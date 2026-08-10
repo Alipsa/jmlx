@@ -63,7 +63,9 @@ the op surface and adding `se.alipsa.jmlx.nn` become mechanical rather than spec
    that document is tracked as work in §8, not left implicit here.
 8. **Generated-lookup composition — resolved by the §2 probe.** Generate bindings **without any
    `-l` flag at all** (not even without `--use-system-load-library`). Confirmed by inspecting the
-   generated `mlx_h_1.SYMBOL_LOOKUP`:
+   generated root header class's `SYMBOL_LOOKUP` field (jextract splits this class into
+   `mlx_h`/`mlx_h_1`/… when the symbol count is large enough to need it — which class actually
+   holds the field isn't load-bearing, only its value is):
    - No `-l`: `SymbolLookup.loaderLookup().or(Linker.nativeLinker().defaultLookup())` — no library
      loading of its own; it only sees libraries already registered with the calling classloader.
    - `-l mlxc` (without `--use-system-load-library`): the static initializer itself calls
@@ -93,9 +95,9 @@ the op surface and adding `se.alipsa.jmlx.nn` become mechanical rather than spec
    (`mlx_metal-0.31.2-py3-none-macosx_26_0_arm64.whl`, 55,792,151 bytes):
    `84ffb60ee503f03eb684f5fb168d5cff31e2a16b7f27c1731eaf7662bd6e9b46`. mlx-c commit pinned:
    `fba4470b89073180056c9ea46c443051375f7399`.
-10. **jextract needs a patched `half.h`, and a small hand-written supplement beside the generated
-    blob.** Two independent jextract findings from the §2 probe, both required before
-    `regen-bindings.sh` can produce a usable `jmlx-ffi`:
+10. **jextract needs a patched `half.h`, and the §3 two-pass filter turned out to fix a second,
+    independent bug as a side effect.** Two jextract findings from the §2 probe, both bearing on
+    `regen-bindings.sh`:
     - `mlx/c/half.h`'s `__bf16` typedef (guarded only by `defined(__ARM_FEATURE_BF16) ||
       defined(__aarch64__)`, so always active on this target) is a **hard parse error** for
       jextract ("`__bf16` is not supported on this target"), and the entire umbrella-header run
@@ -108,22 +110,20 @@ the op surface and adding `se.alipsa.jmlx.nn` become mechanical rather than spec
       erroring. The override lives at `scripts/jextract-overrides/mlx/c/half.h` and is copied, not
       passed via `--include-dir` shadowing (tried first; standard quoted-include resolution rules
       made the shadow directory lose to the real header in practice).
-    - Independent of the above: jextract silently drops `mlx_array_new`, `mlx_array_free`,
-      `mlx_array_new_data`, and `mlx_array_new_data_managed` from the generated output when run
-      against the full `mlx/c/mlx.h` umbrella — no warning, no error, just absent. This reproduces
-      against the real header set (with or without the half.h fix; with a single, minimal
-      `--include-dir`; confirmed on both the full umbrella and `array.h` alone) but a hand-reduced
-      file containing the identical struct/enum/function declarations in isolation binds correctly,
-      so the trigger is some interaction specific to the full header set that wasn't worth chasing
-      further — jextract's own `mlx_device_new`/`mlx_device_free` (byte-for-byte the same
-      `{void* ctx}`-by-value shape) and every *other* `mlx_array_*` function generate correctly.
-      Mitigation, validated end-to-end (real array creation, add, matmul, eval, readback all
-      produced correct values): a small hand-written class,
-      `jmlx-ffi/src/main/java/se/alipsa/jmlx/ffi/MlxArrayCtors.java` (hand-written, **not**
-      generated — lives outside `src/main/generated`), declares raw
-      `Linker.nativeLinker().downcallHandle(...)` bindings for exactly these four symbols, reusing
-      the generated `mlx_array_.layout()` struct layout and `mlx_h_1`'s package-visible
-      `SYMBOL_LOOKUP` so it can never drift out of sync with what `regen-bindings.sh` produces.
+    - Independent of the above: an unfiltered run of jextract against the full `mlx/c/mlx.h`
+      umbrella silently drops `mlx_array_new`, `mlx_array_free`, `mlx_array_new_data`, and
+      `mlx_array_new_data_managed` from the **generated Java** — no warning, no error, just absent
+      — even though `--dump-includes` shows jextract's Clang frontend parses and tracks all four
+      declarations correctly (`mlx_device_new`/`mlx_device_free`, byte-for-byte the same
+      `{void* ctx}`-by-value shape, and every *other* `mlx_array_*` function, all generate
+      correctly). The drop is specific to the *unfiltered, whole-umbrella emission pass*: the §3
+      two-pass filter below — already required to trim Darwin system-header spillover — runs
+      jextract a second time restricted to exactly the symbols `--dump-includes` found under
+      `mlx/c/`, and that filtered/allow-listed run emits all four correctly. No separate
+      hand-written supplement is needed; the two-pass filter is the fix, once it's already the
+      generation strategy for the spillover problem. Validated end-to-end on real GPU hardware
+      through the filtered bindings: array creation, `add`, `matmul` (correct numeric results),
+      `eval`, and readback all worked without any hand-written FFI code.
 
 ## Research findings that shaped this plan
 

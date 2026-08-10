@@ -552,9 +552,14 @@ are flagged where they bite.
   stream or device operations. If not, the backstop must enqueue onto an owning thread instead.
   Determine before relying on the backstop. Not covered by the §2 probe (needs a
   multi-thread-specific experiment); still open.
-- **Exact mlx-c contiguity semantics** — which call forces a contiguous copy, and whether
-  `toFloatArray()` needs it unconditionally or only for non-contiguous views. Still open; address
-  when writing §6.
+- ~~Exact mlx-c contiguity semantics — which call forces a contiguous copy, and whether
+  `toFloatArray()` needs it unconditionally or only for non-contiguous views?~~ **Answered**:
+  `mlx_contiguous(mlx_array* res, const mlx_array a, bool allow_col_major, const mlx_stream s)`
+  (`ops.h`), called with `allow_col_major=false` for a row-major copy. Applied unconditionally in
+  `MLXArray.toFloatArray()` rather than special-cased per op — cheap relative to the eval it's
+  already forcing, and it means no op's implementation has to reason about which of its outputs are
+  contiguous. `MLXNumericTest.transposeReordersElementsNotJustShape` is the regression test: without
+  this call, transpose's lazy strided view reads back in pre-transpose order.
 - **MLX build/bootstrap wall-clock time.** Measured during the probe: mlx-c's cmake build against
   the wheel (fast path) took ~4 seconds on this machine. Downloading and unpacking the ~56 MB wheel
   is network-dependent and not separately timed.

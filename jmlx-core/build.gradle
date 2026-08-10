@@ -7,4 +7,6 @@ dependencies {
     // MemorySegment handles behind plain Java types), so implementation
     // rather than api.
     implementation project(':jmlx-ffi')
+
+    testImplementation testFixtures(project(':jmlx-ffi'))
 }

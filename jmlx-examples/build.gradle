@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     implementation project(':jmlx-core')
+
+    testImplementation testFixtures(project(':jmlx-ffi'))
 }
 
 def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath

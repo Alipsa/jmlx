@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'java-test-fixtures'
 }
 
 sourceSets {
@@ -10,4 +11,10 @@ sourceSets {
             srcDirs += 'src/main/generated/java'
         }
     }
+}
+
+dependencies {
+    // @EnabledIfNativeAvailable (testFixtures) is shared with jmlx-core and
+    // jmlx-examples, which is the point of the testFixtures source set.
+    testFixturesImplementation libs.junit.jupiter.api
 }

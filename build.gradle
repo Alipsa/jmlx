@@ -23,6 +23,16 @@ subprojects {
     testing {
         suites {
             test {
+                // Not libs.versions.junit.jupiter.get(): referencing the
+                // version-catalog accessor from a subprojects{} closure
+                // defined in the *root* script is an implicit parent-project
+                // property lookup, deprecated as of Gradle 9.7 and an error
+                // in Gradle 10. gradle/libs.versions.toml's junit-jupiter
+                // version is the source of truth for the artifact
+                // coordinate (see jmlx-ffi/build.gradle's
+                // testFixturesImplementation); this string only pins the
+                // JVM Test Suite plugin's own bundled-platform version and
+                // is kept in sync with it by hand.
                 useJUnitJupiter('6.0.1')
             }
         }

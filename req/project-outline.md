@@ -5,19 +5,19 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 ### Architectural Layers
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   User Application                     │
-├────────────────────────────────────────────────────────┤
-│  jmlx.nn      Layer, Linear, MultiHeadAttention, Loss  │  Idiomatic High-Level
-├────────────────────────────────────────────────────────┤  Java 25+ API
-│  jmlx.core    MLXArray, Stream, Device, Autograd       │
-├────────────────────────────────────────────────────────┤
-│  jmlx.memory  Arena, MemorySegment, Cleaner Scopes     │  Safe Off-Heap Bridge
-├────────────────────────────────────────────────────────┤
-│  jmlx.ffi     Generated jextract Bindings (mlx-c)      │  Raw Native Invocations
-├────────────────────────────────────────────────────────┤
-│  libmlx.dylib / libmlx_c.dylib                         │  Apple Silicon Metal GPU
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         User Application                         │
+├──────────────────────────────────────────────────────────────────┤
+│  se.alipsa.jmlx.nn      Layer, Linear, MultiHeadAttention, Loss  │  Idiomatic High-Level
+├──────────────────────────────────────────────────────────────────┤  Java 25+ API
+│  se.alipsa.jmlx.core    MLXArray, Stream, Device, Autograd       │
+├──────────────────────────────────────────────────────────────────┤
+│  se.alipsa.jmlx.memory  MLXScope, Cleaner Scopes                 │  Safe Off-Heap Bridge
+├──────────────────────────────────────────────────────────────────┤
+│  se.alipsa.jmlx.ffi     Generated jextract Bindings (mlx-c)      │  Raw Native Invocations
+├──────────────────────────────────────────────────────────────────┤
+│  libmlx.dylib / libmlxc.dylib                                    │  Apple Silicon Metal GPU
+└──────────────────────────────────────────────────────────────────┘
 
 ```
 
@@ -39,7 +39,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 * **Objective:** Establish automated FFM code generation over Apple’s `mlx-c` API.
 * **Deliverables:**
 * Set up CMake build script to build standard `libmlx.dylib` and `libmlx_c.dylib` target binaries.
-* Configure `jextract` task inside Gradle/Maven to parse `mlx/c/*.h` headers into `jmlx.ffi` internal package.
+* Configure `jextract` task inside Gradle/Maven to parse `mlx/c/*.h` headers into `se.alipsa.jmlx.ffi` internal package.
 * Implement FFM linkage sanity tests verifying downcalls for core memory allocation and device queries (`mlx_get_default_device`).
 
 
@@ -69,7 +69,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 
 
 
-#### Phase 4: `jmlx.nn` High-Level Neural Network Modules
+#### Phase 4: `se.alipsa.jmlx.nn` High-Level Neural Network Modules
 
 * **Objective:** Port PyTorch-style layers for building Transformer models directly in Java.
 * **Deliverables:**
@@ -95,23 +95,22 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 ### Code Architecture Example
 
 ```java
-package jmlx.example;
+package se.alipsa.jmlx.example;
 
-import jmlx.core.MLX;
-import jmlx.core.MLXArray;
-import jmlx.nn.Linear;
-
-import java.lang.foreign.Arena;
+import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.nn.Linear;
 
 public class JMLXDemo {
     public static void main(String[] args) {
-        // Explicit scoped arena for zero-leak loop execution
-        try (Arena arena = Arena.ofConfined()) {
+        // Explicit scope for zero-leak loop execution
+        try (MLXScope scope = new MLXScope()) {
             // Allocate native MLX arrays directly from Java primitives
-            MLXArray x = MLX.array(arena, new float[]{1.0f, 2.0f, 3.0f, 4.0f}, new int[]{2, 2});
+            MLXArray x = MLX.array(scope, new float[]{1.0f, 2.0f, 3.0f, 4.0f}, new int[]{2, 2});
 
             // Define a linear layer (2 inputs -> 4 outputs)
-            Linear linear = new Linear(arena, 2, 4);
+            Linear linear = new Linear(scope, 2, 4);
 
             // Forward pass (lazy evaluation)
             MLXArray y = linear.forward(x);
@@ -120,7 +119,7 @@ public class JMLXDemo {
             MLX.eval(y);
 
             System.out.println("Result Shape: " + y.shape());
-            System.out.println("Result Data: " + y.toJavaFloatArray());
+            System.out.println("Result Data: " + y.toFloatArray());
         } // Memory for x, y, and linear parameters instantly released here
     }
 }
@@ -133,7 +132,7 @@ public class JMLXDemo {
 
 | Target Artifact | Contents | Execution Environment |
 | --- | --- | --- |
-| `jmlx-core-25.jar` | Java classes, FFM abstractions, high-level `jmlx.nn` | Any OS with Java 25+ |
+| `jmlx-core-25.jar` | Java classes, FFM abstractions, high-level `se.alipsa.jmlx.nn` | Any OS with Java 25+ |
 | `jmlx-native-macos-arm64.jar` | Compiled `libmlx.dylib` & `libmlx_c.dylib` universal binaries | macOS (M1/M2/M3/M4 Apple Silicon) |
 
 At runtime, `jmlx` automatically extracts and loads the matching `libmlx.dylib` native dynamic library from the classpath if no system-installed `mlx-c` library is found.

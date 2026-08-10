@@ -6,6 +6,7 @@ import java.lang.foreign.SegmentAllocator;
 import java.lang.ref.Cleaner;
 import java.util.ArrayList;
 import java.util.List;
+import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_h;
 
 /**
@@ -26,6 +27,14 @@ import se.alipsa.jmlx.ffi.mlx_h;
  * allocator for anything else corrupts the handle list.
  */
 public final class MLXScope implements AutoCloseable, SegmentAllocator {
+
+    // Same reasoning as MLX's static initializer: mlx_h's own class-init
+    // binds every downcall eagerly, which fails unless the dylib is already
+    // loaded. A scope can be constructed and used without ever touching the
+    // MLX facade class, so it needs this guard independently.
+    static {
+        NativeLoader.ensureLoaded();
+    }
 
     private static final Cleaner CLEANER = Cleaner.create();
 

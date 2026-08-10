@@ -3,6 +3,7 @@ package se.alipsa.jmlx.core;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -24,6 +25,15 @@ import se.alipsa.jmlx.memory.MLXScope;
 public final class MLX {
 
     private MLX() {}
+
+    // Must run before any field below touches mlx_h: mlx_h's own static
+    // initializers bind every downcall via SYMBOL_LOOKUP.findOrThrow at
+    // class-init time, which fails unless the dylib is already loaded.
+    // @EnabledIfNativeAvailable covers this for tests by construction; a
+    // plain main() has nothing else that would call it first.
+    static {
+        NativeLoader.ensureLoaded();
+    }
 
     private static final Arena FACADE_ARENA = Arena.ofShared();
     private static final MemorySegment DEFAULT_DEVICE = resolveDefaultDevice();
@@ -182,8 +192,8 @@ public final class MLX {
 
     static void check(int status) {
         if (status != 0) {
-            String nativeMessage = se.alipsa.jmlx.ffi.NativeLoader.lastNativeError();
-            se.alipsa.jmlx.ffi.NativeLoader.clearLastNativeError();
+            String nativeMessage = NativeLoader.lastNativeError();
+            NativeLoader.clearLastNativeError();
             throw new MLXException(
                 "mlx-c call failed with status " + status
                     + (nativeMessage != null ? ": " + nativeMessage : ""));

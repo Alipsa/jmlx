@@ -13,6 +13,15 @@ sourceSets {
     }
 }
 
+// checkstyleMain's default `source` is sourceSets.main.allJava, which (via
+// the srcDirs addition above) also sweeps in the generated jextract
+// bindings -- machine output that must stay byte-identical to
+// scripts/regen-bindings.sh, not something a style check should ever flag.
+// Point it at the hand-written tree only.
+tasks.named('checkstyleMain', Checkstyle) {
+    source = fileTree(dir: 'src/main/java', include: '**/*.java')
+}
+
 dependencies {
     // @EnabledIfNativeAvailable (testFixtures) is shared with jmlx-core and
     // jmlx-examples, which is the point of the testFixtures source set.

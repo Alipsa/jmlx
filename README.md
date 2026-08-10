@@ -44,6 +44,16 @@ a matmul b = [2, 2] [19.0, 22.0, 43.0, 50.0]
 
 Every module's tests are skipped automatically (not failed) if `native/install/lib/mlx.metallib` isn't present — see `@EnabledIfNativeAvailable` in `jmlx-ffi`.
 
+## Code style
+
+Hand-written sources are Google Java Style with 2-space indentation and a 120-column width (`config/spotless/eclipse-java-google-style-120col.xml`, `config/checkstyle/checkstyle.xml` — both derived from Google's own upstream artifacts; see the comments in each for the exact, documented deviations). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from both, since they must stay byte-identical to `scripts/regen-bindings.sh`'s output.
+
+```sh
+./gradlew spotlessCheck   # verify formatting
+./gradlew spotlessApply   # reformat in place
+./gradlew checkstyleMain checkstyleTest checkstyleTestFixtures  # style/lint (part of `build`/`check`)
+```
+
 ## Running a distributed build
 
 `./gradlew :jmlx-examples:installDist` / `distZip` produce a standalone `jmlx-examples` launcher, but its start script does *not* embed this build machine's `native/install/lib` path — that path is only wired up for the `run` task's own convenience. To run the distributed launcher elsewhere, set `JMLX_LIBRARY_PATH` to wherever `bootstrap-native.sh` staged the native runtime on that machine:

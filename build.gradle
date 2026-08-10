@@ -5,6 +5,10 @@
  * native-access flags and the native-directory system property below.
  */
 
+plugins {
+    id 'com.diffplug.spotless' version '8.9.0' apply false
+}
+
 allprojects {
     repositories {
         mavenCentral()
@@ -13,10 +17,39 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'checkstyle'
+    apply plugin: 'com.diffplug.spotless'
 
     java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(25)
+        }
+    }
+
+    // Style: 2-space indent, 120-column width, Google style otherwise (both
+    // config files derive from Google's own upstream artifacts -- see
+    // config/checkstyle/checkstyle.xml and config/spotless/*.xml for exactly
+    // what was changed and why).
+    checkstyle {
+        toolVersion = '13.10.0'
+        configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+    }
+
+    // jmlx-ffi/src/main/generated/java is committed jextract output, not
+    // hand-written -- scripts/regen-bindings.sh is the only thing allowed to
+    // touch it, and req/initial-plan.md's bindings-drift check asserts it
+    // stays byte-identical to that output. Spotless never sees it because
+    // its `target` below only globs src/main/java, not .../generated/java;
+    // jmlx-ffi/build.gradle does the equivalent for checkstyleMain, since
+    // that generated dir is registered as an extra source root there.
+    spotless {
+        java {
+            target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
+            importOrder()
+            removeUnusedImports()
+            eclipse().configFile(rootProject.file('config/spotless/eclipse-java-google-style-120col.xml'))
+            trimTrailingWhitespace()
+            endWithNewline()
         }
     }
 

@@ -1,0 +1,21 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':jmlx-core')
+}
+
+def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
+
+application {
+    mainClass = 'se.alipsa.jmlx.examples.HelloMLX'
+    // applicationDefaultJvmArgs feeds both the `run` task and the generated
+    // start scripts (req/initial-plan.md §4) -- the
+    // Enable-Native-Access: ALL-UNNAMED manifest attribute is not an
+    // alternative, since it only applies to a jar launched via `java -jar`.
+    applicationDefaultJvmArgs = [
+        '--enable-native-access=ALL-UNNAMED',
+        "-Djmlx.library.path=${nativeLibDir}"
+    ]
+}

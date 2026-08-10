@@ -61,12 +61,69 @@ the op surface and adding `se.alipsa.jmlx.nn` become mechanical rather than spec
    `Alipsa/jmlx` remote. Reverse-domain naming is required for Maven Central and gives collision-free
    JPMS module names. This supersedes `jmlx.core` / `jmlx.nn` in `req/project-outline.md`; updating
    that document is tracked as work in §8, not left implicit here.
-8. **Generated-lookup composition** — jextract emits its own library lookup in a static
-   initializer regardless of flags, which would bypass `NativeLoader`. How the two compose is
-   decided by the §2 probe and **recorded as a new numbered entry in this Decisions list**, plus a
-   comment in `scripts/regen-bindings.sh`, before any bindings are committed. Notably **do not**
-   copy the `--use-system-load-library` flag from the vecxt template below: it emits
-   `System.loadLibrary("mlxc")`, reintroducing both problems §5 exists to avoid.
+8. **Generated-lookup composition — resolved by the §2 probe.** Generate bindings **without any
+   `-l` flag at all** (not even without `--use-system-load-library`). Confirmed by inspecting the
+   generated `mlx_h_1.SYMBOL_LOOKUP`:
+   - No `-l`: `SymbolLookup.loaderLookup().or(Linker.nativeLinker().defaultLookup())` — no library
+     loading of its own; it only sees libraries already registered with the calling classloader.
+   - `-l mlxc` (without `--use-system-load-library`): the static initializer itself calls
+     `SymbolLookup.libraryLookup(System.mapLibraryName("mlxc"), Arena.ofAuto())` — a **bare name**,
+     resolved via the OS's normal library search path, not our resolved absolute directory. This
+     bypasses `NativeLoader` just as thoroughly as `--use-system-load-library` does, only via a
+     different JDK API. **Both `-l` forms are wrong for this project; the fix is omitting `-l`.**
+
+   The corollary changes what `NativeLoader` must do: it must call **`System.load(absoluteDylibPath)`**
+   (a real full-path load), *not* `SymbolLookup.libraryLookup(path, Arena.global())` as originally
+   sketched in §5 below. `System.load` registers the library with the calling classloader, which is
+   exactly what `loaderLookup()` searches — `libraryLookup()` creates a private lookup the generated
+   code never sees, so the two API surfaces don't compose. The `libraryLookup`-over-`System.load`
+   preference in the research findings below is valid JDK-Panama advice in isolation, but it doesn't
+   compose with jextract's own generated internal lookup, which is what actually matters here.
+   Validated end-to-end: `System.load(path)` + the no-`-l` generated bindings correctly resolved
+   `mlx_get_default_device`, `mlx_add`, `mlx_matmul`, etc. against the flat runtime directory.
+9. **Native version pairing — mlx-c HEAD (`fba4470`, tracks `v0.6.0`) with `mlx-metal==0.31.2`
+   (`macosx_26_0_arm64`), not the latest 0.32.0 wheel.** The §2 probe found PyPI still publishes a
+   `mlx-metal` wheel at the exact version mlx-c's `CMakeLists.txt` pins (`GIT_TAG v0.31.2`), which
+   sidesteps the version-mismatch risk entirely rather than betting on 0.31.2-era mlx-c source
+   compiling against 0.32.0 headers. Confirmed by an actual build: `MLX_C_USE_SYSTEM_MLX=ON` found
+   the wheel's MLX package immediately, the mlxc shared library built in ~4 seconds with no
+   `_deps/mlx-src` FetchContent tree, and `otool -L` on the installed `libmlxc.dylib` resolved every
+   dependency via `@rpath`/`@loader_path` against the flat staging directory with no
+   `install_name_tool`/re-signing needed. sha256 of the wheel
+   (`mlx_metal-0.31.2-py3-none-macosx_26_0_arm64.whl`, 55,792,151 bytes):
+   `84ffb60ee503f03eb684f5fb168d5cff31e2a16b7f27c1731eaf7662bd6e9b46`. mlx-c commit pinned:
+   `fba4470b89073180056c9ea46c443051375f7399`.
+10. **jextract needs a patched `half.h`, and a small hand-written supplement beside the generated
+    blob.** Two independent jextract findings from the §2 probe, both required before
+    `regen-bindings.sh` can produce a usable `jmlx-ffi`:
+    - `mlx/c/half.h`'s `__bf16` typedef (guarded only by `defined(__ARM_FEATURE_BF16) ||
+      defined(__aarch64__)`, so always active on this target) is a **hard parse error** for
+      jextract ("`__bf16` is not supported on this target"), and the entire umbrella-header run
+      produces **zero output** when it fires — not a per-symbol skip. `float16_t`/`__fp16` parses
+      fine and is merely skipped from wrapping (unsupported for Java mapping), so it's left alone.
+      Since v0.1 supports only float32/int32, `regen-bindings.sh` copies a trimmed override of
+      `half.h` over the installed one before running jextract, dropping only the `HAS_BFLOAT16`
+      block; every declaration gated on `#ifdef HAS_BFLOAT16` (e.g.
+      `mlx_array_item_bfloat16`/`mlx_array_data_bfloat16`) then cleanly disappears instead of
+      erroring. The override lives at `scripts/jextract-overrides/mlx/c/half.h` and is copied, not
+      passed via `--include-dir` shadowing (tried first; standard quoted-include resolution rules
+      made the shadow directory lose to the real header in practice).
+    - Independent of the above: jextract silently drops `mlx_array_new`, `mlx_array_free`,
+      `mlx_array_new_data`, and `mlx_array_new_data_managed` from the generated output when run
+      against the full `mlx/c/mlx.h` umbrella — no warning, no error, just absent. This reproduces
+      against the real header set (with or without the half.h fix; with a single, minimal
+      `--include-dir`; confirmed on both the full umbrella and `array.h` alone) but a hand-reduced
+      file containing the identical struct/enum/function declarations in isolation binds correctly,
+      so the trigger is some interaction specific to the full header set that wasn't worth chasing
+      further — jextract's own `mlx_device_new`/`mlx_device_free` (byte-for-byte the same
+      `{void* ctx}`-by-value shape) and every *other* `mlx_array_*` function generate correctly.
+      Mitigation, validated end-to-end (real array creation, add, matmul, eval, readback all
+      produced correct values): a small hand-written class,
+      `jmlx-ffi/src/main/java/se/alipsa/jmlx/ffi/MlxArrayCtors.java` (hand-written, **not**
+      generated — lives outside `src/main/generated`), declares raw
+      `Linker.nativeLinker().downcallHandle(...)` bindings for exactly these four symbols, reusing
+      the generated `mlx_array_.layout()` struct layout and `mlx_h_1`'s package-visible
+      `SYMBOL_LOOKUP` so it can never drift out of sync with what `regen-bindings.sh` produces.
 
 ## Research findings that shaped this plan
 
@@ -83,8 +140,11 @@ Verified during design; recorded because several contradict reasonable assumptio
   Separately, `option(BUILD_SHARED_LIBS ... OFF)` (line 14) means the default build produces a
   **static `libmlxc.a`**, not the `libmlxc.dylib` this plan assumes. Both flags are mandatory.
 - **`find_package(MLX REQUIRED)` carries no version constraint**, so a mismatched MLX is accepted
-  silently. This is not hypothetical: the current `mlx-metal` wheel is MLX **0.32.0** while mlx-c
-  pins **v0.31.2**. The bootstrap must assert the pairing and fail loudly.
+  silently. This is not hypothetical: the *latest* `mlx-metal` wheel is MLX **0.32.0** while mlx-c
+  pins **v0.31.2** — but PyPI still serves a **0.31.2** wheel too (`macosx_26_0_arm64`, 55.79 MB),
+  so Decision 9 pins that instead of gambling on the newer headers compiling. The bootstrap still
+  asserts the pairing and fails loudly, since the mismatch risk returns the moment either side
+  moves without the other.
 - **The dylibs are in the `mlx-metal` wheel, not the `mlx` wheel.** Verified by reading the wheels'
   zip central directories. `mlx-0.32.0-…macosx_26_0_arm64.whl` is **562 KB** and contains only
   Python plus `mlx/core.cpython-310-darwin.so` — no dylib, no metallib. It declares
@@ -100,21 +160,41 @@ Verified during design; recorded because several contradict reasonable assumptio
 
   The C++ headers and CMake package config needed by `find_package(MLX)` are both present, which is
   what makes the fast path viable at all.
-- **`mlx.metallib` is a separate, large, colocated file.** Sizes are *approximate and unconfirmed*:
-  the measured `mlx-metal` **wheel** sizes are 40.82 MB (`macosx_15_0`) and 56.51 MB
-  (`macosx_26_0`); the ~130 MB / ~162 MB figures circulating for the metallib itself are the
-  uncompressed sizes and were gathered before it was established which wheel ships it. **Measure
-  after extraction during §2 and replace these numbers**, since §3.7's size assertion depends on
-  the real figure. MLX locates the file via `dladdr` relative to the image containing MLX.
-  `mlx_metal_set_metallib_path` exists in C++ but is **not exposed in mlx-c**, so there is no API
-  escape hatch and no environment variable. A missing metallib fails on the **first GPU op**, not
-  at load — a late, confusing failure this plan must design against.
+- **`mlx.metallib` is a separate, large, colocated file. Measured: 157,748,008 bytes (150.44 MiB /
+  157.75 MB decimal)**, extracted from the pinned `mlx_metal-0.31.2-…macosx_26_0_arm64.whl`. This
+  replaces the earlier unconfirmed ~130 MB / ~162 MB placeholders; §3.7's size assertion should
+  check against this figure (with headroom, since it will drift slightly across MLX versions). MLX
+  locates the file via `dladdr` relative to the image containing MLX. `mlx_metal_set_metallib_path`
+  exists in C++ but is **not exposed in mlx-c**, so there is no API escape hatch and no environment
+  variable. A missing metallib fails on the **first GPU op**, not at load — a late, confusing
+  failure this plan must design against.
 - **`libmlx.dylib` has its own `@rpath` sibling**, `libjaccl.dylib` (~930 KB). The canonical set to
   stage together is `libmlx.dylib` + `libmlxc.dylib` + `libjaccl.dylib` + `mlx.metallib`.
-- **`SymbolLookup.libraryLookup(path, Arena.global())` is preferable to `System.load`.** It maps to
-  `dlopen` while bypassing the classloader registry, so it is immune to
+- **`SymbolLookup.libraryLookup(path, Arena.global())` is preferable to `System.load` — in
+  isolation.** It maps to `dlopen` while bypassing the classloader registry, so it is immune to
   `UnsatisfiedLinkError: … already loaded in another classloader`. `Arena.global()` specifically —
-  a confined arena's close would `dlclose` MLX out from under the process.
+  a confined arena's close would `dlclose` MLX out from under the process. **Superseded by Decision
+  8**: this advice doesn't compose with jextract's own generated `SYMBOL_LOOKUP` (which only ever
+  consults `loaderLookup()`/`defaultLookup()`, never an externally-created `libraryLookup()`), so
+  `NativeLoader` uses `System.load(absolutePath)` instead — verified end-to-end against the
+  generated bindings.
+- **mlx-c's error convention: status codes, but the *default* handler process-exits.** Every
+  generated wrapper (`mlx_add`, `mlx_matmul`, …) follows the same pattern:
+  `try { ... } catch (std::exception& e) { mlx_error(e.what()); return 1; } return 0;` — genuinely
+  a checkable `int` status. But `mlx_error()` calls the installed error handler *before* the
+  `return 1`, and the **default** handler (`mlx_error_handler_default_`, in `mlx/c/error.cpp`) is
+  `printf(...); exit(-1);` — so on an unmodified install, the process exits before that `return 1`
+  is ever observed. `NativeLoader` **must** call `mlx_set_error_handler` with a non-exiting handler
+  (e.g. one that stashes the message and returns) as part of `ensureLoaded()`, before any other
+  native call. Validated: with such a handler installed, a deliberately-triggered shape-mismatch
+  `mlx_add` returned status `1`, the handler fired with the underlying MLX error message
+  (`"[broadcast_shapes] Shapes (2,2) and (3) cannot be broadcast."`), and the JVM process kept
+  running — no abort, no `exit`.
+- **MLX's active/cached memory query is in mlx-c's public headers, confirming the leak test is
+  writable as specified.** `mlx/c/memory.h` declares `mlx_get_active_memory`, `mlx_get_cache_memory`,
+  `mlx_get_peak_memory`, `mlx_reset_peak_memory`, `mlx_clear_cache`, `mlx_set_cache_limit`,
+  `mlx_set_memory_limit`, and `mlx_set_wired_limit` — all ordinary status-returning functions with
+  an `out size_t*` parameter, no different from any other mlx-c call.
 - **Prior art is essentially nonexistent.** A GitHub code search for `"mlx_array" "MemorySegment"`
   returns zero results. The one real precedent is
   [Quafadas/vecxt](https://users.scala-lang.org/t/scala-apple-mlx/12032) (Scala 3 + jextract +
@@ -454,24 +534,27 @@ headers, this test must be redesigned before §6 begins, not after.
 
 ## Open questions
 
-The error-convention, memory-query and jextract-lookup questions are answered by the §2 de-risk
-probe before implementation begins. The rest are flagged where they bite.
+The error-convention, memory-query and jextract-lookup questions were answered by the §2 de-risk
+probe (see Decisions 8–10 and the research findings above) before implementation began. The rest
+are flagged where they bite.
 
+- ~~Does mlx-c return status codes, or does its default error handler abort the process?~~
+  **Answered**: status codes, but the default handler `exit()`s first; a custom handler is
+  mandatory (Decision 10's sibling finding, above).
+- ~~Is MLX's active/cached memory query exposed in mlx-c's public headers?~~ **Answered: yes**
+  (`mlx/c/memory.h`); the leak test is writable as specified.
+- ~~What lookup does jextract's generated static initializer emit per flag, and therefore how does
+  `NativeLoader` compose with it?~~ **Answered — Decision 8**: no `-l` flag, `NativeLoader` uses
+  `System.load(absolutePath)`.
+- ~~Which mlx-c commit SHA pairs with which `mlx-metal` wheel version?~~ **Answered — Decision 9**:
+  mlx-c `fba4470` with `mlx-metal==0.31.2`, sidestepping the mismatch rather than resolving it.
 - **Is `mlx_array_free` safe to call from the `Cleaner` thread?** MLX may have thread affinity for
   stream or device operations. If not, the backstop must enqueue onto an owning thread instead.
-  Determine before relying on the backstop.
-- **Does mlx-c return status codes, or does its default error handler abort the process?** Decides
-  whether `check(...)` is viable or a custom error handler must be installed at load time.
-- **Is MLX's active/cached memory query exposed in mlx-c's public headers?** Decides whether the
-  leak test is writable as specified.
+  Determine before relying on the backstop. Not covered by the §2 probe (needs a
+  multi-thread-specific experiment); still open.
 - **Exact mlx-c contiguity semantics** — which call forces a contiguous copy, and whether
-  `toFloatArray()` needs it unconditionally or only for non-contiguous views.
-- **What lookup does jextract's generated static initializer emit per flag**, and therefore how
-  `NativeLoader` composes with it (Decision 8).
-- **Which mlx-c commit SHA pairs with which `mlx-metal` wheel version.** Known mismatched: the
-  latest wheel is MLX 0.32.0, mlx-c pins v0.31.2. This is an **API question, not an ABI one** —
-  mlx-c is built from source against the wheel's headers, so nothing prebuilt is linked and the
-  answer is just "does it compile and link". Settled by the §2.5 experiment; options are to pin an
-  older 0.31.2 wheel, use a newer mlx-c if one has bumped its tag, or confirm 0.32.0 compiles
-  cleanly.
-- **MLX build/bootstrap wall-clock time** — unmeasured; `cmake` is not yet installed.
+  `toFloatArray()` needs it unconditionally or only for non-contiguous views. Still open; address
+  when writing §6.
+- **MLX build/bootstrap wall-clock time.** Measured during the probe: mlx-c's cmake build against
+  the wheel (fast path) took ~4 seconds on this machine. Downloading and unpacking the ~56 MB wheel
+  is network-dependent and not separately timed.

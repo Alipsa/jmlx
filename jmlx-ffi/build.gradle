@@ -18,3 +18,32 @@ dependencies {
     // jmlx-examples, which is the point of the testFixtures source set.
     testFixturesImplementation libs.junit.jupiter.api
 }
+
+// req/initial-plan.md, Testing approach, "Loader guard": NativeLoaderMissingMetallibTest
+// needs its own JVM and its own directory, or the result depends on test
+// order within a shared JVM (ensureLoaded() caches its outcome) and risks
+// racing every other native test over the real staging directory.
+test {
+    exclude '**/NativeLoaderMissingMetallibTest.class'
+}
+
+def loaderGuardNativeDir = layout.buildDirectory.dir('loader-guard-native/lib')
+
+tasks.register('prepareLoaderGuardNativeDir', Copy) {
+    from rootProject.layout.projectDirectory.dir('native/install/lib')
+    into loaderGuardNativeDir
+    exclude 'mlx.metallib'
+}
+
+tasks.register('loaderGuardTest', Test) {
+    dependsOn prepareLoaderGuardNativeDir
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    include '**/NativeLoaderMissingMetallibTest.class'
+    // Overrides the root build.gradle default (pointed at the real
+    // native/install/lib) with this task's own disposable copy.
+    systemProperty('jmlx.library.path', loaderGuardNativeDir.get().asFile.absolutePath)
+}
+
+check.dependsOn loaderGuardTest

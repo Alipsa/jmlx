@@ -8,7 +8,9 @@
 #
 # Prerequisites this script assumes are already installed (developer-machine
 # setup, not something a project script should silently do): cmake, git,
-# curl, unzip, otool, codesign. jextract itself IS downloaded by this script.
+# curl, unzip, otool, codesign, cc (Xcode Command Line Tools; already implied
+# by cmake building mlx-c's C++ source). jextract itself IS downloaded by
+# this script.
 #
 # Usage: ./scripts/bootstrap-native.sh
 set -euo pipefail
@@ -36,6 +38,14 @@ JEXTRACT_PAGE="https://jdk.java.net/jextract/"
 # that it's authentic. Instead, record the sha256 resolved on the first
 # successful run and compare on every later run.
 JEXTRACT_PIN_FILE="$REPO_ROOT/scripts/.jextract-sha256-pin"
+# jdk.java.net rotates the published early-access build regularly. Pinning
+# the resolved URL too (not just its hash) means a routine rotation doesn't
+# get misdiagnosed as a supply-chain compromise: without this, every fresh
+# clone re-scrapes the page, resolves whatever build is current *today*, and
+# dies on a hash mismatch against a pin recorded against a *different* build
+# -- a false alarm, not a real integrity failure. The page is only scraped
+# when there is no pinned URL yet (first successful run).
+JEXTRACT_URL_PIN_FILE="$REPO_ROOT/scripts/.jextract-url-pin"
 
 # Real measured size (req/initial-plan.md) is 157,748,008 bytes; use a
 # generous floor so a minor MLX version bump doesn't false-positive here.
@@ -44,7 +54,7 @@ METALLIB_MIN_BYTES=100000000
 log() { printf '>>> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-for tool in cmake git curl unzip otool codesign shasum; do
+for tool in cmake git curl unzip otool codesign shasum cc; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool '$tool' not found on PATH -- install it (e.g. 'brew install $tool') and re-run"
 done
 
@@ -57,15 +67,23 @@ JEXTRACT_BIN="$JEXTRACT_DIR/bin/jextract"
 if [[ -x "$JEXTRACT_BIN" ]]; then
   log "jextract already staged at $JEXTRACT_BIN"
 else
-  log "Resolving jextract build for macos-aarch64 from $JEXTRACT_PAGE"
-  JEXTRACT_URL="$(curl -sL -A 'Mozilla/5.0' "$JEXTRACT_PAGE" \
-    | grep -oE 'https://download\.java\.net/java/early_access/jextract/[^"]*macos-aarch64[^"]*\.tar\.gz' \
-    | sort -u | head -1)"
-  [[ -n "$JEXTRACT_URL" ]] || die "could not resolve a macos-aarch64 jextract download URL from $JEXTRACT_PAGE"
-  log "Resolved jextract download: $JEXTRACT_URL"
+  if [[ -f "$JEXTRACT_URL_PIN_FILE" ]]; then
+    JEXTRACT_URL="$(cat "$JEXTRACT_URL_PIN_FILE")"
+    log "Using pinned jextract download: $JEXTRACT_URL"
+  else
+    log "No jextract URL pinned yet -- resolving from $JEXTRACT_PAGE"
+    JEXTRACT_URL="$(curl -fsSL -A 'Mozilla/5.0' "$JEXTRACT_PAGE" \
+      | grep -oE 'https://download\.java\.net/java/early_access/jextract/[^"]*macos-aarch64[^"]*\.tar\.gz' \
+      | sort -u | head -1)"
+    [[ -n "$JEXTRACT_URL" ]] || die "could not resolve a macos-aarch64 jextract download URL from $JEXTRACT_PAGE"
+    log "Resolved jextract download: $JEXTRACT_URL"
+  fi
 
   JEXTRACT_TARBALL="$SCRATCH_DIR/jextract.tar.gz"
-  curl -sL -o "$JEXTRACT_TARBALL" "$JEXTRACT_URL"
+  # --fail: without it, an HTTP error response body is written to disk with
+  # exit 0, which (before the fix below) used to get hashed and pinned as
+  # trustworthy before anything validated it was a real archive.
+  curl -fsSL -o "$JEXTRACT_TARBALL" "$JEXTRACT_URL"
   ACTUAL_SHA256="$(shasum -a 256 "$JEXTRACT_TARBALL" | awk '{print $1}')"
 
   if [[ -f "$JEXTRACT_PIN_FILE" ]]; then
@@ -73,15 +91,25 @@ else
     if [[ "$ACTUAL_SHA256" != "$PINNED_SHA256" ]]; then
       die "jextract download sha256 mismatch: expected $PINNED_SHA256 (pinned in $JEXTRACT_PIN_FILE from an earlier trusted run), got $ACTUAL_SHA256. Refusing to use a build that changed since then."
     fi
-  else
-    log "No jextract pin recorded yet -- trusting this download and pinning its sha256 ($ACTUAL_SHA256) to $JEXTRACT_PIN_FILE"
-    echo "$ACTUAL_SHA256" > "$JEXTRACT_PIN_FILE"
   fi
 
   rm -rf "$JEXTRACT_DIR"
   mkdir -p "$JEXTRACT_DIR"
   tar xzf "$JEXTRACT_TARBALL" -C "$JEXTRACT_DIR" --strip-components=1
   [[ -x "$JEXTRACT_BIN" ]] || die "jextract archive did not produce an executable at $JEXTRACT_BIN"
+
+  # Only pin now that the tarball has been proven to actually extract into a
+  # working jextract. Pinning right after download (the old order) let a
+  # truncated or otherwise-corrupt-but-differently-broken archive poison the
+  # pin with a hash nothing legitimate could ever satisfy again.
+  if [[ ! -f "$JEXTRACT_PIN_FILE" ]]; then
+    log "No jextract sha256 pin recorded yet -- trusting this download and pinning its sha256 ($ACTUAL_SHA256) to $JEXTRACT_PIN_FILE"
+    echo "$ACTUAL_SHA256" > "$JEXTRACT_PIN_FILE"
+  fi
+  if [[ ! -f "$JEXTRACT_URL_PIN_FILE" ]]; then
+    log "Pinning resolved jextract URL to $JEXTRACT_URL_PIN_FILE"
+    echo "$JEXTRACT_URL" > "$JEXTRACT_URL_PIN_FILE"
+  fi
 fi
 "$JEXTRACT_BIN" --version
 
@@ -94,7 +122,7 @@ if [[ -f "$WHEEL_MARKER" ]]; then
 else
   log "Downloading mlx-metal $MLX_METAL_VERSION (macosx_26_0_arm64)"
   WHEEL_FILE="$SCRATCH_DIR/mlx_metal.whl"
-  curl -sL -o "$WHEEL_FILE" "$MLX_METAL_WHEEL_URL"
+  curl -fsSL -o "$WHEEL_FILE" "$MLX_METAL_WHEEL_URL"
   ACTUAL_SHA256="$(shasum -a 256 "$WHEEL_FILE" | awk '{print $1}')"
   [[ "$ACTUAL_SHA256" == "$MLX_METAL_WHEEL_SHA256" ]] || die \
     "mlx-metal wheel sha256 mismatch: expected $MLX_METAL_WHEEL_SHA256, got $ACTUAL_SHA256"
@@ -187,10 +215,37 @@ mkdir -p "$RUNTIME_LIB_DIR"
 cp "$WHEEL_DIR/mlx/lib/libmlx.dylib" "$WHEEL_DIR/mlx/lib/libjaccl.dylib" "$METALLIB_SRC" "$RUNTIME_LIB_DIR/"
 
 # --- 7. Assert the result, don't trust it -------------------------------------
-log "Verifying libmlxc.dylib's dependencies resolve against the flat directory"
-if otool -L "$RUNTIME_LIB_DIR/libmlxc.dylib" | grep -q "not found"; then
-  die "otool -L reports an unresolved dependency for libmlxc.dylib -- the flat runtime directory is not self-consistent"
-fi
+# otool -L only dumps each LC_LOAD_DYLIB install name from the Mach-O header;
+# it never resolves them and never prints "not found" (that's ldd, which
+# macOS doesn't have) -- grepping its output for that string is always false,
+# so it silently never catches a missing dependency. The only way to prove
+# the flat directory is actually self-consistent is to ask dyld to load it
+# for real, via a tiny dlopen probe with RTLD_NOW (eager binding, so a
+# missing dependency or unresolved symbol fails immediately rather than only
+# on first use).
+log "Verifying libmlxc.dylib's dependencies actually resolve (dlopen probe, not otool -L)"
+DLOPEN_PROBE_SRC="$SCRATCH_DIR/dlopen_probe.c"
+cat > "$DLOPEN_PROBE_SRC" <<'EOC'
+#include <dlfcn.h>
+#include <stdio.h>
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    fprintf(stderr, "usage: dlopen_probe <path-to-dylib>\n");
+    return 2;
+  }
+  void *handle = dlopen(argv[1], RTLD_NOW);
+  if (handle == NULL) {
+    fprintf(stderr, "%s\n", dlerror());
+    return 1;
+  }
+  return 0;
+}
+EOC
+DLOPEN_PROBE_BIN="$SCRATCH_DIR/dlopen_probe"
+cc -o "$DLOPEN_PROBE_BIN" "$DLOPEN_PROBE_SRC"
+"$DLOPEN_PROBE_BIN" "$RUNTIME_LIB_DIR/libmlxc.dylib" || die \
+  "dlopen probe failed to load $RUNTIME_LIB_DIR/libmlxc.dylib -- see the dlerror() message above for the unresolved dependency; the flat runtime directory is not self-consistent"
+log "dlopen probe succeeded: libmlxc.dylib and its dependencies resolve against the flat directory"
 
 for lib in libmlxc.dylib libmlx.dylib libjaccl.dylib; do
   codesign -v "$RUNTIME_LIB_DIR/$lib" || die "$lib failed codesign verification (a post-link install_name_tool edit without re-signing would show up here)"

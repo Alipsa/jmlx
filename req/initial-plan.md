@@ -505,9 +505,12 @@ headers, this test must be redesigned before §6 begins, not after.
 2. `./scripts/bootstrap-native.sh` completes; `native/install/lib/` contains all four artifacts —
    `libmlxc.dylib`, `libmlx.dylib`, `libjaccl.dylib`, `mlx.metallib`. Check the metallib explicitly;
    it is the one most likely to be silently absent.
-3. `otool -L native/install/lib/libmlxc.dylib` shows every dependency resolving **against the flat
-   directory** — this is what `-DCMAKE_INSTALL_RPATH=@loader_path` buys, and it will not hold
-   without it. `codesign -v` passes on each dylib.
+3. The bootstrap script's own dlopen probe (`native/scratch/dlopen_probe`, run against
+   `libmlxc.dylib`) succeeds. `otool -L` alone doesn't prove this — it only dumps each
+   `LC_LOAD_DYLIB` install name from the Mach-O header, it never resolves them, and it never prints
+   `not found` (that's `ldd`, which macOS doesn't have); grepping its output for that string is
+   always false, so a genuinely broken flat directory would still pass. `codesign -v` passes on
+   each dylib.
 4. `./scripts/regen-bindings.sh` completes; `jmlx-ffi/src/main/generated/java` is populated.
 5. **Bindings-drift check.** Re-run `scripts/regen-bindings.sh` and assert
    `git diff --exit-code jmlx-ffi/src/main/generated/java` is clean. Committing generated output

@@ -7,7 +7,7 @@ This is the v0.1 vertical slice described in `req/initial-plan.md`: enough of th
 
 - macOS on Apple Silicon, macOS 26 or later.
 - Java 25 (JDK 25 toolchain; Gradle's toolchain support will provision it if you don't already have one).
-- `cmake`, `git`, `curl`, `unzip`, `otool`, `codesign`, `shasum` on `PATH` (all standard on a normal macOS + Homebrew dev setup).
+- `cmake`, `git`, `curl`, `unzip`, `otool`, `codesign`, `shasum`, `cc` on `PATH` (all standard on a normal macOS + Homebrew + Xcode Command Line Tools dev setup; `cc` is already implied by `cmake` building mlx-c's C++ source).
 
 ## One-time native bootstrap
 

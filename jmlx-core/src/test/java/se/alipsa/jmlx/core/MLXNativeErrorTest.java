@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.core;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -23,7 +24,14 @@ class MLXNativeErrorTest {
             MLXArray b = MLX.array(scope, new float[] {1, 2}, new int[] {2});
             // add() would intercept this Java-side; addUnchecked() is the
             // deliberate bypass so the mismatch genuinely reaches mlx_add.
-            assertThrows(MLXException.class, () -> MLX.addUnchecked(a, b));
+            MLXException e = assertThrows(MLXException.class, () -> MLX.addUnchecked(a, b));
+            // Not just "some non-zero status": the message must carry
+            // mlx-c's own, specific-to-this-failure text (e.g. "Shapes (3)
+            // and (2) cannot be broadcast."), not a stale message left over
+            // from an earlier, unrelated native call (MLX.checked() clears
+            // NativeLoader's thread-local immediately before every native
+            // call it wraps, precisely so this can't happen).
+            assertTrue(e.getMessage().contains("cannot be broadcast"), e.getMessage());
         }
     }
 }

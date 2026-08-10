@@ -3,7 +3,9 @@ package se.alipsa.jmlx.core;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
+import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -26,9 +28,10 @@ public final class MLX {
 
     private MLX() {}
 
-    // Must run before any field below touches mlx_h: mlx_h's own static
-    // initializers bind every downcall via SYMBOL_LOOKUP.findOrThrow at
-    // class-init time, which fails unless the dylib is already loaded.
+    // Must run before any field below touches mlx_h: jextract binds each
+    // downcall's method handle lazily, in a private per-function holder
+    // class, the first time that function is actually called -- and that
+    // first call fails unless the dylib is already loaded by then.
     // @EnabledIfNativeAvailable covers this for tests by construction; a
     // plain main() has nothing else that would call it first.
     static {
@@ -41,13 +44,13 @@ public final class MLX {
 
     private static MemorySegment resolveDefaultDevice() {
         MemorySegment dev = mlx_h.mlx_device_new(FACADE_ARENA);
-        check(mlx_h.mlx_get_default_device(dev));
+        checked(() -> mlx_h.mlx_get_default_device(dev));
         return dev;
     }
 
     private static MemorySegment resolveDefaultStream() {
         MemorySegment stream = mlx_h.mlx_stream_new(FACADE_ARENA);
-        check(mlx_h.mlx_get_default_stream(stream, DEFAULT_DEVICE));
+        checked(() -> mlx_h.mlx_get_default_stream(stream, DEFAULT_DEVICE));
         return stream;
     }
 
@@ -74,8 +77,18 @@ public final class MLX {
         try (Arena tmp = Arena.ofConfined()) {
             MemorySegment nativeData = tmp.allocateFrom(ValueLayout.JAVA_FLOAT, data);
             MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+            // mlx_array_new_data has no status return: on failure it calls
+            // the error handler and hands back a struct with a null ctx
+            // (native/scratch/mlx-c/mlx/c/array.cpp:238-251), instead of
+            // anything checked() can see. Detect that explicitly rather than
+            // letting the failure surface far from its cause, the first time
+            // something dereferences the empty handle.
+            NativeLoader.clearLastNativeError();
             MemorySegment handle =
                 mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_FLOAT32());
+            if (mlx_array_.ctx(handle).address() == 0) {
+                throw nativeFailure("mlx_array_new_data");
+            }
             return new MLXArray(scope, handle);
         }
     }
@@ -130,7 +143,7 @@ public final class MLX {
     private static MLXArray binaryOp(MLXArray a, MLXArray b, BinaryOp op) {
         MLXScope scope = a.scope();
         MemorySegment res = mlx_h.mlx_array_new(scope);
-        check(op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
+        checked(() -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
         return new MLXArray(scope, res);
     }
 
@@ -142,7 +155,7 @@ public final class MLX {
     public static MLXArray exp(MLXArray a) {
         MLXScope scope = a.scope();
         MemorySegment res = mlx_h.mlx_array_new(scope);
-        check(mlx_h.mlx_exp(res, a.handle(), DEFAULT_STREAM));
+        checked(() -> mlx_h.mlx_exp(res, a.handle(), DEFAULT_STREAM));
         return new MLXArray(scope, res);
     }
 
@@ -150,7 +163,7 @@ public final class MLX {
     public static MLXArray sum(MLXArray a) {
         MLXScope scope = a.scope();
         MemorySegment res = mlx_h.mlx_array_new(scope);
-        check(mlx_h.mlx_sum(res, a.handle(), false, DEFAULT_STREAM));
+        checked(() -> mlx_h.mlx_sum(res, a.handle(), false, DEFAULT_STREAM));
         return new MLXArray(scope, res);
     }
 
@@ -168,7 +181,7 @@ public final class MLX {
         try (Arena tmp = Arena.ofConfined()) {
             MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
             MemorySegment res = mlx_h.mlx_array_new(scope);
-            check(mlx_h.mlx_reshape(res, a.handle(), nativeShape, shape.length, DEFAULT_STREAM));
+            checked(() -> mlx_h.mlx_reshape(res, a.handle(), nativeShape, shape.length, DEFAULT_STREAM));
             return new MLXArray(scope, res);
         }
     }
@@ -177,7 +190,7 @@ public final class MLX {
     public static MLXArray transpose(MLXArray a) {
         MLXScope scope = a.scope();
         MemorySegment res = mlx_h.mlx_array_new(scope);
-        check(mlx_h.mlx_transpose(res, a.handle(), DEFAULT_STREAM));
+        checked(() -> mlx_h.mlx_transpose(res, a.handle(), DEFAULT_STREAM));
         return new MLXArray(scope, res);
     }
 
@@ -186,17 +199,31 @@ public final class MLX {
     /** Explicitly triggers computation for the given arrays. */
     public static void eval(MLXArray... arrays) {
         for (MLXArray a : arrays) {
-            check(mlx_h.mlx_array_eval(a.handle()));
+            checked(() -> mlx_h.mlx_array_eval(a.handle()));
         }
     }
 
-    static void check(int status) {
+    /**
+     * Runs a status-returning native call and throws {@link MLXException} on
+     * failure. Clears {@link NativeLoader}'s thread-local error message
+     * immediately before invoking {@code nativeCall}, not just after it
+     * fails: some entry points (see {@link #array}) fire the error handler
+     * without a status for this method to see. Without the clear-before
+     * step, a stale message left behind by one of those would sit there
+     * until the next failing checked call, which would then misreport it as
+     * its own.
+     */
+    static void checked(IntSupplier nativeCall) {
+        NativeLoader.clearLastNativeError();
+        int status = nativeCall.getAsInt();
         if (status != 0) {
-            String nativeMessage = NativeLoader.lastNativeError();
-            NativeLoader.clearLastNativeError();
-            throw new MLXException(
-                "mlx-c call failed with status " + status
-                    + (nativeMessage != null ? ": " + nativeMessage : ""));
+            throw nativeFailure("mlx-c call failed with status " + status);
         }
+    }
+
+    private static MLXException nativeFailure(String message) {
+        String nativeMessage = NativeLoader.lastNativeError();
+        NativeLoader.clearLastNativeError();
+        return new MLXException(message + (nativeMessage != null ? ": " + nativeMessage : ""));
     }
 }

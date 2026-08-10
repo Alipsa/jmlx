@@ -10,7 +10,7 @@ public final class HelloMLX {
 
     private HelloMLX() {}
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         try (MLXScope scope = new MLXScope()) {
             MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2});
             MLXArray b = MLX.array(scope, new float[] {5, 6, 7, 8}, new int[] {2, 2});

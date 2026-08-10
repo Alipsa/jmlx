@@ -28,7 +28,7 @@ class MLXGpuVerificationTest {
         int type;
         try (Arena tmp = Arena.ofConfined()) {
             MemorySegment typeOut = tmp.allocate(ValueLayout.JAVA_INT);
-            MLX.check(mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice()));
+            MLX.checked(() -> mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice()));
             type = typeOut.get(ValueLayout.JAVA_INT, 0);
         }
         assertEquals(mlx_h.MLX_GPU(), type, "default device is not GPU");

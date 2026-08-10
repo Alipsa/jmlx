@@ -28,9 +28,10 @@ import se.alipsa.jmlx.ffi.mlx_h;
  */
 public final class MLXScope implements AutoCloseable, SegmentAllocator {
 
-    // Same reasoning as MLX's static initializer: mlx_h's own class-init
-    // binds every downcall eagerly, which fails unless the dylib is already
-    // loaded. A scope can be constructed and used without ever touching the
+    // Same reasoning as MLX's static initializer: jextract binds each
+    // downcall's method handle lazily, the first time that function is
+    // actually called, which fails unless the dylib is already loaded by
+    // then. A scope can be constructed and used without ever touching the
     // MLX facade class, so it needs this guard independently.
     static {
         NativeLoader.ensureLoaded();
@@ -126,6 +127,7 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
 
     @Override
     public void close() {
+        checkThread();
         closed = true;
         holder.closeAll();
         cleanable.clean();

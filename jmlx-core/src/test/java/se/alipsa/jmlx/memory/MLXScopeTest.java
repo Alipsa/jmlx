@@ -1,11 +1,13 @@
 package se.alipsa.jmlx.memory;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import se.alipsa.jmlx.core.MLX;
@@ -30,6 +32,28 @@ class MLXScopeTest {
         MLXScope scope = new MLXScope();
         scope.close();
         assertThrows(IllegalStateException.class, () -> scope.allocate(8, 8));
+    }
+
+    @Test
+    void closeFromWrongThreadThrowsAndLeavesScopeOpen() throws InterruptedException {
+        MLXScope scope = new MLXScope();
+        AtomicReference<Throwable> caught = new AtomicReference<>();
+        Thread other = new Thread(() -> {
+            try {
+                scope.close();
+            } catch (Throwable t) {
+                caught.set(t);
+            }
+        });
+        other.start();
+        other.join();
+
+        assertInstanceOf(IllegalStateException.class, caught.get());
+        // The rejected cross-thread close must not have actually closed
+        // anything: the owning thread can still use the scope, and its own
+        // close() still succeeds.
+        assertDoesNotThrow(() -> MLX.array(scope, new float[] {1f}, new int[] {1}));
+        assertDoesNotThrow(scope::close);
     }
 
     /**

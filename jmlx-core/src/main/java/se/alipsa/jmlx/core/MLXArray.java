@@ -72,16 +72,30 @@ public final class MLXArray {
             throw new IllegalStateException("toFloatArray() requires FLOAT32, got " + dtype());
         }
         try (Arena tmp = Arena.ofConfined()) {
+            // tmp only owns the 8-byte mlx_array struct below; the ctx heap
+            // allocation mlx_contiguous fills in is owned by mlx-c and is
+            // freed solely by mlx_array_free. If mlx_contiguous or
+            // mlx_array_eval throws -- eval is exactly where a deferred
+            // graph error surfaces -- the finally block below still frees
+            // it, so a failed read never leaks the native array.
             MemorySegment contiguous = mlx_h.mlx_array_new(tmp);
-            MLX.check(mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
-            MLX.check(mlx_h.mlx_array_eval(contiguous));
-            long n = mlx_h.mlx_array_size(contiguous);
-            MemorySegment data =
-                mlx_h.mlx_array_data_float32(contiguous).reinterpret(n * ValueLayout.JAVA_FLOAT.byteSize());
-            float[] result = new float[(int) n];
-            MemorySegment.copy(data, ValueLayout.JAVA_FLOAT, 0, result, 0, (int) n);
-            MLX.check(mlx_h.mlx_array_free(contiguous));
-            return result;
+            try {
+                MLX.checked(() -> mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
+                MLX.checked(() -> mlx_h.mlx_array_eval(contiguous));
+                long n = mlx_h.mlx_array_size(contiguous);
+                if (n > Integer.MAX_VALUE) {
+                    throw new IllegalStateException(
+                        "toFloatArray() cannot represent " + n + " elements in a Java array"
+                            + " (limit " + Integer.MAX_VALUE + ")");
+                }
+                MemorySegment data =
+                    mlx_h.mlx_array_data_float32(contiguous).reinterpret(n * ValueLayout.JAVA_FLOAT.byteSize());
+                float[] result = new float[(int) n];
+                MemorySegment.copy(data, ValueLayout.JAVA_FLOAT, 0, result, 0, (int) n);
+                return result;
+            } finally {
+                mlx_h.mlx_array_free(contiguous);
+            }
         }
     }
 

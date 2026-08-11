@@ -88,9 +88,9 @@ than a stricter subset of it, so Phase 4 is additive rather than a renegotiation
 7. **No scalar overloads.** `MLX.array(scope, new float[] {2f}, new int[] {})` already builds a rank-0
    array, and with Decision 1 in place `multiply(a, thatScalar)` broadcasts. Revisit in Phase 4 if the
    ergonomics bite.
-8. **`slice` takes non-negative indices only**, with lengths required to equal `a.ndim()`. Python-style
-   negative indexing lives above mlx's C API, not in it; synthesizing it in Java is the same
-   reimplementation-without-a-native-counterpart that rules out `MLX.dot`. See §3.
+8. **`slice` gets exactly one Java guard — length agreement with `a.ndim()` — and nothing else.**
+   Negative indices and negative strides are *supported by native* and must not be rejected. See §3;
+   this decision replaces an earlier draft that had it backwards.
 
 ## Research findings that shaped this plan
 
@@ -191,9 +191,24 @@ A `dtype() == FLOAT32` guard would be **strictly narrower than native, which is 
 document exists to remove.** It would have to be relaxed the moment float16 lands in Phase 4's
 quantized layers — the same renegotiation Decisions 1 and 2 are spending Phase 3 to avoid. Instead:
 
-* Add `DType.isInexact()` as a predicate on the enum (currently `return this != INT32;`, since
-  FLOAT32 and INT32 are the only constants — `DType.java:7`). It stays correct as dtypes are added,
-  and it is named after native's own predicate.
+* Add `DType.isInexact()` as a predicate on the enum, **as an allowlist field, not
+  `return this != INT32;`**. A denylist is the same false-accept shape as the `d1 <= 1 || d2 <= 1`
+  trap above: it is correct for today's two constants and silently wrong the moment `INT8`, `UINT32`
+  or `BOOL` is added, each of which would report inexact and be accepted by `matmul`. The allowlist
+  form is the same size and cannot rot:
+
+  ```java
+  FLOAT32(mlx_h.MLX_FLOAT32(), true),
+  INT32(mlx_h.MLX_INT32(), false);
+
+  private final boolean inexact;
+
+  public boolean isInexact() {
+    return inexact;
+  }
+  ```
+
+  Named after native's own predicate, `issubdtype(out_type, inexact)`.
 * **Check both operands**, not just the receiver. `matmul` has two.
 
 This guard is *currently unreachable*: nothing in the facade constructs an INT32 array, and
@@ -266,7 +281,8 @@ Decision 3 forbids the one thing that would have triggered `checkThread()` by ac
 * `sqrt`, `negative`, `abs`, `tensordot`, `slice_update`, `async_eval`. All already bound, all four
   lines each. Add when a caller exists.
 * Scalar operand overloads (Decision 7).
-* Python-style negative indexing and negative strides on `slice` (Decision 8).
+* Nothing is excluded from `slice`'s index semantics: negative indices and negative strides work,
+  because native implements them (Decision 8).
 * dtypes beyond FLOAT32. `initial-plan.md`'s v0.1 constraint stands; `DType.INT32` remains
   read-back-only.
 * Splitting `MLX` into multiple facade classes. See Open questions.
@@ -278,9 +294,9 @@ Decision 3 forbids the one thing that would have triggered `checkThread()` by ac
 
 Do this first: §3 and §4 both depend on it, and it changes the exception thrown on misuse everywhere.
 
-* `MLXScope`: add `checkAccess()` exposing the existing private `checkThread()` + `ensureOpen()`
-  pair. `MLXArray` is in `se.alipsa.jmlx.core`, `MLXScope` in `se.alipsa.jmlx.memory`, and `owner` is
-  private, so this cannot be package-private.
+* `MLXScope`: add `public void checkAccess()` exposing the existing private `checkThread()` +
+  `ensureOpen()` pair. `MLXArray` is in `se.alipsa.jmlx.core`, `MLXScope` in `se.alipsa.jmlx.memory`,
+  and both `owner` and `closed` are private, so this cannot be package-private.
 
   **Naming the tradeoff, because it cuts against Decision 6.** There is no `module-info.java` anywhere
   in the tree (verified: `find . -name module-info.java -not -path '*/build/*'` returns nothing), so
@@ -288,21 +304,35 @@ Do this first: §3 and §4 both depend on it, and it changes the exception throw
   document that elsewhere insists the public surface stays flat. Three options, in order of
   preference:
 
-  1. **`MLXArray` holds its own `Thread owner`**, captured in its constructor, and asserts against
-     that. No new `MLXScope` API at all. An array is always constructed on its scope's owning thread
-     (the scope allocates its handle), so the two are identical by construction.
-  2. Add `module-info.java` with `exports se.alipsa.jmlx.memory to se.alipsa.jmlx.core;` — correct,
-     but drags the whole project into the module system for one method, and `--enable-native-access`
-     wiring would need revisiting.
-  3. `public void checkAccess()`, javadoc'd as internal. Simplest, and what this plan originally
-     specified — but it is the option that actually widens the public surface.
+  1. **`public void checkAccess()`** on `MLXScope`, javadoc'd as internal, delegating to the existing
+     private `checkThread()` + `ensureOpen()`. Widens the public surface by one method.
+  2. Add `module-info.java` with `exports se.alipsa.jmlx.memory to se.alipsa.jmlx.core;` — the
+     properly-scoped answer, but drags the whole project into the module system for one method, and
+     the `--enable-native-access` wiring would need revisiting.
+  3. `MLXArray` holds its own `Thread owner`, captured in its constructor. No new `MLXScope` API.
 
-  **Take option 1 unless implementation finds a reason it fails.** It is strictly less API than
-  either alternative and needs no cross-package call.
-* `MLXArray.ensureOpen()`: call `scope.checkAccess()` after the `closed` check. **One
-  `Thread.currentThread()` comparison per handle read closes the hole for `eval`, `exp`, `sum`,
-  `transpose`, `toFloatArray` and all eleven new ops at once**, and demotes `binaryOp`'s same-scope
-  check from sole guard to defence-in-depth. The cost is negligible against a downcall.
+  **Take option 1, and accept that it costs one method against Decision 6.** Option 3 looks like the
+  minimal answer and is not: `checkAccess()` is `checkThread()` **plus** `ensureOpen()`, and option 3
+  can only reproduce the thread half. `MLXScope.closed` is private and cross-package, so an array
+  holding its own `Thread` cannot see whether its scope is still open.
+
+  **That half is load-bearing, and dropping it would open a use-after-free next to the hole this
+  section closes.** `MLXScope.close()` sets `closed = true` and calls `holder.closeAll()`, which frees
+  the handles directly and never touches any `MLXArray` (`MLXScope.java:129-134`, `:64-81`) — so every
+  `MLXArray.closed` flag stays `false` after its scope closes. Under option 1, `array.shape()` at that
+  point throws `IllegalStateException("MLXScope is closed")`. Under option 3, `ensureOpen()` passes and
+  `mlx_h.mlx_array_shape(handle)` reads a freed handle: undefined behaviour, not an exception.
+  **No existing test covers this path**, so nothing would catch the regression.
+
+  Option 2 remains the right cleanup if the project ever modularizes; revisit then.
+* `MLXArray.ensureOpen()`: call `scope.checkAccess()` after the array's own `closed` check. **One
+  added call per handle read closes both the foreign-thread hole and the closed-scope hole for
+  `eval`, `exp`, `sum`, `transpose`, `toFloatArray` and all eleven new ops at once**, and demotes
+  `binaryOp`'s same-scope check from sole guard to defence-in-depth. The cost is a field read and a
+  reference comparison, negligible against a downcall.
+
+  Add a test for the scope-closed path too, since none exists: an `MLXArray` whose scope has been
+  closed must throw `IllegalStateException` from `shape()`, not read freed memory.
 
 Two things this must not break, both already correct by construction — assert them in review rather
 than assuming:
@@ -322,7 +352,8 @@ Three **separate** private helpers. Sharing one is the false-accept trap documen
   `MLX.java` (`:97`, `:103`, `:109`, `:115`, `:130`), so the swap is contained. Predicate:
   `d1 == d2 || d1 == 1 || d2 == 1`, right-aligned, shorter rank padded on the left.
 * `requireMatmulCompatible(a, b)` — reject rank-0; promote rank-1; compare inner dims on the
-  **promoted** shapes; batch-broadcast `shape[:-2]`; guard `dtype() == FLOAT32`.
+  **promoted** shapes; batch-broadcast `shape[:-2]`; require `dtype().isInexact()` on **both**
+  operands (not `== FLOAT32` — see the dtype discussion in Research findings).
 * `requireBroadcastableTo(a, targetShape)` — directional, **plus a non-negative check on every
   element of `targetShape`**. This is the only guard whose input is a user-supplied `int[]` rather
   than shapes read back from native, and without the check it has a false-accept of exactly the class
@@ -381,17 +412,44 @@ their independent `size_t` counts (`mlx_h.java:33416`), which makes it the wides
 in this phase — every other op either takes shapes read back from native or a single `int[]`. Settle
 it here for the same reason Decisions 1 and 2 exist: it is a public API contract.
 
-* `start.length == stop.length == a.ndim()`, and `strides.length == a.ndim()` on the 4-arg overload.
-  Reject otherwise with `IllegalArgumentException` naming both lengths. Passing mismatched counts is
-  the one way a caller can make the three `size_t` arguments disagree with each other.
-* **Negative indices are not supported in this phase.** Reject `start[i] < 0` or `stop[i] < 0`. mlx's
-  Python layer synthesizes Python slice semantics above the C API rather than in it; reproducing that
-  is a Java-side reimplementation with no native counterpart to defer to — the same reasoning that
-  rules out `MLX.dot`. Revisit when a caller needs it.
-* Reject `strides[i] <= 0` on the 4-arg overload. Negative strides are mlx's reverse-a-dimension
-  form and are untested here; zero is degenerate.
-* Do **not** bounds-check `stop[i] <= a.shape()[i]` in Java. mlx clamps rather than throwing, so a
-  Java check would be stricter than native — the defect this document exists to remove.
+**An earlier draft of this section rejected negative indices and negative strides. That was wrong,
+and it was wrong in exactly the way this whole document exists to prevent** — a Java guard stricter
+than native, introduced in the same revision that fixed the identical defect in `matmul`'s dtype
+check. Quoting the source, since that draft rested on recollection rather than evidence:
+
+```cpp
+// upstream mlx/ops.cpp:646-690 @ 68cf2fd — normalize_slice, the function slice() delegates to
+for (int i = 0; i < shape.size(); ++i) {
+  // Following numpy docs
+  //  Negative i and j are interpreted as n + i and n + j ...
+  //  Negative k makes stepping go towards smaller indices
+  auto n = shape[i];
+  auto s = start[i];  s = s < 0 ? s + n : s;      // negative START is normalized
+  auto e = stop[i];   e = e < 0 ? e + n : e;      // negative STOP is normalized
+  if (strides[i] < 0) {
+    has_neg_strides = true;                       // negative STRIDE is the reverse form
+    ...
+  } else {
+    auto st = std::max(ShapeElem(0), std::min(s, n));   // out-of-bounds is CLAMPED, not thrown
+    ...
+  }
+}
+```
+
+So the guard list is exactly one item:
+
+* **`start.length == stop.length == a.ndim()`**, plus `strides.length == a.ndim()` on the 4-arg
+  overload. Reject otherwise with `IllegalArgumentException` naming the lengths and `a.ndim()`.
+  This **mirrors** native rather than narrowing it — upstream `ops.cpp:757-763` raises
+  `"[slice] Invalid number of indices or strides for array with dimension N."` on the same
+  condition. It is worth doing Java-side only because the Java error can name which of the three
+  arrays disagreed.
+
+And explicitly **not**:
+
+* Do **not** reject negative `start`/`stop` — native normalizes them NumPy-style.
+* Do **not** reject negative `strides` — that is native's reverse-a-dimension form.
+* Do **not** bounds-check `stop[i] <= a.shape()[i]` — native clamps rather than throwing.
 
 ### 4. `eval` — `MLX.java`
 
@@ -493,7 +551,8 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `inner` 1-D equals hand-computed dot; `outer` shape and values | |
 | `broadcastTo` success **and** `[3]→[1]` rejected with `IllegalArgumentException` | proves the directional check exists rather than the symmetric one |
 | `broadcastTo(a[1], new int[] {-1})` rejected with `IllegalArgumentException` | the negative-dimension false-accept in §2. Without the non-negative check this throws `MLXException` from native instead — assert the exception **type**, since both throw |
-| `slice` with `start.length != a.ndim()` rejected; negative `start` rejected; `strides[i] == 0` rejected | §3's guards. `slice` has the widest user-supplied input surface in this phase |
+| `slice` with `start.length != a.ndim()` rejected with `IllegalArgumentException` | §3's one guard |
+| `slice` with a **negative** `start`, and with a **negative stride** (reversing a dimension), both succeed and return correct values | guards against re-introducing the over-strict draft. These are the cases Decision 8 originally rejected and native supports |
 | `squeeze` both overloads; `transpose(a, axes)` with a non-reversing permutation | |
 | `slice` contiguous **and strided** | strided is the one that matters: it yields a non-contiguous view, exercising `toFloatArray()`'s `mlx_contiguous` path the way `transposeReordersElementsNotJustShape` does |
 | `eval()` zero-arg no-op | proves the null-ctx check does not misfire on the non-null empty vector |
@@ -527,9 +586,12 @@ above cover the correctness and lifetime risks that the rewrite actually introdu
    `mlx_get_peak_memory`). The tradeoff Decision 3 accepts must be quantified before it ships, not
    asserted. Fails if §4 still reads "can go up" with no measurement.
 10. `grep -rn requireSameShape jmlx-core/src` — expect zero matches.
-11. `grep -rn 'Thread.currentThread()' jmlx-core/src/main | wc -l` — expect exactly the count implied
-    by §1's chosen option (1 for option 1, capturing `owner` in the `MLXArray` constructor). More than
-    that means an op grew its own copy of the check instead of inheriting it from `ensureOpen()`.
+11. `grep -rn 'Thread.currentThread()' jmlx-core/src/main/java/se/alipsa/jmlx/core | wc -l` — **expect
+    0**. The baseline in `jmlx-core/src/main` as a whole is already 2, both pre-existing in
+    `MLXScope` (`:95` capturing `owner`, `:122` in `checkThread`), so an unscoped grep fails against a
+    correct implementation. Scoping it to the `core` package asserts the actual invariant: thread
+    checking lives in `se.alipsa.jmlx.memory` and is reached through `ensureOpen()`, and no op grew
+    its own copy.
 12. `grep -rn 'mlx_vector_array_new_data' jmlx-core/src/main` — expect exactly one call site, and
     confirm by eye that its first argument is the confined `Arena`, never an `MLXScope`. This is the
     heap-corruption case in §4; it is worth one manual look because no test can catch it — passing a

@@ -20,7 +20,7 @@ public final class NativeLoader {
 
   private static final Object LOCK = new Object();
   private static boolean loaded = false;
-  private static RuntimeException loadFailure = null;
+  private static Throwable loadFailure = null;
 
   private static final ThreadLocal<String> LAST_NATIVE_ERROR = new ThreadLocal<>();
 
@@ -34,12 +34,19 @@ public final class NativeLoader {
         return;
       }
       if (loadFailure != null) {
-        throw loadFailure;
+        if (loadFailure instanceof RuntimeException re) {
+          throw re;
+        }
+        throw (LinkageError) loadFailure;
       }
       try {
         doLoad();
         loaded = true;
-      } catch (RuntimeException e) {
+      } catch (RuntimeException | LinkageError e) {
+        // System.load throws UnsatisfiedLinkError (a LinkageError) for a
+        // present-but-unloadable dylib (wrong arch, missing @rpath sibling,
+        // unresolved symbol) -- must be caught here too, or the caching
+        // contract above doesn't hold for the most likely real failure.
         loadFailure = e;
         throw e;
       }
@@ -103,15 +110,25 @@ public final class NativeLoader {
    * The mlx-c error convention is a checkable {@code int} status on every call, but its default error handler calls
    * {@code printf} then {@code exit(-1)} (req/initial-plan.md, research findings) -- so on an unmodified install, the
    * process would exit before that status is ever observed. Installing a handler that only records the message, and
-   * does not exit, is what makes {@code check(...)} in jmlx-core viable at all.
+   * does not exit, is what makes {@code checked(...)} in jmlx-core viable at all.
    */
   private static void installErrorHandler() {
     MemorySegment handlerStub = mlx_error_handler_func.allocate(NativeLoader::onNativeError, ERROR_HANDLER_ARENA);
     mlx_h.mlx_set_error_handler(handlerStub, MemorySegment.NULL, MemorySegment.NULL);
   }
 
+  // This runs as an upcall from native code: any Throwable escaping it is a
+  // fatal JVM error, not a Java exception, so it must never let one through
+  // -- a null msg (SIGSEGV via getString(0) at address 0) or invalid/
+  // unterminated UTF-8 (getString throws) would otherwise crash the process
+  // on exactly the path installed to replace mlx-c's own printf+exit(-1).
   private static void onNativeError(MemorySegment msg, MemorySegment data) {
-    LAST_NATIVE_ERROR.set(msg.reinterpret(Long.MAX_VALUE).getString(0));
+    try {
+      LAST_NATIVE_ERROR
+          .set(msg.address() == 0 ? "<null message from mlx-c>" : msg.reinterpret(Long.MAX_VALUE).getString(0));
+    } catch (Throwable t) {
+      LAST_NATIVE_ERROR.set("<unreadable message from mlx-c: " + t + ">");
+    }
   }
 
   /**

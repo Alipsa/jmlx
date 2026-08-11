@@ -10,7 +10,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * A native {@code mlx_array} handle owned by an {@link MLXScope}. See req/initial-plan.md §6. Not thread-safe: confined
  * to the scope's owning thread, same as the scope itself.
  */
-public final class MLXArray {
+public final class MLXArray implements AutoCloseable {
 
   private final MLXScope scope;
   private final MemorySegment handle;
@@ -100,12 +100,17 @@ public final class MLXArray {
   }
 
   /** Frees this array's native handle. Safe to call more than once. */
+  @Override
   public void close() {
     if (closed) {
       return;
     }
-    closed = true;
+    // free() first: if it throws (e.g. called from a non-owning thread),
+    // closed must stay false, or this array becomes permanently unusable
+    // via ensureOpen() while its native handle is still live. Matches the
+    // ordering MLXScope.close() uses for the same reason.
     scope.free(handle);
+    closed = true;
   }
 
   private void ensureOpen() {

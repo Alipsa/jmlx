@@ -30,8 +30,12 @@ public @interface EnabledIfNativeAvailable {
       try {
         NativeLoader.ensureLoaded();
         return ConditionEvaluationResult.enabled("jmlx native library loaded");
-      } catch (RuntimeException e) {
-        return ConditionEvaluationResult.disabled("jmlx native library not available: " + e.getMessage());
+      } catch (RuntimeException | LinkageError e) {
+        // LinkageError (e.g. UnsatisfiedLinkError from a wrong-arch or
+        // unresolved-symbol dylib) must be caught here too, or exactly the
+        // "false failure" scenario this annotation's javadoc cites turns
+        // into an errored test instead of a skipped one.
+        return ConditionEvaluationResult.disabled("jmlx native library not available: " + e);
       }
     }
   }

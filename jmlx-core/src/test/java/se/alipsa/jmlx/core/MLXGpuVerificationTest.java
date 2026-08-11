@@ -29,6 +29,10 @@ class MLXGpuVerificationTest {
       MLX.checked(() -> mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice()));
       type = typeOut.get(ValueLayout.JAVA_INT, 0);
     }
+    // Fails rather than skips if the default device isn't GPU: this project
+    // targets Apple Silicon with Metal as a hard precondition (README
+    // Requirements; bootstrap-native.sh is macos-aarch64-only), not
+    // something @EnabledIfNativeAvailable's dylib-loaded check alone proves.
     assertEquals(mlx_h.MLX_GPU(), type, "default device is not GPU");
 
     try (MLXScope scope = new MLXScope()) {

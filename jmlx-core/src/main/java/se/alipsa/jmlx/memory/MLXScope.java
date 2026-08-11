@@ -4,8 +4,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
 import java.lang.ref.Cleaner;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_h;
 
@@ -46,14 +45,19 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
    */
   private static final class Holder {
     private final Arena arena = Arena.ofShared();
-    private final List<MemorySegment> handles = new ArrayList<>();
+    // LinkedHashSet, not a List: freeOne()'s removal must be O(1), not an
+    // O(n) scan -- an explicit close of n arrays would otherwise be O(n^2).
+    // Insertion order is preserved for closeAll()'s reverse-order free.
+    private final LinkedHashSet<MemorySegment> handles = new LinkedHashSet<>();
     private boolean closed = false;
 
     synchronized MemorySegment allocate(long byteSize, long byteAlignment) {
+      // No "if (!closed)" guard here: closeAll() closes this shared arena
+      // before releasing the monitor, so once closed is true, the call
+      // above already throws IllegalStateException -- this line is
+      // unreachable with closed still true.
       MemorySegment seg = arena.allocate(byteSize, byteAlignment);
-      if (!closed) {
-        handles.add(seg);
-      }
+      handles.add(seg);
       return seg;
     }
 
@@ -68,8 +72,9 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
       // implemented as specified pending that determination -- see the
       // plan for the fallback (enqueue onto the owning thread instead)
       // if this turns out to be unsafe in practice.
-      for (int i = handles.size() - 1; i >= 0; i--) {
-        mlx_h.mlx_array_free(handles.get(i));
+      MemorySegment[] toFree = handles.toArray(new MemorySegment[0]);
+      for (int i = toFree.length - 1; i >= 0; i--) {
+        mlx_h.mlx_array_free(toFree[i]);
       }
       handles.clear();
       arena.close();

@@ -4,8 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -60,11 +63,19 @@ class MLXScopeTest {
    * scope, is registered with the Cleaner), not directly assertable. What is observable is the consequence: if the
    * capture rule were violated, the scope could never become unreachable and this loop would never observe a cleared
    * referent, tripping the timeout instead.
+   *
+   * <p>
+   * Reaching a cleared referent only proves the scope became unreachable, not that the backstop's cleanup actually ran
+   * -- both can be true well before the JVM's Cleaner thread gets around to invoking the registered action. A second,
+   * independent {@link Cleaner} registered on the same scope makes that run itself observable via a latch, since
+   * multiple Cleaners may be registered on one object and each fires its own action once that object becomes
+   * phantom-reachable.
    */
   @Test
   @Timeout(value = 30, unit = TimeUnit.SECONDS)
   void cleanerBackstopAllowsAnEscapedScopeToBecomeUnreachable() throws InterruptedException {
-    WeakReference<MLXScope> ref = new WeakReference<>(createDetachedScope());
+    CountDownLatch cleanupRan = new CountDownLatch(1);
+    WeakReference<MLXScope> ref = new WeakReference<>(createDetachedScope(cleanupRan));
 
     while (ref.get() != null) {
       System.gc();
@@ -72,6 +83,8 @@ class MLXScopeTest {
     }
 
     assertNull(ref.get());
+    assertTrue(cleanupRan.await(30, TimeUnit.SECONDS),
+        "cleaner backstop did not run after the scope became unreachable");
   }
 
   // Isolated in its own frame so no local variable in the calling test
@@ -80,9 +93,10 @@ class MLXScopeTest {
   // valid when given a real mlx_array-shaped constructor call, and a raw
   // uninitialized allocation would make mlx_array_free undefined behavior
   // once the backstop runs.
-  private static MLXScope createDetachedScope() {
+  private static MLXScope createDetachedScope(CountDownLatch cleanupRan) {
     MLXScope scope = new MLXScope();
     MLX.array(scope, new float[] {1f, 2f, 3f}, new int[] {3});
+    Cleaner.create().register(scope, cleanupRan::countDown);
     return scope;
   }
 }

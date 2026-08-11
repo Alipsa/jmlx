@@ -45,7 +45,10 @@ mkdir -p "$SCRATCH_DIR" "$UNFILTERED_SCRATCH_OUT"
 # once we're done here.
 cp "$HALF_H" "$SCRATCH_DIR/half.h.real"
 restore_half_h() { cp "$SCRATCH_DIR/half.h.real" "$HALF_H"; }
-trap restore_half_h EXIT
+# INT/TERM too, not just EXIT: a Ctrl-C mid-jextract must not leave the
+# patched (bf16-typedef-stripped) half.h sitting in native/install/include,
+# silently diverging from what bootstrap-native.sh staged there.
+trap restore_half_h EXIT INT TERM
 cp "$HALF_H_OVERRIDE" "$HALF_H"
 
 # --- Pass 1: discover every symbol jextract would emit, unfiltered ----------
@@ -78,26 +81,35 @@ FILTERED_COUNT="$(wc -l < "$FILTERED_ARGS_FILE" | tr -d ' ')"
 log "Filtered to $FILTERED_COUNT symbols under mlx/c/ (from $(wc -l < "$DUMP_FILE" | tr -d ' ') discovered total)"
 
 # --- Pass 2: the real generation, restricted to the filtered symbol set ----
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-log "Pass 2/2: generating bindings into $OUTPUT_DIR"
+# Generated into a scratch dir first, not straight into OUTPUT_DIR: a pass-2
+# failure (or a mid-run Ctrl-C) must never leave the committed bindings
+# deleted with nothing valid to replace them.
+PASS2_OUTPUT_DIR="$SCRATCH_DIR/pass2-output"
+mkdir -p "$PASS2_OUTPUT_DIR"
+log "Pass 2/2: generating bindings into $PASS2_OUTPUT_DIR"
 "$JEXTRACT_BIN" \
-  --output "$OUTPUT_DIR" \
+  --output "$PASS2_OUTPUT_DIR" \
   -t "$TARGET_PACKAGE" \
   --include-dir "$INCLUDE_DIR" \
   "$UMBRELLA_HEADER" \
   "@$FILTERED_ARGS_FILE"
 
-GENERATED_COUNT="$(find "$OUTPUT_DIR" -name '*.java' | wc -l | tr -d ' ')"
+GENERATED_COUNT="$(find "$PASS2_OUTPUT_DIR" -name '*.java' | wc -l | tr -d ' ')"
 [[ "$GENERATED_COUNT" -gt 0 ]] || die "pass 2 produced no Java files"
-log "Generated $GENERATED_COUNT Java files into $OUTPUT_DIR"
+log "Generated $GENERATED_COUNT Java files into $PASS2_OUTPUT_DIR"
 
 # Sanity-check the two independent bugs this script works around, so a
 # jextract/mlx-c upgrade that silently changes behavior fails loudly here
 # instead of surfacing later as a confusing NoSuchElementException.
 for fn in mlx_array_new mlx_array_free mlx_array_new_data mlx_get_default_device mlx_add; do
-  grep -rq "findOrThrow(\"$fn\")" "$OUTPUT_DIR" || die "expected generated binding for $fn is missing -- see Decision 10 in req/initial-plan.md"
+  grep -rq "findOrThrow(\"$fn\")" "$PASS2_OUTPUT_DIR" || die "expected generated binding for $fn is missing -- see Decision 10 in req/initial-plan.md"
 done
 log "Confirmed mlx_array_new/free/new_data and mlx_get_default_device/mlx_add are present."
+
+# Only now, with pass 2 fully generated and verified, replace the committed
+# bindings -- the window in which OUTPUT_DIR doesn't exist is a single mv.
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$(dirname "$OUTPUT_DIR")"
+mv "$PASS2_OUTPUT_DIR" "$OUTPUT_DIR"
 
 log "Done. Re-run and 'git diff --exit-code $OUTPUT_DIR' to check for bindings drift."

@@ -189,7 +189,7 @@ cmake --fresh -S "$MLXC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_INSTALL_RPATH=@loader_path \
   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
-  | tee "$CONFIGURE_LOG"
+  2>&1 | tee "$CONFIGURE_LOG"
 
 # Assert the fast path actually engaged. If MLX_C_USE_SYSTEM_MLX=ON silently
 # failed to take, mlx-c still builds -- just against a different, FetchContent'd

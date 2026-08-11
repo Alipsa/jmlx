@@ -737,6 +737,13 @@ above cover the correctness and lifetime risks that the rewrite actually introdu
 
 ## Verification
 
+0. **Before writing any of §4: paste its pseudocode block into a scratch class and compile it against
+   the real generated bindings.** It references five real signatures
+   (`mlx_vector_array_new_data`, `mlx_array_.allocateArray`, `mlx_array_.sizeof`,
+   `mlx_vector_array_.ctx`, and `checked`'s `IntSupplier`), and nothing in a Markdown file checks any
+   of them. Three defects reached committed drafts of that block; two were plain compile errors that
+   `javac` would have rejected in under a second, and re-reading caught neither. This step costs
+   minutes and is ordered first deliberately.
 1. `./gradlew build` — Spotless, Checkstyle, and the forked `loaderGuardTest` included.
 2. `scripts/regen-bindings.sh` then `git diff --exit-code jmlx-ffi/src/main/generated/java` — must be
    clean. **This proves the load-bearing premise of this document**: Phase 3 required no binding
@@ -769,21 +776,28 @@ above cover the correctness and lifetime risks that the rewrite actually introdu
 
 ## Failure modes this document kept producing
 
-Seven review rounds found twenty-four defects here, in three clusters. They are recorded because they
-are what to watch for in Phase 4, not as history — the warning against re-making each one already
-lives where it would be re-made.
+Eight review rounds raised 14 correctness defects and 22 further suggestions against this document.
+The defects fall into three clusters, recorded as what to watch for in Phase 4 rather than as
+history — the warning against re-making each one already lives where it would be re-made.
 
-1. **A Java guard narrower than native.** Hit four times (`requireSameShape`; `matmul` rank-2;
-   `matmul` `dtype() == FLOAT32`; `slice` rejecting negative indices and strides). Twice the
-   narrowing was *introduced by a fix for the previous instance*. The resolving principle is in §3:
-   mirror native where native is defined, guard where it is undefined, and say which case applies.
-2. **A decision recorded in prose but not in the block coded from.** Hit three times. Inline comments
-   carrying the reasoning — as at the allocator argument in §4 — are the mitigation.
-3. **Java written but never compiled or run.** Hit four times, all in §4's block: a dropped
-   `SegmentAllocator`, a nonexistent `MLXException(String, Throwable)`, a lambda capturing a mutated
-   loop counter, and a fixture recipe needing a 2^40-element `float[]`. **Re-reading did not catch
-   these.** Before implementing §4, stand its block up as a compiling scratch file against the real
-   generated bindings — it references five real signatures and Markdown checks none of them.
+1. **A Java guard narrower than native.** Twice, *by this document*: `matmul`'s
+   `dtype() == FLOAT32`, and `slice` rejecting negative indices and strides. (The two guards in
+   shipped v0.1 code — `requireSameShape` and `matmul` rank-2, still at `MLX.java:130` and `:123` —
+   are this document's **premise**, not its output; see Context.) The `slice` one is the instructive
+   case: it was introduced *by the fix for the previous instance*, in the same commit that corrected
+   `matmul`'s dtype guard. The resolving principle is in §3 — mirror native where native is defined,
+   guard where it is undefined, and say which case applies.
+2. **A decision recorded in prose but not in the block coded from.** Three times: the `isInexact()`
+   switch reached Decision 2 but not §2; §4's attribution mitigation had no `catch` in its
+   pseudocode; §1's scope-closed test was mandated in a sentence and absent from the Testing table.
+   Inline comments carrying the reasoning — as at the allocator argument in §4 — are the mitigation.
+3. **Java written but never compiled or run.** Three times, all in §4's block: a dropped
+   `SegmentAllocator`, a lambda capturing a mutated loop counter, and a fixture recipe needing a
+   2^40-element `float[]`. **Re-reading caught none of them** — they were found by checking
+   signatures and by execution. Two of the three are plain compile errors; hence Verification #0.
+   (A fourth, `new MLXException(msg, cause)` against a class declaring only `(String)`, was caught
+   while writing and never reached a commit — by checking the class instead of assuming it, which is
+   the same habit.)
 
 ## Open questions
 

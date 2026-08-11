@@ -88,9 +88,10 @@ than a stricter subset of it, so Phase 4 is additive rather than a renegotiation
 7. **No scalar overloads.** `MLX.array(scope, new float[] {2f}, new int[] {})` already builds a rank-0
    array, and with Decision 1 in place `multiply(a, thatScalar)` broadcasts. Revisit in Phase 4 if the
    ergonomics bite.
-8. **`slice` gets exactly one Java guard — length agreement with `a.ndim()` — and nothing else.**
-   Negative indices and negative strides are *supported by native* and must not be rejected. See §3;
-   this decision replaces an earlier draft that had it backwards.
+8. **`slice` gets two Java guards: length agreement with `a.ndim()`, and a zero-stride rejection.**
+   Negative indices and negative strides are *supported by native* and must not be rejected; a zero
+   stride is *undefined behaviour* in native and must be. See §3 — including why the second guard is
+   not a violation of Decision 1's principle.
 
 ## Research findings that shaped this plan
 
@@ -108,6 +109,14 @@ Permalink base (`v0.31.2` = `68cf2fddd8de5edd8ab3d926391772b2e2cedad8`):
 
 ```
 https://github.com/ml-explore/mlx/blob/68cf2fddd8de5edd8ab3d926391772b2e2cedad8/mlx/<file>#L<line>
+```
+
+Where this document reports *measured* behaviour rather than quoted source (the zero-stride table in
+§3), it was produced against the matching Python package in a throwaway venv, which ships the
+extension module the `mlx-metal` wheel does not:
+
+```
+python3 -m venv /tmp/mlxtest && /tmp/mlxtest/bin/pip install 'mlx==0.31.2'
 ```
 
 **MLX's broadcasting is a literal NumPy implementation.** `broadcast_shapes`, upstream
@@ -281,8 +290,8 @@ Decision 3 forbids the one thing that would have triggered `checkThread()` by ac
 * `sqrt`, `negative`, `abs`, `tensordot`, `slice_update`, `async_eval`. All already bound, all four
   lines each. Add when a caller exists.
 * Scalar operand overloads (Decision 7).
-* Nothing is excluded from `slice`'s index semantics: negative indices and negative strides work,
-  because native implements them (Decision 8).
+* Zero-stride `slice` — rejected Java-side rather than supported, because native's behaviour for it
+  is undefined (Decision 8, §3). Negative indices and negative strides are *not* excluded; they work.
 * dtypes beyond FLOAT32. `initial-plan.md`'s v0.1 constraint stands; `DType.INT32` remains
   read-back-only.
 * Splitting `MLX` into multiple facade classes. See Open questions.
@@ -408,35 +417,55 @@ Add two private helpers mirroring `binaryOp` (`MLX.java:148-166`), then **refact
 | `slice(a, start, stop, strides)` | `mlx_slice` | three `const int*` params, so it does not fit `shapeOp`; own confined-`Arena` body |
 
 **`slice`'s guards, specified rather than left implicit.** It takes three user-supplied `int[]`s plus
-their independent `size_t` counts (`mlx_h.java:33416`), which makes it the widest unvalidated surface
-in this phase — every other op either takes shapes read back from native or a single `int[]`. Settle
-it here for the same reason Decisions 1 and 2 exist: it is a public API contract.
+their independent `size_t` counts (`mlx_h.java:33416`), so the guards need stating — but the answer is
+"two", and the reasoning for why it is not more is the useful part.
 
 **An earlier draft of this section rejected negative indices and negative strides. That was wrong,
 and it was wrong in exactly the way this whole document exists to prevent** — a Java guard stricter
 than native, introduced in the same revision that fixed the identical defect in `matmul`'s dtype
 check. Quoting the source, since that draft rested on recollection rather than evidence:
 
+Quoted **without elisions**, deliberately. Earlier drafts of this document abbreviated both branches
+with `...`, and the line that hides behind the second `...` is the one that decides the zero-stride
+case below. An elision in an evidence block is where the next bug lives.
+
 ```cpp
-// upstream mlx/ops.cpp:646-690 @ 68cf2fd — normalize_slice, the function slice() delegates to
+// upstream mlx/ops.cpp:656-696 @ 68cf2fd — normalize_slice, which slice() delegates to
 for (int i = 0; i < shape.size(); ++i) {
   // Following numpy docs
-  //  Negative i and j are interpreted as n + i and n + j ...
-  //  Negative k makes stepping go towards smaller indices
+  //  Negative i and j are interpreted as n + i and n + j where n is
+  //  the number of elements in the corresponding dimension. Negative
+  //  k makes stepping go towards smaller indices
   auto n = shape[i];
-  auto s = start[i];  s = s < 0 ? s + n : s;      // negative START is normalized
-  auto e = stop[i];   e = e < 0 ? e + n : e;      // negative STOP is normalized
+  auto s = start[i];
+  s = s < 0 ? s + n : s;                          // negative START is normalized
+  auto e = stop[i];
+  e = e < 0 ? e + n : e;                          // negative STOP is normalized
+
+  // Note: -ve strides require start >= stop
   if (strides[i] < 0) {
     has_neg_strides = true;                       // negative STRIDE is the reverse form
-    ...
+    auto st = std::min(s, n - 1);                 // clamped, not thrown
+    auto ed = e > -1 ? e : -1;
+    start[i] = st;
+    ed = ed > st ? st : ed;
+    auto str = -strides[i];
+    out_shape[i] = (start[i] - ed + str - 1) / str;
   } else {
-    auto st = std::max(ShapeElem(0), std::min(s, n));   // out-of-bounds is CLAMPED, not thrown
-    ...
+    auto st = std::max(static_cast<ShapeElem>(0), std::min(s, n));   // clamped, not thrown
+    auto ed = std::max(static_cast<ShapeElem>(0), std::min(e, n));
+    start[i] = st;
+    ed = ed < st ? st : ed;
+    out_shape[i] = (ed - start[i] + strides[i] - 1) / strides[i];    // <-- zero stride divides by 0
+  }
+  // Simplify the stride if it's unused
+  if (out_shape[i] == 1) {
+    strides[i] = 1;
   }
 }
 ```
 
-So the guard list is exactly one item:
+So the guard list is two items:
 
 * **`start.length == stop.length == a.ndim()`**, plus `strides.length == a.ndim()` on the 4-arg
   overload. Reject otherwise with `IllegalArgumentException` naming the lengths and `a.ndim()`.
@@ -444,6 +473,28 @@ So the guard list is exactly one item:
   `"[slice] Invalid number of indices or strides for array with dimension N."` on the same
   condition. It is worth doing Java-side only because the Java error can name which of the three
   arrays disagreed.
+
+* **Reject `strides[i] == 0`.** Note the branch structure above: `0` is not `< 0`, so a zero stride
+  takes the `else` branch and reaches
+  `out_shape[i] = (ed - start[i] + strides[i] - 1) / strides[i]` with a zero divisor.
+  **That is division by zero — C++ undefined behaviour — reachable from a public API method.**
+  Measured on mlx 0.31.2, Apple Silicon, to establish what it actually does rather than assume:
+
+  | | zero stride |
+  | --- | --- |
+  | mlx 0.31.2 aarch64 (`a[::0]`, `a[::0,:]`, `a[1:3:0,:]`) | silently returns shape `(0,)` / `(0,4)`; no error, no crash |
+  | NumPy | `ValueError: slice step cannot be zero` |
+
+  It does **not** crash, because aarch64's `sdiv` returns 0 for a zero divisor instead of trapping,
+  so `out_shape[i]` becomes `0`. That is a property of the current architecture and codegen, not a
+  guarantee the language makes: the expression is UB, and it degrades to a *silently wrong empty
+  result* where NumPy raises.
+
+  **Why this is not the "stricter than native" defect.** That principle governs native behaviour that
+  is *defined* — rejecting a negative stride was wrong precisely because native specifies what a
+  negative stride means. Native specifies nothing here. Converting UB into a named
+  `IllegalArgumentException` is not narrowing the contract; it is the only way to give the method one.
+  Phrase the message after NumPy's ("slice step cannot be zero") rather than as a jmlx restriction.
 
 And explicitly **not**:
 
@@ -553,6 +604,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `broadcastTo(a[1], new int[] {-1})` rejected with `IllegalArgumentException` | the negative-dimension false-accept in §2. Without the non-negative check this throws `MLXException` from native instead — assert the exception **type**, since both throw |
 | `slice` with `start.length != a.ndim()` rejected with `IllegalArgumentException` | §3's one guard |
 | `slice` with a **negative** `start`, and with a **negative stride** (reversing a dimension), both succeed and return correct values | guards against re-introducing the over-strict draft. These are the cases Decision 8 originally rejected and native supports |
+| `slice` with `strides[i] == 0` throws `IllegalArgumentException` | the UB guard. Assert the exception **type and message** — without the guard this does not throw at all, it silently returns a zero-sized dimension, so a test asserting only "does not succeed" would pass against the broken version |
 | `squeeze` both overloads; `transpose(a, axes)` with a non-reversing permutation | |
 | `slice` contiguous **and strided** | strided is the one that matters: it yields a non-contiguous view, exercising `toFloatArray()`'s `mlx_contiguous` path the way `transposeReordersElementsNotJustShape` does |
 | `eval()` zero-arg no-op | proves the null-ctx check does not misfire on the non-null empty vector |

@@ -486,6 +486,11 @@ So the guard list is two items:
   | mlx 0.31.2 aarch64 (`a[::0]`, `a[::0,:]`, `a[1:3:0,:]`) | silently returns shape `(0,)` / `(0,4)`; no error, no crash |
   | NumPy | `ValueError: slice step cannot be zero` |
 
+  It does **not** crash, because aarch64's `sdiv` returns 0 for a zero divisor instead of trapping,
+  so `out_shape[i]` becomes `0`. That is a property of the current architecture and codegen, not a
+  guarantee the language makes: the expression is UB, and it degrades to a *silently wrong empty
+  result* where NumPy raises.
+
   **That measurement went through mlx's Python binding, and the conclusion is about the C API jmlx
   calls — so close the gap rather than infer across it.** This is structurally the same leap that
   produced the retracted negative-index draft. It holds here because `mlx_slice` forwards its three
@@ -505,11 +510,6 @@ So the guard list is two items:
   `0` is itself corroboration that this code path ran: it is exactly what `sdiv`-returns-zero predicts
   from the quoted division.
 
-  It does **not** crash, because aarch64's `sdiv` returns 0 for a zero divisor instead of trapping,
-  so `out_shape[i]` becomes `0`. That is a property of the current architecture and codegen, not a
-  guarantee the language makes: the expression is UB, and it degrades to a *silently wrong empty
-  result* where NumPy raises.
-
   **Why this is not the "stricter than native" defect.** That principle governs native behaviour that
   is *defined* — rejecting a negative stride was wrong precisely because native specifies what a
   negative stride means. Native specifies nothing here. Converting UB into a named
@@ -526,14 +526,15 @@ And explicitly **not**:
 
 ```
 public static void eval(MLXArray... arrays)
-  if (arrays.length == 0) return;
+  int n = arrays.length;
+  if (n == 0) return;
 
   // Pass 1 CAPTURES; it does not merely touch. handle() is thread-checked per §1,
   // so this both validates every array and yields the segments the copy loop uses --
   // the "cannot throw mid-build" invariant then holds by construction rather than
   // by reading each handle a second time below.
-  MemorySegment[] handles = new MemorySegment[arrays.length];
-  for (int i = 0; i < arrays.length; i++) handles[i] = arrays[i].handle();
+  MemorySegment[] handles = new MemorySegment[n];
+  for (int i = 0; i < n; i++) handles[i] = arrays[i].handle();
 
   try (Arena tmp = Arena.ofConfined()) {
     MemorySegment buf = mlx_array_.allocateArray(n, tmp);
@@ -546,10 +547,42 @@ public static void eval(MLXArray... arrays)
     // -- mlx_h.java:5471.
     MemorySegment vec = mlx_h.mlx_vector_array_new_data(tmp, buf, n);
     if (mlx_vector_array_.ctx(vec).address() == 0) throw nativeFailure("mlx_vector_array_new_data");
-    try { checked(() -> mlx_h.mlx_eval(vec)); }
-    finally { mlx_h.mlx_vector_array_free(vec); }
+    try {
+      checked(() -> mlx_h.mlx_eval(vec));
+    } catch (MLXException e) {
+      // Restores the per-array attribution the joint eval loses. MUST sit here,
+      // inside the try-with-resources and BEFORE the finally frees vec: it
+      // re-evaluates the INDIVIDUAL handles via mlx_array_eval, not the vector.
+      throw attributeEvalFailure(e, handles);
+    } finally {
+      mlx_h.mlx_vector_array_free(vec);
+    }
   }
+
+// Re-runs the per-array loop to name the offender; rethrows the original
+// unchanged if it cannot reproduce the failure, so this never masks the error
+// it is trying to describe.
+// REQUIRES a new MLXException(String, Throwable) ctor -- see below.
+private static MLXException attributeEvalFailure(MLXException original, MemorySegment[] handles)
+  for (int i = 0; i < handles.length; i++)
+    try { checked(() -> mlx_h.mlx_array_eval(handles[i])); }
+    catch (MLXException perArray) { return new MLXException("eval: array[" + i + "] failed", perArray); }
+  return original;
 ```
+
+**`MLXException` needs a second constructor.** It currently declares only `MLXException(String)`
+(`MLXException.java:7-9`), so the block above does not compile as written. Add the conventional
+cause-carrying form:
+
+```java
+/** Creates an exception carrying {@code cause}'s mlx-c failure message as context. */
+public MLXException(String message, Throwable cause) {
+  super(message, cause);
+}
+```
+
+Chaining rather than string-concatenating the inner message keeps the per-array exception's stack
+trace, which is the part that identifies where the re-run failed.
 
 * `mlx_array_` is `structLayout(C_POINTER)` (`mlx_array_.java:28-30`), and `C_POINTER` resolves to
   `canonicalLayouts().get("void*")` (`mlx_h$shared.java:27-28`), so `sizeof()` is 8 on
@@ -588,8 +621,13 @@ hypothetical.
 all-or-nothing with no index in the message, where the loop could name which array failed. On the
 *error path only*, catch the `MLXException` and re-run the per-array `mlx_array_eval` loop to
 identify the offending array, then rethrow with its index. This costs nothing on the happy path,
-needs no extra native surface, and restores the diagnostic the loop gave for free. Wrap the re-run
-defensively: if it fails to reproduce the error, rethrow the original rather than masking it.
+needs no extra native surface, and restores the diagnostic the loop gave for free. If the re-run
+fails to reproduce the error, rethrow the original rather than masking it.
+
+**This is in the pseudocode above, not just here.** Two things about it are non-obvious enough to be
+worth re-stating: the `catch` must sit inside the try-with-resources and *before* the `finally` frees
+`vec`, and the re-run evaluates the individual handles via `mlx_array_eval` — not the vector, which
+is exactly what failed.
 
 ### 5. Documentation
 
@@ -618,7 +656,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `log`/`sin`/`cos` vs `Math.*`, `1e-5f` | proves the right symbol is called; not a libm accuracy test |
 | `add([2,3],[3])`, `add([2,3],[1,3])`, `add([2,2], rank0)` | the headline contract change. Assert result shape **and** values |
 | `add([2,3],[4])` throws `IllegalArgumentException` | proves the Java guard fires before native, not after |
-| `matmul` all three rank-1 forms; batched `[2,3,4]×[4,5]→[2,3,5]`; rank-0 rejected | the promotion path is where an off-by-one in axis indexing hides |
+| `matmul` all three rank-1 forms; batched `[2,3,4]×[4,5]→[2,3,5]`; rank-0 rejected | the promotion path is where an off-by-one in axis indexing hides. **No row for the `isInexact()` guard: it is unreachable today** — nothing in the facade constructs an INT32 array — so it is asserted by inspection, like `outer`'s overflow guard |
 | `inner` 1-D equals hand-computed dot; `outer` shape and values | |
 | `broadcastTo` success **and** `[3]→[1]` rejected with `IllegalArgumentException` | proves the directional check exists rather than the symmetric one |
 | `broadcastTo(a[1], new int[] {-1})` rejected with `IllegalArgumentException` | the negative-dimension false-accept in §2. Without the non-negative check this throws `MLXException` from native instead — assert the exception **type**, since both throw |
@@ -630,6 +668,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `eval()` zero-arg no-op | proves the null-ctx check does not misfire on the non-null empty vector |
 | `eval(a, b, c)` all three correct, **including arrays from two scopes on one thread** | the case a same-scope check would wrongly reject |
 | `eval` twice is idempotent | hits the `none unscheduled` fast path |
+| `eval` over several arrays where one has a deferred graph error: the `MLXException` message names **which index** failed | §4's attribution mitigation. Without it the joint eval reports all-or-nothing, so this is the only check that the `catch` was actually implemented rather than dropped along with the pseudocode's `finally` |
 | `MLXMemoryLeakTest` with a multi-array `eval` in the loop | **the test that matters for §4**: a missing `mlx_vector_array_free` shows up as `activeMemoryBytes()` growth, and a double-free aborts the JVM, which is itself the assertion |
 | `MLXScopeTest`: foreign-thread array access throws; owning-thread `close()` afterwards still works | §1 |
 | **`MLXScopeTest`: an `MLXArray` whose *scope* has been closed throws `IllegalStateException` from `shape()`** | **the test that discriminates §1's option 1 from option 3.** `MLXScope.close()` frees handles via `holder.closeAll()` and never touches any `MLXArray`, so `MLXArray.closed` is still `false` at this point — without `checkAccess()`'s `ensureOpen()` half this reads a freed handle instead of throwing. A future "simplification" to an array-local `Thread owner` would drop exactly this check, and nothing else in the suite would notice |

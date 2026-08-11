@@ -645,24 +645,41 @@ why `MLXNativeErrorTest` works at all and why every guard in §2 can be a Java m
 cannot exercise this path. **Allocation-class errors are genuinely deferred**, and are deterministic
 and CI-safe because Metal rejects against its device limit without attempting the allocation:
 
-```python
-a = mx.zeros((2**20, 2**20), dtype=mx.float32)   # 4 TiB. BUILD SUCCEEDS -- shape is valid
-mx.eval(a)
-# RuntimeError: [metal::malloc] Attempting to allocate 4398046511104 bytes
-#               which is greater than the maximum...
+**Build the oversized array with `outer`, not with `MLX.array`.** The obvious Python recipe —
+`mx.zeros((2**20, 2**20))` — has no Java counterpart: `MLX.array` enforces
+`product(shape) == data.length` (`MLX.java:68-75`), so that shape would need a `float[]` of 2^40
+elements, and Java arrays are `int`-indexed with a cap of `Integer.MAX_VALUE` — 512× too small. The
+call would throw `IllegalArgumentException` from the Java length check, a different exception from a
+different layer than the test needs. Phase 3 also adds no `zeros`/`ones`.
+
+`outer` does it from operands a `float[]` can hold, and stays under its own
+`a.size() <= Integer.MAX_VALUE` guard (2^20 ≪ 2^31−1):
+
+```java
+float[] v = new float[1 << 20];               // 4 MB -- trivially allocatable
+MLXArray a = MLX.array(scope, v, new int[] {1 << 20});
+MLXArray bad = MLX.outer(a, a);               // builds shape [2^20, 2^20]; 4 TiB backing
+MLX.eval(bad);
+// MLXException: [metal::malloc] Attempting to allocate 4398046511104 bytes
+//               which is greater than the maximum...
 ```
 
-In Java that is `MLX.array(scope, …)` — or any op — producing a shape whose backing allocation exceeds
-the device limit. The Testing-table row for this mitigation is therefore implementable; it is **not**
-in the "asserted by inspection" bucket that `outer`'s overflow guard and `matmul`'s `isInexact()` guard
-sit in.
+Measured end to end in the three-array form the test actually needs — `eval(good, bad, good)` throws
+in 0.001 s, the per-array re-run gives `ok / THREW / ok` in under 1 ms each, and both good arrays
+remain readable afterwards. The Testing-table row for this mitigation is therefore implementable; it
+is **not** in the "asserted by inspection" bucket that `outer`'s overflow guard and `matmul`'s
+`isInexact()` guard sit in.
 
 *Is re-entering eval on a graph that just failed safe, or does it hang?* The Named caveat below notes
 that mlx's status flags turn a second eval into a `wait()`, which raises the possibility of waiting on
-an event that will never signal. Measured with a three-array joint eval whose middle element is the
-unallocatable array above: the joint eval throws in 0.050 s, then the per-array re-run returns
-`ok / THREW / ok` in 0.003 s, 0.000 s, 0.000 s. **The failing array re-throws immediately rather than
-waiting, and the joint failure leaves its siblings still evaluable.** No hang.
+an event that will never signal. Measured with the three-array fixture above: the joint eval throws in
+single-digit milliseconds, then the per-array re-run returns `ok / THREW / ok`, each in under a
+millisecond. **The failing array re-throws immediately rather than waiting, and the joint failure
+leaves its siblings still readable.** No hang.
+
+(Timings here and above are order-of-magnitude, not benchmarks — the point is "milliseconds, and it
+returns" rather than any particular number. Independent runs have landed anywhere in 1–50 ms for the
+joint eval depending on the fixture used.)
 
 ### 5. Documentation
 
@@ -703,7 +720,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `eval()` zero-arg no-op | proves the null-ctx check does not misfire on the non-null empty vector |
 | `eval(a, b, c)` all three correct, **including arrays from two scopes on one thread** | the case a same-scope check would wrongly reject |
 | `eval` twice is idempotent | hits the `none unscheduled` fast path |
-| `eval(good, bad, good)` where `bad` is an array whose allocation exceeds the Metal device limit: the `MLXException` message names **index 1** | §4's attribution mitigation, and the only check that the `catch` was implemented rather than dropped. **Use an allocation-class error, not a shape error** — shapes are validated at op-build time, so `MLXNativeErrorTest`'s fixture throws long before `eval` and cannot exercise this path. Measured: joint eval throws in 0.050 s, the re-run attributes in under 5 ms |
+| `eval(good, bad, good)` with `bad = MLX.outer(a, a)` for `a` of 2^20 elements: the `MLXException` message names **index 1** | §4's attribution mitigation, and the only check that the `catch` was implemented rather than dropped. **Use an allocation-class error, not a shape error** — shapes are validated at op-build time, so `MLXNativeErrorTest`'s fixture throws long before `eval` and cannot exercise this path. **And build it with `outer`, not `MLX.array`** — see §4; the direct route needs a `float[]` 512× larger than the JVM allows. Measured: joint eval throws in ~1 ms, re-run attributes in under 1 ms each |
 | `MLXMemoryLeakTest` with a multi-array `eval` in the loop | **the test that matters for §4**: a missing `mlx_vector_array_free` shows up as `activeMemoryBytes()` growth, and a double-free aborts the JVM, which is itself the assertion |
 | `MLXScopeTest`: foreign-thread array access throws; owning-thread `close()` afterwards still works | §1 |
 | **`MLXScopeTest`: an `MLXArray` whose *scope* has been closed throws `IllegalStateException` from `shape()`** | **the test that discriminates §1's option 1 from option 3.** `MLXScope.close()` frees handles via `holder.closeAll()` and never touches any `MLXArray`, so `MLXArray.closed` is still `false` at this point — without `checkAccess()`'s `ensureOpen()` half this reads a freed handle instead of throwing. A future "simplification" to an array-local `Thread owner` would drop exactly this check, and nothing else in the suite would notice |

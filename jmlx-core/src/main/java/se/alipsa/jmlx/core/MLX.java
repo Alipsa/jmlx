@@ -101,19 +101,19 @@ public final class MLX {
   /** Elementwise difference of two same-shaped arrays. */
   public static MLXArray subtract(MLXArray a, MLXArray b) {
     requireSameShape(a, b, "subtract");
-    return binaryOp(a, b, mlx_h::mlx_subtract);
+    return binaryOp("subtract", a, b, mlx_h::mlx_subtract);
   }
 
   /** Elementwise product of two same-shaped arrays. */
   public static MLXArray multiply(MLXArray a, MLXArray b) {
     requireSameShape(a, b, "multiply");
-    return binaryOp(a, b, mlx_h::mlx_multiply);
+    return binaryOp("multiply", a, b, mlx_h::mlx_multiply);
   }
 
   /** Elementwise quotient of two same-shaped arrays. */
   public static MLXArray divide(MLXArray a, MLXArray b) {
     requireSameShape(a, b, "divide");
-    return binaryOp(a, b, mlx_h::mlx_divide);
+    return binaryOp("divide", a, b, mlx_h::mlx_divide);
   }
 
   /** Matrix product of two rank-2 arrays with compatible shapes. */
@@ -124,7 +124,7 @@ public final class MLX {
       throw new IllegalArgumentException(
           "matmul: incompatible shapes " + java.util.Arrays.toString(sa) + " and " + java.util.Arrays.toString(sb));
     }
-    return binaryOp(a, b, mlx_h::mlx_matmul);
+    return binaryOp("matmul", a, b, mlx_h::mlx_matmul);
   }
 
   private static void requireSameShape(MLXArray a, MLXArray b, String op) {
@@ -142,10 +142,10 @@ public final class MLX {
    * {@link MLXException} rather than a process abort.
    */
   static MLXArray addUnchecked(MLXArray a, MLXArray b) {
-    return binaryOp(a, b, mlx_h::mlx_add);
+    return binaryOp("add", a, b, mlx_h::mlx_add);
   }
 
-  private static MLXArray binaryOp(MLXArray a, MLXArray b, BinaryOp op) {
+  private static MLXArray binaryOp(String opName, MLXArray a, MLXArray b, BinaryOp op) {
     MLXScope scope = a.scope();
     // The result is allocated in a's scope; without this check, b's scope
     // (and its thread-confinement guard) is never touched at all -- b.handle()
@@ -153,7 +153,7 @@ public final class MLX {
     // another thread's) scope would silently bypass MLXScope's confinement
     // contract instead of being rejected here.
     if (scope != b.scope()) {
-      throw new IllegalArgumentException("operands belong to different MLXScopes");
+      throw new IllegalArgumentException(opName + ": operands belong to different MLXScopes");
     }
     MemorySegment res = mlx_h.mlx_array_new(scope);
     checked(() -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));

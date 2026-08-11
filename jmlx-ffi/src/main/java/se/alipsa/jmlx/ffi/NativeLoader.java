@@ -37,7 +37,17 @@ public final class NativeLoader {
         if (loadFailure instanceof RuntimeException re) {
           throw re;
         }
-        throw (LinkageError) loadFailure;
+        if (loadFailure instanceof Error err) {
+          throw err;
+        }
+        // Unreachable today -- the catch below only ever assigns a
+        // RuntimeException or LinkageError -- but loadFailure's declared
+        // type is the wider Throwable, so nothing stops a future widening
+        // of that catch from landing here. Failing loudly with the
+        // original cause attached beats a raw ClassCastException silently
+        // discarding it, which is exactly the failure mode this class
+        // exists to avoid (see the class javadoc).
+        throw new IllegalStateException("unexpected cached native load failure", loadFailure);
       }
       try {
         doLoad();

@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.ffi;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,5 +24,18 @@ class NativeLoaderMissingMetallibTest {
   void missingMetallibFailsFastNamingTheBootstrapScript() {
     IllegalStateException e = assertThrows(IllegalStateException.class, NativeLoader::ensureLoaded);
     assertTrue(e.getMessage().contains("bootstrap-native.sh"), e.getMessage());
+  }
+
+  // NativeLoader's headline behaviour (its own javadoc: "caches the outcome
+  // and rethrows the original cause every time") is otherwise never
+  // exercised anywhere in this suite -- every other caller either only
+  // calls ensureLoaded() once, or only ever hits the success path on real
+  // hardware. This forked JVM, which is guaranteed to fail once and only
+  // once via the missing metallib above, is the one place that can prove it.
+  @Test
+  void secondCallRethrowsTheCachedOriginalFailure() {
+    IllegalStateException first = assertThrows(IllegalStateException.class, NativeLoader::ensureLoaded);
+    IllegalStateException second = assertThrows(IllegalStateException.class, NativeLoader::ensureLoaded);
+    assertSame(first, second, "second call must rethrow the cached original, not a fresh failure");
   }
 }

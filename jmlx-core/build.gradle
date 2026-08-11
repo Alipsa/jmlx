@@ -1,0 +1,12 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // Not exposed on jmlx-core's own public API (MLXArray/MLX wrap raw
+    // MemorySegment handles behind plain Java types), so implementation
+    // rather than api.
+    implementation project(':jmlx-ffi')
+
+    testImplementation testFixtures(project(':jmlx-ffi'))
+}

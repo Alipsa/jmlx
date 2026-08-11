@@ -1,0 +1,35 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':jmlx-core')
+
+    testImplementation testFixtures(project(':jmlx-ffi'))
+}
+
+application {
+    mainClass = 'se.alipsa.jmlx.examples.HelloMLX'
+    // applicationDefaultJvmArgs feeds both the `run` task and the generated
+    // installDist/distZip start scripts (req/initial-plan.md §4) -- the
+    // Enable-Native-Access: ALL-UNNAMED manifest attribute is not an
+    // alternative, since it only applies to a jar launched via `java -jar`.
+    // Deliberately just this flag, not jmlx.library.path: see the `run` task
+    // below for why that one is scoped to `run` only.
+    applicationDefaultJvmArgs = [
+        '--enable-native-access=ALL-UNNAMED'
+    ]
+}
+
+// jmlx.library.path is set only on this task, not via
+// applicationDefaultJvmArgs above. That property also feeds the start
+// scripts installDist/distZip generate, which would otherwise bake this
+// build machine's absolute native/install/lib path into any distributed
+// archive -- fine for `run` here, broken the moment someone unpacks that
+// archive on a different machine or path. A distribution's consumer sets
+// JMLX_LIBRARY_PATH instead (NativeLoader already supports it) to wherever
+// they ran bootstrap-native.sh.
+tasks.named('run', JavaExec).configure {
+    def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
+    systemProperty('jmlx.library.path', nativeLibDir)
+}

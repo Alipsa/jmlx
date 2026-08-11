@@ -1,0 +1,92 @@
+/*
+ * Root build script. Config shared by jmlx-ffi, jmlx-core and jmlx-examples
+ * lives here; each module's own build.gradle only declares its plugin and
+ * dependencies. See req/initial-plan.md §4 for the rationale behind the
+ * native-access flags and the native-directory system property below.
+ */
+
+plugins {
+    id 'com.diffplug.spotless' version '8.9.0' apply false
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'checkstyle'
+    apply plugin: 'com.diffplug.spotless'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
+    }
+
+    // Style: 2-space indent, 120-column width, Google style otherwise (both
+    // config files derive from Google's own upstream artifacts -- see
+    // config/checkstyle/checkstyle.xml and config/spotless/*.xml for exactly
+    // what was changed and why).
+    checkstyle {
+        toolVersion = '13.10.0'
+        configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+    }
+
+    // jmlx-ffi/src/main/generated/java is committed jextract output, not
+    // hand-written -- scripts/regen-bindings.sh is the only thing allowed to
+    // touch it, and req/initial-plan.md's bindings-drift check asserts it
+    // stays byte-identical to that output. Spotless never sees it because
+    // its `target` below only globs src/main/java, not .../generated/java;
+    // jmlx-ffi/build.gradle does the equivalent for checkstyleMain, since
+    // that generated dir is registered as an extra source root there.
+    spotless {
+        java {
+            target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
+            importOrder()
+            removeUnusedImports()
+            eclipse().configFile(rootProject.file('config/spotless/eclipse-java-google-style-120col.xml'))
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
+
+    testing {
+        suites {
+            test {
+                // Not libs.versions.junit.jupiter.get(): referencing the
+                // version-catalog accessor from a subprojects{} closure
+                // defined in the *root* script is an implicit parent-project
+                // property lookup, deprecated as of Gradle 9.7 and an error
+                // in Gradle 10. gradle/libs.versions.toml's junit-jupiter
+                // version is the source of truth for the artifact
+                // coordinate (see jmlx-ffi/build.gradle's
+                // testFixturesImplementation); this string only pins the
+                // JVM Test Suite plugin's own bundled-platform version and
+                // is kept in sync with it by hand.
+                useJUnitJupiter('6.0.1')
+            }
+        }
+    }
+
+    // req/initial-plan.md §4: an absolute path, since native/install/lib is
+    // CWD-relative and resolves differently under :jmlx-core:test, an IDE
+    // run, and :jmlx-examples:run. Computing the path string here touches no
+    // filesystem state (no exists() check), so it's safe under
+    // org.gradle.configuration-cache=true -- only NativeLoader's own
+    // resolution, at JVM execution time, decides whether the directory is
+    // actually usable.
+    def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
+
+    tasks.withType(Test).configureEach {
+        // --enable-native-access=ALL-UNNAMED: the check applies to the
+        // immediate caller's module. Everything here runs unnamed/classpath
+        // for now, so every test JVM that might transitively reach a
+        // downcall needs this. Once jmlx-ffi is a named JPMS module this
+        // narrows to --enable-native-access=se.alipsa.jmlx.ffi.
+        jvmArgs('--enable-native-access=ALL-UNNAMED')
+        systemProperty('jmlx.library.path', nativeLibDir)
+    }
+}

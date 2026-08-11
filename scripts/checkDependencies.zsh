@@ -83,8 +83,14 @@ MAX_MLXC_TAGS_TO_SCAN=40
 
 # Searches mlx-c's own tags (newest first, via sort -V, since mlx-c's version
 # numbers do not track MLX's) for the tag whose CMakeLists.txt GIT_TAG pins
-# exactly "v$1". Prints "<tag> <commit>" on the first match, nothing if none
-# of the scanned tags match or the scan cap above is hit.
+# exactly "v$1". Prints "<tag> <commit>" and returns 0 on a resolved match;
+# prints nothing and returns 0 if no tag matches (or the scan cap is hit --
+# either way, the caller's own "no tag found" message is accurate); prints
+# nothing but returns 2 if a tag DID match and its commit could not be
+# resolved -- that is a different failure than "no matching tag", so the
+# caller must not report its generic message in that case (this function
+# already warned specifically, and the generic message would flatly
+# contradict it: mlx-c does have the release, only the SHA lookup broke).
 find_mlx_c_commit_for_mlx_version() {
   local target_tag="v${1}" tag cmake_txt pinned_tag
   local commit peeled_output
@@ -114,8 +120,16 @@ find_mlx_c_commit_for_mlx_version() {
         commit="$(print -r -- "$peeled_output" | awk '{print $1}')"
         [[ -z "$commit" ]] && commit="$(git ls-remote "$MLXC_REPO_URL" "refs/tags/${tag}" 2>/dev/null | awk '{print $1}')"
       fi
-      [[ -n "$commit" ]] && print -r -- "$tag $commit"
-      return 0
+      # A match was found -- the empty-result case below is not "no tag
+      # pins this version" (the caller's fallback message would be wrong
+      # here: mlx-c *does* have the release, only this SHA lookup broke),
+      # so it gets its own warning rather than falling through silently.
+      if [[ -n "$commit" ]]; then
+        print -r -- "$tag $commit"
+        return 0
+      fi
+      warn "mlx-c: $tag pins MLX $target_tag, but resolving its commit failed (see the git error above) -- retry, or read the SHA off the tag manually at https://github.com/ml-explore/mlx-c/releases/tag/$tag"
+      return 2
     fi
   done < <(git ls-remote --tags --refs "$MLXC_REPO_URL" 2>/dev/null | awk '{print $2}' | sed 's#refs/tags/##' | sort -rV)
   return 0
@@ -182,12 +196,16 @@ else
   log "Looking for the mlx-c tag that pins MLX v$MLX_METAL_LATEST (mlx-c's own CMakeLists.txt GIT_TAG, req/initial-plan.md Decision 9)..."
 
   MATCH="$(find_mlx_c_commit_for_mlx_version "$MLX_METAL_LATEST")"
+  FIND_STATUS=$?
   if [[ -n "$MATCH" ]]; then
     MATCHED_TAG="${MATCH%% *}"
     MATCHED_COMMIT="${MATCH#* }"
     log "Found: mlx-c $MATCHED_TAG ($MATCHED_COMMIT) pins MLX v$MLX_METAL_LATEST"
     log "Next: ./scripts/updateMlx.zsh $MATCHED_COMMIT"
-  else
+  elif [[ "$FIND_STATUS" -ne 2 ]]; then
+    # Exit status 2 means a tag DID match and already printed its own,
+    # more specific warning above -- this generic message would contradict
+    # it (see the function's own header comment).
     warn "mlx-c: no tag found whose CMakeLists.txt pins MLX v$MLX_METAL_LATEST -- mlx-c's own release may simply lag the new MLX version yet; check https://github.com/ml-explore/mlx-c manually"
   fi
 fi

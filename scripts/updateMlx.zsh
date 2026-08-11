@@ -53,6 +53,16 @@ OLD_COMMIT="$(grep -oE 'MLX_C_COMMIT="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[
 # bindings and no hint to revert.
 BOOTSTRAP_BACKUP="$(mktemp)"
 cp "$BOOTSTRAP_SCRIPT" "$BOOTSTRAP_BACKUP"
+# Set only once bootstrap-native.sh itself has exited zero (see below). A
+# pairing-assertion failure INSIDE bootstrap-native.sh aborts before it
+# touches native/install/lib, so reverting the pin is the whole story in
+# that case. But if bootstrap succeeds and regen-bindings.sh fails after
+# it, native/ has already been rebuilt against $NEW_COMMIT and reverting
+# the pin does NOT revert that -- native/ is untracked, ./gradlew build
+# doesn't re-run bootstrap, and the mismatch only self-heals on the next
+# manual bootstrap run. This flag is how rollback() tells those two cases
+# apart.
+BOOTSTRAP_COMPLETED=""
 rollback() {
   # Not "status": zsh reserves that name as a read-only synonym for $? and
   # refuses `local status=...`.
@@ -60,6 +70,9 @@ rollback() {
   if [[ $exit_status -ne 0 ]]; then
     cp "$BOOTSTRAP_BACKUP" "$BOOTSTRAP_SCRIPT"
     warn "aborting -- reverted scripts/bootstrap-native.sh to its state from before this run (git diff scripts/bootstrap-native.sh should now be clean if it was clean going in)"
+    if [[ -n "$BOOTSTRAP_COMPLETED" ]]; then
+      warn "note: native/ was already rebuilt against $NEW_COMMIT before this failure and is NOT reverted -- re-run ./scripts/bootstrap-native.sh (now back on $OLD_COMMIT) before ./gradlew build, or the staged libraries and the committed bindings will disagree"
+    fi
   fi
   rm -f "$BOOTSTRAP_BACKUP"
 }
@@ -76,6 +89,7 @@ fi
 
 log "Running bootstrap-native.sh (this asserts the new commit's CMakeLists.txt GIT_TAG still pairs with the pinned mlx-metal version -- see the header comment above)"
 "$REPO_ROOT/scripts/bootstrap-native.sh"
+BOOTSTRAP_COMPLETED=1
 
 log "Running regen-bindings.sh"
 "$REPO_ROOT/scripts/regen-bindings.sh"

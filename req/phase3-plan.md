@@ -423,11 +423,11 @@ their independent `size_t` counts (`mlx_h.java:33416`), so the guards need stati
 **An earlier draft of this section rejected negative indices and negative strides. That was wrong,
 and it was wrong in exactly the way this whole document exists to prevent** — a Java guard stricter
 than native, introduced in the same revision that fixed the identical defect in `matmul`'s dtype
-check. Quoting the source, since that draft rested on recollection rather than evidence:
+check. That draft rested on recollection rather than evidence, so here is the source.
 
-Quoted **without elisions**, deliberately. Earlier drafts of this document abbreviated both branches
-with `...`, and the line that hides behind the second `...` is the one that decides the zero-stride
-case below. An elision in an evidence block is where the next bug lives.
+**Quoted without elisions, deliberately.** Earlier drafts of this document abbreviated both branches
+with `...`, and the line hiding behind the second `...` is the one that decides the zero-stride case
+below. An elision in an evidence block is where the next bug lives.
 
 ```cpp
 // upstream mlx/ops.cpp:656-696 @ 68cf2fd — normalize_slice, which slice() delegates to
@@ -474,8 +474,9 @@ So the guard list is two items:
   condition. It is worth doing Java-side only because the Java error can name which of the three
   arrays disagreed.
 
-* **Reject `strides[i] == 0`.** Note the branch structure above: `0` is not `< 0`, so a zero stride
-  takes the `else` branch and reaches
+* **Reject `strides[i] == 0`** — on the 4-arg overload only. The 3-arg overload synthesizes all-1s
+  and cannot reach it, so a check there would be dead code. Note the branch structure above: `0` is
+  not `< 0`, so a zero stride takes the `else` branch and reaches
   `out_shape[i] = (ed - start[i] + strides[i] - 1) / strides[i]` with a zero divisor.
   **That is division by zero — C++ undefined behaviour — reachable from a public API method.**
   Measured on mlx 0.31.2, Apple Silicon, to establish what it actually does rather than assume:
@@ -484,6 +485,25 @@ So the guard list is two items:
   | --- | --- |
   | mlx 0.31.2 aarch64 (`a[::0]`, `a[::0,:]`, `a[1:3:0,:]`) | silently returns shape `(0,)` / `(0,4)`; no error, no crash |
   | NumPy | `ValueError: slice step cannot be zero` |
+
+  **That measurement went through mlx's Python binding, and the conclusion is about the C API jmlx
+  calls — so close the gap rather than infer across it.** This is structurally the same leap that
+  produced the retracted negative-index draft. It holds here because `mlx_slice` forwards its three
+  arrays *verbatim* with no normalization of its own
+  (`native/scratch/mlx-c/mlx/c/ops.cpp:3125-3143`):
+
+  ```cpp
+  mlx::core::slice(
+      mlx_array_get_(a),
+      mlx::core::Shape(start,   start   + start_num),
+      mlx::core::Shape(stop,    stop    + stop_num),
+      mlx::core::Shape(strides, strides + strides_num),
+      mlx_stream_get_(s));
+  ```
+
+  Both bindings therefore converge on the same `normalize_slice` quoted above. The observed shape of
+  `0` is itself corroboration that this code path ran: it is exactly what `sdiv`-returns-zero predicts
+  from the quoted division.
 
   It does **not** crash, because aarch64's `sdiv` returns 0 for a zero divisor instead of trapping,
   so `out_shape[i]` becomes `0`. That is a property of the current architecture and codegen, not a
@@ -602,7 +622,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `inner` 1-D equals hand-computed dot; `outer` shape and values | |
 | `broadcastTo` success **and** `[3]→[1]` rejected with `IllegalArgumentException` | proves the directional check exists rather than the symmetric one |
 | `broadcastTo(a[1], new int[] {-1})` rejected with `IllegalArgumentException` | the negative-dimension false-accept in §2. Without the non-negative check this throws `MLXException` from native instead — assert the exception **type**, since both throw |
-| `slice` with `start.length != a.ndim()` rejected with `IllegalArgumentException` | §3's one guard |
+| `slice` with `start.length != a.ndim()` rejected with `IllegalArgumentException` | first of §3's two guards |
 | `slice` with a **negative** `start`, and with a **negative stride** (reversing a dimension), both succeed and return correct values | guards against re-introducing the over-strict draft. These are the cases Decision 8 originally rejected and native supports |
 | `slice` with `strides[i] == 0` throws `IllegalArgumentException` | the UB guard. Assert the exception **type and message** — without the guard this does not throw at all, it silently returns a zero-sized dimension, so a test asserting only "does not succeed" would pass against the broken version |
 | `squeeze` both overloads; `transpose(a, axes)` with a non-reversing permutation | |
@@ -612,6 +632,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `eval` twice is idempotent | hits the `none unscheduled` fast path |
 | `MLXMemoryLeakTest` with a multi-array `eval` in the loop | **the test that matters for §4**: a missing `mlx_vector_array_free` shows up as `activeMemoryBytes()` growth, and a double-free aborts the JVM, which is itself the assertion |
 | `MLXScopeTest`: foreign-thread array access throws; owning-thread `close()` afterwards still works | §1 |
+| **`MLXScopeTest`: an `MLXArray` whose *scope* has been closed throws `IllegalStateException` from `shape()`** | **the test that discriminates §1's option 1 from option 3.** `MLXScope.close()` frees handles via `holder.closeAll()` and never touches any `MLXArray`, so `MLXArray.closed` is still `false` at this point — without `checkAccess()`'s `ensureOpen()` half this reads a freed handle instead of throwing. A future "simplification" to an array-local `Thread owner` would drop exactly this check, and nothing else in the suite would notice |
 
 **Named caveat.** No test can prove `mlx_eval`-over-a-vector differs from the loop. Results are
 numerically identical and neither recomputes (`array::eval()` is literally `eval({*this})`, upstream
@@ -630,7 +651,9 @@ above cover the correctness and lifetime risks that the rewrite actually introdu
    measured iterations, with a multi-array `eval` in the loop body.
 5. `./gradlew :jmlx-core:test --tests '*MLXNativeErrorTest*'` — passes with **unmodified fixtures**,
    confirming §2's guard did not convert it into a happy path.
-6. `./gradlew :jmlx-core:test --tests '*MLXScopeTest*'` — foreign-thread access throws.
+6. `./gradlew :jmlx-core:test --tests '*MLXScopeTest*'` — **both** foreign-thread access and
+   closed-scope access throw. The second is the use-after-free guard from §1; a run that only proves
+   the first has not exercised the half of `checkAccess()` that option 3 would have dropped.
 7. `./gradlew :jmlx-core:test --tests '*MLXGpuVerificationTest*'` — kernels still dispatch to GPU.
 8. `./gradlew :jmlx-examples:run` — HelloMLX prints correct values for the broadcast `add` and the
    multi-array `eval`.

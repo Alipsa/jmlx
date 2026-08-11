@@ -2,12 +2,9 @@ package se.alipsa.jmlx.core;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
-import se.alipsa.jmlx.ffi.mlx_h;
+import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
@@ -57,13 +54,13 @@ class MLXMemoryLeakTest {
       iteration.run();
     }
 
-    long baseline = activeMemoryBytes();
+    long baseline = NativeMemoryProbe.activeMemoryBytes();
 
     for (int i = 0; i < MEASURED_ITERATIONS; i++) {
       iteration.run();
     }
 
-    long after = activeMemoryBytes();
+    long after = NativeMemoryProbe.activeMemoryBytes();
 
     assertTrue(after - baseline <= LEAK_THRESHOLD_BYTES, "active memory grew from " + baseline + " to " + after
         + " bytes over " + MEASURED_ITERATIONS + " iterations (threshold " + LEAK_THRESHOLD_BYTES + " bytes)");
@@ -84,14 +81,6 @@ class MLXMemoryLeakTest {
       MLX.eval(b);
       b.close();
       a.close();
-    }
-  }
-
-  private static long activeMemoryBytes() {
-    try (Arena tmp = Arena.ofConfined()) {
-      MemorySegment out = tmp.allocate(ValueLayout.JAVA_LONG);
-      MLX.checked(() -> mlx_h.mlx_get_active_memory(out));
-      return out.get(ValueLayout.JAVA_LONG, 0);
     }
   }
 }

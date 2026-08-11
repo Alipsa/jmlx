@@ -72,7 +72,8 @@ than a stricter subset of it, so Phase 4 is additive rather than a renegotiation
 1. **Broadcast-compatible guards replace `requireSameShape`.** The check stays Java-side rather than
    being delegated to native, so errors name the operands and their shapes. See §2.
 2. **`matmul` relaxes to rank ≥ 1**, with mlx's own rank-1 promotion and batch-dim broadcasting.
-   Rank-0 is still rejected, because mlx rejects it.
+   Rank-0 is still rejected, because mlx rejects it. Its dtype guard is `DType.isInexact()` on both
+   operands — mirroring native's rule, not the narrower `== FLOAT32`.
 3. **`eval` becomes a single `mlx_eval` over an `mlx_vector_array`**, replacing the per-array
    `mlx_array_eval` loop. This is what the outline's "`eval(MLXArray... arrays)` dispatcher" means.
    See §4, including the peak-memory tradeoff this incurs.
@@ -87,22 +88,57 @@ than a stricter subset of it, so Phase 4 is additive rather than a renegotiation
 7. **No scalar overloads.** `MLX.array(scope, new float[] {2f}, new int[] {})` already builds a rank-0
    array, and with Decision 1 in place `multiply(a, thatScalar)` broadcasts. Revisit in Phase 4 if the
    ergonomics bite.
+8. **`slice` takes non-negative indices only**, with lengths required to equal `a.ndim()`. Python-style
+   negative indexing lives above mlx's C API, not in it; synthesizing it in Java is the same
+   reimplementation-without-a-native-counterpart that rules out `MLX.dot`. See §3.
 
 ## Research findings that shaped this plan
 
 Read from mlx-c at `native/scratch/mlx-c` (`fba4470`) and from mlx C++ upstream `v0.31.2` — the wheel
-version pinned by `initial-plan.md` Decision 9. **Note that the wheel ships headers and a binary
-only; there is no vendored C++ implementation**, so line numbers marked *upstream* are from the
-`v0.31.2` tag, not from a local file.
+version pinned by `initial-plan.md` Decision 9.
+
+**The mlx-c citations below are verifiable from this repository; the mlx C++ ones are not.** The
+wheel ships headers and a binary only, with no vendored `.cpp`. Since the C++ citations are the
+evidentiary base for every guard in §2 — broadcast rules, matmul promotion order, `inner`'s rank-0
+short-circuit, `outer`'s cast — they are pinned to the immutable tag SHA rather than the tag name,
+and the four load-bearing functions are quoted in full below so a reader can check the reasoning
+without network access.
+
+Permalink base (`v0.31.2` = `68cf2fddd8de5edd8ab3d926391772b2e2cedad8`):
+
+```
+https://github.com/ml-explore/mlx/blob/68cf2fddd8de5edd8ab3d926391772b2e2cedad8/mlx/<file>#L<line>
+```
 
 **MLX's broadcasting is a literal NumPy implementation.** `broadcast_shapes`, upstream
 `mlx/utils.cpp:136-167`, right-aligns the shapes and folds:
 
 ```cpp
-// Use the same broadcasting rules as numpy
-if (b == a)                out_shape[i] = a;
-else if (a == 1 || b == 1) out_shape[i] = a * b;   // 0 if a or b is 0 otherwise max(a,b)
-else throw std::invalid_argument("[broadcast_shapes] Shapes … cannot be broadcast.");
+// upstream mlx/utils.cpp:136-167 @ 68cf2fd, quoted in full
+Shape broadcast_shapes(const Shape& s1, const Shape& s2) {
+  // Use the same broadcasting rules as numpy
+  // https://numpy.org/doc/1.20/user/theory.broadcasting.html
+  int ndim1 = s1.size();
+  int ndim2 = s2.size();
+  int ndim = std::max(ndim1, ndim2);
+  int diff = std::abs(ndim1 - ndim2);
+  const auto& big   = ndim1 > ndim2 ? s1 : s2;
+  const auto& small = ndim1 > ndim2 ? s2 : s1;
+  Shape out_shape(ndim);
+  for (int i = ndim - 1; i >= diff; --i) {
+    auto a = big[i];
+    auto b = small[i - diff];
+    if (b == a) {
+      out_shape[i] = a;
+    } else if (a == 1 || b == 1) {
+      out_shape[i] = a * b;      // 0 if a or b is 0 otherwise max(a, b)
+    } else {
+      throw std::invalid_argument("[broadcast_shapes] Shapes … cannot be broadcast.");
+    }
+  }
+  for (int i = diff - 1; i >= 0; --i) out_shape[i] = big[i];
+  return out_shape;
+}
 ```
 
 Two details are load-bearing and easy to get wrong:
@@ -125,7 +161,20 @@ single most likely implementation error in §2:
 | --- | --- | --- |
 | `add`/`subtract`/`multiply`/`divide` | full NumPy broadcast | upstream `ops.cpp:2836-2843` |
 | `inner` | last dims **exactly equal**, not broadcast-compatible. Short-circuits to `multiply` when either operand is rank-0, so the check must be skipped in that case | upstream `ops.cpp:5453-5463` |
-| `broadcast_to` | **directional**: requires `broadcast_shapes(a.shape, target) == target`. `broadcast_to(a[3], [1])` is "compatible" but native throws | upstream `ops.cpp`, `broadcast_to` |
+| `broadcast_to` | **directional**: requires `broadcast_shapes(a.shape, target) == target`. `broadcast_to(a[3], [1])` is "compatible" but native throws | upstream `ops.cpp:1601-1613` |
+
+```cpp
+// upstream mlx/ops.cpp:5453-5463 @ 68cf2fd — inner's two rules, quoted
+array inner(const array& a, const array& b, StreamOrDevice s) {
+  if (a.ndim() == 0 || b.ndim() == 0) {
+    return multiply(a, b, s);                       // rank-0 short-circuit
+  }
+  if (a.shape(-1) != b.shape(-1)) {                 // EXACT, not broadcast
+    throw std::invalid_argument("[inner] a and b must have the same last dimension.");
+  }
+  return tensordot(a, b, {-1}, {-1}, s);
+}
+```
 
 **`matmul`'s real rules** (upstream `ops.cpp:3192-3267`), in evaluation order: rank-0 on either side
 throws; rank-1 `a` becomes `expand_dims(a, 0)` and rank-1 `b` becomes `expand_dims(b, 1)`; the
@@ -134,14 +183,46 @@ broadcast over `shape[:-2]` (upstream `primitives.cpp:948-964`). **Implementatio
 in Java first, then compare inner dims.** Written against raw shapes, `b.shape(-2)` on a rank-1 `b`
 indexes out of bounds.
 
-`matmul` additionally rejects exact dtypes — `"[matmul] Only inexact types are supported"`, upstream
-`ops.cpp:3223-3229`. Nothing in the facade constructs an int32 array today, but `DType.INT32` already
-exists (`DType.java:7`), so this becomes reachable the moment an `astype` or `int[]` factory lands. A
-`dtype() == FLOAT32` guard is a two-line pre-empt.
+**`matmul` additionally rejects exact dtypes, and the guard for this must mirror that rule rather
+than narrow it.** Native's test is `issubdtype(out_type, inexact)` on the *promoted* type — upstream
+`ops.cpp:3222-3230`, i.e. float16, bfloat16, float32 and complex64 all pass.
 
-**`outer` truncates silently.** Native does `reshape(a, {static_cast<int>(a.size()), 1})` (upstream
-`ops.cpp:5448-5451`). Above 2^31 elements the `size_t → int` cast wraps with **no native error to
-catch**, so Java must guard `a.size() <= Integer.MAX_VALUE` itself.
+A `dtype() == FLOAT32` guard would be **strictly narrower than native, which is the exact defect this
+document exists to remove.** It would have to be relaxed the moment float16 lands in Phase 4's
+quantized layers — the same renegotiation Decisions 1 and 2 are spending Phase 3 to avoid. Instead:
+
+* Add `DType.isInexact()` as a predicate on the enum (currently `return this != INT32;`, since
+  FLOAT32 and INT32 are the only constants — `DType.java:7`). It stays correct as dtypes are added,
+  and it is named after native's own predicate.
+* **Check both operands**, not just the receiver. `matmul` has two.
+
+This guard is *currently unreachable*: nothing in the facade constructs an INT32 array, and
+`DType.fromNative` rejects every other dtype outright. It is specified anyway because it mirrors
+native exactly, and it becomes reachable the moment an `astype` or `int[]` factory lands.
+
+For the record, the absence of a dtype guard on `add`/`multiply`/`inner`/`outer` is **not an
+inconsistency**: those ops call `promote_types` and accept int32 happily (upstream `ops.cpp:2836-2843`).
+There is no native dtype rule there to mirror. Each guard mirrors its own op's actual rule; that is
+the principle, not "every op gets a dtype check".
+
+**`outer` truncates silently — on `a` only.** Quoted in full so the asymmetry of the guard is
+evidently deliberate rather than an oversight:
+
+```cpp
+// upstream mlx/ops.cpp:5448-5451 @ 68cf2fd
+array outer(const array& a, const array& b, StreamOrDevice s) {
+  return multiply(
+      reshape(a, {static_cast<int>(a.size()), 1}, s), flatten(b, s), s);
+}
+```
+
+`a` goes through `static_cast<int>(a.size())`: above 2^31 elements the `size_t → int` cast wraps with
+**no native error to catch**, so Java must guard `a.size() <= Integer.MAX_VALUE` itself. **`b` goes
+through `flatten`, which needs no `int` cast and is therefore safe** — hence the guard is correctly
+one-sided.
+
+This guard is **not in the Testing table and cannot be**: triggering it needs a float32 array above
+2^31 elements, i.e. 8 GB. It is asserted by inspection only.
 
 **`mlx_vector_array` ownership — the highest-risk question in this plan, and the answer is that it is
 safe.** The fear was that `mlx_vector_array_free` would free the contained arrays, double-freeing
@@ -185,6 +266,7 @@ Decision 3 forbids the one thing that would have triggered `checkThread()` by ac
 * `sqrt`, `negative`, `abs`, `tensordot`, `slice_update`, `async_eval`. All already bound, all four
   lines each. Add when a caller exists.
 * Scalar operand overloads (Decision 7).
+* Python-style negative indexing and negative strides on `slice` (Decision 8).
 * dtypes beyond FLOAT32. `initial-plan.md`'s v0.1 constraint stands; `DType.INT32` remains
   read-back-only.
 * Splitting `MLX` into multiple facade classes. See Open questions.
@@ -196,9 +278,27 @@ Decision 3 forbids the one thing that would have triggered `checkThread()` by ac
 
 Do this first: §3 and §4 both depend on it, and it changes the exception thrown on misuse everywhere.
 
-* `MLXScope`: add `public void checkAccess()` exposing the existing private `checkThread()` +
-  `ensureOpen()` pair. It must be public, not package-private — `MLXArray` is in
-  `se.alipsa.jmlx.core`, `MLXScope` in `se.alipsa.jmlx.memory`, and `owner` is private.
+* `MLXScope`: add `checkAccess()` exposing the existing private `checkThread()` + `ensureOpen()`
+  pair. `MLXArray` is in `se.alipsa.jmlx.core`, `MLXScope` in `se.alipsa.jmlx.memory`, and `owner` is
+  private, so this cannot be package-private.
+
+  **Naming the tradeoff, because it cuts against Decision 6.** There is no `module-info.java` anywhere
+  in the tree (verified: `find . -name module-info.java -not -path '*/build/*'` returns nothing), so
+  `public` here is *permanent public API added purely to serve a cross-package internal need*, in a
+  document that elsewhere insists the public surface stays flat. Three options, in order of
+  preference:
+
+  1. **`MLXArray` holds its own `Thread owner`**, captured in its constructor, and asserts against
+     that. No new `MLXScope` API at all. An array is always constructed on its scope's owning thread
+     (the scope allocates its handle), so the two are identical by construction.
+  2. Add `module-info.java` with `exports se.alipsa.jmlx.memory to se.alipsa.jmlx.core;` — correct,
+     but drags the whole project into the module system for one method, and `--enable-native-access`
+     wiring would need revisiting.
+  3. `public void checkAccess()`, javadoc'd as internal. Simplest, and what this plan originally
+     specified — but it is the option that actually widens the public surface.
+
+  **Take option 1 unless implementation finds a reason it fails.** It is strictly less API than
+  either alternative and needs no cross-package call.
 * `MLXArray.ensureOpen()`: call `scope.checkAccess()` after the `closed` check. **One
   `Thread.currentThread()` comparison per handle read closes the hole for `eval`, `exp`, `sum`,
   `transpose`, `toFloatArray` and all eleven new ops at once**, and demotes `binaryOp`'s same-scope
@@ -223,10 +323,22 @@ Three **separate** private helpers. Sharing one is the false-accept trap documen
   `d1 == d2 || d1 == 1 || d2 == 1`, right-aligned, shorter rank padded on the left.
 * `requireMatmulCompatible(a, b)` — reject rank-0; promote rank-1; compare inner dims on the
   **promoted** shapes; batch-broadcast `shape[:-2]`; guard `dtype() == FLOAT32`.
-* `requireBroadcastableTo(a, targetShape)` — directional.
+* `requireBroadcastableTo(a, targetShape)` — directional, **plus a non-negative check on every
+  element of `targetShape`**. This is the only guard whose input is a user-supplied `int[]` rather
+  than shapes read back from native, and without the check it has a false-accept of exactly the class
+  §2 exists to prevent: `broadcastTo(a[1], new int[] {-1})` satisfies `d1 == d2 || d1 == 1 || d2 == 1`
+  via `d1 == 1`, and then `out_shape[i] = a * b` gives `1 * -1 == -1`, which equals the target — so
+  the directional check passes too, and the failure surfaces as `MLXException` from native. That
+  breaks the contract the Testing table asserts ("proves the Java guard fires before native").
 
-Update the four javadocs at `MLX.java:95`, `:101`, `:107`, `:113`. "Elementwise sum of two
-same-shaped arrays" is now wrong: these ops can return a shape matching neither operand.
+**Javadocs falsified by these decisions — six, not four.** Update all of:
+
+| Location | Current text | Falsified by |
+| --- | --- | --- |
+| `MLX.java:95`, `:101`, `:107`, `:113` | "…of two same-shaped arrays" | Decision 1 — these can now return a shape matching neither operand |
+| `MLX.java:119` | "Matrix product of two **rank-2** arrays" | Decision 2 — rank ≥ 1 |
+| `MLX.java:203` | "Reverses every axis; **there is no partial-permutation overload in this slice**" | §3 adds `transpose(a, int[] axes)` |
+| `MLX.java:211-212` | "mirrors mlx-c's `mlx_array_eval`" | Decision 3 — it now mirrors `mlx_eval` over a vector |
 
 **`MLXNativeErrorTest` needs no fixture change, and this is worth a comment in the test.** Its
 `[3]`/`[2]` pair is still broadcast-*incompatible* under NumPy rules, so
@@ -261,21 +373,49 @@ Add two private helpers mirroring `binaryOp` (`MLX.java:148-166`), then **refact
 | `squeeze(a)` | `mlx_squeeze` | all size-1 axes |
 | `squeeze(a, int[] axes)` | `mlx_squeeze_axes` | `shapeOp` |
 | `transpose(a, int[] axes)` | `mlx_transpose_axes` | `shapeOp`. Beyond the outline's "transposed matrices", but Phase 4's attention head reshuffle needs it and it is one method plus one test |
-| `slice(a, start, stop)` | `mlx_slice` | strides default to all-1s |
+| `slice(a, start, stop)` | `mlx_slice` | strides default to all-1s. Guards below |
 | `slice(a, start, stop, strides)` | `mlx_slice` | three `const int*` params, so it does not fit `shapeOp`; own confined-`Arena` body |
+
+**`slice`'s guards, specified rather than left implicit.** It takes three user-supplied `int[]`s plus
+their independent `size_t` counts (`mlx_h.java:33416`), which makes it the widest unvalidated surface
+in this phase — every other op either takes shapes read back from native or a single `int[]`. Settle
+it here for the same reason Decisions 1 and 2 exist: it is a public API contract.
+
+* `start.length == stop.length == a.ndim()`, and `strides.length == a.ndim()` on the 4-arg overload.
+  Reject otherwise with `IllegalArgumentException` naming both lengths. Passing mismatched counts is
+  the one way a caller can make the three `size_t` arguments disagree with each other.
+* **Negative indices are not supported in this phase.** Reject `start[i] < 0` or `stop[i] < 0`. mlx's
+  Python layer synthesizes Python slice semantics above the C API rather than in it; reproducing that
+  is a Java-side reimplementation with no native counterpart to defer to — the same reasoning that
+  rules out `MLX.dot`. Revisit when a caller needs it.
+* Reject `strides[i] <= 0` on the 4-arg overload. Negative strides are mlx's reverse-a-dimension
+  form and are untested here; zero is degenerate.
+* Do **not** bounds-check `stop[i] <= a.shape()[i]` in Java. mlx clamps rather than throwing, so a
+  Java check would be stricter than native — the defect this document exists to remove.
 
 ### 4. `eval` — `MLX.java`
 
 ```
 public static void eval(MLXArray... arrays)
   if (arrays.length == 0) return;
-  pass 1: read every array's handle() -- now thread-checked per §1 -- BEFORE allocating anything,
-          so a closed or foreign-thread array cannot throw mid-build
+
+  // Pass 1 CAPTURES; it does not merely touch. handle() is thread-checked per §1,
+  // so this both validates every array and yields the segments the copy loop uses --
+  // the "cannot throw mid-build" invariant then holds by construction rather than
+  // by reading each handle a second time below.
+  MemorySegment[] handles = new MemorySegment[arrays.length];
+  for (int i = 0; i < arrays.length; i++) handles[i] = arrays[i].handle();
+
   try (Arena tmp = Arena.ofConfined()) {
     MemorySegment buf = mlx_array_.allocateArray(n, tmp);
-    for i: MemorySegment.copy(a.handle(), 0L, buf, i * mlx_array_.sizeof(), mlx_array_.sizeof());
+    for i: MemorySegment.copy(handles[i], 0L, buf, i * mlx_array_.sizeof(), mlx_array_.sizeof());
     NativeLoader.clearLastNativeError();
-    MemorySegment vec = mlx_h.mlx_vector_array_new_data(buf, n);
+    // NOTE the allocator argument. This is the call the confined-Arena paragraph
+    // below is about: passing `scope` here instead of `tmp` is the wrong-type
+    // delete. The generated signature is
+    //   mlx_vector_array_new_data(SegmentAllocator allocator, MemorySegment data, long size)
+    // -- mlx_h.java:5471.
+    MemorySegment vec = mlx_h.mlx_vector_array_new_data(tmp, buf, n);
     if (mlx_vector_array_.ctx(vec).address() == 0) throw nativeFailure("mlx_vector_array_new_data");
     try { checked(() -> mlx_h.mlx_eval(vec)); }
     finally { mlx_h.mlx_vector_array_free(vec); }
@@ -305,15 +445,35 @@ public static void eval(MLXArray... arrays)
 tape build plus one synchronization instead of N plus N (upstream `transforms.cpp:330-345`). But it
 schedules all N graphs before waiting, so all N sets of intermediates are live simultaneously —
 **peak memory can go up** relative to the loop, which let each graph's temporaries be released before
-the next began. Error attribution also regresses: one `mlx_eval` is all-or-nothing with no index in
-the message, where the loop could name which array failed. `mlx_get_peak_memory` /
-`mlx_reset_peak_memory` (`native/install/include/mlx/c/memory.h:35-36`) exist if this ever needs
-measuring.
+the next began.
+
+**Measure this rather than asserting it.** It is the risk that actually bites in Phase 4, where a
+transformer forward pass evals many arrays at once, and Decision 3 is hard to reverse once callers
+depend on the joint-eval semantics. Record one number — peak bytes for the loop versus the vector
+over the same N-array workload, via `mlx_get_peak_memory` / `mlx_reset_peak_memory`
+(`native/install/include/mlx/c/memory.h:35-36`) — and put it in this document. Verification #9. An
+informal one-off measurement is enough; the point is that the tradeoff is quantified rather than
+hypothetical.
+
+**Error attribution regresses, and has a free mitigation — take it.** One `mlx_eval` is
+all-or-nothing with no index in the message, where the loop could name which array failed. On the
+*error path only*, catch the `MLXException` and re-run the per-array `mlx_array_eval` loop to
+identify the offending array, then rethrow with its index. This costs nothing on the happy path,
+needs no extra native surface, and restores the diagnostic the loop gave for free. Wrap the re-run
+defensively: if it fails to reproduce the error, rethrow the original rather than masking it.
 
 ### 5. Documentation
 
 * `req/project-outline.md` Phase 3: mark delivered; record that `mlx_dot` does not exist and that
   `inner`/`outer` cover the outline's dot/outer deliverable.
+
+  **Reconcile the "thread-safe" wording rather than silently marking it done.**
+  `project-outline.md:68` says "**Thread-safe** `eval(MLXArray... arrays)` dispatchers". Decision 4
+  plus §1 deliver something different: a *thread-confined* `eval` that throws on foreign-thread
+  access. That is a defensible reinterpretation — `MLXScope` is confined by construction
+  (`initial-plan.md` §6), so a genuinely thread-safe `eval` would contradict the memory model the
+  project already committed to — but it is a substitution, not the literal deliverable. Amend that
+  outline line to say "thread-confined, enforced" so a later reader does not score it as unmet.
 * `MLX.java`'s class javadoc cites `req/initial-plan.md §7`; add this document.
 * `jmlx-examples/HelloMLX`: add one broadcast `add` and one multi-array `eval`, so the two behavioural
   changes in this phase are visible in the demo rather than only in tests.
@@ -332,6 +492,8 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `matmul` all three rank-1 forms; batched `[2,3,4]×[4,5]→[2,3,5]`; rank-0 rejected | the promotion path is where an off-by-one in axis indexing hides |
 | `inner` 1-D equals hand-computed dot; `outer` shape and values | |
 | `broadcastTo` success **and** `[3]→[1]` rejected with `IllegalArgumentException` | proves the directional check exists rather than the symmetric one |
+| `broadcastTo(a[1], new int[] {-1})` rejected with `IllegalArgumentException` | the negative-dimension false-accept in §2. Without the non-negative check this throws `MLXException` from native instead — assert the exception **type**, since both throw |
+| `slice` with `start.length != a.ndim()` rejected; negative `start` rejected; `strides[i] == 0` rejected | §3's guards. `slice` has the widest user-supplied input surface in this phase |
 | `squeeze` both overloads; `transpose(a, axes)` with a non-reversing permutation | |
 | `slice` contiguous **and strided** | strided is the one that matters: it yields a non-contiguous view, exercising `toFloatArray()`'s `mlx_contiguous` path the way `transposeReordersElementsNotJustShape` does |
 | `eval()` zero-arg no-op | proves the null-ctx check does not misfire on the non-null empty vector |
@@ -361,9 +523,17 @@ above cover the correctness and lifetime risks that the rewrite actually introdu
 7. `./gradlew :jmlx-core:test --tests '*MLXGpuVerificationTest*'` — kernels still dispatch to GPU.
 8. `./gradlew :jmlx-examples:run` — HelloMLX prints correct values for the broadcast `add` and the
    multi-array `eval`.
-9. `grep -rn requireSameShape jmlx-core/src` returns nothing.
-10. `MLXArray.ensureOpen()` is the only place asserting thread ownership on the read path — no new op
-    carries its own copy of the check.
+9. **Peak-memory number recorded in §4** (loop vs. vector over the same N-array workload, via
+   `mlx_get_peak_memory`). The tradeoff Decision 3 accepts must be quantified before it ships, not
+   asserted. Fails if §4 still reads "can go up" with no measurement.
+10. `grep -rn requireSameShape jmlx-core/src` — expect zero matches.
+11. `grep -rn 'Thread.currentThread()' jmlx-core/src/main | wc -l` — expect exactly the count implied
+    by §1's chosen option (1 for option 1, capturing `owner` in the `MLXArray` constructor). More than
+    that means an op grew its own copy of the check instead of inheriting it from `ensureOpen()`.
+12. `grep -rn 'mlx_vector_array_new_data' jmlx-core/src/main` — expect exactly one call site, and
+    confirm by eye that its first argument is the confined `Arena`, never an `MLXScope`. This is the
+    heap-corruption case in §4; it is worth one manual look because no test can catch it — passing a
+    scope there is UB, not a failed assertion.
 
 ## Open questions
 

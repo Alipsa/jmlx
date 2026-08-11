@@ -5,11 +5,23 @@
 `req/project-outline.md` describes Phase 3 in four bullets. `req/initial-plan.md` covered Phases 1+2
 plus a thin op slice and is merged (`dd4fddf`). This document covers the rest of Phase 3.
 
-**It is deliberately an order of magnitude shorter than `req/initial-plan.md`, because the risk it
-addresses is a different kind.** `initial-plan.md` was long because v0.1's unknowns were *native*:
-whether jextract could consume `mlx/c/mlx.h` at all, whether mlx-c's by-value structs survive the FFM
-boundary, whether `mlx.metallib` could be found at runtime. Those are answered, and the answers are
-in the repository. Phase 3 has no native unknowns:
+**It addresses a different kind of risk from `req/initial-plan.md`, and is long for a different
+reason.** `initial-plan.md` ran 568 lines because v0.1's unknowns were *native*: whether jextract
+could consume `mlx/c/mlx.h` at all, whether mlx-c's by-value structs survive the FFM boundary,
+whether `mlx.metallib` could be found at runtime. Length there bought **de-risking** — probes and
+fallbacks for things that might not work.
+
+This document is longer still, and none of it is de-risking. It is **evidence**: quoted native source
+at a pinned SHA, measured behaviour, and exact generated signatures. That is the whole cost centre —
+two C++ quotations and §4's pseudocode account for roughly a hundred lines between them. An earlier
+draft of this paragraph claimed to be "an order of magnitude shorter"; it was, at 380 lines, and
+seven review rounds of adding evidence made it false. The claim is dropped rather than defended.
+
+What the original framing was *for* still holds and is worth stating directly: **the op-adding
+pattern from `initial-plan.md` §7 is not restated here.** It works, it is established, and repeating
+it eleven times would add length without adding evidence.
+
+Phase 3 has no native unknowns:
 
 **Every symbol Phase 3 needs is already in the committed jextract output.** Verified against
 `jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java`:
@@ -90,8 +102,7 @@ than a stricter subset of it, so Phase 4 is additive rather than a renegotiation
    ergonomics bite.
 8. **`slice` gets two Java guards: length agreement with `a.ndim()`, and a zero-stride rejection.**
    Negative indices and negative strides are *supported by native* and must not be rejected; a zero
-   stride is *undefined behaviour* in native and must be. See §3 — including why the second guard is
-   not a violation of Decision 1's principle.
+   stride is *undefined behaviour* in native and must be. See §3.
 
 ## Research findings that shaped this plan
 
@@ -420,14 +431,8 @@ Add two private helpers mirroring `binaryOp` (`MLX.java:148-166`), then **refact
 their independent `size_t` counts (`mlx_h.java:33416`), so the guards need stating — but the answer is
 "two", and the reasoning for why it is not more is the useful part.
 
-**An earlier draft of this section rejected negative indices and negative strides. That was wrong,
-and it was wrong in exactly the way this whole document exists to prevent** — a Java guard stricter
-than native, introduced in the same revision that fixed the identical defect in `matmul`'s dtype
-check. That draft rested on recollection rather than evidence, so here is the source.
-
-**Quoted without elisions, deliberately.** Earlier drafts of this document abbreviated both branches
-with `...`, and the line hiding behind the second `...` is the one that decides the zero-stride case
-below. An elision in an evidence block is where the next bug lives.
+Quoted in full, **without elisions** — the line that decides the zero-stride case below is one an
+abbreviated quote naturally drops.
 
 ```cpp
 // upstream mlx/ops.cpp:656-696 @ 68cf2fd — normalize_slice, which slice() delegates to
@@ -492,9 +497,8 @@ So the guard list is two items:
   result* where NumPy raises.
 
   **That measurement went through mlx's Python binding, and the conclusion is about the C API jmlx
-  calls — so close the gap rather than infer across it.** This is structurally the same leap that
-  produced the retracted negative-index draft. It holds here because `mlx_slice` forwards its three
-  arrays *verbatim* with no normalization of its own
+  calls — so close the gap rather than infer across it.** It holds because `mlx_slice` forwards its
+  three arrays *verbatim* with no normalization of its own
   (`native/scratch/mlx-c/mlx/c/ops.cpp:3125-3143`):
 
   ```cpp
@@ -713,7 +717,7 @@ asserted, not just shapes**. New cases go in `MLXNumericTest` unless noted.
 | `broadcastTo` success **and** `[3]→[1]` rejected with `IllegalArgumentException` | proves the directional check exists rather than the symmetric one |
 | `broadcastTo(a[1], new int[] {-1})` rejected with `IllegalArgumentException` | the negative-dimension false-accept in §2. Without the non-negative check this throws `MLXException` from native instead — assert the exception **type**, since both throw |
 | `slice` with `start.length != a.ndim()` rejected with `IllegalArgumentException` | first of §3's two guards |
-| `slice` with a **negative** `start`, and with a **negative stride** (reversing a dimension), both succeed and return correct values | guards against re-introducing the over-strict draft. These are the cases Decision 8 originally rejected and native supports |
+| `slice` with a **negative** `start`, and with a **negative stride** (reversing a dimension), both succeed and return correct values | **these must not throw.** Native supports both; a guard rejecting them is the failure mode Decision 8 exists to prevent, and this row is what catches it |
 | `slice` with `strides[i] == 0` throws `IllegalArgumentException` | the UB guard. Assert the exception **type and message** — without the guard this does not throw at all, it silently returns a zero-sized dimension, so a test asserting only "does not succeed" would pass against the broken version |
 | `squeeze` both overloads; `transpose(a, axes)` with a non-reversing permutation | |
 | `slice` contiguous **and strided** | strided is the one that matters: it yields a non-contiguous view, exercising `toFloatArray()`'s `mlx_contiguous` path the way `transposeReordersElementsNotJustShape` does |
@@ -762,6 +766,24 @@ above cover the correctness and lifetime risks that the rewrite actually introdu
     confirm by eye that its first argument is the confined `Arena`, never an `MLXScope`. This is the
     heap-corruption case in §4; it is worth one manual look because no test can catch it — passing a
     scope there is UB, not a failed assertion.
+
+## Failure modes this document kept producing
+
+Seven review rounds found twenty-four defects here, in three clusters. They are recorded because they
+are what to watch for in Phase 4, not as history — the warning against re-making each one already
+lives where it would be re-made.
+
+1. **A Java guard narrower than native.** Hit four times (`requireSameShape`; `matmul` rank-2;
+   `matmul` `dtype() == FLOAT32`; `slice` rejecting negative indices and strides). Twice the
+   narrowing was *introduced by a fix for the previous instance*. The resolving principle is in §3:
+   mirror native where native is defined, guard where it is undefined, and say which case applies.
+2. **A decision recorded in prose but not in the block coded from.** Hit three times. Inline comments
+   carrying the reasoning — as at the allocator argument in §4 — are the mitigation.
+3. **Java written but never compiled or run.** Hit four times, all in §4's block: a dropped
+   `SegmentAllocator`, a nonexistent `MLXException(String, Throwable)`, a lambda capturing a mutated
+   loop counter, and a fixture recipe needing a 2^40-element `float[]`. **Re-reading did not catch
+   these.** Before implementing §4, stand its block up as a compiling scratch file against the real
+   generated bindings — it references five real signatures and Markdown checks none of them.
 
 ## Open questions
 

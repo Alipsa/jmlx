@@ -28,6 +28,7 @@ REPO_ROOT="${REPO_ROOT:A}"
 BOOTSTRAP_SCRIPT="$REPO_ROOT/scripts/bootstrap-native.sh"
 
 log() { print -r -- ">>> $*"; }
+warn() { print -r -- "WARNING: $*" >&2; }
 die() { print -r -- "ERROR: $*" >&2; exit 1; }
 
 [[ $# -eq 1 ]] || die "usage: $0 <mlx-c-commit-sha>"
@@ -35,8 +36,34 @@ die() { print -r -- "ERROR: $*" >&2; exit 1; }
 NEW_COMMIT="${1:l}"
 [[ "$NEW_COMMIT" =~ ^[0-9a-f]{40}$ ]] || die "'$1' is not a full 40-character hex commit hash -- pass the complete SHA, not an abbreviated one (see the usage comment at the top of this script for why)"
 
-OLD_COMMIT="$(grep -oE 'MLX_C_COMMIT="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[^"]+"' | tr -d '"')"
-[[ -n "$OLD_COMMIT" ]] || die "could not find a MLX_C_COMMIT=\"...\" line in $BOOTSTRAP_SCRIPT -- has it been restructured?"
+# Split from the die, not chained through `||` on the following line: under
+# set -e, a failing pipeline inside a plain assignment kills the script right
+# here -- before a die on the next line ever gets to run -- so the one
+# scenario this guard exists for (bootstrap-native.sh restructured) would
+# otherwise surface as a bare, undiagnosed exit 1.
+OLD_COMMIT="$(grep -oE 'MLX_C_COMMIT="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[^"]+"' | tr -d '"')" \
+  || die "could not find a MLX_C_COMMIT=\"...\" line in $BOOTSTRAP_SCRIPT -- has it been restructured?"
+
+# Backed up before any edit (even in the "already pinned" branch below, so
+# the same rollback logic covers a bootstrap/regen failure regardless of
+# whether this run actually changed the pin) and restored by this trap if
+# anything after this point fails -- otherwise a version-pairing assertion
+# failure inside bootstrap-native.sh (the documented safety net for a bad
+# repin) leaves the repo sitting on a repinned commit without regenerated
+# bindings and no hint to revert.
+BOOTSTRAP_BACKUP="$(mktemp)"
+cp "$BOOTSTRAP_SCRIPT" "$BOOTSTRAP_BACKUP"
+rollback() {
+  # Not "status": zsh reserves that name as a read-only synonym for $? and
+  # refuses `local status=...`.
+  local exit_status=$?
+  if [[ $exit_status -ne 0 ]]; then
+    cp "$BOOTSTRAP_BACKUP" "$BOOTSTRAP_SCRIPT"
+    warn "aborting -- reverted scripts/bootstrap-native.sh to its state from before this run (git diff scripts/bootstrap-native.sh should now be clean if it was clean going in)"
+  fi
+  rm -f "$BOOTSTRAP_BACKUP"
+}
+trap rollback EXIT
 
 if [[ "$OLD_COMMIT" == "$NEW_COMMIT" ]]; then
   log "MLX_C_COMMIT is already pinned to $NEW_COMMIT -- nothing to repin, running bootstrap/regen anyway to refresh the staged native/ tree"

@@ -55,10 +55,16 @@ latest_from_maven_metadata() {
 }
 
 # Prints one report line and flips UPDATES_FOUND when current != latest.
-# An empty $latest (lookup failed) is reported separately, not compared.
+# Empty $current (the pinned-version regex didn't match -- a parse failure,
+# not "no update") and empty $latest (the upstream lookup failed) are each
+# reported as their own warning, never compared against each other: doing
+# so would either report a parse failure as an available update, or compare
+# two empty strings and silently call it up to date.
 report() {
   local name="$1" current="$2" latest="$3"
-  if [[ -z "$latest" ]]; then
+  if [[ -z "$current" ]]; then
+    warn "$name: could not parse the currently pinned version -- the declaration format may have changed"
+  elif [[ -z "$latest" ]]; then
     warn "$name: could not resolve the latest version (network issue, or the coordinates moved)"
   elif [[ "$current" == "$latest" ]]; then
     log "$name: $current (up to date)"
@@ -68,19 +74,46 @@ report() {
   fi
 }
 
+# Upper bound on how many of mlx-c's tags (newest first) to inspect before
+# giving up. ~19 tags exist at the time of writing; this leaves headroom for
+# years of releases while keeping the no-match case -- the common one, since
+# mlx-c reliably lags a fresh MLX release -- from growing into an unbounded
+# sweep of sequential network requests as more tags accumulate.
+MAX_MLXC_TAGS_TO_SCAN=40
+
 # Searches mlx-c's own tags (newest first, via sort -V, since mlx-c's version
 # numbers do not track MLX's) for the tag whose CMakeLists.txt GIT_TAG pins
 # exactly "v$1". Prints "<tag> <commit>" on the first match, nothing if none
-# of the fetched tags match.
+# of the scanned tags match or the scan cap above is hit.
 find_mlx_c_commit_for_mlx_version() {
-  local target_version="$1" target_tag="v${1}" tag cmake_txt pinned_tag commit
+  local target_tag="v${1}" tag cmake_txt pinned_tag
+  local commit peeled_output
+  local -i peeled_status scanned=0
   while IFS= read -r tag; do
     [[ -z "$tag" ]] && continue
+    scanned+=1
+    if (( scanned > MAX_MLXC_TAGS_TO_SCAN )); then
+      warn "mlx-c: gave up after scanning $MAX_MLXC_TAGS_TO_SCAN tags without a match -- raise MAX_MLXC_TAGS_TO_SCAN in this script if mlx-c now has more releases than that, or check https://github.com/ml-explore/mlx-c manually"
+      return 0
+    fi
     cmake_txt="$(curl -fsSL "$MLXC_RAW_BASE/${tag}/CMakeLists.txt" 2>/dev/null)" || continue
     pinned_tag="$(print -r -- "$cmake_txt" | grep -oE 'GIT_TAG v[0-9.]+' | head -1 | awk '{print $2}')"
     if [[ "$pinned_tag" == "$target_tag" ]]; then
-      commit="$(git ls-remote "$MLXC_REPO_URL" "refs/tags/${tag}^{}" 2>/dev/null | awk '{print $1}')"
-      [[ -z "$commit" ]] && commit="$(git ls-remote "$MLXC_REPO_URL" "refs/tags/${tag}" 2>/dev/null | awk '{print $1}')"
+      # mlx-c's tags are annotated, so the plain ref is a tag OBJECT, not a
+      # commit -- "^{}" peels it to the commit it points at. Only fall back
+      # to the unpeeled ref when the peel query itself succeeded and simply
+      # found nothing (a lightweight tag, where the plain ref already is the
+      # commit); a *failed* peel query (network hiccup) must not fall
+      # through to that same branch, or a transient failure silently yields
+      # a tag-object SHA that looks like a valid 40-hex-char commit to
+      # updateMlx.zsh but can never match `git rev-parse HEAD`.
+      peeled_output="$(git ls-remote "$MLXC_REPO_URL" "refs/tags/${tag}^{}")"
+      peeled_status=$?
+      commit=""
+      if [[ $peeled_status -eq 0 ]]; then
+        commit="$(print -r -- "$peeled_output" | awk '{print $1}')"
+        [[ -z "$commit" ]] && commit="$(git ls-remote "$MLXC_REPO_URL" "refs/tags/${tag}" 2>/dev/null | awk '{print $1}')"
+      fi
       [[ -n "$commit" ]] && print -r -- "$tag $commit"
       return 0
     fi
@@ -94,11 +127,11 @@ find_mlx_c_commit_for_mlx_version() {
 
 log "Checking Gradle plugins..."
 
-SPOTLESS_CURRENT="$(grep -oE "id 'com\.diffplug\.spotless' version '[^']+'" "$BUILD_GRADLE" | grep -oE "[0-9][^']*")"
+SPOTLESS_CURRENT="$(grep -oE "id 'com\.diffplug\.spotless' version '[^']+'" "$BUILD_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 SPOTLESS_LATEST="$(latest_from_maven_metadata 'https://plugins.gradle.org/m2/com/diffplug/spotless/com.diffplug.spotless.gradle.plugin/maven-metadata.xml')"
 report "Gradle plugin com.diffplug.spotless" "$SPOTLESS_CURRENT" "$SPOTLESS_LATEST"
 
-FOOJAY_CURRENT="$(grep -oE "id 'org\.gradle\.toolchains\.foojay-resolver-convention' version '[^']+'" "$SETTINGS_GRADLE" | grep -oE "[0-9][^']*")"
+FOOJAY_CURRENT="$(grep -oE "id 'org\.gradle\.toolchains\.foojay-resolver-convention' version '[^']+'" "$SETTINGS_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 FOOJAY_LATEST="$(latest_from_maven_metadata 'https://plugins.gradle.org/m2/org/gradle/toolchains/foojay-resolver-convention/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin/maven-metadata.xml')"
 report "Gradle plugin org.gradle.toolchains.foojay-resolver-convention" "$FOOJAY_CURRENT" "$FOOJAY_LATEST"
 
@@ -106,7 +139,7 @@ report "Gradle plugin org.gradle.toolchains.foojay-resolver-convention" "$FOOJAY
 
 log "Checking Maven Central dependencies..."
 
-JUNIT_CURRENT="$(grep -E '^junit-jupiter[[:space:]]*=' "$LIBS_TOML" | grep -oE '"[^"]+"' | tr -d '"')"
+JUNIT_CURRENT="$(grep -E '^junit-jupiter[[:space:]]*=' "$LIBS_TOML" | grep -oE '"[^"]+"' | tr -d '"' | head -1)"
 JUNIT_LATEST="$(latest_from_maven_metadata 'https://repo1.maven.org/maven2/org/junit/jupiter/junit-jupiter-api/maven-metadata.xml')"
 report "org.junit.jupiter:junit-jupiter-api" "$JUNIT_CURRENT" "$JUNIT_LATEST"
 
@@ -114,12 +147,12 @@ report "org.junit.jupiter:junit-jupiter-api" "$JUNIT_CURRENT" "$JUNIT_LATEST"
 # useJUnitJupiter(...) pins the bundled-platform version separately from
 # libs.versions.toml's junit-jupiter accessor, and is kept in sync with it by
 # hand -- so check that sync here rather than just the upstream version.
-USE_JUNIT_CURRENT="$(grep -oE "useJUnitJupiter\('[^']+'\)" "$BUILD_GRADLE" | grep -oE "[0-9][^']*")"
+USE_JUNIT_CURRENT="$(grep -oE "useJUnitJupiter\('[^']+'\)" "$BUILD_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 if [[ -n "$USE_JUNIT_CURRENT" && -n "$JUNIT_CURRENT" && "$USE_JUNIT_CURRENT" != "$JUNIT_CURRENT" ]]; then
   warn "build.gradle's useJUnitJupiter('$USE_JUNIT_CURRENT') has drifted from gradle/libs.versions.toml's junit-jupiter ($JUNIT_CURRENT) -- these are meant to be kept in sync by hand (see the comment above useJUnitJupiter in build.gradle)"
 fi
 
-CHECKSTYLE_CURRENT="$(grep -oE "toolVersion = '[^']+'" "$BUILD_GRADLE" | grep -oE "[0-9][^']*")"
+CHECKSTYLE_CURRENT="$(grep -oE "toolVersion = '[^']+'" "$BUILD_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 CHECKSTYLE_LATEST="$(latest_from_maven_metadata 'https://repo1.maven.org/maven2/com/puppycrawl/tools/checkstyle/maven-metadata.xml')"
 report "com.puppycrawl.tools:checkstyle" "$CHECKSTYLE_CURRENT" "$CHECKSTYLE_LATEST"
 
@@ -135,8 +168,8 @@ report "Gradle wrapper" "$WRAPPER_CURRENT" "$WRAPPER_LATEST"
 
 log "Checking mlx-metal (native/ dependency, pinned in scripts/bootstrap-native.sh)..."
 
-MLX_METAL_CURRENT="$(grep -oE 'MLX_METAL_VERSION="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[^"]+"' | tr -d '"')"
-MLX_C_COMMIT_CURRENT="$(grep -oE 'MLX_C_COMMIT="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[^"]+"' | tr -d '"')"
+MLX_METAL_CURRENT="$(grep -oE 'MLX_METAL_VERSION="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[^"]+"' | tr -d '"' | head -1)"
+MLX_C_COMMIT_CURRENT="$(grep -oE 'MLX_C_COMMIT="[^"]+"' "$BOOTSTRAP_SCRIPT" | grep -oE '"[^"]+"' | tr -d '"' | head -1)"
 MLX_METAL_LATEST="$(curl -fsSL 'https://pypi.org/pypi/mlx-metal/json' 2>/dev/null | grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"$/\1/')"
 
 if [[ -z "$MLX_METAL_LATEST" ]]; then

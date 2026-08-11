@@ -14,6 +14,15 @@ import java.lang.foreign.ValueLayout;
  */
 public final class NativeMemoryProbe {
 
+  // Same reasoning as MLX's and MLXScope's own static initializers: this
+  // class calls mlx_h.mlx_get_active_memory directly and is a public
+  // fixture meant to be reached for from new tests, so it needs the guard
+  // independently rather than relying on a caller having already touched
+  // one of those classes first.
+  static {
+    NativeLoader.ensureLoaded();
+  }
+
   private NativeMemoryProbe() {}
 
   /** Current active (not cached, not process RSS) native memory, in bytes, as reported by mlx-c. */

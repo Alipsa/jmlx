@@ -72,7 +72,11 @@ class MLXScopeTest {
   // timeout fails as a bare TimeoutException with none of the baseline/after
   // numbers the assertion below exists to report. Bounding the loop itself
   // leaves the timeout as a backstop for a genuinely hung JVM, not the
-  // mechanism that reports an ordinary failure.
+  // mechanism that reports an ordinary failure. Shared by both poll loops
+  // below via one deadline computed once: two independent 20s budgets would
+  // let total polling sum past the 30s @Timeout if the first loop ran long,
+  // reintroducing the bare-timeout failure mode this constant exists to
+  // avoid.
   private static final long POLL_DEADLINE_SECONDS = 20;
 
   /**
@@ -100,15 +104,22 @@ class MLXScopeTest {
     // than "baseline" if this happened to be the first test in the JVM to
     // touch MLX at all -- MLXMemoryLeakTest's own warmup phase exists for
     // the same reason, just amortized over many iterations instead of one.
+    // A single element suffices: baseline=0 in practice shows the array's
+    // own footprint contributes nothing to active memory, so only the
+    // one-time init path this warmup targets needs exercising.
     try (MLXScope warmup = new MLXScope()) {
-      MLX.array(warmup, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
+      MLX.array(warmup, new float[] {0f}, new int[] {1});
     }
 
     long baseline = NativeMemoryProbe.activeMemoryBytes();
     WeakReference<MLXScope> ref = new WeakReference<>(createDetachedScope());
 
-    long refDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(POLL_DEADLINE_SECONDS);
-    while (ref.get() != null && System.nanoTime() < refDeadline) {
+    // One deadline shared by both loops below, not one per loop: two
+    // independent budgets could sum past the outer @Timeout if the first
+    // loop ran long, reintroducing the bare-timeout failure this test's
+    // deadline bounding exists to avoid.
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(POLL_DEADLINE_SECONDS);
+    while (ref.get() != null && System.nanoTime() < deadline) {
       System.gc();
       Thread.sleep(50);
     }
@@ -118,9 +129,8 @@ class MLXScopeTest {
     // registered action are not synchronized with each other, so poll for
     // the memory drop too rather than sampling once right after the loop
     // above exits.
-    long memoryDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(POLL_DEADLINE_SECONDS);
     long after = NativeMemoryProbe.activeMemoryBytes();
-    while (after - baseline > FREED_DETECTION_SLACK_BYTES && System.nanoTime() < memoryDeadline) {
+    while (after - baseline > FREED_DETECTION_SLACK_BYTES && System.nanoTime() < deadline) {
       System.gc();
       Thread.sleep(50);
       after = NativeMemoryProbe.activeMemoryBytes();

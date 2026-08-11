@@ -32,6 +32,9 @@ MLXC_RAW_BASE="https://raw.githubusercontent.com/ml-explore/mlx-c/refs/tags"
 
 log() { print -r -- ">>> $*"; }
 warn() { print -r -- "WARNING: $*" >&2; }
+# A bare ">>>" between sections -- not `log ""`, which would leave a
+# trailing space after the arrow.
+sep() { print -r -- ">>>"; }
 
 for tool in curl git grep sed awk sort; do
   command -v "$tool" >/dev/null 2>&1 || { print -r -- "ERROR: required tool '$tool' not found on PATH" >&2; exit 1; }
@@ -54,7 +57,13 @@ latest_from_maven_metadata() {
   fi
 }
 
-# Prints one report line and flips UPDATES_FOUND when current != latest.
+# Prints a line and flips UPDATES_FOUND only when there's something to
+# report; an up-to-date result prints nothing here at all -- the caller
+# tracks that silence per section and prints a single "(all up to date)"
+# line when every item in the section was silent (see the section bodies
+# below). Returns 1 whenever it printed something, 0 when up to date, so a
+# caller can accumulate "did this section have any news" with `|| news=1`.
+#
 # Empty $current (the pinned-version regex didn't match -- a parse failure,
 # not "no update") and empty $latest (the upstream lookup failed) are each
 # reported as their own warning, never compared against each other: doing
@@ -64,13 +73,16 @@ report() {
   local name="$1" current="$2" latest="$3"
   if [[ -z "$current" ]]; then
     warn "$name: could not parse the currently pinned version -- the declaration format may have changed"
+    return 1
   elif [[ -z "$latest" ]]; then
     warn "$name: could not resolve the latest version (network issue, or the coordinates moved)"
+    return 1
   elif [[ "$current" == "$latest" ]]; then
-    log "$name: $current (up to date)"
+    return 0
   else
     log "$name: $current -> $latest available"
     UPDATES_FOUND=1
+    return 1
   fi
 }
 
@@ -140,22 +152,27 @@ find_mlx_c_commit_for_mlx_version() {
 # Central) ---------------------------------------------------------------
 
 log "Checking Gradle plugins..."
+typeset -i SECTION_NEWS=0
 
 SPOTLESS_CURRENT="$(grep -oE "id 'com\.diffplug\.spotless' version '[^']+'" "$BUILD_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 SPOTLESS_LATEST="$(latest_from_maven_metadata 'https://plugins.gradle.org/m2/com/diffplug/spotless/com.diffplug.spotless.gradle.plugin/maven-metadata.xml')"
-report "Gradle plugin com.diffplug.spotless" "$SPOTLESS_CURRENT" "$SPOTLESS_LATEST"
+report "Gradle plugin com.diffplug.spotless" "$SPOTLESS_CURRENT" "$SPOTLESS_LATEST" || SECTION_NEWS=1
 
 FOOJAY_CURRENT="$(grep -oE "id 'org\.gradle\.toolchains\.foojay-resolver-convention' version '[^']+'" "$SETTINGS_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 FOOJAY_LATEST="$(latest_from_maven_metadata 'https://plugins.gradle.org/m2/org/gradle/toolchains/foojay-resolver-convention/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin/maven-metadata.xml')"
-report "Gradle plugin org.gradle.toolchains.foojay-resolver-convention" "$FOOJAY_CURRENT" "$FOOJAY_LATEST"
+report "Gradle plugin org.gradle.toolchains.foojay-resolver-convention" "$FOOJAY_CURRENT" "$FOOJAY_LATEST" || SECTION_NEWS=1
+
+[[ "$SECTION_NEWS" -eq 0 ]] && log "(all up to date)"
+sep
 
 # --- Maven Central dependencies ------------------------------------------
 
 log "Checking Maven Central dependencies..."
+typeset -i SECTION_NEWS=0
 
 JUNIT_CURRENT="$(grep -E '^junit-jupiter[[:space:]]*=' "$LIBS_TOML" | grep -oE '"[^"]+"' | tr -d '"' | head -1)"
 JUNIT_LATEST="$(latest_from_maven_metadata 'https://repo1.maven.org/maven2/org/junit/jupiter/junit-jupiter-api/maven-metadata.xml')"
-report "org.junit.jupiter:junit-jupiter-api" "$JUNIT_CURRENT" "$JUNIT_LATEST"
+report "org.junit.jupiter:junit-jupiter-api" "$JUNIT_CURRENT" "$JUNIT_LATEST" || SECTION_NEWS=1
 
 # build.gradle's own comment on this line: the JVM Test Suite plugin's
 # useJUnitJupiter(...) pins the bundled-platform version separately from
@@ -164,19 +181,27 @@ report "org.junit.jupiter:junit-jupiter-api" "$JUNIT_CURRENT" "$JUNIT_LATEST"
 USE_JUNIT_CURRENT="$(grep -oE "useJUnitJupiter\('[^']+'\)" "$BUILD_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 if [[ -n "$USE_JUNIT_CURRENT" && -n "$JUNIT_CURRENT" && "$USE_JUNIT_CURRENT" != "$JUNIT_CURRENT" ]]; then
   warn "build.gradle's useJUnitJupiter('$USE_JUNIT_CURRENT') has drifted from gradle/libs.versions.toml's junit-jupiter ($JUNIT_CURRENT) -- these are meant to be kept in sync by hand (see the comment above useJUnitJupiter in build.gradle)"
+  SECTION_NEWS=1
 fi
 
 CHECKSTYLE_CURRENT="$(grep -oE "toolVersion = '[^']+'" "$BUILD_GRADLE" | grep -oE "[0-9][^']*" | head -1)"
 CHECKSTYLE_LATEST="$(latest_from_maven_metadata 'https://repo1.maven.org/maven2/com/puppycrawl/tools/checkstyle/maven-metadata.xml')"
-report "com.puppycrawl.tools:checkstyle" "$CHECKSTYLE_CURRENT" "$CHECKSTYLE_LATEST"
+report "com.puppycrawl.tools:checkstyle" "$CHECKSTYLE_CURRENT" "$CHECKSTYLE_LATEST" || SECTION_NEWS=1
+
+[[ "$SECTION_NEWS" -eq 0 ]] && log "(all up to date)"
+sep
 
 # --- Gradle wrapper --------------------------------------------------------
 
 log "Checking Gradle wrapper..."
+typeset -i SECTION_NEWS=0
 
 WRAPPER_CURRENT="$(grep -oE 'gradle-[0-9][0-9.]*-bin\.zip' "$WRAPPER_PROPS" | head -1 | sed -E 's/^gradle-//; s/-bin\.zip$//')"
 WRAPPER_LATEST="$(curl -fsSL 'https://services.gradle.org/versions/current' 2>/dev/null | grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"$/\1/')"
-report "Gradle wrapper" "$WRAPPER_CURRENT" "$WRAPPER_LATEST"
+report "Gradle wrapper" "$WRAPPER_CURRENT" "$WRAPPER_LATEST" || SECTION_NEWS=1
+
+[[ "$SECTION_NEWS" -eq 0 ]] && log "(all up to date)"
+sep
 
 # --- mlx-metal / mlx-c (native/, pinned in scripts/bootstrap-native.sh) ---
 
@@ -209,6 +234,7 @@ else
     warn "mlx-c: no tag found whose CMakeLists.txt pins MLX v$MLX_METAL_LATEST -- mlx-c's own release may simply lag the new MLX version yet; check https://github.com/ml-explore/mlx-c manually"
   fi
 fi
+sep
 
 if [[ "$UPDATES_FOUND" -eq 0 ]]; then
   log "All checked dependencies are up to date."

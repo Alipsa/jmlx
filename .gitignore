@@ -36,3 +36,6 @@ build
 
 # Native toolchain artifacts (built/staged by scripts/bootstrap-native.sh)
 /native/
+
+# Subagent-driven-development scratch workspace
+/.superpowers/

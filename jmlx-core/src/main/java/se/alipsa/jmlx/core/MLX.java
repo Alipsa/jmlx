@@ -316,7 +316,7 @@ public final class MLX {
     // own body rather than forcing it through a shape unaryOp doesn't have.
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(() -> mlx_h.mlx_sum(res, a.handle(), false, DEFAULT_STREAM));
+    checked("sum", () -> mlx_h.mlx_sum(res, a.handle(), false, DEFAULT_STREAM));
     return new MLXArray(scope, res);
   }
 
@@ -362,7 +362,7 @@ public final class MLX {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
       MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked(() -> mlx_h.mlx_reshape(res, a.handle(), nativeShape, shape.length, DEFAULT_STREAM));
+      checked("reshape", () -> mlx_h.mlx_reshape(res, a.handle(), nativeShape, shape.length, DEFAULT_STREAM));
       return new MLXArray(scope, res);
     }
   }
@@ -446,8 +446,8 @@ public final class MLX {
       MemorySegment nativeStop = tmp.allocateFrom(ValueLayout.JAVA_INT, stop);
       MemorySegment nativeStrides = tmp.allocateFrom(ValueLayout.JAVA_INT, strides);
       MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked(() -> mlx_h.mlx_slice(res, a.handle(), nativeStart, start.length, nativeStop, stop.length, nativeStrides,
-          strides.length, DEFAULT_STREAM));
+      checked("slice", () -> mlx_h.mlx_slice(res, a.handle(), nativeStart, start.length, nativeStop, stop.length,
+          nativeStrides, strides.length, DEFAULT_STREAM));
       return new MLXArray(scope, res);
     }
   }
@@ -583,11 +583,7 @@ public final class MLX {
    * which would then misreport it as its own.
    */
   static void checked(IntSupplier nativeCall) {
-    NativeLoader.clearLastNativeError();
-    int status = nativeCall.getAsInt();
-    if (status != 0) {
-      throw nativeFailure("mlx-c call failed with status " + status);
-    }
+    checked(null, nativeCall);
   }
 
   /** Same as {@link #checked(IntSupplier)}, but names {@code opName} in the failure message on a non-zero status. */
@@ -595,7 +591,7 @@ public final class MLX {
     NativeLoader.clearLastNativeError();
     int status = nativeCall.getAsInt();
     if (status != 0) {
-      throw nativeFailure(opName + ": mlx-c call failed with status " + status);
+      throw nativeFailure((opName == null ? "" : opName + ": ") + "mlx-c call failed with status " + status);
     }
   }
 

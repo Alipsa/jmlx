@@ -1,5 +1,59 @@
 # jmlx Phase 4 — `se.alipsa.jmlx.nn` Neural Network Modules
 
+## Status — update this section as work lands
+
+**Branch:** `worktree-phase4-m0a-m0b` — [PR #5](https://github.com/Alipsa/jmlx/pull/5) open against
+`main`, not yet merged.
+
+| Item | Status | Commit |
+|---|---|---|
+| M0a — facade split (§1) | **Done** | `112eeda` |
+| M0b — child scopes (§2) | **Done** | `c585ca3` |
+| M0c — `DType`/`astype` (§4) | **Done** | `6d87c7a` |
+| M0d — creation ops (§3, scoped down — see note) | **Done** | `6ce5ba3` |
+| Probe 0b — upcall exception-safety + thread confinement | **Done, confirmed** | scratch, not committed |
+| Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
+| M1 — `Module` and simple layers (§5) | Not started | — |
+| M2 — `MLXGrad`/`ModuleGrad` (§6) | Not started | — |
+| M3 — RoPE, MultiHeadAttention, KV cache (§7) | Not started | — |
+| M4 — `QuantizedLinear` (§8) | Not started | — |
+| §9 — Documentation | Not started | — |
+
+**M0d note.** Implemented only the ops its own "ops added at this merge point" list names
+(`array(scope, int[], int[])`, `zeros`, `ones`, `full`, `arange`, `stopGradient`) — deliberately
+**not** the six generic op-body helpers (`reduceOp`/`axisOp`/`axis2Op`/`vectorInOp`/`vectorOutOp`/
+`nullableHandle`) §3 also defines, since nothing in that same list uses them. Building all six now
+would be untested, unused abstraction. Each is deferred to the specific later merge point (M1/M3/M4)
+that first needs it, built alongside its real consuming op — the same way `binaryOp`/`unaryOp`/
+`shapeOp` landed in M0a already wired to real callers. Revisit if a later merge point tries to add
+one of the six without a real consumer in the same commit.
+
+**Probe 0b findings** (Verification item 0b). All three sub-probes confirmed, run against real
+Apple Silicon hardware: **(a)** a stub returning 1 surfaces as a checkable non-zero status,
+wrappable into `MLXException` via `checked`; JVM survives. **(b)** a stub that lets a `Throwable`
+escape kills the JVM — but via the JDK's own FFM upcall safety net (`"Unrecoverable uncaught
+exception encountered. The VM will now exit"`, a full Java stack trace, exit code 1), **not** an
+opaque native SIGABRT/segfault. Correct this document's framing of that failure mode when M2 is
+written: it is diagnosable, not silent — the design conclusion (§6's `catch (Throwable)` is
+load-bearing) is unchanged, but the assumed mechanism was wrong. **(c)** the closure stub ran
+synchronously on the calling thread (confirmed via `assertSame`), licensing `Arena.ofConfined()`
+for `MLXGrad.Fn`.
+
+**Probe 0f findings** (Verification item 0f). All four assertions confirmed against a hand-rolled
+toy model (`y = w*x + b`, hand-computed `dw=-12`, `db=-6`). Rebinding on → exact match. Rebinding
+off (the negative) → grads came back as **exactly `0.0`/`0.0`** — correct shapes, no exception, a
+live reproduction of the "no signal" failure mode the round-5 Failure modes entry warns about.
+Restore survives both the step scope closing and a throwing loss body, confirmed with `assertSame`
+on the restored references (not just equal values) so a use-after-free into a closed step scope
+would have been caught. **Nothing in §6's rebinding design was falsified — proceed with M2 as
+written.**
+
+**Resume instructions.** Once PR #5 merges, continue with M1 (§5) on a fresh branch off `main`.
+Probes 0b/0f were scratch classes against raw `jmlx-ffi` closure bindings with no permanent home
+until `MLXGrad` exists; they were deleted after their findings were recorded above and are not in
+the PR. Re-run them (or write their permanent equivalents) if M2's actual implementation diverges
+from what they exercised — see §6 for the exact protocol they validated.
+
 ## Context
 
 `req/project-outline.md:83-91` describes Phase 4 in four bullets: a `Module` base class, core layers
@@ -214,7 +268,7 @@ grow `UINT32` in §4 even though nothing will ever read it element-wise.
 Merge points are named **M0a**…**M4**. Each is independently green; M0a–M0d are one PR's worth of
 infrastructure that adds no public layer at all.
 
-### 1. Facade split — pure motion (M0a)
+### 1. Facade split — pure motion (M0a) — **DONE, `112eeda`**
 
 `MLX.java` is 607 lines; roughly 30 new ops plus six new helpers put it past 1,300 at this project's
 javadoc density. `phase3-plan.md:850-852` named the split trigger in advance "so it happens
@@ -247,7 +301,7 @@ single new op.** Then `git diff -M --stat` on that commit shows renames only, an
 verify "nothing changed but the address". Adding 30 ops and *then* splitting produces a diff nobody
 can audit.
 
-### 2. Child scopes — `MLXScope`, `MLXArray`, `binaryOp` (M0b)
+### 2. Child scopes — `MLXScope`, `MLXArray`, `binaryOp` (M0b) — **DONE, `c585ca3`**
 
 ```java
 public MLXScope newChild();                                  // checkAccess() on parent first
@@ -438,7 +492,7 @@ findings for why that is a second wrapper on the same descriptor.
 
   Test coverage is `MLXMemoryLeakTest` with a child-scope loop; there is no compile-time signal.
 
-### 3. Op helpers and creation ops (M0d)
+### 3. Op helpers and creation ops (M0d) — **PARTLY DONE, `6ce5ba3` — see Status note above: creation ops only, the six generic helpers deferred**
 
 Six new private helpers alongside `binaryOp`/`unaryOp`/`shapeOp`, so each shape exists once:
 
@@ -507,7 +561,7 @@ already handles explicitly (`MLX.java:79-90`), and `full`'s body must do the sam
 `mlx_array_.ctx(...).address() == 0` and free the scalar in a `finally`. `zeros`/`ones`/`arange` have
 no such step.
 
-### 4. `DType` and `astype` (M0c)
+### 4. `DType` and `astype` (M0c) — **DONE, `6d87c7a`**
 
 Add `BOOL`, `UINT32`, `FLOAT16`, `BFLOAT16`. The per-constant allowlist design at `DType.java:21-29`
 already anticipated this and needs no structural change — only `fromNative`'s "only float32/int32"
@@ -567,7 +621,7 @@ under-reject (only for pairs this facade cannot construct) but never over-reject
 the documented failure mode; under-rejecting surfaces as a clean `MLXException` carrying mlx's own
 message.
 
-### 5. `Module` and the simple layers (M1)
+### 5. `Module` and the simple layers (M1) — **NOT STARTED — resume here after PR #5 merges**
 
 ```java
 public abstract class Module {
@@ -651,7 +705,7 @@ Ops added: `swapaxes`, `take`/`takeAxis`, `sigmoid`, `erf`, `tanh`, `sqrt`, `rsq
 `weight`) and `MLXFast.layerNorm` (**two** nullables), plus `MLXRandom` for weight init — the key is
 nullable, so a global `mlx_random_seed` suffices and no Java-side key-splitting design is needed.
 
-### 6. `MLXGrad` (M2)
+### 6. `MLXGrad` (M2) — **NOT STARTED — Probes 0b/0f (see Status above) confirmed this section's key assumptions**
 
 Deliberately sequenced **after** M1, so there is a real `Module` tree and a real flatten order to test
 against rather than a synthetic one.
@@ -875,7 +929,7 @@ the form that can enforce module invariants, and it is the form that lives in `n
 it is the model scope, every step leaks one gradient tensor per parameter — which is why `target` is
 a per-call argument rather than a `Fn` field.
 
-### 7. RoPE, MultiHeadAttention, KV cache (M3)
+### 7. RoPE, MultiHeadAttention, KV cache (M3) — **NOT STARTED**
 
 `MLXFast.rope` — `mlx_optional_float base`, plain-`int` `offset` (the static KV-cache offset;
 `mlx_fast_rope_dynamic` takes it as an array and is out of scope until a compiled decode loop exists),
@@ -887,7 +941,7 @@ nullable `freqs`.
 Ops added: `concatenate` (KV append), `split` (fused QKV projection), `softmaxAxis` (the composed
 cross-check path), `triu`/`tril` (causal mask), `where`, comparisons, `expandDims`, `flatten`.
 
-### 8. `QuantizedLinear` (M4)
+### 8. `QuantizedLinear` (M4) — **NOT STARTED**
 
 All three calls combine every awkward parameter shape at once; the exact signatures matter, so they
 are tabulated rather than summarized (`native/install/include/mlx/c/ops.h:359-369`, `:801-808`,
@@ -905,7 +959,7 @@ needs `cstr`, both `optInt`s and `nullableHandle`; it is not a plain `binaryOp` 
 All three resolve their target through `scopeOf(...)` over every array operand including the
 nullables (§2's table).
 
-### 9. Documentation
+### 9. Documentation — **NOT STARTED**
 
 * `req/project-outline.md` Phase 4: mark delivered, with the same explicit reconciliation Phase 3
   used for "thread-safe" rather than a bare checkmark — here, that the outline's `nn` layer sits on a
@@ -971,7 +1025,7 @@ asserting shapes.
    * **0a** — hoist past a child close: build `y = multiply(exp(x), x)` in a child, `keep(y)`, close
      the child, `eval(y)` + `toFloatArray(y)` vs. a hand-computed golden; `mlx_get_active_memory()`
      back to baseline after the *parent* closes.
-   * **0b** — three stubs. One returning `1` → expect `MLXException`, **JVM survives**. One
+   * **0b** — **DONE, confirmed — see Status section above for findings.** Three stubs. One returning `1` → expect `MLXException`, **JVM survives**. One
      *throwing* → expect the **JVM to die** (forked JVM; `jmlx-ffi`'s `loaderGuardTest` task is the
      template). One asserting `Thread.currentThread()` equals the caller, which is what licenses
      `Arena.ofConfined`. The JVM-dies half must be *observed*, not reasoned about: it is what makes
@@ -983,7 +1037,7 @@ asserting shapes.
      nullable `global_scale`, and `vectorOutOp`'s two allocators.
    * **0e** — `mlx_fast_rope` with `base` present and absent, confirming the `mlx_optional_float`
      encoding and the plain-`int` `offset`.
-   * **0f** — **the rebinding mechanism, which no citation in this repo can settle.** Build a
+   * **0f** — **DONE, confirmed — see Status section above for findings.** **The rebinding mechanism, which no citation in this repo can settle.** Build a
      two-parameter toy `Module` whose `forward` reads its own fields; differentiate a rank-0 loss
      through `ModuleGrad`; assert the grads match hand-computed values. Then assert the *negative*:
      with rebinding disabled, the same call does **not** produce those values — because if it does,

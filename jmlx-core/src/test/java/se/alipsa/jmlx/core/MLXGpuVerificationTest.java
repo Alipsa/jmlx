@@ -26,7 +26,7 @@ class MLXGpuVerificationTest {
     int type;
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment typeOut = tmp.allocate(ValueLayout.JAVA_INT);
-      MLX.checked(() -> mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice()));
+      NativeOps.checked(() -> mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice()));
       type = typeOut.get(ValueLayout.JAVA_INT, 0);
     }
     // Fails rather than skips if the default device isn't GPU: this project
@@ -38,7 +38,7 @@ class MLXGpuVerificationTest {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2});
       MLXArray b = MLX.array(scope, new float[] {5, 6, 7, 8}, new int[] {2, 2});
-      assertArrayEquals(new float[] {19, 22, 43, 50}, MLX.matmul(a, b).toFloatArray(), 1e-3f);
+      assertArrayEquals(new float[] {19, 22, 43, 50}, MLXOps.matmul(a, b).toFloatArray(), 1e-3f);
     }
   }
 }

@@ -19,7 +19,7 @@ class MLXNativeErrorTest {
   void mismatchedShapesReachNativeAndSurfaceAsMLXException() {
     try (MLXScope scope = new MLXScope()) {
       // [3] and [2] are still broadcast-INcompatible under the NumPy rules
-      // MLX.requireBroadcastCompatible now mirrors (neither dim is 1, and
+      // MLXOps.requireBroadcastCompatible now mirrors (neither dim is 1, and
       // they are not equal), so mlx_add's own "cannot be broadcast" message
       // below still fires. Do NOT "modernize" this pair to something
       // broadcast-compatible (e.g. [2,2] against [2]): that would silently
@@ -37,11 +37,11 @@ class MLXNativeErrorTest {
       // and this test is the sole coverage of the exit(-1) mitigation in
       // NativeLoader.java:119-128. Removing addUnchecked (or routing add()
       // through it unconditionally) would silently drop that coverage.
-      MLXException e = assertThrows(MLXException.class, () -> MLX.addUnchecked(a, b));
+      MLXException e = assertThrows(MLXException.class, () -> MLXOps.addUnchecked(a, b));
       // Not just "some non-zero status": the message must carry
       // mlx-c's own, specific-to-this-failure text (e.g. "Shapes (3)
       // and (2) cannot be broadcast."), not a stale message left over
-      // from an earlier, unrelated native call (MLX.checked() clears
+      // from an earlier, unrelated native call (NativeOps.checked() clears
       // NativeLoader's thread-local immediately before every native
       // call it wraps, precisely so this can't happen).
       assertTrue(e.getMessage().contains("cannot be broadcast"), e.getMessage());

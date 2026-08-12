@@ -80,7 +80,7 @@ class MLXMemoryLeakTest {
   private static void runIterationRelyingOnScopeClose() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
-      MLXArray b = MLX.exp(a);
+      MLXArray b = MLXOps.exp(a);
       MLX.eval(b);
     }
   }
@@ -88,7 +88,7 @@ class MLXMemoryLeakTest {
   private static void runIterationClosingArraysExplicitly() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
-      MLXArray b = MLX.exp(a);
+      MLXArray b = MLXOps.exp(a);
       MLX.eval(b);
       b.close();
       a.close();
@@ -98,8 +98,8 @@ class MLXMemoryLeakTest {
   private static void runIterationWithMultiArrayEval() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
-      MLXArray b = MLX.exp(a);
-      MLXArray c = MLX.log(b);
+      MLXArray b = MLXOps.exp(a);
+      MLXArray c = MLXOps.log(b);
       MLX.eval(a, b, c);
     }
   }

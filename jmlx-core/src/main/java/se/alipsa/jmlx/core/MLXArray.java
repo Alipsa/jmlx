@@ -117,5 +117,6 @@ public final class MLXArray implements AutoCloseable {
     if (closed) {
       throw new IllegalStateException("MLXArray[" + Integer.toHexString(System.identityHashCode(this)) + "] is closed");
     }
+    scope.checkAccess();
   }
 }

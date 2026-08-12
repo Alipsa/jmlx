@@ -112,6 +112,16 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
     holder.freeOne(handle);
   }
 
+  /**
+   * Internal cross-package hook for {@code MLXArray.ensureOpen()}: asserts that the calling thread is this scope's
+   * owner and that the scope has not been closed. Not for general use -- {@code owner} and {@code closed} are private
+   * to this class, so an {@link se.alipsa.jmlx.core.MLXArray} confined to this scope has no other way to see either.
+   */
+  public void checkAccess() {
+    checkThread();
+    ensureOpen();
+  }
+
   private void ensureOpen() {
     if (closed) {
       throw new IllegalStateException("MLXScope is closed");

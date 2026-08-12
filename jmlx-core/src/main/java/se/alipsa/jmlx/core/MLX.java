@@ -92,47 +92,127 @@ public final class MLX {
     }
   }
 
-  /** Elementwise sum of two same-shaped arrays. */
+  /** Elementwise sum of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
   public static MLXArray add(MLXArray a, MLXArray b) {
-    requireSameShape(a, b, "add");
+    requireBroadcastCompatible(a, b, "add");
     return addUnchecked(a, b);
   }
 
-  /** Elementwise difference of two same-shaped arrays. */
+  /** Elementwise difference of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
   public static MLXArray subtract(MLXArray a, MLXArray b) {
-    requireSameShape(a, b, "subtract");
+    requireBroadcastCompatible(a, b, "subtract");
     return binaryOp("subtract", a, b, mlx_h::mlx_subtract);
   }
 
-  /** Elementwise product of two same-shaped arrays. */
+  /** Elementwise product of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
   public static MLXArray multiply(MLXArray a, MLXArray b) {
-    requireSameShape(a, b, "multiply");
+    requireBroadcastCompatible(a, b, "multiply");
     return binaryOp("multiply", a, b, mlx_h::mlx_multiply);
   }
 
-  /** Elementwise quotient of two same-shaped arrays. */
+  /** Elementwise quotient of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
   public static MLXArray divide(MLXArray a, MLXArray b) {
-    requireSameShape(a, b, "divide");
+    requireBroadcastCompatible(a, b, "divide");
     return binaryOp("divide", a, b, mlx_h::mlx_divide);
   }
 
-  /** Matrix product of two rank-2 arrays with compatible shapes. */
+  /**
+   * Matrix product of {@code a} and {@code b}. Either may be rank-1 (promoted internally, matching mlx's own
+   * vector-matrix / matrix-vector rules); rank &ge; 2 operands batch-broadcast over every axis but the last two. Rank-0
+   * operands are rejected, as mlx itself rejects them.
+   */
   public static MLXArray matmul(MLXArray a, MLXArray b) {
-    int[] sa = a.shape();
-    int[] sb = b.shape();
-    if (sa.length != 2 || sb.length != 2 || sa[1] != sb[0]) {
-      throw new IllegalArgumentException(
-          "matmul: incompatible shapes " + java.util.Arrays.toString(sa) + " and " + java.util.Arrays.toString(sb));
-    }
+    requireMatmulCompatible(a, b);
     return binaryOp("matmul", a, b, mlx_h::mlx_matmul);
   }
 
-  private static void requireSameShape(MLXArray a, MLXArray b, String op) {
+  /**
+   * NumPy broadcast compatibility between {@code a} and {@code b}, right-aligned: for every dimension pair, one of
+   * {@code d1 == d2}, {@code d1 == 1} or {@code d2 == 1} must hold (upstream {@code mlx/utils.cpp:136-167},
+   * {@code broadcast_shapes}). Deliberately written as {@code d1 == 1}/{@code d2 == 1}, not {@code d1 <= 1}/
+   * {@code d2 <= 1}: the latter would wrongly accept a {@code 0} dimension against a {@code 3}, which native rejects.
+   */
+  private static void requireBroadcastCompatible(MLXArray a, MLXArray b, String op) {
     int[] sa = a.shape();
     int[] sb = b.shape();
-    if (!java.util.Arrays.equals(sa, sb)) {
+    int n = Math.max(sa.length, sb.length);
+    for (int i = 0; i < n; i++) {
+      int da = i < n - sa.length ? 1 : sa[i - (n - sa.length)];
+      int db = i < n - sb.length ? 1 : sb[i - (n - sb.length)];
+      if (da != db && da != 1 && db != 1) {
+        throw new IllegalArgumentException(
+            op + ": incompatible shapes " + java.util.Arrays.toString(sa) + " and " + java.util.Arrays.toString(sb));
+      }
+    }
+  }
+
+  /**
+   * Mirrors {@code matmul}'s real native rules (upstream {@code ops.cpp:3192-3267}), in evaluation order: reject rank-0
+   * on either operand; promote a rank-1 {@code a} to {@code [1, a.shape(0)]} and a rank-1 {@code b} to
+   * {@code [b.shape(0), 1]} (mlx's own {@code expand_dims}); compare the inner dimension on the <em>promoted</em>
+   * shapes, not the raw ones -- indexing {@code b.shape(-2)} on a raw rank-1 {@code b} would be out of bounds; require
+   * {@link DType#isInexact()} on both operands, mirroring native's {@code issubdtype(out_type, inexact)} rather than
+   * narrowing it to {@code == FLOAT32}; then require the batch dimensions (every axis but the last two of the promoted
+   * shapes) to be broadcast-compatible.
+   */
+  private static void requireMatmulCompatible(MLXArray a, MLXArray b) {
+    int[] sa = a.shape();
+    int[] sb = b.shape();
+    if (sa.length == 0 || sb.length == 0) {
+      throw new IllegalArgumentException("matmul: rank-0 operand not supported (shapes " + java.util.Arrays.toString(sa)
+          + " and " + java.util.Arrays.toString(sb) + ")");
+    }
+    int[] pa = sa.length == 1 ? new int[] {1, sa[0]} : sa;
+    int[] pb = sb.length == 1 ? new int[] {sb[0], 1} : sb;
+    if (pa[pa.length - 1] != pb[pb.length - 2]) {
       throw new IllegalArgumentException(
-          op + ": shape mismatch " + java.util.Arrays.toString(sa) + " vs " + java.util.Arrays.toString(sb));
+          "matmul: incompatible shapes " + java.util.Arrays.toString(sa) + " and " + java.util.Arrays.toString(sb));
+    }
+    if (!a.dtype().isInexact() || !b.dtype().isInexact()) {
+      throw new IllegalArgumentException("matmul: requires inexact dtypes, got " + a.dtype() + " and " + b.dtype());
+    }
+    int battA = pa.length - 2;
+    int battB = pb.length - 2;
+    int batchDims = Math.max(battA, battB);
+    for (int i = 0; i < batchDims; i++) {
+      int da = i < batchDims - battA ? 1 : pa[i - (batchDims - battA)];
+      int db = i < batchDims - battB ? 1 : pb[i - (batchDims - battB)];
+      if (da != db && da != 1 && db != 1) {
+        throw new IllegalArgumentException("matmul: incompatible batch dimensions " + java.util.Arrays.toString(sa)
+            + " and " + java.util.Arrays.toString(sb));
+      }
+    }
+  }
+
+  /**
+   * Directional broadcast check for {@code broadcastTo(a, targetShape)}: requires
+   * {@code broadcast_shapes(a.shape(), targetShape) == targetShape} (upstream {@code ops.cpp:1601-1613}), which is
+   * <em>not</em> the symmetric predicate {@link #requireBroadcastCompatible} uses -- {@code broadcastTo([3], [1])}
+   * satisfies the symmetric rule but native rejects it. Also rejects any negative element of {@code targetShape}
+   * outright, independent of the shape arithmetic: {@code broadcastTo([1], [-1])} would otherwise pass here, since
+   * {@code 1 == 1} makes the directional check succeed too, and the failure would surface as {@link MLXException} from
+   * native instead of {@link IllegalArgumentException} from Java.
+   */
+  private static void requireBroadcastableTo(MLXArray a, int[] targetShape) {
+    for (int t : targetShape) {
+      if (t < 0) {
+        throw new IllegalArgumentException(
+            "broadcastTo: target shape " + java.util.Arrays.toString(targetShape) + " has a negative dimension");
+      }
+    }
+    int[] sa = a.shape();
+    if (sa.length > targetShape.length) {
+      throw new IllegalArgumentException("broadcastTo: cannot broadcast " + java.util.Arrays.toString(sa) + " to "
+          + java.util.Arrays.toString(targetShape));
+    }
+    int diff = targetShape.length - sa.length;
+    for (int i = 0; i < sa.length; i++) {
+      int ad = sa[i];
+      int td = targetShape[i + diff];
+      if (ad != td && ad != 1) {
+        throw new IllegalArgumentException("broadcastTo: cannot broadcast " + java.util.Arrays.toString(sa) + " to "
+            + java.util.Arrays.toString(targetShape));
+      }
     }
   }
 
@@ -200,7 +280,7 @@ public final class MLX {
     }
   }
 
-  /** Reverses every axis; there is no partial-permutation overload in this slice. */
+  /** Reverses every axis. */
   public static MLXArray transpose(MLXArray a) {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);

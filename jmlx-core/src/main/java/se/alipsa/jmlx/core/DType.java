@@ -4,16 +4,28 @@ import se.alipsa.jmlx.ffi.mlx_h;
 
 /** The mlx-c dtype constants supported by this slice. See req/initial-plan.md, Out of scope. */
 public enum DType {
-  FLOAT32(mlx_h.MLX_FLOAT32()), INT32(mlx_h.MLX_INT32());
+  FLOAT32(mlx_h.MLX_FLOAT32(), true), INT32(mlx_h.MLX_INT32(), false);
 
   private final int nativeValue;
+  private final boolean inexact;
 
-  DType(int nativeValue) {
+  DType(int nativeValue, boolean inexact) {
     this.nativeValue = nativeValue;
+    this.inexact = inexact;
   }
 
   int nativeValue() {
     return nativeValue;
+  }
+
+  /**
+   * Mirrors native's own {@code issubdtype(dtype, inexact)} predicate (upstream {@code ops.cpp:3222-3230}): float16,
+   * bfloat16, float32 and complex64 report {@code true}; integer and boolean dtypes report {@code false}. Written as an
+   * allowlist field on each constant rather than {@code return this != INT32}, so adding a future non-inexact dtype
+   * (e.g. {@code INT8}, {@code UINT32}, {@code BOOL}) cannot silently start reporting {@code true}.
+   */
+  public boolean isInexact() {
+    return inexact;
   }
 
   static DType fromNative(int value) {

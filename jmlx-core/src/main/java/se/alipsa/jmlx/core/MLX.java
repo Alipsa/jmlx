@@ -88,6 +88,48 @@ public final class MLX {
     }
   }
 
+  /**
+   * Lifts {@code a} into {@code target}, which must be {@code a}'s own scope or an ancestor of it. Copy, not move:
+   * after the scope that owns {@code a} closes, use the returned array and never {@code a} again.
+   *
+   * <p>
+   * Safe even though {@code a}'s scope may close immediately after: an mlx {@code ArrayDesc} owns its graph inputs
+   * <em>by value</em>, and each {@code array} is a {@code shared_ptr<ArrayDesc>}, so the returned array holds a
+   * refcount on every input's descriptor. Freeing {@code a}'s own handle only decrements a refcount; it cannot touch
+   * the graph the lifted output still references (req/phase4-plan.md §2, Research findings).
+   *
+   * <p>
+   * {@code target == a.scope()} is legal and returns {@code a} itself -- {@code isAncestorOf} is reflexive.
+   * Deliberately identity, not a copy, in that case: source and target are the same scope, so both handles would die
+   * together anyway, and an unconditional hoist in a loop would otherwise accumulate one fresh handle per iteration in
+   * the target scope. Consequence: in the reflexive case the result <em>aliases</em> the argument, so closing one
+   * closes the other.
+   */
+  public static MLXArray hoist(MLXArray a, MLXScope target) {
+    MLXScope source = a.scope();
+    if (!target.isAncestorOf(source)) {
+      throw new IllegalArgumentException("hoist: target must be a's own scope or an ancestor of it");
+    }
+    if (target == source) {
+      return a;
+    }
+    MemorySegment lifted = mlx_h.mlx_array_new(target);
+    NativeOps.checked("hoist", () -> mlx_h.mlx_array_set(lifted, a.handle()));
+    return new MLXArray(target, lifted);
+  }
+
+  /**
+   * {@code hoist(a, a.scope().parent())}. Throws {@link IllegalStateException} for an array in a root scope --
+   * deliberately not a {@link NullPointerException} from an unchecked {@code parent()} dereference.
+   */
+  public static MLXArray keep(MLXArray a) {
+    MLXScope parent = a.scope().parent();
+    if (parent == null) {
+      throw new IllegalStateException("MLXScope has no parent");
+    }
+    return hoist(a, parent);
+  }
+
   // Not code evaluation: mirrors mlx-c's mlx_eval, which forces every
   // lazily-built computation graph reachable from `arrays` to actually run
   // on device, in a single scheduling pass rather than one pass per array.

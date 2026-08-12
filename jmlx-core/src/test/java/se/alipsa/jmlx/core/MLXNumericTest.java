@@ -2,6 +2,7 @@ package se.alipsa.jmlx.core;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,41 @@ class MLXNumericTest {
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
       MLXArray b = MLX.array(scope, new float[] {10, 20, 30}, new int[] {3});
       assertArrayEquals(new float[] {11, 22, 33}, MLXOps.add(a, b).toFloatArray(), EPS);
+    }
+  }
+
+  /**
+   * See req/phase4-plan.md §2: {@code binaryOp} now resolves its target via {@code scopeOf}/{@code innermost} rather
+   * than rejecting any pair of operands that are not from the exact same scope -- this is "it stops rejecting
+   * parent/child pairs, which is the entire point" (§2), checked in both operand orders since picking "the first
+   * operand's scope" would silently pass one order and fail the other.
+   */
+  @Test
+  void addAcrossParentAndChildScopeAllocatesIntoTheChildRegardlessOfOperandOrder() {
+    try (MLXScope parent = new MLXScope()) {
+      MLXArray w = MLX.array(parent, new float[] {1, 2, 3}, new int[] {3});
+      try (MLXScope child = parent.newChild()) {
+        MLXArray x = MLX.array(child, new float[] {10, 20, 30}, new int[] {3});
+        MLXArray r1 = MLXOps.add(x, w);
+        MLXArray r2 = MLXOps.add(w, x);
+        assertSame(child, r1.scope());
+        assertSame(child, r2.scope());
+        assertArrayEquals(new float[] {11, 22, 33}, r1.toFloatArray(), EPS);
+        assertArrayEquals(new float[] {11, 22, 33}, r2.toFloatArray(), EPS);
+      }
+    }
+  }
+
+  /**
+   * Proves the ancestor relaxation did not become "anything goes": two independent root scopes are still rejected, even
+   * though they are no longer rejected merely for being unequal.
+   */
+  @Test
+  void addAcrossTwoUnrelatedRootScopesThrows() {
+    try (MLXScope scopeA = new MLXScope(); MLXScope scopeB = new MLXScope()) {
+      MLXArray a = MLX.array(scopeA, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray b = MLX.array(scopeB, new float[] {1, 2, 3}, new int[] {3});
+      assertThrows(IllegalArgumentException.class, () -> MLXOps.add(a, b));
     }
   }
 

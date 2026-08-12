@@ -23,7 +23,15 @@ public final class MLXArray implements AutoCloseable {
     this.handle = handle;
   }
 
-  MLXScope scope() {
+  /**
+   * This array's owning scope. Public (req/phase4-plan.md §2) so creation ops with no operand to infer a scope from
+   * (e.g. an RoPE positions array, a causal mask) and {@code nn}-package layers can target a specific scope explicitly,
+   * the same way {@code MLX.array} already takes one. {@code forward()} methods must never allocate here directly (they
+   * should target the activation's own scope, or an explicit-target overload for weight-derived views) -- nothing
+   * enforces that beyond this javadoc; see req/phase4-plan.md §2 and §5 for why, and {@code MLXMemoryLeakTest} for the
+   * only test that would notice a violation.
+   */
+  public MLXScope scope() {
     ensureOpen();
     return scope;
   }

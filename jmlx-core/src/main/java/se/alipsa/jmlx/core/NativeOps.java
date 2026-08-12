@@ -53,18 +53,40 @@ final class NativeOps {
   }
 
   static MLXArray binaryOp(String opName, MLXArray a, MLXArray b, BinaryOp op) {
-    MLXScope scope = a.scope();
-    // The result is allocated in a's scope; without this check, b's scope
-    // (and its thread-confinement guard) is never touched at all -- b.handle()
-    // below reads it directly -- so an operand from another (possibly
-    // another thread's) scope would silently bypass MLXScope's confinement
-    // contract instead of being rejected here.
-    if (scope != b.scope()) {
-      throw new IllegalArgumentException(opName + ": operands belong to different MLXScopes");
-    }
+    MLXScope scope = scopeOf(opName, a, b);
     MemorySegment res = mlx_h.mlx_array_new(scope);
     checked(opName, () -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
     return new MLXArray(scope, res);
+  }
+
+  /**
+   * Innermost scope among all non-null {@code operands} (req/phase4-plan.md §2). Touches every non-null operand's
+   * {@link MLXArray#scope()}, so each one's {@code checkAccess()} runs -- this is what stops a multi-operand op from
+   * silently bypassing {@link MLXScope}'s confinement contract for every operand but the one its target happens to be
+   * picked from.
+   *
+   * <p>
+   * Precondition: at least one operand is non-null -- the caller always passes the primary input ({@code x}, {@code
+   * q}, {@code w}), which is never nullable in any mlx-c signature. Violating it throws
+   * {@link IllegalArgumentException} naming {@code op}, not an empty-reduce exception: the reachable case is a caller
+   * (e.g. inside a {@code layerNorm} body) that forgot to pass its primary input, and the message should say that
+   * rather than "empty".
+   *
+   * @throws IllegalArgumentException if any two operand scopes are unrelated (siblings, or two independent roots)
+   */
+  static MLXScope scopeOf(String op, MLXArray... operands) {
+    MLXScope result = null;
+    for (MLXArray a : operands) {
+      if (a == null) {
+        continue;
+      }
+      MLXScope s = a.scope();
+      result = result == null ? s : MLXScope.innermost(result, s);
+    }
+    if (result == null) {
+      throw new IllegalArgumentException(op + ": scopeOf requires at least one non-null operand");
+    }
+    return result;
   }
 
   @FunctionalInterface

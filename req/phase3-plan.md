@@ -628,22 +628,47 @@ over the same N-array workload, via `mlx_get_peak_memory` / `mlx_reset_peak_memo
 informal one-off measurement is enough; the point is that the tradeoff is quantified rather than
 hypothetical.
 
-**Measured (Task 4, mlx 0.31.2, Apple Silicon):** workload = N independent `matmul` results (each
-built from two freshly-materialized `[M, M]` float32 inputs via `MLX.array`, i.e. `2N` materialized
-operands plus `N` lazy matmul outputs), evaluated either via `N` sequential `mlx_array_eval` calls
-(the old per-array loop, called directly, bypassing `MLX.eval`) or via one `mlx_eval` over an
-`mlx_vector_array` of all `N` results (the new joint form) — `mlx_reset_peak_memory` before each phase,
-`mlx_get_peak_memory` after. Two scales tried, 3 trials each, fresh `MLXScope` per phase so the other
-phase's arrays are not still resident: `N=8, M=2048` (384 MiB total workload) and `N=32, M=1024` (also
-384 MiB total). **Result: identical peak in every trial at both scales — 402,653,184 bytes
-(exactly `3 × N × M² × 4`, i.e. exactly the sum of the `2N` materialized operands plus the `N`
-evaluated results, with zero measurable overhead attributable to scheduling) for both the loop and the
-vector; delta = 0 bytes in all 6 trials.** No difference in either direction was observed for this
-workload on this backend — reported honestly rather than assumed, per the instruction above not to
-assert the tradeoff without measuring it. This does not falsify the tradeoff in general (a workload
-whose ops carry substantial backend-internal scratch beyond their own output buffer, which `matmul` at
-this size apparently does not on Metal, is where it would be expected to show), but it is the actual
-number this measurement produced, not a hypothetical one.
+**Measured (Task 4, mlx 0.31.2, Apple Silicon), round 1 — single-op workload, structurally unable to
+detect the effect either way.** First attempt: `N` independent `matmul` results, each a single-op
+lazy graph over two freshly-materialized `[M, M]` float32 inputs. This has no intra-graph
+intermediate at all — a single-op graph's only buffer is its final output — so this workload could
+not have shown the tradeoff regardless of what it measured. (It measured identical peaks at two
+scales, `N=8, M=2048` and `N=32, M=1024`, both exactly the sum of every materialized/evaluated
+buffer with zero delta; recorded here originally, superseded by round 2 below once this structural
+gap was pointed out in review.)
+
+**Round 2 — genuine multi-op lazy chains, still no measurable difference, for a more precise
+structural reason.** Rebuilt the workload so each of the `N` results is a real multi-op chain with
+actual intra-graph intermediate nodes: `matmul -> exp -> log` (3 ops) at `N=8, M=2048`, then
+`matmul -> exp -> log -> exp -> log` (5 ops) at `N=16, M=1024`, each evaluated either via `N`
+sequential `mlx_array_eval` calls on the final node only (old per-array loop, bypassing `MLX.eval`)
+or one `mlx_eval` over an `mlx_vector_array` of all `N` final nodes (new joint form) —
+`mlx_reset_peak_memory` before each phase, `mlx_get_peak_memory` after, fresh `MLXScope` per phase, 3
+trials each. **Result: identical peak in every trial at both depths/scales — 671,088,640 bytes for
+the 3-op/N=8/M=2048 chain (`5 buffers × N × M² × 4`: the 2 materialized operands plus all 3 lazy
+nodes, all still resident) and 469,762,048 bytes for the 5-op/N=16/M=1024 chain (`7 buffers × N ×
+M² × 4`) — for both the loop and the vector, at both depths; delta = 0 bytes in all 6 trials.**
+
+**Why this workload still couldn't show a difference, and what would be needed to:** this facade's
+own `binaryOp`/`unaryOp` helpers call `mlx_array_new(scope)` for *every* op result the instant the op
+is invoked — including `matmul`'s and each `exp`'s/`log`'s output in the chain above — which
+registers that buffer with the calling `MLXScope` for the scope's entire lifetime, independent of
+whether that node is later consumed as an input by something else in the graph. mlx-c's own
+`array::eval()` can drop an evaluated node's *inputs* once nothing else needs them, which is the
+native mechanism the "loop releases each graph's temporaries before the next begins" claim rests on
+— but that native optimization only frees a buffer when *no* external reference remains, and this
+facade's scope always holds one, for every node, for as long as the scope stays open. So a Java
+caller of this facade can never construct a workload where an intermediate is eligible for
+early/differential freeing based on eval scheduling: everything this facade builds is retained until
+scope close regardless of `eval` strategy, by construction, at any chain depth. **No difference in
+either direction was observed, and — unlike round 1 — this is not just "this particular op lacked
+scratch": it is that this facade's memory-ownership model (every node scope-tracked at creation)
+makes the tradeoff structurally unobservable through Java-visible `MLXScope`/`MLXArray` state at all,
+whatever the ops.** The tradeoff is still real inside mlx-c itself for graphs whose intermediates
+are *not* independently referenced (e.g. a graph built and evaluated in one C++ expression without a
+handle ever being taken to each intermediate) — that native case would need to be probed directly
+against mlx-c or a hidden/internal chain this facade cannot express as its own test, which is out of
+scope for this task; recorded here honestly rather than asserted, per the instruction above.
 
 **Error attribution regresses, and has a free mitigation — take it.** One `mlx_eval` is
 all-or-nothing with no index in the message, where the loop could name which array failed. On the

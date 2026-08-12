@@ -78,14 +78,14 @@ public final class MLXOps {
    * promoted shapes) to be broadcast-compatible.
    *
    * <p>
-   * The dtype check here is <em>per-operand</em>: it requires each of {@code a} and {@code b} to independently be
-   * inexact. Native's actual rule is {@code issubdtype(out_type, inexact)} on the <em>promoted</em> type of the pair,
-   * not on each operand separately. The two rules diverge only for a mixed exact/inexact pair whose promoted type is
-   * still inexact -- e.g. float32 + int32, where {@code promote_types(float32, int32) == float32} -- which native would
-   * accept (promoting the int32 operand) but this per-operand check would reject. That divergence is unreachable today:
-   * nothing in this facade constructs an {@code INT32} array yet, so this method can only ever be called with operands
-   * that are already both inexact or both exact. Revisit this check in the same commit that adds an
-   * {@code astype}/int-array-construction path, so a real mixed-dtype pair can actually reach this method.
+   * The dtype check requires <em>at least one</em> of {@code a}/{@code b} to be inexact -- not each independently, and
+   * not {@code issubdtype(out_type, inexact)} on their actual promoted type, which this facade has no promotion lattice
+   * to compute (see the rejected alternative below). Both-exact is a provable <em>subset</em> of native's rejects:
+   * {@code promote_types(exact, exact)} is always exact, so this can only under-reject relative to native (for pairs
+   * this facade cannot even construct), never over-reject -- and over-rejecting, not under-rejecting, is the failure
+   * mode a Java-side guard exists to avoid. req/phase4-plan.md §4's {@code astype} is what makes a mixed exact/inexact
+   * pair (e.g. float32 x int32) reachable at all; before it, nothing in this facade could construct an {@code INT32}
+   * array, so this method could only ever be called with operands already both inexact or both exact.
    */
   private static void requireMatmulCompatible(MLXArray a, MLXArray b) {
     int[] sa = a.shape();
@@ -100,8 +100,9 @@ public final class MLXOps {
       throw new IllegalArgumentException(
           "matmul: incompatible shapes " + Arrays.toString(sa) + " and " + Arrays.toString(sb));
     }
-    if (!a.dtype().isInexact() || !b.dtype().isInexact()) {
-      throw new IllegalArgumentException("matmul: requires inexact dtypes, got " + a.dtype() + " and " + b.dtype());
+    if (!a.dtype().isInexact() && !b.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "matmul: requires at least one inexact dtype, got " + a.dtype() + " and " + b.dtype());
     }
     int batchA = pa.length - 2;
     int batchB = pb.length - 2;

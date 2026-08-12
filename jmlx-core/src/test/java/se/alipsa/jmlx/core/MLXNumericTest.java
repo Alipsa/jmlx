@@ -217,6 +217,74 @@ class MLXNumericTest {
   }
 
   @Test
+  void matmulSucceedsWithOneExactAndOneInexactOperand() {
+    try (MLXScope scope = new MLXScope()) {
+      // promote_types(float32, int32) == float32, so native accepts this mixed pair even though
+      // requireMatmulCompatible's Java guard only requires ONE operand to be inexact (req/phase4-plan.md §4).
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2});
+      MLXArray identity = MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);
+      assertEquals(DType.INT32, identity.dtype());
+      assertArrayEquals(new float[] {1, 2, 3, 4}, MLXOps.matmul(a, identity).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void matmulRejectsTwoExactOperands() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.astype(MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2}), DType.INT32);
+      MLXArray b = MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);
+      assertThrows(IllegalArgumentException.class, () -> MLXOps.matmul(a, b));
+    }
+  }
+
+  @Test
+  void astypeRoundTripsThroughInt32AndBackToFloat32() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f = MLX.array(scope, new float[] {1.75f, -2.25f, 3f}, new int[] {3});
+      MLXArray i = MLX.astype(f, DType.INT32);
+      assertEquals(DType.INT32, i.dtype());
+      assertArrayEquals(new int[] {1, -2, 3}, i.toIntArray());
+      MLXArray back = MLX.astype(i, DType.FLOAT32);
+      assertArrayEquals(new float[] {1, -2, 3}, back.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void toFloatArrayReadsBackAFloat16ArrayThroughTheAstypeStep() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f32 = MLX.array(scope, new float[] {1.5f, 2.5f, -3.5f}, new int[] {3});
+      MLXArray f16 = MLX.astype(f32, DType.FLOAT16);
+      assertEquals(DType.FLOAT16, f16.dtype());
+      assertArrayEquals(new float[] {1.5f, 2.5f, -3.5f}, f16.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void toFloatArrayRejectsAnExactDtype() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray i = MLX.astype(MLX.array(scope, new float[] {1, 2}, new int[] {2}), DType.INT32);
+      assertThrows(IllegalStateException.class, i::toFloatArray);
+    }
+  }
+
+  @Test
+  void toIntArrayRejectsANonInt32Dtype() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f = MLX.array(scope, new float[] {1, 2}, new int[] {2});
+      assertThrows(IllegalStateException.class, f::toIntArray);
+    }
+  }
+
+  @Test
+  void astypeToBoolAndUint32RoundTripTheirDtype() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f = MLX.array(scope, new float[] {0, 1, 2}, new int[] {3});
+      assertEquals(DType.BOOL, MLX.astype(f, DType.BOOL).dtype());
+      assertEquals(DType.UINT32, MLX.astype(f, DType.UINT32).dtype());
+    }
+  }
+
+  @Test
   void sum() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {4});

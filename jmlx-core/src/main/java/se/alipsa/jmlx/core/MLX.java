@@ -15,8 +15,8 @@ import se.alipsa.jmlx.memory.MLXScope;
  * See req/initial-plan.md §7, req/phase3-plan.md and req/phase4-plan.md §1.
  *
  * <p>
- * req/phase4-plan.md M0a split this class: it keeps array creation, {@code eval} and the default device/stream
- * accessors; every other op moved to a sibling in this package, split by kind -- {@link MLXOps}
+ * req/phase4-plan.md M0a split this class: it keeps array creation, {@code eval}, {@code astype} (added in M0c) and the
+ * default device/stream accessors; every other op moved to a sibling in this package, split by kind -- {@link MLXOps}
  * (elementwise/comparisons/reductions/{@code matmul}/{@code inner}/{@code outer}), {@link MLXShape}
  * ({@code reshape}/{@code broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the
  * {@code fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant}
@@ -116,6 +116,19 @@ public final class MLX {
     MemorySegment lifted = mlx_h.mlx_array_new(target);
     NativeOps.checked("hoist", () -> mlx_h.mlx_array_set(lifted, a.handle()));
     return new MLXArray(target, lifted);
+  }
+
+  /**
+   * Casts {@code a} to {@code dtype} (mlx-c's {@code mlx_astype}), allocating the result into {@code a}'s own scope.
+   * See req/phase4-plan.md §4: this is what lets {@link MLXArray#toFloatArray()} read back {@code FLOAT16}/
+   * {@code BFLOAT16} arrays, and what makes a mixed inexact/exact {@link MLXOps#matmul} pair reachable rather than a
+   * case this facade could only assert was impossible.
+   */
+  public static MLXArray astype(MLXArray a, DType dtype) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("astype", () -> mlx_h.mlx_astype(res, a.handle(), dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
   }
 
   /**

@@ -13,7 +13,8 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Static facade over the mlx-c ops used by this slice. Every op here only builds the lazy computation graph; nothing
  * runs on the GPU/CPU until {@link #eval} (or the implicit eval inside {@link MLXArray#toFloatArray()}) triggers it.
- * See req/initial-plan.md §7.
+ * See req/initial-plan.md §7 and req/phase3-plan.md, which describes the broadcast/matmul guards, the additional ops,
+ * and the {@code mlx_vector_array}-based {@link #eval} added in this phase.
  *
  * <p>
  * Every op's result is allocated in the same scope as its first {@code MLXArray} operand; {@link #array} takes the

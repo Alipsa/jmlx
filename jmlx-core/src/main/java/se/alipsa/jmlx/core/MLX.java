@@ -245,20 +245,95 @@ public final class MLX {
     int apply(MemorySegment res, MemorySegment a, MemorySegment b, MemorySegment stream);
   }
 
-  /** Elementwise natural exponential. */
-  public static MLXArray exp(MLXArray a) {
+  private static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(() -> mlx_h.mlx_exp(res, a.handle(), DEFAULT_STREAM));
+    checked(() -> op.apply(res, a.handle(), DEFAULT_STREAM));
     return new MLXArray(scope, res);
+  }
+
+  @FunctionalInterface
+  private interface UnaryOp {
+    int apply(MemorySegment res, MemorySegment a, MemorySegment stream);
+  }
+
+  /**
+   * Wraps the {@code (res, a, const int*, size_t, stream)} native shape shared by {@code mlx_broadcast_to},
+   * {@code mlx_squeeze_axes} and {@code mlx_transpose_axes}: a confined {@link Arena} owns {@code param}'s native copy
+   * for the lifetime of the call, exactly as {@link #reshape} inlines it for {@code mlx_reshape}.
+   */
+  private static MLXArray shapeOp(String opName, MLXArray a, int[] param, ShapeOp op) {
+    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeParam = tmp.allocateFrom(ValueLayout.JAVA_INT, param);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      checked(() -> op.apply(res, a.handle(), nativeParam, param.length, DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
+
+  @FunctionalInterface
+  private interface ShapeOp {
+    int apply(MemorySegment res, MemorySegment a, MemorySegment param, long paramNum, MemorySegment stream);
+  }
+
+  /** Elementwise natural exponential. */
+  public static MLXArray exp(MLXArray a) {
+    return unaryOp("exp", a, mlx_h::mlx_exp);
+  }
+
+  /** Elementwise natural logarithm. */
+  public static MLXArray log(MLXArray a) {
+    return unaryOp("log", a, mlx_h::mlx_log);
+  }
+
+  /** Elementwise sine. */
+  public static MLXArray sin(MLXArray a) {
+    return unaryOp("sin", a, mlx_h::mlx_sin);
+  }
+
+  /** Elementwise cosine. */
+  public static MLXArray cos(MLXArray a) {
+    return unaryOp("cos", a, mlx_h::mlx_cos);
   }
 
   /** Sums every element to a rank-0 scalar array. */
   public static MLXArray sum(MLXArray a) {
+    // mlx_sum(res, a, keepdims, s) carries an extra bool beyond unaryOp's
+    // (res, a, stream) shape, so it does not fit that helper -- kept as its
+    // own body rather than forcing it through a shape unaryOp doesn't have.
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
     checked(() -> mlx_h.mlx_sum(res, a.handle(), false, DEFAULT_STREAM));
     return new MLXArray(scope, res);
+  }
+
+  /**
+   * Generalized inner product of {@code a} and {@code b}: contracts their last axes, matching {@code mlx_inner} (and
+   * NumPy's {@code inner}). Requires {@code a.shape()[-1] == b.shape()[-1]} unless either operand is rank-0, in which
+   * case native treats the call as a scalar multiply and no last axis exists on that side to compare.
+   */
+  public static MLXArray inner(MLXArray a, MLXArray b) {
+    int[] sa = a.shape();
+    int[] sb = b.shape();
+    if (sa.length > 0 && sb.length > 0 && sa[sa.length - 1] != sb[sb.length - 1]) {
+      throw new IllegalArgumentException("inner: last dimensions disagree: " + java.util.Arrays.toString(sa) + " and "
+          + java.util.Arrays.toString(sb));
+    }
+    return binaryOp("inner", a, b, mlx_h::mlx_inner);
+  }
+
+  /**
+   * Outer product of {@code a} and {@code b}: every pairwise product of their flattened elements, matching
+   * {@code mlx_outer}. Guards {@code a.size() <= Integer.MAX_VALUE} because native reshapes {@code a} via a
+   * {@code static_cast<int>(a.size())} with no bounds check of its own (upstream {@code ops.cpp:5448-5451}); {@code b}
+   * goes through {@code flatten} instead, which needs no such cast, so the guard is deliberately one-sided.
+   */
+  public static MLXArray outer(MLXArray a, MLXArray b) {
+    if (a.size() > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("outer: a has " + a.size() + " elements, exceeding Integer.MAX_VALUE");
+    }
+    return binaryOp("outer", a, b, mlx_h::mlx_outer);
   }
 
   /** Reshapes {@code a} to {@code shape}, which must have the same total element count. */
@@ -280,12 +355,89 @@ public final class MLX {
     }
   }
 
+  /** Broadcasts {@code a} to {@code targetShape}, per NumPy's directional broadcasting rules. */
+  public static MLXArray broadcastTo(MLXArray a, int[] targetShape) {
+    requireBroadcastableTo(a, targetShape);
+    return shapeOp("broadcastTo", a, targetShape, mlx_h::mlx_broadcast_to);
+  }
+
+  /** Removes every size-1 axis from {@code a}'s shape. */
+  public static MLXArray squeeze(MLXArray a) {
+    return unaryOp("squeeze", a, mlx_h::mlx_squeeze);
+  }
+
+  /** Removes the given {@code axes} from {@code a}'s shape; native requires each to currently have size 1. */
+  public static MLXArray squeeze(MLXArray a, int[] axes) {
+    return shapeOp("squeeze", a, axes, mlx_h::mlx_squeeze_axes);
+  }
+
   /** Reverses every axis. */
   public static MLXArray transpose(MLXArray a) {
+    return unaryOp("transpose", a, mlx_h::mlx_transpose);
+  }
+
+  /** Permutes {@code a}'s axes according to {@code axes}, a permutation of {@code 0 .. a.ndim() - 1}. */
+  public static MLXArray transpose(MLXArray a, int[] axes) {
+    return shapeOp("transpose", a, axes, mlx_h::mlx_transpose_axes);
+  }
+
+  /**
+   * Slices {@code a} along every axis using {@code start} (inclusive) and {@code stop} (exclusive), with every axis
+   * implicitly strided by 1. Equivalent to {@link #slice(MLXArray, int[], int[], int[])} with an all-ones
+   * {@code strides}.
+   */
+  public static MLXArray slice(MLXArray a, int[] start, int[] stop) {
+    requireSliceLengths(a, start, stop, null);
+    int[] strides = new int[a.ndim()];
+    java.util.Arrays.fill(strides, 1);
+    return sliceNative(a, start, stop, strides);
+  }
+
+  /**
+   * Slices {@code a} along every axis using {@code start} (inclusive), {@code stop} (exclusive) and {@code strides}.
+   * Mirrors native's own {@code normalize_slice} (upstream {@code ops.cpp:656-696}): negative {@code start}/
+   * {@code stop} are normalized NumPy-style ({@code n + i}); a negative stride reverses that axis; {@code stop} is
+   * clamped to the axis length rather than bounds-checked. A zero stride is division-by-zero -- C++ undefined behaviour
+   * reachable from this call, silently returning an empty axis on Apple Silicon rather than crashing or erroring -- so
+   * it is rejected here with a message phrased after NumPy's own ("slice step cannot be zero") rather than as a
+   * jmlx-specific restriction.
+   */
+  public static MLXArray slice(MLXArray a, int[] start, int[] stop, int[] strides) {
+    requireSliceLengths(a, start, stop, strides);
+    for (int i = 0; i < strides.length; i++) {
+      if (strides[i] == 0) {
+        throw new IllegalArgumentException("slice: strides[" + i + "] must not be 0 (slice step cannot be zero)");
+      }
+    }
+    return sliceNative(a, start, stop, strides);
+  }
+
+  /**
+   * Mirrors upstream's own length check ({@code ops.cpp:757-763}, {@code "[slice] Invalid number of indices or
+   * strides for array with dimension N."}) but names which of {@code start}/{@code stop}/{@code strides} disagreed.
+   * {@code strides} is {@code null} for the 3-arg {@link #slice(MLXArray, int[], int[])} overload, which synthesizes an
+   * all-ones {@code strides} of the correct length itself and so has nothing to check there.
+   */
+  private static void requireSliceLengths(MLXArray a, int[] start, int[] stop, int[] strides) {
+    int nd = a.ndim();
+    if (start.length != nd || stop.length != nd || (strides != null && strides.length != nd)) {
+      throw new IllegalArgumentException("slice: start (length " + start.length + "), stop (length " + stop.length + ")"
+          + (strides != null ? ", strides (length " + strides.length + ")" : "") + " must all equal a.ndim() (" + nd
+          + ")");
+    }
+  }
+
+  private static MLXArray sliceNative(MLXArray a, int[] start, int[] stop, int[] strides) {
     MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(() -> mlx_h.mlx_transpose(res, a.handle(), DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeStart = tmp.allocateFrom(ValueLayout.JAVA_INT, start);
+      MemorySegment nativeStop = tmp.allocateFrom(ValueLayout.JAVA_INT, stop);
+      MemorySegment nativeStrides = tmp.allocateFrom(ValueLayout.JAVA_INT, strides);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      checked(() -> mlx_h.mlx_slice(res, a.handle(), nativeStart, start.length, nativeStop, stop.length, nativeStrides,
+          strides.length, DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
   }
 
   // Not code evaluation: mirrors mlx-c's mlx_array_eval, which forces a

@@ -221,4 +221,192 @@ class MLXNumericTest {
       assertArrayEquals(new float[] {1, 4, 2, 5, 3, 6}, transposed.toFloatArray(), EPS);
     }
   }
+
+  @Test
+  void transposeAxesPermutesWithoutFullyReversing() {
+    try (MLXScope scope = new MLXScope()) {
+      // shape [2,3,2], values 1..12 in row-major order. axes=[1,0,2] swaps only the
+      // first two axes -- unlike transpose(a)'s full reversal, axis 2 stays put -- so
+      // this is the permutation transpose(a) alone can never exercise.
+      float[] data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+      MLXArray a = MLX.array(scope, data, new int[] {2, 3, 2});
+      MLXArray transposed = MLX.transpose(a, new int[] {1, 0, 2});
+      assertArrayEquals(new int[] {3, 2, 2}, transposed.shape());
+      assertArrayEquals(new float[] {1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12}, transposed.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void log() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1f, (float) Math.E}, new int[] {2});
+      float[] result = MLX.log(a).toFloatArray();
+      assertEquals(0f, result[0], EPS);
+      assertEquals(1f, result[1], EPS);
+    }
+  }
+
+  @Test
+  void sin() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {0f, (float) (Math.PI / 2)}, new int[] {2});
+      float[] result = MLX.sin(a).toFloatArray();
+      assertEquals(0f, result[0], EPS);
+      assertEquals(1f, result[1], EPS);
+    }
+  }
+
+  @Test
+  void cos() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {0f, (float) (Math.PI / 2)}, new int[] {2});
+      float[] result = MLX.cos(a).toFloatArray();
+      assertEquals(1f, result[0], EPS);
+      assertEquals(0f, result[1], 1e-6f);
+    }
+  }
+
+  @Test
+  void innerOfTwoRank1VectorsIsADotProduct() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {4, 5, 6}, new int[] {3});
+      MLXArray result = MLX.inner(a, b);
+      assertArrayEquals(new int[] {}, result.shape());
+      assertArrayEquals(new float[] {32}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void outerComputesShapeAndValues() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2}, new int[] {2});
+      MLXArray b = MLX.array(scope, new float[] {3, 4, 5}, new int[] {3});
+      MLXArray result = MLX.outer(a, b);
+      assertArrayEquals(new int[] {2, 3}, result.shape());
+      assertArrayEquals(new float[] {3, 4, 5, 6, 8, 10}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void broadcastToSucceeds() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray result = MLX.broadcastTo(a, new int[] {2, 3});
+      assertArrayEquals(new int[] {2, 3}, result.shape());
+      assertArrayEquals(new float[] {1, 2, 3, 1, 2, 3}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void broadcastToRejectsShapeThatFailsTheDirectionalCheck() {
+    try (MLXScope scope = new MLXScope()) {
+      // [3] -> [1] satisfies the symmetric broadcast_shapes rule (1 == 1 after
+      // right-alignment padding never applies here) but native's directional
+      // check for broadcastTo specifically rejects shrinking a real dimension.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      assertThrows(IllegalArgumentException.class, () -> MLX.broadcastTo(a, new int[] {1}));
+    }
+  }
+
+  @Test
+  void broadcastToRejectsNegativeTargetDimension() {
+    try (MLXScope scope = new MLXScope()) {
+      // Without the non-negative check on targetShape, 1 == 1 would make the
+      // directional check itself pass, and this would instead throw MLXException
+      // from native -- assert the Java-side exception type specifically.
+      MLXArray a = MLX.array(scope, new float[] {1}, new int[] {1});
+      assertThrows(IllegalArgumentException.class, () -> MLX.broadcastTo(a, new int[] {-1}));
+    }
+  }
+
+  @Test
+  void squeezeRemovesAllSizeOneAxes() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {1, 3, 1});
+      MLXArray result = MLX.squeeze(a);
+      assertArrayEquals(new int[] {3}, result.shape());
+      assertArrayEquals(new float[] {1, 2, 3}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void squeezeAxesRemovesOnlyTheGivenAxes() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {1, 3, 1});
+      MLXArray result = MLX.squeeze(a, new int[] {0});
+      assertArrayEquals(new int[] {3, 1}, result.shape());
+      assertArrayEquals(new float[] {1, 2, 3}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void sliceRejectsLengthMismatchWithNdim() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      assertThrows(IllegalArgumentException.class, () -> MLX.slice(a, new int[] {0}, new int[] {2, 3}));
+    }
+  }
+
+  @Test
+  void sliceWithNegativeStartSucceeds() {
+    try (MLXScope scope = new MLXScope()) {
+      // start=-3 on a length-5 axis normalizes to 5-3=2, NumPy-style -- must not throw,
+      // and must select elements [2,3,4] (values 3,4,5), not some clamped/rejected result.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5}, new int[] {5});
+      MLXArray result = MLX.slice(a, new int[] {-3}, new int[] {5});
+      assertArrayEquals(new int[] {3}, result.shape());
+      assertArrayEquals(new float[] {3, 4, 5}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void sliceWithNegativeStrideReversesADimension() {
+    try (MLXScope scope = new MLXScope()) {
+      // start=3, stop=1, stride=-1 on [1,2,3,4,5]: walks index 3 down to (but excluding)
+      // index 1, i.e. indices {3,2} -> values {4,3}. Must not throw: native's reverse form.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5}, new int[] {5});
+      MLXArray result = MLX.slice(a, new int[] {3}, new int[] {1}, new int[] {-1});
+      assertArrayEquals(new int[] {2}, result.shape());
+      assertArrayEquals(new float[] {4, 3}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void sliceRejectsZeroStride() {
+    try (MLXScope scope = new MLXScope()) {
+      // Without this guard, native does not throw at all -- it silently returns a
+      // zero-sized dimension (aarch64 sdiv-by-zero returns 0 rather than trapping).
+      // A test asserting only "does not succeed" would pass against that broken
+      // behaviour too, so assert both the exception type and the message.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {4});
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> MLX.slice(a, new int[] {0}, new int[] {4}, new int[] {0}));
+      assertEquals("slice: strides[0] must not be 0 (slice step cannot be zero)", ex.getMessage());
+    }
+  }
+
+  @Test
+  void sliceContiguousSelectsExpectedSubrange() {
+    try (MLXScope scope = new MLXScope()) {
+      // [[1,2,3],[4,5,6]], columns 1..2 of both rows -> [[2,3],[5,6]].
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      MLXArray result = MLX.slice(a, new int[] {0, 1}, new int[] {2, 3});
+      assertArrayEquals(new int[] {2, 2}, result.shape());
+      assertArrayEquals(new float[] {2, 3, 5, 6}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void sliceStridedSelectsEveryOtherElementInOrder() {
+    try (MLXScope scope = new MLXScope()) {
+      // Stride 2 over 8 elements yields a non-contiguous view: exactly the case that
+      // exercises toFloatArray()'s mlx_contiguous path, the way
+      // transposeReordersElementsNotJustShape does for transpose.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6, 7, 8}, new int[] {8});
+      MLXArray result = MLX.slice(a, new int[] {0}, new int[] {8}, new int[] {2});
+      assertArrayEquals(new int[] {4}, result.shape());
+      assertArrayEquals(new float[] {1, 3, 5, 7}, result.toFloatArray(), EPS);
+    }
+  }
 }

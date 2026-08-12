@@ -15,8 +15,9 @@ import se.alipsa.jmlx.memory.MLXScope;
  * See req/initial-plan.md §7, req/phase3-plan.md and req/phase4-plan.md §1.
  *
  * <p>
- * req/phase4-plan.md M0a split this class: it keeps array creation, {@code eval}, {@code astype} (added in M0c) and the
- * default device/stream accessors; every other op moved to a sibling in this package, split by kind -- {@link MLXOps}
+ * req/phase4-plan.md M0a split this class: it keeps array creation ({@code array}; {@code zeros}/{@code ones}/
+ * {@code full}/{@code arange} added in M0d), {@code eval}, {@code astype} (added in M0c) and the default device/stream
+ * accessors; every other op moved to a sibling in this package, split by kind -- {@link MLXOps}
  * (elementwise/comparisons/reductions/{@code matmul}/{@code inner}/{@code outer}), {@link MLXShape}
  * ({@code reshape}/{@code broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the
  * {@code fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant}
@@ -86,6 +87,92 @@ public final class MLX {
       }
       return new MLXArray(scope, handle);
     }
+  }
+
+  /** Creates an INT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}. */
+  public static MLXArray array(MLXScope scope, int[] data, int[] shape) {
+    long expected = 1;
+    for (int dim : shape) {
+      expected *= dim;
+    }
+    if (expected != data.length) {
+      throw new IllegalArgumentException("shape " + java.util.Arrays.toString(shape) + " (size " + expected
+          + ") does not match data length " + data.length);
+    }
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeData = tmp.allocateFrom(ValueLayout.JAVA_INT, data);
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      // Same statusless-failure hazard as the float[] overload above.
+      NativeLoader.clearLastNativeError();
+      MemorySegment handle = mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_INT32());
+      if (mlx_array_.ctx(handle).address() == 0) {
+        throw NativeOps.nativeFailure("mlx_array_new_data");
+      }
+      return new MLXArray(scope, handle);
+    }
+  }
+
+  /** Creates a {@code shape}-shaped {@code dtype} array of zeros in {@code scope}. */
+  public static MLXArray zeros(MLXScope scope, int[] shape, DType dtype) {
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      NativeOps.checked("zeros",
+          () -> mlx_h.mlx_zeros(res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    }
+    return new MLXArray(scope, res);
+  }
+
+  /** Creates a {@code shape}-shaped {@code dtype} array of ones in {@code scope}. */
+  public static MLXArray ones(MLXScope scope, int[] shape, DType dtype) {
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      NativeOps.checked("ones",
+          () -> mlx_h.mlx_ones(res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    }
+    return new MLXArray(scope, res);
+  }
+
+  /**
+   * Creates a {@code shape}-shaped {@code dtype} array filled with {@code value}, in {@code scope}. Not a pure creation
+   * op (req/phase4-plan.md §3): {@code mlx_full}'s fill value is itself an {@code mlx_array} (upstream
+   * {@code ops.h:437-443}), so {@code value} first becomes a throwaway scalar via mlx-c's own statusless
+   * {@code mlx_array_new_bool}/{@code _int}/{@code _float32} (picked by {@code dtype}) -- the same null-ctx-on-failure
+   * hazard {@link #array} already handles -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only
+   * reads it, it does not adopt it.
+   */
+  public static MLXArray full(MLXScope scope, int[] shape, float value, DType dtype) {
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment scalar = switch (dtype) {
+        case BOOL -> mlx_h.mlx_array_new_bool(tmp, value != 0f);
+        case INT32 -> mlx_h.mlx_array_new_int(tmp, (int) value);
+        default -> mlx_h.mlx_array_new_float32(tmp, value);
+      };
+      if (mlx_array_.ctx(scalar).address() == 0) {
+        throw NativeOps.nativeFailure("full: mlx_array_new_" + dtype);
+      }
+      try {
+        MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+        MemorySegment res = mlx_h.mlx_array_new(scope);
+        NativeOps.checked("full", () -> mlx_h.mlx_full(res, nativeShape, shape.length, scalar, dtype.nativeValue(),
+            NativeOps.DEFAULT_STREAM));
+        return new MLXArray(scope, res);
+      } finally {
+        mlx_h.mlx_array_free(scalar);
+      }
+    }
+  }
+
+  /**
+   * Creates a {@code dtype} array in {@code scope} counting from {@code start} to {@code stop} (exclusive) by
+   * {@code step}.
+   */
+  public static MLXArray arange(MLXScope scope, double start, double stop, double step, DType dtype) {
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("arange",
+        () -> mlx_h.mlx_arange(res, start, stop, step, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
   }
 
   /**

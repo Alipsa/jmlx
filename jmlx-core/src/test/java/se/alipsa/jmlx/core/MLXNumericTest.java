@@ -285,6 +285,78 @@ class MLXNumericTest {
   }
 
   @Test
+  void arrayIntOverloadCreatesAnInt32ArrayFromRowMajorData() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new int[] {1, 2, 3, 4}, new int[] {2, 2});
+      assertEquals(DType.INT32, a.dtype());
+      assertArrayEquals(new int[] {1, 2, 3, 4}, a.toIntArray());
+    }
+  }
+
+  @Test
+  void zerosAndOnesFillEveryElement() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray z = MLX.zeros(scope, new int[] {2, 2}, DType.FLOAT32);
+      assertArrayEquals(new float[] {0, 0, 0, 0}, z.toFloatArray(), EPS);
+      MLXArray o = MLX.ones(scope, new int[] {3}, DType.INT32);
+      assertEquals(DType.INT32, o.dtype());
+      assertArrayEquals(new int[] {1, 1, 1}, o.toIntArray());
+    }
+  }
+
+  @Test
+  void fullFillsFloat32WithTheGivenValue() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f = MLX.full(scope, new int[] {2, 2}, 7f, DType.FLOAT32);
+      assertArrayEquals(new float[] {7, 7, 7, 7}, f.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void fullTruncatesTheFillValueForAnInt32Target() {
+    try (MLXScope scope = new MLXScope()) {
+      // 5.9f -> mlx_array_new_int((int) 5.9f) == 5, matching Java's own truncating cast.
+      MLXArray f = MLX.full(scope, new int[] {3}, 5.9f, DType.INT32);
+      assertArrayEquals(new int[] {5, 5, 5}, f.toIntArray());
+    }
+  }
+
+  @Test
+  void fullBuildsABoolFillViaTheBoolScalarConstructor() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f = MLX.full(scope, new int[] {2}, 1f, DType.BOOL);
+      assertEquals(DType.BOOL, f.dtype());
+      assertArrayEquals(new int[] {1, 1}, MLX.astype(f, DType.INT32).toIntArray());
+    }
+  }
+
+  @Test
+  void arangeWithAnIntegerStepProducesIntegerCounts() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.arange(scope, 0, 5, 1, DType.INT32);
+      assertArrayEquals(new int[] {0, 1, 2, 3, 4}, a.toIntArray());
+    }
+  }
+
+  @Test
+  void arangeWithAFractionalStepProducesFractionalCounts() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.arange(scope, 0, 1, 0.25, DType.FLOAT32);
+      assertArrayEquals(new float[] {0, 0.25f, 0.5f, 0.75f}, a.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void stopGradientPreservesTheForwardValueAndDtype() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray blocked = MLXOps.stopGradient(a);
+      assertEquals(a.dtype(), blocked.dtype());
+      assertArrayEquals(new float[] {1, 2, 3}, blocked.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
   void sum() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {4});

@@ -126,6 +126,15 @@ public final class MLXOps {
     return NativeOps.binaryOp("add", a, b, mlx_h::mlx_add);
   }
 
+  /**
+   * Blocks gradient flow through {@code a}: the forward value is unchanged, but any traced backward pass treats
+   * {@code a} as a constant rather than differentiating through whatever produced it. Fits {@code unaryOp}'s exact
+   * {@code (res, a, stream)} shape (upstream {@code mlx_stop_gradient}), so it needs no hand-rolled body.
+   */
+  public static MLXArray stopGradient(MLXArray a) {
+    return NativeOps.unaryOp("stopGradient", a, mlx_h::mlx_stop_gradient);
+  }
+
   /** Elementwise natural exponential. */
   public static MLXArray exp(MLXArray a) {
     return NativeOps.unaryOp("exp", a, mlx_h::mlx_exp);

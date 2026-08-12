@@ -121,7 +121,8 @@ public final class MLX {
   /**
    * Matrix product of {@code a} and {@code b}. Either may be rank-1 (promoted internally, matching mlx's own
    * vector-matrix / matrix-vector rules); rank &ge; 2 operands batch-broadcast over every axis but the last two. Rank-0
-   * operands are rejected, as mlx itself rejects them.
+   * operands are rejected, as mlx itself rejects them. Both operands must have an inexact dtype (see
+   * {@link DType#isInexact()}); see {@link #requireMatmulCompatible} for how that check relates to native's rule.
    */
   public static MLXArray matmul(MLXArray a, MLXArray b) {
     requireMatmulCompatible(a, b);
@@ -153,9 +154,18 @@ public final class MLX {
    * on either operand; promote a rank-1 {@code a} to {@code [1, a.shape(0)]} and a rank-1 {@code b} to
    * {@code [b.shape(0), 1]} (mlx's own {@code expand_dims}); compare the inner dimension on the <em>promoted</em>
    * shapes, not the raw ones -- indexing {@code b.shape(-2)} on a raw rank-1 {@code b} would be out of bounds; require
-   * {@link DType#isInexact()} on both operands, mirroring native's {@code issubdtype(out_type, inexact)} rather than
-   * narrowing it to {@code == FLOAT32}; then require the batch dimensions (every axis but the last two of the promoted
-   * shapes) to be broadcast-compatible.
+   * {@link DType#isInexact()} on both operands; then require the batch dimensions (every axis but the last two of the
+   * promoted shapes) to be broadcast-compatible.
+   *
+   * <p>
+   * The dtype check here is <em>per-operand</em>: it requires each of {@code a} and {@code b} to independently be
+   * inexact. Native's actual rule is {@code issubdtype(out_type, inexact)} on the <em>promoted</em> type of the pair,
+   * not on each operand separately. The two rules diverge only for a mixed exact/inexact pair whose promoted type is
+   * still inexact -- e.g. float32 + int32, where {@code promote_types(float32, int32) == float32} -- which native would
+   * accept (promoting the int32 operand) but this per-operand check would reject. That divergence is unreachable today:
+   * nothing in this facade constructs an {@code INT32} array yet, so this method can only ever be called with operands
+   * that are already both inexact or both exact. Revisit this check in the same commit that adds an
+   * {@code astype}/int-array-construction path, so a real mixed-dtype pair can actually reach this method.
    */
   private static void requireMatmulCompatible(MLXArray a, MLXArray b) {
     int[] sa = a.shape();
@@ -173,12 +183,12 @@ public final class MLX {
     if (!a.dtype().isInexact() || !b.dtype().isInexact()) {
       throw new IllegalArgumentException("matmul: requires inexact dtypes, got " + a.dtype() + " and " + b.dtype());
     }
-    int battA = pa.length - 2;
-    int battB = pb.length - 2;
-    int batchDims = Math.max(battA, battB);
+    int batchA = pa.length - 2;
+    int batchB = pb.length - 2;
+    int batchDims = Math.max(batchA, batchB);
     for (int i = 0; i < batchDims; i++) {
-      int da = i < batchDims - battA ? 1 : pa[i - (batchDims - battA)];
-      int db = i < batchDims - battB ? 1 : pb[i - (batchDims - battB)];
+      int da = i < batchDims - batchA ? 1 : pa[i - (batchDims - batchA)];
+      int db = i < batchDims - batchB ? 1 : pb[i - (batchDims - batchB)];
       if (da != db && da != 1 && db != 1) {
         throw new IllegalArgumentException("matmul: incompatible batch dimensions " + java.util.Arrays.toString(sa)
             + " and " + java.util.Arrays.toString(sb));
@@ -448,10 +458,15 @@ public final class MLX {
   /**
    * Explicitly triggers computation for the given arrays, via a single {@code mlx_eval} over an
    * {@code mlx_vector_array} rather than one {@code mlx_array_eval} per array. This schedules all N graphs before
-   * waiting on any of them, so all N sets of intermediates are live simultaneously -- <b>peak memory can go up</b>
-   * relative to evaluating one array at a time, which lets each graph's temporaries be released before the next begins.
-   * See req/phase3-plan.md §4 for a measured figure (peak bytes for the loop versus the vector, over the same N-array
-   * workload).
+   * waiting on any of them, so all N sets of intermediates are live simultaneously, in principle at the cost of peak
+   * memory relative to evaluating one array at a time (which would let each graph's temporaries be released before the
+   * next begins). In practice, per req/phase3-plan.md §4, that effect was measured as unobservable through this
+   * facade's ownership model: every op result -- intermediate or final -- is registered with its {@link MLXScope} the
+   * instant the op is invoked and is only freed at scope close, regardless of eval strategy, so nothing this facade
+   * builds is ever eligible for differential early free. Two rounds of measurement (single-op and multi-op lazy chains,
+   * 6 trials total) found a delta of exactly 0 bytes. The underlying native-level tradeoff remains real in principle
+   * for mlx-c graphs whose intermediates are <em>not</em> independently referenced by anything outside the graph, but
+   * that case wasn't -- and structurally couldn't be -- exercised by this facade's measurement.
    *
    * <p>
    * There is deliberately no same-scope check here (unlike {@link #binaryOp}): {@code eval} allocates no result, so
@@ -459,9 +474,9 @@ public final class MLX {
    * is legitimate.
    *
    * <p>
-   * On failure, re-runs the per-array {@code mlx_array_eval} loop to attribute which array caused it -- the one
-   * diagnostic the joint form loses -- and rethrows with that array's index; if the re-run cannot reproduce the
-   * failure, the original exception is rethrown unchanged rather than masked.
+   * On failure, re-runs the per-array {@code mlx_array_eval} loop to identify the first array whose own evaluation
+   * reproduces the failure -- the one diagnostic the joint form loses -- and rethrows with that array's index; if the
+   * re-run cannot reproduce the failure, the original exception is rethrown unchanged rather than masked.
    */
   public static void eval(MLXArray... arrays) {
     int n = arrays.length;

@@ -8,7 +8,9 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * A native {@code mlx_array} handle owned by an {@link MLXScope}. See req/initial-plan.md §6. Not thread-safe: confined
- * to the scope's owning thread, same as the scope itself.
+ * to the scope's owning thread, same as the scope itself. That confinement is enforced, not just documented: every
+ * handle read goes through {@link #ensureOpen()}, which delegates to {@link MLXScope#checkAccess()} and throws
+ * {@link IllegalStateException} on foreign-thread or closed-scope access.
  */
 public final class MLXArray implements AutoCloseable {
 

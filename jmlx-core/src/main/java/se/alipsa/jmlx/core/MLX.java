@@ -495,7 +495,7 @@ public final class MLX {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment vec = newVectorArray(handles, tmp);
       try {
-        checked(() -> mlx_h.mlx_eval(vec));
+        checked("eval", () -> mlx_h.mlx_eval(vec));
       } catch (MLXException e) {
         // Restores the per-array attribution the joint eval loses, by
         // re-evaluating the INDIVIDUAL handles via mlx_array_eval, not the
@@ -586,8 +586,12 @@ public final class MLX {
     checked(null, nativeCall);
   }
 
-  /** Same as {@link #checked(IntSupplier)}, but names {@code opName} in the failure message on a non-zero status. */
-  private static void checked(String opName, IntSupplier nativeCall) {
+  /**
+   * Same as {@link #checked(IntSupplier)}, but names {@code opName} in the failure message on a non-zero status.
+   * Package-private, not {@code private}: {@link MLXArray#toFloatArray()} is a cross-class caller with its own op-level
+   * name to attribute failures to.
+   */
+  static void checked(String opName, IntSupplier nativeCall) {
     NativeLoader.clearLastNativeError();
     int status = nativeCall.getAsInt();
     if (status != 0) {

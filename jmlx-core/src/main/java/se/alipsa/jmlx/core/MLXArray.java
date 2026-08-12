@@ -83,8 +83,8 @@ public final class MLXArray implements AutoCloseable {
       // it, so a failed read never leaks the native array.
       MemorySegment contiguous = mlx_h.mlx_array_new(tmp);
       try {
-        MLX.checked(() -> mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
-        MLX.checked(() -> mlx_h.mlx_array_eval(contiguous));
+        MLX.checked("toFloatArray", () -> mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
+        MLX.checked("toFloatArray", () -> mlx_h.mlx_array_eval(contiguous));
         long n = mlx_h.mlx_array_size(contiguous);
         if (n > Integer.MAX_VALUE) {
           throw new IllegalStateException("toFloatArray() cannot represent " + n + " elements in a Java array"

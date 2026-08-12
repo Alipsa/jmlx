@@ -7,6 +7,7 @@ import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
+import se.alipsa.jmlx.ffi.mlx_vector_array_;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
@@ -440,13 +441,115 @@ public final class MLX {
     }
   }
 
-  // Not code evaluation: mirrors mlx-c's mlx_array_eval, which forces a
-  // lazily-built computation graph to actually run on device.
-  /** Explicitly triggers computation for the given arrays. */
+  // Not code evaluation: mirrors mlx-c's mlx_eval, which forces every
+  // lazily-built computation graph reachable from `arrays` to actually run
+  // on device, in a single scheduling pass rather than one pass per array.
+  /**
+   * Explicitly triggers computation for the given arrays, via a single {@code mlx_eval} over an
+   * {@code mlx_vector_array} rather than one {@code mlx_array_eval} per array. This schedules all N graphs before
+   * waiting on any of them, so all N sets of intermediates are live simultaneously -- <b>peak memory can go up</b>
+   * relative to evaluating one array at a time, which lets each graph's temporaries be released before the next begins.
+   * See req/phase3-plan.md §4 for a measured figure (peak bytes for the loop versus the vector, over the same N-array
+   * workload).
+   *
+   * <p>
+   * There is deliberately no same-scope check here (unlike {@link #binaryOp}): {@code eval} allocates no result, so
+   * there is no "which scope owns the output" question to settle, and evaluating arrays from two scopes on one thread
+   * is legitimate.
+   *
+   * <p>
+   * On failure, re-runs the per-array {@code mlx_array_eval} loop to attribute which array caused it -- the one
+   * diagnostic the joint form loses -- and rethrows with that array's index; if the re-run cannot reproduce the
+   * failure, the original exception is rethrown unchanged rather than masked.
+   */
   public static void eval(MLXArray... arrays) {
-    for (MLXArray a : arrays) {
-      checked(() -> mlx_h.mlx_array_eval(a.handle()));
+    int n = arrays.length;
+    if (n == 0) {
+      return;
     }
+    // Pass 1 CAPTURES; it does not merely touch. handle() is thread-checked
+    // (MLXArray.ensureOpen() -> MLXScope.checkAccess()), so this both
+    // validates every array up front and yields the segments the copy loop
+    // below uses -- the "cannot throw mid-build" invariant then holds by
+    // construction rather than by reading each handle a second time.
+    MemorySegment[] handles = new MemorySegment[n];
+    for (int i = 0; i < n; i++) {
+      handles[i] = arrays[i].handle();
+    }
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment vec = newVectorArray(handles, tmp);
+      try {
+        checked(() -> mlx_h.mlx_eval(vec));
+      } catch (MLXException e) {
+        // Restores the per-array attribution the joint eval loses. MUST sit
+        // here, inside the try-with-resources and BEFORE the finally frees
+        // vec: it re-evaluates the INDIVIDUAL handles via mlx_array_eval,
+        // not the vector, which is exactly what failed.
+        throw attributeEvalFailure(e, handles);
+      } finally {
+        mlx_h.mlx_vector_array_free(vec);
+      }
+    }
+  }
+
+  /**
+   * Builds an {@code mlx_vector_array} over {@code handles}, backed by a raw struct-array copy allocated from
+   * {@code allocator}. Factored out of {@link #eval} because {@code mlx_async_eval} (upstream {@code transforms.h:31})
+   * takes the same {@code mlx_vector_array} and would reuse this verbatim.
+   *
+   * <p>
+   * {@code allocator} MUST be a confined {@link Arena} (never an {@link MLXScope}): the vector's backing struct array
+   * is not an {@code mlx_array} this method's caller will ever hand to {@code mlx_array_free}, so allocating it through
+   * a scope would corrupt that scope's handle-tracking invariant -- a wrong-type delete, not a caught exception.
+   */
+  private static MemorySegment newVectorArray(MemorySegment[] handles, Arena allocator) {
+    int n = handles.length;
+    MemorySegment buf = mlx_array_.allocateArray(n, allocator);
+    long elementSize = mlx_array_.sizeof();
+    for (int i = 0; i < n; i++) {
+      // A raw MemorySegment.copy of sizeof() bytes, not a ctx get/set
+      // round-trip: a byte-for-byte struct copy stays correct if mlx_array_
+      // ever gains a field.
+      MemorySegment.copy(handles[i], 0L, buf, i * elementSize, elementSize);
+    }
+    // mlx_vector_array_new_data is statusless and returns a null-ctx struct
+    // on failure (vector.cpp:41-54), the same hazard class MLX.array already
+    // handles above. clearLastNativeError() must run immediately before this
+    // call, not just before mlx_eval below, for the reason given in
+    // MLX.checked's javadoc: some entry points fire the error handler
+    // without a status for checked() to see.
+    NativeLoader.clearLastNativeError();
+    MemorySegment vec = mlx_h.mlx_vector_array_new_data(allocator, buf, n);
+    // size == 0 returns a non-null ctx (vector.cpp:45 heap-allocates an
+    // empty std::vector), so this check will not misfire on eval()'s empty
+    // varargs case -- but eval() never reaches here for n == 0 regardless,
+    // since it returns before capturing handles.
+    if (mlx_vector_array_.ctx(vec).address() == 0) {
+      throw nativeFailure("mlx_vector_array_new_data");
+    }
+    return vec;
+  }
+
+  /**
+   * Re-runs the per-array {@code mlx_array_eval} loop to name the offender after the joint {@code mlx_eval} above
+   * failed; rethrows {@code original} unchanged if the re-run cannot reproduce the failure, so this never masks the
+   * error it is trying to describe.
+   */
+  private static MLXException attributeEvalFailure(MLXException original, MemorySegment[] handles) {
+    for (int i = 0; i < handles.length; i++) {
+      // `h`, not handles[i], inside the lambda: checked() takes an
+      // IntSupplier, and the loop counter is mutated each iteration, so
+      // capturing it directly is "local variables referenced from a lambda
+      // expression must be final or effectively final". `i` in the message
+      // below is fine -- string concatenation is not a capture.
+      final MemorySegment h = handles[i];
+      try {
+        checked(() -> mlx_h.mlx_array_eval(h));
+      } catch (MLXException perArray) {
+        return new MLXException("eval: array[" + i + "] failed", perArray);
+      }
+    }
+    return original;
   }
 
   /**

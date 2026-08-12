@@ -7,4 +7,9 @@ public final class MLXException extends RuntimeException {
   public MLXException(String message) {
     super(message);
   }
+
+  /** Creates an exception carrying {@code cause}'s mlx-c failure message as context. */
+  public MLXException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

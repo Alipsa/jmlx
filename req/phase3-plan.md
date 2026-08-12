@@ -628,6 +628,23 @@ over the same N-array workload, via `mlx_get_peak_memory` / `mlx_reset_peak_memo
 informal one-off measurement is enough; the point is that the tradeoff is quantified rather than
 hypothetical.
 
+**Measured (Task 4, mlx 0.31.2, Apple Silicon):** workload = N independent `matmul` results (each
+built from two freshly-materialized `[M, M]` float32 inputs via `MLX.array`, i.e. `2N` materialized
+operands plus `N` lazy matmul outputs), evaluated either via `N` sequential `mlx_array_eval` calls
+(the old per-array loop, called directly, bypassing `MLX.eval`) or via one `mlx_eval` over an
+`mlx_vector_array` of all `N` results (the new joint form) — `mlx_reset_peak_memory` before each phase,
+`mlx_get_peak_memory` after. Two scales tried, 3 trials each, fresh `MLXScope` per phase so the other
+phase's arrays are not still resident: `N=8, M=2048` (384 MiB total workload) and `N=32, M=1024` (also
+384 MiB total). **Result: identical peak in every trial at both scales — 402,653,184 bytes
+(exactly `3 × N × M² × 4`, i.e. exactly the sum of the `2N` materialized operands plus the `N`
+evaluated results, with zero measurable overhead attributable to scheduling) for both the loop and the
+vector; delta = 0 bytes in all 6 trials.** No difference in either direction was observed for this
+workload on this backend — reported honestly rather than assumed, per the instruction above not to
+assert the tradeoff without measuring it. This does not falsify the tradeoff in general (a workload
+whose ops carry substantial backend-internal scratch beyond their own output buffer, which `matmul` at
+this size apparently does not on Metal, is where it would be expected to show), but it is the actual
+number this measurement produced, not a hypothetical one.
+
 **Error attribution regresses, and has a free mitigation — take it.** One `mlx_eval` is
 all-or-nothing with no index in the message, where the loop could name which array failed. On the
 *error path only*, catch the `MLXException` and re-run the per-array `mlx_array_eval` loop to

@@ -278,6 +278,17 @@ class MLXNumericTest {
   }
 
   @Test
+  void innerRejectsMismatchedLastDimension() {
+    try (MLXScope scope = new MLXScope()) {
+      // Both operands rank-1 (>= 1), so the rank-0 skip in the guard cannot mask this:
+      // last dimensions 3 vs 4 genuinely disagree and must be rejected before native ever runs.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {4});
+      assertThrows(IllegalArgumentException.class, () -> MLX.inner(a, b));
+    }
+  }
+
+  @Test
   void outerComputesShapeAndValues() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1, 2}, new int[] {2});

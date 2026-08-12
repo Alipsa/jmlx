@@ -237,6 +237,20 @@ class MLXNumericTest {
   }
 
   @Test
+  void transposeAxesRejectsANonPermutation() {
+    try (MLXScope scope = new MLXScope()) {
+      // {0, 0, 2} repeats axis 0 and omits axis 1: not a permutation of
+      // 0..ndim()-1. Unlike the Java-side guards elsewhere in this class,
+      // there is no Java guard here -- native's own validation rejects
+      // this, so it surfaces as MLXException, not IllegalArgumentException.
+      // Pinned here so that stays a deliberate fact, not an accident nobody
+      // noticed changed.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, new int[] {2, 3, 2});
+      assertThrows(MLXException.class, () -> MLX.transpose(a, new int[] {0, 0, 2}));
+    }
+  }
+
+  @Test
   void log() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1f, (float) Math.E}, new int[] {2});
@@ -348,6 +362,19 @@ class MLXNumericTest {
       MLXArray result = MLX.squeeze(a, new int[] {0});
       assertArrayEquals(new int[] {3, 1}, result.shape());
       assertArrayEquals(new float[] {1, 2, 3}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void squeezeAxesRejectsAnAxisWithSizeNotOne() {
+    try (MLXScope scope = new MLXScope()) {
+      // Axis 1 has size 3, not 1, so it cannot be squeezed. As with
+      // transposeAxesRejectsANonPermutation, there is no Java-side guard
+      // here -- native validates and rejects it, surfacing as
+      // MLXException rather than IllegalArgumentException. Pinned so this
+      // stays a deliberate, known fact rather than an untested assumption.
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {1, 3, 1});
+      assertThrows(MLXException.class, () -> MLX.squeeze(a, new int[] {1}));
     }
   }
 

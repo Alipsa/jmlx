@@ -854,3 +854,9 @@ history — the warning against re-making each one already lives where it would 
   `vector.cpp:50-53` returns a fresh null-ctx struct **without freeing the partially built vector** —
   mlx-c leaks it. `MLXArray.ensureOpen()` already prevents passing one, so this is recorded rather
   than worked around.
+* **`requireMatmulCompatible`'s dtype guard is per-operand; native's is on the promoted type.**
+  Diverges only for a mixed exact/inexact pair whose promoted type is still inexact (e.g. float32 +
+  int32), which nothing in this facade can construct yet, so it is unreachable today. Tracked as a
+  Phase 4 entry condition: the guard must be revisited in the same commit that adds `astype` or an
+  `int[]`-array-construction path, so a real mixed-dtype pair can actually reach it. See
+  `requireMatmulCompatible`'s javadoc in `MLX.java` for the full reasoning.

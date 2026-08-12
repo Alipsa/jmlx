@@ -17,10 +17,9 @@ class MLXEvalTest {
 
   @Test
   void zeroArgEvalIsANoOp() {
-    // Proves the null-ctx check inside newVectorArray does not misfire on
-    // the non-null empty vector mlx_vector_array_new_data(..., 0) returns --
-    // though eval() never actually reaches that call for n == 0, since it
-    // returns before capturing handles.
+    // Pins the n == 0 early return in eval() itself: it returns before ever
+    // capturing handles or calling newVectorArray, so this does not exercise
+    // (and cannot prove anything about) that method's null-ctx check.
     assertDoesNotThrow(() -> MLX.eval());
   }
 

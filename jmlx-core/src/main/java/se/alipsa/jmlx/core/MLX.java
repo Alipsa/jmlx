@@ -248,7 +248,7 @@ public final class MLX {
       throw new IllegalArgumentException(opName + ": operands belong to different MLXScopes");
     }
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(() -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
+    checked(opName, () -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
     return new MLXArray(scope, res);
   }
 
@@ -260,7 +260,7 @@ public final class MLX {
   private static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(() -> op.apply(res, a.handle(), DEFAULT_STREAM));
+    checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
     return new MLXArray(scope, res);
   }
 
@@ -279,7 +279,7 @@ public final class MLX {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeParam = tmp.allocateFrom(ValueLayout.JAVA_INT, param);
       MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked(() -> op.apply(res, a.handle(), nativeParam, param.length, DEFAULT_STREAM));
+      checked(opName, () -> op.apply(res, a.handle(), nativeParam, param.length, DEFAULT_STREAM));
       return new MLXArray(scope, res);
     }
   }
@@ -497,10 +497,12 @@ public final class MLX {
       try {
         checked(() -> mlx_h.mlx_eval(vec));
       } catch (MLXException e) {
-        // Restores the per-array attribution the joint eval loses. MUST sit
-        // here, inside the try-with-resources and BEFORE the finally frees
-        // vec: it re-evaluates the INDIVIDUAL handles via mlx_array_eval,
-        // not the vector, which is exactly what failed.
+        // Restores the per-array attribution the joint eval loses, by
+        // re-evaluating the INDIVIDUAL handles via mlx_array_eval, not the
+        // vector (which is exactly what failed). Its position relative to
+        // the finally below is immaterial: it only touches `handles`, which
+        // are segments owned by each array's own MLXScope, not `vec` or
+        // `tmp` -- it would be equally correct after either was released.
         throw attributeEvalFailure(e, handles);
       } finally {
         mlx_h.mlx_vector_array_free(vec);
@@ -549,7 +551,10 @@ public final class MLX {
   /**
    * Re-runs the per-array {@code mlx_array_eval} loop to name the offender after the joint {@code mlx_eval} above
    * failed; rethrows {@code original} unchanged if the re-run cannot reproduce the failure, so this never masks the
-   * error it is trying to describe.
+   * error it is trying to describe. When the re-run does reproduce it, the returned exception's message folds in the
+   * per-array native text (not just its index) so it is visible from {@code getMessage()} without navigating
+   * {@code getCause()}, and {@code original} -- the joint failure that triggered this re-run -- is attached as a
+   * suppressed exception rather than discarded.
    */
   private static MLXException attributeEvalFailure(MLXException original, MemorySegment[] handles) {
     for (int i = 0; i < handles.length; i++) {
@@ -562,7 +567,9 @@ public final class MLX {
       try {
         checked(() -> mlx_h.mlx_array_eval(h));
       } catch (MLXException perArray) {
-        return new MLXException("eval: array[" + i + "] failed", perArray);
+        MLXException attributed = new MLXException("eval: array[" + i + "] failed: " + perArray.getMessage(), perArray);
+        attributed.addSuppressed(original);
+        return attributed;
       }
     }
     return original;
@@ -580,6 +587,15 @@ public final class MLX {
     int status = nativeCall.getAsInt();
     if (status != 0) {
       throw nativeFailure("mlx-c call failed with status " + status);
+    }
+  }
+
+  /** Same as {@link #checked(IntSupplier)}, but names {@code opName} in the failure message on a non-zero status. */
+  private static void checked(String opName, IntSupplier nativeCall) {
+    NativeLoader.clearLastNativeError();
+    int status = nativeCall.getAsInt();
+    if (status != 0) {
+      throw nativeFailure(opName + ": mlx-c call failed with status " + status);
     }
   }
 

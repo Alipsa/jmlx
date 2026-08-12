@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 
@@ -55,6 +56,44 @@ class MLXScopeTest {
     // close() still succeeds.
     assertDoesNotThrow(() -> MLX.array(scope, new float[] {1f}, new int[] {1}));
     assertDoesNotThrow(scope::close);
+  }
+
+  @Test
+  void arrayAccessFromWrongThreadThrowsAndOwningThreadCloseStillWorks() throws InterruptedException {
+    MLXScope scope = new MLXScope();
+    MLXArray array = MLX.array(scope, new float[] {1f}, new int[] {1});
+    AtomicReference<Throwable> caught = new AtomicReference<>();
+    Thread other = new Thread(() -> {
+      try {
+        array.shape();
+      } catch (Throwable t) {
+        caught.set(t);
+      }
+    });
+    other.start();
+    other.join();
+
+    assertInstanceOf(IllegalStateException.class, caught.get());
+    // The rejected foreign-thread read must not have wedged anything: the
+    // owning thread can still read the array and close the scope.
+    assertDoesNotThrow(array::shape);
+    assertDoesNotThrow(scope::close);
+  }
+
+  @Test
+  void arrayAccessAfterScopeCloseThrowsInsteadOfReadingFreedMemory() {
+    MLXScope scope = new MLXScope();
+    MLXArray array = MLX.array(scope, new float[] {1f}, new int[] {1});
+    // MLXScope.close() frees handles via Holder.closeAll() and never
+    // touches any MLXArray, so array's own `closed` flag is still false
+    // here -- this is exactly the path that discriminates checkAccess()
+    // (option 1, checkThread() + ensureOpen()) from an array-local
+    // Thread owner (option 3, which can only reproduce the thread half).
+    // Without the ensureOpen() half, shape() below would read a freed
+    // handle instead of throwing.
+    scope.close();
+
+    assertThrows(IllegalStateException.class, array::shape);
   }
 
   // The escaped array must be large enough that "never freed" and "freed"

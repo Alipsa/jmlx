@@ -49,6 +49,17 @@ class MLXMemoryLeakTest {
     assertNoGrowthOver(MLXMemoryLeakTest::runIterationClosingArraysExplicitly);
   }
 
+  /**
+   * The variant that matters for req/phase3-plan.md §4's {@code mlx_vector_array}-based joint {@code eval}: a missing
+   * {@code mlx_vector_array_free} inside {@code MLX.eval} would show up here as {@code activeMemoryBytes()} growth
+   * across iterations, and a double-free of the vector (or of a handle copied into its backing buffer) would abort the
+   * JVM outright -- which is itself the assertion, since no Java exception could report it.
+   */
+  @Test
+  void activeMemoryDoesNotGrowWithMultiArrayEvalInTheLoop() {
+    assertNoGrowthOver(MLXMemoryLeakTest::runIterationWithMultiArrayEval);
+  }
+
   private static void assertNoGrowthOver(Runnable iteration) {
     for (int i = 0; i < WARMUP_ITERATIONS; i++) {
       iteration.run();
@@ -81,6 +92,15 @@ class MLXMemoryLeakTest {
       MLX.eval(b);
       b.close();
       a.close();
+    }
+  }
+
+  private static void runIterationWithMultiArrayEval() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
+      MLXArray b = MLX.exp(a);
+      MLXArray c = MLX.log(b);
+      MLX.eval(a, b, c);
     }
   }
 }

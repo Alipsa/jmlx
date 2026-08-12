@@ -8,7 +8,9 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * A native {@code mlx_array} handle owned by an {@link MLXScope}. See req/initial-plan.md §6. Not thread-safe: confined
- * to the scope's owning thread, same as the scope itself.
+ * to the scope's owning thread, same as the scope itself. That confinement is enforced, not just documented: every
+ * handle read goes through {@link #ensureOpen()}, which delegates to {@link MLXScope#checkAccess()} and throws
+ * {@link IllegalStateException} on foreign-thread or closed-scope access.
  */
 public final class MLXArray implements AutoCloseable {
 
@@ -81,8 +83,8 @@ public final class MLXArray implements AutoCloseable {
       // it, so a failed read never leaks the native array.
       MemorySegment contiguous = mlx_h.mlx_array_new(tmp);
       try {
-        MLX.checked(() -> mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
-        MLX.checked(() -> mlx_h.mlx_array_eval(contiguous));
+        MLX.checked("toFloatArray", () -> mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
+        MLX.checked("toFloatArray", () -> mlx_h.mlx_array_eval(contiguous));
         long n = mlx_h.mlx_array_size(contiguous);
         if (n > Integer.MAX_VALUE) {
           throw new IllegalStateException("toFloatArray() cannot represent " + n + " elements in a Java array"
@@ -117,5 +119,6 @@ public final class MLXArray implements AutoCloseable {
     if (closed) {
       throw new IllegalStateException("MLXArray[" + Integer.toHexString(System.identityHashCode(this)) + "] is closed");
     }
+    scope.checkAccess();
   }
 }

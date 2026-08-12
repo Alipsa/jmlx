@@ -61,11 +61,22 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 #### Phase 3: Tensor Operations & Lazy Evaluation Engine
 
 * **Objective:** Expose NumPy/PyTorch-style array manipulations.
+* **Status:** Delivered. See `req/phase3-plan.md` for the detailed plan and decisions.
 * **Deliverables:**
 * **Element-wise Ops:** `add`, `subtract`, `multiply`, `divide`, `exp`, `log`, `sin`, `cos`.
 * **Linear Algebra:** Matrix multiplication (`matmul`), transposed matrices, vector dot products, outer products.
+  *Note: `mlx_dot` does not exist in mlx-c — it offers `mlx_inner`, `mlx_outer` and `mlx_tensordot` instead. NumPy's
+  `dot` has rank-dependent semantics (vector dot for 1-D, matmul for 2-D, tensor contraction above); inventing a
+  Java-side `MLX.dot` to reproduce them would have no native counterpart to defer to. This deliverable is satisfied
+  by exposing mlx-c's own `inner`/`outer` — 1-D `inner` *is* the vector dot product — rather than by a `dot` method.*
 * **Shape Manipulation:** `reshape`, `transpose`, `squeeze`, `broadcast_to`, `slice`.
-* **Evaluation Engine:** Thread-safe `eval(MLXArray... arrays)` dispatchers triggering native evaluation on Apple Silicon GPUs.
+* **Evaluation Engine:** ~~Thread-safe~~ **Thread-confined, enforced** `eval(MLXArray... arrays)` dispatchers
+  triggering native evaluation on Apple Silicon GPUs.
+  *Note: this substitutes the literal "thread-safe" deliverable above. `MLXScope` is confined by construction (see
+  `req/initial-plan.md` §6), so a genuinely thread-safe `eval` would contradict the memory model the project already
+  committed to. What was delivered instead is thread-confinement enforced at the API boundary: `eval` throws if
+  called from a thread other than the one that owns the arrays' scope. This is a defensible reinterpretation, not
+  the original wording — flagging it explicitly so it is not mistaken for the unmet literal deliverable.*
 
 
 

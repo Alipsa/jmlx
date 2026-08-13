@@ -102,11 +102,12 @@ public abstract class Module {
 
   /**
    * Rejects a {@code param}/{@code child} name containing {@code '.'}: {@link #parameters()} joins names with
-   * {@code '.'} to build dotted paths, and {@link #update}/{@link #rebind} split on {@code '.'} to parse them back --
-   * a local name containing a dot would stop the two APIs from round-tripping (a checkpoint key that happens to embed
-   * a dot, say, would be misparsed as an extra path segment).
+   * {@code '.'} to build dotted paths, and {@link #update}/{@link #rebind} split on {@code '.'} to parse them back -- a
+   * local name containing a dot would stop the two APIs from round-tripping (a checkpoint key that happens to embed a
+   * dot, say, would be misparsed as an extra path segment).
    */
   private static void requireNoDot(String kind, String name) {
+    Objects.requireNonNull(name, kind + " name must not be null");
     if (name.indexOf('.') >= 0) {
       throw new IllegalArgumentException(
           kind + " name \"" + name + "\" must not contain '.' -- reserved as the parameters()/update() path separator");
@@ -158,14 +159,7 @@ public abstract class Module {
    * @throws NullPointerException if any value is {@code null}
    */
   public final void update(Map<String, MLXArray> byPath) {
-    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = resolveAll(byPath);
-    Set<Module> touched = new HashSet<>();
-    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
-      ResolvedTarget target = entry.getKey();
-      target.owner().params.put(target.localName(), entry.getValue());
-      touched.add(target.owner());
-    }
-    notifyDepthFirst(touched);
+    notifyDepthFirst(writeAll(resolveAll(byPath)));
   }
 
   private void notifyDepthFirst(Set<Module> touched) {
@@ -202,11 +196,7 @@ public abstract class Module {
    * @throws NullPointerException if any value is {@code null}
    */
   public final void rebind(SequencedMap<String, MLXArray> values) {
-    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = resolveAll(values);
-    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
-      ResolvedTarget target = entry.getKey();
-      target.owner().params.put(target.localName(), entry.getValue());
-    }
+    writeAll(resolveAll(values));
   }
 
   /**
@@ -228,10 +218,11 @@ public abstract class Module {
    * the validation pass {@link #update} and {@link #rebind} both run to completion before either performs a single
    * write, so a bad entry anywhere in {@code byPath} leaves every parameter untouched.
    *
+   * @throws NullPointerException if {@code byPath} or any value in it is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
-   * @throws NullPointerException if any value is {@code null}
    */
   private List<Map.Entry<ResolvedTarget, MLXArray>> resolveAll(Map<String, MLXArray> byPath) {
+    Objects.requireNonNull(byPath, "parameter map must not be null");
     List<Map.Entry<ResolvedTarget, MLXArray>> resolved = new ArrayList<>();
     for (Map.Entry<String, MLXArray> entry : byPath.entrySet()) {
       String path = entry.getKey();
@@ -240,6 +231,17 @@ public abstract class Module {
       resolved.add(Map.entry(resolve(path, path), value));
     }
     return resolved;
+  }
+
+  /** Writes every resolved entry, returning the set of modules whose own {@code params} map was written to. */
+  private Set<Module> writeAll(List<Map.Entry<ResolvedTarget, MLXArray>> resolved) {
+    Set<Module> touched = new HashSet<>();
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
+      ResolvedTarget target = entry.getKey();
+      target.owner().params.put(target.localName(), entry.getValue());
+      touched.add(target.owner());
+    }
+    return touched;
   }
 
   // fullPath is threaded through unchanged so an exception thrown after

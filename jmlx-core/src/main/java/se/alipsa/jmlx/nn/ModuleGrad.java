@@ -28,11 +28,15 @@ public final class ModuleGrad implements AutoCloseable {
   private ModuleGrad(Module tree, BiFunction<MLXArray[], MLXArray[], MLXArray[]> loss) {
     this.tree = tree;
     this.loss = loss;
-    tree.freeze();
-    this.paramPaths = List.copyOf(tree.parameters().keySet());
-    if (paramPaths.isEmpty()) {
+    // Validate BEFORE freezing: freeze() is irreversible and cascades to every descendant, so a
+    // tree rejected here for having no parameters must be left mutable -- the caller may still add
+    // the missing ones and retry. Freezing first would permanently block that recovery.
+    List<String> paths = List.copyOf(tree.parameters().keySet());
+    if (paths.isEmpty()) {
       throw new IllegalStateException("ModuleGrad: tree has no parameters to differentiate");
     }
+    tree.freeze();
+    this.paramPaths = paths;
     int[] argnums = IntStream.range(0, paramPaths.size()).toArray();
     this.fn = MLXGrad.valueAndGrad(this::body, argnums);
   }
@@ -74,17 +78,17 @@ public final class ModuleGrad implements AutoCloseable {
   /**
    * Per-iteration: {@code target} is this step's scope (grads and the returned loss value land there), {@code
    * inputs} is this batch. Re-reads {@code tree.parameters()}'s current VALUES on every call (req/phase4-plan.md §6:
-   * snapshotting them once in {@link #of} would differentiate against stale weights after the first {@code update}) and
-   * throws if the key SET has drifted since {@link #of}.
+   * snapshotting them once in {@link #of} would differentiate against stale weights after the first {@code update}).
+   *
+   * <p>
+   * No key-set drift check: {@link #of} freezes {@code tree} before returning, {@code param}/{@code child} both throw
+   * once frozen, and {@code update}/{@code rebind} only ever write to an already-existing key (an unknown path throws
+   * rather than being inserted) -- so {@code tree.parameters().keySet()} provably cannot differ from the paths captured
+   * in {@link #of} on any call reachable through this class's own public surface.
    */
   public Result apply(MLXScope target, MLXArray[] inputs) {
     ensureOpen();
     SequencedMap<String, MLXArray> current = tree.parameters();
-    List<String> currentKeys = List.copyOf(current.keySet());
-    if (!currentKeys.equals(paramPaths)) {
-      throw new IllegalStateException("ModuleGrad: parameter key set changed since of() -- expected " + paramPaths
-          + " but tree.parameters() " + "now has " + currentKeys);
-    }
     MLXArray[] primals = new MLXArray[paramPaths.size() + inputs.length];
     int i = 0;
     for (String path : paramPaths) {
@@ -96,9 +100,9 @@ public final class ModuleGrad implements AutoCloseable {
     MLXGrad.Result r = fn.apply(target, primals);
     SequencedMap<String, MLXArray> grads = new LinkedHashMap<>();
     for (int p = 0; p < paramPaths.size(); p++) {
-      grads.put(paramPaths.get(p), r.grads()[p]);
+      grads.put(paramPaths.get(p), r.grads().get(p));
     }
-    return new Result(r.values()[0], Collections.unmodifiableSequencedMap(grads));
+    return new Result(r.values().get(0), Collections.unmodifiableSequencedMap(grads));
   }
 
   /** {@code value} is the rank-0 loss for this call; {@code grads} is keyed by dotted parameter path. */

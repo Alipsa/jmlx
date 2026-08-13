@@ -127,6 +127,27 @@ final class NativeOps {
   }
 
   /**
+   * Wraps the {@code (res, a, const int*, size_t, bool, stream)} native shape shared by {@code mlx_sum_axes} and
+   * {@code mlx_mean_axes}: a confined {@link Arena} owns {@code axes}'s native copy for the lifetime of the call,
+   * exactly as {@code shapeOp} does for its param.
+   */
+  static MLXArray reduceOp(String opName, MLXArray a, int[] axes, boolean keepdims, ReduceOp op) {
+    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeAxes = tmp.allocateFrom(ValueLayout.JAVA_INT, axes);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      checked(opName, () -> op.apply(res, a.handle(), nativeAxes, axes.length, keepdims, DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
+
+  @FunctionalInterface
+  interface ReduceOp {
+    int apply(MemorySegment res, MemorySegment a, MemorySegment axes, long axesNum, boolean keepdims,
+        MemorySegment stream);
+  }
+
+  /**
    * Runs a status-returning native call and throws {@link MLXException} on failure. Clears {@link NativeLoader}'s
    * thread-local error message immediately before invoking {@code nativeCall}, not just after it fails: some entry
    * points (see {@link MLX#array}) fire the error handler without a status for this method to see. Without the

@@ -508,6 +508,149 @@ class MLXNumericTest {
   }
 
   @Test
+  void sigmoid() {
+    try (MLXScope scope = new MLXScope()) {
+      // irrational values; use 1e-4f tolerance
+      MLXArray a = MLX.array(scope, new float[] {0f, 1f, -1f}, new int[] {3});
+      float[] result = MLXOps.sigmoid(a).toFloatArray();
+      assertEquals(0.5f, result[0], 1e-4f);
+      assertEquals(0.7310586f, result[1], 1e-4f);
+      assertEquals(0.2689414f, result[2], 1e-4f);
+    }
+  }
+
+  @Test
+  void erf() {
+    try (MLXScope scope = new MLXScope()) {
+      // irrational values; use 1e-4f tolerance
+      MLXArray a = MLX.array(scope, new float[] {0f, 1f}, new int[] {2});
+      float[] result = MLXOps.erf(a).toFloatArray();
+      assertEquals(0.0f, result[0], 1e-4f);
+      assertEquals(0.8427008f, result[1], 1e-4f);
+    }
+  }
+
+  @Test
+  void tanh() {
+    try (MLXScope scope = new MLXScope()) {
+      // irrational values; use 1e-4f tolerance
+      MLXArray a = MLX.array(scope, new float[] {0f, 1f, -1f}, new int[] {3});
+      float[] result = MLXOps.tanh(a).toFloatArray();
+      assertEquals(0.0f, result[0], 1e-4f);
+      assertEquals(0.7615942f, result[1], 1e-4f);
+      assertEquals(-0.7615942f, result[2], 1e-4f);
+    }
+  }
+
+  @Test
+  void sqrt() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {4, 9, 16}, new int[] {3});
+      assertArrayEquals(new float[] {2, 3, 4}, MLXOps.sqrt(a).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void rsqrt() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {4, 16}, new int[] {2});
+      assertArrayEquals(new float[] {0.5f, 0.25f}, MLXOps.rsqrt(a).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void square() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {2, -3, 4}, new int[] {3});
+      assertArrayEquals(new float[] {4, 9, 16}, MLXOps.square(a).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void negative() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {2, -3, 0}, new int[] {3});
+      assertArrayEquals(new float[] {-2, 3, 0}, MLXOps.negative(a).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void maximum() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 5, 3}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {4, 2, 3}, new int[] {3});
+      assertArrayEquals(new float[] {4, 5, 3}, MLXOps.maximum(a, b).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void maximumRejectsIncompatibleShapes() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {4});
+      assertThrows(IllegalArgumentException.class, () -> MLXOps.maximum(a, b));
+    }
+  }
+
+  @Test
+  void power() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {2, 3, 4}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {3, 2, 1}, new int[] {3});
+      assertArrayEquals(new float[] {8, 9, 4}, MLXOps.power(a, b).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void powerRejectsIncompatibleShapes() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {2, 3}, new int[] {2});
+      MLXArray b = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      assertThrows(IllegalArgumentException.class, () -> MLXOps.power(a, b));
+    }
+  }
+
+  @Test
+  void sumWithAxesAndKeepdimsFalse() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      MLXArray result = MLXOps.sum(a, new int[] {1}, false);
+      assertArrayEquals(new int[] {2}, result.shape());
+      assertArrayEquals(new float[] {6, 15}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void sumWithAxesAndKeepdimTrue() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      MLXArray result = MLXOps.sum(a, new int[] {0}, true);
+      assertArrayEquals(new int[] {1, 3}, result.shape());
+      assertArrayEquals(new float[] {5, 7, 9}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void meanWithAxesAndKeepdimsFalse() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      MLXArray result = MLXOps.mean(a, new int[] {1}, false);
+      assertArrayEquals(new int[] {2}, result.shape());
+      assertArrayEquals(new float[] {2, 5}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void meanWithAxesAndKeepdimTrue() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      MLXArray result = MLXOps.mean(a, new int[] {0}, true);
+      assertArrayEquals(new int[] {1, 3}, result.shape());
+      assertArrayEquals(new float[] {2.5f, 3.5f, 4.5f}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
   void innerOfTwoRank1VectorsIsADotProduct() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});

@@ -127,13 +127,6 @@ public final class MLXGrad {
           }
         }
       }
-
-      // Unsynchronized on purpose, matching MLXScope.Holder's identical field: ensureOpen() reads
-      // this on every apply() call, and an unsynchronized volatile read is both correct (visible
-      // across the Cleaner thread, which writes it under this Holder's monitor) and free.
-      boolean isClosed() {
-        return closed;
-      }
     }
 
     /**
@@ -213,7 +206,17 @@ public final class MLXGrad {
       // already exist, must be released here rather than leaking for the rest of the process.
       // plain/vg are plain locals (not Holder fields) precisely so this catch block can see which
       // of them got as far as being created, independent of whether a Holder is ever built.
-      Arena arena = Arena.ofConfined();
+      // Shared, not confined: Holder.closeAll() below runs on the Cleaner thread when the backstop
+      // fires, and every operation there -- both closures' by-value struct marshalling (which reads
+      // vgClosure/plainClosure) and arena.close() itself -- requires the segment/arena to permit
+      // access from a thread other than whichever one constructed it (confirmed empirically: both
+      // throw WrongThreadException off-thread against a confined arena, neither does against a
+      // shared one). A WrongThreadException thrown there would be silently swallowed by the
+      // Cleaner (its cleaning-action contract ignores exceptions with no trace), so a confined
+      // arena here would have made the backstop above permanently inert -- closed still flips to
+      // true on the first line of closeAll(), so it would never even retry -- while looking, from
+      // every angle short of an off-thread empirical check, exactly like a working one.
+      Arena arena = Arena.ofShared();
       MemorySegment plain = null;
       MemorySegment vg = null;
       try {
@@ -369,13 +372,15 @@ public final class MLXGrad {
       cleanable.clean();
     }
 
-    // Consults holder.isClosed() too, not just this Fn's own `closed` flag, for the same reason
-    // MLXScope.ensureOpen() does: the Cleaner backstop frees the closures without ever touching
-    // this Fn object, and flipping `closed` here would be the capture Holder/Cleaner split exists
-    // to avoid.
+    // Unlike MLXScope.ensureOpen(), does not also consult a Holder-level closed flag: that
+    // check exists on MLXScope to catch a parent scope's cascade closing a still-reachable
+    // child's Holder out from under it. Fn has no such cascade -- its Holder is only ever closed
+    // by this method or by the Cleaner, and the Cleaner cannot have fired while this method is on
+    // the stack, since that requires Fn to already be unreachable. So `closed` alone is
+    // sufficient here.
     private void ensureOpen() {
       checkThread();
-      if (closed || holder.isClosed()) {
+      if (closed) {
         throw new IllegalStateException("MLXGrad.Fn is closed");
       }
     }

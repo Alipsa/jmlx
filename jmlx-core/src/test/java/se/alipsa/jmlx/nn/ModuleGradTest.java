@@ -2,8 +2,10 @@ package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -141,6 +143,42 @@ class ModuleGradTest {
       Module empty = new Module(model) {};
       assertThrows(
           IllegalStateException.class, () -> ModuleGrad.of(empty, (params, inputs) -> inputs));
+    }
+  }
+
+  /**
+   * Mirrors {@code MLXGradTest.crossThreadApplyThrows}: confinement is enforced transitively
+   * through the wrapped {@code MLXGrad.Fn} either way, but the diagnostic must name {@code
+   * ModuleGrad} -- the API the caller actually misused -- not the internal {@code Fn} it delegates
+   * to.
+   */
+  @Test
+  void crossThreadApplyThrowsNamingModuleGrad() throws InterruptedException {
+    try (MLXScope model = new MLXScope()) {
+      MLXArray weight = MLX.array(model, new float[] {1, 1, 1}, new int[] {1, 3});
+      MLXArray bias = MLX.array(model, new float[] {0}, new int[] {1});
+      Linear linear = new Linear(model, weight, bias);
+      try (ModuleGrad mg = ModuleGrad.of(linear, ModuleGradTest::mseLoss);
+          MLXScope step = model.newChild()) {
+        MLXArray x = MLX.array(step, new float[] {1, 2, 3}, new int[] {1, 3});
+        MLXArray target = MLX.array(step, new float[] {0}, new int[] {1, 1});
+        Throwable[] caught = new Throwable[1];
+        Thread other =
+            new Thread(
+                () -> {
+                  try {
+                    mg.apply(step, new MLXArray[] {x, target});
+                  } catch (Throwable t) {
+                    caught[0] = t;
+                  }
+                });
+        other.start();
+        other.join();
+        assertInstanceOf(IllegalStateException.class, caught[0]);
+        assertTrue(
+            caught[0].getMessage().contains("ModuleGrad"),
+            "expected message to name ModuleGrad, got: " + caught[0].getMessage());
+      }
     }
   }
 }

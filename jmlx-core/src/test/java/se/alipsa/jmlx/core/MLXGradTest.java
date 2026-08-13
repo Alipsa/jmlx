@@ -3,11 +3,15 @@ package se.alipsa.jmlx.core;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.ref.WeakReference;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -172,5 +176,51 @@ class MLXGradTest {
       other.join();
       assertInstanceOf(IllegalStateException.class, caught[0]);
     }
+  }
+
+  /**
+   * Mirrors {@code MLXScopeTest.cleanerBackstopFreesTheEscapedScopesNativeMemory}'s reachability
+   * half: if {@code Fn}'s {@code Holder}/{@code Upcall} split were broken and something captured
+   * {@code Fn} itself (directly or transitively) instead of just {@code Holder}'s arena, {@code Fn}
+   * could never become phantom-reachable and this loop would time out.
+   *
+   * <p>Unlike that test, there is deliberately no {@code NativeMemoryProbe}-based second half here:
+   * {@code Holder.closeAll()} frees two process-heap {@code std::function}s and the small FFM
+   * upcall trampoline backing them, none of which mlx-c's active-memory counter ({@code
+   * mlx_get_active_memory}) tracks -- that counter only reflects device/array buffers, and {@code
+   * Fn} retains none between calls. Whether {@code Holder.closeAll()} itself completes without
+   * throwing when run off the constructing thread -- the actual defect fixed alongside this test,
+   * {@code Arena.ofConfined()} vs {@code Arena.ofShared()} for {@code Holder}'s arena -- was
+   * instead confirmed empirically outside this suite: a confined arena's {@code MemorySegment} read
+   * and {@code Arena.close()} both threw {@code WrongThreadException} when invoked from a thread
+   * other than the arena's owner, a shared arena's did neither. That check cannot be folded into
+   * this test because {@link java.lang.ref.Cleaner} itself swallows any exception thrown by a
+   * cleaning action without a trace (also confirmed empirically) -- so a {@code
+   * WrongThreadException} thrown by a wrongly-confined arena on the Cleaner thread is invisible to
+   * any test, this one included, and would still let this reachability check pass. Only using the
+   * right arena type guarantees the fix; this test only guards the unrelated capture failure.
+   */
+  @Test
+  @Timeout(value = 30, unit = TimeUnit.SECONDS)
+  void cleanerBackstopRunsForAnEscapedFn() throws InterruptedException {
+    WeakReference<MLXGrad.Fn> ref = new WeakReference<>(createDetachedFn());
+
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+    while (ref.get() != null && System.nanoTime() < deadline) {
+      System.gc();
+      Thread.sleep(50);
+    }
+    assertNull(ref.get(), "escaped Fn was not collected within 20s");
+  }
+
+  // Isolated in its own frame so no local variable in the calling test method keeps fn (or the
+  // scope its one real apply() call runs against) reachable after this method returns.
+  private static MLXGrad.Fn createDetachedFn() {
+    MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0])}, new int[] {0});
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      fn.apply(scope, new MLXArray[] {x});
+    }
+    return fn;
   }
 }

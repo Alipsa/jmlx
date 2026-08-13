@@ -13,11 +13,12 @@
 | M0d — creation ops (§3, scoped down — see note) | **Done** | `6ce5ba3` |
 | Probe 0b — upcall exception-safety + thread confinement | **Done, confirmed** | scratch, not committed |
 | Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
-| M1 — `Module` and simple layers (§5) | Not started | — |
+| M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
 | M2 — `MLXGrad`/`ModuleGrad` (§6) | Not started | — |
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | Not started | — |
 | M4 — `QuantizedLinear` (§8) | Not started | — |
 | §9 — Documentation | Not started | — |
+| §10 — CI, self-hosted runner (see note below) | Not started | — |
 
 **M0d note.** Implemented only the ops its own "ops added at this merge point" list names
 (`array(scope, int[], int[])`, `zeros`, `ones`, `full`, `arange`, `stopGradient`) — deliberately
@@ -53,6 +54,13 @@ Probes 0b/0f were scratch classes against raw `jmlx-ffi` closure bindings with n
 until `MLXGrad` exists; they were deleted after their findings were recorded above and are not in
 the PR. Re-run them (or write their permanent equivalents) if M2's actual implementation diverges
 from what they exercised — see §6 for the exact protocol they validated.
+
+**CI gap found during M1's PR #6 review.** This repo has no CI wired up: `gh pr checks` reports no
+checks at any point in a PR's life. A `spotlessJavaCheck` formatting violation shipped into PR #6's
+first review-response commit and was only caught because `./gradlew build` was re-run by hand — a
+green PR page meant nothing. Added as §10 below: a hosted GitHub Actions runner cannot bootstrap the
+native library (needs Apple Silicon + macOS 26), so closing this gap needs a **self-hosted runner**,
+not a standard Actions job.
 
 ## Context
 
@@ -973,6 +981,28 @@ nullables (§2's table).
 * `jmlx-examples/HelloMLX`: add a `Linear` forward pass inside a child scope, so the two behavioural
   changes in this phase (cross-scope ops, child-scope lifetime) are visible in the demo rather than
   only in tests.
+
+### 10. CI — self-hosted runner for `./gradlew build` — **NOT STARTED**
+
+Found as a gap during M1's PR #6 review (see Status note above), not part of the original Phase 4
+design — recorded here as the concrete follow-up rather than a GitHub issue, so it stays attached to
+the plan that will act on it.
+
+* **Why self-hosted, not a standard `actions/checkout` + `actions/setup-java` job:** the native
+  bootstrap this repo's tests depend on (`@EnabledIfNativeAvailable`, `NativeLoader`) needs a staged
+  MLX library built for Apple Silicon on macOS 26 — hardware a hosted GitHub Actions runner cannot
+  provide. A self-hosted runner on real Apple Silicon hardware is the only way to run the same
+  `./gradlew build` a human currently runs by hand.
+* **Scope:** register a self-hosted runner (macOS, Apple Silicon, macOS 26), add a workflow that runs
+  `./gradlew build` (which already chains `spotlessCheck`, `checkstyleMain`, `checkstyleTest`, and
+  every module's test suite) on pull request open/synchronize against `main`, and turn that check into
+  a required status check in branch protection so a red run blocks merge instead of only a red local
+  terminal.
+* **Fallback considered and rejected as the primary fix:** a local pre-push git hook running
+  `./gradlew build`. Cheaper to set up, but it protects only pushes from a machine that has the hook
+  installed — it does nothing for a PR pushed from elsewhere, and unlike a required CI check it is not
+  visible on the PR page. Worth keeping as a fast local backstop *in addition to* the runner, not
+  instead of it.
 
 ## Testing approach
 

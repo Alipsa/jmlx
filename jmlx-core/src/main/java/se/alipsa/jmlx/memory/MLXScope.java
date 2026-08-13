@@ -84,6 +84,16 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
     }
 
     synchronized void addChild(Holder child) {
+      // A closed parent must reject the child rather than silently insert
+      // into a set closeAll() has already cleared: newChild() calls
+      // checkAccess() before this runs, but that leaves a window where the
+      // Cleaner could cascade an unreachable parent between the check and
+      // this call -- e.g. `new MLXScope().newChild()`, where the root has no
+      // other reference. A child added into that window would never be
+      // cascaded, only freed by its own close()/Cleaner.
+      if (closed) {
+        throw new IllegalStateException("MLXScope is closed");
+      }
       children.add(child);
     }
 

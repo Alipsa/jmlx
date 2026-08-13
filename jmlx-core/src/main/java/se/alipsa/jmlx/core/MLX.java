@@ -143,7 +143,14 @@ public final class MLX {
    * reads it, it does not adopt it.
    */
   public static MLXArray full(MLXScope scope, int[] shape, float value, DType dtype) {
+    if (dtype == DType.UINT32 && value < 0) {
+      throw new IllegalArgumentException("full: value " + value + " is negative and cannot fill a UINT32 array");
+    }
     try (Arena tmp = Arena.ofConfined()) {
+      // Same statusless-failure hazard as MLX.array's overloads: these
+      // constructors signal failure only via the error handler plus a
+      // null-ctx return, not a status checked() can see.
+      NativeLoader.clearLastNativeError();
       MemorySegment scalar = switch (dtype) {
         case BOOL -> mlx_h.mlx_array_new_bool(tmp, value != 0f);
         case INT32 -> mlx_h.mlx_array_new_int(tmp, (int) value);
@@ -167,8 +174,20 @@ public final class MLX {
   /**
    * Creates a {@code dtype} array in {@code scope} counting from {@code start} to {@code stop} (exclusive) by
    * {@code step}.
+   *
+   * <p>
+   * Rejects {@code step == 0} in Java: upstream {@code mlx::core::arange} (v0.31.2 {@code mlx/ops.cpp}) validates NaN
+   * and infinite {@code start}/{@code stop}/{@code step} up front, but only ever computes
+   * {@code real_size = ceil((stop - start) / step)} afterward -- so {@code step == 0} with {@code stop == start}
+   * reaches that division as {@code 0.0 / 0.0 == NaN}, which is not caught by the earlier checks or by the subsequent
+   * {@code real_size > INT_MAX} guard (a NaN comparison is always false), and flows into
+   * {@code static_cast<int>(real_size)} -- C++ undefined behaviour for a NaN operand, the same UB class
+   * {@link MLXShape#slice(MLXArray, int[], int[], int[])}'s zero-stride guard exists for.
    */
   public static MLXArray arange(MLXScope scope, double start, double stop, double step, DType dtype) {
+    if (step == 0) {
+      throw new IllegalArgumentException("arange: step must not be 0");
+    }
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked("arange",
         () -> mlx_h.mlx_arange(res, start, stop, step, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));

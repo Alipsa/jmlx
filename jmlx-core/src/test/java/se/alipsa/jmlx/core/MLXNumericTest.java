@@ -260,6 +260,16 @@ class MLXNumericTest {
   }
 
   @Test
+  void toFloatArrayReadsBackABfloat16ArrayThroughTheAstypeStep() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray f32 = MLX.array(scope, new float[] {1.5f, 2.5f, -3.5f}, new int[] {3});
+      MLXArray bf16 = MLX.astype(f32, DType.BFLOAT16);
+      assertEquals(DType.BFLOAT16, bf16.dtype());
+      assertArrayEquals(new float[] {1.5f, 2.5f, -3.5f}, bf16.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
   void toFloatArrayRejectsAnExactDtype() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray i = MLX.astype(MLX.array(scope, new float[] {1, 2}, new int[] {2}), DType.INT32);
@@ -331,10 +341,33 @@ class MLXNumericTest {
   }
 
   @Test
+  void fullRejectsANegativeValueForAUint32Target() {
+    try (MLXScope scope = new MLXScope()) {
+      // UINT32 falls to the float32 scalar branch and mlx_full then astypes
+      // that scalar to uint32 -- static_cast<uint32_t>(-1.0f) is UB in C++,
+      // so this is rejected in Java before it ever reaches native.
+      assertThrows(IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, -1f, DType.UINT32));
+    }
+  }
+
+  @Test
   void arangeWithAnIntegerStepProducesIntegerCounts() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.arange(scope, 0, 5, 1, DType.INT32);
       assertArrayEquals(new int[] {0, 1, 2, 3, 4}, a.toIntArray());
+    }
+  }
+
+  @Test
+  void arangeRejectsAZeroStep() {
+    try (MLXScope scope = new MLXScope()) {
+      // Without this guard, start == stop with step == 0 reaches native's
+      // static_cast<int>(0.0 / 0.0) -- a NaN operand, C++ undefined
+      // behaviour neither the isnan(start/step/stop) nor the real_size >
+      // INT_MAX checks upstream catch.
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> MLX.arange(scope, 5, 5, 0, DType.FLOAT32));
+      assertEquals("arange: step must not be 0", ex.getMessage());
     }
   }
 

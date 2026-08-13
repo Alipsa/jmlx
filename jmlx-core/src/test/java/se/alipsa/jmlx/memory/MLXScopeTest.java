@@ -201,6 +201,22 @@ class MLXScopeTest {
     }
   }
 
+  @Test
+  void hoistIntoADescendantScopeThrows() {
+    try (MLXScope parent = new MLXScope(); MLXScope child = parent.newChild()) {
+      MLXArray a = MLX.array(parent, new float[] {1f}, new int[] {1});
+      assertThrows(IllegalArgumentException.class, () -> MLX.hoist(a, child));
+    }
+  }
+
+  @Test
+  void hoistIntoAnUnrelatedScopeThrows() {
+    try (MLXScope rootA = new MLXScope(); MLXScope rootB = new MLXScope()) {
+      MLXArray a = MLX.array(rootA, new float[] {1f}, new int[] {1});
+      assertThrows(IllegalArgumentException.class, () -> MLX.hoist(a, rootB));
+    }
+  }
+
   /**
    * Pins the reflexive fast path: a copy-returning implementation of the {@code target == source} case would also pass
    * a same-values assertion, so this asserts identity (above) paired with a repetition-count that would show growth if

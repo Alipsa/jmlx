@@ -88,28 +88,57 @@ public final class MLXGrad {
       this.argnums = argnums.clone();
       // If anything below throws, this Fn is never returned to valueAndGrad's caller and has no
       // Cleaner backstop (unlike MLXScope) -- so arena, and whichever of the two closures already
-      // exist, must be released here rather than leaking for the rest of the process.
+      // exist, must be released here rather than leaking for the rest of the process. plain/vg are
+      // plain locals (not the this.* fields) precisely so the catch block below can see which of
+      // them got as far as being created, independent of whether the fields themselves ever get
+      // assigned.
+      MemorySegment plain = null;
+      MemorySegment vg = null;
       try {
         mlx_closure_new_func$fun.Function upcall = this::onClosureInvoked;
         MemorySegment funcPtr = mlx_closure_new_func$fun.allocate(upcall, arena);
-        MemorySegment plain = mlx_h.mlx_closure_new_func(arena, funcPtr);
         // mlx_closure_new_func is statusless: on failure it calls the error handler and returns a
         // null-ctx struct (closure.cpp's catch block), the same hazard class MLX.array/
-        // MLX.newVectorArray already guard against explicitly.
+        // MLX.newVectorArray already guard against explicitly. clearLastNativeError() must run
+        // immediately before the call, not just after a failure: without it, a stale message left
+        // by some earlier, unrelated statusless failure would still be sitting there and get
+        // misattributed to this call (NativeOps.checked's javadoc documents the identical hazard).
+        NativeLoader.clearLastNativeError();
+        plain = mlx_h.mlx_closure_new_func(arena, funcPtr);
         if (mlx_closure_.ctx(plain).address() == 0) {
           throw NativeOps.nativeFailure("mlx_closure_new_func");
         }
-        this.plainClosure = plain;
-        MemorySegment vg = mlx_h.mlx_closure_value_and_grad_new(arena);
+        MemorySegment plainForLambda = plain;
+        vg = mlx_h.mlx_closure_value_and_grad_new(arena);
+        MemorySegment vgForLambda = vg;
         try (Arena tmp = Arena.ofConfined()) {
           MemorySegment nativeArgnums = tmp.allocateFrom(ValueLayout.JAVA_INT, this.argnums);
           NativeOps.checked(
               "valueAndGrad",
-              () -> mlx_h.mlx_value_and_grad(vg, plainClosure, nativeArgnums, this.argnums.length));
+              () ->
+                  mlx_h.mlx_value_and_grad(
+                      vgForLambda, plainForLambda, nativeArgnums, this.argnums.length));
         }
+        this.plainClosure = plain;
         this.vgClosure = vg;
       } catch (Throwable t) {
-        arena.close();
+        // Mirrors close()'s own free order (vg before plain) before releasing the arena: the same
+        // ordering rule that method's javadoc calls load-bearing applies here too -- closing the
+        // arena while a closure's std::function still holds the upcall stub pointer leaves that
+        // closure dangling, even on a failure path where nothing will ever invoke it again.
+        // mlx_closure_free/mlx_closure_value_and_grad_free both no-op on a null ctx (private/
+        // closure.h), so the guards below only need to ask "did construction get this far", not
+        // "is the ctx itself valid".
+        try {
+          if (vg != null) {
+            mlx_h.mlx_closure_value_and_grad_free(vg);
+          }
+          if (plain != null) {
+            mlx_h.mlx_closure_free(plain);
+          }
+        } finally {
+          arena.close();
+        }
         throw t;
       }
     }
@@ -148,9 +177,9 @@ public final class MLXGrad {
           NativeOps.checked(
               "valueAndGrad.apply",
               () -> mlx_h.mlx_closure_value_and_grad_apply(res0, res1, vgClosure, inputVec));
-          List<MLXArray> values = unpackVector(res0, target);
-          List<MLXArray> grads = unpackVector(res1, target);
-          return new Result(values, grads);
+          MLXArray[] values = unpackVector(res0, target);
+          MLXArray[] grads = unpackVector(res1, target);
+          return new Result(List.of(values), List.of(grads));
         } catch (MLXException nativeFailure) {
           rethrowEscapedOr(nativeFailure);
           throw nativeFailure;
@@ -199,8 +228,8 @@ public final class MLXGrad {
      */
     private int onClosureInvoked(MemorySegment res, MemorySegment in) {
       try {
-        List<MLXArray> primalsIn = unpackVector(in, applyTarget);
-        MLXArray[] result = body.apply(primalsIn.toArray(new MLXArray[0]));
+        MLXArray[] primalsIn = unpackVector(in, applyTarget);
+        MLXArray[] result = body.apply(primalsIn);
         if (result == null || result.length == 0 || result[0].ndim() != 0) {
           int rank = result == null || result.length == 0 ? -1 : result[0].ndim();
           throw new IllegalArgumentException(
@@ -228,7 +257,7 @@ public final class MLXGrad {
       }
     }
 
-    private static List<MLXArray> unpackVector(MemorySegment vec, MLXScope target) {
+    private static MLXArray[] unpackVector(MemorySegment vec, MLXScope target) {
       long n = mlx_h.mlx_vector_array_size(vec);
       MLXArray[] out = new MLXArray[(int) n];
       for (int i = 0; i < n; i++) {
@@ -237,7 +266,7 @@ public final class MLXGrad {
         NativeOps.checked("valueAndGrad", () -> mlx_h.mlx_vector_array_get(h, vec, idx));
         out[i] = new MLXArray(target, h);
       }
-      return List.of(out);
+      return out;
     }
 
     /**

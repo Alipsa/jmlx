@@ -29,17 +29,19 @@ public final class ModuleGrad implements AutoCloseable {
   private ModuleGrad(Module tree, BiFunction<MLXArray[], MLXArray[], MLXArray[]> loss) {
     this.tree = tree;
     this.loss = loss;
-    // Validate BEFORE freezing: freeze() is irreversible and cascades to every descendant, so a
-    // tree rejected here for having no parameters must be left mutable -- the caller may still add
-    // the missing ones and retry. Freezing first would permanently block that recovery.
+    // Freeze only after every other fallible step, last: freeze() is irreversible and cascades to
+    // every descendant, so a tree rejected anywhere in this constructor -- for having no
+    // parameters, or because MLXGrad.valueAndGrad itself throws -- must be left mutable, letting
+    // the caller fix it up and retry. this::body is not invoked during construction, so nothing
+    // above this line can observe tree in a not-yet-frozen state and rely on that by accident.
     List<String> paths = List.copyOf(tree.parameters().keySet());
     if (paths.isEmpty()) {
       throw new IllegalStateException("ModuleGrad: tree has no parameters to differentiate");
     }
-    tree.freeze();
     this.paramPaths = paths;
     int[] argnums = IntStream.range(0, paramPaths.size()).toArray();
     this.fn = MLXGrad.valueAndGrad(this::body, argnums);
+    tree.freeze();
   }
 
   /**

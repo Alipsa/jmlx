@@ -155,8 +155,8 @@ public abstract class Module {
    * parameter exactly as it was and fires no notifications; without this, a throw partway through would apply some
    * writes and skip their notifications, since the notify pass only runs after the whole loop returns.
    *
+   * @throws NullPointerException if {@code byPath}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
-   * @throws NullPointerException if any value is {@code null}
    */
   public final void update(Map<String, MLXArray> byPath) {
     notifyDepthFirst(writeAll(resolveAll(byPath)));
@@ -192,8 +192,8 @@ public abstract class Module {
    * {@code onParametersUpdated()}". Legal even after {@link #freeze()}, since resolving and writing a parameter never
    * checks {@code frozen}.
    *
+   * @throws NullPointerException if {@code values}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
-   * @throws NullPointerException if any value is {@code null}
    */
   public final void rebind(SequencedMap<String, MLXArray> values) {
     writeAll(resolveAll(values));
@@ -218,14 +218,14 @@ public abstract class Module {
    * the validation pass {@link #update} and {@link #rebind} both run to completion before either performs a single
    * write, so a bad entry anywhere in {@code byPath} leaves every parameter untouched.
    *
-   * @throws NullPointerException if {@code byPath} or any value in it is {@code null}
+   * @throws NullPointerException if {@code byPath}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
    */
   private List<Map.Entry<ResolvedTarget, MLXArray>> resolveAll(Map<String, MLXArray> byPath) {
     Objects.requireNonNull(byPath, "parameter map must not be null");
     List<Map.Entry<ResolvedTarget, MLXArray>> resolved = new ArrayList<>();
     for (Map.Entry<String, MLXArray> entry : byPath.entrySet()) {
-      String path = entry.getKey();
+      String path = Objects.requireNonNull(entry.getKey(), "parameter path must not be null");
       MLXArray value = entry.getValue();
       Objects.requireNonNull(value, "parameter path \"" + path + "\": value must not be null");
       resolved.add(Map.entry(resolve(path, path), value));

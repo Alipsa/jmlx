@@ -280,4 +280,35 @@ class ModuleTest {
       assertThrows(NullPointerException.class, () -> branch.child("other", null));
     }
   }
+
+  /**
+   * {@code Map.of} rejects a {@code null} key outright, so this uses a {@code LinkedHashMap} -- the kind of map a
+   * checkpoint loader would plausibly build -- to reach {@code resolveAll}'s own key null-check rather than one
+   * {@code Map.of} would have caught for free.
+   */
+  @Test
+  void updateWithANullKeyThrowsNullPointerException() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      Leaf leaf = new Leaf(scope, w);
+
+      Map<String, MLXArray> byPath = new LinkedHashMap<>();
+      byPath.put(null, w);
+
+      assertThrows(NullPointerException.class, () -> leaf.update(byPath));
+    }
+  }
+
+  @Test
+  void rebindWithANullKeyThrowsNullPointerException() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      Leaf leaf = new Leaf(scope, w);
+
+      SequencedMap<String, MLXArray> values = new LinkedHashMap<>();
+      values.put(null, w);
+
+      assertThrows(NullPointerException.class, () -> leaf.rebind(values));
+    }
+  }
 }

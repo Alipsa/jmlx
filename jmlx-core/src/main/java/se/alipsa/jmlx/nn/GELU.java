@@ -7,9 +7,9 @@ import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * The exact-form GELU activation: {@code 0.5 * x * (1 + erf(x / sqrt(2)))}. The tanh approximation is out of scope for
- * this layer. No parameters -- {@code scope} is accepted only to satisfy {@link Module}'s constructor contract; nothing
- * is registered.
+ * The exact-form GELU activation: {@code 0.5 * x * (1 + erf(x / sqrt(2)))}. The tanh approximation
+ * is out of scope for this layer. No parameters -- {@code scope} is accepted only to satisfy {@link
+ * Module}'s constructor contract; nothing is registered.
  */
 public final class GELU extends Module implements UnaryModule {
 

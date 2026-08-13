@@ -8,11 +8,11 @@ import java.nio.file.Path;
 /**
  * Loads {@code libmlxc.dylib} and installs mlx-c's error handler.
  *
- * <p>
- * {@link #ensureLoaded()} is idempotent and caches its outcome, unlike a static initializer: a static initializer gives
- * {@code ExceptionInInitializerError} on first touch and a bare {@code NoClassDefFoundError} with the cause discarded
- * on every subsequent touch (req/initial-plan.md §5) -- exactly what a confused contributor would hit on their second
- * test run. This caches the outcome and rethrows the original cause every time instead.
+ * <p>{@link #ensureLoaded()} is idempotent and caches its outcome, unlike a static initializer: a
+ * static initializer gives {@code ExceptionInInitializerError} on first touch and a bare {@code
+ * NoClassDefFoundError} with the cause discarded on every subsequent touch (req/initial-plan.md §5)
+ * -- exactly what a confused contributor would hit on their second test run. This caches the
+ * outcome and rethrows the original cause every time instead.
  */
 public final class NativeLoader {
 
@@ -25,8 +25,8 @@ public final class NativeLoader {
   private static final ThreadLocal<String> LAST_NATIVE_ERROR = new ThreadLocal<>();
 
   /**
-   * Loads the native library and installs the error handler, if not already done. Safe to call repeatedly and from
-   * multiple threads.
+   * Loads the native library and installs the error handler, if not already done. Safe to call
+   * repeatedly and from multiple threads.
    */
   public static void ensureLoaded() {
     synchronized (LOCK) {
@@ -71,13 +71,17 @@ public final class NativeLoader {
     // reads like a bug in the op, not a missing file.
     Path metallib = dir.resolve("mlx.metallib");
     if (!Files.exists(metallib)) {
-      throw new IllegalStateException("mlx.metallib not found at " + metallib
-          + " -- run scripts/bootstrap-native.sh to stage the native runtime directory");
+      throw new IllegalStateException(
+          "mlx.metallib not found at "
+              + metallib
+              + " -- run scripts/bootstrap-native.sh to stage the native runtime directory");
     }
     Path dylib = dir.resolve("libmlxc.dylib");
     if (!Files.exists(dylib)) {
-      throw new IllegalStateException("libmlxc.dylib not found at " + dylib
-          + " -- run scripts/bootstrap-native.sh to stage the native runtime directory");
+      throw new IllegalStateException(
+          "libmlxc.dylib not found at "
+              + dylib
+              + " -- run scripts/bootstrap-native.sh to stage the native runtime directory");
     }
 
     // System.load (a full path), not SymbolLookup.libraryLookup:
@@ -92,9 +96,10 @@ public final class NativeLoader {
   }
 
   /**
-   * Resolves the directory containing {@code libmlxc.dylib} and its siblings. In order: the {@code jmlx.library.path}
-   * system property (this is also how the Gradle build injects an absolute path -- see root build.gradle and
-   * jmlx-examples/build.gradle), then the {@code JMLX_LIBRARY_PATH} environment variable.
+   * Resolves the directory containing {@code libmlxc.dylib} and its siblings. In order: the {@code
+   * jmlx.library.path} system property (this is also how the Gradle build injects an absolute path
+   * -- see root build.gradle and jmlx-examples/build.gradle), then the {@code JMLX_LIBRARY_PATH}
+   * environment variable.
    */
   private static Path resolveLibraryDir() {
     String prop = System.getProperty("jmlx.library.path");
@@ -117,13 +122,15 @@ public final class NativeLoader {
   private static final Arena ERROR_HANDLER_ARENA = Arena.ofShared();
 
   /**
-   * The mlx-c error convention is a checkable {@code int} status on every call, but its default error handler calls
-   * {@code printf} then {@code exit(-1)} (req/initial-plan.md, research findings) -- so on an unmodified install, the
-   * process would exit before that status is ever observed. Installing a handler that only records the message, and
-   * does not exit, is what makes {@code checked(...)} in jmlx-core viable at all.
+   * The mlx-c error convention is a checkable {@code int} status on every call, but its default
+   * error handler calls {@code printf} then {@code exit(-1)} (req/initial-plan.md, research
+   * findings) -- so on an unmodified install, the process would exit before that status is ever
+   * observed. Installing a handler that only records the message, and does not exit, is what makes
+   * {@code checked(...)} in jmlx-core viable at all.
    */
   private static void installErrorHandler() {
-    MemorySegment handlerStub = mlx_error_handler_func.allocate(NativeLoader::onNativeError, ERROR_HANDLER_ARENA);
+    MemorySegment handlerStub =
+        mlx_error_handler_func.allocate(NativeLoader::onNativeError, ERROR_HANDLER_ARENA);
     mlx_h.mlx_set_error_handler(handlerStub, MemorySegment.NULL, MemorySegment.NULL);
   }
 
@@ -134,20 +141,22 @@ public final class NativeLoader {
   // on exactly the path installed to replace mlx-c's own printf+exit(-1).
   private static void onNativeError(MemorySegment msg, MemorySegment data) {
     try {
-      LAST_NATIVE_ERROR
-          .set(msg.address() == 0 ? "<null message from mlx-c>" : msg.reinterpret(Long.MAX_VALUE).getString(0));
+      LAST_NATIVE_ERROR.set(
+          msg.address() == 0
+              ? "<null message from mlx-c>"
+              : msg.reinterpret(Long.MAX_VALUE).getString(0));
     } catch (Throwable t) {
       LAST_NATIVE_ERROR.set("<unreadable message from mlx-c: " + t + ">");
     }
   }
 
   /**
-   * The message from the most recent native error observed on the calling thread, or {@code null} if none has been
-   * observed (or it has been cleared via {@link #clearLastNativeError()}).
+   * The message from the most recent native error observed on the calling thread, or {@code null}
+   * if none has been observed (or it has been cleared via {@link #clearLastNativeError()}).
    *
-   * <p>
-   * The mlx-c error handler runs synchronously on the same thread that made the failing call, so this is thread-local
-   * rather than shared -- see the thread-confinement contract on MLXScope/MLXArray.
+   * <p>The mlx-c error handler runs synchronously on the same thread that made the failing call, so
+   * this is thread-local rather than shared -- see the thread-confinement contract on
+   * MLXScope/MLXArray.
    */
   public static String lastNativeError() {
     return LAST_NATIVE_ERROR.get();

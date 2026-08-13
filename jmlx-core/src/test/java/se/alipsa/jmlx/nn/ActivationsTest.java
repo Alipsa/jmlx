@@ -8,7 +8,9 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
-/** {@link SiLU} and {@link GELU}: no parameters, so combined into one file rather than one apiece. */
+/**
+ * {@link SiLU} and {@link GELU}: no parameters, so combined into one file rather than one apiece.
+ */
 @EnabledIfNativeAvailable
 class ActivationsTest {
 
@@ -28,9 +30,10 @@ class ActivationsTest {
   }
 
   /**
-   * These are the standard-normal-CDF identity values ({@code GELU(x) = x * Phi(x)}, {@code Phi(1) = 0.8413447},
-   * {@code Phi(-1) = 0.1586553}), but asserted against the plain {@code 0.5*x*(1+erf(x/sqrt2))} formula's numeric
-   * result, since that is what {@link GELU#forward} actually computes.
+   * These are the standard-normal-CDF identity values ({@code GELU(x) = x * Phi(x)}, {@code Phi(1)
+   * = 0.8413447}, {@code Phi(-1) = 0.1586553}), but asserted against the plain {@code
+   * 0.5*x*(1+erf(x/sqrt2))} formula's numeric result, since that is what {@link GELU#forward}
+   * actually computes.
    */
   @Test
   void geluMatchesTheExactFormGolden() {

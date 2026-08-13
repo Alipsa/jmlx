@@ -10,7 +10,8 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/phase3-plan.md §4, Testing approach rows for the {@code mlx_vector_array}-based joint {@link MLX#eval}.
+ * See req/phase3-plan.md §4, Testing approach rows for the {@code mlx_vector_array}-based joint
+ * {@link MLX#eval}.
  */
 @EnabledIfNativeAvailable
 class MLXEvalTest {
@@ -28,7 +29,8 @@ class MLXEvalTest {
     // The case a same-scope check (like binaryOp's) would wrongly reject:
     // eval allocates no result, so there is no "which scope owns the
     // output" question, and mixing scopes here is legitimate.
-    try (MLXScope scope1 = new MLXScope(); MLXScope scope2 = new MLXScope()) {
+    try (MLXScope scope1 = new MLXScope();
+        MLXScope scope2 = new MLXScope()) {
       MLXArray a = MLX.array(scope1, new float[] {1f, 2f, 3f}, new int[] {3});
       MLXArray b = MLX.array(scope2, new float[] {4f, 5f, 6f}, new int[] {3});
       MLXArray c = MLXOps.exp(a);

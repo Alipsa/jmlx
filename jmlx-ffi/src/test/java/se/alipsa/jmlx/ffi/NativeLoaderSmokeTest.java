@@ -9,8 +9,9 @@ import java.lang.foreign.ValueLayout;
 import org.junit.jupiter.api.Test;
 
 /**
- * See req/initial-plan.md, Testing approach, "FFI smoke": a downcall reaches the dylib and returns a sane device. This
- * is the §5 gate: it must pass before jmlx-core's memory/array/op layers are built on top of NativeLoader.
+ * See req/initial-plan.md, Testing approach, "FFI smoke": a downcall reaches the dylib and returns
+ * a sane device. This is the §5 gate: it must pass before jmlx-core's memory/array/op layers are
+ * built on top of NativeLoader.
  */
 class NativeLoaderSmokeTest {
 

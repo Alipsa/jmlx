@@ -363,7 +363,8 @@ public final class MLX {
    * allocated from {@code allocator}. Factored out of {@link #eval} because {@code mlx_async_eval}
    * (upstream {@code transforms.h:31}) takes the same {@code mlx_vector_array} and would reuse this
    * verbatim; package-private (not {@code private}) since {@link MLXGrad#valueAndGrad} builds the
-   * same shape of input vector for {@code mlx_closure_value_and_grad_apply} (req/phase4-plan.md §6).
+   * same shape of input vector for {@code mlx_closure_value_and_grad_apply} (req/phase4-plan.md
+   * §6).
    *
    * <p>{@code allocator} MUST be a confined {@link Arena} (never an {@link MLXScope}): the vector's
    * backing struct array is not an {@code mlx_array} this method's caller will ever hand to {@code

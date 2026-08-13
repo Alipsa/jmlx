@@ -12,8 +12,8 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Tests for {@link MLXGrad}, the primitive autograd wrapper (req/phase4-plan.md §6, req/plans/phase4-m2-plan.md Task
- * 1).
+ * Tests for {@link MLXGrad}, the primitive autograd wrapper (req/phase4-plan.md §6,
+ * req/plans/phase4-m2-plan.md Task 1).
  */
 @EnabledIfNativeAvailable
 class MLXGradTest {
@@ -24,7 +24,8 @@ class MLXGradTest {
   void gradOfSumOfSquares() {
     try (MLXScope model = new MLXScope();
         MLXGrad.Fn fn =
-            MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(MLXOps.multiply(xs[0], xs[0]))}, new int[] {0})) {
+            MLXGrad.valueAndGrad(
+                xs -> new MLXArray[] {MLXOps.sum(MLXOps.multiply(xs[0], xs[0]))}, new int[] {0})) {
       try (MLXScope step = model.newChild()) {
         MLXArray x = MLX.array(step, new float[] {1, 2, 3}, new int[] {3});
         MLXGrad.Result r = fn.apply(step, new MLXArray[] {x});
@@ -40,7 +41,8 @@ class MLXGradTest {
   void fnReusedAcrossTwoStepScopesLandsGradsInEachOwnScope() {
     try (MLXScope model = new MLXScope();
         MLXGrad.Fn fn =
-            MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(MLXOps.multiply(xs[0], xs[0]))}, new int[] {0})) {
+            MLXGrad.valueAndGrad(
+                xs -> new MLXArray[] {MLXOps.sum(MLXOps.multiply(xs[0], xs[0]))}, new int[] {0})) {
       try (MLXScope step1 = model.newChild()) {
         MLXArray x1 = MLX.array(step1, new float[] {1, 2, 3}, new int[] {3});
         MLXArray grad1 = fn.apply(step1, new MLXArray[] {x1}).grads().get(0);
@@ -64,19 +66,23 @@ class MLXGradTest {
 
   @Test
   void argnumsMustBeStrictlyIncreasing() {
-    assertThrows(IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {1, 1}));
-    assertThrows(IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {1, 0}));
+    assertThrows(
+        IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {1, 1}));
+    assertThrows(
+        IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {1, 0}));
   }
 
   @Test
   void argnumsMustBeNonNegative() {
-    assertThrows(IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {-1}));
+    assertThrows(
+        IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {-1}));
   }
 
   @Test
   void argnumsOutOfRangeForPrimalsThrows() {
     try (MLXScope scope = new MLXScope();
-        MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0])}, new int[] {1})) {
+        MLXGrad.Fn fn =
+            MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0])}, new int[] {1})) {
       MLXArray x = MLX.array(scope, new float[] {1}, new int[] {1});
       assertThrows(IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {x}));
     }
@@ -96,7 +102,8 @@ class MLXGradTest {
   @Test
   void nullSecondaryResultThrowsNamingTheIndex() {
     try (MLXScope scope = new MLXScope();
-        MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0]), null}, new int[] {0})) {
+        MLXGrad.Fn fn =
+            MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0]), null}, new int[] {0})) {
       MLXArray x = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
       IllegalArgumentException ex =
           assertThrows(IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {x}));
@@ -112,9 +119,13 @@ class MLXGradTest {
 
   @Test
   void exceptionThrownInsideBodySurfacesAsThatExceptionJvmAlive() {
-    try (MLXScope scope = new MLXScope(); MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> {
-      throw new BodyBoom("boom");
-    }, new int[] {0})) {
+    try (MLXScope scope = new MLXScope();
+        MLXGrad.Fn fn =
+            MLXGrad.valueAndGrad(
+                xs -> {
+                  throw new BodyBoom("boom");
+                },
+                new int[] {0})) {
       MLXArray x = MLX.array(scope, new float[] {1}, new int[] {1});
       // Asserts the exception TYPE, not just "throws something" -- without step 3 of the
       // exception-safety protocol, a generic MLXException is thrown too, which a type-blind
@@ -144,16 +155,19 @@ class MLXGradTest {
   @Test
   void crossThreadApplyThrows() throws InterruptedException {
     try (MLXScope scope = new MLXScope();
-        MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0])}, new int[] {0})) {
+        MLXGrad.Fn fn =
+            MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0])}, new int[] {0})) {
       MLXArray x = MLX.array(scope, new float[] {1}, new int[] {1});
       Throwable[] caught = new Throwable[1];
-      Thread other = new Thread(() -> {
-        try {
-          fn.apply(scope, new MLXArray[] {x});
-        } catch (Throwable t) {
-          caught[0] = t;
-        }
-      });
+      Thread other =
+          new Thread(
+              () -> {
+                try {
+                  fn.apply(scope, new MLXArray[] {x});
+                } catch (Throwable t) {
+                  caught[0] = t;
+                }
+              });
       other.start();
       other.join();
       assertInstanceOf(IllegalStateException.class, caught[0]);

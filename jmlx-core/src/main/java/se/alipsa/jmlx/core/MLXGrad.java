@@ -13,10 +13,11 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Primitive-only autograd over a flat primal vector: {@code mlx_value_and_grad} wrapped as a Java closure. Deliberately
- * has no {@code Module}-aware overload -- see {@code ModuleGrad} in the neural-network package and req/phase4-plan.md
- * §6 for why that lives there instead of here (this class would otherwise have to import that package, inverting its
- * one-way dependency onto this one).
+ * Primitive-only autograd over a flat primal vector: {@code mlx_value_and_grad} wrapped as a Java
+ * closure. Deliberately has no {@code Module}-aware overload -- see {@code ModuleGrad} in the
+ * neural-network package and req/phase4-plan.md §6 for why that lives there instead of here (this
+ * class would otherwise have to import that package, inverting its one-way dependency onto this
+ * one).
  */
 public final class MLXGrad {
 
@@ -27,19 +28,20 @@ public final class MLXGrad {
   }
 
   /**
-   * Stashes a {@link Throwable} that escaped the upcall body, so {@link Fn#apply} can re-surface the ORIGINAL exception
-   * after mlx-c reports the resulting native failure as a generic {@link MLXException} (req/phase4-plan.md §6, the
-   * three-step exception-safety protocol). Thread-local, not a per-{@code Fn} field: cleared immediately before every
-   * {@code apply}, mirroring {@code NativeOps.checked}'s identical clear-before-call rule for {@code NativeLoader}'s
-   * native-error thread-local, and for the same reason -- a stale value from a previous failure must never be
+   * Stashes a {@link Throwable} that escaped the upcall body, so {@link Fn#apply} can re-surface
+   * the ORIGINAL exception after mlx-c reports the resulting native failure as a generic {@link
+   * MLXException} (req/phase4-plan.md §6, the three-step exception-safety protocol). Thread-local,
+   * not a per-{@code Fn} field: cleared immediately before every {@code apply}, mirroring {@code
+   * NativeOps.checked}'s identical clear-before-call rule for {@code NativeLoader}'s native-error
+   * thread-local, and for the same reason -- a stale value from a previous failure must never be
    * misattributed to the next one.
    */
   private static final ThreadLocal<Throwable> ESCAPED = new ThreadLocal<>();
 
   /**
-   * Differentiates {@code body} with respect to the primal indices in {@code argnums}. {@code argnums} must be
-   * non-empty and strictly increasing; the upper-bound check (every index {@code < primals.length}) happens per
-   * {@link Fn#apply} call, once {@code primals.length} is known.
+   * Differentiates {@code body} with respect to the primal indices in {@code argnums}. {@code
+   * argnums} must be non-empty and strictly increasing; the upper-bound check (every index {@code <
+   * primals.length}) happens per {@link Fn#apply} call, once {@code primals.length} is known.
    */
   public static Fn valueAndGrad(Function<MLXArray[], MLXArray[]> body, int[] argnums) {
     validateArgnumsShape(argnums);
@@ -52,7 +54,8 @@ public final class MLXGrad {
     }
     for (int i = 0; i < argnums.length; i++) {
       if (argnums[i] < 0) {
-        throw new IllegalArgumentException("valueAndGrad: argnums[" + i + "] = " + argnums[i] + " is negative");
+        throw new IllegalArgumentException(
+            "valueAndGrad: argnums[" + i + "] = " + argnums[i] + " is negative");
       }
       if (i > 0 && argnums[i] <= argnums[i - 1]) {
         throw new IllegalArgumentException(
@@ -62,11 +65,12 @@ public final class MLXGrad {
   }
 
   /**
-   * A live {@code mlx_closure_value_and_grad} plus the upcall stub backing it. Reusable across many {@link #apply}
-   * calls -- {@code target} is a per-call argument, not bound at construction, because grads must land in the
-   * per-iteration step scope (req/phase4-plan.md §6: binding it at construction forces a choice between a target
-   * closed by iteration two, or one upcall stub churned per step). Confined to its constructing thread, the same as
-   * {@link MLXScope}/{@link MLXArray}: {@code arena} and both closures below are only ever touched from that thread.
+   * A live {@code mlx_closure_value_and_grad} plus the upcall stub backing it. Reusable across many
+   * {@link #apply} calls -- {@code target} is a per-call argument, not bound at construction,
+   * because grads must land in the per-iteration step scope (req/phase4-plan.md §6: binding it at
+   * construction forces a choice between a target closed by iteration two, or one upcall stub
+   * churned per step). Confined to its constructing thread, the same as {@link MLXScope}/{@link
+   * MLXArray}: {@code arena} and both closures below are only ever touched from that thread.
    */
   public static final class Fn implements AutoCloseable {
 
@@ -99,7 +103,8 @@ public final class MLXGrad {
         MemorySegment vg = mlx_h.mlx_closure_value_and_grad_new(arena);
         try (Arena tmp = Arena.ofConfined()) {
           MemorySegment nativeArgnums = tmp.allocateFrom(ValueLayout.JAVA_INT, this.argnums);
-          NativeOps.checked("valueAndGrad",
+          NativeOps.checked(
+              "valueAndGrad",
               () -> mlx_h.mlx_value_and_grad(vg, plainClosure, nativeArgnums, this.argnums.length));
         }
         this.vgClosure = vg;
@@ -110,14 +115,18 @@ public final class MLXGrad {
     }
 
     /**
-     * Runs the closure, landing traced primals, values and grads in {@code target}. {@code primals} must have at least
-     * {@code argnums[argnums.length - 1] + 1} elements.
+     * Runs the closure, landing traced primals, values and grads in {@code target}. {@code primals}
+     * must have at least {@code argnums[argnums.length - 1] + 1} elements.
      */
     public Result apply(MLXScope target, MLXArray[] primals) {
       ensureOpen();
       if (argnums[argnums.length - 1] >= primals.length) {
         throw new IllegalArgumentException(
-            "valueAndGrad: argnums " + Arrays.toString(argnums) + " out of range for " + primals.length + " primal(s)");
+            "valueAndGrad: argnums "
+                + Arrays.toString(argnums)
+                + " out of range for "
+                + primals.length
+                + " primal(s)");
       }
       MemorySegment[] handles = new MemorySegment[primals.length];
       for (int i = 0; i < primals.length; i++) {
@@ -136,7 +145,8 @@ public final class MLXGrad {
         // not just the success path. One finally covering the whole block, not two, is what makes
         // that true even when checked(...) throws before result unpacking ever runs.
         try {
-          NativeOps.checked("valueAndGrad.apply",
+          NativeOps.checked(
+              "valueAndGrad.apply",
               () -> mlx_h.mlx_closure_value_and_grad_apply(res0, res1, vgClosure, inputVec));
           List<MLXArray> values = unpackVector(res0, target);
           List<MLXArray> grads = unpackVector(res1, target);
@@ -172,16 +182,19 @@ public final class MLXGrad {
       if (escaped instanceof Error e) {
         throw e;
       }
-      // body is a Function<MLXArray[], MLXArray[]>, which declares no checked exceptions -- unreachable in
-      // practice, kept only because the catch (Throwable) below can technically observe one via sneaky-throw.
+      // body is a Function<MLXArray[], MLXArray[]>, which declares no checked exceptions --
+      // unreachable in
+      // practice, kept only because the catch (Throwable) below can technically observe one via
+      // sneaky-throw.
       throw new MLXException("valueAndGrad: body threw a checked exception", escaped);
     }
 
     /**
-     * The upcall body: {@code int fun(mlx_vector_array* res, const mlx_vector_array in)}. Runs synchronously on the
-     * {@link #apply} caller's thread (confirmed: req/phase4-plan.md Probe 0b(c)), so the {@link MLXArray}s it builds
-     * are confined to that thread like any other. Never lets a {@link Throwable} escape past this frame -- catches
-     * everything, stashes it on {@link #ESCAPED}, and returns {@code 1}, a supported non-leaking mlx-c error path
+     * The upcall body: {@code int fun(mlx_vector_array* res, const mlx_vector_array in)}. Runs
+     * synchronously on the {@link #apply} caller's thread (confirmed: req/phase4-plan.md Probe
+     * 0b(c)), so the {@link MLXArray}s it builds are confined to that thread like any other. Never
+     * lets a {@link Throwable} escape past this frame -- catches everything, stashes it on {@link
+     * #ESCAPED}, and returns {@code 1}, a supported non-leaking mlx-c error path
      * (req/phase4-plan.md Research findings, {@code closure.cpp:44-51}).
      */
     private int onClosureInvoked(MemorySegment res, MemorySegment in) {
@@ -190,19 +203,23 @@ public final class MLXGrad {
         MLXArray[] result = body.apply(primalsIn.toArray(new MLXArray[0]));
         if (result == null || result.length == 0 || result[0].ndim() != 0) {
           int rank = result == null || result.length == 0 ? -1 : result[0].ndim();
-          throw new IllegalArgumentException("valueAndGrad: body's first returned array must be rank-0 (a reduced "
-              + "scalar loss), got rank " + rank);
+          throw new IllegalArgumentException(
+              "valueAndGrad: body's first returned array must be rank-0 (a reduced "
+                  + "scalar loss), got rank "
+                  + rank);
         }
         MemorySegment[] handles = new MemorySegment[result.length];
         for (int i = 0; i < result.length; i++) {
           if (result[i] == null) {
-            throw new IllegalArgumentException("valueAndGrad: body's returned array[" + i + "] is null");
+            throw new IllegalArgumentException(
+                "valueAndGrad: body's returned array[" + i + "] is null");
           }
           handles[i] = result[i].handle();
         }
         try (Arena tmp = Arena.ofConfined()) {
           MemorySegment buf = NativeOps.copyHandlesInto(handles, tmp);
-          NativeOps.checked("valueAndGrad", () -> mlx_h.mlx_vector_array_set_data(res, buf, handles.length));
+          NativeOps.checked(
+              "valueAndGrad", () -> mlx_h.mlx_vector_array_set_data(res, buf, handles.length));
         }
         return 0;
       } catch (Throwable t) {
@@ -224,11 +241,12 @@ public final class MLXGrad {
     }
 
     /**
-     * Confined to the constructing thread, matching {@link MLXScope}/{@link MLXArray}. Frees both closures, then the
-     * arena backing the upcall stub -- order is load-bearing (req/phase4-plan.md §6): both closures' underlying
-     * {@code std::function}s hold the raw stub pointer until freed, so closing the arena first would leave a dangling
-     * stub inside a live closure. Each step runs even if an earlier one throws, so a failure never abandons the later
-     * frees (or the arena) permanently -- {@code close()} is otherwise a one-shot: once {@link #closed} flips, a
+     * Confined to the constructing thread, matching {@link MLXScope}/{@link MLXArray}. Frees both
+     * closures, then the arena backing the upcall stub -- order is load-bearing (req/phase4-plan.md
+     * §6): both closures' underlying {@code std::function}s hold the raw stub pointer until freed,
+     * so closing the arena first would leave a dangling stub inside a live closure. Each step runs
+     * even if an earlier one throws, so a failure never abandons the later frees (or the arena)
+     * permanently -- {@code close()} is otherwise a one-shot: once {@link #closed} flips, a
      * partially-failed cleanup is not retried.
      */
     @Override
@@ -239,7 +257,8 @@ public final class MLXGrad {
       }
       closed = true;
       try {
-        NativeOps.checked("valueAndGrad.close", () -> mlx_h.mlx_closure_value_and_grad_free(vgClosure));
+        NativeOps.checked(
+            "valueAndGrad.close", () -> mlx_h.mlx_closure_value_and_grad_free(vgClosure));
       } finally {
         try {
           NativeOps.checked("valueAndGrad.close", () -> mlx_h.mlx_closure_free(plainClosure));
@@ -259,14 +278,15 @@ public final class MLXGrad {
     private void checkThread() {
       Thread current = Thread.currentThread();
       if (current != owner) {
-        throw new IllegalStateException("MLXGrad.Fn is confined to " + owner + " but was accessed from " + current);
+        throw new IllegalStateException(
+            "MLXGrad.Fn is confined to " + owner + " but was accessed from " + current);
       }
     }
   }
 
   /**
-   * {@code values} holds {@code body}'s rank-0 loss (element 0); {@code grads.get(i)} corresponds to
-   * {@code argnums[i]}.
+   * {@code values} holds {@code body}'s rank-0 loss (element 0); {@code grads.get(i)} corresponds
+   * to {@code argnums[i]}.
    */
   public record Result(List<MLXArray> values, List<MLXArray> grads) {}
 }

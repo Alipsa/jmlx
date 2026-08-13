@@ -16,8 +16,8 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Tests for {@link ModuleGrad}, the module-aware autograd wrapper (req/phase4-plan.md §6, req/plans/phase4-m2-plan.md
- * Task 2).
+ * Tests for {@link ModuleGrad}, the module-aware autograd wrapper (req/phase4-plan.md §6,
+ * req/plans/phase4-m2-plan.md Task 2).
  */
 @EnabledIfNativeAvailable
 class ModuleGradTest {
@@ -25,8 +25,8 @@ class ModuleGradTest {
   private static final float EPS = 1e-4f;
 
   /**
-   * {@code params[0]} = weight [1,3], {@code params[1]} = bias [1]; {@code inputs[0]} = x [1,3], {@code inputs[1]} =
-   * target [1,1]. {@code loss = sum((x @ weight.T + bias - target)^2)}.
+   * {@code params[0]} = weight [1,3], {@code params[1]} = bias [1]; {@code inputs[0]} = x [1,3],
+   * {@code inputs[1]} = target [1,1]. {@code loss = sum((x @ weight.T + bias - target)^2)}.
    */
   private static MLXArray[] mseLoss(MLXArray[] params, MLXArray[] inputs) {
     MLXArray weightT = MLXShape.transpose(params[0], inputs[0].scope());
@@ -67,9 +67,12 @@ class ModuleGradTest {
       MLXArray weight = MLX.array(model, new float[] {1, 1, 1}, new int[] {1, 3});
       MLXArray bias = MLX.array(model, new float[] {0}, new int[] {1});
       Linear linear = new Linear(model, weight, bias);
-      try (ModuleGrad mg = ModuleGrad.of(linear, (params, inputs) -> {
-        throw new RuntimeException("loss boom");
-      })) {
+      try (ModuleGrad mg =
+          ModuleGrad.of(
+              linear,
+              (params, inputs) -> {
+                throw new RuntimeException("loss boom");
+              })) {
         try (MLXScope step = model.newChild()) {
           MLXArray x = MLX.array(step, new float[] {1, 2, 3}, new int[] {1, 3});
           MLXArray target = MLX.array(step, new float[] {0}, new int[] {1, 1});
@@ -99,7 +102,8 @@ class ModuleGradTest {
         try (MLXScope step2 = model.newChild()) {
           MLXArray x2 = MLX.array(step2, new float[] {2, 2, 2}, new int[] {1, 3});
           MLXArray t2 = MLX.array(step2, new float[] {0}, new int[] {1, 1});
-          float[] grads2 = mg.apply(step2, new MLXArray[] {x2, t2}).grads().get("weight").toFloatArray();
+          float[] grads2 =
+              mg.apply(step2, new MLXArray[] {x2, t2}).grads().get("weight").toFloatArray();
           assertNotEquals(grads1[0], grads2[0]);
         }
       }
@@ -123,7 +127,8 @@ class ModuleGradTest {
         try (MLXScope step2 = model.newChild()) {
           MLXArray x = MLX.array(step2, new float[] {1, 2, 3}, new int[] {1, 3});
           MLXArray t = MLX.array(step2, new float[] {0}, new int[] {1, 1});
-          float[] gradsAfter = mg.apply(step2, new MLXArray[] {x, t}).grads().get("weight").toFloatArray();
+          float[] gradsAfter =
+              mg.apply(step2, new MLXArray[] {x, t}).grads().get("weight").toFloatArray();
           assertNotEquals(gradsBefore[0], gradsAfter[0]);
         }
       }
@@ -134,7 +139,8 @@ class ModuleGradTest {
   void treeWithNoParametersThrows() {
     try (MLXScope model = new MLXScope()) {
       Module empty = new Module(model) {};
-      assertThrows(IllegalStateException.class, () -> ModuleGrad.of(empty, (params, inputs) -> inputs));
+      assertThrows(
+          IllegalStateException.class, () -> ModuleGrad.of(empty, (params, inputs) -> inputs));
     }
   }
 }

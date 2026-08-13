@@ -216,6 +216,27 @@ final class NativeOps {
   }
 
   /**
+   * Copies {@code handles} into a freshly allocated contiguous {@code mlx_array[]} buffer -- the raw
+   * struct-array shape both {@code mlx_vector_array_new_data} ({@link MLX#eval}'s vector
+   * construction) and {@code mlx_vector_array_set_data} ({@link MLXGrad}'s upcall, writing an
+   * existing vector's ctx) accept as their {@code data} parameter. A byte-for-byte struct copy, not
+   * a ctx get/set round-trip, so this stays correct if {@code mlx_array_} ever gains a field.
+   * {@code allocator} must be a confined {@link Arena} (never an {@link MLXScope}) for the same
+   * reason {@link MLX#eval}'s vector allocator must be: the buffer is not an {@code mlx_array}
+   * handle this method's caller will ever pass to {@code mlx_array_free}, so allocating it through a
+   * scope would corrupt that scope's handle-tracking invariant.
+   */
+  static MemorySegment copyHandlesInto(MemorySegment[] handles, SegmentAllocator allocator) {
+    int n = handles.length;
+    MemorySegment buf = mlx_array_.allocateArray(n, allocator);
+    long elementSize = mlx_array_.sizeof();
+    for (int i = 0; i < n; i++) {
+      MemorySegment.copy(handles[i], 0L, buf, i * elementSize, elementSize);
+    }
+    return buf;
+  }
+
+  /**
    * Runs a status-returning native call and throws {@link MLXException} on failure. Clears {@link
    * NativeLoader}'s thread-local error message immediately before invoking {@code nativeCall}, not
    * just after it fails: some entry points (see {@link MLX#array}) fire the error handler without a

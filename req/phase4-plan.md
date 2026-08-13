@@ -2,8 +2,7 @@
 
 ## Status — update this section as work lands
 
-**Branch:** `worktree-phase4-m0a-m0b` — [PR #5](https://github.com/Alipsa/jmlx/pull/5) open against
-`main`, not yet merged.
+**Branch:** `worktree-phase4-m2`, off `main` at `0855ef5` (PR #7 merged, M1 done).
 
 | Item | Status | Commit |
 |---|---|---|
@@ -14,7 +13,7 @@
 | Probe 0b — upcall exception-safety + thread confinement | **Done, confirmed** | scratch, not committed |
 | Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
 | M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
-| M2 — `MLXGrad`/`ModuleGrad` (§6) | Not started | — |
+| M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | this branch, see req/plans/phase4-m2-plan.md |
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | Not started | — |
 | M4 — `QuantizedLinear` (§8) | Not started | — |
 | §9 — Documentation | Not started | — |
@@ -61,6 +60,26 @@ first review-response commit and was only caught because `./gradlew build` was r
 green PR page meant nothing. Added as §10 below: a hosted GitHub Actions runner cannot bootstrap the
 native library (needs Apple Silicon + macOS 26), so closing this gap needs a **self-hosted runner**,
 not a standard Actions job.
+
+**M2 findings.** Implemented per req/plans/phase4-m2-plan.md, in two tasks: `MLXGrad` (`core`, plus
+`NativeOps.copyHandlesInto` factored out of `MLX.newVectorArray` for the upcall's `res`-fill step) and
+`ModuleGrad` (`nn`, the rebinding wrapper). All 14 new tests passed against real Apple Silicon hardware
+on the first run, including `gradOfSumOfSquares` (the exact §6 Verification 0c fixture) and
+`gradsMatchHandComputedValues` (a real `Linear` layer end-to-end, not a hand-rolled toy model). No
+scratch probe was written separately for 0c — Task 1's permanent test class serves that role, compiled
+and run before Task 2 depended on `MLXGrad` at all; see req/plans/phase4-m2-plan.md's opening section
+for why that is stronger evidence than the scratch-and-delete precedent 0b/0f used, not a shortcut past
+it. The spec's every native-surface assumption for §6 held exactly as written: `mlx_value_and_grad`
+takes its plain-closure argument by value and does not take ownership of it (confirmed against
+`transforms.cpp:99-115`, so `Fn.close()` frees both closures independently, in the documented order);
+`mlx_closure_value_and_grad_apply`'s two out-vectors unpack with the same shape as §3's deferred
+`vectorOutOp`, hand-rolled locally in `MLXGrad` rather than forcing a fit through that helper (M4's real
+consumer); the three-step exception-safety protocol reproduces the original exception type, not a
+generic `MLXException`, confirmed by asserting the type rather than just "throws". The negative
+rebinding-disabled test from the spec's Testing table was deliberately not re-committed — Probe 0f
+already produced that finding (exact `0.0`/`0.0` grads) against a hand-rolled model, and re-deriving it
+here would require shipping a second, rebinding-disabled code path in production `ModuleGrad` with no
+caller besides that one test.
 
 ## Context
 

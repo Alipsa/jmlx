@@ -95,6 +95,37 @@ public final class MLXShape {
   }
 
   /**
+   * Reverses every axis, allocating the result into {@code target} instead of {@code a.scope()}. See req/phase4-plan.md
+   * §2 mitigation 1: lets a weight-derived view computed inside {@code forward()} land in the caller's (step) scope
+   * rather than leaking into {@code a}'s own (model) scope once per call.
+   */
+  public static MLXArray transpose(MLXArray a, MLXScope target) {
+    return NativeOps.unaryOp("transpose", a, target, mlx_h::mlx_transpose);
+  }
+
+  /** Swaps two axes. */
+  public static MLXArray swapaxes(MLXArray a, int axis1, int axis2) {
+    return NativeOps.axis2Op("swapaxes", a, axis1, axis2, mlx_h::mlx_swapaxes);
+  }
+
+  /** Takes array entries at the given indices, treating the array as flattened regardless of its own shape. */
+  public static MLXArray take(MLXArray a, MLXArray indices) {
+    return NativeOps.binaryOp("take", a, indices, mlx_h::mlx_take);
+  }
+
+  /**
+   * Takes array slices at the given indices of the specified axis. Result shape is
+   * {@code a.shape()[:axis] + indices.shape() + a.shape()[axis+1:]}.
+   */
+  public static MLXArray takeAxis(MLXArray a, MLXArray indices, int axis) {
+    MLXScope scope = NativeOps.scopeOf("takeAxis", a, indices);
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("takeAxis",
+        () -> mlx_h.mlx_take_axis(res, a.handle(), indices.handle(), axis, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /**
    * Slices {@code a} along every axis using {@code start} (inclusive) and {@code stop} (exclusive), with every axis
    * implicitly strided by 1. Equivalent to {@link #slice(MLXArray, int[], int[], int[])} with an all-ones
    * {@code strides}.

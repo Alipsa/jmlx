@@ -2,9 +2,11 @@ package se.alipsa.jmlx.core;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentAllocator;
 import java.lang.foreign.ValueLayout;
 import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
+import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -94,11 +96,25 @@ final class NativeOps {
     int apply(MemorySegment res, MemorySegment a, MemorySegment b, MemorySegment stream);
   }
 
-  static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
-    MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
+  /**
+   * Allocates the result into {@code target} instead of {@code a.scope()} -- e.g. {@code Linear.forward} computing
+   * {@code transpose(W, x.scope())} so the view lands in the step scope rather than leaking into the model scope
+   * (req/phase4-plan.md §5). {@code target} must be related to {@code a.scope()} -- either an ancestor OR a descendant
+   * of it -- checked via {@link MLXScope#innermost}, not {@link MLXScope#isAncestorOf} alone: unlike {@link MLX#hoist},
+   * which only ever narrows toward an ancestor, this overload is also used to push a result INTO a descendant (the step
+   * scope), so both directions must be legal. Without this check, a caller passing an unrelated {@code target} would
+   * silently allocate a result referencing {@code a} into a scope that could close before (or long after) {@code a}'s
+   * own scope, breaking the invariant that a result's scope is always related to every operand it references.
+   */
+  static MLXArray unaryOp(String opName, MLXArray a, MLXScope target, UnaryOp op) {
+    MLXScope.innermost(a.scope(), target);
+    MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    return new MLXArray(target, res);
+  }
+
+  static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
+    return unaryOp(opName, a, a.scope(), op);
   }
 
   @FunctionalInterface
@@ -124,6 +140,59 @@ final class NativeOps {
   @FunctionalInterface
   interface ShapeOp {
     int apply(MemorySegment res, MemorySegment a, MemorySegment param, long paramNum, MemorySegment stream);
+  }
+
+  /**
+   * Wraps the {@code (res, a, const int*, size_t, bool, stream)} native shape shared by {@code mlx_sum_axes} and
+   * {@code mlx_mean_axes}: a confined {@link Arena} owns {@code axes}'s native copy for the lifetime of the call,
+   * exactly as {@code shapeOp} does for its param.
+   */
+  static MLXArray reduceOp(String opName, MLXArray a, int[] axes, boolean keepdims, ReduceOp op) {
+    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeAxes = tmp.allocateFrom(ValueLayout.JAVA_INT, axes);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      checked(opName, () -> op.apply(res, a.handle(), nativeAxes, axes.length, keepdims, DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
+
+  @FunctionalInterface
+  interface ReduceOp {
+    int apply(MemorySegment res, MemorySegment a, MemorySegment axes, long axesNum, boolean keepdims,
+        MemorySegment stream);
+  }
+
+  /**
+   * Wraps the {@code (res, a, int, int, stream)} native shape shared by {@code mlx_swapaxes}: applies a
+   * two-argument-plus-stream operation.
+   */
+  static MLXArray axis2Op(String opName, MLXArray a, int axis1, int axis2, Axis2Op op) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    checked(opName, () -> op.apply(res, a.handle(), axis1, axis2, DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  @FunctionalInterface
+  interface Axis2Op {
+    int apply(MemorySegment res, MemorySegment a, int axis1, int axis2, MemorySegment stream);
+  }
+
+  /**
+   * The native "null" for a by-value nullable {@code mlx_array} parameter (e.g. {@code mlx_fast_rms_norm}'s
+   * {@code weight}, {@code mlx_random_normal}'s {@code key}): a zero-{@code ctx} struct, never
+   * {@link MemorySegment#NULL} -- passing {@code MemorySegment.NULL} where mlx-c expects a by-value struct is a
+   * segfault, not an exception (req/phase4-plan.md, Research findings). {@link SegmentAllocator#allocate}'s contract
+   * makes no zero-fill guarantee (only {@link Arena#ofConfined()}/{@code ofShared()} document zero-initialization, and
+   * {@code SegmentAllocator.slicingAllocator} explicitly hands back reused, non-zeroed slices), so the struct is filled
+   * with zero explicitly rather than relying on the allocator.
+   */
+  static MemorySegment nullableHandle(MLXArray a, SegmentAllocator tmp) {
+    if (a != null) {
+      return a.handle();
+    }
+    return tmp.allocate(mlx_array_.layout()).fill((byte) 0);
   }
 
   /**

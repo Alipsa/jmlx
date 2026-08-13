@@ -38,6 +38,18 @@ public final class MLXOps {
     return NativeOps.binaryOp("divide", a, b, mlx_h::mlx_divide);
   }
 
+  /** Elementwise maximum of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
+  public static MLXArray maximum(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "maximum");
+    return NativeOps.binaryOp("maximum", a, b, mlx_h::mlx_maximum);
+  }
+
+  /** Elementwise power (a raised to the power b), broadcasting their shapes per NumPy's rules if they differ. */
+  public static MLXArray power(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "power");
+    return NativeOps.binaryOp("power", a, b, mlx_h::mlx_power);
+  }
+
   /**
    * Matrix product of {@code a} and {@code b}. Either may be rank-1 (promoted internally, matching mlx's own
    * vector-matrix / matrix-vector rules); rank &ge; 2 operands batch-broadcast over every axis but the last two. Rank-0
@@ -155,6 +167,41 @@ public final class MLXOps {
     return NativeOps.unaryOp("cos", a, mlx_h::mlx_cos);
   }
 
+  /** Elementwise sigmoid. */
+  public static MLXArray sigmoid(MLXArray a) {
+    return NativeOps.unaryOp("sigmoid", a, mlx_h::mlx_sigmoid);
+  }
+
+  /** Elementwise error function. */
+  public static MLXArray erf(MLXArray a) {
+    return NativeOps.unaryOp("erf", a, mlx_h::mlx_erf);
+  }
+
+  /** Elementwise hyperbolic tangent. */
+  public static MLXArray tanh(MLXArray a) {
+    return NativeOps.unaryOp("tanh", a, mlx_h::mlx_tanh);
+  }
+
+  /** Elementwise square root. */
+  public static MLXArray sqrt(MLXArray a) {
+    return NativeOps.unaryOp("sqrt", a, mlx_h::mlx_sqrt);
+  }
+
+  /** Elementwise reciprocal square root. */
+  public static MLXArray rsqrt(MLXArray a) {
+    return NativeOps.unaryOp("rsqrt", a, mlx_h::mlx_rsqrt);
+  }
+
+  /** Elementwise square. */
+  public static MLXArray square(MLXArray a) {
+    return NativeOps.unaryOp("square", a, mlx_h::mlx_square);
+  }
+
+  /** Elementwise negation. */
+  public static MLXArray negative(MLXArray a) {
+    return NativeOps.unaryOp("negative", a, mlx_h::mlx_negative);
+  }
+
   /** Sums every element to a rank-0 scalar array. */
   public static MLXArray sum(MLXArray a) {
     // mlx_sum(res, a, keepdims, s) carries an extra bool beyond unaryOp's
@@ -164,6 +211,22 @@ public final class MLXOps {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked("sum", () -> mlx_h.mlx_sum(res, a.handle(), false, NativeOps.DEFAULT_STREAM));
     return new MLXArray(scope, res);
+  }
+
+  /**
+   * Sum reduction along specified axes. {@code keepdims} controls whether reduced axes are kept as singleton dimensions
+   * (true) or removed (false).
+   */
+  public static MLXArray sum(MLXArray a, int[] axes, boolean keepdims) {
+    return NativeOps.reduceOp("sum", a, axes, keepdims, mlx_h::mlx_sum_axes);
+  }
+
+  /**
+   * Mean reduction along specified axes. {@code keepdims} controls whether reduced axes are kept as singleton
+   * dimensions (true) or removed (false).
+   */
+  public static MLXArray mean(MLXArray a, int[] axes, boolean keepdims) {
+    return NativeOps.reduceOp("mean", a, axes, keepdims, mlx_h::mlx_mean_axes);
   }
 
   /**

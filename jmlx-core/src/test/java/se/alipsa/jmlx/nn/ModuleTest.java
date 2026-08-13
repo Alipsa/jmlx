@@ -208,4 +208,76 @@ class ModuleTest {
       assertThrows(IllegalArgumentException.class, () -> branch.rebind(values));
     }
   }
+
+  /**
+   * Regression test: {@code update} used to write each entry as it resolved it, so a later entry's bad path left
+   * earlier entries already written with no notification fired (the notify pass only runs after the whole loop
+   * returns). Resolving every path before writing any of them means a bad entry anywhere leaves every parameter --
+   * including ones with a valid path earlier in iteration order -- untouched.
+   */
+  @Test
+  void updateWithAMixOfValidAndInvalidPathsAppliesNoWritesAndDoesNotNotify() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray newW = MLX.array(scope, new float[] {2f}, new int[] {1});
+      Leaf leaf = new Leaf(scope, w);
+      Branch branch = new Branch(scope, leaf);
+
+      SequencedMap<String, MLXArray> values = new LinkedHashMap<>();
+      values.put("leaf.w", newW);
+      values.put("leaf.missing", newW);
+
+      assertThrows(IllegalArgumentException.class, () -> branch.update(values));
+
+      assertFalse(leaf.notified);
+      assertSame(w, leaf.param("w"));
+    }
+  }
+
+  /** Same atomicity guarantee as {@code update}, for {@code rebind}. */
+  @Test
+  void rebindWithAMixOfValidAndInvalidPathsAppliesNoWrites() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray newW = MLX.array(scope, new float[] {2f}, new int[] {1});
+      Leaf leaf = new Leaf(scope, w);
+      Branch branch = new Branch(scope, leaf);
+
+      SequencedMap<String, MLXArray> values = new LinkedHashMap<>();
+      values.put("leaf.w", newW);
+      values.put("leaf.missing", newW);
+
+      assertThrows(IllegalArgumentException.class, () -> branch.rebind(values));
+
+      assertSame(w, leaf.param("w"));
+    }
+  }
+
+  @Test
+  void paramRejectsANameContainingADot() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      Leaf leaf = new Leaf(scope, w);
+      MLXArray other = MLX.array(scope, new float[] {2f}, new int[] {1});
+      assertThrows(IllegalArgumentException.class, () -> leaf.param("a.b", other));
+    }
+  }
+
+  @Test
+  void childRejectsANameContainingADot() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      Branch branch = new Branch(scope, new Leaf(scope, w));
+      assertThrows(IllegalArgumentException.class, () -> branch.child("a.b", new Leaf(scope, w)));
+    }
+  }
+
+  @Test
+  void childRejectsANullModule() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      Branch branch = new Branch(scope, new Leaf(scope, w));
+      assertThrows(NullPointerException.class, () -> branch.child("other", null));
+    }
+  }
 }

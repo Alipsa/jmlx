@@ -12,6 +12,13 @@ import se.alipsa.jmlx.memory.MLXScope;
  * See req/initial-plan.md, Testing approach, "Numeric correctness". Unlike the other op classes, {@code normal}/
  * {@code uniform}'s actual values are the RNG's own, not a formula's -- the only meaningful assertions here are shape/
  * dtype, seeded determinism, and (for uniform) a range property, not hand-computed goldens.
+ *
+ * <p>
+ * {@link #seedMakesNormalDeterministic} and {@link #uniformEveryElementFallsWithinTheRequestedHalfOpenRange} both call
+ * {@link MLXRandom#seed}, which reseeds mlx's process-wide RNG state -- not per-thread or per-scope. This is only safe
+ * because JUnit runs this suite's methods sequentially (no {@code junit-platform.properties} enabling parallel
+ * execution anywhere in this project); enabling parallel test execution later would make these two tests flaky against
+ * each other and any other test that seeds the RNG.
  */
 @EnabledIfNativeAvailable
 class MLXRandomTest {

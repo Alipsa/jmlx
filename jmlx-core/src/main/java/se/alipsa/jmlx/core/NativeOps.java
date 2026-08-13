@@ -183,11 +183,16 @@ final class NativeOps {
    * The native "null" for a by-value nullable {@code mlx_array} parameter (e.g. {@code mlx_fast_rms_norm}'s
    * {@code weight}, {@code mlx_random_normal}'s {@code key}): a zero-{@code ctx} struct, never
    * {@link MemorySegment#NULL} -- passing {@code MemorySegment.NULL} where mlx-c expects a by-value struct is a
-   * segfault, not an exception (req/phase4-plan.md, Research findings). {@link SegmentAllocator#allocate} zero-fills by
-   * default, so allocating one fresh {@code mlx_array_} struct from {@code tmp} already IS the null value.
+   * segfault, not an exception (req/phase4-plan.md, Research findings). {@link SegmentAllocator#allocate}'s contract
+   * makes no zero-fill guarantee (only {@link Arena#ofConfined()}/{@code ofShared()} document zero-initialization, and
+   * {@code SegmentAllocator.slicingAllocator} explicitly hands back reused, non-zeroed slices), so the struct is filled
+   * with zero explicitly rather than relying on the allocator.
    */
   static MemorySegment nullableHandle(MLXArray a, SegmentAllocator tmp) {
-    return a == null ? tmp.allocate(mlx_array_.layout()) : a.handle();
+    if (a != null) {
+      return a.handle();
+    }
+    return tmp.allocate(mlx_array_.layout()).fill((byte) 0);
   }
 
   /**

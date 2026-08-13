@@ -893,4 +893,18 @@ class MLXNumericTest {
       assertArrayEquals(new float[] {1, 3, 2, 4}, result.toFloatArray(), EPS);
     }
   }
+
+  /**
+   * The other side of {@link #transposeExplicitTargetAllocatesIntoTargetScope}: an explicit target unrelated to
+   * {@code a.scope()} (two independent roots, neither an ancestor nor a descendant of the other) must be rejected --
+   * {@code NativeOps.unaryOp}'s relatedness check exists specifically so a result never references an operand from a
+   * scope that could close before or long after it.
+   */
+  @Test
+  void transposeExplicitTargetRejectsAnUnrelatedScope() {
+    try (MLXScope s1 = new MLXScope(); MLXScope s2 = new MLXScope()) {
+      MLXArray a = MLX.array(s1, new float[] {1, 2, 3, 4}, new int[] {2, 2});
+      assertThrows(IllegalArgumentException.class, () -> MLXShape.transpose(a, s2));
+    }
+  }
 }

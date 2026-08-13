@@ -1,8 +1,10 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.SequencedMap;
@@ -47,6 +49,7 @@ public abstract class Module {
    */
   protected final MLXArray param(String name, MLXArray value) {
     Objects.requireNonNull(value, "param \"" + name + "\": value must not be null");
+    requireNoDot("param", name);
     if (frozen) {
       throw new IllegalStateException("Module is frozen: cannot register parameter \"" + name + "\"");
     }
@@ -74,9 +77,19 @@ public abstract class Module {
   /**
    * Registers {@code module} as this module's own submodule named {@code name} and returns it.
    *
+   * <p>
+   * Registering {@code module} as its own ancestor, or the same instance under two different parents (e.g. a tied
+   * embedding), is not supported in M1: no runtime check catches either case, and the results are undefined --
+   * {@link #parameters()}, {@link #freeze()}, and {@link #update} would recurse into a cycle in the first case, and
+   * {@link #update}'s {@link #onParametersUpdated()} notification would fire twice for one write in the second.
+   *
    * @throws IllegalStateException if this module is frozen, or if {@code name} is already registered
+   * @throws NullPointerException if {@code module} is {@code null}
+   * @throws IllegalArgumentException if {@code name} contains {@code '.'}
    */
   protected final <M extends Module> M child(String name, M module) {
+    Objects.requireNonNull(module, "child \"" + name + "\": module must not be null");
+    requireNoDot("child", name);
     if (frozen) {
       throw new IllegalStateException("Module is frozen: cannot register child \"" + name + "\"");
     }
@@ -85,6 +98,19 @@ public abstract class Module {
     }
     children.put(name, module);
     return module;
+  }
+
+  /**
+   * Rejects a {@code param}/{@code child} name containing {@code '.'}: {@link #parameters()} joins names with
+   * {@code '.'} to build dotted paths, and {@link #update}/{@link #rebind} split on {@code '.'} to parse them back --
+   * a local name containing a dot would stop the two APIs from round-tripping (a checkpoint key that happens to embed
+   * a dot, say, would be misparsed as an extra path segment).
+   */
+  private static void requireNoDot(String kind, String name) {
+    if (name.indexOf('.') >= 0) {
+      throw new IllegalArgumentException(
+          kind + " name \"" + name + "\" must not contain '.' -- reserved as the parameters()/update() path separator");
+    }
   }
 
   /**
@@ -123,15 +149,21 @@ public abstract class Module {
    * Writes each entry's value into the parameter at its dotted path, then calls {@link #onParametersUpdated()} on
    * exactly the modules whose own {@code params} map was written to (depth-first: this module first, then
    * {@code children} in insertion order). Every write completes before any notification runs -- spec §5:
-   * "all-writes-then-all-notifies, not interleaved".
+   * "all-writes-then-all-notifies, not interleaved". Every path in {@code byPath} is resolved -- and every value
+   * null-checked -- before any write happens, so a bad entry (an unknown path, a {@code null} value) leaves every
+   * parameter exactly as it was and fires no notifications; without this, a throw partway through would apply some
+   * writes and skip their notifications, since the notify pass only runs after the whole loop returns.
    *
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
    * @throws NullPointerException if any value is {@code null}
    */
   public final void update(Map<String, MLXArray> byPath) {
+    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = resolveAll(byPath);
     Set<Module> touched = new HashSet<>();
-    for (Map.Entry<String, MLXArray> entry : byPath.entrySet()) {
-      touched.add(resolveAndWrite(entry.getKey(), entry.getKey(), entry.getValue()));
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
+      ResolvedTarget target = entry.getKey();
+      target.owner().params.put(target.localName(), entry.getValue());
+      touched.add(target.owner());
     }
     notifyDepthFirst(touched);
   }
@@ -160,16 +192,20 @@ public abstract class Module {
   }
 
   /**
-   * Writes each entry's value into the parameter at its dotted path, exactly like {@link #update}, but never calls
-   * {@link #onParametersUpdated()} -- spec §6: "rebind must NOT fire {@code onParametersUpdated()}". Legal even after
-   * {@link #freeze()}, since {@link #resolveAndWrite} never checks {@code frozen}.
+   * Writes each entry's value into the parameter at its dotted path, exactly like {@link #update} -- including
+   * resolving every path and null-checking every value before any write, so a bad entry leaves every parameter
+   * untouched -- but never calls {@link #onParametersUpdated()}: spec §6, "rebind must NOT fire
+   * {@code onParametersUpdated()}". Legal even after {@link #freeze()}, since resolving and writing a parameter never
+   * checks {@code frozen}.
    *
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
    * @throws NullPointerException if any value is {@code null}
    */
   public final void rebind(SequencedMap<String, MLXArray> values) {
-    for (Map.Entry<String, MLXArray> entry : values.entrySet()) {
-      resolveAndWrite(entry.getKey(), entry.getKey(), entry.getValue());
+    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = resolveAll(values);
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
+      ResolvedTarget target = entry.getKey();
+      target.owner().params.put(target.localName(), entry.getValue());
     }
   }
 
@@ -184,25 +220,45 @@ public abstract class Module {
    */
   protected void onParametersUpdated() {}
 
+  /** The module owning a resolved path's final segment, and that segment's name local to {@code owner}. */
+  private record ResolvedTarget(Module owner, String localName) {}
+
+  /**
+   * Resolves every entry's path to its {@link ResolvedTarget} and null-checks every value, without writing anything --
+   * the validation pass {@link #update} and {@link #rebind} both run to completion before either performs a single
+   * write, so a bad entry anywhere in {@code byPath} leaves every parameter untouched.
+   *
+   * @throws IllegalArgumentException if any path does not resolve to a registered parameter
+   * @throws NullPointerException if any value is {@code null}
+   */
+  private List<Map.Entry<ResolvedTarget, MLXArray>> resolveAll(Map<String, MLXArray> byPath) {
+    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = new ArrayList<>();
+    for (Map.Entry<String, MLXArray> entry : byPath.entrySet()) {
+      String path = entry.getKey();
+      MLXArray value = entry.getValue();
+      Objects.requireNonNull(value, "parameter path \"" + path + "\": value must not be null");
+      resolved.add(Map.entry(resolve(path, path), value));
+    }
+    return resolved;
+  }
+
   // fullPath is threaded through unchanged so an exception thrown after
   // descending into a child still names the original dotted path the
   // caller passed in, not just the trailing segment local to this module --
   // update/rebind's contract requires the exception to name the full path.
-  private Module resolveAndWrite(String fullPath, String path, MLXArray value) {
-    Objects.requireNonNull(value, "parameter path \"" + fullPath + "\": value must not be null");
+  private ResolvedTarget resolve(String fullPath, String path) {
     int dot = path.indexOf('.');
     if (dot < 0) {
       if (!params.containsKey(path)) {
         throw new IllegalArgumentException("unknown parameter path \"" + fullPath + "\"");
       }
-      params.put(path, value);
-      return this;
+      return new ResolvedTarget(this, path);
     }
     String childName = path.substring(0, dot);
     Module target = children.get(childName);
     if (target == null) {
       throw new IllegalArgumentException("unknown parameter path \"" + fullPath + "\"");
     }
-    return target.resolveAndWrite(fullPath, path.substring(dot + 1), value);
+    return target.resolve(fullPath, path.substring(dot + 1));
   }
 }

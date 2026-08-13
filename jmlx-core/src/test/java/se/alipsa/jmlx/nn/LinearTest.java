@@ -52,6 +52,25 @@ class LinearTest {
   }
 
   /**
+   * {@code null} bias's only other coverage is {@code constructorRejectsARankOneWeight}, which never reaches
+   * {@code forward()} -- this is the only test that actually exercises the {@code hasBias ? add : y} branch's
+   * {@code false} side with a value assertion.
+   */
+  @Test
+  void forwardWithoutBiasComputesTheLinearTransformOnly() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray weight = MLX.array(scope, new float[] {1, 0, 1, 0, 1, 1}, new int[] {2, 3});
+      Linear linear = new Linear(scope, weight, null);
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3}, new int[] {1, 3});
+
+      MLXArray y = linear.forward(x);
+
+      assertArrayEquals(new int[] {1, 2}, y.shape());
+      assertArrayEquals(new float[] {4, 5}, y.toFloatArray(), EPS);
+    }
+  }
+
+  /**
    * The spec's named regression test: a {@code W.T} registration would still pass
    * {@link #forwardComputesTheAffineTransform} above and only fail here.
    */

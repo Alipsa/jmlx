@@ -68,23 +68,29 @@ public final class MLXRandom {
    * {@code mlx::core::array} the struct's {@code ctx} points at is owned by mlx-c and freed solely by
    * {@code mlx_array_free} (see {@link MLXArray#toFloatArray()}'s javadoc for the same invariant). {@code
    * mlx_random_uniform} takes {@code low}/{@code high} as {@code const mlx_array}, i.e. it borrows them rather than
-   * adopting them, so both scalars are freed in a {@code finally}, mirroring {@link MLX#full}'s pattern. {@code key} is
-   * always the RNG's own default, as in {@link #normal}.
+   * adopting them, so both scalars are freed in a {@code finally}, mirroring {@link MLX#full}'s pattern. The two frees
+   * are nested -- {@code highScalar}'s acquisition and its {@code finally} sit inside {@code lowScalar}'s -- so that if
+   * acquiring {@code highScalar} itself throws (e.g. via {@link #float32Scalar}'s null-{@code ctx} check),
+   * {@code lowScalar} is still freed rather than leaked. {@code key} is always the RNG's own default, as in
+   * {@link #normal}.
    */
   public static MLXArray uniform(MLXScope scope, int[] shape, DType dtype, float low, float high) {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment lowScalar = float32Scalar("uniform", low, tmp);
-      MemorySegment highScalar = float32Scalar("uniform", high, tmp);
       try {
-        MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
-        MemorySegment key = NativeOps.nullableHandle(null, tmp);
-        MemorySegment res = mlx_h.mlx_array_new(scope);
-        NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape,
-            shape.length, dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
-        return new MLXArray(scope, res);
+        MemorySegment highScalar = float32Scalar("uniform", high, tmp);
+        try {
+          MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+          MemorySegment key = NativeOps.nullableHandle(null, tmp);
+          MemorySegment res = mlx_h.mlx_array_new(scope);
+          NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape,
+              shape.length, dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
+          return new MLXArray(scope, res);
+        } finally {
+          mlx_h.mlx_array_free(highScalar);
+        }
       } finally {
         mlx_h.mlx_array_free(lowScalar);
-        mlx_h.mlx_array_free(highScalar);
       }
     }
   }

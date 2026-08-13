@@ -20,6 +20,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  */
 public final class ModuleGrad implements AutoCloseable {
 
+  private final Thread owner = Thread.currentThread();
   private final Module tree;
   private final BiFunction<MLXArray[], MLXArray[], MLXArray[]> loss;
   private final List<String> paramPaths;
@@ -119,6 +120,7 @@ public final class ModuleGrad implements AutoCloseable {
 
   @Override
   public void close() {
+    checkThread();
     if (closed) {
       return;
     }
@@ -127,8 +129,17 @@ public final class ModuleGrad implements AutoCloseable {
   }
 
   private void ensureOpen() {
+    checkThread();
     if (closed) {
       throw new IllegalStateException("ModuleGrad is closed");
+    }
+  }
+
+  private void checkThread() {
+    Thread current = Thread.currentThread();
+    if (current != owner) {
+      throw new IllegalStateException(
+          "ModuleGrad is confined to " + owner + " but was accessed from " + current);
     }
   }
 }

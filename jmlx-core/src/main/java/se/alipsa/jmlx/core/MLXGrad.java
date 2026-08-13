@@ -3,6 +3,7 @@ package se.alipsa.jmlx.core;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.ref.Cleaner;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -70,33 +71,154 @@ public final class MLXGrad {
    * because grads must land in the per-iteration step scope (req/phase4-plan.md §6: binding it at
    * construction forces a choice between a target closed by iteration two, or one upcall stub
    * churned per step). Confined to its constructing thread, the same as {@link MLXScope}/{@link
-   * MLXArray}: {@code arena} and both closures below are only ever touched from that thread.
+   * MLXArray}: {@code Holder} and both closures it owns are only ever touched from that thread,
+   * except for the {@link Cleaner} backstop below.
    */
   public static final class Fn implements AutoCloseable {
 
+    private static final Cleaner CLEANER = Cleaner.create();
+
+    /**
+     * Owns the two native closures and the arena backing the upcall stub. This -- not {@code Fn} --
+     * is what gets registered with the {@link Cleaner}, for the same capture-avoidance reason
+     * {@code MLXScope}'s own private {@code Holder} exists: the cleanup action must never hold a
+     * reference path back to the {@code Fn} it cleans up after, or {@code Fn} could never become
+     * unreachable and the action would never run.
+     */
+    private static final class Holder {
+      private final Arena arena;
+      private final MemorySegment plainClosure;
+      private final MemorySegment vgClosure;
+      private volatile boolean closed;
+
+      Holder(Arena arena, MemorySegment plainClosure, MemorySegment vgClosure) {
+        this.arena = arena;
+        this.plainClosure = plainClosure;
+        this.vgClosure = vgClosure;
+      }
+
+      /**
+       * Frees both closures, then the arena backing the upcall stub -- order is load-bearing
+       * (req/phase4-plan.md §6): both closures' underlying {@code std::function}s hold the raw stub
+       * pointer until freed, so closing the arena first would leave a dangling stub inside a live
+       * closure. Each step runs even if an earlier one throws, so a failure never abandons the
+       * later frees (or the arena) permanently. Synchronized and idempotent: the owning {@code
+       * Fn}'s explicit {@code close()} and the {@link Cleaner} backstop can both reach this method,
+       * and must not double-free.
+       *
+       * <p>Open question (req/initial-plan.md, Open questions), inherited unresolved from {@code
+       * MLXScope}'s own {@code Holder}: whether these native frees are safe to run from the Cleaner
+       * thread rather than {@code Fn}'s owning thread. Implemented as specified pending that
+       * determination.
+       */
+      synchronized void closeAll() {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        try {
+          NativeOps.checked(
+              "valueAndGrad.close", () -> mlx_h.mlx_closure_value_and_grad_free(vgClosure));
+        } finally {
+          try {
+            NativeOps.checked("valueAndGrad.close", () -> mlx_h.mlx_closure_free(plainClosure));
+          } finally {
+            arena.close();
+          }
+        }
+      }
+
+      // Unsynchronized on purpose, matching MLXScope.Holder's identical field: ensureOpen() reads
+      // this on every apply() call, and an unsynchronized volatile read is both correct (visible
+      // across the Cleaner thread, which writes it under this Holder's monitor) and free.
+      boolean isClosed() {
+        return closed;
+      }
+    }
+
+    /**
+     * The upcall target: holds {@code body} and the current {@code applyTarget}, but -- unlike
+     * {@code Fn} itself -- nothing that references {@code Fn}. This is what actually backs the
+     * upcall stub, via a bound reference to {@link #onClosureInvoked}, so the reference chain the
+     * FFM {@code Linker.upcallStub} contract creates -- arena (kept alive by {@link Holder}) to
+     * stub to the bound {@code MethodHandle} to its target -- never loops back to {@code Fn}. Had
+     * the target instead been {@code Fn::onClosureInvoked}, {@code Fn} would stay strongly
+     * reachable for as long as {@link Holder}'s arena is (unverified against JDK source, but this
+     * is the documented {@code upcallStub} contract), which is exactly what {@link Holder} exists
+     * to remain reachable for -- {@code Fn} could then never become unreachable, and the {@link
+     * Cleaner} backstop above would never run.
+     */
+    private static final class Upcall {
+      private final Function<MLXArray[], MLXArray[]> body;
+      private MLXScope applyTarget;
+
+      Upcall(Function<MLXArray[], MLXArray[]> body) {
+        this.body = body;
+      }
+
+      /**
+       * The upcall body: {@code int fun(mlx_vector_array* res, const mlx_vector_array in)}. Runs
+       * synchronously on the {@link Fn#apply} caller's thread (confirmed: req/phase4-plan.md Probe
+       * 0b(c)), so the {@link MLXArray}s it builds are confined to that thread like any other, and
+       * {@code applyTarget} needs no synchronization despite {@code Fn} being reachable from the
+       * Cleaner thread too: nothing here is ever touched off {@code Fn}'s owning thread. Never lets
+       * a {@link Throwable} escape past this frame -- catches everything, stashes it on {@link
+       * #ESCAPED}, and returns {@code 1}, a supported non-leaking mlx-c error path
+       * (req/phase4-plan.md Research findings, {@code closure.cpp:44-51}).
+       */
+      int onClosureInvoked(MemorySegment res, MemorySegment in) {
+        try {
+          MLXArray[] primalsIn = unpackVector(in, applyTarget);
+          MLXArray[] result = body.apply(primalsIn);
+          if (result == null || result.length == 0 || result[0].ndim() != 0) {
+            int rank = result == null || result.length == 0 ? -1 : result[0].ndim();
+            throw new IllegalArgumentException(
+                "valueAndGrad: body's first returned array must be rank-0 (a reduced "
+                    + "scalar loss), got rank "
+                    + rank);
+          }
+          MemorySegment[] handles = new MemorySegment[result.length];
+          for (int i = 0; i < result.length; i++) {
+            if (result[i] == null) {
+              throw new IllegalArgumentException(
+                  "valueAndGrad: body's returned array[" + i + "] is null");
+            }
+            handles[i] = result[i].handle();
+          }
+          try (Arena tmp = Arena.ofConfined()) {
+            MemorySegment buf = NativeOps.copyHandlesInto(handles, tmp);
+            NativeOps.checked(
+                "valueAndGrad", () -> mlx_h.mlx_vector_array_set_data(res, buf, handles.length));
+          }
+          return 0;
+        } catch (Throwable t) {
+          ESCAPED.set(t);
+          return 1;
+        }
+      }
+    }
+
     private final Thread owner = Thread.currentThread();
-    private final Arena arena = Arena.ofConfined();
-    private final Function<MLXArray[], MLXArray[]> body;
+    private final Upcall upcall;
+    private final Holder holder;
+    private final Cleaner.Cleanable cleanable;
     private final int[] argnums;
-    private final MemorySegment plainClosure;
-    private final MemorySegment vgClosure;
-    private MLXScope applyTarget;
     private boolean closed;
 
     private Fn(Function<MLXArray[], MLXArray[]> body, int[] argnums) {
-      this.body = body;
       this.argnums = argnums.clone();
+      this.upcall = new Upcall(body);
       // If anything below throws, this Fn is never returned to valueAndGrad's caller and has no
-      // Cleaner backstop (unlike MLXScope) -- so arena, and whichever of the two closures already
-      // exist, must be released here rather than leaking for the rest of the process. plain/vg are
-      // plain locals (not the this.* fields) precisely so the catch block below can see which of
-      // them got as far as being created, independent of whether the fields themselves ever get
-      // assigned.
+      // Holder yet to register with the Cleaner -- so arena, and whichever of the two closures
+      // already exist, must be released here rather than leaking for the rest of the process.
+      // plain/vg are plain locals (not Holder fields) precisely so this catch block can see which
+      // of them got as far as being created, independent of whether a Holder is ever built.
+      Arena arena = Arena.ofConfined();
       MemorySegment plain = null;
       MemorySegment vg = null;
       try {
-        mlx_closure_new_func$fun.Function upcall = this::onClosureInvoked;
-        MemorySegment funcPtr = mlx_closure_new_func$fun.allocate(upcall, arena);
+        mlx_closure_new_func$fun.Function upcallFn = upcall::onClosureInvoked;
+        MemorySegment funcPtr = mlx_closure_new_func$fun.allocate(upcallFn, arena);
         // mlx_closure_new_func is statusless: on failure it calls the error handler and returns a
         // null-ctx struct (closure.cpp's catch block), the same hazard class MLX.array/
         // MLX.newVectorArray already guard against explicitly. clearLastNativeError() must run
@@ -119,16 +241,14 @@ public final class MLXGrad {
                   mlx_h.mlx_value_and_grad(
                       vgForLambda, plainForLambda, nativeArgnums, this.argnums.length));
         }
-        this.plainClosure = plain;
-        this.vgClosure = vg;
       } catch (Throwable t) {
-        // Mirrors close()'s own free order (vg before plain) before releasing the arena: the same
-        // ordering rule that method's javadoc calls load-bearing applies here too -- closing the
-        // arena while a closure's std::function still holds the upcall stub pointer leaves that
-        // closure dangling, even on a failure path where nothing will ever invoke it again.
-        // mlx_closure_free/mlx_closure_value_and_grad_free both no-op on a null ctx (private/
-        // closure.h), so the guards below only need to ask "did construction get this far", not
-        // "is the ctx itself valid".
+        // Mirrors Holder.closeAll()'s own free order (vg before plain) before releasing the arena:
+        // the same ordering rule that method's javadoc calls load-bearing applies here too --
+        // closing the arena while a closure's std::function still holds the upcall stub pointer
+        // leaves that closure dangling, even on a failure path where nothing will ever invoke it
+        // again. mlx_closure_free/mlx_closure_value_and_grad_free both no-op on a null ctx
+        // (private/closure.h), so the guards below only need to ask "did construction get this
+        // far", not "is the ctx itself valid".
         try {
           if (vg != null) {
             mlx_h.mlx_closure_value_and_grad_free(vg);
@@ -141,6 +261,8 @@ public final class MLXGrad {
         }
         throw t;
       }
+      this.holder = new Holder(arena, plain, vg);
+      this.cleanable = CLEANER.register(this, holder::closeAll);
     }
 
     /**
@@ -161,7 +283,7 @@ public final class MLXGrad {
       for (int i = 0; i < primals.length; i++) {
         handles[i] = primals[i].handle();
       }
-      applyTarget = target;
+      upcall.applyTarget = target;
       ESCAPED.remove();
       try (Arena tmp = Arena.ofConfined()) {
         MemorySegment inputVec = MLX.newVectorArray(handles, tmp);
@@ -176,7 +298,7 @@ public final class MLXGrad {
         try {
           NativeOps.checked(
               "valueAndGrad.apply",
-              () -> mlx_h.mlx_closure_value_and_grad_apply(res0, res1, vgClosure, inputVec));
+              () -> mlx_h.mlx_closure_value_and_grad_apply(res0, res1, holder.vgClosure, inputVec));
           MLXArray[] values = unpackVector(res0, target);
           MLXArray[] grads = unpackVector(res1, target);
           return new Result(List.of(values), List.of(grads));
@@ -189,7 +311,7 @@ public final class MLXGrad {
           mlx_h.mlx_vector_array_free(res1);
         }
       } finally {
-        applyTarget = null;
+        upcall.applyTarget = null;
         // Defensive, not load-bearing under the current control flow (every path that sets ESCAPED
         // is already drained by rethrowEscapedOr on the failure path): clearing it here too means a
         // stashed Throwable can never outlive one apply() call and pin the MLXArrays/scopes it may
@@ -212,49 +334,9 @@ public final class MLXGrad {
         throw e;
       }
       // body is a Function<MLXArray[], MLXArray[]>, which declares no checked exceptions --
-      // unreachable in
-      // practice, kept only because the catch (Throwable) below can technically observe one via
-      // sneaky-throw.
+      // unreachable in practice, kept only because the catch (Throwable) below can technically
+      // observe one via sneaky-throw.
       throw new MLXException("valueAndGrad: body threw a checked exception", escaped);
-    }
-
-    /**
-     * The upcall body: {@code int fun(mlx_vector_array* res, const mlx_vector_array in)}. Runs
-     * synchronously on the {@link #apply} caller's thread (confirmed: req/phase4-plan.md Probe
-     * 0b(c)), so the {@link MLXArray}s it builds are confined to that thread like any other. Never
-     * lets a {@link Throwable} escape past this frame -- catches everything, stashes it on {@link
-     * #ESCAPED}, and returns {@code 1}, a supported non-leaking mlx-c error path
-     * (req/phase4-plan.md Research findings, {@code closure.cpp:44-51}).
-     */
-    private int onClosureInvoked(MemorySegment res, MemorySegment in) {
-      try {
-        MLXArray[] primalsIn = unpackVector(in, applyTarget);
-        MLXArray[] result = body.apply(primalsIn);
-        if (result == null || result.length == 0 || result[0].ndim() != 0) {
-          int rank = result == null || result.length == 0 ? -1 : result[0].ndim();
-          throw new IllegalArgumentException(
-              "valueAndGrad: body's first returned array must be rank-0 (a reduced "
-                  + "scalar loss), got rank "
-                  + rank);
-        }
-        MemorySegment[] handles = new MemorySegment[result.length];
-        for (int i = 0; i < result.length; i++) {
-          if (result[i] == null) {
-            throw new IllegalArgumentException(
-                "valueAndGrad: body's returned array[" + i + "] is null");
-          }
-          handles[i] = result[i].handle();
-        }
-        try (Arena tmp = Arena.ofConfined()) {
-          MemorySegment buf = NativeOps.copyHandlesInto(handles, tmp);
-          NativeOps.checked(
-              "valueAndGrad", () -> mlx_h.mlx_vector_array_set_data(res, buf, handles.length));
-        }
-        return 0;
-      } catch (Throwable t) {
-        ESCAPED.set(t);
-        return 1;
-      }
     }
 
     private static MLXArray[] unpackVector(MemorySegment vec, MLXScope target) {
@@ -270,13 +352,11 @@ public final class MLXGrad {
     }
 
     /**
-     * Confined to the constructing thread, matching {@link MLXScope}/{@link MLXArray}. Frees both
-     * closures, then the arena backing the upcall stub -- order is load-bearing (req/phase4-plan.md
-     * §6): both closures' underlying {@code std::function}s hold the raw stub pointer until freed,
-     * so closing the arena first would leave a dangling stub inside a live closure. Each step runs
-     * even if an earlier one throws, so a failure never abandons the later frees (or the arena)
-     * permanently -- {@code close()} is otherwise a one-shot: once {@link #closed} flips, a
-     * partially-failed cleanup is not retried.
+     * Confined to the constructing thread, matching {@link MLXScope}/{@link MLXArray}. {@code
+     * close()} is otherwise a one-shot: once {@link #closed} flips, {@link Holder#closeAll} is not
+     * retried even if it previously threw partway through -- {@link Holder#closeAll} is itself
+     * idempotent, so calling it again from the {@link Cleaner} backstop after this method's
+     * explicit call is always safe.
      */
     @Override
     public void close() {
@@ -285,21 +365,17 @@ public final class MLXGrad {
         return;
       }
       closed = true;
-      try {
-        NativeOps.checked(
-            "valueAndGrad.close", () -> mlx_h.mlx_closure_value_and_grad_free(vgClosure));
-      } finally {
-        try {
-          NativeOps.checked("valueAndGrad.close", () -> mlx_h.mlx_closure_free(plainClosure));
-        } finally {
-          arena.close();
-        }
-      }
+      holder.closeAll();
+      cleanable.clean();
     }
 
+    // Consults holder.isClosed() too, not just this Fn's own `closed` flag, for the same reason
+    // MLXScope.ensureOpen() does: the Cleaner backstop frees the closures without ever touching
+    // this Fn object, and flipping `closed` here would be the capture Holder/Cleaner split exists
+    // to avoid.
     private void ensureOpen() {
       checkThread();
-      if (closed) {
+      if (closed || holder.isClosed()) {
         throw new IllegalStateException("MLXGrad.Fn is closed");
       }
     }

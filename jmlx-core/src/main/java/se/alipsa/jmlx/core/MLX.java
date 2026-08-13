@@ -3,7 +3,6 @@ package se.alipsa.jmlx.core;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
@@ -13,8 +12,18 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Static facade over the mlx-c ops used by this slice. Every op here only builds the lazy computation graph; nothing
  * runs on the GPU/CPU until {@link #eval} (or the implicit eval inside {@link MLXArray#toFloatArray()}) triggers it.
- * See req/initial-plan.md §7 and req/phase3-plan.md, which describes the broadcast/matmul guards, the additional ops,
- * and the {@code mlx_vector_array}-based {@link #eval} added in this phase.
+ * See req/initial-plan.md §7, req/phase3-plan.md and req/phase4-plan.md §1.
+ *
+ * <p>
+ * req/phase4-plan.md M0a split this class: it keeps array creation ({@code array}; {@code zeros}/{@code ones}/
+ * {@code full}/{@code arange} added in M0d), {@code eval}, {@code astype} (added in M0c) and the default device/stream
+ * accessors; every other op moved to a sibling in this package, split by kind -- {@link MLXOps}
+ * (elementwise/comparisons/reductions/{@code matmul}/{@code inner}/{@code outer}), {@link MLXShape}
+ * ({@code reshape}/{@code broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the
+ * {@code fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant}
+ * ({@code quantize}/{@code dequantize}/{@code quantizedMatmul}) and {@link MLXRandom}
+ * ({@code seed}/{@code normal}/{@code uniform}). This class does not delegate to them -- duplicating their javadoc here
+ * would double the evidence base and let one copy go stale.
  *
  * <p>
  * Every op's result is allocated in the same scope as its first {@code MLXArray} operand; {@link #array} takes the
@@ -23,7 +32,9 @@ import se.alipsa.jmlx.memory.MLXScope;
  * <p>
  * {@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever mlx-c's own default device
  * is at first use, and cached for the process lifetime -- this slice does not expose device switching, so there is no
- * stale-cache hazard in practice.
+ * stale-cache hazard in practice. The resolved values live in {@link NativeOps}, which every op class (including this
+ * one, for {@code eval}) needs direct access to; these methods are the public read of that shared state, not a
+ * delegated op body.
  */
 public final class MLX {
 
@@ -39,30 +50,14 @@ public final class MLX {
     NativeLoader.ensureLoaded();
   }
 
-  private static final Arena FACADE_ARENA = Arena.ofShared();
-  private static final MemorySegment DEFAULT_DEVICE = resolveDefaultDevice();
-  private static final MemorySegment DEFAULT_STREAM = resolveDefaultStream();
-
-  private static MemorySegment resolveDefaultDevice() {
-    MemorySegment dev = mlx_h.mlx_device_new(FACADE_ARENA);
-    checked(() -> mlx_h.mlx_get_default_device(dev));
-    return dev;
-  }
-
-  private static MemorySegment resolveDefaultStream() {
-    MemorySegment stream = mlx_h.mlx_stream_new(FACADE_ARENA);
-    checked(() -> mlx_h.mlx_get_default_stream(stream, DEFAULT_DEVICE));
-    return stream;
-  }
-
   /** Opaque {@code mlx_device} handle; valid for the process lifetime. */
   public static MemorySegment defaultDevice() {
-    return DEFAULT_DEVICE;
+    return NativeOps.defaultDevice();
   }
 
   /** Opaque {@code mlx_stream} handle; valid for the process lifetime. */
   public static MemorySegment defaultStream() {
-    return DEFAULT_STREAM;
+    return NativeOps.DEFAULT_STREAM;
   }
 
   /** Creates a FLOAT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}. */
@@ -88,368 +83,179 @@ public final class MLX {
       MemorySegment handle =
           mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_FLOAT32());
       if (mlx_array_.ctx(handle).address() == 0) {
-        throw nativeFailure("mlx_array_new_data");
+        throw NativeOps.nativeFailure("mlx_array_new_data");
       }
       return new MLXArray(scope, handle);
     }
   }
 
-  /** Elementwise sum of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
-  public static MLXArray add(MLXArray a, MLXArray b) {
-    requireBroadcastCompatible(a, b, "add");
-    return addUnchecked(a, b);
-  }
-
-  /** Elementwise difference of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
-  public static MLXArray subtract(MLXArray a, MLXArray b) {
-    requireBroadcastCompatible(a, b, "subtract");
-    return binaryOp("subtract", a, b, mlx_h::mlx_subtract);
-  }
-
-  /** Elementwise product of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
-  public static MLXArray multiply(MLXArray a, MLXArray b) {
-    requireBroadcastCompatible(a, b, "multiply");
-    return binaryOp("multiply", a, b, mlx_h::mlx_multiply);
-  }
-
-  /** Elementwise quotient of {@code a} and {@code b}, broadcasting their shapes per NumPy's rules if they differ. */
-  public static MLXArray divide(MLXArray a, MLXArray b) {
-    requireBroadcastCompatible(a, b, "divide");
-    return binaryOp("divide", a, b, mlx_h::mlx_divide);
-  }
-
-  /**
-   * Matrix product of {@code a} and {@code b}. Either may be rank-1 (promoted internally, matching mlx's own
-   * vector-matrix / matrix-vector rules); rank &ge; 2 operands batch-broadcast over every axis but the last two. Rank-0
-   * operands are rejected, as mlx itself rejects them. Both operands must have an inexact dtype (see
-   * {@link DType#isInexact()}); see {@link #requireMatmulCompatible} for how that check relates to native's rule.
-   */
-  public static MLXArray matmul(MLXArray a, MLXArray b) {
-    requireMatmulCompatible(a, b);
-    return binaryOp("matmul", a, b, mlx_h::mlx_matmul);
-  }
-
-  /**
-   * NumPy broadcast compatibility between {@code a} and {@code b}, right-aligned: for every dimension pair, one of
-   * {@code d1 == d2}, {@code d1 == 1} or {@code d2 == 1} must hold (upstream {@code mlx/utils.cpp:136-167},
-   * {@code broadcast_shapes}). Deliberately written as {@code d1 == 1}/{@code d2 == 1}, not {@code d1 <= 1}/
-   * {@code d2 <= 1}: the latter would wrongly accept a {@code 0} dimension against a {@code 3}, which native rejects.
-   */
-  private static void requireBroadcastCompatible(MLXArray a, MLXArray b, String op) {
-    int[] sa = a.shape();
-    int[] sb = b.shape();
-    int n = Math.max(sa.length, sb.length);
-    for (int i = 0; i < n; i++) {
-      int da = i < n - sa.length ? 1 : sa[i - (n - sa.length)];
-      int db = i < n - sb.length ? 1 : sb[i - (n - sb.length)];
-      if (da != db && da != 1 && db != 1) {
-        throw new IllegalArgumentException(
-            op + ": incompatible shapes " + java.util.Arrays.toString(sa) + " and " + java.util.Arrays.toString(sb));
-      }
-    }
-  }
-
-  /**
-   * Mirrors {@code matmul}'s real native rules (upstream {@code ops.cpp:3192-3267}), in evaluation order: reject rank-0
-   * on either operand; promote a rank-1 {@code a} to {@code [1, a.shape(0)]} and a rank-1 {@code b} to
-   * {@code [b.shape(0), 1]} (mlx's own {@code expand_dims}); compare the inner dimension on the <em>promoted</em>
-   * shapes, not the raw ones -- indexing {@code b.shape(-2)} on a raw rank-1 {@code b} would be out of bounds; require
-   * {@link DType#isInexact()} on both operands; then require the batch dimensions (every axis but the last two of the
-   * promoted shapes) to be broadcast-compatible.
-   *
-   * <p>
-   * The dtype check here is <em>per-operand</em>: it requires each of {@code a} and {@code b} to independently be
-   * inexact. Native's actual rule is {@code issubdtype(out_type, inexact)} on the <em>promoted</em> type of the pair,
-   * not on each operand separately. The two rules diverge only for a mixed exact/inexact pair whose promoted type is
-   * still inexact -- e.g. float32 + int32, where {@code promote_types(float32, int32) == float32} -- which native would
-   * accept (promoting the int32 operand) but this per-operand check would reject. That divergence is unreachable today:
-   * nothing in this facade constructs an {@code INT32} array yet, so this method can only ever be called with operands
-   * that are already both inexact or both exact. Revisit this check in the same commit that adds an
-   * {@code astype}/int-array-construction path, so a real mixed-dtype pair can actually reach this method.
-   */
-  private static void requireMatmulCompatible(MLXArray a, MLXArray b) {
-    int[] sa = a.shape();
-    int[] sb = b.shape();
-    if (sa.length == 0 || sb.length == 0) {
-      throw new IllegalArgumentException("matmul: rank-0 operand not supported (shapes " + java.util.Arrays.toString(sa)
-          + " and " + java.util.Arrays.toString(sb) + ")");
-    }
-    int[] pa = sa.length == 1 ? new int[] {1, sa[0]} : sa;
-    int[] pb = sb.length == 1 ? new int[] {sb[0], 1} : sb;
-    if (pa[pa.length - 1] != pb[pb.length - 2]) {
-      throw new IllegalArgumentException(
-          "matmul: incompatible shapes " + java.util.Arrays.toString(sa) + " and " + java.util.Arrays.toString(sb));
-    }
-    if (!a.dtype().isInexact() || !b.dtype().isInexact()) {
-      throw new IllegalArgumentException("matmul: requires inexact dtypes, got " + a.dtype() + " and " + b.dtype());
-    }
-    int batchA = pa.length - 2;
-    int batchB = pb.length - 2;
-    int batchDims = Math.max(batchA, batchB);
-    for (int i = 0; i < batchDims; i++) {
-      int da = i < batchDims - batchA ? 1 : pa[i - (batchDims - batchA)];
-      int db = i < batchDims - batchB ? 1 : pb[i - (batchDims - batchB)];
-      if (da != db && da != 1 && db != 1) {
-        throw new IllegalArgumentException("matmul: incompatible batch dimensions " + java.util.Arrays.toString(sa)
-            + " and " + java.util.Arrays.toString(sb));
-      }
-    }
-  }
-
-  /**
-   * Directional broadcast check for {@code broadcastTo(a, targetShape)}: requires
-   * {@code broadcast_shapes(a.shape(), targetShape) == targetShape} (upstream {@code ops.cpp:1601-1613}), which is
-   * <em>not</em> the symmetric predicate {@link #requireBroadcastCompatible} uses -- {@code broadcastTo([3], [1])}
-   * satisfies the symmetric rule but native rejects it. Also rejects any negative element of {@code targetShape}
-   * outright, independent of the shape arithmetic: {@code broadcastTo([1], [-1])} would otherwise pass here, since
-   * {@code 1 == 1} makes the directional check succeed too, and the failure would surface as {@link MLXException} from
-   * native instead of {@link IllegalArgumentException} from Java.
-   */
-  private static void requireBroadcastableTo(MLXArray a, int[] targetShape) {
-    for (int t : targetShape) {
-      if (t < 0) {
-        throw new IllegalArgumentException(
-            "broadcastTo: target shape " + java.util.Arrays.toString(targetShape) + " has a negative dimension");
-      }
-    }
-    int[] sa = a.shape();
-    if (sa.length > targetShape.length) {
-      throw new IllegalArgumentException("broadcastTo: cannot broadcast " + java.util.Arrays.toString(sa) + " to "
-          + java.util.Arrays.toString(targetShape));
-    }
-    int diff = targetShape.length - sa.length;
-    for (int i = 0; i < sa.length; i++) {
-      int ad = sa[i];
-      int td = targetShape[i + diff];
-      if (ad != td && ad != 1) {
-        throw new IllegalArgumentException("broadcastTo: cannot broadcast " + java.util.Arrays.toString(sa) + " to "
-            + java.util.Arrays.toString(targetShape));
-      }
-    }
-  }
-
-  /**
-   * Skips the Java-side shape check {@link #add} otherwise applies before ever reaching native. Deliberate bypass
-   * (req/initial-plan.md, Testing approach) so a test can exercise a genuine native error path and prove it surfaces as
-   * {@link MLXException} rather than a process abort.
-   */
-  static MLXArray addUnchecked(MLXArray a, MLXArray b) {
-    return binaryOp("add", a, b, mlx_h::mlx_add);
-  }
-
-  private static MLXArray binaryOp(String opName, MLXArray a, MLXArray b, BinaryOp op) {
-    MLXScope scope = a.scope();
-    // The result is allocated in a's scope; without this check, b's scope
-    // (and its thread-confinement guard) is never touched at all -- b.handle()
-    // below reads it directly -- so an operand from another (possibly
-    // another thread's) scope would silently bypass MLXScope's confinement
-    // contract instead of being rejected here.
-    if (scope != b.scope()) {
-      throw new IllegalArgumentException(opName + ": operands belong to different MLXScopes");
-    }
-    MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(opName, () -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
-    return new MLXArray(scope, res);
-  }
-
-  @FunctionalInterface
-  private interface BinaryOp {
-    int apply(MemorySegment res, MemorySegment a, MemorySegment b, MemorySegment stream);
-  }
-
-  private static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
-    MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
-    return new MLXArray(scope, res);
-  }
-
-  @FunctionalInterface
-  private interface UnaryOp {
-    int apply(MemorySegment res, MemorySegment a, MemorySegment stream);
-  }
-
-  /**
-   * Wraps the {@code (res, a, const int*, size_t, stream)} native shape shared by {@code mlx_broadcast_to},
-   * {@code mlx_squeeze_axes} and {@code mlx_transpose_axes}: a confined {@link Arena} owns {@code param}'s native copy
-   * for the lifetime of the call, exactly as {@link #reshape} inlines it for {@code mlx_reshape}.
-   */
-  private static MLXArray shapeOp(String opName, MLXArray a, int[] param, ShapeOp op) {
-    MLXScope scope = a.scope();
-    try (Arena tmp = Arena.ofConfined()) {
-      MemorySegment nativeParam = tmp.allocateFrom(ValueLayout.JAVA_INT, param);
-      MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked(opName, () -> op.apply(res, a.handle(), nativeParam, param.length, DEFAULT_STREAM));
-      return new MLXArray(scope, res);
-    }
-  }
-
-  @FunctionalInterface
-  private interface ShapeOp {
-    int apply(MemorySegment res, MemorySegment a, MemorySegment param, long paramNum, MemorySegment stream);
-  }
-
-  /** Elementwise natural exponential. */
-  public static MLXArray exp(MLXArray a) {
-    return unaryOp("exp", a, mlx_h::mlx_exp);
-  }
-
-  /** Elementwise natural logarithm. */
-  public static MLXArray log(MLXArray a) {
-    return unaryOp("log", a, mlx_h::mlx_log);
-  }
-
-  /** Elementwise sine. */
-  public static MLXArray sin(MLXArray a) {
-    return unaryOp("sin", a, mlx_h::mlx_sin);
-  }
-
-  /** Elementwise cosine. */
-  public static MLXArray cos(MLXArray a) {
-    return unaryOp("cos", a, mlx_h::mlx_cos);
-  }
-
-  /** Sums every element to a rank-0 scalar array. */
-  public static MLXArray sum(MLXArray a) {
-    // mlx_sum(res, a, keepdims, s) carries an extra bool beyond unaryOp's
-    // (res, a, stream) shape, so it does not fit that helper -- kept as its
-    // own body rather than forcing it through a shape unaryOp doesn't have.
-    MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked("sum", () -> mlx_h.mlx_sum(res, a.handle(), false, DEFAULT_STREAM));
-    return new MLXArray(scope, res);
-  }
-
-  /**
-   * Generalized inner product of {@code a} and {@code b}: contracts their last axes, matching {@code mlx_inner} (and
-   * NumPy's {@code inner}). Requires {@code a.shape()[-1] == b.shape()[-1]} unless either operand is rank-0, in which
-   * case native treats the call as a scalar multiply and no last axis exists on that side to compare.
-   */
-  public static MLXArray inner(MLXArray a, MLXArray b) {
-    int[] sa = a.shape();
-    int[] sb = b.shape();
-    if (sa.length > 0 && sb.length > 0 && sa[sa.length - 1] != sb[sb.length - 1]) {
-      throw new IllegalArgumentException("inner: last dimensions disagree: " + java.util.Arrays.toString(sa) + " and "
-          + java.util.Arrays.toString(sb));
-    }
-    return binaryOp("inner", a, b, mlx_h::mlx_inner);
-  }
-
-  /**
-   * Outer product of {@code a} and {@code b}: every pairwise product of their flattened elements, matching
-   * {@code mlx_outer}. Guards {@code a.size() <= Integer.MAX_VALUE} because native reshapes {@code a} via a
-   * {@code static_cast<int>(a.size())} with no bounds check of its own (upstream {@code ops.cpp:5448-5451}); {@code b}
-   * goes through {@code flatten} instead, which needs no such cast, so the guard is deliberately one-sided.
-   */
-  public static MLXArray outer(MLXArray a, MLXArray b) {
-    if (a.size() > Integer.MAX_VALUE) {
-      throw new IllegalArgumentException("outer: a has " + a.size() + " elements, exceeding Integer.MAX_VALUE");
-    }
-    return binaryOp("outer", a, b, mlx_h::mlx_outer);
-  }
-
-  /** Reshapes {@code a} to {@code shape}, which must have the same total element count. */
-  public static MLXArray reshape(MLXArray a, int[] shape) {
-    long targetSize = 1;
+  /** Creates an INT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}. */
+  public static MLXArray array(MLXScope scope, int[] data, int[] shape) {
+    long expected = 1;
     for (int dim : shape) {
-      targetSize *= dim;
+      expected *= dim;
     }
-    if (targetSize != a.size()) {
-      throw new IllegalArgumentException("reshape: shape " + java.util.Arrays.toString(shape) + " (size " + targetSize
-          + ") does not match array size " + a.size());
+    if (expected != data.length) {
+      throw new IllegalArgumentException("shape " + java.util.Arrays.toString(shape) + " (size " + expected
+          + ") does not match data length " + data.length);
     }
-    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeData = tmp.allocateFrom(ValueLayout.JAVA_INT, data);
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      // Same statusless-failure hazard as the float[] overload above.
+      NativeLoader.clearLastNativeError();
+      MemorySegment handle = mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_INT32());
+      if (mlx_array_.ctx(handle).address() == 0) {
+        throw NativeOps.nativeFailure("mlx_array_new_data");
+      }
+      return new MLXArray(scope, handle);
+    }
+  }
+
+  /** Creates a {@code shape}-shaped {@code dtype} array of zeros in {@code scope}. */
+  public static MLXArray zeros(MLXScope scope, int[] shape, DType dtype) {
+    MemorySegment res = mlx_h.mlx_array_new(scope);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
-      MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked("reshape", () -> mlx_h.mlx_reshape(res, a.handle(), nativeShape, shape.length, DEFAULT_STREAM));
-      return new MLXArray(scope, res);
+      NativeOps.checked("zeros",
+          () -> mlx_h.mlx_zeros(res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
     }
+    return new MLXArray(scope, res);
   }
 
-  /** Broadcasts {@code a} to {@code targetShape}, per NumPy's directional broadcasting rules. */
-  public static MLXArray broadcastTo(MLXArray a, int[] targetShape) {
-    requireBroadcastableTo(a, targetShape);
-    return shapeOp("broadcastTo", a, targetShape, mlx_h::mlx_broadcast_to);
-  }
-
-  /** Removes every size-1 axis from {@code a}'s shape. */
-  public static MLXArray squeeze(MLXArray a) {
-    return unaryOp("squeeze", a, mlx_h::mlx_squeeze);
-  }
-
-  /** Removes the given {@code axes} from {@code a}'s shape; native requires each to currently have size 1. */
-  public static MLXArray squeeze(MLXArray a, int[] axes) {
-    return shapeOp("squeeze", a, axes, mlx_h::mlx_squeeze_axes);
-  }
-
-  /** Reverses every axis. */
-  public static MLXArray transpose(MLXArray a) {
-    return unaryOp("transpose", a, mlx_h::mlx_transpose);
-  }
-
-  /** Permutes {@code a}'s axes according to {@code axes}, a permutation of {@code 0 .. a.ndim() - 1}. */
-  public static MLXArray transpose(MLXArray a, int[] axes) {
-    return shapeOp("transpose", a, axes, mlx_h::mlx_transpose_axes);
+  /** Creates a {@code shape}-shaped {@code dtype} array of ones in {@code scope}. */
+  public static MLXArray ones(MLXScope scope, int[] shape, DType dtype) {
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      NativeOps.checked("ones",
+          () -> mlx_h.mlx_ones(res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    }
+    return new MLXArray(scope, res);
   }
 
   /**
-   * Slices {@code a} along every axis using {@code start} (inclusive) and {@code stop} (exclusive), with every axis
-   * implicitly strided by 1. Equivalent to {@link #slice(MLXArray, int[], int[], int[])} with an all-ones
-   * {@code strides}.
+   * Creates a {@code shape}-shaped {@code dtype} array filled with {@code value}, in {@code scope}. Not a pure creation
+   * op (req/phase4-plan.md §3): {@code mlx_full}'s fill value is itself an {@code mlx_array} (upstream
+   * {@code ops.h:437-443}), so {@code value} first becomes a throwaway scalar via mlx-c's own statusless
+   * {@code mlx_array_new_bool}/{@code _int}/{@code _float32} (picked by {@code dtype}) -- the same null-ctx-on-failure
+   * hazard {@link #array} already handles -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only
+   * reads it, it does not adopt it.
+   *
+   * <p>
+   * Rejects a {@code value} unrepresentable in {@code dtype} when {@code dtype == UINT32}: that branch funnels through
+   * {@code mlx_array_new_float32} and lets mlx narrow the float32 scalar to {@code uint32_t} itself, and per
+   * [conv.fpint]/1 a float-to-integer conversion is undefined behaviour whenever the truncated value does not fit the
+   * target type -- not only for negatives, but also for {@code NaN} and any value {@code >= 2^32}. {@code INT32} has no
+   * equivalent hole: its branch narrows via Java's own {@code (int) value} cast first, which JLS 5.1.3 defines as
+   * saturating with {@code NaN -> 0}, before the value ever reaches native.
    */
-  public static MLXArray slice(MLXArray a, int[] start, int[] stop) {
-    requireSliceLengths(a, start, stop, null);
-    int[] strides = new int[a.ndim()];
-    java.util.Arrays.fill(strides, 1);
-    return sliceNative(a, start, stop, strides);
-  }
-
-  /**
-   * Slices {@code a} along every axis using {@code start} (inclusive), {@code stop} (exclusive) and {@code strides}.
-   * Mirrors native's own {@code normalize_slice} (upstream {@code ops.cpp:656-696}): negative {@code start}/
-   * {@code stop} are normalized NumPy-style ({@code n + i}); a negative stride reverses that axis; {@code stop} is
-   * clamped to the axis length rather than bounds-checked. A zero stride is division-by-zero -- C++ undefined behaviour
-   * reachable from this call, silently returning an empty axis on Apple Silicon rather than crashing or erroring -- so
-   * it is rejected here with a message phrased after NumPy's own ("slice step cannot be zero") rather than as a
-   * jmlx-specific restriction.
-   */
-  public static MLXArray slice(MLXArray a, int[] start, int[] stop, int[] strides) {
-    requireSliceLengths(a, start, stop, strides);
-    for (int i = 0; i < strides.length; i++) {
-      if (strides[i] == 0) {
-        throw new IllegalArgumentException("slice: strides[" + i + "] must not be 0 (slice step cannot be zero)");
+  public static MLXArray full(MLXScope scope, int[] shape, float value, DType dtype) {
+    if (dtype == DType.UINT32 && !(value >= 0 && value < 4294967296f)) {
+      throw new IllegalArgumentException("full: value " + value + " cannot fill a UINT32 array");
+    }
+    try (Arena tmp = Arena.ofConfined()) {
+      // Same statusless-failure hazard as MLX.array's overloads: these
+      // constructors signal failure only via the error handler plus a
+      // null-ctx return, not a status checked() can see.
+      NativeLoader.clearLastNativeError();
+      MemorySegment scalar = switch (dtype) {
+        case BOOL -> mlx_h.mlx_array_new_bool(tmp, value != 0f);
+        case INT32 -> mlx_h.mlx_array_new_int(tmp, (int) value);
+        default -> mlx_h.mlx_array_new_float32(tmp, value);
+      };
+      if (mlx_array_.ctx(scalar).address() == 0) {
+        throw NativeOps.nativeFailure("full: mlx_array_new_" + dtype);
+      }
+      try {
+        MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+        MemorySegment res = mlx_h.mlx_array_new(scope);
+        NativeOps.checked("full", () -> mlx_h.mlx_full(res, nativeShape, shape.length, scalar, dtype.nativeValue(),
+            NativeOps.DEFAULT_STREAM));
+        return new MLXArray(scope, res);
+      } finally {
+        mlx_h.mlx_array_free(scalar);
       }
     }
-    return sliceNative(a, start, stop, strides);
   }
 
   /**
-   * Mirrors upstream's own length check ({@code ops.cpp:757-763}, {@code "[slice] Invalid number of indices or
-   * strides for array with dimension N."}) but names which of {@code start}/{@code stop}/{@code strides} disagreed.
-   * {@code strides} is {@code null} for the 3-arg {@link #slice(MLXArray, int[], int[])} overload, which synthesizes an
-   * all-ones {@code strides} of the correct length itself and so has nothing to check there.
+   * Creates a {@code dtype} array in {@code scope} counting from {@code start} to {@code stop} (exclusive) by
+   * {@code step}.
+   *
+   * <p>
+   * Rejects {@code step == 0} in Java: upstream {@code mlx::core::arange} (v0.31.2 {@code mlx/ops.cpp}) validates NaN
+   * in any of {@code start}/{@code stop}/{@code step} and infinite {@code start}/{@code stop} up front -- an infinite
+   * {@code step} is special-cased into an early return rather than rejected -- but only ever computes
+   * {@code real_size = ceil((stop - start) / step)} afterward -- so {@code step == 0} with {@code stop == start}
+   * reaches that division as {@code 0.0 / 0.0 == NaN}, which is not caught by the earlier checks or by the subsequent
+   * {@code real_size > INT_MAX} guard (a NaN comparison is always false), and flows into
+   * {@code static_cast<int>(real_size)} -- C++ undefined behaviour for a NaN operand, the same UB class
+   * {@link MLXShape#slice(MLXArray, int[], int[], int[])}'s zero-stride guard exists for.
    */
-  private static void requireSliceLengths(MLXArray a, int[] start, int[] stop, int[] strides) {
-    int nd = a.ndim();
-    if (start.length != nd || stop.length != nd || (strides != null && strides.length != nd)) {
-      throw new IllegalArgumentException("slice: start (length " + start.length + "), stop (length " + stop.length + ")"
-          + (strides != null ? ", strides (length " + strides.length + ")" : "") + " must all equal a.ndim() (" + nd
-          + ")");
+  public static MLXArray arange(MLXScope scope, double start, double stop, double step, DType dtype) {
+    if (step == 0) {
+      throw new IllegalArgumentException("arange: step must not be 0");
     }
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("arange",
+        () -> mlx_h.mlx_arange(res, start, stop, step, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
   }
 
-  private static MLXArray sliceNative(MLXArray a, int[] start, int[] stop, int[] strides) {
-    MLXScope scope = a.scope();
-    try (Arena tmp = Arena.ofConfined()) {
-      MemorySegment nativeStart = tmp.allocateFrom(ValueLayout.JAVA_INT, start);
-      MemorySegment nativeStop = tmp.allocateFrom(ValueLayout.JAVA_INT, stop);
-      MemorySegment nativeStrides = tmp.allocateFrom(ValueLayout.JAVA_INT, strides);
-      MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked("slice", () -> mlx_h.mlx_slice(res, a.handle(), nativeStart, start.length, nativeStop, stop.length,
-          nativeStrides, strides.length, DEFAULT_STREAM));
-      return new MLXArray(scope, res);
+  /**
+   * Lifts {@code a} into {@code target}, which must be {@code a}'s own scope or an ancestor of it. Copy, not move:
+   * after the scope that owns {@code a} closes, use the returned array and never {@code a} again.
+   *
+   * <p>
+   * Safe even though {@code a}'s scope may close immediately after: an mlx {@code ArrayDesc} owns its graph inputs
+   * <em>by value</em>, and each {@code array} is a {@code shared_ptr<ArrayDesc>}, so the returned array holds a
+   * refcount on every input's descriptor. Freeing {@code a}'s own handle only decrements a refcount; it cannot touch
+   * the graph the lifted output still references (req/phase4-plan.md §2, Research findings).
+   *
+   * <p>
+   * {@code target == a.scope()} is legal and returns {@code a} itself -- {@code isAncestorOf} is reflexive.
+   * Deliberately identity, not a copy, in that case: source and target are the same scope, so both handles would die
+   * together anyway, and an unconditional hoist in a loop would otherwise accumulate one fresh handle per iteration in
+   * the target scope. Consequence: in the reflexive case the result <em>aliases</em> the argument, so closing one
+   * closes the other.
+   */
+  public static MLXArray hoist(MLXArray a, MLXScope target) {
+    MLXScope source = a.scope();
+    if (!target.isAncestorOf(source)) {
+      throw new IllegalArgumentException("hoist: target must be a's own scope or an ancestor of it");
     }
+    if (target == source) {
+      return a;
+    }
+    MemorySegment lifted = mlx_h.mlx_array_new(target);
+    NativeOps.checked("hoist", () -> mlx_h.mlx_array_set(lifted, a.handle()));
+    return new MLXArray(target, lifted);
+  }
+
+  /**
+   * Casts {@code a} to {@code dtype} (mlx-c's {@code mlx_astype}), allocating the result into {@code a}'s own scope.
+   * See req/phase4-plan.md §4: this is what lets {@link MLXArray#toFloatArray()} read back {@code FLOAT16}/
+   * {@code BFLOAT16} arrays, and what makes a mixed inexact/exact {@link MLXOps#matmul} pair reachable rather than a
+   * case this facade could only assert was impossible.
+   */
+  public static MLXArray astype(MLXArray a, DType dtype) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("astype", () -> mlx_h.mlx_astype(res, a.handle(), dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /**
+   * {@code hoist(a, a.scope().parent())}. Throws {@link IllegalStateException} for an array in a root scope --
+   * deliberately not a {@link NullPointerException} from an unchecked {@code parent()} dereference.
+   */
+  public static MLXArray keep(MLXArray a) {
+    MLXScope parent = a.scope().parent();
+    if (parent == null) {
+      throw new IllegalStateException("MLXScope has no parent");
+    }
+    return hoist(a, parent);
   }
 
   // Not code evaluation: mirrors mlx-c's mlx_eval, which forces every
@@ -469,7 +275,7 @@ public final class MLX {
    * that case wasn't -- and structurally couldn't be -- exercised by this facade's measurement.
    *
    * <p>
-   * There is deliberately no same-scope check here (unlike {@link #binaryOp}): {@code eval} allocates no result, so
+   * There is deliberately no same-scope check here (unlike {@code binaryOp}): {@code eval} allocates no result, so
    * there is no "which scope owns the output" question to settle, and evaluating arrays from two scopes on one thread
    * is legitimate.
    *
@@ -495,7 +301,7 @@ public final class MLX {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment vec = newVectorArray(handles, tmp);
       try {
-        checked("eval", () -> mlx_h.mlx_eval(vec));
+        NativeOps.checked("eval", () -> mlx_h.mlx_eval(vec));
       } catch (MLXException e) {
         // Restores the per-array attribution the joint eval loses, by
         // re-evaluating the INDIVIDUAL handles via mlx_array_eval, not the
@@ -534,7 +340,7 @@ public final class MLX {
     // on failure (vector.cpp:41-54), the same hazard class MLX.array already
     // handles above. clearLastNativeError() must run immediately before this
     // call, not just before mlx_eval below, for the reason given in
-    // MLX.checked's javadoc: some entry points fire the error handler
+    // NativeOps.checked's javadoc: some entry points fire the error handler
     // without a status for checked() to see.
     NativeLoader.clearLastNativeError();
     MemorySegment vec = mlx_h.mlx_vector_array_new_data(allocator, buf, n);
@@ -543,7 +349,7 @@ public final class MLX {
     // varargs case -- but eval() never reaches here for n == 0 regardless,
     // since it returns before capturing handles.
     if (mlx_vector_array_.ctx(vec).address() == 0) {
-      throw nativeFailure("mlx_vector_array_new_data");
+      throw NativeOps.nativeFailure("mlx_vector_array_new_data");
     }
     return vec;
   }
@@ -565,7 +371,7 @@ public final class MLX {
       // below is fine -- string concatenation is not a capture.
       final MemorySegment h = handles[i];
       try {
-        checked(() -> mlx_h.mlx_array_eval(h));
+        NativeOps.checked(() -> mlx_h.mlx_array_eval(h));
       } catch (MLXException perArray) {
         MLXException attributed = new MLXException("eval: array[" + i + "] failed: " + perArray.getMessage(), perArray);
         attributed.addSuppressed(original);
@@ -573,35 +379,5 @@ public final class MLX {
       }
     }
     return original;
-  }
-
-  /**
-   * Runs a status-returning native call and throws {@link MLXException} on failure. Clears {@link NativeLoader}'s
-   * thread-local error message immediately before invoking {@code nativeCall}, not just after it fails: some entry
-   * points (see {@link #array}) fire the error handler without a status for this method to see. Without the
-   * clear-before step, a stale message left behind by one of those would sit there until the next failing checked call,
-   * which would then misreport it as its own.
-   */
-  static void checked(IntSupplier nativeCall) {
-    checked(null, nativeCall);
-  }
-
-  /**
-   * Same as {@link #checked(IntSupplier)}, but names {@code opName} in the failure message on a non-zero status.
-   * Package-private, not {@code private}: {@link MLXArray#toFloatArray()} is a cross-class caller with its own op-level
-   * name to attribute failures to.
-   */
-  static void checked(String opName, IntSupplier nativeCall) {
-    NativeLoader.clearLastNativeError();
-    int status = nativeCall.getAsInt();
-    if (status != 0) {
-      throw nativeFailure((opName == null ? "" : opName + ": ") + "mlx-c call failed with status " + status);
-    }
-  }
-
-  private static MLXException nativeFailure(String message) {
-    String nativeMessage = NativeLoader.lastNativeError();
-    NativeLoader.clearLastNativeError();
-    return new MLXException(message + (nativeMessage != null ? ": " + nativeMessage : ""));
   }
 }

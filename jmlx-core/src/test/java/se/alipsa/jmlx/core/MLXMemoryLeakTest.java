@@ -60,6 +60,44 @@ class MLXMemoryLeakTest {
     assertNoGrowthOver(MLXMemoryLeakTest::runIterationWithMultiArrayEval);
   }
 
+  /**
+   * See req/phase4-plan.md §2's {@code Holder} cascade + {@code removeChild} machinery: unlike the variants above, each
+   * iteration here creates a genuine {@link MLXScope#newChild()} of one long-lived parent (not a fresh root) and does a
+   * cross-scope {@code add} against a weight living in that parent, matching the shape of a real per-step decode loop.
+   * A missing {@code removeChild} call would accumulate dead {@code Holder} objects in the parent's children set -- a
+   * Java-heap leak this native-memory probe cannot see directly -- but a broken cascade or free path in that same
+   * machinery would still show up here as active-memory growth.
+   */
+  @Test
+  void activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent() {
+    try (MLXScope parent = new MLXScope()) {
+      MLXArray weight = MLX.array(parent, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
+      for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+        runChildScopeIteration(parent, weight);
+      }
+
+      long baseline = NativeMemoryProbe.activeMemoryBytes();
+
+      for (int i = 0; i < MEASURED_ITERATIONS; i++) {
+        runChildScopeIteration(parent, weight);
+      }
+
+      long after = NativeMemoryProbe.activeMemoryBytes();
+
+      assertTrue(after - baseline <= LEAK_THRESHOLD_BYTES,
+          "active memory grew from " + baseline + " to " + after + " bytes over " + MEASURED_ITERATIONS
+              + " per-iteration child scopes (threshold " + LEAK_THRESHOLD_BYTES + " bytes)");
+    }
+  }
+
+  private static void runChildScopeIteration(MLXScope parent, MLXArray weight) {
+    try (MLXScope child = parent.newChild()) {
+      MLXArray x = MLX.array(child, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
+      MLXArray y = MLXOps.add(x, weight);
+      MLX.eval(y);
+    }
+  }
+
   private static void assertNoGrowthOver(Runnable iteration) {
     for (int i = 0; i < WARMUP_ITERATIONS; i++) {
       iteration.run();
@@ -80,7 +118,7 @@ class MLXMemoryLeakTest {
   private static void runIterationRelyingOnScopeClose() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
-      MLXArray b = MLX.exp(a);
+      MLXArray b = MLXOps.exp(a);
       MLX.eval(b);
     }
   }
@@ -88,7 +126,7 @@ class MLXMemoryLeakTest {
   private static void runIterationClosingArraysExplicitly() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
-      MLXArray b = MLX.exp(a);
+      MLXArray b = MLXOps.exp(a);
       MLX.eval(b);
       b.close();
       a.close();
@@ -98,8 +136,8 @@ class MLXMemoryLeakTest {
   private static void runIterationWithMultiArrayEval() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
-      MLXArray b = MLX.exp(a);
-      MLXArray c = MLX.log(b);
+      MLXArray b = MLXOps.exp(a);
+      MLXArray c = MLXOps.log(b);
       MLX.eval(a, b, c);
     }
   }

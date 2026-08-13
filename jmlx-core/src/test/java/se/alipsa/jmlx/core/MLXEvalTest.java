@@ -31,7 +31,7 @@ class MLXEvalTest {
     try (MLXScope scope1 = new MLXScope(); MLXScope scope2 = new MLXScope()) {
       MLXArray a = MLX.array(scope1, new float[] {1f, 2f, 3f}, new int[] {3});
       MLXArray b = MLX.array(scope2, new float[] {4f, 5f, 6f}, new int[] {3});
-      MLXArray c = MLX.exp(a);
+      MLXArray c = MLXOps.exp(a);
       assertDoesNotThrow(() -> MLX.eval(a, b, c));
       assertArrayEquals(new float[] {4f, 5f, 6f}, b.toFloatArray());
     }
@@ -41,7 +41,7 @@ class MLXEvalTest {
   void evalTwiceIsIdempotent() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1f, 2f, 3f}, new int[] {3});
-      MLXArray b = MLX.exp(a);
+      MLXArray b = MLXOps.exp(a);
       assertDoesNotThrow(() -> MLX.eval(a, b));
       // Second eval hits mlx's "already scheduled" fast path (array::eval()
       // is a wait() the second time around, upstream array.cpp:154-161) --
@@ -62,7 +62,7 @@ class MLXEvalTest {
       MLXArray good1 = MLX.array(scope, new float[] {1f, 2f, 3f}, new int[] {3});
       float[] big = new float[1 << 20];
       MLXArray a = MLX.array(scope, big, new int[] {1 << 20});
-      MLXArray bad = MLX.outer(a, a); // shape [2^20, 2^20]; ~4 TiB, never actually allocated
+      MLXArray bad = MLXOps.outer(a, a); // shape [2^20, 2^20]; ~4 TiB, never actually allocated
       MLXArray good2 = MLX.array(scope, new float[] {4f, 5f}, new int[] {2});
 
       MLXException e = assertThrows(MLXException.class, () -> MLX.eval(good1, bad, good2));

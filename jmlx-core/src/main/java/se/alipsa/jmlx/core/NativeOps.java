@@ -94,11 +94,14 @@ final class NativeOps {
     int apply(MemorySegment res, MemorySegment a, MemorySegment b, MemorySegment stream);
   }
 
-  static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
-    MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
+  static MLXArray unaryOp(String opName, MLXArray a, MLXScope target, UnaryOp op) {
+    MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    return new MLXArray(target, res);
+  }
+
+  static MLXArray unaryOp(String opName, MLXArray a, UnaryOp op) {
+    return unaryOp(opName, a, a.scope(), op);
   }
 
   @FunctionalInterface
@@ -145,6 +148,22 @@ final class NativeOps {
   interface ReduceOp {
     int apply(MemorySegment res, MemorySegment a, MemorySegment axes, long axesNum, boolean keepdims,
         MemorySegment stream);
+  }
+
+  /**
+   * Wraps the {@code (res, a, int, int, stream)} native shape shared by {@code mlx_swapaxes}: applies a
+   * two-argument-plus-stream operation.
+   */
+  static MLXArray axis2Op(String opName, MLXArray a, int axis1, int axis2, Axis2Op op) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    checked(opName, () -> op.apply(res, a.handle(), axis1, axis2, DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  @FunctionalInterface
+  interface Axis2Op {
+    int apply(MemorySegment res, MemorySegment a, int axis1, int axis2, MemorySegment stream);
   }
 
   /**

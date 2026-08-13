@@ -817,4 +817,55 @@ class MLXNumericTest {
       assertArrayEquals(new float[] {1, 3, 5, 7}, result.toFloatArray(), EPS);
     }
   }
+
+  @Test
+  void swapaxesSwapsTheGivenAxes() {
+    try (MLXScope scope = new MLXScope()) {
+      // [[1,2,3],[4,5,6]], swapaxes(0,1) -> [[1,4],[2,5],[3,6]]
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
+      MLXArray result = MLXShape.swapaxes(a, 0, 1);
+      assertArrayEquals(new int[] {3, 2}, result.shape());
+      assertArrayEquals(new float[] {1, 4, 2, 5, 3, 6}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void takeFlattenedArrayAtIndices() {
+    try (MLXScope scope = new MLXScope()) {
+      // [[1,2],[3,4]] flattened is [1,2,3,4]; take indices [0,3,1] -> [1,4,2]
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2});
+      MLXArray indices = MLX.array(scope, new int[] {0, 3, 1}, new int[] {3});
+      MLXArray result = MLXShape.take(a, indices);
+      assertArrayEquals(new int[] {3}, result.shape());
+      assertArrayEquals(new float[] {1, 4, 2}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void takeAxisSelectsSlicesAlongAnAxis() {
+    try (MLXScope scope = new MLXScope()) {
+      // [[1,2],[3,4],[5,6]], takeAxis along axis 0 with indices [2,0] -> [[5,6],[1,2]]
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {3, 2});
+      MLXArray indices = MLX.array(scope, new int[] {2, 0}, new int[] {2});
+      MLXArray result = MLXShape.takeAxis(a, indices, 0);
+      assertArrayEquals(new int[] {2, 2}, result.shape());
+      assertArrayEquals(new float[] {5, 6, 1, 2}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void transposeExplicitTargetAllocatesIntoTargetScope() {
+    try (MLXScope parent = new MLXScope()) {
+      MLXArray result;
+      try (MLXScope child = parent.newChild()) {
+        MLXArray a = MLX.array(child, new float[] {1, 2, 3, 4}, new int[] {2, 2});
+        result = MLXShape.transpose(a, parent);
+        assertSame(parent, result.scope());
+      }
+      // Close the child scope; now verify the result is still readable after the child is
+      // closed. This proves the view actually escaped the child before it closed, not just
+      // that the call didn't throw.
+      assertArrayEquals(new float[] {1, 3, 2, 4}, result.toFloatArray(), EPS);
+    }
+  }
 }

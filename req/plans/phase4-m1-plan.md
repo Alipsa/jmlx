@@ -505,20 +505,29 @@ public static MLXArray uniform(MLXScope scope, int[] shape, DType dtype, float l
   try (Arena tmp = Arena.ofConfined()) {
     MemorySegment lowScalar = float32Scalar("uniform", low, tmp);
     MemorySegment highScalar = float32Scalar("uniform", high, tmp);
-    MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
-    MemorySegment key = NativeOps.nullableHandle(null, tmp);
-    MemorySegment res = mlx_h.mlx_array_new(scope);
-    NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape,
-        shape.length, dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    try {
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      MemorySegment key = NativeOps.nullableHandle(null, tmp);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape,
+          shape.length, dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    } finally {
+      mlx_h.mlx_array_free(lowScalar);
+      mlx_h.mlx_array_free(highScalar);
+    }
   }
 }
 ```
 
-(`lowScalar`/`highScalar` need no explicit free — they were allocated from `tmp`, a confined `Arena`
-closed at the end of the `try`, unlike `full`'s scalar which is allocated from the same `tmp` used for
-the *shape* array too and freed early via its own `finally` for an unrelated reason specific to that
-method. Do not copy `full`'s `finally` here — there is nothing that needs freeing before `tmp` closes.)
+(**Corrected from an earlier draft of this plan, which incorrectly asserted `lowScalar`/`highScalar`
+need no explicit free.** `tmp` only owns the 8-byte `mlx_array_` struct each scalar constructor writes
+into; the heap-allocated `mlx::core::array` the struct's `ctx` points at is owned by mlx-c and freed
+solely by `mlx_array_free` — the exact invariant `MLXArray.toFloatArray()`'s javadoc documents and the
+exact reason `MLX.full` already wraps its own scalar construction in a `finally`. `mlx_random_uniform`
+takes `low`/`high` as `const mlx_array`, i.e. it borrows them rather than adopting them, so both
+scalars must be freed in a `finally` here too, mirroring `full`'s pattern rather than diverging from
+it.)
 
 This plan deliberately does **not** touch `MLX.full`'s existing scalar-construction code to share this
 new helper — `full` is already shipped and twice-reviewed (PR #5); leave it as is. The duplication this
@@ -782,7 +791,10 @@ the `Φ` restatement, since that is what the implementation actually computes.
 3. `grep -rn 'mlx_array_new(' jmlx-core/src/main` — every call site's allocator must be one of: a
    `scopeOf(...)` result, an explicit `MLXScope` parameter (creation ops, the new explicit-target
    `transpose`), or a confined `Arena` freed by a local `finally` (the read-back path, and the
-   `float32Scalar`/`nullableHandle` allocations in Task 4, which are confined-`Arena`-scoped and never
-   individually freed because the whole arena closes at the end of the `try`).
+   `nullableHandle` allocation in Task 4, which is a zero-filled struct with no native `ctx` heap
+   allocation behind it, so it is confined-`Arena`-scoped and never individually freed because the
+   whole arena closes at the end of the `try` -- unlike `float32Scalar`'s result, which DOES have a
+   `ctx` heap allocation and must be freed via `mlx_array_free` in a `finally`, exactly like `full`'s
+   scalar).
 4. `./gradlew :jmlx-core:test --tests '*MLXMemoryLeakTest*'` and, after Task 5,
    `--tests '*LinearTest*'` — no active-memory growth beyond the existing threshold.

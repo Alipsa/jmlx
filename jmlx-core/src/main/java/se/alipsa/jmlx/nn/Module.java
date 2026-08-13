@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SequencedMap;
 import java.util.Set;
 import se.alipsa.jmlx.core.MLXArray;
@@ -42,8 +43,10 @@ public abstract class Module {
    * {@code forward()}; see this class's javadoc for why.
    *
    * @throws IllegalStateException if this module is frozen, or if {@code name} is already registered
+   * @throws NullPointerException if {@code value} is {@code null}
    */
   protected final MLXArray param(String name, MLXArray value) {
+    Objects.requireNonNull(value, "param \"" + name + "\": value must not be null");
     if (frozen) {
       throw new IllegalStateException("Module is frozen: cannot register parameter \"" + name + "\"");
     }
@@ -84,7 +87,14 @@ public abstract class Module {
     return module;
   }
 
-  /** The {@link MLXScope} passed to this module's constructor. */
+  /**
+   * The {@link MLXScope} passed to this module's constructor -- WEIGHTS live here. {@code forward()} implementations
+   * must never allocate directly into this scope: a creation op called with {@code scope()}, or a single-operand op on
+   * a parameter (e.g. {@code astype(W)}, {@code transpose(W)}), allocates its result here and leaks it once per forward
+   * call, since this scope lives for the model's lifetime rather than closing per step. Target the activation's own
+   * scope instead (e.g. {@code x.scope()}), or use an op's explicit-target overload when the operand is a parameter
+   * rather than an activation.
+   */
   protected final MLXScope scope() {
     return scope;
   }
@@ -116,6 +126,7 @@ public abstract class Module {
    * "all-writes-then-all-notifies, not interleaved".
    *
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
+   * @throws NullPointerException if any value is {@code null}
    */
   public final void update(Map<String, MLXArray> byPath) {
     Set<Module> touched = new HashSet<>();
@@ -154,6 +165,7 @@ public abstract class Module {
    * {@link #freeze()}, since {@link #resolveAndWrite} never checks {@code frozen}.
    *
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
+   * @throws NullPointerException if any value is {@code null}
    */
   public final void rebind(SequencedMap<String, MLXArray> values) {
     for (Map.Entry<String, MLXArray> entry : values.entrySet()) {
@@ -162,8 +174,13 @@ public abstract class Module {
   }
 
   /**
-   * Called after {@link #update} writes one or more of this module's own parameters. Empty by default; subclasses
-   * override to react to a parameter change (e.g. invalidate a derived cache). Never called from {@link #rebind}.
+   * Called after {@link #update} writes one or more of this module's own parameters. Empty by default; never called
+   * from {@link #rebind}. Do NOT use this to cache a derived {@link MLXArray} view (e.g. a transposed weight) in a
+   * field: a not-yet-built autograd feature ({@code ModuleGrad}) will call {@link #rebind} to swap in traced primals
+   * around a loss call and restore them afterward without notifying this hook, so a cached view here would either leak
+   * (recomputed once per step in a scope that never closes, if the hook fired on restore) or dangle (if the recompute
+   * were suppressed). Read the current value fresh via {@link #param(String)} instead -- see this class's javadoc and
+   * req/phase4-plan.md §2 for the full analysis.
    */
   protected void onParametersUpdated() {}
 
@@ -172,6 +189,7 @@ public abstract class Module {
   // caller passed in, not just the trailing segment local to this module --
   // update/rebind's contract requires the exception to name the full path.
   private Module resolveAndWrite(String fullPath, String path, MLXArray value) {
+    Objects.requireNonNull(value, "parameter path \"" + fullPath + "\": value must not be null");
     int dot = path.indexOf('.');
     if (dot < 0) {
       if (!params.containsKey(path)) {

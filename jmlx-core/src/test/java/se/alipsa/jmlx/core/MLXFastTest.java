@@ -40,9 +40,11 @@ class MLXFastTest {
   }
 
   /**
-   * Mirrors the spec's Testing-approach row "layerNorm(x, weight, bias) with a null weight still picks the innermost of
-   * the non-null operands": weight is null and x/bias live in different scopes, so this exercises scopeOf's
-   * nullable-operand skip together with its cross-scope resolution, not just the null-weight null-mapping alone.
+   * {@code rmsNorm} has only two operands ({@code x}, {@code weight}), so with {@code weight == null} there is exactly
+   * one non-null operand -- this proves {@code scopeOf} reduces to {@code x}'s own scope when the other operand is
+   * skipped, not any cross-scope resolution (there is no second non-null operand in a different scope to resolve
+   * against here; see {@code layerNormWithXInAChildScopeAndNullWeightAndBiasInTheParentAllocatesIntoTheChild} below for
+   * that case).
    */
   @Test
   void rmsNormWithXInAChildScopeAndNullWeightAllocatesIntoTheChild() {
@@ -91,6 +93,27 @@ class MLXFastTest {
         MLXArray result = MLXFast.layerNorm(x, weight, bias, 1e-5f);
         assertSame(child, result.scope());
         assertArrayEquals(new float[] {-1.683282f, 0.105573f, 1.894427f, 3.683282f}, result.toFloatArray(), EPS);
+      }
+    }
+  }
+
+  /**
+   * The genuine cross-scope-plus-null-skip case: weight is null (skipped by scopeOf), x lives in a child scope, and
+   * bias lives in the parent scope -- a different scope from x. This exercises {@code scopeOf("layerNorm", x, weight,
+   * bias)} for real, with weight == null: the innermost of x's child scope and bias's ancestor parent scope is the
+   * child, so the result must land there even though one of the three operands is skipped and another is in an ancestor
+   * scope.
+   */
+  @Test
+  void layerNormWithXInAChildScopeAndNullWeightAndBiasInTheParentAllocatesIntoTheChild() {
+    try (MLXScope parent = new MLXScope()) {
+      MLXArray bias = MLX.array(parent, new float[] {1, 1, 1, 1}, new int[] {4});
+      try (MLXScope child = parent.newChild()) {
+        MLXArray x = MLX.array(child, new float[] {1, 2, 3, 4}, new int[] {4});
+        // mean=2.5, var=1.25 (exact), std=sqrt(1.25)~=1.118034, (x-mean)/std + 1:
+        MLXArray result = MLXFast.layerNorm(x, null, bias, 1e-5f);
+        assertSame(child, result.scope());
+        assertArrayEquals(new float[] {-0.341641f, 0.552786f, 1.447214f, 2.341641f}, result.toFloatArray(), EPS);
       }
     }
   }

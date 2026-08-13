@@ -650,6 +650,31 @@ class MLXNumericTest {
     }
   }
 
+  /**
+   * All other sum/mean-with-axes tests above pass a single-element {@code axes} array (e.g. {@code {0}} or {@code {1}})
+   * -- nothing in those would catch a bug where the implementation passed a hardcoded {@code 1} instead of
+   * {@code axes.length} as the native axes count. A genuinely multi-element {@code axes} array on a rank-3 input is the
+   * only way to distinguish the two.
+   */
+  @Test
+  void sumAndMeanWithMultiElementAxesReduceOverBothGivenAxes() {
+    try (MLXScope scope = new MLXScope()) {
+      // shape [2,3,2], values 1..12 in row-major order. Reducing over axes
+      // {0,1} leaves only the last axis: for k=0, sum of {1,3,5,7,9,11} = 36;
+      // for k=1, sum of {2,4,6,8,10,12} = 42. Each set has 6 elements, so
+      // mean is 6 and 7 respectively.
+      float[] data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+      MLXArray a = MLX.array(scope, data, new int[] {2, 3, 2});
+      MLXArray sumResult = MLXOps.sum(a, new int[] {0, 1}, false);
+      assertArrayEquals(new int[] {2}, sumResult.shape());
+      assertArrayEquals(new float[] {36, 42}, sumResult.toFloatArray(), EPS);
+
+      MLXArray meanResult = MLXOps.mean(a, new int[] {0, 1}, false);
+      assertArrayEquals(new int[] {2}, meanResult.shape());
+      assertArrayEquals(new float[] {6, 7}, meanResult.toFloatArray(), EPS);
+    }
+  }
+
   @Test
   void innerOfTwoRank1VectorsIsADotProduct() {
     try (MLXScope scope = new MLXScope()) {

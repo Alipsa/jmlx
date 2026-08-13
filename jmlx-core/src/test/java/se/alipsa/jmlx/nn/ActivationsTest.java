@@ -12,7 +12,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 @EnabledIfNativeAvailable
 class ActivationsTest {
 
-  // Irrational sigmoid/erf, same reasoning as MLXOpsTest's sigmoid()/erf().
+  // Irrational sigmoid/erf, same reasoning as MLXNumericTest's sigmoid()/erf().
   private static final float EPS = 1e-4f;
 
   @Test

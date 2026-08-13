@@ -62,22 +62,30 @@ public final class MLXRandom {
    * Draws a {@code shape}-shaped {@code dtype} array from a uniform distribution over {@code [low, high)} ({@code
    * mlx_random_uniform}). Unlike {@code normal}'s {@code loc}/{@code scale}, mlx-c's {@code low}/{@code high} are real
    * {@code mlx_array} parameters passed by value, not {@code float} -- so the Java-facing {@code float low}/
-   * {@code float high} are each first turned into a throwaway scalar array via {@link #float32Scalar}. Those scalars
-   * need no explicit free: they are allocated from {@code tmp}, a confined {@link Arena} closed at the end of this
-   * method, unlike {@link MLX#full}'s scalar (allocated from the same {@code tmp} used for the shape array too, and
-   * freed early via its own {@code finally} for a reason specific to that method) -- there is nothing here that needs
-   * freeing before {@code tmp} closes. {@code key} is always the RNG's own default, as in {@link #normal}.
+   * {@code float high} are each first turned into a throwaway scalar array via {@link #float32Scalar}. Those scalars DO
+   * need an explicit free, exactly like {@link MLX#full}'s scalar: {@code tmp} (a confined {@link Arena}) owns only the
+   * 8-byte {@code mlx_array_} struct that {@code mlx_array_new_float32} writes into; the heap-allocated
+   * {@code mlx::core::array} the struct's {@code ctx} points at is owned by mlx-c and freed solely by
+   * {@code mlx_array_free} (see {@link MLXArray#toFloatArray()}'s javadoc for the same invariant). {@code
+   * mlx_random_uniform} takes {@code low}/{@code high} as {@code const mlx_array}, i.e. it borrows them rather than
+   * adopting them, so both scalars are freed in a {@code finally}, mirroring {@link MLX#full}'s pattern. {@code key} is
+   * always the RNG's own default, as in {@link #normal}.
    */
   public static MLXArray uniform(MLXScope scope, int[] shape, DType dtype, float low, float high) {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment lowScalar = float32Scalar("uniform", low, tmp);
       MemorySegment highScalar = float32Scalar("uniform", high, tmp);
-      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
-      MemorySegment key = NativeOps.nullableHandle(null, tmp);
-      MemorySegment res = mlx_h.mlx_array_new(scope);
-      NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape, shape.length,
-          dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
-      return new MLXArray(scope, res);
+      try {
+        MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+        MemorySegment key = NativeOps.nullableHandle(null, tmp);
+        MemorySegment res = mlx_h.mlx_array_new(scope);
+        NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape,
+            shape.length, dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
+        return new MLXArray(scope, res);
+      } finally {
+        mlx_h.mlx_array_free(lowScalar);
+        mlx_h.mlx_array_free(highScalar);
+      }
     }
   }
 }

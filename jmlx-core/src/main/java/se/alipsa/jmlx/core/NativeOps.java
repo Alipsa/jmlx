@@ -96,7 +96,18 @@ final class NativeOps {
     int apply(MemorySegment res, MemorySegment a, MemorySegment b, MemorySegment stream);
   }
 
+  /**
+   * Allocates the result into {@code target} instead of {@code a.scope()} -- e.g. {@code Linear.forward} computing
+   * {@code transpose(W, x.scope())} so the view lands in the step scope rather than leaking into the model scope
+   * (req/phase4-plan.md §5). {@code target} must be related to {@code a.scope()} -- either an ancestor OR a descendant
+   * of it -- checked via {@link MLXScope#innermost}, not {@link MLXScope#isAncestorOf} alone: unlike {@link MLX#hoist},
+   * which only ever narrows toward an ancestor, this overload is also used to push a result INTO a descendant (the step
+   * scope), so both directions must be legal. Without this check, a caller passing an unrelated {@code target} would
+   * silently allocate a result referencing {@code a} into a scope that could close before (or long after) {@code a}'s
+   * own scope, breaking the invariant that a result's scope is always related to every operand it references.
+   */
   static MLXArray unaryOp(String opName, MLXArray a, MLXScope target, UnaryOp op) {
+    MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
     return new MLXArray(target, res);

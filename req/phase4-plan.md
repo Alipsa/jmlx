@@ -13,7 +13,7 @@
 | Probe 0b — upcall exception-safety + thread confinement | **Done, confirmed** | scratch, not committed |
 | Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
 | M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
-| M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | this branch, see req/plans/phase4-m2-plan.md |
+| M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | [PR #8](https://github.com/Alipsa/jmlx/pull/8), `7173d24` |
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | Not started | — |
 | M4 — `QuantizedLinear` (§8) | Not started | — |
 | §9 — Documentation | Not started | — |

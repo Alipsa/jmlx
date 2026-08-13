@@ -351,6 +351,24 @@ class MLXNumericTest {
   }
 
   @Test
+  void fullRejectsNanForAUint32Target() {
+    try (MLXScope scope = new MLXScope()) {
+      // NaN < 0 is false, so a negative-only guard would let this through;
+      // static_cast<uint32_t>(NaN) is UB regardless of sign.
+      assertThrows(IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, Float.NaN, DType.UINT32));
+    }
+  }
+
+  @Test
+  void fullRejectsAnOutOfRangeValueForAUint32Target() {
+    try (MLXScope scope = new MLXScope()) {
+      // 1e20f is positive and would pass a negative-only guard, but it is
+      // far above UINT32_MAX -- static_cast<uint32_t>(1e20f) is UB.
+      assertThrows(IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, 1e20f, DType.UINT32));
+    }
+  }
+
+  @Test
   void arangeWithAnIntegerStepProducesIntegerCounts() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.arange(scope, 0, 5, 1, DType.INT32);

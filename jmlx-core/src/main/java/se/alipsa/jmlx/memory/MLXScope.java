@@ -90,7 +90,12 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
       // Cleaner could cascade an unreachable parent between the check and
       // this call -- e.g. `new MLXScope().newChild()`, where the root has no
       // other reference. A child added into that window would never be
-      // cascaded, only freed by its own close()/Cleaner.
+      // cascaded, only freed by its own close()/Cleaner. Deliberately
+      // untested: reaching this branch needs the Cleaner to fire in that
+      // exact window, and the synchronously reachable path (parent.close();
+      // parent.newChild()) throws from ensureOpen() first, never touching
+      // this check -- a GC-timing-dependent test would be flaky, not a
+      // meaningful regression guard.
       if (closed) {
         throw new IllegalStateException("MLXScope is closed");
       }
@@ -178,7 +183,9 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   /**
    * Creates a child of this scope. Calls {@link #checkAccess()} on this scope first, so the child is guaranteed to
    * share this scope's owner thread -- ancestor-related scopes are therefore same-thread automatically. Closing this
-   * scope (or a further ancestor of it) closes the child too, via the cascade described on {@link Holder}.
+   * scope (or a further ancestor of it) closes the child too, via the cascade described on {@link Holder}. Can also
+   * throw {@link IllegalStateException} from {@link Holder#addChild}, in the narrow window where the {@link Cleaner}
+   * cascades this scope between the {@code checkAccess()} check above and the child's insertion.
    */
   public MLXScope newChild() {
     checkAccess();

@@ -141,10 +141,18 @@ public final class MLX {
    * {@code mlx_array_new_bool}/{@code _int}/{@code _float32} (picked by {@code dtype}) -- the same null-ctx-on-failure
    * hazard {@link #array} already handles -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only
    * reads it, it does not adopt it.
+   *
+   * <p>
+   * Rejects a {@code value} unrepresentable in {@code dtype} when {@code dtype == UINT32}: that branch funnels through
+   * {@code mlx_array_new_float32} and lets mlx narrow the float32 scalar to {@code uint32_t} itself, and per
+   * [conv.fpint]/1 a float-to-integer conversion is undefined behaviour whenever the truncated value does not fit the
+   * target type -- not only for negatives, but also for {@code NaN} and any value {@code >= 2^32}. {@code INT32} has no
+   * equivalent hole: its branch narrows via Java's own {@code (int) value} cast first, which JLS 5.1.3 defines as
+   * saturating with {@code NaN -> 0}, before the value ever reaches native.
    */
   public static MLXArray full(MLXScope scope, int[] shape, float value, DType dtype) {
-    if (dtype == DType.UINT32 && value < 0) {
-      throw new IllegalArgumentException("full: value " + value + " is negative and cannot fill a UINT32 array");
+    if (dtype == DType.UINT32 && !(value >= 0 && value < 4294967296f)) {
+      throw new IllegalArgumentException("full: value " + value + " cannot fill a UINT32 array");
     }
     try (Arena tmp = Arena.ofConfined()) {
       // Same statusless-failure hazard as MLX.array's overloads: these
@@ -177,7 +185,8 @@ public final class MLX {
    *
    * <p>
    * Rejects {@code step == 0} in Java: upstream {@code mlx::core::arange} (v0.31.2 {@code mlx/ops.cpp}) validates NaN
-   * and infinite {@code start}/{@code stop}/{@code step} up front, but only ever computes
+   * in any of {@code start}/{@code stop}/{@code step} and infinite {@code start}/{@code stop} up front -- an infinite
+   * {@code step} is special-cased into an early return rather than rejected -- but only ever computes
    * {@code real_size = ceil((stop - start) / step)} afterward -- so {@code step == 0} with {@code stop == start}
    * reaches that division as {@code 0.0 / 0.0 == NaN}, which is not caught by the earlier checks or by the subsequent
    * {@code real_size > INT_MAX} guard (a NaN comparison is always false), and flows into

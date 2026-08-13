@@ -26,10 +26,10 @@ subprojects {
         }
     }
 
-    // Style: 2-space indent, 120-column width, Google style otherwise (both
-    // config files derive from Google's own upstream artifacts -- see
-    // config/checkstyle/checkstyle.xml and config/spotless/*.xml for exactly
-    // what was changed and why).
+    // Style: 2-space indent, 100-column width, Google Java Style, enforced by
+    // running google-java-format directly (no separate Spotless config file --
+    // see config/checkstyle/checkstyle.xml for the checkstyle side, which
+    // derives from Google's own upstream artifact).
     checkstyle {
         toolVersion = '13.10.0'
         configFile = rootProject.file('config/checkstyle/checkstyle.xml')
@@ -47,7 +47,7 @@ subprojects {
             target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
             importOrder()
             removeUnusedImports()
-            eclipse().configFile(rootProject.file('config/spotless/eclipse-java-google-style-120col.xml'))
+            googleJavaFormat('1.28.0').reflowLongStrings()
             trimTrailingWhitespace()
             endWithNewline()
         }

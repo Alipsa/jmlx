@@ -18,8 +18,9 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/phase4-plan.md §5-6 for the design {@link Module} implements; the class javadoc there explains why
- * {@link Module#param(String, MLXArray)}'s return value must not be cached by a subclass.
+ * See req/phase4-plan.md §5-6 for the design {@link Module} implements; the class javadoc there
+ * explains why {@link Module#param(String, MLXArray)}'s return value must not be cached by a
+ * subclass.
  */
 @EnabledIfNativeAvailable
 class ModuleTest {
@@ -67,8 +68,10 @@ class ModuleTest {
     try (MLXScope scope = new MLXScope()) {
       MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
       Leaf leaf = new Leaf(scope, w);
-      IllegalStateException ex = assertThrows(IllegalStateException.class,
-          () -> leaf.param("w", MLX.array(scope, new float[] {2f}, new int[] {1})));
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class,
+              () -> leaf.param("w", MLX.array(scope, new float[] {2f}, new int[] {1})));
       assertTrue(ex.getMessage().contains("w"));
     }
   }
@@ -172,7 +175,8 @@ class ModuleTest {
       Branch branch = new Branch(scope, leaf);
 
       IllegalArgumentException ex =
-          assertThrows(IllegalArgumentException.class, () -> branch.update(Map.of("leaf.missing", w)));
+          assertThrows(
+              IllegalArgumentException.class, () -> branch.update(Map.of("leaf.missing", w)));
       assertTrue(ex.getMessage().contains("leaf.missing"));
     }
   }
@@ -210,10 +214,11 @@ class ModuleTest {
   }
 
   /**
-   * Regression test: {@code update} used to write each entry as it resolved it, so a later entry's bad path left
-   * earlier entries already written with no notification fired (the notify pass only runs after the whole loop
-   * returns). Resolving every path before writing any of them means a bad entry anywhere leaves every parameter --
-   * including ones with a valid path earlier in iteration order -- untouched.
+   * Regression test: {@code update} used to write each entry as it resolved it, so a later entry's
+   * bad path left earlier entries already written with no notification fired (the notify pass only
+   * runs after the whole loop returns). Resolving every path before writing any of them means a bad
+   * entry anywhere leaves every parameter -- including ones with a valid path earlier in iteration
+   * order -- untouched.
    */
   @Test
   void updateWithAMixOfValidAndInvalidPathsAppliesNoWritesAndDoesNotNotify() {
@@ -282,9 +287,9 @@ class ModuleTest {
   }
 
   /**
-   * {@code Map.of} rejects a {@code null} key outright, so this uses a {@code LinkedHashMap} -- the kind of map a
-   * checkpoint loader would plausibly build -- to reach {@code resolveAll}'s own key null-check rather than one
-   * {@code Map.of} would have caught for free.
+   * {@code Map.of} rejects a {@code null} key outright, so this uses a {@code LinkedHashMap} -- the
+   * kind of map a checkpoint loader would plausibly build -- to reach {@code resolveAll}'s own key
+   * null-check rather than one {@code Map.of} would have caught for free.
    */
   @Test
   void updateWithANullKeyThrowsNullPointerException() {

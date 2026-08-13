@@ -14,8 +14,9 @@ import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/phase4-plan.md §2 for the withdrawn-cache mitigation {@link Linear#forward} implements: {@code weight} is
- * registered in the checkpoint's {@code [out, in]} layout and transposed fresh, into the caller's scope, on every call.
+ * See req/phase4-plan.md §2 for the withdrawn-cache mitigation {@link Linear#forward} implements:
+ * {@code weight} is registered in the checkpoint's {@code [out, in]} layout and transposed fresh,
+ * into the caller's scope, on every call.
  */
 @EnabledIfNativeAvailable
 class LinearTest {
@@ -28,7 +29,10 @@ class LinearTest {
   private static final int MEASURED_ITERATIONS = 200;
   private static final long LEAK_THRESHOLD_BYTES = 2_000_000;
 
-  /** Wraps a single child module named "proj" -- test-local, like {@code ModuleTest}'s {@code Branch}. */
+  /**
+   * Wraps a single child module named "proj" -- test-local, like {@code ModuleTest}'s {@code
+   * Branch}.
+   */
   private static final class Wrapper extends Module {
     Wrapper(MLXScope scope, Module child) {
       super(scope);
@@ -52,9 +56,9 @@ class LinearTest {
   }
 
   /**
-   * {@code null} bias's only other coverage is {@code constructorRejectsARankOneWeight}, which never reaches
-   * {@code forward()} -- this is the only test that actually exercises the {@code hasBias ? add : y} branch's
-   * {@code false} side with a value assertion.
+   * {@code null} bias's only other coverage is {@code constructorRejectsARankOneWeight}, which
+   * never reaches {@code forward()} -- this is the only test that actually exercises the {@code
+   * hasBias ? add : y} branch's {@code false} side with a value assertion.
    */
   @Test
   void forwardWithoutBiasComputesTheLinearTransformOnly() {
@@ -71,8 +75,8 @@ class LinearTest {
   }
 
   /**
-   * The spec's named regression test: a {@code W.T} registration would still pass
-   * {@link #forwardComputesTheAffineTransform} above and only fail here.
+   * The spec's named regression test: a {@code W.T} registration would still pass {@link
+   * #forwardComputesTheAffineTransform} above and only fail here.
    */
   @Test
   void parametersReturnsWeightInTheCheckpointsOutInShapeNotItsTranspose() {
@@ -107,8 +111,9 @@ class LinearTest {
   }
 
   /**
-   * The {@code Linear} is the nested module, not the direct receiver of {@code update} -- a {@code Linear} that IS the
-   * receiver would pass even if the depth-first tree walk in {@code Module.update} were broken.
+   * The {@code Linear} is the nested module, not the direct receiver of {@code update} -- a {@code
+   * Linear} that IS the receiver would pass even if the depth-first tree walk in {@code
+   * Module.update} were broken.
    */
   @Test
   void updateOnAParentHoldingANestedLinearThenForwardUsesTheNewWeights() {
@@ -132,15 +137,18 @@ class LinearTest {
   }
 
   /**
-   * The one test in this task with no compile-time signal for the bug it catches: a {@code transpose(weight)}
-   * accidentally allocating into {@code weight.scope()} instead of {@code x.scope()} would leak the transposed weight
-   * copy into the long-lived parent once per iteration. Same warmup/measured-iteration/threshold shape as
-   * {@code MLXMemoryLeakTest}'s {@code activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent}.
+   * The one test in this task with no compile-time signal for the bug it catches: a {@code
+   * transpose(weight)} accidentally allocating into {@code weight.scope()} instead of {@code
+   * x.scope()} would leak the transposed weight copy into the long-lived parent once per iteration.
+   * Same warmup/measured-iteration/threshold shape as {@code MLXMemoryLeakTest}'s {@code
+   * activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent}.
    */
   @Test
   void activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent() {
     try (MLXScope parent = new MLXScope()) {
-      MLXArray weight = MLX.array(parent, new float[OUT_FEATURES * IN_FEATURES], new int[] {OUT_FEATURES, IN_FEATURES});
+      MLXArray weight =
+          MLX.array(
+              parent, new float[OUT_FEATURES * IN_FEATURES], new int[] {OUT_FEATURES, IN_FEATURES});
       Linear linear = new Linear(parent, weight, null);
 
       for (int i = 0; i < WARMUP_ITERATIONS; i++) {
@@ -155,9 +163,17 @@ class LinearTest {
 
       long after = NativeMemoryProbe.activeMemoryBytes();
 
-      assertTrue(after - baseline <= LEAK_THRESHOLD_BYTES,
-          "active memory grew from " + baseline + " to " + after + " bytes over " + MEASURED_ITERATIONS
-              + " per-iteration child scopes (threshold " + LEAK_THRESHOLD_BYTES + " bytes)");
+      assertTrue(
+          after - baseline <= LEAK_THRESHOLD_BYTES,
+          "active memory grew from "
+              + baseline
+              + " to "
+              + after
+              + " bytes over "
+              + MEASURED_ITERATIONS
+              + " per-iteration child scopes (threshold "
+              + LEAK_THRESHOLD_BYTES
+              + " bytes)");
     }
   }
 

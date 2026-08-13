@@ -8,7 +8,10 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
-/** Reuses {@code MLXFastTest}'s {@code rmsNormWithWeightScalesTheNormalizedResult} golden through the layer. */
+/**
+ * Reuses {@code MLXFastTest}'s {@code rmsNormWithWeightScalesTheNormalizedResult} golden through
+ * the layer.
+ */
 @EnabledIfNativeAvailable
 class RMSNormTest {
 
@@ -24,7 +27,8 @@ class RMSNormTest {
 
       MLXArray result = rmsNorm.forward(x);
 
-      assertArrayEquals(new float[] {0.730296f, 1.460592f, 2.190888f, 2.921184f}, result.toFloatArray(), EPS);
+      assertArrayEquals(
+          new float[] {0.730296f, 1.460592f, 2.190888f, 2.921184f}, result.toFloatArray(), EPS);
     }
   }
 }

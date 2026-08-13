@@ -5,8 +5,8 @@ import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * The SiLU (a.k.a. swish) activation: {@code x * sigmoid(x)}. No parameters -- {@code scope} is accepted only to
- * satisfy {@link Module}'s constructor contract; nothing is registered.
+ * The SiLU (a.k.a. swish) activation: {@code x * sigmoid(x)}. No parameters -- {@code scope} is
+ * accepted only to satisfy {@link Module}'s constructor contract; nothing is registered.
  */
 public final class SiLU extends Module implements UnaryModule {
 

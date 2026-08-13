@@ -46,7 +46,7 @@ Every module's tests are skipped automatically (not failed) if `native/install/l
 
 ## Code style
 
-Hand-written sources are Google Java Style with 2-space indentation and a 120-column width (`config/spotless/eclipse-java-google-style-120col.xml`, `config/checkstyle/checkstyle.xml` — both derived from Google's own upstream artifacts; see the comments in each for the exact, documented deviations). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from both, since they must stay byte-identical to `scripts/regen-bindings.sh`'s output.
+Hand-written sources are Google Java Style with 2-space indentation and a 100-column width, enforced by running `google-java-format` directly via Spotless (see `build.gradle`'s `spotless` block and `config/checkstyle/checkstyle.xml`, which derives from Google's own upstream artifact; see its comments for the one remaining documented deviation). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from both, since they must stay byte-identical to `scripts/regen-bindings.sh`'s output.
 
 ```sh
 ./gradlew spotlessCheck   # verify formatting

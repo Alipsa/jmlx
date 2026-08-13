@@ -21,7 +21,8 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 
 /**
- * See req/initial-plan.md, Testing approach, "Memory lifecycle" (scope half) and "Testing the Cleaner backstop".
+ * See req/initial-plan.md, Testing approach, "Memory lifecycle" (scope half) and "Testing the
+ * Cleaner backstop".
  */
 @EnabledIfNativeAvailable
 class MLXScopeTest {
@@ -44,13 +45,15 @@ class MLXScopeTest {
   void closeFromWrongThreadThrowsAndLeavesScopeOpen() throws InterruptedException {
     MLXScope scope = new MLXScope();
     AtomicReference<Throwable> caught = new AtomicReference<>();
-    Thread other = new Thread(() -> {
-      try {
-        scope.close();
-      } catch (Throwable t) {
-        caught.set(t);
-      }
-    });
+    Thread other =
+        new Thread(
+            () -> {
+              try {
+                scope.close();
+              } catch (Throwable t) {
+                caught.set(t);
+              }
+            });
     other.start();
     other.join();
 
@@ -63,17 +66,20 @@ class MLXScopeTest {
   }
 
   @Test
-  void arrayAccessFromWrongThreadThrowsAndOwningThreadCloseStillWorks() throws InterruptedException {
+  void arrayAccessFromWrongThreadThrowsAndOwningThreadCloseStillWorks()
+      throws InterruptedException {
     MLXScope scope = new MLXScope();
     MLXArray array = MLX.array(scope, new float[] {1f}, new int[] {1});
     AtomicReference<Throwable> caught = new AtomicReference<>();
-    Thread other = new Thread(() -> {
-      try {
-        array.shape();
-      } catch (Throwable t) {
-        caught.set(t);
-      }
-    });
+    Thread other =
+        new Thread(
+            () -> {
+              try {
+                array.shape();
+              } catch (Throwable t) {
+                caught.set(t);
+              }
+            });
     other.start();
     other.join();
 
@@ -125,13 +131,15 @@ class MLXScopeTest {
   void newChildFromWrongThreadThrowsAndLeavesParentOpen() throws InterruptedException {
     MLXScope parent = new MLXScope();
     AtomicReference<Throwable> caught = new AtomicReference<>();
-    Thread other = new Thread(() -> {
-      try {
-        parent.newChild();
-      } catch (Throwable t) {
-        caught.set(t);
-      }
-    });
+    Thread other =
+        new Thread(
+            () -> {
+              try {
+                parent.newChild();
+              } catch (Throwable t) {
+                caught.set(t);
+              }
+            });
     other.start();
     other.join();
 
@@ -142,7 +150,8 @@ class MLXScopeTest {
 
   @Test
   void innermostReturnsTheChildRegardlessOfArgumentOrder() {
-    try (MLXScope parent = new MLXScope(); MLXScope child = parent.newChild()) {
+    try (MLXScope parent = new MLXScope();
+        MLXScope child = parent.newChild()) {
       assertSame(child, MLXScope.innermost(parent, child));
       assertSame(child, MLXScope.innermost(child, parent));
     }
@@ -150,23 +159,27 @@ class MLXScopeTest {
 
   @Test
   void innermostRejectsTwoIndependentRootScopes() {
-    try (MLXScope a = new MLXScope(); MLXScope b = new MLXScope()) {
+    try (MLXScope a = new MLXScope();
+        MLXScope b = new MLXScope()) {
       assertThrows(IllegalArgumentException.class, () -> MLXScope.innermost(a, b));
     }
   }
 
   @Test
   void innermostRejectsSiblingScopes() {
-    try (MLXScope parent = new MLXScope(); MLXScope childA = parent.newChild(); MLXScope childB = parent.newChild()) {
+    try (MLXScope parent = new MLXScope();
+        MLXScope childA = parent.newChild();
+        MLXScope childB = parent.newChild()) {
       assertThrows(IllegalArgumentException.class, () -> MLXScope.innermost(childA, childB));
     }
   }
 
   /**
-   * The use-after-free the cascade introduces (req/phase4-plan.md §2). {@code parent.close()} frees {@code child}'s
-   * handles via the {@code Holder} cascade without ever touching {@code child}'s own {@code closed} field -- without
-   * {@code holder.isClosed()} in {@code MLXArray}/{@code MLXScope}'s {@code ensureOpen()}, {@code a.shape()} below
-   * would read freed memory instead of throwing.
+   * The use-after-free the cascade introduces (req/phase4-plan.md §2). {@code parent.close()} frees
+   * {@code child}'s handles via the {@code Holder} cascade without ever touching {@code child}'s
+   * own {@code closed} field -- without {@code holder.isClosed()} in {@code MLXArray}/{@code
+   * MLXScope}'s {@code ensureOpen()}, {@code a.shape()} below would read freed memory instead of
+   * throwing.
    */
   @Test
   void parentCascadeThenChildAndItsArraysThrowInsteadOfReadingFreedMemory() {
@@ -203,7 +216,8 @@ class MLXScopeTest {
 
   @Test
   void hoistIntoADescendantScopeThrows() {
-    try (MLXScope parent = new MLXScope(); MLXScope child = parent.newChild()) {
+    try (MLXScope parent = new MLXScope();
+        MLXScope child = parent.newChild()) {
       MLXArray a = MLX.array(parent, new float[] {1f}, new int[] {1});
       assertThrows(IllegalArgumentException.class, () -> MLX.hoist(a, child));
     }
@@ -211,16 +225,18 @@ class MLXScopeTest {
 
   @Test
   void hoistIntoAnUnrelatedScopeThrows() {
-    try (MLXScope rootA = new MLXScope(); MLXScope rootB = new MLXScope()) {
+    try (MLXScope rootA = new MLXScope();
+        MLXScope rootB = new MLXScope()) {
       MLXArray a = MLX.array(rootA, new float[] {1f}, new int[] {1});
       assertThrows(IllegalArgumentException.class, () -> MLX.hoist(a, rootB));
     }
   }
 
   /**
-   * Pins the reflexive fast path: a copy-returning implementation of the {@code target == source} case would also pass
-   * a same-values assertion, so this asserts identity (above) paired with a repetition-count that would show growth if
-   * hoist ever allocated a fresh handle per call in that case.
+   * Pins the reflexive fast path: a copy-returning implementation of the {@code target == source}
+   * case would also pass a same-values assertion, so this asserts identity (above) paired with a
+   * repetition-count that would show growth if hoist ever allocated a fresh handle per call in that
+   * case.
    */
   @Test
   void hoistIntoItsOwnScopeRepeatedlyShowsNoMemoryGrowth() {
@@ -237,17 +253,23 @@ class MLXScopeTest {
         MLX.hoist(a, scope);
       }
       long after = NativeMemoryProbe.activeMemoryBytes();
-      assertTrue(after - baseline <= FREED_DETECTION_SLACK_BYTES,
-          "active memory grew from " + baseline + " to " + after + " bytes over 1000 same-scope hoist() calls");
+      assertTrue(
+          after - baseline <= FREED_DETECTION_SLACK_BYTES,
+          "active memory grew from "
+              + baseline
+              + " to "
+              + after
+              + " bytes over 1000 same-scope hoist() calls");
     }
   }
 
   /**
-   * Asserts the {@code array.h}/{@code private/array.h} refcounting reasoning (req/phase4-plan.md §2, Research
-   * findings) rather than merely inferring it: builds {@code y = multiply(exp(x), x)} in a child scope, {@code
-   * keep}s {@code y} into the parent, closes the child (freeing {@code x} and the un-kept {@code exp(x)} intermediate),
-   * then evaluates {@code y} and checks its values against a hand-computed golden -- which only succeeds if mlx's own
-   * {@code ArrayDesc} kept the graph alive independently of this facade's handle bookkeeping.
+   * Asserts the {@code array.h}/{@code private/array.h} refcounting reasoning (req/phase4-plan.md
+   * §2, Research findings) rather than merely inferring it: builds {@code y = multiply(exp(x), x)}
+   * in a child scope, {@code keep}s {@code y} into the parent, closes the child (freeing {@code x}
+   * and the un-kept {@code exp(x)} intermediate), then evaluates {@code y} and checks its values
+   * against a hand-computed golden -- which only succeeds if mlx's own {@code ArrayDesc} kept the
+   * graph alive independently of this facade's handle bookkeeping.
    */
   @Test
   void hoistSurvivesChildScopeCloseAndStillEvaluatesCorrectly() {
@@ -263,12 +285,20 @@ class MLXScopeTest {
         kept = MLX.keep(y);
       }
       MLX.eval(kept);
-      float[] expected = {(float) (1 * Math.exp(1)), (float) (2 * Math.exp(2)), (float) (3 * Math.exp(3))};
+      float[] expected = {
+        (float) (1 * Math.exp(1)), (float) (2 * Math.exp(2)), (float) (3 * Math.exp(3))
+      };
       assertArrayEquals(expected, kept.toFloatArray(), 1e-2f);
     }
     long after = NativeMemoryProbe.activeMemoryBytes();
-    assertTrue(after - baseline <= FREED_DETECTION_SLACK_BYTES, "active memory did not return to baseline after the"
-        + " parent closed (baseline=" + baseline + ", after=" + after + ")");
+    assertTrue(
+        after - baseline <= FREED_DETECTION_SLACK_BYTES,
+        "active memory did not return to baseline after the"
+            + " parent closed (baseline="
+            + baseline
+            + ", after="
+            + after
+            + ")");
   }
 
   // The escaped array must be large enough that "never freed" and "freed"
@@ -294,20 +324,21 @@ class MLXScopeTest {
   private static final long POLL_DEADLINE_SECONDS = 20;
 
   /**
-   * "The action provably captures a holder, not the scope" is enforced structurally (a static-nested holder, not the
-   * scope, is registered with the Cleaner), not directly assertable. What is observable is the consequence: if the
-   * capture rule were violated, the scope could never become unreachable and the first loop below would never observe a
-   * cleared referent.
+   * "The action provably captures a holder, not the scope" is enforced structurally (a
+   * static-nested holder, not the scope, is registered with the Cleaner), not directly assertable.
+   * What is observable is the consequence: if the capture rule were violated, the scope could never
+   * become unreachable and the first loop below would never observe a cleared referent.
    *
-   * <p>
-   * The referent clearing only proves the scope became unreachable, not that {@code holder.closeAll()} actually ran and
-   * freed the native array -- a separate, independent {@link java.lang.ref.Cleaner} registration on the same scope was
-   * tried here first, but multiple Cleaners on one referent fire independently with no defined order, so that
-   * approach's latch passed even with this class's own backstop registration deliberately removed. Sampling mlx-c's own
-   * active memory ({@link NativeMemoryProbe}, shared with {@link se.alipsa.jmlx.core.MLXMemoryLeakTest}) before and
-   * after is the one check that actually depends on the real backstop having executed -- confirmed by the same mutation
-   * (temporarily registering a no-op in place of {@code holder::closeAll}): this version of the test fails the
-   * assertion below, the latch-based version did not.
+   * <p>The referent clearing only proves the scope became unreachable, not that {@code
+   * holder.closeAll()} actually ran and freed the native array -- a separate, independent {@link
+   * java.lang.ref.Cleaner} registration on the same scope was tried here first, but multiple
+   * Cleaners on one referent fire independently with no defined order, so that approach's latch
+   * passed even with this class's own backstop registration deliberately removed. Sampling mlx-c's
+   * own active memory ({@link NativeMemoryProbe}, shared with {@link
+   * se.alipsa.jmlx.core.MLXMemoryLeakTest}) before and after is the one check that actually depends
+   * on the real backstop having executed -- confirmed by the same mutation (temporarily registering
+   * a no-op in place of {@code holder::closeAll}): this version of the test fails the assertion
+   * below, the latch-based version did not.
    */
   @Test
   @Timeout(value = 30, unit = TimeUnit.SECONDS)
@@ -350,8 +381,14 @@ class MLXScopeTest {
       after = NativeMemoryProbe.activeMemoryBytes();
     }
 
-    assertTrue(after - baseline <= FREED_DETECTION_SLACK_BYTES, "cleaner backstop did not free the escaped scope's"
-        + " native memory (baseline=" + baseline + ", after=" + after + ")");
+    assertTrue(
+        after - baseline <= FREED_DETECTION_SLACK_BYTES,
+        "cleaner backstop did not free the escaped scope's"
+            + " native memory (baseline="
+            + baseline
+            + ", after="
+            + after
+            + ")");
   }
 
   // Isolated in its own frame so no local variable in the calling test

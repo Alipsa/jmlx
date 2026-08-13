@@ -10,9 +10,9 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Numeric correctness": every facade op against hand-computed values.
- * reshape/transpose additionally assert element values, not just shape -- the only thing that catches the contiguity
- * bug in {@link MLXArray#toFloatArray()}.
+ * See req/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
+ * hand-computed values. reshape/transpose additionally assert element values, not just shape -- the
+ * only thing that catches the contiguity bug in {@link MLXArray#toFloatArray()}.
  */
 @EnabledIfNativeAvailable
 class MLXNumericTest {
@@ -29,10 +29,11 @@ class MLXNumericTest {
   }
 
   /**
-   * See req/phase4-plan.md §2: {@code binaryOp} now resolves its target via {@code scopeOf}/{@code innermost} rather
-   * than rejecting any pair of operands that are not from the exact same scope -- this is "it stops rejecting
-   * parent/child pairs, which is the entire point" (§2), checked in both operand orders since picking "the first
-   * operand's scope" would silently pass one order and fail the other.
+   * See req/phase4-plan.md §2: {@code binaryOp} now resolves its target via {@code scopeOf}/{@code
+   * innermost} rather than rejecting any pair of operands that are not from the exact same scope --
+   * this is "it stops rejecting parent/child pairs, which is the entire point" (§2), checked in
+   * both operand orders since picking "the first operand's scope" would silently pass one order and
+   * fail the other.
    */
   @Test
   void addAcrossParentAndChildScopeAllocatesIntoTheChildRegardlessOfOperandOrder() {
@@ -51,12 +52,13 @@ class MLXNumericTest {
   }
 
   /**
-   * Proves the ancestor relaxation did not become "anything goes": two independent root scopes are still rejected, even
-   * though they are no longer rejected merely for being unequal.
+   * Proves the ancestor relaxation did not become "anything goes": two independent root scopes are
+   * still rejected, even though they are no longer rejected merely for being unequal.
    */
   @Test
   void addAcrossTwoUnrelatedRootScopesThrows() {
-    try (MLXScope scopeA = new MLXScope(); MLXScope scopeB = new MLXScope()) {
+    try (MLXScope scopeA = new MLXScope();
+        MLXScope scopeB = new MLXScope()) {
       MLXArray a = MLX.array(scopeA, new float[] {1, 2, 3}, new int[] {3});
       MLXArray b = MLX.array(scopeB, new float[] {1, 2, 3}, new int[] {3});
       assertThrows(IllegalArgumentException.class, () -> MLXOps.add(a, b));
@@ -115,7 +117,8 @@ class MLXNumericTest {
   @Test
   void addBroadcastsSingletonLeadingDimension() {
     try (MLXScope scope = new MLXScope()) {
-      // [2,3] + [1,3]: same broadcast as the row-vector case, expressed with an explicit size-1 axis.
+      // [2,3] + [1,3]: same broadcast as the row-vector case, expressed with an explicit size-1
+      // axis.
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
       MLXArray b = MLX.array(scope, new float[] {100, 200, 300}, new int[] {1, 3});
       MLXArray result = MLXOps.add(a, b);
@@ -220,9 +223,11 @@ class MLXNumericTest {
   void matmulSucceedsWithOneExactAndOneInexactOperand() {
     try (MLXScope scope = new MLXScope()) {
       // promote_types(float32, int32) == float32, so native accepts this mixed pair even though
-      // requireMatmulCompatible's Java guard only requires ONE operand to be inexact (req/phase4-plan.md §4).
+      // requireMatmulCompatible's Java guard only requires ONE operand to be inexact
+      // (req/phase4-plan.md §4).
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2});
-      MLXArray identity = MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);
+      MLXArray identity =
+          MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);
       assertEquals(DType.INT32, identity.dtype());
       assertArrayEquals(new float[] {1, 2, 3, 4}, MLXOps.matmul(a, identity).toFloatArray(), EPS);
     }
@@ -231,8 +236,10 @@ class MLXNumericTest {
   @Test
   void matmulRejectsTwoExactOperands() {
     try (MLXScope scope = new MLXScope()) {
-      MLXArray a = MLX.astype(MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2}), DType.INT32);
-      MLXArray b = MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);
+      MLXArray a =
+          MLX.astype(MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2}), DType.INT32);
+      MLXArray b =
+          MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);
       assertThrows(IllegalArgumentException.class, () -> MLXOps.matmul(a, b));
     }
   }
@@ -346,7 +353,8 @@ class MLXNumericTest {
       // UINT32 falls to the float32 scalar branch and mlx_full then astypes
       // that scalar to uint32 -- static_cast<uint32_t>(-1.0f) is UB in C++,
       // so this is rejected in Java before it ever reaches native.
-      assertThrows(IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, -1f, DType.UINT32));
+      assertThrows(
+          IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, -1f, DType.UINT32));
     }
   }
 
@@ -355,7 +363,9 @@ class MLXNumericTest {
     try (MLXScope scope = new MLXScope()) {
       // NaN < 0 is false, so a negative-only guard would let this through;
       // static_cast<uint32_t>(NaN) is UB regardless of sign.
-      assertThrows(IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, Float.NaN, DType.UINT32));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> MLX.full(scope, new int[] {2}, Float.NaN, DType.UINT32));
     }
   }
 
@@ -364,7 +374,9 @@ class MLXNumericTest {
     try (MLXScope scope = new MLXScope()) {
       // 1e20f is positive and would pass a negative-only guard, but it is
       // far above UINT32_MAX -- static_cast<uint32_t>(1e20f) is UB.
-      assertThrows(IllegalArgumentException.class, () -> MLX.full(scope, new int[] {2}, 1e20f, DType.UINT32));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> MLX.full(scope, new int[] {2}, 1e20f, DType.UINT32));
     }
   }
 
@@ -384,7 +396,8 @@ class MLXNumericTest {
       // behaviour neither the isnan(start/step/stop) nor the real_size >
       // INT_MAX checks upstream catch.
       IllegalArgumentException ex =
-          assertThrows(IllegalArgumentException.class, () -> MLX.arange(scope, 5, 5, 0, DType.FLOAT32));
+          assertThrows(
+              IllegalArgumentException.class, () -> MLX.arange(scope, 5, 5, 0, DType.FLOAT32));
       assertEquals("arange: step must not be 0", ex.getMessage());
     }
   }
@@ -459,7 +472,8 @@ class MLXNumericTest {
       MLXArray a = MLX.array(scope, data, new int[] {2, 3, 2});
       MLXArray transposed = MLXShape.transpose(a, new int[] {1, 0, 2});
       assertArrayEquals(new int[] {3, 2, 2}, transposed.shape());
-      assertArrayEquals(new float[] {1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12}, transposed.toFloatArray(), EPS);
+      assertArrayEquals(
+          new float[] {1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12}, transposed.toFloatArray(), EPS);
     }
   }
 
@@ -472,7 +486,9 @@ class MLXNumericTest {
       // this, so it surfaces as MLXException, not IllegalArgumentException.
       // Pinned here so that stays a deliberate fact, not an accident nobody
       // noticed changed.
-      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, new int[] {2, 3, 2});
+      MLXArray a =
+          MLX.array(
+              scope, new float[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, new int[] {2, 3, 2});
       assertThrows(MLXException.class, () -> MLXShape.transpose(a, new int[] {0, 0, 2}));
     }
   }
@@ -651,10 +667,10 @@ class MLXNumericTest {
   }
 
   /**
-   * All other sum/mean-with-axes tests above pass a single-element {@code axes} array (e.g. {@code {0}} or {@code {1}})
-   * -- nothing in those would catch a bug where the implementation passed a hardcoded {@code 1} instead of
-   * {@code axes.length} as the native axes count. A genuinely multi-element {@code axes} array on a rank-3 input is the
-   * only way to distinguish the two.
+   * All other sum/mean-with-axes tests above pass a single-element {@code axes} array (e.g. {@code
+   * {0}} or {@code {1}}) -- nothing in those would catch a bug where the implementation passed a
+   * hardcoded {@code 1} instead of {@code axes.length} as the native axes count. A genuinely
+   * multi-element {@code axes} array on a rank-3 input is the only way to distinguish the two.
    */
   @Test
   void sumAndMeanWithMultiElementAxesReduceOverBothGivenAxes() {
@@ -777,7 +793,8 @@ class MLXNumericTest {
   void sliceRejectsLengthMismatchWithNdim() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {2, 3});
-      assertThrows(IllegalArgumentException.class, () -> MLXShape.slice(a, new int[] {0}, new int[] {2, 3}));
+      assertThrows(
+          IllegalArgumentException.class, () -> MLXShape.slice(a, new int[] {0}, new int[] {2, 3}));
     }
   }
 
@@ -813,8 +830,10 @@ class MLXNumericTest {
       // A test asserting only "does not succeed" would pass against that broken
       // behaviour too, so assert both the exception type and the message.
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {4});
-      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-          () -> MLXShape.slice(a, new int[] {0}, new int[] {4}, new int[] {0}));
+      IllegalArgumentException ex =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> MLXShape.slice(a, new int[] {0}, new int[] {4}, new int[] {0}));
       assertEquals("slice: strides[0] must not be 0 (slice step cannot be zero)", ex.getMessage());
     }
   }
@@ -895,14 +914,16 @@ class MLXNumericTest {
   }
 
   /**
-   * The other side of {@link #transposeExplicitTargetAllocatesIntoTargetScope}: an explicit target unrelated to
-   * {@code a.scope()} (two independent roots, neither an ancestor nor a descendant of the other) must be rejected --
-   * {@code NativeOps.unaryOp}'s relatedness check exists specifically so a result never references an operand from a
-   * scope that could close before or long after it.
+   * The other side of {@link #transposeExplicitTargetAllocatesIntoTargetScope}: an explicit target
+   * unrelated to {@code a.scope()} (two independent roots, neither an ancestor nor a descendant of
+   * the other) must be rejected -- {@code NativeOps.unaryOp}'s relatedness check exists
+   * specifically so a result never references an operand from a scope that could close before or
+   * long after it.
    */
   @Test
   void transposeExplicitTargetRejectsAnUnrelatedScope() {
-    try (MLXScope s1 = new MLXScope(); MLXScope s2 = new MLXScope()) {
+    try (MLXScope s1 = new MLXScope();
+        MLXScope s2 = new MLXScope()) {
       MLXArray a = MLX.array(s1, new float[] {1, 2, 3, 4}, new int[] {2, 2});
       assertThrows(IllegalArgumentException.class, () -> MLXShape.transpose(a, s2));
     }

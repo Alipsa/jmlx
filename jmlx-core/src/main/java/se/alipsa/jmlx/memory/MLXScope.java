@@ -9,27 +9,27 @@ import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_h;
 
 /**
- * Owns the {@code mlx_array} native handles allocated on it and frees them in reverse insertion order on
- * {@link #close()}. See req/initial-plan.md §6 and req/phase4-plan.md §2.
+ * Owns the {@code mlx_array} native handles allocated on it and frees them in reverse insertion
+ * order on {@link #close()}. See req/initial-plan.md §6 and req/phase4-plan.md §2.
  *
- * <p>
- * Thread-safety contract: an {@code MLXScope} and the {@code MLXArray}s it owns are confined to the thread that created
- * the scope. The sole exception is the JVM's {@link Cleaner} thread invoking the backstop below, which is why the
- * backstop touches only {@link Holder} and never the scope itself.
+ * <p>Thread-safety contract: an {@code MLXScope} and the {@code MLXArray}s it owns are confined to
+ * the thread that created the scope. The sole exception is the JVM's {@link Cleaner} thread
+ * invoking the backstop below, which is why the backstop touches only {@link Holder} and never the
+ * scope itself.
  *
- * <p>
- * req/phase4-plan.md §2: a scope may have a {@link #parent()}, formed via {@link #newChild()}. {@link #newChild()}
- * calls {@link #checkAccess()} on the parent first, so a child always has the same owner thread as its parent, by
- * construction -- ancestor-related scopes are therefore same-thread automatically, which is why the ancestor rule used
- * by op helpers (see {@code NativeOps.scopeOf} in {@code se.alipsa.jmlx.core}) is an ownership-comprehensibility
- * invariant, not a confinement guard.
+ * <p>req/phase4-plan.md §2: a scope may have a {@link #parent()}, formed via {@link #newChild()}.
+ * {@link #newChild()} calls {@link #checkAccess()} on the parent first, so a child always has the
+ * same owner thread as its parent, by construction -- ancestor-related scopes are therefore
+ * same-thread automatically, which is why the ancestor rule used by op helpers (see {@code
+ * NativeOps.scopeOf} in {@code se.alipsa.jmlx.core}) is an ownership-comprehensibility invariant,
+ * not a confinement guard.
  *
- * <p>
- * Implements {@link SegmentAllocator} so it can be passed directly to mlx-c's struct-returning constructors (e.g.
- * {@code mlx_array_new}, {@code mlx_array_new_data}), which allocate their result through whatever allocator they are
- * given. {@link #allocate} is reserved for that use: it assumes every segment handed out represents an
- * {@code mlx_array} struct and will later be passed to {@code mlx_array_free}. Passing a scope as an allocator for
- * anything else corrupts the handle list.
+ * <p>Implements {@link SegmentAllocator} so it can be passed directly to mlx-c's struct-returning
+ * constructors (e.g. {@code mlx_array_new}, {@code mlx_array_new_data}), which allocate their
+ * result through whatever allocator they are given. {@link #allocate} is reserved for that use: it
+ * assumes every segment handed out represents an {@code mlx_array} struct and will later be passed
+ * to {@code mlx_array_free}. Passing a scope as an allocator for anything else corrupts the handle
+ * list.
  */
 public final class MLXScope implements AutoCloseable, SegmentAllocator {
 
@@ -45,10 +45,11 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   private static final Cleaner CLEANER = Cleaner.create();
 
   /**
-   * Capture rule: the failure mode of this whole pattern is the cleanup action holding a reference path back to the
-   * object it is meant to clean up after, which keeps that object permanently reachable and the action never runs. This
-   * holder -- not {@code MLXScope} -- is what gets registered with the {@link Cleaner}, so the action below can only
-   * ever reach {@code this} holder, never the owning scope.
+   * Capture rule: the failure mode of this whole pattern is the cleanup action holding a reference
+   * path back to the object it is meant to clean up after, which keeps that object permanently
+   * reachable and the action never runs. This holder -- not {@code MLXScope} -- is what gets
+   * registered with the {@link Cleaner}, so the action below can only ever reach {@code this}
+   * holder, never the owning scope.
    */
   private static final class Holder {
     private final Arena arena = Arena.ofShared();
@@ -181,11 +182,12 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   }
 
   /**
-   * Creates a child of this scope. Calls {@link #checkAccess()} on this scope first, so the child is guaranteed to
-   * share this scope's owner thread -- ancestor-related scopes are therefore same-thread automatically. Closing this
-   * scope (or a further ancestor of it) closes the child too, via the cascade described on {@link Holder}. Can also
-   * throw {@link IllegalStateException} from {@link Holder#addChild}, in the narrow window where the {@link Cleaner}
-   * cascades this scope between the {@code checkAccess()} check above and the child's insertion.
+   * Creates a child of this scope. Calls {@link #checkAccess()} on this scope first, so the child
+   * is guaranteed to share this scope's owner thread -- ancestor-related scopes are therefore
+   * same-thread automatically. Closing this scope (or a further ancestor of it) closes the child
+   * too, via the cascade described on {@link Holder}. Can also throw {@link IllegalStateException}
+   * from {@link Holder#addChild}, in the narrow window where the {@link Cleaner} cascades this
+   * scope between the {@code checkAccess()} check above and the child's insertion.
    */
   public MLXScope newChild() {
     checkAccess();
@@ -197,14 +199,16 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
     return parent;
   }
 
-  /** Distance from the nearest root: {@code 0} for a root, {@code parent().depth() + 1} otherwise. */
+  /**
+   * Distance from the nearest root: {@code 0} for a root, {@code parent().depth() + 1} otherwise.
+   */
   public int depth() {
     return parent == null ? 0 : parent.depth() + 1;
   }
 
   /**
-   * Whether {@code other} is this scope or a descendant of it. Reflexive: {@code x.isAncestorOf(x)} is {@code true} --
-   * see {@link se.alipsa.jmlx.core.MLX#hoist} for why that matters.
+   * Whether {@code other} is this scope or a descendant of it. Reflexive: {@code x.isAncestorOf(x)}
+   * is {@code true} -- see {@link se.alipsa.jmlx.core.MLX#hoist} for why that matters.
    */
   public boolean isAncestorOf(MLXScope other) {
     for (MLXScope s = other; s != null; s = s.parent) {
@@ -216,12 +220,13 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   }
 
   /**
-   * The innermost (deepest) of {@code x} and {@code y}, which must be the same scope or one an ancestor of the other --
-   * order-independent, unlike picking "the first operand's scope". {@link #depth()} makes the pick O(1); the ancestor
-   * check below is the O(depth) part, and depth is at most about three in every realistic use (root -> model -> step),
-   * so it is not worth caching.
+   * The innermost (deepest) of {@code x} and {@code y}, which must be the same scope or one an
+   * ancestor of the other -- order-independent, unlike picking "the first operand's scope". {@link
+   * #depth()} makes the pick O(1); the ancestor check below is the O(depth) part, and depth is at
+   * most about three in every realistic use (root -> model -> step), so it is not worth caching.
    *
-   * @throws IllegalArgumentException if neither is an ancestor of the other (siblings, or two independent roots)
+   * @throws IllegalArgumentException if neither is an ancestor of the other (siblings, or two
+   *     independent roots)
    */
   public static MLXScope innermost(MLXScope x, MLXScope y) {
     if (x == y) {
@@ -230,7 +235,8 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
     MLXScope deeper = x.depth() >= y.depth() ? x : y;
     MLXScope shallower = deeper == x ? y : x;
     if (!shallower.isAncestorOf(deeper)) {
-      throw new IllegalArgumentException("MLXScope: unrelated scopes (neither is an ancestor of the other)");
+      throw new IllegalArgumentException(
+          "MLXScope: unrelated scopes (neither is an ancestor of the other)");
     }
     return deeper;
   }
@@ -243,9 +249,9 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   }
 
   /**
-   * Frees one handle ahead of scope close, so an owner can release its native resource early without waiting for the
-   * whole scope to close. Not for general use: {@code handle} must be a segment this scope itself handed out via
-   * {@link #allocate}, or this is a no-op.
+   * Frees one handle ahead of scope close, so an owner can release its native resource early
+   * without waiting for the whole scope to close. Not for general use: {@code handle} must be a
+   * segment this scope itself handed out via {@link #allocate}, or this is a no-op.
    */
   public void free(MemorySegment handle) {
     checkThread();
@@ -253,9 +259,10 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   }
 
   /**
-   * Internal cross-package hook for {@code MLXArray.ensureOpen()}: asserts that the calling thread is this scope's
-   * owner and that the scope has not been closed. Not for general use -- {@code owner} and {@code closed} are private
-   * to this class, so an {@link se.alipsa.jmlx.core.MLXArray} confined to this scope has no other way to see either.
+   * Internal cross-package hook for {@code MLXArray.ensureOpen()}: asserts that the calling thread
+   * is this scope's owner and that the scope has not been closed. Not for general use -- {@code
+   * owner} and {@code closed} are private to this class, so an {@link se.alipsa.jmlx.core.MLXArray}
+   * confined to this scope has no other way to see either.
    */
   public void checkAccess() {
     checkThread();
@@ -279,7 +286,8 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   private void checkThread() {
     Thread current = Thread.currentThread();
     if (current != owner) {
-      throw new IllegalStateException("MLXScope is confined to " + owner + " but was accessed from " + current);
+      throw new IllegalStateException(
+          "MLXScope is confined to " + owner + " but was accessed from " + current);
     }
   }
 

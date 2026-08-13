@@ -10,31 +10,31 @@ import se.alipsa.jmlx.ffi.mlx_vector_array_;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Static facade over the mlx-c ops used by this slice. Every op here only builds the lazy computation graph; nothing
- * runs on the GPU/CPU until {@link #eval} (or the implicit eval inside {@link MLXArray#toFloatArray()}) triggers it.
- * See req/initial-plan.md §7, req/phase3-plan.md and req/phase4-plan.md §1.
+ * Static facade over the mlx-c ops used by this slice. Every op here only builds the lazy
+ * computation graph; nothing runs on the GPU/CPU until {@link #eval} (or the implicit eval inside
+ * {@link MLXArray#toFloatArray()}) triggers it. See req/initial-plan.md §7, req/phase3-plan.md and
+ * req/phase4-plan.md §1.
  *
- * <p>
- * req/phase4-plan.md M0a split this class: it keeps array creation ({@code array}; {@code zeros}/{@code ones}/
- * {@code full}/{@code arange} added in M0d), {@code eval}, {@code astype} (added in M0c) and the default device/stream
- * accessors; every other op moved to a sibling in this package, split by kind -- {@link MLXOps}
- * (elementwise/comparisons/reductions/{@code matmul}/{@code inner}/{@code outer}), {@link MLXShape}
- * ({@code reshape}/{@code broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the
- * {@code fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant}
- * ({@code quantize}/{@code dequantize}/{@code quantizedMatmul}) and {@link MLXRandom}
- * ({@code seed}/{@code normal}/{@code uniform}). This class does not delegate to them -- duplicating their javadoc here
+ * <p>req/phase4-plan.md M0a split this class: it keeps array creation ({@code array}; {@code
+ * zeros}/{@code ones}/ {@code full}/{@code arange} added in M0d), {@code eval}, {@code astype}
+ * (added in M0c) and the default device/stream accessors; every other op moved to a sibling in this
+ * package, split by kind -- {@link MLXOps} (elementwise/comparisons/reductions/{@code
+ * matmul}/{@code inner}/{@code outer}), {@link MLXShape} ({@code reshape}/{@code
+ * broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the {@code
+ * fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant} ({@code
+ * quantize}/{@code dequantize}/{@code quantizedMatmul}) and {@link MLXRandom} ({@code seed}/{@code
+ * normal}/{@code uniform}). This class does not delegate to them -- duplicating their javadoc here
  * would double the evidence base and let one copy go stale.
  *
- * <p>
- * Every op's result is allocated in the same scope as its first {@code MLXArray} operand; {@link #array} takes the
- * scope explicitly since it has no operand to infer one from.
+ * <p>Every op's result is allocated in the same scope as its first {@code MLXArray} operand; {@link
+ * #array} takes the scope explicitly since it has no operand to infer one from.
  *
- * <p>
- * {@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever mlx-c's own default device
- * is at first use, and cached for the process lifetime -- this slice does not expose device switching, so there is no
- * stale-cache hazard in practice. The resolved values live in {@link NativeOps}, which every op class (including this
- * one, for {@code eval}) needs direct access to; these methods are the public read of that shared state, not a
- * delegated op body.
+ * <p>{@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever
+ * mlx-c's own default device is at first use, and cached for the process lifetime -- this slice
+ * does not expose device switching, so there is no stale-cache hazard in practice. The resolved
+ * values live in {@link NativeOps}, which every op class (including this one, for {@code eval})
+ * needs direct access to; these methods are the public read of that shared state, not a delegated
+ * op body.
  */
 public final class MLX {
 
@@ -60,15 +60,22 @@ public final class MLX {
     return NativeOps.DEFAULT_STREAM;
   }
 
-  /** Creates a FLOAT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}. */
+  /**
+   * Creates a FLOAT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}.
+   */
   public static MLXArray array(MLXScope scope, float[] data, int[] shape) {
     long expected = 1;
     for (int dim : shape) {
       expected *= dim;
     }
     if (expected != data.length) {
-      throw new IllegalArgumentException("shape " + java.util.Arrays.toString(shape) + " (size " + expected
-          + ") does not match data length " + data.length);
+      throw new IllegalArgumentException(
+          "shape "
+              + java.util.Arrays.toString(shape)
+              + " (size "
+              + expected
+              + ") does not match data length "
+              + data.length);
     }
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeData = tmp.allocateFrom(ValueLayout.JAVA_FLOAT, data);
@@ -81,7 +88,8 @@ public final class MLX {
       // something dereferences the empty handle.
       NativeLoader.clearLastNativeError();
       MemorySegment handle =
-          mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_FLOAT32());
+          mlx_h.mlx_array_new_data(
+              scope, nativeData, nativeShape, shape.length, mlx_h.MLX_FLOAT32());
       if (mlx_array_.ctx(handle).address() == 0) {
         throw NativeOps.nativeFailure("mlx_array_new_data");
       }
@@ -89,22 +97,30 @@ public final class MLX {
     }
   }
 
-  /** Creates an INT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}. */
+  /**
+   * Creates an INT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}.
+   */
   public static MLXArray array(MLXScope scope, int[] data, int[] shape) {
     long expected = 1;
     for (int dim : shape) {
       expected *= dim;
     }
     if (expected != data.length) {
-      throw new IllegalArgumentException("shape " + java.util.Arrays.toString(shape) + " (size " + expected
-          + ") does not match data length " + data.length);
+      throw new IllegalArgumentException(
+          "shape "
+              + java.util.Arrays.toString(shape)
+              + " (size "
+              + expected
+              + ") does not match data length "
+              + data.length);
     }
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeData = tmp.allocateFrom(ValueLayout.JAVA_INT, data);
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
       // Same statusless-failure hazard as the float[] overload above.
       NativeLoader.clearLastNativeError();
-      MemorySegment handle = mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_INT32());
+      MemorySegment handle =
+          mlx_h.mlx_array_new_data(scope, nativeData, nativeShape, shape.length, mlx_h.MLX_INT32());
       if (mlx_array_.ctx(handle).address() == 0) {
         throw NativeOps.nativeFailure("mlx_array_new_data");
       }
@@ -117,8 +133,11 @@ public final class MLX {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
-      NativeOps.checked("zeros",
-          () -> mlx_h.mlx_zeros(res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+      NativeOps.checked(
+          "zeros",
+          () ->
+              mlx_h.mlx_zeros(
+                  res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
     }
     return new MLXArray(scope, res);
   }
@@ -128,26 +147,30 @@ public final class MLX {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
-      NativeOps.checked("ones",
-          () -> mlx_h.mlx_ones(res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+      NativeOps.checked(
+          "ones",
+          () ->
+              mlx_h.mlx_ones(
+                  res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
     }
     return new MLXArray(scope, res);
   }
 
   /**
-   * Creates a {@code shape}-shaped {@code dtype} array filled with {@code value}, in {@code scope}. Not a pure creation
-   * op (req/phase4-plan.md §3): {@code mlx_full}'s fill value is itself an {@code mlx_array} (upstream
-   * {@code ops.h:437-443}), so {@code value} first becomes a throwaway scalar via mlx-c's own statusless
-   * {@code mlx_array_new_bool}/{@code _int}/{@code _float32} (picked by {@code dtype}) -- the same null-ctx-on-failure
-   * hazard {@link #array} already handles -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only
-   * reads it, it does not adopt it.
+   * Creates a {@code shape}-shaped {@code dtype} array filled with {@code value}, in {@code scope}.
+   * Not a pure creation op (req/phase4-plan.md §3): {@code mlx_full}'s fill value is itself an
+   * {@code mlx_array} (upstream {@code ops.h:437-443}), so {@code value} first becomes a throwaway
+   * scalar via mlx-c's own statusless {@code mlx_array_new_bool}/{@code _int}/{@code _float32}
+   * (picked by {@code dtype}) -- the same null-ctx-on-failure hazard {@link #array} already handles
+   * -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only reads it, it does
+   * not adopt it.
    *
-   * <p>
-   * Rejects a {@code value} unrepresentable in {@code dtype} when {@code dtype == UINT32}: that branch funnels through
-   * {@code mlx_array_new_float32} and lets mlx narrow the float32 scalar to {@code uint32_t} itself, and per
-   * [conv.fpint]/1 a float-to-integer conversion is undefined behaviour whenever the truncated value does not fit the
-   * target type -- not only for negatives, but also for {@code NaN} and any value {@code >= 2^32}. {@code INT32} has no
-   * equivalent hole: its branch narrows via Java's own {@code (int) value} cast first, which JLS 5.1.3 defines as
+   * <p>Rejects a {@code value} unrepresentable in {@code dtype} when {@code dtype == UINT32}: that
+   * branch funnels through {@code mlx_array_new_float32} and lets mlx narrow the float32 scalar to
+   * {@code uint32_t} itself, and per [conv.fpint]/1 a float-to-integer conversion is undefined
+   * behaviour whenever the truncated value does not fit the target type -- not only for negatives,
+   * but also for {@code NaN} and any value {@code >= 2^32}. {@code INT32} has no equivalent hole:
+   * its branch narrows via Java's own {@code (int) value} cast first, which JLS 5.1.3 defines as
    * saturating with {@code NaN -> 0}, before the value ever reaches native.
    */
   public static MLXArray full(MLXScope scope, int[] shape, float value, DType dtype) {
@@ -159,19 +182,28 @@ public final class MLX {
       // constructors signal failure only via the error handler plus a
       // null-ctx return, not a status checked() can see.
       NativeLoader.clearLastNativeError();
-      MemorySegment scalar = switch (dtype) {
-        case BOOL -> mlx_h.mlx_array_new_bool(tmp, value != 0f);
-        case INT32 -> mlx_h.mlx_array_new_int(tmp, (int) value);
-        default -> mlx_h.mlx_array_new_float32(tmp, value);
-      };
+      MemorySegment scalar =
+          switch (dtype) {
+            case BOOL -> mlx_h.mlx_array_new_bool(tmp, value != 0f);
+            case INT32 -> mlx_h.mlx_array_new_int(tmp, (int) value);
+            default -> mlx_h.mlx_array_new_float32(tmp, value);
+          };
       if (mlx_array_.ctx(scalar).address() == 0) {
         throw NativeOps.nativeFailure("full: mlx_array_new_" + dtype);
       }
       try {
         MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
         MemorySegment res = mlx_h.mlx_array_new(scope);
-        NativeOps.checked("full", () -> mlx_h.mlx_full(res, nativeShape, shape.length, scalar, dtype.nativeValue(),
-            NativeOps.DEFAULT_STREAM));
+        NativeOps.checked(
+            "full",
+            () ->
+                mlx_h.mlx_full(
+                    res,
+                    nativeShape,
+                    shape.length,
+                    scalar,
+                    dtype.nativeValue(),
+                    NativeOps.DEFAULT_STREAM));
         return new MLXArray(scope, res);
       } finally {
         mlx_h.mlx_array_free(scalar);
@@ -180,50 +212,55 @@ public final class MLX {
   }
 
   /**
-   * Creates a {@code dtype} array in {@code scope} counting from {@code start} to {@code stop} (exclusive) by
-   * {@code step}.
+   * Creates a {@code dtype} array in {@code scope} counting from {@code start} to {@code stop}
+   * (exclusive) by {@code step}.
    *
-   * <p>
-   * Rejects {@code step == 0} in Java: upstream {@code mlx::core::arange} (v0.31.2 {@code mlx/ops.cpp}) validates NaN
-   * in any of {@code start}/{@code stop}/{@code step} and infinite {@code start}/{@code stop} up front -- an infinite
-   * {@code step} is special-cased into an early return rather than rejected -- but only ever computes
-   * {@code real_size = ceil((stop - start) / step)} afterward -- so {@code step == 0} with {@code stop == start}
-   * reaches that division as {@code 0.0 / 0.0 == NaN}, which is not caught by the earlier checks or by the subsequent
-   * {@code real_size > INT_MAX} guard (a NaN comparison is always false), and flows into
-   * {@code static_cast<int>(real_size)} -- C++ undefined behaviour for a NaN operand, the same UB class
+   * <p>Rejects {@code step == 0} in Java: upstream {@code mlx::core::arange} (v0.31.2 {@code
+   * mlx/ops.cpp}) validates NaN in any of {@code start}/{@code stop}/{@code step} and infinite
+   * {@code start}/{@code stop} up front -- an infinite {@code step} is special-cased into an early
+   * return rather than rejected -- but only ever computes {@code real_size = ceil((stop - start) /
+   * step)} afterward -- so {@code step == 0} with {@code stop == start} reaches that division as
+   * {@code 0.0 / 0.0 == NaN}, which is not caught by the earlier checks or by the subsequent {@code
+   * real_size > INT_MAX} guard (a NaN comparison is always false), and flows into {@code
+   * static_cast<int>(real_size)} -- C++ undefined behaviour for a NaN operand, the same UB class
    * {@link MLXShape#slice(MLXArray, int[], int[], int[])}'s zero-stride guard exists for.
    */
-  public static MLXArray arange(MLXScope scope, double start, double stop, double step, DType dtype) {
+  public static MLXArray arange(
+      MLXScope scope, double start, double stop, double step, DType dtype) {
     if (step == 0) {
       throw new IllegalArgumentException("arange: step must not be 0");
     }
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    NativeOps.checked("arange",
-        () -> mlx_h.mlx_arange(res, start, stop, step, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    NativeOps.checked(
+        "arange",
+        () ->
+            mlx_h.mlx_arange(
+                res, start, stop, step, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
     return new MLXArray(scope, res);
   }
 
   /**
-   * Lifts {@code a} into {@code target}, which must be {@code a}'s own scope or an ancestor of it. Copy, not move:
-   * after the scope that owns {@code a} closes, use the returned array and never {@code a} again.
+   * Lifts {@code a} into {@code target}, which must be {@code a}'s own scope or an ancestor of it.
+   * Copy, not move: after the scope that owns {@code a} closes, use the returned array and never
+   * {@code a} again.
    *
-   * <p>
-   * Safe even though {@code a}'s scope may close immediately after: an mlx {@code ArrayDesc} owns its graph inputs
-   * <em>by value</em>, and each {@code array} is a {@code shared_ptr<ArrayDesc>}, so the returned array holds a
-   * refcount on every input's descriptor. Freeing {@code a}'s own handle only decrements a refcount; it cannot touch
-   * the graph the lifted output still references (req/phase4-plan.md §2, Research findings).
+   * <p>Safe even though {@code a}'s scope may close immediately after: an mlx {@code ArrayDesc}
+   * owns its graph inputs <em>by value</em>, and each {@code array} is a {@code
+   * shared_ptr<ArrayDesc>}, so the returned array holds a refcount on every input's descriptor.
+   * Freeing {@code a}'s own handle only decrements a refcount; it cannot touch the graph the lifted
+   * output still references (req/phase4-plan.md §2, Research findings).
    *
-   * <p>
-   * {@code target == a.scope()} is legal and returns {@code a} itself -- {@code isAncestorOf} is reflexive.
-   * Deliberately identity, not a copy, in that case: source and target are the same scope, so both handles would die
-   * together anyway, and an unconditional hoist in a loop would otherwise accumulate one fresh handle per iteration in
-   * the target scope. Consequence: in the reflexive case the result <em>aliases</em> the argument, so closing one
-   * closes the other.
+   * <p>{@code target == a.scope()} is legal and returns {@code a} itself -- {@code isAncestorOf} is
+   * reflexive. Deliberately identity, not a copy, in that case: source and target are the same
+   * scope, so both handles would die together anyway, and an unconditional hoist in a loop would
+   * otherwise accumulate one fresh handle per iteration in the target scope. Consequence: in the
+   * reflexive case the result <em>aliases</em> the argument, so closing one closes the other.
    */
   public static MLXArray hoist(MLXArray a, MLXScope target) {
     MLXScope source = a.scope();
     if (!target.isAncestorOf(source)) {
-      throw new IllegalArgumentException("hoist: target must be a's own scope or an ancestor of it");
+      throw new IllegalArgumentException(
+          "hoist: target must be a's own scope or an ancestor of it");
     }
     if (target == source) {
       return a;
@@ -234,21 +271,25 @@ public final class MLX {
   }
 
   /**
-   * Casts {@code a} to {@code dtype} (mlx-c's {@code mlx_astype}), allocating the result into {@code a}'s own scope.
-   * See req/phase4-plan.md §4: this is what lets {@link MLXArray#toFloatArray()} read back {@code FLOAT16}/
-   * {@code BFLOAT16} arrays, and what makes a mixed inexact/exact {@link MLXOps#matmul} pair reachable rather than a
-   * case this facade could only assert was impossible.
+   * Casts {@code a} to {@code dtype} (mlx-c's {@code mlx_astype}), allocating the result into
+   * {@code a}'s own scope. See req/phase4-plan.md §4: this is what lets {@link
+   * MLXArray#toFloatArray()} read back {@code FLOAT16}/ {@code BFLOAT16} arrays, and what makes a
+   * mixed inexact/exact {@link MLXOps#matmul} pair reachable rather than a case this facade could
+   * only assert was impossible.
    */
   public static MLXArray astype(MLXArray a, DType dtype) {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    NativeOps.checked("astype", () -> mlx_h.mlx_astype(res, a.handle(), dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+    NativeOps.checked(
+        "astype",
+        () -> mlx_h.mlx_astype(res, a.handle(), dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
     return new MLXArray(scope, res);
   }
 
   /**
-   * {@code hoist(a, a.scope().parent())}. Throws {@link IllegalStateException} for an array in a root scope --
-   * deliberately not a {@link NullPointerException} from an unchecked {@code parent()} dereference.
+   * {@code hoist(a, a.scope().parent())}. Throws {@link IllegalStateException} for an array in a
+   * root scope -- deliberately not a {@link NullPointerException} from an unchecked {@code
+   * parent()} dereference.
    */
   public static MLXArray keep(MLXArray a) {
     MLXScope parent = a.scope().parent();
@@ -263,26 +304,27 @@ public final class MLX {
   // on device, in a single scheduling pass rather than one pass per array.
   /**
    * Explicitly triggers computation for the given arrays, via a single {@code mlx_eval} over an
-   * {@code mlx_vector_array} rather than one {@code mlx_array_eval} per array. This schedules all N graphs before
-   * waiting on any of them, so all N sets of intermediates are live simultaneously, in principle at the cost of peak
-   * memory relative to evaluating one array at a time (which would let each graph's temporaries be released before the
-   * next begins). In practice, per req/phase3-plan.md §4, that effect was measured as unobservable through this
-   * facade's ownership model: every op result -- intermediate or final -- is registered with its {@link MLXScope} the
-   * instant the op is invoked and is only freed at scope close, regardless of eval strategy, so nothing this facade
-   * builds is ever eligible for differential early free. Two rounds of measurement (single-op and multi-op lazy chains,
-   * 6 trials total) found a delta of exactly 0 bytes. The underlying native-level tradeoff remains real in principle
-   * for mlx-c graphs whose intermediates are <em>not</em> independently referenced by anything outside the graph, but
-   * that case wasn't -- and structurally couldn't be -- exercised by this facade's measurement.
+   * {@code mlx_vector_array} rather than one {@code mlx_array_eval} per array. This schedules all N
+   * graphs before waiting on any of them, so all N sets of intermediates are live simultaneously,
+   * in principle at the cost of peak memory relative to evaluating one array at a time (which would
+   * let each graph's temporaries be released before the next begins). In practice, per
+   * req/phase3-plan.md §4, that effect was measured as unobservable through this facade's ownership
+   * model: every op result -- intermediate or final -- is registered with its {@link MLXScope} the
+   * instant the op is invoked and is only freed at scope close, regardless of eval strategy, so
+   * nothing this facade builds is ever eligible for differential early free. Two rounds of
+   * measurement (single-op and multi-op lazy chains, 6 trials total) found a delta of exactly 0
+   * bytes. The underlying native-level tradeoff remains real in principle for mlx-c graphs whose
+   * intermediates are <em>not</em> independently referenced by anything outside the graph, but that
+   * case wasn't -- and structurally couldn't be -- exercised by this facade's measurement.
    *
-   * <p>
-   * There is deliberately no same-scope check here (unlike {@code binaryOp}): {@code eval} allocates no result, so
-   * there is no "which scope owns the output" question to settle, and evaluating arrays from two scopes on one thread
-   * is legitimate.
+   * <p>There is deliberately no same-scope check here (unlike {@code binaryOp}): {@code eval}
+   * allocates no result, so there is no "which scope owns the output" question to settle, and
+   * evaluating arrays from two scopes on one thread is legitimate.
    *
-   * <p>
-   * On failure, re-runs the per-array {@code mlx_array_eval} loop to identify the first array whose own evaluation
-   * reproduces the failure -- the one diagnostic the joint form loses -- and rethrows with that array's index; if the
-   * re-run cannot reproduce the failure, the original exception is rethrown unchanged rather than masked.
+   * <p>On failure, re-runs the per-array {@code mlx_array_eval} loop to identify the first array
+   * whose own evaluation reproduces the failure -- the one diagnostic the joint form loses -- and
+   * rethrows with that array's index; if the re-run cannot reproduce the failure, the original
+   * exception is rethrown unchanged rather than masked.
    */
   public static void eval(MLXArray... arrays) {
     int n = arrays.length;
@@ -317,14 +359,15 @@ public final class MLX {
   }
 
   /**
-   * Builds an {@code mlx_vector_array} over {@code handles}, backed by a raw struct-array copy allocated from
-   * {@code allocator}. Factored out of {@link #eval} because {@code mlx_async_eval} (upstream {@code transforms.h:31})
-   * takes the same {@code mlx_vector_array} and would reuse this verbatim.
+   * Builds an {@code mlx_vector_array} over {@code handles}, backed by a raw struct-array copy
+   * allocated from {@code allocator}. Factored out of {@link #eval} because {@code mlx_async_eval}
+   * (upstream {@code transforms.h:31}) takes the same {@code mlx_vector_array} and would reuse this
+   * verbatim.
    *
-   * <p>
-   * {@code allocator} MUST be a confined {@link Arena} (never an {@link MLXScope}): the vector's backing struct array
-   * is not an {@code mlx_array} this method's caller will ever hand to {@code mlx_array_free}, so allocating it through
-   * a scope would corrupt that scope's handle-tracking invariant -- a wrong-type delete, not a caught exception.
+   * <p>{@code allocator} MUST be a confined {@link Arena} (never an {@link MLXScope}): the vector's
+   * backing struct array is not an {@code mlx_array} this method's caller will ever hand to {@code
+   * mlx_array_free}, so allocating it through a scope would corrupt that scope's handle-tracking
+   * invariant -- a wrong-type delete, not a caught exception.
    */
   private static MemorySegment newVectorArray(MemorySegment[] handles, Arena allocator) {
     int n = handles.length;
@@ -355,12 +398,13 @@ public final class MLX {
   }
 
   /**
-   * Re-runs the per-array {@code mlx_array_eval} loop to name the offender after the joint {@code mlx_eval} above
-   * failed; rethrows {@code original} unchanged if the re-run cannot reproduce the failure, so this never masks the
-   * error it is trying to describe. When the re-run does reproduce it, the returned exception's message folds in the
-   * per-array native text (not just its index) so it is visible from {@code getMessage()} without navigating
-   * {@code getCause()}, and {@code original} -- the joint failure that triggered this re-run -- is attached as a
-   * suppressed exception rather than discarded.
+   * Re-runs the per-array {@code mlx_array_eval} loop to name the offender after the joint {@code
+   * mlx_eval} above failed; rethrows {@code original} unchanged if the re-run cannot reproduce the
+   * failure, so this never masks the error it is trying to describe. When the re-run does reproduce
+   * it, the returned exception's message folds in the per-array native text (not just its index) so
+   * it is visible from {@code getMessage()} without navigating {@code getCause()}, and {@code
+   * original} -- the joint failure that triggered this re-run -- is attached as a suppressed
+   * exception rather than discarded.
    */
   private static MLXException attributeEvalFailure(MLXException original, MemorySegment[] handles) {
     for (int i = 0; i < handles.length; i++) {
@@ -373,7 +417,8 @@ public final class MLX {
       try {
         NativeOps.checked(() -> mlx_h.mlx_array_eval(h));
       } catch (MLXException perArray) {
-        MLXException attributed = new MLXException("eval: array[" + i + "] failed: " + perArray.getMessage(), perArray);
+        MLXException attributed =
+            new MLXException("eval: array[" + i + "] failed: " + perArray.getMessage(), perArray);
         attributed.addSuppressed(original);
         return attributed;
       }

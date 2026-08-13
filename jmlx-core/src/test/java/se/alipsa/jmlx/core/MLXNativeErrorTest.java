@@ -8,9 +8,10 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Native error path": a genuine native error surfaces as
- * {@link MLXException}, not a process abort. Every other test in this module is a happy path; this is the one proving
- * the §5 error-handler mitigation actually works, since mlx-c's default error handler calls exit(-1).
+ * See req/initial-plan.md, Testing approach, "Native error path": a genuine native error surfaces
+ * as {@link MLXException}, not a process abort. Every other test in this module is a happy path;
+ * this is the one proving the §5 error-handler mitigation actually works, since mlx-c's default
+ * error handler calls exit(-1).
  */
 @EnabledIfNativeAvailable
 class MLXNativeErrorTest {

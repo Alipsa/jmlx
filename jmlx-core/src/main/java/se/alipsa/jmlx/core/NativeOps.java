@@ -2,9 +2,11 @@ package se.alipsa.jmlx.core;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentAllocator;
 import java.lang.foreign.ValueLayout;
 import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
+import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -164,6 +166,17 @@ final class NativeOps {
   @FunctionalInterface
   interface Axis2Op {
     int apply(MemorySegment res, MemorySegment a, int axis1, int axis2, MemorySegment stream);
+  }
+
+  /**
+   * The native "null" for a by-value nullable {@code mlx_array} parameter (e.g. {@code mlx_fast_rms_norm}'s
+   * {@code weight}, {@code mlx_random_normal}'s {@code key}): a zero-{@code ctx} struct, never
+   * {@link MemorySegment#NULL} -- passing {@code MemorySegment.NULL} where mlx-c expects a by-value struct is a
+   * segfault, not an exception (req/phase4-plan.md, Research findings). {@link SegmentAllocator#allocate} zero-fills by
+   * default, so allocating one fresh {@code mlx_array_} struct from {@code tmp} already IS the null value.
+   */
+  static MemorySegment nullableHandle(MLXArray a, SegmentAllocator tmp) {
+    return a == null ? tmp.allocate(mlx_array_.layout()) : a.handle();
   }
 
   /**

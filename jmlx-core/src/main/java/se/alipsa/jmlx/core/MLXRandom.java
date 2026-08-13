@@ -1,5 +1,13 @@
 package se.alipsa.jmlx.core;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import se.alipsa.jmlx.ffi.NativeLoader;
+import se.alipsa.jmlx.ffi.mlx_array_;
+import se.alipsa.jmlx.ffi.mlx_h;
+import se.alipsa.jmlx.memory.MLXScope;
+
 /**
  * Home for {@code seed}, {@code normal}, {@code uniform} and (if a caller ever needs explicit keys) {@code key}/
  * {@code split} (req/phase4-plan.md §1, §5). Empty until M1's weight initialization needs it; created now, during M0a's
@@ -9,4 +17,67 @@ package se.alipsa.jmlx.core;
 public final class MLXRandom {
 
   private MLXRandom() {}
+
+  /**
+   * Seeds mlx's global RNG state ({@code mlx_random_seed}). No result and no stream: this affects process-wide state.
+   */
+  public static void seed(long seed) {
+    NativeOps.checked("seed", () -> mlx_h.mlx_random_seed(seed));
+  }
+
+  /**
+   * Draws a {@code shape}-shaped {@code dtype} array from a normal distribution ({@code mlx_random_normal}) with mean
+   * {@code loc} and standard deviation {@code scale}. Unlike {@code uniform}'s {@code low}/{@code high}, {@code loc}/
+   * {@code scale} are genuinely plain {@code float} parameters in the native signature, not {@code mlx_array} -- no
+   * scalar-array bridge is needed here. {@code key} is always the RNG's own default (a Java {@code null} through
+   * {@link NativeOps#nullableHandle}); this facade does not yet expose explicit keys.
+   */
+  public static MLXArray normal(MLXScope scope, int[] shape, DType dtype, float loc, float scale) {
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      MemorySegment key = NativeOps.nullableHandle(null, tmp);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      NativeOps.checked("normal", () -> mlx_h.mlx_random_normal(res, nativeShape, shape.length, dtype.nativeValue(),
+          loc, scale, key, NativeOps.DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
+
+  /**
+   * Builds a single-element {@code dtype}-narrowed scalar {@code mlx_array} from {@code value}, via mlx-c's own
+   * statusless {@code mlx_array_new_float32} -- the same null-{@code ctx}-on-failure hazard {@link MLX#array} and
+   * {@link MLX#full} already handle. Factored out of {@link #uniform} so the four-line check is not duplicated once for
+   * {@code low} and once for {@code high}.
+   */
+  private static MemorySegment float32Scalar(String opName, float value, Arena tmp) {
+    NativeLoader.clearLastNativeError();
+    MemorySegment scalar = mlx_h.mlx_array_new_float32(tmp, value);
+    if (mlx_array_.ctx(scalar).address() == 0) {
+      throw NativeOps.nativeFailure(opName + ": mlx_array_new_float32");
+    }
+    return scalar;
+  }
+
+  /**
+   * Draws a {@code shape}-shaped {@code dtype} array from a uniform distribution over {@code [low, high)} ({@code
+   * mlx_random_uniform}). Unlike {@code normal}'s {@code loc}/{@code scale}, mlx-c's {@code low}/{@code high} are real
+   * {@code mlx_array} parameters passed by value, not {@code float} -- so the Java-facing {@code float low}/
+   * {@code float high} are each first turned into a throwaway scalar array via {@link #float32Scalar}. Those scalars
+   * need no explicit free: they are allocated from {@code tmp}, a confined {@link Arena} closed at the end of this
+   * method, unlike {@link MLX#full}'s scalar (allocated from the same {@code tmp} used for the shape array too, and
+   * freed early via its own {@code finally} for a reason specific to that method) -- there is nothing here that needs
+   * freeing before {@code tmp} closes. {@code key} is always the RNG's own default, as in {@link #normal}.
+   */
+  public static MLXArray uniform(MLXScope scope, int[] shape, DType dtype, float low, float high) {
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment lowScalar = float32Scalar("uniform", low, tmp);
+      MemorySegment highScalar = float32Scalar("uniform", high, tmp);
+      MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      MemorySegment key = NativeOps.nullableHandle(null, tmp);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      NativeOps.checked("uniform", () -> mlx_h.mlx_random_uniform(res, lowScalar, highScalar, nativeShape, shape.length,
+          dtype.nativeValue(), key, NativeOps.DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
 }

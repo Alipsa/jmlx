@@ -233,4 +233,50 @@ public final class MLXShape {
       return new MLXArray(scope, res);
     }
   }
+
+  /** Concatenates {@code arrays} along {@code axis}; every array must agree on every other axis. */
+  public static MLXArray concatenate(MLXArray[] arrays, int axis) {
+    if (arrays.length == 0) {
+      throw new IllegalArgumentException("concatenate: requires at least one array");
+    }
+    return NativeOps.vectorInOp("concatenate", arrays, axis, mlx_h::mlx_concatenate_axis);
+  }
+
+  /** Splits {@code a} into {@code numSplits} equal-size parts along {@code axis}, in order. */
+  public static MLXArray[] split(MLXArray a, int numSplits, int axis) {
+    return NativeOps.vectorOutOp(
+        "split",
+        a.scope(),
+        (vec, stream) -> mlx_h.mlx_split(vec, a.handle(), numSplits, axis, stream));
+  }
+
+  /** Inserts a new size-1 axis at position {@code axis}. */
+  public static MLXArray expandDims(MLXArray a, int axis) {
+    return NativeOps.axisOp("expandDims", a, axis, mlx_h::mlx_expand_dims);
+  }
+
+  /**
+   * Merges the axes from {@code startAxis} to {@code endAxis} (inclusive) into a single axis. Fits
+   * the existing {@link NativeOps#axis2Op} exactly -- same {@code (res, a, int, int, stream)} shape
+   * as {@code mlx_swapaxes} -- so no new helper is needed for this op.
+   */
+  public static MLXArray flatten(MLXArray a, int startAxis, int endAxis) {
+    return NativeOps.axis2Op("flatten", a, startAxis, endAxis, mlx_h::mlx_flatten);
+  }
+
+  /**
+   * Zeroes every element strictly above the {@code k}-th diagonal (the upper triangle kept is
+   * {@code k} diagonals above the main one; {@code k=0} keeps the main diagonal).
+   */
+  public static MLXArray tril(MLXArray a, int k) {
+    return NativeOps.axisOp("tril", a, k, mlx_h::mlx_tril);
+  }
+
+  /**
+   * Zeroes every element strictly below the {@code k}-th diagonal -- the complement of {@link
+   * #tril}. {@code triu(ones(shape, BOOL), 1)} is the standard strictly-upper causal mask.
+   */
+  public static MLXArray triu(MLXArray a, int k) {
+    return NativeOps.axisOp("triu", a, k, mlx_h::mlx_triu);
+  }
 }

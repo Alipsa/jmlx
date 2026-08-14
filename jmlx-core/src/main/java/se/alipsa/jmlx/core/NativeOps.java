@@ -8,6 +8,8 @@ import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
+import se.alipsa.jmlx.ffi.mlx_optional_float_;
+import se.alipsa.jmlx.ffi.mlx_vector_array_;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
@@ -199,6 +201,25 @@ final class NativeOps {
   }
 
   /**
+   * Wraps the {@code (res, a, int, stream)} native shape shared by {@code mlx_expand_dims}, {@code
+   * mlx_tril} and {@code mlx_triu} (req/phase4-plan.md §7's Native surface table). Unlike {@code
+   * axis2Op}, this is a single caller-supplied int -- an axis for {@code expandDims}, a diagonal
+   * offset {@code k} for {@code tril}/{@code triu} -- not necessarily an axis in every case, so the
+   * parameter is named generically in the functional interface below.
+   */
+  static MLXArray axisOp(String opName, MLXArray a, int param, AxisOp op) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    checked(opName, () -> op.apply(res, a.handle(), param, DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  @FunctionalInterface
+  interface AxisOp {
+    int apply(MemorySegment res, MemorySegment a, int param, MemorySegment stream);
+  }
+
+  /**
    * The native "null" for a by-value nullable {@code mlx_array} parameter (e.g. {@code
    * mlx_fast_rms_norm}'s {@code weight}, {@code mlx_random_normal}'s {@code key}): a zero-{@code
    * ctx} struct, never {@link MemorySegment#NULL} -- passing {@code MemorySegment.NULL} where mlx-c
@@ -213,6 +234,34 @@ final class NativeOps {
       return a.handle();
     }
     return tmp.allocate(mlx_array_.layout()).fill((byte) 0);
+  }
+
+  /**
+   * The native encoding of an {@code mlx_optional_float} by-value struct (req/phase4-plan.md §7's
+   * Native surface table: 8 bytes, {@code {float value; bool has_value;}}, no native constructor
+   * function -- allocate and set both fields, the same shape spec §6 describes for the sibling
+   * {@code mlx_optional_int}). {@code value == null} encodes "absent" ({@code has_value=false});
+   * the {@code value} field is left at {@code 0f} in that case, which mlx-c never reads (see {@code
+   * mlx_optional_float_.value}'s getter contract -- it is caller-supplied storage, not itself
+   * consulted for validity).
+   */
+  static MemorySegment optFloat(Arena tmp, Float value) {
+    MemorySegment seg = mlx_optional_float_.allocate(tmp);
+    mlx_optional_float_.value(seg, value != null ? value : 0f);
+    mlx_optional_float_.has_value(seg, value != null);
+    return seg;
+  }
+
+  /**
+   * Allocates a NUL-terminated C string once, in {@link #FACADE_ARENA} -- for the closed-set {@code
+   * const char*} parameters this facade's mlx-c surface uses (SDPA's {@code mask_mode}), which
+   * never need per-call allocation (req/phase4-plan.md §7's Native surface table). Callers store
+   * the result in a {@code private static final MemorySegment} field per distinct literal, exactly
+   * like {@link #DEFAULT_STREAM} -- this method allocates on every call, so it must only ever be
+   * invoked from a static initializer, never per-op.
+   */
+  static MemorySegment cstr(String s) {
+    return FACADE_ARENA.allocateFrom(s);
   }
 
   /**
@@ -238,6 +287,78 @@ final class NativeOps {
       MemorySegment.copy(handles[i], 0L, buf, i * elementSize, elementSize);
     }
     return buf;
+  }
+
+  /**
+   * Wraps an op taking an {@code mlx_vector_array} <em>input</em> by value (e.g. {@code
+   * mlx_concatenate_axis}) plus a caller-supplied {@code axis}. Resolves the result's scope via
+   * {@link #scopeOf} over every element of {@code xs} -- the ancestor rule generalized to N
+   * operands (req/phase4-plan.md §3). Builds the {@code mlx_vector_array} itself via {@link
+   * #copyHandlesInto} rather than delegating to {@code MLX.newVectorArray}: this class depends on
+   * nothing else in this package (see the class javadoc), and calling into {@code MLX} here would
+   * be the one exception.
+   */
+  static MLXArray vectorInOp(String opName, MLXArray[] xs, int axis, VectorInOp op) {
+    MLXScope scope = scopeOf(opName, xs);
+    MemorySegment[] handles = new MemorySegment[xs.length];
+    for (int i = 0; i < xs.length; i++) {
+      handles[i] = xs[i].handle();
+    }
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment buf = copyHandlesInto(handles, tmp);
+      // mlx_vector_array_new_data is statusless -- same null-ctx-on-failure hazard MLX.array and
+      // MLX.newVectorArray already guard against explicitly.
+      NativeLoader.clearLastNativeError();
+      MemorySegment vec = mlx_h.mlx_vector_array_new_data(tmp, buf, handles.length);
+      if (mlx_vector_array_.ctx(vec).address() == 0) {
+        throw nativeFailure("mlx_vector_array_new_data");
+      }
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      checked(opName, () -> op.apply(res, vec, axis, DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
+
+  @FunctionalInterface
+  interface VectorInOp {
+    int apply(MemorySegment res, MemorySegment arrays, int axis, MemorySegment stream);
+  }
+
+  /**
+   * Wraps an op producing an {@code mlx_vector_array} <em>output</em> (e.g. {@code mlx_split}).
+   * {@code target} is an explicit parameter, not inferred from an operand, purely for legibility
+   * (req/phase4-plan.md §3: "its inputs may be none" was a false justification in an earlier draft
+   * of that document -- {@code mlx_split}'s {@code a} operand does exist -- the real reason is that
+   * this helper's whole hazard is two allocators with opposite correct answers on adjacent lines,
+   * and naming the target in the signature keeps that contrast visible at the call site).
+   *
+   * <p>{@code op} is invoked with only {@code (vec, stream)}; any other native parameters (the
+   * source array, {@code num_splits}, an axis, ...) are captured by the caller's lambda, the same
+   * pattern {@link #checked(String, IntSupplier)} already uses throughout this class.
+   */
+  static MLXArray[] vectorOutOp(String opName, MLXScope target, VectorOutOp op) {
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment vec = mlx_h.mlx_vector_array_new(tmp); // tmp -- NOT target
+      try {
+        checked(opName, () -> op.apply(vec, DEFAULT_STREAM));
+        long n = mlx_h.mlx_vector_array_size(vec);
+        MLXArray[] out = new MLXArray[(int) n];
+        for (int i = 0; i < n; i++) {
+          MemorySegment h = mlx_h.mlx_array_new(target); // target -- NOT tmp
+          final long idx = i;
+          checked(opName, () -> mlx_h.mlx_vector_array_get(h, vec, idx));
+          out[i] = new MLXArray(target, h);
+        }
+        return out;
+      } finally {
+        mlx_h.mlx_vector_array_free(vec);
+      }
+    }
+  }
+
+  @FunctionalInterface
+  interface VectorOutOp {
+    int apply(MemorySegment vec, MemorySegment stream);
   }
 
   /**

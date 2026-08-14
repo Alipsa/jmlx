@@ -2,7 +2,7 @@
 
 ## Status — update this section as work lands
 
-**Branch:** `worktree-phase4-m2`, off `main` at `0855ef5` (PR #7 merged, M1 done).
+**Branch:** `worktree-phase4-m3`, off `main` at `8bb08ad` (PR #8 merged, M2 done).
 
 | Item | Status | Commit |
 |---|---|---|
@@ -14,7 +14,7 @@
 | Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
 | M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
 | M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | [PR #8](https://github.com/Alipsa/jmlx/pull/8), `7173d24` |
-| M3 — RoPE, MultiHeadAttention, KV cache (§7) | Not started | — |
+| M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | this branch, see req/plans/phase4-m3-plan.md |
 | M4 — `QuantizedLinear` (§8) | Not started | — |
 | §9 — Documentation | Not started | — |
 | §10 — CI, self-hosted runner (see note below) | Not started | — |
@@ -47,6 +47,34 @@ Restore survives both the step scope closing and a throwing loss body, confirmed
 on the restored references (not just equal values) so a use-after-free into a closed step scope
 would have been caught. **Nothing in §6's rebinding design was falsified — proceed with M2 as
 written.**
+
+**M3 findings** (RoPE/SDPA, confirmed against real mlx-c on Apple Silicon hardware, not assumed —
+see req/plans/phase4-m3-plan.md's own "Findings from this plan's pre-work" for the probes). RoPE
+(`mlx_fast_rope`, `traditional=false`): half-split pairing `(x_i, x_{i+d/2})`, `freq_i =
+base^(-2i/d)`, `angle_i = offset*scale*freq_i`, standard 2D rotation. SDPA
+(`mlx_fast_scaled_dot_product_attention`) `mask_mode` semantics: `""`/`"causal"`/`"array"`;
+`"causal"` bottom-aligns a shorter query against a longer key/value (row `i` of queries is treated
+as absolute position `keys.shape()[-2] - queries.shape()[-2] + i`) — the exact mechanism that makes
+a single `causal` flag correct for both full-sequence prefill and single-token decode against a KV
+cache, with zero custom masking code needed in `MultiHeadAttention`; `"array"` mode is additive for
+float masks (large negative = masked out) and boolean for `BOOL` masks (`true`=attend,
+`false`=mask out).
+
+**M3's KVCache memory-growth bug, found and fixed during Task 3.** `NativeOps.vectorInOp` (added in
+Task 1) built its `mlx_vector_array` via `mlx_vector_array_new_data` but never called
+`mlx_vector_array_free` on it — its sibling `vectorOutOp` frees correctly, in a `finally`; the
+asymmetry was the tell. This leaked one refcount per `concatenate` operand on every call: invisible
+in a single call (nothing in Task 1's own tests chains `concatenate`), but `O(N^2)` active memory in
+`KVCache`'s decode-loop shape, since each step's leak permanently pinned that step's entire history
+alive. An initial theory blamed this on mlx's `ArrayDesc.inputs`-by-value graph retention being
+fundamentally unavoidable without a bound `array::detach()` (which `mlx-c` does not expose) — that
+theory was wrong; the leak was the missing `free()`, one layer below the graph itself. Fixed by
+freeing the vector unconditionally in a `finally`, mirroring `vectorOutOp`'s existing pattern
+(`NativeOps.vectorInOp`); regression-tested by `MLXMemoryLeakTest#activeMemoryDoesNotGrowWithConcatenateInTheLoop`.
+Once fixed, `KVCache.append`'s original plain-`hoist`-then-`close` design (from the brief) already
+achieves linear growth — no design change to `KVCache` itself was needed. `KVCache` still
+accumulates without eviction (deliberately out of scope for this milestone — see the plan's
+"Deliberately not covered" section).
 
 **Resume instructions.** Once PR #5 merges, continue with M1 (§5) on a fresh branch off `main`.
 Probes 0b/0f were scratch classes against raw `jmlx-ffi` closure bindings with no permanent home

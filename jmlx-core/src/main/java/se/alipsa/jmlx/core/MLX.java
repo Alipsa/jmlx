@@ -362,23 +362,17 @@ public final class MLX {
    * Builds an {@code mlx_vector_array} over {@code handles}, backed by a raw struct-array copy
    * allocated from {@code allocator}. Factored out of {@link #eval} because {@code mlx_async_eval}
    * (upstream {@code transforms.h:31}) takes the same {@code mlx_vector_array} and would reuse this
-   * verbatim.
+   * verbatim; package-private (not {@code private}) since {@link MLXGrad#valueAndGrad} builds the
+   * same shape of input vector for {@code mlx_closure_value_and_grad_apply} (req/phase4-plan.md
+   * §6).
    *
    * <p>{@code allocator} MUST be a confined {@link Arena} (never an {@link MLXScope}): the vector's
    * backing struct array is not an {@code mlx_array} this method's caller will ever hand to {@code
    * mlx_array_free}, so allocating it through a scope would corrupt that scope's handle-tracking
    * invariant -- a wrong-type delete, not a caught exception.
    */
-  private static MemorySegment newVectorArray(MemorySegment[] handles, Arena allocator) {
-    int n = handles.length;
-    MemorySegment buf = mlx_array_.allocateArray(n, allocator);
-    long elementSize = mlx_array_.sizeof();
-    for (int i = 0; i < n; i++) {
-      // A raw MemorySegment.copy of sizeof() bytes, not a ctx get/set
-      // round-trip: a byte-for-byte struct copy stays correct if mlx_array_
-      // ever gains a field.
-      MemorySegment.copy(handles[i], 0L, buf, i * elementSize, elementSize);
-    }
+  static MemorySegment newVectorArray(MemorySegment[] handles, Arena allocator) {
+    MemorySegment buf = NativeOps.copyHandlesInto(handles, allocator);
     // mlx_vector_array_new_data is statusless and returns a null-ctx struct
     // on failure (vector.cpp:41-54), the same hazard class MLX.array already
     // handles above. clearLastNativeError() must run immediately before this
@@ -386,7 +380,7 @@ public final class MLX {
     // NativeOps.checked's javadoc: some entry points fire the error handler
     // without a status for checked() to see.
     NativeLoader.clearLastNativeError();
-    MemorySegment vec = mlx_h.mlx_vector_array_new_data(allocator, buf, n);
+    MemorySegment vec = mlx_h.mlx_vector_array_new_data(allocator, buf, handles.length);
     // size == 0 returns a non-null ctx (vector.cpp:45 heap-allocates an
     // empty std::vector), so this check will not misfire on eval()'s empty
     // varargs case -- but eval() never reaches here for n == 0 regardless,

@@ -55,7 +55,7 @@ public final class ModuleGrad implements AutoCloseable {
    *
    * <p>{@code loss} must not strongly reference the returned {@code ModuleGrad} -- directly, or
    * transitively through an enclosing object the caller bound it to (e.g. a training loop's {@code
-   * this::loss}, where the loop itself owns the {@code ModuleGrad} in a field). {@link Body} holds
+   * this::loss}, where the loop itself owns the {@code ModuleGrad} in a field). {@code Body} holds
    * {@code loss} for as long as the wrapped {@link MLXGrad.Fn}'s upcall stub is alive (see {@link
    * MLXGrad#valueAndGrad}'s own javadoc for why that's unavoidable), so such a reference closes the
    * identical cycle {@code valueAndGrad} warns against one level out -- through {@code loss}

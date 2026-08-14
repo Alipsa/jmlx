@@ -199,9 +199,15 @@ class ModuleGradTest {
    * the arena closed before {@code tree}/{@code model} themselves become unreachable and can run
    * their own backstops). Asserting only on the wrapper would pass even if that second stage were
    * broken.
+   *
+   * <p>Each stage gets its own, freshly-reset 20s deadline rather than sharing one: stage 2 runs
+   * strictly after stage 1 (Fn collected, then Holder.closeAll() on the Cleaner thread, then
+   * arena.close(), then tree/model released, then MLXScope's own backstop) and is therefore the
+   * more GC-timing-sensitive of the two -- a shared deadline would let a slow stage 1 starve stage
+   * 2's budget down to whatever was left, turning a working chain into a spurious failure.
    */
   @Test
-  @Timeout(value = 30, unit = TimeUnit.SECONDS)
+  @Timeout(value = 45, unit = TimeUnit.SECONDS)
   void cleanerBackstopRunsForADetachedModuleGrad() throws InterruptedException {
     Detached detached = createDetachedModuleGrad();
 
@@ -212,6 +218,7 @@ class ModuleGradTest {
     }
     assertNull(detached.moduleGrad().get(), "escaped ModuleGrad was not collected within 20s");
 
+    deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
     while (detached.model().get() != null && System.nanoTime() < deadline) {
       System.gc();
       Thread.sleep(50);

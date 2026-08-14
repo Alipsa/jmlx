@@ -129,6 +129,10 @@ public final class MLXFast {
    * single new token's decode-step attention over a longer KV cache correct without a custom mask
    * (confirmed empirically, same Findings section).
    *
+   * <p>{@code sinks} is passed straight through to {@code mlx_fast_scaled_dot_product_attention}'s
+   * own {@code sinks} parameter (verified against the mlx-c header's parameter order) but is not
+   * yet exercised with a non-null value by any test in this codebase.
+   *
    * @throws IllegalArgumentException if both {@code causal} and a non-null {@code maskArr} are
    *     given
    */

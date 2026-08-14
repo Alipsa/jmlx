@@ -12,8 +12,9 @@ import se.alipsa.jmlx.memory.MLXScope;
  * projection}. See req/phase4-plan.md §7.
  *
  * <p>Not a {@link UnaryModule}: {@link #forward} takes a {@link KVCache} and a causal flag in
- * addition to {@code x} -- {@code UnaryModule}'s own javadoc names this class as the reason that
- * interface is not folded into {@link Module} itself.
+ * addition to {@code x} -- this class is exactly the kind of composite module that motivates {@code
+ * UnaryModule} existing as a separate interface from {@link Module} rather than being folded into
+ * it.
  */
 public final class MultiHeadAttention extends Module {
 
@@ -81,11 +82,21 @@ public final class MultiHeadAttention extends Module {
    * correct with the same flag: mlx's causal mask bottom-aligns a shorter query against a longer
    * key/value (see {@link MLXFast#scaledDotProductAttention}'s javadoc).
    *
-   * <p>{@code cache}'s own scope must be this layer's {@code scope()} or an ancestor of it -- see
-   * {@link KVCache}'s javadoc; violating this throws from inside {@link KVCache#append}.
+   * <p>{@code cache}'s own scope must be {@code x}'s scope or an ancestor of it -- see {@link
+   * KVCache}'s javadoc; violating this throws from inside {@link KVCache#append}.
+   *
+   * @throws IllegalArgumentException if {@code x} is not rank-3 with last dimension {@code numHeads
+   *     * headDim}
    */
   public MLXArray forward(MLXArray x, KVCache cache, boolean causal) {
     int[] shape = x.shape();
+    if (shape.length != 3 || shape[2] != numHeads * headDim) {
+      throw new IllegalArgumentException(
+          "MultiHeadAttention.forward: x must be [batch, seq, embedDim] with embedDim="
+              + (numHeads * headDim)
+              + ", got shape "
+              + Arrays.toString(shape));
+    }
     int batch = shape[0];
     int seq = shape[1];
     int offset = cache != null ? cache.offset() : 0;

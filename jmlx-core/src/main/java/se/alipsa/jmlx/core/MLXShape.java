@@ -239,6 +239,11 @@ public final class MLXShape {
     if (arrays.length == 0) {
       throw new IllegalArgumentException("concatenate: requires at least one array");
     }
+    for (int i = 0; i < arrays.length; i++) {
+      if (arrays[i] == null) {
+        throw new IllegalArgumentException("concatenate: arrays[" + i + "] must not be null");
+      }
+    }
     return NativeOps.vectorInOp("concatenate", arrays, axis, mlx_h::mlx_concatenate_axis);
   }
 

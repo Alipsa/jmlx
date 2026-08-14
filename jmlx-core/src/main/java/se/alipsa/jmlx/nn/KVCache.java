@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.Arrays;
 import java.util.Objects;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -24,6 +25,13 @@ import se.alipsa.jmlx.memory.MLXScope;
  * by one full copy of "everything appended so far" every step -- {@code O(N^2)} in total appended
  * length after {@code N} steps, not {@code O(N)} -- exactly the shape req/phase4-plan.md's Context
  * section opens with.
+ *
+ * <p>The {@code O(N)} guarantee above is for retained <em>data</em>, not for the work a caller who
+ * never forces evaluation defers: if {@code N} {@code append}s happen with no intervening {@link
+ * MLX#eval} (or other read of the accumulated tensors), the unevaluated {@code concatenate} chain
+ * still does {@code O(N^2)} work, with all intermediates transiently live, at the eventual single
+ * {@code eval} -- not violated by {@code KVCacheTest} or {@code MultiHeadAttentionTest}, both of
+ * which evaluate every step, but not enforced by this class either.
  */
 public final class KVCache {
 
@@ -31,6 +39,7 @@ public final class KVCache {
   private MLXArray keys;
   private MLXArray values;
   private int offset;
+  private boolean ownsKeys; // false when the first hoist returned the caller's own array unchanged
 
   /** Creates an empty cache whose accumulated tensors live in {@code scope}. */
   public KVCache(MLXScope scope) {
@@ -67,7 +76,8 @@ public final class KVCache {
    * handle -- see this class's javadoc for why that close is both necessary and safe.
    *
    * @throws NullPointerException if {@code k} or {@code v} is {@code null}
-   * @throws IllegalArgumentException if {@code k}/{@code v}'s scope is neither this cache's own
+   * @throws IllegalArgumentException if {@code k} has rank &lt; 2, if {@code v}'s sequence length
+   *     disagrees with {@code k}'s, or if {@code k}/{@code v}'s scope is neither this cache's own
    *     scope nor a descendant of it (via {@link MLX#hoist}), or (from {@link
    *     MLXShape#concatenate}) if their shape disagrees with the existing accumulated tensor on any
    *     axis but the sequence axis
@@ -75,18 +85,39 @@ public final class KVCache {
   public void append(MLXArray k, MLXArray v) {
     Objects.requireNonNull(k, "KVCache.append: k must not be null");
     Objects.requireNonNull(v, "KVCache.append: v must not be null");
+    if (k.ndim() < 2) {
+      throw new IllegalArgumentException(
+          "KVCache.append: k must have rank >= 2 (shape [..., T, headDim]), got shape "
+              + Arrays.toString(k.shape()));
+    }
     int seqAxis = k.ndim() - 2;
     int newLength = k.shape()[seqAxis];
+    if (v.ndim() < 2 || v.shape()[v.ndim() - 2] != newLength) {
+      throw new IllegalArgumentException(
+          "KVCache.append: v's sequence length must match k's ("
+              + newLength
+              + "), got k shape "
+              + Arrays.toString(k.shape())
+              + ", v shape "
+              + Arrays.toString(v.shape()));
+    }
     if (keys == null) {
+      // MLX.hoist is a documented no-copy optimization when its argument is already in the target
+      // scope -- when that happens here, keys/values alias the caller's own arrays, and the next
+      // append must not close() them.
       keys = MLX.hoist(k, scope);
       values = MLX.hoist(v, scope);
+      ownsKeys = keys != k;
     } else {
       MLXArray concatenatedKeys = MLXShape.concatenate(new MLXArray[] {keys, k}, seqAxis);
       MLXArray concatenatedValues = MLXShape.concatenate(new MLXArray[] {values, v}, seqAxis);
+      if (ownsKeys) {
+        keys.close();
+        values.close();
+      }
       MLXArray hoistedKeys = MLX.hoist(concatenatedKeys, scope);
       MLXArray hoistedValues = MLX.hoist(concatenatedValues, scope);
-      keys.close();
-      values.close();
+      ownsKeys = true;
       keys = hoistedKeys;
       values = hoistedValues;
     }

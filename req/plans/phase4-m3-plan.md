@@ -170,6 +170,16 @@ not call `MLX.newVectorArray`):
  * rather than delegating to {@code MLX.newVectorArray}: this class depends on nothing else in this
  * package (see the class javadoc), and calling into {@code MLX} here would be the one exception.
  */
+```
+
+> **Amended after execution.** This body leaks: `mlx_vector_array_new_data`'s vector is never freed,
+> leaking one refcount per operand on every call -- invisible in a single call, `O(N^2)` active
+> memory in a decode-loop shape (discovered during Task 3, fixed in commit `ffb042c`). The shipped
+> version wraps the call in `try { ... } finally { mlx_h.mlx_vector_array_free(vec); }` -- see
+> `NativeOps.vectorInOp` in the actual source for the correct body. Left here unmodified as a record
+> of what shipped originally; do not copy this block.
+
+```java
 static MLXArray vectorInOp(String opName, MLXArray[] xs, int axis, VectorInOp op) {
   MLXScope scope = scopeOf(opName, xs);
   MemorySegment[] handles = new MemorySegment[xs.length];
@@ -1236,7 +1246,15 @@ class MultiHeadAttentionTest {
     }
     return MLX.array(scope, data, new int[] {EMBED_DIM, EMBED_DIM});
   }
+```
 
+> **Amended after execution.** The `headOut` line below (`MLXOps.matmul(weights, ropedHead)`) is
+> wrong: it reuses `ropedHead` (RoPE'd) as the V operand, but RoPE must never be applied to V --
+> `MultiHeadAttention.forward` correctly never RoPEs `v`. Found during Task 4 by independent
+> cross-check, fixed in the shipped test to `MLXOps.matmul(weights, head)` (the raw, un-roped
+> slice). Left here unmodified as a record of what shipped originally; do not copy this method.
+
+```java
   /** Per-head causal attention computed independently of {@link MultiHeadAttention#forward}: a
    * separate per-position rope call per head/position, and a manual matmul+triu+where+softmaxAxis
    * causal mask instead of the built-in {@code causal} flag -- Decision 8's composition-identity

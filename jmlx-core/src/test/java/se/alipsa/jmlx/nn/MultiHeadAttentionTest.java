@@ -173,4 +173,17 @@ class MultiHeadAttentionTest {
           () -> new MultiHeadAttention(scope, 3, qkvWeight, null, outWeight, null));
     }
   }
+
+  @Test
+  void constructorRejectsAQkvWeightShapedForADifferentEmbedDim() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray outWeight = identityWeight(scope);
+      MLXArray badQkvWeight =
+          MLX.array(
+              scope, new float[2 * EMBED_DIM * EMBED_DIM], new int[] {2 * EMBED_DIM, EMBED_DIM});
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> new MultiHeadAttention(scope, HEADS, badQkvWeight, null, outWeight, null));
+    }
+  }
 }

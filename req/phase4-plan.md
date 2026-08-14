@@ -76,6 +76,14 @@ achieves linear growth — no design change to `KVCache` itself was needed. `KVC
 accumulates without eviction (deliberately out of scope for this milestone — see the plan's
 "Deliberately not covered" section).
 
+**A second defect, found during Task 4 by independent cross-check.** The plan's own
+`composedReference` test helper (`req/plans/phase4-m3-plan.md`'s M3 test file) RoPE'd `v` by
+mistake — its final per-head `matmul` used `ropedHead` (the RoPE'd slice) as the V operand instead
+of the raw `head` slice, even though `MultiHeadAttention.forward` itself correctly never applies
+RoPE to `v`. Fixed in the shipped test by changing that `matmul`'s second operand from `ropedHead`
+to `head`; the plan document itself is left unmodified with an amendment note, per this repo's
+"don't rewrite history" convention for plan docs.
+
 **Resume instructions.** Once PR #5 merges, continue with M1 (§5) on a fresh branch off `main`.
 Probes 0b/0f were scratch classes against raw `jmlx-ffi` closure bindings with no permanent home
 until `MLXGrad` exists; they were deleted after their findings were recorded above and are not in

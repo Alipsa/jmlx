@@ -296,7 +296,9 @@ final class NativeOps {
    * operands (req/phase4-plan.md §3). Builds the {@code mlx_vector_array} itself via {@link
    * #copyHandlesInto} rather than delegating to {@code MLX.newVectorArray}: this class depends on
    * nothing else in this package (see the class javadoc), and calling into {@code MLX} here would
-   * be the one exception.
+   * be the one exception. {@code vec} must be freed after the call: its backing {@code
+   * std::vector<array>} holds a value copy of every operand, each a live refcount, so an unfreed
+   * {@code vec} permanently leaks one refcount per operand, per call.
    */
   static MLXArray vectorInOp(String opName, MLXArray[] xs, int axis, VectorInOp op) {
     MLXScope scope = scopeOf(opName, xs);
@@ -313,9 +315,13 @@ final class NativeOps {
       if (mlx_vector_array_.ctx(vec).address() == 0) {
         throw nativeFailure("mlx_vector_array_new_data");
       }
-      MemorySegment res = mlx_h.mlx_array_new(scope);
-      checked(opName, () -> op.apply(res, vec, axis, DEFAULT_STREAM));
-      return new MLXArray(scope, res);
+      try {
+        MemorySegment res = mlx_h.mlx_array_new(scope);
+        checked(opName, () -> op.apply(res, vec, axis, DEFAULT_STREAM));
+        return new MLXArray(scope, res);
+      } finally {
+        mlx_h.mlx_vector_array_free(vec);
+      }
     }
   }
 

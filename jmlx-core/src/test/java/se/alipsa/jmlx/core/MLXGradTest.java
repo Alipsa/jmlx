@@ -69,6 +69,11 @@ class MLXGradTest {
   }
 
   @Test
+  void argnumsMustNotBeNull() {
+    assertThrows(NullPointerException.class, () -> MLXGrad.valueAndGrad(xs -> xs, null));
+  }
+
+  @Test
   void argnumsMustBeStrictlyIncreasing() {
     assertThrows(
         IllegalArgumentException.class, () -> MLXGrad.valueAndGrad(xs -> xs, new int[] {1, 1}));
@@ -93,6 +98,18 @@ class MLXGradTest {
   }
 
   @Test
+  void nullPrimalsElementThrowsNamingTheIndex() {
+    try (MLXScope scope = new MLXScope();
+        MLXGrad.Fn fn =
+            MLXGrad.valueAndGrad(xs -> new MLXArray[] {MLXOps.sum(xs[0])}, new int[] {0})) {
+      IllegalArgumentException ex =
+          assertThrows(
+              IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {null}));
+      assertTrue(ex.getMessage().contains("[0]"), ex.getMessage());
+    }
+  }
+
+  @Test
   void nonRankZeroLossThrowsNamingTheRank() {
     try (MLXScope scope = new MLXScope();
         MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[] {xs[0]}, new int[] {0})) {
@@ -100,6 +117,28 @@ class MLXGradTest {
       IllegalArgumentException ex =
           assertThrows(IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {x}));
       assertTrue(ex.getMessage().contains("rank 1"), ex.getMessage());
+    }
+  }
+
+  @Test
+  void nullBodyResultThrowsNamingNullNotAFabricatedRank() {
+    try (MLXScope scope = new MLXScope();
+        MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> null, new int[] {0})) {
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {x}));
+      assertTrue(ex.getMessage().contains("null"), ex.getMessage());
+    }
+  }
+
+  @Test
+  void emptyBodyResultThrowsNamingEmptyArrayNotAFabricatedRank() {
+    try (MLXScope scope = new MLXScope();
+        MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[0], new int[] {0})) {
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {x}));
+      assertTrue(ex.getMessage().contains("empty array"), ex.getMessage());
     }
   }
 

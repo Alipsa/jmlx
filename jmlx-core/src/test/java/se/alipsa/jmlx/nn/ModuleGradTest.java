@@ -192,25 +192,46 @@ class ModuleGradTest {
    * (which owns the very {@code MLXGrad.Fn} the body backs) or this {@code ModuleGrad}, its {@code
    * tree}, and the model's {@link MLXScope} would never become unreachable once a caller drops a
    * {@code ModuleGrad} without {@code close()}.
+   *
+   * <p>Polls a second, independent {@link WeakReference} on the model scope after the first
+   * assertion passes: the release is two-stage (the {@code ModuleGrad} wrapper becoming unreachable
+   * is only the first link -- {@code Fn} must then be collected, its {@code Holder} cleaned, and
+   * the arena closed before {@code tree}/{@code model} themselves become unreachable and can run
+   * their own backstops). Asserting only on the wrapper would pass even if that second stage were
+   * broken.
    */
   @Test
   @Timeout(value = 30, unit = TimeUnit.SECONDS)
   void cleanerBackstopRunsForADetachedModuleGrad() throws InterruptedException {
-    WeakReference<ModuleGrad> ref = new WeakReference<>(createDetachedModuleGrad());
+    Detached detached = createDetachedModuleGrad();
 
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-    while (ref.get() != null && System.nanoTime() < deadline) {
+    while (detached.moduleGrad().get() != null && System.nanoTime() < deadline) {
       System.gc();
       Thread.sleep(50);
     }
-    assertNull(ref.get(), "escaped ModuleGrad was not collected within 20s");
+    assertNull(detached.moduleGrad().get(), "escaped ModuleGrad was not collected within 20s");
+
+    while (detached.model().get() != null && System.nanoTime() < deadline) {
+      System.gc();
+      Thread.sleep(50);
+    }
+    assertNull(
+        detached.model().get(),
+        "model scope was not collected within 20s after the ModuleGrad wrapping it was -- Fn's "
+            + "Holder/arena chain must release tree/scope too");
   }
 
-  // Isolated in its own frame so no local variable in the calling test method keeps mg (or the
-  // model scope/tree it wraps) reachable after this method returns. model is deliberately left
-  // open (never closed), mirroring the failure scenario: a caller dropping a ModuleGrad without
-  // close() -- the case the Cleaner backstop exists for.
-  private static ModuleGrad createDetachedModuleGrad() {
+  // Both fields are WeakReferences, not the ModuleGrad/MLXScope themselves, so this record can be
+  // held by the calling test method across the whole polling loop without itself keeping either
+  // referent reachable.
+  private record Detached(WeakReference<ModuleGrad> moduleGrad, WeakReference<MLXScope> model) {}
+
+  // Isolated in its own frame so no local variable in the calling test method keeps mg, model, or
+  // the tree it wraps reachable after this method returns. model is deliberately left open (never
+  // closed), mirroring the failure scenario: a caller dropping a ModuleGrad without close() -- the
+  // case the Cleaner backstop exists for.
+  private static Detached createDetachedModuleGrad() {
     MLXScope model = new MLXScope();
     MLXArray weight = MLX.array(model, new float[] {1, 1, 1}, new int[] {1, 3});
     MLXArray bias = MLX.array(model, new float[] {0}, new int[] {1});
@@ -221,6 +242,6 @@ class ModuleGradTest {
       MLXArray target = MLX.array(step, new float[] {0}, new int[] {1, 1});
       mg.apply(step, new MLXArray[] {x, target});
     }
-    return mg;
+    return new Detached(new WeakReference<>(mg), new WeakReference<>(model));
   }
 }

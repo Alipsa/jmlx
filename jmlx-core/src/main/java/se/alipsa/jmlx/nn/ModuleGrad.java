@@ -52,6 +52,17 @@ public final class ModuleGrad implements AutoCloseable {
    * current after an {@code update}). {@code loss} receives {@code (params, inputs)} and must
    * return a rank-0 loss as element 0 -- see {@link MLXGrad.Fn#apply} for what happens if it does
    * not.
+   *
+   * <p>{@code loss} must not strongly reference the returned {@code ModuleGrad} -- directly, or
+   * transitively through an enclosing object the caller bound it to (e.g. a training loop's {@code
+   * this::loss}, where the loop itself owns the {@code ModuleGrad} in a field). {@link Body} holds
+   * {@code loss} for as long as the wrapped {@link MLXGrad.Fn}'s upcall stub is alive (see {@link
+   * MLXGrad#valueAndGrad}'s own javadoc for why that's unavoidable), so such a reference closes the
+   * identical cycle {@code valueAndGrad} warns against one level out -- through {@code loss}
+   * instead of through {@code Body} itself -- and pins the {@code Fn}, this {@code Module} tree,
+   * and its {@link MLXScope} (the model's GPU weights) for the process lifetime. Not fixable inside
+   * this class: {@code loss} must be retained for the {@code Fn}'s lifetime for the upcall to be
+   * able to call it at all, so avoiding the cycle is on the caller.
    */
   public static ModuleGrad of(Module tree, BiFunction<MLXArray[], MLXArray[], MLXArray[]> loss) {
     return new ModuleGrad(tree, loss);

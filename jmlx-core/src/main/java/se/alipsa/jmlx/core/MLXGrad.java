@@ -55,6 +55,7 @@ public final class MLXGrad {
    */
   public static Fn valueAndGrad(Function<MLXArray[], MLXArray[]> body, int[] argnums) {
     Objects.requireNonNull(body, "valueAndGrad: body must not be null");
+    Objects.requireNonNull(argnums, "valueAndGrad: argnums must not be null");
     validateArgnumsShape(argnums);
     return new Fn(body, argnums);
   }
@@ -176,7 +177,8 @@ public final class MLXGrad {
           if (result == null || result.length == 0) {
             throw new IllegalArgumentException(
                 "valueAndGrad: body's first returned array must be rank-0 (a reduced "
-                    + "scalar loss), got rank -1");
+                    + "scalar loss), got "
+                    + (result == null ? "null" : "an empty array"));
           }
           // Checked before result[0].ndim() below: a null element at index 0 must fail here,
           // naming its index, rather than NPE-ing out of the rank check that follows.
@@ -311,6 +313,9 @@ public final class MLXGrad {
       }
       MemorySegment[] handles = new MemorySegment[primals.length];
       for (int i = 0; i < primals.length; i++) {
+        if (primals[i] == null) {
+          throw new IllegalArgumentException("valueAndGrad.apply: primals[" + i + "] is null");
+        }
         handles[i] = primals[i].handle();
       }
       upcall.applyTarget = target;

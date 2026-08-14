@@ -1,0 +1,179 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+`jmlx` is a pure, idiomatic Java 25 framework for Apple Silicon GPU tensor operations, wrapping Apple's
+native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The current code is the **v0.1
+vertical slice** described in `req/initial-plan.md`: just enough of the stack — native bootstrap,
+generated bindings, memory management, and a handful of tensor ops — to prove the pipeline works
+end to end on real Apple Silicon GPU hardware. `req/project-outline.md` describes the full multi-phase
+vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); `req/phase3-plan.md` is
+the plan for the next slice (broadcast-compatible ops, relaxed matmul, `slice`, a batched `eval`) and
+is not yet implemented in `jmlx-core`.
+
+Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
+
+## One-time native bootstrap
+
+The native runtime (mlx-c compiled against a pinned `mlx-metal` wheel) is not checked in and must be
+staged before anything native will run:
+
+```sh
+./scripts/bootstrap-native.sh
+```
+
+This is idempotent and downloads/verifies (trust-on-first-use, pinned SHA-256) a pinned `mlx-metal`
+wheel and jextract build, clones `mlx-c` at a pinned commit, builds it against the wheel's MLX, and
+stages the result as a **flat** directory at `native/install/lib/` (`libmlxc.dylib`, `libmlx.dylib`,
+`libjaccl.dylib`, `mlx.metallib`). Flatness is a runtime invariant, not incidental: MLX finds
+`mlx.metallib` and dyld resolves `@rpath` siblings by colocation with `libmlx.dylib`/`libmlxc.dylib`;
+splitting into `lib/`/`share/` breaks both.
+
+The Java bindings in `jmlx-ffi/src/main/generated/java` are committed jextract output, not generated
+on the fly. Only regenerate them if the pinned mlx-c commit changes:
+
+```sh
+./scripts/regen-bindings.sh
+```
+
+After running it, `git diff --exit-code jmlx-ffi/src/main/generated/java` must be clean if nothing
+should have changed — this is the bindings-drift check.
+
+`scripts/checkDependencies.zsh` is a read-only report of available updates (Gradle plugins/deps, the
+wrapper, the pinned `mlx-metal` version, and — since mlx-c versions independently of MLX — the mlx-c
+tag that pairs with a newer wheel). `scripts/updateMlx.zsh <mlx-c-commit-sha>` repins `MLX_C_COMMIT` in
+`bootstrap-native.sh` and re-runs bootstrap + regen for you; it takes a full 40-char SHA, not a short
+one.
+
+## Build, test, run
+
+```sh
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-examples
+./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
+./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
+./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
+```
+
+Every module's native-dependent tests are **skipped, not failed**, when `native/install/lib/mlx.metallib`
+is absent — see `@EnabledIfNativeAvailable` (a `jmlx-ffi` test fixture, shared via `testFixtures`,
+delegating to `NativeLoader.ensureLoaded()` itself so the skip gate can never diverge from the real
+loader logic). Don't add a separate existence check to decide whether native tests should run.
+
+`jmlx-ffi` also has a `loaderGuardTest` task (wired into `check`) that exercises `NativeLoaderMissingMetallibTest`
+in its own JVM against a disposable copy of the native dir with `mlx.metallib` excluded — it's excluded
+from the regular `test` task because `NativeLoader.ensureLoaded()` caches its outcome, so it would race
+every other native test over the real staging directory if run in the same JVM.
+
+## Code style
+
+Hand-written sources are Google Java Style, 2-space indent, 120-column width
+(`config/spotless/eclipse-java-google-style-120col.xml`, `config/checkstyle/checkstyle.xml` — both
+derived from Google's own upstream artifacts, with deviations documented in comments at the top of
+each file). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from
+both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — never hand-edit them.
+
+```sh
+./gradlew spotlessCheck                                      # verify formatting
+./gradlew spotlessApply                                       # reformat in place
+./gradlew checkstyleMain checkstyleTest checkstyleTestFixtures # style/lint (part of build/check)
+```
+
+## Architecture
+
+```
+jmlx-examples    HelloMLX                          demo, end-to-end test
+       |
+jmlx-core        MLX  MLXArray  MLXScope           hand-written idiomatic Java
+                 DType  MLXException                se.alipsa.jmlx.{core,memory}
+       |
+jmlx-ffi         se.alipsa.jmlx.ffi.*              committed jextract output
+                 NativeLoader                      hand-written
+       |
+native/install/lib/  libmlxc.dylib                 built by scripts/bootstrap-native.sh
+                     libmlx.dylib  libjaccl.dylib   staged from the mlx-metal wheel
+                     mlx.metallib                   staged from the mlx-metal wheel
+```
+
+Three modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
+it in `jmlx-ffi` means it compiles once and stays untouched by day-to-day iteration on `jmlx-core`,
+keeping incremental builds fast and generated code out of review diffs. `jmlx-core` depends on
+`jmlx-ffi` as `implementation`, not `api` — `MLXArray`/`MLX` wrap raw `MemorySegment` handles behind
+plain Java types and never expose `jmlx-ffi` on their own public surface.
+
+**Loading order matters.** jextract binds each downcall's method handle lazily, in a private
+per-function holder class, the first time that function is called — and that first call fails unless
+the dylib is already loaded by then. Both `MLX` and `MLXScope` have a static initializer that calls
+`NativeLoader.ensureLoaded()` for exactly this reason; either class can be the first one touched, so
+both guard independently rather than relying on load order.
+
+**`NativeLoader`** loads `libmlxc.dylib` via `System.load(absolutePath)`, not
+`SymbolLookup.libraryLookup`: the bindings are generated *without* a `-l` flag, so their internal
+`SYMBOL_LOOKUP` is `loaderLookup().or(defaultLookup())`, which only sees libraries registered with the
+calling classloader — exactly what `System.load` does and `libraryLookup()` does not. It resolves the
+native library directory from the `jmlx.library.path` system property first, then `JMLX_LIBRARY_PATH`.
+The root `build.gradle` wires every `Test` task's `jmlx.library.path` to the real
+`native/install/lib`; `jmlx-examples`'s `run` task does the same, but its `installDist`/`distZip` start
+scripts deliberately do *not* get that property baked in (it's an absolute build-machine path) — a
+distributed launcher elsewhere is expected to set `JMLX_LIBRARY_PATH` instead.
+
+mlx-c's default error handler is `printf` + `exit(-1)` on failure, which would kill the JVM before any
+status code is observable. `NativeLoader` installs a replacement handler (an FFM upcall stub, kept
+alive in a process-lifetime `Arena` since mlx-c may call it any time) that just records the message on
+a thread-local, since the mlx-c error convention fires synchronously on the calling thread. `MLX.checked`
+clears that thread-local immediately before every native call (not just after a failure) and wraps a
+non-zero status into `MLXException`, attaching the recorded native message when present. A few mlx-c
+entry points (e.g. `mlx_array_new_data`) have no status return at all and only signal failure via the
+error handler plus a null `ctx` in the returned struct — those call sites check for that explicitly.
+
+**Memory model:** `MLXScope` owns every native `mlx_array` handle allocated through it (it implements
+`SegmentAllocator` so it can be passed directly to mlx-c's struct-returning constructors) and frees them
+in reverse insertion order on `close()`. A `Cleaner` backstop exists in case a scope is never explicitly
+closed, but the cleanup action is registered against a private `Holder` object, never the `MLXScope`
+itself — capturing the scope in the cleanup action would make it permanently reachable and the action
+would never run. `MLXScope` and every `MLXArray` allocated from it are confined to the thread that
+created the scope (checked via `ensureOpen()`/thread-identity checks on every access, including
+centrally in `MLXArray`); the sole exception is the JVM Cleaner thread, which only ever touches the
+`Holder`, never the scope. Every `MLX` op result is allocated into the same scope as its first
+`MLXArray` operand; `MLX.array(scope, ...)` takes the scope explicitly since it has no operand to infer
+one from. A binary op rejects operands from two different scopes rather than silently allocating into
+one and skipping the other's confinement check.
+
+**Lazy evaluation:** every op in `MLX` only builds mlx's lazy computation graph; nothing runs on
+GPU/CPU until `MLX.eval(...)` (or the implicit eval inside `MLXArray.toFloatArray()`) forces it.
+`toFloatArray()` also forces contiguity first (`mlx_contiguous`, row-major) before reading the raw data
+pointer — a lazy op like `transpose` can otherwise yield a strided view, and reading raw data without
+that step would return plausible-looking values in the wrong order instead of crashing.
+
+Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` only covers `FLOAT32`/`INT32`.
+`defaultDevice()`/`defaultStream()` are resolved once from mlx-c's own defaults and cached for the
+process lifetime — this slice doesn't expose device switching.
+
+## Native version pinning
+
+mlx-c is versioned independently of MLX itself (mlx-c's own `CMakeLists.txt` pins an exact MLX tag via
+`GIT_TAG`), so a newer `mlx-metal` wheel does not imply any particular mlx-c commit works with it — the
+two are only bumped together, via `scripts/checkDependencies.zsh` (which cross-references mlx-c's tags
+against the wheel version) and `scripts/updateMlx.zsh`. Current pin: mlx-c `fba4470` (tracks `v0.6.0`)
+against `mlx-metal==0.31.2` (`macosx_26_0_arm64`) — see Decision 9 in `req/initial-plan.md` for why the
+latest 0.32.0 wheel was deliberately not used.
+
+`scripts/jextract-overrides/mlx/c/half.h` is a trimmed override copied over the staged header before
+running jextract: the real header's `__bf16` typedef is a hard parse error for jextract on this target,
+and this slice doesn't support bfloat16 anyway. `regen-bindings.sh` runs jextract twice — an unfiltered
+discovery pass, then a second pass restricted to symbols whose `--dump-includes` header path is under
+`mlx/c/` — both to trim Darwin system-header spillover and because (independently) an unfiltered
+whole-umbrella run silently drops `mlx_array_new`/`mlx_array_free`/`mlx_array_new_data`/
+`mlx_array_new_data_managed` from the generated Java with no warning. See Decision 10 in
+`req/initial-plan.md` for the full story if either script needs changing.
+
+## Requirements docs
+
+`req/initial-plan.md` and `req/phase3-plan.md` are living design documents, not just history — they
+record the *why* behind non-obvious decisions (native library loading strategy, jextract's two-pass
+generation, memory confinement rules) that the code comments themselves point back to. When touching
+`NativeLoader`, `MLXScope`, `MLX`, or the bootstrap/regen scripts, check whether the relevant decision
+is already recorded there before re-deriving it. `req/project-outline.md` is the original, broader
+multi-phase vision; where it conflicts with `req/initial-plan.md` on scope or naming, the latter is
+authoritative for what's actually being built now.

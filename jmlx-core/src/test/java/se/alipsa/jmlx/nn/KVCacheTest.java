@@ -69,6 +69,43 @@ class KVCacheTest {
     }
   }
 
+  /**
+   * {@code k}/{@code v} may independently be aliased-in-place or hoisted-as-a-copy on the first
+   * {@code append} -- {@code ownsKeys}/{@code ownsValues} must be tracked separately, not derived
+   * from {@code keys} alone. Here {@code k0} lives in a descendant scope (hoisted, owned) while
+   * {@code v0} lives in the cache's own scope (aliased, not owned). Deriving both flags from {@code
+   * keys} would wrongly close {@code v0} -- the caller's own array -- on the next append.
+   */
+  @Test
+  void appendTracksKeyAndValueOwnershipIndependently() {
+    try (MLXScope cacheScope = new MLXScope()) {
+      KVCache cache = new KVCache(cacheScope);
+      MLXArray v0 = MLX.array(cacheScope, new float[] {3, 4}, new int[] {1, 1, 1, 2});
+      try (MLXScope step = cacheScope.newChild()) {
+        MLXArray k0 = MLX.array(step, new float[] {1, 2}, new int[] {1, 1, 1, 2});
+        cache.append(k0, v0);
+      }
+      try (MLXScope step2 = cacheScope.newChild()) {
+        MLXArray k1 = MLX.array(step2, new float[] {5, 6}, new int[] {1, 1, 1, 2});
+        MLXArray v1 = MLX.array(step2, new float[] {7, 8}, new int[] {1, 1, 1, 2});
+        cache.append(k1, v1);
+      }
+      // v0 must still be open -- the caller's own array, never owned by the cache.
+      assertArrayEquals(new float[] {3, 4}, v0.toFloatArray(), EPS);
+      assertArrayEquals(new float[] {3, 4, 7, 8}, cache.values().toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void firstAppendRejectsKAndVWithMismatchedNonSequenceAxisShapes() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope);
+      MLXArray k = MLX.array(scope, new float[] {1, 2}, new int[] {1, 1, 1, 2});
+      MLXArray v = MLX.array(scope, new float[] {3, 4, 5}, new int[] {1, 1, 1, 3});
+      assertThrows(IllegalArgumentException.class, () -> cache.append(k, v));
+    }
+  }
+
   @Test
   void appendFromAnUnrelatedScopeThrows() {
     try (MLXScope cacheScope = new MLXScope();

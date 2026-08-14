@@ -1034,6 +1034,23 @@ class MLXNumericTest {
   }
 
   /**
+   * {@code condition=[3]}/{@code x=[1]} and {@code x=[1]}/{@code y=[2]} are each pairwise
+   * broadcast-compatible, but {@code condition=[3]} and {@code y=[2]} are not -- pairwise
+   * compatibility isn't transitive, so a guard that only checks (condition,x) and (x,y) misses this
+   * case and lets it reach mlx-c as an {@code MLXException} instead of the intended {@code
+   * IllegalArgumentException}.
+   */
+  @Test
+  void whereRejectsConditionAndYThatAreNotBroadcastCompatibleEvenWhenXBridgesThem() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray condition = MLX.full(scope, new int[] {3}, 1f, DType.FLOAT32);
+      MLXArray x = MLX.full(scope, new int[] {1}, 100f, DType.FLOAT32);
+      MLXArray y = MLX.full(scope, new int[] {2}, -1f, DType.FLOAT32);
+      assertThrows(IllegalArgumentException.class, () -> MLXOps.where(condition, x, y));
+    }
+  }
+
+  /**
    * Reuses this plan's own empirically-confirmed SDPA finding: softmax([0,1]) = [0.2689414,
    * 0.7310586].
    */

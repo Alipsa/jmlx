@@ -39,7 +39,8 @@ public final class KVCache {
   private MLXArray keys;
   private MLXArray values;
   private int offset;
-  private boolean ownsKeys; // false when the first hoist returned the caller's own array unchanged
+  private boolean ownsKeys; // false when the first hoist returned k unchanged (same scope as this)
+  private boolean ownsValues; // same, for v -- tracked independently since hoist checks each alone
 
   /** Creates an empty cache whose accumulated tensors live in {@code scope}. */
   public KVCache(MLXScope scope) {
@@ -76,11 +77,11 @@ public final class KVCache {
    * handle -- see this class's javadoc for why that close is both necessary and safe.
    *
    * @throws NullPointerException if {@code k} or {@code v} is {@code null}
-   * @throws IllegalArgumentException if {@code k} has rank &lt; 2, if {@code v}'s sequence length
-   *     disagrees with {@code k}'s, or if {@code k}/{@code v}'s scope is neither this cache's own
-   *     scope nor a descendant of it (via {@link MLX#hoist}), or (from {@link
-   *     MLXShape#concatenate}) if their shape disagrees with the existing accumulated tensor on any
-   *     axis but the sequence axis
+   * @throws IllegalArgumentException if {@code k} has rank &lt; 2, if {@code v}'s rank or any
+   *     non-sequence-axis length disagrees with {@code k}'s, or if {@code k}/{@code v}'s scope is
+   *     neither this cache's own scope nor a descendant of it (via {@link MLX#hoist}), or (from
+   *     {@link MLXShape#concatenate}) if their shape disagrees with the existing accumulated tensor
+   *     on any axis but the sequence axis
    */
   public void append(MLXArray k, MLXArray v) {
     Objects.requireNonNull(k, "KVCache.append: k must not be null");
@@ -90,9 +91,29 @@ public final class KVCache {
           "KVCache.append: k must have rank >= 2 (shape [..., T, headDim]), got shape "
               + Arrays.toString(k.shape()));
     }
+    if (v.ndim() != k.ndim()) {
+      throw new IllegalArgumentException(
+          "KVCache.append: v's rank must match k's ("
+              + k.ndim()
+              + "), got k shape "
+              + Arrays.toString(k.shape())
+              + ", v shape "
+              + Arrays.toString(v.shape()));
+    }
     int seqAxis = k.ndim() - 2;
+    for (int axis = 0; axis < k.ndim(); axis++) {
+      if (axis != seqAxis && k.shape()[axis] != v.shape()[axis]) {
+        throw new IllegalArgumentException(
+            "KVCache.append: v's shape must match k's shape except on the sequence axis ("
+                + seqAxis
+                + "), got k shape "
+                + Arrays.toString(k.shape())
+                + ", v shape "
+                + Arrays.toString(v.shape()));
+      }
+    }
     int newLength = k.shape()[seqAxis];
-    if (v.ndim() < 2 || v.shape()[v.ndim() - 2] != newLength) {
+    if (v.shape()[seqAxis] != newLength) {
       throw new IllegalArgumentException(
           "KVCache.append: v's sequence length must match k's ("
               + newLength
@@ -104,20 +125,27 @@ public final class KVCache {
     if (keys == null) {
       // MLX.hoist is a documented no-copy optimization when its argument is already in the target
       // scope -- when that happens here, keys/values alias the caller's own arrays, and the next
-      // append must not close() them.
+      // append must not close() them. Tracked independently for keys/values: k and v may live in
+      // different (though each individually valid) scopes.
       keys = MLX.hoist(k, scope);
       values = MLX.hoist(v, scope);
       ownsKeys = keys != k;
+      ownsValues = values != v;
     } else {
       MLXArray concatenatedKeys = MLXShape.concatenate(new MLXArray[] {keys, k}, seqAxis);
       MLXArray concatenatedValues = MLXShape.concatenate(new MLXArray[] {values, v}, seqAxis);
-      if (ownsKeys) {
-        keys.close();
-        values.close();
-      }
+      // Hoist before closing the superseded handles: if hoist throws, keys/values still refer to
+      // open, valid arrays instead of handles this class already closed out from under itself.
       MLXArray hoistedKeys = MLX.hoist(concatenatedKeys, scope);
       MLXArray hoistedValues = MLX.hoist(concatenatedValues, scope);
+      if (ownsKeys) {
+        keys.close();
+      }
+      if (ownsValues) {
+        values.close();
+      }
       ownsKeys = true;
+      ownsValues = true;
       keys = hoistedKeys;
       values = hoistedValues;
     }

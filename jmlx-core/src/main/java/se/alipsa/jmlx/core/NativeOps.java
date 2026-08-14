@@ -4,6 +4,8 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
 import java.lang.foreign.ValueLayout;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_array_;
@@ -252,16 +254,20 @@ final class NativeOps {
     return seg;
   }
 
+  private static final Map<String, MemorySegment> CSTR_CACHE = new ConcurrentHashMap<>();
+
   /**
-   * Allocates a NUL-terminated C string once, in {@link #FACADE_ARENA} -- for the closed-set {@code
-   * const char*} parameters this facade's mlx-c surface uses (SDPA's {@code mask_mode}), which
-   * never need per-call allocation (req/phase4-plan.md §7's Native surface table). Callers store
-   * the result in a {@code private static final MemorySegment} field per distinct literal, exactly
-   * like {@link #DEFAULT_STREAM} -- this method allocates on every call, so it must only ever be
-   * invoked from a static initializer, never per-op.
+   * Returns a NUL-terminated C string for {@code s}, allocated in {@link #FACADE_ARENA} at most
+   * once per distinct literal -- for the closed-set {@code const char*} parameters this facade's
+   * mlx-c surface uses (SDPA's {@code mask_mode}), which never need per-call allocation
+   * (req/phase4-plan.md §7's Native surface table). Callers store the result in a {@code private
+   * static final MemorySegment} field per distinct literal, exactly like {@link #DEFAULT_STREAM}.
+   * Backed by an intern cache keyed on {@code s} so that even an accidental per-call use never
+   * grows {@link #FACADE_ARENA} beyond one segment per distinct literal ever seen -- the intended
+   * static-initializer-only discipline is structural, not just documented.
    */
   static MemorySegment cstr(String s) {
-    return FACADE_ARENA.allocateFrom(s);
+    return CSTR_CACHE.computeIfAbsent(s, FACADE_ARENA::allocateFrom);
   }
 
   /**

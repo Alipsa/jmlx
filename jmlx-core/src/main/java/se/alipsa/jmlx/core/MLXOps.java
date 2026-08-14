@@ -331,6 +331,7 @@ public final class MLXOps {
   public static MLXArray where(MLXArray condition, MLXArray x, MLXArray y) {
     requireBroadcastCompatible(condition, x, "where");
     requireBroadcastCompatible(x, y, "where");
+    requireBroadcastCompatible(condition, y, "where");
     MLXScope scope = NativeOps.scopeOf("where", condition, x, y);
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(

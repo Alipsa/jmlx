@@ -270,7 +270,7 @@ public final class MLXShape {
   }
 
   /**
-   * Zeroes every element strictly above the {@code k}-th diagonal (the upper triangle kept is
+   * Zeroes every element strictly above the {@code k}-th diagonal (the lower triangle kept extends
    * {@code k} diagonals above the main one; {@code k=0} keeps the main diagonal).
    */
   public static MLXArray tril(MLXArray a, int k) {

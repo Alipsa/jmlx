@@ -2,7 +2,7 @@
 
 ## Status — update this section as work lands
 
-**Branch:** `worktree-phase4-m3`, off `main` at `8bb08ad` (PR #8 merged, M2 done).
+**Branch:** `worktree-phase4-m4`, off `main` at `59c9afe` (PR #10 merged, M3 done).
 
 | Item | Status | Commit |
 |---|---|---|
@@ -15,8 +15,8 @@
 | M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
 | M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | [PR #8](https://github.com/Alipsa/jmlx/pull/8), `7173d24` |
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | this branch, see req/plans/phase4-m3-plan.md |
-| M4 — `QuantizedLinear` (§8) | Not started | — |
-| §9 — Documentation | Not started | — |
+| M4 — `QuantizedLinear` (§8) | Not started — planned, see req/plans/phase4-m4-plan.md | — |
+| §9 — Documentation | Not started — folded into M4's plan (req/plans/phase4-m4-plan.md, Task 3), not a separate merge point | — |
 | §10 — CI, self-hosted runner (see note below) | Not started | — |
 
 **M0d note.** Implemented only the ops its own "ops added at this merge point" list names

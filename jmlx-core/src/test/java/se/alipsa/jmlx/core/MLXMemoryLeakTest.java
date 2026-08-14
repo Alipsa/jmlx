@@ -50,6 +50,16 @@ class MLXMemoryLeakTest {
   }
 
   /**
+   * A missing {@code mlx_vector_array_free} in {@link NativeOps#vectorInOp} would leak a refcount
+   * on every operand of every {@link MLXShape#concatenate} call -- invisible in a single call, but
+   * unbounded across iterations. This is the regression guard for exactly that bug.
+   */
+  @Test
+  void activeMemoryDoesNotGrowWithConcatenateInTheLoop() {
+    assertNoGrowthOver(MLXMemoryLeakTest::runIterationWithConcatenate);
+  }
+
+  /**
    * The variant that matters for req/phase3-plan.md §4's {@code mlx_vector_array}-based joint
    * {@code eval}: a missing {@code mlx_vector_array_free} inside {@code MLX.eval} would show up
    * here as {@code activeMemoryBytes()} growth across iterations, and a double-free of the vector
@@ -149,6 +159,15 @@ class MLXMemoryLeakTest {
       MLX.eval(b);
       b.close();
       a.close();
+    }
+  }
+
+  private static void runIterationWithConcatenate() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
+      MLXArray b = MLX.array(scope, new float[ARRAY_ELEMENTS], new int[] {ARRAY_ELEMENTS});
+      MLXArray c = MLXShape.concatenate(new MLXArray[] {a, b}, 0);
+      MLX.eval(c);
     }
   }
 

@@ -1,7 +1,7 @@
 # jmlx
 A pure, idiomatic Java 25 framework for Apple Silicon GPU tensor operations and LLM inference—wrapping Apple's native MLX core with zero-copy FFM bindings.
 
-This is the v0.1 vertical slice described in `req/initial-plan.md`: enough of the stack — native bootstrap, generated bindings, memory management, and a handful of tensor ops — to prove the whole pipeline works end to end on real Apple Silicon GPU hardware.
+The core (`req/initial-plan.md`) is a v0.1 vertical slice — native bootstrap, generated bindings, memory management, and a handful of tensor ops — proven end to end on real Apple Silicon GPU hardware. `se.alipsa.jmlx.nn` (`req/phase4-plan.md`) builds a small neural-network module system on top of it: `Module`/`Linear`/normalization/activation layers, reverse-mode autograd (`MLXGrad`), and multi-head self-attention with RoPE and an incremental KV cache for decoding.
 
 ## Requirements
 
@@ -31,9 +31,11 @@ Re-run this only if you change the pinned mlx-c commit; `git diff --exit-code jm
 
 ```sh
 ./gradlew build          # compiles jmlx-ffi, jmlx-core, jmlx-examples
-./gradlew :jmlx-core:test  # memory lifecycle, numeric correctness, native error path -- against real hardware
+./gradlew :jmlx-core:test  # memory lifecycle, numeric correctness, layers/autograd/attention -- against real hardware
 ./gradlew :jmlx-examples:run  # runs HelloMLX
 ```
+
+`jmlx-ffi`'s `loaderGuardTest` (wired into `check`, so it runs as part of `build`) exercises the native-loader's missing-`mlx.metallib` failure path in its own JVM against a disposable copy of the native directory — it's excluded from the regular `test` task since `NativeLoader.ensureLoaded()` caches its outcome and would otherwise race every other native test over the real staging directory.
 
 `HelloMLX` builds two small matrices, adds and matrix-multiplies them, evaluates on the GPU, and prints the results:
 

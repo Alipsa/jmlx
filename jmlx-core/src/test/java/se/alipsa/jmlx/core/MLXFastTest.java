@@ -2,6 +2,7 @@ package se.alipsa.jmlx.core;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -124,6 +125,113 @@ class MLXFastTest {
         assertArrayEquals(
             new float[] {-0.341641f, 0.552786f, 1.447214f, 2.341641f}, result.toFloatArray(), EPS);
       }
+    }
+  }
+
+  @Test
+  void ropeRotatesHalfSplitPairsByPositionDependentAngle() {
+    try (MLXScope scope = new MLXScope()) {
+      // dims=4: pair (x0,x2)=(1,1) rotates by angle_0 = 1*1.0*10000^0 = 1 rad; pair (x1,x3)=(0,0)
+      // is fixed by any rotation. Confirmed empirically (this plan's Findings section).
+      MLXArray x = MLX.array(scope, new float[] {1, 0, 1, 0}, new int[] {1, 1, 4});
+      MLXArray result = MLXFast.rope(x, 4, false, 10000f, 1.0f, 1, null);
+      assertArrayEquals(new float[] {-0.30116868f, 0f, 1.3817731f, 0f}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void ropeWithOffsetZeroIsTheIdentity() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray x = MLX.array(scope, new float[] {1, 0, 1, 0}, new int[] {1, 1, 4});
+      MLXArray result = MLXFast.rope(x, 4, false, 10000f, 1.0f, 0, null);
+      assertArrayEquals(new float[] {1, 0, 1, 0}, result.toFloatArray(), EPS);
+    }
+  }
+
+  /**
+   * Exercises BOTH frequency components (freq_0=1, freq_1=base^-0.5=0.01) with every input element
+   * nonzero, hand-derived from the confirmed formula: angle_0=1 rad (cos=0.5403023, sin=0.8414710),
+   * angle_1=0.01 rad (cos=0.9999500, sin=0.0099998).
+   */
+  @Test
+  void ropeRotatesBothFrequencyComponentsWhenEveryElementIsNonzero() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {1, 1, 4});
+      MLXArray result = MLXFast.rope(x, 4, false, 10000f, 1.0f, 1, null);
+      assertArrayEquals(
+          new float[] {-1.9841106f, 1.9599007f, 2.4623779f, 4.0197997f},
+          result.toFloatArray(),
+          EPS);
+    }
+  }
+
+  @Test
+  void ropeWithNeitherBaseNorFreqsThrowsAnMlxException() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray x = MLX.array(scope, new float[] {1, 0, 1, 0}, new int[] {1, 1, 4});
+      assertThrows(MLXException.class, () -> MLXFast.rope(x, 4, false, null, 1.0f, 1, null));
+    }
+  }
+
+  @Test
+  void scaledDotProductAttentionCausalMatchesHandComputedGolden() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray q = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray k = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray v = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray result = MLXFast.scaledDotProductAttention(q, k, v, 1.0f, true, null, null);
+      assertArrayEquals(new float[] {1f, 0f, 0.2689414f, 0.7310586f}, result.toFloatArray(), 1e-3f);
+    }
+  }
+
+  @Test
+  void scaledDotProductAttentionArrayModeAdditiveMaskMatchesCausal() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray q = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray k = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray v = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray additiveMask =
+          MLX.array(scope, new float[] {0f, -1e9f, 0f, 0f}, new int[] {1, 1, 2, 2});
+      MLXArray result = MLXFast.scaledDotProductAttention(q, k, v, 1.0f, false, additiveMask, null);
+      assertArrayEquals(new float[] {1f, 0f, 0.2689414f, 0.7310586f}, result.toFloatArray(), 1e-3f);
+    }
+  }
+
+  @Test
+  void scaledDotProductAttentionArrayModeBooleanMaskTrueMeansAttend() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray q = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray k = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray v = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray rowIdx = MLX.array(scope, new float[] {0, 0, 1, 1}, new int[] {1, 1, 2, 2});
+      MLXArray colIdx = MLX.array(scope, new float[] {0, 1, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray boolMask = MLXOps.greater(colIdx, rowIdx); // true exactly at the strictly-upper cell
+      MLXArray result = MLXFast.scaledDotProductAttention(q, k, v, 1.0f, false, boolMask, null);
+      assertArrayEquals(new float[] {0f, 1f, 0.5f, 0.5f}, result.toFloatArray(), 1e-3f);
+    }
+  }
+
+  @Test
+  void scaledDotProductAttentionCausalBottomAlignsAShorterQuery() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray q = MLX.array(scope, new float[] {1, 1}, new int[] {1, 1, 1, 2});
+      MLXArray k = MLX.array(scope, new float[] {1, 0, 0, 1, 1, 1}, new int[] {1, 1, 3, 2});
+      MLXArray v = MLX.array(scope, new float[] {1, 0, 0, 1, 1, 1}, new int[] {1, 1, 3, 2});
+      MLXArray result = MLXFast.scaledDotProductAttention(q, k, v, 1.0f, true, null, null);
+      assertArrayEquals(new float[] {0.78805846f, 0.78805846f}, result.toFloatArray(), 1e-3f);
+    }
+  }
+
+  @Test
+  void scaledDotProductAttentionRejectsCausalTogetherWithAnExplicitMask() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray q = MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {1, 1, 2, 2});
+      MLXArray k = q;
+      MLXArray v = q;
+      MLXArray mask = MLX.zeros(scope, new int[] {1, 1, 2, 2}, DType.BOOL);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> MLXFast.scaledDotProductAttention(q, k, v, 1.0f, true, mask, null));
     }
   }
 }

@@ -292,4 +292,69 @@ public final class MLXOps {
     }
     return NativeOps.binaryOp("outer", a, b, mlx_h::mlx_outer);
   }
+
+  /** Elementwise {@code a < b}, broadcasting per NumPy's rules. Result dtype is {@code BOOL}. */
+  public static MLXArray less(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "less");
+    return NativeOps.binaryOp("less", a, b, mlx_h::mlx_less);
+  }
+
+  /** Elementwise {@code a <= b}. Result dtype is {@code BOOL}. */
+  public static MLXArray lessEqual(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "lessEqual");
+    return NativeOps.binaryOp("lessEqual", a, b, mlx_h::mlx_less_equal);
+  }
+
+  /** Elementwise {@code a > b}. Result dtype is {@code BOOL}. */
+  public static MLXArray greater(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "greater");
+    return NativeOps.binaryOp("greater", a, b, mlx_h::mlx_greater);
+  }
+
+  /** Elementwise {@code a >= b}. Result dtype is {@code BOOL}. */
+  public static MLXArray greaterEqual(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "greaterEqual");
+    return NativeOps.binaryOp("greaterEqual", a, b, mlx_h::mlx_greater_equal);
+  }
+
+  /** Elementwise {@code a == b}. Result dtype is {@code BOOL}. */
+  public static MLXArray equal(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "equal");
+    return NativeOps.binaryOp("equal", a, b, mlx_h::mlx_equal);
+  }
+
+  /**
+   * Elementwise select: {@code x} where {@code condition} is nonzero, {@code y} otherwise. Three
+   * array operands, none nullable -- resolves its target via {@link NativeOps#scopeOf} across all
+   * three, same shape as this class's other hand-rolled bodies ({@link #inner}, {@link #outer}).
+   */
+  public static MLXArray where(MLXArray condition, MLXArray x, MLXArray y) {
+    requireBroadcastCompatible(condition, x, "where");
+    requireBroadcastCompatible(x, y, "where");
+    requireBroadcastCompatible(condition, y, "where");
+    MLXScope scope = NativeOps.scopeOf("where", condition, x, y);
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "where",
+        () ->
+            mlx_h.mlx_where(
+                res, condition.handle(), x.handle(), y.handle(), NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /**
+   * Softmax along {@code axis}. {@code precise} requests float32 accumulation regardless of {@code
+   * a}'s dtype (mlx-c's own {@code precise} flag) -- carries an extra {@code bool} beyond {@link
+   * NativeOps#axisOp}'s {@code (res, a, int, stream)} shape, so it is hand-rolled rather than
+   * forced through that helper, the same reason {@link #sum(MLXArray)} is hand-rolled beyond {@code
+   * unaryOp}.
+   */
+  public static MLXArray softmaxAxis(MLXArray a, int axis, boolean precise) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "softmaxAxis",
+        () -> mlx_h.mlx_softmax_axis(res, a.handle(), axis, precise, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
 }

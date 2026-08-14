@@ -928,4 +928,138 @@ class MLXNumericTest {
       assertThrows(IllegalArgumentException.class, () -> MLXShape.transpose(a, s2));
     }
   }
+
+  @Test
+  void concatenateJoinsArraysAlongTheGivenAxis() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2}, new int[] {1, 2});
+      MLXArray b = MLX.array(scope, new float[] {3, 4, 5}, new int[] {1, 3});
+      MLXArray result = MLXShape.concatenate(new MLXArray[] {a, b}, 1);
+      assertArrayEquals(new int[] {1, 5}, result.shape());
+      assertArrayEquals(new float[] {1, 2, 3, 4, 5}, result.toFloatArray(), EPS);
+    }
+  }
+
+  /**
+   * Proves {@code vectorInOp} resolves via {@code scopeOf} over every element, not just the first.
+   */
+  @Test
+  void concatenateAcrossParentAndChildScopeAllocatesIntoTheChild() {
+    try (MLXScope parent = new MLXScope()) {
+      MLXArray a = MLX.array(parent, new float[] {1, 2}, new int[] {1, 2});
+      try (MLXScope child = parent.newChild()) {
+        MLXArray b = MLX.array(child, new float[] {3, 4}, new int[] {1, 2});
+        MLXArray result = MLXShape.concatenate(new MLXArray[] {a, b}, 1);
+        assertSame(child, result.scope());
+        assertArrayEquals(new float[] {1, 2, 3, 4}, result.toFloatArray(), EPS);
+      }
+    }
+  }
+
+  @Test
+  void splitDividesIntoEqualPartsInOrder() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {1, 6});
+      MLXArray[] parts = MLXShape.split(a, 3, 1);
+      assertEquals(3, parts.length);
+      assertArrayEquals(new float[] {1, 2}, parts[0].toFloatArray(), EPS);
+      assertArrayEquals(new float[] {3, 4}, parts[1].toFloatArray(), EPS);
+      assertArrayEquals(new float[] {5, 6}, parts[2].toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void expandDimsInsertsASizeOneAxis() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      assertArrayEquals(new int[] {1, 3}, MLXShape.expandDims(a, 0).shape());
+      assertArrayEquals(new int[] {3, 1}, MLXShape.expandDims(a, 1).shape());
+    }
+  }
+
+  @Test
+  void flattenMergesTheGivenAxisRange() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[8], new int[] {1, 2, 2, 2});
+      assertArrayEquals(new int[] {1, 4, 2}, MLXShape.flatten(a, 1, 2).shape());
+    }
+  }
+
+  @Test
+  void triuZeroesBelowTheKthDiagonal() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray ones = MLX.ones(scope, new int[] {3, 3}, DType.FLOAT32);
+      MLXArray result = MLXShape.triu(ones, 1);
+      assertArrayEquals(new float[] {0, 1, 1, 0, 0, 1, 0, 0, 0}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void trilZeroesAboveTheKthDiagonal() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray ones = MLX.ones(scope, new int[] {3, 3}, DType.FLOAT32);
+      MLXArray result = MLXShape.tril(ones, 0);
+      assertArrayEquals(new float[] {1, 0, 0, 1, 1, 0, 1, 1, 1}, result.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void comparisonsProduceElementwiseBooleanResults() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {2, 2, 2}, new int[] {3});
+      assertEquals(DType.BOOL, MLXOps.less(a, b).dtype());
+      assertArrayEquals(
+          new float[] {1, 0, 0}, MLX.astype(MLXOps.less(a, b), DType.FLOAT32).toFloatArray(), EPS);
+      assertArrayEquals(
+          new float[] {0, 1, 1},
+          MLX.astype(MLXOps.greaterEqual(a, b), DType.FLOAT32).toFloatArray(),
+          EPS);
+      assertArrayEquals(
+          new float[] {0, 1, 0}, MLX.astype(MLXOps.equal(a, b), DType.FLOAT32).toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void whereSelectsBetweenTwoArraysByCondition() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLXArray b = MLX.array(scope, new float[] {2, 2, 2}, new int[] {3});
+      MLXArray condition = MLXOps.less(a, b);
+      MLXArray ifTrue = MLX.full(scope, new int[] {3}, 100f, DType.FLOAT32);
+      MLXArray ifFalse = MLX.full(scope, new int[] {3}, -1f, DType.FLOAT32);
+      assertArrayEquals(
+          new float[] {100, -1, -1}, MLXOps.where(condition, ifTrue, ifFalse).toFloatArray(), EPS);
+    }
+  }
+
+  /**
+   * {@code condition=[3]}/{@code x=[1]} and {@code x=[1]}/{@code y=[2]} are each pairwise
+   * broadcast-compatible, but {@code condition=[3]} and {@code y=[2]} are not -- pairwise
+   * compatibility isn't transitive, so a guard that only checks (condition,x) and (x,y) misses this
+   * case and lets it reach mlx-c as an {@code MLXException} instead of the intended {@code
+   * IllegalArgumentException}.
+   */
+  @Test
+  void whereRejectsConditionAndYThatAreNotBroadcastCompatibleEvenWhenXBridgesThem() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray condition = MLX.full(scope, new int[] {3}, 1f, DType.FLOAT32);
+      MLXArray x = MLX.full(scope, new int[] {1}, 100f, DType.FLOAT32);
+      MLXArray y = MLX.full(scope, new int[] {2}, -1f, DType.FLOAT32);
+      assertThrows(IllegalArgumentException.class, () -> MLXOps.where(condition, x, y));
+    }
+  }
+
+  /**
+   * Reuses this plan's own empirically-confirmed SDPA finding: softmax([0,1]) = [0.2689414,
+   * 0.7310586].
+   */
+  @Test
+  void softmaxAxisNormalizesAlongTheGivenAxis() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {0, 1}, new int[] {1, 2});
+      MLXArray result = MLXOps.softmaxAxis(a, 1, true);
+      assertArrayEquals(new float[] {0.2689414f, 0.7310586f}, result.toFloatArray(), 1e-3f);
+    }
+  }
 }

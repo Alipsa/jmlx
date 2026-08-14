@@ -4,12 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
@@ -180,5 +184,43 @@ class ModuleGradTest {
             "expected message to name ModuleGrad, got: " + caught[0].getMessage());
       }
     }
+  }
+
+  /**
+   * Mirrors {@code MLXGradTest.cleanerBackstopRunsForAnEscapedFn}, but with a capturing body:
+   * {@code ModuleGrad}'s closure body must not strongly reference the enclosing {@code ModuleGrad}
+   * (which owns the very {@code MLXGrad.Fn} the body backs) or this {@code ModuleGrad}, its {@code
+   * tree}, and the model's {@link MLXScope} would never become unreachable once a caller drops a
+   * {@code ModuleGrad} without {@code close()}.
+   */
+  @Test
+  @Timeout(value = 30, unit = TimeUnit.SECONDS)
+  void cleanerBackstopRunsForADetachedModuleGrad() throws InterruptedException {
+    WeakReference<ModuleGrad> ref = new WeakReference<>(createDetachedModuleGrad());
+
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+    while (ref.get() != null && System.nanoTime() < deadline) {
+      System.gc();
+      Thread.sleep(50);
+    }
+    assertNull(ref.get(), "escaped ModuleGrad was not collected within 20s");
+  }
+
+  // Isolated in its own frame so no local variable in the calling test method keeps mg (or the
+  // model scope/tree it wraps) reachable after this method returns. model is deliberately left
+  // open (never closed), mirroring the failure scenario: a caller dropping a ModuleGrad without
+  // close() -- the case the Cleaner backstop exists for.
+  private static ModuleGrad createDetachedModuleGrad() {
+    MLXScope model = new MLXScope();
+    MLXArray weight = MLX.array(model, new float[] {1, 1, 1}, new int[] {1, 3});
+    MLXArray bias = MLX.array(model, new float[] {0}, new int[] {1});
+    Linear linear = new Linear(model, weight, bias);
+    ModuleGrad mg = ModuleGrad.of(linear, ModuleGradTest::mseLoss);
+    try (MLXScope step = model.newChild()) {
+      MLXArray x = MLX.array(step, new float[] {1, 2, 3}, new int[] {1, 3});
+      MLXArray target = MLX.array(step, new float[] {0}, new int[] {1, 1});
+      mg.apply(step, new MLXArray[] {x, target});
+    }
+    return mg;
   }
 }

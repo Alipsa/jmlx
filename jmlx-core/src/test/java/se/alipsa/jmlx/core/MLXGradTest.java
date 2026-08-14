@@ -115,6 +115,19 @@ class MLXGradTest {
     }
   }
 
+  // Regression guard: a null at index 0 must go through the same named-index diagnostic as any
+  // other index, not NPE out of the rank check (which used to run before the null check).
+  @Test
+  void nullPrimaryResultThrowsNamingTheIndex() {
+    try (MLXScope scope = new MLXScope();
+        MLXGrad.Fn fn = MLXGrad.valueAndGrad(xs -> new MLXArray[] {null}, new int[] {0})) {
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> fn.apply(scope, new MLXArray[] {x}));
+      assertTrue(ex.getMessage().contains("[0]"), ex.getMessage());
+    }
+  }
+
   private static final class BodyBoom extends RuntimeException {
     BodyBoom(String message) {
       super(message);

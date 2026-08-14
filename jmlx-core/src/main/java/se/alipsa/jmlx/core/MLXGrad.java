@@ -6,6 +6,7 @@ import java.lang.foreign.ValueLayout;
 import java.lang.ref.Cleaner;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_closure_;
@@ -43,8 +44,17 @@ public final class MLXGrad {
    * Differentiates {@code body} with respect to the primal indices in {@code argnums}. {@code
    * argnums} must be non-empty and strictly increasing; the upper-bound check (every index {@code <
    * primals.length}) happens per {@link Fn#apply} call, once {@code primals.length} is known.
+   *
+   * <p>{@code body} must not strongly reference the returned {@link Fn} -- directly, or
+   * transitively through an enclosing object the caller bound it to (e.g. an instance method
+   * reference on a class that itself holds the {@code Fn}). {@code Fn}'s upcall target holds {@code
+   * body} for as long as the upcall stub is alive, so such a reference would close a cycle back
+   * through the stub's owning arena to {@code Fn} itself, defeating the {@code Holder}/{@code
+   * Upcall} split below and permanently pinning {@code Fn} (and anything it transitively keeps
+   * alive) even after the caller drops every reference to it.
    */
   public static Fn valueAndGrad(Function<MLXArray[], MLXArray[]> body, int[] argnums) {
+    Objects.requireNonNull(body, "valueAndGrad: body must not be null");
     validateArgnumsShape(argnums);
     return new Fn(body, argnums);
   }
@@ -163,19 +173,27 @@ public final class MLXGrad {
         try {
           MLXArray[] primalsIn = unpackVector(in, applyTarget);
           MLXArray[] result = body.apply(primalsIn);
-          if (result == null || result.length == 0 || result[0].ndim() != 0) {
-            int rank = result == null || result.length == 0 ? -1 : result[0].ndim();
+          if (result == null || result.length == 0) {
             throw new IllegalArgumentException(
                 "valueAndGrad: body's first returned array must be rank-0 (a reduced "
-                    + "scalar loss), got rank "
-                    + rank);
+                    + "scalar loss), got rank -1");
           }
-          MemorySegment[] handles = new MemorySegment[result.length];
+          // Checked before result[0].ndim() below: a null element at index 0 must fail here,
+          // naming its index, rather than NPE-ing out of the rank check that follows.
           for (int i = 0; i < result.length; i++) {
             if (result[i] == null) {
               throw new IllegalArgumentException(
                   "valueAndGrad: body's returned array[" + i + "] is null");
             }
+          }
+          if (result[0].ndim() != 0) {
+            throw new IllegalArgumentException(
+                "valueAndGrad: body's first returned array must be rank-0 (a reduced "
+                    + "scalar loss), got rank "
+                    + result[0].ndim());
+          }
+          MemorySegment[] handles = new MemorySegment[result.length];
+          for (int i = 0; i < result.length; i++) {
             handles[i] = result[i].handle();
           }
           try (Arena tmp = Arena.ofConfined()) {
@@ -260,7 +278,14 @@ public final class MLXGrad {
             mlx_h.mlx_closure_free(plain);
           }
         } finally {
-          arena.close();
+          // Caught rather than left to propagate: a throwing arena.close() would otherwise
+          // replace t as the exception leaving this catch block, losing the original failure
+          // that's actually why construction is unwinding.
+          try {
+            arena.close();
+          } catch (Throwable closeFailure) {
+            t.addSuppressed(closeFailure);
+          }
         }
         throw t;
       }
@@ -274,6 +299,8 @@ public final class MLXGrad {
      */
     public Result apply(MLXScope target, MLXArray[] primals) {
       ensureOpen();
+      Objects.requireNonNull(target, "valueAndGrad.apply: target must not be null");
+      Objects.requireNonNull(primals, "valueAndGrad.apply: primals must not be null");
       if (argnums[argnums.length - 1] >= primals.length) {
         throw new IllegalArgumentException(
             "valueAndGrad: argnums "

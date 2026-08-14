@@ -77,50 +77,53 @@ public final class KVCache {
    * handle -- see this class's javadoc for why that close is both necessary and safe.
    *
    * @throws NullPointerException if {@code k} or {@code v} is {@code null}
-   * @throws IllegalArgumentException if {@code k} has rank &lt; 2, if {@code v}'s rank or any
-   *     non-sequence-axis length disagrees with {@code k}'s, or if {@code k}/{@code v}'s scope is
-   *     neither this cache's own scope nor a descendant of it (via {@link MLX#hoist}), or (from
-   *     {@link MLXShape#concatenate}) if their shape disagrees with the existing accumulated tensor
-   *     on any axis but the sequence axis
+   * @throws IllegalArgumentException if {@code k} has rank &lt; 2, if {@code v}'s rank disagrees
+   *     with {@code k}'s, if any of their shared leading (batch) axes disagree, if their sequence
+   *     lengths (second-to-last axis) disagree, or if {@code k}/{@code v}'s scope is neither this
+   *     cache's own scope nor a descendant of it (via {@link MLX#hoist}), or (from {@link
+   *     MLXShape#concatenate}) if their shape disagrees with the existing accumulated tensor on any
+   *     axis but the sequence axis. {@code k}'s and {@code v}'s last axis (head dim) may differ
+   *     from each other -- the two tensors are concatenated independently, so that is not a
+   *     cross-tensor invariant this class needs.
    */
   public void append(MLXArray k, MLXArray v) {
     Objects.requireNonNull(k, "KVCache.append: k must not be null");
     Objects.requireNonNull(v, "KVCache.append: v must not be null");
-    if (k.ndim() < 2) {
+    int[] ks = k.shape();
+    int[] vs = v.shape();
+    if (ks.length < 2) {
       throw new IllegalArgumentException(
           "KVCache.append: k must have rank >= 2 (shape [..., T, headDim]), got shape "
-              + Arrays.toString(k.shape()));
+              + Arrays.toString(ks));
     }
-    if (v.ndim() != k.ndim()) {
+    if (vs.length != ks.length) {
       throw new IllegalArgumentException(
           "KVCache.append: v's rank must match k's ("
-              + k.ndim()
+              + ks.length
               + "), got k shape "
-              + Arrays.toString(k.shape())
+              + Arrays.toString(ks)
               + ", v shape "
-              + Arrays.toString(v.shape()));
+              + Arrays.toString(vs));
     }
-    int seqAxis = k.ndim() - 2;
-    for (int axis = 0; axis < k.ndim(); axis++) {
-      if (axis != seqAxis && k.shape()[axis] != v.shape()[axis]) {
+    int seqAxis = ks.length - 2;
+    for (int axis = 0; axis < ks.length - 1; axis++) {
+      if (axis != seqAxis && ks[axis] != vs[axis]) {
         throw new IllegalArgumentException(
-            "KVCache.append: v's shape must match k's shape except on the sequence axis ("
-                + seqAxis
-                + "), got k shape "
-                + Arrays.toString(k.shape())
+            "KVCache.append: v's leading (batch) axes must match k's, got k shape "
+                + Arrays.toString(ks)
                 + ", v shape "
-                + Arrays.toString(v.shape()));
+                + Arrays.toString(vs));
       }
     }
-    int newLength = k.shape()[seqAxis];
-    if (v.shape()[seqAxis] != newLength) {
+    int newLength = ks[seqAxis];
+    if (vs[seqAxis] != newLength) {
       throw new IllegalArgumentException(
           "KVCache.append: v's sequence length must match k's ("
               + newLength
               + "), got k shape "
-              + Arrays.toString(k.shape())
+              + Arrays.toString(ks)
               + ", v shape "
-              + Arrays.toString(v.shape()));
+              + Arrays.toString(vs));
     }
     if (keys == null) {
       // MLX.hoist is a documented no-copy optimization when its argument is already in the target

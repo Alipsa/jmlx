@@ -97,12 +97,31 @@ class KVCacheTest {
   }
 
   @Test
-  void firstAppendRejectsKAndVWithMismatchedNonSequenceAxisShapes() {
+  void firstAppendRejectsKAndVWithMismatchedLeadingBatchAxisShapes() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope);
+      // Axis 1 (numHeads) differs: 2 vs 3 -- a leading (batch) axis, not the sequence or last axis.
+      MLXArray k = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {1, 2, 1, 2});
+      MLXArray v = MLX.array(scope, new float[] {1, 2, 3, 4, 5, 6}, new int[] {1, 3, 1, 2});
+      assertThrows(IllegalArgumentException.class, () -> cache.append(k, v));
+    }
+  }
+
+  /**
+   * The container only needs k/v to agree on rank and sequence length -- the two tensors are
+   * concatenated independently, so their last axis (head dim) is free to differ, e.g. for MLA-style
+   * attention where V's head dim differs from Q/K's.
+   */
+  @Test
+  void firstAppendAllowsKAndVWithDifferentHeadDims() {
     try (MLXScope scope = new MLXScope()) {
       KVCache cache = new KVCache(scope);
       MLXArray k = MLX.array(scope, new float[] {1, 2}, new int[] {1, 1, 1, 2});
       MLXArray v = MLX.array(scope, new float[] {3, 4, 5}, new int[] {1, 1, 1, 3});
-      assertThrows(IllegalArgumentException.class, () -> cache.append(k, v));
+      cache.append(k, v);
+      assertEquals(1, cache.offset());
+      assertArrayEquals(new float[] {1, 2}, cache.keys().toFloatArray(), EPS);
+      assertArrayEquals(new float[] {3, 4, 5}, cache.values().toFloatArray(), EPS);
     }
   }
 

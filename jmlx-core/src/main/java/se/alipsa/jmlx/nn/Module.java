@@ -168,12 +168,18 @@ public abstract class Module {
    *
    * <p>If any {@link #onParametersUpdated()} call throws, every write this call made is rolled back
    * to its pre-call value before the exception propagates, and no further {@code
-   * onParametersUpdated()} calls run -- the whole call is all-writes-and-all-notifies-succeed, or
-   * none of it takes effect. This matters because {@code onParametersUpdated()} runs strictly after
-   * the write (its own contract: "called after update writes"), so unlike the resolve/null-check
-   * pass above, its own validation cannot run before the write happens -- a subclass override that
-   * validates and throws (e.g. {@code QuantizedLinear}) would otherwise leave its rejected value
-   * permanently installed, with no way for the caller to recover the previous binding.
+   * onParametersUpdated()} calls run. This is a write-rollback guarantee only, not full
+   * transactional atomicity: any {@code onParametersUpdated()} call that already returned before
+   * the throw is not, and cannot be, undone -- its notification already happened, against values
+   * that are reverted out from under it a moment later. A module whose hook has an observable side
+   * effect beyond validation (the base contract only forbids caching a derived {@link MLXArray}
+   * view, not every side effect) would see that side effect survive the rollback even though the
+   * parameter it was based on did not. This matters because {@code onParametersUpdated()} runs
+   * strictly after the write (its own contract: "called after update writes"), so unlike the
+   * resolve/null-check pass above, its own validation cannot run before the write happens -- a
+   * subclass override that validates and throws (e.g. {@code QuantizedLinear}) would otherwise
+   * leave its rejected value permanently installed, with no way for the caller to recover the
+   * previous binding.
    *
    * @throws NullPointerException if {@code byPath}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter

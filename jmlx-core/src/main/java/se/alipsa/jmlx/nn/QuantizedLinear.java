@@ -13,8 +13,11 @@ import se.alipsa.jmlx.memory.MLXScope;
  * rationale in this codebase -- req/phase4-plan.md, Research findings). {@code weight} is the
  * {@code UINT32}-packed form of a checkpoint-layout {@code [out, in]} weight -- see {@link
  * MLXQuant#quantize} to build one from a float weight, or load one directly from a quantized
- * checkpoint (Phase 5). Unlike {@link Linear}, {@code forward} needs no explicit-target overload
- * for its weight-bearing op: {@link MLXQuant#quantizedMatmul}'s javadoc explains why.
+ * checkpoint (Phase 5). {@code forward} passes {@code x.scope()} explicitly to {@link
+ * MLXQuant#quantizedMatmul}'s target overload, the same reason {@link Linear#forward} targets
+ * {@code x.scope()} for its own weight-bearing op (req/plans/phase4-m4-plan.md's Amendment): the
+ * default (innermost-of-all-operands) overload leaks into the model scope once per call whenever
+ * the model was built in a scope that is itself a descendant of {@code x}'s own.
  *
  * <p><strong>Incompatible with {@link ModuleGrad}</strong> -- not merely untested together: {@code
  * QuantizedMatmul}'s native backward pass has no gradient with respect to a quantized weight at all
@@ -52,14 +55,18 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * the same reason: legal range, not a default value (distinct from Global Constraint 5's "absent
    * means let native pick a default" argument). Native validates the packing/group-size
    * relationship on the first {@link #forward} call; this constructor validates only the shape
-   * relationships (and now the legal-set membership) it can check without unpacking {@code weight}
-   * -- the same division of labor {@link Linear}'s own constructor draws. Non-null: {@code weight},
-   * {@code scales}, {@code biases}; {@code bias} is the only nullable parameter. Unlike every
-   * {@code MLXQuant} method (Global Constraint 5), a {@code null} {@code scales}/{@code biases}
-   * here fails as a bare {@code NullPointerException} out of {@code .ndim()} with no named message
-   * -- the same gap {@link Linear}'s own constructor already has for its {@code weight} parameter,
-   * so this is precedent-consistent rather than a new one, not a guard this constructor is expected
-   * to add.
+   * relationships, the legal-set membership, and (since {@code scales}/{@code biases} are not
+   * dtype-checked by anything upstream of native itself, confirmed empirically: an {@code INT32}
+   * pair passes construction and only fails at {@link #forward} with {@code "[quantized_matmul]
+   * Only real floating types are supported"}) that both are one of the floating dtypes {@link
+   * se.alipsa.jmlx.core.DType#isInexact()} recognizes -- everything it can check without unpacking
+   * {@code weight} -- the same division of labor {@link Linear}'s own constructor draws. Non-null:
+   * {@code weight}, {@code scales}, {@code biases}; {@code bias} is the only nullable parameter.
+   * Unlike every {@code MLXQuant} method (Global Constraint 5), a {@code null} {@code
+   * scales}/{@code biases} here fails as a bare {@code NullPointerException} out of {@code .ndim()}
+   * with no named message -- the same gap {@link Linear}'s own constructor already has for its
+   * {@code weight} parameter, so this is precedent-consistent rather than a new one, not a guard
+   * this constructor is expected to add.
    */
   public QuantizedLinear(
       MLXScope scope,
@@ -134,6 +141,16 @@ public final class QuantizedLinear extends Module implements UnaryModule {
           "QuantizedLinear: weight must be rank 2 [out, packedIn], got shape "
               + Arrays.toString(weight.shape()));
     }
+    if (!scales.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear: scales must be a floating dtype (FLOAT32, FLOAT16, or BFLOAT16), got "
+              + scales.dtype());
+    }
+    if (!biases.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear: biases must be a floating dtype (FLOAT32, FLOAT16, or BFLOAT16), got "
+              + biases.dtype());
+    }
     if (scales.ndim() != 2 || !Arrays.equals(scales.shape(), biases.shape())) {
       throw new IllegalArgumentException(
           "QuantizedLinear: scales and biases must have the same rank-2 shape, got "
@@ -189,11 +206,29 @@ public final class QuantizedLinear extends Module implements UnaryModule {
     }
   }
 
+  /**
+   * {@code y = quantizedMatmul(x, weight, scales, biases, transpose=true)}, targeting {@code
+   * x.scope()} explicitly (see this class's own javadoc) {@code + bias} when {@link #hasBias}. That
+   * final {@code add} is not scope-targeted: {@link MLXOps#add} has no explicit-target overload, so
+   * under the inverted layout the class javadoc describes, the {@code hasBias} branch can still
+   * leak one array into the model scope per call -- the exact same residual gap {@link
+   * Linear#forward}'s own {@code hasBias} branch has today (confirmed empirically), not a new one
+   * this class introduces. Closing it would mean adding a target overload to {@link MLXOps#add}
+   * itself, which is shared by every op in this codebase, not something scoped to this class.
+   */
   @Override
   public MLXArray forward(MLXArray x) {
     MLXArray y =
         MLXQuant.quantizedMatmul(
-            x, param("weight"), param("scales"), param("biases"), true, groupSize, bits, MODE);
+            x,
+            param("weight"),
+            param("scales"),
+            param("biases"),
+            true,
+            groupSize,
+            bits,
+            MODE,
+            x.scope());
     return hasBias ? MLXOps.add(y, param("bias")) : y;
   }
 }

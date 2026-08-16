@@ -160,11 +160,16 @@ public final class MLXQuant {
    * from {@code dequantize}'s shared affine path). Non-null in practice under {@code "affine"}:
    * {@code x}, {@code w}, {@code scales}, {@code biases}, {@code mode}.
    *
-   * <p>Needs no explicit-target overload the way {@code Linear.forward}'s {@code transpose(W,
-   * x.scope())} does (req/phase4-plan.md §2's fifth sub-hazard): {@code x} is always a genuine
-   * second array operand here, never absent, so {@link NativeOps#scopeOf} alone already resolves to
-   * the step scope whenever {@code x} is an activation and {@code w}/{@code scales}/{@code biases}
-   * are model-scope parameters (Global Constraint 6).
+   * <p>Allocates into {@link NativeOps#scopeOf}'s innermost-of-the-four-operands rule, which only
+   * lands in the step scope for the layout {@code Global Constraint 6} assumes: {@code x} in the
+   * step scope, {@code w}/{@code scales}/{@code biases} in an ancestor (model) scope. On the
+   * inverted layout -- a model built inside a scope that is itself a <em>descendant</em> of {@code
+   * x}'s own, e.g. {@code x} from the root and the model from a child scope -- the innermost rule
+   * instead picks the model scope, leaking one array into it per call (confirmed empirically,
+   * req/plans/phase4-m4-plan.md's Amendment). Use the {@link #quantizedMatmul(MLXArray, MLXArray,
+   * MLXArray, MLXArray, boolean, Integer, Integer, String, MLXScope)} overload with an explicit
+   * {@code target} (typically {@code x.scope()}, mirroring {@code Linear.forward}'s {@code
+   * transpose(W, x.scope())}) to avoid that leak under the inverted layout.
    */
   public static MLXArray quantizedMatmul(
       MLXArray x,
@@ -175,8 +180,40 @@ public final class MLXQuant {
       Integer groupSize,
       Integer bits,
       String mode) {
+    return quantizedMatmul(
+        x,
+        w,
+        scales,
+        biases,
+        transpose,
+        groupSize,
+        bits,
+        mode,
+        NativeOps.scopeOf("quantizedMatmul", x, w, scales, biases));
+  }
+
+  /**
+   * Same fused quantized matmul as {@link #quantizedMatmul(MLXArray, MLXArray, MLXArray, MLXArray,
+   * boolean, Integer, Integer, String)}, but allocates the result into {@code target} instead of
+   * the innermost scope among the four operands -- e.g. {@code QuantizedLinear.forward} passing
+   * {@code x.scope()} so the result lands in the step scope even under the inverted layout the
+   * no-target overload's javadoc documents. {@code target} must be related to every operand --
+   * checked via {@link MLXScope#innermost} against {@link NativeOps#scopeOf}'s own result, the same
+   * invariant {@link NativeOps#unaryOp(String, MLXArray, MLXScope, NativeOps.UnaryOp)}'s target
+   * overload documents.
+   */
+  public static MLXArray quantizedMatmul(
+      MLXArray x,
+      MLXArray w,
+      MLXArray scales,
+      MLXArray biases,
+      boolean transpose,
+      Integer groupSize,
+      Integer bits,
+      String mode,
+      MLXScope target) {
     checkMode("quantizedMatmul", mode);
-    MLXScope target = NativeOps.scopeOf("quantizedMatmul", x, w, scales, biases);
+    MLXScope.innermost(NativeOps.scopeOf("quantizedMatmul", x, w, scales, biases), target);
     MemorySegment modeStr = NativeOps.cstr(mode);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment gs = NativeOps.optInt(tmp, groupSize);

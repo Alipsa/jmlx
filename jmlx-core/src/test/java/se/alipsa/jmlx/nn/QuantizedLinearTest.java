@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.SequencedMap;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXException;
@@ -130,6 +132,32 @@ class QuantizedLinearTest {
     }
   }
 
+  /**
+   * This PR's round-7 review finding 1: on the "inverted" scope layout -- the model built in a
+   * scope that is itself a descendant of {@code x}'s own (here, {@code x} from a root scope and the
+   * model from a child of it) -- {@link MLXQuant#quantizedMatmul}'s default (innermost-of-all-
+   * operands) overload would allocate the result into the model scope, leaking one array per {@code
+   * forward} call. Confirmed empirically before this fix existed. {@code forward} now passes {@code
+   * x.scope()} explicitly, so the result must land there instead, matching {@link Linear#forward}'s
+   * own (bias-less) behavior on the same layout.
+   */
+  @Test
+  void forwardTargetsXScopeUnderTheInvertedScopeLayout() {
+    try (MLXScope root = new MLXScope()) {
+      MLXArray x = MLX.array(root, inputFixture(), new int[] {1, IN});
+
+      try (MLXScope model = root.newChild()) {
+        MLXArray[] q = quantizedWeight(model);
+        QuantizedLinear quantizedLinear =
+            new QuantizedLinear(model, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+
+        MLXArray result = quantizedLinear.forward(x);
+
+        assertSame(root, result.scope());
+      }
+    }
+  }
+
   @Test
   void parametersExposesWeightScalesBiasesAndOptionalBiasInTheCheckpointLayout() {
     try (MLXScope scope = new MLXScope()) {
@@ -204,6 +232,30 @@ class QuantizedLinearTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> new QuantizedLinear(scope, floatWeight, q[1], q[2], null, GROUP_SIZE, BITS));
+    }
+  }
+
+  /**
+   * This PR's round-7 review finding 3: neither {@code scales} nor {@code biases} had any dtype
+   * check, so an {@code INT32} pair passed construction and only failed at the next {@link
+   * #forward} call, with native's own error ({@code "[quantized_matmul] Only real floating types
+   * are supported ..."}) -- the same deferred-native-failure mode the existing {@code
+   * weight.dtype()}/{@code groupSize}/{@code bits} checks exist to prevent, confirmed empirically
+   * before this test existed.
+   */
+  @Test
+  void constructorRejectsNonFloatingScalesOrBiases() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      MLXArray int32Scales = MLX.astype(q[1], DType.INT32);
+      MLXArray int32Biases = MLX.astype(q[2], DType.INT32);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> new QuantizedLinear(scope, q[0], int32Scales, q[2], null, GROUP_SIZE, BITS));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> new QuantizedLinear(scope, q[0], q[1], int32Biases, null, GROUP_SIZE, BITS));
     }
   }
 

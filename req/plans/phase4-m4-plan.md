@@ -757,11 +757,47 @@ before `QuantizedLinear`'s override -- left its rejected value permanently insta
 the caller to recover the previous binding, and aborted `notifyDepthFirst`'s recursion before any
 sibling or descendant module past the throwing one got notified. `Module.update` now snapshots every
 touched parameter's previous value before writing, and restores all of them if any
-`onParametersUpdated()` call throws, so the whole call is all-writes-and-all-notifies-succeed or none
-of it takes effect -- pinned by `ModuleTest#updateRollsBackTheWriteWhenOnParametersUpdatedThrows` and
+`onParametersUpdated()` call throws -- pinned by
+`ModuleTest#updateRollsBackTheWriteWhenOnParametersUpdatedThrows` and
 `ModuleTest#updateRollsBackEverySiblingWhenOneOnParametersUpdatedThrows`. This fix lives in `Module`,
 not `QuantizedLinear`, since the gap was in the shared base class's contract, not in this layer's own
 code.
+
+**Amendment (post-merge review): the previous paragraph overstated this as full transactional
+atomicity ("all-writes-and-all-notifies-succeed, or none of it takes effect") -- it is a
+write-rollback guarantee only.** An `onParametersUpdated()` call that already returned before a
+later sibling's throw is not, and cannot be, undone: its notification already happened, against
+values that are reverted a moment later. `ModuleTest#updateRollsBackEverySiblingWhenOneOnParametersUpdatedThrows`
+itself proves this -- it asserts the already-succeeded sibling's `notified` flag is still `true`
+after the rollback, alongside its parameter value being restored. The base contract only forbids
+caching a derived `MLXArray` view in the hook (`Module`'s own javadoc), not every side effect, so a
+hook with some other observable effect would see that effect survive even though the parameter it
+was based on did not. `Module.update`'s javadoc was corrected to state the write-rollback guarantee
+precisely rather than the broader (false) claim.
+
+**Amendment (post-merge review): two further round-7 findings, both in `QuantizedLinear` itself.**
+(1) `forward` relied solely on `MLXQuant.quantizedMatmul`'s default (innermost-of-all-operands)
+scope resolution, which only lands in the step scope for the descendant-step-scope layout the
+class's original javadoc assumed ("Unlike `Linear`, `forward` needs no explicit-target overload").
+On the inverted layout -- the model built in a scope that is itself a descendant of `x`'s own --
+the innermost rule instead picks the model scope, leaking one array per `forward` call (confirmed
+empirically: with params in a child model scope and `x` in the root, the old
+`QuantizedLinear.forward(x).scope()` was the model scope, while bias-less `Linear.forward(x).scope()`
+was correctly the root). Fixed by giving `MLXQuant.quantizedMatmul` an explicit-`target` overload
+(mirroring `MLXShape.transpose(MLXArray, MLXScope)`'s own pattern) and having `forward` pass
+`x.scope()` explicitly, pinned by `QuantizedLinearTest#forwardTargetsXScopeUnderTheInvertedScopeLayout`
+and `MLXQuantTest#quantizedMatmulWithExplicitTargetAllocatesIntoTarget`/
+`#quantizedMatmulRejectsAnUnrelatedTarget`. The class's own javadoc now states this precisely rather
+than the withdrawn "needs no explicit-target overload" claim. The subsequent bias-add step
+(`MLXOps.add(y, param("bias"))`) is not scope-targeted -- `MLXOps#add` has no explicit-target
+overload -- so the `hasBias` branch can still leak under the inverted layout; this is the exact same
+pre-existing gap `Linear.forward`'s own `hasBias` branch has today (confirmed empirically), not a new
+one this fix introduces, and closing it is out of scope for this class (it would mean adding a target
+overload to `MLXOps#add` itself, shared by every op in this codebase). (2) Neither `scales` nor
+`biases` had a dtype check: an `INT32` pair passed construction and only failed at the next `forward`
+call with native's own `"[quantized_matmul] Only real floating types are supported"` error (confirmed
+empirically). Fixed by validating `scales.dtype().isInexact()`/`biases.dtype().isInexact()` in the
+constructor's `validate` method, pinned by `QuantizedLinearTest#constructorRejectsNonFloatingScalesOrBiases`.
 
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a

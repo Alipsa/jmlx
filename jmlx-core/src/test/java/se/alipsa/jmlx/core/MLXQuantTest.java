@@ -167,6 +167,51 @@ class MLXQuantTest {
     }
   }
 
+  /**
+   * This PR's round-7 review finding 1: the no-target {@code quantizedMatmul} overload allocates
+   * into {@link NativeOps#scopeOf}'s innermost-of-all-operands pick, which leaks into the model
+   * scope on the "inverted" layout ({@code x}'s scope an ancestor of the model's) -- see {@code
+   * QuantizedLinear}'s own javadoc. This pins the explicit-{@code target} overload itself: passing
+   * a {@code target} strictly more descendant than every operand's natural scope must land the
+   * result there, not at the operands' own (shallower) scope.
+   */
+  @Test
+  void quantizedMatmulWithExplicitTargetAllocatesIntoTarget() {
+    try (MLXScope root = new MLXScope()) {
+      float[] fixture = new float[64];
+      for (int i = 0; i < 64; i++) {
+        fixture[i] = (i % 7 - 3) * 0.3f;
+      }
+      MLXArray w = MLX.array(root, fixture, new int[] {1, 64});
+      MLXArray x = MLX.array(root, fixture, new int[] {1, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+
+      try (MLXScope target = root.newChild()) {
+        MLXArray result =
+            MLXQuant.quantizedMatmul(x, q[0], q[1], q[2], true, 32, 4, "affine", target);
+        assertSame(target, result.scope());
+      }
+    }
+  }
+
+  @Test
+  void quantizedMatmulRejectsAnUnrelatedTarget() {
+    try (MLXScope s1 = new MLXScope();
+        MLXScope s2 = new MLXScope()) {
+      float[] fixture = new float[64];
+      for (int i = 0; i < 64; i++) {
+        fixture[i] = (i % 7 - 3) * 0.3f;
+      }
+      MLXArray w = MLX.array(s1, fixture, new int[] {1, 64});
+      MLXArray x = MLX.array(s1, fixture, new int[] {1, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> MLXQuant.quantizedMatmul(x, q[0], q[1], q[2], true, 32, 4, "affine", s2));
+    }
+  }
+
   @Test
   void dequantizeRejectsBiasesFromAnUnrelatedScope() {
     try (MLXScope s1 = new MLXScope();

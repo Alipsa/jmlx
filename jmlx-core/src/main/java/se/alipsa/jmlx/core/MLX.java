@@ -29,12 +29,22 @@ import se.alipsa.jmlx.memory.MLXScope;
  *
  * <p>Every op's result is allocated in the innermost scope among every non-null {@code MLXArray}
  * operand it's given, not just its first ({@link NativeOps#scopeOf}, req/phase4-plan.md §2) --
- * superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1. Three
- * ops take a scope directly instead of inferring one from an operand: {@link #array}, which has no
- * operand to infer one from, and the explicit-target overloads {@link #hoist} and {@link
- * MLXShape#transpose(MLXArray, MLXScope)}, which let a caller push a result toward an ancestor or
- * descendant scope rather than accept {@code scopeOf}'s own answer (req/phase4-plan.md §2
- * mitigation 1 -- see {@code Linear.forward}'s {@code transpose(W, x.scope())} for why).
+ * superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1. This
+ * rule only applies to ops that compute a result from one or more {@code MLXArray} operands; two
+ * other categories take a scope directly instead, and are not exceptions to it so much as outside
+ * its premise or purpose:
+ *
+ * <ul>
+ *   <li>Ops with no {@code MLXArray} operand to infer a scope from at all: the creation ops ({@link
+ *       #array}, {@link #zeros}, {@link #ones}, {@link #full}, {@link #arange}), {@link
+ *       MLXRandom#normal} and {@link MLXRandom#uniform}, and {@link MLXGrad.Fn#apply}, whose {@code
+ *       target} is where the traced primals/grads themselves land, not a result derived from an
+ *       existing operand.
+ *   <li>Explicit-target overloads that override {@code scopeOf}'s own answer for an operand that
+ *       DOES exist: {@link #hoist} and {@link MLXShape#transpose(MLXArray, MLXScope)}, which let a
+ *       caller push a result toward an ancestor or descendant scope instead (req/phase4-plan.md §2
+ *       mitigation 1 -- see {@code Linear.forward}'s {@code transpose(W, x.scope())} for why).
+ * </ul>
  *
  * <p>{@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever
  * mlx-c's own default device is at first use, and cached for the process lifetime -- this slice

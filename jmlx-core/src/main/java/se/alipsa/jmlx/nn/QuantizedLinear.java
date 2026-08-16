@@ -15,6 +15,16 @@ import se.alipsa.jmlx.memory.MLXScope;
  * MLXQuant#quantize} to build one from a float weight, or load one directly from a quantized
  * checkpoint (Phase 5). Unlike {@link Linear}, {@code forward} needs no explicit-target overload
  * for its weight-bearing op: {@link MLXQuant#quantizedMatmul}'s javadoc explains why.
+ *
+ * <p><strong>Incompatible with {@link ModuleGrad}</strong> -- not merely untested together: {@code
+ * QuantizedMatmul}'s native backward pass has no gradient with respect to a quantized weight at all
+ * (confirmed empirically: {@code "[QuantizedMatmul::vjp] no gradient wrt the quantized weights."}),
+ * so {@code ModuleGrad.of(quantizedLinear, loss).apply(...)} always throws {@code MLXException} on
+ * its first {@code apply} call -- after the constructor has already frozen {@code tree}
+ * irreversibly, since {@link Module} has no non-trainable/buffer concept to exclude {@code weight}
+ * from differentiation. This is an inherent native limitation, not a gap this layer's own code
+ * could close: quantization-aware training is out of scope for this layer
+ * (req/plans/phase4-m4-plan.md, "Deliberately not covered").
  */
 public final class QuantizedLinear extends Module implements UnaryModule {
 

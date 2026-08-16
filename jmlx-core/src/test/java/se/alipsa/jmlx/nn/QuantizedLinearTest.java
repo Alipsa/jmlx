@@ -5,9 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.SequencedMap;
+import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXException;
+import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXQuant;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.NativeMemoryProbe;
@@ -62,6 +65,29 @@ class QuantizedLinearTest {
   private static MLXArray[] quantizedWeight(MLXScope scope) {
     MLXArray w = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
     return MLXQuant.quantize(w, GROUP_SIZE, BITS, "affine", null);
+  }
+
+  /**
+   * {@code QuantizedLinear} and {@link ModuleGrad} are mutually incompatible, not merely untested
+   * together (see this class's own javadoc, and {@link ModuleGrad}'s): {@code QuantizedMatmul}'s
+   * native backward pass has no gradient with respect to a quantized weight at all -- confirmed
+   * against the shipped native error, not inferred. This is a regression pin for that failure mode,
+   * not a feature test: if a future mlx-c version starts supporting this, this test's expected
+   * exception should be replaced with a real gradient-correctness assertion.
+   */
+  @Test
+  void moduleGradOnAQuantizedLinearThrowsNoGradientForTheQuantizedWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      BiFunction<MLXArray[], MLXArray[], MLXArray[]> loss =
+          (params, inputs) -> new MLXArray[] {MLXOps.sum(quantizedLinear.forward(inputs[0]))};
+      try (ModuleGrad mg = ModuleGrad.of(quantizedLinear, loss)) {
+        MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+        assertThrows(MLXException.class, () -> mg.apply(scope, new MLXArray[] {x}));
+      }
+    }
   }
 
   @Test

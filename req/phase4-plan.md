@@ -14,7 +14,7 @@
 | Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
 | M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
 | M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | [PR #8](https://github.com/Alipsa/jmlx/pull/8), `7173d24` |
-| M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | this branch, see req/plans/phase4-m3-plan.md |
+| M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | [PR #10](https://github.com/Alipsa/jmlx/pull/10), `59c9afe`, see req/plans/phase4-m3-plan.md |
 | M4 — `QuantizedLinear` (§8) | **Done** | this branch, see req/plans/phase4-m4-plan.md |
 | §9 — Documentation | **Done** | this branch, req/plans/phase4-m4-plan.md Task 3 |
 | §10 — CI, self-hosted runner (see note below) | Not started | — |

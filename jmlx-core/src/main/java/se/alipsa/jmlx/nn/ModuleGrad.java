@@ -18,6 +18,11 @@ import se.alipsa.jmlx.memory.MLXScope;
  * model's own ops rather than over disconnected primal arrays (req/phase4-plan.md §6). Lives here,
  * not in {@code se.alipsa.jmlx.core}, so that package never has to import {@link Module} -- see the
  * class javadoc on {@link MLXGrad}.
+ *
+ * <p>Differentiates with respect to every entry of {@code tree.parameters()} -- {@link Module} has
+ * no non-trainable/buffer concept to exclude any of them, so a tree containing a {@link
+ * QuantizedLinear} always fails at the first {@link #apply} call, since quantized weights have no
+ * native gradient at all. See {@link QuantizedLinear}'s own javadoc for the confirmed native error.
  */
 public final class ModuleGrad implements AutoCloseable {
 

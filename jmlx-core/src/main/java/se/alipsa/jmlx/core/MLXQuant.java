@@ -42,12 +42,16 @@ public final class MLXQuant {
   /**
    * Affine quantization ({@code mlx_quantize}): packs {@code w} into a {@code UINT32}-encoded
    * weight plus per-group {@code scales}/{@code biases} for reconstruction (see {@link
-   * #dequantize}). The three-array result order is native's own: {@code [w_q, scales, biases]}.
-   * {@code groupSize}/{@code bits} are Java {@code null} for "let native pick its own default" (see
-   * this class's Findings reference in {@link NativeOps#optInt} -- {@code QuantizedLinear} never
-   * uses this path, since a persisted layer must remember its own exact values). {@code
-   * globalScale} is a Java {@code null} for "none" -- a legitimate call, not an error, exactly like
-   * {@link MLXFast#rmsNorm}'s {@code weight}. Non-null: {@code w}, {@code mode}.
+   * #dequantize}). Under {@code mode="affine"} (the only mode {@code QuantizedLinear} uses), the
+   * result is native's own three-array order: {@code [w_q, scales, biases]} -- but the result
+   * length is {@code mode}-dependent, not a fixed 3: {@code mode="mxfp4"} returns only {@code [w_q,
+   * scales]}, no {@code biases} (confirmed empirically). A caller using a non-affine {@code mode}
+   * must check {@code result.length} rather than assume index 2 exists. {@code groupSize}/{@code
+   * bits} are Java {@code null} for "let native pick its own default" (see this class's Findings
+   * reference in {@link NativeOps#optInt} -- {@code QuantizedLinear} never uses this path, since a
+   * persisted layer must remember its own exact values). {@code globalScale} is a Java {@code null}
+   * for "none" -- a legitimate call, not an error, exactly like {@link MLXFast#rmsNorm}'s {@code
+   * weight}. Non-null: {@code w}, {@code mode}.
    *
    * <p>The result's scope is resolved via {@link NativeOps#scopeOf} over <em>both</em> array
    * operands, {@code w} and {@code globalScale} -- not just {@code w.scope()} the way {@link

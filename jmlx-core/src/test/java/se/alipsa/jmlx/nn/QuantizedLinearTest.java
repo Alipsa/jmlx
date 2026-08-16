@@ -235,6 +235,35 @@ class QuantizedLinearTest {
     }
   }
 
+  /**
+   * The positive direction {@link
+   * #constructorRejectsInconsistentPackedColumnCountForNonPowerOfTwoBits} does not cover: a {@code
+   * bits=3} weight whose {@code groupSize}/{@code bits} <em>are</em> consistent with the actual
+   * {@code weight}/{@code scales} shapes must be accepted and must {@code forward} correctly.
+   * Without this row, a regression that made the packed-column check wrongly reject every
+   * non-power-of-2 {@code bits} value (or a future mlx-c version that changes 3/5/6-bit packing)
+   * would still pass the whole suite, since the only other non-power-of-2 test asserts a rejection.
+   */
+  @Test
+  void forwardWorksForNonPowerOfTwoBits() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] q = MLXQuant.quantize(w, GROUP_SIZE, 3, "affine", null);
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, 3);
+      MLXArray quantizedResult = quantizedLinear.forward(x);
+
+      MLXArray dequantizedWeight =
+          MLXQuant.dequantize(q[0], q[1], q[2], GROUP_SIZE, 3, "affine", null, null);
+      Linear linear = new Linear(scope, dequantizedWeight, null);
+      MLXArray linearResult = linear.forward(x);
+
+      assertArrayEquals(linearResult.toFloatArray(), quantizedResult.toFloatArray(), EPS);
+    }
+  }
+
   @Test
   void activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent() {
     try (MLXScope parent = new MLXScope()) {

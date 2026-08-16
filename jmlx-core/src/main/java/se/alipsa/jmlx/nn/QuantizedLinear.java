@@ -36,27 +36,30 @@ public final class QuantizedLinear extends Module implements UnaryModule {
 
   /**
    * {@code weight} is {@code [out, packedIn]} {@code UINT32} (packed columns = {@code in * bits /
-   * 32} -- only for {@code bits} in {@code {2, 4, 8}}; {@code bits} in {@code {3, 5, 6}} pack
-   * unevenly and this constructor cannot check them, see below); {@code scales}/{@code biases} are
-   * each {@code [out, in / groupSize]}; {@code bias}, if non-null, is {@code [out]}. {@code
-   * groupSize}/{@code bits} are each restricted to the exact legal sets this native version
-   * supports ({@code {32, 64, 128}} / {@code {2, 3, 4, 5, 6, 8}}, confirmed against the shipped
-   * binary, Findings section) rather than merely {@code > 0} -- an out-of-set value would otherwise
-   * clear every other check unchanged and fail as an opaque native error at first {@link #forward}
-   * call, the same failure mode {@code weight.dtype() != UINT32} exists to prevent for a plain
-   * float weight. This hardcodes a native-version-specific set into the layer, the same trade-off
-   * Global Constraint 4 already accepts for {@code mode} ("a genuinely new upstream mode would need
-   * this validation set updated too") -- accepted here for the same reason: legal range, not a
-   * default value (distinct from Global Constraint 5's "absent means let native pick a default"
-   * argument). Native validates the packing/group-size relationship on the first {@link #forward}
-   * call; this constructor validates only the shape relationships (and now the legal-set
-   * membership) it can check without unpacking {@code weight} -- the same division of labor {@link
-   * Linear}'s own constructor draws. Non-null: {@code weight}, {@code scales}, {@code biases};
-   * {@code bias} is the only nullable parameter. Unlike every {@code MLXQuant} method (Global
-   * Constraint 5), a {@code null} {@code scales}/{@code biases} here fails as a bare {@code
-   * NullPointerException} out of {@code .ndim()} with no named message -- the same gap {@link
-   * Linear}'s own constructor already has for its {@code weight} parameter, so this is
-   * precedent-consistent rather than a new one, not a guard this constructor is expected to add.
+   * 32} -- holds for every legal {@code bits} value, {@code {2, 3, 4, 5, 6, 8}}, not just the
+   * power-of-2 subset {@code get_pack_factor}/{@code get_bytes_per_pack}'s byte-level packing might
+   * suggest: {@code group_size}'s own legal set forces {@code in} to always be a multiple of 32, so
+   * the byte-level unevenness never surfaces at this word granularity -- confirmed empirically, see
+   * below); {@code scales}/{@code biases} are each {@code [out, in / groupSize]}; {@code bias}, if
+   * non-null, is {@code [out]}. {@code groupSize}/{@code bits} are each restricted to the exact
+   * legal sets this native version supports ({@code {32, 64, 128}} / {@code {2, 3, 4, 5, 6, 8}},
+   * confirmed against the shipped binary, Findings section) rather than merely {@code > 0} -- an
+   * out-of-set value would otherwise clear every other check unchanged and fail as an opaque native
+   * error at first {@link #forward} call, the same failure mode {@code weight.dtype() != UINT32}
+   * exists to prevent for a plain float weight. This hardcodes a native-version-specific set into
+   * the layer, the same trade-off Global Constraint 4 already accepts for {@code mode} ("a
+   * genuinely new upstream mode would need this validation set updated too") -- accepted here for
+   * the same reason: legal range, not a default value (distinct from Global Constraint 5's "absent
+   * means let native pick a default" argument). Native validates the packing/group-size
+   * relationship on the first {@link #forward} call; this constructor validates only the shape
+   * relationships (and now the legal-set membership) it can check without unpacking {@code weight}
+   * -- the same division of labor {@link Linear}'s own constructor draws. Non-null: {@code weight},
+   * {@code scales}, {@code biases}; {@code bias} is the only nullable parameter. Unlike every
+   * {@code MLXQuant} method (Global Constraint 5), a {@code null} {@code scales}/{@code biases}
+   * here fails as a bare {@code NullPointerException} out of {@code .ndim()} with no named message
+   * -- the same gap {@link Linear}'s own constructor already has for its {@code weight} parameter,
+   * so this is precedent-consistent rather than a new one, not a guard this constructor is expected
+   * to add.
    */
   public QuantizedLinear(
       MLXScope scope,

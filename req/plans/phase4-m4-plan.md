@@ -707,6 +707,22 @@ public final class QuantizedLinear extends Module implements UnaryModule {
 }
 ```
 
+**Amendment (post-merge review): both the constructor javadoc above (packed-columns sentence,
+`only for \`bits\` in \`{2, 4, 8}\`...`) and the `if (32 % bits == 0)` gate around the packed-column
+consistency check are wrong, not just conservative -- see this document's own Findings-section
+amendment (above, under "`packedCols = cols * bits / 32` only holds for power-of-2 `bits`") for the
+full empirical correction.** `packedCols = in * bits / 32` holds for every legal `bits` value
+(`{2, 3, 4, 5, 6, 8}`), because `group_size`'s own legal set forces `in` to always be a multiple of
+32 -- the byte-level pack-factor unevenness `get_pack_factor`/`get_bytes_per_pack` describe never
+surfaces at this word granularity. The gated check silently skipped the packed-column consistency
+guard for `bits` in `{3, 5, 6}`, reintroducing the exact deferred-opaque-native-error failure mode
+the check exists to prevent. The shipped `QuantizedLinear.java` no longer has this gate: the javadoc
+sentence was corrected and the check now runs unconditionally for all six legal `bits` values,
+pinned by `constructorRejectsInconsistentPackedColumnCountForNonPowerOfTwoBits`. This code listing is
+left as originally written, per this repo's convention of amending rather than rewriting a merged
+plan's code -- do not copy the `only for \`bits\` in \`{2, 4, 8}\`` sentence or the
+`if (32 % bits == 0)` gate from it into new code.
+
 **`groupSize`/`bits` are plain `int` fields, not `MLXArray` parameters** -- same reasoning as
 `Linear`'s `hasBias` boolean (`Module`'s own javadoc: "a cached scalar field ... has no such hazard,
 since it is never an `MLXArray` and is never rebound"). They are structural configuration of the

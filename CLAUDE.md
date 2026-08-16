@@ -5,13 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 `jmlx` is a pure, idiomatic Java 25 framework for Apple Silicon GPU tensor operations, wrapping Apple's
-native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The current code is the **v0.1
-vertical slice** described in `req/initial-plan.md`: just enough of the stack — native bootstrap,
-generated bindings, memory management, and a handful of tensor ops — to prove the pipeline works
-end to end on real Apple Silicon GPU hardware. `req/project-outline.md` describes the full multi-phase
-vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); `req/phase3-plan.md` is
-the plan for the next slice (broadcast-compatible ops, relaxed matmul, `slice`, a batched `eval`) and
-is not yet implemented in `jmlx-core`.
+native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The **v0.1 vertical slice** described
+in `req/initial-plan.md` (native bootstrap, generated bindings, memory management, a handful of tensor
+ops) is done, and two further phases are built on top of it: `req/phase3-plan.md` (broadcast-compatible
+ops, relaxed matmul, `slice`, a batched `eval`) and `req/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`,
+`Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
+cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/project-outline.md`
+describes the full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model
+loading); Phase 5 (safetensors/GGUF checkpoint loading, tokenizers, model implementations) is not yet
+implemented.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -85,8 +87,13 @@ both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — ne
 ```
 jmlx-examples    HelloMLX                          demo, end-to-end test
        |
-jmlx-core        MLX  MLXArray  MLXScope           hand-written idiomatic Java
-                 DType  MLXException                se.alipsa.jmlx.{core,memory}
+jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLinear,
+                                                    RMSNorm/LayerNorm/SiLU/GELU/Embedding,
+                                                    MultiHeadAttention, KVCache, ModuleGrad
+                 se.alipsa.jmlx.core                MLX, MLXOps, MLXShape, MLXFast, MLXQuant,
+                                                    MLXRandom, MLXGrad, MLXArray, DType,
+                                                    MLXException
+                 se.alipsa.jmlx.memory              MLXScope
        |
 jmlx-ffi         se.alipsa.jmlx.ffi.*              committed jextract output
                  NativeLoader                      hand-written
@@ -146,9 +153,10 @@ GPU/CPU until `MLX.eval(...)` (or the implicit eval inside `MLXArray.toFloatArra
 pointer — a lazy op like `transpose` can otherwise yield a strided view, and reading raw data without
 that step would return plausible-looking values in the wrong order instead of crashing.
 
-Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` only covers `FLOAT32`/`INT32`.
-`defaultDevice()`/`defaultStream()` are resolved once from mlx-c's own defaults and cached for the
-process lifetime — this slice doesn't expose device switching.
+Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` covers `FLOAT32`, `INT32`,
+`BOOL`, `UINT32` (the packed-weight dtype `QuantizedLinear` validates against), `FLOAT16` and
+`BFLOAT16`. `defaultDevice()`/`defaultStream()` are resolved once from mlx-c's own defaults and cached
+for the process lifetime — this slice doesn't expose device switching.
 
 ## Native version pinning
 

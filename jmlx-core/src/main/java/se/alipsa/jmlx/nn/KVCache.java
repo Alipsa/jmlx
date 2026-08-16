@@ -137,21 +137,30 @@ public final class KVCache {
     } else {
       MLXArray concatenatedKeys = MLXShape.concatenate(new MLXArray[] {keys, k}, seqAxis);
       MLXArray concatenatedValues = MLXShape.concatenate(new MLXArray[] {values, v}, seqAxis);
-      // Hoist before closing the superseded handles: if hoist throws, keys/values still refer to
-      // open, valid arrays instead of handles this class already closed out from under itself.
+      // Both concatenates and both hoists must succeed before either superseded handle is closed:
+      // if any of the four throws, keys/values still refer to open, valid arrays instead of a
+      // handle this class already closed out from under itself, and neither field has been
+      // reassigned yet -- a partial success (one tensor advanced, the other not) would desync
+      // keys/values from each other and from offset. replaceAccumulated does the close+reassign as
+      // a single step once both hoists are in hand, immediately after they're computed.
       MLXArray hoistedKeys = MLX.hoist(concatenatedKeys, scope);
       MLXArray hoistedValues = MLX.hoist(concatenatedValues, scope);
-      if (ownsKeys) {
-        keys.close();
-      }
-      if (ownsValues) {
-        values.close();
-      }
-      ownsKeys = true;
-      ownsValues = true;
-      keys = hoistedKeys;
-      values = hoistedValues;
+      replaceAccumulated(hoistedKeys, hoistedValues);
     }
     offset += newLength;
+  }
+
+  /** Closes whichever of the superseded {@code keys}/{@code values} this cache itself owns. */
+  private void replaceAccumulated(MLXArray newKeys, MLXArray newValues) {
+    if (ownsKeys) {
+      keys.close();
+    }
+    if (ownsValues) {
+      values.close();
+    }
+    keys = newKeys;
+    values = newValues;
+    ownsKeys = true;
+    ownsValues = true;
   }
 }

@@ -272,7 +272,11 @@ class QuantizedLinearTest {
    * #onParametersUpdated()} closes that gap by re-running the same checks; this pins the case where
    * the replacement alone (a different {@code out} dimension) is already inconsistent with the
    * unchanged {@code scales}, so it should throw rather than defer to an opaque native error at the
-   * next {@link QuantizedLinear#forward} call.
+   * next {@link QuantizedLinear#forward} call. Also pins this PR's round-6 review finding 1: {@link
+   * Module#update}'s rollback-on-throw means {@code weight} must still be the original {@code [OUT,
+   * ...]} array afterward, not the rejected {@code [3, ...]} one -- before that fix, the rejected
+   * write stayed installed even though the constructor's own validation would never have accepted
+   * it.
    */
   @Test
   void updateWithAWeightAloneInconsistentWithTheExistingScalesThrows() {
@@ -292,6 +296,8 @@ class QuantizedLinearTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> quantizedLinear.update(Map.of("weight", threeRowQuantized[0])));
+
+      assertArrayEquals(q[0].shape(), quantizedLinear.parameters().get("weight").shape());
     }
   }
 
@@ -300,8 +306,7 @@ class QuantizedLinearTest {
    * biases} are replaced together, self-consistent with each other, but quantized under a {@code
    * groupSize} different from this layer's own cached one -- {@code gs=32,bits=4} at construction,
    * {@code gs=64,bits=4} at update. Before {@link #onParametersUpdated()} existed, this would
-   * silently succeed and only surface as an opaque native error (or, in the narrower case the
-   * review flagged, wrong numbers with no error at all) at the next {@code forward()} call.
+   * silently succeed and only surface as an opaque native error at the next {@code forward()} call.
    */
   @Test
   void updateWithWeightScalesAndBiasesQuantizedUnderADifferentGroupSizeThrows() {
@@ -320,7 +325,37 @@ class QuantizedLinearTest {
   }
 
   /**
-   * The non-regression counterpart to the two tests above: a replacement that stays consistent with
+   * Pins {@link #onParametersUpdated()}'s documented blind spot (this PR's round-6 review finding
+   * 2): a replacement quantized under {@code groupSize=64,bits=2} algebraically reproduces the same
+   * expected packed-column count this layer's cached {@code groupSize=32,bits=4} would compute for
+   * an {@code in=64} weight ({@code 4} either way), so the shape check cannot tell the two {@code
+   * (groupSize, bits)} pairs apart and {@code update} succeeds. Native itself is not fooled: the
+   * next {@code forward()} call still throws, because {@code quantizedMatmul} is invoked with the
+   * layer's own (wrong) cached {@code groupSize=32,bits=4} against data actually packed at {@code
+   * groupSize=64,bits=2} -- confirmed empirically, not merely reasoned about. If this ever silently
+   * computed wrong numbers instead of throwing, that would be a correctness regression worth its
+   * own test; this test exists to catch that regression, not to bless the current blind spot as
+   * acceptable.
+   */
+  @Test
+  void updateWithACoincidentalPackedColumnCollisionSucceedsButForwardStillThrowsNatively() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+
+      MLXArray w2 = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] q2 = MLXQuant.quantize(w2, 64, 2, "affine", null);
+
+      quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2]));
+
+      assertThrows(MLXException.class, () -> quantizedLinear.forward(x));
+    }
+  }
+
+  /**
+   * The non-regression counterpart to the tests above: a replacement that stays consistent with
    * this layer's own {@code groupSize}/{@code bits} must still be accepted by {@link
    * #onParametersUpdated()}, and {@code forward()} must reflect the new weight.
    */

@@ -63,6 +63,31 @@ class ModuleTest {
     }
   }
 
+  /** A leaf whose {@code onParametersUpdated()} always throws, for the rollback tests below. */
+  private static final class ThrowingLeaf extends Module {
+    boolean notified;
+
+    ThrowingLeaf(MLXScope scope, MLXArray w) {
+      super(scope);
+      param("w", w);
+    }
+
+    @Override
+    protected void onParametersUpdated() {
+      notified = true;
+      throw new IllegalStateException("ThrowingLeaf always rejects an update");
+    }
+  }
+
+  /** Two named children ("first", "second"), for the multi-module rollback test. */
+  private static final class TwoChildBranch extends Module {
+    TwoChildBranch(MLXScope scope, Module first, Module second) {
+      super(scope);
+      child("first", first);
+      child("second", second);
+    }
+  }
+
   @Test
   void paramWithDuplicateNameThrows() {
     try (MLXScope scope = new MLXScope()) {
@@ -236,6 +261,57 @@ class ModuleTest {
 
       assertFalse(leaf.notified);
       assertSame(w, leaf.param("w"));
+    }
+  }
+
+  /**
+   * Regression test for PR #11 round-6 review finding 1: {@code onParametersUpdated()} runs after
+   * the write, by contract ("called after update writes"), so a throwing override cannot be
+   * validated-before-write the way an unknown path or {@code null} value can be. Before this fix,
+   * the throw left the new (rejected) value permanently installed with no way to recover the
+   * previous binding -- exactly what a real subclass ({@code QuantizedLinear}) started doing in
+   * this PR. This pins that {@code update} now rolls the write back to the pre-call value first.
+   */
+  @Test
+  void updateRollsBackTheWriteWhenOnParametersUpdatedThrows() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray newW = MLX.array(scope, new float[] {2f}, new int[] {1});
+      ThrowingLeaf leaf = new ThrowingLeaf(scope, w);
+
+      assertThrows(IllegalStateException.class, () -> leaf.update(Map.of("w", newW)));
+
+      assertTrue(leaf.notified);
+      assertSame(w, leaf.param("w"));
+    }
+  }
+
+  /**
+   * The composed-tree case: two siblings are both touched by one {@code update} call; the first's
+   * {@code onParametersUpdated()} succeeds before the second's throws. The whole call is
+   * all-writes-and-all-notifies-succeed or none of it takes effect, so the first sibling's already-
+   * successful write is rolled back too, not just the one that threw -- and the second sibling's
+   * write, made before either notification ran, is rolled back as well.
+   */
+  @Test
+  void updateRollsBackEverySiblingWhenOneOnParametersUpdatedThrows() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray firstW = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray secondW = MLX.array(scope, new float[] {10f}, new int[] {1});
+      MLXArray newFirstW = MLX.array(scope, new float[] {2f}, new int[] {1});
+      MLXArray newSecondW = MLX.array(scope, new float[] {20f}, new int[] {1});
+      Leaf first = new Leaf(scope, firstW);
+      ThrowingLeaf second = new ThrowingLeaf(scope, secondW);
+      TwoChildBranch branch = new TwoChildBranch(scope, first, second);
+
+      assertThrows(
+          IllegalStateException.class,
+          () -> branch.update(Map.of("first.w", newFirstW, "second.w", newSecondW)));
+
+      assertTrue(first.notified);
+      assertTrue(second.notified);
+      assertSame(firstW, first.param("w"));
+      assertSame(secondW, second.param("w"));
     }
   }
 

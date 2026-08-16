@@ -86,17 +86,31 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * Re-runs this constructor's own validation against whichever of {@code weight}/{@code
    * scales}/{@code biases}/{@code bias} {@link #update} just wrote. {@link #update} can replace any
    * subset of these arrays with no shape/{@code groupSize}/{@code bits} agreement enforced on its
-   * own; without this override, a caller that replaces {@code weight} alone (or pairs a {@code
-   * weight} quantized under a different {@code groupSize}/{@code bits} than this layer's own cached
-   * ones) would defer the mismatch to an opaque native error at the next {@link #forward} call --
-   * or, worse, to silently wrong numbers if the mismatched {@code (groupSize, bits)} pairing
-   * happens to still yield the same packed column count (e.g. {@code groupSize=32, bits=4} vs.
-   * {@code groupSize=64, bits=2}). {@code groupSize}/{@code bits} themselves are re-validated too
-   * even though {@link #update} cannot change them (they are plain fields, not registered
-   * parameters) -- cheap, and keeps this override a straight re-run of the constructor's checks
-   * rather than a hand-maintained subset. Never called from {@link #rebind} (see {@link
-   * Module#onParametersUpdated()}), so {@code ModuleGrad}'s rebind-around-a-loss-call usage is
-   * unaffected.
+   * own; without this override, a caller that replaces {@code weight} alone (or pairs it with
+   * {@code scales}/{@code biases} inconsistent with this layer's own cached {@code
+   * groupSize}/{@code bits}) would defer the mismatch to an opaque native error at the next {@link
+   * #forward} call. {@link Module#update} rolls the write back to its pre-call value when this
+   * throws, so a rejected {@code update} call leaves every parameter exactly as it was rather than
+   * installing the rejected value anyway (req/plans/phase4-m4-plan.md's Amendment covers the
+   * distinct bug this closed in {@code Module} itself).
+   *
+   * <p>This is a shape check, not a semantic one: it re-derives an expected packed-column count
+   * from {@code scales}' own shape and this layer's cached {@code groupSize}/{@code bits}, so it
+   * only catches a mismatch that shows up in that arithmetic. A replacement quantized under a
+   * <em>different</em> {@code (groupSize, bits)} pair that happens to algebraically reproduce the
+   * same expected count (e.g. an {@code in=64} weight re-quantized at {@code groupSize=64, bits=2}
+   * against this layer's cached {@code groupSize=32, bits=4}: both give {@code
+   * expectedPackedCols=4}) passes this check and is not caught here -- confirmed empirically, not
+   * merely reasoned about. Native itself still validates the packing/group-size relationship on the
+   * next {@link #forward} call using the wrong cached {@code groupSize}/{@code bits}, so this
+   * specific case still surfaces as a native error rather than as silently wrong numbers; it is
+   * this override's blind spot, not a corruption vector this class leaves open.
+   *
+   * <p>{@code groupSize}/{@code bits} themselves are re-validated too even though {@link #update}
+   * cannot change them (they are plain fields, not registered parameters) -- cheap, and keeps this
+   * override a straight re-run of the constructor's checks rather than a hand-maintained subset.
+   * Never called from {@link #rebind} (see {@link Module#onParametersUpdated()}), so {@code
+   * ModuleGrad}'s rebind-around-a-loss-call usage is unaffected.
    */
   @Override
   protected void onParametersUpdated() {

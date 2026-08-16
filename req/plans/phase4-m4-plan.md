@@ -728,6 +728,41 @@ plan's code -- do not copy the `only for \`bits\` in \`{2, 4, 8}\`` sentence or 
 since it is never an `MLXArray` and is never rebound"). They are structural configuration of the
 layer, not a value `update`/`rebind` ever touches.
 
+**Amendment (post-merge review): the code listing above predates two later fixes, neither reflected
+in it.** This document's Task 2 listing above shows only the constructor and `forward` -- no
+`onParametersUpdated` override -- because the shipped `QuantizedLinear.java` originally had the same
+gap: the constructor's shape/`groupSize`/`bits` validation ran once, at construction, but
+`Module.update`/`rebind` could replace `weight`/`scales`/`biases`/`bias` afterward with no
+re-validation at all, silently permitting a mismatch that would only surface as an opaque native
+error (or, in one specific case, not surface at all -- see below) at the next `forward` call.
+
+The shipped class now has a `private static void validate(...)` (the constructor's checks, extracted
+unchanged) and a `protected void onParametersUpdated()` override that re-runs it against whichever
+of the four `update` just wrote, pinned by three regression tests
+(`updateWithAWeightAloneInconsistentWithTheExistingScalesThrows`,
+`updateWithWeightScalesAndBiasesQuantizedUnderADifferentGroupSizeThrows`,
+`updateWithAConsistentReplacementSucceedsAndForwardReflectsIt`). This re-validation is a shape check,
+not a semantic one, and does not catch every possible mismatch: a replacement quantized under a
+different `(groupSize, bits)` pair that happens to algebraically reproduce the same expected
+packed-column count (`in=64` re-quantized at `groupSize=64,bits=2` against a layer cached at
+`groupSize=32,bits=4` -- both give `expectedPackedCols=4`) passes this check. Native itself is not
+fooled -- the next `forward` call still throws, confirmed empirically, pinned by
+`updateWithACoincidentalPackedColumnCollisionSucceedsButForwardStillThrowsNatively` -- so this is a
+documented blind spot in the check, not a silent-corruption path this class leaves open.
+
+Separately, this override exposed a real bug in `Module.update` itself, shared by every subclass
+that overrides `onParametersUpdated()`: `update` wrote every value before calling the hook
+(`writeAll(...)` before `notifyDepthFirst(...)`), so a hook that threw -- something no subclass did
+before `QuantizedLinear`'s override -- left its rejected value permanently installed, with no way for
+the caller to recover the previous binding, and aborted `notifyDepthFirst`'s recursion before any
+sibling or descendant module past the throwing one got notified. `Module.update` now snapshots every
+touched parameter's previous value before writing, and restores all of them if any
+`onParametersUpdated()` call throws, so the whole call is all-writes-and-all-notifies-succeed or none
+of it takes effect -- pinned by `ModuleTest#updateRollsBackTheWriteWhenOnParametersUpdatedThrows` and
+`ModuleTest#updateRollsBackEverySiblingWhenOneOnParametersUpdatedThrows`. This fix lives in `Module`,
+not `QuantizedLinear`, since the gap was in the shared base class's contract, not in this layer's own
+code.
+
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a
 parameter that *could* allocate into the model scope if written wrong (§2's fifth sub-hazard).

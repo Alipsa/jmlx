@@ -166,11 +166,47 @@ public abstract class Module {
    * would apply some writes and skip their notifications, since the notify pass only runs after the
    * whole loop returns.
    *
+   * <p>If any {@link #onParametersUpdated()} call throws, every write this call made is rolled back
+   * to its pre-call value before the exception propagates, and no further {@code
+   * onParametersUpdated()} calls run -- the whole call is all-writes-and-all-notifies-succeed, or
+   * none of it takes effect. This matters because {@code onParametersUpdated()} runs strictly after
+   * the write (its own contract: "called after update writes"), so unlike the resolve/null-check
+   * pass above, its own validation cannot run before the write happens -- a subclass override that
+   * validates and throws (e.g. {@code QuantizedLinear}) would otherwise leave its rejected value
+   * permanently installed, with no way for the caller to recover the previous binding.
+   *
    * @throws NullPointerException if {@code byPath}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
    */
   public final void update(Map<String, MLXArray> byPath) {
-    notifyDepthFirst(writeAll(resolveAll(byPath)));
+    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = resolveAll(byPath);
+    Map<ResolvedTarget, MLXArray> previousValues = capturePreviousValues(resolved);
+    Set<Module> touched = writeAll(resolved);
+    boolean succeeded = false;
+    try {
+      notifyDepthFirst(touched);
+      succeeded = true;
+    } finally {
+      if (!succeeded) {
+        restore(previousValues);
+      }
+    }
+  }
+
+  private static Map<ResolvedTarget, MLXArray> capturePreviousValues(
+      List<Map.Entry<ResolvedTarget, MLXArray>> resolved) {
+    Map<ResolvedTarget, MLXArray> previous = new LinkedHashMap<>();
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
+      ResolvedTarget target = entry.getKey();
+      previous.put(target, target.owner().params.get(target.localName()));
+    }
+    return previous;
+  }
+
+  private static void restore(Map<ResolvedTarget, MLXArray> previousValues) {
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : previousValues.entrySet()) {
+      entry.getKey().owner().params.put(entry.getKey().localName(), entry.getValue());
+    }
   }
 
   private void notifyDepthFirst(Set<Module> touched) {

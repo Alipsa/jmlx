@@ -216,6 +216,25 @@ class QuantizedLinearTest {
     }
   }
 
+  /**
+   * The same guard as {@link
+   * #constructorRejectsAWeightWithAPackedColumnCountInconsistentWithGroupSizeAndBits}, but for a
+   * non-power-of-2 {@code bits} value: {@code packedCols = in * bits / 32} holds for {@code bits=3}
+   * too (confirmed empirically -- an earlier version of this constructor's check ran only when
+   * {@code 32 % bits == 0}, on the wrong belief that {@code bits} in {@code {3, 5, 6}} pack
+   * unevenly enough to break the formula, and so silently skipped this exact case).
+   */
+  @Test
+  void constructorRejectsInconsistentPackedColumnCountForNonPowerOfTwoBits() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] q = MLXQuant.quantize(w, GROUP_SIZE, 3, "affine", null);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> new QuantizedLinear(scope, q[0], q[1], q[2], null, 64, 3));
+    }
+  }
+
   @Test
   void activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent() {
     try (MLXScope parent = new MLXScope()) {

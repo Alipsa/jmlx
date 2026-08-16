@@ -277,10 +277,12 @@ final class NativeOps {
    * value; bool has_value;}} shape as {@link #optInt}/{@link #optFloat} (confirmed by reading the
    * generated {@code mlx_optional_dtype_} binding directly: byte-identical layout, only the field's
    * C type name differs). {@code value == null} encodes "absent"; {@code mlx_dequantize} then
-   * produces its own default dtype -- FLOAT32 in every case this facade can construct (confirmed
-   * empirically, req/plans/phase4-m4-plan.md's Findings section: absent {@code dtype} matches
-   * {@code scales}' own dtype, which this facade only ever produces as FLOAT32 via {@link
-   * MLXQuant#quantize}).
+   * defaults to {@code scales}' own dtype (confirmed empirically, req/plans/phase4-m4-plan.md's
+   * Findings section) -- FLOAT32 whenever {@code scales} is FLOAT32, but not unconditionally:
+   * {@code scales} need not be FLOAT32 (e.g. {@link MLXQuant#quantize} on a weight already {@code
+   * astype}'d to FLOAT16 produces FLOAT16 {@code scales}, confirmed empirically), so a caller
+   * relying on an absent {@code dtype} to mean FLOAT32 must first confirm {@code scales}' own dtype
+   * is FLOAT32.
    */
   static MemorySegment optDtype(Arena tmp, DType value) {
     MemorySegment seg = mlx_optional_dtype_.allocate(tmp);

@@ -38,14 +38,23 @@ class MLXQuantTest {
   }
 
   /**
-   * The "three-array result order" a reader might otherwise assume unconditional (see this method's
-   * own javadoc note) does not hold for every {@code mode}: {@code mode="mxfp4"} with {@code
-   * bits=4}/{@code group_size=32} -- the one non-affine mode this exact fixture can legally
-   * construct ({@code mxfp8} demands {@code bits=8}, {@code nvfp4} demands {@code group_size=16},
-   * confirmed empirically) -- returns only {@code [w_q, scales]}, no {@code biases}. Not exercised
-   * by {@code QuantizedLinear} (which only ever uses {@code mode="affine"}), but real API surface
-   * on {@link MLXQuant#quantize} directly.
+   * The absent-{@code dtype} default is not unconditionally FLOAT32 (see {@link #dequantize}'s own
+   * javadoc note): it follows {@code scales}' own dtype. Confirmed empirically by quantizing a
+   * weight already {@code astype}'d to FLOAT16 -- {@code quantize} then produces FLOAT16 {@code
+   * scales}, and a subsequent {@code dequantize(..., dtype=null)} returns FLOAT16, not FLOAT32.
    */
+  @Test
+  void dequantizeDefaultDtypeFollowsScalesDtypeNotAlwaysFloat32() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray w16 = MLX.astype(w, DType.FLOAT16);
+      MLXArray[] q = MLXQuant.quantize(w16, 32, 4, "affine", null);
+      assertEquals(DType.FLOAT16, q[1].dtype());
+      MLXArray result = MLXQuant.dequantize(q[0], q[1], q[2], 32, 4, "affine", null, null);
+      assertEquals(DType.FLOAT16, result.dtype());
+    }
+  }
+
   @Test
   void quantizeWithMxfp4ModeReturnsOnlyTwoArrays() {
     try (MLXScope scope = new MLXScope()) {

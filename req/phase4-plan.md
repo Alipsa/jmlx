@@ -87,8 +87,12 @@ to `head`; the plan document itself is left unmodified with an amendment note, p
 **M4 findings** (`QuantizedLinear`, confirmed against real mlx-c on Apple Silicon hardware — see
 req/plans/phase4-m4-plan.md's own "Findings from this plan's pre-work" for the probes this
 summarizes). `mlx_quantize` on a `[1,64]` FLOAT32 input, `group_size=32`, `bits=4`, `mode="affine"`:
-`w_q` is UINT32, shape `[1, packedCols]` with `packedCols = cols * bits / 32` (holds only for
-power-of-2 `bits` -- `{2, 4, 8}`, not `{3, 5, 6}`); `scales`/`biases` are each FLOAT32, shape
+`w_q` is UINT32, shape `[1, packedCols]` with `packedCols = cols * bits / 32` -- holds for every
+legal `bits` value (`{2, 3, 4, 5, 6, 8}`), not just the power-of-2 subset an earlier reading of the
+pre-work probes assumed (`get_pack_factor`/`get_bytes_per_pack`'s byte-level unevenness never
+surfaces at the word granularity `packedCols` is computed in, because `group_size`'s own legal set
+forces `cols` to always be a multiple of 32; confirmed empirically post-merge, see
+req/plans/phase4-m4-plan.md's amendment); `scales`/`biases` are each FLOAT32, shape
 `[1, cols / groupSize]`. `global_scale` is unconditionally rejected on the Metal backend, for both
 `quantize` and `dequantize`, in every mode tried -- dead API surface on this codebase, kept for a
 future non-Metal backend. `mlx_quantized_matmul(x, w_q, scales, biases, transpose=true, ...)` treats
@@ -99,7 +103,12 @@ beyond the plan's own pre-work: `mlx_dequantize` with `mode="affine"` unconditio
 `biases` (`"[dequantize] Biases must be provided for affine quantization"`) -- `MLXQuant.dequantize`'s
 `biases` stays nullable API surface regardless (a hypothetical non-affine mode may not require it),
 but every `mode="affine"` caller must pass a real one; `MLXQuantTest.dequantizeRejectsNullBiasesUnderAffineMode`
-is the regression pin. All three ops' composition-identity tests (`quantizedMatmul` vs.
+is the regression pin. A second post-merge finding: `mlx_dequantize`'s absent-`dtype` default is not
+unconditionally FLOAT32 -- it follows `scales`' own dtype, which is only FLOAT32 for a caller who
+quantized an unmodified FLOAT32 weight; `quantize` on a weight already `astype`'d to FLOAT16 produces
+FLOAT16 `scales`, and `dequantize(..., dtype=null)` then silently returns FLOAT16
+(`MLXQuantTest.dequantizeDefaultDtypeFollowsScalesDtypeNotAlwaysFloat32` is the regression pin).
+All three ops' composition-identity tests (`quantizedMatmul` vs.
 `matmul(x, transpose(dequantize(...)))`, and `QuantizedLinear.forward` vs. `Linear.forward` on the
 dequantized weight) agree to within float32 rounding noise (`~1e-6`), not quantization noise, so
 those rows use the facade's usual `1e-5f`/`1e-3f` tolerance rather than `EPS_ROUNDTRIP`'s `0.15f`.

@@ -105,25 +105,29 @@ public final class QuantizedLinear extends Module implements UnaryModule {
       throw new IllegalArgumentException(
           "QuantizedLinear: groupSize must be one of {32, 64, 128}, got " + groupSize);
     }
-    // packedCols = in * bits / 32 only holds for power-of-2 bits -- of the now-enforced legal
-    // set {2, 3, 4, 5, 6, 8} (confirmed against the shipped binary, Findings section), that's
-    // exactly {2, 4, 8}: bits 3/5/6 pack unevenly (mlx-c's own get_pack_factor/
-    // get_bytes_per_pack), so this check is skipped rather than wrong for them.
-    if (32 % bits == 0) {
-      long in = (long) scales.shape()[1] * groupSize;
-      long expectedPackedCols = in * bits / 32;
-      if (weight.shape()[1] != expectedPackedCols) {
-        throw new IllegalArgumentException(
-            "QuantizedLinear: weight's packed column count ("
-                + weight.shape()[1]
-                + ") is inconsistent with scales/groupSize/bits (expected "
-                + expectedPackedCols
-                + " for in="
-                + in
-                + ", bits="
-                + bits
-                + ")");
-      }
+    // packedCols = in * bits / 32 holds for every legal bits value {2, 3, 4, 5, 6, 8}, not just
+    // the power-of-2 subset -- confirmed empirically (probed in in {64, 96, 128, 160, 224} x bits
+    // in {3, 5, 6}: w_q's last dim matched in * bits / 32 exactly every time, all UINT32). The
+    // formula is always integral here because group_size is restricted to {32, 64, 128} above, so
+    // in (= scales.shape()[1] * groupSize) is always a multiple of 32 -- the byte-level pack
+    // factor mlx-c's own get_pack_factor/get_bytes_per_pack describes never actually divides a
+    // word unevenly at these sizes. An earlier version of this check ran only when 32 % bits == 0,
+    // on the wrong belief that bits 3/5/6 pack unevenly enough to break the formula; that gated
+    // check silently let a groupSize/bits mismatch through construction, deferring it to an opaque
+    // native error at first forward() -- exactly the failure mode this check exists to prevent.
+    long in = (long) scales.shape()[1] * groupSize;
+    long expectedPackedCols = in * bits / 32;
+    if (weight.shape()[1] != expectedPackedCols) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear: weight's packed column count ("
+              + weight.shape()[1]
+              + ") is inconsistent with scales/groupSize/bits (expected "
+              + expectedPackedCols
+              + " for in="
+              + in
+              + ", bits="
+              + bits
+              + ")");
     }
     param("weight", weight);
     param("scales", scales);

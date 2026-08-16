@@ -87,9 +87,12 @@ public final class MLXQuant {
    * codebase's Metal backend (confirmed empirically, req/plans/phase4-m4-plan.md Findings): this
    * method's own {@code globalScale} is just as untestable in this codebase as {@code quantize}'s
    * is, not an ordinary nullable operand with no caveat. {@code dtype} is a Java {@code null} for
-   * "let native pick its own default" -- confirmed empirically to be FLOAT32 for every input this
-   * facade can construct (req/plans/phase4-m4-plan.md Findings). Non-null: {@code w}, {@code
-   * scales}, {@code mode}.
+   * "let native pick its own default" -- confirmed empirically to follow {@code scales}' own dtype,
+   * not unconditionally FLOAT32 (req/plans/phase4-m4-plan.md Findings): {@code scales} is FLOAT32
+   * for a caller who quantized an unmodified FLOAT32 weight, but {@link #quantize} on a weight
+   * already {@code astype}'d to FLOAT16 produces FLOAT16 {@code scales}, and an absent {@code
+   * dtype} then dequantizes to FLOAT16, silently. Non-null: {@code w}, {@code scales}, {@code
+   * mode}.
    *
    * <p>Unlike {@code globalScale} (on either method), a non-null {@code biases} is real, legal
    * input on this codebase's Metal backend (Findings section) -- {@code MLXQuantTest}'s cross-scope

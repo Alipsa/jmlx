@@ -44,6 +44,20 @@ deleted -- same precedent as M2/M3's probes. All findings below are measured out
   otherwise relies on. Only `bits` values with `32 % bits == 0` (2, 4, 8 -- not 3, 5, 6) are safe for
   any assertion built on `packedCols`; `QuantizedLinear`'s constructor (Task 2) scopes its
   groupSize/bits consistency check to that condition rather than assuming the formula universally.
+
+  **Amendment (post-merge review): this bullet's conclusion is empirically false.** Derived from
+  reading `get_pack_factor`/`get_bytes_per_pack`'s *byte-level* pack unit, not from measuring
+  `mlx_quantize`'s actual output shape -- the byte-level unevenness those functions describe never
+  surfaces at the *word* granularity `packedCols` is computed in, because `group_size`'s own legal
+  set (`{32, 64, 128}`) forces `cols` (`= scales.shape()[1] * group_size`) to always be a multiple of
+  32. Probed directly: `cols` in `{64, 96, 128, 160, 224}` x `bits` in `{3, 5, 6}` all produced
+  `w_q.shape()[-1] == cols * bits / 32` exactly, every time. `QuantizedLinear`'s `32 % bits == 0`
+  gate was itself wrong, not merely conservative -- it silently skipped the packed-column
+  consistency check for half the legal `bits` set, reintroducing the deferred-opaque-native-error
+  failure mode the check exists to prevent (a mismatched `groupSize` at `bits=3` cleared
+  construction and only failed at first `forward()`, with `[quantized_matmul] The shapes of the
+  weight and scales are incompatible...`). Fixed: the check now runs unconditionally for all six
+  legal `bits` values.
 * **`global_scale` is unconditionally rejected on the Metal backend, for both `quantize` and
   `dequantize`, in both modes tried.** Probed directly (`ScratchQuantizeProbe2`, same precedent): a
   non-null `global_scale` with `mode="affine"` on the same `[1,64]` input returns status `1` with

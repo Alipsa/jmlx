@@ -70,6 +70,47 @@ public final class QuantizedLinear extends Module implements UnaryModule {
       int groupSize,
       int bits) {
     super(scope);
+    validate(weight, scales, biases, bias, groupSize, bits);
+    param("weight", weight);
+    param("scales", scales);
+    param("biases", biases);
+    hasBias = bias != null;
+    if (hasBias) {
+      param("bias", bias);
+    }
+    this.groupSize = groupSize;
+    this.bits = bits;
+  }
+
+  /**
+   * Re-runs this constructor's own validation against whichever of {@code weight}/{@code
+   * scales}/{@code biases}/{@code bias} {@link #update} just wrote. {@link #update} can replace any
+   * subset of these arrays with no shape/{@code groupSize}/{@code bits} agreement enforced on its
+   * own; without this override, a caller that replaces {@code weight} alone (or pairs a {@code
+   * weight} quantized under a different {@code groupSize}/{@code bits} than this layer's own cached
+   * ones) would defer the mismatch to an opaque native error at the next {@link #forward} call --
+   * or, worse, to silently wrong numbers if the mismatched {@code (groupSize, bits)} pairing
+   * happens to still yield the same packed column count (e.g. {@code groupSize=32, bits=4} vs.
+   * {@code groupSize=64, bits=2}). {@code groupSize}/{@code bits} themselves are re-validated too
+   * even though {@link #update} cannot change them (they are plain fields, not registered
+   * parameters) -- cheap, and keeps this override a straight re-run of the constructor's checks
+   * rather than a hand-maintained subset. Never called from {@link #rebind} (see {@link
+   * Module#onParametersUpdated()}), so {@code ModuleGrad}'s rebind-around-a-loss-call usage is
+   * unaffected.
+   */
+  @Override
+  protected void onParametersUpdated() {
+    validate(
+        param("weight"),
+        param("scales"),
+        param("biases"),
+        hasBias ? param("bias") : null,
+        groupSize,
+        bits);
+  }
+
+  private static void validate(
+      MLXArray weight, MLXArray scales, MLXArray biases, MLXArray bias, int groupSize, int bits) {
     if (weight.dtype() != DType.UINT32) {
       throw new IllegalArgumentException(
           "QuantizedLinear: weight must be UINT32-packed, got " + weight.dtype());
@@ -132,15 +173,6 @@ public final class QuantizedLinear extends Module implements UnaryModule {
               + bits
               + ")");
     }
-    param("weight", weight);
-    param("scales", scales);
-    param("biases", biases);
-    hasBias = bias != null;
-    if (hasBias) {
-      param("bias", bias);
-    }
-    this.groupSize = groupSize;
-    this.bits = bits;
   }
 
   @Override

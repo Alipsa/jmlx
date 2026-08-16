@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
 import java.util.SequencedMap;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
@@ -257,6 +258,92 @@ class QuantizedLinearTest {
 
       MLXArray dequantizedWeight =
           MLXQuant.dequantize(q[0], q[1], q[2], GROUP_SIZE, 3, "affine", null, null);
+      Linear linear = new Linear(scope, dequantizedWeight, null);
+      MLXArray linearResult = linear.forward(x);
+
+      assertArrayEquals(linearResult.toFloatArray(), quantizedResult.toFloatArray(), EPS);
+    }
+  }
+
+  /**
+   * {@link Module#update} can replace {@code weight} alone with no shape agreement against the
+   * still-in-place {@code scales}/{@code biases} enforced on its own -- unlike the constructor,
+   * which validates all four together before registering any of them. {@link
+   * #onParametersUpdated()} closes that gap by re-running the same checks; this pins the case where
+   * the replacement alone (a different {@code out} dimension) is already inconsistent with the
+   * unchanged {@code scales}, so it should throw rather than defer to an opaque native error at the
+   * next {@link QuantizedLinear#forward} call.
+   */
+  @Test
+  void updateWithAWeightAloneInconsistentWithTheExistingScalesThrows() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+
+      float[] threeRowWeightData = new float[3 * IN];
+      for (int i = 0; i < threeRowWeightData.length; i++) {
+        threeRowWeightData[i] = (i % 7 - 3) * 0.3f;
+      }
+      MLXArray threeRowWeight = MLX.array(scope, threeRowWeightData, new int[] {3, IN});
+      MLXArray[] threeRowQuantized =
+          MLXQuant.quantize(threeRowWeight, GROUP_SIZE, BITS, "affine", null);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.update(Map.of("weight", threeRowQuantized[0])));
+    }
+  }
+
+  /**
+   * The scenario from this PR's round-5 review finding: {@code weight}/{@code scales}/{@code
+   * biases} are replaced together, self-consistent with each other, but quantized under a {@code
+   * groupSize} different from this layer's own cached one -- {@code gs=32,bits=4} at construction,
+   * {@code gs=64,bits=4} at update. Before {@link #onParametersUpdated()} existed, this would
+   * silently succeed and only surface as an opaque native error (or, in the narrower case the
+   * review flagged, wrong numbers with no error at all) at the next {@code forward()} call.
+   */
+  @Test
+  void updateWithWeightScalesAndBiasesQuantizedUnderADifferentGroupSizeThrows() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+
+      MLXArray w2 = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] q2 = MLXQuant.quantize(w2, 64, BITS, "affine", null);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2])));
+    }
+  }
+
+  /**
+   * The non-regression counterpart to the two tests above: a replacement that stays consistent with
+   * this layer's own {@code groupSize}/{@code bits} must still be accepted by {@link
+   * #onParametersUpdated()}, and {@code forward()} must reflect the new weight.
+   */
+  @Test
+  void updateWithAConsistentReplacementSucceedsAndForwardReflectsIt() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+
+      float[] otherWeightData = new float[OUT * IN];
+      for (int i = 0; i < otherWeightData.length; i++) {
+        otherWeightData[i] = (i % 5 - 2) * 0.4f;
+      }
+      MLXArray w2 = MLX.array(scope, otherWeightData, new int[] {OUT, IN});
+      MLXArray[] q2 = MLXQuant.quantize(w2, GROUP_SIZE, BITS, "affine", null);
+
+      quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2]));
+      MLXArray quantizedResult = quantizedLinear.forward(x);
+
+      MLXArray dequantizedWeight =
+          MLXQuant.dequantize(q2[0], q2[1], q2[2], GROUP_SIZE, BITS, "affine", null, null);
       Linear linear = new Linear(scope, dequantizedWeight, null);
       MLXArray linearResult = linear.forward(x);
 

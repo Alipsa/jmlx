@@ -799,6 +799,62 @@ call with native's own `"[quantized_matmul] Only real floating types are support
 empirically). Fixed by validating `scales.dtype().isInexact()`/`biases.dtype().isInexact()` in the
 constructor's `validate` method, pinned by `QuantizedLinearTest#constructorRejectsNonFloatingScalesOrBiases`.
 
+**Amendment (post-merge review): round-7/8's `onParametersUpdated()` re-validation (two paragraphs
+above) was itself built on a false premise -- the "documented blind spot" it described is not a
+narrow coincidence but a permanent, unfixable-by-shape-validation property of the arithmetic itself,
+and it is reachable from the constructor directly, not only through `update`.** `expectedPackedCols =
+in * bits / 32`, with `in = scales.shape()[1] * groupSize`, depends only on the product
+`groupSize * bits` -- never on the two values independently. So *any* two legal `(groupSize, bits)`
+pairs sharing a product (`groupSize=32,bits=4` and `groupSize=64,bits=2`, both 128; in general
+`groupSize'=2*groupSize, bits'=bits/2`) are permanently indistinguishable by a shape-only check, full
+stop -- there is no smarter version of this check that closes the gap, because the check has strictly
+less information than the claim it would need to verify. Worse, native does **not** re-validate the
+`groupSize`/`bits` a caller declares against how `weight`/`scales` were actually produced: it re-derives
+`in` from the layer's own (possibly wrong) cached values and only fails if the activation's feature
+width disagrees with that wrongly-derived `in`. Confirmed empirically (probe since deleted, reproduced
+as a permanent regression test below): a `weight`/`scales` pair genuinely quantized at
+`groupSize=64,bits=2`, constructed directly (not via `update`) as `groupSize=32,bits=4`, with an
+activation whose width coincidentally matches the wrongly-derived `in` -- neither the constructor nor
+`forward` throws; `forward` silently computes a numeric result decoded under the wrong pair. The
+round-7/8 test this superseded
+(`updateWithACoincidentalPackedColumnCollisionSucceedsButForwardStillThrowsNatively`) only ever threw
+because its own activation's width (`IN=64`) happened to disagree with that scenario's
+wrongly-derived `in` (`32`) -- not because native validates anything -- so it was pinning a coincidence
+of its own test data, not a guarantee.
+
+Given this, "re-run the constructor's shape checks from `onParametersUpdated()`" was assessed as worse
+than no check at all: it advertises a safety guarantee (`update` rejects a bad replacement) this class
+cannot actually provide, for the entire family of same-product `(groupSize, bits)` pairs. The shipped
+class now takes a different approach: `onParametersUpdated()` unconditionally throws
+`IllegalStateException` whenever generic `Module.update()` touches this layer's own
+`weight`/`scales`/`biases`/`bias` -- there is no re-validation to trust or not trust, because that path
+is no longer supported at all. A new public method, `updateQuantization(weight, scales, biases, bias,
+groupSize, bits)`, is the sole supported way to replace this layer's quantization configuration after
+construction: it validates the same way the constructor does, then uses `Module.rebind` (which does not
+trigger `onParametersUpdated()`) to write all four parameters together with the caller-supplied
+`groupSize`/`bits` atomically -- `groupSize`/`bits` are no longer `final` fields for exactly this reason.
+This closes the narrower "stale cached `groupSize`/`bits` vs. a changed replacement" hole completely
+(the replacement's own `groupSize`/`bits` are always supplied together with its data, never assumed),
+but it does **not**, and cannot, fix the constructor-level limitation itself: `updateQuantization` runs
+the identical shape check the constructor does, so a caller who calls it with a `(groupSize, bits)` that
+does not match how `weight`/`scales`/`biases` were actually produced -- but shares a product with the
+pair that does -- is accepted just as readily. Both the constructor's and `updateQuantization`'s javadoc
+now state this precisely, rather than the withdrawn "not a corruption vector, just this override's
+blind spot" framing. Pinned by
+`updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack`,
+`updateQuantizationReplacesWeightScalesBiasesAndGroupSizeBitsTogetherAndForwardIsCorrect`,
+`updateQuantizationValidatesLikeTheConstructor`, `updateQuantizationRejectsABiasNullnessMismatch`, and
+`constructorAcceptsAGroupSizeBitsMismatchAndForwardSilentlyMiscomputes` (the direct-construction
+reproduction, replacing the withdrawn coincidence-pinning test above). The class-level javadoc's
+`ModuleGrad` interaction paragraph was also corrected in the same review round: `ModuleGrad.of(quantizedLinear,
+loss).apply(...)` throws on its first `apply` call only when `loss` actually reaches this layer's
+`forward` -- the normal case in practice, and consistent with `ModuleGrad`'s own general rule -- not
+unconditionally for every possible `loss`, as the previous wording claimed. The `forward` javadoc's
+bias-path scope-leak note (round 7, above) is now also pinned by a regression test,
+`forwardWithBiasLeaksIntoModelScopeUnderTheInvertedScopeLayout`, rather than standing as an unguarded
+claim -- the leak itself remains unfixed, deliberately, for the same reason stated in round 7's own
+amendment (`MLXOps#add` has no explicit-target overload).
+
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a
 parameter that *could* allocate into the model scope if written wrong (§2's fifth sub-hazard).

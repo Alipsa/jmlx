@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.function.BiFunction;
@@ -318,20 +319,72 @@ class QuantizedLinearTest {
   }
 
   /**
-   * {@link Module#update} can replace {@code weight} alone with no shape agreement against the
-   * still-in-place {@code scales}/{@code biases} enforced on its own -- unlike the constructor,
-   * which validates all four together before registering any of them. {@link
-   * #onParametersUpdated()} closes that gap by re-running the same checks; this pins the case where
-   * the replacement alone (a different {@code out} dimension) is already inconsistent with the
-   * unchanged {@code scales}, so it should throw rather than defer to an opaque native error at the
-   * next {@link QuantizedLinear#forward} call. Also pins this PR's round-6 review finding 1: {@link
-   * Module#update}'s rollback-on-throw means {@code weight} must still be the original {@code [OUT,
-   * ...]} array afterward, not the rejected {@code [3, ...]} one -- before that fix, the rejected
-   * write stayed installed even though the constructor's own validation would never have accepted
-   * it.
+   * This PR's round-9 review finding 1: {@link QuantizedLinear#onParametersUpdated()} was rewritten
+   * to reject unconditionally, since a shape check re-run against this layer's stale cached {@code
+   * groupSize}/{@code bits} can never verify a replacement was quantized under that same pair
+   * rather than a different one sharing the same product (see that method's own javadoc). This pins
+   * the new behavior: even a shape-consistent, same-{@code groupSize}/{@code bits} replacement --
+   * the case generic {@code update} used to accept -- is now rejected, with the write rolled back.
    */
   @Test
-  void updateWithAWeightAloneInconsistentWithTheExistingScalesThrows() {
+  void updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+
+      float[] otherWeightData = new float[OUT * IN];
+      for (int i = 0; i < otherWeightData.length; i++) {
+        otherWeightData[i] = (i % 5 - 2) * 0.4f;
+      }
+      MLXArray w2 = MLX.array(scope, otherWeightData, new int[] {OUT, IN});
+      MLXArray[] q2 = MLXQuant.quantize(w2, GROUP_SIZE, BITS, "affine", null);
+
+      assertThrows(
+          IllegalStateException.class,
+          () -> quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2])));
+
+      // weight is UINT32 (the packed dtype), so toFloatArray()/toIntArray() don't apply here --
+      // reference identity is both sufficient and exact: rollback restores the same MLXArray.
+      assertSame(q[0], quantizedLinear.parameters().get("weight"));
+    }
+  }
+
+  /**
+   * The safe replacement path {@link QuantizedLinear#updateQuantization} exists for: {@code
+   * weight}/{@code scales}/{@code biases} and {@code groupSize}/{@code bits} change together, as
+   * one atomic unit, so there is no window where the cached {@code groupSize}/{@code bits} describe
+   * data other than the one they are paired with. Constructed at {@code groupSize=32,bits=4};
+   * replaced with a payload actually quantized at {@code groupSize=64,bits=2} -- the exact pair
+   * this PR's round-7/8 tests used to probe the (then-real) {@code update} blind spot -- and {@code
+   * forward} must now compute the mathematically correct result for the new configuration, not a
+   * mismatched one.
+   */
+  @Test
+  void updateQuantizationReplacesWeightScalesBiasesAndGroupSizeBitsTogetherAndForwardIsCorrect() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+
+      MLXArray w2 = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] q2 = MLXQuant.quantize(w2, 64, 2, "affine", null);
+
+      quantizedLinear.updateQuantization(q2[0], q2[1], q2[2], null, 64, 2);
+      MLXArray quantizedResult = quantizedLinear.forward(x);
+
+      MLXArray dequantizedWeight =
+          MLXQuant.dequantize(q2[0], q2[1], q2[2], 64, 2, "affine", null, null);
+      Linear linear = new Linear(scope, dequantizedWeight, null);
+      MLXArray linearResult = linear.forward(x);
+
+      assertArrayEquals(linearResult.toFloatArray(), quantizedResult.toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void updateQuantizationValidatesLikeTheConstructor() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray[] q = quantizedWeight(scope);
       QuantizedLinear quantizedLinear =
@@ -347,94 +400,103 @@ class QuantizedLinearTest {
 
       assertThrows(
           IllegalArgumentException.class,
-          () -> quantizedLinear.update(Map.of("weight", threeRowQuantized[0])));
-
-      assertArrayEquals(q[0].shape(), quantizedLinear.parameters().get("weight").shape());
+          () ->
+              quantizedLinear.updateQuantization(
+                  threeRowQuantized[0], q[1], q[2], null, GROUP_SIZE, BITS));
     }
   }
 
-  /**
-   * The scenario from this PR's round-5 review finding: {@code weight}/{@code scales}/{@code
-   * biases} are replaced together, self-consistent with each other, but quantized under a {@code
-   * groupSize} different from this layer's own cached one -- {@code gs=32,bits=4} at construction,
-   * {@code gs=64,bits=4} at update. Before {@link #onParametersUpdated()} existed, this would
-   * silently succeed and only surface as an opaque native error at the next {@code forward()} call.
-   */
   @Test
-  void updateWithWeightScalesAndBiasesQuantizedUnderADifferentGroupSizeThrows() {
+  void updateQuantizationRejectsABiasNullnessMismatch() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray[] q = quantizedWeight(scope);
-      QuantizedLinear quantizedLinear =
-          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
-
-      MLXArray w2 = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
-      MLXArray[] q2 = MLXQuant.quantize(w2, 64, BITS, "affine", null);
-
+      QuantizedLinear noBias = new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray bias = MLX.array(scope, new float[] {0.5f, -0.5f}, new int[] {OUT});
       assertThrows(
           IllegalArgumentException.class,
-          () -> quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2])));
+          () -> noBias.updateQuantization(q[0], q[1], q[2], bias, GROUP_SIZE, BITS));
+
+      QuantizedLinear withBias =
+          new QuantizedLinear(scope, q[0], q[1], q[2], bias, GROUP_SIZE, BITS);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> withBias.updateQuantization(q[0], q[1], q[2], null, GROUP_SIZE, BITS));
     }
   }
 
   /**
-   * Pins {@link #onParametersUpdated()}'s documented blind spot (this PR's round-6 review finding
-   * 2): a replacement quantized under {@code groupSize=64,bits=2} algebraically reproduces the same
-   * expected packed-column count this layer's cached {@code groupSize=32,bits=4} would compute for
-   * an {@code in=64} weight ({@code 4} either way), so the shape check cannot tell the two {@code
-   * (groupSize, bits)} pairs apart and {@code update} succeeds. Native itself is not fooled: the
-   * next {@code forward()} call still throws, because {@code quantizedMatmul} is invoked with the
-   * layer's own (wrong) cached {@code groupSize=32,bits=4} against data actually packed at {@code
-   * groupSize=64,bits=2} -- confirmed empirically, not merely reasoned about. If this ever silently
-   * computed wrong numbers instead of throwing, that would be a correctness regression worth its
-   * own test; this test exists to catch that regression, not to bless the current blind spot as
-   * acceptable.
+   * This PR's round-9 review finding 1, the "real pin" finding 2 asked for: a fundamental, proven
+   * limitation, not a narrow coincidence. {@code packedCols = in * bits / 32}, with {@code in =
+   * scales.shape()[1] * groupSize}, depends only on the product {@code groupSize * bits} -- so a
+   * {@code weight}/{@code scales} pair genuinely quantized at {@code groupSize=64,bits=2} (product
+   * 128) is indistinguishable, by any shape check, from one genuinely quantized at {@code
+   * groupSize=32,bits=4} (same product) -- confirmed here by constructing directly (not via {@code
+   * update}) with the mismatched declaration and an activation width ({@code [1,32]}) that
+   * coincidentally matches the wrongly-derived {@code in=32}: no exception anywhere, and the
+   * computed result provably disagrees with the correct ({@code groupSize=64,bits=2}) computation
+   * on the same data. This is a documented, permanent limitation of shape-based validation (see the
+   * constructor's own javadoc) -- this test exists to keep that limitation visible and correctly
+   * characterized, not to bless it as acceptable or to imply a future fix is expected here.
    */
   @Test
-  void updateWithACoincidentalPackedColumnCollisionSucceedsButForwardStillThrowsNatively() {
+  void constructorAcceptsAGroupSizeBitsMismatchAndForwardSilentlyMiscomputes() {
     try (MLXScope scope = new MLXScope()) {
-      MLXArray[] q = quantizedWeight(scope);
-      QuantizedLinear quantizedLinear =
-          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
-      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+      // IN=64 is a multiple of both the true groupSize (64) and the wrongly-declared one (32),
+      // so this reproduces the exact scenario the constructor's javadoc describes: q is genuinely
+      // quantized at groupSize=64,bits=2 (product 128), then declared groupSize=32,bits=4 (same
+      // product 128) -- accepted outright by the constructor, not just via update().
+      MLXArray w = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] q = MLXQuant.quantize(w, 64, 2, "affine", null);
 
-      MLXArray w2 = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
-      MLXArray[] q2 = MLXQuant.quantize(w2, 64, 2, "affine", null);
+      QuantizedLinear mismatched = new QuantizedLinear(scope, q[0], q[1], q[2], null, 32, 4);
 
-      quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2]));
+      // x's width (32) matches the wrongly-derived in = scales.shape()[1] * declaredGroupSize
+      // (1 * 32), not the true in=64 -- the coincidence that lets forward proceed with no error
+      // at all, silently decoding a groupSize=64,bits=2 payload as groupSize=32,bits=4.
+      float[] onesData = new float[32];
+      Arrays.fill(onesData, 1f);
+      MLXArray x = MLX.array(scope, onesData, new int[] {1, 32});
 
-      assertThrows(MLXException.class, () -> quantizedLinear.forward(x));
+      MLXArray miscomputed = mismatched.forward(x);
+
+      // Pin the miscomputation as exactly the deterministic result of decoding q under the wrong
+      // (declared) groupSize/bits -- not merely "some value", and not an apples-to-apples
+      // comparison against the true groupSize=64,bits=2 decoding, which would need a [1,64] input
+      // and so has no valid comparison against this [1,32] one at all (that mismatch is the point).
+      MLXArray dequantizedUnderTheWrongDeclaration =
+          MLXQuant.dequantize(q[0], q[1], q[2], 32, 4, "affine", null, null);
+      Linear linear = new Linear(scope, dequantizedUnderTheWrongDeclaration, null);
+      MLXArray expectedMiscomputedResult = linear.forward(x);
+
+      assertArrayEquals(expectedMiscomputedResult.toFloatArray(), miscomputed.toFloatArray(), EPS);
     }
   }
 
   /**
-   * The non-regression counterpart to the tests above: a replacement that stays consistent with
-   * this layer's own {@code groupSize}/{@code bits} must still be accepted by {@link
-   * #onParametersUpdated()}, and {@code forward()} must reflect the new weight.
+   * This PR's round-9 review finding 4: {@link QuantizedLinear#forward}'s own javadoc documents
+   * that the {@code hasBias} branch's {@code MLXOps.add(y, bias)} is not scope-targeted (unlike the
+   * {@code quantizedMatmul} call above it), so it can still leak into the model scope under the
+   * inverted layout {@link #forwardTargetsXScopeUnderTheInvertedScopeLayout} covers only for the
+   * bias-less path. This pins that documented residual gap for the bias-bearing path, rather than
+   * leaving it as a claim with no regression guard: the result's scope is the model scope, not
+   * {@code x}'s, precisely because there is currently no fix for it (see {@code forward}'s javadoc
+   * for why closing it is out of scope for this class).
    */
   @Test
-  void updateWithAConsistentReplacementSucceedsAndForwardReflectsIt() {
-    try (MLXScope scope = new MLXScope()) {
-      MLXArray[] q = quantizedWeight(scope);
-      QuantizedLinear quantizedLinear =
-          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
-      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+  void forwardWithBiasLeaksIntoModelScopeUnderTheInvertedScopeLayout() {
+    try (MLXScope root = new MLXScope()) {
+      MLXArray x = MLX.array(root, inputFixture(), new int[] {1, IN});
 
-      float[] otherWeightData = new float[OUT * IN];
-      for (int i = 0; i < otherWeightData.length; i++) {
-        otherWeightData[i] = (i % 5 - 2) * 0.4f;
+      try (MLXScope model = root.newChild()) {
+        MLXArray[] q = quantizedWeight(model);
+        MLXArray bias = MLX.array(model, new float[] {0.5f, -0.5f}, new int[] {OUT});
+        QuantizedLinear quantizedLinear =
+            new QuantizedLinear(model, q[0], q[1], q[2], bias, GROUP_SIZE, BITS);
+
+        MLXArray result = quantizedLinear.forward(x);
+
+        assertSame(model, result.scope());
       }
-      MLXArray w2 = MLX.array(scope, otherWeightData, new int[] {OUT, IN});
-      MLXArray[] q2 = MLXQuant.quantize(w2, GROUP_SIZE, BITS, "affine", null);
-
-      quantizedLinear.update(Map.of("weight", q2[0], "scales", q2[1], "biases", q2[2]));
-      MLXArray quantizedResult = quantizedLinear.forward(x);
-
-      MLXArray dequantizedWeight =
-          MLXQuant.dequantize(q2[0], q2[1], q2[2], GROUP_SIZE, BITS, "affine", null, null);
-      Linear linear = new Linear(scope, dequantizedWeight, null);
-      MLXArray linearResult = linear.forward(x);
-
-      assertArrayEquals(linearResult.toFloatArray(), quantizedResult.toFloatArray(), EPS);
     }
   }
 

@@ -12,7 +12,8 @@ import se.alipsa.jmlx.memory.MLXScope;
  * Research findings). Empty until M1 ({@code rmsNorm}/{@code layerNorm}) and M3 ({@code rope}/SDPA)
  * land those ops; created now, during M0a's pure-motion facade split, so later merge points add ops
  * to an address that already exists rather than growing {@link MLX} past the point §1 named as its
- * split trigger.
+ * split trigger. See {@link MLX}'s javadoc for the index of every sibling this facade was split
+ * into.
  */
 public final class MLXFast {
 

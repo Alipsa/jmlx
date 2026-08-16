@@ -22,11 +22,14 @@ import se.alipsa.jmlx.memory.MLXScope;
  * matmul}/{@code inner}/{@code outer}), {@link MLXShape} ({@code reshape}/{@code
  * broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the {@code
  * fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant} ({@code
- * quantize}/{@code dequantize}/{@code quantizedMatmul}) and {@link MLXRandom} ({@code seed}/{@code
- * normal}/{@code uniform}). This class does not delegate to them -- duplicating their javadoc here
+ * quantize}/{@code dequantize}/{@code quantizedMatmul}), {@link MLXRandom} ({@code seed}/{@code
+ * normal}/{@code uniform}) and {@link MLXGrad} (primitive-only autograd, {@code
+ * mlx_value_and_grad}). This class does not delegate to them -- duplicating their javadoc here
  * would double the evidence base and let one copy go stale.
  *
- * <p>Every op's result is allocated in the same scope as its first {@code MLXArray} operand; {@link
+ * <p>Every op's result is allocated in the innermost scope among every non-null {@code MLXArray}
+ * operand it's given, not just its first ({@link NativeOps#scopeOf}, req/phase4-plan.md §2) --
+ * superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1; {@link
  * #array} takes the scope explicitly since it has no operand to infer one from.
  *
  * <p>{@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever

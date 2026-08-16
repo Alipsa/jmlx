@@ -19,7 +19,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * closure. Deliberately has no {@code Module}-aware overload -- see {@code ModuleGrad} in the
  * neural-network package and req/phase4-plan.md §6 for why that lives there instead of here (this
  * class would otherwise have to import that package, inverting its one-way dependency onto this
- * one).
+ * one). See {@link MLX}'s javadoc for the index of every sibling this facade was split into.
  */
 public final class MLXGrad {
 

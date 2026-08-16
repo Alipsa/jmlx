@@ -10,7 +10,9 @@ import java.util.function.IntSupplier;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
+import se.alipsa.jmlx.ffi.mlx_optional_dtype_;
 import se.alipsa.jmlx.ffi.mlx_optional_float_;
+import se.alipsa.jmlx.ffi.mlx_optional_int_;
 import se.alipsa.jmlx.ffi.mlx_vector_array_;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -251,6 +253,39 @@ final class NativeOps {
     MemorySegment seg = mlx_optional_float_.allocate(tmp);
     mlx_optional_float_.value(seg, value != null ? value : 0f);
     mlx_optional_float_.has_value(seg, value != null);
+    return seg;
+  }
+
+  /**
+   * The native encoding of an {@code mlx_optional_int} by-value struct (req/phase4-plan.md §8's
+   * Native surface table: 8 bytes, {@code {int value; bool has_value;}}, no native constructor
+   * function -- same shape as {@link #optFloat}, for {@code mlx_quantize}/{@code mlx_dequantize}/
+   * {@code mlx_quantized_matmul}'s {@code group_size}/{@code bits} parameters). {@code value ==
+   * null} encodes "absent" ({@code has_value=false}); native applies its own default in that case
+   * (confirmed empirically, req/plans/phase4-m4-plan.md's Findings section) -- this facade does not
+   * duplicate it.
+   */
+  static MemorySegment optInt(Arena tmp, Integer value) {
+    MemorySegment seg = mlx_optional_int_.allocate(tmp);
+    mlx_optional_int_.value(seg, value != null ? value : 0);
+    mlx_optional_int_.has_value(seg, value != null);
+    return seg;
+  }
+
+  /**
+   * The native encoding of an {@code mlx_optional_dtype} by-value struct -- same 8-byte {@code {int
+   * value; bool has_value;}} shape as {@link #optInt}/{@link #optFloat} (confirmed by reading the
+   * generated {@code mlx_optional_dtype_} binding directly: byte-identical layout, only the field's
+   * C type name differs). {@code value == null} encodes "absent"; {@code mlx_dequantize} then
+   * produces its own default dtype -- FLOAT32 in every case this facade can construct (confirmed
+   * empirically, req/plans/phase4-m4-plan.md's Findings section: absent {@code dtype} matches
+   * {@code scales}' own dtype, which this facade only ever produces as FLOAT32 via {@link
+   * MLXQuant#quantize}).
+   */
+  static MemorySegment optDtype(Arena tmp, DType value) {
+    MemorySegment seg = mlx_optional_dtype_.allocate(tmp);
+    mlx_optional_dtype_.value(seg, value != null ? value.nativeValue() : 0);
+    mlx_optional_dtype_.has_value(seg, value != null);
     return seg;
   }
 

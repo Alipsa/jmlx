@@ -36,6 +36,13 @@ class QuantizedLinearTest {
   private static final int MEASURED_ITERATIONS = 200;
   private static final long LEAK_THRESHOLD_BYTES = 2_000_000;
 
+  // Dedicated to the leak test below, at LinearTest's own fixture scale -- not this file's
+  // shape-assertion OUT/IN (2/64), whose per-iteration x+y footprint (~264 bytes) is too small for
+  // LEAK_THRESHOLD_BYTES to discriminate a real per-iteration leak from noise (a leak that size
+  // over MEASURED_ITERATIONS iterations would land ~two orders of magnitude under the threshold).
+  private static final int LEAK_IN_FEATURES = 100_000;
+  private static final int LEAK_OUT_FEATURES = 4;
+
   private static float[] weightFixture() {
     float[] w = new float[OUT * IN];
     for (int i = 0; i < w.length; i++) {
@@ -186,19 +193,23 @@ class QuantizedLinearTest {
   @Test
   void activeMemoryDoesNotGrowWithPerIterationChildScopeUnderALongLivedParent() {
     try (MLXScope parent = new MLXScope()) {
-      MLXArray[] q = quantizedWeight(parent);
-      MLXArray bias = MLX.array(parent, new float[] {0.5f, -0.5f}, new int[] {OUT});
+      MLXArray weight =
+          MLX.array(
+              parent,
+              new float[LEAK_OUT_FEATURES * LEAK_IN_FEATURES],
+              new int[] {LEAK_OUT_FEATURES, LEAK_IN_FEATURES});
+      MLXArray[] q = MLXQuant.quantize(weight, GROUP_SIZE, BITS, "affine", null);
       QuantizedLinear quantizedLinear =
-          new QuantizedLinear(parent, q[0], q[1], q[2], bias, GROUP_SIZE, BITS);
+          new QuantizedLinear(parent, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
 
       for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-        runChildScopeIteration(parent, quantizedLinear);
+        runLeakTestIteration(parent, quantizedLinear);
       }
 
       long baseline = NativeMemoryProbe.activeMemoryBytes();
 
       for (int i = 0; i < MEASURED_ITERATIONS; i++) {
-        runChildScopeIteration(parent, quantizedLinear);
+        runLeakTestIteration(parent, quantizedLinear);
       }
 
       long after = NativeMemoryProbe.activeMemoryBytes();
@@ -217,9 +228,9 @@ class QuantizedLinearTest {
     }
   }
 
-  private static void runChildScopeIteration(MLXScope parent, QuantizedLinear quantizedLinear) {
+  private static void runLeakTestIteration(MLXScope parent, QuantizedLinear quantizedLinear) {
     try (MLXScope child = parent.newChild()) {
-      MLXArray x = MLX.array(child, inputFixture(), new int[] {1, IN});
+      MLXArray x = MLX.array(child, new float[LEAK_IN_FEATURES], new int[] {1, LEAK_IN_FEATURES});
       MLXArray y = quantizedLinear.forward(x);
       MLX.eval(y);
     }

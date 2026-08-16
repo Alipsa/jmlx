@@ -176,6 +176,24 @@ class MLXQuantTest {
     }
   }
 
+  /**
+   * Same finding as {@link #dequantizeRejectsNullBiasesUnderAffineMode}, confirmed directly against
+   * {@code mlx_quantized_matmul} rather than assumed from {@code dequantize}'s behavior: {@code
+   * mode="affine"} unconditionally rejects a null {@code biases} here too ("{@code
+   * [quantized_matmul] Biases must be provided for affine quantization}", `mlx-c/mlx/c/ops.cpp`).
+   */
+  @Test
+  void quantizedMatmulRejectsNullBiasesUnderAffineMode() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray x = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+      assertThrows(
+          MLXException.class,
+          () -> MLXQuant.quantizedMatmul(x, q[0], q[1], null, true, 32, 4, "affine"));
+    }
+  }
+
   @Test
   void quantizeRejectsAnUnsupportedMode() {
     try (MLXScope scope = new MLXScope()) {

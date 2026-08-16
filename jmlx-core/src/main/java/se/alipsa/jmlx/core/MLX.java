@@ -29,8 +29,12 @@ import se.alipsa.jmlx.memory.MLXScope;
  *
  * <p>Every op's result is allocated in the innermost scope among every non-null {@code MLXArray}
  * operand it's given, not just its first ({@link NativeOps#scopeOf}, req/phase4-plan.md §2) --
- * superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1; {@link
- * #array} takes the scope explicitly since it has no operand to infer one from.
+ * superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1. Three
+ * ops take a scope directly instead of inferring one from an operand: {@link #array}, which has no
+ * operand to infer one from, and the explicit-target overloads {@link #hoist} and {@link
+ * MLXShape#transpose(MLXArray, MLXScope)}, which let a caller push a result toward an ancestor or
+ * descendant scope rather than accept {@code scopeOf}'s own answer (req/phase4-plan.md §2
+ * mitigation 1 -- see {@code Linear.forward}'s {@code transpose(W, x.scope())} for why).
  *
  * <p>{@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever
  * mlx-c's own default device is at first use, and cached for the process lifetime -- this slice

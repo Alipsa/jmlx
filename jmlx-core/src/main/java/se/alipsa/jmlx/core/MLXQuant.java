@@ -146,8 +146,12 @@ public final class MLXQuant {
    * source). {@code transpose=true} is the convention that matches {@code Linear}'s own checkpoint
    * layout: {@code w}/{@code scales}/{@code biases} describe the packed form of an {@code [out,
    * in]} weight (confirmed empirically, req/plans/phase4-m4-plan.md Findings). {@code biases} is a
-   * Java {@code null} for "none", same nullable-array convention as {@link #dequantize}. Non-null:
-   * {@code x}, {@code w}, {@code scales}, {@code mode}.
+   * Java {@code null} for "none", same nullable-array convention as {@link #dequantize} -- and,
+   * like {@link #dequantize}'s {@code biases}, a null value is not actually legal under {@code
+   * mode="affine"}: native rejects it with {@code "[quantized_matmul] Biases must be provided for
+   * affine quantization"} (confirmed empirically against this method directly, not just inferred
+   * from {@code dequantize}'s shared affine path). Non-null in practice under {@code "affine"}:
+   * {@code x}, {@code w}, {@code scales}, {@code biases}, {@code mode}.
    *
    * <p>Needs no explicit-target overload the way {@code Linear.forward}'s {@code transpose(W,
    * x.scope())} does (req/phase4-plan.md §2's fifth sub-hazard): {@code x} is always a genuine

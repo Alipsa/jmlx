@@ -41,9 +41,14 @@ import se.alipsa.jmlx.memory.MLXScope;
  *       target} is where the traced primals/grads themselves land, not a result derived from an
  *       existing operand.
  *   <li>Explicit-target overloads that override {@code scopeOf}'s own answer for an operand that
- *       DOES exist: {@link #hoist} and {@link MLXShape#transpose(MLXArray, MLXScope)}, which let a
- *       caller push a result toward an ancestor or descendant scope instead (req/phase4-plan.md §2
- *       mitigation 1 -- see {@code Linear.forward}'s {@code transpose(W, x.scope())} for why).
+ *       DOES exist: {@link #hoist}, {@link MLXShape#transpose(MLXArray, MLXScope)}, and {@link
+ *       MLXQuant#quantizedMatmul(MLXArray, MLXArray, MLXArray, MLXArray, boolean, Integer, Integer,
+ *       String, MLXScope)}, which let a caller push a result toward an ancestor or descendant scope
+ *       instead (req/phase4-plan.md §2 mitigation 1 -- see {@code Linear.forward}'s {@code
+ *       transpose(W, x.scope())} for why; {@code QuantizedLinear.forward}'s own {@code
+ *       quantizedMatmul(..., x.scope())} call is the same mitigation for a multi-operand op, added
+ *       after the innermost-of-all-operands rule was found to leak on an "inverted" scope layout --
+ *       req/plans/phase4-m4-plan.md's Amendment).
  * </ul>
  *
  * <p>{@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever

@@ -11,12 +11,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
+import se.alipsa.jmlx.core.MLXQuant;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -147,6 +150,54 @@ class ModuleGradTest {
       Module empty = new Module(model) {};
       assertThrows(
           IllegalStateException.class, () -> ModuleGrad.of(empty, (params, inputs) -> inputs));
+    }
+  }
+
+  private static final class TwoLayerTree extends Module {
+    TwoLayerTree(MLXScope scope, Linear lin, QuantizedLinear ql) {
+      super(scope);
+      child("lin", lin);
+      child("ql", ql);
+    }
+  }
+
+  /**
+   * This PR's round-8 review finding 1: {@code ModuleGrad}'s own javadoc used to claim a tree
+   * containing a {@code QuantizedLinear} "always fails at the first apply call" -- false whenever
+   * the loss graph never reaches that layer's quantized weight. Confirmed empirically: a tree with
+   * an unused {@code QuantizedLinear} sibling next to a {@code Linear} the loss actually uses has
+   * {@code apply} succeed, returning a {@code UINT32}-typed non-gradient for the packed weight
+   * alongside real gradients for {@code scales}/{@code biases} and the {@code Linear}'s own weight.
+   * This pins that (surprising, easy to regress) success case, not just the failure case {@code
+   * QuantizedLinearTest#moduleGradOnAQuantizedLinearThrowsNoGradientForTheQuantizedWeight} already
+   * covers for the reached-weight case.
+   */
+  @Test
+  void applySucceedsWithAnUnusedQuantizedLinearSiblingReturningANonsensicalWeightGradient() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray weight = MLX.array(scope, new float[] {1f, 2f, 3f, 4f}, new int[] {2, 2});
+      Linear lin = new Linear(scope, weight, null);
+
+      float[] qw = new float[2 * 64];
+      for (int i = 0; i < qw.length; i++) {
+        qw[i] = (i % 7 - 3) * 0.3f;
+      }
+      MLXArray w = MLX.array(scope, qw, new int[] {2, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+      QuantizedLinear ql = new QuantizedLinear(scope, q[0], q[1], q[2], null, 32, 4);
+
+      TwoLayerTree tree = new TwoLayerTree(scope, lin, ql);
+      try (ModuleGrad mg =
+          ModuleGrad.of(
+              tree, (params, inputs) -> new MLXArray[] {MLXOps.sum(lin.forward(inputs[0]))})) {
+        MLXArray x = MLX.array(scope, new float[] {1f, 1f}, new int[] {1, 2});
+
+        ModuleGrad.Result result = mg.apply(scope, new MLXArray[] {x});
+
+        SequencedMap<String, MLXArray> grads = result.grads();
+        assertEquals(DType.FLOAT32, grads.get("lin.weight").dtype());
+        assertEquals(DType.UINT32, grads.get("ql.weight").dtype());
+      }
     }
   }
 

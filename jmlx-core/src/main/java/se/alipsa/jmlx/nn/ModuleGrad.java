@@ -21,8 +21,20 @@ import se.alipsa.jmlx.memory.MLXScope;
  *
  * <p>Differentiates with respect to every entry of {@code tree.parameters()} -- {@link Module} has
  * no non-trainable/buffer concept to exclude any of them, so a tree containing a {@link
- * QuantizedLinear} always fails at the first {@link #apply} call, since quantized weights have no
- * native gradient at all. See {@link QuantizedLinear}'s own javadoc for the confirmed native error.
+ * QuantizedLinear} fails at the first {@link #apply} call <em>if and only if the loss graph
+ * actually reaches that layer's quantized weight</em>, since quantized weights have no native
+ * gradient at all (see {@link QuantizedLinear}'s own javadoc for the confirmed native error). A
+ * {@code QuantizedLinear} that {@code tree} contains but {@code loss} never calls {@code forward}
+ * on does not trigger that error -- confirmed empirically: a tree with an unused {@code
+ * QuantizedLinear} sibling next to a plain {@link Linear} the loss actually uses had {@link #apply}
+ * succeed, returning a {@code UINT32}-typed "gradient" for the packed weight alongside real
+ * gradients for {@code scales}/{@code biases} and the {@code Linear}'s own weight. That value is
+ * not a usable gradient in any sense -- it is whatever the underlying autodiff machinery produces
+ * for a parameter the loss graph never touched -- so a training loop that blindly applies {@code
+ * weight - lr * grad} across every entry of {@link Result#grads()} would corrupt the packed weight
+ * rather than raise an error. Callers building a training loop over a tree that may contain a
+ * {@code QuantizedLinear} must exclude its {@code weight} entry from any such update themselves;
+ * {@link Module} has no mechanism to do this on their behalf.
  */
 public final class ModuleGrad implements AutoCloseable {
 

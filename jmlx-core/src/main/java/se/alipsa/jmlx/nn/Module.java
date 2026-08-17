@@ -83,7 +83,7 @@ public abstract class Module {
    * parents (e.g. a tied embedding), is not supported in M1: no runtime check catches either case,
    * and the results are undefined -- {@link #parameters()}, {@link #freeze()}, and {@link #update}
    * would recurse into a cycle in the first case, and {@link #update}'s {@link
-   * #onParametersUpdated()} notification would fire twice for one write in the second.
+   * #onParametersUpdated(Set)} notification would fire twice for one write in the second.
    *
    * @throws IllegalStateException if this module is frozen, or if {@code name} is already
    *     registered
@@ -157,28 +157,82 @@ public abstract class Module {
 
   /**
    * Writes each entry's value into the parameter at its dotted path, then calls {@link
-   * #onParametersUpdated()} on exactly the modules whose own {@code params} map was written to
-   * (depth-first: this module first, then {@code children} in insertion order). Every write
-   * completes before any notification runs -- spec §5: "all-writes-then-all-notifies, not
-   * interleaved". Every path in {@code byPath} is resolved -- and every value null-checked --
-   * before any write happens, so a bad entry (an unknown path, a {@code null} value) leaves every
-   * parameter exactly as it was and fires no notifications; without this, a throw partway through
-   * would apply some writes and skip their notifications, since the notify pass only runs after the
-   * whole loop returns.
+   * #onParametersUpdated(Set)} on exactly the modules whose own {@code params} map was written to,
+   * naming exactly the local parameter names touched on that module (depth-first: this module
+   * first, then {@code children} in insertion order). Every write completes before any notification
+   * runs -- spec §5: "all-writes-then-all-notifies, not interleaved". Every path in {@code byPath}
+   * is resolved -- and every value null-checked -- before any write happens, so a bad entry (an
+   * unknown path, a {@code null} value) leaves every parameter exactly as it was and fires no
+   * notifications; without this, a throw partway through would apply some writes and skip their
+   * notifications, since the notify pass only runs after the whole loop returns.
+   *
+   * <p>If any {@link #onParametersUpdated(Set)} call throws, every write this call made is rolled
+   * back to its pre-call value before the exception propagates, and no further {@code
+   * onParametersUpdated()} calls run. This is a write-rollback guarantee only, not full
+   * transactional atomicity: any {@code onParametersUpdated()} call that already returned before
+   * the throw is not, and cannot be, undone -- its notification already happened, against values
+   * that are reverted out from under it a moment later. A module whose hook has an observable side
+   * effect beyond validation (the base contract only forbids caching a derived {@link MLXArray}
+   * view, not every side effect) would see that side effect survive the rollback even though the
+   * parameter it was based on did not. This matters because {@code onParametersUpdated()} runs
+   * strictly after the write (its own contract: "called after update writes"), so unlike the
+   * resolve/null-check pass above, its own validation cannot run before the write happens -- a
+   * subclass override that validates and throws (e.g. {@code QuantizedLinear}) would otherwise
+   * leave its rejected value permanently installed, with no way for the caller to recover the
+   * previous binding.
    *
    * @throws NullPointerException if {@code byPath}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
    */
   public final void update(Map<String, MLXArray> byPath) {
-    notifyDepthFirst(writeAll(resolveAll(byPath)));
+    List<Map.Entry<ResolvedTarget, MLXArray>> resolved = resolveAll(byPath);
+    Map<ResolvedTarget, MLXArray> previousValues = capturePreviousValues(resolved);
+    writeAll(resolved);
+    Map<Module, Set<String>> touchedNames = touchedNamesByModule(resolved);
+    boolean succeeded = false;
+    try {
+      notifyDepthFirst(touchedNames);
+      succeeded = true;
+    } finally {
+      if (!succeeded) {
+        restore(previousValues);
+      }
+    }
   }
 
-  private void notifyDepthFirst(Set<Module> touched) {
-    if (touched.contains(this)) {
-      onParametersUpdated();
+  private static Map<Module, Set<String>> touchedNamesByModule(
+      List<Map.Entry<ResolvedTarget, MLXArray>> resolved) {
+    Map<Module, Set<String>> byModule = new LinkedHashMap<>();
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
+      ResolvedTarget target = entry.getKey();
+      byModule.computeIfAbsent(target.owner(), m -> new HashSet<>()).add(target.localName());
+    }
+    return byModule;
+  }
+
+  private static Map<ResolvedTarget, MLXArray> capturePreviousValues(
+      List<Map.Entry<ResolvedTarget, MLXArray>> resolved) {
+    Map<ResolvedTarget, MLXArray> previous = new LinkedHashMap<>();
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
+      ResolvedTarget target = entry.getKey();
+      previous.put(target, target.owner().params.get(target.localName()));
+    }
+    return previous;
+  }
+
+  private static void restore(Map<ResolvedTarget, MLXArray> previousValues) {
+    for (Map.Entry<ResolvedTarget, MLXArray> entry : previousValues.entrySet()) {
+      entry.getKey().owner().params.put(entry.getKey().localName(), entry.getValue());
+    }
+  }
+
+  private void notifyDepthFirst(Map<Module, Set<String>> touchedNames) {
+    Set<String> ownNames = touchedNames.get(this);
+    if (ownNames != null) {
+      onParametersUpdated(ownNames);
     }
     for (Module child : children.values()) {
-      child.notifyDepthFirst(touched);
+      child.notifyDepthFirst(touchedNames);
     }
   }
 
@@ -200,9 +254,9 @@ public abstract class Module {
   /**
    * Writes each entry's value into the parameter at its dotted path, exactly like {@link #update}
    * -- including resolving every path and null-checking every value before any write, so a bad
-   * entry leaves every parameter untouched -- but never calls {@link #onParametersUpdated()}: spec
-   * §6, "rebind must NOT fire {@code onParametersUpdated()}". Legal even after {@link #freeze()},
-   * since resolving and writing a parameter never checks {@code frozen}.
+   * entry leaves every parameter untouched -- but never calls {@link #onParametersUpdated(Set)}:
+   * spec §6, "rebind must NOT fire {@code onParametersUpdated()}". Legal even after {@link
+   * #freeze()}, since resolving and writing a parameter never checks {@code frozen}.
    *
    * @throws NullPointerException if {@code values}, or any key or value in it, is {@code null}
    * @throws IllegalArgumentException if any path does not resolve to a registered parameter
@@ -212,16 +266,22 @@ public abstract class Module {
   }
 
   /**
-   * Called after {@link #update} writes one or more of this module's own parameters. Empty by
-   * default; never called from {@link #rebind}. Do NOT use this to cache a derived {@link MLXArray}
-   * view (e.g. a transposed weight) in a field: a not-yet-built autograd feature ({@code
-   * ModuleGrad}) will call {@link #rebind} to swap in traced primals around a loss call and restore
-   * them afterward without notifying this hook, so a cached view here would either leak (recomputed
-   * once per step in a scope that never closes, if the hook fired on restore) or dangle (if the
-   * recompute were suppressed). Read the current value fresh via {@link #param(String)} instead --
-   * see this class's javadoc and req/phase4-plan.md §2 for the full analysis.
+   * Called after {@link #update} writes one or more of this module's own parameters, naming exactly
+   * which local parameter names ({@code names}, never empty) were written in that call -- a
+   * subclass whose parameters aren't all interchangeable (e.g. {@link QuantizedLinear}'s {@code
+   * weight}/{@code scales}/{@code biases}, which must only ever change together with the {@code
+   * groupSize}/{@code bits} they were quantized under, versus its unrelated {@code bias}) can use
+   * {@code names} to reject only the writes that actually matter to it, rather than rejecting every
+   * write to any of its own parameters. Empty by default; never called from {@link #rebind}. Do NOT
+   * use this to cache a derived {@link MLXArray} view (e.g. a transposed weight) in a field: a
+   * not-yet-built autograd feature ({@code ModuleGrad}) will call {@link #rebind} to swap in traced
+   * primals around a loss call and restore them afterward without notifying this hook, so a cached
+   * view here would either leak (recomputed once per step in a scope that never closes, if the hook
+   * fired on restore) or dangle (if the recompute were suppressed). Read the current value fresh
+   * via {@link #param(String)} instead -- see this class's javadoc and req/phase4-plan.md §2 for
+   * the full analysis.
    */
-  protected void onParametersUpdated() {}
+  protected void onParametersUpdated(Set<String> names) {}
 
   /**
    * The module owning a resolved path's final segment, and that segment's name local to {@code
@@ -250,18 +310,12 @@ public abstract class Module {
     return resolved;
   }
 
-  /**
-   * Writes every resolved entry, returning the set of modules whose own {@code params} map was
-   * written to.
-   */
-  private Set<Module> writeAll(List<Map.Entry<ResolvedTarget, MLXArray>> resolved) {
-    Set<Module> touched = new HashSet<>();
+  /** Writes every resolved entry into its owning module's {@code params} map. */
+  private void writeAll(List<Map.Entry<ResolvedTarget, MLXArray>> resolved) {
     for (Map.Entry<ResolvedTarget, MLXArray> entry : resolved) {
       ResolvedTarget target = entry.getKey();
       target.owner().params.put(target.localName(), entry.getValue());
-      touched.add(target.owner());
     }
-    return touched;
   }
 
   // fullPath is threaded through unchanged so an exception thrown after

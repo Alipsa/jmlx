@@ -10,7 +10,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 ├──────────────────────────────────────────────────────────────────┤
 │  se.alipsa.jmlx.nn      Layer, Linear, MultiHeadAttention, Loss  │  Idiomatic High-Level
 ├──────────────────────────────────────────────────────────────────┤  Java 25+ API
-│  se.alipsa.jmlx.core    MLXArray, Stream, Device, Autograd       │
+│  se.alipsa.jmlx.core    MLXArray, Autograd (MLXGrad)             │
 ├──────────────────────────────────────────────────────────────────┤
 │  se.alipsa.jmlx.memory  MLXScope, Cleaner Scopes                 │  Safe Off-Heap Bridge
 ├──────────────────────────────────────────────────────────────────┤
@@ -83,11 +83,23 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 #### Phase 4: `se.alipsa.jmlx.nn` High-Level Neural Network Modules
 
 * **Objective:** Port PyTorch-style layers for building Transformer models directly in Java.
+* **Status:** Delivered. See `req/phase4-plan.md` for the detailed plan, milestones and decisions.
 * **Deliverables:**
 * `Module` base class tracking trainable `MLXArray` weight parameters.
 * Core neural network layers: `Linear`, `Embedding`, `RMSNorm`, `LayerNorm`, `ROPE` (Rotary Position Embeddings), `SiLU`, `GELU`.
 * Quantized module support: `QuantizedLinear` handling low-bit weights (4-bit, 8-bit GGUF/MLX quantization).
 * Attention utilities: `MultiHeadAttention` with KV-caching structures.
+
+  *Reconciliation, same spirit as Phase 3's "thread-safe" note above: this section's deliverables list reads as
+  if every op lived inside `se.alipsa.jmlx.nn` itself, and as if autograd and RoPE were `nn` concerns. Neither is
+  true of what actually shipped. `nn` (`Module`, `Linear`, `Embedding`, `RMSNorm`, `LayerNorm`, `SiLU`, `GELU`,
+  `MultiHeadAttention`, `KVCache`, `QuantizedLinear`) is built entirely on a public op surface that lives in
+  `core` (`MLXOps`, `MLXShape`, `MLXFast`, `MLXQuant`, `MLXRandom`, `MLXGrad`) — `nn` itself contains no mlx-c
+  call sites. Autograd (`MLXGrad`/`ModuleGrad`) shipped in M2, even though this deliverables list names no
+  autograd item anywhere under Phase 4. `ROPE` shipped as `MLXFast.rope` — a `core` op landed in M3 — rather
+  than as an `nn` module the way this list's own wording groups it alongside `SiLU`/`GELU`; this codebase has no
+  `nn.Rope` type at all. Each milestone (M0a–M4) and the empirical findings behind the non-obvious decisions are
+  recorded in `req/phase4-plan.md`'s own Status table.*
 
 
 

@@ -5,13 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 `jmlx` is a pure, idiomatic Java 25 framework for Apple Silicon GPU tensor operations, wrapping Apple's
-native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The current code is the **v0.1
-vertical slice** described in `req/initial-plan.md`: just enough of the stack — native bootstrap,
-generated bindings, memory management, and a handful of tensor ops — to prove the pipeline works
-end to end on real Apple Silicon GPU hardware. `req/project-outline.md` describes the full multi-phase
-vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); `req/phase3-plan.md` is
-the plan for the next slice (broadcast-compatible ops, relaxed matmul, `slice`, a batched `eval`) and
-is not yet implemented in `jmlx-core`.
+native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The **v0.1 vertical slice** described
+in `req/initial-plan.md` (native bootstrap, generated bindings, memory management, a handful of tensor
+ops) is done, and two further phases are built on top of it: `req/phase3-plan.md` (broadcast-compatible
+ops, relaxed matmul, `slice`, a batched `eval`) and `req/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`,
+`Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
+cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/project-outline.md`
+describes the full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model
+loading); Phase 5 (safetensors/GGUF checkpoint loading, tokenizers, model implementations) is not yet
+implemented.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -85,8 +87,13 @@ both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — ne
 ```
 jmlx-examples    HelloMLX                          demo, end-to-end test
        |
-jmlx-core        MLX  MLXArray  MLXScope           hand-written idiomatic Java
-                 DType  MLXException                se.alipsa.jmlx.{core,memory}
+jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLinear,
+                                                    RMSNorm/LayerNorm/SiLU/GELU/Embedding,
+                                                    MultiHeadAttention, KVCache, ModuleGrad
+                 se.alipsa.jmlx.core                MLX, MLXOps, MLXShape, MLXFast, MLXQuant,
+                                                    MLXRandom, MLXGrad, MLXArray, DType,
+                                                    MLXException
+                 se.alipsa.jmlx.memory              MLXScope
        |
 jmlx-ffi         se.alipsa.jmlx.ffi.*              committed jextract output
                  NativeLoader                      hand-written
@@ -104,9 +111,15 @@ plain Java types and never expose `jmlx-ffi` on their own public surface.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless
-the dylib is already loaded by then. Both `MLX` and `MLXScope` have a static initializer that calls
-`NativeLoader.ensureLoaded()` for exactly this reason; either class can be the first one touched, so
-both guard independently rather than relying on load order.
+the dylib is already loaded by then. `MLX`, `MLXScope`, `NativeOps`, and `MLXGrad` each have a static
+initializer that calls `NativeLoader.ensureLoaded()` for exactly this reason; any of the four can be
+the first one touched, so each guards independently rather than relying on load order. `NativeOps`'s
+guard covers `MLXOps`/`MLXShape`/`MLXFast`/`MLXQuant`/`MLXRandom` transitively, since every op in those
+classes reaches native only through `NativeOps`'s own `checked`/`binaryOp`/`unaryOp`/`shapeOp`-family
+helpers — none of those classes needs (or has) its own guard. `MLXGrad` needs its own regardless: it
+calls `mlx_h.*` directly at 17 call sites (`mlx_closure_*`/`mlx_value_and_grad` and their frees),
+bypassing `NativeOps`'s helpers entirely, so it cannot rely on `NativeOps`'s guard the way the op
+facades do.
 
 **`NativeLoader`** loads `libmlxc.dylib` via `System.load(absolutePath)`, not
 `SymbolLookup.libraryLookup`: the bindings are generated *without* a `-l` flag, so their internal
@@ -121,8 +134,9 @@ distributed launcher elsewhere is expected to set `JMLX_LIBRARY_PATH` instead.
 mlx-c's default error handler is `printf` + `exit(-1)` on failure, which would kill the JVM before any
 status code is observable. `NativeLoader` installs a replacement handler (an FFM upcall stub, kept
 alive in a process-lifetime `Arena` since mlx-c may call it any time) that just records the message on
-a thread-local, since the mlx-c error convention fires synchronously on the calling thread. `MLX.checked`
-clears that thread-local immediately before every native call (not just after a failure) and wraps a
+a thread-local, since the mlx-c error convention fires synchronously on the calling thread.
+`NativeOps.checked` (moved from `MLX.checked` in an earlier phase) clears that thread-local
+immediately before every native call (not just after a failure) and wraps a
 non-zero status into `MLXException`, attaching the recorded native message when present. A few mlx-c
 entry points (e.g. `mlx_array_new_data`) have no status return at all and only signal failure via the
 error handler plus a null `ctx` in the returned struct — those call sites check for that explicitly.
@@ -135,10 +149,17 @@ itself — capturing the scope in the cleanup action would make it permanently r
 would never run. `MLXScope` and every `MLXArray` allocated from it are confined to the thread that
 created the scope (checked via `ensureOpen()`/thread-identity checks on every access, including
 centrally in `MLXArray`); the sole exception is the JVM Cleaner thread, which only ever touches the
-`Holder`, never the scope. Every `MLX` op result is allocated into the same scope as its first
-`MLXArray` operand; `MLX.array(scope, ...)` takes the scope explicitly since it has no operand to infer
-one from. A binary op rejects operands from two different scopes rather than silently allocating into
-one and skipping the other's confinement check.
+`Holder`, never the scope. An op's result is allocated into the innermost scope among every non-null
+`MLXArray` operand it's given (`NativeOps.scopeOf`), not just its first — a rule that rejects two
+operands only when their scopes are *unrelated* (siblings, or two independent roots), not merely
+different: a related ancestor/descendant pair is legal and resolves to the descendant (e.g.
+`Linear.forward`'s `add(y, bias)` across a model scope and a step scope, or
+`MLXQuantTest.dequantizeWithBiasesInAChildScopeOfWAllocatesIntoTheChild`). `MLX.array(scope, ...)` and
+a few other ops (creation ops, `MLXRandom.normal`/`uniform`, `MLXGrad.Fn#apply`) take the scope
+explicitly since they have no operand to infer one from; `MLX.hoist`, `MLXShape.transpose(MLXArray,
+MLXScope)`, and `MLXQuant.quantizedMatmul`'s explicit-target overload instead override `scopeOf`'s own
+answer, letting a caller push a result toward an ancestor or descendant scope on purpose. See `MLX`'s
+own class javadoc for the full, authoritative version of this rule.
 
 **Lazy evaluation:** every op in `MLX` only builds mlx's lazy computation graph; nothing runs on
 GPU/CPU until `MLX.eval(...)` (or the implicit eval inside `MLXArray.toFloatArray()`) forces it.
@@ -146,9 +167,10 @@ GPU/CPU until `MLX.eval(...)` (or the implicit eval inside `MLXArray.toFloatArra
 pointer — a lazy op like `transpose` can otherwise yield a strided view, and reading raw data without
 that step would return plausible-looking values in the wrong order instead of crashing.
 
-Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` only covers `FLOAT32`/`INT32`.
-`defaultDevice()`/`defaultStream()` are resolved once from mlx-c's own defaults and cached for the
-process lifetime — this slice doesn't expose device switching.
+Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` covers `FLOAT32`, `INT32`,
+`BOOL`, `UINT32` (the packed-weight dtype `QuantizedLinear` validates against), `FLOAT16` and
+`BFLOAT16`. `defaultDevice()`/`defaultStream()` are resolved once from mlx-c's own defaults and cached
+for the process lifetime — this slice doesn't expose device switching.
 
 ## Native version pinning
 
@@ -160,8 +182,11 @@ against `mlx-metal==0.31.2` (`macosx_26_0_arm64`) — see Decision 9 in `req/ini
 latest 0.32.0 wheel was deliberately not used.
 
 `scripts/jextract-overrides/mlx/c/half.h` is a trimmed override copied over the staged header before
-running jextract: the real header's `__bf16` typedef is a hard parse error for jextract on this target,
-and this slice doesn't support bfloat16 anyway. `regen-bindings.sh` runs jextract twice — an unfiltered
+running jextract: the real header's `__bf16` typedef (the raw C half-precision arithmetic type) is a
+hard parse error for jextract on this target. This only strips that C-level typedef, not
+bfloat16 support itself — `DType.BFLOAT16` (mapping to mlx-c's own `MLX_BFLOAT16` enum constant) is
+fully supported by this slice; jextract only ever needed to parse past the C type, never bind it.
+`regen-bindings.sh` runs jextract twice — an unfiltered
 discovery pass, then a second pass restricted to symbols whose `--dump-includes` header path is under
 `mlx/c/` — both to trim Darwin system-header spillover and because (independently) an unfiltered
 whole-umbrella run silently drops `mlx_array_new`/`mlx_array_free`/`mlx_array_new_data`/
@@ -170,10 +195,13 @@ whole-umbrella run silently drops `mlx_array_new`/`mlx_array_free`/`mlx_array_ne
 
 ## Requirements docs
 
-`req/initial-plan.md` and `req/phase3-plan.md` are living design documents, not just history — they
-record the *why* behind non-obvious decisions (native library loading strategy, jextract's two-pass
-generation, memory confinement rules) that the code comments themselves point back to. When touching
-`NativeLoader`, `MLXScope`, `MLX`, or the bootstrap/regen scripts, check whether the relevant decision
-is already recorded there before re-deriving it. `req/project-outline.md` is the original, broader
-multi-phase vision; where it conflicts with `req/initial-plan.md` on scope or naming, the latter is
-authoritative for what's actually being built now.
+`req/initial-plan.md`, `req/phase3-plan.md`, and `req/phase4-plan.md` are living design documents, not
+just history — they record the *why* behind non-obvious decisions (native library loading strategy,
+jextract's two-pass generation, memory confinement rules, the `se.alipsa.jmlx.nn` module framework and
+autograd design) that the code comments themselves point back to. `req/plans/phase4-m4-plan.md` is
+`QuantizedLinear`'s own implementation plan, amended in place (not rewritten) as post-merge review
+found and fixed real gaps in it. When touching `NativeLoader`, `MLXScope`, `MLX`, `NativeOps`, anything
+under `se.alipsa.jmlx.nn`, or the bootstrap/regen scripts, check whether the relevant decision is
+already recorded in one of these before re-deriving it. `req/project-outline.md` is the original,
+broader multi-phase vision; where it conflicts with `req/initial-plan.md` on scope or naming, the
+latter is authoritative for what's actually being built now.

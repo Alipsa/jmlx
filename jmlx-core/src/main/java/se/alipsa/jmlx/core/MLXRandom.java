@@ -9,10 +9,12 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Home for {@code seed}, {@code normal}, {@code uniform} and (if a caller ever needs explicit keys)
- * {@code key}/ {@code split} (req/phase4-plan.md §1, §5). Empty until M1's weight initialization
- * needs it; created now, during M0a's pure-motion facade split, so M1 adds ops to an address that
- * already exists rather than growing {@link MLX} past the point §1 named as its split trigger.
+ * Home for {@code seed}, {@code normal} and {@code uniform} (req/phase4-plan.md §1, §5), landed in
+ * M1 for weight initialization onto a class created empty during M0a's pure-motion facade split, so
+ * M1 could add ops to an address that already existed rather than growing {@link MLX} past the
+ * point §1 named as its split trigger. {@code key}/{@code split} (explicit PRNG keys) have no
+ * caller yet and are not implemented. See {@link MLX}'s javadoc for the index of every sibling this
+ * facade was split into.
  */
 public final class MLXRandom {
 

@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -27,6 +28,7 @@ class ModuleTest {
 
   private static final class Leaf extends Module {
     boolean notified;
+    Set<String> lastNames;
 
     Leaf(MLXScope scope, MLXArray w) {
       super(scope);
@@ -34,8 +36,9 @@ class ModuleTest {
     }
 
     @Override
-    protected void onParametersUpdated() {
+    protected void onParametersUpdated(Set<String> names) {
       notified = true;
+      lastNames = names;
     }
   }
 
@@ -48,7 +51,7 @@ class ModuleTest {
     }
 
     @Override
-    protected void onParametersUpdated() {
+    protected void onParametersUpdated(Set<String> names) {
       notified = true;
     }
   }
@@ -60,6 +63,47 @@ class ModuleTest {
       param("a", a);
       param("b", b);
       child("c", c);
+    }
+  }
+
+  /** A leaf whose {@code onParametersUpdated(Set)} always throws, for the rollback tests below. */
+  private static final class ThrowingLeaf extends Module {
+    boolean notified;
+
+    ThrowingLeaf(MLXScope scope, MLXArray w) {
+      super(scope);
+      param("w", w);
+    }
+
+    @Override
+    protected void onParametersUpdated(Set<String> names) {
+      notified = true;
+      throw new IllegalStateException("ThrowingLeaf always rejects an update");
+    }
+  }
+
+  /** Two named children ("first", "second"), for the multi-module rollback test. */
+  private static final class TwoChildBranch extends Module {
+    TwoChildBranch(MLXScope scope, Module first, Module second) {
+      super(scope);
+      child("first", first);
+      child("second", second);
+    }
+  }
+
+  /** Two own parameters ("a", "b"), capturing the exact {@code names} passed to the hook. */
+  private static final class TwoParamLeaf extends Module {
+    Set<String> lastNames;
+
+    TwoParamLeaf(MLXScope scope, MLXArray a, MLXArray b) {
+      super(scope);
+      param("a", a);
+      param("b", b);
+    }
+
+    @Override
+    protected void onParametersUpdated(Set<String> names) {
+      lastNames = names;
     }
   }
 
@@ -164,6 +208,29 @@ class ModuleTest {
       assertTrue(leaf.notified);
       assertFalse(branch.notified);
       assertSame(newW, leaf.param("w"));
+      assertEquals(Set.of("w"), leaf.lastNames);
+    }
+  }
+
+  /**
+   * PR #11 round-10 review finding 1: {@code onParametersUpdated()} used to take no arguments at
+   * all, so a subclass with parameters that aren't all interchangeable (e.g. {@code
+   * QuantizedLinear}'s {@code weight}/{@code scales}/{@code biases} vs. its unrelated {@code bias})
+   * had no way to reject only the writes that actually mattered to it -- it could only reject every
+   * write to any of its own parameters, or none. This pins that a write touching only one of a
+   * module's own parameters reports exactly that name, not every registered parameter name.
+   */
+  @Test
+  void onParametersUpdatedNamesExactlyTheParametersWrittenInThisCallNotEveryRegisteredOne() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray b = MLX.array(scope, new float[] {2f}, new int[] {1});
+      MLXArray newB = MLX.array(scope, new float[] {3f}, new int[] {1});
+      TwoParamLeaf leaf = new TwoParamLeaf(scope, a, b);
+
+      leaf.update(Map.of("b", newB));
+
+      assertEquals(Set.of("b"), leaf.lastNames);
     }
   }
 
@@ -236,6 +303,57 @@ class ModuleTest {
 
       assertFalse(leaf.notified);
       assertSame(w, leaf.param("w"));
+    }
+  }
+
+  /**
+   * Regression test for PR #11 round-6 review finding 1: {@code onParametersUpdated()} runs after
+   * the write, by contract ("called after update writes"), so a throwing override cannot be
+   * validated-before-write the way an unknown path or {@code null} value can be. Before this fix,
+   * the throw left the new (rejected) value permanently installed with no way to recover the
+   * previous binding -- exactly what a real subclass ({@code QuantizedLinear}) started doing in
+   * this PR. This pins that {@code update} now rolls the write back to the pre-call value first.
+   */
+  @Test
+  void updateRollsBackTheWriteWhenOnParametersUpdatedThrows() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray newW = MLX.array(scope, new float[] {2f}, new int[] {1});
+      ThrowingLeaf leaf = new ThrowingLeaf(scope, w);
+
+      assertThrows(IllegalStateException.class, () -> leaf.update(Map.of("w", newW)));
+
+      assertTrue(leaf.notified);
+      assertSame(w, leaf.param("w"));
+    }
+  }
+
+  /**
+   * The composed-tree case: two siblings are both touched by one {@code update} call; the first's
+   * {@code onParametersUpdated()} succeeds before the second's throws. The whole call is
+   * all-writes-and-all-notifies-succeed or none of it takes effect, so the first sibling's already-
+   * successful write is rolled back too, not just the one that threw -- and the second sibling's
+   * write, made before either notification ran, is rolled back as well.
+   */
+  @Test
+  void updateRollsBackEverySiblingWhenOneOnParametersUpdatedThrows() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray firstW = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray secondW = MLX.array(scope, new float[] {10f}, new int[] {1});
+      MLXArray newFirstW = MLX.array(scope, new float[] {2f}, new int[] {1});
+      MLXArray newSecondW = MLX.array(scope, new float[] {20f}, new int[] {1});
+      Leaf first = new Leaf(scope, firstW);
+      ThrowingLeaf second = new ThrowingLeaf(scope, secondW);
+      TwoChildBranch branch = new TwoChildBranch(scope, first, second);
+
+      assertThrows(
+          IllegalStateException.class,
+          () -> branch.update(Map.of("first.w", newFirstW, "second.w", newSecondW)));
+
+      assertTrue(first.notified);
+      assertTrue(second.notified);
+      assertSame(firstW, first.param("w"));
+      assertSame(secondW, second.param("w"));
     }
   }
 

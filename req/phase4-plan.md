@@ -2,7 +2,7 @@
 
 ## Status — update this section as work lands
 
-**Branch:** `worktree-phase4-m3`, off `main` at `8bb08ad` (PR #8 merged, M2 done).
+**Branch:** `worktree-phase4-m4`, off `main` at `59c9afe` (PR #10 merged, M3 done).
 
 | Item | Status | Commit |
 |---|---|---|
@@ -14,9 +14,9 @@
 | Probe 0f — `ModuleGrad` rebinding mechanism | **Done, confirmed** | scratch, not committed |
 | M1 — `Module` and simple layers (§5) | **Done** | [PR #6](https://github.com/Alipsa/jmlx/pull/6), `369b31d` |
 | M2 — `MLXGrad`/`ModuleGrad` (§6) | **Done** | [PR #8](https://github.com/Alipsa/jmlx/pull/8), `7173d24` |
-| M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | this branch, see req/plans/phase4-m3-plan.md |
-| M4 — `QuantizedLinear` (§8) | Not started | — |
-| §9 — Documentation | Not started | — |
+| M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | [PR #10](https://github.com/Alipsa/jmlx/pull/10), `59c9afe`, see req/plans/phase4-m3-plan.md |
+| M4 — `QuantizedLinear` (§8) | **Done** | this branch, see req/plans/phase4-m4-plan.md |
+| §9 — Documentation | **Done** | this branch, req/plans/phase4-m4-plan.md Task 3 |
 | §10 — CI, self-hosted runner (see note below) | Not started | — |
 
 **M0d note.** Implemented only the ops its own "ops added at this merge point" list names
@@ -83,6 +83,36 @@ of the raw `head` slice, even though `MultiHeadAttention.forward` itself correct
 RoPE to `v`. Fixed in the shipped test by changing that `matmul`'s second operand from `ropedHead`
 to `head`; the plan document itself is left unmodified with an amendment note, per this repo's
 "don't rewrite history" convention for plan docs.
+
+**M4 findings** (`QuantizedLinear`, confirmed against real mlx-c on Apple Silicon hardware — see
+req/plans/phase4-m4-plan.md's own "Findings from this plan's pre-work" for the probes this
+summarizes). `mlx_quantize` on a `[1,64]` FLOAT32 input, `group_size=32`, `bits=4`, `mode="affine"`:
+`w_q` is UINT32, shape `[1, packedCols]` with `packedCols = cols * bits / 32` -- holds for every
+legal `bits` value (`{2, 3, 4, 5, 6, 8}`), not just the power-of-2 subset an earlier reading of the
+pre-work probes assumed (`get_pack_factor`/`get_bytes_per_pack`'s byte-level unevenness never
+surfaces at the word granularity `packedCols` is computed in, because `group_size`'s own legal set
+forces `cols` to always be a multiple of 32; confirmed empirically post-merge, see
+req/plans/phase4-m4-plan.md's amendment); `scales`/`biases` are each FLOAT32, shape
+`[1, cols / groupSize]`. `global_scale` is unconditionally rejected on the Metal backend, for both
+`quantize` and `dequantize`, in every mode tried -- dead API surface on this codebase, kept for a
+future non-Metal backend. `mlx_quantized_matmul(x, w_q, scales, biases, transpose=true, ...)` treats
+`w_q` as the packed form of a checkpoint-layout `[out, in]` weight and computes `x @ w^T`, exactly
+`Linear`'s own convention. `groupSize`/`bits` are restricted by the shipped binary to `{32, 64, 128}`/
+`{2, 3, 4, 5, 6, 8}` respectively -- `QuantizedLinear`'s constructor enforces both sets. A finding
+beyond the plan's own pre-work: `mlx_dequantize` with `mode="affine"` unconditionally rejects a null
+`biases` (`"[dequantize] Biases must be provided for affine quantization"`) -- `MLXQuant.dequantize`'s
+`biases` stays nullable API surface regardless (a hypothetical non-affine mode may not require it),
+but every `mode="affine"` caller must pass a real one; `MLXQuantTest.dequantizeRejectsNullBiasesUnderAffineMode`
+is the regression pin. A second post-merge finding: `mlx_dequantize`'s absent-`dtype` default is not
+unconditionally FLOAT32 -- it follows `scales`' own dtype, which is only FLOAT32 for a caller who
+quantized an unmodified FLOAT32 weight; `quantize` on a weight already `astype`'d to FLOAT16 produces
+FLOAT16 `scales`, and `dequantize(..., dtype=null)` then silently returns FLOAT16
+(`MLXQuantTest.dequantizeDefaultDtypeFollowsScalesDtypeNotAlwaysFloat32` is the regression pin).
+All three ops' composition-identity tests (`quantizedMatmul` vs.
+`matmul(x, transpose(dequantize(...)))`, and `QuantizedLinear.forward` vs. `Linear.forward` on the
+dequantized weight) agree to within float32 rounding noise (`~1e-6`), not quantization noise, so
+those rows use the facade's usual `1e-5f`/`1e-3f` tolerance rather than `EPS_ROUNDTRIP`'s `0.15f`.
+241 tests passed (`jmlx-core` + `jmlx-ffi`, including the forked `loaderGuardTest`), 0 failures.
 
 **Resume instructions.** Once PR #5 merges, continue with M1 (§5) on a fresh branch off `main`.
 Probes 0b/0f were scratch classes against raw `jmlx-ffi` closure bindings with no permanent home
@@ -1117,9 +1147,11 @@ asserting shapes.
      §6's `catch (Throwable)` load-bearing rather than defensive.
    * **0c** — `mlx_value_and_grad` on `f(x) = sum(x*x)`, `x = [1,2,3]` → `[2,4,6]`. Exercises the
      full round-trip including `mlx_vector_array_set_data` on the `out` param.
-   * **0d** — `mlx_quantize` on a `[1,64]` float32, `group_size=32`, `bits=4` → 3-element vector,
+   * **0d** — **DONE, confirmed — see Status section above (M4 findings) for the full results.**
+     `mlx_quantize` on a `[1,64]` float32, `group_size=32`, `bits=4` → 3-element vector,
      `w_q.dtype() == UINT32`. Four unknowns in one call: by-value `optInt`, `const char*` mode,
-     nullable `global_scale`, and `vectorOutOp`'s two allocators.
+     nullable `global_scale`, and `vectorOutOp`'s two allocators. All four confirmed; see
+     req/plans/phase4-m4-plan.md's "Findings from this plan's pre-work" for the full probe results.
    * **0e** — `mlx_fast_rope` with `base` present and absent, confirming the `mlx_optional_float`
      encoding and the plain-`int` `offset`.
    * **0f** — **DONE, confirmed — see Status section above for findings.** **The rebinding mechanism, which no citation in this repo can settle.** Build a

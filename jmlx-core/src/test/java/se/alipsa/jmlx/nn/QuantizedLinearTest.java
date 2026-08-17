@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.function.BiFunction;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXException;
 import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXQuant;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -331,16 +333,18 @@ class QuantizedLinearTest {
   }
 
   /**
-   * This PR's round-9 review finding 1: {@link QuantizedLinear#onParametersUpdated(java.util.Set)}
-   * was rewritten to reject a {@code weight}/{@code scales}/{@code biases} write unconditionally,
-   * since a shape check re-run against this layer's stale cached {@code groupSize}/{@code bits} can
-   * never verify a replacement was quantized under that same pair rather than a different one
-   * sharing the same product (see that method's own javadoc). This pins the new behavior: even a
-   * shape-consistent, same-{@code groupSize}/{@code bits} replacement -- the case generic {@code
-   * update} used to accept -- is now rejected, with the write rolled back.
+   * This PR's round-9 review finding 1, narrowed by round-12 review finding 1: {@link
+   * QuantizedLinear#onParametersUpdated(java.util.Set)} rejects any write touching {@code weight}
+   * unconditionally (the shape check the constructor's own javadoc documents can never verify a
+   * replacement was quantized under this layer's own {@code groupSize}/{@code bits} rather than a
+   * different pair sharing the same product) -- this pins that a {@code weight} write is still
+   * rejected and rolled back even when accompanied by a shape-consistent {@code scales}/ {@code
+   * biases} replacement, unlike a {@code scales}/{@code biases}-only write (see {@link
+   * #updateOfScalesAndBiasesAloneViaModuleUpdateSucceeds}), which round 12 fixed to succeed instead
+   * of also being rejected unconditionally.
    */
   @Test
-  void updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack() {
+  void updateOfWeightViaModuleUpdateAlwaysThrowsAndRollsBack() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray[] q = quantizedWeight(scope);
       QuantizedLinear quantizedLinear =
@@ -360,6 +364,67 @@ class QuantizedLinearTest {
       // weight is UINT32 (the packed dtype), so toFloatArray()/toIntArray() don't apply here --
       // reference identity is both sufficient and exact: rollback restores the same MLXArray.
       assertSame(q[0], quantizedLinear.parameters().get("weight"));
+      assertSame(q[1], quantizedLinear.parameters().get("scales"));
+      assertSame(q[2], quantizedLinear.parameters().get("biases"));
+    }
+  }
+
+  /**
+   * This PR's round-12 review finding 1: {@code onParametersUpdated} previously rejected a {@code
+   * scales}/{@code biases} write unconditionally, on the mistaken premise that the constructor's
+   * groupSize/bits-versus-arithmetic ambiguity (which is specifically about {@code weight}'s own
+   * identity) applied to a {@code scales}/{@code biases}-only write too -- it does not, since
+   * {@code weight} never changes in that case. This pins that a shape/dtype-consistent {@code
+   * scales}/ {@code biases}-only {@link Module#update} now succeeds, with {@code forward}
+   * reflecting the new values -- the exact write a generic training loop applying a {@code
+   * ModuleGrad} gradient step needs to make, without requiring {@link
+   * QuantizedLinear#updateScalesAndBiases} or any typed reference to this layer at all.
+   */
+  @Test
+  void updateOfScalesAndBiasesAloneViaModuleUpdateSucceeds() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+
+      MLXArray newScales = MLXOps.multiply(q[1], MLX.array(scope, new float[] {2f}, new int[] {}));
+      MLXArray newBiases = MLXOps.add(q[2], MLX.array(scope, new float[] {0.1f}, new int[] {}));
+
+      quantizedLinear.update(Map.of("scales", newScales, "biases", newBiases));
+      MLXArray result = quantizedLinear.forward(x);
+
+      QuantizedLinear rebuilt =
+          new QuantizedLinear(scope, q[0], newScales, newBiases, null, GROUP_SIZE, BITS);
+      MLXArray expected = rebuilt.forward(x);
+
+      assertArrayEquals(expected.toFloatArray(), result.toFloatArray(), EPS);
+      assertSame(newScales, quantizedLinear.parameters().get("scales"));
+      assertSame(newBiases, quantizedLinear.parameters().get("biases"));
+    }
+  }
+
+  /**
+   * The validation {@link #updateOfScalesAndBiasesAloneViaModuleUpdateSucceeds} relies on actually
+   * runs, rather than every {@code scales}/{@code biases} write now being silently accepted: a
+   * replacement whose shape is inconsistent with this layer's unchanged {@code weight} (wrong
+   * {@code out} dimension) is rejected and rolled back, exactly like the constructor's own check.
+   */
+  @Test
+  void updateOfScalesAndBiasesWithAMismatchedShapeViaModuleUpdateThrowsAndRollsBack() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray wrongOutScales = MLX.array(scope, new float[] {1, 2}, new int[] {1, 2});
+      MLXArray wrongOutBiases = MLX.array(scope, new float[] {1, 2}, new int[] {1, 2});
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.update(Map.of("scales", wrongOutScales, "biases", wrongOutBiases)));
+
+      assertSame(q[1], quantizedLinear.parameters().get("scales"));
+      assertSame(q[2], quantizedLinear.parameters().get("biases"));
     }
   }
 
@@ -410,6 +475,38 @@ class QuantizedLinearTest {
 
       assertSame(newLinWeight, lin.parameters().get("weight"));
       assertSame(newBias, ql.parameters().get("bias"));
+    }
+  }
+
+  /**
+   * The exact scenario this PR's round-12 review finding 1 reported as broken: for {@code Tree{lin:
+   * Linear, ql: QuantizedLinear}}, a single {@link Module#update} call carrying shape-matched
+   * gradient-style replacements for {@code lin.weight}/{@code ql.scales}/{@code ql.biases} used to
+   * throw and roll back {@code lin.weight} too, collaterally -- so no layer got its step.
+   * Deliberately never touches {@code ql} directly after construction (only {@code tree}),
+   * demonstrating this PR's round-12 review finding 2's resolution as a side effect: a generic
+   * training loop holding only the root module and a dotted-path grads map needs no typed reference
+   * to the nested {@code QuantizedLinear} to apply a {@code scales}/{@code biases} step.
+   */
+  @Test
+  void updateSpanningALinearSiblingAndThisLayersScalesAndBiasesSucceedsForBoth() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray linWeight = MLX.array(scope, new float[] {1f, 2f, 3f, 4f}, new int[] {2, 2});
+      Linear lin = new Linear(scope, linWeight, null);
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear ql = new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      TwoModuleTree tree = new TwoModuleTree(scope, lin, ql);
+
+      MLXArray newLinWeight = MLX.array(scope, new float[] {5f, 6f, 7f, 8f}, new int[] {2, 2});
+      MLXArray newScales = MLXOps.multiply(q[1], MLX.array(scope, new float[] {2f}, new int[] {}));
+      MLXArray newBiases = MLXOps.add(q[2], MLX.array(scope, new float[] {0.1f}, new int[] {}));
+
+      tree.update(
+          Map.of("lin.weight", newLinWeight, "ql.scales", newScales, "ql.biases", newBiases));
+
+      assertSame(newLinWeight, tree.parameters().get("lin.weight"));
+      assertSame(newScales, tree.parameters().get("ql.scales"));
+      assertSame(newBiases, tree.parameters().get("ql.biases"));
     }
   }
 
@@ -557,6 +654,83 @@ class QuantizedLinearTest {
     }
   }
 
+  /**
+   * This PR's round-12 review finding 3: {@link Module#rebind} is {@code public} and {@code final}
+   * -- inherited, un-overridable, un-narrowable -- so it bypasses every invariant this class tries
+   * to protect, including the one {@link QuantizedLinear#updateQuantization}'s own javadoc used to
+   * claim was now "impossible": a caller can replace {@code weight} directly via {@code rebind},
+   * leaving {@code groupSize}/{@code bits} stale, with zero validation. Reuses the exact
+   * mismatched-quantization construction {@link
+   * #constructorAcceptsAGroupSizeBitsMismatchAndForwardSilentlyMiscomputes} pins for the
+   * constructor, but via {@code rebind} on an already-constructed layer instead: {@code rebind}
+   * itself does not throw, and {@code forward} then silently miscomputes exactly like the
+   * constructor case.
+   */
+  @Test
+  void rebindOfWeightAloneBypassesValidationAndSilentlyBreaksTheGroupSizeBitsInvariant() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] originalQ = quantizedWeight(scope);
+
+      // Genuinely quantized at groupSize=64,bits=2 (product 128), rebound onto a layer that still
+      // believes groupSize=32,bits=4 (same product) -- the identical mismatch the constructor's own
+      // javadoc documents, reached here through rebind instead of construction.
+      MLXArray w = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      MLXArray[] mismatchedQ = MLXQuant.quantize(w, 64, 2, "affine", null);
+      SequencedMap<String, MLXArray> replacement = new LinkedHashMap<>();
+      replacement.put("weight", mismatchedQ[0]);
+      replacement.put("scales", mismatchedQ[1]);
+      replacement.put("biases", mismatchedQ[2]);
+
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, originalQ[0], originalQ[1], originalQ[2], null, 32, 4);
+      quantizedLinear.rebind(replacement);
+
+      assertSame(mismatchedQ[0], quantizedLinear.parameters().get("weight"));
+
+      // x's width (32) matches the wrongly-derived in = scales.shape()[1] * declaredGroupSize
+      // (1 * 32), not the true in=64 -- the same coincidence
+      // constructorAcceptsAGroupSizeBitsMismatchAndForwardSilentlyMiscomputes exploits.
+      float[] onesData = new float[32];
+      Arrays.fill(onesData, 1f);
+      MLXArray x = MLX.array(scope, onesData, new int[] {1, 32});
+
+      MLXArray miscomputed = quantizedLinear.forward(x);
+
+      MLXArray dequantizedUnderTheWrongDeclaration =
+          MLXQuant.dequantize(
+              mismatchedQ[0], mismatchedQ[1], mismatchedQ[2], 32, 4, "affine", null, null);
+      Linear linear = new Linear(scope, dequantizedUnderTheWrongDeclaration, null);
+      MLXArray expectedMiscomputedResult = linear.forward(x);
+
+      assertArrayEquals(expectedMiscomputedResult.toFloatArray(), miscomputed.toFloatArray(), EPS);
+    }
+  }
+
+  /**
+   * The other direction of the same round-12 review finding 3 hole: {@code rebind} does not even
+   * dtype-check {@code weight}, so a {@code FLOAT32} replacement succeeds silently at {@code
+   * rebind} time and only fails later, deep inside native code, at the next {@link #forward} call
+   * -- the exact deferred-native-failure mode this class's constructor validation otherwise exists
+   * to prevent, reopened here because {@code rebind} cannot run that validation at all.
+   */
+  @Test
+  void rebindOfWeightWithAFloat32ArraySucceedsButFailsLaterAtForward() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      MLXArray floatWeight = MLX.array(scope, weightFixture(), new int[] {OUT, IN});
+      SequencedMap<String, MLXArray> replacement = new LinkedHashMap<>();
+      replacement.put("weight", floatWeight);
+
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      quantizedLinear.rebind(replacement);
+      assertSame(floatWeight, quantizedLinear.parameters().get("weight"));
+
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+      assertThrows(MLXException.class, () -> quantizedLinear.forward(x));
+    }
+  }
+
   @Test
   void updateQuantizationValidatesLikeTheConstructor() {
     try (MLXScope scope = new MLXScope()) {
@@ -655,6 +829,13 @@ class QuantizedLinearTest {
    * leaving it as a claim with no regression guard: the result's scope is the model scope, not
    * {@code x}'s, precisely because there is currently no fix for it (see {@code forward}'s javadoc
    * for why closing it is out of scope for this class).
+   *
+   * <p><strong>This assertion pins a known, deliberately-unfixed limitation, not desired
+   * behavior.</strong> If {@code MLXOps#add} ever gains an explicit-target overload and {@code
+   * forward} is updated to use it (the fix this class's own javadoc says would require touching
+   * {@code MLXOps}, shared by every op in this codebase), this exact assertion is expected to start
+   * failing -- and should then be inverted to {@code assertSame(x.scope(), result.scope())} to pin
+   * the fixed (non-leaking) behavior instead, not treated as a regression to chase down.
    */
   @Test
   void forwardWithBiasLeaksIntoModelScopeUnderTheInvertedScopeLayout() {

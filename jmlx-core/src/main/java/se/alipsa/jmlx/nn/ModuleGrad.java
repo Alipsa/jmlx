@@ -57,13 +57,20 @@ public final class ModuleGrad implements AutoCloseable {
     // parameters, or because MLXGrad.valueAndGrad itself throws -- must be left mutable, letting
     // the caller fix it up and retry. Body.apply is not invoked during construction, so nothing
     // above this line can observe tree in a not-yet-frozen state and rely on that by accident.
-    List<String> paths = inexactParamPaths(tree.parameters());
+    SequencedMap<String, MLXArray> allParams = tree.parameters();
+    List<String> paths = inexactParamPaths(allParams);
     if (paths.isEmpty()) {
-      throw new IllegalStateException("ModuleGrad: tree has no parameters to differentiate");
+      if (allParams.isEmpty()) {
+        throw new IllegalStateException("ModuleGrad: tree has no parameters to differentiate");
+      }
+      throw new IllegalStateException(
+          "ModuleGrad: tree has no floating-dtype (differentiable) parameters -- every registered"
+              + " parameter is non-floating: "
+              + allParams.keySet());
     }
     this.paramPaths = List.copyOf(paths);
     int[] argnums = IntStream.range(0, paramPaths.size()).toArray();
-    this.fn = MLXGrad.valueAndGrad(new Body(tree, loss, paths), argnums);
+    this.fn = MLXGrad.valueAndGrad(new Body(tree, loss, paramPaths), argnums);
     tree.freeze();
   }
 

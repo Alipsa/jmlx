@@ -983,6 +983,73 @@ affine quantization"`, both already pinned by `dequantizeRejectsNullBiasesUnderA
 by `quantizeRejectsANullW`, `dequantizeRejectsANullWOrScales`, and
 `quantizedMatmulRejectsANullXWOrScales` (all `MLXQuantTest`).
 
+**Amendment (round 12, finding 1): round 11's `updateScalesAndBiases` fix left `onParametersUpdated`
+gated on `names.contains("weight") || names.contains("scales") || names.contains("biases")` -- still
+rejecting a `scales`/`biases`-only `update()`, and pointing the error message at `updateQuantization`,
+which a gradient step cannot satisfy (it has no new `weight`/`bias`/`groupSize`/`bits`) rather than at
+`updateScalesAndBiases`, added in the same PR for exactly this case.** The premise for gating on
+`scales`/`biases` at all was mistaken: the constructor's groupSize/bits-versus-arithmetic ambiguity is
+inherently about `weight`'s own identity (a same-shape `weight` could have been quantized under a
+different `(groupSize, bits)` pair sharing the same product) -- it does not apply to a `scales`/`biases`
+write that leaves `weight` untouched, since there is only one `weight` throughout for a
+same-product-different-pair substitution to hide behind. Fixed by gating the unconditional throw on
+`names.contains("weight")` alone, and validating a `scales`/`biases` touch against the current,
+unchanged `weight`/`groupSize`/`bits` via a new shared helper, `validateScalesAndBiasesAgainstWeight`
+(extracted from `validate`'s own tail and now also used by `updateScalesAndBiases`, replacing that
+method's weaker "match the old shape" check with the same weight-grounded validation) -- accepting the
+write if it passes, throwing `IllegalArgumentException` (triggering `Module.update`'s existing
+write-rollback) if not. This closes finding 2 from the same round as a side effect: a generic training
+loop holding only the root module and a dotted-path grads map can now write `ql.scales`/`ql.biases`
+through a single `tree.update(grads)` call, with no way (and no need) to obtain the nested
+`QuantizedLinear` instance at all -- `updateScalesAndBiases` remains available as a direct,
+single-layer alternative for a caller that already has a typed reference, not the only route.
+`updateQuantization`'s "always rejects a `weight`/`scales`/`biases` replacement" claim and this class's
+own "generic training loop... needs `updateScalesAndBiases`" class javadoc paragraph, both now
+inaccurate, were corrected in the same round. Pinned by
+`updateOfWeightViaModuleUpdateAlwaysThrowsAndRollsBack` (renamed from
+`updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack`, now covering only `weight`),
+`updateOfScalesAndBiasesAloneViaModuleUpdateSucceeds`,
+`updateOfScalesAndBiasesWithAMismatchedShapeViaModuleUpdateThrowsAndRollsBack` (confirms validation
+still actually runs), and `updateSpanningALinearSiblingAndThisLayersScalesAndBiasesSucceedsForBoth`
+(the exact reported scenario -- deliberately never touches the `QuantizedLinear` instance directly
+after construction, pinning finding 2's resolution too).
+
+**Amendment (round 12, finding 3): `updateQuantization`'s javadoc claimed the stale-`groupSize`/`bits`
+mismatch is "now impossible, because `groupSize`/`bits` and the arrays they describe can only ever
+change together, through this one method" -- false, confirmed empirically.** `Module.rebind` is
+`public` and `final` (by design: `ModuleGrad`'s traced-primal swap must never validate or notify, for
+every subclass, not just this one), so this class has no way to intercept a direct
+`quantizedLinear.rebind(Map.of("weight", someOtherWeight, ...))` call at all. Confirmed two ways: a
+`weight`/`scales`/`biases` triple genuinely quantized at a different `(groupSize, bits)` pair sharing
+this layer's cached product rebinds silently (no exception), breaking the same invariant
+`constructorAcceptsAGroupSizeBitsMismatchAndForwardSilentlyMiscomputes` already pins for construction,
+now reachable through `rebind` on an already-constructed layer too; and a `FLOAT32` `weight` rebinds
+silently as well, only failing later, deep inside native code, at the next `forward` call (`"[quantized_matmul]
+The weight matrix should be uint32 but received float32"`). Not fixed in code -- `rebind`'s contract is
+load-bearing for `ModuleGrad` and not something this class can narrow for itself -- but the javadoc claim
+is corrected to name `rebind` explicitly as a bypass this method's own validation cannot reach, rather
+than asserting an atomicity guarantee that does not actually hold for a caller using the inherited API
+surface. Pinned by `rebindOfWeightAloneBypassesValidationAndSilentlyBreaksTheGroupSizeBitsInvariant` and
+`rebindOfWeightWithAFloat32ArraySucceedsButFailsLaterAtForward` (both `QuantizedLinearTest`) -- pins of a
+known, deliberately-unfixed gap, in the same spirit as the inverted-layout bias-scope-leak test below.
+
+**Amendment (round 12, low findings): `ModuleGrad`'s "no parameters to differentiate" message
+misdiagnosed an all-non-floating tree (it has parameters, just none floating); `Body` was constructed
+with the pre-`List.copyOf` mutable `paths` list instead of the field's own immutable snapshot;
+`MLXQuant`'s explicit-target `quantizedMatmul` overload null-checked every operand round 11 introduced
+except `target` itself, which still reached `MLXScope.innermost` and NPE'd out of its own `depth()`
+call; and `QuantizedLinearTest`'s inverted-layout bias-leak pin asserted the current (leaky) behavior
+with no note that a future `MLXOps#add` target overload would flip it, risking being read as a
+regression rather than an expected update.** Fixed respectively: the constructor now distinguishes
+"tree has no parameters at all" from "tree has parameters but none are floating" (naming the excluded
+paths in the latter case), pinned by
+`treeWithOnlyNonFloatingParametersThrowsANamedMessageNotTheEmptyTreeOne`; `Body` now receives
+`this.paramPaths`, matching Low finding 2's own suggested fix exactly; `quantizedMatmul`'s target
+overload gained an `Objects.requireNonNull(target, ...)` check alongside its existing ones, pinned by
+`quantizedMatmulRejectsANullTarget`; and the leak-pin test's javadoc now states explicitly that the
+assertion is expected to flip (to `assertSame(x.scope(), ...)`) if `MLXOps#add` ever gains a target
+overload, rather than being treated as a regression if that happens.
+
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a
 parameter that *could* allocate into the model scope if written wrong (§2's fifth sub-hazard).

@@ -154,6 +154,38 @@ class ModuleGradTest {
     }
   }
 
+  /**
+   * This PR's round-12 review, low finding 1: the "tree has no parameters to differentiate" message
+   * previously fired verbatim for this scenario too, even though the tree DOES have a parameter --
+   * just none floating. Pins the corrected message, which must distinguish the two cases and name
+   * the excluded parameter(s).
+   */
+  @Test
+  void treeWithOnlyNonFloatingParametersThrowsANamedMessageNotTheEmptyTreeOne() {
+    try (MLXScope model = new MLXScope()) {
+      MLXArray intParam = MLX.array(model, new int[] {1, 2, 3}, new int[] {3});
+      IntOnlyModule intOnly = new IntOnlyModule(model, intParam);
+      IllegalStateException ex =
+          assertThrows(
+              IllegalStateException.class,
+              () -> ModuleGrad.of(intOnly, (params, inputs) -> inputs));
+      assertTrue(
+          ex.getMessage().contains("count"),
+          "expected message to name the excluded non-floating parameter, got: " + ex.getMessage());
+      assertFalse(
+          ex.getMessage().contains("no parameters to differentiate"),
+          "message must distinguish 'has non-floating parameters' from 'has none at all', got: "
+              + ex.getMessage());
+    }
+  }
+
+  private static final class IntOnlyModule extends Module {
+    IntOnlyModule(MLXScope scope, MLXArray intParam) {
+      super(scope);
+      param("count", intParam);
+    }
+  }
+
   private static final class TwoLayerTree extends Module {
     TwoLayerTree(MLXScope scope, Linear lin, QuantizedLinear ql) {
       super(scope);

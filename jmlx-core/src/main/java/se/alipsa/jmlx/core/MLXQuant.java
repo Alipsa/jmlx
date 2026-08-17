@@ -216,9 +216,12 @@ public final class MLXQuant {
    * no-target overload's javadoc documents. {@code target} must be related to every operand --
    * checked via {@link MLXScope#innermost} against {@link NativeOps#scopeOf}'s own result, the same
    * invariant {@link NativeOps#unaryOp(String, MLXArray, MLXScope, NativeOps.UnaryOp)}'s target
-   * overload documents. {@code x}/{@code w}/{@code scales} are checked explicitly here (this is the
-   * one call site both overloads funnel through); {@code biases} is not -- see the no-target
-   * overload's own javadoc for why.
+   * overload documents. {@code x}/{@code w}/{@code scales}/{@code target} are checked explicitly
+   * here (this is the one call site both overloads funnel through); {@code biases} is not -- see
+   * the no-target overload's own javadoc for why. A null {@code target} would otherwise reach
+   * {@link MLXScope#innermost} and NPE out of its own {@code depth()} call with no named message --
+   * this PR's round-11 review finding 4 fixed this for every OTHER documented-non-null operand on
+   * this method but missed this one, confirmed by round 12's own review.
    */
   public static MLXArray quantizedMatmul(
       MLXArray x,
@@ -234,6 +237,7 @@ public final class MLXQuant {
     Objects.requireNonNull(x, "quantizedMatmul: x must not be null");
     Objects.requireNonNull(w, "quantizedMatmul: w must not be null");
     Objects.requireNonNull(scales, "quantizedMatmul: scales must not be null");
+    Objects.requireNonNull(target, "quantizedMatmul: target must not be null");
     MLXScope.innermost(NativeOps.scopeOf("quantizedMatmul", x, w, scales, biases), target);
     MemorySegment modeStr = NativeOps.cstr(mode);
     try (Arena tmp = Arena.ofConfined()) {

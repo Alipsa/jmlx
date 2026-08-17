@@ -315,6 +315,24 @@ class MLXQuantTest {
     }
   }
 
+  /**
+   * This PR's round-11 review finding 4 fixed x/w/scales on the explicit-target {@code
+   * quantizedMatmul} overload but missed {@code target} itself, which reaches {@link
+   * se.alipsa.jmlx.memory.MLXScope#innermost} and NPEs out of its own {@code depth()} call with no
+   * named message -- confirmed by round-12's own review.
+   */
+  @Test
+  void quantizedMatmulRejectsANullTarget() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray x = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+      assertThrows(
+          NullPointerException.class,
+          () -> MLXQuant.quantizedMatmul(x, q[0], q[1], q[2], true, 32, 4, "affine", null));
+    }
+  }
+
   @Test
   void quantizeRejectsAnUnsupportedMode() {
     try (MLXScope scope = new MLXScope()) {

@@ -132,11 +132,11 @@ public final class QuantizedLinear extends Module implements UnaryModule {
 
   /**
    * Rejects a {@link #update} write that touches {@code weight} -- {@code scales}/{@code biases}
-   * (with or without {@code weight}) and {@code bias} alone are both accepted, subject to
-   * validation for the first: {@code weight} itself is what {@code groupSize}/{@code bits}
-   * describe, so a write that replaces it without also replacing them (they are plain fields, not
-   * registered parameters {@code update} can see) could pair a new {@code weight} with this layer's
-   * <em>stale, possibly-no-longer-true</em> {@code groupSize}/{@code bits} -- exactly the check the
+   * (with or without {@code bias}) are both accepted, subject to validation, and so is {@code bias}
+   * alone: {@code weight} itself is what {@code groupSize}/{@code bits} describe, so a write that
+   * replaces it without also replacing them (they are plain fields, not registered parameters
+   * {@code update} can see) could pair a new {@code weight} with this layer's <em>stale,
+   * possibly-no-longer-true</em> {@code groupSize}/{@code bits} -- exactly the check the
    * constructor's own javadoc explains is provably unable to distinguish a same-shape replacement
    * from one quantized under a genuinely different {@code (groupSize, bits)} pair sharing the same
    * product. That ambiguity is specifically about {@code weight} changing without {@code
@@ -145,14 +145,19 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * bits} describe) never changes at all: {@link #validateScalesAndBiasesAgainstWeight} validates
    * the new {@code scales}/{@code biases} against the current, unchanged {@code weight}/{@code
    * groupSize}/{@code bits} exactly as {@link #updateScalesAndBiases} does, and either accepts the
-   * write or throws (triggering {@link Module#update}'s own write-rollback). An earlier version of
-   * this override rejected {@code scales}/{@code biases} unconditionally too, on the mistaken
-   * premise that the constructor's ambiguity applied to them the same way it applies to {@code
-   * weight} -- it does not, since that ambiguity is inherently about {@code weight}'s own identity,
-   * not about {@code scales}/{@code biases} in isolation. A still earlier version rejected every
-   * write to any of this layer's own parameters unconditionally, including a {@code bias}-only
-   * write that has no bearing on {@code groupSize}/{@code bits} at all -- {@code names} (added
-   * together with {@link Module#onParametersUpdated(Set)}) is what lets this override discriminate.
+   * write or throws (triggering {@link Module#update}'s own write-rollback). Nor does it apply to
+   * {@code bias}, which has no quantization relationship to {@code groupSize}/{@code bits} at all
+   * -- but {@code bias} still has its own, independent shape invariant relative to {@code weight}
+   * (rank 1, length {@code weight.shape()[0]}), which the constructor enforces and this hook now
+   * re-validates too, rather than letting {@link #update} install a {@code bias} the constructor
+   * would have rejected. An earlier version of this override rejected {@code scales}/{@code biases}
+   * unconditionally too, on the mistaken premise that the constructor's ambiguity applied to them
+   * the same way it applies to {@code weight} -- it does not, since that ambiguity is inherently
+   * about {@code weight}'s own identity, not about {@code scales}/{@code biases} in isolation. A
+   * still earlier version rejected every write to any of this layer's own parameters
+   * unconditionally, including a {@code bias}-only write that has no bearing on {@code
+   * groupSize}/{@code bits} at all -- {@code names} (added together with {@link
+   * Module#onParametersUpdated(Set)}) is what lets this override discriminate.
    *
    * <p>Use {@link #updateQuantization} instead of a plain {@link #update} only when {@code weight}
    * itself is changing: it takes the replacement's {@code groupSize}/{@code bits} explicitly and
@@ -169,6 +174,8 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * @throws IllegalStateException if {@code names} contains {@code "weight"}
    * @throws IllegalArgumentException if {@code names} contains {@code "scales"} or {@code "biases"}
    *     and the new value fails {@link #validateScalesAndBiasesAgainstWeight}
+   * @throws IllegalArgumentException if {@code names} contains {@code "bias"} and the new value is
+   *     not rank 1 with length {@code weight.shape()[0]}
    */
   @Override
   protected void onParametersUpdated(Set<String> names) {
@@ -182,6 +189,9 @@ public final class QuantizedLinear extends Module implements UnaryModule {
     if (names.contains("scales") || names.contains("biases")) {
       validateScalesAndBiasesAgainstWeight(
           param("weight"), param("scales"), param("biases"), groupSize, bits);
+    }
+    if (names.contains("bias")) {
+      validateBiasAgainstWeight(param("weight"), param("bias"));
     }
   }
 
@@ -261,15 +271,19 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * have on hand.
    *
    * <p>Unlike {@link #updateQuantization}, this method takes no {@code groupSize}/{@code bits}: the
-   * replacement is validated against this layer's <em>current</em> ({@code final}, unchanging)
-   * {@code weight}/{@code groupSize}/{@code bits} instead, via the same {@link
-   * #validateScalesAndBiasesAgainstWeight} helper {@link #onParametersUpdated(Set)}'s own {@code
-   * scales}/{@code biases} branch now uses -- since {@code weight} does not change here, the
-   * groupSize/bits-versus-arithmetic ambiguity the constructor's own javadoc documents (a shape
-   * check alone cannot distinguish one {@code (groupSize, bits)} pair from a different one sharing
-   * the same product) simply does not arise: nothing about the quantized {@code weight} this
-   * layer's {@code groupSize}/{@code bits} describe is changing, so there is nothing for that
-   * ambiguity to apply to.
+   * replacement is validated against this layer's <em>current</em> {@code weight}/{@code
+   * groupSize}/{@code bits} instead, via the same {@link #validateScalesAndBiasesAgainstWeight}
+   * helper {@link #onParametersUpdated(Set)}'s own {@code scales}/{@code biases} branch now uses.
+   * Neither {@code weight} nor {@code groupSize}/{@code bits} is actually immutable -- {@code
+   * groupSize}/{@code bits} are plain, non-{@code final} fields reassigned by {@link
+   * #updateQuantization}, and {@code weight} itself can be replaced via the inherited {@link
+   * #rebind} (see that method's own javadoc for why this class cannot prevent that) -- but neither
+   * changes as a side effect of THIS call, which is all the validation below actually needs: since
+   * {@code weight} does not change here, the groupSize/bits-versus-arithmetic ambiguity the
+   * constructor's own javadoc documents (a shape check alone cannot distinguish one {@code
+   * (groupSize, bits)} pair from a different one sharing the same product) simply does not arise:
+   * nothing about the quantized {@code weight} this layer's {@code groupSize}/{@code bits} describe
+   * is changing, so there is nothing for that ambiguity to apply to.
    *
    * <p>Uses {@link #rebind}, not {@link #update}, so {@link #onParametersUpdated(Set)} does not
    * fire for this call -- the same choice {@link #updateQuantization} already makes, for the same
@@ -307,13 +321,7 @@ public final class QuantizedLinear extends Module implements UnaryModule {
           "QuantizedLinear: weight must be rank 2 [out, packedIn], got shape "
               + Arrays.toString(weight.shape()));
     }
-    if (bias != null && (bias.ndim() != 1 || bias.shape()[0] != weight.shape()[0])) {
-      throw new IllegalArgumentException(
-          "QuantizedLinear: bias must be rank 1 with length weight.shape()[0]="
-              + weight.shape()[0]
-              + ", got shape "
-              + Arrays.toString(bias.shape()));
-    }
+    validateBiasAgainstWeight(weight, bias);
     if (bits != 2 && bits != 3 && bits != 4 && bits != 5 && bits != 6 && bits != 8) {
       throw new IllegalArgumentException(
           "QuantizedLinear: bits must be one of {2, 3, 4, 5, 6, 8}, got " + bits);
@@ -393,6 +401,32 @@ public final class QuantizedLinear extends Module implements UnaryModule {
               + ", bits="
               + bits
               + ")");
+    }
+  }
+
+  /**
+   * Validates {@code bias} against {@code weight}: {@code null} is always accepted (a layer may
+   * legitimately have no {@code bias}); a non-null {@code bias} must be rank 1 with length {@code
+   * weight.shape()[0]}. Shared by the constructor (via {@link #validate}) and {@link
+   * #onParametersUpdated(Set)}'s own {@code bias} branch, so a {@code bias}-only {@link #update}
+   * cannot install a value the constructor would have rejected -- {@code bias} has no quantization
+   * relationship to {@code groupSize}/{@code bits} (unlike {@code weight}/{@code scales}/{@code
+   * biases}), but it still has this independent shape invariant relative to {@code weight} -- an
+   * earlier version of {@link #onParametersUpdated(Set)} let a {@code bias}-only write through
+   * completely unvalidated, so this check was the one thing standing between a {@code bias} write
+   * and the constructor's own invariant for it. Confirmed empirically before this fix existed: a
+   * {@code [2,2]}-shaped {@code bias} replacement (rank 2, not rank 1) succeeded via {@link
+   * #update} with no exception at all, and {@link #forward}'s {@code MLXOps.add(y, bias)} then
+   * broadcast {@code y}'s {@code [1,2]} against it rather than failing, silently producing a {@code
+   * [2,2]} result instead of the correct {@code [1,2]}.
+   */
+  private static void validateBiasAgainstWeight(MLXArray weight, MLXArray bias) {
+    if (bias != null && (bias.ndim() != 1 || bias.shape()[0] != weight.shape()[0])) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear: bias must be rank 1 with length weight.shape()[0]="
+              + weight.shape()[0]
+              + ", got shape "
+              + Arrays.toString(bias.shape()));
     }
   }
 

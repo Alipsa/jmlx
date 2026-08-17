@@ -451,6 +451,34 @@ class QuantizedLinearTest {
   }
 
   /**
+   * This PR's round-13 review, medium finding 1: {@code onParametersUpdated} validated {@code
+   * scales}/{@code biases} touches but had no branch for {@code bias} at all, so {@link
+   * Module#update} could install a {@code bias} the constructor would have rejected -- confirmed
+   * empirically before this fix existed: with {@code OUT=2}, a {@code [2,2]}-shaped {@code bias}
+   * replacement succeeded via {@code update} with no exception, and {@code forward}'s {@code
+   * MLXOps.add(y, bias)} then silently broadcast {@code y}'s {@code [1,2]} against it instead of
+   * failing, producing a wrong output shape. This pins the fix: the identical replacement now
+   * throws {@code IllegalArgumentException} and rolls back, exactly like the constructor's own
+   * check would.
+   */
+  @Test
+  void updateOfBiasWithAWrongShapeViaModuleUpdateThrowsAndRollsBack() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      MLXArray bias = MLX.array(scope, new float[] {0.5f, -0.5f}, new int[] {OUT});
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], bias, GROUP_SIZE, BITS);
+      MLXArray wrongShapedBias = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {OUT, OUT});
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.update(Map.of("bias", wrongShapedBias)));
+
+      assertSame(bias, quantizedLinear.parameters().get("bias"));
+    }
+  }
+
+  /**
    * This PR's round-10 review finding 1's second half: before this fix, {@code onParametersUpdated}
    * over-rejecting a {@code bias}-only write meant a single {@link Module#update} call spanning
    * both a plain {@code Linear} sibling and this layer's {@code bias} would throw and roll back the
@@ -635,9 +663,14 @@ class QuantizedLinearTest {
   /**
    * {@code updateScalesAndBiases} uses {@link Module#rebind}, not {@link Module#update}, the same
    * choice {@link QuantizedLinear#updateQuantization} already makes -- this pins that a {@code
-   * scales}/{@code biases} replacement through it does NOT throw, even though the identical
-   * replacement through {@link Module#update} always does (see {@link
-   * #updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack}).
+   * scales}/{@code biases} replacement through it does not fire {@link
+   * QuantizedLinear#onParametersUpdated(java.util.Set)} (unlike an identical replacement through
+   * {@link Module#update}, which does fire it and validates -- see {@link
+   * #updateOfScalesAndBiasesAloneViaModuleUpdateSucceeds}). {@link Module#update} does NOT always
+   * throw for a {@code scales}/{@code biases} replacement (only a {@code weight}-touching one does,
+   * see {@link #updateOfWeightViaModuleUpdateAlwaysThrowsAndRollsBack}) -- what this test isolates
+   * is specifically that {@code updateScalesAndBiases} skips the notify/rollback machinery
+   * entirely, not that {@link Module#update} would have rejected the same values.
    */
   @Test
   void updateScalesAndBiasesDoesNotFireOnParametersUpdated() {

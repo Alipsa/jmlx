@@ -1050,6 +1050,45 @@ overload gained an `Objects.requireNonNull(target, ...)` check alongside its exi
 assertion is expected to flip (to `assertSame(x.scope(), ...)`) if `MLXOps#add` ever gains a target
 overload, rather than being treated as a regression if that happens.
 
+**Amendment (round 13, finding 1): round 12's relaxed `onParametersUpdated` validated `scales`/
+`biases` touches against `weight` but had no branch for `bias` at all, so `Module.update` could
+install a `bias` the constructor would have rejected.** Confirmed empirically: with `OUT=2`,
+`ql.update(Map.of("bias", <a [2,2]-shaped array>))` succeeded with no exception, and `forward`'s
+`MLXOps.add(y, bias)` then silently broadcast `y`'s `[1,2]` against the wrongly-shaped `[2,2]` bias
+(`MLXOps.add` checks broadcast-compatibility, not exact-shape equality) rather than failing --
+producing a wrong output shape with no exception anywhere in the call chain. This is new surface
+this PR introduced, not merely inherited from `Linear`'s own unvalidated precedent:
+`updateOfBiasAloneViaModuleUpdateSucceeds` (round 10) is the test that deliberately opened the
+`bias`-via-`update()` path in the first place, without anyone then adding the validation that path
+needed. Fixed by extracting the constructor's own `bias`-vs-`weight` shape check (rank 1, length
+`weight.shape()[0]`) into a new shared helper, `validateBiasAgainstWeight`, used both by `validate`
+(via the constructor and `updateQuantization`) and by a new `bias` branch in `onParametersUpdated`
+-- so a `bias`-only (or `bias`-plus-`scales`/`biases`) `update()` call now re-runs exactly the check
+the constructor itself would run, and rolls back on failure via `Module.update`'s existing
+write-rollback. Pinned by `updateOfBiasWithAWrongShapeViaModuleUpdateThrowsAndRollsBack`.
+
+**Amendment (round 13, low findings): four stale-doc issues introduced by round 12's own edits.**
+(1) `onParametersUpdated`'s javadoc said `scales`/`biases` "(with or without `weight`)" are
+accepted -- directly contradicting the same paragraph's own opening sentence (any write touching
+`weight` is rejected), its own `@throws`, and `updateOfWeightViaModuleUpdateAlwaysThrowsAndRollsBack`;
+almost certainly meant "(with or without `bias`)", now corrected (the class-level javadoc already had
+the correct wording; only this method's own javadoc had the typo). (2) `updateScalesAndBiases`'s
+javadoc described `weight`/`groupSize`/`bits` as "current (`final`, unchanging)" -- false: `groupSize`/
+`bits` are plain, non-`final` fields reassigned by `updateQuantization`, and `weight` is mutable via
+the inherited `rebind` (round 12's own finding 3); corrected to state plainly that neither is actually
+immutable, only that neither changes as a side effect of the call this method itself makes, which is
+what the validation actually relies on. (3) `QuantizedLinearTest`'s
+`updateScalesAndBiasesDoesNotFireOnParametersUpdated` had a dangling `{@link}` to the round-9-era
+method name `updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack`, renamed to
+`updateOfWeightViaModuleUpdateAlwaysThrowsAndRollsBack` in round 12 -- fixed, and the surrounding
+javadoc's claim that the identical replacement through `Module.update` "always" throws was corrected
+too (round 12 inverted that for a `scales`/`biases`-only write; only a `weight`-touching write still
+always throws). (4) `forward`'s bias-branch scope leak under the inverted layout (already documented,
+already pinned by `forwardWithBiasLeaksIntoModelScopeUnderTheInvertedScopeLayout`) was reviewed again
+and confirmed to need no further action -- flagged by round 13's review only to keep the
+accepted-leak decision visible, not because anything was actually wrong; no doc or test change made
+for this one.
+
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a
 parameter that *could* allocate into the model scope if written wrong (§2's fifth sub-hazard).

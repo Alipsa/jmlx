@@ -1,9 +1,11 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -19,22 +21,24 @@ import se.alipsa.jmlx.memory.MLXScope;
  * not in {@code se.alipsa.jmlx.core}, so that package never has to import {@link Module} -- see the
  * class javadoc on {@link MLXGrad}.
  *
- * <p>Differentiates with respect to every entry of {@code tree.parameters()} -- {@link Module} has
- * no non-trainable/buffer concept to exclude any of them, so a tree containing a {@link
- * QuantizedLinear} fails at the first {@link #apply} call <em>if and only if the loss graph
- * actually reaches that layer's quantized weight</em>, since quantized weights have no native
- * gradient at all (see {@link QuantizedLinear}'s own javadoc for the confirmed native error). A
- * {@code QuantizedLinear} that {@code tree} contains but {@code loss} never calls {@code forward}
- * on does not trigger that error -- confirmed empirically: a tree with an unused {@code
- * QuantizedLinear} sibling next to a plain {@link Linear} the loss actually uses had {@link #apply}
- * succeed, returning a {@code UINT32}-typed "gradient" for the packed weight alongside real
- * gradients for {@code scales}/{@code biases} and the {@code Linear}'s own weight. That value is
- * not a usable gradient in any sense -- it is whatever the underlying autodiff machinery produces
- * for a parameter the loss graph never touched -- so a training loop that blindly applies {@code
- * weight - lr * grad} across every entry of {@link Result#grads()} would corrupt the packed weight
- * rather than raise an error. Callers building a training loop over a tree that may contain a
- * {@code QuantizedLinear} must exclude its {@code weight} entry from any such update themselves;
- * {@link Module} has no mechanism to do this on their behalf.
+ * <p>Differentiates with respect to every entry of {@code tree.parameters()} whose current value
+ * has a floating dtype ({@link se.alipsa.jmlx.core.DType#isInexact()}) -- {@link Module} has no
+ * non-trainable/buffer concept of its own, but {@code isInexact()} is enough to exclude a {@code
+ * UINT32}-packed parameter automatically: in practice, {@link QuantizedLinear}'s {@code weight},
+ * which has no native gradient at all (see {@link QuantizedLinear}'s own javadoc for the confirmed
+ * native error). A non-floating parameter never appears in {@link #paramPaths}, never appears in
+ * {@link #apply}'s traced primal vector, and never appears as a key in a {@link Result#grads()} map
+ * -- confirmed empirically that excluding its index from {@code argnums} avoids the native failure
+ * entirely, rather than merely working around it after the fact: a tree containing a {@code
+ * QuantizedLinear} now trains its {@code scales}/{@code biases}/{@code bias} through {@link #apply}
+ * exactly like any other parameter, whether or not {@code loss} actually reaches that layer's
+ * {@code forward}, with only the packed {@code weight} itself excluded. An earlier version of this
+ * class differentiated with respect to every entry unconditionally, which both failed outright
+ * whenever {@code loss} reached a {@code QuantizedLinear}'s {@code forward} and, when it didn't,
+ * returned a nonsensical {@code UINT32}-typed "gradient" for the packed weight that a training loop
+ * applying {@code weight - lr * grad} across every entry of {@link Result#grads()} would have
+ * silently corrupted it with -- excluding the parameter by dtype closes both failure modes at once,
+ * rather than requiring every caller to filter {@link Result#grads()} themselves.
  */
 public final class ModuleGrad implements AutoCloseable {
 
@@ -53,7 +57,7 @@ public final class ModuleGrad implements AutoCloseable {
     // parameters, or because MLXGrad.valueAndGrad itself throws -- must be left mutable, letting
     // the caller fix it up and retry. Body.apply is not invoked during construction, so nothing
     // above this line can observe tree in a not-yet-frozen state and rely on that by accident.
-    List<String> paths = List.copyOf(tree.parameters().keySet());
+    List<String> paths = inexactParamPaths(tree.parameters());
     if (paths.isEmpty()) {
       throw new IllegalStateException("ModuleGrad: tree has no parameters to differentiate");
     }
@@ -64,11 +68,35 @@ public final class ModuleGrad implements AutoCloseable {
   }
 
   /**
-   * Freezes {@code tree} and captures {@code tree.parameters().keySet()} -- the ORDER only, not the
-   * values (req/phase4-plan.md §6: re-reading values every {@link #apply} is what keeps grads
-   * current after an {@code update}). {@code loss} receives {@code (params, inputs)} and must
-   * return a rank-0 loss as element 0 -- see {@link MLXGrad.Fn#apply} for what happens if it does
-   * not.
+   * The dotted paths of {@code parameters} whose current value has a floating dtype ({@link
+   * se.alipsa.jmlx.core.DType#isInexact()}), in {@code parameters}' own iteration order -- a
+   * non-floating parameter (in practice, only {@link QuantizedLinear}'s {@code UINT32}-packed
+   * {@code weight}) is excluded from differentiation entirely, never appearing in {@link
+   * #paramPaths}, in {@link #apply}'s traced primal vector, or in a {@link Result#grads()} map:
+   * confirmed empirically that excluding such a parameter's index from {@code argnums} avoids
+   * {@code QuantizedMatmul}'s native {@code "[QuantizedMatmul::vjp] no gradient wrt the quantized
+   * weights"} failure entirely (the failure fires only when that parameter's own gradient is
+   * actually requested), rather than merely hiding a nonsensical {@code UINT32}-typed "gradient"
+   * the caller would otherwise have to know to filter out of {@link Result#grads()} itself before
+   * using it in a weight update -- see this class's own javadoc for why a caller doing so
+   * unconditionally would otherwise silently corrupt a packed weight.
+   */
+  private static List<String> inexactParamPaths(SequencedMap<String, MLXArray> parameters) {
+    List<String> paths = new ArrayList<>();
+    for (Map.Entry<String, MLXArray> entry : parameters.entrySet()) {
+      if (entry.getValue().dtype().isInexact()) {
+        paths.add(entry.getKey());
+      }
+    }
+    return paths;
+  }
+
+  /**
+   * Freezes {@code tree} and captures the dotted paths of its floating-dtype parameters (see {@link
+   * #inexactParamPaths}) -- the ORDER only, not the values (req/phase4-plan.md §6: re-reading
+   * values every {@link #apply} is what keeps grads current after an {@code update}). {@code loss}
+   * receives {@code (params, inputs)} and must return a rank-0 loss as element 0 -- see {@link
+   * MLXGrad.Fn#apply} for what happens if it does not.
    *
    * <p>{@code loss} must not strongly reference the returned {@code ModuleGrad} -- directly, or
    * transitively through an enclosing object the caller bound it to (e.g. a training loop's {@code

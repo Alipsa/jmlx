@@ -3,6 +3,7 @@ package se.alipsa.jmlx.nn;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.SequencedMap;
+import java.util.Set;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
@@ -21,19 +22,19 @@ import se.alipsa.jmlx.memory.MLXScope;
  * default (innermost-of-all-operands) overload leaks into the model scope once per call whenever
  * the model was built in a scope that is itself a descendant of {@code x}'s own.
  *
- * <p><strong>Incompatible with {@link ModuleGrad}</strong> -- not merely untested together: {@code
- * QuantizedMatmul}'s native backward pass has no gradient with respect to a quantized weight at all
- * (confirmed empirically: {@code "[QuantizedMatmul::vjp] no gradient wrt the quantized weights."}).
- * {@code ModuleGrad.of(quantizedLinear, loss).apply(...)} throws {@code MLXException} on its first
- * {@code apply} call whenever {@code loss} actually calls this layer's {@link #forward} -- the only
- * way this layer's registration in {@code tree} has any effect on the computed loss at all, and so
- * the normal case in practice -- not unconditionally for every possible {@code loss} (see {@link
- * ModuleGrad}'s own javadoc for the general rule this is an instance of: a {@code loss} that never
- * reaches a {@code QuantizedLinear}'s quantized weight does not trigger this failure, whether that
- * layer is the tree root passed to {@code ModuleGrad.of} directly or a descendant of it). This is
- * an inherent native limitation, not a gap this layer's own code could close: quantization-aware
- * training is out of scope for this layer (req/plans/phase4-m4-plan.md, "Deliberately not
- * covered").
+ * <p><strong>{@code weight} itself cannot be trained through {@link ModuleGrad}</strong> -- not
+ * merely untested: {@code QuantizedMatmul}'s native backward pass has no gradient with respect to a
+ * quantized weight at all (confirmed empirically: {@code "[QuantizedMatmul::vjp] no gradient wrt
+ * the quantized weights."}). {@link ModuleGrad} excludes any non-floating-dtype parameter from
+ * differentiation entirely, by dtype ({@link se.alipsa.jmlx.core.DType#isInexact()}) -- confirmed
+ * empirically that excluding {@code weight}'s index from {@code argnums} avoids the native failure
+ * outright, rather than merely deferring it, so {@code scales}/{@code biases}/{@code bias}
+ * <em>are</em> trainable through {@code ModuleGrad.of(quantizedLinear, loss).apply(...)} exactly
+ * like any other parameter, whether or not {@code loss} actually reaches this layer's {@link
+ * #forward} (see {@link ModuleGrad}'s own javadoc for the general rule this is an instance of).
+ * Only {@code weight} is excluded: this is an inherent native limitation, not a gap this layer's
+ * own code could close -- full quantization-aware training (updating the quantized weight itself)
+ * is out of scope for this layer (req/plans/phase4-m4-plan.md, "Deliberately not covered").
  */
 public final class QuantizedLinear extends Module implements UnaryModule {
 
@@ -116,21 +117,27 @@ public final class QuantizedLinear extends Module implements UnaryModule {
   }
 
   /**
-   * Always rejects: {@link #update} lets a caller replace {@code weight}/{@code scales}/{@code
-   * biases}/{@code bias} without touching {@code groupSize}/{@code bits} at all (they are plain
-   * fields, not registered parameters {@code update} can see), so a shape check re-run here could
-   * only ever validate the replacement against this layer's <em>stale, possibly-no-longer-true</em>
-   * {@code groupSize}/{@code bits} -- exactly the check the constructor's own javadoc explains is
-   * provably unable to distinguish a same-shape replacement from one quantized under a genuinely
-   * different {@code (groupSize, bits)} pair sharing the same product. An earlier version of this
-   * override ran that check anyway and documented the gap as a narrow "blind spot"; that
-   * documentation was itself wrong -- confirmed empirically, the gap is not narrow (it is every
-   * {@code (groupSize, bits)} pair sharing a product with this layer's cached one, not one specific
-   * coincidence) and not merely a missed native error (the mismatch can silently compute wrong
-   * numbers with no error at all, if the caller's activation width happens to agree with the value
-   * {@code in} the stale {@code groupSize} wrongly derives). Re-running a check that cannot detect
-   * the exact failure mode it exists to catch is worse than no check: it advertises a safety
-   * guarantee this class cannot provide through {@link #update}.
+   * Rejects a {@link #update} write that touches {@code weight}, {@code scales}, or {@code biases}
+   * -- {@code bias} alone is accepted (it has no quantization relationship to {@code groupSize}/
+   * {@code bits} at all, unlike the other three): {@link #update} lets a caller replace {@code
+   * weight}/{@code scales}/{@code biases} without touching {@code groupSize}/{@code bits} at all
+   * (they are plain fields, not registered parameters {@code update} can see), so a shape check
+   * re-run here could only ever validate the replacement against this layer's <em>stale,
+   * possibly-no-longer-true</em> {@code groupSize}/{@code bits} -- exactly the check the
+   * constructor's own javadoc explains is provably unable to distinguish a same-shape replacement
+   * from one quantized under a genuinely different {@code (groupSize, bits)} pair sharing the same
+   * product. An earlier version of this override ran that check anyway and documented the gap as a
+   * narrow "blind spot"; that documentation was itself wrong -- confirmed empirically, the gap is
+   * not narrow (it is every {@code (groupSize, bits)} pair sharing a product with this layer's
+   * cached one, not one specific coincidence) and not merely a missed native error (the mismatch
+   * can silently compute wrong numbers with no error at all, if the caller's activation width
+   * happens to agree with the value {@code in} the stale {@code groupSize} wrongly derives).
+   * Re-running a check that cannot detect the exact failure mode it exists to catch is worse than
+   * no check: it advertises a safety guarantee this class cannot provide through {@link #update}. A
+   * still earlier version of this override rejected every write to any of this layer's own
+   * parameters unconditionally, including a {@code bias}-only write that has no bearing on {@code
+   * groupSize}/ {@code bits} at all -- {@code names} (added together with {@link
+   * Module#onParametersUpdated(Set)}) is what lets this override discriminate.
    *
    * <p>Use {@link #updateQuantization} instead, which takes the replacement's {@code groupSize}/
    * {@code bits} explicitly and updates them together with the arrays as a single atomic operation
@@ -138,34 +145,39 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * actually describe the arrays they are paired with after construction. {@link Module#update}
    * rolls the write back to its pre-call value when this throws (req/plans/phase4-m4-plan.md's
    * Amendment covers that fix in {@code Module} itself), so calling {@link #update} on this layer's
-   * own parameters is a no-op other than the thrown exception -- never called from {@link #rebind}
-   * (see {@link Module#onParametersUpdated()}), so {@code ModuleGrad}'s rebind-around-a-loss-call
-   * usage is unaffected, though {@link ModuleGrad} is independently incompatible with this class
-   * for the unrelated reason this class's own javadoc explains.
+   * {@code weight}/{@code scales}/{@code biases} is a no-op other than the thrown exception --
+   * never called from {@link #rebind} (see {@link Module#onParametersUpdated(Set)}), so {@code
+   * ModuleGrad}'s rebind-around-a-loss-call usage is unaffected, though {@link ModuleGrad} is
+   * independently incompatible with this class for the unrelated reason this class's own javadoc
+   * explains.
    *
-   * @throws IllegalStateException always
+   * @throws IllegalStateException if {@code names} contains {@code "weight"}, {@code "scales"}, or
+   *     {@code "biases"}
    */
   @Override
-  protected void onParametersUpdated() {
-    throw new IllegalStateException(
-        "QuantizedLinear: weight/scales/biases/bias must not be replaced via Module.update() -- a"
-            + " shape check alone cannot verify a replacement was quantized under this layer's own"
-            + " groupSize/bits rather than a different pair sharing the same product; use"
-            + " updateQuantization(...) instead, which takes groupSize/bits explicitly");
+  protected void onParametersUpdated(Set<String> names) {
+    if (names.contains("weight") || names.contains("scales") || names.contains("biases")) {
+      throw new IllegalStateException(
+          "QuantizedLinear: weight/scales/biases must not be replaced via Module.update() -- a"
+              + " shape check alone cannot verify a replacement was quantized under this layer's"
+              + " own groupSize/bits rather than a different pair sharing the same product; use"
+              + " updateQuantization(...) instead, which takes groupSize/bits explicitly");
+    }
   }
 
   /**
    * Atomically replaces this layer's {@code weight}/{@code scales}/{@code biases}/{@code bias}
    * together with the {@code groupSize}/{@code bits} they were quantized under -- the only
    * supported way to change this layer's quantization configuration after construction, since
-   * {@link #update} always rejects a {@code weight}/{@code scales}/{@code biases}/{@code bias}
-   * replacement (see {@link #onParametersUpdated()}). Re-runs the constructor's own validation
-   * against the new values as a single unit, exactly as if this layer had been freshly constructed
-   * with them; on rejection, no parameter or field is changed (validation runs before any write).
-   * {@code bias}'s nullness must match whether this layer was originally constructed with one:
-   * {@link #rebind} (which this method uses to write the {@code MLXArray}-typed parameters, so
-   * {@link #onParametersUpdated()} does not fire for this call) can replace an existing parameter's
-   * value but cannot register or remove one.
+   * {@link #update} always rejects a {@code weight}/{@code scales}/{@code biases} replacement (see
+   * {@link #onParametersUpdated(Set)}; a {@code bias}-only {@link #update} is unaffected, since
+   * {@code bias} has no quantization relationship to {@code groupSize}/{@code bits}). Re-runs the
+   * constructor's own validation against the new values as a single unit, exactly as if this layer
+   * had been freshly constructed with them; on rejection, no parameter or field is changed
+   * (validation runs before any write). {@code bias}'s nullness must match whether this layer was
+   * originally constructed with one: {@link #rebind} (which this method uses to write the {@code
+   * MLXArray}-typed parameters, so {@link #onParametersUpdated(Set)} does not fire for this call)
+   * can replace an existing parameter's value but cannot register or remove one.
    *
    * <p>Requiring {@code groupSize}/{@code bits} explicitly, every time, does not make this layer
    * able to verify that {@code weight}/{@code scales}/{@code biases} were actually quantized at the

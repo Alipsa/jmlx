@@ -2,6 +2,7 @@ package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -162,18 +163,18 @@ class ModuleGradTest {
   }
 
   /**
-   * This PR's round-8 review finding 1: {@code ModuleGrad}'s own javadoc used to claim a tree
-   * containing a {@code QuantizedLinear} "always fails at the first apply call" -- false whenever
-   * the loss graph never reaches that layer's quantized weight. Confirmed empirically: a tree with
-   * an unused {@code QuantizedLinear} sibling next to a {@code Linear} the loss actually uses has
-   * {@code apply} succeed, returning a {@code UINT32}-typed non-gradient for the packed weight
-   * alongside real gradients for {@code scales}/{@code biases} and the {@code Linear}'s own weight.
-   * This pins that (surprising, easy to regress) success case, not just the failure case {@code
-   * QuantizedLinearTest#moduleGradOnAQuantizedLinearThrowsNoGradientForTheQuantizedWeight} already
-   * covers for the reached-weight case.
+   * This PR's round-8 review finding 1 established that a tree containing a {@code QuantizedLinear}
+   * does not fail at the first {@code apply} call when the loss graph never reaches that layer's
+   * quantized weight; round-10 review finding 3 went further: {@code ModuleGrad} now excludes a
+   * non-floating-dtype parameter (in practice, {@code QuantizedLinear}'s {@code UINT32}-packed
+   * {@code weight}) from differentiation entirely, by dtype, rather than merely tolerating whatever
+   * nonsensical value the native autodiff machinery produced for an untouched one. This pins that:
+   * an unused {@code QuantizedLinear} sibling's {@code weight} does not appear in {@code grads()}
+   * at all, while its {@code scales}/{@code biases} still do (with real, if untrained-by-this-loss,
+   * gradient values), alongside the {@code Linear} sibling's own real gradient.
    */
   @Test
-  void applySucceedsWithAnUnusedQuantizedLinearSiblingReturningANonsensicalWeightGradient() {
+  void applySucceedsWithAnUnusedQuantizedLinearSiblingExcludingItsWeightFromGrads() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray weight = MLX.array(scope, new float[] {1f, 2f, 3f, 4f}, new int[] {2, 2});
       Linear lin = new Linear(scope, weight, null);
@@ -196,7 +197,9 @@ class ModuleGradTest {
 
         SequencedMap<String, MLXArray> grads = result.grads();
         assertEquals(DType.FLOAT32, grads.get("lin.weight").dtype());
-        assertEquals(DType.UINT32, grads.get("ql.weight").dtype());
+        assertFalse(grads.containsKey("ql.weight"), "ql.weight must be excluded from grads()");
+        assertEquals(DType.FLOAT32, grads.get("ql.scales").dtype());
+        assertEquals(DType.FLOAT32, grads.get("ql.biases").dtype());
       }
     }
   }

@@ -855,6 +855,60 @@ bias-path scope-leak note (round 7, above) is now also pinned by a regression te
 claim -- the leak itself remains unfixed, deliberately, for the same reason stated in round 7's own
 amendment (`MLXOps#add` has no explicit-target overload).
 
+**Amendment (round 10): round 9's unconditional `onParametersUpdated()` throw itself over-rejected --
+it fired on ANY write to any of this layer's own parameters, including a `bias`-only write, which has
+no quantization relationship to `groupSize`/`bits` at all (unlike `weight`/`scales`/`biases`, which
+must only ever change together with them -- the actual reason round 9 rejected unconditionally).**
+`Module.onParametersUpdated()` took no arguments, so a subclass had no way to tell which of its own
+parameters a given `update()` call actually touched -- it could only reject every write or none, not
+discriminate. Fixed in `Module` itself, not just this class: `update()` now tracks, per touched module,
+exactly which of its own local parameter names were written in that call (`touchedNamesByModule`,
+built alongside the existing `resolved`/`previousValues` pass), and `onParametersUpdated()` is now
+`onParametersUpdated(Set<String> names)` -- the only override in the tree, so no other subclass needed
+updating. `QuantizedLinear`'s override now rejects only when `names` contains `"weight"`, `"scales"`,
+or `"biases"`, leaving a `bias`-only `update()` to succeed. The two independent-module scenario this
+enables -- `Tree{lin: Linear, ql: QuantizedLinear}.update(Map.of("lin.weight", ..., "ql.bias", ...))`
+succeeding for both siblings, where it used to throw and collaterally roll back `lin.weight` too
+(`Module.update`'s own write-rollback-on-any-throwing-notify guarantee, unchanged) -- is not itself a
+new guarantee about unrelated modules in one `update()` call (that all-or-nothing behavior across
+modules is unchanged and still documented in `Module.update`'s own javadoc); it is simply no longer
+triggered by a write this layer never had a real reason to reject. A combined call that still touches
+`ql.scales` (a genuine quantization-relevant field) is correctly rejected exactly as before, with the
+same collateral rollback of `lin.weight` -- that is `Module.update`'s own batching semantics, not a bug
+this fix addresses. Pinned by
+`onParametersUpdatedNamesExactlyTheParametersWrittenInThisCallNotEveryRegisteredOne` (`ModuleTest`),
+`updateOfBiasAloneViaModuleUpdateSucceeds`, and
+`updateSpanningALinearSiblingAndThisLayersBiasSucceedsForBoth` (`QuantizedLinearTest`).
+
+**Amendment (round 10, finding 3): `ModuleGrad`'s "unused `QuantizedLinear` sibling" success case
+(round 8) still returned a nonsensical `UINT32`-typed "gradient" for the packed `weight` inside
+`Result.grads()` -- nothing prevented a training loop that blindly applies `weight - lr * grad` across
+every entry from silently corrupting it.** Fixed in `ModuleGrad` itself, not this class: `ModuleGrad`
+now builds its differentiated parameter set (`paramPaths`/`argnums`) from only the entries of
+`tree.parameters()` whose current value has a floating dtype (`DType.isInexact()`), via a new
+`inexactParamPaths` helper -- excluding a `QuantizedLinear`'s `weight` (the only non-floating parameter
+anywhere in this tree) automatically, without `Module` needing any non-trainable/buffer concept of its
+own. Confirmed empirically, via a standalone `MLXGrad` probe before touching `ModuleGrad` itself
+(primals `[x, weight, scales, biases]`, `argnums = {2, 3}` excluding `weight`'s index 1): excluding the
+quantized weight's index from `argnums` avoids `QuantizedMatmul`'s native
+`"[QuantizedMatmul::vjp] no gradient wrt the quantized weights"` failure entirely -- it only fires when
+that parameter's own gradient is actually requested -- rather than merely working around a value that
+still needed filtering after the fact. This is a substantially bigger effect than the finding's own
+"convert silent corruption into a construction-time error" framing asked for: it makes `scales`/
+`biases`/`bias` genuinely trainable through `ModuleGrad` whether or not `loss` reaches a
+`QuantizedLinear`'s `forward`, with only the packed `weight` itself excluded -- superseding, not just
+patching, this class's own previous "Incompatible with `ModuleGrad`" class-level javadoc and
+`ModuleGrad`'s own "differentiates with respect to every entry" claim, both corrected in the same
+round. Two previously-shipped regression tests pinned the old (now-superseded) behavior and were
+rewritten to match the new one rather than merely adjusted:
+`QuantizedLinearTest#moduleGradOnAQuantizedLinearThrowsNoGradientForTheQuantizedWeight` (asserted a
+throw; renamed to `moduleGradOnAQuantizedLinearExcludesTheQuantizedWeightButTrainsScalesAndBiases`,
+now asserting success with real `scales`/`biases` gradients and no `"weight"` key) and
+`ModuleGradTest#applySucceedsWithAnUnusedQuantizedLinearSiblingReturningANonsensicalWeightGradient`
+(asserted a `UINT32`-typed grad for `ql.weight`; renamed to
+`applySucceedsWithAnUnusedQuantizedLinearSiblingExcludingItsWeightFromGrads`, now asserting `ql.weight`
+is absent from `grads()` while `ql.scales`/`ql.biases` are present).
+
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a
 parameter that *could* allocate into the model scope if written wrong (§2's fifth sub-hazard).

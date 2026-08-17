@@ -111,12 +111,15 @@ plain Java types and never expose `jmlx-ffi` on their own public surface.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless
-the dylib is already loaded by then. `MLX`, `MLXScope`, and `NativeOps` each have a static initializer
-that calls `NativeLoader.ensureLoaded()` for exactly this reason; any of the three can be the first one
-touched, so each guards independently rather than relying on load order. `NativeOps`'s guard covers
-`MLXOps`/`MLXShape`/`MLXFast`/`MLXQuant`/`MLXRandom` transitively, since every op in those classes
-reaches native only through `NativeOps`'s own `checked`/`binaryOp`/`unaryOp`/`shapeOp`-family helpers —
-none of those classes needs (or has) its own guard.
+the dylib is already loaded by then. `MLX`, `MLXScope`, `NativeOps`, and `MLXGrad` each have a static
+initializer that calls `NativeLoader.ensureLoaded()` for exactly this reason; any of the four can be
+the first one touched, so each guards independently rather than relying on load order. `NativeOps`'s
+guard covers `MLXOps`/`MLXShape`/`MLXFast`/`MLXQuant`/`MLXRandom` transitively, since every op in those
+classes reaches native only through `NativeOps`'s own `checked`/`binaryOp`/`unaryOp`/`shapeOp`-family
+helpers — none of those classes needs (or has) its own guard. `MLXGrad` needs its own regardless: it
+calls `mlx_h.*` directly at 17 call sites (`mlx_closure_*`/`mlx_value_and_grad` and their frees),
+bypassing `NativeOps`'s helpers entirely, so it cannot rely on `NativeOps`'s guard the way the op
+facades do.
 
 **`NativeLoader`** loads `libmlxc.dylib` via `System.load(absolutePath)`, not
 `SymbolLookup.libraryLookup`: the bindings are generated *without* a `-l` flag, so their internal

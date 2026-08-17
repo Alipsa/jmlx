@@ -1,6 +1,8 @@
 package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
-import se.alipsa.jmlx.core.MLXException;
 import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXQuant;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -72,15 +73,20 @@ class QuantizedLinearTest {
   }
 
   /**
-   * {@code QuantizedLinear} and {@link ModuleGrad} are mutually incompatible, not merely untested
-   * together (see this class's own javadoc, and {@link ModuleGrad}'s): {@code QuantizedMatmul}'s
-   * native backward pass has no gradient with respect to a quantized weight at all -- confirmed
-   * against the shipped native error, not inferred. This is a regression pin for that failure mode,
-   * not a feature test: if a future mlx-c version starts supporting this, this test's expected
-   * exception should be replaced with a real gradient-correctness assertion.
+   * This PR's round-10 review finding 3: {@link ModuleGrad} used to differentiate with respect to
+   * every entry of {@code tree.parameters()} unconditionally, so this scenario used to throw {@code
+   * MLXException} on the first {@code apply} call ({@code QuantizedMatmul}'s native backward pass
+   * has no gradient with respect to a quantized weight at all). {@link ModuleGrad} now excludes a
+   * non-floating-dtype parameter (in practice, only this layer's {@code UINT32}-packed {@code
+   * weight}) from differentiation entirely, by dtype -- confirmed empirically that this avoids the
+   * native failure outright rather than merely working around it, since the failure only fires when
+   * the quantized weight's own gradient is actually requested. This pins the new behavior: {@code
+   * apply} now succeeds even though {@code loss} reaches this layer's {@code forward}, {@code
+   * grads()} contains real gradients for {@code scales}/{@code biases}, and does not contain {@code
+   * "weight"} at all.
    */
   @Test
-  void moduleGradOnAQuantizedLinearThrowsNoGradientForTheQuantizedWeight() {
+  void moduleGradOnAQuantizedLinearExcludesTheQuantizedWeightButTrainsScalesAndBiases() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray[] q = quantizedWeight(scope);
       QuantizedLinear quantizedLinear =
@@ -89,7 +95,13 @@ class QuantizedLinearTest {
           (params, inputs) -> new MLXArray[] {MLXOps.sum(quantizedLinear.forward(inputs[0]))};
       try (ModuleGrad mg = ModuleGrad.of(quantizedLinear, loss)) {
         MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
-        assertThrows(MLXException.class, () -> mg.apply(scope, new MLXArray[] {x}));
+
+        ModuleGrad.Result result = mg.apply(scope, new MLXArray[] {x});
+
+        SequencedMap<String, MLXArray> grads = result.grads();
+        assertFalse(grads.containsKey("weight"), "weight must be excluded from differentiation");
+        assertEquals(DType.FLOAT32, grads.get("scales").dtype());
+        assertEquals(DType.FLOAT32, grads.get("biases").dtype());
       }
     }
   }
@@ -319,12 +331,13 @@ class QuantizedLinearTest {
   }
 
   /**
-   * This PR's round-9 review finding 1: {@link QuantizedLinear#onParametersUpdated()} was rewritten
-   * to reject unconditionally, since a shape check re-run against this layer's stale cached {@code
-   * groupSize}/{@code bits} can never verify a replacement was quantized under that same pair
-   * rather than a different one sharing the same product (see that method's own javadoc). This pins
-   * the new behavior: even a shape-consistent, same-{@code groupSize}/{@code bits} replacement --
-   * the case generic {@code update} used to accept -- is now rejected, with the write rolled back.
+   * This PR's round-9 review finding 1: {@link QuantizedLinear#onParametersUpdated(java.util.Set)}
+   * was rewritten to reject a {@code weight}/{@code scales}/{@code biases} write unconditionally,
+   * since a shape check re-run against this layer's stale cached {@code groupSize}/{@code bits} can
+   * never verify a replacement was quantized under that same pair rather than a different one
+   * sharing the same product (see that method's own javadoc). This pins the new behavior: even a
+   * shape-consistent, same-{@code groupSize}/{@code bits} replacement -- the case generic {@code
+   * update} used to accept -- is now rejected, with the write rolled back.
    */
   @Test
   void updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack() {
@@ -347,6 +360,64 @@ class QuantizedLinearTest {
       // weight is UINT32 (the packed dtype), so toFloatArray()/toIntArray() don't apply here --
       // reference identity is both sufficient and exact: rollback restores the same MLXArray.
       assertSame(q[0], quantizedLinear.parameters().get("weight"));
+    }
+  }
+
+  /**
+   * This PR's round-10 review finding 1: {@code onParametersUpdated()} used to reject every write
+   * to any of this layer's own parameters unconditionally, including a {@code bias}-only write --
+   * even though {@code bias} has no quantization relationship to {@code groupSize}/{@code bits} at
+   * all, unlike {@code weight}/{@code scales}/{@code biases}. This pins that a {@code bias}-only
+   * {@link Module#update} now succeeds.
+   */
+  @Test
+  void updateOfBiasAloneViaModuleUpdateSucceeds() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      MLXArray bias = MLX.array(scope, new float[] {0.5f, -0.5f}, new int[] {OUT});
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], bias, GROUP_SIZE, BITS);
+      MLXArray newBias = MLX.array(scope, new float[] {1f, -1f}, new int[] {OUT});
+
+      quantizedLinear.update(Map.of("bias", newBias));
+
+      assertSame(newBias, quantizedLinear.parameters().get("bias"));
+    }
+  }
+
+  /**
+   * This PR's round-10 review finding 1's second half: before this fix, {@code onParametersUpdated}
+   * over-rejecting a {@code bias}-only write meant a single {@link Module#update} call spanning
+   * both a plain {@code Linear} sibling and this layer's {@code bias} would throw and roll back the
+   * unrelated sibling's write too (per {@code Module}'s own documented write-rollback-on-any-
+   * throwing-notify guarantee) -- collateral damage on a write this layer never had a real reason
+   * to reject. This pins that such a combined call now succeeds for both siblings.
+   */
+  @Test
+  void updateSpanningALinearSiblingAndThisLayersBiasSucceedsForBoth() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray linWeight = MLX.array(scope, new float[] {1f, 2f, 3f, 4f}, new int[] {2, 2});
+      Linear lin = new Linear(scope, linWeight, null);
+      MLXArray[] q = quantizedWeight(scope);
+      MLXArray bias = MLX.array(scope, new float[] {0.5f, -0.5f}, new int[] {OUT});
+      QuantizedLinear ql = new QuantizedLinear(scope, q[0], q[1], q[2], bias, GROUP_SIZE, BITS);
+      TwoModuleTree tree = new TwoModuleTree(scope, lin, ql);
+
+      MLXArray newLinWeight = MLX.array(scope, new float[] {5f, 6f, 7f, 8f}, new int[] {2, 2});
+      MLXArray newBias = MLX.array(scope, new float[] {1f, -1f}, new int[] {OUT});
+
+      tree.update(Map.of("lin.weight", newLinWeight, "ql.bias", newBias));
+
+      assertSame(newLinWeight, lin.parameters().get("weight"));
+      assertSame(newBias, ql.parameters().get("bias"));
+    }
+  }
+
+  private static final class TwoModuleTree extends Module {
+    TwoModuleTree(MLXScope scope, Linear lin, QuantizedLinear ql) {
+      super(scope);
+      child("lin", lin);
+      child("ql", ql);
     }
   }
 

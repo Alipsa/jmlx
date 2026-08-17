@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -27,6 +28,7 @@ class ModuleTest {
 
   private static final class Leaf extends Module {
     boolean notified;
+    Set<String> lastNames;
 
     Leaf(MLXScope scope, MLXArray w) {
       super(scope);
@@ -34,8 +36,9 @@ class ModuleTest {
     }
 
     @Override
-    protected void onParametersUpdated() {
+    protected void onParametersUpdated(Set<String> names) {
       notified = true;
+      lastNames = names;
     }
   }
 
@@ -48,7 +51,7 @@ class ModuleTest {
     }
 
     @Override
-    protected void onParametersUpdated() {
+    protected void onParametersUpdated(Set<String> names) {
       notified = true;
     }
   }
@@ -63,7 +66,7 @@ class ModuleTest {
     }
   }
 
-  /** A leaf whose {@code onParametersUpdated()} always throws, for the rollback tests below. */
+  /** A leaf whose {@code onParametersUpdated(Set)} always throws, for the rollback tests below. */
   private static final class ThrowingLeaf extends Module {
     boolean notified;
 
@@ -73,7 +76,7 @@ class ModuleTest {
     }
 
     @Override
-    protected void onParametersUpdated() {
+    protected void onParametersUpdated(Set<String> names) {
       notified = true;
       throw new IllegalStateException("ThrowingLeaf always rejects an update");
     }
@@ -85,6 +88,22 @@ class ModuleTest {
       super(scope);
       child("first", first);
       child("second", second);
+    }
+  }
+
+  /** Two own parameters ("a", "b"), capturing the exact {@code names} passed to the hook. */
+  private static final class TwoParamLeaf extends Module {
+    Set<String> lastNames;
+
+    TwoParamLeaf(MLXScope scope, MLXArray a, MLXArray b) {
+      super(scope);
+      param("a", a);
+      param("b", b);
+    }
+
+    @Override
+    protected void onParametersUpdated(Set<String> names) {
+      lastNames = names;
     }
   }
 
@@ -189,6 +208,29 @@ class ModuleTest {
       assertTrue(leaf.notified);
       assertFalse(branch.notified);
       assertSame(newW, leaf.param("w"));
+      assertEquals(Set.of("w"), leaf.lastNames);
+    }
+  }
+
+  /**
+   * PR #11 round-10 review finding 1: {@code onParametersUpdated()} used to take no arguments at
+   * all, so a subclass with parameters that aren't all interchangeable (e.g. {@code
+   * QuantizedLinear}'s {@code weight}/{@code scales}/{@code biases} vs. its unrelated {@code bias})
+   * had no way to reject only the writes that actually mattered to it -- it could only reject every
+   * write to any of its own parameters, or none. This pins that a write touching only one of a
+   * module's own parameters reports exactly that name, not every registered parameter name.
+   */
+  @Test
+  void onParametersUpdatedNamesExactlyTheParametersWrittenInThisCallNotEveryRegisteredOne() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1f}, new int[] {1});
+      MLXArray b = MLX.array(scope, new float[] {2f}, new int[] {1});
+      MLXArray newB = MLX.array(scope, new float[] {3f}, new int[] {1});
+      TwoParamLeaf leaf = new TwoParamLeaf(scope, a, b);
+
+      leaf.update(Map.of("b", newB));
+
+      assertEquals(Set.of("b"), leaf.lastNames);
     }
   }
 

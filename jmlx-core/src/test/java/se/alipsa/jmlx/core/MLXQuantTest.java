@@ -266,6 +266,55 @@ class MLXQuantTest {
     }
   }
 
+  /**
+   * This PR's round-11 review finding 4: {@code quantize}/{@code dequantize}/{@code
+   * quantizedMatmul} document {@code w}/{@code scales}/{@code x} as non-null, but (before this fix)
+   * left them unchecked -- a null value reached {@code w.handle()}/{@code scales.handle()}/{@code
+   * x.handle()} as a bare {@code NullPointerException} naming neither the operation nor the
+   * parameter, unlike {@code mode}'s own null handling ({@code checkMode} already gives a named
+   * error for that one). This pins the named error for each documented-non-null array operand --
+   * {@code biases} deliberately excluded throughout, since it stays legitimate, nullable API
+   * surface (see {@link #dequantizeRejectsNullBiasesUnderAffineMode}/{@link
+   * #quantizedMatmulRejectsNullBiasesUnderAffineMode}, which already pin native's own well-named
+   * rejection of a null {@code biases} under {@code mode="affine"} specifically).
+   */
+  @Test
+  void quantizeRejectsANullW() {
+    assertThrows(NullPointerException.class, () -> MLXQuant.quantize(null, 32, 4, "affine", null));
+  }
+
+  @Test
+  void dequantizeRejectsANullWOrScales() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+      assertThrows(
+          NullPointerException.class,
+          () -> MLXQuant.dequantize(null, q[1], q[2], 32, 4, "affine", null, null));
+      assertThrows(
+          NullPointerException.class,
+          () -> MLXQuant.dequantize(q[0], null, q[2], 32, 4, "affine", null, null));
+    }
+  }
+
+  @Test
+  void quantizedMatmulRejectsANullXWOrScales() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray w = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray x = MLX.array(scope, defaultFixture(), new int[] {1, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+      assertThrows(
+          NullPointerException.class,
+          () -> MLXQuant.quantizedMatmul(null, q[0], q[1], q[2], true, 32, 4, "affine"));
+      assertThrows(
+          NullPointerException.class,
+          () -> MLXQuant.quantizedMatmul(x, null, q[1], q[2], true, 32, 4, "affine"));
+      assertThrows(
+          NullPointerException.class,
+          () -> MLXQuant.quantizedMatmul(x, q[0], null, q[2], true, 32, 4, "affine"));
+    }
+  }
+
   @Test
   void quantizeRejectsAnUnsupportedMode() {
     try (MLXScope scope = new MLXScope()) {

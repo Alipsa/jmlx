@@ -61,7 +61,7 @@ public final class ModuleGrad implements AutoCloseable {
     if (paths.isEmpty()) {
       throw new IllegalStateException("ModuleGrad: tree has no parameters to differentiate");
     }
-    this.paramPaths = paths;
+    this.paramPaths = List.copyOf(paths);
     int[] argnums = IntStream.range(0, paramPaths.size()).toArray();
     this.fn = MLXGrad.valueAndGrad(new Body(tree, loss, paths), argnums);
     tree.freeze();
@@ -98,6 +98,18 @@ public final class ModuleGrad implements AutoCloseable {
    * receives {@code (params, inputs)} and must return a rank-0 loss as element 0 -- see {@link
    * MLXGrad.Fn#apply} for what happens if it does not.
    *
+   * <p>{@code loss}'s {@code params} array is indexed by this instance's {@link #paramPaths()}, in
+   * that exact order: {@code params[i]} is the current value of {@code paramPaths().get(i)}. This
+   * is <strong>not necessarily {@code tree.parameters()}'s own index order</strong> -- {@link
+   * #paramPaths} only ever contains the floating-dtype subset (see {@link #inexactParamPaths}), so
+   * a tree containing any non-floating parameter (in practice, a {@link QuantizedLinear}'s packed
+   * {@code weight}) has an index correspondence in {@code params} that skips over it entirely:
+   * {@code params[0]} is whichever floating parameter is first in {@code tree.parameters()}'s own
+   * order, not necessarily {@code tree.parameters()}'s own element 0. A {@code loss} written to
+   * assume positional correspondence with {@code tree.parameters()} itself, rather than with {@link
+   * #paramPaths()}, silently reads the wrong parameter at every following index once the tree has
+   * any excluded one -- call {@link #paramPaths()} rather than recomputing this filter.
+   *
    * <p>{@code loss} must not strongly reference the returned {@code ModuleGrad} -- directly, or
    * transitively through an enclosing object the caller bound it to (e.g. a training loop's {@code
    * this::loss}, where the loop itself owns the {@code ModuleGrad} in a field). {@code Body} holds
@@ -111,6 +123,17 @@ public final class ModuleGrad implements AutoCloseable {
    */
   public static ModuleGrad of(Module tree, BiFunction<MLXArray[], MLXArray[], MLXArray[]> loss) {
     return new ModuleGrad(tree, loss);
+  }
+
+  /**
+   * The dotted paths this instance differentiates with respect to, in the exact order {@code
+   * loss}'s {@code params} array corresponds to -- {@code paramPaths().get(i)} names {@code
+   * params[i]} on every {@link #apply} call. Fixed at construction (see {@link #of}'s own javadoc
+   * for why this can differ from {@code tree.parameters()}'s own index order) and never changes
+   * afterward, regardless of any later {@code update}/{@code rebind} on {@code tree}.
+   */
+  public List<String> paramPaths() {
+    return paramPaths;
   }
 
   /**
@@ -167,11 +190,28 @@ public final class ModuleGrad implements AutoCloseable {
    * every call (req/phase4-plan.md §6: snapshotting them once in {@link #of} would differentiate
    * against stale weights after the first {@code update}).
    *
-   * <p>No key-set drift check: {@link #of} freezes {@code tree} before returning, {@code
+   * <p>Key-set drift is impossible: {@link #of} freezes {@code tree} before returning, {@code
    * param}/{@code child} both throw once frozen, and {@code update}/{@code rebind} only ever write
    * to an already-existing key (an unknown path throws rather than being inserted) -- so {@code
    * tree.parameters().keySet()} provably cannot differ from the paths captured in {@link #of} on
-   * any call reachable through this class's own public surface.
+   * any call reachable through this class's own public surface. DTYPE drift is a distinct claim
+   * this javadoc previously conflated with the key-set one: {@link #paramPaths} is filtered by
+   * dtype ONCE, at construction (see {@link #inexactParamPaths}), and neither {@code update} nor
+   * {@code rebind} enforces that a replacement keeps the value's dtype unchanged -- confirmed
+   * reachable, not merely hypothetical: {@code Module.update}/{@code rebind} run no dtype check of
+   * their own, so a plain {@link Linear}'s FLOAT32 {@code weight}, already included in {@link
+   * #paramPaths} at construction, can be replaced afterward with a same-shape {@code INT32} (or
+   * {@code UINT32}) array, and this method would otherwise have fed it straight into the traced
+   * primal vector, failing deep inside {@code fn.apply} with whatever opaque native error the
+   * untraceable op produces for that dtype, rather than a message naming {@code ModuleGrad} or the
+   * offending path. This method now checks every {@link #paramPaths} entry's current dtype on every
+   * call instead of silently trusting it (see the {@code isInexact()} check below) -- but only in
+   * this one direction: the REVERSE case, a parameter excluded from {@link #paramPaths} at
+   * construction for being non-floating and later replaced with a floating value, is NOT caught
+   * here and remains a silent miss by design, since {@link #paramPaths} is captured once and never
+   * grows -- such a parameter is simply never differentiated through this instance regardless of
+   * its current dtype; construct a new {@code ModuleGrad} after such a replacement if it should
+   * become trainable.
    *
    * <p>Each call builds three fresh parameter maps ({@code current} here, plus {@code Body}'s
    * {@code saved}/{@code traced}) and runs two {@code rebind} calls, each re-splitting every dotted
@@ -184,7 +224,17 @@ public final class ModuleGrad implements AutoCloseable {
     MLXArray[] primals = new MLXArray[paramPaths.size() + inputs.length];
     int i = 0;
     for (String path : paramPaths) {
-      primals[i++] = current.get(path);
+      MLXArray value = current.get(path);
+      if (!value.dtype().isInexact()) {
+        throw new IllegalStateException(
+            "ModuleGrad: parameter \""
+                + path
+                + "\" had a floating dtype when this ModuleGrad was constructed but is now "
+                + value.dtype()
+                + " -- a non-floating value cannot be differentiated; construct a new ModuleGrad"
+                + " if this replacement is intentional");
+      }
+      primals[i++] = value;
     }
     for (MLXArray input : inputs) {
       primals[i++] = input;

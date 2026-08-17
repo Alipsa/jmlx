@@ -2,6 +2,7 @@ package se.alipsa.jmlx.core;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.util.Objects;
 import java.util.Set;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -51,7 +52,11 @@ public final class MLXQuant {
    * reference in {@link NativeOps#optInt} -- {@code QuantizedLinear} never uses this path, since a
    * persisted layer must remember its own exact values). {@code globalScale} is a Java {@code null}
    * for "none" -- a legitimate call, not an error, exactly like {@link MLXFast#rmsNorm}'s {@code
-   * weight}. Non-null: {@code w}, {@code mode}.
+   * weight}. Non-null: {@code w}, {@code mode} -- {@code checkMode} already gives a named error for
+   * a null {@code mode}; {@code w} is checked explicitly too, rather than left to fail as a bare,
+   * unnamed {@code NullPointerException} out of {@code w.handle()} the way it did before this
+   * class's own null-check enforcement was made consistent across every documented non-null array
+   * operand (this method's, {@link #dequantize}'s, and {@link #quantizedMatmul}'s).
    *
    * <p>The result's scope is resolved via {@link NativeOps#scopeOf} over <em>both</em> array
    * operands, {@code w} and {@code globalScale} -- not just {@code w.scope()} the way {@link
@@ -65,6 +70,7 @@ public final class MLXQuant {
   public static MLXArray[] quantize(
       MLXArray w, Integer groupSize, Integer bits, String mode, MLXArray globalScale) {
     checkMode("quantize", mode);
+    Objects.requireNonNull(w, "quantize: w must not be null");
     MLXScope target = NativeOps.scopeOf("quantize", w, globalScale);
     MemorySegment modeStr = NativeOps.cstr(mode);
     try (Arena tmp = Arena.ofConfined()) {
@@ -91,8 +97,11 @@ public final class MLXQuant {
    * not unconditionally FLOAT32 (req/plans/phase4-m4-plan.md Findings): {@code scales} is FLOAT32
    * for a caller who quantized an unmodified FLOAT32 weight, but {@link #quantize} on a weight
    * already {@code astype}'d to FLOAT16 produces FLOAT16 {@code scales}, and an absent {@code
-   * dtype} then dequantizes to FLOAT16, silently. Non-null: {@code w}, {@code scales}, {@code
-   * mode}.
+   * dtype} then dequantizes to FLOAT16, silently. Non-null: {@code w}, {@code scales}, {@code mode}
+   * -- each checked explicitly (see {@link #quantize}'s own javadoc for why); {@code biases} is
+   * deliberately NOT included in that check, since it stays legitimate, nullable API surface (see
+   * below) rather than a documented-non-null operand this class's null-check enforcement applies
+   * to.
    *
    * <p>Unlike {@code globalScale} (on either method), a non-null {@code biases} is real, legal
    * input on this codebase's Metal backend (Findings section) -- {@code MLXQuantTest}'s cross-scope
@@ -117,6 +126,8 @@ public final class MLXQuant {
       MLXArray globalScale,
       DType dtype) {
     checkMode("dequantize", mode);
+    Objects.requireNonNull(w, "dequantize: w must not be null");
+    Objects.requireNonNull(scales, "dequantize: scales must not be null");
     MLXScope target = NativeOps.scopeOf("dequantize", w, scales, biases, globalScale);
     MemorySegment modeStr = NativeOps.cstr(mode);
     try (Arena tmp = Arena.ofConfined()) {
@@ -158,7 +169,12 @@ public final class MLXQuant {
    * mode="affine"}: native rejects it with {@code "[quantized_matmul] Biases must be provided for
    * affine quantization"} (confirmed empirically against this method directly, not just inferred
    * from {@code dequantize}'s shared affine path). Non-null in practice under {@code "affine"}:
-   * {@code x}, {@code w}, {@code scales}, {@code biases}, {@code mode}.
+   * {@code x}, {@code w}, {@code scales}, {@code biases}, {@code mode} -- but only {@code x},
+   * {@code w}, {@code scales}, {@code mode} are checked explicitly (the target overload below is
+   * where the check runs, since this overload immediately delegates to it): {@code biases} is
+   * deliberately excluded, since it stays legitimate, nullable API surface (a hypothetical
+   * non-affine mode may not need it) rather than a documented-non-null operand, the same
+   * distinction {@link #dequantize}'s own javadoc draws.
    *
    * <p>Allocates into {@link NativeOps#scopeOf}'s innermost-of-the-four-operands rule, which only
    * lands in the step scope for the layout {@code Global Constraint 6} assumes: {@code x} in the
@@ -200,7 +216,9 @@ public final class MLXQuant {
    * no-target overload's javadoc documents. {@code target} must be related to every operand --
    * checked via {@link MLXScope#innermost} against {@link NativeOps#scopeOf}'s own result, the same
    * invariant {@link NativeOps#unaryOp(String, MLXArray, MLXScope, NativeOps.UnaryOp)}'s target
-   * overload documents.
+   * overload documents. {@code x}/{@code w}/{@code scales} are checked explicitly here (this is the
+   * one call site both overloads funnel through); {@code biases} is not -- see the no-target
+   * overload's own javadoc for why.
    */
   public static MLXArray quantizedMatmul(
       MLXArray x,
@@ -213,6 +231,9 @@ public final class MLXQuant {
       String mode,
       MLXScope target) {
     checkMode("quantizedMatmul", mode);
+    Objects.requireNonNull(x, "quantizedMatmul: x must not be null");
+    Objects.requireNonNull(w, "quantizedMatmul: w must not be null");
+    Objects.requireNonNull(scales, "quantizedMatmul: scales must not be null");
     MLXScope.innermost(NativeOps.scopeOf("quantizedMatmul", x, w, scales, biases), target);
     MemorySegment modeStr = NativeOps.cstr(mode);
     try (Arena tmp = Arena.ofConfined()) {

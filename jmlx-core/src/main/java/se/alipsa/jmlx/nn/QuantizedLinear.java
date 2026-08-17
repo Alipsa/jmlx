@@ -2,6 +2,7 @@ package se.alipsa.jmlx.nn;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.Objects;
 import java.util.SequencedMap;
 import java.util.Set;
 import se.alipsa.jmlx.core.DType;
@@ -35,6 +36,16 @@ import se.alipsa.jmlx.memory.MLXScope;
  * Only {@code weight} is excluded: this is an inherent native limitation, not a gap this layer's
  * own code could close -- full quantization-aware training (updating the quantized weight itself)
  * is out of scope for this layer (req/plans/phase4-m4-plan.md, "Deliberately not covered").
+ *
+ * <p>Since {@code weight} is never trainable, a gradient step never has a new {@code weight} to
+ * write back -- only {@code scales}/{@code biases} (and, separately, {@code bias}, already writable
+ * through the ordinary {@link #update} since it has no quantization relationship to {@code
+ * groupSize}/{@code bits} at all). {@link #onParametersUpdated(Set)} still rejects a {@code
+ * scales}/{@code biases} write through {@link #update} regardless (a shape check cannot verify the
+ * {@code groupSize}/{@code bits} pairing -- see that method's own javadoc), so a generic training
+ * loop applying {@code ModuleGrad}'s gradients back onto a tree containing this layer needs a way
+ * to write {@code scales}/{@code biases} that does not run through {@link #update} at all: {@link
+ * #updateScalesAndBiases} is that path.
  */
 public final class QuantizedLinear extends Module implements UnaryModule {
 
@@ -142,14 +153,18 @@ public final class QuantizedLinear extends Module implements UnaryModule {
    * <p>Use {@link #updateQuantization} instead, which takes the replacement's {@code groupSize}/
    * {@code bits} explicitly and updates them together with the arrays as a single atomic operation
    * -- the only way this layer's cached {@code groupSize}/{@code bits} can ever be trusted to
-   * actually describe the arrays they are paired with after construction. {@link Module#update}
-   * rolls the write back to its pre-call value when this throws (req/plans/phase4-m4-plan.md's
-   * Amendment covers that fix in {@code Module} itself), so calling {@link #update} on this layer's
-   * {@code weight}/{@code scales}/{@code biases} is a no-op other than the thrown exception --
-   * never called from {@link #rebind} (see {@link Module#onParametersUpdated(Set)}), so {@code
-   * ModuleGrad}'s rebind-around-a-loss-call usage is unaffected, though {@link ModuleGrad} is
-   * independently incompatible with this class for the unrelated reason this class's own javadoc
-   * explains.
+   * actually describe the arrays they are paired with after construction. If only {@code scales}/
+   * {@code biases} are changing (e.g. a gradient step -- {@code weight} itself is never trainable,
+   * see this class's own javadoc), {@link #updateScalesAndBiases} is the narrower alternative:
+   * unlike {@link #updateQuantization}, it does not require re-supplying {@code weight}/{@code
+   * bias}/{@code groupSize}/{@code bits}, since none of those are changing either. {@link
+   * Module#update} rolls the write back to its pre-call value when this throws
+   * (req/plans/phase4-m4-plan.md's Amendment covers that fix in {@code Module} itself), so calling
+   * {@link #update} on this layer's {@code weight}/{@code scales}/{@code biases} is a no-op other
+   * than the thrown exception -- never called from {@link #rebind} (see {@link
+   * Module#onParametersUpdated(Set)}), so {@code ModuleGrad}'s rebind-around-a-loss-call usage is
+   * unaffected, though {@link ModuleGrad} is independently incompatible with this class for the
+   * unrelated reason this class's own javadoc explains.
    *
    * @throws IllegalStateException if {@code names} contains {@code "weight"}, {@code "scales"}, or
    *     {@code "biases"}
@@ -215,6 +230,76 @@ public final class QuantizedLinear extends Module implements UnaryModule {
     rebind(values);
     this.groupSize = groupSize;
     this.bits = bits;
+  }
+
+  /**
+   * Replaces this layer's {@code scales}/{@code biases} alone, leaving {@code weight}/{@code
+   * bias}/{@code groupSize}/{@code bits} untouched -- the escape hatch a generic training loop
+   * needs to write a gradient step's {@code scales}/{@code biases} back onto this layer: {@code
+   * weight} itself is never trainable through {@link ModuleGrad} (no native gradient exists for it
+   * at all, see this class's own javadoc), so a gradient step never produces a new {@code weight}
+   * to write back, and routing a {@code scales}/{@code biases}-only change through {@link
+   * #updateQuantization} would force the caller to also re-supply {@code weight}/{@code bias}/
+   * {@code groupSize}/{@code bits} unchanged, none of which this method's caller has any reason to
+   * have on hand.
+   *
+   * <p>Unlike {@link #updateQuantization}, this method takes no {@code groupSize}/{@code bits}: the
+   * replacement is validated against this layer's <em>current</em> {@code scales}/{@code biases}
+   * shape, not re-derived from {@code groupSize}/{@code bits} and {@code weight}'s packed column
+   * count. Since {@code weight} does not change here, the groupSize/bits-versus-arithmetic
+   * ambiguity the constructor's own javadoc documents (a shape check alone cannot distinguish one
+   * {@code (groupSize, bits)} pair from a different one sharing the same product) simply does not
+   * arise: nothing about the quantized {@code weight} this layer's {@code groupSize}/{@code bits}
+   * describe is changing, so there is nothing for that ambiguity to apply to.
+   *
+   * <p>Uses {@link #rebind}, not {@link #update}, so {@link #onParametersUpdated(Set)} does not
+   * fire for this call -- the same choice {@link #updateQuantization} already makes, for the same
+   * reason ({@link #rebind}'s own contract: replace an existing parameter's value without
+   * notifying).
+   *
+   * @throws NullPointerException if {@code scales} or {@code biases} is {@code null}
+   * @throws IllegalArgumentException if {@code scales}/{@code biases} is not a floating dtype, or
+   *     does not have the same shape as this layer's current {@code scales}/{@code biases}
+   */
+  public void updateScalesAndBiases(MLXArray scales, MLXArray biases) {
+    Objects.requireNonNull(
+        scales, "QuantizedLinear.updateScalesAndBiases: scales must not be null");
+    Objects.requireNonNull(
+        biases, "QuantizedLinear.updateScalesAndBiases: biases must not be null");
+    if (!scales.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear.updateScalesAndBiases: scales must be a floating dtype (FLOAT32,"
+              + " FLOAT16, or BFLOAT16), got "
+              + scales.dtype());
+    }
+    if (!biases.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear.updateScalesAndBiases: biases must be a floating dtype (FLOAT32,"
+              + " FLOAT16, or BFLOAT16), got "
+              + biases.dtype());
+    }
+    MLXArray currentScales = param("scales");
+    if (!Arrays.equals(scales.shape(), currentScales.shape())) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear.updateScalesAndBiases: scales shape must match the current scales"
+              + " shape "
+              + Arrays.toString(currentScales.shape())
+              + ", got "
+              + Arrays.toString(scales.shape()));
+    }
+    MLXArray currentBiases = param("biases");
+    if (!Arrays.equals(biases.shape(), currentBiases.shape())) {
+      throw new IllegalArgumentException(
+          "QuantizedLinear.updateScalesAndBiases: biases shape must match the current biases"
+              + " shape "
+              + Arrays.toString(currentBiases.shape())
+              + ", got "
+              + Arrays.toString(biases.shape()));
+    }
+    SequencedMap<String, MLXArray> values = new LinkedHashMap<>();
+    values.put("scales", scales);
+    values.put("biases", biases);
+    rebind(values);
   }
 
   private static void validate(

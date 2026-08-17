@@ -454,6 +454,109 @@ class QuantizedLinearTest {
     }
   }
 
+  /**
+   * This PR's round-11 review finding 1: {@code updateQuantization} is the only sanctioned way to
+   * replace {@code scales}/{@code biases}, but it forces re-supplying {@code weight}/{@code bias}/
+   * {@code groupSize}/{@code bits} unchanged too -- and {@code groupSize}/{@code bits} are not
+   * exposed by this class at all, so a generic training loop applying a gradient step has no way to
+   * obtain them. {@link QuantizedLinear#updateScalesAndBiases} is the narrower escape hatch: this
+   * pins that it replaces {@code scales}/{@code biases} alone and {@code forward} reflects the new
+   * values, without touching {@code weight}/{@code groupSize}/{@code bits} (confirmed by comparing
+   * against a fresh {@code QuantizedLinear} built directly from the new {@code scales}/ {@code
+   * biases} and this layer's original {@code weight}).
+   */
+  @Test
+  void updateScalesAndBiasesReplacesBothAndForwardReflectsTheNewValues() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray x = MLX.array(scope, inputFixture(), new int[] {1, IN});
+
+      MLXArray newScales = MLXOps.multiply(q[1], MLX.array(scope, new float[] {2f}, new int[] {}));
+      MLXArray newBiases = MLXOps.add(q[2], MLX.array(scope, new float[] {0.1f}, new int[] {}));
+
+      quantizedLinear.updateScalesAndBiases(newScales, newBiases);
+      MLXArray result = quantizedLinear.forward(x);
+
+      QuantizedLinear rebuilt =
+          new QuantizedLinear(scope, q[0], newScales, newBiases, null, GROUP_SIZE, BITS);
+      MLXArray expected = rebuilt.forward(x);
+
+      assertArrayEquals(expected.toFloatArray(), result.toFloatArray(), EPS);
+      assertSame(newScales, quantizedLinear.parameters().get("scales"));
+      assertSame(newBiases, quantizedLinear.parameters().get("biases"));
+    }
+  }
+
+  @Test
+  void updateScalesAndBiasesRejectsNullArguments() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      assertThrows(
+          NullPointerException.class, () -> quantizedLinear.updateScalesAndBiases(null, q[2]));
+      assertThrows(
+          NullPointerException.class, () -> quantizedLinear.updateScalesAndBiases(q[1], null));
+    }
+  }
+
+  @Test
+  void updateScalesAndBiasesRejectsNonFloatingDtype() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray int32Scales = MLX.astype(q[1], DType.INT32);
+      MLXArray int32Biases = MLX.astype(q[2], DType.INT32);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.updateScalesAndBiases(int32Scales, q[2]));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.updateScalesAndBiases(q[1], int32Biases));
+    }
+  }
+
+  @Test
+  void updateScalesAndBiasesRejectsAShapeMismatch() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray wrongShapedScales = MLX.array(scope, new float[] {1, 2, 3}, new int[] {1, 3});
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.updateScalesAndBiases(wrongShapedScales, q[2]));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> quantizedLinear.updateScalesAndBiases(q[1], wrongShapedScales));
+    }
+  }
+
+  /**
+   * {@code updateScalesAndBiases} uses {@link Module#rebind}, not {@link Module#update}, the same
+   * choice {@link QuantizedLinear#updateQuantization} already makes -- this pins that a {@code
+   * scales}/{@code biases} replacement through it does NOT throw, even though the identical
+   * replacement through {@link Module#update} always does (see {@link
+   * #updateOfWeightScalesOrBiasesViaModuleUpdateAlwaysThrowsAndRollsBack}).
+   */
+  @Test
+  void updateScalesAndBiasesDoesNotFireOnParametersUpdated() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray[] q = quantizedWeight(scope);
+      QuantizedLinear quantizedLinear =
+          new QuantizedLinear(scope, q[0], q[1], q[2], null, GROUP_SIZE, BITS);
+      MLXArray[] q2 = quantizedWeight(scope);
+
+      quantizedLinear.updateScalesAndBiases(q2[1], q2[2]);
+
+      assertSame(q2[1], quantizedLinear.parameters().get("scales"));
+      assertSame(q2[2], quantizedLinear.parameters().get("biases"));
+    }
+  }
+
   @Test
   void updateQuantizationValidatesLikeTheConstructor() {
     try (MLXScope scope = new MLXScope()) {

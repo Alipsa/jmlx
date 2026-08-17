@@ -205,6 +205,72 @@ class ModuleGradTest {
   }
 
   /**
+   * This PR's round-11 review finding 3: {@code loss}'s {@code params} array is indexed by {@link
+   * ModuleGrad#paramPaths()}, not by {@code tree.parameters()}'s own order, once the tree has any
+   * excluded (non-floating) parameter -- {@code lin.weight} then {@code ql.weight} (excluded, a
+   * {@code UINT32}-packed weight) then {@code ql.scales} then {@code ql.biases} in {@code
+   * tree.parameters()}'s own order, but {@link ModuleGrad#paramPaths()} must skip over {@code
+   * ql.weight} entirely, landing {@code ql.scales} at index 1 rather than index 2.
+   */
+  @Test
+  void paramPathsSkipsTheExcludedNonFloatingParameterAndPreservesOrderOfTheRest() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray weight = MLX.array(scope, new float[] {1f, 2f, 3f, 4f}, new int[] {2, 2});
+      Linear lin = new Linear(scope, weight, null);
+
+      float[] qw = new float[2 * 64];
+      for (int i = 0; i < qw.length; i++) {
+        qw[i] = (i % 7 - 3) * 0.3f;
+      }
+      MLXArray w = MLX.array(scope, qw, new int[] {2, 64});
+      MLXArray[] q = MLXQuant.quantize(w, 32, 4, "affine", null);
+      QuantizedLinear ql = new QuantizedLinear(scope, q[0], q[1], q[2], null, 32, 4);
+
+      TwoLayerTree tree = new TwoLayerTree(scope, lin, ql);
+      try (ModuleGrad mg =
+          ModuleGrad.of(
+              tree, (params, inputs) -> new MLXArray[] {MLXOps.sum(lin.forward(inputs[0]))})) {
+        assertEquals(List.of("lin.weight", "ql.scales", "ql.biases"), mg.paramPaths());
+      }
+    }
+  }
+
+  /**
+   * This PR's round-11 review finding 2: {@link Module#update}/{@link Module#rebind} run no dtype
+   * check of their own, so a parameter that was floating-dtype (and therefore included in {@link
+   * ModuleGrad#paramPaths()}) at construction can be replaced afterward with a non-floating value
+   * of the same shape -- without this fix, {@code apply} would feed that value straight into the
+   * traced primal vector and fail deep inside the wrapped {@code MLXGrad.Fn} with an opaque native
+   * error naming neither {@code ModuleGrad} nor the offending parameter. This pins the earlier,
+   * named {@code IllegalStateException} this class now throws instead, confirmed to fire before
+   * ever reaching the native call (not merely a different exception type for the same native
+   * failure): the replacement here is INT32, and native's own "no gradient" error is specific to
+   * quantized (UINT32) weights, so a native failure for this exact scenario would look nothing like
+   * this test's assertion if this check were removed.
+   */
+  @Test
+  void applyThrowsIfAFormerlyFloatingParameterIsReplacedWithANonFloatingValue() {
+    try (MLXScope model = new MLXScope()) {
+      MLXArray weight = MLX.array(model, new float[] {1, 1, 1}, new int[] {1, 3});
+      MLXArray bias = MLX.array(model, new float[] {0}, new int[] {1});
+      Linear linear = new Linear(model, weight, bias);
+      try (ModuleGrad mg = ModuleGrad.of(linear, ModuleGradTest::mseLoss)) {
+        linear.update(Map.of("weight", MLX.array(model, new int[] {2, 2, 2}, new int[] {1, 3})));
+        try (MLXScope step = model.newChild()) {
+          MLXArray x = MLX.array(step, new float[] {1, 2, 3}, new int[] {1, 3});
+          MLXArray target = MLX.array(step, new float[] {0}, new int[] {1, 1});
+          IllegalStateException ex =
+              assertThrows(
+                  IllegalStateException.class, () -> mg.apply(step, new MLXArray[] {x, target}));
+          assertTrue(
+              ex.getMessage().contains("weight"),
+              "expected message to name the offending path, got: " + ex.getMessage());
+        }
+      }
+    }
+  }
+
+  /**
    * Mirrors {@code MLXGradTest.crossThreadApplyThrows}: confinement is enforced transitively
    * through the wrapped {@code MLXGrad.Fn} either way, but the diagnostic must name {@code
    * ModuleGrad} -- the API the caller actually misused -- not the internal {@code Fn} it delegates

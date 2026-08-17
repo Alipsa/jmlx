@@ -909,6 +909,80 @@ now asserting success with real `scales`/`biases` gradients and no `"weight"` ke
 `applySucceedsWithAnUnusedQuantizedLinearSiblingExcludingItsWeightFromGrads`, now asserting `ql.weight`
 is absent from `grads()` while `ql.scales`/`ql.biases` are present).
 
+**Amendment (round 11, finding 1): round 10's fix let `bias` alone pass through `Module.update()`, but
+`scales`/`biases` -- now genuinely trainable through `ModuleGrad` per round 10's own finding 3 fix --
+still had no writable path at all outside `updateQuantization`, which forces re-supplying `weight`/
+`bias`/`groupSize`/`bits` unchanged, and `groupSize`/`bits` are not exposed by this class to begin
+with.** A generic training loop applying a gradient step to `scales`/`biases` therefore had no escape
+hatch. Fixed with a new method, `updateScalesAndBiases(MLXArray scales, MLXArray biases)`, narrower than
+`updateQuantization`: it replaces only `scales`/`biases`, leaving `weight`/`bias`/`groupSize`/`bits`
+untouched, and validates the replacement against this layer's *current* `scales`/`biases` shape and
+dtype rather than re-deriving an expected packed-column count from `groupSize`/`bits` and `weight`. This
+sidesteps the groupSize/bits-versus-arithmetic ambiguity the constructor's own javadoc documents
+entirely -- that ambiguity is about whether a `weight`/`scales`/`biases` triple was quantized under the
+declared `(groupSize, bits)` pair specifically, and since `weight` never changes here, there is nothing
+for the ambiguity to apply to. Like `updateQuantization`, it uses `rebind`, not `update`, so
+`onParametersUpdated(Set)` never fires for this call. Considered and rejected: exposing `groupSize()`/
+`bits()` accessors instead (the finding's other suggested fix) -- `weight`/`bias` are already readable
+via `parameters()`, so the only genuinely missing piece was `groupSize`/`bits`, but adding a narrower
+method matching the actual use case (a gradient step never touches `weight`, so it should never need to
+be re-supplied at all) was judged cleaner than making every caller reconstruct an `updateQuantization`
+call from parts it has no independent reason to hold onto. Pinned by
+`updateScalesAndBiasesReplacesBothAndForwardReflectsTheNewValues`,
+`updateScalesAndBiasesRejectsNullArguments`, `updateScalesAndBiasesRejectsNonFloatingDtype`,
+`updateScalesAndBiasesRejectsAShapeMismatch`, and `updateScalesAndBiasesDoesNotFireOnParametersUpdated`
+(all `QuantizedLinearTest`).
+
+**Amendment (round 11, finding 2): `ModuleGrad`'s own "No key-set drift check" javadoc argued drift was
+impossible using a proof that only covers `tree.parameters().keySet()`, not the DTYPE of each value --
+a distinct claim it silently conflated with the key-set one.** `Module.update`/`Module.rebind` run no
+dtype check of their own, so a parameter already included in `paramPaths` at construction (for being
+floating-dtype then) can be replaced afterward with a same-shape but non-floating value -- confirmed
+reachable directly against a plain `Linear`'s FLOAT32 `weight`, not merely hypothetical. Before this fix,
+`apply` would feed such a value straight into the traced primal vector, failing deep inside the wrapped
+`MLXGrad.Fn` with whatever opaque native error that particular dtype mismatch produces, naming neither
+`ModuleGrad` nor the offending path. Fixed by checking each `paramPaths` entry's current value against
+`isInexact()` on every `apply` call, throwing a named `IllegalStateException` before ever reaching the
+native call. Deliberately asymmetric, and documented as such: the reverse direction -- a parameter
+excluded from `paramPaths` at construction for being non-floating, later replaced with a floating value
+-- is NOT caught, since `paramPaths` is captured once at construction and never grows; such a parameter
+is simply never differentiated through that `ModuleGrad` instance, silently, by design (construct a new
+one if it should become trainable). Pinned by
+`applyThrowsIfAFormerlyFloatingParameterIsReplacedWithANonFloatingValue` (`ModuleGradTest`).
+
+**Amendment (round 11, finding 3): `loss`'s `params` array is indexed by the floating-dtype-filtered
+`paramPaths`, not by `tree.parameters()`'s own order, once the tree has any excluded parameter -- but
+`paramPaths` was a private field with no accessor, so a `loss` implementation had no way to know the
+correspondence except by recomputing the same dtype filter itself.** A `loss` written to assume
+positional correspondence with `tree.parameters()` itself (e.g. "index 0 is always the first
+registered parameter") would silently read the wrong parameter at every index from the first excluded
+one onward. Fixed with a new public accessor, `paramPaths()` (returning the already-immutable
+`List.copyOf` snapshot captured at construction), and by rewriting `of`'s javadoc to state the index
+correspondence explicitly: `params[i]` is `paramPaths().get(i)`'s current value, not necessarily
+`tree.parameters()`'s own element `i`. Pinned by
+`paramPathsSkipsTheExcludedNonFloatingParameterAndPreservesOrderOfTheRest` (`ModuleGradTest`), which
+constructs a `Tree{lin: Linear, ql: QuantizedLinear}` and asserts `paramPaths()` is exactly
+`["lin.weight", "ql.scales", "ql.biases"]` -- skipping `ql.weight` (`UINT32`, excluded) without
+disturbing the relative order of the rest.
+
+**Amendment (round 11, finding 4, partial): `MLXQuant.dequantize`/`quantizedMatmul` document `w`/
+`scales`/`x` as non-null but never checked them, unlike `mode` (`checkMode` already gives a named
+error) -- a null value reached `w.handle()`/`scales.handle()`/`x.handle()` as a bare, unnamed
+`NullPointerException`.** Fixed for `w` (`quantize`, `dequantize`), `scales` (`dequantize`,
+`quantizedMatmul`), and `x` (`quantizedMatmul`) via `Objects.requireNonNull` with a named message,
+placed right after each method's existing `checkMode` call; `quantize`'s own `w` was fixed too for the
+same reason even though the finding named only `dequantize`/`quantizedMatmul`, for internal consistency
+within one class. **Deliberately NOT extended to `biases`**, which the finding's wording also listed:
+`biases` stays legitimate, nullable API surface on every one of these methods (a hypothetical
+non-affine `mode` may not need it, per Global Constraint 5), and a null `biases` under `mode="affine"`
+specifically is already rejected by native itself with a confirmed, well-named error (`"[dequantize]
+Biases must be provided for affine quantization"` / `"[quantized_matmul] Biases must be provided for
+affine quantization"`, both already pinned by `dequantizeRejectsNullBiasesUnderAffineMode`/
+`quantizedMatmulRejectsNullBiasesUnderAffineMode` before this round). Adding a Java-level null check for
+`biases` would incorrectly forbid that legitimate nullable surface rather than close a real gap. Pinned
+by `quantizeRejectsANullW`, `dequantizeRejectsANullWOrScales`, and
+`quantizedMatmulRejectsANullXWOrScales` (all `MLXQuantTest`).
+
 **No memory-leak-loop test names a specific hazard here, unlike `Linear`'s.** `Linear.forward`'s own
 `MLXMemoryLeakTest`-shaped test exists specifically because `transpose(W)` is a single-operand op on a
 parameter that *could* allocate into the model scope if written wrong (§2's fifth sub-hazard).

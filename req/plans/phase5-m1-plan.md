@@ -34,35 +34,51 @@ the Java side). Every one of these seven calls this plan makes must pass a confi
 `MLXScope`, mirroring `MLX.newVectorArray`'s narrowed-`Arena`-parameter precedent (D2b already names
 this pattern; this just confirms the full call list it applies to).
 
-**Every struct out-param this plan writes into must arrive already constructed via its own
-`mlx_h.*_new(allocator)` call -- a raw `tmp.allocate(ValueLayout.ADDRESS)` slot is not just wasteful,
-it is unsafe, confirmed by reading the private headers every affected function goes through.**
-`mlx_load_safetensors` writes its two out-params via `mlx_map_string_to_array_set_(*res_0, tpl_0)` /
-`mlx_map_string_to_string_set_(*res_1, tpl_1)` (`io.cpp:72-73`); `mlx_load_gguf` via
-`mlx_io_gguf_set_(*gguf, ...)` (`io.cpp:37`); `mlx_map_string_to_array_iterator_next`'s `value` via
-`mlx_array_set_(*value, ...)` (`map.cpp:98`); and GGUF's `get_metadata_string`/`get_metadata_array`/
-`get_metadata_vector_string` via the same `mlx_##CNAME##_set_` macro (`io_types.cpp:140-158`). Every
-one of these private `_set_` helpers branches on whether the destination's `ctx` is already non-null
-(`private/array.h:24-31`, `private/map.h:27-35`, `private/gguf.h:20-24`): `mlx_array_set_`/
-`mlx_map_string_to_array_set_` reassign via C++ `operator=` if `ctx` is already set, `mlx_io_gguf_set_`
-outright `delete`s whatever `ctx` already points at before allocating a replacement. None of them
-check anything else first -- an out-param slot whose `ctx` field happens to hold uninitialized garbage
-(exactly what a raw `tmp.allocate(ValueLayout.ADDRESS)` can produce, with no zero-fill guarantee this
-plan can rely on) is read by these helpers as a live, already-owned pointer, and either reassigned
-through or `delete`d -- undefined behavior or heap corruption, not merely a wrong value. Every
-`mlx_h.*_new(allocator)` constructor this plan uses (`mlx_array_new`, `mlx_string_new`,
-`mlx_vector_string_new`, `mlx_map_string_to_array_new`, `mlx_map_string_to_string_new`,
-`mlx_io_gguf_new`) is confirmed, reading each one's own `.cpp` body, to always return a struct in a
-state these `_set_` helpers handle correctly -- either a literal zero-`ctx` (`mlx_array_new`'s success
-path returns `mlx_array_()` = `{nullptr}`) or a genuinely-owned non-null `ctx` pointing at a real empty
-object that the destination `_set_`'s own non-null branch correctly reassigns/frees before replacing
-(`mlx_io_gguf_new`'s success path constructs a real empty `GGUFLoad`, not a literal null). **Every
-struct-shaped out-param in Tasks 2/3 below is therefore built via the matching `_new(allocator)` call,
-never a raw allocated slot** -- this supersedes an earlier draft of this plan that used
-`tmp.allocate(ValueLayout.ADDRESS)` for `tensorMap`/`metaMap`/`io`/`str`/`vstr`-style out-params, which
-had exactly this hazard. Plain pointer-to-pointer out-params (`const char** key`, `char** res`) have no
-such hazard -- a native call only ever writes a fresh pointer value into those, never reads what was
-there first -- so `keySlot`/`itemSlot`-style slots stay a raw `tmp.allocate(ValueLayout.ADDRESS)`
+**Every struct out-param this plan writes into is built via its own `mlx_h.*_new(allocator)` call
+rather than a raw `tmp.allocate(ValueLayout.ADDRESS)` slot -- not because the raw slot is unsafe today,
+but because the reason it happens to work is a private-header implementation detail of the pinned
+commit, not part of mlx-c's public contract.** `mlx_load_safetensors` writes its two out-params via
+`mlx_map_string_to_array_set_(*res_0, tpl_0)` / `mlx_map_string_to_string_set_(*res_1, tpl_1)`
+(`io.cpp:72-73`); `mlx_load_gguf` via `mlx_io_gguf_set_(*gguf, ...)` (`io.cpp:37`);
+`mlx_map_string_to_array_iterator_next`'s `value` via `mlx_array_set_(*value, ...)` (`map.cpp:98`);
+and GGUF's `get_metadata_string`/`get_metadata_array`/`get_metadata_vector_string` via the same
+`mlx_##CNAME##_set_` macro (`io_types.cpp:140-158`). Every one of these **private** `_set_` helpers
+(`private/array.h:24-31`, `private/map.h:27-35`, `private/gguf.h:20-24` -- none of this is declared in
+the public `mlx/c/*.h` headers mlx-c documents) branches on whether the destination's `ctx` is already
+non-null: `mlx_array_set_`/`mlx_map_string_to_array_set_` reassign via C++ `operator=` if `ctx` is
+already set, `mlx_io_gguf_set_` outright `delete`s whatever `ctx` already points at before allocating a
+replacement.
+
+A raw `tmp.allocate(ValueLayout.ADDRESS)` slot's `ctx` field is *not* uninitialized garbage here, and
+an earlier draft of this plan was wrong to say so: `java.lang.foreign.Arena`'s own javadoc documents
+`ofConfined()` (and `ofShared`/`ofAuto`/`global`) as zero-initializing every segment `allocate` hands
+back, and this codebase's own `NativeOps.nullableHandle` already leans on exactly that guarantee
+elsewhere (`tmp.allocate(mlx_array_.layout()).fill((byte) 0)`'s explicit `.fill` there is defensive
+because `nullableHandle`'s own parameter is typed as the *wider* `SegmentAllocator` -- which
+"makes no zero-fill guarantee," per that method's own javadoc -- not because `Arena.ofConfined()`
+itself lacks one). So a raw zeroed slot's `ctx` genuinely is null, every time, for every `tmp` this
+plan ever uses (always a concrete `Arena.ofConfined()`) -- these `_set_` helpers' null-`ctx` branch
+was always the one taken, not skipped over a wild pointer. The actual reason to avoid the raw slot is
+narrower than "it's unsafe": relying on it means this plan's correctness depends on *two* independent
+facts holding together -- `Arena`'s zero-fill guarantee (public, stable) *and* these specific private
+`_set_` bodies choosing to treat a null `ctx` as "allocate fresh" rather than, say, asserting non-null
+(an internal choice of the pinned commit, changeable on any future mlx-c bump without touching a single
+public header this project's own bindings-drift check would catch). Calling the type's own
+`mlx_h.*_new(allocator)` constructor sidesteps that second dependency entirely: it is mlx-c's own
+documented way to obtain a valid empty instance of the type, and (confirmed by reading each
+constructor's own `.cpp` body) always returns something these `_set_` helpers handle correctly
+regardless of which branch they take internally -- either a literal zero-`ctx` (`mlx_array_new`'s
+success path returns `mlx_array_()` = `{nullptr}`, byte-identical to a zeroed slot) or a
+genuinely-owned non-null `ctx` pointing at a real empty object that the destination `_set_`'s own
+non-null branch correctly reassigns/frees before replacing (`mlx_io_gguf_new`'s success path
+constructs a real empty `GGUFLoad`, not a literal null). **Every struct-shaped out-param in Tasks 2/3
+below is therefore built via the matching `_new(allocator)` call, never a raw allocated slot** -- this
+supersedes an earlier draft of this plan that used `tmp.allocate(ValueLayout.ADDRESS)` for
+`tensorMap`/`metaMap`/`io`/`str`/`vstr`-style out-params, which (this correction aside) happened to be
+memory-safe against the pinned commit but coupled this plan to more than it needed to. Plain
+pointer-to-pointer out-params (`const char** key`, `char** res`) have no such coupling either way -- a
+native call only ever writes a fresh pointer value into those, never reads what was there first -- so
+`keySlot`/`itemSlot`-style slots stay a raw `tmp.allocate(ValueLayout.ADDRESS)`
 (suggestion 5's generated-layout point still applies to `mlx_array`'s own slots specifically, via
 `mlx_array_.layout()`, since that one is already an established idiom elsewhere in this codebase --
 `NativeOps.nullableHandle`/`NativeOps.vectorOutOp`).
@@ -177,12 +193,15 @@ verbatim; constraints below are the ones specific to this plan, in addition to t
    entry-by-entry (`mlx_io_gguf_set_array`/`set_metadata_*`), then frees it in a `finally` regardless of
    whether `mlx_save_gguf` itself succeeds** (D1's asymmetric-write-path note).
 9. **Every struct-shaped out-param (`mlx_map_string_to_array*`, `mlx_map_string_to_string*`,
-   `mlx_io_gguf*`, `mlx_string*`, `mlx_vector_string*`, and the per-entry `mlx_array*` an iterator
-   writes into) is built via that type's own `mlx_h.*_new(allocator)` constructor, never a raw
-   `tmp.allocate(ValueLayout.ADDRESS)` slot** (Findings above) -- the native call on the other end
-   branches on whether the destination's `ctx` is already non-null, and uninitialized memory there is
-   read as a live pointer, not merely a wrong value. Plain `const char**`/`bool*` out-params
-   (`keySlot`, `flagSlot`, `itemSlot`) have no such hazard and stay a raw allocated slot.
+   `mlx_io_gguf*`, `mlx_string*`, `mlx_vector_string*`, and `readArrayMap`'s single reusable scratch
+   `mlx_array*`, built once before its loop rather than per entry -- Global Constraint 4) is built via
+   that type's own `mlx_h.*_new(allocator)` constructor, never a raw `tmp.allocate(ValueLayout.ADDRESS)`
+   slot** (Findings above) -- not because the raw slot is unsafe against the pinned commit (a confined
+   `Arena` zero-fills, so its `ctx` is genuinely null either way), but because relying on that combined
+   with the private `_set_` helpers' own null-`ctx` handling couples this plan to an implementation
+   detail of those bodies rather than mlx-c's public, documented constructors. Plain `const char**`/
+   `bool*` out-params (`keySlot`, `flagSlot`, `itemSlot`) have no such coupling either way and stay a
+   raw allocated slot.
 10. **Every loop index used inside a per-iteration native-call lambda is copied to a fresh `long`
     local first** (`long idx = i;`) -- the loop variable itself is mutated by the `for` loop and is not
     effectively final, so capturing it directly in the lambda is a compile error. Applies to both of
@@ -627,17 +646,28 @@ nothing is allocated until the status confirms there is something to allocate fo
               () -> mlx_h.mlx_io_gguf_set_metadata_string(io, key, value));
         }
         for (Map.Entry<String, java.util.List<String>> e : metadataVectorStrings.entrySet()) {
+          // mlx_io_gguf_set_metadata_vector_string(mlx_io_gguf, const char*, const mlx_vector_string
+          // mvstr) copies mvstr's contents into the map (io_types.cpp:240:
+          // cpp_map.insert(std::make_pair(key, mlx_vector_string_get_(mvstr)))) rather than adopting
+          // it -- unlike set_array/set_metadata_array's MLXArray.handle() inputs, which the caller's
+          // own MLXScope already owns, mvstr is allocated fresh right here and nothing else will ever
+          // free it; the try/finally is load-bearing, not just Global Constraint 6 hygiene, since
+          // both checked calls below can throw before setMetadataVectorString's own call runs.
           MemorySegment key = tmp.allocateFrom(e.getKey());
           MemorySegment mvstr = mlx_h.mlx_vector_string_new(tmp);
-          for (String value : e.getValue()) {
-            MemorySegment v = tmp.allocateFrom(value);
+          try {
+            for (String value : e.getValue()) {
+              MemorySegment v = tmp.allocateFrom(value);
+              NativeOps.checked(
+                  "saveGguf.appendVectorStringValue",
+                  () -> mlx_h.mlx_vector_string_append_value(mvstr, v));
+            }
             NativeOps.checked(
-                "saveGguf.appendVectorStringValue",
-                () -> mlx_h.mlx_vector_string_append_value(mvstr, v));
+                "saveGguf.setMetadataVectorString",
+                () -> mlx_h.mlx_io_gguf_set_metadata_vector_string(io, key, mvstr));
+          } finally {
+            mlx_h.mlx_vector_string_free(mvstr);
           }
-          NativeOps.checked(
-              "saveGguf.setMetadataVectorString",
-              () -> mlx_h.mlx_io_gguf_set_metadata_vector_string(io, key, mvstr));
         }
         MemorySegment filePath = tmp.allocateFrom(file);
         NativeOps.checked("saveGguf", () -> mlx_h.mlx_save_gguf(filePath, io));

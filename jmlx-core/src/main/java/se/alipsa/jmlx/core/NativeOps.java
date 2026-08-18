@@ -13,6 +13,7 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.ffi.mlx_optional_dtype_;
 import se.alipsa.jmlx.ffi.mlx_optional_float_;
 import se.alipsa.jmlx.ffi.mlx_optional_int_;
+import se.alipsa.jmlx.ffi.mlx_stream_;
 import se.alipsa.jmlx.ffi.mlx_vector_array_;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -54,7 +55,7 @@ final class NativeOps {
    * arrays are backed by a lazy {@code Load} primitive whose {@code eval_gpu} is unimplemented in
    * the pinned {@code mlx-metal==0.31.2} wheel (req/plans/phase5-m1-plan.md's amendment).
    */
-  static final MemorySegment DEFAULT_CPU_STREAM = mlx_h.mlx_default_cpu_stream_new(FACADE_ARENA);
+  static final MemorySegment DEFAULT_CPU_STREAM = resolveDefaultCpuStream();
 
   private static MemorySegment resolveDefaultDevice() {
     MemorySegment dev = mlx_h.mlx_device_new(FACADE_ARENA);
@@ -65,6 +66,22 @@ final class NativeOps {
   private static MemorySegment resolveDefaultStream() {
     MemorySegment stream = mlx_h.mlx_stream_new(FACADE_ARENA);
     checked(() -> mlx_h.mlx_get_default_stream(stream, DEFAULT_DEVICE));
+    return stream;
+  }
+
+  /**
+   * {@code mlx_default_cpu_stream_new} has no status return: on failure it fires the error handler
+   * and hands back {@code mlx_stream_new_()} (a null-{@code ctx} struct), the same statusless shape
+   * {@link MLX#array(MLXScope, float[], int[])} already guards for {@code mlx_array_new_data}
+   * (confirmed against {@code stream.cpp}'s {@code catch} branch) -- {@code checked()} would never
+   * see the failure, so it is detected explicitly instead, exactly like that site.
+   */
+  private static MemorySegment resolveDefaultCpuStream() {
+    NativeLoader.clearLastNativeError();
+    MemorySegment stream = mlx_h.mlx_default_cpu_stream_new(FACADE_ARENA);
+    if (mlx_stream_.ctx(stream).address() == 0) {
+      throw nativeFailure("mlx_default_cpu_stream_new");
+    }
     return stream;
   }
 

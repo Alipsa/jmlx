@@ -10,10 +10,10 @@ in `req/initial-plan.md` (native bootstrap, generated bindings, memory managemen
 ops) is done, and two further phases are built on top of it: `req/phase3-plan.md` (broadcast-compatible
 ops, relaxed matmul, `slice`, a batched `eval`) and `req/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`,
 `Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
-cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/project-outline.md`
-describes the full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model
-loading); Phase 5 (safetensors/GGUF checkpoint loading, tokenizers, model implementations) is not yet
-implemented.
+cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/plans/phase5-m1-plan.md`
+(`MLXIO` -- safetensors/GGUF checkpoint I/O) is also delivered. `req/project-outline.md` describes the
+full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); the rest
+of Phase 5 (tokenizers, model implementations) is not yet implemented.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -91,7 +91,7 @@ jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLine
                                                     RMSNorm/LayerNorm/SiLU/GELU/Embedding,
                                                     MultiHeadAttention, KVCache, ModuleGrad
                  se.alipsa.jmlx.core                MLX, MLXOps, MLXShape, MLXFast, MLXQuant,
-                                                    MLXRandom, MLXGrad, MLXArray, DType,
+                                                    MLXRandom, MLXGrad, MLXIO, MLXArray, DType,
                                                     MLXException
                  se.alipsa.jmlx.memory              MLXScope
        |
@@ -111,15 +111,17 @@ plain Java types and never expose `jmlx-ffi` on their own public surface.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless
-the dylib is already loaded by then. `MLX`, `MLXScope`, `NativeOps`, and `MLXGrad` each have a static
-initializer that calls `NativeLoader.ensureLoaded()` for exactly this reason; any of the four can be
-the first one touched, so each guards independently rather than relying on load order. `NativeOps`'s
+the dylib is already loaded by then. `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO` each have a
+static initializer that calls `NativeLoader.ensureLoaded()` for exactly this reason; any of the five can
+be the first one touched, so each guards independently rather than relying on load order. `NativeOps`'s
 guard covers `MLXOps`/`MLXShape`/`MLXFast`/`MLXQuant`/`MLXRandom` transitively, since every op in those
 classes reaches native only through `NativeOps`'s own `checked`/`binaryOp`/`unaryOp`/`shapeOp`-family
-helpers — none of those classes needs (or has) its own guard. `MLXGrad` needs its own regardless: it
-calls `mlx_h.*` directly at 17 call sites (`mlx_closure_*`/`mlx_value_and_grad` and their frees),
-bypassing `NativeOps`'s helpers entirely, so it cannot rely on `NativeOps`'s guard the way the op
-facades do.
+helpers — none of those classes needs (or has) its own guard. `MLXGrad` and `MLXIO` both need their own
+regardless: `MLXGrad` calls `mlx_h.*` directly at 17 call sites (`mlx_closure_*`/`mlx_value_and_grad` and
+their frees), and `MLXIO` calls `mlx_h.*` directly for safetensors/GGUF I/O and their five
+non-`mlx_array` struct types (`mlx_string`, `mlx_vector_string`, `mlx_map_string_to_array`,
+`mlx_map_string_to_string`, `mlx_io_gguf`) — both bypass `NativeOps`'s helpers entirely, so neither can
+rely on `NativeOps`'s guard the way the op facades do.
 
 **`NativeLoader`** loads `libmlxc.dylib` via `System.load(absolutePath)`, not
 `SymbolLookup.libraryLookup`: the bindings are generated *without* a `-l` flag, so their internal
@@ -199,9 +201,10 @@ whole-umbrella run silently drops `mlx_array_new`/`mlx_array_free`/`mlx_array_ne
 just history — they record the *why* behind non-obvious decisions (native library loading strategy,
 jextract's two-pass generation, memory confinement rules, the `se.alipsa.jmlx.nn` module framework and
 autograd design) that the code comments themselves point back to. `req/plans/phase4-m4-plan.md` is
-`QuantizedLinear`'s own implementation plan, amended in place (not rewritten) as post-merge review
-found and fixed real gaps in it. When touching `NativeLoader`, `MLXScope`, `MLX`, `NativeOps`, anything
-under `se.alipsa.jmlx.nn`, or the bootstrap/regen scripts, check whether the relevant decision is
-already recorded in one of these before re-deriving it. `req/project-outline.md` is the original,
+`QuantizedLinear`'s own implementation plan, and `req/plans/phase5-m1-plan.md` is `MLXIO`'s, each
+amended in place (not rewritten) as post-merge/post-implementation review found and fixed real gaps in
+it. When touching `NativeLoader`, `MLXScope`, `MLX`, `NativeOps`, `MLXIO`, anything under
+`se.alipsa.jmlx.nn`, or the bootstrap/regen scripts, check whether the relevant decision is already
+recorded in one of these before re-deriving it. `req/project-outline.md` is the original,
 broader multi-phase vision; where it conflicts with `req/initial-plan.md` on scope or naming, the
 latter is authoritative for what's actually being built now.

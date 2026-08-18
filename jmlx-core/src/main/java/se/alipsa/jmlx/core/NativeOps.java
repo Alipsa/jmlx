@@ -441,4 +441,56 @@ final class NativeOps {
     NativeLoader.clearLastNativeError();
     return new MLXException(message + (nativeMessage != null ? ": " + nativeMessage : ""));
   }
+
+  /**
+   * Reads a borrowed, NUL-terminated {@code const char*}/{@code char*} into a Java {@code String}.
+   * {@code ptr} must outlive this call but is never freed by it -- every accessor {@link MLXIO}
+   * uses this for ({@code mlx_string_data}, {@code mlx_vector_string_get}, the two map iterator/get
+   * families) returns a pointer into storage some other handle already owns (req/phase5-plan.md's
+   * Research findings). {@code reinterpret} is required before {@code getString}: a raw pointer
+   * value read out of a struct field or written into an out-param slot comes back as a zero-length
+   * segment with no declared bounds, and {@code getString} on one throws {@code
+   * IndexOutOfBoundsException} rather than reading anything.
+   */
+  static String readNativeString(MemorySegment ptr) {
+    return ptr.reinterpret(Long.MAX_VALUE).getString(0);
+  }
+
+  /**
+   * Classifies one of the two {@code mlx_map_string_to_*_iterator_next} calls' three-way status
+   * (confirmed against {@code map.cpp} directly, req/plans/phase5-m1-plan.md's Findings): {@code 0}
+   * means the out-params were written and there is a current entry, {@code 2} means the iterator
+   * had already reached the map's end (ordinary loop termination, not failure), and anything else
+   * is a genuine error routed through the same {@link MLXException} path {@link #checked} uses.
+   */
+  static boolean mapIteratorNext(String opName, IntSupplier nativeCall) {
+    NativeLoader.clearLastNativeError();
+    int status = nativeCall.getAsInt();
+    if (status == 0) {
+      return true;
+    }
+    if (status == 2) {
+      return false;
+    }
+    throw nativeFailure(opName + ": mlx-c call failed with status " + status);
+  }
+
+  /**
+   * Runs one of GGUF's {@code mlx_io_gguf_has_metadata_*} predicates, which return {@code 2} not
+   * only when the key is present under a different bucket but also whenever the key is absent from
+   * the metadata map entirely (confirmed against {@code io_types.cpp}'s {@code
+   * IMPLEMENT_GGUF_HAS_METADATA} macro) -- routine for a tensor-only key, which by definition never
+   * appears in the metadata map and so fails every one of the three probes before {@link
+   * MLXIO#readGgufEntry} falls through to {@code get_array}. Unlike {@link #mapIteratorNext},
+   * status {@code 2} here still leaves the caller's {@code flag} out-param correctly set (to {@code
+   * false}); {@link #checked} would misreport this ordinary case as a bare failure instead.
+   */
+  static void hasMetadataProbe(String opName, IntSupplier nativeCall) {
+    NativeLoader.clearLastNativeError();
+    int status = nativeCall.getAsInt();
+    if (status == 0 || status == 2) {
+      return;
+    }
+    throw nativeFailure(opName + ": mlx-c call failed with status " + status);
+  }
 }

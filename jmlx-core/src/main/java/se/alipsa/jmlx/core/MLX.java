@@ -23,9 +23,10 @@ import se.alipsa.jmlx.memory.MLXScope;
  * broadcastTo}/{@code squeeze}/{@code transpose}/{@code slice}), {@link MLXFast} (the {@code
  * fast.h} family: {@code rmsNorm}/{@code layerNorm}/{@code rope}/SDPA), {@link MLXQuant} ({@code
  * quantize}/{@code dequantize}/{@code quantizedMatmul}), {@link MLXRandom} ({@code seed}/{@code
- * normal}/{@code uniform}) and {@link MLXGrad} (primitive-only autograd, {@code
- * mlx_value_and_grad}). This class does not delegate to them -- duplicating their javadoc here
- * would double the evidence base and let one copy go stale.
+ * normal}/{@code uniform}), {@link MLXGrad} (primitive-only autograd, {@code mlx_value_and_grad})
+ * and {@link MLXIO} (req/plans/phase5-m1-plan.md: safetensors/GGUF checkpoint {@code load}/{@code
+ * save}). This class does not delegate to them -- duplicating their javadoc here would double the
+ * evidence base and let one copy go stale.
  *
  * <p>Every op's result is allocated in the innermost scope among every non-null {@code MLXArray}
  * operand it's given, not just its first ({@link NativeOps#scopeOf}, req/phase4-plan.md §2) --
@@ -37,9 +38,10 @@ import se.alipsa.jmlx.memory.MLXScope;
  * <ul>
  *   <li>Ops with no {@code MLXArray} operand to infer a scope from at all: the creation ops ({@link
  *       #array}, {@link #zeros}, {@link #ones}, {@link #full}, {@link #arange}), {@link
- *       MLXRandom#normal} and {@link MLXRandom#uniform}, and {@link MLXGrad.Fn#apply}, whose {@code
- *       target} is where the traced primals/grads themselves land, not a result derived from an
- *       existing operand.
+ *       MLXRandom#normal} and {@link MLXRandom#uniform}, {@link MLXGrad.Fn#apply}, and {@link
+ *       MLXIO#loadSafetensors}/{@link MLXIO#loadGguf}, whose {@code target} is where the traced
+ *       primals/grads (or loaded tensors) themselves land, not a result derived from an existing
+ *       operand.
  *   <li>Explicit-target overloads that override {@code scopeOf}'s own answer for an operand that
  *       DOES exist: {@link #hoist}, {@link MLXShape#transpose(MLXArray, MLXScope)}, and {@link
  *       MLXQuant#quantizedMatmul(MLXArray, MLXArray, MLXArray, MLXArray, boolean, Integer, Integer,

@@ -683,6 +683,59 @@ and suggested `mlx_string_new_data` as a likely simplification. Neither was nece
 `mstr` parameter is a plain `const char*`, not an `mlx_string` at all -- no string object needs
 building for this call in the first place, and the code above reflects that.
 
+**Amendment (post-implementation, empirical): the `loadGguf`/`readGgufEntry` code above never ran
+against real hardware during planning or its three review rounds, and running it surfaced two defects
+neither static review caught.**
+
+1. **`readGgufEntry`'s whole per-key dispatch is built on a false premise.** `mlx_io_gguf_get_keys`
+   does not enumerate "every key in the file" -- it enumerates only the tensor map (confirmed against
+   its own body in `io_types.cpp`, which iterates `mlx_io_gguf_get_(io).first` specifically). The
+   metadata map (`.second`) has no enumerator at all. This means a standalone metadata key with no
+   same-named tensor (e.g. `general.name`, `tokenizer.vocab` in this plan's own Task 4 test fixtures)
+   never appears in `keys` and so is architecturally unreachable by the loop above -- every
+   `has_metadata_*` probe in `readGgufEntry` sees only tensor keys, for which all three predicates
+   correctly return false every time, so `metaArrays`/`metaStrings`/`metaVectorStrings` come back empty
+   regardless of what was saved. `mlx_c/examples/example-gguf.c` (not read closely enough during this
+   plan's own pre-work) confirms the intended usage: it only ever calls `has_metadata_string` against a
+   key it already has in hand from its own tensor loop, using the *same* key name for both a tensor and
+   its metadata annotation -- there is no example anywhere of discovering a metadata-only key. GGUF's
+   real on-disk metadata keys (`general.architecture`, `tokenizer.ggml.tokens`, etc.) are a fixed,
+   well-known vocabulary a real loader is expected to look up by name, not enumerate.
+
+   **Fix:** `loadGguf` now takes three additional `Set<String>` parameters (`metadataArrayKeys`,
+   `metadataStringKeys`, `metadataVectorStringKeys`) naming exactly the metadata keys the caller wants
+   read; an empty set is the normal case for a kind the caller doesn't need, not a workaround. The tensor
+   loop (`get_keys` + `get_array`) is now unconditional, with no `has_metadata_*` probing in front of it
+   at all -- `readGgufEntry`'s single per-key dispatch method is gone, replaced by four independent
+   methods (`readGgufTensors`, `readGgufMetadataArrays`, `readGgufMetadataStrings`,
+   `readGgufMetadataVectorStrings`) in the shipped `MLXIO.java`. `saveGguf`'s shape is unaffected --
+   saving already took each metadata map explicitly, so only the *load* side had a discoverability
+   assumption to fix. `MLXIOTest`'s two GGUF round-trip tests were updated to pass the metadata key names
+   they themselves saved, and a new `loadGgufRequestedMetadataKeyAbsentIsOmittedNotThrown` test exercises
+   the case `hasMetadataProbe`'s status-`2`-is-not-an-error tolerance actually exists for now that tensor
+   keys never reach it: a caller-requested metadata key genuinely absent from the file is silently
+   omitted from the result map, not thrown.
+
+2. **`mlx_load_safetensors`/`mlx_load_gguf` against `NativeOps.DEFAULT_STREAM` (GPU on Apple Silicon)
+   produce arrays that cannot be evaluated.** Both loaders hand back arrays backed by MLX's lazy `Load`
+   C++ primitive (`class Load : public UnaryPrimitive`, `mlx/primitives.h`); calling `toFloatArray()` on
+   one afterward throws `MLXException: [Load::eval_gpu] Not implemented.` (`array.cpp:352`) in the pinned
+   `mlx-metal==0.31.2` wheel. Confirmed empirically, not from source (the wheel ships no `.cpp` for
+   `Load::eval_gpu` to inspect directly): building an explicit CPU stream via `mlx_h.mlx_device_new_type`
+   + `mlx_h.mlx_stream_new_device` and passing that instead makes the identical round-trip evaluate
+   correctly.
+
+   **Fix:** both `loadSafetensors` and `loadGguf` now build a request-scoped CPU stream (a private
+   `MLXIO.cpuStream(Arena)` helper) and pass it to `mlx_load_safetensors`/`mlx_load_gguf` in place of
+   `NativeOps.DEFAULT_STREAM`. This only affects the load call itself -- every other op in this codebase
+   still runs on the process-wide GPU default, and a loaded array can be freely combined with GPU-stream
+   arrays afterward, since evaluation forces the whole graph regardless of which stream produced which
+   lazy node.
+
+Both fixes are reflected in the shipped `MLXIO.java`/`NativeOps.java`/`MLXIOTest.java`; the code listings
+above predate them and are left as originally written, per this repo's convention of amending rather
+than rewriting a merged plan.
+
 ## Task 4: `MLXIOTest.java` (new file, `jmlx-core/src/test/java/se/alipsa/jmlx/core/`)
 
 Per Global Constraint 7 (`req/plans/phase4-m1-plan.md`): `@EnabledIfNativeAvailable`,
@@ -695,6 +748,7 @@ Per Global Constraint 7 (`req/plans/phase4-m1-plan.md`): `@EnabledIfNativeAvaila
 | `loadSafetensorsEmptyMetadataMapIsEmptyNotNull` | A tensor-only save (no metadata) loads back an empty `Map`, not a `null` or a map containing a stray empty-string key (guards against the iterator loop mishandling zero entries). |
 | `saveThenLoadGgufRoundTripsTensorsAndAllThreeMetadataKinds` | One tensor, one numeric metadata array, one string metadata value, one string-list metadata value -- all four round-trip and land in the correct one of `GgufResult`'s four maps, not misclassified into a neighboring bucket. |
 | `loadGgufMetadataVectorStringPreservesOrder` | A metadata string-list with 3+ distinct values round-trips in the same order (guards against `mlx_vector_string_append_value`/read-back order not matching insertion order). |
+| `loadGgufRequestedMetadataKeyAbsentIsOmittedNotThrown` | (Added post-implementation, see the amendment above.) A caller-supplied metadata key name genuinely absent from the file is silently omitted from the result map, not thrown -- the actual case `hasMetadataProbe`'s status-`2` tolerance exists for once tensor keys no longer reach it at all. |
 | `loadSafetensorsUnknownFileThrowsMLXException` | A nonexistent path throws `MLXException`, not an unchecked native crash or a silent empty result. |
 | `loadSafetensorsAllocatesIntoTheGivenScope` | Tensors loaded into a child scope are unusable once only the child (not an ancestor) is closed -- confirms `target` is actually honored, not silently defaulted to some other scope. |
 | `saveSafetensorsUnwritablePathThrowsMLXException` | Save to a path in a nonexistent/unwritable directory throws `MLXException` rather than crashing or silently no-op'ing -- the one test in this table that actually exercises D2c's swallow-on-`finally` cleanup path under a real in-flight failure (every other test's `finally` blocks run on a clean success path), not just the load-side failure `loadSafetensorsUnknownFileThrowsMLXException` already covers. |

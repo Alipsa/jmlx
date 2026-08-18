@@ -180,15 +180,32 @@ helper:
   `mlx_io_gguf_get_metadata_string(mlx_string *str, mlx_io_gguf io, const char *key)`'s out-param
   fits this shape among the accessors M1 needs.
 
-**`mlx_vector_string_get(char **res, const mlx_vector_string vec, size_t idx)` is the one accessor
-whose lifetime is not yet determined, and it sits on `loadGguf`'s only path to enumerating keys at
-all.** `mlx_io_gguf_get_keys(mlx_vector_string *keys, mlx_io_gguf io)` is GGUF's sole key-enumeration
-entry point, and every key it returns must be read back out of that `mlx_vector_string` through
-`mlx_vector_string_get` -- there is no other route. Its header carries no ownership comment, and the
-non-`const` `char**` return hints at caller-owned, but whether that means a bare `free()`, a
-different mlx call, or no free at all is not established here. This blocks writing `loadGguf` at all,
-not just one row of a lifetime table -- resolving it by probe is a named M1 prerequisite (see Open
-questions below), not a detail to fold into the helper's implementation later.
+**`mlx_vector_string_get(char **res, const mlx_vector_string vec, size_t idx)` is resolved as
+borrowed, same bucket as the three accessors above -- confirmed from mlx-c's actual implementation,
+not just its header.** The header carries no ownership comment and the non-`const` `char **` return
+could plausibly have hinted at caller-owned, so this was flagged as a genuine blocker on `loadGguf`
+(GGUF's sole key-enumeration path: `mlx_io_gguf_get_keys` returns an `mlx_vector_string`, and every
+key must be read back out of it through this call -- there is no other route). Reading
+`native/scratch/mlx-c/mlx/c/vector.cpp` (the pinned checkout at `fba4470b89073180056c9ea46c443051375f7399`,
+matching `bootstrap-native.sh`'s own `MLX_C_COMMIT`) settles it directly: `*res =
+mlx_vector_string_get_(vec).at(index).data();` -- a pointer into the vector's own internal
+`std::string` storage, not a fresh allocation. No free call applies, and the same C-string-copy
+helper built for the other three borrowed accessors covers this one too. This was resolved by
+reading the real `.cpp` source rather than by writing a runtime probe -- stronger evidence than a
+probe result, since it is the actual logic that will run, not an inferred behavior from one sample
+call.
+
+**GGUF/safetensors map iteration has a three-way status convention, not the usual 0-or-throw
+`NativeOps.checked` shape.** `mlx_map_string_to_array_iterator_next`'s own implementation
+(`native/scratch/mlx-c/mlx/c/map.cpp`) returns `0` on a successful read, `1` on a genuine error (goes
+through `mlx_error`, same as everywhere else), and `2` when the iterator has already reached the
+map's `end()` -- a normal loop-termination signal, not a failure. Routing this call through
+`NativeOps.checked` unmodified would misread every ordinary end-of-map as an `MLXException`; the
+helper that drives `loadSafetensors`'s tensor/metadata read loop needs its own three-way switch
+instead of reusing `checked` as-is. Not yet confirmed whether `mlx_map_string_to_string_iterator_next`
+shares the identical `0`/`1`/`2` convention -- likely, given the parallel design, but `req/plans/phase5-m1-plan.md`
+should verify against its own `map.cpp` body before assuming it rather than citing this paragraph as
+proof for both map types.
 
 Per the M0d precedent in `req/phase4-plan.md` (add a generic helper only in the task that first needs
 it, wired to a real consumer, never speculatively), the resulting helper(s) are added to `NativeOps`
@@ -264,6 +281,6 @@ M1's round-trip tests prove only the facade layer, not interop.
 
 - M2's core question (FFM-bind HF `tokenizers`'s C API vs. a pure-Java implementation) is
   unresolved — see D3.
-- `mlx_vector_string_get`'s ownership is unresolved and blocks `loadGguf` outright, since it is the
-  only route to reading keys back out of `mlx_io_gguf_get_keys`'s result — see Research findings
-  above. Resolve by probe before M1's own first task, not during it.
+
+No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
+last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

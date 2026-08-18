@@ -13,7 +13,7 @@ Research findings section below leans on that same precedent for M1's own C-stri
 | Item | Status | Commit |
 |---|---|---|
 | M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
-| M2 — Tokenizer integration (§2) | Desk-research spike done (D3 below); build-and-measure prototyping still pending -- needs a decision on installing a Rust toolchain first | — |
+| M2 — Tokenizer integration (§2) | Desk-research spike done (D3 below): waiting for upstream `mlx-c` tokenizer support is ruled out, but the FFM-vs-pure-Java architecture choice itself is still open between two credible precedents -- neither prototyped yet | — |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | Not started | — |
 
 ## Context
@@ -146,6 +146,23 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
 - **No official C/C++ binding.** `huggingface/tokenizers` issue #185 (opened 2020, asking exactly
   this question) was closed as "not planned" via the stale-bot, with no maintainer commitment ever
   made. The crate remains Rust-native with official bindings only for Python (PyO3) and Node.js.
+- **`mlx`/`mlx-c` adding tokenizer support upstream is very unlikely, and waiting for it is not a
+  viable deferral -- confirmed against the project's own stated scope and its own precedent across
+  its other two official language bindings, not assumed.** `ml-explore/mlx-c`'s own README states its
+  scope directly: "a C API for MLX... expands MLX to the C language... can be used standalone or as
+  a bridge to bind other languages to MLX" -- a low-level array/tensor API mirroring MLX's own core
+  scope (an array framework, not a text-processing one), with no tokenizer functionality anywhere in
+  it. More telling: Apple's own two higher-level official bindings already faced this exact problem
+  and both solved it the same way jmlx is now considering, not by asking MLX/mlx-c for it --
+  `mlx-lm` (Python) depends directly on Hugging Face's own `transformers`/`tokenizers` packages, and
+  `mlx-swift-lm` (Swift) "integrates with a variety of tokenizer and downloader packages through
+  protocol conformance," naming `huggingface/swift-transformers`'s `Tokenizers` product specifically
+  (see below) as its default. All recent tokenizer-related engineering activity in the `ml-explore`
+  org (streaming-detokenizer fixes, chat-template handling, think-token NoneType fixes) is happening
+  in `mlx-lm` at the Python application layer, not in `mlx`/`mlx-c` core -- no roadmap item, issue, or
+  discussion found anywhere suggesting tokenizer support is planned for MLX's core C API. This is the
+  same architectural choice jmlx now faces (FFM-bind an external tokenizer implementation vs. write
+  one), not a problem MLX itself is going to solve on jmlx's behalf.
 - **A maintained, permissively-licensed, genuinely plain-C shim exists: `mlc-ai/tokenizers-cpp`.**
   Apache-2.0 (compatible with this repo's MIT `LICENSE` -- permissive, no copyleft obligation
   conflict), 503 stars, actively maintained (pushed 2026-05-20, per `gh api
@@ -171,15 +188,30 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   layer above it (`include/tokenizers_cpp.h`'s `Tokenizer::FromBlobSentencePiece`/
   `FromBlobRWKVWorld`), which this project would not need to bind at all if only HF-JSON-format
   tokenizers are in scope for M3's reference models (Llama/Qwen both ship `tokenizer.json`).
-- **Prior art already chose this exact path, independently.** DJL (Deep Java Library, the most
-  prominent Java ML library with an equivalent problem) does not reimplement HF tokenizers in pure
-  Java -- `extensions/tokenizers` wraps the same upstream `tokenizers` Rust crate via its own
-  hand-written native bridge (JNI in DJL's case, since that predates or simply didn't adopt FFM;
-  jmlx would use FFM instead, which needs no JNI ceremony at all -- one more reason to prefer
-  `tokenizers-cpp`'s plain-`extern "C"` shape over reusing DJL's crate directly, whose native
-  functions are JNI-shaped `Java_...` symbols, not callable via FFM). This is independent
-  confirmation that "FFM/JNI-bind the Rust crate" beats "reimplement in pure Java" for this exact
-  problem, from a team solving it for a different host language.
+- **Prior art exists on both sides of this choice, from credible sources -- not a settled question.**
+  DJL (Deep Java Library, the most prominent Java ML library with an equivalent problem) does not
+  reimplement HF tokenizers in pure Java -- `extensions/tokenizers` wraps the same upstream
+  `tokenizers` Rust crate via its own hand-written native bridge (JNI in DJL's case, since that
+  predates or simply didn't adopt FFM; jmlx would use FFM instead, which needs no JNI ceremony at
+  all -- one more reason to prefer `tokenizers-cpp`'s plain-`extern "C"` shape over reusing DJL's
+  crate directly, whose native functions are JNI-shaped `Java_...` symbols, not callable via FFM).
+
+  **Amendment: this bullet originally concluded DJL's choice was "independent confirmation that
+  FFM/JNI-bind beats reimplement" -- that overstated it.** Hugging Face itself did the opposite for
+  Swift: `huggingface/swift-transformers` (Apache-2.0, actively maintained -- pushed 2026-07-28,
+  confirmed via `gh api repos/huggingface/swift-transformers`) is a **from-scratch, pure-Swift**
+  reimplementation of the tokenizer pipeline, not a Rust FFI wrapper -- confirmed directly from its
+  `Sources/Tokenizers/` file list: `BPETokenizer.swift`, `UnigramTokenizer.swift`,
+  `BertTokenizer.swift`, `Normalizer.swift`, `PreTokenizer.swift`, `PostProcessor.swift`,
+  `TokenLattice.swift`, `Trie.swift`, with its own `TokenizersTests` suite. `mlx-swift-lm` (see the
+  bullet above) depends on exactly this package for its own tokenizer support. So the two most
+  directly comparable precedents split: DJL (Java, wraps Rust via JNI) vs. Hugging Face itself
+  (Swift, pure reimplementation, no Rust at all) -- both maintained, both production-used, for the
+  identical problem. What this actually changes for M2: "pure Java" is no longer the vaguely-scoped
+  fallback D3 originally framed it as -- there is now a concrete, battle-tested reference
+  implementation, maintained by the same organization that owns the `tokenizer.json` format, to port
+  from rather than reverse-engineer from spec documents alone. This does not resolve the choice; it
+  makes both sides of it equally concrete.
 - **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
   the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
   = ["staticlib"]`; producing something `System.load()`-able would need either (a) a small additional
@@ -351,11 +383,12 @@ parameter (D2a above); `saveGguf` additionally builds and frees its own `mlx_io_
 paragraph and architecture-diagram class list to name `MLXIO` as the fifth native-loading-guard
 class alongside `MLX`/`MLXScope`/`NativeOps`/`MLXGrad`.
 
-### 2. Tokenizer integration (M2) — **DESK RESEARCH DONE, PROTOTYPE PENDING — see D3's amendment**
+### 2. Tokenizer integration (M2) — **DESK RESEARCH DONE, ARCHITECTURE CHOICE STILL OPEN — see D3's amendment**
 
-Not planned in detail here. Desk research (license, C-API existence, build shape, prior art, risks)
-is written up as D3's amendment above; `req/plans/phase5-m2-plan.md` still should not be written
-until the load-time-cost prototype D3 also asked for actually lands.
+Not planned in detail here. Desk research (license, C-API existence, build shape, prior art on both
+sides, risks) is written up as D3's amendment above; `req/plans/phase5-m2-plan.md` still should not
+be written until both the FFM-vs-pure-Java choice is made and, if FFM is chosen, the load-time-cost
+prototype D3 also asked for actually lands.
 
 ### 3. Reference models — `LlamaModel`, `QwenModel` (M3) — **NOT STARTED — blocked on M1 and M2**
 
@@ -383,12 +416,20 @@ named scope boundary rather than left implicit.
 
 ## Open questions
 
-- M2's architecture question (FFM-bind a plain-C shim over HF `tokenizers` vs. a pure-Java
-  implementation) is resolved in favor of the former — see D3's amendment. What remains open:
-  real load-time cost (needs an actual build-and-measure prototype, blocked on a Rust toolchain
-  decision), whether `onig` is actually needed for M3's target models, and whether to fork
-  `tokenizers-cpp/rust` or write a from-scratch minimal `cdylib` crate against the plain
-  `tokenizers` crate directly.
+- **Resolved: waiting for `mlx`/`mlx-c` to add tokenizer support upstream is not a viable deferral
+  for M2.** See D3's amendment — MLX's own two other official language bindings (`mlx-lm`,
+  `mlx-swift-lm`) both already solved this by depending on an external tokenizer package rather than
+  MLX/mlx-c itself, and there is no roadmap signal anywhere suggesting that will change.
+- **Still open: M2's architecture question itself (FFM-bind a plain-C shim over HF `tokenizers` vs.
+  a pure-Java reimplementation) is genuinely two-sided, not resolved.** An earlier pass through this
+  document concluded DJL's Rust/JNI choice settled it — that overstated things: Hugging Face's own
+  `swift-transformers` independently chose a from-scratch pure-Swift reimplementation for the
+  identical problem, so both directions now have a maintained, production-used precedent from a
+  credible source. What remains open regardless of which direction is chosen: real load-time cost for
+  the FFM path (needs an actual build-and-measure prototype, blocked on a Rust toolchain decision),
+  whether `onig` is actually needed for M3's target models if the FFM path is chosen, and how large a
+  port from `swift-transformers` would actually be if the pure-Java path is chosen instead (not yet
+  estimated — its `Sources/Tokenizers/` file list is known, its total size/complexity is not).
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

@@ -212,6 +212,39 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   implementation, maintained by the same organization that owns the `tokenizer.json` format, to port
   from rather than reverse-engineer from spec documents alone. This does not resolve the choice; it
   makes both sides of it equally concrete.
+- **Port-size estimate for the pure-Java path, measured directly rather than guessed.**
+  `swift-transformers/Sources/Tokenizers/` totals **~3,850 lines** across 12 files
+  (`Tokenizer.swift` 1041, `Normalizer.swift` 376, `BertTokenizer.swift` 358, `PreTokenizer.swift`
+  366, `BPETokenizer.swift` 339, `ByteEncoder.swift` 286, `Decoder.swift` 283,
+  `UnigramTokenizer.swift` 167, `TokenLattice.swift`/`String+PreTokenization.swift` 158 each,
+  `PostProcessor.swift` 214, `Trie.swift` 101); its own `TokenizersTests` totals **~2,290 lines**
+  (excluding `ChatTemplateTests.swift` and `YYJSONParserTests.swift`, neither of which tests the
+  tokenizer pipeline itself), reusable as a porting/validation reference even though XCTest
+  assertions don't translate mechanically to JUnit. Of `Tokenizer.swift`'s 1041 lines, only
+  `AutoTokenizer` (lines 846-948, ~100 lines, 11 of the file's `Hub.`-prefixed references) is
+  Hub-download convenience code a Java port would drop entirely -- `MLXIO`'s own file-loading
+  precedent already covers "load from a local string/path," so this isn't lost functionality, just
+  code that would never get ported. **The real complication: `applyChatTemplate` (part of the core
+  `Tokenizer` protocol, not an add-on) depends on `import Jinja` -- `huggingface/swift-jinja`, a full
+  Jinja2-template-engine port, confirmed via `Package.swift`'s `Tokenizers` target listing it as a
+  direct dependency, not merely a test dependency.** `swift-jinja/Sources/Jinja/` totals **~6,660
+  lines** across 13 files (`Filters.swift` 2178, `Interpreter.swift` 903, `Value.swift` 891,
+  `Parser.swift` 777, `Lexer.swift` 484, plus 8 smaller files) -- larger than the tokenizer pipeline
+  itself. So the honest total for a pure-Java port with full chat-template fidelity is **~10,500
+  lines** (~3,850 tokenizer + ~6,660 Jinja), not ~3,850 -- a materially different scoping question
+  than "port the tokenizer." Llama/Qwen instruct variants (M3's actual targets) need *some* chat
+  formatting to be usable at all, but not necessarily *general* Jinja2 evaluation: since M3 targets
+  a small, known set of model families rather than arbitrary Hub models, hand-formatting each
+  target model's own specific chat template as a small dedicated Java method (reading the same
+  `tokenizer_config.json`'s `chat_template` field just enough to detect which known template it is,
+  or simply hardcoding the known Llama-3/Qwen2 chat-format strings) would sidestep the ~6,660-line
+  Jinja port entirely -- at the cost of not generalizing to arbitrary future Hub models the way a
+  real Jinja engine would, mirroring this codebase's own established "ship exactly what's needed,
+  not the general case" convention (e.g. `req/plans/phase4-m4-plan.md`'s own deferrals). This
+  scoping choice is not made here -- it depends on M3's own requirements, which this document
+  explicitly declines to plan (D4) -- but it changes the comparison materially: ~3,850 lines (no
+  chat templates) or ~10,500 lines (full Jinja) against the FFM path's toolchain cost, not a single
+  fixed number either way.
 - **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
   the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
   = ["staticlib"]`; producing something `System.load()`-able would need either (a) a small additional
@@ -425,11 +458,15 @@ named scope boundary rather than left implicit.
   document concluded DJL's Rust/JNI choice settled it — that overstated things: Hugging Face's own
   `swift-transformers` independently chose a from-scratch pure-Swift reimplementation for the
   identical problem, so both directions now have a maintained, production-used precedent from a
-  credible source. What remains open regardless of which direction is chosen: real load-time cost for
-  the FFM path (needs an actual build-and-measure prototype, blocked on a Rust toolchain decision),
-  whether `onig` is actually needed for M3's target models if the FFM path is chosen, and how large a
-  port from `swift-transformers` would actually be if the pure-Java path is chosen instead (not yet
-  estimated — its `Sources/Tokenizers/` file list is known, its total size/complexity is not).
+  credible source. The pure-Java port size is now measured, not guessed (see D3's amendment): ~3,850
+  lines for tokenization alone, or ~10,500 lines if full Jinja2 chat-template fidelity is also
+  wanted — a real, quantified number to weigh against the FFM path's toolchain cost, not an open
+  unknown anymore. What remains genuinely open regardless of which direction is chosen: real
+  load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a Rust
+  toolchain decision), whether `onig` is actually needed for M3's target models if the FFM path is
+  chosen, and whether M3's reference models need general Jinja2 chat-template evaluation at all or
+  can get away with hand-formatting a small, known set of chat templates instead (D4 explicitly
+  defers M3's own requirements, so this isn't decidable from this document alone).
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

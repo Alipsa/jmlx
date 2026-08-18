@@ -189,6 +189,23 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   the latter is simpler since it also sidesteps needing the C++/CMake/submodule machinery
   (`sentencepiece`, `msgpack`) that only the C++ layer requires, if HF-JSON-only scope (see above)
   is accepted for M2.
+- **A Rust toolchain is unavoidable for this whole path -- there is no way to use `tokenizers-cpp`
+  (or any fork of it) without one.** The actual tokenizer logic is the upstream `tokenizers` Rust
+  crate itself; `tokenizers-cpp`'s C and C++ layers are thin wrapper headers that call into a Rust
+  `staticlib` compiled by `cargo`/`rustc` -- they do not replace or reimplement it. Confirmed two
+  ways: `tokenizers-cpp/CMakeLists.txt` explicitly branches on `CMAKE_SYSTEM_NAME STREQUAL "Darwin"`
+  + `CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64"` to set `TOKENIZERS_CPP_CARGO_TARGET
+  aarch64-apple-darwin` (this repo's own target triple) and shells out to `cargo build` via
+  `CARGO_EXTRA_ENVS`; and neither of its two GitHub releases (`v0.1.0`, `v0.1.1`) publishes any
+  binary assets at all (source tags only), so there is no prebuilt `.a`/`.dylib` to download the way
+  `bootstrap-native.sh` already downloads a prebuilt `mlx-metal` wheel for MLX itself. Practically:
+  `aarch64-apple-darwin` being an explicit, named target is a genuinely good sign for this repo's
+  specific platform (unlike the ambiguity noted below about `onig`'s clang compatibility), but Rust
+  becomes a wherever-this-builds toolchain dependency (dev machines and CI both) that this project
+  does not otherwise have, unlike mlx-c's C/C++ toolchain requirement, which Xcode Command Line
+  Tools already satisfies on any macOS machine capable of running this project at all. The only way
+  to avoid a Rust toolchain entirely is the pure-Java alternative D3 already named -- not something
+  this bullet resolves, only sharpens the actual trade-off being decided.
 - **One real risk, not previously visible from the plan text alone: Rust-side panics cross the FFI
   boundary as failures with no recoverable status.** `rust/src/lib.rs`'s wrapper calls `.unwrap()`
   on `Tokenizer::from_str`/`encode`/`decode` -- a malformed `tokenizer.json` or a decode error panics

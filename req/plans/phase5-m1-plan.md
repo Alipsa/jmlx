@@ -78,10 +78,7 @@ supersedes an earlier draft of this plan that used `tmp.allocate(ValueLayout.ADD
 memory-safe against the pinned commit but coupled this plan to more than it needed to. Plain
 pointer-to-pointer out-params (`const char** key`, `char** res`) have no such coupling either way -- a
 native call only ever writes a fresh pointer value into those, never reads what was there first -- so
-`keySlot`/`itemSlot`-style slots stay a raw `tmp.allocate(ValueLayout.ADDRESS)`
-(suggestion 5's generated-layout point still applies to `mlx_array`'s own slots specifically, via
-`mlx_array_.layout()`, since that one is already an established idiom elsewhere in this codebase --
-`NativeOps.nullableHandle`/`NativeOps.vectorOutOp`).
+`keySlot`/`itemSlot`-style slots stay a raw `tmp.allocate(ValueLayout.ADDRESS)`.
 
 **`mlx_map_string_to_array_iterator_next`'s per-entry `value` out-param cannot be allocated via
 `target` up front without wasting one array on the loop's terminating call** -- confirmed from

@@ -2,18 +2,18 @@
 
 ## Status — update this section as work lands
 
-**Branch:** `phase5-plan`, off `main` at `f28a327` (PR #11, Phase 4 M4 `QuantizedLinear`, merged).
-Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4 plus §9 documentation **Done** — but not
-"fully Done": §10 (CI, self-hosted runner) is still **Not started**, per that
-document's own Status table. (M0d is also `Done` only in a scoped-down sense — six generic op-body
-helpers deliberately deferred past their original merge point, per that table's own M0d note; this
-document's Research findings section below leans on that same precedent for M1's own C-string
-helper.)
+**Branch:** this phase started on `phase5-plan`, off `main` at `f28a327` (PR #11, Phase 4 M4
+`QuantizedLinear`, merged); M1 has since merged to `main` via PR #12 (`5c85f8c`) and that branch is
+deleted. Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4 plus §9 documentation **Done** —
+but not "fully Done": §10 (CI, self-hosted runner) is still **Not started**, per that document's own
+Status table. (M0d is also `Done` only in a scoped-down sense — six generic op-body helpers
+deliberately deferred past their original merge point, per that table's own M0d note; this document's
+Research findings section below leans on that same precedent for M1's own C-string helper.)
 
 | Item | Status | Commit |
 |---|---|---|
-| M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | Plan written, implementation not started — see `req/plans/phase5-m1-plan.md` | — |
-| M2 — Tokenizer integration (§2) | Not started — needs its own research spike first | — |
+| M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
+| M2 — Tokenizer integration (§2) | Desk-research spike done (D3 below); build-and-measure prototyping still pending -- needs a decision on installing a Rust toolchain first | — |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | Not started | — |
 
 ## Context
@@ -139,6 +139,89 @@ compatibility, and prototyping load-time cost) before a plan for it can be writt
 already can be. Do not start M2 implementation from this document — write `req/plans/phase5-m2-plan.md`
 only after that spike.
 
+**D3 amendment (M2 desk-research spike, first half): there is no official C API, but a viable
+third-party one exists, and prior art independently converged on the same architecture jmlx already
+uses for MLX itself.** Findings, each confirmed against a primary source rather than assumed:
+
+- **No official C/C++ binding.** `huggingface/tokenizers` issue #185 (opened 2020, asking exactly
+  this question) was closed as "not planned" via the stale-bot, with no maintainer commitment ever
+  made. The crate remains Rust-native with official bindings only for Python (PyO3) and Node.js.
+- **A maintained, permissively-licensed, genuinely plain-C shim exists: `mlc-ai/tokenizers-cpp`.**
+  Apache-2.0 (compatible with this repo's MIT `LICENSE` -- permissive, no copyleft obligation
+  conflict), 503 stars, actively maintained (pushed 2026-05-20, per `gh api
+  repos/mlc-ai/tokenizers-cpp` at spike time), built in part for and used by MLC LLM. Its
+  `include/tokenizers_c.h` is a genuine `extern "C"` API -- opaque `void*` handle, out-param structs,
+  no C++ name mangling, no JNI ceremony -- the same shape mlx-c itself presents and that jextract/FFM
+  already binds cleanly in this codebase:
+  ```c
+  typedef void* TokenizerHandle;
+  typedef struct { int* token_ids; size_t len; } TokenizerEncodeResult;
+  TokenizerHandle tokenizers_new_from_str(const char* json, size_t len);
+  TokenizerHandle byte_level_bpe_tokenizers_new_from_str(const char* vocab, size_t vocab_len,
+      const char* merges, size_t merges_len, const char* added_tokens, size_t added_tokens_len);
+  void tokenizers_encode(TokenizerHandle, const char* data, size_t len, int add_special_token,
+      TokenizerEncodeResult* result);
+  void tokenizers_decode(TokenizerHandle, const uint32_t* data, size_t len, int skip_special_token);
+  void tokenizers_get_decode_str(TokenizerHandle, const char** data, size_t* len);
+  void tokenizers_free(TokenizerHandle);
+  ```
+  (full list also has `encode_batch`/`free_encode_results`/`get_vocab_size`/`id_to_token`/
+  `token_to_id`). This plain-C layer covers HF `tokenizer.json` (`tokenizers_new_from_str`) and raw
+  byte-level BPE vocab+merges directly; SentencePiece and RWKV-World support exist only at the C++
+  layer above it (`include/tokenizers_cpp.h`'s `Tokenizer::FromBlobSentencePiece`/
+  `FromBlobRWKVWorld`), which this project would not need to bind at all if only HF-JSON-format
+  tokenizers are in scope for M3's reference models (Llama/Qwen both ship `tokenizer.json`).
+- **Prior art already chose this exact path, independently.** DJL (Deep Java Library, the most
+  prominent Java ML library with an equivalent problem) does not reimplement HF tokenizers in pure
+  Java -- `extensions/tokenizers` wraps the same upstream `tokenizers` Rust crate via its own
+  hand-written native bridge (JNI in DJL's case, since that predates or simply didn't adopt FFM;
+  jmlx would use FFM instead, which needs no JNI ceremony at all -- one more reason to prefer
+  `tokenizers-cpp`'s plain-`extern "C"` shape over reusing DJL's crate directly, whose native
+  functions are JNI-shaped `Java_...` symbols, not callable via FFM). This is independent
+  confirmation that "FFM/JNI-bind the Rust crate" beats "reimplement in pure Java" for this exact
+  problem, from a team solving it for a different host language.
+- **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
+  the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
+  = ["staticlib"]`; producing something `System.load()`-able would need either (a) a small additional
+  link step producing a `.dylib` that statically links `libtokenizers_c.a` (mirroring how
+  `bootstrap-native.sh` already builds `libmlxc.dylib` from source against a pinned wheel), or (b) a
+  jmlx-owned fork of `rust/Cargo.toml` + `rust/src/lib.rs` with `crate-type = ["cdylib"]` instead --
+  the latter is simpler since it also sidesteps needing the C++/CMake/submodule machinery
+  (`sentencepiece`, `msgpack`) that only the C++ layer requires, if HF-JSON-only scope (see above)
+  is accepted for M2.
+- **One real risk, not previously visible from the plan text alone: Rust-side panics cross the FFI
+  boundary as failures with no recoverable status.** `rust/src/lib.rs`'s wrapper calls `.unwrap()`
+  on `Tokenizer::from_str`/`encode`/`decode` -- a malformed `tokenizer.json` or a decode error panics
+  inside Rust rather than returning a checkable error code. A Rust panic unwinding across an `extern
+  "C"` boundary without `catch_unwind` is undefined behavior, not a catchable `MLXException`-style
+  failure -- structurally worse than mlx-c's own error convention (`printf` + `exit(-1)`, which
+  `NativeLoader`'s custom handler already replaces) precisely because there is no error-handler hook
+  to intercept it the way `NativeLoader` intercepts mlx-c's. Whatever plan follows this spike needs
+  to either wrap every entry point in `catch_unwind` in a jmlx-owned fork of the Rust glue, or
+  explicitly accept malformed-tokenizer-file input as an unrecoverable-crash case (unlike every other
+  failure path in this codebase, which surfaces as a catchable `MLXException`).
+- **A build-fragility note, not a blocker:** `tokenizers-cpp`'s `onig` Cargo feature (enabled in its
+  `Cargo.toml`, needed to replicate Python `regex`-module-exact Unicode splitting for GPT-2/GPT-4-style
+  BPE pretokenizers) pulls in `onig_sys`, which vendors and compiles an old bundled copy of the
+  Oniguruma C source when no system library is found via `pkg-config` -- known to hit compiler
+  compatibility issues on newer GCC (unconfirmed either way against Apple's clang on this repo's
+  actual macOS 26/Apple Silicon target, since that combination has not yet been built here). Whether
+  M2 needs `onig` at all depends on which reference models' tokenizers M3 actually targets: Llama/Qwen
+  both use byte-level BPE without the exact GPT-2 regex-split behavior `onig` exists for, so it may be
+  possible to build with `default-features = false` and skip `onig` entirely, avoiding this risk
+  rather than resolving it.
+
+**Still open, deliberately not resolved by this desk-research pass:** actually building a minimal
+`cdylib` from a jmlx-owned fork of `tokenizers-cpp/rust` (or from scratch against the plain
+`tokenizers` crate) and measuring real load-time cost for a representative `tokenizer.json`, per D3's
+original "prototyping load-time cost" requirement. This machine has no Rust toolchain installed
+(`cargo`/`rustc` both absent); doing so is an environment change worth confirming with a human before
+taking, not something to do unilaterally mid-spike. `req/plans/phase5-m2-plan.md` should not be
+written until that prototyping step also lands -- the desk research above resolves the *architecture*
+question (FFM-bind a plain-C shim, most likely a jmlx-owned fork of `tokenizers-cpp/rust` scoped to
+HF-JSON + byte-level-BPE only, skipping the C++/SentencePiece layer) but not the *cost* question D3
+also asked for.
+
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already
 has `Linear`, `QuantizedLinear`, `RMSNorm`, `MultiHeadAttention`, `KVCache`, and RoPE (via
@@ -230,9 +313,12 @@ in M1's own first task, not built ahead of time here.
 
 ## Work breakdown
 
-### 1. Checkpoint I/O — `MLXIO`, safetensors + GGUF (M1) — **PLAN WRITTEN, IMPLEMENTATION NOT STARTED**
+### 1. Checkpoint I/O — `MLXIO`, safetensors + GGUF (M1) — **DONE** (PR #12, `5c85f8c`)
 
-Full task-by-task plan lives in `req/plans/phase5-m1-plan.md`. Summary: a new
+Full task-by-task plan lives in `req/plans/phase5-m1-plan.md`, whose own amendments record two
+runtime-discovered fixes beyond what's summarized below (a CPU-stream requirement for
+`mlx_load_safetensors`/`mlx_load_gguf`, and a redesign of `loadGguf`'s metadata parameters once
+testing showed `mlx_io_gguf_get_keys` cannot enumerate metadata-only keys). Summary: a new
 `se.alipsa.jmlx.core.MLXIO` facade class (package-private-constructor constraints rule out a new
 package — see D2) exposing `loadSafetensors`/`saveSafetensors`/`loadGguf`/`saveGguf`, following two
 distinct precedents for two distinct properties rather than one class as a blanket model: `MLXGrad`'s
@@ -248,10 +334,11 @@ parameter (D2a above); `saveGguf` additionally builds and frees its own `mlx_io_
 paragraph and architecture-diagram class list to name `MLXIO` as the fifth native-loading-guard
 class alongside `MLX`/`MLXScope`/`NativeOps`/`MLXGrad`.
 
-### 2. Tokenizer integration (M2) — **NOT STARTED — blocked on a research spike, see D3**
+### 2. Tokenizer integration (M2) — **DESK RESEARCH DONE, PROTOTYPE PENDING — see D3's amendment**
 
-Not planned in detail here. First step is the spike named in D3, written up as its own findings
-section before `req/plans/phase5-m2-plan.md` exists.
+Not planned in detail here. Desk research (license, C-API existence, build shape, prior art, risks)
+is written up as D3's amendment above; `req/plans/phase5-m2-plan.md` still should not be written
+until the load-time-cost prototype D3 also asked for actually lands.
 
 ### 3. Reference models — `LlamaModel`, `QwenModel` (M3) — **NOT STARTED — blocked on M1 and M2**
 
@@ -279,8 +366,12 @@ named scope boundary rather than left implicit.
 
 ## Open questions
 
-- M2's core question (FFM-bind HF `tokenizers`'s C API vs. a pure-Java implementation) is
-  unresolved — see D3.
+- M2's architecture question (FFM-bind a plain-C shim over HF `tokenizers` vs. a pure-Java
+  implementation) is resolved in favor of the former — see D3's amendment. What remains open:
+  real load-time cost (needs an actual build-and-measure prototype, blocked on a Rust toolchain
+  decision), whether `onig` is actually needed for M3's target models, and whether to fork
+  `tokenizers-cpp/rust` or write a from-scratch minimal `cdylib` crate against the plain
+  `tokenizers` crate directly.
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

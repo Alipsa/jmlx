@@ -2,9 +2,9 @@
 
 ## Status — update this section as work lands
 
-**Branch:** none yet. Written from `main` after PR #11 (Phase 4 M4, `QuantizedLinear`) merged,
-`f28a327`. Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4 plus §9 documentation
-**Done** — but not "fully Done": §10 (CI, self-hosted runner) is still **Not started**, per that
+**Branch:** `phase5-plan`, off `main` at `f28a327` (PR #11, Phase 4 M4 `QuantizedLinear`, merged).
+Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4 plus §9 documentation **Done** — but not
+"fully Done": §10 (CI, self-hosted runner) is still **Not started**, per that
 document's own Status table. (M0d is also `Done` only in a scoped-down sense — six generic op-body
 helpers deliberately deferred past their original merge point, per that table's own M0d note; this
 document's Research findings section below leans on that same precedent for M1's own C-string
@@ -76,7 +76,7 @@ subclassing). So `MLXIO` joins `MLXQuant`/`MLXRandom`/`MLXGrad` as another nativ
 class inside `core`, not a new `se.alipsa.jmlx.io` package — see §1 below for the exact API shape
 (the full task-by-task reasoning belongs in `req/plans/phase5-m1-plan.md`, not yet written).
 
-**`MLXIO` is the first facade in this codebase whose native surface returns handles that are not
+**D2a — `MLXIO` is the first facade in this codebase whose native surface returns handles that are not
 `mlx_array` at all, and `MLXScope` cannot own any of them.** `mlx_io_gguf`, `mlx_map_string_to_array`,
 `mlx_map_string_to_string`, `mlx_vector_string`, and `mlx_string` each come back from these load
 calls with their own deallocator (`mlx_io_gguf_free`, `mlx_map_string_to_array_free`,
@@ -95,7 +95,7 @@ exactly this reason (`CLAUDE.md`'s memory-model rule). This is the most likely s
 or handle-list corruption in M1 if missed, and belongs in `req/plans/phase5-m1-plan.md`'s own Global
 Constraints once that document exists.
 
-**`mlx_io_gguf_new` is the specific call site this hazard becomes checkable at.** It binds as
+**D2b — `mlx_io_gguf_new` is the specific call site this hazard becomes checkable at.** It binds as
 `MemorySegment mlx_io_gguf_new(SegmentAllocator allocator)` -- jextract's generated signature takes
 any `SegmentAllocator`, and `MLXScope` implements that interface (`CLAUDE.md`'s memory model:
 "`MLXScope` ... implements `SegmentAllocator`"), so `saveGguf` passing a scope here compiles cleanly
@@ -107,13 +107,27 @@ rather than a runtime one -- "`allocator` MUST be a confined `Arena` (never an `
 helper `saveGguf` builds its `mlx_io_gguf` through should take the same narrowed `Arena` parameter
 type, not `SegmentAllocator`.
 
-**Every one of these five types' free functions -- and both `*_iterator_free` variants -- returns a
-status `int` rather than being statusless like `mlx_array_free`.** Routing one through
-`NativeOps.checked` from inside a `finally` block risks losing a real in-flight failure: `checked`
-throws on a non-zero status, and a fresh exception thrown from a `finally` replaces whatever
-exception was already propagating instead of chaining it. Which of the two applicable fixes
-(swallow the cleanup status, or attach it via `Throwable.addSuppressed`) applies uniformly to all
-seven of these free calls is an open question -- see Open questions below.
+**D2c — Every one of these five types' free functions -- and both `*_iterator_free` variants --
+returns a status `int`, same as `mlx_array_free(mlx_array arr)` itself** (the genuinely statusless
+entry points are the `mlx_array` constructors, `mlx_array_new`/`mlx_array_new_data`, which "have no
+status return at all and only signal failure via the error handler plus a null `ctx`" -- `CLAUDE.md`'s
+error-handling paragraph, not its Memory model paragraph, notes this). Routing one of these seven
+frees through `NativeOps.checked` from inside a `finally` block risks losing a real in-flight failure
+during exception unwinding: `checked` throws on a non-zero status, and a fresh exception thrown from
+a `finally` replaces whatever exception was already propagating instead of chaining it.
+
+This codebase already has a precedent to follow rather than decide fresh: `MLXScope`'s own teardown
+(`Holder.closeAll`'s reverse-order loop, and `freeOne`) calls `mlx_h.mlx_array_free` bare, outside
+`NativeOps.checked`, discarding its status -- and does so unconditionally, not only when unwinding an
+exception: neither call site sits inside a `try`/`catch` reacting to one, so the same discard applies
+on an ordinary clean `close()` too. That covers more than the unwinding hazard above explains: a
+cleanup failure on an otherwise-successful exit vanishes silently as well, not just one that would
+otherwise mask a real error -- consistent with `MLXScope` treating a failed free as unactionable
+information either way, not merely as the lesser of two evils during unwinding. Whether that discard
+was a deliberate policy or merely incidental is not established by the code alone, so this is cited as
+precedent to follow, not as a documented decision -- but absent a reason to diverge, `MLXIO`'s own
+cleanup should swallow these seven frees' statuses the same way, on every exit path, not attach them
+via `Throwable.addSuppressed`.
 
 **D3 — Tokenizer integration (M2) is deliberately left unplanned here.** Unlike checkpoint I/O,
 there is no existing binding to lean on: mlx-c has no tokenizer API at all. Whether the right move
@@ -211,13 +225,12 @@ distinct properties rather than one class as a blanket model: `MLXGrad`'s own
 because every entry point still funnels through `NativeOps.checked`/`scopeOf`/`cstr` first;
 `MLXIO`'s hand-rolled bodies must not assume the same); and `MLXQuant`'s hand-rolled-body shape and
 cached-stream reuse (D1 above) for everything else -- confined `Arena` for transient structs freed on
-every exit path via `try/finally`, with the cleanup-status decision from D2 above applied wherever a
-free's own status is checked inside one of those `finally` blocks. `loadSafetensors`/`loadGguf` each
-take an explicit `MLXScope` parameter (D2's handle-ownership note above); `saveGguf` additionally
-builds and frees its own `mlx_io_gguf` via a confined `Arena`-scoped helper, never an `MLXScope`
-(same note). Update CLAUDE.md's "Loading order matters" paragraph and architecture-diagram class list
-to name `MLXIO` as the fifth native-loading-guard class alongside `MLX`/`MLXScope`/`NativeOps`/
-`MLXGrad`.
+every exit path via `try/finally`, swallowing each free's own status per D2c above rather than
+routing it through `NativeOps.checked`. `loadSafetensors`/`loadGguf` each take an explicit `MLXScope`
+parameter (D2a above); `saveGguf` additionally builds and frees its own `mlx_io_gguf` via a confined
+`Arena`-scoped helper, never an `MLXScope` (D2b above). Update CLAUDE.md's "Loading order matters"
+paragraph and architecture-diagram class list to name `MLXIO` as the fifth native-loading-guard
+class alongside `MLX`/`MLXScope`/`NativeOps`/`MLXGrad`.
 
 ### 2. Tokenizer integration (M2) — **NOT STARTED — blocked on a research spike, see D3**
 
@@ -232,7 +245,7 @@ Not planned in detail here — see D4.
 
 Same conventions `req/plans/phase4-m1-plan.md`'s Global Constraint 7 already establishes project-wide:
 `@EnabledIfNativeAvailable` on native-dependent test classes, `try (MLXScope scope = new MLXScope())`,
-hand-computed goldens, element-value assertions rather than shape-only assertions. M1 specifically
+hand-computed goldens, element-value assertions rather than shape-only assertions. Round-trip alone
 needs no external binary fixture files: `mlx_save_safetensors`/`mlx_save_gguf` exist precisely so
 tests can round-trip (build small `MLXArray`s, save, reload in a fresh scope, assert tensor values
 and metadata match) for both formats — the concrete test list belongs in
@@ -254,7 +267,3 @@ M1's round-trip tests prove only the facade layer, not interop.
 - `mlx_vector_string_get`'s ownership is unresolved and blocks `loadGguf` outright, since it is the
   only route to reading keys back out of `mlx_io_gguf_get_keys`'s result — see Research findings
   above. Resolve by probe before M1's own first task, not during it.
-- Which of "swallow the cleanup status" or "attach it via `Throwable.addSuppressed`" applies when one
-  of the five non-`mlx_array` types' free functions (or either `*_iterator_free`) itself returns
-  non-zero — see D2 above. Pick one before `req/plans/phase5-m1-plan.md` is written, not per call
-  site during it.

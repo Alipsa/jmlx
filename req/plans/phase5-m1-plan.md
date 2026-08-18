@@ -725,16 +725,32 @@ neither static review caught.**
    + `mlx_h.mlx_stream_new_device` and passing that instead makes the identical round-trip evaluate
    correctly.
 
-   **Fix:** both `loadSafetensors` and `loadGguf` now build a request-scoped CPU stream (a private
-   `MLXIO.cpuStream(Arena)` helper) and pass it to `mlx_load_safetensors`/`mlx_load_gguf` in place of
-   `NativeOps.DEFAULT_STREAM`. This only affects the load call itself -- every other op in this codebase
-   still runs on the process-wide GPU default, and a loaded array can be freely combined with GPU-stream
-   arrays afterward, since evaluation forces the whole graph regardless of which stream produced which
-   lazy node.
+   **Fix:** both `loadSafetensors` and `loadGguf` now pass `NativeOps.DEFAULT_CPU_STREAM` -- a new
+   constant resolved once, alongside `DEFAULT_DEVICE`/`DEFAULT_STREAM`, via `mlx_h.mlx_default_cpu_stream_new`
+   -- in place of `NativeOps.DEFAULT_STREAM`. This only affects the load call itself -- every other op in
+   this codebase still runs on the process-wide GPU default, and a loaded array can be freely combined
+   with GPU-stream arrays afterward, since evaluation forces the whole graph regardless of which stream
+   produced which lazy node.
 
-Both fixes are reflected in the shipped `MLXIO.java`/`NativeOps.java`/`MLXIOTest.java`; the code listings
-above predate them and are left as originally written, per this repo's convention of amending rather
-than rewriting a merged plan.
+   **Amendment (round 2, post-implementation): the fix above's first cut leaked a device and a
+   scheduler stream on every single load call.** A `private MLXIO.cpuStream(Arena tmp)` helper built a
+   fresh `mlx_device`/`mlx_stream` pair per call via `mlx_h.mlx_device_new_type` + `mlx_h.mlx_stream_new_device`,
+   allocated into the call's own confined `Arena`. That `Arena` only reclaims the 8-byte Java-side
+   struct holding `ctx`; it does nothing to the native object behind it, which `mlx_device_free`/
+   `mlx_stream_free` exist specifically to release (Global Constraint 2's device/stream distinction,
+   never extended to cover the two handle types this fix introduced). Worse than an ordinary heap leak:
+   `mlx_stream_new_device` registers a genuinely new stream in MLX's scheduler on every call (confirmed
+   empirically -- five successive calls returned scheduler indices 0, 1, 2, 3, 4), so a loader reading N
+   safetensors shards would leave N scheduler streams alive for the rest of the process. The fix needed
+   was simpler than the one it replaced: `mlx_h.mlx_default_cpu_stream_new` returns MLX's *existing*
+   default CPU stream -- a stable index across every call (confirmed empirically: index 5 on every
+   call) -- so it can be resolved once and cached, exactly like `DEFAULT_STREAM`/`DEFAULT_DEVICE`
+   already are. `MLXIO.cpuStream(Arena)` is gone entirely; both load call sites now reference
+   `NativeOps.DEFAULT_CPU_STREAM` directly.
+
+All three fixes are reflected in the shipped `MLXIO.java`/`NativeOps.java`/`MLXIOTest.java`; the code
+listings above predate them and are left as originally written, per this repo's convention of amending
+rather than rewriting a merged plan.
 
 ## Task 4: `MLXIOTest.java` (new file, `jmlx-core/src/test/java/se/alipsa/jmlx/core/`)
 
@@ -752,6 +768,7 @@ Per Global Constraint 7 (`req/plans/phase4-m1-plan.md`): `@EnabledIfNativeAvaila
 | `loadSafetensorsUnknownFileThrowsMLXException` | A nonexistent path throws `MLXException`, not an unchecked native crash or a silent empty result. |
 | `loadSafetensorsAllocatesIntoTheGivenScope` | Tensors loaded into a child scope are unusable once only the child (not an ancestor) is closed -- confirms `target` is actually honored, not silently defaulted to some other scope. |
 | `saveSafetensorsUnwritablePathThrowsMLXException` | Save to a path in a nonexistent/unwritable directory throws `MLXException` rather than crashing or silently no-op'ing -- the one test in this table that actually exercises D2c's swallow-on-`finally` cleanup path under a real in-flight failure (every other test's `finally` blocks run on a clean success path), not just the load-side failure `loadSafetensorsUnknownFileThrowsMLXException` already covers. |
+| `saveGgufUnwritablePathThrowsMLXException` | (Added post-implementation.) Same missing-subdir trick against `saveGguf` specifically, whose cleanup is materially larger than `saveSafetensors`'s -- a per-entry `mlx_vector_string_free(mvstr)` nested inside the metadata-vector-string loop, plus the outer `mlx_io_gguf_free(io)` -- both run under a real in-flight `mlx_save_gguf` failure, not just a clean-success path. |
 
 **Real-checkpoint fixture gap (Testing approach in `req/phase5-plan.md`):** none of the tests above
 touch an externally-authored safetensors/GGUF file -- every fixture is written by `MLXIO` itself, so

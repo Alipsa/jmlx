@@ -44,6 +44,18 @@ final class NativeOps {
   private static final MemorySegment DEFAULT_DEVICE = resolveDefaultDevice();
   static final MemorySegment DEFAULT_STREAM = resolveDefaultStream();
 
+  /**
+   * The process-wide default CPU stream, resolved once and never freed, exactly like {@link
+   * #DEFAULT_STREAM}. {@code mlx_default_cpu_stream_new} returns MLX's *existing* default CPU
+   * stream (a stable scheduler index across every call) rather than minting a new one -- {@code
+   * mlx_stream_new_device} would instead register a fresh scheduler stream on every call, leaking
+   * one per invocation since nothing would ever free it. {@link MLXIO#loadSafetensors}/ {@link
+   * MLXIO#loadGguf} need this instead of {@link #DEFAULT_STREAM} specifically because both loaders'
+   * arrays are backed by a lazy {@code Load} primitive whose {@code eval_gpu} is unimplemented in
+   * the pinned {@code mlx-metal==0.31.2} wheel (req/plans/phase5-m1-plan.md's amendment).
+   */
+  static final MemorySegment DEFAULT_CPU_STREAM = mlx_h.mlx_default_cpu_stream_new(FACADE_ARENA);
+
   private static MemorySegment resolveDefaultDevice() {
     MemorySegment dev = mlx_h.mlx_device_new(FACADE_ARENA);
     checked(() -> mlx_h.mlx_get_default_device(dev));
@@ -479,11 +491,15 @@ final class NativeOps {
    * Runs one of GGUF's {@code mlx_io_gguf_has_metadata_*} predicates, which return {@code 2} not
    * only when the key is present under a different bucket but also whenever the key is absent from
    * the metadata map entirely (confirmed against {@code io_types.cpp}'s {@code
-   * IMPLEMENT_GGUF_HAS_METADATA} macro) -- routine for a tensor-only key, which by definition never
-   * appears in the metadata map and so fails every one of the three probes before {@link
-   * MLXIO#readGgufEntry} falls through to {@code get_array}. Unlike {@link #mapIteratorNext},
-   * status {@code 2} here still leaves the caller's {@code flag} out-param correctly set (to {@code
-   * false}); {@link #checked} would misreport this ordinary case as a bare failure instead.
+   * IMPLEMENT_GGUF_HAS_METADATA} macro). {@link MLXIO}'s tensor-reading path never reaches this
+   * method at all -- {@code readGgufTensors} calls {@code get_array} unconditionally, with no
+   * probing in front of it (req/plans/phase5-m1-plan.md's amendment). Status {@code 2} here means a
+   * caller-requested metadata key ({@code loadGguf}'s {@code metadata*Keys} parameters) is
+   * genuinely absent from the file -- the ordinary case {@code
+   * loadGgufRequestedMetadataKeyAbsentIsOmittedNotThrown} exercises, not a failure. Unlike {@link
+   * #mapIteratorNext}, status {@code 2} here still leaves the caller's {@code flag} out-param
+   * correctly set (to {@code false}); {@link #checked} would misreport this ordinary case as a bare
+   * failure instead.
    */
   static void hasMetadataProbe(String opName, IntSupplier nativeCall) {
     NativeLoader.clearLastNativeError();

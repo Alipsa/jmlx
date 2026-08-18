@@ -175,4 +175,17 @@ class MLXIOTest {
       assertThrows(MLXException.class, () -> MLXIO.saveSafetensors(file, tensors, Map.of()));
     }
   }
+
+  @Test
+  void saveGgufUnwritablePathThrowsMLXException(@TempDir Path dir) {
+    String file = dir.resolve("missing-subdir").resolve("out.gguf").toString();
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          Map.of("w", MLX.array(scope, new float[] {1f}, new int[] {1}));
+      Map<String, List<String>> metaVectorStrings = Map.of("list", List.of("a", "b"));
+      assertThrows(
+          MLXException.class,
+          () -> MLXIO.saveGguf(file, tensors, Map.of(), Map.of(), metaVectorStrings));
+    }
+  }
 }

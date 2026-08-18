@@ -27,23 +27,6 @@ public final class MLXIO {
     NativeLoader.ensureLoaded();
   }
 
-  /**
-   * Builds an explicit CPU stream for {@code mlx_load_safetensors}/{@code mlx_load_gguf}
-   * specifically, in place of {@link NativeOps#DEFAULT_STREAM} (GPU on Apple Silicon). Both loaders
-   * hand back arrays backed by MLX's lazy {@code Load} primitive, whose {@code eval_gpu} is
-   * unimplemented in the pinned {@code mlx-metal==0.31.2} wheel -- confirmed empirically:
-   * evaluating a GPU-stream {@code Load} result throws {@code MLXException: [Load::eval_gpu] Not
-   * implemented.}, while the identical round-trip against a CPU stream evaluates correctly. This
-   * only affects the load call itself; every other op in this codebase still runs on the
-   * process-wide GPU default, and a loaded array can be freely combined with GPU-stream arrays
-   * afterward since evaluation forces the whole graph regardless of which stream produced which
-   * lazy node.
-   */
-  private static MemorySegment cpuStream(Arena tmp) {
-    MemorySegment cpuDevice = mlx_h.mlx_device_new_type(tmp, mlx_h.MLX_CPU(), 0);
-    return mlx_h.mlx_stream_new_device(tmp, cpuDevice);
-  }
-
   /** The two maps {@code mlx_load_safetensors}/{@code mlx_save_safetensors} exchange directly. */
   public record SafetensorsResult(Map<String, MLXArray> tensors, Map<String, String> metadata) {}
 
@@ -63,10 +46,11 @@ public final class MLXIO {
       MemorySegment metaMap = mlx_h.mlx_map_string_to_string_new(tmp);
       MemorySegment filePath = tmp.allocateFrom(file);
       try {
-        MemorySegment stream = cpuStream(tmp);
         NativeOps.checked(
             "loadSafetensors",
-            () -> mlx_h.mlx_load_safetensors(tensorMap, metaMap, filePath, stream));
+            () ->
+                mlx_h.mlx_load_safetensors(
+                    tensorMap, metaMap, filePath, NativeOps.DEFAULT_CPU_STREAM));
         Map<String, MLXArray> tensors = readArrayMap(tensorMap, target, tmp);
         Map<String, String> metadata = readStringMap(metaMap, tmp);
         return new SafetensorsResult(tensors, metadata);
@@ -213,8 +197,8 @@ public final class MLXIO {
       MemorySegment io = mlx_h.mlx_io_gguf_new(tmp);
       MemorySegment filePath = tmp.allocateFrom(file);
       try {
-        MemorySegment stream = cpuStream(tmp);
-        NativeOps.checked("loadGguf", () -> mlx_h.mlx_load_gguf(io, filePath, stream));
+        NativeOps.checked(
+            "loadGguf", () -> mlx_h.mlx_load_gguf(io, filePath, NativeOps.DEFAULT_CPU_STREAM));
         Map<String, MLXArray> tensors = readGgufTensors(io, target, tmp);
         Map<String, MLXArray> metaArrays =
             readGgufMetadataArrays(io, target, tmp, metadataArrayKeys);

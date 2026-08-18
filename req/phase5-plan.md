@@ -12,7 +12,7 @@ helper.)
 
 | Item | Status | Commit |
 |---|---|---|
-| M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | Not started — `req/plans/phase5-m1-plan.md` does not exist yet; see §1 below for the task-by-task plan until it is written | — |
+| M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | Plan written, implementation not started — see `req/plans/phase5-m1-plan.md` | — |
 | M2 — Tokenizer integration (§2) | Not started — needs its own research spike first | — |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | Not started | — |
 
@@ -73,8 +73,8 @@ both scoped to `se.alipsa.jmlx.core`. A class outside that package could not wra
 `mlx_array` handle into an `MLXArray` at all without opening new cross-package access on a type the
 codebase has deliberately kept closed (`MLXArray`/`MLXScope` are both `public final`, no
 subclassing). So `MLXIO` joins `MLXQuant`/`MLXRandom`/`MLXGrad` as another native-facing facade
-class inside `core`, not a new `se.alipsa.jmlx.io` package — see §1 below for the exact API shape
-(the full task-by-task reasoning belongs in `req/plans/phase5-m1-plan.md`, not yet written).
+class inside `core`, not a new `se.alipsa.jmlx.io` package — see §1 below for the exact API shape,
+and `req/plans/phase5-m1-plan.md` for the full task-by-task implementation.
 
 **D2a — `MLXIO` is the first facade in this codebase whose native surface returns handles that are not
 `mlx_array` at all, and `MLXScope` cannot own any of them.** `mlx_io_gguf`, `mlx_map_string_to_array`,
@@ -230,14 +230,13 @@ in M1's own first task, not built ahead of time here.
 
 ## Work breakdown
 
-### 1. Checkpoint I/O — `MLXIO`, safetensors + GGUF (M1) — **NOT STARTED**
+### 1. Checkpoint I/O — `MLXIO`, safetensors + GGUF (M1) — **PLAN WRITTEN, IMPLEMENTATION NOT STARTED**
 
-`req/plans/phase5-m1-plan.md` does not exist yet — this section is the summary to write it from, not
-a pointer to an already-written task-by-task plan. A new `se.alipsa.jmlx.core.MLXIO` facade class
-(package-private-constructor constraints rule out a new package — see D2) exposing
-`loadSafetensors`/`saveSafetensors`/`loadGguf`/`saveGguf`, following two distinct precedents for two
-distinct properties rather than one class as a blanket model: `MLXGrad`'s own
-`NativeLoader.ensureLoaded()` guard, since `MLXIO` calls `mlx_h` directly and cannot rely on
+Full task-by-task plan lives in `req/plans/phase5-m1-plan.md`. Summary: a new
+`se.alipsa.jmlx.core.MLXIO` facade class (package-private-constructor constraints rule out a new
+package — see D2) exposing `loadSafetensors`/`saveSafetensors`/`loadGguf`/`saveGguf`, following two
+distinct precedents for two distinct properties rather than one class as a blanket model: `MLXGrad`'s
+own `NativeLoader.ensureLoaded()` guard, since `MLXIO` calls `mlx_h` directly and cannot rely on
 `NativeOps`'s transitive guard the way `MLXQuant` does (`MLXQuant` has no guard of its own precisely
 because every entry point still funnels through `NativeOps.checked`/`scopeOf`/`cstr` first;
 `MLXIO`'s hand-rolled bodies must not assume the same); and `MLXQuant`'s hand-rolled-body shape and
@@ -265,17 +264,18 @@ Same conventions `req/plans/phase4-m1-plan.md`'s Global Constraint 7 already est
 hand-computed goldens, element-value assertions rather than shape-only assertions. Round-trip alone
 needs no external binary fixture files: `mlx_save_safetensors`/`mlx_save_gguf` exist precisely so
 tests can round-trip (build small `MLXArray`s, save, reload in a fresh scope, assert tensor values
-and metadata match) for both formats — the concrete test list belongs in
-`req/plans/phase5-m1-plan.md`, not yet written.
+and metadata match) for both formats — the concrete test list is `req/plans/phase5-m1-plan.md`'s
+Task 4.
 
 Round-trip proves `MLXIO` is self-consistent (jmlx writes, jmlx reads back what it wrote); it does
 not exercise the real-world variation Context's own quoted objective ("Load pre-trained safetensors
 and GGUF model files") requires -- HF's vs. llama.cpp's differing metadata conventions, real
 quantized tensor dtypes, or the tensor-naming schemes M3's checkpoint → `Module` mapping will
-eventually depend on. `req/plans/phase5-m1-plan.md` must choose one of two ways to close that gap:
-commit one small real checkpoint fragment per format as a checked-in fixture, or state plainly that
-real-world validation is deferred to M3 (where a real checkpoint is unavoidable anyway) and that
-M1's round-trip tests prove only the facade layer, not interop.
+eventually depend on. `req/plans/phase5-m1-plan.md`'s Task 4 resolves this by choosing the second of
+the two ways this document originally posed to close that gap: real-world validation is deferred to
+M3 (where a real checkpoint is unavoidable anyway), not a checked-in fixture fragment added here --
+M1's round-trip tests prove only the facade layer, not interop, and that is stated as a deliberate,
+named scope boundary rather than left implicit.
 
 ## Open questions
 

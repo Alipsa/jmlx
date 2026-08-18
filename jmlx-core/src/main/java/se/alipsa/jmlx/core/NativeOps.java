@@ -13,6 +13,7 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.ffi.mlx_optional_dtype_;
 import se.alipsa.jmlx.ffi.mlx_optional_float_;
 import se.alipsa.jmlx.ffi.mlx_optional_int_;
+import se.alipsa.jmlx.ffi.mlx_stream_;
 import se.alipsa.jmlx.ffi.mlx_vector_array_;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -44,6 +45,18 @@ final class NativeOps {
   private static final MemorySegment DEFAULT_DEVICE = resolveDefaultDevice();
   static final MemorySegment DEFAULT_STREAM = resolveDefaultStream();
 
+  /**
+   * The process-wide default CPU stream, resolved once and never freed, exactly like {@link
+   * #DEFAULT_STREAM}. {@code mlx_default_cpu_stream_new} returns MLX's *existing* default CPU
+   * stream (a stable scheduler index across every call) rather than minting a new one -- {@code
+   * mlx_stream_new_device} would instead register a fresh scheduler stream on every call, leaking
+   * one per invocation since nothing would ever free it. {@link MLXIO#loadSafetensors}/ {@link
+   * MLXIO#loadGguf} need this instead of {@link #DEFAULT_STREAM} specifically because both loaders'
+   * arrays are backed by a lazy {@code Load} primitive whose {@code eval_gpu} is unimplemented in
+   * the pinned {@code mlx-metal==0.31.2} wheel (req/plans/phase5-m1-plan.md's amendment).
+   */
+  static final MemorySegment DEFAULT_CPU_STREAM = resolveDefaultCpuStream();
+
   private static MemorySegment resolveDefaultDevice() {
     MemorySegment dev = mlx_h.mlx_device_new(FACADE_ARENA);
     checked(() -> mlx_h.mlx_get_default_device(dev));
@@ -53,6 +66,22 @@ final class NativeOps {
   private static MemorySegment resolveDefaultStream() {
     MemorySegment stream = mlx_h.mlx_stream_new(FACADE_ARENA);
     checked(() -> mlx_h.mlx_get_default_stream(stream, DEFAULT_DEVICE));
+    return stream;
+  }
+
+  /**
+   * {@code mlx_default_cpu_stream_new} has no status return: on failure it fires the error handler
+   * and hands back {@code mlx_stream_new_()} (a null-{@code ctx} struct), the same statusless shape
+   * {@link MLX#array(MLXScope, float[], int[])} already guards for {@code mlx_array_new_data}
+   * (confirmed against {@code stream.cpp}'s {@code catch} branch) -- {@code checked()} would never
+   * see the failure, so it is detected explicitly instead, exactly like that site.
+   */
+  private static MemorySegment resolveDefaultCpuStream() {
+    NativeLoader.clearLastNativeError();
+    MemorySegment stream = mlx_h.mlx_default_cpu_stream_new(FACADE_ARENA);
+    if (mlx_stream_.ctx(stream).address() == 0) {
+      throw nativeFailure("mlx_default_cpu_stream_new");
+    }
     return stream;
   }
 
@@ -440,5 +469,61 @@ final class NativeOps {
     String nativeMessage = NativeLoader.lastNativeError();
     NativeLoader.clearLastNativeError();
     return new MLXException(message + (nativeMessage != null ? ": " + nativeMessage : ""));
+  }
+
+  /**
+   * Reads a borrowed, NUL-terminated {@code const char*}/{@code char*} into a Java {@code String}.
+   * {@code ptr} must outlive this call but is never freed by it -- every accessor {@link MLXIO}
+   * uses this for ({@code mlx_string_data}, {@code mlx_vector_string_get}, the two map iterator/get
+   * families) returns a pointer into storage some other handle already owns (req/phase5-plan.md's
+   * Research findings). {@code reinterpret} is required before {@code getString}: a raw pointer
+   * value read out of a struct field or written into an out-param slot comes back as a zero-length
+   * segment with no declared bounds, and {@code getString} on one throws {@code
+   * IndexOutOfBoundsException} rather than reading anything.
+   */
+  static String readNativeString(MemorySegment ptr) {
+    return ptr.reinterpret(Long.MAX_VALUE).getString(0);
+  }
+
+  /**
+   * Classifies one of the two {@code mlx_map_string_to_*_iterator_next} calls' three-way status
+   * (confirmed against {@code map.cpp} directly, req/plans/phase5-m1-plan.md's Findings): {@code 0}
+   * means the out-params were written and there is a current entry, {@code 2} means the iterator
+   * had already reached the map's end (ordinary loop termination, not failure), and anything else
+   * is a genuine error routed through the same {@link MLXException} path {@link #checked} uses.
+   */
+  static boolean mapIteratorNext(String opName, IntSupplier nativeCall) {
+    NativeLoader.clearLastNativeError();
+    int status = nativeCall.getAsInt();
+    if (status == 0) {
+      return true;
+    }
+    if (status == 2) {
+      return false;
+    }
+    throw nativeFailure(opName + ": mlx-c call failed with status " + status);
+  }
+
+  /**
+   * Runs one of GGUF's {@code mlx_io_gguf_has_metadata_*} predicates, which return {@code 2} not
+   * only when the key is present under a different bucket but also whenever the key is absent from
+   * the metadata map entirely (confirmed against {@code io_types.cpp}'s {@code
+   * IMPLEMENT_GGUF_HAS_METADATA} macro). {@link MLXIO}'s tensor-reading path never reaches this
+   * method at all -- {@code readGgufTensors} calls {@code get_array} unconditionally, with no
+   * probing in front of it (req/plans/phase5-m1-plan.md's amendment). Status {@code 2} here means a
+   * caller-requested metadata key ({@code loadGguf}'s {@code metadata*Keys} parameters) is
+   * genuinely absent from the file -- the ordinary case {@code
+   * loadGgufRequestedMetadataKeyAbsentIsOmittedNotThrown} exercises, not a failure. Unlike {@link
+   * #mapIteratorNext}, status {@code 2} here still leaves the caller's {@code flag} out-param
+   * correctly set (to {@code false}); {@link #checked} would misreport this ordinary case as a bare
+   * failure instead.
+   */
+  static void hasMetadataProbe(String opName, IntSupplier nativeCall) {
+    NativeLoader.clearLastNativeError();
+    int status = nativeCall.getAsInt();
+    if (status == 0 || status == 2) {
+      return;
+    }
+    throw nativeFailure(opName + ": mlx-c call failed with status " + status);
   }
 }

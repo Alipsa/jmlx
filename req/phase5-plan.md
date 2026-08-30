@@ -537,12 +537,13 @@ parameter (D2a above); `saveGguf` additionally builds and frees its own `mlx_io_
 paragraph and architecture-diagram class list to name `MLXIO` as the fifth native-loading-guard
 class alongside `MLX`/`MLXScope`/`NativeOps`/`MLXGrad`.
 
-### 2. Tokenizer integration (M2) — **DESK RESEARCH DONE, ARCHITECTURE CHOICE STILL OPEN — see D3's amendment**
+### 2. Tokenizer integration (M2) — **DONE — see the Status table and D3's resolution note**
 
-Not planned in detail here. Desk research (license, C-API existence, build shape, prior art on both
-sides, risks) is written up as D3's amendment above; `req/plans/phase5-m2-plan.md` still should not
-be written until both the FFM-vs-pure-Java choice is made and, if FFM is chosen, the load-time-cost
-prototype D3 also asked for actually lands.
+Planned in detail at `req/plans/phase5-m2-plan.md` and implemented as the `jmlx-tokenizer` module.
+The desk research that preceded it (license, C-API existence, build shape, prior art on both sides,
+risks) is written up as D3's amendment above; the FFM-vs-pure-Java choice it left open was resolved
+in favor of pure Java, so the load-time-cost prototype D3 also asked for was never needed and was not
+built.
 
 ### 3. Reference models — `LlamaModel`, `QwenModel` (M3) — **NOT STARTED — blocked on M1 and M2**
 
@@ -590,12 +591,13 @@ named scope boundary rather than left implicit.
   (`github.com/Alipsa/hfjinja`) is a released, dependency-free Java 21+ port of `@huggingface/jinja`
   itself — i.e. option 2 already done, by the same org as jmlx — so the chat-template half of the
   pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted. [Amended:
-  the `numFound: 0` result below was `search.maven.org`'s own indexing lag, not the true state of the
-  repository — `se.alipsa:hfjinja:0.5.0` genuinely resolves from `repo1.maven.org` and is what
-  `jmlx-tokenizer` actually depends on (via `mavenLocal()` in this build environment specifically, per
-  D3's amendment, not because the artifact itself is unpublished).] Its adoption
-  cost is not moot, though: it is confirmed absent from Maven Central (`numFound: 0`), so using it
-  today means JitPack, a source/composite build, or publishing it first — see D3's amendment.**
+  the sentence originally here claimed `hfjinja` was "confirmed absent from Maven Central
+  (`numFound: 0`)" and would need JitPack, a source build, or publishing first — that was
+  `search.maven.org`'s own stale index, not the true state of the repository.
+  `se.alipsa:hfjinja:0.5.0` genuinely resolves from `repo1.maven.org` and is exactly what
+  `jmlx-tokenizer` depends on today (via `mavenLocal()` in this build environment specifically, per
+  D3's amendment, not because the artifact itself is unpublished — see D3's amendment for the full
+  correction).]**
   Now resolved by the same choice as above: M2 shipped as the pure-Java `jmlx-tokenizer` module using
   `hfjinja` directly, so the FFM path's own remaining unknowns below were never prototyped and are
   left here only as historical record, not as work still to be done. What

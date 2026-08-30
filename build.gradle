@@ -72,6 +72,19 @@ subprojects {
         }
     }
 
+    // useJUnitJupiter above adds org.junit.platform:junit-platform-launcher
+    // to testRuntimeOnly without an explicit version, relying on
+    // org.junit:junit-bom for version alignment. This environment's
+    // mavenLocal() cache only has junit-bom's .pom (no Gradle Module
+    // Metadata .module file) and has no mavenCentral() network access to
+    // fetch it, so that automatic alignment resolves to an empty version
+    // ("Could not find org.junit.platform:junit-platform-launcher:.").
+    // Pinning it explicitly, matching the useJUnitJupiter version above,
+    // sidesteps the platform lookup entirely.
+    dependencies {
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.1'
+    }
+
     // req/initial-plan.md §4: an absolute path, since native/install/lib is
     // CWD-relative and resolves differently under :jmlx-core:test, an IDE
     // run, and :jmlx-examples:run. Computing the path string here touches no

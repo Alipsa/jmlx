@@ -297,15 +297,25 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   Jinjava. This effectively supersedes options 1-3 for M2/M3 on the porting/build-shape question: it
   needs no hand-port of the ~3,860 remaining Jinja lines (already done, against the smaller/more
   current source this document already preferred over `swift-jinja`), no Jinjava
-  compatibility-verification risk, and no GraalJS dependency-weight cost. **It does not, however,
-  supersede the adoption cost: Maven Central's search API returns `numFound: 0` for `hfjinja` --
-  confirmed directly, not left as an open question -- so it is not currently resolvable as a normal
-  Gradle dependency.** Adopting it today means JitPack, a source/composite build, or publishing it
-  to Maven Central first; that real cost belongs in the comparison, not folded into "supersedes
-  everything." Still unverified: whether its byte-exact-vs.-Node-output differential corpus actually
-  covers M3's target models (Llama/Qwen/Mistral) specifically -- worth checking before depending on
-  it for real, but the "port or embed a JS engine" trade-off this
-  section spent most of its length on is likely moot now.
+  compatibility-verification risk, and no GraalJS dependency-weight cost. **Correction to an earlier
+  pass of this amendment: the "not on Maven Central" adoption-cost concern is now stale.**
+  `se.alipsa:hfjinja:0.5.0` resolves directly from Maven Central's actual repository
+  (`repo1.maven.org/maven2/se/alipsa/hfjinja/0.5.0/hfjinja-0.5.0.pom` returns `200`) and is listed on
+  `central.sonatype.com/artifact/se.alipsa/hfjinja` -- confirmed directly, not left as an open
+  question. (The legacy `search.maven.org` search-index API still returns `numFound: 0` for it as of
+  this writing -- a known indexing-lag artifact of that index, not evidence the artifact is
+  unavailable; do not re-trust that specific endpoint for freshly-published coordinates without
+  cross-checking `repo1.maven.org` directly.) A normal `implementation 'se.alipsa:hfjinja:0.5.0'`
+  Gradle dependency against `mavenCentral()` (already jmlx's only declared repository) is sufficient
+  -- no JitPack, source build, or local publish step needed. Its public API is a single class,
+  `se.alipsa.hfjinja.Template` (`Template.parse(String)` / `.render(Map<String,?>)`), zero runtime
+  dependencies, Java 21+, exceptions `TemplateSyntaxException`/`TemplateRenderException` (both extend
+  `HfJinjaException`) -- directly usable for HF chat templates with no adaptation layer needed beyond
+  building the `messages`/`add_generation_prompt`/`bos_token`/`eos_token` context map M3 already has
+  to assemble regardless of which Jinja path was chosen. Still unverified: whether its
+  byte-exact-vs.-Node-output differential corpus actually covers M3's target models
+  (Llama/Qwen/Mistral) specifically -- worth checking before depending on it for real, but the "port
+  or embed a JS engine" trade-off this section spent most of its length on is moot now.
 - **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
   the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
   = ["staticlib"]`; producing something `System.load()`-able would need either (a) a small additional

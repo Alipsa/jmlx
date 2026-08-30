@@ -574,8 +574,11 @@ named scope boundary rather than left implicit.
   for M2.** See D3's amendment — MLX's own two other official language bindings (`mlx-lm`,
   `mlx-swift-lm`) both already solved this by depending on an external tokenizer package rather than
   MLX/mlx-c itself, and there is no roadmap signal anywhere suggesting that will change.
-- **Still open: M2's architecture question itself (FFM-bind a plain-C shim over HF `tokenizers` vs.
-  a pure-Java reimplementation) is genuinely two-sided, not resolved.** An earlier pass through this
+- **Resolved (pure-Java chosen and implemented — see the Status table and D3's resolution note
+  above): M2's architecture question itself (FFM-bind a plain-C shim over HF `tokenizers` vs.
+  a pure-Java reimplementation) is no longer open.** The two-sided analysis below is left in place as
+  the historical record of the research that led to that choice, per this document's own
+  amend-don't-delete convention. An earlier pass through this
   document concluded DJL's Rust/JNI choice settled it — that overstated things: Hugging Face's own
   `swift-transformers` independently chose a from-scratch pure-Swift reimplementation for the
   identical problem, so both directions now have a maintained, production-used precedent from a
@@ -586,20 +589,26 @@ named scope boundary rather than left implicit.
   cost, not an open unknown anymore. **The porting question is largely mooted since: `hfjinja`
   (`github.com/Alipsa/hfjinja`) is a released, dependency-free Java 21+ port of `@huggingface/jinja`
   itself — i.e. option 2 already done, by the same org as jmlx — so the chat-template half of the
-  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted. Its adoption
+  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted. [Amended:
+  the `numFound: 0` result below was `search.maven.org`'s own indexing lag, not the true state of the
+  repository — `se.alipsa:hfjinja:0.5.0` genuinely resolves from `repo1.maven.org` and is what
+  `jmlx-tokenizer` actually depends on (via `mavenLocal()` in this build environment specifically, per
+  D3's amendment, not because the artifact itself is unpublished).] Its adoption
   cost is not moot, though: it is confirmed absent from Maven Central (`numFound: 0`), so using it
-  today means JitPack, a source/composite build, or publishing it first — see D3's amendment.** What
-  remains genuinely open regardless of which tokenization direction (FFM vs. pure-Java) is chosen:
-  real load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a
+  today means JitPack, a source/composite build, or publishing it first — see D3's amendment.**
+  Now resolved by the same choice as above: M2 shipped as the pure-Java `jmlx-tokenizer` module using
+  `hfjinja` directly, so the FFM path's own remaining unknowns below were never prototyped and are
+  left here only as historical record, not as work still to be done. What
+  remained genuinely open at the time, regardless of which tokenization direction (FFM vs. pure-Java)
+  was chosen: real load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a
   Rust toolchain decision), including which regex backend to build it with -- Llama/Qwen's
   pretokenizer regexes need lookahead/Unicode-class support that only `onig` or `fancy-regex` provide
   (plain `regex` is ruled out either way), but whether `fancy-regex`'s pure-Rust split behavior
   actually matches `onig`'s on these specific patterns is unconfirmed and belongs in that same
   prototype (see D3's amendment). Whether M3's reference models need general
   Jinja2 chat-template evaluation at all or can get away with hand-formatting a small, known set of
-  chat templates instead is still deferred to M3's own requirements (D4), though if `hfjinja` is
-  adopted and its Maven-availability cost is paid, that question loses most of its urgency, since the
-  "port vs. hand-format" trade-off it was weighing is no longer a real port.
+  chat templates instead is still deferred to M3's own requirements (D4); `hfjinja` is now adopted, so
+  the "port vs. hand-format" trade-off it was weighing is no longer a real port.
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

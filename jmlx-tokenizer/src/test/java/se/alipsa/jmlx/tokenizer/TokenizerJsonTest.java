@@ -4,13 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class TokenizerJsonTest {
 
   private Path fixture(String name) {
-    return Path.of("src/test/resources/se/alipsa/jmlx/tokenizer/" + name);
+    try {
+      return Path.of(getClass().getResource(name).toURI());
+    } catch (URISyntaxException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Test

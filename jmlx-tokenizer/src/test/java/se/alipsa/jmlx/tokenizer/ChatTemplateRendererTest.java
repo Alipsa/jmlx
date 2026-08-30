@@ -3,6 +3,7 @@ package se.alipsa.jmlx.tokenizer;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -12,7 +13,11 @@ import org.junit.jupiter.api.Test;
 class ChatTemplateRendererTest {
 
   private String readFixture(String name) throws IOException {
-    return Files.readString(Path.of("src/test/resources/se/alipsa/jmlx/tokenizer/" + name));
+    try {
+      return Files.readString(Path.of(getClass().getResource(name).toURI()));
+    } catch (URISyntaxException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Test

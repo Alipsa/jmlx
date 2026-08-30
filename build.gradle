@@ -11,6 +11,14 @@ plugins {
 
 allprojects {
     repositories {
+        // This build environment cannot reach mavenCentral() directly, so
+        // mavenLocal() is checked first -- it's where jmlx-tokenizer's two
+        // dependencies (tools.jackson.core:jackson-databind:3.1.2 and
+        // se.alipsa:hfjinja:0.5.0) actually resolve from, out of
+        // ~/.m2/repository. mavenCentral() below is deliberately kept, not
+        // removed, so a networked environment is unaffected. The Jackson
+        // version is pinned to 3.1.2, not a newer 3.x, specifically because
+        // that's the version available in this environment's local repository.
         mavenLocal()
         mavenCentral()
     }

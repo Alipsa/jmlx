@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -34,7 +35,7 @@ public final class TokenizerJsonLoader {
         parseNormalizer(root.path("normalizer")),
         parsePreTokenizer(root.get("pre_tokenizer")),
         parsePostProcessor(root.path("post_processor")),
-        parseModel(root.get("model")),
+        parseModel(root.path("model")),
         parseAddedTokens(root.path("added_tokens")));
   }
 
@@ -56,7 +57,7 @@ public final class TokenizerJsonLoader {
     }
     String regex = null;
     boolean addPrefixSpace = false;
-    for (JsonNode step : node.get("pretokenizers")) {
+    for (JsonNode step : node.path("pretokenizers")) {
       String stepType = step.path("type").asString("");
       if ("Split".equals(stepType)) {
         regex = step.path("pattern").path("Regex").asString(null);
@@ -68,8 +69,13 @@ public final class TokenizerJsonLoader {
       throw new TokenizerException(
           "TokenizerJsonLoader: pre_tokenizer.pretokenizers has no Split step");
     }
-    return new PreTokenizerConfig(
-        Pattern.compile(regex, Pattern.UNICODE_CHARACTER_CLASS), addPrefixSpace);
+    try {
+      return new PreTokenizerConfig(
+          Pattern.compile(regex, Pattern.UNICODE_CHARACTER_CLASS), addPrefixSpace);
+    } catch (PatternSyntaxException e) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: invalid pre_tokenizer regex '" + regex + "'", e);
+    }
   }
 
   private static List<PostProcessorStep> parsePostProcessor(JsonNode node) {
@@ -79,7 +85,7 @@ public final class TokenizerJsonLoader {
     }
     String type = node.path("type").asString("");
     if ("Sequence".equals(type)) {
-      for (JsonNode step : node.get("processors")) {
+      for (JsonNode step : node.path("processors")) {
         steps.add(parsePostProcessorStep(step));
       }
     } else {
@@ -95,7 +101,7 @@ public final class TokenizerJsonLoader {
     }
     if ("TemplateProcessing".equals(type)) {
       List<TemplateItem> single = new ArrayList<>();
-      for (JsonNode item : node.get("single")) {
+      for (JsonNode item : node.path("single")) {
         if (item.has("SpecialToken")) {
           single.add(new SpecialTokenItem(item.path("SpecialToken").path("id").asString()));
         } else if (item.has("Sequence")) {

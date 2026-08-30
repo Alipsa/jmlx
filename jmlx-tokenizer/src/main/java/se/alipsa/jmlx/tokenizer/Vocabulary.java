@@ -60,10 +60,4 @@ public final class Vocabulary {
   public boolean isSpecial(int id) {
     return specialIds.contains(id);
   }
-
-  /** Whether {@code token} exists in the vocabulary at all (used by {@code ignore_merges}). */
-  public boolean contains(String token) {
-    Objects.requireNonNull(token, "Vocabulary.contains: token must not be null");
-    return tokenToId.containsKey(token);
-  }
 }

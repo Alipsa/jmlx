@@ -95,16 +95,16 @@ against these real files, not reconstructions:
   both extend `HfJinjaException`, both unchecked. Built-in globals already include `raise_exception`,
   `range`, `namespace`, `tojson`-style JSON serialization support for chat-template use — no host
   functions need registering for either target model's template.
-- **This build environment cannot reach `mavenCentral()`; `mavenLocal()` must be added to the root
-  `build.gradle`'s `repositories {}` block, and both new dependencies are pinned to whatever version
-  is actually already present in `~/.m2/repository`, not each library's own latest release.**
-  `se.alipsa:hfjinja:0.5.0` is present locally (the user built and installed it there directly).
-  `tools.jackson.core:jackson-databind` is present only up to **`3.1.2`** — `3.2.2` (Maven Central's
-  actual latest at spike time) is *not* present locally and would fail to resolve in this
-  environment, so this plan pins Jackson to **`3.1.2`**, confirmed as a complete local artifact
-  (`.jar`/`.pom`/sources, no partial/failed-download markers). A machine with real Maven Central
-  access could use a newer Jackson 3.x release instead; this plan pins to what this build can
-  actually resolve today.
+- **Snapshot builds may resolve from `mavenLocal()` before `mavenCentral()` to support locally
+  published snapshot artifacts during development; release builds resolve only from Maven Central.**
+  This environment cannot reach Maven Central, so its snapshot development build uses locally
+  available dependencies. `se.alipsa:hfjinja:0.5.0` is present locally (the user built and installed
+  it there directly). `tools.jackson.core:jackson-databind` is present only up to **`3.1.2`** —
+  `3.2.2` (Maven Central's actual latest at spike time) is *not* present locally and would fail to
+  resolve in this environment, so this plan pins Jackson to **`3.1.2`**, confirmed as a complete
+  local artifact (`.jar`/`.pom`/sources, no partial/failed-download markers). A machine with real
+  Maven Central access could use a newer Jackson 3.x release instead; this plan pins to what this
+  build can actually resolve today.
 - **Jackson 3.1.2** (`tools.jackson.core:jackson-databind:3.1.2`) is the JSON parser: no JSON library
   exists anywhere in this repo today.
   Jackson 3 renamed several `JsonNode` accessors from its 2.x line (`asText()` → `asString()`,

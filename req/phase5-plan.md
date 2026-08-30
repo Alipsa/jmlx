@@ -314,7 +314,11 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   jmlx-owned fork of `rust/Cargo.toml` + `rust/src/lib.rs` with `crate-type = ["cdylib"]` instead --
   the latter is simpler since it also sidesteps needing the C++/CMake/submodule machinery
   (`sentencepiece`, `msgpack`) that only the C++ layer requires, if HF-JSON-only scope (see above)
-  is accepted for M2.
+  is accepted for M2. Either way, this fork inherits an upstream pin the same way `bootstrap-native.sh`
+  pins `MLX_C_COMMIT`: `rust/Cargo.toml` pins `tokenizers = "0.21.2"` (see the `onig`/`fancy-regex`
+  bullet below), and a jmlx-owned fork would own re-pinning it on the same
+  `scripts/checkDependencies.zsh`/`scripts/updateMlx.zsh`-style discipline this repo already has for
+  mlx-c, not a new maintenance burden invented for M2.
 - **A Rust toolchain is unavoidable for this whole path -- there is no way to use `tokenizers-cpp`
   (or any fork of it) without one.** The actual tokenizer logic is the upstream `tokenizers` Rust
   crate itself; `tokenizers-cpp`'s C and C++ layers are thin wrapper headers that call into a Rust
@@ -353,24 +357,32 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   with current vocab sizes (no token ID reaches `Integer.MAX_VALUE`), but it's exactly the kind of
   layout mismatch this codebase's own binding conventions otherwise pin down explicitly, and worth
   naming alongside the panic risk rather than leaving implicit in the quoted header above.
-- **A hard requirement of the FFM path for M3's actual target models, not an escapable build-fragility
-  note.** `tokenizers-cpp/rust/Cargo.toml` declares `tokenizers = { version = "0.21.2",
-  default-features = false, features = ["onig"] }` -- `onig` is already an explicit, deliberate
-  opt-in feature, not something inherited from upstream's own `default = ["progressbar", "onig",
-  "esaxx_fast"]`, so passing `default-features = false` (already set) does nothing further; skipping
-  `onig` means removing it from that explicit feature list, not flipping a flag. Doing so is not an
-  option for Llama/Qwen specifically: both use exactly the GPT-2-style regex split `onig` exists for,
-  confirmed against `llama.cpp/src/llama-vocab.cpp` -- QWEN2's pretokenizer regex is
-  `[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*` plus `\s+(?!\S)`, LLAMA3's differs only in
-  `\p{N}{1,3}` -- both rely on Unicode property classes and a negative lookahead, which is exactly
-  what Rust's `regex` crate cannot express and precisely why `onig` is there. There is also no
-  supported non-`onig` substitute reachable on this target: the only alternative engine,
-  `fancy-regex`, is gated behind upstream's `unstable_wasm = ["fancy-regex", "getrandom/wasm_js"]`,
-  which drags in a wasm `getrandom` backend -- wrong for `aarch64-apple-darwin`. `onig_sys` vendoring
-  and compiling a bundled Oniguruma C source when no system library is found via `pkg-config` (known
-  to hit compiler-compatibility issues on newer GCC, unconfirmed either way against Apple's clang on
-  this repo's actual macOS 26/Apple Silicon target) is therefore a real build-time cost the FFM path
-  must carry, not a risk it can build its way around.
+- **Not an escapable build-fragility note, but not a hard requirement of the FFM path either: exactly
+  one of `onig`/`fancy-regex` must be enabled, and `fancy-regex` is a real, pure-Rust alternative.**
+  `tokenizers-cpp/rust/Cargo.toml` declares `tokenizers = { version = "0.21.2", default-features =
+  false, features = ["onig"] }` -- `onig` is already an explicit, deliberate opt-in feature, not
+  something inherited from upstream's own `default = ["progressbar", "onig", "esaxx_fast"]`, so
+  passing `default-features = false` (already set) does nothing further; upstream's own
+  `tokenizers/src/utils/mod.rs` requires one of the two (`#[cfg(not(any(feature = "onig", feature =
+  "fancy-regex")))] compile_error!(...)`), so "skip the regex engine entirely" -- this bullet's
+  original framing -- was never on the table. Skipping `onig` specifically is not an option for
+  Llama/Qwen: both use exactly the GPT-2-style regex split `onig`/`fancy-regex` exist for, confirmed
+  against `llama.cpp/src/llama-vocab.cpp` -- QWEN2's pretokenizer regex is
+  `[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*` plus `\s+(?!\S)`, LLAMA3's differs mainly
+  in the numeric portion (`\p{N}{1,3}`) -- both rely on Unicode property classes and a negative
+  lookahead, which Rust's plain `regex` crate cannot express. **But `fancy-regex` is a supported,
+  reachable substitute, not gated behind `unstable_wasm` as an earlier pass here claimed:** upstream's
+  `Cargo.toml` declares `fancy-regex = { version = "0.14", optional = true }` as its own
+  implicitly-named feature, and `unstable_wasm = ["fancy-regex", "getrandom/wasm_js"]` merely bundles
+  it with a wasm `getrandom` backend for a different (wasm) target -- it does not gate `fancy-regex`
+  itself. `default-features = false, features = ["fancy-regex"]` is a valid non-wasm configuration on
+  `aarch64-apple-darwin`, and since `fancy-regex` is pure Rust, choosing it would eliminate the
+  `onig_sys`/Oniguruma-C-vendoring/`pkg-config`/GCC-compatibility fragility entirely -- the cheapest
+  available reduction in the FFM path's build cost, not something this document should argue away.
+  Not verified here: whether `fancy-regex` is byte-identical to `onig` on Llama-3/Qwen2's specific
+  patterns -- both engines support the lookaround and `\p{...}` classes those patterns use, but
+  split-behavior equivalence for these exact regexes is unconfirmed, and belongs in the load-time-cost
+  prototype this document already defers, not asserted here.
 
 **Still open, deliberately not resolved by this desk-research pass:** actually building a minimal
 `cdylib` from a jmlx-owned fork of `tokenizers-cpp/rust` (or from scratch against the plain
@@ -548,9 +560,11 @@ named scope boundary rather than left implicit.
   today means JitPack, a source/composite build, or publishing it first — see D3's amendment.** What
   remains genuinely open regardless of which tokenization direction (FFM vs. pure-Java) is chosen:
   real load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a
-  Rust toolchain decision); and, confirmed rather than open on the FFM side specifically, `onig` is a
-  hard requirement for Llama/Qwen's actual pretokenizer regex if that path is chosen, not an
-  escapable build-fragility note (see D3's amendment). Whether M3's reference models need general
+  Rust toolchain decision), including which regex backend to build it with -- Llama/Qwen's
+  pretokenizer regexes need lookahead/Unicode-class support that only `onig` or `fancy-regex` provide
+  (plain `regex` is ruled out either way), but whether `fancy-regex`'s pure-Rust split behavior
+  actually matches `onig`'s on these specific patterns is unconfirmed and belongs in that same
+  prototype (see D3's amendment). Whether M3's reference models need general
   Jinja2 chat-template evaluation at all or can get away with hand-formatting a small, known set of
   chat templates instead is still deferred to M3's own requirements (D4), though if `hfjinja` is
   adopted and its Maven-availability cost is paid, that question loses most of its urgency, since the

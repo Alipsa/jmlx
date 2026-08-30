@@ -55,11 +55,12 @@ public final class ByteLevelCoding {
   /**
    * Decodes a byte-level string back to raw bytes. Does not decode as UTF-8 itself: a multi-byte
    * UTF-8 character can be split across separate BPE tokens, so callers must concatenate the raw
-   * bytes of every consecutive byte-level token before UTF-8-decoding the combined buffer
-   * (see {@link ByteLevelDecoder}).
+   * bytes of every consecutive byte-level token before UTF-8-decoding the combined buffer (see
+   * {@link ByteLevelDecoder}).
    */
   public static byte[] decodeToBytes(String byteLevelText) {
-    Objects.requireNonNull(byteLevelText, "ByteLevelCoding.decodeToBytes: byteLevelText must not be null");
+    Objects.requireNonNull(
+        byteLevelText, "ByteLevelCoding.decodeToBytes: byteLevelText must not be null");
     byte[] out = new byte[byteLevelText.codePointCount(0, byteLevelText.length())];
     int i = 0;
     int index = 0;
@@ -68,7 +69,9 @@ public final class ByteLevelCoding {
       Integer b = CODE_POINT_TO_BYTE.get(codePoint);
       if (b == null) {
         throw new TokenizerException(
-            "ByteLevelCoding.decodeToBytes: code point " + codePoint + " is not a valid byte-level character");
+            "ByteLevelCoding.decodeToBytes: code point "
+                + codePoint
+                + " is not a valid byte-level character");
       }
       out[i++] = b.byteValue();
       index += Character.charCount(codePoint);

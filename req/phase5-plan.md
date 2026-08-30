@@ -294,13 +294,17 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   Java 21+ port of `@huggingface/jinja` specifically (option 2 above), pinned to upstream `0.5.9`,
   explicitly scoped as "the Hugging Face chat-template Jinja subset," not a general-purpose or
   Python-compatible Jinja2 engine -- the same narrow scope this document already argued for over
-  Jinjava. This effectively supersedes options 1-3 for M2/M3: it needs no hand-port of the ~3,860
-  remaining Jinja lines (already done, against the smaller/more current source this document already
-  preferred over `swift-jinja`), no Jinjava compatibility-verification risk, and no GraalJS
-  dependency-weight cost. Not yet verified here: whether it's published to a resolvable Maven
-  coordinate yet (the repo alone doesn't confirm this), and whether its byte-exact-vs.-Node-output
-  differential corpus actually covers M3's target models (Llama/Qwen/Mistral) specifically -- both
-  worth checking before depending on it for real, but the "port or embed a JS engine" trade-off this
+  Jinjava. This effectively supersedes options 1-3 for M2/M3 on the porting/build-shape question: it
+  needs no hand-port of the ~3,860 remaining Jinja lines (already done, against the smaller/more
+  current source this document already preferred over `swift-jinja`), no Jinjava
+  compatibility-verification risk, and no GraalJS dependency-weight cost. **It does not, however,
+  supersede the adoption cost: Maven Central's search API returns `numFound: 0` for `hfjinja` --
+  confirmed directly, not left as an open question -- so it is not currently resolvable as a normal
+  Gradle dependency.** Adopting it today means JitPack, a source/composite build, or publishing it
+  to Maven Central first; that real cost belongs in the comparison, not folded into "supersedes
+  everything." Still unverified: whether its byte-exact-vs.-Node-output differential corpus actually
+  covers M3's target models (Llama/Qwen/Mistral) specifically -- worth checking before depending on
+  it for real, but the "port or embed a JS engine" trade-off this
   section spent most of its length on is likely moot now.
 - **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
   the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
@@ -331,24 +335,42 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
 - **One real risk, not previously visible from the plan text alone: Rust-side panics cross the FFI
   boundary as failures with no recoverable status.** `rust/src/lib.rs`'s wrapper calls `.unwrap()`
   on `Tokenizer::from_str`/`encode`/`decode` -- a malformed `tokenizer.json` or a decode error panics
-  inside Rust rather than returning a checkable error code. A Rust panic unwinding across an `extern
-  "C"` boundary without `catch_unwind` is undefined behavior, not a catchable `MLXException`-style
-  failure -- structurally worse than mlx-c's own error convention (`printf` + `exit(-1)`, which
-  `NativeLoader`'s custom handler already replaces) precisely because there is no error-handler hook
-  to intercept it the way `NativeLoader` intercepts mlx-c's. Whatever plan follows this spike needs
+  inside Rust rather than returning a checkable error code. **Correction: a Rust panic unwinding
+  across an `extern "C"` boundary without `catch_unwind` is not undefined behavior -- per the
+  Rustonomicon's FFI chapter, "panic will cause the process to safely abort" (UB is the reverse
+  direction: a foreign exception entering Rust). Both this and mlx-c's own error convention (`printf`
+  + `exit(-1)`) are immediate, defined process death; the genuine distinction is narrower than "UB vs.
+  catchable" -- mlx-c's exit path is interceptable, and `NativeLoader`'s custom handler already
+  intercepts it, while a Rust abort offers no hook at all.** Whatever plan follows this spike needs
   to either wrap every entry point in `catch_unwind` in a jmlx-owned fork of the Rust glue, or
   explicitly accept malformed-tokenizer-file input as an unrecoverable-crash case (unlike every other
   failure path in this codebase, which surfaces as a catchable `MLXException`).
-- **A build-fragility note, not a blocker:** `tokenizers-cpp`'s `onig` Cargo feature (enabled in its
-  `Cargo.toml`, needed to replicate Python `regex`-module-exact Unicode splitting for GPT-2/GPT-4-style
-  BPE pretokenizers) pulls in `onig_sys`, which vendors and compiles an old bundled copy of the
-  Oniguruma C source when no system library is found via `pkg-config` -- known to hit compiler
-  compatibility issues on newer GCC (unconfirmed either way against Apple's clang on this repo's
-  actual macOS 26/Apple Silicon target, since that combination has not yet been built here). Whether
-  M2 needs `onig` at all depends on which reference models' tokenizers M3 actually targets: Llama/Qwen
-  both use byte-level BPE without the exact GPT-2 regex-split behavior `onig` exists for, so it may be
-  possible to build with `default-features = false` and skip `onig` entirely, avoiding this risk
-  rather than resolving it.
+- **A second FFI hazard in the same header, independent of the panic risk above: a signedness
+  mismatch between encode and decode.** `TokenizerEncodeResult` declares `int* token_ids`, but
+  `tokenizers_decode` takes `const uint32_t* data` -- confirmed against the upstream header, not just
+  this document's own transcription of it. An FFM binding would read `token_ids` as
+  `ValueLayout.JAVA_INT` (signed) and need to pass it back as unsigned for decode; not exploitable
+  with current vocab sizes (no token ID reaches `Integer.MAX_VALUE`), but it's exactly the kind of
+  layout mismatch this codebase's own binding conventions otherwise pin down explicitly, and worth
+  naming alongside the panic risk rather than leaving implicit in the quoted header above.
+- **A hard requirement of the FFM path for M3's actual target models, not an escapable build-fragility
+  note.** `tokenizers-cpp/rust/Cargo.toml` declares `tokenizers = { version = "0.21.2",
+  default-features = false, features = ["onig"] }` -- `onig` is already an explicit, deliberate
+  opt-in feature, not something inherited from upstream's own `default = ["progressbar", "onig",
+  "esaxx_fast"]`, so passing `default-features = false` (already set) does nothing further; skipping
+  `onig` means removing it from that explicit feature list, not flipping a flag. Doing so is not an
+  option for Llama/Qwen specifically: both use exactly the GPT-2-style regex split `onig` exists for,
+  confirmed against `llama.cpp/src/llama-vocab.cpp` -- QWEN2's pretokenizer regex is
+  `[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*` plus `\s+(?!\S)`, LLAMA3's differs only in
+  `\p{N}{1,3}` -- both rely on Unicode property classes and a negative lookahead, which is exactly
+  what Rust's `regex` crate cannot express and precisely why `onig` is there. There is also no
+  supported non-`onig` substitute reachable on this target: the only alternative engine,
+  `fancy-regex`, is gated behind upstream's `unstable_wasm = ["fancy-regex", "getrandom/wasm_js"]`,
+  which drags in a wasm `getrandom` backend -- wrong for `aarch64-apple-darwin`. `onig_sys` vendoring
+  and compiling a bundled Oniguruma C source when no system library is found via `pkg-config` (known
+  to hit compiler-compatibility issues on newer GCC, unconfirmed either way against Apple's clang on
+  this repo's actual macOS 26/Apple Silicon target) is therefore a real build-time cost the FFM path
+  must carry, not a risk it can build its way around.
 
 **Still open, deliberately not resolved by this desk-research pass:** actually building a minimal
 `cdylib` from a jmlx-owned fork of `tokenizers-cpp/rust` (or from scratch against the plain
@@ -356,10 +378,9 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
 original "prototyping load-time cost" requirement. This machine has no Rust toolchain installed
 (`cargo`/`rustc` both absent); doing so is an environment change worth confirming with a human before
 taking, not something to do unilaterally mid-spike. `req/plans/phase5-m2-plan.md` should not be
-written until that prototyping step also lands -- the desk research above resolves the *architecture*
-question (FFM-bind a plain-C shim, most likely a jmlx-owned fork of `tokenizers-cpp/rust` scoped to
-HF-JSON + byte-level-BPE only, skipping the C++/SentencePiece layer) but not the *cost* question D3
-also asked for.
+written until that prototyping step also lands, nor until the FFM-vs-pure-Java architecture choice
+itself is actually made -- the desk research above narrows both (see D3's amendment for the pure-Java
+side, and this bullet's own onig/panic findings for the FFM side's real cost) but resolves neither.
 
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already
@@ -519,19 +540,21 @@ named scope boundary rather than left implicit.
   lines for tokenization alone, ~7,700 lines with full chat-template fidelity if porting Jinja from
   HF's own smaller, more current JS implementation (`@huggingface/jinja`) rather than `swift-jinja`,
   or ~10,500 from the latter — real, quantified numbers to weigh against the FFM path's toolchain
-  cost, not an open unknown anymore. **Largely mooted since: `hfjinja`
+  cost, not an open unknown anymore. **The porting question is largely mooted since: `hfjinja`
   (`github.com/Alipsa/hfjinja`) is a released, dependency-free Java 21+ port of `@huggingface/jinja`
   itself — i.e. option 2 already done, by the same org as jmlx — so the chat-template half of the
-  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted; see D3's
-  amendment for what's still unverified (Maven coordinate, model-coverage of its differential test
-  corpus).** What remains genuinely open regardless of which tokenization direction (FFM vs.
-  pure-Java) is chosen: real load-time cost for the FFM path (needs an actual build-and-measure
-  prototype, blocked on a Rust toolchain decision), whether `onig` is actually needed for M3's target
-  models if the FFM path is chosen, and whether M3's reference models need general Jinja2
-  chat-template evaluation at all or can get away with hand-formatting a small, known set of chat
-  templates instead (D4 explicitly defers M3's own requirements, so this isn't decidable from this
-  document alone) — though if `hfjinja` is adopted, that last question loses most of its urgency too,
-  since the "port vs. hand-format" trade-off it was weighing is no longer a real port.
+  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted. Its adoption
+  cost is not moot, though: it is confirmed absent from Maven Central (`numFound: 0`), so using it
+  today means JitPack, a source/composite build, or publishing it first — see D3's amendment.** What
+  remains genuinely open regardless of which tokenization direction (FFM vs. pure-Java) is chosen:
+  real load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a
+  Rust toolchain decision); and, confirmed rather than open on the FFM side specifically, `onig` is a
+  hard requirement for Llama/Qwen's actual pretokenizer regex if that path is chosen, not an
+  escapable build-fragility note (see D3's amendment). Whether M3's reference models need general
+  Jinja2 chat-template evaluation at all or can get away with hand-formatting a small, known set of
+  chat templates instead is still deferred to M3's own requirements (D4), though if `hfjinja` is
+  adopted and its Maven-availability cost is paid, that question loses most of its urgency, since the
+  "port vs. hand-format" trade-off it was weighing is no longer a real port.
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

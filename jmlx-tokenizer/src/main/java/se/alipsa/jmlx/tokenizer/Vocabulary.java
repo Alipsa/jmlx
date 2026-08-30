@@ -16,6 +16,10 @@ public final class Vocabulary {
   private final Map<Integer, String> idToToken;
   private final Set<Integer> specialIds;
 
+  /**
+   * Merges {@code modelVocab} with {@code addedTokens}, the latter taking precedence on id
+   * collision.
+   */
   public Vocabulary(Map<String, Integer> modelVocab, List<AddedToken> addedTokens) {
     Objects.requireNonNull(modelVocab, "Vocabulary: modelVocab must not be null");
     Objects.requireNonNull(addedTokens, "Vocabulary: addedTokens must not be null");

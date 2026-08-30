@@ -11,10 +11,4 @@ java {
 dependencies {
     implementation libs.jackson.databind
     implementation libs.hfjinja
-    testImplementation libs.junit.jupiter.api
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
-}
-
-test {
-    useJUnitPlatform()
 }

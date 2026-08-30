@@ -357,8 +357,9 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   with current vocab sizes (no token ID reaches `Integer.MAX_VALUE`), but it's exactly the kind of
   layout mismatch this codebase's own binding conventions otherwise pin down explicitly, and worth
   naming alongside the panic risk rather than leaving implicit in the quoted header above.
-- **Not an escapable build-fragility note, but not a hard requirement of the FFM path either: exactly
-  one of `onig`/`fancy-regex` must be enabled, and `fancy-regex` is a real, pure-Rust alternative.**
+- **A regex backend is unavoidable, but `onig` specifically is not: exactly one of
+  `onig`/`fancy-regex` must be enabled, and `fancy-regex` is a real, pure-Rust alternative that
+  avoids the Oniguruma build fragility.**
   `tokenizers-cpp/rust/Cargo.toml` declares `tokenizers = { version = "0.21.2", default-features =
   false, features = ["onig"] }` -- `onig` is already an explicit, deliberate opt-in feature, not
   something inherited from upstream's own `default = ["progressbar", "onig", "esaxx_fast"]`, so
@@ -382,8 +383,8 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   and unconfirmed either way against Apple's clang on this repo's actual macOS 26/Apple Silicon
   target, since that combination has not yet been built here. This is the cheapest available
   reduction in the FFM path's build cost. Not verified here: whether `fancy-regex` is byte-identical
-  to `onig` on Llama-3/Qwen2's specific
-  patterns -- both engines support the lookaround and `\p{...}` classes those patterns use, but
+  to `onig` on Llama-3/Qwen2's specific patterns -- both engines support the lookaround and
+  `\p{...}` classes those patterns use, but
   split-behavior equivalence for these exact regexes is unconfirmed, and belongs in the load-time-cost
   prototype this document already defers, not asserted here.
 

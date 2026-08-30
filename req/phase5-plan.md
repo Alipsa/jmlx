@@ -288,6 +288,20 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
      "pure, idiomatic Java... zero-copy FFM" framing in `CLAUDE.md`, which none of the tokenizer-side
      options raise this sharply. Not evaluated further here: actual jar-size/startup-cost numbers, or
      whether GraalJS's polyglot API composes cleanly with `MLXScope`'s confinement/lifecycle model.
+
+  **Amendment: "no official Java equivalent of `swift-jinja` exists" is no longer true.** `hfjinja`
+  (`github.com/Alipsa/hfjinja`, MIT, same org as jmlx) has since been released -- a dependency-free
+  Java 21+ port of `@huggingface/jinja` specifically (option 2 above), pinned to upstream `0.5.9`,
+  explicitly scoped as "the Hugging Face chat-template Jinja subset," not a general-purpose or
+  Python-compatible Jinja2 engine -- the same narrow scope this document already argued for over
+  Jinjava. This effectively supersedes options 1-3 for M2/M3: it needs no hand-port of the ~3,860
+  remaining Jinja lines (already done, against the smaller/more current source this document already
+  preferred over `swift-jinja`), no Jinjava compatibility-verification risk, and no GraalJS
+  dependency-weight cost. Not yet verified here: whether it's published to a resolvable Maven
+  coordinate yet (the repo alone doesn't confirm this), and whether its byte-exact-vs.-Node-output
+  differential corpus actually covers M3's target models (Llama/Qwen/Mistral) specifically -- both
+  worth checking before depending on it for real, but the "port or embed a JS engine" trade-off this
+  section spent most of its length on is likely moot now.
 - **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
   the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
   = ["staticlib"]`; producing something `System.load()`-able would need either (a) a small additional
@@ -505,16 +519,19 @@ named scope boundary rather than left implicit.
   lines for tokenization alone, ~7,700 lines with full chat-template fidelity if porting Jinja from
   HF's own smaller, more current JS implementation (`@huggingface/jinja`) rather than `swift-jinja`,
   or ~10,500 from the latter — real, quantified numbers to weigh against the FFM path's toolchain
-  cost, not an open unknown anymore. No Java-native equivalent of `swift-jinja` exists; Jinjava
-  (HubSpot) is the closest existing library but is unverified against real HF chat templates, and
-  embedding GraalJS to run `@huggingface/jinja` directly (no porting at all) is a third option with
-  its own dependency-weight cost — see D3's amendment for all three. What remains genuinely open
-  regardless of which direction is chosen: real load-time cost for the FFM path (needs an actual
-  build-and-measure prototype, blocked on a Rust toolchain decision), whether `onig` is actually
-  needed for M3's target models if the FFM path is chosen, and whether M3's reference models need
-  general Jinja2 chat-template evaluation at all or can get away with hand-formatting a small, known
-  set of chat templates instead (D4 explicitly defers M3's own requirements, so this isn't decidable
-  from this document alone).
+  cost, not an open unknown anymore. **Largely mooted since: `hfjinja`
+  (`github.com/Alipsa/hfjinja`) is a released, dependency-free Java 21+ port of `@huggingface/jinja`
+  itself — i.e. option 2 already done, by the same org as jmlx — so the chat-template half of the
+  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted; see D3's
+  amendment for what's still unverified (Maven coordinate, model-coverage of its differential test
+  corpus).** What remains genuinely open regardless of which tokenization direction (FFM vs.
+  pure-Java) is chosen: real load-time cost for the FFM path (needs an actual build-and-measure
+  prototype, blocked on a Rust toolchain decision), whether `onig` is actually needed for M3's target
+  models if the FFM path is chosen, and whether M3's reference models need general Jinja2
+  chat-template evaluation at all or can get away with hand-formatting a small, known set of chat
+  templates instead (D4 explicitly defers M3's own requirements, so this isn't decidable from this
+  document alone) — though if `hfjinja` is adopted, that last question loses most of its urgency too,
+  since the "port vs. hand-format" trade-off it was weighing is no longer a real port.
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

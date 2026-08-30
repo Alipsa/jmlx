@@ -1,0 +1,16 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencies {
+    implementation libs.jackson.databind
+    implementation libs.hfjinja
+    testImplementation libs.junit.jupiter.api
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+}

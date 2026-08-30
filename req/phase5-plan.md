@@ -359,34 +359,33 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   naming alongside the panic risk rather than leaving implicit in the quoted header above.
 - **A regex backend is unavoidable, but `onig` specifically is not: exactly one of
   `onig`/`fancy-regex` must be enabled, and `fancy-regex` is a real, pure-Rust alternative that
-  avoids the Oniguruma build fragility.**
-  `tokenizers-cpp/rust/Cargo.toml` declares `tokenizers = { version = "0.21.2", default-features =
-  false, features = ["onig"] }` -- `onig` is already an explicit, deliberate opt-in feature, not
-  something inherited from upstream's own `default = ["progressbar", "onig", "esaxx_fast"]`, so
-  passing `default-features = false` (already set) does nothing further; upstream's own
-  `tokenizers/src/utils/mod.rs` requires one of the two (`#[cfg(not(any(feature = "onig", feature =
-  "fancy-regex")))] compile_error!(...)`), so "skip the regex engine entirely" -- this bullet's
-  original framing -- was never on the table. Skipping `onig` specifically is not an option for
-  Llama/Qwen: both use exactly the GPT-2-style regex split `onig`/`fancy-regex` exist for, confirmed
-  against `llama.cpp/src/llama-vocab.cpp` -- QWEN2's pretokenizer regex is
-  `[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*` plus `\s+(?!\S)`, LLAMA3's differs mainly
-  in the numeric portion (`\p{N}{1,3}`) -- both rely on Unicode property classes and a negative
-  lookahead, which Rust's plain `regex` crate cannot express. **But `fancy-regex` is a supported,
-  reachable substitute, not gated behind `unstable_wasm` as an earlier pass here claimed:** upstream's
-  `Cargo.toml` declares `fancy-regex = { version = "0.14", optional = true }` as its own
-  implicitly-named feature, and `unstable_wasm = ["fancy-regex", "getrandom/wasm_js"]` merely bundles
-  it with a wasm `getrandom` backend for a different (wasm) target -- it does not gate `fancy-regex`
-  itself. `default-features = false, features = ["fancy-regex"]` is a valid non-wasm configuration on
-  `aarch64-apple-darwin`, and since `fancy-regex` is pure Rust, choosing it would eliminate entirely
-  the fragility `onig_sys` carries: it vendors and compiles a bundled Oniguruma C source when no
-  system library is found via `pkg-config`, known to hit compiler compatibility issues on newer GCC
-  and unconfirmed either way against Apple's clang on this repo's actual macOS 26/Apple Silicon
-  target, since that combination has not yet been built here. This is the cheapest available
-  reduction in the FFM path's build cost. Not verified here: whether `fancy-regex` is byte-identical
-  to `onig` on Llama-3/Qwen2's specific patterns -- both engines support the lookaround and
-  `\p{...}` classes those patterns use, but
-  split-behavior equivalence for these exact regexes is unconfirmed, and belongs in the load-time-cost
-  prototype this document already defers, not asserted here.
+  avoids the Oniguruma build fragility.** `tokenizers-cpp/rust/Cargo.toml` declares `tokenizers = {
+  version = "0.21.2", default-features = false, features = ["onig"] }` -- `onig` is already an
+  explicit, deliberate opt-in feature, not something inherited from upstream's own `default =
+  ["progressbar", "onig", "esaxx_fast"]`, so passing `default-features = false` (already set) does
+  nothing further; upstream's own `tokenizers/src/utils/mod.rs` requires one of the two
+  (`#[cfg(not(any(feature = "onig", feature = "fancy-regex")))] compile_error!(...)`), so "skip the
+  regex engine entirely" -- this bullet's original framing -- was never on the table. What
+  Llama/Qwen force is the capability, not the crate: both use exactly the GPT-2-style regex split
+  `onig`/`fancy-regex` exist for, confirmed against `llama.cpp/src/llama-vocab.cpp` -- QWEN2's
+  pretokenizer regex is `[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*` plus `\s+(?!\S)`,
+  LLAMA3's differs mainly in the numeric portion (`\p{N}{1,3}`) -- both rely on Unicode property
+  classes and a negative lookahead, which Rust's plain `regex` crate cannot express. **But
+  `fancy-regex` is a supported, reachable substitute, not gated behind `unstable_wasm` as an earlier
+  pass here claimed:** upstream's `Cargo.toml` declares `fancy-regex = { version = "0.14", optional =
+  true }` as its own implicitly-named feature, and `unstable_wasm = ["fancy-regex",
+  "getrandom/wasm_js"]` merely bundles it with a wasm `getrandom` backend for a different (wasm)
+  target -- it does not gate `fancy-regex` itself. `default-features = false, features =
+  ["fancy-regex"]` is a valid non-wasm configuration on `aarch64-apple-darwin`, and since
+  `fancy-regex` is pure Rust, choosing it would eliminate entirely the fragility `onig_sys` carries:
+  it vendors and compiles a bundled Oniguruma C source when no system library is found via
+  `pkg-config`, known to hit compiler compatibility issues on newer GCC and unconfirmed either way
+  against Apple's clang on this repo's actual macOS 26/Apple Silicon target, since that combination
+  has not yet been built here. This is the cheapest available reduction in the FFM path's build
+  cost. Not verified here: whether `fancy-regex` is byte-identical to `onig` on Llama-3/Qwen2's
+  specific patterns -- both engines support the lookaround and `\p{...}` classes those patterns use,
+  but split-behavior equivalence for these exact regexes is unconfirmed, and belongs in the
+  load-time-cost prototype this document already defers, not asserted here.
 
 **Still open, deliberately not resolved by this desk-research pass:** actually building a minimal
 `cdylib` from a jmlx-owned fork of `tokenizers-cpp/rust` (or from scratch against the plain

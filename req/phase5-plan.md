@@ -13,7 +13,7 @@ Research findings section below leans on that same precedent for M1's own C-stri
 | Item | Status | Commit |
 |---|---|---|
 | M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
-| M2 — Tokenizer integration (§2) | Desk-research spike done (D3 below): waiting for upstream `mlx-c` tokenizer support is ruled out, but the FFM-vs-pure-Java architecture choice itself is still open between two credible precedents -- neither prototyped yet | — |
+| M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus `hfjinja`-based chat-template rendering, resolving the FFM-vs-pure-Java choice D3 left open in favor of pure Java; dependencies `tools.jackson.core:jackson-databind:3.1.2` and `se.alipsa:hfjinja:0.5.0`, both resolved via `mavenLocal()` since this build environment lacks direct Maven Central network access; `req/plans/phase5-m2-plan.md`'s own Tasks 1-14 record the implementation) | Tasks 1-14 on `phase5-m2-tokenizer` (not yet merged to `main`) |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | Not started | — |
 
 ## Context
@@ -406,6 +406,24 @@ taking, not something to do unilaterally mid-spike. `req/plans/phase5-m2-plan.md
 written until that prototyping step also lands, nor until the FFM-vs-pure-Java architecture choice
 itself is actually made -- the desk research above narrows both (see D3's amendment for the pure-Java
 side, and the onig and panic bullets above for the FFM side's real cost) but resolves neither.
+
+**D3 resolution (M2 implemented): the FFM-vs-pure-Java architecture choice above is now made, not
+still open.** `req/plans/phase5-m2-plan.md` chose the pure-Java path over the `tokenizers-cpp`/FFM
+path this section spent most of its length de-risking, and it has since been implemented as the
+`jmlx-tokenizer` module (`se.alipsa.jmlx.tokenizer`) -- see the Status table above. This sidesteps
+every FFM-path risk this section documented (the Rust-panic-crosses-FFI hazard, the
+`token_ids`/`uint32_t` signedness mismatch, the `onig`/`fancy-regex` build fragility, and the
+Rust-toolchain dependency this project would otherwise not have needed) at the cost this section also
+named up front: a genuine from-scratch port -- `HfTokenizer` and its supporting classes for the
+byte-level-BPE pipeline, plus `hfjinja` (`se.alipsa:hfjinja:0.5.0`) for the chat-template half this
+section's `@huggingface/jinja`/option-2 bullet already preferred -- rather than a thin binding over
+already-battle-tested native code the way M1's `MLXIO` is. One correction to the amendment above:
+`se.alipsa:hfjinja:0.5.0` and `tools.jackson.core:jackson-databind:3.1.2` are resolved via
+`mavenLocal()` in this build environment, not `mavenCentral()` alone as that amendment assumed would
+suffice -- this environment cannot reach Maven Central directly (see `req/plans/phase5-m2-plan.md`'s
+own Findings). The "still open" paragraph immediately above and the rest of D3 are left in place as
+the historical record of the research that led here, per this document's own amend-don't-delete
+convention.
 
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already

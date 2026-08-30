@@ -376,10 +376,13 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   implicitly-named feature, and `unstable_wasm = ["fancy-regex", "getrandom/wasm_js"]` merely bundles
   it with a wasm `getrandom` backend for a different (wasm) target -- it does not gate `fancy-regex`
   itself. `default-features = false, features = ["fancy-regex"]` is a valid non-wasm configuration on
-  `aarch64-apple-darwin`, and since `fancy-regex` is pure Rust, choosing it would eliminate the
-  `onig_sys`/Oniguruma-C-vendoring/`pkg-config`/GCC-compatibility fragility entirely -- the cheapest
-  available reduction in the FFM path's build cost, not something this document should argue away.
-  Not verified here: whether `fancy-regex` is byte-identical to `onig` on Llama-3/Qwen2's specific
+  `aarch64-apple-darwin`, and since `fancy-regex` is pure Rust, choosing it would eliminate entirely
+  the fragility `onig_sys` carries: it vendors and compiles a bundled Oniguruma C source when no
+  system library is found via `pkg-config`, known to hit compiler compatibility issues on newer GCC
+  and unconfirmed either way against Apple's clang on this repo's actual macOS 26/Apple Silicon
+  target, since that combination has not yet been built here. This is the cheapest available
+  reduction in the FFM path's build cost. Not verified here: whether `fancy-regex` is byte-identical
+  to `onig` on Llama-3/Qwen2's specific
   patterns -- both engines support the lookaround and `\p{...}` classes those patterns use, but
   split-behavior equivalence for these exact regexes is unconfirmed, and belongs in the load-time-cost
   prototype this document already defers, not asserted here.
@@ -392,7 +395,7 @@ original "prototyping load-time cost" requirement. This machine has no Rust tool
 taking, not something to do unilaterally mid-spike. `req/plans/phase5-m2-plan.md` should not be
 written until that prototyping step also lands, nor until the FFM-vs-pure-Java architecture choice
 itself is actually made -- the desk research above narrows both (see D3's amendment for the pure-Java
-side, and this bullet's own onig/panic findings for the FFM side's real cost) but resolves neither.
+side, and the onig and panic bullets above for the FFM side's real cost) but resolves neither.
 
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already

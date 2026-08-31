@@ -51,4 +51,13 @@ class BpeMergerTest {
     BpeMerger merger = new BpeMerger(new BpeModelConfig(BASE_VOCAB, Map.of(), false));
     assertEquals(List.of("l", "o", "w"), merger.merge("low"));
   }
+
+  @Test
+  void equalRankCandidatePairsMergeTheLeftmostOccurrenceFirst() {
+    // "aaa" has two candidate "a a" pairs at the same rank (index 0-1 and 1-2). Merging the
+    // leftmost first yields "aa"+"a"; merging the rightmost first would instead yield "a"+"aa".
+    Map<String, Integer> vocab = Map.of("a", 0, "aa", 1);
+    BpeMerger merger = new BpeMerger(new BpeModelConfig(vocab, Map.of("a a", 0), false));
+    assertEquals(List.of("aa", "a"), merger.merge("aaa"));
+  }
 }

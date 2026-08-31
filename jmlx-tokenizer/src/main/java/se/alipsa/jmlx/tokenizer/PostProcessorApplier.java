@@ -12,11 +12,14 @@ public final class PostProcessorApplier {
   private PostProcessorApplier() {}
 
   /** Applies every step in {@code steps} to {@code tokens} in order. */
-  public static List<String> apply(
+  public static List<ResolvedToken> apply(
       List<PostProcessorStep> steps, List<String> tokens, boolean addSpecialTokens) {
     Objects.requireNonNull(steps, "PostProcessorApplier.apply: steps must not be null");
     Objects.requireNonNull(tokens, "PostProcessorApplier.apply: tokens must not be null");
-    List<String> result = tokens;
+    List<ResolvedToken> result = new ArrayList<>();
+    for (String token : tokens) {
+      result.add(new ResolvedToken(token, null));
+    }
     for (PostProcessorStep step : steps) {
       if (step instanceof TemplateProcessingStep template) {
         result = applyTemplate(template, result, addSpecialTokens);
@@ -27,9 +30,9 @@ public final class PostProcessorApplier {
     return result;
   }
 
-  private static List<String> applyTemplate(
-      TemplateProcessingStep step, List<String> tokens, boolean addSpecialTokens) {
-    List<String> out = new ArrayList<>();
+  private static List<ResolvedToken> applyTemplate(
+      TemplateProcessingStep step, List<ResolvedToken> tokens, boolean addSpecialTokens) {
+    List<ResolvedToken> out = new ArrayList<>();
     for (TemplateItem item : step.single()) {
       if (item instanceof SequenceItem) {
         out.addAll(tokens);
@@ -42,7 +45,12 @@ public final class PostProcessorApplier {
                     + special.id()
                     + "'");
           }
-          out.addAll(info.tokens());
+          List<String> specialTokens = info.tokens();
+          List<Integer> specialIds = info.ids();
+          for (int i = 0; i < specialTokens.size(); i++) {
+            Integer id = i < specialIds.size() ? specialIds.get(i) : null;
+            out.add(new ResolvedToken(specialTokens.get(i), id));
+          }
         }
       }
     }

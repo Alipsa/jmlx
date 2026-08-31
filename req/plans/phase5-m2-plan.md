@@ -74,6 +74,13 @@ against these real files, not reconstructions:
 - **`merges` is a JSON array of single space-separated strings** (e.g. `"Ġ Ġ"`), not the older
   two-element-array-per-merge format — confirmed by direct inspection of both files. Array index
   order is priority rank (lower index merges first).
+
+  **Amendment (PR #14 review, round 2): this bullet has the history backwards.** The
+  two-element-array form (`["Ġ", "Ġ"]`) is not older — it is the *newer* serialization, introduced
+  in HF `tokenizers` PR #909 (released in `tokenizers` v0.20.0) specifically to make each merge's
+  two components unambiguous without a separator convention. The single space-separated string is
+  the older format this plan's two fixture files happened to use, and remains valid: `tokenizers`
+  still round-trips both. `TokenizerJsonLoader.parseModel` (Task 4, below) accepts either shape.
 - **`added_tokens`: zero entries on either model set `lstrip`/`rstrip`/`single_word`/`normalized`**
   (checked all 22 Qwen2.5 entries and all 256 Llama-3 entries programmatically, not sampled) — the
   whitespace-eating variant of added-token matching `Tokenizer.swift` supports is dead code for both
@@ -98,8 +105,11 @@ against these real files, not reconstructions:
 - **Snapshot builds may resolve from `mavenLocal()` before `mavenCentral()` to support locally
   published snapshot artifacts during development; release builds resolve only from Maven Central.**
   This environment cannot reach Maven Central, so its snapshot development build uses locally
-  available dependencies. `se.alipsa:hfjinja:0.5.0` is present locally (the user built and installed
-  it there directly). `tools.jackson.core:jackson-databind` is present only up to **`3.1.2`** —
+  available dependencies. [Amended (PR #14 review, rounds 1 and 3): the "cannot reach Maven
+  Central" premise in the previous sentence is mistaken -- see Task 1's Step 1c amendment below for
+  the corrected diagnosis and the `build.gradle` shape actually shipped.] `se.alipsa:hfjinja:0.5.0`
+  is present locally (the user built and installed it there directly).
+  `tools.jackson.core:jackson-databind` is present only up to **`3.1.2`** —
   `3.2.2` (Maven Central's actual latest at spike time) is *not* present locally and would fail to
   resolve in this environment, so this plan pins Jackson to **`3.1.2`**, confirmed as a complete
   local artifact (`.jar`/`.pom`/sources, no partial/failed-download markers). A machine with real
@@ -253,6 +263,33 @@ allprojects {
 `mavenCentral()` stays in the list (not removed) so a build environment that *does* have real
 network access still works unchanged — this only adds a local-first lookup, it doesn't take
 anything away.
+
+**Amendment (PR #14 review, rounds 1 and 3): the "this build environment cannot reach
+`mavenCentral()`" premise above was mistaken, and the shipped `build.gradle` does not match the
+snippet above.** Live dependency resolution against a stock `mavenCentral()`-only repository list
+(`./gradlew :jmlx-tokenizer:dependencies --configuration compileClasspath --refresh-dependencies`,
+and a direct `curl` against `repo1.maven.org`) confirms both `se.alipsa:hfjinja:0.5.0` and
+`tools.jackson.core:jackson-databind:3.1.2` resolve from Maven Central alone -- this environment was
+never actually unable to reach it. The root `build.gradle` instead gates `mavenLocal()` on `jmlx`'s
+own root project version (`group = 'se.alipsa'`, `version = '0.5.0-SNAPSHOT'`, both set in an
+`allprojects {}` block) being a `-SNAPSHOT` build, an ordinary and unrelated local-development
+convenience (per this repo's own `~/.claude/CLAUDE.md` policy: "If a project is a SNAPSHOT version,
+`mavenLocal()` should be enabled — always"), not a network workaround:
+
+```groovy
+allprojects {
+    repositories {
+        mavenCentral()
+        if (rootProject.version.toString().endsWith('-SNAPSHOT')) {
+            mavenLocal()
+        }
+    }
+}
+```
+
+`mavenCentral()` is checked first here (not `mavenLocal()`), so a release build -- or any build
+whose `jmlx` version isn't a `-SNAPSHOT` -- resolves every dependency from Central alone and can
+never have a stale same-GAV artifact in `~/.m2/repository` silently win with no diagnostic.
 
 **Step 1d — `jmlx-tokenizer/build.gradle`:** new file, mirroring `jmlx-core/build.gradle`'s
 plugin/toolchain/spotless/checkstyle blocks but with this module's own dependencies:
@@ -702,6 +739,47 @@ public final class TokenizerJsonLoader {
 }
 ```
 
+**Amendment (PR #14 review, rounds 1-2): the listing above predates six fixes; left as originally
+written, per this repo's convention of amending rather than rewriting a merged plan wholesale.**
+
+- `load`'s `try`/`catch` originally wrapped only `MAPPER.readTree(...)`; every `parse*` call below
+  it ran outside the `try` block, so a Jackson-internal exception thrown from deep inside one of
+  them (e.g. calling `asString()` on a non-textual node) escaped `HfTokenizer.fromFile` unwrapped,
+  with no file path attached. The `try` block now wraps the whole method body.
+- `parseModel`'s merge-parsing loop originally called `merge.asString()` unconditionally, assuming
+  every element of `merges` is a single space-separated string. It now accepts both that format and
+  the two-element-array format (see the amendment two bullets above), and NPE-guards the array
+  case: `merge.get(1)` is `null` for a malformed 1-element array, and calling `.asString()` on that
+  null used to throw a raw, uncaught `NullPointerException` — now checked and rethrown as
+  `TokenizerException`.
+- That same loop originally used `mergeRank.put(...)`, so a duplicate pair (reachable once both
+  merge serializations can appear in one array) let whichever occurrence came *last* win, silently
+  downgrading an earlier pair's priority. `tokenizers` itself keeps the *first* occurrence; the loop
+  now uses `mergeRank.putIfAbsent(...)` to match. (Re-joining an array pair with a plain `" "`
+  separator is safe either way: byte `0x20` is never a byte-level-printable-range byte — the
+  printable range starts at `!` — so a literal space can never occur inside a byte-level symbol,
+  and can't collide with a merge's own delimiter.)
+- An empty `mergeRank` (e.g. `"merges": []`) originally parsed successfully into a `BpeModelConfig`
+  that `BpeMerger` would then silently degrade against — see `BpeMergerTest`'s own
+  `withoutIgnoreMergesAndNoMergeRulesEachByteStaysItsOwnSymbol` case, which documents exactly that
+  degradation. `parseModel` now throws if `mergeRank` ends up empty.
+- `parsePreTokenizer` originally collapsed the ordered `pretokenizers` array into an unordered
+  `(regex, addPrefixSpace)` pair by scanning for a `"Split"`-typed step and a `"ByteLevel"`-typed
+  step independently, ignoring `behavior`, `invert`, and `use_regex` entirely. A file with
+  `invert: true` (which flips which spans count as matches), a non-`"Isolated"` `behavior`, a
+  `use_regex: true` `ByteLevel` step, more than two steps, or the two steps in reversed order loaded
+  without complaint and then tokenized differently from HF with no diagnostic — exactly the
+  silent-divergence failure mode Global Constraint 5 warns about. `parsePreTokenizer` now requires
+  `pretokenizers` to be exactly `[Split, ByteLevel]` in that order, with `Split.behavior ==
+  "Isolated"`, `Split.invert == false`, and `ByteLevel.use_regex == false`, throwing
+  `TokenizerException` otherwise.
+- `TemplateProcessing`'s `special_tokens.*.ids`/`.tokens` arrays were parsed with no length check.
+  `PostProcessorApplier` (Task 10, amended below) pairs them positionally; an entry with mismatched
+  lengths let extra `ids` silently drop or, in the worst case (populated `ids` with an *empty*
+  `tokens`), made the whole special token vanish from a template's output with no error.
+  `parsePostProcessorStep` now throws if a `special_tokens` entry's `ids` and `tokens` lengths
+  differ.
+
 **`TokenizerJsonTest.java`** (against the synthetic fixtures from Task 14 — written here but only
 runnable once Task 14 lands; note the dependency in the commit message):
 
@@ -808,10 +886,31 @@ public final class Vocabulary {
 }
 ```
 
-**No standalone test file** — `Vocabulary` is exercised end-to-end by `HfTokenizerTest` (Task 12);
-its logic is simple enough (two map builds, three lookups) that a dedicated unit test would duplicate
-those assertions without adding coverage, matching this codebase's existing practice of not testing
-trivial wrapper classes in isolation when an integration test already exercises every branch.
+**Amendment (PR #14 review, round 2): the constructor above under-specifies collision handling, and
+this plan's "no standalone test file" call below turned out wrong.** Two real gaps, both fixed:
+
+- The constructor's `tokenToId.put`/`idToToken.put` pair only ever *adds* an added token's own
+  entries; it never removes whatever the colliding id or token string previously pointed to. If an
+  added token's id collides with a *different* model-vocab token, `tokenToId` ends up with two
+  string keys mapping to the same id (the original plus the added one) while `idToToken` keeps only
+  the added one — so `idOf(originalToken)` still returns the id, but `tokenOf(that id)` no longer
+  returns `originalToken`. The symmetric case (an added token's *string* colliding with a different
+  model-vocab id) breaks the same invariant the other direction. The constructor now removes the
+  stale reverse-mapping on both an id collision and a token-string collision, so `idOf`/`tokenOf`
+  stay exact mutual inverses across any collision, not just consistent for the non-colliding case
+  this plan's snippet implicitly assumed.
+- `specialIds.add(t.id())` is also one-directional: if a *later* added token collides on the same id
+  as an *earlier* one and is not itself `special`, the id's entry in `specialIds` is never removed,
+  so `isSpecial` keeps reporting `true` for a token that is not special. The loop now does
+  `specialIds.add(t.id())`/`specialIds.remove(t.id())` based on the *current* occupant's `special`
+  flag, so `specialIds` always reflects whichever token currently owns the id.
+- A `maxKnownId()` accessor was added (the largest id assigned by either `modelVocab` or
+  `addedTokens`), for `HfTokenizer#decode` (Task 12, amended below) to distinguish a legitimately
+  above-vocab id from an in-range hole.
+- This plan's "no standalone test file" call turned out wrong once the collision-handling behavior
+  above needed exercising directly: `VocabularyTest.java` now covers both collision directions, the
+  `specialIds` pruning fix, and `maxKnownId()`, independent of whatever `HfTokenizerTest` happens to
+  reach through a real tokenizer.json fixture.
 
 ## Task 6: `BpeMerger`
 
@@ -983,6 +1082,28 @@ class ByteLevelPreTokenizerTest {
   }
 }
 ```
+
+**Amendment (PR #14 review, rounds 1-2): `split` above has two real bugs, the second introduced and
+then corrected across two review rounds on the same PR.**
+
+- `add_prefix_space` was applied once, to the whole `text`, before running the regex at all —
+  correct only when the regex produces a single match. HF's real pipeline runs `ByteLevel` *after*
+  `Split`, over each already-split piece independently, so every piece that doesn't already start
+  with a space gets its own prefix space, not just the first character of the whole input. `split`
+  now runs the regex over the unmodified `text` first and applies `add_prefix_space` per resulting
+  piece.
+- Round 1 of this PR's review flagged that `Matcher.find()` silently skips any span the regex
+  doesn't match, and the fix committed then made `split` throw `TokenizerException` on any such gap.
+  **Round 2 corrected that fix as over-strict relative to HF itself:** HF's `find_matches` trait
+  contract requires covering the whole string with contiguous, ordered slices, explicitly keeping
+  non-matching spans (tagged `is_match=false`) rather than discarding them, under
+  `SplitDelimiterBehavior::Isolated`. A file whose regex doesn't cover every character therefore
+  still tokenizes successfully under real HF, and this port hard-failing where HF wouldn't is itself
+  a fidelity bug, not a fix. `split` now emits an unmatched span as its own chunk instead of
+  throwing; a span that turns out to encode an unrepresentable symbol still surfaces loudly via
+  `BpeMerger.merge`'s existing no-vocabulary-entry check, so this isn't a return to the original
+  silent-drop behavior — it's matching HF's actual, looser contract instead of guessing at a
+  stricter one.
 
 ## Task 8: `TextNormalizer`
 
@@ -1202,7 +1323,17 @@ class PostProcessorApplierTest {
 }
 ```
 
-## Task 11: `ByteLevelDecoder`
+**Amendment (PR #14 review, round 2): `apply` above discards a `SpecialTokenInfo` field it already
+parses, forcing a redundant lookup that can fail even when the original data didn't need it.**
+`TokenizerJsonLoader` (Task 4) parses a `TemplateProcessing` special token's own `ids` list, but the
+snippet above only ever reads `info.tokens()`, re-resolving each string back to an id later in
+`HfTokenizer.encode` via `Vocabulary.idOf`. That throws for any template special token present in
+`special_tokens` but missing from `model.vocab` + `added_tokens` — even though the correct id sat
+right there in the discarded `ids` list. `apply` now returns `List<ResolvedToken>` (a new
+`record ResolvedToken(String text, Integer id)`) instead of `List<String>`: a `SequenceItem`'s
+tokens carry a `null` id (still resolved later via `Vocabulary.idOf`), while a `SpecialTokenItem`'s
+tokens carry the `SpecialTokenInfo`'s own `ids` entry at the same index, used as-is. `HfTokenizer`
+(Task 12, amended below) is the only caller and was updated to match.
 
 ```java
 package se.alipsa.jmlx.tokenizer;
@@ -1400,6 +1531,28 @@ class HfTokenizerTest {
   }
 }
 ```
+
+**Amendment (PR #14 review, rounds 1-2): both `encode` and `decode` above trusted their inputs in
+ways that could silently corrupt or drop tokens.** `encode`'s `for (String token : processed) { ids.add(vocabulary.idOf(token)); }`
+loop predates `PostProcessorApplier`'s `ResolvedToken` return type (Task 10, amended above); it now
+iterates `ResolvedToken`s and only falls back to `vocabulary.idOf(token.text())` when a token has no
+pre-resolved id (a `SequenceItem` token). A `SpecialTokenItem` token's id -- sourced from the
+tokenizer.json file's own `special_tokens.ids`, not a sampled model output -- is cross-checked against
+`vocabulary.hasId(id)` and throws if absent (finding 7): unlike a sampled logit, there is no legitimate
+reason for a file-declared special-token id to be missing from the vocabulary, and trusting it
+unchecked would bake a corrupt id into the encoded sequence that `decode` would then silently drop.
+`decode`'s `tokens.add(vocabulary.tokenOf(id))` unconditionally threw `TokenizerException` for *any*
+unrecognized id, which is too strict: e.g. Qwen2.5's `config.json` `vocab_size` (152064) exceeds its
+tokenizer vocab (151665), so a sampled logit can legitimately land in that gap, and a hard exception
+there would abort an entire generation loop over a normal, expected input. `decode` now checks
+`vocabulary.hasId(id)` first and, only when absent, skips ids above `Vocabulary#maxKnownId` (Task 7,
+amended above) while still throwing on an in-range hole -- indistinguishable from the above-vocab case
+by id value alone, but always a real bug (the wrong tokenizer for the checkpoint, a mis-parsed
+`added_tokens`, a `Vocabulary` bug) that must not be swept up by the same skip (finding 2). Both fixes
+are exercised by `HfTokenizerTest`'s `encodeThrowsWhenATemplateSpecialTokenIdHasNoVocabularyEntry`,
+`decodeSkipsAnAboveVocabIdInsteadOfAbortingTheWholeSequence`, and
+`decodeThrowsOnAnInRangeIdWithNoVocabularyEntryInsteadOfSilentlyDroppingIt` (the last two against a new
+`qwen-style-with-id-gap.tokenizer.json` fixture; the first against `llama3-style-bad-template-id.tokenizer.json`).
 
 ## Task 13: `ChatTemplateRenderer`
 

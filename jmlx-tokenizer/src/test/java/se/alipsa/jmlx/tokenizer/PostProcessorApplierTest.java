@@ -11,7 +11,9 @@ class PostProcessorApplierTest {
   @Test
   void byteLevelStepAloneIsANoOp() {
     List<String> tokens = List.of("low", "Ġthe");
-    assertEquals(tokens, PostProcessorApplier.apply(List.of(new ByteLevelStep()), tokens, true));
+    assertEquals(
+        List.of(new ResolvedToken("low", null), new ResolvedToken("Ġthe", null)),
+        PostProcessorApplier.apply(List.of(new ByteLevelStep()), tokens, true));
   }
 
   @Test
@@ -25,7 +27,10 @@ class PostProcessorApplierTest {
                     "<|begin_of_text|>", List.of(128000), List.of("<|begin_of_text|>"))));
     List<String> tokens = List.of("low", "Ġthe");
     assertEquals(
-        List.of("<|begin_of_text|>", "low", "Ġthe"),
+        List.of(
+            new ResolvedToken("<|begin_of_text|>", 128000),
+            new ResolvedToken("low", null),
+            new ResolvedToken("Ġthe", null)),
         PostProcessorApplier.apply(List.of(new ByteLevelStep(), template), tokens, true));
   }
 
@@ -39,6 +44,25 @@ class PostProcessorApplierTest {
                 new SpecialTokenInfo(
                     "<|begin_of_text|>", List.of(128000), List.of("<|begin_of_text|>"))));
     List<String> tokens = List.of("low", "Ġthe");
-    assertEquals(tokens, PostProcessorApplier.apply(List.of(template), tokens, false));
+    assertEquals(
+        List.of(new ResolvedToken("low", null), new ResolvedToken("Ġthe", null)),
+        PostProcessorApplier.apply(List.of(template), tokens, false));
+  }
+
+  @Test
+  void templateProcessingUsesTheSpecialTokenInfoIdDirectlyWithoutAVocabularyLookup() {
+    // The template's special token is present in special_tokens.ids but deliberately NOT in the
+    // model.vocab/added_tokens a Vocabulary would be built from -- PostProcessorApplier must not
+    // require a fresh string lookup to resolve it (see PR #14 review, finding 6).
+    var template =
+        new TemplateProcessingStep(
+            List.of(new SpecialTokenItem("<|reserved|>"), new SequenceItem()),
+            Map.of(
+                "<|reserved|>",
+                new SpecialTokenInfo("<|reserved|>", List.of(999), List.of("<|reserved|>"))));
+    List<String> tokens = List.of("low");
+    assertEquals(
+        List.of(new ResolvedToken("<|reserved|>", 999), new ResolvedToken("low", null)),
+        PostProcessorApplier.apply(List.of(template), tokens, true));
   }
 }

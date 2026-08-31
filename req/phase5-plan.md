@@ -13,7 +13,7 @@ Research findings section below leans on that same precedent for M1's own C-stri
 | Item | Status | Commit |
 |---|---|---|
 | M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
-| M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus `hfjinja`-based chat-template rendering, resolving the FFM-vs-pure-Java choice D3 left open in favor of pure Java; dependencies `tools.jackson.core:jackson-databind:3.1.2` and `se.alipsa:hfjinja:0.5.0`, both resolved via `mavenLocal()` since this build environment lacks direct Maven Central network access; `req/plans/phase5-m2-plan.md`'s own Tasks 1-14 record the implementation) | Tasks 1-14 on `phase5-m2-tokenizer` (not yet merged to `main`) |
+| M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus `hfjinja`-based chat-template rendering, resolving the FFM-vs-pure-Java choice D3 left open in favor of pure Java; dependencies `tools.jackson.core:jackson-databind:3.1.2` and `se.alipsa:hfjinja:0.5.0`, both resolved via `mavenCentral()` directly -- `mavenLocal()` is enabled alongside it only because `jmlx`'s own root project version is currently a `-SNAPSHOT` (PR #14 review round 1), not a network-reachability workaround; see D3's second correction below; `req/plans/phase5-m2-plan.md`'s own Tasks 1-14 record the implementation) | Tasks 1-14 on `phase5-m2-tokenizer` (not yet merged to `main`) |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | Not started | — |
 
 ## Context
@@ -425,6 +425,18 @@ own Findings). The "still open" paragraph immediately above and the rest of D3 a
 the historical record of the research that led here, per this document's own amend-don't-delete
 convention.
 
+**Second correction (PR #14 review round 3): the sentence directly above is itself stale.** Live
+dependency resolution against a stock `mavenCentral()`-only repository list
+(`./gradlew :jmlx-tokenizer:dependencies --configuration compileClasspath --refresh-dependencies`, and
+a direct `curl` against `repo1.maven.org`) confirms both `se.alipsa:hfjinja:0.5.0` and
+`tools.jackson.core:jackson-databind:3.1.2` resolve from Maven Central alone -- this build environment
+was never actually unable to reach it. The root `build.gradle`'s `mavenLocal()` is enabled for an
+unrelated, ordinary reason instead: `jmlx`'s own root project version is currently `0.5.0-SNAPSHOT`,
+and the shared `repositories {}` block adds `mavenLocal()` whenever that's true (the expected setup for
+resolving a locally-built, unreleased dependency during local development), not because Central itself
+was ever unreachable. `req/plans/phase5-m2-plan.md`'s own Findings section predates this root-cause
+diagnosis and should not be read as evidence of an actual network limitation.
+
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already
 has `Linear`, `QuantizedLinear`, `RMSNorm`, `MultiHeadAttention`, `KVCache`, and RoPE (via
@@ -597,7 +609,11 @@ named scope boundary rather than left implicit.
   `se.alipsa:hfjinja:0.5.0` genuinely resolves from `repo1.maven.org` and is exactly what
   `jmlx-tokenizer` depends on today (via `mavenLocal()` in this build environment specifically, per
   D3's amendment, not because the artifact itself is unpublished — see D3's amendment for the full
-  correction).]**
+  correction).]** **Further correction (PR #14 review round 3):** D3's own second correction
+  (Decisions section, above) applies here too — the "cannot reach Maven Central directly" premise in
+  the bracket just above was itself mistaken. Both dependencies resolve from Maven Central alone;
+  `mavenLocal()` is enabled only because `jmlx`'s own root project version is currently a
+  `-SNAPSHOT`, unrelated to either dependency's own publication state or reachability.
   Now resolved by the same choice as above: M2 shipped as the pure-Java `jmlx-tokenizer` module using
   `hfjinja` directly, so the FFM path's own remaining unknowns below were never prototyped and are
   left here only as historical record, not as work still to be done. What

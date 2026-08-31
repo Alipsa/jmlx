@@ -1,6 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -31,9 +31,12 @@ class ChatTemplateRendererTest {
             "<|begin_of_text|>",
             "<|eot_id|>",
             Map.of());
-    assertTrue(result.startsWith("<|begin_of_text|>"));
-    assertTrue(result.contains("<|start_header_id|>user<|end_header_id|>"));
-    assertTrue(result.endsWith("<|start_header_id|>assistant<|end_header_id|>\n\n"));
+    // Byte-verbatim, not startsWith/contains/endsWith: those would pass through a whitespace bug
+    // (e.g. a missing/extra blank line around the header separators) undetected.
+    assertEquals(
+        "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
+            + "Hello<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        result);
   }
 
   @Test
@@ -47,8 +50,12 @@ class ChatTemplateRendererTest {
             null,
             "<|im_end|>",
             Map.of());
-    assertTrue(result.contains("You are Qwen, created by Alibaba Cloud."));
-    assertTrue(result.contains("<|im_start|>user\nHello<|im_end|>"));
-    assertTrue(result.endsWith("<|im_start|>assistant\n"));
+    assertEquals(
+        "<|im_start|>system\n"
+            + "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n"
+            + "<|im_start|>user\n"
+            + "Hello<|im_end|>\n"
+            + "<|im_start|>assistant\n",
+        result);
   }
 }

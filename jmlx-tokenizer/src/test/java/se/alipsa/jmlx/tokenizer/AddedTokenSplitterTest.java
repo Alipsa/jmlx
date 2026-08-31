@@ -30,4 +30,17 @@ class AddedTokenSplitterTest {
         List.of(new AddedTokenSplitter.Segment("hello world", false)),
         splitter.split("hello world"));
   }
+
+  @Test
+  void longerAddedTokenWinsOverAShorterOneThatIsAPrefixOfIt() {
+    // Without longest-first sorting, the alternation would try "<|im_start|>" first and match
+    // only that, leaving "extra" as unmatched trailing plain text.
+    List<AddedToken> tokens =
+        List.of(
+            new AddedToken(1, "<|im_start|>", true), new AddedToken(2, "<|im_start|>extra", true));
+    AddedTokenSplitter splitter = new AddedTokenSplitter(tokens);
+    assertEquals(
+        List.of(new AddedTokenSplitter.Segment("<|im_start|>extra", true)),
+        splitter.split("<|im_start|>extra"));
+  }
 }

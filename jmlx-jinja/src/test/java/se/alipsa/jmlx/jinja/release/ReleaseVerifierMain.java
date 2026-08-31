@@ -458,7 +458,9 @@ public final class ReleaseVerifierMain {
   }
 
   private static Path repositoryRoot(Path directory) throws Exception {
-    return Path.of(output(directory, "git", "rev-parse", "--show-toplevel")).toAbsolutePath().normalize();
+    return Path.of(output(directory, "git", "rev-parse", "--show-toplevel").trim())
+        .toAbsolutePath()
+        .normalize();
   }
 
   private static String output(Path directory, String... command) throws Exception {

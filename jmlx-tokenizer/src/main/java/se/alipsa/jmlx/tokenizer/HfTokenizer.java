@@ -170,7 +170,7 @@ public final class HfTokenizer {
    * null} returns empty; an unknown non-null token throws.
    */
   public OptionalInt bosTokenId(String bosToken) {
-    return configuredTokenId(bosToken, "bosTokenId");
+    return configuredTokenId(bosToken);
   }
 
   /**
@@ -186,7 +186,7 @@ public final class HfTokenizer {
    * null} returns empty; an unknown non-null token throws.
    */
   public OptionalInt eosTokenId(String eosToken) {
-    return configuredTokenId(eosToken, "eosTokenId");
+    return configuredTokenId(eosToken);
   }
 
   /**
@@ -197,11 +197,8 @@ public final class HfTokenizer {
     Objects.requireNonNull(eosTokens, "HfTokenizer.eosTokenIds: eosTokens must not be null");
     List<Integer> ids = new ArrayList<>(eosTokens.size());
     for (String eosToken : eosTokens) {
-      OptionalInt id = configuredTokenId(eosToken, "eosTokenIds");
-      if (id.isEmpty()) {
-        throw new TokenizerException("HfTokenizer.eosTokenIds: EOS tokens must not contain null");
-      }
-      ids.add(id.getAsInt());
+      Objects.requireNonNull(eosToken, "HfTokenizer.eosTokenIds: EOS tokens must not contain null");
+      ids.add(configuredTokenId(eosToken).getAsInt());
     }
     return List.copyOf(ids);
   }
@@ -226,13 +223,13 @@ public final class HfTokenizer {
     return OptionalInt.empty();
   }
 
-  private OptionalInt configuredTokenId(String token, String method) {
+  private OptionalInt configuredTokenId(String token) {
     if (token == null) {
       return OptionalInt.empty();
     }
     if (!vocabulary.hasToken(token)) {
       throw new TokenizerException(
-          "HfTokenizer." + method + ": no vocabulary entry for token '" + token + "'");
+          "HfTokenizer: no vocabulary entry for configured special token '" + token + "'");
     }
     return OptionalInt.of(vocabulary.idOf(token));
   }

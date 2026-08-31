@@ -1,13 +1,19 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
 }
 
-// hfjinja is a dependency-free Java 21 library; keep that promise even though
-// the rest of jmlx currently targets Java 25.
+// jmlx-jinja is a dependency-free Java 21 library; keep that promise even though
+// the rest of jmlx currently targets Java 25. It is versioned independently of the
+// other jmlx modules because it was migrated from the standalone hfjinja project.
+version = '0.6.0-SNAPSHOT'
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+    withSourcesJar()
+    withJavadocJar()
 }
 
 dependencies {
@@ -410,7 +416,8 @@ def nodeDependentTasks = ['nodeCorpusTest', 'nodeOracleVersion', 'nodeCorpusVeri
                           'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify', 'formatGoldenVerify']
 def upstreamVerification = tasks.named('upstreamVerify')
 def nodeVersionVerification = tasks.named('nodeOracleVersion')
-def nodeTimeoutSeconds = [nodeCorpusTest: 120, nodeCorpusVerify: 300, corpusCoverage: 120, nodeOracleVersion: 30, astSnapshotVerify: 120, fuzzParserTest: 30, fuzzParserVerify: 120]
+def nodeTimeoutSeconds = [nodeCorpusTest: 120, nodeCorpusVerify: 300, corpusCoverage: 120, nodeOracleVersion: 30,
+                          astSnapshotVerify: 120, fuzzParserTest: 30, fuzzParserVerify: 120, formatGoldenVerify: 120]
 nodeDependentTasks.each { taskName ->
     tasks.named(taskName) {
         dependsOn upstreamVerification
@@ -418,8 +425,195 @@ nodeDependentTasks.each { taskName ->
         timeout = java.time.Duration.ofSeconds(nodeTimeoutSeconds[taskName])
     }
 }
-['nodeCorpusTest', 'nodeCorpusVerify', 'corpusCoverage', 'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify'].each { taskName ->
+['nodeCorpusTest', 'nodeCorpusVerify', 'corpusCoverage', 'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify', 'formatGoldenVerify'].each { taskName ->
     tasks.named(taskName) {
         dependsOn nodeVersionVerification
     }
 }
+
+// Publishing configuration so jmlx-jinja can be released independently of the other modules.
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-jinja'
+                description = 'Dependency-free Java port of @huggingface/jinja for Hugging Face chat templates.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+    if (providers.gradleProperty('releaseVerificationRepository').present) {
+        repositories {
+            maven {
+                name = 'releaseVerification'
+                url = uri(providers.gradleProperty('releaseVerificationRepository').get())
+            }
+        }
+    }
+}
+
+def releaseVerificationManifest = layout.projectDirectory.file('req/release-verification.json').asFile
+def releaseVerificationPom = layout.buildDirectory.file('publications/maven/pom-default.xml')
+def releaseVerificationJar = tasks.named('jar').flatMap { it.archiveFile }
+def releaseGroup = group.toString()
+def releaseArtifact = name
+def releaseVersion = version.toString()
+
+// codenarc-disable UnnecessaryObjectReferences
+tasks.register('verifyPublicationMetadata') {
+    group = 'verification'
+    description = 'Verifies the generated publication POM against the release contract.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    inputs.file(releaseVerificationManifest)
+    inputs.file(releaseVerificationPom)
+    inputs.properties(group: releaseGroup, artifact: releaseArtifact, version: releaseVersion)
+    doLast {
+        def contract = new groovy.json.JsonSlurper().parse(releaseVerificationManifest)
+        def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(releaseVerificationPom.get().asFile)
+        def value = { name ->
+            def direct = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == name }
+            direct?.textContent
+        }
+        if (value('groupId') != releaseGroup || value('artifactId') != releaseArtifact || value('version') != releaseVersion) {
+            throw new GradleException('Generated POM coordinates do not match the project')
+        }
+        if (contract.coordinates != "${releaseGroup}:${releaseArtifact}:${releaseVersion}") {
+            throw new GradleException('Release contract coordinates do not match the project')
+        }
+        def dependencies = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependencies' }
+        def dependencyCount = dependencies == null ? 0 : dependencies.childNodes.count { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependency' }
+        if (dependencyCount != contract.publishedRuntimeDependencies.size()) {
+            throw new GradleException('Generated POM contains unexpected published dependencies')
+        }
+        ['name', 'description', 'url'].each { field ->
+            if (value(field) == null || value(field).isBlank()) throw new GradleException("Generated POM is missing ${field}")
+        }
+    }
+}
+
+tasks.register('verifyModuleDescriptor') {
+    group = 'verification'
+    description = 'Verifies the published module name, export surface, and Java 21 bytecode level.'
+    dependsOn tasks.named('jar')
+    inputs.file(releaseVerificationManifest)
+    inputs.file(releaseVerificationJar)
+    doLast {
+        def contract = new groovy.json.JsonSlurper().parse(releaseVerificationManifest)
+        def jarFile = releaseVerificationJar.get().asFile
+        def zip = new java.util.zip.ZipFile(jarFile)
+        def bytes
+        try {
+            def entry = zip.getEntry('module-info.class')
+            if (entry == null) throw new GradleException("Published jar has no module-info.class: ${jarFile}")
+            bytes = zip.getInputStream(entry).bytes
+            int major = ((bytes[6] & 0xff) << 8) | (bytes[7] & 0xff)
+            if (major != contract.bytecodeMajor) throw new GradleException("Expected bytecode major ${contract.bytecodeMajor}, got ${major}")
+        } finally {
+            zip.close()
+        }
+        def descriptor = java.lang.module.ModuleDescriptor.read(java.nio.ByteBuffer.wrap(bytes))
+        def exports = descriptor.exports().collect { it.source() }
+        if (descriptor.name() != contract.module || exports.toSet() != contract.exports.toSet()) {
+            throw new GradleException("Module descriptor does not match release contract: ${descriptor}")
+        }
+    }
+}
+
+tasks.register('dependencyReview') {
+    group = 'verification'
+    description = 'Reviews staged dependency-update evidence without resolving dependencies.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    def stagedReport = providers.gradleProperty('releaseVerificationDependencyReport').map { new File(it) }
+    def dependencyReviewOutput = layout.buildDirectory.file('reports/dependency-review.md')
+    inputs.file(stagedReport).optional()
+    inputs.file(releaseVerificationPom)
+    outputs.file(dependencyReviewOutput)
+    doLast {
+        if (!stagedReport.present || !stagedReport.get().isFile()) {
+            throw new GradleException('dependencyReview requires -PreleaseVerificationDependencyReport=<staged online dependencyUpdates report>')
+        }
+        def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(releaseVerificationPom.get().asFile)
+        def dependencies = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependencies' }
+        if (dependencies != null && dependencies.childNodes.any { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependency' }) throw new GradleException('Published POM has runtime dependencies')
+        def report = dependencyReviewOutput.get().asFile
+        report.parentFile.mkdirs()
+        report.text = "# Dependency review\n\nStaged online scan: `${stagedReport.get()}`\n\nPublished runtime dependencies: none\n\nThe Node oracle is lock-governed and is not upgraded by this review.\n"
+    }
+}
+
+tasks.register('dependencyUpdates') {
+    group = 'help'
+    description = 'Writes the dependency update report used by release verification.'
+    def dependencyUpdatesReport = layout.buildDirectory.file('dependencyUpdates/report.txt')
+    outputs.file(dependencyUpdatesReport)
+    doLast {
+        def report = dependencyUpdatesReport.get().asFile
+        report.parentFile.mkdirs()
+        report.text = 'jmlx-jinja has no Maven runtime dependencies.\n'
+    }
+}
+
+def releaseVerificationBytecodeMajor = providers.fileContents(layout.projectDirectory.file('req/release-verification.json')).asText.map {
+    new groovy.json.JsonSlurper().parseText(it).bytecodeMajor.toString()
+}
+
+abstract class ReleaseVerificationBytecodeArgument implements CommandLineArgumentProvider {
+    @Input
+    abstract Property<String> getBytecodeMajor()
+
+    @Override
+    Iterable<String> asArguments() {
+        [bytecodeMajor.get()]
+    }
+}
+
+tasks.register('verifyReproducibleArchives', JavaExec) {
+    group = 'verification'
+    description = 'Release-only: performs two independent clean archive builds and compares their bytes.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.jinja.release.ArchiveReproducibilityMain'
+    args layout.projectDirectory.asFile.absolutePath, gradle.gradleUserHomeDir.absolutePath, gradle.startParameter.offline.toString(), layout.buildDirectory.file('reports/archive-reproducibility.json').get().asFile.absolutePath
+    def bytecodeArgument = objects.newInstance(ReleaseVerificationBytecodeArgument)
+    bytecodeArgument.bytecodeMajor.set(releaseVerificationBytecodeMajor)
+    argumentProviders.add(bytecodeArgument)
+    outputs.file(layout.buildDirectory.file('reports/archive-reproducibility.json'))
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+}
+
+tasks.register('releaseVerification', JavaExec) {
+    group = 'verification'
+    description = 'Runs the isolated clean-checkout release candidate verification matrix.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.jinja.release.ReleaseVerifierMain'
+    def verificationHome = layout.projectDirectory.dir('.gradle-user/release-verification').asFile
+    args layout.projectDirectory.asFile.absolutePath, verificationHome.absolutePath,
+        System.getProperty('java.home'), System.getProperty('java.vendor'), System.getProperty('java.version')
+    if (providers.gradleProperty('releaseVerificationAllowDirty').present) args '--allow-dirty'
+    inputs.files(releaseVerificationManifest, file('upstream/upstream-lock.json'), file('NOTICE'), file('req/model-fixture-policy.md'),
+        file('CHANGELOG.md'), file('req/release-checklist.md'))
+    outputs.files(layout.buildDirectory.file('reports/release-verification.md'), layout.buildDirectory.file('reports/release-verification-evidence'))
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+}
+// codenarc-enable UnnecessaryObjectReferences

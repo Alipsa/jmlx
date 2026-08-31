@@ -20,9 +20,6 @@ public final class ReleaseVerifierMain {
   private static final Pattern ARRAY =
       Pattern.compile("\\\"%s\\\"\\s*:\\s*\\[([^]]*)]", Pattern.DOTALL);
   private static final Pattern JSON_STRING = Pattern.compile("\\\"([^\\\"]+)\\\"");
-  private static final Pattern MAIN_ARCHIVE_DIGEST =
-      Pattern.compile(
-          "\\\"name\\\"\\s*:\\s*\\\"hfjinja-(?![^\\\"]+-(?:sources|javadoc)\\.jar)[^\\\"]+\\.jar\\\"\\s*,\\s*\\\"firstSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"\\s*,\\s*\\\"secondSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"");
 
   private ReleaseVerifierMain() {}
 
@@ -33,6 +30,8 @@ public final class ReleaseVerifierMain {
               + " <daemon-vendor> <daemon-version> [--allow-dirty]");
     }
     Path source = Path.of(args[0]).toAbsolutePath().normalize();
+    Path repositoryRoot = repositoryRoot(source);
+    Path modulePath = repositoryRoot.relativize(source);
     Path userHome = Path.of(args[1]).toAbsolutePath().normalize();
     String daemonJavaHome = args[2];
     String daemonVendor = args[3];
@@ -53,6 +52,7 @@ public final class ReleaseVerifierMain {
     Path repository = Files.createTempDirectory("hfjinja-release-repository-");
     try {
       run(source, "git", "worktree", "add", "--detach", worktree.toString(), head);
+      Path candidateModule = worktree.resolve(modulePath);
       Files.createDirectories(userHome);
       Files.writeString(
           worktree.resolve("gradle.properties"),
@@ -60,33 +60,33 @@ public final class ReleaseVerifierMain {
           java.nio.file.StandardOpenOption.APPEND);
 
       // Each destructive operation gets a separate Gradle process and graph.
-      gradle(worktree, userHome, false, "verifyReproducibleArchives");
-      gradle(worktree, userHome, false, "clean", "check");
-      gradle(worktree, userHome, false, "dependencyUpdates");
+      gradle(candidateModule, userHome, false, "verifyReproducibleArchives");
+      gradle(candidateModule, userHome, false, "clean", "check");
+      gradle(candidateModule, userHome, false, "dependencyUpdates");
       Path stagedReport = dependencyEvidence.resolve("dependency-updates.txt");
-      Files.copy(worktree.resolve("build/dependencyUpdates/report.txt"), stagedReport);
+      Files.copy(candidateModule.resolve("build/dependencyUpdates/report.txt"), stagedReport);
 
-      gradle(worktree, userHome, true, "verifyReproducibleArchives");
+      gradle(candidateModule, userHome, true, "verifyReproducibleArchives");
       Path archiveEvidence = dependencyEvidence.resolve("archive-reproducibility.json");
-      copyEvidence(worktree, dependencyEvidence, "build/reports/archive-reproducibility.json");
-      gradle(worktree, userHome, true, "clean", "check");
-      verifyRequiredTaskEvidence(worktree, source.resolve("req/release-verification.json"));
+      copyEvidence(candidateModule, dependencyEvidence, "build/reports/archive-reproducibility.json");
+      gradle(candidateModule, userHome, true, "clean", "check");
+      verifyRequiredTaskEvidence(candidateModule, source.resolve("req/release-verification.json"));
       gradle(
-          worktree,
+          candidateModule,
           userHome,
           true,
           "dependencyReview",
           "-PreleaseVerificationDependencyReport=" + stagedReport);
       Files.createDirectories(retainedEvidence);
-      copyEvidence(worktree, retainedEvidence, "build/reports/corpus-coverage.md");
-      copyEvidence(worktree, retainedEvidence, "build/publications/maven/pom-default.xml");
-      copyEvidence(worktree, retainedEvidence, "build/reports/dependency-review.md");
+      copyEvidence(candidateModule, retainedEvidence, "build/reports/corpus-coverage.md");
+      copyEvidence(candidateModule, retainedEvidence, "build/publications/maven/pom-default.xml");
+      copyEvidence(candidateModule, retainedEvidence, "build/reports/dependency-review.md");
       Files.copy(
           archiveEvidence,
           retainedEvidence.resolve("archive-reproducibility.json"),
           java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       gradle(
-          worktree,
+          candidateModule,
           userHome,
           true,
           "publishMavenPublicationToReleaseVerificationRepository",
@@ -94,7 +94,7 @@ public final class ReleaseVerifierMain {
       String resolvedDigest = runConsumer(worktree, userHome, repository, coordinates);
       Path published = publishedJar(repository, coordinates);
       String publishedDigest = sha256(published);
-      String archiveDigest = mainArchiveDigest(archiveEvidence);
+      String archiveDigest = mainArchiveDigest(archiveEvidence, coordinates);
       if (!archiveDigest.equals(publishedDigest) || !publishedDigest.equals(resolvedDigest)) {
         throw new IllegalStateException(
             "archive, published candidate, and consumer-resolved main JAR digests must all match");
@@ -124,12 +124,13 @@ public final class ReleaseVerifierMain {
 
   private static void gradle(Path project, Path userHome, boolean offline, String... tasks)
       throws Exception {
+    Path repositoryRoot = repositoryRoot(project);
     String wrapper =
         System.getProperty("os.name").toLowerCase().contains("win") ? "gradlew.bat" : "gradlew";
     List<String> command =
         new ArrayList<>(
             List.of(
-                project.resolve(wrapper).toString(),
+                repositoryRoot.resolve(wrapper).toString(),
                 "-Dorg.gradle.java.installations.auto-download=false",
                 "--gradle-user-home",
                 userHome.toString()));
@@ -404,8 +405,15 @@ public final class ReleaseVerifierMain {
         "{\n  \"status\": \"IN PROGRESS\"\n}\n");
   }
 
-  static String mainArchiveDigest(Path archiveEvidence) throws Exception {
-    Matcher match = MAIN_ARCHIVE_DIGEST.matcher(Files.readString(archiveEvidence));
+  static String mainArchiveDigest(Path archiveEvidence, String coordinates) throws Exception {
+    String[] coordinate = coordinates.split(":", -1);
+    if (coordinate.length != 3) throw new IllegalArgumentException("invalid coordinates: " + coordinates);
+    Pattern mainArchiveDigest =
+        Pattern.compile(
+            "\\\"name\\\"\\s*:\\s*\\\""
+                + Pattern.quote(coordinate[1])
+                + "-(?![^\\\"]+-(?:sources|javadoc)\\.jar)[^\\\"]+\\.jar\\\"\\s*,\\s*\\\"firstSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"\\s*,\\s*\\\"secondSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"");
+    Matcher match = mainArchiveDigest.matcher(Files.readString(archiveEvidence));
     if (!match.find()) throw new IllegalStateException("archive evidence has no main JAR digest");
     if (!match.group(1).equals(match.group(2))) {
       throw new IllegalStateException("archive evidence records non-identical main JARs");
@@ -448,6 +456,10 @@ public final class ReleaseVerifierMain {
   private static String sha256(Path file) throws Exception {
     return HexFormat.of()
         .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+  }
+
+  private static Path repositoryRoot(Path directory) throws Exception {
+    return Path.of(output(directory, "git", "rev-parse", "--show-toplevel")).toAbsolutePath().normalize();
   }
 
   private static String output(Path directory, String... command) throws Exception {

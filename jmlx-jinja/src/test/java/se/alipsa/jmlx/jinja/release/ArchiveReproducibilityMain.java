@@ -17,9 +17,11 @@ public final class ArchiveReproducibilityMain {
     if (args.length != 5) {
       throw new IllegalArgumentException(
           "usage: ArchiveReproducibilityMain <project-dir> <gradle-user-home> <offline>"
-              + " <bytecode-major> <report>");
+              + " <report> <bytecode-major>");
     }
     Path project = Path.of(args[0]).toAbsolutePath().normalize();
+    Path repositoryRoot = repositoryRoot(project);
+    Path modulePath = repositoryRoot.relativize(project);
     Path userHome = Path.of(args[1]).toAbsolutePath().normalize();
     boolean offline = Boolean.parseBoolean(args[2]);
     Path report = Path.of(args[3]).toAbsolutePath().normalize();
@@ -29,8 +31,9 @@ public final class ArchiveReproducibilityMain {
     Path sandbox = sandboxParent.resolve("candidate");
     try {
       runGit(project, "git", "worktree", "add", "--detach", sandbox.toString(), "HEAD");
-      List<Path> first = buildAndCopy(sandbox, userHome, offline, evidence.resolve("first"));
-      List<Path> second = buildAndCopy(sandbox, userHome, offline, evidence.resolve("second"));
+      Path candidateModule = sandbox.resolve(modulePath);
+      List<Path> first = buildAndCopy(candidateModule, userHome, offline, evidence.resolve("first"));
+      List<Path> second = buildAndCopy(candidateModule, userHome, offline, evidence.resolve("second"));
       for (int index = 0; index < first.size(); index++) {
         if (!sha256(first.get(index)).equals(sha256(second.get(index)))) {
           throw new IllegalStateException(
@@ -79,12 +82,13 @@ public final class ArchiveReproducibilityMain {
 
   private static void runGradle(Path project, Path userHome, boolean offline, String... tasks)
       throws IOException, InterruptedException {
+    Path repositoryRoot = repositoryRoot(project);
     String wrapper =
         System.getProperty("os.name").toLowerCase().contains("win") ? "gradlew.bat" : "gradlew";
     List<String> command =
         new ArrayList<>(
             List.of(
-                project.resolve(wrapper).toString(),
+                repositoryRoot.resolve(wrapper).toString(),
                 "-Dorg.gradle.java.installations.auto-download=false",
                 "--gradle-user-home",
                 userHome.toString()));
@@ -127,6 +131,17 @@ public final class ArchiveReproducibilityMain {
     } catch (Exception ignored) {
       // Cleanup is best effort; do not hide the original verification failure.
     }
+  }
+
+  private static Path repositoryRoot(Path directory) throws IOException, InterruptedException {
+    Process process =
+        new ProcessBuilder("git", "rev-parse", "--show-toplevel")
+            .directory(directory.toFile())
+            .redirectErrorStream(true)
+            .start();
+    String output = new String(process.getInputStream().readAllBytes()).trim();
+    if (process.waitFor() != 0) throw new IllegalStateException("cannot find repository root: " + output);
+    return Path.of(output).toAbsolutePath().normalize();
   }
 
   private static String report(List<Path> first, List<Path> second) throws Exception {

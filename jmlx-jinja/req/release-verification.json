@@ -1,7 +1,7 @@
 {
   "jdkMajor": 21,
   "bytecodeMajor": 65,
-  "coordinates": "se.alipsa:jmlx-jinja:0.5.0-SNAPSHOT",
+  "coordinates": "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT",
   "module": "se.alipsa.jmlx.jinja",
   "exports": ["se.alipsa.jmlx.jinja"],
   "publishedRuntimeDependencies": [],

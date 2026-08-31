@@ -86,7 +86,8 @@ class ReleaseVerifierMainTest {
     var evidence = temporaryDirectory.resolve("hfjinja-archive-evidence.json");
     Files.writeString(evidence, "{\"archives\":[]}");
     assertThrows(
-        IllegalStateException.class, () -> ReleaseVerifierMain.mainArchiveDigest(evidence));
+        IllegalStateException.class,
+        () -> ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
   }
 
   @Test
@@ -94,9 +95,26 @@ class ReleaseVerifierMainTest {
     var evidence = temporaryDirectory.resolve("hfjinja-archive-mismatch.json");
     Files.writeString(
         evidence,
-        "{\"name\":\"hfjinja-0.5.0-SNAPSHOT.jar\",\"firstSha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"secondSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}");
+        "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"secondSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}");
     assertThrows(
-        IllegalStateException.class, () -> ReleaseVerifierMain.mainArchiveDigest(evidence));
+        IllegalStateException.class,
+        () -> ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
+  }
+
+  @Test
+  void findsTheMainJarForTheConfiguredArtifact() throws Exception {
+    var evidence = temporaryDirectory.resolve("jmlx-jinja-archive-evidence.json");
+    String digest = "a".repeat(64);
+    Files.writeString(
+        evidence,
+        "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\""
+            + digest
+            + "\",\"secondSha256\":\""
+            + digest
+            + "\"}");
+    assertEquals(
+        digest,
+        ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
   }
 
   @Test

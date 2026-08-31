@@ -76,6 +76,15 @@ class TokenizerJsonLoaderTest {
   }
 
   @Test
+  void preTokenizerAddPrefixSpaceMustBeBoolean() {
+    String preTokenizer =
+        VALID_PRE_TOKENIZER.replace(
+            "\"add_prefix_space\": false", "\"add_prefix_space\": \"true\"");
+    Path path = writeTokenizerJson(VALID_DECODER, preTokenizer, VALID_MODEL, "[]");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
   void missingDecoderFieldThrows() {
     String json =
         "{\"normalizer\": null, \"pre_tokenizer\": "
@@ -253,6 +262,13 @@ class TokenizerJsonLoaderTest {
     String addedTokens =
         "[{\"id\": 2, \"content\": \"<x>\", \"special\": false, " + flagsJson + "}]";
     return writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+  }
+
+  @Test
+  void addedTokenSpecialMustBeBooleanEvenWithoutANormalizer() {
+    String addedTokens = "[{\"id\": 2, \"content\": \"<x>\", \"special\": \"true\"}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
   }
 
   @Test

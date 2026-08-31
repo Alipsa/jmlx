@@ -77,4 +77,15 @@ class BpeMergerTest {
     BpeMerger merger = new BpeMerger(new BpeModelConfig(vocab, Map.of("a a", 0), false));
     assertEquals(List.of("aa", "a"), merger.merge("aaa"));
   }
+
+  @Test
+  void mergesALongUnboundedPreTokenChunkWithoutRescanningAllPairsAfterEachMerge() {
+    String word = "a".repeat(16_384);
+    Map<String, Integer> ranks = new HashMap<>();
+    for (String symbol = "a"; symbol.length() < word.length(); symbol += symbol) {
+      ranks.put(symbol + " " + symbol, ranks.size());
+    }
+    BpeMerger merger = new BpeMerger(new BpeModelConfig(Map.of("a", 0, word, 1), ranks, false));
+    assertEquals(List.of(word), merger.merge(word));
+  }
 }

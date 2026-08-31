@@ -4,11 +4,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import se.alipsa.hfjinja.HfJinjaException;
 import se.alipsa.hfjinja.Template;
 
 /** Renders a Hugging Face {@code chat_template} Jinja string via {@code hfjinja}. */
 public final class ChatTemplateRenderer {
+
+  private static final Map<String, Template> TEMPLATES = new ConcurrentHashMap<>();
 
   private ChatTemplateRenderer() {}
 
@@ -19,6 +22,18 @@ public final class ChatTemplateRenderer {
    */
   public static String render(
       String chatTemplate,
+      List<Map<String, Object>> messages,
+      boolean addGenerationPrompt,
+      String bosToken,
+      String eosToken,
+      Map<String, Object> extraContext) {
+    return render(
+        parse(chatTemplate), messages, addGenerationPrompt, bosToken, eosToken, extraContext);
+  }
+
+  /** Renders a parsed chat template against the standard HF chat-template context variables. */
+  public static String render(
+      Template chatTemplate,
       List<Map<String, Object>> messages,
       boolean addGenerationPrompt,
       String bosToken,
@@ -35,10 +50,21 @@ public final class ChatTemplateRenderer {
     context.put("bos_token", bosToken);
     context.put("eos_token", eosToken);
     try {
-      return Template.parse(chatTemplate).render(context);
+      return chatTemplate.render(context);
     } catch (HfJinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);
+    }
+  }
+
+  /** Parses and caches a chat template for callers rendering the same template repeatedly. */
+  public static Template parse(String chatTemplate) {
+    Objects.requireNonNull(
+        chatTemplate, "ChatTemplateRenderer.parse: chatTemplate must not be null");
+    try {
+      return TEMPLATES.computeIfAbsent(chatTemplate, Template::parse);
+    } catch (HfJinjaException e) {
+      throw new TokenizerException("ChatTemplateRenderer.parse: failed to parse chat template", e);
     }
   }
 }

@@ -169,6 +169,7 @@ public final class TokenizerJsonLoader {
       throw new TokenizerException(
           "TokenizerJsonLoader: pre_tokenizer Split step has no pattern.Regex");
     }
+    requireBoolean(byteLevelStep, "add_prefix_space", "pre_tokenizer ByteLevel add_prefix_space");
     boolean addPrefixSpace = byteLevelStep.path("add_prefix_space").asBoolean(false);
     try {
       // No Pattern.UNICODE_CHARACTER_CLASS: HF compiles this regex with onig (the default
@@ -535,6 +536,7 @@ public final class TokenizerJsonLoader {
     for (JsonNode entry : node) {
       requireValidAddedTokenIdentity(entry);
       String content = entry.path("content").asString();
+      requireBoolean(entry, "special", "added_tokens['" + content + "'].special");
       boolean special = entry.path("special").asBoolean(false);
       requireNoStrippingOrSingleWordFlags(entry, content);
       requireNoNormalization(entry, content, special, normalizer);

@@ -11,6 +11,17 @@ import org.junit.jupiter.api.Test;
 
 class HfTokenizerTest {
 
+  @Test
+  void qwen25GoldenVectorsMatchHuggingFaceTokenizers() {
+    // tokenizer.json is the unmodified Qwen/Qwen2.5-0.5B-Instruct artifact from Hugging Face.
+    HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("qwen2.5-0.5b-instruct.tokenizer.json"));
+    assertEquals(List.of(9707, 11, 1879, 0), tokenizer.encode("Hello, world!", false));
+    assertEquals(List.of(785, 3974, 13876, 38835), tokenizer.encode("The quick brown fox", false));
+    assertEquals(List.of(220, 12621, 198), tokenizer.encode("  spaces\n", false));
+    assertEquals(151645, tokenizer.eosTokenId());
+    assertEquals(151665, tokenizer.vocabSize());
+  }
+
   private Path fixture(String name) {
     try {
       return Path.of(getClass().getResource(name).toURI());
@@ -53,6 +64,16 @@ class HfTokenizerTest {
     HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("llama3-style.tokenizer.json"));
     List<Integer> ids = tokenizer.encode("low the", true);
     assertEquals("low the", tokenizer.decode(ids, true));
+  }
+
+  @Test
+  void exposesModelServingTokenIdsAndVocabularySize() {
+    HfTokenizer qwen = HfTokenizer.fromFile(fixture("qwen-style.tokenizer.json"));
+    HfTokenizer llama = HfTokenizer.fromFile(fixture("llama3-style.tokenizer.json"));
+    assertEquals(19, qwen.eosTokenId());
+    assertEquals(20, qwen.vocabSize());
+    assertEquals(128000, llama.bosTokenId());
+    assertEquals(128001, llama.vocabSize());
   }
 
   @Test

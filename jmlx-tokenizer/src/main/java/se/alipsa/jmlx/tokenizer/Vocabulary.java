@@ -154,4 +154,9 @@ public final class Vocabulary {
   public int maxKnownId() {
     return maxKnownId;
   }
+
+  /** Number of ids in the contiguous vocabulary range needed for a model output head. */
+  public int vocabSize() {
+    return maxKnownId + 1;
+  }
 }

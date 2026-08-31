@@ -18,6 +18,11 @@ import java.util.Objects;
  */
 public final class HfTokenizer {
 
+  private static final List<String> BOS_TOKEN_NAMES =
+      List.of("<|begin_of_text|>", "<s>", "<|bos|>");
+  private static final List<String> EOS_TOKEN_NAMES =
+      List.of("<|eot_id|>", "<|im_end|>", "<|end_of_text|>", "<|endoftext|>", "</s>");
+
   private final TokenizerJson json;
   private final Vocabulary vocabulary;
   private final int baseVocabularyMaxKnownId;
@@ -29,55 +34,20 @@ public final class HfTokenizer {
     this.json = json;
     List<AddedToken> templateTokens = collectTemplateSpecialTokens(json.postProcessor());
     List<AddedToken> newTemplateTokens;
-    // null, not a sentinel int, stands for "no baseVocabulary was built:" the final assignment
-    // below reads this reference directly instead of re-testing templateTokens.isEmpty() a
-    // second time, so there is no parallel condition that could drift out of sync with it (PR
-    // #14 review round 7, finding 9, replacing an earlier -1 sentinel whose meaning depended on
-    // a ternary re-checking templateTokens.isEmpty() rather than on the value itself -- a
-    // refactor that dropped that ternary would have silently substituted -1 for the real
-    // boundary, making every non-negative id skip instead of throwing on a genuine hole).
     Vocabulary baseVocabulary;
     if (templateTokens.isEmpty()) {
-      // Skips building baseVocabulary below entirely when there's nothing to validate against
-      // it -- Qwen2.5's own post_processor has no TemplateProcessing step at all, so this avoids
-      // a second, otherwise-discarded Vocabulary construction over its full ~150k-entry
-      // model.vocab merely to come back empty (PR #14 review round 5, finding 11).
       newTemplateTokens = List.of();
       baseVocabulary = null;
     } else {
       requireInternallyConsistentTemplateTokens(templateTokens);
       baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
       requireNoTemplateVocabularyConflicts(templateTokens, baseVocabulary);
-      // A template token already present in baseVocabulary -- whether as a plain model.vocab
-      // entry or a "real" added_tokens entry -- is left exactly as baseVocabulary already has
-      // it, not re-registered here as a brand-new AddedToken: doing that unconditionally used to
-      // stamp special=true onto *every* template-named token regardless of its real status,
-      // corrupting specialIds (making skipSpecialTokens wrongly drop a token added_tokens itself
-      // declared special=false for) (PR #14 review round 5, finding 1).
       newTemplateTokens =
           templateTokens.stream().filter(t -> !baseVocabulary.hasToken(t.content())).toList();
     }
-    // Registering a genuinely-new validated template token as if it were an addedToken, rather
-    // than leaving it merely "trusted but unregistered" in encode() below, is what makes
-    // decode() agree with encode(): otherwise a template id with no other vocabulary entry
-    // either vanishes silently from decode's above-maxKnownId skip, or throws as an in-range
-    // hole if it happens to be numerically below some unrelated, larger id -- both observed with
-    // the pre-round-4 encode check (PR #14 review round 4, finding 2).
     List<AddedToken> mergedAddedTokens = new ArrayList<>(json.addedTokens());
     mergedAddedTokens.addAll(newTemplateTokens);
     this.vocabulary = new Vocabulary(json.model().vocab(), mergedAddedTokens);
-    // Deliberately NOT vocabulary.maxKnownId(): a template can register a single, arbitrarily
-    // sparse id far above the real vocab's own top (e.g. a fine-tune's BOS id declared as
-    // 999999 against a ~128k-entry vocab). Folding that outlier into decode()'s own
-    // above-maxKnownId skip threshold would misclassify every id between the real vocab's top
-    // and that outlier as an "in-range hole" instead of the legitimate above-vocab case the skip
-    // exists for -- verified end-to-end: with vocabulary.maxKnownId() used directly, decode() on
-    // an id far below the template outlier but still above the real vocab's own top wrongly
-    // threw instead of skipping. baseVocabularyMaxKnownId instead reflects only model.vocab +
-    // added_tokens (json.addedTokens(), not the template-only registrations above), so decode()'s
-    // skip/throw split still tracks the real vocabulary's own boundary; the template id itself
-    // still resolves correctly via vocabulary.hasId/tokenOf regardless, since it was merged above
-    // (PR #14 review round 6, finding 2).
     this.baseVocabularyMaxKnownId =
         baseVocabulary != null ? baseVocabulary.maxKnownId() : vocabulary.maxKnownId();
     this.merger = new BpeMerger(json.model());
@@ -184,6 +154,31 @@ public final class HfTokenizer {
     Objects.requireNonNull(
         tokenizerJsonPath, "HfTokenizer.fromFile: tokenizerJsonPath must not be null");
     return new HfTokenizer(TokenizerJsonLoader.load(tokenizerJsonPath));
+  }
+
+  /** Returns the BOS id for the supported Qwen/Llama token naming conventions. */
+  public int bosTokenId() {
+    return specialTokenId("bos", BOS_TOKEN_NAMES);
+  }
+
+  /** Returns the EOS id for the supported Qwen/Llama token naming conventions. */
+  public int eosTokenId() {
+    return specialTokenId("eos", EOS_TOKEN_NAMES);
+  }
+
+  /** Returns the size needed for the model output head, including any added-token ids. */
+  public int vocabSize() {
+    return baseVocabularyMaxKnownId + 1;
+  }
+
+  private int specialTokenId(String kind, List<String> names) {
+    for (String name : names) {
+      if (vocabulary.hasToken(name)) {
+        return vocabulary.idOf(name);
+      }
+    }
+    throw new TokenizerException(
+        "HfTokenizer: no " + kind + " token found; tried supported names " + names);
   }
 
   /** Encodes {@code text} into token ids. */

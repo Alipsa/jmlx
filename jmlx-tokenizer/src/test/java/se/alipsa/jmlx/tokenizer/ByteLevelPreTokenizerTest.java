@@ -1,12 +1,18 @@
 package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class ByteLevelPreTokenizerTest {
+
+  @Test
+  void rejectsANullSplitPatternAtConfigurationConstruction() {
+    assertThrows(NullPointerException.class, () -> new PreTokenizerConfig(null, false));
+  }
 
   // The real Qwen2.5/Llama-3 regex (Qwen2.5's \p{N} variant), verified against each model's
   // actual tokenizer.json — see this plan's Findings section. No Pattern.UNICODE_CHARACTER_CLASS:

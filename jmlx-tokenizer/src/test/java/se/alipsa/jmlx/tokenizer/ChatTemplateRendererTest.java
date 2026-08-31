@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -9,8 +10,19 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import se.alipsa.hfjinja.Template;
 
 class ChatTemplateRendererTest {
+
+  @Test
+  void cachesParsedTemplatesAndAllowsTheirReuse() {
+    Template template = ChatTemplateRenderer.parse("{{ messages[0]['content'] }}");
+    assertSame(template, ChatTemplateRenderer.parse("{{ messages[0]['content'] }}"));
+    assertEquals(
+        "Hello",
+        ChatTemplateRenderer.render(
+            template, List.of(Map.of("content", "Hello")), false, null, null, Map.of()));
+  }
 
   private String readFixture(String name) throws IOException {
     try {

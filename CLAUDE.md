@@ -53,7 +53,7 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-examples
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-examples
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
@@ -112,7 +112,7 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
                  (no "|" above: pure Java, no dependency on jmlx-ffi or native/install/lib)
 ```
 
-Three modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
+The native stack has three modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
 it in `jmlx-ffi` means it compiles once and stays untouched by day-to-day iteration on `jmlx-core`,
 keeping incremental builds fast and generated code out of review diffs. `jmlx-core` depends on
 `jmlx-ffi` as `implementation`, not `api` — `MLXArray`/`MLX` wrap raw `MemorySegment` handles behind

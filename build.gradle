@@ -1,9 +1,9 @@
 /*
- * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer and
- * jmlx-examples lives here; each module's own build.gradle only declares its
- * plugin and dependencies. See req/initial-plan.md §4 for the rationale
- * behind the native-access flags and the native-directory system property
- * below.
+ * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer,
+ * jmlx-jinja and jmlx-examples lives here; each module's own build.gradle only
+ * declares its plugin and dependencies. See req/initial-plan.md §4 for the
+ * rationale behind the native-access flags and the native-directory system
+ * property below.
  */
 
 plugins {
@@ -16,11 +16,10 @@ allprojects {
 }
 
 // mavenLocal() is only added when the jmlx project's own version (above) is a -SNAPSHOT
-// build -- the expected setup for resolving a locally-built, unreleased dependency (e.g.
-// testing against an unreleased hfjinja before it is published to Central) during local
-// development, not a build-hygiene concern. A real release build resolves every dependency
-// from mavenCentral() alone, so a stale same-GAV artifact sitting in ~/.m2/repository can
-// never silently win over Central with no diagnostic (see PR #14 review).
+// build -- the expected setup for resolving a locally-built, unreleased dependency during
+// local development, not a build-hygiene concern. A real release build resolves every
+// dependency from mavenCentral() alone, so a stale same-GAV artifact sitting in
+// ~/.m2/repository can never silently win over Central with no diagnostic (see PR #14 review).
 allprojects {
     repositories {
         mavenCentral()

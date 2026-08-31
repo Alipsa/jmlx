@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import se.alipsa.hfjinja.Template;
+import se.alipsa.jmlx.jinja.Template;
 
 class ChatTemplateRendererTest {
 

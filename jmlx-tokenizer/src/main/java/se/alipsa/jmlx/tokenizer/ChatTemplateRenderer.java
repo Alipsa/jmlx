@@ -4,10 +4,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import se.alipsa.hfjinja.HfJinjaException;
-import se.alipsa.hfjinja.Template;
+import se.alipsa.jmlx.jinja.HfJinjaException;
+import se.alipsa.jmlx.jinja.Template;
 
-/** Renders a Hugging Face {@code chat_template} Jinja string via {@code hfjinja}. */
+/** Renders a Hugging Face {@code chat_template} Jinja string via {@code jmlx-jinja}. */
 public final class ChatTemplateRenderer {
 
   private ChatTemplateRenderer() {}

@@ -206,13 +206,13 @@ Commit `upstream/mapping.yml`, for example:
 ```yaml
 runtime.ts:
   java:
-    - src/main/java/se/alipsa/hfjinja/internal/runtime/Interpreter.java
-    - src/main/java/se/alipsa/hfjinja/internal/runtime/Values.java
+    - src/main/java/se/alipsa/jmlx/jinja/internal/runtime/Interpreter.java
+    - src/main/java/se/alipsa/jmlx/jinja/internal/runtime/Values.java
   tests:
-    - src/test/java/se/alipsa/hfjinja/UpstreamRuntimeTest.java
+    - src/test/java/se/alipsa/jmlx/jinja/UpstreamRuntimeTest.java
 parser.ts:
   java:
-    - src/main/java/se/alipsa/hfjinja/internal/parser/Parser.java
+    - src/main/java/se/alipsa/jmlx/jinja/internal/parser/Parser.java
 ```
 
 If a sync changes a mapped upstream file, the update must modify the corresponding Java code/tests
@@ -243,8 +243,8 @@ hfjinja/
   build.gradle                  # Java 21 toolchain; no production dependencies
   settings.gradle
   src/main/java/module-info.java
-  src/main/java/se/alipsa/hfjinja/
-  src/test/java/se/alipsa/hfjinja/
+  src/main/java/se/alipsa/jmlx/jinja/
+  src/test/java/se/alipsa/jmlx/jinja/
   src/test/resources/fixtures/
   upstream/
     upstream-lock.json

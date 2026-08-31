@@ -33,7 +33,7 @@ public final class Lexer {
   private static final String JS_WHITESPACE_CHAR_CLASS =
       "\\t\\n"
           + "\\u000B\\f\\r"
-          + "\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF";
+          + " \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF";
 
   /*
    * ECMAScript's multiline ^ recognizes only LF, CR, LS, and PS as line terminators. Java also
@@ -357,7 +357,7 @@ public final class Lexer {
         || c == '\u000B'
         || c == '\f'
         || c == '\r'
-        || c == '\u0020'
+        || c == ' '
         || c == '\u00A0'
         || c == '\u1680'
         || (c >= '\u2000' && c <= '\u200A')
@@ -400,7 +400,7 @@ public final class Lexer {
             || lastType == TokenType.CloseStatement
             || lastType == TokenType.CloseExpression
             || lastType == TokenType.Comment) {
-          var start = currentLocation();
+          final var start = currentLocation();
           var text = new StringBuilder();
           while (cursorPosition < src.length()
               && !(charAt(cursorPosition) == '{'
@@ -417,7 +417,7 @@ public final class Lexer {
         }
 
         if (charAt(cursorPosition) == '{' && charAt(cursorPosition + 1) == '#') {
-          var start = currentLocation();
+          final var start = currentLocation();
           advance(2); // skip "{#"
           var stripBefore = charAt(cursorPosition) == '-';
           if (stripBefore) {
@@ -509,10 +509,14 @@ public final class Lexer {
             addToken(pattern.type(), pattern.sequence(), currentLocation());
             if (pattern.type() == TokenType.OpenExpression) {
               curlyBracketDepth = 0;
-            } else if (pattern.type() == TokenType.OpenCurlyBracket) {
-              curlyBracketDepth++;
-            } else if (pattern.type() == TokenType.CloseCurlyBracket) {
-              curlyBracketDepth--;
+            } else {
+              if (pattern.type() == TokenType.OpenCurlyBracket) {
+                curlyBracketDepth++;
+              } else {
+                if (pattern.type() == TokenType.CloseCurlyBracket) {
+                  curlyBracketDepth--;
+                }
+              }
             }
             advance(pattern.sequence().length());
             continue main;

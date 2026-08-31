@@ -41,7 +41,7 @@ public final class Values {
    * @return the corresponding runtime value
    */
   public static Value fromHost(Object input) {
-    return fromHost(
+    return fromHostValue(
         input,
         new IdentityHashMap<>(),
         new IdentityHashMap<>(),
@@ -94,8 +94,9 @@ public final class Values {
       }
       case FloatValue floatValue -> sourceValue(hostFloat(floatValue.value()), value, sourceValues);
       case StringValue stringValue -> {
-        if (stringValue.undefinedBacked())
+        if (stringValue.undefinedBacked()) {
           throw new UndefinedHostValueException("undefined value at " + path.describe());
+        }
         yield stringValue.value();
       }
       case ArrayValue arrayValue -> {
@@ -126,7 +127,9 @@ public final class Values {
       }
       case TupleValue tupleValue -> {
         var existing = converted.get(tupleValue);
-        if (existing != null) yield existing;
+        if (existing != null) {
+          yield existing;
+        }
         requireAcyclicValue(tupleValue, visiting);
         try {
           var values = new ArrayList<Object>(tupleValue.values().size());
@@ -156,8 +159,9 @@ public final class Values {
         try {
           var values = new LinkedHashMap<String, Object>(objectValue.values().size());
           for (var entry : objectValue.values().entrySet()) {
-            if (!(entry.getKey() instanceof String key))
+            if (!(entry.getKey() instanceof String key)) {
               throw conversion("Map keys must be strings");
+            }
             var pathLength = path.length();
             path.appendKey(key);
             try {
@@ -176,7 +180,9 @@ public final class Values {
       }
       case KeywordArgumentsValue keywordArgumentsValue -> {
         var existing = converted.get(keywordArgumentsValue);
-        if (existing != null) yield existing;
+        if (existing != null) {
+          yield existing;
+        }
         requireAcyclicValue(keywordArgumentsValue, visiting);
         try {
           var values = new LinkedHashMap<String, Object>(keywordArgumentsValue.values().size());
@@ -245,6 +251,7 @@ public final class Values {
     return Double.valueOf(value);
   }
 
+  /** Thrown when a value without a host representation crosses the host-function boundary. */
   public static final class UndefinedHostValueException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
@@ -295,7 +302,7 @@ public final class Values {
    */
   public static Value fromHostFunctionReturn(
       Object input, IdentityHashMap<Object, Value> sourceValues) {
-    return fromHost(
+    return fromHostValue(
         input,
         new IdentityHashMap<>(),
         new IdentityHashMap<>(),
@@ -305,16 +312,16 @@ public final class Values {
         new CopyBudget());
   }
 
-  private static Value fromHost(
+  private static Value fromHostValue(
       Object input,
       IdentityHashMap<Object, Value> converted,
       IdentityHashMap<Object, Boolean> visiting,
       IdentityHashMap<Value, Boolean> containsMutable,
       CopyBudget copyBudget) {
-    return fromHost(input, converted, visiting, containsMutable, null, false, copyBudget);
+    return fromHostValue(input, converted, visiting, containsMutable, null, false, copyBudget);
   }
 
-  private static Value fromHost(
+  private static Value fromHostValue(
       Object input,
       IdentityHashMap<Object, Value> converted,
       IdentityHashMap<Object, Boolean> visiting,
@@ -364,7 +371,7 @@ public final class Values {
         var values = new ArrayList<Value>(length);
         for (int index = 0; index < length; index++) {
           values.add(
-              fromHost(
+              fromHostValue(
                   Array.get(input, index),
                   converted,
                   visiting,
@@ -390,7 +397,7 @@ public final class Values {
         var values = new ArrayList<Value>(list.size());
         for (Object item : list) {
           values.add(
-              fromHost(
+              fromHostValue(
                   item,
                   converted,
                   visiting,
@@ -420,7 +427,7 @@ public final class Values {
           }
           values.put(
               key,
-              fromHost(
+              fromHostValue(
                   entry.getValue(),
                   converted,
                   visiting,
@@ -442,7 +449,9 @@ public final class Values {
   /** Copies only paths containing mutable objects; immutable DAG portions stay shared. */
   private static Value copyMutableObjects(
       Value value, IdentityHashMap<Value, Boolean> containsMutable, CopyBudget copyBudget) {
-    if (!containsMutableObjects(value, containsMutable)) return value;
+    if (!containsMutableObjects(value, containsMutable)) {
+      return value;
+    }
     return copyMutableObjects(value, containsMutable, new IdentityHashMap<>(), copyBudget);
   }
 
@@ -455,7 +464,9 @@ public final class Values {
       IdentityHashMap<Value, Value> copied,
       CopyBudget copyBudget) {
     var existing = copied.get(value);
-    if (existing != null) return existing;
+    if (existing != null) {
+      return existing;
+    }
     return switch (value) {
       case ObjectValue objectValue -> {
         copyBudget.charge();
@@ -511,7 +522,9 @@ public final class Values {
 
   private static boolean containsMutableObjects(Value value, IdentityHashMap<Value, Boolean> memo) {
     var existing = memo.get(value);
-    if (existing != null) return existing;
+    if (existing != null) {
+      return existing;
+    }
     boolean result =
         switch (value) {
           case ObjectValue ignored -> true;

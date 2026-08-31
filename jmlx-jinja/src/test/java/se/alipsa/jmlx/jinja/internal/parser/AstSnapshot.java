@@ -22,14 +22,22 @@ final class AstSnapshot {
   private static void list(
       String name, List<? extends Statement> values, String indent, StringBuilder out) {
     line(name, indent, out);
-    if (values == null) line("-", indent + "  ", out);
-    else for (var value : values) emit(value, indent + "  ", out);
+    if (values == null) {
+      line("-", indent + "  ", out);
+    } else {
+      for (var value : values) {
+        emit(value, indent + "  ", out);
+      }
+    }
   }
 
   private static void value(String name, Statement value, String indent, StringBuilder out) {
     line(name, indent, out);
-    if (value == null) line("-", indent + "  ", out);
-    else emit(value, indent + "  ", out);
+    if (value == null) {
+      line("-", indent + "  ", out);
+    } else {
+      emit(value, indent + "  ", out);
+    }
   }
 
   private static void emit(Statement n, String i, StringBuilder o) {
@@ -59,7 +67,7 @@ final class AstSnapshot {
       case Statement.Comment x -> {
         line("Comment", i, o);
         line("value", i + "  ", o);
-        line(q(x.value()), i + "    ", o);
+        line(quote(x.value()), i + "    ", o);
       }
       case Statement.SetStatement x -> {
         line("Set", i, o);
@@ -102,10 +110,10 @@ final class AstSnapshot {
         emit(x.callee(), i + "    ", o);
         list("args", x.args(), i + "  ", o);
       }
-      case Expression.Identifier x -> scalar("Identifier", q(x.value()), i, o);
+      case Expression.Identifier x -> scalar("Identifier", quote(x.value()), i, o);
       case Expression.IntegerLiteral x -> scalar("IntegerLiteral", number(x.value()), i, o);
       case Expression.FloatLiteral x -> scalar("FloatLiteral", number(x.value()), i, o);
-      case Expression.StringLiteral x -> scalar("StringLiteral", q(x.value()), i, o);
+      case Expression.StringLiteral x -> scalar("StringLiteral", quote(x.value()), i, o);
       case Expression.ArrayLiteral x -> {
         line("ArrayLiteral", i, o);
         list("value", x.value(), i + "  ", o);
@@ -188,7 +196,7 @@ final class AstSnapshot {
       se.alipsa.jmlx.jinja.internal.lexer.Token token, String i, StringBuilder o) {
     line(token.type().toString(), i, o);
     line("value", i + "  ", o);
-    line(q(token.value()), i + "    ", o);
+    line(quote(token.value()), i + "    ", o);
   }
 
   private static void binary(
@@ -200,7 +208,7 @@ final class AstSnapshot {
     emit(bv, i + "    ", o);
   }
 
-  private static String q(String value) {
+  private static String quote(String value) {
     return JsFormat.quote(value);
   }
 

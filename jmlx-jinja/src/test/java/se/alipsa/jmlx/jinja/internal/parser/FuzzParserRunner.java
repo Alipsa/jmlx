@@ -24,7 +24,9 @@ final class FuzzParserRunner {
   public static void main(String[] args) throws Exception {
     try (var input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
       String line;
-      while ((line = input.readLine()) != null) System.out.println(run(line));
+      while ((line = input.readLine()) != null) {
+        System.out.println(run(line));
+      }
     }
   }
 
@@ -50,8 +52,9 @@ final class FuzzParserRunner {
       } catch (TemplateSyntaxException exception) {
         return response(id, "SYNTAX", null, exception.getMessage());
       } catch (TemplateRenderException exception) {
-        if (exception.category() == ErrorCategory.RESOURCE_LIMIT)
+        if (exception.category() == ErrorCategory.RESOURCE_LIMIT) {
           return response(id, "LIMIT", null);
+        }
         throw exception;
       }
     } catch (StackOverflowError error) {
@@ -87,10 +90,19 @@ final class FuzzParserRunner {
     var result = new StringBuilder("\"");
     for (var index = 0; index < value.length(); index++) {
       var character = value.charAt(index);
-      if (character == '\\') result.append("\\\\");
-      else if (character == '"') result.append("\\\"");
-      else if (character >= 0x20 && character <= 0x7e) result.append(character);
-      else result.append(String.format("\\u%04x", (int) character));
+      if (character == '\\') {
+        result.append("\\\\");
+      } else {
+        if (character == '"') {
+          result.append("\\\"");
+        } else {
+          if (character >= 0x20 && character <= 0x7e) {
+            result.append(character);
+          } else {
+            result.append(String.format("\\u%04x", (int) character));
+          }
+        }
+      }
     }
     return result.append('"').toString();
   }
@@ -103,36 +115,49 @@ final class FuzzParserRunner {
       boolean trimBlocks,
       boolean lstripBlocks) {
     static Candidate read(String json) {
-      String id = null, family = null, encoded = null;
+      String id = null;
+      String family = null;
+      String encoded = null;
       var strings = STRING.matcher(json);
-      while (strings.find())
+      while (strings.find()) {
         switch (strings.group(1)) {
           case "id" -> id = strings.group(2);
           case "family" -> family = strings.group(2);
           case "source" -> encoded = strings.group(2);
           default -> {}
         }
-      Boolean trim = null, lstrip = null;
+      }
+      Boolean trim = null;
+      Boolean lstrip = null;
       var booleans = BOOLEAN.matcher(json);
-      while (booleans.find())
-        if (booleans.group(1).equals("trimBlocks")) trim = Boolean.valueOf(booleans.group(2));
-        else lstrip = Boolean.valueOf(booleans.group(2));
+      while (booleans.find()) {
+        if (booleans.group(1).equals("trimBlocks")) {
+          trim = Boolean.valueOf(booleans.group(2));
+        } else {
+          lstrip = Boolean.valueOf(booleans.group(2));
+        }
+      }
       var length = LENGTH.matcher(json);
       if (id == null
           || family == null
           || encoded == null
           || trim == null
           || lstrip == null
-          || !length.find()) throw new IllegalArgumentException("Malformed candidate");
+          || !length.find()) {
+        throw new IllegalArgumentException("Malformed candidate");
+      }
       var bytes = Base64.getDecoder().decode(encoded);
-      if ((bytes.length & 1) != 0)
+      if ((bytes.length & 1) != 0) {
         throw new IllegalArgumentException("HARNESS odd UTF-16LE byte count");
+      }
       var chars = new char[bytes.length / 2];
-      for (var index = 0; index < chars.length; index++)
+      for (var index = 0; index < chars.length; index++) {
         chars[index] = (char) ((bytes[2 * index] & 0xff) | ((bytes[2 * index + 1] & 0xff) << 8));
+      }
       var source = new String(chars);
-      if (source.length() != Integer.parseInt(length.group(1)))
+      if (source.length() != Integer.parseInt(length.group(1))) {
         throw new IllegalArgumentException("HARNESS source length differs");
+      }
       return new Candidate(id, family, source, encoded, trim, lstrip);
     }
   }

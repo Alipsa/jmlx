@@ -15,7 +15,8 @@ import se.alipsa.jmlx.jinja.internal.lexer.Lexer;
 class AstSnapshotDifferentialTest {
   private static final Pattern FIXTURE =
       Pattern.compile(
-          "\\{\\s*\\\"name\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*\\\"source\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"])*)\\\"");
+          "\\{\\s*\\\"name\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*\\\"source\\\""
+              + "\\s*:\\s*\\\"((?:\\\\.|[^\\\"])*)\\\"");
 
   @Test
   void matchesPinnedNodeParserSnapshots() throws Exception {
@@ -36,11 +37,12 @@ class AstSnapshotDifferentialTest {
                   Lexer.tokenize(source, TemplateOptions.DEFAULT), TemplateOptions.DEFAULT)));
     }
     assertEquals(expected.keySet(), actual.keySet(), "fixture and snapshot names differ");
-    for (var entry : actual.entrySet())
+    for (var entry : actual.entrySet()) {
       assertEquals(
           expected.get(entry.getKey()),
           entry.getValue(),
           entry.getKey() + " (" + fixtureSources.get(entry.getKey()) + ")");
+    }
   }
 
   private static Map<String, String> blocks(String input) {
@@ -49,12 +51,18 @@ class AstSnapshotDifferentialTest {
     var body = new StringBuilder();
     for (var line : input.split("(?<=\\n)")) {
       if (line.startsWith("=== ")) {
-        if (name != null) result.put(name, body.toString());
+        if (name != null) {
+          result.put(name, body.toString());
+        }
         name = line.substring(4, line.indexOf(' ', 4));
         body.setLength(0);
-      } else body.append(line);
+      } else {
+        body.append(line);
+      }
     }
-    if (name != null) result.put(name, body.toString());
+    if (name != null) {
+      result.put(name, body.toString());
+    }
     return result;
   }
 
@@ -66,7 +74,9 @@ class AstSnapshotDifferentialTest {
         result.append(character);
         continue;
       }
-      if (++index == value.length()) throw new IllegalArgumentException("Incomplete JSON escape");
+      if (++index == value.length()) {
+        throw new IllegalArgumentException("Incomplete JSON escape");
+      }
       switch (value.charAt(index)) {
         case '"' -> result.append('"');
         case '\\' -> result.append('\\');
@@ -77,8 +87,9 @@ class AstSnapshotDifferentialTest {
         case 'r' -> result.append('\r');
         case 't' -> result.append('\t');
         case 'u' -> {
-          if (index + 4 >= value.length())
+          if (index + 4 >= value.length()) {
             throw new IllegalArgumentException("Incomplete Unicode escape");
+          }
           result.append((char) Integer.parseInt(value.substring(index + 1, index + 5), 16));
           index += 4;
         }

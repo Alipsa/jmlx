@@ -7,7 +7,9 @@ import se.alipsa.jmlx.jinja.TemplateRenderException;
 
 final class RenderBudget {
   private final RenderOptions options;
-  private long steps, iterations, output;
+  private long steps;
+  private long iterations;
+  private long output;
   private long rangeElements;
   private int macroDepth;
 
@@ -16,22 +18,27 @@ final class RenderBudget {
   }
 
   void chargeStep(SourceLocation location) {
-    if (++steps > options.maxSteps()) fail("Maximum render steps exceeded", location);
+    if (++steps > options.maxSteps()) {
+      fail("Maximum render steps exceeded", location);
+    }
   }
 
   void chargeLoopIteration(SourceLocation location) {
-    if (++iterations > options.maxLoopIterations())
+    if (++iterations > options.maxLoopIterations()) {
       fail("Maximum loop iterations exceeded", location);
+    }
   }
 
   void chargeOutput(int length, SourceLocation location) {
-    if ((output += length) > options.maxOutputLength())
+    if ((output += length) > options.maxOutputLength()) {
       fail("Maximum output length exceeded", location);
+    }
   }
 
   void chargeRangeElement(SourceLocation location) {
-    if (++rangeElements > options.maxLoopIterations())
+    if (++rangeElements > options.maxLoopIterations()) {
       fail("Maximum loop iterations exceeded", location);
+    }
   }
 
   int remainingOutputLength() {
@@ -44,7 +51,9 @@ final class RenderBudget {
   // that fails to pair this with exitMacro() in a finally cannot leak a level — the invariant is
   // structural, not caller-enforced.
   void enterMacro(SourceLocation location) {
-    if (macroDepth >= options.maxMacroDepth()) fail("Maximum macro call depth exceeded", location);
+    if (macroDepth >= options.maxMacroDepth()) {
+      fail("Maximum macro call depth exceeded", location);
+    }
     macroDepth++;
   }
 

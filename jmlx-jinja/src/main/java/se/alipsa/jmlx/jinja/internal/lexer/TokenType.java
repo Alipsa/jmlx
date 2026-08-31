@@ -11,7 +11,10 @@ package se.alipsa.jmlx.jinja.internal.lexer;
  * from accessing it.
  */
 public enum TokenType {
-  /** Literal template text outside any {{ }}, {% %}, or {# #} construct. */
+  /**
+   * Literal template text outside any {@code {{...}}}, {@code {%...%}}, or {@code {#...#}}
+   * construct.
+   */
   Text,
   /** A numeric literal, e.g. {@code 5} or {@code 5.0}. */
   NumericLiteral,

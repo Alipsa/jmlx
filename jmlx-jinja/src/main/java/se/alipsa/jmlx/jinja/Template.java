@@ -77,7 +77,9 @@ public final class Template {
    *     string-length limit
    */
   public String format(double indent) {
-    if (Double.isNaN(indent) || indent == 0d) return format();
+    if (Double.isNaN(indent) || indent == 0d) {
+      return format();
+    }
     return TemplateFormatter.format(
         program, " ".repeat(TemplateFormatter.validateIndentCount(indent)));
   }

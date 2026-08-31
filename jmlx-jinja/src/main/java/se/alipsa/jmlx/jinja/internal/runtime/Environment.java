@@ -26,8 +26,9 @@ public final class Environment {
   }
 
   void set(String name, Value value) {
-    if (variables.containsKey(name))
+    if (variables.containsKey(name)) {
       throw new IllegalStateException("Variable already declared: " + name);
+    }
     variables.put(name, value);
   }
 
@@ -38,7 +39,9 @@ public final class Environment {
   Value lookupVariable(String name) {
     for (var env = this; env != null; env = env.parent) {
       var value = env.variables.get(name);
-      if (value != null) return value;
+      if (value != null) {
+        return value;
+      }
     }
     return Value.UndefinedValue.INSTANCE;
   }
@@ -48,11 +51,12 @@ public final class Environment {
     if (args.size() > 1
         || (!args.isEmpty()
             && !(args.get(0) instanceof Value.ObjectValue)
-            && !(args.get(0) instanceof Value.KeywordArgumentsValue)))
+            && !(args.get(0) instanceof Value.KeywordArgumentsValue))) {
       throw new TemplateRenderException(
           "`namespace` expects either zero arguments or a single object argument",
           ErrorCategory.TYPE,
           location);
+    }
     return args.isEmpty() ? new Value.ObjectValue(new LinkedHashMap<>()) : args.get(0);
   }
 }

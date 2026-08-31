@@ -98,7 +98,9 @@ class TemplateConcurrencyTest {
       }
       assertTrue(ready.await(10, TimeUnit.SECONDS), "not every worker reached the start barrier");
       start.countDown();
-      for (var future : futures) future.get(20, TimeUnit.SECONDS);
+      for (var future : futures) {
+        future.get(20, TimeUnit.SECONDS);
+      }
       assertEquals(expectedHostCalls(), hostCalls.get());
     } finally {
       start.countDown();
@@ -109,7 +111,7 @@ class TemplateConcurrencyTest {
   @Test
   @Order(2)
   void templateStoresOnlyItsFinalParsedProgram() throws Exception {
-    var template = Template.parse("{{ value }}");
+    final var template = Template.parse("{{ value }}");
     var fields =
         Arrays.stream(Template.class.getDeclaredFields())
             .filter(field -> !field.isSynthetic())
@@ -121,8 +123,9 @@ class TemplateConcurrencyTest {
     assertTrue(Modifier.isFinal(program.getModifiers()));
     program.setAccessible(true);
     var parsedProgram = program.get(template);
-    for (var value = 0; value < 10; value++)
+    for (var value = 0; value < 10; value++) {
       assertEquals(Integer.toString(value), template.render(Map.of("value", value)));
+    }
     assertSame(parsedProgram, program.get(template));
     assertNotNull(parsedProgram);
   }
@@ -134,9 +137,12 @@ class TemplateConcurrencyTest {
     var executor = Executors.newFixedThreadPool(WORKERS, daemonThreadFactory());
     try {
       var futures = new ArrayList<Future<?>>();
-      for (var worker = 0; worker < WORKERS; worker++)
+      for (var worker = 0; worker < WORKERS; worker++) {
         futures.add(executor.submit(() -> assertEquals(expected, template.format(2))));
-      for (var future : futures) future.get(10, TimeUnit.SECONDS);
+      }
+      for (var future : futures) {
+        future.get(10, TimeUnit.SECONDS);
+      }
     } finally {
       shutdown(executor);
     }
@@ -151,12 +157,12 @@ class TemplateConcurrencyTest {
       boolean allowFailure) {
     var id = "W" + worker + "R" + round;
     var overload = (worker + round) % 4;
-    var explicitOptions = overload == 1 || overload == 3;
-    var fail = allowFailure && (worker + round) % 5 == 0;
+    final var explicitOptions = overload == 1 || overload == 3;
+    final var fail = allowFailure && (worker + round) % 5 == 0;
     var state = new LinkedHashMap<String, Object>();
     state.put("seen", "caller-value");
     state.put("nested", new ArrayList<>(List.of("first", "second")));
-    var expectedState = copyState(state);
+    final var expectedState = copyState(state);
     var context = new LinkedHashMap<String, Object>();
     context.put("id", id);
     context.put("state", state);
@@ -204,11 +210,14 @@ class TemplateConcurrencyTest {
   private static int expectedHostCalls() {
     var calls =
         1; // The constrained explicit-options priming render above invokes format_tool once.
-    for (var worker = 0; worker < WORKERS; worker++)
+    for (var worker = 0; worker < WORKERS; worker++) {
       for (var round = 0; round < ROUNDS; round++) {
         var overload = (worker + round) % 4;
-        if (overload == 1 || overload == 3) calls++;
+        if (overload == 1 || overload == 3) {
+          calls++;
+        }
       }
+    }
     return calls;
   }
 

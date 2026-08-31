@@ -441,7 +441,7 @@ class LexerTest {
     void mapsLocationsPastEndOfMalformedInput() {
       // Regression case from the parser fuzz corpus: Scanner may advance beyond the final source
       // character while diagnosing an incomplete tag.
-      var source = "{\uD83D\uDE00\n\r\n{\0}[{{('\0!!!()('\r\n{{%\"";
+      var source = "{😀\n\r\n{\0}[{{('\0!!!()('\r\n{{%\"";
       var error =
           assertThrows(
               TemplateSyntaxException.class, () -> Lexer.tokenize(source, TemplateOptions.DEFAULT));
@@ -452,7 +452,7 @@ class LexerTest {
     @Test
     void mapsLocationsPastEndOfMalformedInputAfterPreprocessing() {
       // The trailing newline creates an origin map while the scanner still overshoots the source.
-      var source = "{\uD83D\uDE00\n\r\n{\0}[{{('\0!!!()('\r\n{{%\"\n";
+      var source = "{😀\n\r\n{\0}[{{('\0!!!()('\r\n{{%\"\n";
       var error =
           assertThrows(
               TemplateSyntaxException.class, () -> Lexer.tokenize(source, TemplateOptions.DEFAULT));

@@ -64,7 +64,9 @@ public final class Interpreter {
     try {
       seed(env, options, program.location(), budget);
       for (var e : context.values().entrySet()) {
-        if (e.getKey() instanceof String key) env.set(key, e.getValue());
+        if (e.getKey() instanceof String key) {
+          env.set(key, e.getValue());
+        }
       }
     } catch (IllegalStateException ex) {
       throw new TemplateRenderException(ex.getMessage(), ErrorCategory.VALUE, program.location());
@@ -93,9 +95,10 @@ public final class Interpreter {
           ErrorCategory.RESOURCE_LIMIT,
           program.location());
     }
-    if (!(result instanceof ExecResult.Normal normal))
+    if (!(result instanceof ExecResult.Normal normal)) {
       throw new TemplateRenderException(
           "break or continue outside a for loop", ErrorCategory.SYNTAX, program.location());
+    }
     try {
       output.append(normal.output());
     } catch (IOException ex) {
@@ -124,12 +127,13 @@ public final class Interpreter {
         "strftime_now",
         new Value.CallableValue(
             (a, k, x, s) -> strftime(a, k, x, o), Value.CallableValue.CONVERTED_FUNCTION_SOURCE));
-    for (var e : o.hostFunctions().entrySet())
+    for (var e : o.hostFunctions().entrySet()) {
       env.set(
           e.getKey(),
           new Value.CallableValue(
               (a, k, x, s) -> HostFunctions.invoke(e.getKey(), e.getValue(), a, k, x),
               Value.CallableValue.CONVERTED_FUNCTION_SOURCE));
+    }
   }
 
   static ExecResult evaluateBlock(List<Statement> body, Environment env, RenderBudget budget) {
@@ -137,7 +141,9 @@ public final class Interpreter {
     for (var node : body) {
       budget.chargeStep(node.location());
       var result = evaluateStatement(node, env, budget);
-      if (!(result instanceof ExecResult.Normal n)) return result;
+      if (!(result instanceof ExecResult.Normal n)) {
+        return result;
+      }
       out.append(n.output());
     }
     return new ExecResult.Normal(out.toString());
@@ -228,14 +234,16 @@ public final class Interpreter {
       Expression.BinaryExpression expression, Environment env, RenderBudget budget) {
     var left = evaluateExpression(expression.left(), env, budget);
     var operator = expression.operator().value();
-    if (operator.equals("and"))
+    if (operator.equals("and")) {
       return truthy(left, expression.left().location())
           ? evaluateExpression(expression.right(), env, budget)
           : left;
-    if (operator.equals("or"))
+    }
+    if (operator.equals("or")) {
       return truthy(left, expression.left().location())
           ? left
           : evaluateExpression(expression.right(), env, budget);
+    }
 
     var right = evaluateExpression(expression.right(), env, budget);
     deferredValue(left, "value", expression.location());
@@ -246,45 +254,61 @@ public final class Interpreter {
     }
     if (left instanceof Value.UndefinedValue || right instanceof Value.UndefinedValue) {
       if (right instanceof Value.UndefinedValue
-          && (operator.equals("in") || operator.equals("not in")))
+          && (operator.equals("in") || operator.equals("not in"))) {
         return new Value.BooleanValue(operator.equals("not in"));
+      }
       throw operatorUndefined(operator, expression.location());
     }
-    if (left instanceof Value.NullValue || right instanceof Value.NullValue)
+    if (left instanceof Value.NullValue || right instanceof Value.NullValue) {
       throw operatorNull(expression.location());
-    if (operator.equals("~"))
+    }
+    if (operator.equals("~")) {
       return new Value.StringValue(
           JsOperations.payloadText(left, expression.location())
               + JsOperations.payloadText(right, expression.location()));
+    }
     if (JsOperations.numeric(left) && JsOperations.numeric(right)) {
-      if (operator.equals("+")) return JsOperations.add(left, right, expression.location());
+      if (operator.equals("+")) {
+        return JsOperations.add(left, right, expression.location());
+      }
       if (operator.equals("-")
           || operator.equals("*")
           || operator.equals("/")
-          || operator.equals("%")) return JsOperations.arithmetic(operator, left, right);
+          || operator.equals("%")) {
+        return JsOperations.arithmetic(operator, left, right);
+      }
       if (operator.equals("<")
           || operator.equals(">")
           || operator.equals("<=")
-          || operator.equals(">="))
+          || operator.equals(">=")) {
         return new Value.BooleanValue(JsOperations.compare(operator, left, right));
-    } else if (arrayLike(left) && arrayLike(right)) {
-      if (operator.equals("+"))
-        return JsOperations.concatenate(arrayValues(left), arrayValues(right));
-    } else if (arrayLike(right)
-        && !(left instanceof Value.ArrayValue || left instanceof Value.TupleValue)) {
-      if (operator.equals("in") || operator.equals("not in")) {
-        boolean present = JsOperations.contains(left, new Value.ArrayValue(arrayValues(right)));
-        return new Value.BooleanValue(operator.equals("in") ? present : !present);
+      }
+    } else {
+      if (arrayLike(left) && arrayLike(right)) {
+        if (operator.equals("+")) {
+          return JsOperations.concatenate(arrayValues(left), arrayValues(right));
+        }
+      } else {
+        if (arrayLike(right)
+            && !(left instanceof Value.ArrayValue || left instanceof Value.TupleValue)) {
+          if (operator.equals("in") || operator.equals("not in")) {
+            boolean present = JsOperations.contains(left, new Value.ArrayValue(arrayValues(right)));
+            return new Value.BooleanValue(operator.equals("in") ? present : !present);
+          }
+        }
       }
     }
     if (left instanceof Value.StringValue || right instanceof Value.StringValue) {
-      if (operator.equals("+")) return JsOperations.add(left, right, expression.location());
+      if (operator.equals("+")) {
+        return JsOperations.add(left, right, expression.location());
+      }
     }
     if (left instanceof Value.StringValue string && right instanceof Value.StringValue other) {
       if (operator.equals("in") || operator.equals("not in")) {
-        if (other.undefinedBacked())
+        if (other.undefinedBacked()) {
           throw filterType(
               "Cannot read properties of undefined (reading 'includes')", expression.location());
+        }
         boolean present = JsOperations.contains(string, other);
         return new Value.BooleanValue(operator.equals("in") ? present : !present);
       }
@@ -319,8 +343,9 @@ public final class Interpreter {
       Expression.UnaryExpression expression, Environment env, RenderBudget budget) {
     var argument = evaluateExpression(expression.argument(), env, budget);
     deferredValue(argument, "value", expression.location());
-    if (expression.operator().value().equals("not"))
+    if (expression.operator().value().equals("not")) {
       return new Value.BooleanValue(!JsOperations.rawTruthy(argument));
+    }
     throw operatorUnsupportedUnary(expression.operator().value(), argument, expression.location());
   }
 
@@ -339,13 +364,18 @@ public final class Interpreter {
       RenderBudget budget,
       SourceLocation location) {
     if (filterNode instanceof Expression.Identifier identifier) {
-      if (!absorbsDeferredOperand(identifier.value())) deferredValue(operand, location);
+      if (!absorbsDeferredOperand(identifier.value())) {
+        deferredValue(operand, location);
+      }
       return applyBareFilter(operand, identifier.value(), location, budget);
     }
     if (!(filterNode instanceof Expression.CallExpression call)
-        || !(call.callee() instanceof Expression.Identifier identifier))
+        || !(call.callee() instanceof Expression.Identifier identifier)) {
       throw filterType("Unknown filter: " + filterNode.getClass().getSimpleName(), location);
-    if (!absorbsDeferredOperand(identifier.value())) deferredValue(operand, location);
+    }
+    if (!absorbsDeferredOperand(identifier.value())) {
+      deferredValue(operand, location);
+    }
     return applyCallFilter(operand, identifier.value(), call, env, budget, location);
   }
 
@@ -407,15 +437,18 @@ public final class Interpreter {
           filterToJson(operand, filterArguments(name, call, env, budget), location, budget);
       case "int", "float" -> {
         var arguments = filterArguments(name, call, env, budget);
-        if (operand instanceof Value.IntegerValue || operand instanceof Value.FloatValue)
+        if (operand instanceof Value.IntegerValue || operand instanceof Value.FloatValue) {
           yield operand;
+        }
         yield filterNumber(operand, arguments, location, name.equals("int"));
       }
       case "default" -> filterDefault(operand, filterArguments(name, call, env, budget), location);
       case "join" -> {
         if (!(operand instanceof Value.ArrayValue
             || operand instanceof Value.TupleValue
-            || operand instanceof Value.StringValue)) throw filterReceiver(name, operand, location);
+            || operand instanceof Value.StringValue)) {
+          throw filterReceiver(name, operand, location);
+        }
         yield filterJoin(operand, filterArguments(name, call, env, budget), location);
       }
       default -> applyCallFilterByReceiver(operand, name, call, env, budget, location);
@@ -429,11 +462,13 @@ public final class Interpreter {
       Environment env,
       RenderBudget budget,
       SourceLocation location) {
-    if (operand instanceof Value.ArrayValue array)
+    if (operand instanceof Value.ArrayValue array) {
       return applyArrayCallFilter(array.values(), operand, name, call, env, budget, location);
-    if (operand instanceof Value.TupleValue tuple)
+    }
+    if (operand instanceof Value.TupleValue tuple) {
       return applyArrayCallFilter(tuple.values(), operand, name, call, env, budget, location);
-    if (operand instanceof Value.StringValue)
+    }
+    if (operand instanceof Value.StringValue) {
       return switch (name) {
         case "indent" ->
             filterIndent(operand, filterArguments(name, call, env, budget), location, budget);
@@ -441,13 +476,15 @@ public final class Interpreter {
             filterReplace(operand, filterArguments(name, call, env, budget), location);
         default -> throw unknownCallFilter(name, operand, location);
       };
+    }
     if (operand instanceof Value.ObjectValue object) {
       if (name.equals("get")
           || name.equals("items")
           || name.equals("keys")
           || name.equals("values")
-          || name.equals("dictsort"))
+          || name.equals("dictsort")) {
         return filterObjectBuiltin(object, filterArguments(name, call, env, budget), location);
+      }
       throw unknownCallFilter(name, operand, location);
     }
     if (operand instanceof Value.KeywordArgumentsValue object) {
@@ -455,8 +492,9 @@ public final class Interpreter {
           || name.equals("items")
           || name.equals("keys")
           || name.equals("values")
-          || name.equals("dictsort"))
+          || name.equals("dictsort")) {
         return filterObjectBuiltin(object, filterArguments(name, call, env, budget), location);
+      }
       throw unknownCallFilter(name, operand, location);
     }
     throw filterReceiver(name, operand, location);
@@ -487,14 +525,20 @@ public final class Interpreter {
       RenderBudget budget,
       SourceLocation location,
       boolean select) {
-    if (values.isEmpty() && call.args().isEmpty()) return new Value.ArrayValue(List.of());
-    for (var item : values)
-      if (!(item instanceof Value.ObjectValue))
+    if (values.isEmpty() && call.args().isEmpty()) {
+      return new Value.ArrayValue(List.of());
+    }
+    for (var item : values) {
+      if (!(item instanceof Value.ObjectValue)) {
         throw filterType("`" + name + "` can only be applied to array of objects", location);
-    for (var argument : call.args())
-      if (!(argument instanceof Expression.StringLiteral))
+      }
+    }
+    for (var argument : call.args()) {
+      if (!(argument instanceof Expression.StringLiteral)) {
         throw new TemplateRenderException(
             "arguments of `" + name + "` must be strings", ErrorCategory.TYPE, location);
+      }
+    }
     return filterSelectAttr(values, filterArguments(name, call, env, budget), location, select);
   }
 
@@ -508,7 +552,9 @@ public final class Interpreter {
       Expression.TestExpression expression, Environment env, RenderBudget budget) {
     var operand = evaluateExpression(expression.operand(), env, budget);
     String name = expression.test().value();
-    if (testReadsDeferredValue(name)) deferredValue(operand, expression.location());
+    if (testReadsDeferredValue(name)) {
+      deferredValue(operand, expression.location());
+    }
     boolean result = namedTest(name, operand, null, expression.location());
     return new Value.BooleanValue(expression.negate() ? !result : result);
   }
@@ -524,31 +570,42 @@ public final class Interpreter {
   private static Value filterToJson(
       Value operand, NamedArguments filter, SourceLocation location, RenderBudget budget) {
     Value indent = absentFilterArgument(filter.keywords().get("indent"), Value.NullValue.INSTANCE);
-    if (!(indent instanceof Value.NullValue || indent instanceof Value.IntegerValue))
+    if (!(indent instanceof Value.NullValue || indent instanceof Value.IntegerValue)) {
       throw new TemplateRenderException(
           "If set, indent must be a number", ErrorCategory.TYPE, location);
-    Double indentValue = indent instanceof Value.IntegerValue number ? number.value() : null;
+    }
+    Double indentValue = null;
+    if (indent instanceof Value.IntegerValue number) {
+      indentValue = number.value();
+    }
 
     Value ensureAscii =
         absentFilterArgument(filter.keywords().get("ensure_ascii"), new Value.BooleanValue(false));
-    if (!(ensureAscii instanceof Value.BooleanValue ensureAsciiValue))
+    if (!(ensureAscii instanceof Value.BooleanValue ensureAsciiValue)) {
       throw new TemplateRenderException(
           "If set, ensure_ascii must be a boolean", ErrorCategory.TYPE, location);
+    }
     Value sortKeys =
         absentFilterArgument(filter.keywords().get("sort_keys"), new Value.BooleanValue(false));
-    if (!(sortKeys instanceof Value.BooleanValue sortKeysValue))
+    if (!(sortKeys instanceof Value.BooleanValue sortKeysValue)) {
       throw new TemplateRenderException(
           "If set, sort_keys must be a boolean", ErrorCategory.TYPE, location);
+    }
     Value separators =
         absentFilterArgument(filter.keywords().get("separators"), Value.NullValue.INSTANCE);
     JsFormat.JsonSeparators separatorValues = null;
-    if (separators instanceof Value.ArrayValue array)
+    if (separators instanceof Value.ArrayValue array) {
       separatorValues = jsonSeparators(array.values(), location);
-    else if (separators instanceof Value.TupleValue tuple)
-      separatorValues = jsonSeparators(tuple.values(), location);
-    else if (!(separators instanceof Value.NullValue))
-      throw new TemplateRenderException(
-          "If set, separators must be a tuple of two strings", ErrorCategory.TYPE, location);
+    } else {
+      if (separators instanceof Value.TupleValue tuple) {
+        separatorValues = jsonSeparators(tuple.values(), location);
+      } else {
+        if (!(separators instanceof Value.NullValue)) {
+          throw new TemplateRenderException(
+              "If set, separators must be a tuple of two strings", ErrorCategory.TYPE, location);
+        }
+      }
+    }
     return new Value.StringValue(
         JsFormat.runtimeJson(
             operand,
@@ -566,9 +623,10 @@ public final class Interpreter {
       List<Value> values, SourceLocation location) {
     if (values.size() != 2
         || !(values.get(0) instanceof Value.StringValue first)
-        || !(values.get(1) instanceof Value.StringValue second))
+        || !(values.get(1) instanceof Value.StringValue second)) {
       throw new TemplateRenderException(
           "separators must be a tuple of two strings", ErrorCategory.TYPE, location);
+    }
     return new JsFormat.JsonSeparators(
         first.undefinedBacked() ? null : first.value(),
         second.undefinedBacked() ? null : second.value());
@@ -584,11 +642,14 @@ public final class Interpreter {
         filter.positional().size() > 1
             ? absentFilterArgument(filter.positional().get(1), new Value.BooleanValue(false))
             : absentFilterArgument(filter.keywords().get("boolean"), new Value.BooleanValue(false));
-    if (!(booleanFlag instanceof Value.BooleanValue flag))
+    if (!(booleanFlag instanceof Value.BooleanValue flag)) {
       throw new TemplateRenderException(
           "`default` filter flag must be a boolean", ErrorCategory.TYPE, location);
+    }
     if (operand instanceof Value.DeferredUndefinedValue) {
-      if (flag.value()) deferredValue(operand, "__bool__", location);
+      if (flag.value()) {
+        deferredValue(operand, "__bool__", location);
+      }
       deferredValue(operand, location);
     }
     return undefinedLike(operand) || flag.value() && !truthy(operand) ? fallback : operand;
@@ -596,13 +657,27 @@ public final class Interpreter {
 
   private static Value filterLength(Value operand, SourceLocation location) {
     int length;
-    if (operand instanceof Value.ArrayValue array) length = array.values().size();
-    else if (operand instanceof Value.TupleValue tuple) length = tuple.values().size();
-    else if (operand instanceof Value.StringValue string && !string.undefinedBacked())
-      length = string.value().length();
-    else if (operand instanceof Value.ObjectValue object) length = object.values().size();
-    else if (operand instanceof Value.KeywordArgumentsValue object) length = object.values().size();
-    else throw filterReceiver("length", operand, location);
+    if (operand instanceof Value.ArrayValue array) {
+      length = array.values().size();
+    } else {
+      if (operand instanceof Value.TupleValue tuple) {
+        length = tuple.values().size();
+      } else {
+        if (operand instanceof Value.StringValue string && !string.undefinedBacked()) {
+          length = string.value().length();
+        } else {
+          if (operand instanceof Value.ObjectValue object) {
+            length = object.values().size();
+          } else {
+            if (operand instanceof Value.KeywordArgumentsValue object) {
+              length = object.values().size();
+            } else {
+              throw filterReceiver("length", operand, location);
+            }
+          }
+        }
+      }
+    }
     return new Value.IntegerValue(length);
   }
 
@@ -611,8 +686,9 @@ public final class Interpreter {
       NamedArguments filter,
       SourceLocation location,
       java.util.function.UnaryOperator<String> operation) {
-    if (!(operand instanceof Value.StringValue string) || string.undefinedBacked())
+    if (!(operand instanceof Value.StringValue string) || string.undefinedBacked()) {
       throw filterReceiver(filter.name(), operand, location);
+    }
     return new Value.StringValue(operation.apply(string.value()));
   }
 
@@ -621,22 +697,34 @@ public final class Interpreter {
         filter.positional().isEmpty()
             ? filter.keywords().get("separator")
             : filter.positional().get(0);
-    if (separator == null || separator instanceof Value.DeferredUndefinedValue)
+    if (separator == null || separator instanceof Value.DeferredUndefinedValue) {
       separator = new Value.StringValue("");
-    if (!(separator instanceof Value.StringValue string))
+    }
+    if (!(separator instanceof Value.StringValue string)) {
       throw new TemplateRenderException("separator must be a string", ErrorCategory.TYPE, location);
+    }
     List<Value> values;
-    if (operand instanceof Value.ArrayValue array) values = array.values();
-    else if (operand instanceof Value.TupleValue tuple) values = tuple.values();
-    else if (operand instanceof Value.StringValue value) {
-      if (value.undefinedBacked()) throw filterType("undefined is not iterable", location);
-      values =
-          value
-              .value()
-              .codePoints()
-              .mapToObj(c -> (Value) new Value.StringValue(new String(Character.toChars(c))))
-              .toList();
-    } else throw filterReceiver("join", operand, location);
+    if (operand instanceof Value.ArrayValue array) {
+      values = array.values();
+    } else {
+      if (operand instanceof Value.TupleValue tuple) {
+        values = tuple.values();
+      } else {
+        if (operand instanceof Value.StringValue value) {
+          if (value.undefinedBacked()) {
+            throw filterType("undefined is not iterable", location);
+          }
+          values =
+              value
+                  .value()
+                  .codePoints()
+                  .mapToObj(c -> (Value) new Value.StringValue(new String(Character.toChars(c))))
+                  .toList();
+        } else {
+          throw filterReceiver("join", operand, location);
+        }
+      }
+    }
     String separatorText = string.undefinedBacked() ? "," : string.value();
     return new Value.StringValue(
         values.stream()
@@ -645,34 +733,51 @@ public final class Interpreter {
   }
 
   private static Value filterList(Value operand, SourceLocation location) {
-    if (operand instanceof Value.ArrayValue array) return array;
-    if (operand instanceof Value.TupleValue tuple) return tuple;
+    if (operand instanceof Value.ArrayValue array) {
+      return array;
+    }
+    if (operand instanceof Value.TupleValue tuple) {
+      return tuple;
+    }
     throw filterReceiver("list", operand, location);
   }
 
   private static Value filterItems(Value operand, SourceLocation location) {
-    if (operand instanceof Value.ObjectValue object) return itemsOf(object.values());
-    if (operand instanceof Value.KeywordArgumentsValue object) return itemsOf(object.values());
+    if (operand instanceof Value.ObjectValue object) {
+      return itemsOf(object.values());
+    }
+    if (operand instanceof Value.KeywordArgumentsValue object) {
+      return itemsOf(object.values());
+    }
     throw filterReceiver("items", operand, location);
   }
 
   private static List<Value> sequence(Value operand, String name, SourceLocation location) {
-    if (operand instanceof Value.ArrayValue array) return array.values();
-    if (operand instanceof Value.TupleValue tuple) return tuple.values();
+    if (operand instanceof Value.ArrayValue array) {
+      return array.values();
+    }
+    if (operand instanceof Value.TupleValue tuple) {
+      return tuple.values();
+    }
     throw filterReceiver(name, operand, location);
   }
 
   private static Value filterFirstLast(
       Value operand, NamedArguments filter, SourceLocation location, boolean last) {
     var values = sequence(operand, filter.name(), location);
-    if (values.isEmpty()) return Value.DeferredUndefinedValue.INSTANCE;
+    if (values.isEmpty()) {
+      return Value.DeferredUndefinedValue.INSTANCE;
+    }
     return values.get(last ? values.size() - 1 : 0);
   }
 
   private static boolean lowerTest(Value value, SourceLocation location) {
-    if (!(value instanceof Value.StringValue string)) return false;
-    if (string.undefinedBacked())
+    if (!(value instanceof Value.StringValue string)) {
+      return false;
+    }
+    if (string.undefinedBacked()) {
       throw filterType("Cannot read properties of undefined (reading 'toLowerCase')", location);
+    }
     return string.value().equals(string.value().toLowerCase(Locale.ROOT));
   }
 
@@ -687,17 +792,20 @@ public final class Interpreter {
     var result = new ArrayList<Value>();
     for (var value : sequence(operand, filter.name(), location)) {
       deferredValue(value, location);
-      if (result.stream().noneMatch(existing -> JsOperations.strictValueEquals(existing, value)))
+      if (result.stream().noneMatch(existing -> JsOperations.strictValueEquals(existing, value))) {
         result.add(value);
+      }
     }
     return new Value.ArrayValue(result);
   }
 
   private static Value filterAbs(Value operand, NamedArguments filter, SourceLocation location) {
-    if (operand instanceof Value.IntegerValue number)
+    if (operand instanceof Value.IntegerValue number) {
       return new Value.IntegerValue(Math.abs(number.value()));
-    if (operand instanceof Value.FloatValue number)
+    }
+    if (operand instanceof Value.FloatValue number) {
       return new Value.FloatValue(Math.abs(number.value()));
+    }
     throw filterReceiver(filter.name(), operand, location);
   }
 
@@ -709,8 +817,9 @@ public final class Interpreter {
     if (attribute != null
         && !(attribute instanceof Value.NullValue
             || attribute instanceof Value.StringValue
-            || attribute instanceof Value.IntegerValue))
+            || attribute instanceof Value.IntegerValue)) {
       throw filterType("attribute must be a string, integer, or null", location);
+    }
     values.sort(
         (left, right) -> {
           Value a = sortValue(left, attribute);
@@ -723,17 +832,20 @@ public final class Interpreter {
 
   private static Value filterMap(Value operand, NamedArguments filter, SourceLocation location) {
     var attribute = filter.keywords().get("attribute");
-    if (attribute == null)
+    if (attribute == null) {
       throw filterType(
           "`map` expressions without `attribute` set are not currently supported.", location);
-    if (!(attribute instanceof Value.StringValue string) || string.undefinedBacked())
+    }
+    if (!(attribute instanceof Value.StringValue string) || string.undefinedBacked()) {
       throw filterType("attribute must be a string", location);
+    }
     Value fallback =
         absentFilterArgument(filter.keywords().get("default"), Value.UndefinedValue.INSTANCE);
     var values = new ArrayList<Value>();
     for (var item : sequence(operand, filter.name(), location)) {
-      if (!(item instanceof Value.ObjectValue))
+      if (!(item instanceof Value.ObjectValue)) {
         throw filterType("items in map must be an object", location);
+      }
       Value mapped = attribute(item, string.value());
       values.add(mapped instanceof Value.UndefinedValue ? fallback : mapped);
     }
@@ -742,34 +854,43 @@ public final class Interpreter {
 
   private static Value filterIndent(
       Value operand, NamedArguments filter, SourceLocation location, RenderBudget budget) {
-    if (!(operand instanceof Value.StringValue string) || string.undefinedBacked())
+    if (!(operand instanceof Value.StringValue string) || string.undefinedBacked()) {
       throw filterReceiver(filter.name(), operand, location);
+    }
     Value width = filterArgument(filter, 0, "width");
-    if (width == null) width = new Value.IntegerValue(4);
-    if (!(width instanceof Value.IntegerValue number))
+    if (width == null) {
+      width = new Value.IntegerValue(4);
+    }
+    if (!(width instanceof Value.IntegerValue number)) {
       throw filterType("width must be a number", location);
+    }
     boolean first = filterTruthy(filterArgument(filter, 1, "first"), false);
     boolean blank = filterTruthy(filterArgument(filter, 2, "blank"), false);
-    if (number.value() < 0)
+    if (number.value() < 0) {
       throw new TemplateRenderException(
           "Invalid count value: " + JsFormat.plainString(number.value()),
           ErrorCategory.VALUE,
           location);
-    if (number.value() > budget.remainingOutputLength())
+    }
+    if (number.value() > budget.remainingOutputLength()) {
       throw new TemplateRenderException(
           "Maximum render output length exceeded", ErrorCategory.RESOURCE_LIMIT, location);
+    }
     var lines = string.value().split("\\n", -1);
     String prefix = " ".repeat((int) number.value());
-    for (int index = 0; index < lines.length; index++)
-      if ((first || index != 0) && (blank || !lines[index].isEmpty()))
+    for (int index = 0; index < lines.length; index++) {
+      if ((first || index != 0) && (blank || !lines[index].isEmpty())) {
         lines[index] = prefix + lines[index];
+      }
+    }
     return new Value.StringValue(String.join("\n", lines));
   }
 
   private static Value filterReplace(
       Value operand, NamedArguments filter, SourceLocation location) {
-    if (!(operand instanceof Value.StringValue string) || string.undefinedBacked())
+    if (!(operand instanceof Value.StringValue string) || string.undefinedBacked()) {
       throw filterReceiver(filter.name(), operand, location);
+    }
     var arguments = new ArrayList<>(filter.positional());
     // Filter calls always append their keyword bag, including an empty one. The bag is an ordinary
     // upstream argument slot, so it can be observed as the replacement value.
@@ -788,8 +909,12 @@ public final class Interpreter {
   private static boolean filterBoolean(
       NamedArguments filter, int index, String key, boolean fallback, SourceLocation location) {
     Value value = filterArgument(filter, index, key);
-    if (value == null) return fallback;
-    if (value instanceof Value.BooleanValue booleanValue) return booleanValue.value();
+    if (value == null) {
+      return fallback;
+    }
+    if (value instanceof Value.BooleanValue booleanValue) {
+      return booleanValue.value();
+    }
     throw filterType(key + " must be a boolean", location);
   }
 
@@ -810,13 +935,18 @@ public final class Interpreter {
     if (operand instanceof Value.ObjectValue object) {
       values = object.values();
       builtins = object.builtins();
-    } else if (operand instanceof Value.KeywordArgumentsValue object) {
-      values = object.values();
-      builtins = object.builtins();
-    } else throw filterReceiver(filter.name(), operand, location);
+    } else {
+      if (operand instanceof Value.KeywordArgumentsValue object) {
+        values = object.values();
+        builtins = object.builtins();
+      } else {
+        throw filterReceiver(filter.name(), operand, location);
+      }
+    }
     var arguments = new ArrayList<>(filter.positional());
-    if (!filter.keywords().isEmpty())
+    if (!filter.keywords().isEmpty()) {
       arguments.add(new Value.KeywordArgumentsValue(filter.keywords()));
+    }
     var builtin =
         filter.name().equals("items")
             ? objectItemsBuiltin(builtins, values)
@@ -827,7 +957,9 @@ public final class Interpreter {
   }
 
   private static Value sortValue(Value value, Value attribute) {
-    if (attribute == null || attribute instanceof Value.NullValue) return value;
+    if (attribute == null || attribute instanceof Value.NullValue) {
+      return value;
+    }
     String path =
         attribute instanceof Value.StringValue string
             ? string.value()
@@ -837,26 +969,32 @@ public final class Interpreter {
 
   private static Value attribute(Value value, String path) {
     for (var part : path.split("\\.")) {
-      if (value instanceof Value.ObjectValue object)
+      if (value instanceof Value.ObjectValue object) {
         value =
             Value.materialize(object.values().getOrDefault(part, Value.UndefinedValue.INSTANCE));
-      else if (value instanceof Value.ArrayValue array) {
-        try {
-          int index = Integer.parseInt(part);
-          value =
-              index >= 0 && index < array.values().size()
-                  ? Value.materialize(array.values().get(index))
-                  : Value.UndefinedValue.INSTANCE;
-        } catch (NumberFormatException ignored) {
+      } else {
+        if (value instanceof Value.ArrayValue array) {
+          try {
+            int index = Integer.parseInt(part);
+            value =
+                index >= 0 && index < array.values().size()
+                    ? Value.materialize(array.values().get(index))
+                    : Value.UndefinedValue.INSTANCE;
+          } catch (NumberFormatException ignored) {
+            return Value.UndefinedValue.INSTANCE;
+          }
+        } else {
           return Value.UndefinedValue.INSTANCE;
         }
-      } else return Value.UndefinedValue.INSTANCE;
+      }
     }
     return value;
   }
 
   private static Value filterBool(Value operand, NamedArguments filter, SourceLocation location) {
-    if (operand instanceof Value.BooleanValue) return operand;
+    if (operand instanceof Value.BooleanValue) {
+      return operand;
+    }
     throw filterReceiver(filter.name(), operand, location);
   }
 
@@ -881,13 +1019,16 @@ public final class Interpreter {
   }
 
   private static Value filterToString(Value operand, SourceLocation location) {
-    if (operand instanceof Value.StringValue string) return string;
+    if (operand instanceof Value.StringValue string) {
+      return string;
+    }
     if (operand instanceof Value.ArrayValue
         || operand instanceof Value.TupleValue
         || operand instanceof Value.IntegerValue
         || operand instanceof Value.FloatValue
-        || operand instanceof Value.BooleanValue)
+        || operand instanceof Value.BooleanValue) {
       return new Value.StringValue(renderText(operand, location));
+    }
     throw filterReceiver("string", operand, location);
   }
 
@@ -898,11 +1039,12 @@ public final class Interpreter {
    */
   private static Value filterSelectAttr(
       List<Value> values, NamedArguments filter, SourceLocation location, boolean select) {
-    if (filter.positional().isEmpty())
+    if (filter.positional().isEmpty()) {
       throw new TemplateRenderException(
           "`" + filter.name() + "` filter requires at least one argument",
           ErrorCategory.ARITY,
           location);
+    }
     var attr = requireFilterString(filter, 0, location);
     String testName =
         filter.positional().size() > 1 ? requireFilterString(filter, 1, location).value() : null;
@@ -915,7 +1057,9 @@ public final class Interpreter {
               && (testName == null
                   ? truthy(attrValue)
                   : namedTest(testName, attrValue, comparison, location));
-      if (matched == select) result.add(item);
+      if (matched == select) {
+        result.add(item);
+      }
     }
     return new Value.ArrayValue(result);
   }
@@ -923,7 +1067,9 @@ public final class Interpreter {
   private static Value.StringValue requireFilterString(
       NamedArguments filter, int index, SourceLocation location) {
     var value = filter.positional().get(index);
-    if (value instanceof Value.StringValue string && !string.undefinedBacked()) return string;
+    if (value instanceof Value.StringValue string && !string.undefinedBacked()) {
+      return string;
+    }
     throw new TemplateRenderException(
         "`" + filter.name() + "` arguments must be strings", ErrorCategory.TYPE, location);
   }
@@ -932,8 +1078,9 @@ public final class Interpreter {
       String name, Value value, Value comparison, SourceLocation location) {
     return switch (name) {
       case "equalto", "eq" -> {
-        if (comparison == null)
+        if (comparison == null) {
           throw filterType("`" + name + "` test requires a comparison value", location);
+        }
         yield JsOperations.strictEquals(value, comparison);
       }
       case "defined" -> !undefinedLike(value);
@@ -964,15 +1111,19 @@ public final class Interpreter {
   }
 
   private static boolean integerTest(Value value, boolean odd, SourceLocation location) {
-    if (!(value instanceof Value.IntegerValue number))
+    if (!(value instanceof Value.IntegerValue number)) {
       throw filterType("cannot " + (odd ? "odd" : "even") + " on " + type(value), location);
+    }
     return (number.value() % 2 != 0) == odd;
   }
 
   private static boolean upperTest(Value value, SourceLocation location) {
-    if (!(value instanceof Value.StringValue string)) return false;
-    if (string.undefinedBacked())
+    if (!(value instanceof Value.StringValue string)) {
+      return false;
+    }
+    if (string.undefinedBacked()) {
       throw filterType("Cannot read properties of undefined (reading 'toUpperCase')", location);
+    }
     return string.value().equals(string.value().toUpperCase(Locale.ROOT));
   }
 
@@ -1004,16 +1155,20 @@ public final class Interpreter {
     fallback =
         absentFilterArgument(
             fallback, integer ? new Value.IntegerValue(0) : new Value.FloatValue(0));
-    if (operand instanceof Value.IntegerValue value)
+    if (operand instanceof Value.IntegerValue value) {
       return integer ? value : new Value.FloatValue(value.value());
-    if (operand instanceof Value.FloatValue value)
+    }
+    if (operand instanceof Value.FloatValue value) {
       return integer ? new Value.IntegerValue(Math.floor(value.value())) : value;
-    if (operand instanceof Value.BooleanValue value)
+    }
+    if (operand instanceof Value.BooleanValue value) {
       return integer
           ? new Value.IntegerValue(value.value() ? 1 : 0)
           : new Value.FloatValue(value.value() ? 1 : 0);
-    if (!(operand instanceof Value.StringValue string))
+    }
+    if (!(operand instanceof Value.StringValue string)) {
       throw filterReceiver(filter.name(), operand, location);
+    }
     var parsed = integer ? parseInt(string.value()) : parseFloat(string.value());
     return Double.isNaN(parsed)
         ? fallback
@@ -1022,7 +1177,9 @@ public final class Interpreter {
 
   private static double parseInt(String text) {
     var matcher = java.util.regex.Pattern.compile("^[\\s]*([+-]?\\d+)").matcher(text);
-    if (!matcher.find()) return Double.NaN;
+    if (!matcher.find()) {
+      return Double.NaN;
+    }
     try {
       return Double.parseDouble(matcher.group(1));
     } catch (NumberFormatException ignored) {
@@ -1032,15 +1189,22 @@ public final class Interpreter {
 
   private static double parseFloat(String text) {
     var trimmed = JsOperations.trimEcmaWhitespace(text);
-    if (trimmed.startsWith("Infinity") || trimmed.startsWith("+Infinity"))
+    if (trimmed.startsWith("Infinity") || trimmed.startsWith("+Infinity")) {
       return Double.POSITIVE_INFINITY;
-    if (trimmed.startsWith("-Infinity")) return Double.NEGATIVE_INFINITY;
-    if (trimmed.startsWith("NaN")) return Double.NaN;
+    }
+    if (trimmed.startsWith("-Infinity")) {
+      return Double.NEGATIVE_INFINITY;
+    }
+    if (trimmed.startsWith("NaN")) {
+      return Double.NaN;
+    }
     var matcher =
         java.util.regex.Pattern.compile(
                 "^([+-]?(?:(?:\\d+\\.?\\d*)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?)")
             .matcher(trimmed);
-    if (!matcher.find()) return Double.NaN;
+    if (!matcher.find()) {
+      return Double.NaN;
+    }
     try {
       return Double.parseDouble(matcher.group(1));
     } catch (NumberFormatException ignored) {
@@ -1068,22 +1232,30 @@ public final class Interpreter {
       if (argument instanceof Expression.KeywordArgumentExpression keyword) {
         sawKeyword = true;
         keywords.put(keyword.key().value(), evaluateExpression(keyword.value(), env, budget));
-      } else if (argument instanceof Expression.SpreadExpression spread) {
-        var value = evaluateExpression(spread.argument(), env, budget);
-        if (value instanceof Value.ArrayValue array) positional.addAll(array.values());
-        else if (value instanceof Value.TupleValue tuple) positional.addAll(tuple.values());
-        else
-          throw new TemplateRenderException(
-              "Cannot unpack non-iterable type: " + type(value),
-              ErrorCategory.TYPE,
-              spread.location());
       } else {
-        if (sawKeyword)
-          throw new TemplateRenderException(
-              "Positional arguments must come before keyword arguments",
-              ErrorCategory.SYNTAX,
-              argument.location());
-        positional.add(evaluateExpression(argument, env, budget));
+        if (argument instanceof Expression.SpreadExpression spread) {
+          var value = evaluateExpression(spread.argument(), env, budget);
+          if (value instanceof Value.ArrayValue array) {
+            positional.addAll(array.values());
+          } else {
+            if (value instanceof Value.TupleValue tuple) {
+              positional.addAll(tuple.values());
+            } else {
+              throw new TemplateRenderException(
+                  "Cannot unpack non-iterable type: " + type(value),
+                  ErrorCategory.TYPE,
+                  spread.location());
+            }
+          }
+        } else {
+          if (sawKeyword) {
+            throw new TemplateRenderException(
+                "Positional arguments must come before keyword arguments",
+                ErrorCategory.SYNTAX,
+                argument.location());
+          }
+          positional.add(evaluateExpression(argument, env, budget));
+        }
       }
     }
     return new EvaluatedArguments(
@@ -1102,9 +1274,10 @@ public final class Interpreter {
   }
 
   private static void deferredValue(Value value, String property, SourceLocation location) {
-    if (value instanceof Value.DeferredUndefinedValue)
+    if (value instanceof Value.DeferredUndefinedValue) {
       throw filterType(
           "Cannot read properties of undefined (reading '" + property + "')", location);
+    }
   }
 
   private static TemplateRenderException unknownBareFilter(
@@ -1186,7 +1359,9 @@ public final class Interpreter {
 
   private static List<Value> values(List<Expression> items, Environment e, RenderBudget b) {
     var r = new ArrayList<Value>();
-    for (var x : items) r.add(evaluateExpression(x, e, b));
+    for (var x : items) {
+      r.add(evaluateExpression(x, e, b));
+    }
     return r;
   }
 
@@ -1194,11 +1369,12 @@ public final class Interpreter {
     var r = new LinkedHashMap<Object, Value>();
     for (var item : x.value()) {
       var k = evaluateExpression(item.key(), e, b);
-      if (!(k instanceof Value.StringValue key))
+      if (!(k instanceof Value.StringValue key)) {
         throw new TemplateRenderException(
             "Object keys must be strings: got " + type(k),
             ErrorCategory.TYPE,
             item.key().location());
+      }
       r.put(key.undefinedBacked() ? key : key.value(), evaluateExpression(item.value(), e, b));
     }
     return new Value.ObjectValue(r);
@@ -1237,62 +1413,80 @@ public final class Interpreter {
   private static Value member(Expression.MemberExpression n, Environment e, RenderBudget b) {
     var target = evaluateExpression(n.object(), e, b);
     deferredValue(target, "builtins", n.location());
-    if (n.computed() && n.property() instanceof Expression.SliceExpression slice)
+    if (n.computed() && n.property() instanceof Expression.SliceExpression slice) {
       return slice(target, slice, e, b, n.location());
+    }
     var p =
         !n.computed() && n.property() instanceof Expression.Identifier id
             ? new Value.StringValue(id.value())
             : evaluateExpression(n.property(), e, b);
     if (target instanceof Value.ObjectValue x) {
-      if (!(p instanceof Value.StringValue s))
+      if (!(p instanceof Value.StringValue s)) {
         throw access("Cannot access property with non-string: got " + type(p), n.location());
+      }
       var key = objectKey(s);
       Value memberValue = x.values().get(key);
-      if (memberValue != null && !(memberValue instanceof Value.DeferredUndefinedValue))
+      if (memberValue != null && !(memberValue instanceof Value.DeferredUndefinedValue)) {
         return Value.materialize(memberValue);
-      if (!s.undefinedBacked() && "items".equals(s.value()))
+      }
+      if (!s.undefinedBacked() && "items".equals(s.value())) {
         return objectItemsBuiltin(x.builtins(), x.values());
+      }
       if (!s.undefinedBacked()
           && (s.value().equals("get")
               || s.value().equals("keys")
               || s.value().equals("values")
-              || s.value().equals("dictsort")))
+              || s.value().equals("dictsort"))) {
         return objectBuiltin(x.builtins(), x.values(), s.value());
+      }
       return Value.UndefinedValue.INSTANCE;
     }
     if (target instanceof Value.KeywordArgumentsValue x) {
-      if (!(p instanceof Value.StringValue s))
+      if (!(p instanceof Value.StringValue s)) {
         throw access("Cannot access property with non-string: got " + type(p), n.location());
-      if (s.undefinedBacked()) return Value.UndefinedValue.INSTANCE;
+      }
+      if (s.undefinedBacked()) {
+        return Value.UndefinedValue.INSTANCE;
+      }
       Value memberValue = x.values().get(s.value());
-      if (memberValue != null && !(memberValue instanceof Value.DeferredUndefinedValue))
+      if (memberValue != null && !(memberValue instanceof Value.DeferredUndefinedValue)) {
         return Value.materialize(memberValue);
-      if (s.value().equals("items")) return objectItemsBuiltin(x.builtins(), x.values());
+      }
+      if (s.value().equals("items")) {
+        return objectItemsBuiltin(x.builtins(), x.values());
+      }
       if (s.value().equals("get")
           || s.value().equals("keys")
           || s.value().equals("values")
-          || s.value().equals("dictsort"))
+          || s.value().equals("dictsort")) {
         return objectBuiltin(x.builtins(), x.values(), s.value());
+      }
       return Value.UndefinedValue.INSTANCE;
     }
     if (target instanceof Value.ArrayValue x) {
       if (p instanceof Value.StringValue property
           && !property.undefinedBacked()
-          && property.value().equals("length")) return new Value.IntegerValue(x.values().size());
+          && property.value().equals("length")) {
+        return new Value.IntegerValue(x.values().size());
+      }
       return memberIndex(x.values(), p, n.location());
     }
     if (target instanceof Value.TupleValue x) {
       if (p instanceof Value.StringValue property
           && !property.undefinedBacked()
-          && property.value().equals("length")) return new Value.IntegerValue(x.values().size());
+          && property.value().equals("length")) {
+        return new Value.IntegerValue(x.values().size());
+      }
       return memberIndex(x.values(), p, n.location());
     }
     if (target instanceof Value.StringValue x) {
-      if (x.undefinedBacked())
+      if (x.undefinedBacked()) {
         throw filterType("Cannot read properties of undefined (reading 'at')", n.location());
+      }
       if (p instanceof Value.StringValue property) {
-        if (!property.undefinedBacked() && property.value().equals("length"))
+        if (!property.undefinedBacked() && property.value().equals("length")) {
           return new Value.IntegerValue(x.value().length());
+        }
         if (List.of(
                 "startswith",
                 "endswith",
@@ -1305,19 +1499,23 @@ public final class Interpreter {
                 "lstrip",
                 "split",
                 "replace")
-            .contains(property.value())) return stringBuiltin(x, property.value());
+            .contains(property.value())) {
+          return stringBuiltin(x, property.value());
+        }
         return Value.UndefinedValue.INSTANCE;
       }
-      if (!(p instanceof Value.IntegerValue))
+      if (!(p instanceof Value.IntegerValue)) {
         throw access(
             "Cannot access property with non-string/non-number: got " + type(p), n.location());
+      }
       var v = index(x.value().length(), p);
       return v < 0
           ? Value.StringValue.undefined()
           : new Value.StringValue(String.valueOf(x.value().charAt(v)));
     }
-    if (!(p instanceof Value.StringValue))
+    if (!(p instanceof Value.StringValue)) {
       throw access("Cannot access property with non-string: got " + type(p), n.location());
+    }
     return Value.UndefinedValue.INSTANCE;
   }
 
@@ -1325,16 +1523,20 @@ public final class Interpreter {
       String receiver, String name, BiPredicate<String, String> matches) {
     return new Value.CallableValue(
         (arguments, hasKeywords, location, environment) -> {
-          if (arguments.isEmpty())
+          if (arguments.isEmpty()) {
             throw new TemplateRenderException(
                 name + "() requires at least one argument", ErrorCategory.ARITY, location);
+          }
           var pattern = arguments.getFirst();
-          if (pattern instanceof Value.StringValue string)
+          if (pattern instanceof Value.StringValue string) {
             return new Value.BooleanValue(matches.test(receiver, string.value()));
-          if (pattern instanceof Value.ArrayValue array)
+          }
+          if (pattern instanceof Value.ArrayValue array) {
             return stringBoundaryTuple(receiver, name, matches, array.values(), location);
-          if (pattern instanceof Value.TupleValue tuple)
+          }
+          if (pattern instanceof Value.TupleValue tuple) {
             return stringBoundaryTuple(receiver, name, matches, tuple.values(), location);
+          }
           throw new TemplateRenderException(
               name + "() argument must be a string or tuple of strings",
               ErrorCategory.TYPE,
@@ -1349,10 +1551,11 @@ public final class Interpreter {
 
   private static Value.CallableValue stringBuiltinValue(Value.StringValue receiver, String name) {
     String text = receiver.value();
-    if (name.equals("startswith") || name.equals("endswith"))
+    if (name.equals("startswith") || name.equals("endswith")) {
       return (Value.CallableValue)
           stringBoundaryBuiltin(
               text, name, name.equals("startswith") ? String::startsWith : String::endsWith);
+    }
     return new Value.CallableValue(
         (arguments, hasKeywords, location, environment) -> {
           return switch (name) {
@@ -1372,8 +1575,9 @@ public final class Interpreter {
   }
 
   private static List<Value> positional(List<Value> arguments) {
-    if (arguments.isEmpty() || !(arguments.getLast() instanceof Value.KeywordArgumentsValue))
+    if (arguments.isEmpty() || !(arguments.getLast() instanceof Value.KeywordArgumentsValue)) {
       return arguments;
+    }
     return arguments.subList(0, arguments.size() - 1);
   }
 
@@ -1383,13 +1587,15 @@ public final class Interpreter {
         arguments.isEmpty()
             ? Value.NullValue.INSTANCE
             : absentFilterArgument(arguments.getFirst(), Value.NullValue.INSTANCE);
-    if (!(separator instanceof Value.StringValue) && !(separator instanceof Value.NullValue))
+    if (!(separator instanceof Value.StringValue) && !(separator instanceof Value.NullValue)) {
       throw filterType("sep argument must be a string or null", location);
+    }
     int max = -1;
     Value maxSplit = arguments.size() > 1 ? absentFilterArgument(arguments.get(1), null) : null;
     if (maxSplit != null) {
-      if (!(maxSplit instanceof Value.IntegerValue number))
+      if (!(maxSplit instanceof Value.IntegerValue number)) {
         throw filterType("maxsplit argument must be a number", location);
+      }
       max = (int) number.value();
     }
     String[] parts;
@@ -1398,10 +1604,16 @@ public final class Interpreter {
       var result = new ArrayList<String>();
       int index = 0;
       while (index < text.length()) {
-        while (index < text.length() && JsOperations.isEcmaWhitespace(text.charAt(index))) index++;
-        if (index == text.length()) break;
+        while (index < text.length() && JsOperations.isEcmaWhitespace(text.charAt(index))) {
+          index++;
+        }
+        if (index == text.length()) {
+          break;
+        }
         int start = index;
-        while (index < text.length() && !JsOperations.isEcmaWhitespace(text.charAt(index))) index++;
+        while (index < text.length() && !JsOperations.isEcmaWhitespace(text.charAt(index))) {
+          index++;
+        }
         if (max != -1 && result.size() >= max) {
           // Upstream appends the current match plus the otherwise-unsplit suffix.
           result.add(text.substring(start));
@@ -1412,7 +1624,9 @@ public final class Interpreter {
       parts = result.toArray(String[]::new);
     } else {
       String text = ((Value.StringValue) separator).value();
-      if (text.isEmpty()) throw filterType("empty separator", location);
+      if (text.isEmpty()) {
+        throw filterType("empty separator", location);
+      }
       var split =
           new ArrayList<>(
               java.util.Arrays.asList(
@@ -1433,13 +1647,16 @@ public final class Interpreter {
 
   private static Value stringReplace(
       String receiver, List<Value> arguments, SourceLocation location) {
-    if (arguments.size() < 2)
+    if (arguments.size() < 2) {
       throw filterType("replace() requires at least two arguments", location);
+    }
     if (!(arguments.get(0) instanceof Value.StringValue oldValue)
-        || !(arguments.get(1) instanceof Value.StringValue newValue))
+        || !(arguments.get(1) instanceof Value.StringValue newValue)) {
       throw filterType("replace() arguments must be strings", location);
-    if (oldValue.undefinedBacked())
+    }
+    if (oldValue.undefinedBacked()) {
       throw filterType("Cannot read properties of undefined (reading 'length')", location);
+    }
     Value count;
     if (arguments.size() > 2) {
       Value thirdArgument = arguments.get(2);
@@ -1448,11 +1665,14 @@ public final class Interpreter {
           thirdArgument instanceof Value.KeywordArgumentsValue
               ? absentFilterArgument(keyword(arguments, "count"), Value.NullValue.INSTANCE)
               : thirdArgument;
-    } else count = Value.NullValue.INSTANCE;
+    } else {
+      count = Value.NullValue.INSTANCE;
+    }
     if (count != null
         && !(count instanceof Value.IntegerValue)
-        && !(count instanceof Value.NullValue))
+        && !(count instanceof Value.NullValue)) {
       throw filterType("replace() count argument must be a number or null", location);
+    }
     return new Value.StringValue(
         replace(
             receiver,
@@ -1462,18 +1682,24 @@ public final class Interpreter {
   }
 
   private static String replace(String value, String oldValue, String newValue, int count) {
-    if (count == 0) return value;
+    if (count == 0) {
+      return value;
+    }
     var result = new StringBuilder();
     int position = 0;
     int replacements = 0;
     while (count < 0 || replacements < count) {
       int index = value.indexOf(oldValue, position);
-      if (index < 0) break;
+      if (index < 0) {
+        break;
+      }
       result.append(value, position, index).append(newValue);
       position = index + oldValue.length();
       replacements++;
       if (oldValue.isEmpty()) {
-        if (position >= value.length()) break;
+        if (position >= value.length()) {
+          break;
+        }
         int next = value.offsetByCodePoints(position, 1);
         result.append(value, position, next);
         position = next;
@@ -1500,11 +1726,12 @@ public final class Interpreter {
           var positional = positional(arguments);
           return switch (name) {
             case "get" -> {
-              if (arguments.isEmpty() || !(arguments.getFirst() instanceof Value.StringValue key))
+              if (arguments.isEmpty() || !(arguments.getFirst() instanceof Value.StringValue key)) {
                 throw filterType(
                     "Object key must be a string: got "
                         + (arguments.isEmpty() ? "UndefinedValue" : type(arguments.getFirst())),
                     location);
+              }
               yield values.getOrDefault(
                   key.value(),
                   arguments.size() > 1
@@ -1540,8 +1767,9 @@ public final class Interpreter {
     boolean caseSensitive =
         caseValue == null ? false : booleanValue(caseValue, "case_sensitive", location);
     String by = byValue == null ? "key" : stringValue(byValue, "by", location);
-    if (!by.equals("key") && !by.equals("value"))
+    if (!by.equals("key") && !by.equals("value")) {
       throw filterType("by must be either 'key' or 'value'", location);
+    }
     boolean reverse = reverseValue != null && booleanValue(reverseValue, "reverse", location);
     var entries = new ArrayList<Value>();
     for (var entry : values.entrySet()) {
@@ -1562,31 +1790,44 @@ public final class Interpreter {
   }
 
   private static boolean booleanValue(Value value, String name, SourceLocation location) {
-    if (value instanceof Value.BooleanValue booleanValue) return booleanValue.value();
+    if (value instanceof Value.BooleanValue booleanValue) {
+      return booleanValue.value();
+    }
     throw filterType(name + " must be a boolean", location);
   }
 
   private static String stringValue(Value value, String name, SourceLocation location) {
-    if (value instanceof Value.StringValue string) return string.value();
+    if (value instanceof Value.StringValue string) {
+      return string.value();
+    }
     throw filterType(name + " must be a string", location);
   }
 
   private static int compareValues(
       Value left, Value right, boolean caseSensitive, SourceLocation location) {
-    if (numericLike(left) && numericLike(right))
+    if (numericLike(left) && numericLike(right)) {
       return Double.compare(JsOperations.toNumber(left), JsOperations.toNumber(right));
-    if (left instanceof Value.StringValue a && right instanceof Value.StringValue b) {
-      if (!caseSensitive && (a.undefinedBacked() || b.undefinedBacked()))
-        throw filterType("Cannot read properties of undefined (reading 'toLowerCase')", location);
-      if (caseSensitive && (a.undefinedBacked() || b.undefinedBacked())) return 0;
-      String aText = caseSensitive ? a.value() : a.value().toLowerCase(Locale.ROOT);
-      String bText = caseSensitive ? b.value() : b.value().toLowerCase(Locale.ROOT);
-      return aText.compareTo(bText);
     }
-    if (left instanceof Value.BooleanValue a && right instanceof Value.BooleanValue b)
+    if (left instanceof Value.StringValue a && right instanceof Value.StringValue b) {
+      if (!caseSensitive && (a.undefinedBacked() || b.undefinedBacked())) {
+        throw filterType("Cannot read properties of undefined (reading 'toLowerCase')", location);
+      }
+      if (caseSensitive && (a.undefinedBacked() || b.undefinedBacked())) {
+        return 0;
+      }
+      String leftText = caseSensitive ? a.value() : a.value().toLowerCase(Locale.ROOT);
+      String rightText = caseSensitive ? b.value() : b.value().toLowerCase(Locale.ROOT);
+      return leftText.compareTo(rightText);
+    }
+    if (left instanceof Value.BooleanValue a && right instanceof Value.BooleanValue b) {
       return Boolean.compare(a.value(), b.value());
-    if (left instanceof Value.NullValue && right instanceof Value.NullValue) return 0;
-    if (left instanceof Value.UndefinedValue && right instanceof Value.UndefinedValue) return 0;
+    }
+    if (left instanceof Value.NullValue && right instanceof Value.NullValue) {
+      return 0;
+    }
+    if (left instanceof Value.UndefinedValue && right instanceof Value.UndefinedValue) {
+      return 0;
+    }
     throw filterType("Cannot compare " + type(left) + " with " + type(right), location);
   }
 
@@ -1601,10 +1842,13 @@ public final class Interpreter {
       List<Value> patterns,
       SourceLocation location) {
     for (var pattern : patterns) {
-      if (!(pattern instanceof Value.StringValue string) || string.undefinedBacked())
+      if (!(pattern instanceof Value.StringValue string) || string.undefinedBacked()) {
         throw new TemplateRenderException(
             name + "() tuple elements must be strings", ErrorCategory.TYPE, location);
-      if (matches.test(receiver, string.value())) return new Value.BooleanValue(true);
+      }
+      if (matches.test(receiver, string.value())) {
+        return new Value.BooleanValue(true);
+      }
     }
     return new Value.BooleanValue(false);
   }
@@ -1638,24 +1882,28 @@ public final class Interpreter {
       Environment environment,
       RenderBudget budget,
       SourceLocation memberLocation) {
-    if (!(arrayLike(target) || target instanceof Value.StringValue))
+    if (!(arrayLike(target) || target instanceof Value.StringValue)) {
       throw access("Slice object must be an array or string", memberLocation);
+    }
     var start = sliceComponent(expression.start(), environment, budget);
     var stop = sliceComponent(expression.stop(), environment, budget);
     var step = sliceComponent(expression.step(), environment, budget);
     Double startValue = sliceBound(start, expression.start(), "start");
     Double stopValue = sliceBound(stop, expression.stop(), "stop");
     Double stepValue = sliceBound(step, expression.step(), "step");
-    if (target instanceof Value.StringValue string && string.undefinedBacked())
+    if (target instanceof Value.StringValue string && string.undefinedBacked()) {
       throw filterType("undefined is not iterable", memberLocation);
-    if (arrayLike(target))
+    }
+    if (arrayLike(target)) {
       return new Value.ArrayValue(
           JsSlice.slice(arrayValues(target), startValue, stopValue, stepValue));
+    }
     var string = ((Value.StringValue) target).value();
     var codePoints = string.codePoints().boxed().toList();
     var result = new StringBuilder();
-    for (var codePoint : JsSlice.slice(codePoints, startValue, stopValue, stepValue))
+    for (var codePoint : JsSlice.slice(codePoints, startValue, stopValue, stepValue)) {
       result.appendCodePoint(codePoint);
+    }
     return new Value.StringValue(result.toString());
   }
 
@@ -1667,8 +1915,12 @@ public final class Interpreter {
   }
 
   private static Double sliceBound(Value value, Expression expression, String name) {
-    if (value instanceof Value.UndefinedValue) return null;
-    if (value instanceof Value.IntegerValue integer) return integer.value();
+    if (value instanceof Value.UndefinedValue) {
+      return null;
+    }
+    if (value instanceof Value.IntegerValue integer) {
+      return integer.value();
+    }
     throw access("Slice " + name + " must be numeric or undefined", expression.location());
   }
 
@@ -1681,10 +1933,13 @@ public final class Interpreter {
   }
 
   private static Value memberIndex(List<Value> values, Value property, SourceLocation location) {
-    if (property instanceof Value.StringValue) return Value.UndefinedValue.INSTANCE;
-    if (!(property instanceof Value.IntegerValue))
+    if (property instanceof Value.StringValue) {
+      return Value.UndefinedValue.INSTANCE;
+    }
+    if (!(property instanceof Value.IntegerValue)) {
       throw access(
           "Cannot access property with non-string/non-number: got " + type(property), location);
+    }
     return indexed(values, property);
   }
 
@@ -1694,33 +1949,43 @@ public final class Interpreter {
   }
 
   private static int index(int size, Value p) {
-    if (!(p instanceof Value.IntegerValue x)) return -1;
+    if (!(p instanceof Value.IntegerValue x)) {
+      return -1;
+    }
     int i = (int) x.value();
-    if (i < 0) i += size;
+    if (i < 0) {
+      i += size;
+    }
     return i < 0 || i >= size ? -1 : i;
   }
 
   private static Value call(Expression.CallExpression n, Environment e, RenderBudget b) {
     var evaluated = evaluateArguments(n.args(), e, b);
     var arguments = new ArrayList<>(evaluated.positional());
-    if (!evaluated.keywords().isEmpty())
+    if (!evaluated.keywords().isEmpty()) {
       arguments.add(new Value.KeywordArgumentsValue(evaluated.keywords()));
+    }
     var callee = evaluateExpression(n.callee(), e, b);
-    if (!(callee instanceof Value.CallableValue f))
+    if (!(callee instanceof Value.CallableValue f)) {
       throw new TemplateRenderException(
           "Cannot call something that is not a function: got " + type(callee),
           ErrorCategory.TYPE,
           n.location());
+    }
     return f.callable().invoke(arguments, !evaluated.keywords().isEmpty(), n.location(), e);
   }
 
   private static String type(Value v) {
-    if (v instanceof Value.DeferredUndefinedValue) return "UndefinedValue";
+    if (v instanceof Value.DeferredUndefinedValue) {
+      return "UndefinedValue";
+    }
     return v instanceof Value.CallableValue ? "FunctionValue" : v.getClass().getSimpleName();
   }
 
   private static Value callableBodyResult(ExecResult result, SourceLocation location) {
-    if (result instanceof ExecResult.Normal normal) return new Value.StringValue(normal.output());
+    if (result instanceof ExecResult.Normal normal) {
+      return new Value.StringValue(normal.output());
+    }
     throw new LoopControl(result, location);
   }
 
@@ -1760,26 +2025,29 @@ public final class Interpreter {
                   var nodeArg = n.args().get(i);
                   Value passed = i < positional.size() ? positional.get(i) : null;
                   if (nodeArg instanceof Expression.Identifier id) {
-                    if (passed == null || passed instanceof Value.DeferredUndefinedValue)
+                    if (passed == null || passed instanceof Value.DeferredUndefinedValue) {
                       throw new TemplateRenderException(
                           "Missing positional argument: " + id.value(), ErrorCategory.ARITY, l);
+                    }
                     macroScope.setVariable(id.value(), passed);
-                  } else if (nodeArg instanceof Expression.KeywordArgumentExpression kwarg) {
-                    Value fromKwargs =
-                        kwargs == null ? null : kwargs.values().get(kwarg.key().value());
-                    Value value =
-                        passed != null && !(passed instanceof Value.DeferredUndefinedValue)
-                            ? passed
-                            : fromKwargs != null
-                                    && !(fromKwargs instanceof Value.DeferredUndefinedValue)
-                                ? fromKwargs
-                                : evaluateExpression(kwarg.value(), macroScope, b);
-                    macroScope.setVariable(kwarg.key().value(), value);
                   } else {
-                    throw new TemplateRenderException(
-                        "Unknown argument type: " + nodeArg.getClass().getSimpleName(),
-                        ErrorCategory.SYNTAX,
-                        nodeArg.location());
+                    if (nodeArg instanceof Expression.KeywordArgumentExpression kwarg) {
+                      Value fromKwargs =
+                          kwargs == null ? null : kwargs.values().get(kwarg.key().value());
+                      Value value =
+                          passed != null && !(passed instanceof Value.DeferredUndefinedValue)
+                              ? passed
+                              : fromKwargs != null
+                                      && !(fromKwargs instanceof Value.DeferredUndefinedValue)
+                                  ? fromKwargs
+                                  : evaluateExpression(kwarg.value(), macroScope, b);
+                      macroScope.setVariable(kwarg.key().value(), value);
+                    } else {
+                      throw new TemplateRenderException(
+                          "Unknown argument type: " + nodeArg.getClass().getSimpleName(),
+                          ErrorCategory.SYNTAX,
+                          nodeArg.location());
+                    }
                   }
                 }
                 return callableBodyResult(evaluateBlock(n.body(), macroScope, b), l);
@@ -1802,12 +2070,13 @@ public final class Interpreter {
               if (n.callerArgs() != null) {
                 for (int i = 0; i < n.callerArgs().size(); i++) {
                   var param = n.callerArgs().get(i);
-                  if (!(param instanceof Expression.Identifier id))
+                  if (!(param instanceof Expression.Identifier id)) {
                     throw new TemplateRenderException(
                         "Caller parameter must be an identifier, got "
                             + param.getClass().getSimpleName(),
                         ErrorCategory.SYNTAX,
                         param.location());
+                  }
                   Value value =
                       i < callerArgs.size() ? callerArgs.get(i) : Value.UndefinedValue.INSTANCE;
                   callBlockEnv.setVariable(id.value(), value);
@@ -1835,11 +2104,12 @@ public final class Interpreter {
     // before it reaches user-registered host functions, since they have no such upstream contract.
     arguments.add(new Value.KeywordArgumentsValue(evaluated.keywords()));
     var callee = evaluateExpression(n.call().callee(), e, b);
-    if (!(callee instanceof Value.CallableValue f))
+    if (!(callee instanceof Value.CallableValue f)) {
       throw new TemplateRenderException(
           "Cannot call something that is not a function: got " + type(callee),
           ErrorCategory.TYPE,
           n.call().location());
+    }
     var newEnv = new Environment(e);
     newEnv.setVariable("caller", caller);
     var result =
@@ -1867,7 +2137,9 @@ public final class Interpreter {
     // paths above) is deliberate: FilterStatement never crosses the Value.CallableValue.Callable
     // boundary, so this composes correctly exactly as evaluateSet's block-capture already does —
     // confirmed against the oracle that a bare break here bleeds into the caller's enclosing loop.
-    if (!(rendered instanceof ExecResult.Normal normal)) return rendered;
+    if (!(rendered instanceof ExecResult.Normal normal)) {
+      return rendered;
+    }
     var filtered =
         applyFilter(
             new Value.StringValue(normal.output()), n.filter(), e, b, n.filter().location());
@@ -1883,68 +2155,94 @@ public final class Interpreter {
 
   private static ExecResult evaluateSet(Statement.SetStatement n, Environment e, RenderBudget b) {
     Value rhs;
-    if (n.value() != null) rhs = evaluateExpression(n.value(), e, b);
-    else {
+    if (n.value() != null) {
+      rhs = evaluateExpression(n.value(), e, b);
+    } else {
       var r = evaluateBlock(n.body(), e, b);
-      if (!(r instanceof ExecResult.Normal normal)) return r;
+      if (!(r instanceof ExecResult.Normal normal)) {
+        return r;
+      }
       rhs = new Value.StringValue(normal.output());
     }
-    if (n.assignee() instanceof Expression.Identifier x) e.setVariable(x.value(), rhs);
-    else if (n.assignee() instanceof Expression.TupleLiteral x) {
-      if (!(rhs instanceof Value.ArrayValue || rhs instanceof Value.TupleValue))
-        throw new TemplateRenderException(
-            "Cannot unpack non-iterable type in set: " + type(rhs),
-            ErrorCategory.TYPE,
-            n.location());
-      List<Value> vals =
-          rhs instanceof Value.ArrayValue a ? a.values() : ((Value.TupleValue) rhs).values();
-      if (vals.size() != x.value().size())
-        throw new TemplateRenderException(
-            "Too " + (vals.size() < x.value().size() ? "few" : "many") + " items to unpack in set",
-            ErrorCategory.VALUE,
-            n.location());
-      for (int i = 0; i < vals.size(); i++) {
-        if (!(x.value().get(i) instanceof Expression.Identifier id))
+    if (n.assignee() instanceof Expression.Identifier x) {
+      e.setVariable(x.value(), rhs);
+    } else {
+      if (n.assignee() instanceof Expression.TupleLiteral x) {
+        if (!(rhs instanceof Value.ArrayValue || rhs instanceof Value.TupleValue)) {
           throw new TemplateRenderException(
-              "Cannot unpack to non-identifier in set: "
-                  + x.value().get(i).getClass().getSimpleName(),
+              "Cannot unpack non-iterable type in set: " + type(rhs),
               ErrorCategory.TYPE,
               n.location());
-        e.setVariable(id.value(), vals.get(i));
+        }
+        List<Value> vals =
+            rhs instanceof Value.ArrayValue a ? a.values() : ((Value.TupleValue) rhs).values();
+        if (vals.size() != x.value().size()) {
+          throw new TemplateRenderException(
+              "Too "
+                  + (vals.size() < x.value().size() ? "few" : "many")
+                  + " items to unpack in set",
+              ErrorCategory.VALUE,
+              n.location());
+        }
+        for (int i = 0; i < vals.size(); i++) {
+          if (!(x.value().get(i) instanceof Expression.Identifier id)) {
+            throw new TemplateRenderException(
+                "Cannot unpack to non-identifier in set: "
+                    + x.value().get(i).getClass().getSimpleName(),
+                ErrorCategory.TYPE,
+                n.location());
+          }
+          e.setVariable(id.value(), vals.get(i));
+        }
+      } else {
+        if (n.assignee() instanceof Expression.MemberExpression x) {
+          var target = evaluateExpression(x.object(), e, b);
+          if (!(target instanceof Value.ObjectValue
+              || target instanceof Value.KeywordArgumentsValue)) {
+            throw new TemplateRenderException(
+                "Cannot assign to member of non-object", ErrorCategory.TYPE, n.location());
+          }
+          if (!(x.property() instanceof Expression.Identifier key)) {
+            throw new TemplateRenderException(
+                "Cannot assign to member with non-identifier property",
+                ErrorCategory.TYPE,
+                n.location());
+          }
+          if (target instanceof Value.ObjectValue obj) {
+            obj.values().put(key.value(), rhs);
+          } else {
+            ((Value.KeywordArgumentsValue) target).values().put(key.value(), rhs);
+          }
+        } else {
+          throw new TemplateRenderException(
+              "Invalid LHS inside assignment expression: " + astJson(n.assignee()),
+              ErrorCategory.SYNTAX,
+              n.location());
+        }
       }
-    } else if (n.assignee() instanceof Expression.MemberExpression x) {
-      var target = evaluateExpression(x.object(), e, b);
-      if (!(target instanceof Value.ObjectValue || target instanceof Value.KeywordArgumentsValue))
-        throw new TemplateRenderException(
-            "Cannot assign to member of non-object", ErrorCategory.TYPE, n.location());
-      if (!(x.property() instanceof Expression.Identifier key))
-        throw new TemplateRenderException(
-            "Cannot assign to member with non-identifier property",
-            ErrorCategory.TYPE,
-            n.location());
-      if (target instanceof Value.ObjectValue obj) obj.values().put(key.value(), rhs);
-      else ((Value.KeywordArgumentsValue) target).values().put(key.value(), rhs);
-    } else
-      throw new TemplateRenderException(
-          "Invalid LHS inside assignment expression: " + astJson(n.assignee()),
-          ErrorCategory.SYNTAX,
-          n.location());
+    }
     return new ExecResult.Normal("");
   }
 
   private static String astJson(Expression expression) {
-    if (expression instanceof Expression.Identifier value)
+    if (expression instanceof Expression.Identifier value) {
       return "{\"type\":\"Identifier\",\"value\":" + JsFormat.quote(value.value()) + "}";
-    if (expression instanceof Expression.IntegerLiteral value)
+    }
+    if (expression instanceof Expression.IntegerLiteral value) {
       return "{\"type\":\"IntegerLiteral\",\"value\":" + JsFormat.jsonString(value.value()) + "}";
-    if (expression instanceof Expression.FloatLiteral value)
+    }
+    if (expression instanceof Expression.FloatLiteral value) {
       return "{\"type\":\"FloatLiteral\",\"value\":" + JsFormat.jsonString(value.value()) + "}";
-    if (expression instanceof Expression.StringLiteral value)
+    }
+    if (expression instanceof Expression.StringLiteral value) {
       return "{\"type\":\"StringLiteral\",\"value\":" + JsFormat.quote(value.value()) + "}";
-    if (expression instanceof Expression.ArrayLiteral value)
+    }
+    if (expression instanceof Expression.ArrayLiteral value) {
       return "{\"type\":\"ArrayLiteral\",\"value\":" + astJsonList(value.value()) + "}";
-    if (expression instanceof Expression.TupleLiteral value)
+    }
+    if (expression instanceof Expression.TupleLiteral value) {
       return "{\"type\":\"TupleLiteral\",\"value\":" + astJsonList(value.value()) + "}";
+    }
     return "{\"type\":" + JsFormat.quote(expression.getClass().getSimpleName()) + "}";
   }
 
@@ -1961,28 +2259,41 @@ public final class Interpreter {
     var scope = new Environment(e);
     var iterable = evaluateExpression(iterableExpression, scope, b);
     List<Value> items;
-    if (iterable instanceof Value.ArrayValue a) items = a.values();
-    else if (iterable instanceof Value.TupleValue a) items = a.values();
-    else if (iterable instanceof Value.ObjectValue o) {
-      items = new ArrayList<>();
-      for (var k : o.values().keySet())
-        items.add(
-            k instanceof Value.StringValue string ? string : new Value.StringValue((String) k));
-    } else if (iterable instanceof Value.KeywordArgumentsValue o) {
-      items = new ArrayList<>();
-      for (var k : o.values().keySet()) items.add(new Value.StringValue(k));
-    } else
-      throw new TemplateRenderException(
-          "Expected iterable or object type in for loop: got " + type(iterable),
-          ErrorCategory.TYPE,
-          n.location());
+    if (iterable instanceof Value.ArrayValue a) {
+      items = a.values();
+    } else {
+      if (iterable instanceof Value.TupleValue a) {
+        items = a.values();
+      } else {
+        if (iterable instanceof Value.ObjectValue o) {
+          items = new ArrayList<>();
+          for (var k : o.values().keySet()) {
+            items.add(
+                k instanceof Value.StringValue string ? string : new Value.StringValue((String) k));
+          }
+        } else {
+          if (iterable instanceof Value.KeywordArgumentsValue o) {
+            items = new ArrayList<>();
+            for (var k : o.values().keySet()) {
+              items.add(new Value.StringValue(k));
+            }
+          } else {
+            throw new TemplateRenderException(
+                "Expected iterable or object type in for loop: got " + type(iterable),
+                ErrorCategory.TYPE,
+                n.location());
+          }
+        }
+      }
+    }
     var filtered = new ArrayList<Value>();
     for (var item : items) {
       b.chargeLoopIteration(n.location());
       var filterScope = new Environment(e);
       bind(n.loopVariable(), item, filterScope, n.location());
-      if (test == null || truthy(evaluateExpression(test, filterScope, b), test.location()))
+      if (test == null || truthy(evaluateExpression(test, filterScope, b), test.location())) {
         filtered.add(item);
+      }
     }
     items = filtered;
     var out = new StringBuilder();
@@ -2006,8 +2317,12 @@ public final class Interpreter {
       } catch (LoopControl control) {
         r = control.result();
       }
-      if (r instanceof ExecResult.Break) break;
-      if (r instanceof ExecResult.Continue) continue;
+      if (r instanceof ExecResult.Break) {
+        break;
+      }
+      if (r instanceof ExecResult.Continue) {
+        continue;
+      }
       none = false;
       out.append(((ExecResult.Normal) r).output());
     }
@@ -2019,23 +2334,27 @@ public final class Interpreter {
       e.setVariable(x.value(), item);
       return;
     }
-    if (!(target instanceof Expression.TupleLiteral tuple))
+    if (!(target instanceof Expression.TupleLiteral tuple)) {
       throw new TemplateRenderException(
           "Invalid loop variable(s): " + target.getClass().getSimpleName(), ErrorCategory.TYPE, l);
-    if (!(item instanceof Value.ArrayValue a))
+    }
+    if (!(item instanceof Value.ArrayValue a)) {
       throw new TemplateRenderException(
           "Cannot unpack non-iterable type: " + type(item), ErrorCategory.TYPE, l);
-    if (a.values().size() != tuple.value().size())
+    }
+    if (a.values().size() != tuple.value().size()) {
       throw new TemplateRenderException(
           "Too " + (a.values().size() < tuple.value().size() ? "few" : "many") + " items to unpack",
           ErrorCategory.VALUE,
           l);
+    }
     for (int i = 0; i < a.values().size(); i++) {
-      if (!(tuple.value().get(i) instanceof Expression.Identifier id))
+      if (!(tuple.value().get(i) instanceof Expression.Identifier id)) {
         throw new TemplateRenderException(
             "Cannot unpack non-identifier type: " + tuple.value().get(i).getClass().getSimpleName(),
             ErrorCategory.TYPE,
             l);
+      }
       e.setVariable(id.value(), a.values().get(i));
     }
   }
@@ -2073,14 +2392,17 @@ public final class Interpreter {
     deferredValue(current, "value", l);
     deferredValue(stop, "value", l);
     deferredValue(step, "value", l);
-    if (step instanceof Value.UndefinedValue) step = new Value.IntegerValue(1);
+    if (step instanceof Value.UndefinedValue) {
+      step = new Value.IntegerValue(1);
+    }
     if (stop instanceof Value.UndefinedValue) {
       stop = current;
       current = new Value.IntegerValue(0);
     }
     if (step instanceof Value.IntegerValue integerStep && integerStep.value() == 0
-        || step instanceof Value.FloatValue floatStep && floatStep.value() == 0)
+        || step instanceof Value.FloatValue floatStep && floatStep.value() == 0) {
       throw new TemplateRenderException("range() step must not be zero", ErrorCategory.VALUE, l);
+    }
     boolean ascending = JsOperations.toNumber(step) > 0;
     var r = new ArrayList<Value>();
     while (ascending
@@ -2094,15 +2416,18 @@ public final class Interpreter {
   }
 
   private static Value rangeElement(Value value) {
-    if (value instanceof Value.FloatValue number)
+    if (value instanceof Value.FloatValue number) {
       return number.value() == Math.rint(number.value())
           ? new Value.IntegerValue(number.value())
           : value;
+    }
     return value;
   }
 
   private static Value argument(List<Value> arguments, int index) {
-    if (index >= arguments.size()) return Value.UndefinedValue.INSTANCE;
+    if (index >= arguments.size()) {
+      return Value.UndefinedValue.INSTANCE;
+    }
     var value = arguments.get(index);
     return value instanceof Value.NullValue
             || value instanceof Value.StringValue string && string.undefinedBacked()
@@ -2186,9 +2511,10 @@ public final class Interpreter {
     // guard resolves that ambiguity as a missing-format TYPE error. That matches the upstream
     // TypeError family for each of these call shapes; preserving positional count through the
     // Callable signature would only improve the local message, not its observable category.
-    if (a.isEmpty() || a.get(0) instanceof Value.KeywordArgumentsValue)
+    if (a.isEmpty() || a.get(0) instanceof Value.KeywordArgumentsValue) {
       throw new TemplateRenderException(
           "strftime_now() expected one string argument", ErrorCategory.TYPE, l);
+    }
     var format = argument(a, 0);
     // Upstream's convertToRuntimeValues unwraps every argument shape to its raw .value before
     // calling strftime_now, so an absent/undefined-backed argument and an explicit `none` both
@@ -2196,12 +2522,14 @@ public final class Interpreter {
     // "Cannot read properties of ... (reading 'replace')" message surfaces -- never a single
     // shared message. hfjinja normalizes all of these failures into the TYPE category, matching
     // the upstream TypeError family while retaining stable local messages.
-    if (!(format instanceof Value.StringValue f))
+    if (!(format instanceof Value.StringValue f)) {
       throw new TemplateRenderException(
           "strftime_now() format must be a string", ErrorCategory.TYPE, l);
-    if (o.clock().isEmpty() || o.zoneId().isEmpty())
+    }
+    if (o.clock().isEmpty() || o.zoneId().isEmpty()) {
       throw new TemplateRenderException(
           "strftime_now requires clock and zone", ErrorCategory.VALUE, l);
+    }
     var z = ZonedDateTime.now(o.clock().get()).withZoneSameInstant(o.zoneId().get());
     return new Value.StringValue(PosixStrftime.format(z, f.value()));
   }

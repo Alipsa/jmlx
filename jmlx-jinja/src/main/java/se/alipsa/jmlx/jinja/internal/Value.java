@@ -32,6 +32,7 @@ public sealed interface Value
     return value instanceof DeferredUndefinedValue ? UndefinedValue.INSTANCE : value;
   }
 
+  /** The singleton value used for undefined template expressions. */
   enum UndefinedValue implements Value {
     INSTANCE
   }
@@ -41,14 +42,18 @@ public sealed interface Value
     INSTANCE
   }
 
+  /** The singleton value used for the JavaScript null value. */
   enum NullValue implements Value {
     INSTANCE
   }
 
+  /** A JavaScript boolean value. */
   record BooleanValue(boolean value) implements Value {}
 
+  /** A JavaScript integer value. */
   record IntegerValue(double value) implements Value {}
 
+  /** A JavaScript floating-point value. */
   record FloatValue(double value) implements Value {}
 
   /** A string value, optionally backed by JavaScript {@code undefined}. */
@@ -77,7 +82,9 @@ public sealed interface Value
     }
 
     public Map<String, CallableValue> builtins() {
-      if (builtins == null) builtins = new LinkedHashMap<>();
+      if (builtins == null) {
+        builtins = new LinkedHashMap<>();
+      }
       return builtins;
     }
 
@@ -99,6 +106,7 @@ public sealed interface Value
     }
   }
 
+  /** An immutable JavaScript array value. */
   record ArrayValue(List<Value> values) implements Value {
     public ArrayValue {
       values =
@@ -106,6 +114,7 @@ public sealed interface Value
     }
   }
 
+  /** An immutable tuple value. */
   record TupleValue(List<Value> values) implements Value {
     public TupleValue {
       values =
@@ -128,7 +137,9 @@ public sealed interface Value
     }
 
     public Map<String, CallableValue> builtins() {
-      if (builtins == null) builtins = new LinkedHashMap<>();
+      if (builtins == null) {
+        builtins = new LinkedHashMap<>();
+      }
       return builtins;
     }
 
@@ -163,7 +174,9 @@ public sealed interface Value
     }
 
     public Map<String, CallableValue> builtins() {
-      if (builtins == null) builtins = new LinkedHashMap<>();
+      if (builtins == null) {
+        builtins = new LinkedHashMap<>();
+      }
       return builtins;
     }
   }
@@ -205,9 +218,12 @@ public sealed interface Value
       Objects.requireNonNull(renderedText);
     }
 
+    /** Invokes a callable template value. */
     @FunctionalInterface
     public interface Callable {
       /**
+       * Invokes this callable.
+       *
        * @param arguments the positional arguments, possibly with a trailing {@link
        *     KeywordArgumentsValue} bag
        * @param hasKeywordArguments whether the caller actually supplied keyword arguments

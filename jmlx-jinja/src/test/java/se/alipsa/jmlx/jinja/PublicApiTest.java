@@ -66,7 +66,7 @@ class PublicApiTest {
   void formattingOverloadsValidateInputsAndDoNotMutateTheTemplate() {
     var template = Template.parse("{% if a %}{{ x }}{% endif %}");
     var context = Map.of("a", true, "x", "x");
-    var beforeFormatting = template.render(context);
+    final var beforeFormatting = template.render(context);
     assertThrows(NullPointerException.class, () -> template.format((String) null));
     assertEquals(template.format(9), template.format('\t'));
     assertEquals("{%- if a -%}\n\t{{- x -}}\n{%- endif -%}", template.format(""));

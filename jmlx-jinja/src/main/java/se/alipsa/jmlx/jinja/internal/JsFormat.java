@@ -26,6 +26,7 @@ public final class JsFormat {
       boolean sortKeys,
       JsonSeparators separators,
       int maxOutputLength) {
+    /** Returns the default JSON formatting options. */
     public static JsonOptions defaults() {
       return new JsonOptions(null, false, false, null, Integer.MAX_VALUE);
     }
@@ -53,16 +54,23 @@ public final class JsFormat {
    * @return the JavaScript-compatible representation
    */
   public static String plainString(double value) {
-    if (Double.isNaN(value)) return "NaN";
-    if (value == Double.POSITIVE_INFINITY) return "Infinity";
-    if (value == Double.NEGATIVE_INFINITY) return "-Infinity";
+    if (Double.isNaN(value)) {
+      return "NaN";
+    }
+    if (value == Double.POSITIVE_INFINITY) {
+      return "Infinity";
+    }
+    if (value == Double.NEGATIVE_INFINITY) {
+      return "-Infinity";
+    }
     return shortest(value);
   }
 
   /** Formats a float runtime value, retaining a fractional zero for integral floats. */
   public static String floatString(double value) {
-    if (value % 1 == 0 && Math.abs(value) < 1e21)
+    if (value % 1 == 0 && Math.abs(value) < 1e21) {
       return new BigDecimal(value).setScale(1, RoundingMode.UNNECESSARY).toPlainString();
+    }
     return plainString(value);
   }
 
@@ -183,11 +191,15 @@ public final class JsFormat {
   }
 
   private static String jsonObjectSortKey(Object key, SourceLocation location) {
-    if (key instanceof String string) return string;
+    if (key instanceof String string) {
+      return string;
+    }
     // Known upstream divergence: with three or more keys including undefined, V8's sort callback
     // dereferences undefined and throws. Keep this total ordering rather than reproducing that
     // engine accident; it also keeps all entries representable by the Java object model.
-    if (key instanceof Value.StringValue string && string.undefinedBacked()) return string.value();
+    if (key instanceof Value.StringValue string && string.undefinedBacked()) {
+      return string.value();
+    }
     throw new TemplateRenderException("Object keys must be strings", ErrorCategory.TYPE, location);
   }
 
@@ -199,17 +211,20 @@ public final class JsFormat {
       int depth,
       boolean array,
       SourceLocation location) {
-    if (!hasPrettyIndent(options))
+    if (!hasPrettyIndent(options)) {
       return open + String.join(itemSeparator(options), values) + close;
+    }
     int indentWidth = jsonIndent(options, location);
     String itemSeparator = itemSeparator(options);
     long basePaddingLength = 1L + (long) indentWidth * depth;
     long childrenPaddingLength = basePaddingLength + indentWidth;
     long renderedLength = 2L + childrenPaddingLength + basePaddingLength;
-    if (values.isEmpty() && !array) renderedLength = 2L + basePaddingLength;
-    else {
-      for (var value : values)
+    if (values.isEmpty() && !array) {
+      renderedLength = 2L + basePaddingLength;
+    } else {
+      for (var value : values) {
         renderedLength = checkedAdd(renderedLength, value.length(), location);
+      }
       renderedLength =
           checkedAdd(
               renderedLength,
@@ -217,13 +232,16 @@ public final class JsFormat {
                   * (itemSeparator.length() + childrenPaddingLength),
               location);
     }
-    if (renderedLength > options.maxOutputLength())
+    if (renderedLength > options.maxOutputLength()) {
       throw new TemplateRenderException(
           "Maximum render output length exceeded", ErrorCategory.RESOURCE_LIMIT, location);
+    }
     String indent = " ".repeat(indentWidth);
     String basePadding = "\n" + indent.repeat(depth);
     String childrenPadding = basePadding + indent;
-    if (values.isEmpty() && !array) return open + basePadding + close;
+    if (values.isEmpty() && !array) {
+      return open + basePadding + close;
+    }
     return open
         + childrenPadding
         + String.join(itemSeparator + childrenPadding, values)
@@ -242,12 +260,14 @@ public final class JsFormat {
 
   private static int jsonIndent(JsonOptions options, SourceLocation location) {
     double indent = options.indent();
-    if (indent < 0)
+    if (indent < 0) {
       throw new TemplateRenderException(
           "Invalid count value: " + plainString(indent), ErrorCategory.VALUE, location);
-    if (indent > options.maxOutputLength())
+    }
+    if (indent > options.maxOutputLength()) {
       throw new TemplateRenderException(
           "Maximum render output length exceeded", ErrorCategory.RESOURCE_LIMIT, location);
+    }
     return (int) indent;
   }
 
@@ -257,22 +277,27 @@ public final class JsFormat {
 
   private static String itemSeparator(JsonOptions options) {
     if (options.separators() != null) {
-      if (options.separators().item() == null) return hasPrettyIndent(options) ? "undefined" : ",";
+      if (options.separators().item() == null) {
+        return hasPrettyIndent(options) ? "undefined" : ",";
+      }
       return options.separators().item();
     }
     return hasPrettyIndent(options) ? "," : ", ";
   }
 
   private static String keySeparator(JsonOptions options) {
-    if (options.separators() == null) return ": ";
+    if (options.separators() == null) {
+      return ": ";
+    }
     return options.separators().key() == null ? "undefined" : options.separators().key();
   }
 
   private static void enterJson(
       Value value, IdentityHashMap<Value, Boolean> visiting, SourceLocation location) {
-    if (visiting.put(value, Boolean.TRUE) != null)
+    if (visiting.put(value, Boolean.TRUE) != null) {
       throw new TemplateRenderException(
           "Cannot convert cyclic value to JSON", ErrorCategory.TYPE, location);
+    }
   }
 
   /**
@@ -303,37 +328,53 @@ public final class JsFormat {
           boolean paired =
               high && i + 1 < value.length() && Character.isLowSurrogate(value.charAt(i + 1))
                   || low && i > 0 && Character.isHighSurrogate(value.charAt(i - 1));
-          if (c < 0x20 || (high || low) && !paired) b.append(String.format("\\u%04x", (int) c));
-          else b.append(c);
+          if (c < 0x20 || (high || low) && !paired) {
+            b.append(String.format("\\u%04x", (int) c));
+          } else {
+            b.append(c);
+          }
         }
       }
     }
     var quoted = b.append('"').toString();
-    if (!ensureAscii) return quoted;
+    if (!ensureAscii) {
+      return quoted;
+    }
     var ascii = new StringBuilder(quoted.length());
     for (int i = 0; i < quoted.length(); i++) {
       char c = quoted.charAt(i);
-      if (c >= 0x7f) ascii.append(String.format("\\u%04x", (int) c));
-      else ascii.append(c);
+      if (c >= 0x7f) {
+        ascii.append(String.format("\\u%04x", (int) c));
+      } else {
+        ascii.append(c);
+      }
     }
     return ascii.toString();
   }
 
   static String shortest(double value) {
-    if (value == 0d) return "0";
+    if (value == 0d) {
+      return "0";
+    }
     var exact = new BigDecimal(value);
     for (int p = 1; p <= 17; p++) {
       var c = exact.round(new MathContext(p, RoundingMode.HALF_EVEN)).stripTrailingZeros();
-      if (Double.parseDouble(c.toString()) == value) return format(c);
+      if (Double.parseDouble(c.toString()) == value) {
+        return format(c);
+      }
     }
     throw new IllegalStateException("No JavaScript round-trip decimal for finite double");
   }
 
   static String format(BigDecimal decimal) {
-    if (decimal.signum() == 0) return "0";
+    if (decimal.signum() == 0) {
+      return "0";
+    }
     var n = decimal.stripTrailingZeros();
     int e = n.precision() - n.scale() - 1;
-    if (e >= -6 && e < 21) return n.toPlainString();
+    if (e >= -6 && e < 21) {
+      return n.toPlainString();
+    }
     String d = n.unscaledValue().abs().toString();
     return (n.signum() < 0 ? "-" : "")
         + (d.length() == 1 ? d : d.charAt(0) + "." + d.substring(1))

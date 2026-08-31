@@ -956,7 +956,8 @@ class InterpreterTest {
             .render(Map.of()));
     assertEquals(
         "{\"k\\u00e4\": \"v\\u007f\\ud83d\\ude00\"}",
-        Template.parse("{{ {'k\u00e4': 'v\u007f😀'} | tojson(ensure_ascii=True) }}")
+        Template.parse(
+                "{{ {'kä': 'v" + Character.toString(0x7f) + "😀'} | tojson(ensure_ascii=True) }}")
             .render(Map.of()));
     assertEquals(
         "{\"a\": 1}", Template.parse("{{ {'a': 1} | tojson(indent=0) }}").render(Map.of()));
@@ -973,8 +974,7 @@ class InterpreterTest {
             .render(Map.of()));
     assertEquals(
         "{\"á\": 1, \"á\": 2}",
-        Template.parse("{{ {'\u00e1': 1, 'a\u0301': 2} | tojson(sort_keys=true) }}")
-            .render(Map.of()));
+        Template.parse("{{ {'á': 1, 'á': 2} | tojson(sort_keys=true) }}").render(Map.of()));
     assertEquals(
         "{\"a\": 2, undefined: 1}",
         Template.parse("{{ {'abc'[9]: 1, 'a': 2} | tojson(sort_keys=true) }}").render(Map.of()));
@@ -2507,7 +2507,9 @@ class InterpreterTest {
 
   private String resource(String name) throws Exception {
     try (InputStream input = getClass().getResourceAsStream("/model-templates/" + name)) {
-      if (input == null) throw new AssertionError("Missing model template resource: " + name);
+      if (input == null) {
+        throw new AssertionError("Missing model template resource: " + name);
+      }
       return new String(input.readAllBytes(), StandardCharsets.UTF_8);
     }
   }
@@ -2520,13 +2522,17 @@ class InterpreterTest {
   private static String sha256(String text) throws Exception {
     var digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
     var hex = new StringBuilder();
-    for (var value : digest) hex.append(String.format("%02x", value));
+    for (var value : digest) {
+      hex.append(String.format("%02x", value));
+    }
     return hex.toString();
   }
 
   private static Map<String, Object> orderedMap(Object... entries) {
     var result = new LinkedHashMap<String, Object>();
-    for (int i = 0; i < entries.length; i += 2) result.put((String) entries[i], entries[i + 1]);
+    for (int i = 0; i < entries.length; i += 2) {
+      result.put((String) entries[i], entries[i + 1]);
+    }
     return result;
   }
 }

@@ -21,6 +21,16 @@ import se.alipsa.jmlx.jinja.TemplateRenderException;
 public final class HostFunctions {
   private HostFunctions() {}
 
+  /**
+   * Invokes a host function after converting its template arguments to host values.
+   *
+   * @param name the template-visible function name
+   * @param function the host function to invoke
+   * @param positionalArguments the positional template arguments
+   * @param hasKeywordArguments whether the call has keyword arguments
+   * @param location the source location of the call
+   * @return the converted result
+   */
   public static Value invoke(
       String name,
       HostFunction function,

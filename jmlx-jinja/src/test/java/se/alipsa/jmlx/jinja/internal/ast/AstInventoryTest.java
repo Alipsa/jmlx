@@ -18,7 +18,9 @@ class AstInventoryTest {
   void javaNodesCoverEveryUpstreamAstNode() throws Exception {
     var expected = new TreeSet<String>();
     var matcher = KEY.matcher(Files.readString(Path.of("upstream/ast-allowlist.json")));
-    while (matcher.find()) expected.add(matcher.group(1));
+    while (matcher.find()) {
+      expected.add(matcher.group(1));
+    }
     expected.removeAll(Set.of("Statement", "Expression", "Literal"));
     var actual = new TreeSet<String>();
     actual.addAll(records(Statement.class));

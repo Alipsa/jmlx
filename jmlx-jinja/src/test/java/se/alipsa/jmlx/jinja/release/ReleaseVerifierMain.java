@@ -23,6 +23,7 @@ public final class ReleaseVerifierMain {
 
   private ReleaseVerifierMain() {}
 
+  /** Runs the release verification workflow. */
   public static void main(String[] args) throws Exception {
     if (args.length < 5 || args.length > 6) {
       throw new IllegalArgumentException(
@@ -30,10 +31,10 @@ public final class ReleaseVerifierMain {
               + " <daemon-vendor> <daemon-version> [--allow-dirty]");
     }
     Path source = Path.of(args[0]).toAbsolutePath().normalize();
-    String moduleDirectory = source.getFileName().toString();
-    Path userHome = Path.of(args[1]).toAbsolutePath().normalize();
-    String daemonJavaHome = args[2];
-    String daemonVendor = args[3];
+    final String moduleDirectory = source.getFileName().toString();
+    final Path userHome = Path.of(args[1]).toAbsolutePath().normalize();
+    final String daemonJavaHome = args[2];
+    final String daemonVendor = args[3];
     String daemonVersion = args[4];
     boolean allowDirty = args.length == 6 && "--allow-dirty".equals(args[5]);
     Path report = source.resolve("build/reports/release-verification.md");
@@ -41,8 +42,9 @@ public final class ReleaseVerifierMain {
     prepareReport(report, retainedEvidence);
     verifyEnvironment(source, daemonVersion);
     String status = output(source, "git", "status", "--porcelain", "--", ".");
-    if (!status.isBlank() && !allowDirty)
+    if (!status.isBlank() && !allowDirty) {
       throw new IllegalStateException("source checkout is dirty:\n" + status);
+    }
     String head = output(source, "git", "rev-parse", "HEAD").trim();
     String coordinates = contractCoordinates(source.resolve("req/release-verification.json"));
     Path parent = Files.createTempDirectory("hfjinja-release-worktree-");
@@ -66,7 +68,7 @@ public final class ReleaseVerifierMain {
       Files.copy(candidateModule.resolve("build/dependencyUpdates/report.txt"), stagedReport);
 
       gradle(candidateModule, userHome, true, "verifyReproducibleArchives");
-      Path archiveEvidence = dependencyEvidence.resolve("archive-reproducibility.json");
+      final Path archiveEvidence = dependencyEvidence.resolve("archive-reproducibility.json");
       copyEvidence(
           candidateModule, dependencyEvidence, "build/reports/archive-reproducibility.json");
       gradle(candidateModule, userHome, true, "clean", "check");
@@ -141,7 +143,9 @@ public final class ReleaseVerifierMain {
                 "-Dorg.gradle.java.installations.auto-download=false",
                 "--gradle-user-home",
                 userHome.toString()));
-    if (offline) command.add("--offline");
+    if (offline) {
+      command.add("--offline");
+    }
     command.addAll(List.of(tasks));
     requireIsolation(command, offline);
     run(project, command.toArray(String[]::new));
@@ -165,8 +169,9 @@ public final class ReleaseVerifierMain {
     String expectedNode =
         match(source.resolve("upstream/upstream-lock.json"), NODE_VERSION, "nodeVersion");
     String actualNode = output(source, "node", "--version").trim();
-    if (!expectedNode.equals(actualNode))
+    if (!expectedNode.equals(actualNode)) {
       throw new IllegalStateException("required Node " + expectedNode + ", got " + actualNode);
+    }
   }
 
   static void verifyRequiredTaskEvidence(Path worktree, Path contract) throws Exception {
@@ -182,10 +187,12 @@ public final class ReleaseVerifierMain {
             "build/reports/fuzz-parser.md");
     for (String task : stringArray(contract, "requiredTasks")) {
       String relative = evidence.get(task);
-      if (relative == null)
+      if (relative == null) {
         throw new IllegalStateException("no evidence mapping for required task: " + task);
-      if (!Files.isRegularFile(worktree.resolve(relative)))
+      }
+      if (!Files.isRegularFile(worktree.resolve(relative))) {
         throw new IllegalStateException("required verification evidence is missing: " + relative);
+      }
     }
   }
 
@@ -193,12 +200,14 @@ public final class ReleaseVerifierMain {
       Path candidate, Path userHome, Path repository, String coordinates) throws Exception {
     Path consumer = Files.createTempDirectory("hfjinja-release-consumer-");
     String[] coordinate = coordinates.split(":", -1);
-    if (coordinate.length != 3)
+    if (coordinate.length != 3) {
       throw new IllegalStateException("invalid contract coordinates: " + coordinates);
+    }
     try {
       Files.writeString(
           consumer.resolve("settings.gradle"),
-          "pluginManagement { repositories { } }\nrootProject.name = 'hfjinja-release-consumer'\n");
+          "pluginManagement { repositories {"
+              + "} }\nrootProject.name = 'hfjinja-release-consumer'\n");
       String repositoryUri = repository.toUri().toString().replace("'", "\\'");
       Files.writeString(
           consumer.resolve("build.gradle"),
@@ -253,9 +262,10 @@ public final class ReleaseVerifierMain {
       run(consumer, consumerCommand.toArray(String[]::new));
       try (var files = Files.list(consumer.resolve("build/resolved"))) {
         List<Path> resolved = files.toList();
-        if (resolved.size() != 1)
+        if (resolved.size() != 1) {
           throw new IllegalStateException(
               "consumer runtime graph must contain only the candidate JAR: " + resolved);
+        }
         if (!resolved.getFirst().getFileName().toString().startsWith(coordinate[1] + "-")) {
           throw new IllegalStateException(
               "consumer resolved an artifact other than the candidate JAR: " + resolved);
@@ -272,7 +282,7 @@ public final class ReleaseVerifierMain {
     String settings = Files.readString(consumer.resolve("settings.gradle"));
     String build = Files.readString(consumer.resolve("build.gradle"));
     String properties = Files.readString(consumer.resolve("gradle.properties"));
-    if (!settings.contains("pluginManagement { repositories { } }")
+    if (!settings.contains("pluginManagement { repositories {" + "} }")
         || !build.contains(repository.toUri().toString())
         || build.contains("mavenCentral")
         || build.contains("mavenLocal")
@@ -281,8 +291,9 @@ public final class ReleaseVerifierMain {
     }
     String wrapper =
         System.getProperty("os.name").toLowerCase().contains("win") ? "gradlew.bat" : "gradlew";
-    if (!Files.isRegularFile(candidate.resolve(wrapper)))
+    if (!Files.isRegularFile(candidate.resolve(wrapper))) {
       throw new IllegalStateException("consumer must use the candidate worktree wrapper");
+    }
   }
 
   private static Path publishedJar(Path repository, String coordinates) throws Exception {
@@ -387,7 +398,9 @@ public final class ReleaseVerifierMain {
 
   private static String match(Path file, Pattern pattern, String name) throws Exception {
     Matcher matcher = pattern.matcher(Files.readString(file));
-    if (!matcher.find()) throw new IllegalStateException("missing " + name + " in " + file);
+    if (!matcher.find()) {
+      throw new IllegalStateException("missing " + name + " in " + file);
+    }
     return matcher.group(1);
   }
 
@@ -395,11 +408,17 @@ public final class ReleaseVerifierMain {
     Matcher array =
         Pattern.compile(ARRAY.pattern().formatted(name), Pattern.DOTALL)
             .matcher(Files.readString(file));
-    if (!array.find()) throw new IllegalStateException("missing " + name + " in " + file);
+    if (!array.find()) {
+      throw new IllegalStateException("missing " + name + " in " + file);
+    }
     List<String> result = new ArrayList<>();
     Matcher value = JSON_STRING.matcher(array.group(1));
-    while (value.find()) result.add(value.group(1));
-    if (result.isEmpty()) throw new IllegalStateException(name + " must not be empty");
+    while (value.find()) {
+      result.add(value.group(1));
+    }
+    if (result.isEmpty()) {
+      throw new IllegalStateException(name + " must not be empty");
+    }
     return result;
   }
 
@@ -416,15 +435,20 @@ public final class ReleaseVerifierMain {
 
   static String mainArchiveDigest(Path archiveEvidence, String coordinates) throws Exception {
     String[] coordinate = coordinates.split(":", -1);
-    if (coordinate.length != 3)
+    if (coordinate.length != 3) {
       throw new IllegalArgumentException("invalid coordinates: " + coordinates);
+    }
     Pattern mainArchiveDigest =
         Pattern.compile(
             "\\\"name\\\"\\s*:\\s*\\\""
                 + Pattern.quote(coordinate[1])
-                + "-(?![^\\\"]+-(?:sources|javadoc)\\.jar)[^\\\"]+\\.jar\\\"\\s*,\\s*\\\"firstSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"\\s*,\\s*\\\"secondSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"");
+                + "-(?![^\\\"]+-(?:sources|javadoc)\\.jar)[^\\\"]+\\.jar\\\""
+                + "\\s*,\\s*\\\"firstSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\""
+                + "\\s*,\\s*\\\"secondSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"");
     Matcher match = mainArchiveDigest.matcher(Files.readString(archiveEvidence));
-    if (!match.find()) throw new IllegalStateException("archive evidence has no main JAR digest");
+    if (!match.find()) {
+      throw new IllegalStateException("archive evidence has no main JAR digest");
+    }
     if (!match.group(1).equals(match.group(2))) {
       throw new IllegalStateException("archive evidence records non-identical main JARs");
     }
@@ -434,8 +458,9 @@ public final class ReleaseVerifierMain {
   private static void copyEvidence(Path worktree, Path destination, String relative)
       throws Exception {
     Path source = worktree.resolve(relative);
-    if (!Files.isRegularFile(source))
+    if (!Files.isRegularFile(source)) {
       throw new IllegalStateException("required candidate evidence is missing: " + relative);
+    }
     Files.copy(
         source,
         destination.resolve(source.getFileName()),
@@ -478,14 +503,17 @@ public final class ReleaseVerifierMain {
     Process process =
         new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).start();
     String text = new String(process.getInputStream().readAllBytes());
-    if (process.waitFor() != 0) throw new IllegalStateException(text);
+    if (process.waitFor() != 0) {
+      throw new IllegalStateException(text);
+    }
     return text;
   }
 
   private static void run(Path directory, String... command) throws Exception {
     Process process = new ProcessBuilder(command).directory(directory.toFile()).inheritIO().start();
-    if (process.waitFor() != 0)
+    if (process.waitFor() != 0) {
       throw new IllegalStateException("command failed: " + String.join(" ", command));
+    }
   }
 
   private static void runQuietly(Path directory, String... command) {

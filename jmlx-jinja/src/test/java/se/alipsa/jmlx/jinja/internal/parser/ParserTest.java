@@ -80,8 +80,9 @@ class ParserTest {
   @Test
   void deeplyNestedElifChainsAreResourceLimited() {
     var source = new StringBuilder("{% if a %}x");
-    for (var index = 0; index < 5_000; index++)
+    for (var index = 0; index < 5_000; index++) {
       source.append("{% elif b").append(index).append(" %}y");
+    }
     source.append("{% endif %}");
     var error = assertThrows(TemplateRenderException.class, () -> parse(source.toString()));
     assertEquals(ErrorCategory.RESOURCE_LIMIT, error.category());
@@ -111,7 +112,9 @@ class ParserTest {
     var astSource = Files.readString(Path.of("upstream/vendor/src/ast.ts"));
     var upstreamTypes = new HashSet<String>();
     var matcher = Pattern.compile("type\\s*=\\s*\\\"([^\\\"]+)\\\"").matcher(astSource);
-    while (matcher.find()) upstreamTypes.add(matcher.group(1));
+    while (matcher.find()) {
+      upstreamTypes.add(matcher.group(1));
+    }
     for (var expressionType : Expression.class.getDeclaredClasses()) {
       if (Expression.class.isAssignableFrom(expressionType)) {
         assertTrue(

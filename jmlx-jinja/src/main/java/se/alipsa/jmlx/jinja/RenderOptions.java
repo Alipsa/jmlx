@@ -165,11 +165,23 @@ public final class RenderOptions {
       return this;
     }
 
+    /**
+     * Overrides the maximum number of rendering steps.
+     *
+     * @param value the new positive limit
+     * @return this builder
+     */
     public Builder maxSteps(int value) {
       maxSteps = positive(value, "maxSteps");
       return this;
     }
 
+    /**
+     * Overrides the maximum number of loop iterations.
+     *
+     * @param value the new positive limit
+     * @return this builder
+     */
     public Builder maxLoopIterations(int value) {
       maxLoopIterations = positive(value, "maxLoopIterations");
       return this;
@@ -238,7 +250,9 @@ public final class RenderOptions {
   }
 
   private static int positive(int value, String name) {
-    if (value <= 0) throw new IllegalArgumentException(name + " must be positive");
+    if (value <= 0) {
+      throw new IllegalArgumentException(name + " must be positive");
+    }
     return value;
   }
 

@@ -48,7 +48,9 @@ public final class Parser {
     Statement.Program parseProgram() {
       var body = new ArrayList<Statement>();
       var start = tokens.isEmpty() ? endLocation : tokens.get(0).start();
-      while (current < tokens.size()) body.add(parseAny());
+      while (current < tokens.size()) {
+        body.add(parseAny());
+      }
       return new Statement.Program(body, start);
     }
 
@@ -74,29 +76,30 @@ public final class Parser {
 
     Statement parseJinjaStatement() {
       var start = expect(TokenType.OpenStatement, "Expected opening statement token").start();
-      if (current >= tokens.size() || peek().type() != TokenType.Identifier)
+      if (current >= tokens.size() || peek().type() != TokenType.Identifier) {
         throw syntax("Unknown statement, got " + typeHere(), locationHere());
+      }
       var nameToken = peek();
       var name = nameToken.value();
       next();
       return switch (name) {
         case "set" -> parseSetStatement(start);
         case "if" -> {
-          var r = parseIfStatement(start);
+          final var r = parseIfStatement(start);
           expect(TokenType.OpenStatement, "Expected {% token");
           expectIdentifier("endif");
           expect(TokenType.CloseStatement, "Expected %} token");
           yield r;
         }
         case "macro" -> {
-          var r = parseMacroStatement(start);
+          final var r = parseMacroStatement(start);
           expect(TokenType.OpenStatement, "Expected {% token");
           expectIdentifier("endmacro");
           expect(TokenType.CloseStatement, "Expected %} token");
           yield r;
         }
         case "for" -> {
-          var r = parseForStatement(start);
+          final var r = parseForStatement(start);
           expect(TokenType.OpenStatement, "Expected {% token");
           expectIdentifier("endfor");
           expect(TokenType.CloseStatement, "Expected %} token");
@@ -132,7 +135,9 @@ public final class Parser {
         value = parseExpressionSequence(false);
       } else {
         expect(TokenType.CloseStatement, "Expected %} token");
-        while (!isStatement("endset")) body.add(parseAny());
+        while (!isStatement("endset")) {
+          body.add(parseAny());
+        }
         expect(TokenType.OpenStatement, "Expected {% token");
         expectIdentifier("endset");
       }
@@ -141,72 +146,90 @@ public final class Parser {
     }
 
     Statement.If parseIfStatement(SourceLocation start) {
-      var test = parseExpression();
+      final var test = parseExpression();
       expect(TokenType.CloseStatement, "Expected closing statement token");
       var body = new ArrayList<Statement>();
       var alternate = new ArrayList<Statement>();
-      while (!isStatement("elif", "else", "endif")) body.add(parseAny());
+      while (!isStatement("elif", "else", "endif")) {
+        body.add(parseAny());
+      }
       if (isStatement("elif")) {
         var elifStart = next().start();
         next();
         alternate.add(nested(() -> parseIfStatement(elifStart)));
-      } else if (isStatement("else")) {
-        next();
-        next();
-        expect(TokenType.CloseStatement, "Expected closing statement token");
-        while (!isStatement("endif")) alternate.add(parseAny());
+      } else {
+        if (isStatement("else")) {
+          next();
+          next();
+          expect(TokenType.CloseStatement, "Expected closing statement token");
+          while (!isStatement("endif")) {
+            alternate.add(parseAny());
+          }
+        }
       }
       return new Statement.If(test, body, alternate, start);
     }
 
     Statement.Macro parseMacroStatement(SourceLocation start) {
       var name = parsePrimaryExpression();
-      if (!(name instanceof Expression.Identifier id))
+      if (!(name instanceof Expression.Identifier id)) {
         throw syntax("Expected identifier following macro statement", name.location());
+      }
       var args = parseArgs();
       expect(TokenType.CloseStatement, "Expected closing statement token");
       var body = new ArrayList<Statement>();
-      while (!isStatement("endmacro")) body.add(parseAny());
+      while (!isStatement("endmacro")) {
+        body.add(parseAny());
+      }
       return new Statement.Macro(id, args, body, start);
     }
 
     Statement.For parseForStatement(SourceLocation start) {
       var variable = parseExpressionSequence(true);
+      // Expression record names are pinned against upstream/vendor/src/ast.ts discriminators by
+      // ParserTest.
       if (!(variable instanceof Expression.Identifier
-          || variable instanceof Expression.TupleLiteral))
-        // Expression record names are pinned against upstream/vendor/src/ast.ts discriminators by
-        // ParserTest.
+          || variable instanceof Expression.TupleLiteral)) {
         throw syntax(
             "Expected identifier/tuple for the loop variable, got "
                 + variable.getClass().getSimpleName()
                 + " instead",
             variable.location());
-      if (!isIdentifier("in"))
+      }
+      if (!isIdentifier("in")) {
         throw syntax("Expected `in` keyword following loop variable", locationHere());
+      }
       next();
-      var iterable = parseExpression();
+      final var iterable = parseExpression();
       expect(TokenType.CloseStatement, "Expected closing statement token");
       var body = new ArrayList<Statement>();
-      while (!isStatement("endfor", "else")) body.add(parseAny());
+      while (!isStatement("endfor", "else")) {
+        body.add(parseAny());
+      }
       var alternate = new ArrayList<Statement>();
       if (isStatement("else")) {
         next();
         next();
         expect(TokenType.CloseStatement, "Expected closing statement token");
-        while (!isStatement("endfor")) alternate.add(parseAny());
+        while (!isStatement("endfor")) {
+          alternate.add(parseAny());
+        }
       }
       return new Statement.For(variable, iterable, body, alternate, start);
     }
 
     Statement.CallStatement parseCallStatement(SourceLocation start) {
-      List<Expression> callerArgs = is(TokenType.OpenParen) ? parseArgs() : null;
+      final List<Expression> callerArgs = is(TokenType.OpenParen) ? parseArgs() : null;
       var callee = parsePrimaryExpression();
-      if (!(callee instanceof Expression.Identifier))
+      if (!(callee instanceof Expression.Identifier)) {
         throw syntax("Expected identifier following call statement", callee.location());
-      var callArgs = parseArgs();
+      }
+      final var callArgs = parseArgs();
       expect(TokenType.CloseStatement, "Expected closing statement token");
       var body = new ArrayList<Statement>();
-      while (!isStatement("endcall")) body.add(parseAny());
+      while (!isStatement("endcall")) {
+        body.add(parseAny());
+      }
       expect(TokenType.OpenStatement, "Expected '{%'");
       expectIdentifier("endcall");
       expect(TokenType.CloseStatement, "Expected closing statement token");
@@ -219,11 +242,14 @@ public final class Parser {
 
     Statement.FilterStatement parseFilterStatement(SourceLocation start) {
       Expression filter = parsePrimaryExpression();
-      if (filter instanceof Expression.Identifier && is(TokenType.OpenParen))
+      if (filter instanceof Expression.Identifier && is(TokenType.OpenParen)) {
         filter = parseCallExpression(filter);
+      }
       expect(TokenType.CloseStatement, "Expected closing statement token");
       var body = new ArrayList<Statement>();
-      while (!isStatement("endfilter")) body.add(parseAny());
+      while (!isStatement("endfilter")) {
+        body.add(parseAny());
+      }
       expect(TokenType.OpenStatement, "Expected '{%'");
       expectIdentifier("endfilter");
       expect(TokenType.CloseStatement, "Expected '%}'");
@@ -300,8 +326,13 @@ public final class Parser {
         if (isIdentifier("not", "in")) {
           op = new Token(TokenType.Identifier, "not in", peek().start());
           current += 2;
-        } else if (isIdentifier("in") || is(TokenType.ComparisonBinaryOperator)) op = next();
-        else break;
+        } else {
+          if (isIdentifier("in") || is(TokenType.ComparisonBinaryOperator)) {
+            op = next();
+          } else {
+            break;
+          }
+        }
         left =
             new Expression.BinaryExpression(op, left, parseAdditiveExpression(), left.location());
       }
@@ -333,10 +364,13 @@ public final class Parser {
       while (isIdentifier("is")) {
         next();
         boolean negate = isIdentifier("not");
-        if (negate) next();
+        if (negate) {
+          next();
+        }
         var test = parsePrimaryExpression();
-        if (!(test instanceof Expression.Identifier id))
+        if (!(test instanceof Expression.Identifier id)) {
           throw syntax("Expected identifier for the test", test.location());
+        }
         operand = new Expression.TestExpression(operand, negate, id, operand.location());
       }
       return operand;
@@ -347,9 +381,12 @@ public final class Parser {
       while (is(TokenType.Pipe)) {
         next();
         Expression filter = parsePrimaryExpression();
-        if (!(filter instanceof Expression.Identifier))
+        if (!(filter instanceof Expression.Identifier)) {
           throw syntax("Expected identifier for the filter", filter.location());
-        if (is(TokenType.OpenParen)) filter = parseCallExpression(filter);
+        }
+        if (is(TokenType.OpenParen)) {
+          filter = parseCallExpression(filter);
+        }
         operand = new Expression.FilterExpression(operand, filter, operand.location());
       }
       return operand;
@@ -390,15 +427,18 @@ public final class Parser {
                 arg = parseExpression();
                 if (is(TokenType.Equals)) {
                   next();
-                  if (!(arg instanceof Expression.Identifier id))
+                  if (!(arg instanceof Expression.Identifier id)) {
                     throw syntax("Expected identifier for keyword argument", arg.location());
+                  }
                   arg =
                       new Expression.KeywordArgumentExpression(
                           id, parseExpression(), id.location());
                 }
               }
               args.add(arg);
-              if (is(TokenType.Comma)) next();
+              if (is(TokenType.Comma)) {
+                next();
+              }
             }
             return args;
           });
@@ -422,12 +462,14 @@ public final class Parser {
                 }
               }
             }
-            if (slices.isEmpty())
+            if (slices.isEmpty()) {
               throw syntax(
                   "Expected at least one argument for member/slice expression", locationHere());
+            }
             if (slice) {
-              if (slices.size() > 3)
+              if (slices.size() > 3) {
                 throw syntax("Expected 0-3 arguments for slice expression", locationHere());
+              }
               var start = slices.get(0);
               var stop = slices.size() > 1 ? slices.get(1) : null;
               var step = slices.size() > 2 ? slices.get(2) : null;
@@ -448,9 +490,10 @@ public final class Parser {
         } else {
           property = parsePrimaryExpression();
           if (!(property instanceof Expression.Identifier
-              || property instanceof Expression.IntegerLiteral))
+              || property instanceof Expression.IntegerLiteral)) {
             throw syntax(
                 "Expected identifier or integer following dot operator", property.location());
+          }
         }
         object = new Expression.MemberExpression(object, property, computed, object.location());
       }
@@ -463,7 +506,9 @@ public final class Parser {
         case NumericLiteral -> number(token);
         case StringLiteral -> {
           var value = new StringBuilder(token.value());
-          while (is(TokenType.StringLiteral)) value.append(next().value());
+          while (is(TokenType.StringLiteral)) {
+            value.append(next().value());
+          }
           yield new Expression.StringLiteral(value.toString(), token.start());
         }
         case Identifier -> new Expression.Identifier(token.value(), token.start());
@@ -484,7 +529,9 @@ public final class Parser {
                   var values = new ArrayList<Expression>();
                   while (!is(TokenType.CloseSquareBracket)) {
                     values.add(parseExpression());
-                    if (is(TokenType.Comma)) next();
+                    if (is(TokenType.Comma)) {
+                      next();
+                    }
                   }
                   next();
                   return new Expression.ArrayLiteral(values, token.start());
@@ -498,7 +545,9 @@ public final class Parser {
                     expect(
                         TokenType.Colon, "Expected colon between key and value in object literal");
                     values.add(new Expression.ObjectEntry(key, parseExpression()));
-                    if (is(TokenType.Comma)) next();
+                    if (is(TokenType.Comma)) {
+                      next();
+                    }
                   }
                   next();
                   return new Expression.ObjectLiteral(values, token.start());
@@ -514,7 +563,9 @@ public final class Parser {
     }
 
     Token peek() {
-      if (current >= tokens.size()) throw syntax("Unexpected end of template", endLocation);
+      if (current >= tokens.size()) {
+        throw syntax("Unexpected end of template", endLocation);
+      }
       return tokens.get(current);
     }
 
@@ -525,26 +576,38 @@ public final class Parser {
     }
 
     Token expect(TokenType type, String error) {
-      if (current >= tokens.size())
+      if (current >= tokens.size()) {
         throw syntax("Parser Error: " + error + ". End of template !== " + type + ".", endLocation);
+      }
       var t = tokens.get(current++);
-      if (t.type() != type)
+      if (t.type() != type) {
         throw syntax("Parser Error: " + error + ". " + t.type() + " !== " + type + ".", t.start());
+      }
       return t;
     }
 
     boolean is(TokenType... types) {
-      if (current + types.length > tokens.size()) return false;
-      for (var i = 0; i < types.length; i++)
-        if (tokens.get(current + i).type() != types[i]) return false;
+      if (current + types.length > tokens.size()) {
+        return false;
+      }
+      for (var i = 0; i < types.length; i++) {
+        if (tokens.get(current + i).type() != types[i]) {
+          return false;
+        }
+      }
       return true;
     }
 
     boolean isIdentifier(String... names) {
-      if (current + names.length > tokens.size()) return false;
-      for (var i = 0; i < names.length; i++)
+      if (current + names.length > tokens.size()) {
+        return false;
+      }
+      for (var i = 0; i < names.length; i++) {
         if (tokens.get(current + i).type() != TokenType.Identifier
-            || !names[i].equals(tokens.get(current + i).value())) return false;
+            || !names[i].equals(tokens.get(current + i).value())) {
+          return false;
+        }
+      }
       return true;
     }
 
@@ -556,7 +619,9 @@ public final class Parser {
     }
 
     void expectIdentifier(String name) {
-      if (!isIdentifier(name)) throw syntax("Expected " + name, locationHere());
+      if (!isIdentifier(name)) {
+        throw syntax("Expected " + name, locationHere());
+      }
       current++;
     }
 

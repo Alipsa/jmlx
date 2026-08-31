@@ -14,7 +14,18 @@ import org.junit.jupiter.api.Test;
 class FormatDifferentialTest {
   private static final Pattern RECORD =
       Pattern.compile(
-          "\\{\\\"name\\\":\\\"(?<name>(?:\\\\.|[^\\\"])*)\\\",\\\"source\\\":\\\"(?<source>(?:\\\\.|[^\\\"])*)\\\",\\\"indent\\\":\\{(?:(?:\\\"default\\\":true)|(?:\\\"number\\\":(?<number>-?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?))|(?:\\\"string\\\":\\\"(?<string>(?:\\\\.|[^\\\"])*)\\\"))\\},\\\"roundTrip\\\":\\\"(?<roundTrip>[^\\\"]+)\\\",\\\"formatted\\\":\\\"(?<formatted>(?:\\\\.|[^\\\"])*)\\\",\\\"context\\\":\\\"(?<context>(?:\\\\.|[^\\\"])*)\\\",\\\"originalRendered\\\":(?:null|\\\"(?<originalRendered>(?:\\\\.|[^\\\"])*)\\\"),\\\"reformattedRendered\\\":(?:null|\\\"(?<reformattedRendered>(?:\\\\.|[^\\\"])*)\\\"),\\\"reformattedError\\\":(?:null|\\\"(?<reformattedError>(?:\\\\.|[^\\\"])*)\\\"),\\\"reformattedCategory\\\":(?:null|\\\"(?<reformattedCategory>[^\\\"]+)\\\")\\}");
+          "\\{\\\"name\\\":\\\"(?<name>(?:\\\\.|[^\\\"])*)\\\","
+              + "\\\"source\\\":\\\"(?<source>(?:\\\\.|[^\\\"])*)\\\",\\\"indent\\\":\\{"
+              + "(?:(?:\\\"default\\\":true)|(?:\\\"number\\\":(?<number>-?(?:\\d+\\.?\\d*|"
+              + "\\.\\d+)(?:[eE][+-]?\\d+)?))|(?:\\\"string\\\":\\\"(?<string>"
+              + "(?:\\\\.|[^\\\"])*)\\\"))\\},\\\"roundTrip\\\":\\\"(?<roundTrip>[^\\\"]+)\\\","
+              + "\\\"formatted\\\":\\\"(?<formatted>(?:\\\\.|[^\\\"])*)\\\","
+              + "\\\"context\\\":\\\"(?<context>(?:\\\\.|[^\\\"])*)\\\",\\\"originalRendered\\\":"
+              + "(?:null|\\\"(?<originalRendered>(?:\\\\.|[^\\\"])*)\\\"),"
+              + "\\\"reformattedRendered\\\":(?:null|\\\"(?<reformattedRendered>"
+              + "(?:\\\\.|[^\\\"])*)\\\"),\\\"reformattedError\\\":(?:null|\\\"(?<reformattedError>"
+              + "(?:\\\\.|[^\\\"])*)\\\"),\\\"reformattedCategory\\\":"
+              + "(?:null|\\\"(?<reformattedCategory>[^\\\"]+)\\\")\\}");
 
   @Test
   void matchesEveryPinnedNodeFormatGolden() throws Exception {
@@ -46,11 +57,12 @@ class FormatDifferentialTest {
               ErrorCategory.valueOf(required(matcher, "reformattedCategory")),
               failure.category(),
               name + " formatted error category");
-        } else
+        } else {
           assertEquals(
               unescape(required(matcher, "reformattedRendered")),
               Template.parse(actual).render(context),
               name + " formatted render");
+        }
       }
       records++;
     }
@@ -59,8 +71,9 @@ class FormatDifferentialTest {
 
   private static String required(Matcher matcher, String group) {
     var value = matcher.group(group);
-    if (value == null)
+    if (value == null) {
       throw new AssertionError("Missing " + group + " in renderable golden record");
+    }
     return value;
   }
 
@@ -88,9 +101,12 @@ class FormatDifferentialTest {
     var out = new StringBuilder();
     for (int i = 0; i < value.length(); i++) {
       char c = value.charAt(i);
-      if (c != '\\') out.append(c);
-      else {
-        if (++i == value.length()) throw new IllegalArgumentException("Incomplete JSON escape");
+      if (c != '\\') {
+        out.append(c);
+      } else {
+        if (++i == value.length()) {
+          throw new IllegalArgumentException("Incomplete JSON escape");
+        }
         char escaped = value.charAt(i);
         out.append(
             switch (escaped) {
@@ -105,15 +121,18 @@ class FormatDifferentialTest {
               case 'u' -> unicodeEscape(value, i);
               default -> throw new IllegalArgumentException("Unsupported JSON escape: " + escaped);
             });
-        if (escaped == 'u') i += 4;
+        if (escaped == 'u') {
+          i += 4;
+        }
       }
     }
     return out.toString();
   }
 
   private static char unicodeEscape(String value, int escapeIndex) {
-    if (escapeIndex + 4 >= value.length())
+    if (escapeIndex + 4 >= value.length()) {
       throw new IllegalArgumentException("Incomplete JSON escape");
+    }
     return (char) Integer.parseInt(value.substring(escapeIndex + 1, escapeIndex + 5), 16);
   }
 }

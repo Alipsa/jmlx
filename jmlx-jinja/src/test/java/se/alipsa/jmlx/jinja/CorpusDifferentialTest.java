@@ -27,8 +27,9 @@ class CorpusDifferentialTest {
   static List<DynamicTest> dynamicTests(List<CorpusFixtures.Record> records) {
     var executable = records.stream().filter(CorpusFixtures.Record::templateBearing).toList();
     long expectedExecutions = records.stream().filter(record -> !record.hashOnly()).count();
-    if (executable.isEmpty())
+    if (executable.isEmpty()) {
       throw new AssertionError("no template-bearing corpus records were executed");
+    }
     var tests =
         executable.stream()
             .map(
@@ -86,8 +87,9 @@ class CorpusDifferentialTest {
             + error.category()
             + ": "
             + error.getMessage());
-    if (record.expected().errorMessage() != null)
+    if (record.expected().errorMessage() != null) {
       assertEquals(record.expected().errorMessage(), error.getMessage(), label + " error message");
+    }
   }
 
   private static TemplateOptions templateOptions(CorpusFixtures.Record record) {

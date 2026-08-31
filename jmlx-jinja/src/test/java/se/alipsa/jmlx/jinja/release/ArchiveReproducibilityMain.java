@@ -13,6 +13,7 @@ import java.util.zip.ZipFile;
 public final class ArchiveReproducibilityMain {
   private ArchiveReproducibilityMain() {}
 
+  /** Runs the reproducible archive verification workflow. */
   public static void main(String[] args) throws Exception {
     if (args.length != 5) {
       throw new IllegalArgumentException(
@@ -45,7 +46,9 @@ public final class ArchiveReproducibilityMain {
       Files.createDirectories(report.getParent());
       Files.writeString(report, report(first, second));
       System.out.println("archive evidence: " + report);
-      for (Path archive : first) System.out.println(archive.getFileName() + " " + sha256(archive));
+      for (Path archive : first) {
+        System.out.println(archive.getFileName() + " " + sha256(archive));
+      }
     } finally {
       runQuietly(project, "git", "worktree", "remove", "--force", sandbox.toString());
       runQuietly(project, "git", "worktree", "prune");
@@ -93,7 +96,9 @@ public final class ArchiveReproducibilityMain {
                 "-Dorg.gradle.java.installations.auto-download=false",
                 "--gradle-user-home",
                 userHome.toString()));
-    if (offline) command.add("--offline");
+    if (offline) {
+      command.add("--offline");
+    }
     command.addAll(List.of(tasks));
     Process process = new ProcessBuilder(command).directory(project.toFile()).inheritIO().start();
     if (process.waitFor() != 0) {
@@ -104,13 +109,15 @@ public final class ArchiveReproducibilityMain {
   private static void verifyModule(Path archive, int expectedBytecodeMajor) throws IOException {
     try (ZipFile zip = new ZipFile(archive.toFile())) {
       var entry = zip.getEntry("module-info.class");
-      if (entry == null)
+      if (entry == null) {
         throw new IllegalStateException("archive has no module-info.class: " + archive);
+      }
       byte[] moduleInfo = zip.getInputStream(entry).readAllBytes();
       int major = ((moduleInfo[6] & 0xff) << 8) | (moduleInfo[7] & 0xff);
-      if (major != expectedBytecodeMajor)
+      if (major != expectedBytecodeMajor) {
         throw new IllegalStateException(
             "expected bytecode major " + expectedBytecodeMajor + ", got " + major);
+      }
     }
   }
 
@@ -122,8 +129,9 @@ public final class ArchiveReproducibilityMain {
   private static void runGit(Path directory, String... command)
       throws IOException, InterruptedException {
     Process process = new ProcessBuilder(command).directory(directory.toFile()).inheritIO().start();
-    if (process.waitFor() != 0)
+    if (process.waitFor() != 0) {
       throw new IllegalStateException("command failed: " + String.join(" ", command));
+    }
   }
 
   private static void runQuietly(Path directory, String... command) {
@@ -141,8 +149,9 @@ public final class ArchiveReproducibilityMain {
             .redirectErrorStream(true)
             .start();
     String output = new String(process.getInputStream().readAllBytes()).trim();
-    if (process.waitFor() != 0)
+    if (process.waitFor() != 0) {
       throw new IllegalStateException("cannot find repository root: " + output);
+    }
     return Path.of(output).toAbsolutePath().normalize();
   }
 
@@ -158,7 +167,9 @@ public final class ArchiveReproducibilityMain {
           .append("\", \"secondSha256\": \"")
           .append(sha256(second.get(index)))
           .append("\"}");
-      if (index + 1 < first.size()) result.append(',');
+      if (index + 1 < first.size()) {
+        result.append(',');
+      }
       result.append('\n');
     }
     return result.append("  ]\n}\n").toString();

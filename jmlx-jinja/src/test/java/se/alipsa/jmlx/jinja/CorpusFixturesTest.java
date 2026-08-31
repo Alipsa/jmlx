@@ -18,7 +18,8 @@ class CorpusFixturesTest {
             "{\"id\":\"first\",\"source\":\"test\",\"template\":\"\\uD83D\\uDE00\\n"
                 + "\",\"context\":{\"n\":1e2,\"list\":[true,null]},\"expected\":{\"text\":\"x\"}}\n"
                 + "\n"
-                + "{\"id\":\"second\",\"id\":\"second-final\",\"source\":\"test\",\"template\":\"x\",\"context\":{},\"expected\":{\"text\":\"x\"}}\n",
+                + "{\"id\":\"second\",\"id\":\"second-final\",\"source\":\"test\","
+                + "\"template\":\"x\",\"context\":{},\"expected\":{\"text\":\"x\"}}\n",
             "synthetic.jsonl");
     assertEquals(1, records.get(0).line());
     assertEquals(3, records.get(1).line());
@@ -31,7 +32,8 @@ class CorpusFixturesTest {
   void parsesExactErrorMessageExpectations() {
     var record =
         CorpusFixtures.readContent(
-                "{\"id\":\"exact-error\",\"source\":\"test\",\"template\":\"x\",\"context\":{},\"expected\":{\"errorCategory\":\"EXPLICIT_RAISE\",\"errorMessage\":\"x\"}}",
+                "{\"id\":\"exact-error\",\"source\":\"test\",\"template\":\"x\",\"context\":{},"
+                    + "\"expected\":{\"errorCategory\":\"EXPLICIT_RAISE\",\"errorMessage\":\"x\"}}",
                 "synthetic.jsonl")
             .getFirst();
     assertEquals(ErrorCategory.EXPLICIT_RAISE, record.expected().errorCategory());
@@ -41,7 +43,9 @@ class CorpusFixturesTest {
             IllegalArgumentException.class,
             () ->
                 CorpusFixtures.readContent(
-                    "{\"id\":\"invalid-error\",\"source\":\"test\",\"template\":\"x\",\"context\":{},\"expected\":{\"errorCategory\":\"EXPLICIT_RAISE\",\"errorMessage\":1}}",
+                    "{\"id\":\"invalid-error\",\"source\":\"test\",\"template\":\"x\","
+                        + "\"context\":{},\"expected\":{\"errorCategory\":\"EXPLICIT_RAISE\","
+                        + "\"errorMessage\":1}}",
                     "synthetic.jsonl"));
     assertTrue(invalid.getMessage().contains("errorMessage must be a string"));
   }
@@ -51,7 +55,7 @@ class CorpusFixturesTest {
     var malformed =
         assertThrows(
             IllegalArgumentException.class,
-            () -> CorpusFixtures.readContent("\n { }", "bad.jsonl"));
+            () -> CorpusFixtures.readContent("\n {" + "}", "bad.jsonl"));
     assertTrue(malformed.getMessage().contains("bad.jsonl:2"));
     var globals =
         assertThrows(
@@ -67,7 +71,7 @@ class CorpusFixturesTest {
                     + invalidUnicode
                     + "\",\"context\":{},\"expected\":{\"text\":\"x\"}}",
                 "unicode.jsonl"));
-    String nonAsciiUnicode = new String(new char[] {'\\', 'u', '\u0660', '\u0660', '\u0664', '1'});
+    String nonAsciiUnicode = new String(new char[] {'\\', 'u', '٠', '٠', '٤', '1'});
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -142,7 +146,8 @@ class CorpusFixturesTest {
                 + "a".repeat(64)
                 + "\",\"modelRepo\":\"example/model\",\"modelRevision\":\""
                 + "b".repeat(40)
-                + "\",\"templatePath\":\"template.jinja\",\"context\":{},\"expected\":{\"sha256\":\""
+                + "\",\"templatePath\":\"template.jinja\",\"context\":{},"
+                + "\"expected\":{\"sha256\":\""
                 + "c".repeat(64)
                 + "\"}}",
             "hash.jsonl");

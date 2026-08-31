@@ -96,7 +96,11 @@ class ReleaseVerifierMainTest {
     var evidence = temporaryDirectory.resolve("hfjinja-archive-mismatch.json");
     Files.writeString(
         evidence,
-        "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"secondSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}");
+        "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\""
+            + "a".repeat(64)
+            + "\",\"secondSha256\":\""
+            + "b".repeat(64)
+            + "\"}");
     assertThrows(
         IllegalStateException.class,
         () ->

@@ -34,13 +34,16 @@ public final class TemplateFormatter {
    */
   public static int validateIndentCount(double value) {
     double count = value < 0 ? Math.ceil(value) : Math.floor(value);
-    if (count < 0 || count > MAX_PINNED_NODE_STRING_LENGTH) throw invalidCount(value);
+    if (count < 0 || count > MAX_PINNED_NODE_STRING_LENGTH) {
+      throw invalidCount(value);
+    }
     return (int) count;
   }
 
   static void validateRepeatedIndentLength(int unitLength, int depth) {
-    if ((long) unitLength * depth > MAX_PINNED_NODE_STRING_LENGTH)
+    if ((long) unitLength * depth > MAX_PINNED_NODE_STRING_LENGTH) {
       throw new IllegalArgumentException("Indentation exceeds pinned Node string length limit");
+    }
   }
 
   private static IllegalArgumentException invalidCount(double value) {
@@ -101,7 +104,9 @@ public final class TemplateFormatter {
     Statement.If current = node;
     boolean first = true;
     while (true) {
-      if (!first) out.append(NL);
+      if (!first) {
+        out.append(NL);
+      }
       out.append(pad)
           .append(tag(first ? "if" : "elif", expression(current.test(), -1)))
           .append(NL)
@@ -110,14 +115,17 @@ public final class TemplateFormatter {
           && current.alternate().getFirst() instanceof Statement.If next) {
         current = next;
         first = false;
-      } else break;
+      } else {
+        break;
+      }
     }
-    if (!current.alternate().isEmpty())
+    if (!current.alternate().isEmpty()) {
       out.append(NL)
           .append(pad)
           .append(tag("else"))
           .append(NL)
           .append(statements(current.alternate(), depth + 1, indent));
+    }
     return out.append(NL).append(pad).append(tag("endif")).toString();
   }
 
@@ -132,12 +140,13 @@ public final class TemplateFormatter {
             .append(tag("for", expression(x.loopVariable(), -1), "in", iterable))
             .append(NL)
             .append(statements(x.body(), depth + 1, indent));
-    if (!x.defaultBlock().isEmpty())
+    if (!x.defaultBlock().isEmpty()) {
       out.append(NL)
           .append(pad)
           .append(tag("else"))
           .append(NL)
           .append(statements(x.defaultBlock(), depth + 1, indent));
+    }
     return out.append(NL).append(pad).append(tag("endfor")).toString();
   }
 
@@ -260,11 +269,15 @@ public final class TemplateFormatter {
         || x.object() instanceof Expression.FloatLiteral
         || x.object() instanceof Expression.ArrayLiteral
         || x.object() instanceof Expression.TupleLiteral
-        || x.object() instanceof Expression.ObjectLiteral)) object = "(" + object + ")";
+        || x.object() instanceof Expression.ObjectLiteral)) {
+      object = "(" + object + ")";
+    }
     String property = expression(x.property(), -1);
     if (!x.computed()
         && !(x.property() instanceof Expression.Identifier
-            || x.property() instanceof Expression.IntegerLiteral)) property = "(" + property + ")";
+            || x.property() instanceof Expression.IntegerLiteral)) {
+      property = "(" + property + ")";
+    }
     return x.computed() ? object + "[" + property + "]" : object + "." + property;
   }
 }

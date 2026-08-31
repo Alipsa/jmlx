@@ -20,8 +20,7 @@ public final class ArchiveReproducibilityMain {
               + " <report> <bytecode-major>");
     }
     Path project = Path.of(args[0]).toAbsolutePath().normalize();
-    Path repositoryRoot = repositoryRoot(project);
-    Path modulePath = repositoryRoot.relativize(project);
+    String moduleDirectory = project.getFileName().toString();
     Path userHome = Path.of(args[1]).toAbsolutePath().normalize();
     boolean offline = Boolean.parseBoolean(args[2]);
     Path report = Path.of(args[3]).toAbsolutePath().normalize();
@@ -31,7 +30,7 @@ public final class ArchiveReproducibilityMain {
     Path sandbox = sandboxParent.resolve("candidate");
     try {
       runGit(project, "git", "worktree", "add", "--detach", sandbox.toString(), "HEAD");
-      Path candidateModule = sandbox.resolve(modulePath);
+      Path candidateModule = sandbox.resolve(moduleDirectory);
       List<Path> first = buildAndCopy(candidateModule, userHome, offline, evidence.resolve("first"));
       List<Path> second = buildAndCopy(candidateModule, userHome, offline, evidence.resolve("second"));
       for (int index = 0; index < first.size(); index++) {

@@ -30,8 +30,7 @@ public final class ReleaseVerifierMain {
               + " <daemon-vendor> <daemon-version> [--allow-dirty]");
     }
     Path source = Path.of(args[0]).toAbsolutePath().normalize();
-    Path repositoryRoot = repositoryRoot(source);
-    Path modulePath = repositoryRoot.relativize(source);
+    String moduleDirectory = source.getFileName().toString();
     Path userHome = Path.of(args[1]).toAbsolutePath().normalize();
     String daemonJavaHome = args[2];
     String daemonVendor = args[3];
@@ -52,7 +51,7 @@ public final class ReleaseVerifierMain {
     Path repository = Files.createTempDirectory("hfjinja-release-repository-");
     try {
       run(source, "git", "worktree", "add", "--detach", worktree.toString(), head);
-      Path candidateModule = worktree.resolve(modulePath);
+      Path candidateModule = worktree.resolve(moduleDirectory);
       Files.createDirectories(userHome);
       Files.writeString(
           worktree.resolve("gradle.properties"),

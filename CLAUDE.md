@@ -11,9 +11,10 @@ ops) is done, and two further phases are built on top of it: `req/phase3-plan.md
 ops, relaxed matmul, `slice`, a batched `eval`) and `req/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`,
 `Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
 cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/plans/phase5-m1-plan.md`
-(`MLXIO` -- safetensors/GGUF checkpoint I/O) is also delivered. `req/project-outline.md` describes the
-full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); the rest
-of Phase 5 (tokenizers, model implementations) is not yet implemented.
+(`MLXIO` -- safetensors/GGUF checkpoint I/O) and `req/plans/phase5-m2-plan.md` (`jmlx-tokenizer` --
+byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered. `req/project-outline.md`
+describes the full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model
+loading); the rest of Phase 5 (model implementations, i.e. M3) is not yet implemented.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -52,7 +53,7 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-examples
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-examples
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
@@ -101,13 +102,32 @@ jmlx-ffi         se.alipsa.jmlx.ffi.*              committed jextract output
 native/install/lib/  libmlxc.dylib                 built by scripts/bootstrap-native.sh
                      libmlx.dylib  libjaccl.dylib   staged from the mlx-metal wheel
                      mlx.metallib                   staged from the mlx-metal wheel
+
+jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRenderer,
+                                                    TokenizerJson/TokenizerJsonLoader, Vocabulary,
+                                                    BpeMerger, ByteLevelCoding,
+                                                    ByteLevelPreTokenizer, ByteLevelDecoder,
+                                                    AddedTokenSplitter, TextNormalizer,
+                                                    PostProcessorApplier, TokenizerException
+                 (no "|" above: pure Java, no dependency on jmlx-ffi or native/install/lib)
 ```
 
-Three modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
+The native stack has three modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
 it in `jmlx-ffi` means it compiles once and stays untouched by day-to-day iteration on `jmlx-core`,
 keeping incremental builds fast and generated code out of review diffs. `jmlx-core` depends on
 `jmlx-ffi` as `implementation`, not `api` — `MLXArray`/`MLX` wrap raw `MemorySegment` handles behind
 plain Java types and never expose `jmlx-ffi` on their own public surface.
+
+**A fourth module, `jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`), sits outside this
+native chain entirely — the first pure-Java module in this codebase.** It has no dependency on
+`jmlx-ffi` and never touches `native/install/lib`; its only dependencies are ordinary Maven artifacts
+— Jackson (`tools.jackson.core:jackson-databind`, for parsing `tokenizer.json`) and `hfjinja`
+(`se.alipsa:hfjinja`, for rendering HF `chat_template` Jinja strings). `HfTokenizer` is a from-scratch
+Java port of the byte-level-BPE pipeline (vocabulary/merges, byte-level pre-tokenization and decoding,
+normalization, added-token splitting, post-processing), not an FFM binding over `mlx-c` or any other
+native tokenizer library — unlike `jmlx-core`, it does not call `NativeLoader.ensureLoaded()` and is
+not part of the "Loading order matters" native-guard discussion below (which is specific to `MLX`,
+`MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless

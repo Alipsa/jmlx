@@ -1,0 +1,2483 @@
+# jmlx Phase 5 — M2 implementation plan (`jmlx-tokenizer`, byte-level BPE + chat templates)
+
+Concrete task-by-task plan for `req/phase5-plan.md`'s M2. The architecture question that document's
+own D3 left open is now resolved by explicit decision, not desk research: **pure-Java port**, as a new
+`jmlx-tokenizer` Gradle module (sibling to `jmlx-ffi`/`jmlx-core`/`jmlx-examples`, not a package inside
+`jmlx-core`) — chosen over a standalone repo because it has no external reuse target yet and over the
+FFM/`tokenizers-cpp` path because it avoids the Rust toolchain this machine doesn't have. Chat-template
+rendering uses `se.alipsa:hfjinja:0.5.0` (Maven Central), the user's own Java port of
+`@huggingface/jinja` — not the hand-format-per-model or GraalJS options D3's amendment also
+considered.
+
+**Scope is deliberately narrower than "port swift-transformers."** `req/phase5-plan.md`'s own
+"ship exactly what's needed" precedent applies: M3's actual named targets are Llama-3-Instruct and
+Qwen2.5-Instruct, and both declare `"tokenizer_class": "PreTrainedTokenizerFast"` backed by a
+byte-level BPE `model.type: "BPE"` in their `tokenizer.json` — not `LlamaTokenizer`'s legacy
+SentencePiece/Metaspace path. This plan ports only what byte-level BPE needs: no
+WordPiece/Unigram/SentencePiece, no `BertTokenizer`, no general normalizer plugin chain (just
+`None`/`NFC`, the only two either target model declares), no `Trie`-based added-token matching
+(confirmed unused by this path — a single combined regex handles it), and no sentence-pair
+(`pair`-template) post-processing (chat/completion use is single-sequence only).
+
+## Findings from this plan's pre-work
+
+**Both target models' real `tokenizer.json`/`tokenizer_config.json` were fetched directly and
+inspected** (`Qwen/Qwen2.5-0.5B-Instruct`, and `NousResearch/Meta-Llama-3-8B-Instruct` — an ungated
+re-upload of the same gated `meta-llama/Meta-Llama-3-8B-Instruct` weights/tokenizer, used here only
+because `meta-llama`'s own repo requires accepting a license gate the fetching environment can't do
+non-interactively; the tokenizer files themselves are redistributed unchanged). Findings below are
+against these real files, not reconstructions:
+
+- **Pretokenizer regex, byte-exact from the JSON itself** (not `llama.cpp`'s rewritten-for-a-
+  lookahead-free-engine form, which is a red herring for a Java port — `java.util.regex.Pattern`
+  supports `(?i:...)` and lookahead natively):
+  - QWEN2.5: `(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+`
+  - LLAMA3: same, with `\p{N}` replaced by `\p{N}{1,3}`.
+  - Both wrapped in a `pre_tokenizer.Sequence` as `[{type: "Split", pattern: {Regex: "..."},
+    behavior: "Isolated", invert: false}, {type: "ByteLevel", add_prefix_space: false, use_regex:
+    false, trim_offsets: <false for Qwen, true for Llama-3, irrelevant here — offsets aren't tracked>}]`.
+    `behavior: "Isolated"` + `invert: false` on a pattern that's exhaustive over all Unicode text means
+    this reduces to a plain `Matcher.find()` loop collecting every match in order — no need to port
+    `tokenizers`' general `Split`/`Invert`/`Removed`/`MergedWithPrevious` behavior enum, only the one
+    case these two files actually use. The following `ByteLevel` stage has `use_regex: false`
+    (splitting already happened), so it does nothing but byte-encode each already-split chunk.
+- **Normalizer:** Qwen2.5 declares `{"type": "NFC"}`; Llama-3 declares `null` (none). Both real,
+  no other normalizer type appears in either file — confirms the `None`/`NFC`-only scope above.
+- **Post-processor — the two real shapes to support, nothing else:**
+  - Qwen2.5: `{"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex":
+    false}` — a bare `ByteLevel` post-processor. In the real `tokenizers` Rust implementation this step
+    exists purely to fix up byte-offset↔character-offset mappings; since this port does not track
+    offsets (an explicit, named scope boundary — jmlx's use case is encode/decode, not
+    offset-aware tooling), a bare `ByteLevel` post-processor step is a no-op on the token list itself.
+    This matches Qwen's own `tokenizer_config.json` (`bos_token: null`, `add_bos_token: false`) — Qwen
+    prepends nothing; `<|im_start|>`/`<|im_end|>` are literal added-token text the chat template emits.
+  - Llama-3: `{"type": "Sequence", "processors": [{"type": "ByteLevel", ...}, {"type":
+    "TemplateProcessing", "single": [{"SpecialToken": {"id": "<|begin_of_text|>", "type_id": 0}},
+    {"Sequence": {"id": "A", "type_id": 0}}], "special_tokens": {"<|begin_of_text|>": {"id":
+    "<|begin_of_text|>", "ids": [128000], "tokens": ["<|begin_of_text|>"]}}}]}` — the `ByteLevel` step
+    is again a no-op per above; `TemplateProcessing`'s `single` template is what prepends
+    `<|begin_of_text|>` as BOS when `addSpecialTokens` is true. Only the `single` template is needed
+    (no `pair`).
+- **`model.ignore_merges: true` on Llama-3 (absent/false on Qwen2.5) is a real, load-bearing BPE
+  algorithm variant, confirmed against `tokenizers/src/models/bpe/model.rs` (`v0.21.2`) directly, not
+  swift-transformers (which doesn't implement it — a real gap in the porting source, not a Java-port
+  simplification):** when true, `tokenize_with_cache` checks whether the *entire* pre-token string is
+  already a single vocab entry, and if so returns it as one token, skipping the merge loop entirely —
+  before the merge cache is even consulted. When false (Qwen2.5's case), this shortcut is skipped and
+  the normal rank-ordered merge loop always runs. Both models have `dropout: null`, `fuse_unk: false`,
+  `byte_fallback: false`, `continuing_subword_prefix`/`end_of_word_suffix` empty/absent — the
+  hexadecimal-byte-fallback path (`BPETokenizer.swift`'s `hexaEncode`) is therefore dead code for both
+  real targets and is out of scope (an out-of-vocab merge result should never occur given
+  `byte_fallback: false` and that every raw byte already has its own vocab entry by construction of
+  byte-level BPE training; Task 6 below fails loudly with `TokenizerException` if it ever does, rather
+  than silently guessing).
+- **`merges` is a JSON array of single space-separated strings** (e.g. `"Ġ Ġ"`), not the older
+  two-element-array-per-merge format — confirmed by direct inspection of both files. Array index
+  order is priority rank (lower index merges first).
+
+  **Amendment (PR #14 review, round 2): this bullet has the history backwards.** The
+  two-element-array form (`["Ġ", "Ġ"]`) is not older — it is the *newer* serialization, introduced
+  in HF `tokenizers` PR #909 (released in `tokenizers` v0.20.0) specifically to make each merge's
+  two components unambiguous without a separator convention. The single space-separated string is
+  the older format this plan's two fixture files happened to use, and remains valid: `tokenizers`
+  still round-trips both. `TokenizerJsonLoader.parseModel` (Task 4, below) accepts either shape.
+- **`added_tokens`: zero entries on either model set `lstrip`/`rstrip`/`single_word`/`normalized`**
+  (checked all 22 Qwen2.5 entries and all 256 Llama-3 entries programmatically, not sampled) — the
+  whitespace-eating variant of added-token matching `Tokenizer.swift` supports is dead code for both
+  real targets and is out of scope; added-token matching is exact-literal-string matching only.
+- **`Trie.swift` is unused by this path.** The actual `PreTrainedTokenizer.tokenize()` path in
+  `swift-transformers` builds one combined `NSRegularExpression` from all `added_tokens[].content`
+  (escaped, longest-first) and splits on that directly — not trie search. This plan does the Java
+  equivalent (`Pattern.quote` per token, `|`-joined, longest-first) rather than porting `Trie.swift`.
+- **Real chat templates, fetched verbatim from each model's own `tokenizer_config.json`** (not a
+  community-reformatted mirror): both captured below in Task 14's fixtures. Qwen2.5's chat_template
+  is ChatML-style with tool-calling support (uses Jinja's `tojson` filter); Llama-3's is a much
+  shorter single-loop template with no tool-calling. `bos_token`/`eos_token`: Qwen2.5 has
+  `bos_token: null`, `eos_token: "<|im_end|>"`; Llama-3 has `bos_token: "<|begin_of_text|>"`,
+  `eos_token: "<|eot_id|>"`.
+- **`hfjinja`'s real public API** (`se.alipsa:hfjinja:0.5.0`, JPMS module `se.alipsa.hfjinja`, zero
+  runtime dependencies, Java 21+): a single class `se.alipsa.hfjinja.Template` —
+  `Template.parse(String source)` returns a `Template`; `.render(Map<String,?> context)` returns the
+  rendered `String`. Exceptions `TemplateSyntaxException` (parse) / `TemplateRenderException` (render)
+  both extend `HfJinjaException`, both unchecked. Built-in globals already include `raise_exception`,
+  `range`, `namespace`, `tojson`-style JSON serialization support for chat-template use — no host
+  functions need registering for either target model's template.
+- **Snapshot builds may resolve from `mavenLocal()` before `mavenCentral()` to support locally
+  published snapshot artifacts during development; release builds resolve only from Maven Central.**
+  This environment cannot reach Maven Central, so its snapshot development build uses locally
+  available dependencies. [Amended (PR #14 review, rounds 1 and 3): the "cannot reach Maven
+  Central" premise in the previous sentence is mistaken -- see Task 1's Step 1c amendment below for
+  the corrected diagnosis and the `build.gradle` shape actually shipped.] `se.alipsa:hfjinja:0.5.0`
+  is present locally (the user built and installed it there directly).
+  `tools.jackson.core:jackson-databind` is present only up to **`3.1.2`** —
+  `3.2.2` (Maven Central's actual latest at spike time) is *not* present locally and would fail to
+  resolve in this environment, so this plan pins Jackson to **`3.1.2`**, confirmed as a complete
+  local artifact (`.jar`/`.pom`/sources, no partial/failed-download markers). A machine with real
+  Maven Central access could use a newer Jackson 3.x release instead; this plan pins to what this
+  build can actually resolve today. [Amended (PR #14 review, round 5, finding 8): this sentence and
+  the two before it still restate the same retracted "cannot reach Maven Central" premise the
+  amendment at the top of this bullet already corrects for the sentence it immediately follows --
+  see Task 1's Step 1c amendment for the corrected diagnosis, and the dependency-table amendment
+  below for the corrected framing of this exact pin. `3.1.2` resolves from Maven Central directly
+  like any other 3.x release; it was never a local-artifact-availability constraint, only an
+  unreviewed pin against Central's then-current latest (`3.2.2`).]
+- **Jackson 3.1.2** (`tools.jackson.core:jackson-databind:3.1.2`) is the JSON parser: no JSON library
+  exists anywhere in this repo today.
+  Jackson 3 renamed several `JsonNode` accessors from its 2.x line (`asText()` → `asString()`,
+  `textValue()` → `stringValue()`, `isTextual()` → `isString()`) and made its base exception
+  (`tools.jackson.core.JacksonException`, replacing `JsonProcessingException`) unchecked
+  (`extends RuntimeException`, not `IOException`) — code below uses the 3.x names; double-check
+  against the installed jar's javadoc during implementation in case a minor accessor name differs.
+  A full `ObjectMapper.readTree(...)` parse (not a manual streaming walk) is used even though
+  `tokenizer.json` is large (Qwen2.5: 7.0 MB / 151,643 vocab entries; Llama-3: 9.1 MB / 128,000 vocab
+  entries, both measured directly) — a sub-second, one-time parse cost that's negligible next to this
+  framework's own multi-GB safetensors/GGUF loading, so a manual streaming parser would be premature
+  optimization for no measured benefit.
+- **jmlx conventions this plan follows:** `TokenizerException extends RuntimeException` with the
+  same two-constructor shape as `se.alipsa.jmlx.core.MLXException` (message-only, message+cause) —
+  a new type, not a reuse of `MLXException`, since that type's own Javadoc scopes it specifically to
+  mlx-c native failures. `Objects.requireNonNull(x, "method: x must not be null")` on every public
+  parameter. JUnit Jupiter 6.0.1, plain `org.junit.jupiter.api.Assertions.*` (no AssertJ/Hamcrest),
+  matching `MLXIOTest`. **Unlike every existing `jmlx-core` test class, none of this module's tests
+  need `@EnabledIfNativeAvailable`** — a pure-Java tokenizer has no native dependency at all, so its
+  suite runs (and gates CI) even on a machine with no `mlx.metallib` staged, which existing native
+  tests cannot do. This is a real, worth-noting usability improvement, not an oversight.
+
+## Global Constraints
+
+1. **No SentencePiece, WordPiece, Unigram, `BertTokenizer`, general normalizer chain, `Trie`-based
+   added-token matching, offset tracking, or sentence-pair post-processing.** Every one of these is
+   confirmed dead code for Llama-3-Instruct and Qwen2.5-Instruct specifically (Findings above) and is
+   out of scope for this plan, not merely deferred silently.
+2. **Every public method parameter is null-checked via `Objects.requireNonNull` with a
+   `"ClassName.methodName: paramName must not be null"`-style message**, matching existing
+   `jmlx-core` convention.
+3. **All native-format field names (`ignore_merges`, `add_prefix_space`, `byte_fallback`, etc.) are
+   preserved verbatim as JSON keys mapped by the Jackson loader (Task 4), even though the Java fields
+   they populate use `lowerCamelCase`** — matching how `tokenizer.json`/`tokenizer_config.json` are
+   actually shaped, so a future engineer comparing this code against a real file isn't translating
+   names in their head.
+4. **`BpeMerger`'s merge loop is the plain "repeatedly find the lowest-rank adjacent pair, merge,
+   repeat" reference algorithm** (the same algorithm HF's own reference Python BPE implementations
+   use), not `BPETokenizer.swift`'s doubly-linked-list-plus-min-heap optimization. Pre-token chunks
+   are short (a handful of characters; the pretokenizer regex guarantees this), so the reference
+   algorithm's worse asymptotic complexity is not a real performance concern here — the swap
+   trades a real implementation-complexity cost for a performance win this workload doesn't need,
+   which is a case the codebase's own YAGNI convention already covers elsewhere in this doc.
+5. **Every JSON-shape assumption below (regex strings, post-processor shapes, `ignore_merges`
+   semantics, absence of `lstrip`/`rstrip` on added tokens) is stated as a target-model-specific fact,
+   not a general `tokenizers`-library guarantee** — a future third model with a different
+   `tokenizer.json` shape may need this plan revisited, not silently misinterpreted by code that
+   assumes today's two shapes are the only ones that exist.
+6. **`ChatTemplateRenderer`'s context map takes an open `Map<String, Object> extraContext` merged in
+   underneath the fixed `messages`/`add_generation_prompt`/`bos_token`/`eos_token` keys**, so
+   tool-calling variables (`tools`, etc.) Qwen2.5's own chat_template already references can be added
+   by a caller later (M3's own job) without this class changing shape.
+
+## Third-party dependencies this plan adds
+
+| Dependency | Coordinates | Used by |
+|---|---|---|
+| Jackson databind | `tools.jackson.core:jackson-databind:3.1.2` (pulls `jackson-core` and `com.fasterxml.jackson.core:jackson-annotations` transitively — the annotations artifact keeps its 2.x coordinates even under Jackson 3; pinned to `3.1.2` -- \[Amended, PR #14 review round 4, finding 11: not, as originally written here, "because only `3.1.2` is present in this environment's `~/.m2/repository`" -- that premise is retracted, see Task 1's Step 1c amendment. `3.1.2` resolves from Maven Central directly, same as any newer 3.x; the pin is simply unreviewed against Central's current latest, not forced by any environment limitation.\]) | Task 4 (`TokenizerJson`) |
+| hfjinja | `se.alipsa:hfjinja:0.5.0` (resolves from Maven Central directly; also present in `~/.m2/repository` from local development, added to the root `build.gradle` by Task 1) | Task 13 (`ChatTemplateRenderer`) |
+
+## File Structure
+
+New Gradle module `jmlx-tokenizer`, package `se.alipsa.jmlx.tokenizer`:
+
+```
+jmlx-tokenizer/
+  build.gradle
+  src/main/java/se/alipsa/jmlx/tokenizer/
+    TokenizerException.java
+    ByteLevelCoding.java
+    AddedToken.java                  (record)
+    BpeModelConfig.java              (record)
+    PreTokenizerConfig.java          (record)
+    NormalizerKind.java              (enum)
+    PostProcessorStep.java           (sealed interface)
+    ByteLevelStep.java               (record, implements PostProcessorStep)
+    TemplateProcessingStep.java      (record, implements PostProcessorStep)
+    TemplateItem.java                (sealed interface)
+    SpecialTokenItem.java            (record, implements TemplateItem)
+    SequenceItem.java                (record, implements TemplateItem)
+    SpecialTokenInfo.java            (record)
+    TokenizerJson.java               (record + Jackson loader)
+    Vocabulary.java
+    BpeMerger.java
+    ByteLevelPreTokenizer.java
+    TextNormalizer.java
+    AddedTokenSplitter.java
+    PostProcessorApplier.java
+    ByteLevelDecoder.java
+    HfTokenizer.java
+    ChatTemplateRenderer.java
+  src/test/java/se/alipsa/jmlx/tokenizer/
+    ByteLevelCodingTest.java
+    TokenizerJsonTest.java
+    BpeMergerTest.java
+    ByteLevelPreTokenizerTest.java
+    AddedTokenSplitterTest.java
+    PostProcessorApplierTest.java
+    ByteLevelDecoderTest.java
+    HfTokenizerTest.java
+    ChatTemplateRendererTest.java
+  src/test/resources/se/alipsa/jmlx/tokenizer/
+    qwen-style.tokenizer.json
+    llama3-style.tokenizer.json
+    qwen2.5-instruct-chat-template.jinja
+    llama3-instruct-chat-template.jinja
+```
+
+## Task 1: Module scaffolding
+
+**Step 1a — `settings.gradle`:** add `jmlx-tokenizer` to the `include(...)` call:
+
+```groovy
+include('jmlx-ffi', 'jmlx-core', 'jmlx-tokenizer', 'jmlx-examples')
+```
+
+**Step 1b — `gradle/libs.versions.toml`:** add version and library entries alongside the existing
+`junit-jupiter` ones:
+
+```toml
+[versions]
+junit-jupiter = "6.0.1"
+jackson = "3.1.2"
+hfjinja = "0.5.0"
+
+[libraries]
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
+jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
+hfjinja = { module = "se.alipsa:hfjinja", version.ref = "hfjinja" }
+```
+
+**Step 1c — root `build.gradle`: add `mavenLocal()`.** This build environment cannot reach
+`mavenCentral()`; both new dependencies must resolve from `~/.m2/repository` instead (Findings
+above). Add `mavenLocal()` *before* `mavenCentral()` in the existing `allprojects` block so it's
+checked first:
+
+```groovy
+allprojects {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+```
+
+`mavenCentral()` stays in the list (not removed) so a build environment that *does* have real
+network access still works unchanged — this only adds a local-first lookup, it doesn't take
+anything away.
+
+**Amendment (PR #14 review, rounds 1 and 3): the "this build environment cannot reach
+`mavenCentral()`" premise above was mistaken, and the shipped `build.gradle` does not match the
+snippet above.** Live dependency resolution against a stock `mavenCentral()`-only repository list
+(`./gradlew :jmlx-tokenizer:dependencies --configuration compileClasspath --refresh-dependencies`,
+and a direct `curl` against `repo1.maven.org`) confirms both `se.alipsa:hfjinja:0.5.0` and
+`tools.jackson.core:jackson-databind:3.1.2` resolve from Maven Central alone -- this environment was
+never actually unable to reach it. The root `build.gradle` instead gates `mavenLocal()` on `jmlx`'s
+own root project version (`group = 'se.alipsa'`, `version = '0.5.0-SNAPSHOT'`, both set in an
+`allprojects {}` block) being a `-SNAPSHOT` build, an ordinary and unrelated local-development
+convenience (per this repo's own `~/.claude/CLAUDE.md` policy: "If a project is a SNAPSHOT version,
+`mavenLocal()` should be enabled — always"), not a network workaround:
+
+```groovy
+allprojects {
+    repositories {
+        mavenCentral()
+        if (rootProject.version.toString().endsWith('-SNAPSHOT')) {
+            mavenLocal()
+        }
+    }
+}
+```
+
+`mavenCentral()` is checked first here (not `mavenLocal()`), so a release build -- or any build
+whose `jmlx` version isn't a `-SNAPSHOT` -- resolves every dependency from Central alone and can
+never have a stale same-GAV artifact in `~/.m2/repository` silently win with no diagnostic.
+
+**Step 1d — `jmlx-tokenizer/build.gradle`:** new file, mirroring `jmlx-core/build.gradle`'s
+plugin/toolchain/spotless/checkstyle blocks but with this module's own dependencies:
+
+```groovy
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencies {
+    implementation libs.jackson.databind
+    implementation libs.hfjinja
+    testImplementation libs.junit.jupiter.api
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+(Copy the actual `spotless`/`checkstyle` configuration blocks from `jmlx-core/build.gradle` verbatim
+rather than retyping them here — they must stay byte-identical across modules.)
+
+**Step 1e — verify:** `./gradlew :jmlx-tokenizer:build` succeeds with zero source files (an empty
+module compiles), confirming both `mavenLocal()` resolution and the module wiring work together.
+Commit before writing any class.
+
+```bash
+git add settings.gradle gradle/libs.versions.toml build.gradle jmlx-tokenizer/build.gradle
+git commit -m "Scaffold jmlx-tokenizer module"
+```
+
+## Task 2: `TokenizerException`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** Thrown when a tokenizer.json file, chat template, or token stream cannot be processed. */
+public final class TokenizerException extends RuntimeException {
+
+  /** Creates an exception carrying a description of the tokenizer failure. */
+  public TokenizerException(String message) {
+    super(message);
+  }
+
+  /** Creates an exception carrying {@code cause}'s failure as context. */
+  public TokenizerException(String message, Throwable cause) {
+    super(message, cause);
+  }
+}
+```
+
+No test file needed for this class alone (`RuntimeException` subclasses are exercised by the classes
+that throw them, per every other exception class in this codebase).
+
+## Task 3: `ByteLevelCoding`
+
+The standard GPT-2 byte↔Unicode table (`ByteEncoder.swift`'s own source, static data, portable
+verbatim; independently re-derivable from the well-known `bytes_to_unicode()` reference algorithm).
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * The GPT-2 byte-level encoding: maps each of the 256 possible byte values to a printable Unicode
+ * character, so that BPE vocab/merges (which operate on printable text) can represent arbitrary
+ * bytes, including whitespace and control characters, without ambiguity.
+ */
+public final class ByteLevelCoding {
+
+  private static final int[] BYTE_TO_CODE_POINT = new int[256];
+  private static final Map<Integer, Integer> CODE_POINT_TO_BYTE = new HashMap<>();
+
+  static {
+    boolean[] isPrintable = new boolean[256];
+    for (int b = '!'; b <= '~'; b++) {
+      isPrintable[b] = true;
+    }
+    for (int b = 0xA1; b <= 0xAC; b++) {
+      isPrintable[b] = true;
+    }
+    for (int b = 0xAE; b <= 0xFF; b++) {
+      isPrintable[b] = true;
+    }
+    int nextExtraCodePoint = 256;
+    for (int b = 0; b < 256; b++) {
+      int codePoint = isPrintable[b] ? b : nextExtraCodePoint++;
+      BYTE_TO_CODE_POINT[b] = codePoint;
+      CODE_POINT_TO_BYTE.put(codePoint, b);
+    }
+  }
+
+  private ByteLevelCoding() {}
+
+  /** Encodes raw UTF-8 bytes as a byte-level string: one Unicode character per input byte. */
+  public static String encode(byte[] utf8Bytes) {
+    Objects.requireNonNull(utf8Bytes, "ByteLevelCoding.encode: utf8Bytes must not be null");
+    StringBuilder sb = new StringBuilder(utf8Bytes.length);
+    for (byte b : utf8Bytes) {
+      sb.appendCodePoint(BYTE_TO_CODE_POINT[b & 0xFF]);
+    }
+    return sb.toString();
+  }
+
+  /** Encodes a plain-text string (its UTF-8 bytes) as a byte-level string. */
+  public static String encode(String text) {
+    Objects.requireNonNull(text, "ByteLevelCoding.encode: text must not be null");
+    return encode(text.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Decodes a byte-level string back to raw bytes. Does not decode as UTF-8 itself: a multi-byte
+   * UTF-8 character can be split across separate BPE tokens, so callers must concatenate the raw
+   * bytes of every consecutive byte-level token before UTF-8-decoding the combined buffer
+   * (see {@link ByteLevelDecoder}).
+   */
+  public static byte[] decodeToBytes(String byteLevelText) {
+    Objects.requireNonNull(byteLevelText, "ByteLevelCoding.decodeToBytes: byteLevelText must not be null");
+    byte[] out = new byte[byteLevelText.codePointCount(0, byteLevelText.length())];
+    int i = 0;
+    int index = 0;
+    while (index < byteLevelText.length()) {
+      int codePoint = byteLevelText.codePointAt(index);
+      Integer b = CODE_POINT_TO_BYTE.get(codePoint);
+      if (b == null) {
+        throw new TokenizerException(
+            "ByteLevelCoding.decodeToBytes: code point " + codePoint + " is not a valid byte-level character");
+      }
+      out[i++] = b.byteValue();
+      index += Character.charCount(codePoint);
+    }
+    return out;
+  }
+}
+```
+
+(Add `import java.util.Objects;` alongside the others.)
+
+**Amendment (PR #14 review, round 5, finding 3): `decodeToBytes` above throws where HF falls back.**
+The `if (b == null) throw ...` branch is stricter than HF's actual `ByteLevel::decode_chain`
+(`huggingface/tokenizers`'s Rust source), which tries a per-character mapping and, as soon as any
+character in a token fails to map, falls back to that *entire token's own raw UTF-8 bytes*
+(`.unwrap_or_else(|| t.as_bytes().to_vec())`) rather than erroring. This is a real, reachable case
+for this port, not just theoretical: a token string built from an id with no vocabulary entry, or a
+malformed added token, can contain a character like a plain space (code point 32, itself not
+byte-level-printable per the static initializer above) that no legitimate byte-level token ever
+would. The fix replaces the `throw` with `return byteLevelText.getBytes(StandardCharsets.UTF_8);`
+(a whole-string fallback, not per-character) as soon as the first unmapped code point is found. The
+eventual `new String(bytes, UTF_8)` in `ByteLevelDecoder` already matches `from_utf8_lossy`'s
+replacement-character behavior for whatever these raw bytes decode to, so no further change is
+needed there.
+
+**Amendment (PR #14 review, round 6, finding 6): the reachability description above overstated one
+case and, after round 6 finding 1 (`ByteLevelDecoder`, above), understated another.** "An id with no
+vocabulary entry" never actually reaches this method at all: `HfTokenizer#decode` filters such ids
+out (skip or throw) before ever producing a token string, so `decodeToBytes` never sees one. "A
+malformed added token" *did* describe a real gap at the time, but for a different reason than
+originally stated: with round 5's still-current literal-pass-through design, an `added_tokens`
+entry's content took the literal branch and never reached `decodeToBytes` at all -- the actually
+reachable case was a plain, non-added `model.vocab` token string (which, after round 5 finding 1,
+includes a template token matching one). Round 6 finding 1 changed this again: with the literal
+pass-through removed entirely, an `added_tokens` entry's own content *does* now reach
+`decodeToBytes` like every other token, restoring "a malformed/unusual added token" as a genuinely
+reachable case alongside the plain-vocab one. The method's own javadoc was corrected to describe
+both currently-reachable cases and explicitly rule out the id-with-no-entry case.
+
+**`ByteLevelCodingTest.java`:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
+
+class ByteLevelCodingTest {
+
+  @Test
+  void spaceEncodesToGSubscriptCharacter() {
+    // The well-known GPT-2 encoding: byte 0x20 (space) maps to U+0120 ('Ġ').
+    assertEquals("Ġ", ByteLevelCoding.encode(" "));
+  }
+
+  @Test
+  void asciiLettersEncodeUnchanged() {
+    assertEquals("low", ByteLevelCoding.encode("low"));
+  }
+
+  @Test
+  void everyByteValueRoundTrips() {
+    byte[] allBytes = new byte[256];
+    for (int b = 0; b < 256; b++) {
+      allBytes[b] = (byte) b;
+    }
+    String encoded = ByteLevelCoding.encode(allBytes);
+    assertArrayEquals(allBytes, ByteLevelCoding.decodeToBytes(encoded));
+  }
+
+  @Test
+  void multiByteUtf8RoundTrips() {
+    byte[] utf8 = "héllo 中文".getBytes(StandardCharsets.UTF_8);
+    String encoded = ByteLevelCoding.encode(utf8);
+    assertArrayEquals(utf8, ByteLevelCoding.decodeToBytes(encoded));
+  }
+}
+```
+
+## Task 4: `TokenizerJson` — model records + Jackson loader
+
+**Step 4a — the model records:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** One entry from {@code tokenizer.json}'s {@code added_tokens} array. */
+public record AddedToken(int id, String content, boolean special) {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.Map;
+
+/** {@code tokenizer.json}'s {@code model} object, scoped to the byte-level-BPE fields this port uses. */
+public record BpeModelConfig(Map<String, Integer> vocab, Map<String, Integer> mergeRank, boolean ignoreMerges) {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.regex.Pattern;
+
+/** {@code tokenizer.json}'s {@code pre_tokenizer}, scoped to the {@code Split}+{@code ByteLevel} shape both target models use. */
+public record PreTokenizerConfig(Pattern splitPattern, boolean addPrefixSpace) {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** {@code tokenizer.json}'s {@code normalizer}: {@code null} (NONE) or {@code {"type": "NFC"}}. */
+public enum NormalizerKind {
+  NONE,
+  NFC
+}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** One step of a (possibly {@code Sequence}-wrapped) {@code post_processor}. */
+public sealed interface PostProcessorStep permits ByteLevelStep, TemplateProcessingStep {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** The {@code ByteLevel} post-processor step: a no-op on the token list (this port does not track offsets). */
+public record ByteLevelStep() implements PostProcessorStep {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.List;
+import java.util.Map;
+
+/** The {@code TemplateProcessing} post-processor step's {@code single} template. */
+public record TemplateProcessingStep(List<TemplateItem> single, Map<String, SpecialTokenInfo> specialTokens)
+    implements PostProcessorStep {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** One item of a {@code TemplateProcessing} template: either a literal special token or the real sequence. */
+public sealed interface TemplateItem permits SpecialTokenItem, SequenceItem {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** A {@code {"SpecialToken": {"id": "..."}}} template item, referencing a key into {@code specialTokens}. */
+public record SpecialTokenItem(String id) implements TemplateItem {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+/** A {@code {"Sequence": {"id": "A"}}} template item: splice in the real encoded token sequence here. */
+public record SequenceItem() implements TemplateItem {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.List;
+
+/** One entry of a {@code TemplateProcessing} step's {@code special_tokens} map. */
+public record SpecialTokenInfo(String id, List<Integer> ids, List<String> tokens) {}
+```
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.List;
+
+/** The parsed, byte-level-BPE-scoped contents of a {@code tokenizer.json} file. */
+public record TokenizerJson(
+    NormalizerKind normalizer,
+    PreTokenizerConfig preTokenizer,
+    List<PostProcessorStep> postProcessor,
+    BpeModelConfig model,
+    List<AddedToken> addedTokens) {}
+```
+
+**Step 4b — the loader** (`TokenizerJsonLoader`, a separate class from the `TokenizerJson` record
+itself, matching this codebase's own preference for small single-responsibility files):
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/** Parses a {@code tokenizer.json} file into a {@link TokenizerJson}. */
+public final class TokenizerJsonLoader {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private TokenizerJsonLoader() {}
+
+  /** Loads and parses {@code path} as a byte-level-BPE {@code tokenizer.json}. */
+  public static TokenizerJson load(Path path) {
+    Objects.requireNonNull(path, "TokenizerJsonLoader.load: path must not be null");
+    JsonNode root;
+    try {
+      root = MAPPER.readTree(Files.newInputStream(path));
+    } catch (IOException | JacksonException e) {
+      throw new TokenizerException("TokenizerJsonLoader.load: failed to parse " + path, e);
+    }
+    return new TokenizerJson(
+        parseNormalizer(root.path("normalizer")),
+        parsePreTokenizer(root.get("pre_tokenizer")),
+        parsePostProcessor(root.path("post_processor")),
+        parseModel(root.get("model")),
+        parseAddedTokens(root.path("added_tokens")));
+  }
+
+  private static NormalizerKind parseNormalizer(JsonNode node) {
+    if (node.isNull() || node.isMissingNode()) {
+      return NormalizerKind.NONE;
+    }
+    String type = node.path("type").asString("");
+    if ("NFC".equals(type)) {
+      return NormalizerKind.NFC;
+    }
+    throw new TokenizerException("TokenizerJsonLoader: unsupported normalizer type '" + type + "'");
+  }
+
+  private static PreTokenizerConfig parsePreTokenizer(JsonNode node) {
+    if (node == null || !"Sequence".equals(node.path("type").asString(""))) {
+      throw new TokenizerException("TokenizerJsonLoader: expected pre_tokenizer.type == 'Sequence'");
+    }
+    String regex = null;
+    boolean addPrefixSpace = false;
+    for (JsonNode step : node.get("pretokenizers")) {
+      String stepType = step.path("type").asString("");
+      if ("Split".equals(stepType)) {
+        regex = step.path("pattern").path("Regex").asString(null);
+      } else if ("ByteLevel".equals(stepType)) {
+        addPrefixSpace = step.path("add_prefix_space").asBoolean(false);
+      }
+    }
+    if (regex == null) {
+      throw new TokenizerException("TokenizerJsonLoader: pre_tokenizer.pretokenizers has no Split step");
+    }
+    return new PreTokenizerConfig(Pattern.compile(regex, Pattern.UNICODE_CHARACTER_CLASS), addPrefixSpace);
+  }
+
+  private static List<PostProcessorStep> parsePostProcessor(JsonNode node) {
+    List<PostProcessorStep> steps = new ArrayList<>();
+    if (node.isNull() || node.isMissingNode()) {
+      return steps;
+    }
+    String type = node.path("type").asString("");
+    if ("Sequence".equals(type)) {
+      for (JsonNode step : node.get("processors")) {
+        steps.add(parsePostProcessorStep(step));
+      }
+    } else {
+      steps.add(parsePostProcessorStep(node));
+    }
+    return steps;
+  }
+
+  private static PostProcessorStep parsePostProcessorStep(JsonNode node) {
+    String type = node.path("type").asString("");
+    if ("ByteLevel".equals(type)) {
+      return new ByteLevelStep();
+    }
+    if ("TemplateProcessing".equals(type)) {
+      List<TemplateItem> single = new ArrayList<>();
+      for (JsonNode item : node.get("single")) {
+        if (item.has("SpecialToken")) {
+          single.add(new SpecialTokenItem(item.path("SpecialToken").path("id").asString()));
+        } else if (item.has("Sequence")) {
+          single.add(new SequenceItem());
+        } else {
+          throw new TokenizerException("TokenizerJsonLoader: unrecognized TemplateProcessing item " + item);
+        }
+      }
+      Map<String, SpecialTokenInfo> specialTokens = new LinkedHashMap<>();
+      for (Map.Entry<String, JsonNode> entry : node.path("special_tokens").properties()) {
+        JsonNode v = entry.getValue();
+        List<Integer> ids = new ArrayList<>();
+        v.path("ids").forEach(idNode -> ids.add(idNode.asInt()));
+        List<String> tokens = new ArrayList<>();
+        v.path("tokens").forEach(tokenNode -> tokens.add(tokenNode.asString()));
+        specialTokens.put(entry.getKey(), new SpecialTokenInfo(v.path("id").asString(), ids, tokens));
+      }
+      return new TemplateProcessingStep(single, specialTokens);
+    }
+    throw new TokenizerException("TokenizerJsonLoader: unsupported post_processor step type '" + type + "'");
+  }
+
+  private static BpeModelConfig parseModel(JsonNode node) {
+    if (!"BPE".equals(node.path("type").asString(""))) {
+      throw new TokenizerException("TokenizerJsonLoader: expected model.type == 'BPE'");
+    }
+    Map<String, Integer> vocab = new HashMap<>();
+    for (Map.Entry<String, JsonNode> entry : node.path("vocab").properties()) {
+      vocab.put(entry.getKey(), entry.getValue().asInt());
+    }
+    Map<String, Integer> mergeRank = new HashMap<>();
+    int rank = 0;
+    for (JsonNode merge : node.path("merges")) {
+      mergeRank.put(merge.asString(), rank++);
+    }
+    boolean ignoreMerges = node.path("ignore_merges").asBoolean(false);
+    return new BpeModelConfig(vocab, mergeRank, ignoreMerges);
+  }
+
+  private static List<AddedToken> parseAddedTokens(JsonNode node) {
+    List<AddedToken> tokens = new ArrayList<>();
+    for (JsonNode entry : node) {
+      tokens.add(new AddedToken(
+          entry.path("id").asInt(), entry.path("content").asString(), entry.path("special").asBoolean(false)));
+    }
+    return tokens;
+  }
+}
+```
+
+**Amendment (PR #14 review, rounds 1-2): the listing above predates six fixes; left as originally
+written, per this repo's convention of amending rather than rewriting a merged plan wholesale.**
+
+- `load`'s `try`/`catch` originally wrapped only `MAPPER.readTree(...)`; every `parse*` call below
+  it ran outside the `try` block, so a Jackson-internal exception thrown from deep inside one of
+  them (e.g. calling `asString()` on a non-textual node) escaped `HfTokenizer.fromFile` unwrapped,
+  with no file path attached. The `try` block now wraps the whole method body.
+- `parseModel`'s merge-parsing loop originally called `merge.asString()` unconditionally, assuming
+  every element of `merges` is a single space-separated string. It now accepts both that format and
+  the two-element-array format (see the amendment two bullets above), and NPE-guards the array
+  case: `merge.get(1)` is `null` for a malformed 1-element array, and calling `.asString()` on that
+  null used to throw a raw, uncaught `NullPointerException` — now checked and rethrown as
+  `TokenizerException`.
+- That same loop originally used `mergeRank.put(...)`, so a duplicate pair (reachable once both
+  merge serializations can appear in one array) let whichever occurrence came *last* win, silently
+  downgrading an earlier pair's priority. `tokenizers` itself keeps the *first* occurrence; the loop
+  now uses `mergeRank.putIfAbsent(...)` to match. (Re-joining an array pair with a plain `" "`
+  separator is safe either way: byte `0x20` is never a byte-level-printable-range byte — the
+  printable range starts at `!` — so a literal space can never occur inside a byte-level symbol,
+  and can't collide with a merge's own delimiter.)
+- An empty `mergeRank` (e.g. `"merges": []`) originally parsed successfully into a `BpeModelConfig`
+  that `BpeMerger` would then silently degrade against — see `BpeMergerTest`'s own
+  `withoutIgnoreMergesAndNoMergeRulesEachByteStaysItsOwnSymbol` case, which documents exactly that
+  degradation. `parseModel` now throws if `mergeRank` ends up empty.
+- `parsePreTokenizer` originally collapsed the ordered `pretokenizers` array into an unordered
+  `(regex, addPrefixSpace)` pair by scanning for a `"Split"`-typed step and a `"ByteLevel"`-typed
+  step independently, ignoring `behavior`, `invert`, and `use_regex` entirely. A file with
+  `invert: true` (which flips which spans count as matches), a non-`"Isolated"` `behavior`, a
+  `use_regex: true` `ByteLevel` step, more than two steps, or the two steps in reversed order loaded
+  without complaint and then tokenized differently from HF with no diagnostic — exactly the
+  silent-divergence failure mode Global Constraint 5 warns about. `parsePreTokenizer` now requires
+  `pretokenizers` to be exactly `[Split, ByteLevel]` in that order, with `Split.behavior ==
+  "Isolated"`, `Split.invert == false`, and `ByteLevel.use_regex == false`, throwing
+  `TokenizerException` otherwise.
+- `TemplateProcessing`'s `special_tokens.*.ids`/`.tokens` arrays were parsed with no length check.
+  `PostProcessorApplier` (Task 10, amended below) pairs them positionally; an entry with mismatched
+  lengths let extra `ids` silently drop or, in the worst case (populated `ids` with an *empty*
+  `tokens`), made the whole special token vanish from a template's output with no error.
+  `parsePostProcessorStep` now throws if a `special_tokens` entry's `ids` and `tokens` lengths
+  differ.
+
+**Amendment (PR #14 review, round 3, finding 1): the bullet directly above is itself now stale.**
+A *both-empty* `ids`/`tokens` pair (`[]`/`[]`) passes an `ids.size() != tokens.size()` check (`0 ==
+0`) but still makes `PostProcessorApplier.applyTemplate` (Task 10, amended below) loop zero times
+over the special token -- silently vanishing it (e.g. a BOS token) exactly as the bullet above
+already worried about, just via a different empty/non-empty combination than "populated `ids` with
+an empty `tokens`" covers. Separately, `SpecialTokenInfo` is a public record and
+`PostProcessorApplier.apply` is public too, so a loader-only check is bypassable by any other
+caller. Both are fixed by moving the invariant into `SpecialTokenInfo`'s own compact constructor
+(`ids`/`tokens` must both be non-empty *and* equal-length, not just equal-length), which also
+defensively `List.copyOf`s both lists so a caller can't mutate them into an invalid state after
+construction (PR #14 review round 4, finding 10) -- see `SpecialTokenInfoTest.java`. The manual
+length check has been removed from `parsePostProcessorStep` (now dead code once the record enforces
+its own invariant unconditionally).
+
+**Amendment (PR #14 review, round 4): five more findings, none changing this method's code
+listing's overall shape but each closing a real silent-divergence gap.**
+
+- **Finding 1 (highest value): `Pattern.compile(regex, Pattern.UNICODE_CHARACTER_CLASS)` was
+  itself wrong, not merely under-verified as this plan's own Findings section originally flagged
+  it.** HF compiles this same regex with `onig` (the default `"onig"` cargo feature), whose
+  `\s`/`\S`/`\w`/`\d`/`\b` are ASCII-only -- exactly Java `Pattern`'s own default *without* the
+  flag. `Pattern.UNICODE_CHARACTER_CLASS` makes `\s` Unicode-aware instead (e.g. matching U+00A0
+  NBSP), diverging from HF on any input containing Unicode whitespace (pasted web text, French
+  typography, decoded `&nbsp;`) -- verified end-to-end against `"hi" + NBSP + NBSP + "there"`:
+  splitting it produces three chunks (`hi`, the two NBSPs merged into one chunk, `there`)
+  *without* the flag, matching onig, but a different split *with* it, since Unicode-aware `\s`
+  then treats the NBSPs as a whitespace boundary instead of two ordinary non-letter,
+  non-digit characters. The flag also buys nothing for `\p{L}` (Unicode-letter matching),
+  which is Unicode-scoped by definition regardless of this flag. Fixed by dropping the flag
+  entirely: `Pattern.compile(regex)`. `ByteLevelPreTokenizerTest`'s own `QWEN_REGEX` constant
+  carried the same flag and was fixed identically, since it had structurally masked this from ever
+  being caught by that suite. [Amended (PR #14 review, round 5, finding 10): the comment added above
+  `QWEN_REGEX` at the time named the wrong sibling test as the one demonstrating this divergence
+  (`zeroWidthMatchDoesNotEmitAnEmptyChunk`, an unrelated round-3 test about empty regex matches) --
+  the actual regression test added by this same fix is
+  `asciiOnlyWhitespaceClassMatchesOnigNotJavasUnicodeDefault`. Corrected the cross-reference.]
+- **Finding 3: five `model` fields -- `byte_fallback`, `dropout`, `unk_token`,
+  `continuing_subword_prefix`, `end_of_word_suffix` -- were read nowhere**, the same class of gap
+  the `decoder` fix above (round 3, finding 3) closed, left open on `model`. `byte_fallback: true`
+  loaded silently and only surfaced later as a `BpeMerger#merge` exception whose own message
+  admits the assumption was never checked; a `dropout` or non-null `unk_token` loaded and encoded
+  silently with different ids and no diagnostic at all. `parseModel` now calls a new
+  `requireInertModelFields` that throws unless all five are at the inert default verified absent
+  from both target models' real files (see this plan's Findings).
+- **Finding 4 (regression from round 3's own decoder fix): a missing or explicit-`null` `decoder`
+  now fails to load with a misleading message (`unsupported decoder type ''`).** `decoder` is
+  optional/nullable in HF's own serde -- `parseNormalizer` immediately above already tolerates
+  absent/null for exactly this reason -- but both committed fixtures happen to always declare one,
+  so no test caught this. `requireByteLevelDecoder` now checks `isMissingNode()`/`isNull()`
+  explicitly first and throws a message that says so, rather than defaulting to `ByteLevel`
+  (silently guessing the shape would be its own divergence) or reusing the type-mismatch message's
+  confusing empty-string type.
+- **Finding 7: `added_tokens` entries' `lstrip`/`rstrip`/`single_word`/`normalized` fields were
+  dropped without validation**, even though `AddedTokenSplitter`'s own javadoc already documents
+  that it implements none of them. A fine-tune's added token declaring `lstrip: true` loaded
+  cleanly and tokenized adjacent whitespace differently from HF with no diagnostic -- the same
+  class of gap as finding 3, one layer down. `parseAddedTokens` now calls a new
+  `requireNoStrippingOrSingleWordFlags` that throws if any of the four is `true`.
+- **Finding 8: `Split.behavior` defaulted to `"Isolated"` via `asString("Isolated")` instead of
+  being required**, inconsistent with `invert`, `use_regex`, and `pattern.Regex` in the same method,
+  none of which default. `behavior` isn't optional in HF's own serde, so a file omitting it loaded
+  as if it had declared the one supported value instead of failing loudly. Changed to
+  `asString(null)`, so an absent `behavior` now falls through to the same "unsupported behavior"
+  throw as an explicit non-`"Isolated"` value.
+
+**Amendment (PR #14 review, round 5): three more findings in the same method family.**
+
+- **Finding 6: `requireInertModelFields`'s `dropout` check (finding 3 above) rejected any
+  non-null/non-missing value, including an explicit `"dropout": 0.0`**, even though `0.0` is
+  semantically identical to null/absent (no dropout applied) -- `BpeMerger` has no dropout behavior
+  to diverge either way at exactly `0.0`. Changed to `dropout.asDouble(0.0) > 0.0`, so only a
+  genuinely positive value throws.
+- **Finding 5: the `normalized` rejection folded into `requireNoStrippingOrSingleWordFlags` (finding
+  7 above) had two problems, not one.** First, it fires even when `normalizer` is `NormalizerKind.NONE`
+  (true of the entire Llama-3 family, including this plan's own `llama3-style` fixture) -- but HF
+  only routes an added token through a normalization trie when a normalizer actually exists, so with
+  none configured, `normalized: true` vs `false` is a no-op distinction, not a real divergence from
+  `AddedTokenSplitter`'s un-implemented normalization. Second, `parseAddedTokens` read an absent
+  `normalized` via `.asBoolean(false)`, but HF's own serde default is actually `!special` (normalized
+  by default unless the token is special) -- so the strict check was silently bypassed in exactly the
+  case (a non-special token omitting `normalized`) where HF really would normalize it. Fixed by
+  extracting a separate `requireNoNormalization(entry, content, special, normalizer)` that only
+  throws when `normalizer != NormalizerKind.NONE && entry.path("normalized").asBoolean(!special)`;
+  `load` now computes `normalizer` before `parseAddedTokens` and threads it through.
+- **Finding 9: `requireByteLevelDecoder`'s `node == null` branch was dead code.** The sole call site
+  passes `root.path("decoder")`, and Jackson's `path()` (unlike `get()`, used for `pre_tokenizer`
+  above) never returns Java `null` -- only ever a real node or a `MissingNode`. Removed; the
+  `isMissingNode()`/`isNull()` checks already cover every reachable case.
+
+**Amendment (PR #14 review, round 5, finding 4): most of round 4's own validations above --
+`requireInertModelFields`'s five checks, the missing/`null`-decoder case, `added_tokens`'
+four flags, and `Split.behavior` required-vs-wrong -- shipped with no dedicated test, reachable only
+incidentally (if at all) through `HfTokenizerTest`'s handful of full-tokenizer fixtures.** A new
+`TokenizerJsonLoaderTest.java` now exercises `TokenizerJsonLoader.load` directly against small,
+inline-written minimal `tokenizer.json` files (one field varied per test, via a `@TempDir`-backed
+helper rather than a new named fixture file per case) covering: missing/`null`/wrong-type `decoder`;
+missing vs. wrong `Split.behavior`; each of `byte_fallback`/`dropout`/`unk_token`/
+`continuing_subword_prefix`/`end_of_word_suffix` (including that `dropout: 0.0` and an explicit
+`null` `continuing_subword_prefix` do *not* throw, per findings 5/6 below); and each of
+`added_tokens`' `lstrip`/`rstrip`/`single_word`/`normalized` flags (the last one crossed with
+`normalizer` presence/absence and `special` true/false, per finding 5). `VocabularyTest.java` gained
+a test asserting `maxKnownId()`'s value directly after a vacating collision (finding 7's own repro),
+not just `hasId`. `SpecialTokenInfoTest.java` gained a test that mutates the caller's `ids`/`tokens`
+lists after construction and asserts the stored record is unaffected, exercising round 4 finding
+10's `List.copyOf` defense directly rather than only relying on it never having been observed to
+break.
+
+**Amendment (PR #14 review, round 6): two more findings in this same method family, one of them a
+regression in round 5's own fix.**
+
+- **Finding 3 (medium): round 5 finding 6's own narrowed `dropout` check was too permissive.**
+  `dropout.asDouble(0.0) > 0.0` silently returns the default `0.0` for *any* node `asDouble` can't
+  coerce to a number at all, not just for a genuine `0.0` -- verified directly: `{"dropout":
+  {"p": 0.5}}`, `{"dropout": "half"}`, `{"dropout": [0.5]}`, and `{"dropout": -1.0}` were all
+  wrongly accepted, all four of which the *previous* (round-4) `!isNull() && !isMissingNode()`
+  check correctly rejected. Fixed by whitelisting only an exact numeric zero instead:
+  `!(dropout.isNumber() && dropout.doubleValue() == 0.0)`. New tests cover all four
+  previously-silently-accepted shapes, plus a negative number.
+- **Finding 5 (low): `requireNoNormalization`'s thrown message always said "has normalized=true"**,
+  even when the offending value came from the `!special` default (round 5 finding 5) rather than an
+  explicit field in the file -- so for a file with no `normalized` key at all, the message named a
+  field the file doesn't contain. Fixed by checking `normalizedNode.isMissingNode() ||
+  normalizedNode.isNull()` and wording the message accordingly ("normalized absent, which defaults
+  to true for a non-special added token" vs. "normalized=true").
+
+**Amendment (PR #14 review, round 7): three more findings in this same `parseModel`/`added_tokens`
+validation family.**
+
+- **Finding 2 (medium): `parseModel`'s `vocab` loop never rejected two different token strings
+  sharing one `model.vocab` id.** `Vocabulary`'s constructor copies `modelVocab` into `tokenToId`
+  wholesale (both colliding entries survive there) but builds `idToToken` via
+  `modelVocab.forEach((token, id) -> idToToken.put(id, token))`, so whichever token `HashMap`
+  happens to iterate last silently wins that id -- `idOf(firstToken)` and `idOf(secondToken)` both
+  still resolve, but `tokenOf(thatId)` only ever returns one of them, disagreeing with whichever
+  caller used the other string to encode. Unlike every other vocabulary contradiction this port
+  rejects (a template token conflicting with `baseVocabulary`, two template tokens conflicting with
+  each other, an `added_tokens` collision -- which `Vocabulary` resolves deterministically by
+  design, added-token-wins), this one was a genuinely malformed `model.vocab` with no rule to
+  resolve it by, and nothing caught it. `parseModel` now tracks `id -> token` as it builds `vocab`
+  and throws if a later entry's id already belongs to a different token string, mirroring
+  `HfTokenizer#requireInternallyConsistentTemplateTokens`'s own id/text contradiction check.
+  `TokenizerJsonLoaderTest.duplicateIdInModelVocabThrows` covers it.
+- **Finding 4 (low): `requireNoNormalization`'s round-6 message fix (finding 5 above) branched on
+  `isMissingNode()`/`isNull()`, but missed a third case -- present, but not coercible to a
+  boolean.** `normalizedNode.asBoolean(!special)` silently returns its default for *any* node it
+  can't coerce, not just an absent/null one -- the same `asDouble`-style defect round 6 finding 3
+  fixed for `dropout`, here for `asBoolean` instead. A value like `"normalized": "yes"` reaches the
+  same "would throw" branch as a literal `"normalized": true` but was reported by the "isNull ?
+  absent : true" branching as `"normalized=true"`, naming a boolean literal the file never wrote.
+  Fixed by checking `isBoolean()` first and adding a third message for the present-but-non-boolean
+  case, naming the actual value. `addedTokenNormalizedNonBooleanValueThrowsNamingTheActualValueNotTrueOrAbsent`
+  covers it, alongside new message-content assertions (not just `assertThrows`) on the two
+  already-existing branches -- finding 5, below.
+- **Finding 5 (low): neither round-6 message fix (finding 5 above) nor this round's finding 4 had a
+  test that actually pinned the message wording.** Both `addedTokenNormalizedTrueThrowsWhenANormalizerExists`
+  and `addedTokenNormalizedAbsentDefaultsToTrueForNonSpecialTokenAndStillThrows` only asserted
+  `TokenizerException.class`, so a revert to the pre-round-6 single message, or the pre-round-7
+  three-branch split collapsing back to two, would pass unnoticed -- unlike this port's other
+  message-sensitive fixes, which do assert content. Both tests now also assert
+  `getMessage().contains(...)` against the exact wording each branch is supposed to produce.
+
+Separately, `BpeModelConfig` and `TokenizerJson` (Step 4a, above) gained the same defensive-copy
+compact constructors `SpecialTokenInfo` (Task 4's finding-1 amendment) already has -- see the
+finding-3 amendment under Task 12, below, which covers all three records together since the
+motivating repro is `HfTokenizer`-shaped.
+
+**Amendment (PR #14 review, round 9): five more findings across `TokenizerJsonLoader` and
+`TemplateProcessingStep` (Step 4a), all fixed.**
+
+- **Finding 1 (medium): `added_tokens` was the one declaration source with no id<->content
+  bijection check.** `model.vocab` has one (round 7, finding 2, above) and `TemplateProcessing`
+  special tokens have one (`HfTokenizer#requireInternallyConsistentTemplateTokens`), but
+  `added_tokens` itself did not -- verified directly: `[{"id":100,"content":"<a>"},
+  {"id":100,"content":"<b>"}]` loaded cleanly, then `encode("<a>")` threw "no vocabulary entry for
+  token '<a>'" on perfectly valid input, because `AddedTokenSplitter` is built from every entry's
+  content and still split at `"<a>"` while `Vocabulary`'s added-token collision cleanup had already
+  vacated it in favor of `"<b>"`. The mirror case (one content under two different ids) loaded
+  cleanly and then made `decode` throw for an id the file itself declared. Fixed by a new
+  `requireInternallyConsistentAddedTokens`, mirroring `requireInternallyConsistentTemplateTokens`'s
+  own structure exactly, called once over the fully-built `List<AddedToken>` at the end of
+  `parseAddedTokens`.
+- **Finding 2 (medium): a `TemplateProcessing` step with a missing or empty `single` silently
+  discarded the entire encoded text, with no diagnostic.** Verified directly: a missing `single`
+  (parses to zero items) and an explicit `single: []` both made `encode("low", true)` return `[]`
+  instead of throwing -- `PostProcessorApplier#applyTemplate` rebuilds its whole output purely from
+  `step.single()`'s items, so a `single` with no `Sequence` item can never emit the real encoded
+  sequence under any `addSpecialTokens` setting (the same failure mode a `single` holding only
+  `SpecialToken` items reduces to once `addSpecialTokens=false` skips all of them too, or even
+  under `addSpecialTokens=true` if it never had a `Sequence` item to begin with). This is the
+  malformed-file route to exactly the failure round 8 finding 2's own test description named
+  ("clearing `single` made `apply` return an empty sequence") -- that fix closed the
+  post-construction-*mutation* route but left the *malformed-input* route open.
+  `TemplateProcessingStep`'s compact constructor (round 8, finding 2) now also requires at least
+  one `SequenceItem` in `single`, mirroring `SpecialTokenInfo`'s own precedent of validating a
+  vanishing-content invariant in the type itself.
+- **Finding 3 (low): the "reject non-boolean outright" principle (round 8, finding 3) was applied
+  only to `normalized`.** Every other `asBoolean(default)` guard in this class still failed open --
+  verified directly: `"lstrip": "yes"` and `"byte_fallback": "yes"` both loaded cleanly, each
+  defeating the very guard checking it, since neither string parses as the literal boolean `true`
+  and `asBoolean(false)` silently returns its `false` default for the unrecognized string. Same
+  exposure for `rstrip`, `single_word`, `pre_tokenizer` `Split.invert`, `pre_tokenizer`
+  `ByteLevel.use_regex`, and `model.ignore_merges` -- the last of which has no "must be false" guard
+  to defeat at all (it's a real config value), so a non-boolean there would silently flip
+  tokenization to whichever meaning `false` happens to mean, rather than merely bypassing a
+  validation. Fixed by a new shared `requireBoolean(node, field, description)` helper, called
+  before each of the six existing `asBoolean` guards above.
+- **Finding 4 (low): `added_tokens`' `id` was required present but never checked to actually be
+  integral, and `content` was never checked to actually be a string.** Verified directly:
+  `"id": "3"` (a JSON string) loads via `asInt()` as the coerced integer `3`, and `"id": 100.9`
+  loads as the silently truncated `100`; `{"content": 123}` becomes the stringified `"123"`. A
+  truncated or type-coerced id landing on one `model.vocab` already owns re-triggers the exact
+  collision-vacating behavior round 8 finding 1 was written to prevent. A genuinely non-coercible
+  value (`{}`, `"abc"`) already threw, but as a raw Jackson error wrapped into `load`'s generic
+  "failed to parse" message rather than `requireValidAddedTokenIdentity`'s own specific diagnostic.
+  Closed by adding `isString()`/`isIntegralNumber()` checks to that method.
+- **Finding 5 (low): `TemplateProcessingStep`'s round-8 `Map.copyOf(specialTokens)` discarded the
+  loader's own `LinkedHashMap` declaration order, and JDK immutable maps randomize their iteration
+  order per JVM run (not a bug -- a documented property).** Verified across four runs: the same
+  `LinkedHashMap` insertion order produced three different `Map.copyOf` iteration orders. Nothing
+  observable breaks today, since `requireInternallyConsistentTemplateTokens` rejects template
+  contradictions before iteration order matters to anything, but a future message-content
+  assertion over a multi-entry contradiction -- the exact direction round 8's own message-content
+  fixes push this suite in -- would flake on which entry's name lands in the thrown message. Fixed
+  by `Collections.unmodifiableMap(new LinkedHashMap<>(specialTokens))` instead, which keeps both
+  the defensive copy and the declaration order.
+
+New tests: `TokenizerJsonLoaderTest` gained `addedTokensSameIdDifferentContentThrows` /
+`addedTokensSameContentDifferentIdThrows` (finding 1), non-boolean variants of the existing
+`byte_fallback`/`lstrip`/`Split.invert`/`ByteLevel.use_regex`/`ignore_merges` tests (finding 3), and
+`addedTokenNonIntegralIdThrows` / `addedTokenStringIdThrows` / `addedTokenNonStringContentThrows`
+(finding 4). A new `TemplateProcessingStepTest.java` -- this type's first dedicated test file,
+mirroring `SpecialTokenInfoTest`'s role -- covers finding 2's invariant directly
+(`constructorThrowsWhenSingleIsEmpty`, `constructorThrowsWhenSingleHasOnlySpecialTokenItemsAndNoSequenceItem`,
+`doesNotThrowWhenSingleHasASequenceItemAlongsideSpecialTokenItems`) and finding 5's ordering fix
+(`constructorPreservesSpecialTokensInsertionOrder`).
+
+**`TokenizerJsonTest.java`** (against the synthetic fixtures from Task 14 — written here but only
+runnable once Task 14 lands; note the dependency in the commit message):
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+
+class TokenizerJsonTest {
+
+  private Path fixture(String name) {
+    return Path.of("src/test/resources/se/alipsa/jmlx/tokenizer/" + name);
+  }
+
+  @Test
+  void qwenStyleFixtureParsesNfcNormalizerAndByteLevelPostProcessor() {
+    TokenizerJson json = TokenizerJsonLoader.load(fixture("qwen-style.tokenizer.json"));
+    assertEquals(NormalizerKind.NFC, json.normalizer());
+    assertFalse(json.model().ignoreMerges());
+    assertEquals(1, json.postProcessor().size());
+    assertTrue(json.postProcessor().get(0) instanceof ByteLevelStep);
+  }
+
+  @Test
+  void llama3StyleFixtureParsesIgnoreMergesAndTemplateProcessing() {
+    TokenizerJson json = TokenizerJsonLoader.load(fixture("llama3-style.tokenizer.json"));
+    assertEquals(NormalizerKind.NONE, json.normalizer());
+    assertTrue(json.model().ignoreMerges());
+    assertEquals(2, json.postProcessor().size());
+    assertTrue(json.postProcessor().get(1) instanceof TemplateProcessingStep);
+  }
+}
+```
+
+## Task 5: `Vocabulary`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Token string ↔ id lookups, merging a BPE model's own vocab with the file's {@code added_tokens}. */
+public final class Vocabulary {
+
+  private final Map<String, Integer> tokenToId;
+  private final Map<Integer, String> idToToken;
+  private final Set<Integer> specialIds;
+
+  public Vocabulary(Map<String, Integer> modelVocab, List<AddedToken> addedTokens) {
+    Objects.requireNonNull(modelVocab, "Vocabulary: modelVocab must not be null");
+    Objects.requireNonNull(addedTokens, "Vocabulary: addedTokens must not be null");
+    this.tokenToId = new HashMap<>(modelVocab);
+    this.idToToken = new HashMap<>();
+    modelVocab.forEach((token, id) -> idToToken.put(id, token));
+    this.specialIds = new HashSet<>();
+    for (AddedToken t : addedTokens) {
+      tokenToId.put(t.content(), t.id());
+      idToToken.put(t.id(), t.content());
+      if (t.special()) {
+        specialIds.add(t.id());
+      }
+    }
+  }
+
+  /** Looks up a token string's id, throwing if it is not in the vocabulary. */
+  public int idOf(String token) {
+    Objects.requireNonNull(token, "Vocabulary.idOf: token must not be null");
+    Integer id = tokenToId.get(token);
+    if (id == null) {
+      throw new TokenizerException("Vocabulary.idOf: no vocabulary entry for token '" + token + "'");
+    }
+    return id;
+  }
+
+  /** Looks up an id's token string, throwing if it is not in the vocabulary. */
+  public String tokenOf(int id) {
+    String token = idToToken.get(id);
+    if (token == null) {
+      throw new TokenizerException("Vocabulary.tokenOf: no vocabulary entry for id " + id);
+    }
+    return token;
+  }
+
+  /** Whether {@code id} is one of the file's special (not just added) tokens. */
+  public boolean isSpecial(int id) {
+    return specialIds.contains(id);
+  }
+
+  /** Whether {@code token} exists in the vocabulary at all (used by {@code ignore_merges}). */
+  public boolean contains(String token) {
+    Objects.requireNonNull(token, "Vocabulary.contains: token must not be null");
+    return tokenToId.containsKey(token);
+  }
+}
+```
+
+**Amendment (PR #14 review, round 2): the constructor above under-specifies collision handling, and
+this plan's "no standalone test file" call below turned out wrong.** Two real gaps, both fixed:
+
+- The constructor's `tokenToId.put`/`idToToken.put` pair only ever *adds* an added token's own
+  entries; it never removes whatever the colliding id or token string previously pointed to. If an
+  added token's id collides with a *different* model-vocab token, `tokenToId` ends up with two
+  string keys mapping to the same id (the original plus the added one) while `idToToken` keeps only
+  the added one — so `idOf(originalToken)` still returns the id, but `tokenOf(that id)` no longer
+  returns `originalToken`. The symmetric case (an added token's *string* colliding with a different
+  model-vocab id) breaks the same invariant the other direction. The constructor now removes the
+  stale reverse-mapping on both an id collision and a token-string collision, so `idOf`/`tokenOf`
+  stay exact mutual inverses across any collision, not just consistent for the non-colliding case
+  this plan's snippet implicitly assumed.
+- `specialIds.add(t.id())` is also one-directional: if a *later* added token collides on the same id
+  as an *earlier* one and is not itself `special`, the id's entry in `specialIds` is never removed,
+  so `isSpecial` keeps reporting `true` for a token that is not special. The loop now does
+  `specialIds.add(t.id())`/`specialIds.remove(t.id())` based on the *current* occupant's `special`
+  flag, so `specialIds` always reflects whichever token currently owns the id.
+- A `maxKnownId()` accessor was added (the largest id assigned by either `modelVocab` or
+  `addedTokens`), for `HfTokenizer#decode` (Task 12, amended below) to distinguish a legitimately
+  above-vocab id from an in-range hole.
+- This plan's "no standalone test file" call turned out wrong once the collision-handling behavior
+  above needed exercising directly: `VocabularyTest.java` now covers both collision directions, the
+  `specialIds` pruning fix, and `maxKnownId()`, independent of whatever `HfTokenizerTest` happens to
+  reach through a real tokenizer.json fixture.
+
+**Amendment (PR #14 review, round 3, finding 5): the `specialIds` pruning above was itself
+one-directional.** The bullet above only prunes `specialIds` on the *id*-collision path (`if
+(t.special())`/`else`); the *token-string*-collision path a few lines earlier
+(`idToToken.remove(previousIdForToken)`) vacates an id from `idToToken` without touching
+`specialIds`, so `isSpecial(previousIdForToken)` can stay `true` even though
+`hasId(previousIdForToken)` is now `false` -- contradicting this class's own javadoc ("`specialIds`
+tracks whichever token currently occupies an id"). Fixed by also calling
+`specialIds.remove(previousIdForToken)` on that path.
+
+**Amendment (PR #14 review, round 4): two more findings.**
+
+- **Finding 6: `maxKnownId` counted an id the constructor itself vacated.** The `max` bullet above
+  tracked the running max incrementally as `modelVocab`/`addedTokens` were processed, including
+  `t.id()` on *every* iteration -- even one that a *later* collision then removes from `idToToken`.
+  E.g. `new Vocabulary(Map.of("a", 1, "b", 2), List.of(new AddedToken(1, "b", false)))` leaves
+  `hasId(2)` `false` (vacated by the id-1 added token reusing content `"b"`) but `maxKnownId()`
+  still `2` -- so `HfTokenizer#decode` treats this deliberately-unmapped id as an in-range hole
+  (throws) instead of the above-vocab case it should be indistinguishable from. Fixed by computing
+  `max` in one pass over the *final* `idToToken.keySet()` after the merge loop finishes, instead of
+  tracking it incrementally during the loop.
+- **Finding 2 (`HfTokenizer`, Task 12, amended below) needed a new `hasToken(String)` accessor** --
+  the mirror of `hasId`/`tokenOf`, for `HfTokenizer`'s `TemplateProcessing` conflict check to detect
+  a token *string* already claimed by a different id (not just an id already claiming a different
+  string, which `hasId`/`tokenOf` alone can check).
+
+**Amendment (PR #14 review, round 5, finding 7): `maxKnownId`'s own javadoc still described its
+pre-round-4 computation.** Finding 6 immediately above changed the computation itself (final-pass
+over `idToToken.keySet()`, not an incremental running max) but left the accessor's javadoc reading
+"The largest id assigned by either `modelVocab` or `addedTokens`" -- which is exactly the stale,
+incremental-max description finding 6 fixed *code* to no longer match, using the same
+`Map.of("a", 1, "b", 2)` + `AddedToken(1, "b", false)` repro (id `2` was briefly assigned but is not
+"the largest id" any more once vacated). Reworded to "The largest id with a vocabulary entry *after*
+collision cleanup" and cross-referenced to the constructor's own javadoc.
+
+**Amendment (PR #14 review, round 8, finding 5): `modelVocab`'s own id<->content bijection
+(mirroring `TokenizerJsonLoader`'s round-7 `model.vocab` check and `HfTokenizer`'s template-token
+check) was enforced only at the loader, not in `Vocabulary` itself**, even though this
+constructor's own javadoc promises `idOf`/`tokenOf` stay "exact mutual inverses." `Vocabulary` is
+public and constructed directly (every test in `VocabularyTest`, and potentially M3), so a
+loader-only check is bypassable. Fixed by the same check inside the constructor's own
+`modelVocab.forEach` loop, as a second, defense-in-depth line; the loader's own check stays too,
+for its better, file-specific message. **Amendment (PR #14 review, round 9, finding 6): that new
+check's guard, `existingToken != null && !existingToken.equals(token)`, had a dead second clause.**
+`modelVocab.forEach` iterates unique keys (it's a `Map`), so the only way `idToToken.put(id,
+token)` can return a non-null `existingToken` is when a *different* token key already claimed that
+id -- `existingToken.equals(token)` can never be true when `existingToken != null`, unlike the
+analogous list-based checks elsewhere (e.g. `requireInternallyConsistentTemplateTokens`,
+`requireInternallyConsistentAddedTokens` -- Task 4's own round-9 finding 1, above), where the
+input is a plain `List` and the exact same `(id, content)` pair really can appear twice without
+being a contradiction. Simplified to `if (existingToken != null)`, matching this codebase's own
+precedent of removing exactly this kind of unreachable defensive branch (round 4 finding 9, round
+7 finding 9). The structurally identical dead clause in `TokenizerJsonLoader#parseModel`'s own
+`model.vocab` check (round 7, finding 2, above) -- built the same way, over `JsonNode.properties()`,
+whose keys are likewise unique -- was not touched this round; noted here in case a future round
+wants it cleaned up too.
+
+## Task 6: `BpeMerger`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** The byte-level BPE merge algorithm: repeatedly applies the lowest-rank adjacent-pair merge. */
+public final class BpeMerger {
+
+  private final BpeModelConfig model;
+
+  public BpeMerger(BpeModelConfig model) {
+    this.model = Objects.requireNonNull(model, "BpeMerger: model must not be null");
+  }
+
+  /** Merges one byte-level-encoded pre-token chunk into its final BPE symbol sequence. */
+  public List<String> merge(String byteLevelWord) {
+    Objects.requireNonNull(byteLevelWord, "BpeMerger.merge: byteLevelWord must not be null");
+    if (model.ignoreMerges() && model.vocab().containsKey(byteLevelWord)) {
+      return List.of(byteLevelWord);
+    }
+    List<String> symbols = new ArrayList<>();
+    byteLevelWord.codePoints().forEach(cp -> symbols.add(new String(Character.toChars(cp))));
+    while (symbols.size() > 1) {
+      int bestRank = Integer.MAX_VALUE;
+      int bestIndex = -1;
+      for (int i = 0; i < symbols.size() - 1; i++) {
+        Integer rank = model.mergeRank().get(symbols.get(i) + " " + symbols.get(i + 1));
+        if (rank != null && rank < bestRank) {
+          bestRank = rank;
+          bestIndex = i;
+        }
+      }
+      if (bestIndex == -1) {
+        break;
+      }
+      String merged = symbols.get(bestIndex) + symbols.get(bestIndex + 1);
+      symbols.set(bestIndex, merged);
+      symbols.remove(bestIndex + 1);
+    }
+    for (String symbol : symbols) {
+      if (!model.vocab().containsKey(symbol)) {
+        throw new TokenizerException(
+            "BpeMerger.merge: merged symbol '" + symbol + "' has no vocabulary entry (byte_fallback"
+                + " is assumed false for this port's target models — see req/plans/phase5-m2-plan.md)");
+      }
+    }
+    return symbols;
+  }
+}
+```
+
+**`BpeMergerTest.java`:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class BpeMergerTest {
+
+  private static final Map<String, Integer> BASE_VOCAB =
+      Map.of("l", 0, "o", 1, "w", 2, "t", 3, "h", 4, "e", 5, "Ġ", 11, "lo", 12, "low", 13, "th", 14, "the", 15,
+          "Ġthe", 16);
+
+  private static final Map<String, Integer> MERGE_RANK =
+      Map.of("l o", 0, "lo w", 1, "t h", 2, "th e", 3, "Ġ the", 4);
+
+  @Test
+  void mergesLowestRankPairsInOrderUntilASingleSymbolRemains() {
+    BpeMerger merger = new BpeMerger(new BpeModelConfig(BASE_VOCAB, MERGE_RANK, false));
+    assertEquals(List.of("low"), merger.merge("low"));
+  }
+
+  @Test
+  void mergesAcrossFourSymbolsIncludingTheByteLevelSpaceMarker() {
+    BpeMerger merger = new BpeMerger(new BpeModelConfig(BASE_VOCAB, MERGE_RANK, false));
+    assertEquals(List.of("Ġthe"), merger.merge("Ġthe"));
+  }
+
+  @Test
+  void ignoreMergesShortCircuitsToAWholeVocabHitWithoutRunningTheMergeLoop() {
+    // Empty merge-rank table: without the ignore_merges shortcut, "low" could never merge past
+    // its three individual byte symbols. With it, the whole-word vocab hit wins directly.
+    BpeMerger merger = new BpeMerger(new BpeModelConfig(BASE_VOCAB, Map.of(), true));
+    assertEquals(List.of("low"), merger.merge("low"));
+  }
+
+  @Test
+  void withoutIgnoreMergesAndNoMergeRulesEachByteStaysItsOwnSymbol() {
+    BpeMerger merger = new BpeMerger(new BpeModelConfig(BASE_VOCAB, Map.of(), false));
+    assertEquals(List.of("l", "o", "w"), merger.merge("low"));
+  }
+}
+```
+
+## Task 7: `ByteLevelPreTokenizer`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+
+/** Splits normalized text into byte-level-encoded pre-token chunks via the model's Split regex. */
+public final class ByteLevelPreTokenizer {
+
+  private final PreTokenizerConfig config;
+
+  public ByteLevelPreTokenizer(PreTokenizerConfig config) {
+    this.config = Objects.requireNonNull(config, "ByteLevelPreTokenizer: config must not be null");
+  }
+
+  /** Splits {@code text} into byte-level-encoded chunks, one per regex match, in order. */
+  public List<String> split(String text) {
+    Objects.requireNonNull(text, "ByteLevelPreTokenizer.split: text must not be null");
+    String input = config.addPrefixSpace() && !text.isEmpty() && text.charAt(0) != ' ' ? " " + text : text;
+    List<String> chunks = new ArrayList<>();
+    Matcher matcher = config.splitPattern().matcher(input);
+    while (matcher.find()) {
+      chunks.add(ByteLevelCoding.encode(matcher.group()));
+    }
+    return chunks;
+  }
+}
+```
+
+**`ByteLevelPreTokenizerTest.java`:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+
+class ByteLevelPreTokenizerTest {
+
+  // The real Qwen2.5/Llama-3 regex (Qwen2.5's \p{N} variant), verified against each model's
+  // actual tokenizer.json — see this plan's Findings section.
+  private static final Pattern QWEN_REGEX = Pattern.compile(
+      "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*"
+          + "|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+",
+      Pattern.UNICODE_CHARACTER_CLASS);
+
+  @Test
+  void splitsWordAndLeadingSpaceIntoSeparateChunks() {
+    ByteLevelPreTokenizer pretokenizer = new ByteLevelPreTokenizer(new PreTokenizerConfig(QWEN_REGEX, false));
+    // "low the": "low" has no leading space; " the" is captured as one chunk with its leading space.
+    assertEquals(List.of("low", "Ġthe"), pretokenizer.split("low the"));
+  }
+
+  @Test
+  void contractionIsItsOwnChunk() {
+    ByteLevelPreTokenizer pretokenizer = new ByteLevelPreTokenizer(new PreTokenizerConfig(QWEN_REGEX, false));
+    assertEquals(List.of("it", "'s"), pretokenizer.split("it's"));
+  }
+}
+```
+
+**Amendment (PR #14 review, rounds 1-2): `split` above has two real bugs, the second introduced and
+then corrected across two review rounds on the same PR.**
+
+- `add_prefix_space` was applied once, to the whole `text`, before running the regex at all —
+  correct only when the regex produces a single match. HF's real pipeline runs `ByteLevel` *after*
+  `Split`, over each already-split piece independently, so every piece that doesn't already start
+  with a space gets its own prefix space, not just the first character of the whole input. `split`
+  now runs the regex over the unmodified `text` first and applies `add_prefix_space` per resulting
+  piece.
+- Round 1 of this PR's review flagged that `Matcher.find()` silently skips any span the regex
+  doesn't match, and the fix committed then made `split` throw `TokenizerException` on any such gap.
+  **Round 2 corrected that fix as over-strict relative to HF itself:** HF's `find_matches` trait
+  contract requires covering the whole string with contiguous, ordered slices, explicitly keeping
+  non-matching spans (tagged `is_match=false`) rather than discarding them, under
+  `SplitDelimiterBehavior::Isolated`. A file whose regex doesn't cover every character therefore
+  still tokenizes successfully under real HF, and this port hard-failing where HF wouldn't is itself
+  a fidelity bug, not a fix. `split` now emits an unmatched span as its own chunk instead of
+  throwing; a span that turns out to encode an unrepresentable symbol still surfaces loudly via
+  `BpeMerger.merge`'s existing no-vocabulary-entry check, so this isn't a return to the original
+  silent-drop behavior — it's matching HF's actual, looser contract instead of guessing at a
+  stricter one.
+
+## Task 8: `TextNormalizer`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.text.Normalizer;
+import java.util.Objects;
+
+/** Applies a {@code tokenizer.json} normalizer ({@code None} or {@code NFC}) to input text. */
+public final class TextNormalizer {
+
+  private TextNormalizer() {}
+
+  /** Normalizes {@code text} per {@code kind}. */
+  public static String normalize(NormalizerKind kind, String text) {
+    Objects.requireNonNull(kind, "TextNormalizer.normalize: kind must not be null");
+    Objects.requireNonNull(text, "TextNormalizer.normalize: text must not be null");
+    return switch (kind) {
+      case NONE -> text;
+      case NFC -> Normalizer.normalize(text, Normalizer.Form.NFC);
+    };
+  }
+}
+```
+
+**No standalone test file** — `java.text.Normalizer` is a JDK-tested implementation; this class adds
+one line of dispatch logic, exercised end-to-end by `HfTokenizerTest`'s Qwen-style fixture case.
+
+## Task 9: `AddedTokenSplitter`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/** Splits input text around literal added-token strings (longest-first, no lstrip/rstrip — see Findings). */
+public final class AddedTokenSplitter {
+
+  /** One segment of split input: either literal added-token text, or plain text needing full tokenization. */
+  public record Segment(String text, boolean isAddedToken) {}
+
+  private final Pattern addedTokenPattern;
+
+  public AddedTokenSplitter(List<AddedToken> addedTokens) {
+    Objects.requireNonNull(addedTokens, "AddedTokenSplitter: addedTokens must not be null");
+    if (addedTokens.isEmpty()) {
+      this.addedTokenPattern = null;
+      return;
+    }
+    String alternation = addedTokens.stream()
+        .map(AddedToken::content)
+        .sorted(Comparator.comparingInt(String::length).reversed())
+        .map(Pattern::quote)
+        .collect(Collectors.joining("|"));
+    this.addedTokenPattern = Pattern.compile(alternation);
+  }
+
+  /** Splits {@code text} into ordered segments, tagging which ones are literal added-token strings. */
+  public List<Segment> split(String text) {
+    Objects.requireNonNull(text, "AddedTokenSplitter.split: text must not be null");
+    List<Segment> segments = new ArrayList<>();
+    if (addedTokenPattern == null) {
+      if (!text.isEmpty()) {
+        segments.add(new Segment(text, false));
+      }
+      return segments;
+    }
+    Matcher matcher = addedTokenPattern.matcher(text);
+    int last = 0;
+    while (matcher.find()) {
+      if (matcher.start() > last) {
+        segments.add(new Segment(text.substring(last, matcher.start()), false));
+      }
+      segments.add(new Segment(matcher.group(), true));
+      last = matcher.end();
+    }
+    if (last < text.length()) {
+      segments.add(new Segment(text.substring(last), false));
+    }
+    return segments;
+  }
+}
+```
+
+**`AddedTokenSplitterTest.java`:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class AddedTokenSplitterTest {
+
+  private static final List<AddedToken> QWEN_ADDED_TOKENS =
+      List.of(new AddedToken(151644, "<|im_start|>", true), new AddedToken(151645, "<|im_end|>", true));
+
+  @Test
+  void splitsPlainTextAroundLiteralAddedTokens() {
+    AddedTokenSplitter splitter = new AddedTokenSplitter(QWEN_ADDED_TOKENS);
+    List<AddedTokenSplitter.Segment> segments = splitter.split("<|im_start|>user\nhi<|im_end|>");
+    assertEquals(
+        List.of(
+            new AddedTokenSplitter.Segment("<|im_start|>", true),
+            new AddedTokenSplitter.Segment("user\nhi", false),
+            new AddedTokenSplitter.Segment("<|im_end|>", true)),
+        segments);
+  }
+
+  @Test
+  void plainTextWithNoAddedTokensIsOneSegment() {
+    AddedTokenSplitter splitter = new AddedTokenSplitter(QWEN_ADDED_TOKENS);
+    assertEquals(List.of(new AddedTokenSplitter.Segment("hello world", false)), splitter.split("hello world"));
+  }
+}
+```
+
+## Task 10: `PostProcessorApplier`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Applies a {@code tokenizer.json} post-processor's steps to an already-encoded token-string list. */
+public final class PostProcessorApplier {
+
+  private PostProcessorApplier() {}
+
+  /** Applies every step in {@code steps} to {@code tokens} in order. */
+  public static List<String> apply(List<PostProcessorStep> steps, List<String> tokens, boolean addSpecialTokens) {
+    Objects.requireNonNull(steps, "PostProcessorApplier.apply: steps must not be null");
+    Objects.requireNonNull(tokens, "PostProcessorApplier.apply: tokens must not be null");
+    List<String> result = tokens;
+    for (PostProcessorStep step : steps) {
+      if (step instanceof TemplateProcessingStep template) {
+        result = applyTemplate(template, result, addSpecialTokens);
+      }
+      // ByteLevelStep is a no-op on the token list (see Findings: it only fixes up offsets, which
+      // this port does not track).
+    }
+    return result;
+  }
+
+  private static List<String> applyTemplate(TemplateProcessingStep step, List<String> tokens, boolean addSpecialTokens) {
+    List<String> out = new ArrayList<>();
+    for (TemplateItem item : step.single()) {
+      if (item instanceof SequenceItem) {
+        out.addAll(tokens);
+      } else if (item instanceof SpecialTokenItem special) {
+        if (addSpecialTokens) {
+          SpecialTokenInfo info = step.specialTokens().get(special.id());
+          if (info == null) {
+            throw new TokenizerException(
+                "PostProcessorApplier: template references unknown special token '" + special.id() + "'");
+          }
+          out.addAll(info.tokens());
+        }
+      }
+    }
+    return out;
+  }
+}
+```
+
+**`PostProcessorApplierTest.java`:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class PostProcessorApplierTest {
+
+  @Test
+  void byteLevelStepAloneIsANoOp() {
+    List<String> tokens = List.of("low", "Ġthe");
+    assertEquals(tokens, PostProcessorApplier.apply(List.of(new ByteLevelStep()), tokens, true));
+  }
+
+  @Test
+  void templateProcessingPrependsBosTokenWhenAddSpecialTokensIsTrue() {
+    var template = new TemplateProcessingStep(
+        List.of(new SpecialTokenItem("<|begin_of_text|>"), new SequenceItem()),
+        Map.of("<|begin_of_text|>", new SpecialTokenInfo("<|begin_of_text|>", List.of(128000),
+            List.of("<|begin_of_text|>"))));
+    List<String> tokens = List.of("low", "Ġthe");
+    assertEquals(
+        List.of("<|begin_of_text|>", "low", "Ġthe"),
+        PostProcessorApplier.apply(List.of(new ByteLevelStep(), template), tokens, true));
+  }
+
+  @Test
+  void templateProcessingOmitsBosTokenWhenAddSpecialTokensIsFalse() {
+    var template = new TemplateProcessingStep(
+        List.of(new SpecialTokenItem("<|begin_of_text|>"), new SequenceItem()),
+        Map.of("<|begin_of_text|>", new SpecialTokenInfo("<|begin_of_text|>", List.of(128000),
+            List.of("<|begin_of_text|>"))));
+    List<String> tokens = List.of("low", "Ġthe");
+    assertEquals(tokens, PostProcessorApplier.apply(List.of(template), tokens, false));
+  }
+}
+```
+
+**Amendment (PR #14 review, round 2): `apply` above discards a `SpecialTokenInfo` field it already
+parses, forcing a redundant lookup that can fail even when the original data didn't need it.**
+`TokenizerJsonLoader` (Task 4) parses a `TemplateProcessing` special token's own `ids` list, but the
+snippet above only ever reads `info.tokens()`, re-resolving each string back to an id later in
+`HfTokenizer.encode` via `Vocabulary.idOf`. That throws for any template special token present in
+`special_tokens` but missing from `model.vocab` + `added_tokens` — even though the correct id sat
+right there in the discarded `ids` list. `apply` now returns `List<ResolvedToken>` (a new
+`record ResolvedToken(String text, Integer id)`) instead of `List<String>`: a `SequenceItem`'s
+tokens carry a `null` id (still resolved later via `Vocabulary.idOf`), while a `SpecialTokenItem`'s
+tokens carry the `SpecialTokenInfo`'s own `ids` entry at the same index, used as-is. `HfTokenizer`
+(Task 12, amended below) is the only caller and was updated to match.
+
+**Amendment (PR #14 review, round 4, finding 9): the `i < specialIds.size() ? ... : null` ternary
+in `applyTemplate`'s loop is dead code, and worth removing rather than leaving as a trap.** Once
+`SpecialTokenInfo`'s own compact constructor (Task 4's finding-1 amendment, above) guarantees
+`ids.size() == tokens.size()`, `i < specialTokens.size()` (the loop bound) always implies `i <
+specialIds.size()` too, so the `: null` branch can never execute. Leaving it in place keeps a
+silent `id == null` path alive in the code -- re-triggering the exact `Vocabulary.idOf` fallback
+this amendment was written to remove -- if that invariant is ever loosened later without anyone
+noticing this ternary depends on it. Simplified to `specialIds.get(i)` directly.
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Decodes a list of token strings back to text, byte-decoding non-added tokens and passing added tokens through. */
+public final class ByteLevelDecoder {
+
+  private ByteLevelDecoder() {}
+
+  /**
+   * Decodes {@code tokens} to text. Consecutive non-added-token strings have their raw bytes
+   * concatenated before UTF-8 decoding (a multi-byte character can be split across token
+   * boundaries); added-token strings are literal text and pass through unchanged as their own
+   * segment, exactly as {@code Decoder.swift}'s {@code ByteLevelDecoder} does.
+   */
+  public static String decode(List<String> tokens, Set<String> addedTokenContents) {
+    Objects.requireNonNull(tokens, "ByteLevelDecoder.decode: tokens must not be null");
+    Objects.requireNonNull(addedTokenContents, "ByteLevelDecoder.decode: addedTokenContents must not be null");
+    StringBuilder out = new StringBuilder();
+    ByteArrayOutputStream pending = new ByteArrayOutputStream();
+    for (String token : tokens) {
+      if (addedTokenContents.contains(token)) {
+        out.append(new String(pending.toByteArray(), StandardCharsets.UTF_8));
+        pending.reset();
+        out.append(token);
+      } else {
+        pending.writeBytes(ByteLevelCoding.decodeToBytes(token));
+      }
+    }
+    out.append(new String(pending.toByteArray(), StandardCharsets.UTF_8));
+    return out.toString();
+  }
+}
+```
+
+**`ByteLevelDecoderTest.java`:**
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+class ByteLevelDecoderTest {
+
+  @Test
+  void decodesPlainByteLevelTokensBackToText() {
+    assertEquals("low the", ByteLevelDecoder.decode(List.of("low", "Ġthe"), Set.of()));
+  }
+
+  @Test
+  void addedTokensPassThroughLiterallyBetweenDecodedText() {
+    String result = ByteLevelDecoder.decode(
+        List.of("<|im_start|>", "Ġthe"), Set.of("<|im_start|>", "<|im_end|>"));
+    assertEquals("<|im_start|> the", result);
+  }
+
+  @Test
+  void multiByteCharacterSplitAcrossTwoTokensStillDecodesCorrectly() {
+    // "é" is 2 UTF-8 bytes (0xC3 0xA9); simulate them arriving as two separate BPE token pieces.
+    String piece1 = ByteLevelCoding.encode(new byte[] {(byte) 0xC3});
+    String piece2 = ByteLevelCoding.encode(new byte[] {(byte) 0xA9});
+    assertEquals("é", ByteLevelDecoder.decode(List.of(piece1, piece2), Set.of()));
+  }
+}
+```
+
+**Amendment (PR #14 review, round 6, finding 1): the literal-pass-through design above has no HF
+counterpart and was measured against the wrong reference implementation.** This class's own javadoc
+cited `Decoder.swift`'s `ByteLevelDecoder` (swift-transformers) -- the one class in this module not
+measured against HF's Rust source the rest of the plan holds itself to. Verified directly against
+`huggingface/tokenizers`: `TokenizerImpl::decode` resolves every id -- added-vocabulary or
+model-vocabulary, no distinction -- into one flat `Vec<String>` and passes all of it to `decoder
+.decode(tokens)`; `ByteLevel`'s own `decode_chain` then applies the *identical* per-character
+byte-level mapping (falling back to a token's own raw UTF-8 bytes per token on any unmapped
+character, exactly {@link ByteLevelCoding#decodeToBytes}'s round-5-finding-3 behavior) to every
+token, concatenating raw bytes across the *entire* sequence before one final `from_utf8_lossy` --
+there is no branch anywhere that treats an added token's string differently. For Qwen2.5's and
+Llama-3's real `added_tokens` (every one built from plain printable-ASCII characters, each already
+byte-level-identity-mapped) the two designs produce byte-identical output, which is why this was
+never caught by either target model's own round-trip tests. It stopped being purely theoretical
+after round 5 finding 1's fix, though: whether a *template* token gets byte-decoded or passed
+through literally now hinges entirely on `HfTokenizer`'s `hasToken` filter, making this branch
+load-bearing in a way it wasn't before. Fixed by removing the branch entirely -- `decode` now takes
+only `List<String> tokens`, accumulates every token's `ByteLevelCoding.decodeToBytes` output into
+one buffer, and converts it to a `String` once at the end, matching `decode_chain` exactly:
+
+```java
+public static String decode(List<String> tokens) {
+  Objects.requireNonNull(tokens, "ByteLevelDecoder.decode: tokens must not be null");
+  ByteArrayOutputStream pending = new ByteArrayOutputStream();
+  for (String token : tokens) {
+    pending.writeBytes(ByteLevelCoding.decodeToBytes(token));
+  }
+  return new String(pending.toByteArray(), StandardCharsets.UTF_8);
+}
+```
+
+`HfTokenizer`'s own `addedTokenContents` field (Task 12, below) is now entirely unused and removed
+along with it -- there is no longer anything for it to feed. `ByteLevelDecoderTest`'s
+`addedTokensPassThroughLiterallyBetweenDecodedText` test is renamed and repurposed to
+`specialTokenShapedStringDecodesToItselfSinceItIsAllPrintableAscii`, keeping the same input/output
+pair (still useful coverage: it shows the general byte-decode path reconstructs a real added
+token's content correctly, for the structural reason above -- not because of any special-casing).
+
+## Task 12: `HfTokenizer`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** A byte-level BPE tokenizer loaded from a {@code tokenizer.json} file. */
+public final class HfTokenizer {
+
+  private final TokenizerJson json;
+  private final Vocabulary vocabulary;
+  private final BpeMerger merger;
+  private final ByteLevelPreTokenizer pretokenizer;
+  private final AddedTokenSplitter addedTokenSplitter;
+  private final Set<String> addedTokenContents;
+
+  private HfTokenizer(TokenizerJson json) {
+    this.json = json;
+    this.vocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
+    this.merger = new BpeMerger(json.model());
+    this.pretokenizer = new ByteLevelPreTokenizer(json.preTokenizer());
+    this.addedTokenSplitter = new AddedTokenSplitter(json.addedTokens());
+    this.addedTokenContents = new HashSet<>();
+    json.addedTokens().forEach(t -> addedTokenContents.add(t.content()));
+  }
+
+  /** Loads a tokenizer from a {@code tokenizer.json} file. */
+  public static HfTokenizer fromFile(Path tokenizerJsonPath) {
+    Objects.requireNonNull(tokenizerJsonPath, "HfTokenizer.fromFile: tokenizerJsonPath must not be null");
+    return new HfTokenizer(TokenizerJsonLoader.load(tokenizerJsonPath));
+  }
+
+  /** Encodes {@code text} into token ids. */
+  public List<Integer> encode(String text, boolean addSpecialTokens) {
+    Objects.requireNonNull(text, "HfTokenizer.encode: text must not be null");
+    List<String> tokens = new ArrayList<>();
+    for (AddedTokenSplitter.Segment segment : addedTokenSplitter.split(text)) {
+      if (segment.isAddedToken()) {
+        tokens.add(segment.text());
+        continue;
+      }
+      String normalized = TextNormalizer.normalize(json.normalizer(), segment.text());
+      for (String chunk : pretokenizer.split(normalized)) {
+        tokens.addAll(merger.merge(chunk));
+      }
+    }
+    List<String> processed = PostProcessorApplier.apply(json.postProcessor(), tokens, addSpecialTokens);
+    List<Integer> ids = new ArrayList<>(processed.size());
+    for (String token : processed) {
+      ids.add(vocabulary.idOf(token));
+    }
+    return ids;
+  }
+
+  /** Decodes token ids back into text. */
+  public String decode(List<Integer> ids, boolean skipSpecialTokens) {
+    Objects.requireNonNull(ids, "HfTokenizer.decode: ids must not be null");
+    List<String> tokens = new ArrayList<>();
+    for (int id : ids) {
+      if (skipSpecialTokens && vocabulary.isSpecial(id)) {
+        continue;
+      }
+      tokens.add(vocabulary.tokenOf(id));
+    }
+    return ByteLevelDecoder.decode(tokens, addedTokenContents);
+  }
+}
+```
+
+**`HfTokenizerTest.java`** (end-to-end against both Task 14 fixtures):
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.nio.file.Path;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class HfTokenizerTest {
+
+  private Path fixture(String name) {
+    return Path.of("src/test/resources/se/alipsa/jmlx/tokenizer/" + name);
+  }
+
+  @Test
+  void qwenStyleEncodeDecodeRoundTrips() {
+    HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("qwen-style.tokenizer.json"));
+    List<Integer> ids = tokenizer.encode("low the", false);
+    assertEquals(List.of(13, 16), ids);
+    assertEquals("low the", tokenizer.decode(ids, false));
+  }
+
+  @Test
+  void llama3StylePrependsBosTokenWhenAddSpecialTokensIsTrue() {
+    HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("llama3-style.tokenizer.json"));
+    List<Integer> ids = tokenizer.encode("low the", true);
+    assertEquals(List.of(128000, 13, 16), ids);
+  }
+
+  @Test
+  void llama3StyleOmitsBosTokenWhenAddSpecialTokensIsFalse() {
+    HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("llama3-style.tokenizer.json"));
+    assertEquals(List.of(13, 16), tokenizer.encode("low the", false));
+  }
+
+  @Test
+  void decodeSkipsSpecialTokensWhenRequested() {
+    HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("llama3-style.tokenizer.json"));
+    List<Integer> ids = tokenizer.encode("low the", true);
+    assertEquals("low the", tokenizer.decode(ids, true));
+  }
+}
+```
+
+**Amendment (PR #14 review, rounds 1-2): both `encode` and `decode` above trusted their inputs in
+ways that could silently corrupt or drop tokens.** `encode`'s `for (String token : processed) { ids.add(vocabulary.idOf(token)); }`
+loop predates `PostProcessorApplier`'s `ResolvedToken` return type (Task 10, amended above); it now
+iterates `ResolvedToken`s and only falls back to `vocabulary.idOf(token.text())` when a token has no
+pre-resolved id (a `SequenceItem` token). A `SpecialTokenItem` token's id -- sourced from the
+tokenizer.json file's own `special_tokens.ids`, not a sampled model output -- is cross-checked against
+`vocabulary.hasId(id)` and throws if absent (finding 7): unlike a sampled logit, there is no legitimate
+reason for a file-declared special-token id to be missing from the vocabulary, and trusting it
+unchecked would bake a corrupt id into the encoded sequence that `decode` would then silently drop.
+`decode`'s `tokens.add(vocabulary.tokenOf(id))` unconditionally threw `TokenizerException` for *any*
+unrecognized id, which is too strict: e.g. Qwen2.5's `config.json` `vocab_size` (152064) exceeds its
+tokenizer vocab (151665), so a sampled logit can legitimately land in that gap, and a hard exception
+there would abort an entire generation loop over a normal, expected input. `decode` now checks
+`vocabulary.hasId(id)` first and, only when absent, skips ids above `Vocabulary#maxKnownId` (Task 7,
+amended above) while still throwing on an in-range hole -- indistinguishable from the above-vocab case
+by id value alone, but always a real bug (the wrong tokenizer for the checkpoint, a mis-parsed
+`added_tokens`, a `Vocabulary` bug) that must not be swept up by the same skip (finding 2). Both fixes
+are exercised by `HfTokenizerTest`'s `encodeThrowsWhenATemplateSpecialTokenIdHasNoVocabularyEntry`,
+`decodeSkipsAnAboveVocabIdInsteadOfAbortingTheWholeSequence`, and
+`decodeThrowsOnAnInRangeIdWithNoVocabularyEntryInsteadOfSilentlyDroppingIt` (the last two against a new
+`qwen-style-with-id-gap.tokenizer.json` fixture; the first against `llama3-style-bad-template-id.tokenizer.json`).
+
+**Amendment (PR #14 review round 3, undocumented at the time; superseded by round 4 below): the
+finding-7 cross-check above (`if (!vocabulary.hasId(id)) throw`) was itself too strict, rejecting
+`ResolvedToken`'s own documented legitimate case (a template id with no vocabulary entry anywhere).
+Round 3 narrowed it to `vocabulary.hasId(id) && !vocabulary.tokenOf(id).equals(token.text())`** --
+throw only when the id belongs to a *different* known token, not merely when it's unknown. This
+interim fix was never written up here (a process gap in itself), and round 4 (below) replaced it
+with a strictly more complete mechanism, so it is recorded here only for the historical record, not
+as a design still in effect.
+
+**Amendment (PR #14 review round 4, finding 2): round 3's check was still only one-directional, and
+neither round left `encode`/`decode` actually agreeing with each other.** Two failures verified
+end-to-end against round 3's code: (1) a template id absent from the vocabulary but whose *text*
+was already claimed by a *different* id (e.g. template says id 999999 for `"<|begin_of_text|>"`,
+while `model.vocab`/`added_tokens` already map `"<|begin_of_text|>"` to 128000) passed `encode`
+silently -- round 3 only checked "does this id belong to a different token," never "does this text
+belong to a different id." (2) Even a template id round 3 correctly accepted as legitimate (no
+vocabulary entry at all) was never actually *registered* anywhere: `encode` just baked the raw id
+into the output, so `decode` on that same id either silently vanished it (if the id landed above
+`maxKnownId`, indistinguishable from a legitimately sampled above-vocab id) or threw as a spurious
+in-range hole (if the id happened to be numerically below some unrelated larger id) -- `encode`
+accepting an id is not the same as `decode` being able to resolve it back.
+
+Both are fixed together by validating and registering every `TemplateProcessing` special token
+once, in the constructor, instead of per-call in `encode`:
+
+```java
+private HfTokenizer(TokenizerJson json) {
+  this.json = json;
+  Vocabulary baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
+  List<AddedToken> templateTokens = collectTemplateSpecialTokens(json.postProcessor());
+  requireNoTemplateVocabularyConflicts(templateTokens, baseVocabulary);
+  List<AddedToken> mergedAddedTokens = new ArrayList<>(json.addedTokens());
+  mergedAddedTokens.addAll(templateTokens);
+  this.vocabulary = new Vocabulary(json.model().vocab(), mergedAddedTokens);
+  // ... merger/pretokenizer as before; addedTokenSplitter stays scoped to json.addedTokens()
+  // (it splits raw input text, a mechanism HF keeps independent of TemplateProcessing's
+  // special_tokens); addedTokenContents is built from mergedAddedTokens instead, so
+  // ByteLevelDecoder passes a template-only special token through literally too.
+}
+```
+
+`collectTemplateSpecialTokens` walks every `TemplateProcessingStep`'s `specialTokens()` map and
+turns each `(ids[i], tokens[i])` pair into a synthetic `AddedToken(id, text, special = true)`.
+`requireNoTemplateVocabularyConflicts` checks each one against `baseVocabulary` in *both*
+directions -- `hasId(id) && !tokenOf(id).equals(text)` (round 3's check) *and* the new mirror,
+`hasToken(text) && idOf(text) != id` (needing `Vocabulary`'s new `hasToken`, Task 5's finding-6
+amendment above) -- and throws `TokenizerException` on either. Once validated, the template tokens
+are merged into the *same* `Vocabulary` instance `encode`/`decode` both use, via the existing
+added-token-collision machinery (Task 5) -- so a legitimate template-only id becomes a first-class,
+resolvable vocabulary entry instead of a value `encode` merely trusted and forgot. This is also why
+`encode`'s own per-token branch collapses to trusting `token.id()` outright (`ids.add(id != null ?
+id : vocabulary.idOf(token.text()))`): every non-null `ResolvedToken` id was already checked and
+registered by the time `encode` runs, so re-validating it there is checking for a scenario the
+constructor has already made unreachable. A genuine conflict now fails at *load* time
+(`HfTokenizer.fromFile`), not on the first `encode()` call -- a strictly earlier, clearer failure
+point.
+
+`llama3-style-template-id-absent-from-vocab.tokenizer.json` (Task 14) was corrected alongside this:
+its round-3 version didn't actually test its own name -- `"<|begin_of_text|>"` was present in both
+`model.vocab` and `added_tokens` under id 128000 while the template declared 999999 for it, which
+is the *mirror-conflict* case, not the "absent entirely" case the fixture name promised. Fixed by
+removing that token from the fixture's `model.vocab`/`added_tokens` entirely. Two new fixtures cover
+what it no longer does: `llama3-style-template-id-mirrors-a-different-id.tokenizer.json` (the
+mirror-conflict case, using the original fixture content) and
+`llama3-style-template-id-below-max-known-id.tokenizer.json` (the second failure mode above -- a
+template id below an unrelated `maxKnownId`, to prove the fix isn't specific to the above-vocab
+symptom).
+
+**Amendment (PR #14 review, round 5): the constructor above has two more real gaps, both regressing
+round 4's own encode/decode-agreement fix, plus one perf suggestion.**
+
+- **Finding 1 (highest value): `collectTemplateSpecialTokens` above hardcodes `special = true` for
+  *every* template-declared `(id, text)` pair, unconditionally**, even when that exact pair already
+  exists in `baseVocabulary` -- whether as a plain `model.vocab` entry or as a "real" `added_tokens`
+  entry that may itself declare `special: false`. Merging such a token in anyway re-registers it as
+  a brand-new special `AddedToken`, corrupting `addedTokenContents` (forcing literal pass-through
+  decode on what may be an ordinary vocab token) and `specialIds` (making `skipSpecialTokens=true`
+  wrongly drop a token `added_tokens` itself declared not special). Verified end-to-end: an
+  `added_tokens` entry `{id: 999999, content: "<|begin_of_text|>", special: false}` also named by a
+  template's `special_tokens` makes `decode(ids, true)` drop it, even though the file's own
+  `added_tokens` says it is not special. Fixed by collecting all template tokens and validating them
+  as before, but filtering to only the ones **absent** from `baseVocabulary`
+  (`!baseVocabulary.hasToken(t.content())`) before merging them into `mergedAddedTokens` -- an
+  already-known token is left exactly as `baseVocabulary` already has it, real `special` flag and
+  all.
+- **Finding 2: `requireNoTemplateVocabularyConflicts` only validates each template token against
+  `baseVocabulary`, never against the *other* template tokens in the same `templateTokens` list.**
+  Two `special_tokens` entries that independently pass the `baseVocabulary` check can still
+  contradict *each other* -- e.g. two different ids both claiming text `"<s>"`, or the same id
+  claiming two different texts -- and both repros were verified to reach `Vocabulary`'s own
+  last-added-wins collision cleanup, which resolves the contradiction silently (vacating one id or
+  text, no diagnostic) instead of failing loudly, reintroducing the exact encode/decode disagreement
+  finding 2 (round 4) closed, just via a different cause. This also meant the "every such id was
+  already checked against ... by construction" comment on `encode`'s trust of a `ResolvedToken`'s
+  pre-resolved id was no longer reliably true. Fixed by adding
+  `requireInternallyConsistentTemplateTokens(templateTokens)` -- checked before the
+  `baseVocabulary` conflict check, using two plain `HashMap`s (id→text, text→id) with
+  `putIfAbsent` to detect either direction of self-contradiction -- called unconditionally on every
+  non-empty `templateTokens` list. With this in place, `encode`'s comment is accurate again: no
+  further wording change was needed there.
+- **Finding 11 (suggestion, not a bug): the constructor built a full `Vocabulary` over
+  `model.vocab` twice** -- once for `baseVocabulary`, once more for the final `this.vocabulary` --
+  doubling the map-construction cost over Qwen2.5's/Llama-3's real ~150k/~128k-entry vocabularies
+  purely to validate against a scratch copy. Rather than duplicating `Vocabulary`'s own
+  collision-resolution logic to avoid a second construction (which would create a second place that
+  logic has to stay correct), the constructor now short-circuits: `baseVocabulary` is only built,
+  and the finding-1/finding-2 checks above only run, when `collectTemplateSpecialTokens` actually
+  returns at least one token. Qwen2.5's own `post_processor` has no `TemplateProcessing` step at
+  all, so this fully avoids the double construction for that model's real, much larger vocabulary;
+  Llama-3 (which does have one BOS template token) still pays the double-construction cost, judged
+  an acceptable one-time load-time cost rather than a correctness-relevant hot path.
+
+New fixtures cover findings 1 and 2:
+`llama3-style-template-token-matches-existing-added-token.tokenizer.json` (a template token matching
+an existing non-special `added_tokens` entry -- finding 1), and
+`llama3-style-two-template-tokens-share-text-with-different-ids.tokenizer.json` /
+`llama3-style-two-template-tokens-share-id-with-different-text.tokenizer.json` (the two directions
+of finding 2's self-contradiction, mirroring how round 4's own fixtures covered both directions of
+the `baseVocabulary` conflict check).
+
+**Amendment (PR #14 review, round 6): two more findings, one of them a real regression from round
+4's own `maxKnownId`-merging fix.**
+
+- **Finding 2 (medium): registering a template id into the same `Vocabulary` decode/encode both use
+  (round 4's own fix, above) interacts badly with `Vocabulary#maxKnownId`'s above-vocab skip
+  heuristic (round 4, finding 6) when the template id is a sparse outlier.** Verified end-to-end on
+  the shipped `llama3-style-template-id-absent-from-vocab.tokenizer.json` fixture, whose template
+  registers BOS as id `999999` while the real vocab tops out at `16`: `decode(200000)` and
+  `decode(999998)` both threw "in-range hole" instead of being skipped as legitimately above the
+  real vocab -- a single sparse template registration converted the *entire* range between the real
+  vocab's own top and that outlier into throwing holes, defeating the documented purpose of the skip
+  ("a sampled logit outside a checkpoint's trained vocab"). Fixed by tracking a separate
+  `baseVocabularyMaxKnownId` field -- computed from `baseVocabulary` (`model.vocab` + `added_tokens`
+  only, before template tokens are merged in) when there was a `baseVocabulary` to build, or
+  `this.vocabulary.maxKnownId()` directly when `templateTokens` was empty (in which case they're
+  identical anyway, per round 5 finding 11's short-circuit) -- and using that instead of
+  `vocabulary.maxKnownId()` in `decode`'s skip/throw check. The template id itself still resolves
+  correctly regardless, via `vocabulary.hasId`/`tokenOf`, since it's still merged into `this
+  .vocabulary` exactly as before; only the *skip-threshold* computation excludes it.
+- **Finding 4 (low): the round-5 finding-1 regression test only covered the `added_tokens` half of
+  the fix, not the plain-`model.vocab` half.** `templateSpecialTokenMatchingAnExistingNonSpecialAddedTokenKeepsItsRealSpecialFlag`
+  exercises a template token matching an existing `added_tokens` entry, but round 5 finding 1's own
+  filter (`!baseVocabulary.hasToken(t.content())`) applies identically to a template token matching
+  a *plain* `model.vocab` entry -- a case with no test at all, so a regression re-promoting such a
+  token to `special=true` would pass the suite untouched. Closed by a new
+  `llama3-style-template-token-matches-existing-model-vocab-entry.tokenizer.json` fixture (a
+  template naming id `15`/`"the"`, an ordinary `model.vocab` entry with no `added_tokens`
+  involvement at all) and `templateSpecialTokenMatchingAnExistingPlainModelVocabEntryKeepsItsRealSpecialFlag`,
+  asserting `decode(ids, true)` still includes `"the"` (`"thelow the"`) rather than silently
+  dropping it (`"low the"`, the regressed value) the way `skipSpecialTokens=true` would if the
+  token were wrongly promoted.
+
+**Amendment (PR #14 review, round 7): five more findings -- one investigated and pushed back on as
+inconsistent with an existing, deliberately-designed test rather than implemented; the rest fixed.**
+
+- **Finding 1 (medium, investigated -- not applied as suggested): "the `baseVocabularyMaxKnownId`
+  fix (round 6, finding 2, above) closed only one of two identical doors -- it excludes a sparse
+  *template*-declared outlier from the skip threshold, but not a sparse *`added_tokens`*-declared
+  one."** Verified on `llama3-style-template-id-below-max-known-id.tokenizer.json` (real
+  `model.vocab` tops at 16, one real `added_tokens` entry at id `128000`): `decode(50)` throws as an
+  in-range hole, even though 50 sits in the gap between the real vocab's top and that added token.
+  The suggested fix -- exclude sparse `added_tokens` ids from the threshold the same way template-only
+  ids already are -- was investigated and found to directly contradict an existing, deliberately
+  designed regression test: `HfTokenizerTest.decodeThrowsOnAnInRangeIdWithNoVocabularyEntryInsteadOfSilentlyDroppingIt`,
+  against `qwen-style-with-id-gap.tokenizer.json`, is *structurally identical* to this fixture --
+  a dense low vocab (0-19) plus one sparse `added_tokens` entry far above it (id 100, `"<|extra|>"`)
+  -- and its own PR #14-review provenance explicitly requires `decode(50)` there to *throw*, not
+  skip, specifically because a sparse `added_tokens` id is a first-class vocabulary declaration by
+  the file's own author (unlike a template-only `special_tokens` reference, which HF's own semantics
+  -- see `ResolvedToken`'s javadoc -- allow to name an id with no vocabulary entry anywhere else in
+  the file). Both fixtures cannot be resolved the same way without either regressing the qwen-style
+  test's own established intent or leaving this finding's fixture's `decode(50)` throwing as
+  "expected" rather than "a bug": the two suggested alternatives (a known-id *set* instead of a
+  *max*, or narrowing the threshold computation further) were examined and neither actually
+  distinguishes "a sparse `added_tokens` id declares a real, if oddly-numbered, extension of the
+  vocabulary" (the qwen-style-with-id-gap case, where the gap is a hole) from "a sparse
+  `added_tokens` id is itself an isolated, disconnected outlier" (this finding's case, where the gap
+  is claimed to be legitimate) without an extra signal this port's inputs don't carry.
+  **Withdrawn (PR #14 review, round 8, finding 7): this is not an open question left for a future
+  round to resolve -- both `decodeThrowsOnAnInRangeIdWithNoVocabularyEntryInsteadOfSilentlyDroppingIt`
+  and `decodeStillThrowsOnAGenuineInRangeHoleBelowTheThresholdOnATemplateBearingFixture` (finding 6,
+  below) are correct, permanent behavior, not provisional pending a decision.** The distinction that
+  settles it: an `added_tokens` entry is a first-class vocabulary declaration by the tokenizer
+  file's own author -- if it's sparse, that sparsity is the file's own claim about its vocabulary,
+  and a gap below it is exactly the kind of thing this port's "throw on an in-range hole" behavior
+  exists to catch (the wrong tokenizer for a checkpoint, a mis-parsed `added_tokens`, a `Vocabulary`
+  bug). A `TemplateProcessing.special_tokens` reference is not a vocabulary declaration at all --
+  it's a post-processor's *use* of an id, and HF's own semantics (`ResolvedToken`'s javadoc) let it
+  name an id with no vocabulary entry anywhere else in the file, which is why round 6 finding 2
+  correctly excluded it from the threshold and this finding's suggestion to extend that exclusion to
+  `added_tokens` too does not carry over. Recorded here, not just in this round's own findings list,
+  because this plan is what the code's own comments point back to -- a future round re-reading only
+  round 7's original text without this correction could otherwise reopen a settled question.
+- **Finding 3 (medium): `BpeModelConfig` and `TokenizerJson` never got the defensive-copy compact
+  constructor `SpecialTokenInfo` gained (Task 4's finding-1 amendment) for exactly the same
+  exposure.** `BpeMerger` holds a `BpeModelConfig` by reference and re-reads `model.vocab()`/`model
+  .mergeRank()` directly on every `merge` call rather than caching a snapshot, so a caller mutating
+  either map after constructing a `BpeModelConfig` directly (reachable in tests, and the one thing
+  that kept `HfTokenizer` from being provably immutable -- see finding 7, below) changed
+  tokenization mid-flight; `TokenizerJson` retains its `postProcessor`/`addedTokens` lists for
+  `HfTokenizer`'s entire lifetime with the same exposure. Both records now have a compact
+  constructor `Map.copyOf`/`List.copyOf`-ing the mutable fields (and `ignoreMerges`,
+  `normalizer`/`preTokenizer`/`model` are left uncopied, having no mutable-collection exposure of
+  their own).
+- **Finding 6 (low): the round-6 finding-2 regression test's second assertion was vacuous, and
+  nothing exercised the complementary "still throws" case on a template-bearing fixture.**
+  `decodeSkipsAnIdBetweenTheRealVocabTopAndASparseTemplateIdInsteadOfThrowingAsAHole` asserted
+  `decode(1000000)` skips, but `1000000` already exceeded the *pre-fix* threshold too (`999999`,
+  the template id itself), so it passed under the old, buggy code just as well -- only `decode(500)`
+  actually pinned the fix. Changed the second id to `999998` (below the old threshold, so it only
+  skips under the fixed `baseVocabularyMaxKnownId`). Separately, added
+  `decodeStillThrowsOnAGenuineInRangeHoleBelowTheThresholdOnATemplateBearingFixture`, using
+  `llama3-style-template-id-below-max-known-id.tokenizer.json` (a template-bearing fixture whose
+  `baseVocabularyMaxKnownId` is 128000, from a real `added_tokens` entry, not the tiny real
+  `model.vocab`'s own top of 16) to assert `decode(50)` still throws -- the complementary half
+  finding 1, above, investigates further.
+- **Finding 7 (low): `HfTokenizer`'s thread-safety was real (every field final, no shared mutable
+  state, `Matcher`/etc. allocated per call) but undocumented**, worth stating for M3's model-serving
+  loop. Added to the class javadoc, now safe to state unconditionally once finding 3's defensive
+  copies close the one remaining way an external caller could still mutate shared state after
+  construction.
+- **Finding 8 (low): `decode`'s own javadoc linked `{@link #baseVocabularyMaxKnownId}`, a private
+  field, which does not resolve in generated public javadoc.** Reworded in prose instead, restoring
+  a link to the public `Vocabulary#maxKnownId()` concept it's approximating.
+- **Finding 9 (low): the constructor's `int baseMaxKnownId` used a `-1` sentinel whose meaning
+  depended on the final assignment's ternary re-testing `templateTokens.isEmpty()` a second time,
+  not on the sentinel value itself** -- a refactor that dropped that redundant ternary and read the
+  sentinel directly would have silently substituted `-1` for the real threshold, making every
+  non-negative id skip instead of throwing on a genuine hole (an empty-looking decode with no
+  diagnostic). Replaced with a nullable `Vocabulary baseVocabulary` local: `null` means "not built,"
+  read directly by the final assignment, with no parallel condition to drift out of sync.
+
+**Amendment (PR #14 review, round 8): six more findings, all fixed, plus finding 7's withdrawal of
+round 7 finding 1 recorded above and finding 8's noted-but-not-acted-on performance observation.**
+
+- **Finding 1 (medium): `parseAddedTokens` never validated that an `added_tokens` entry actually
+  has `content`/`id` at all.** Verified directly against this port's pinned Jackson version:
+  `entry.path("content").asString()` returns `""` for a missing or `null` node, and `AddedTokenSplitter`
+  compiles every added token's content via `Pattern.quote` into one alternation regex -- an empty
+  pattern matches at every position, so a missing/empty `content` silently interleaved the token's
+  id between every character of the input and left every character unmerged, while `decode` still
+  round-tripped the original text (a passing round-trip assertion hiding garbage encode ids).
+  Separately, `entry.path("id").asInt()` silently defaults to `0` for a missing `id`, and
+  `Vocabulary`'s own added-token collision cleanup then vacates whatever real `model.vocab` token
+  currently owns id `0`, making it permanently un-encodable with no diagnostic at either site. Fixed
+  by a new `requireValidAddedTokenIdentity`, called first in `parseAddedTokens`'s loop, alongside
+  the presence/type validation already there for `byte_fallback`/`dropout`/`unk_token`/`lstrip`/
+  `rstrip`/`single_word`/`normalized`.
+- **Finding 2 (medium): `TemplateProcessingStep` was the one loader-produced value type still
+  holding live, caller-mutable collections.** `TokenizerJson`'s own `List.copyOf(postProcessor)`
+  (round 7's own fix) is shallow -- it freezes the outer list, not the `TemplateProcessingStep`
+  instances inside it -- so a caller clearing a step's `single` list or removing a `specialTokens`
+  entry after loading still corrupted `PostProcessorApplier#apply` for every subsequent `encode`
+  call, verified through public API only: clearing `single` made `apply` return an empty sequence
+  instead of the real one, and removing a `specialTokens` entry turned a valid template into
+  `apply`'s "references unknown special token" throw. This also falsified two claims made in round
+  7's own amendments -- `HfTokenizer`'s class javadoc ("every instance field is immutable once
+  construction finishes") and finding 3's own text above ("the one remaining way an external caller
+  could still mutate shared state") -- both restored to true now that `TemplateProcessingStep` has
+  the same compact-constructor treatment `SpecialTokenInfo`/`BpeModelConfig`/`TokenizerJson` already
+  had.
+- **Finding 3 (low): non-boolean `normalized` values had two remaining problems even after round 7
+  finding 4's three-branch message fix.** Verified against the pinned Jackson version:
+  `"normalized": "true"` and `"normalized": 1` both coerce to boolean `true` regardless of the
+  `!special` default (Jackson's `asBoolean` parses literal `"true"`/`"false"` text, unlike
+  `asDouble`'s purely-numeric coercion), reaching the old "normalized=true" branch even for a
+  *special* token, where that branch's "defaults to true for a non-special added token" wording is
+  false on both counts (it isn't a default, and the token isn't non-special); and `"normalized":
+  "false"` / `"normalized": 0` coerce to `false` regardless of default, so the guard never fired at
+  all -- silently bypassing this validation for a file HF's own strictly-typed serde would itself
+  reject. Fixed by rejecting any present, non-boolean `normalized` value outright, before even
+  considering what it would coerce to -- closing both problems at once and removing the need for the
+  round-7 message's parenthetical, per the reasoning that unlike `dropout`'s numeric `0.0`, there is
+  no non-boolean `normalized` value this port can call semantically equivalent to a real boolean.
+- **Finding 4 (low): the round-7 defensive-copy fixes for `BpeModelConfig` and `TokenizerJson` had
+  no test of their own** -- reverting either compact constructor to a bare assignment would have
+  passed the whole suite untouched, unlike `SpecialTokenInfo`'s own round-5 copy, which
+  `SpecialTokenInfoTest` already pins. Closed by
+  `BpeMergerTest.mutatingTheVocabOrMergeRankMapAfterConstructionDoesNotAffectAnAlreadyBuiltBpeModelConfig`
+  (mutating the source maps after constructing a `BpeModelConfig`, then asserting `BpeMerger` still
+  merges as if they hadn't changed -- the repro `BpeModelConfig`'s own javadoc already cited) and
+  `TokenizerJsonTest.mutatingThePostProcessorOrAddedTokensListAfterConstructionDoesNotAffectTheStoredJson`
+  (constructing a `TokenizerJson` directly, since the loader itself never retains a reference to the
+  lists it builds).
+- **Finding 5 (low): the `model.vocab` duplicate-id invariant (round 7 finding 2) was enforced only
+  at `TokenizerJsonLoader`, not in `Vocabulary` itself**, even though the constructor's own javadoc
+  promises `idOf`/`tokenOf` stay "exact mutual inverses" -- verified directly: `new
+  Vocabulary(Map.of("a", 5, "b", 5), List.of())` still let `idOf("a")` and `idOf("b")` both resolve
+  to `5` while `tokenOf(5)` returned only whichever token `HashMap` iteration happened to visit last.
+  `Vocabulary` is public and constructed directly (every test in `VocabularyTest`, and potentially
+  M3 if it ever builds a vocabulary from something other than a `tokenizer.json`), so a loader-only
+  check is bypassable. `SpecialTokenInfo` adopted the opposite standard explicitly in round 3
+  ("Validating here, not just at the `TokenizerJsonLoader` call site..."); `Vocabulary`'s own
+  constructor now does the same, as a second, defense-in-depth line -- the loader's own check stays
+  too, for its better, file-specific message.
+- **Finding 6 (low): `duplicateIdInModelVocabThrows` (round 7's own new test) asserted only the
+  exception type**, unlike the round-7 `normalized`-message tests added in the same diff. Added
+  `assertTrue(e.getMessage().contains("id 0 for both"))`.
+
+Separately, **finding 8 (suggestion, not acted on): parsing/wrapping a full-size `model.vocab`
+builds roughly five full-vocab-sized maps** -- `parseModel`'s own `vocab` and its
+validation-only `vocabTokenById` (discarded once the loop ends), `BpeModelConfig`'s
+`Map.copyOf(vocab)`, and `Vocabulary`'s `tokenToId`/`idToToken` -- where `Vocabulary`'s own
+`idToToken` is exactly the inverse map `parseModel` already built and threw away. Noted because
+round 5 finding 11 established double `Vocabulary` construction as a cost worth avoiding, but
+weighed differently here: finding 11's fix was a wasted construction that Qwen2.5's own file shape
+(no `TemplateProcessing` step) let the constructor skip *entirely* for free. This finding's five
+maps are each used for something real (loader-side validation with a good message, `BpeModelConfig`'s
+own immutability guarantee, `Vocabulary`'s actual inverse lookup) and are paid by both target models
+unconditionally, at model-load time, not on any per-token hot path -- avoiding them would mean
+threading the loader's already-validated inverse map through `BpeModelConfig` and into `Vocabulary`'s
+constructor, coupling three classes this port otherwise keeps deliberately separate (see this
+plan's own preference for small single-responsibility types) to save a one-time, sub-second cost
+even at Qwen2.5's ~150k-entry scale. Left as-is; revisit only if model-load latency is ever actually
+measured and found to matter.
+
+## Task 13: `ChatTemplateRenderer`
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import se.alipsa.hfjinja.HfJinjaException;
+import se.alipsa.hfjinja.Template;
+
+/** Renders a Hugging Face {@code chat_template} Jinja string via {@code hfjinja}. */
+public final class ChatTemplateRenderer {
+
+  private ChatTemplateRenderer() {}
+
+  /**
+   * Renders {@code chatTemplate} against the standard HF chat-template context variables, plus any
+   * caller-supplied {@code extraContext} (e.g. {@code tools} for tool-calling templates) merged in
+   * underneath the fixed keys below.
+   */
+  public static String render(
+      String chatTemplate,
+      List<Map<String, Object>> messages,
+      boolean addGenerationPrompt,
+      String bosToken,
+      String eosToken,
+      Map<String, Object> extraContext) {
+    Objects.requireNonNull(chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
+    Objects.requireNonNull(messages, "ChatTemplateRenderer.render: messages must not be null");
+    Objects.requireNonNull(extraContext, "ChatTemplateRenderer.render: extraContext must not be null");
+    Map<String, Object> context = new HashMap<>(extraContext);
+    context.put("messages", messages);
+    context.put("add_generation_prompt", addGenerationPrompt);
+    context.put("bos_token", bosToken);
+    context.put("eos_token", eosToken);
+    try {
+      return Template.parse(chatTemplate).render(context);
+    } catch (HfJinjaException e) {
+      throw new TokenizerException("ChatTemplateRenderer.render: failed to render chat template", e);
+    }
+  }
+}
+```
+
+**`ChatTemplateRendererTest.java`** (against the two real chat templates captured in Task 14):
+
+```java
+package se.alipsa.jmlx.tokenizer;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class ChatTemplateRendererTest {
+
+  private String readFixture(String name) throws IOException {
+    return Files.readString(Path.of("src/test/resources/se/alipsa/jmlx/tokenizer/" + name));
+  }
+
+  @Test
+  void llama3TemplateWrapsMessagesWithHeaderTagsAndBosToken() throws IOException {
+    String template = readFixture("llama3-instruct-chat-template.jinja");
+    String result = ChatTemplateRenderer.render(
+        template,
+        List.of(Map.of("role", "user", "content", "Hello")),
+        true,
+        "<|begin_of_text|>",
+        "<|eot_id|>",
+        Map.of());
+    assertTrue(result.startsWith("<|begin_of_text|>"));
+    assertTrue(result.contains("<|start_header_id|>user<|end_header_id|>"));
+    assertTrue(result.endsWith("<|start_header_id|>assistant<|end_header_id|>\n\n"));
+  }
+
+  @Test
+  void qwenTemplateInsertsDefaultSystemPromptWhenNoneProvided() throws IOException {
+    String template = readFixture("qwen2.5-instruct-chat-template.jinja");
+    String result = ChatTemplateRenderer.render(
+        template, List.of(Map.of("role", "user", "content", "Hello")), true, null, "<|im_end|>", Map.of());
+    assertTrue(result.contains("You are Qwen, created by Alibaba Cloud."));
+    assertTrue(result.contains("<|im_start|>user\nHello<|im_end|>"));
+    assertTrue(result.endsWith("<|im_start|>assistant\n"));
+  }
+}
+```
+
+## Task 14: Test fixtures
+
+**Step 14a — `qwen-style.tokenizer.json`** (small, hand-built; encode/decode results are hand-traced
+in this plan's Findings-derived design, not asserted blindly):
+
+```json
+{
+  "normalizer": {"type": "NFC"},
+  "pre_tokenizer": {
+    "type": "Sequence",
+    "pretokenizers": [
+      {"type": "Split", "pattern": {"Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"}, "behavior": "Isolated", "invert": false},
+      {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": false}
+    ]
+  },
+  "post_processor": {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": false},
+  "decoder": {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": false},
+  "model": {
+    "type": "BPE",
+    "ignore_merges": false,
+    "vocab": {"l": 0, "o": 1, "w": 2, "t": 3, "h": 4, "e": 5, "n": 6, "s": 7, "r": 8, "i": 9, "d": 10,
+      "Ġ": 11, "lo": 12, "low": 13, "th": 14, "the": 15, "Ġthe": 16, "<|endoftext|>": 17,
+      "<|im_start|>": 18, "<|im_end|>": 19},
+    "merges": ["l o", "lo w", "t h", "th e", "Ġ the"]
+  },
+  "added_tokens": [
+    {"id": 17, "content": "<|endoftext|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false},
+    {"id": 18, "content": "<|im_start|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false},
+    {"id": 19, "content": "<|im_end|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false}
+  ]
+}
+```
+
+**Step 14b — `llama3-style.tokenizer.json`** (same base vocab/merges, `ignore_merges: true`, and a
+`Sequence[ByteLevel, TemplateProcessing]` post-processor prepending a BOS token):
+
+```json
+{
+  "normalizer": null,
+  "pre_tokenizer": {
+    "type": "Sequence",
+    "pretokenizers": [
+      {"type": "Split", "pattern": {"Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"}, "behavior": "Isolated", "invert": false},
+      {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": true, "use_regex": false}
+    ]
+  },
+  "post_processor": {
+    "type": "Sequence",
+    "processors": [
+      {"type": "ByteLevel", "add_prefix_space": true, "trim_offsets": false, "use_regex": true},
+      {"type": "TemplateProcessing",
+        "single": [{"SpecialToken": {"id": "<|begin_of_text|>", "type_id": 0}}, {"Sequence": {"id": "A", "type_id": 0}}],
+        "special_tokens": {"<|begin_of_text|>": {"id": "<|begin_of_text|>", "ids": [128000], "tokens": ["<|begin_of_text|>"]}}}
+    ]
+  },
+  "decoder": {"type": "ByteLevel", "add_prefix_space": true, "trim_offsets": true, "use_regex": true},
+  "model": {
+    "type": "BPE",
+    "ignore_merges": true,
+    "vocab": {"l": 0, "o": 1, "w": 2, "t": 3, "h": 4, "e": 5, "n": 6, "s": 7, "r": 8, "i": 9, "d": 10,
+      "Ġ": 11, "lo": 12, "low": 13, "th": 14, "the": 15, "Ġthe": 16, "<|begin_of_text|>": 128000},
+    "merges": ["l o", "lo w", "t h", "th e", "Ġ the"]
+  },
+  "added_tokens": [
+    {"id": 128000, "content": "<|begin_of_text|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false}
+  ]
+}
+```
+
+**Step 14c — `qwen2.5-instruct-chat-template.jinja`**: the exact, byte-verbatim `chat_template` field
+fetched from `Qwen/Qwen2.5-0.5B-Instruct/raw/main/tokenizer_config.json` — copy the raw string value
+directly (do not retype it by hand; extract it with a small script, e.g.
+`python3 -c "import json; print(json.load(open('tokenizer_config.json'))['chat_template'])"` against
+a freshly-downloaded copy, to guarantee byte-fidelity) into this file with no reformatting.
+
+**Step 14d — `llama3-instruct-chat-template.jinja`**: same extraction approach, against
+`NousResearch/Meta-Llama-3-8B-Instruct/raw/main/tokenizer_config.json` (an ungated re-upload of
+`meta-llama/Meta-Llama-3-8B-Instruct`'s own tokenizer files, used only because the gated original
+requires an interactive license-acceptance step; the content is Meta's own, unmodified). If gated
+access is available at implementation time, prefer fetching directly from `meta-llama`'s own repo and
+note in the commit message which source was used.
+
+```bash
+git add jmlx-tokenizer/src/test/resources
+git commit -m "Add tokenizer test fixtures (synthetic tokenizer.json + real chat templates)"
+```
+
+## Task 15: Documentation
+
+- `CLAUDE.md`'s Architecture diagram: add a `jmlx-tokenizer` row (`se.alipsa.jmlx.tokenizer` —
+  `HfTokenizer`, `ChatTemplateRenderer`, and the byte-level-BPE pipeline classes), noting it has **no**
+  native dependency and does not participate in the "loading order matters" native-guard discussion at
+  all — the first pure-Java module in this codebase.
+- `req/phase5-plan.md`'s Status table: flip M2's row from "Desk-research spike done... architecture
+  choice still open" to `Done` (or `In progress` if implemented across multiple sittings), recording
+  the module (`jmlx-tokenizer`), the chosen architecture (pure-Java, not FFM), and the dependencies
+  added (Jackson 3.1.2, hfjinja 0.5.0, both resolved via `mavenLocal()` \[Amended, PR #14 review
+  round 4, finding 11: both actually resolve from `mavenCentral()` directly -- `mavenLocal()` is
+  enabled alongside it only because `jmlx`'s own project version is a `-SNAPSHOT`; see Task 1's
+  Step 1c amendment above and `req/phase5-plan.md`'s own corrected Status row\]), same convention
+  `req/phase4-plan.md`'s and `req/phase5-plan.md`'s
+  own M1 row already use.
+- `req/phase5-plan.md`'s D3 finding about "no official Java equivalent of `swift-jinja` exists" and
+  the onig/fancy-regex FFM-path analysis both become historical context once M2 ships via the
+  pure-Java path — leave them in place (this document's own convention is to amend, not delete,
+  superseded research) but note in the Status table that D3's FFM-vs-pure-Java question is now
+  resolved by this plan, not still open.
+
+## Task 16: full verification pass
+
+- `./gradlew :jmlx-tokenizer:test` — every test class above passes. No native bootstrap required —
+  confirm by running this on a fresh checkout with `native/install/lib/mlx.metallib` absent, unlike
+  every prior milestone's verification pass.
+- `./gradlew build` — confirms `jmlx-ffi`/`jmlx-core`/`jmlx-tokenizer`/`jmlx-examples` all still
+  compile together.
+- `./gradlew spotlessCheck checkstyleMain checkstyleTest` (run against `jmlx-tokenizer` specifically,
+  and the whole build) — formatting/style, same gate every prior milestone has run.
+- Manual sanity check against a real (not synthetic) `tokenizer.json`: download
+  `Qwen/Qwen2.5-0.5B-Instruct/tokenizer.json` and confirm `HfTokenizer.fromFile(...)` loads it without
+  throwing and that `encode("Hello, world!", true)` followed by `decode(ids, true)` round-trips back
+  to `"Hello, world!"` — this is the first real-file exercise this plan's own synthetic-fixture test
+  suite doesn't cover, mirroring M1's own documented real-checkpoint-fixture gap (`req/plans/
+  phase5-m1-plan.md` Task 4) rather than silently assuming the synthetic fixtures are sufficient proof.
+
+## Deliberately not covered by this plan
+
+- SentencePiece, WordPiece, Unigram, `BertTokenizer`, any non-BPE `model.type` — Global Constraint 1.
+- General normalizer plugin chain beyond `None`/`NFC` (`Lowercase`, `StripAccents`, `Sequence`, etc.)
+  — neither target model needs them.
+- `Trie`-based added-token matching, and added-token `lstrip`/`rstrip`/`single_word` whitespace-eating
+  behavior — confirmed unused by both target models (Findings above); a future model that does set
+  these flags would need this plan revisited.
+- Offset tracking (character↔byte position mapping) — `ByteLevel` post-processor/decoder steps are
+  modeled as no-ops on the token list for exactly this reason.
+- Sentence-pair (`pair`-template) post-processing — chat/completion use is single-sequence only.
+- Tool-calling context variables (`tools`, `tool_call`, etc.) for Qwen2.5's own chat_template — Task
+  13's `extraContext` parameter exists so M3 can add these later without touching `ChatTemplateRenderer`,
+  but populating them is M3's job, not this plan's.
+- A real (non-synthetic) `tokenizer.json`/`tokenizer_config.json` fixture committed to the repo — both
+  real files are 7-9 MB; Task 16's manual sanity check exercises the real files without committing
+  them, mirroring M1's own real-checkpoint-fixture deferral to M3.
+- Batched encode/decode APIs (`encode_batch`-equivalent) — not needed until M3 names a caller that
+  batches.
+- Publishing `jmlx-tokenizer` as a standalone artifact/repository — explicitly decided against for
+  now (this plan's own opening paragraph); revisit only if a consumer outside jmlx materializes.

@@ -1,0 +1,25 @@
+{
+  "normalizer": {"type": "NFC"},
+  "pre_tokenizer": {
+    "type": "Sequence",
+    "pretokenizers": [
+      {"type": "Split", "pattern": {"Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"}, "behavior": "Isolated", "invert": false},
+      {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": false}
+    ]
+  },
+  "post_processor": {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": false},
+  "decoder": {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": false, "use_regex": false},
+  "model": {
+    "type": "BPE",
+    "ignore_merges": false,
+    "vocab": {"l": 0, "o": 1, "w": 2, "t": 3, "h": 4, "e": 5, "n": 6, "s": 7, "r": 8, "i": 9, "d": 10,
+      "Ġ": 11, "lo": 12, "low": 13, "th": 14, "the": 15, "Ġthe": 16, "<|endoftext|>": 17,
+      "<|im_start|>": 18, "<|im_end|>": 19},
+    "merges": [["l", "o"], ["lo", "w"], ["t", "h"], ["th", "e"], ["Ġ", "the"]]
+  },
+  "added_tokens": [
+    {"id": 17, "content": "<|endoftext|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false},
+    {"id": 18, "content": "<|im_start|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false},
+    {"id": 19, "content": "<|im_end|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false}
+  ]
+}

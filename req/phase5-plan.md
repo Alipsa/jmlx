@@ -13,7 +13,7 @@ Research findings section below leans on that same precedent for M1's own C-stri
 | Item | Status | Commit |
 |---|---|---|
 | M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
-| M2 — Tokenizer integration (§2) | Desk-research spike done (D3 below): waiting for upstream `mlx-c` tokenizer support is ruled out, but the FFM-vs-pure-Java architecture choice itself is still open between two credible precedents -- neither prototyped yet | — |
+| M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus `hfjinja`-based chat-template rendering, resolving the FFM-vs-pure-Java choice D3 left open in favor of pure Java; dependencies `tools.jackson.core:jackson-databind:3.1.2` and `se.alipsa:hfjinja:0.5.0`, both resolved via `mavenCentral()` directly -- `mavenLocal()` is enabled alongside it only because `jmlx`'s own root project version is currently a `-SNAPSHOT` (PR #14 review round 1), not a network-reachability workaround; see D3's second correction below; `req/plans/phase5-m2-plan.md`'s own Tasks 1-14 record the implementation) | Tasks 1-14 on `phase5-m2-tokenizer` (not yet merged to `main`) |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | Not started | — |
 
 ## Context
@@ -297,15 +297,25 @@ uses for MLX itself.** Findings, each confirmed against a primary source rather 
   Jinjava. This effectively supersedes options 1-3 for M2/M3 on the porting/build-shape question: it
   needs no hand-port of the ~3,860 remaining Jinja lines (already done, against the smaller/more
   current source this document already preferred over `swift-jinja`), no Jinjava
-  compatibility-verification risk, and no GraalJS dependency-weight cost. **It does not, however,
-  supersede the adoption cost: Maven Central's search API returns `numFound: 0` for `hfjinja` --
-  confirmed directly, not left as an open question -- so it is not currently resolvable as a normal
-  Gradle dependency.** Adopting it today means JitPack, a source/composite build, or publishing it
-  to Maven Central first; that real cost belongs in the comparison, not folded into "supersedes
-  everything." Still unverified: whether its byte-exact-vs.-Node-output differential corpus actually
-  covers M3's target models (Llama/Qwen/Mistral) specifically -- worth checking before depending on
-  it for real, but the "port or embed a JS engine" trade-off this
-  section spent most of its length on is likely moot now.
+  compatibility-verification risk, and no GraalJS dependency-weight cost. **Correction to an earlier
+  pass of this amendment: the "not on Maven Central" adoption-cost concern is now stale.**
+  `se.alipsa:hfjinja:0.5.0` resolves directly from Maven Central's actual repository
+  (`repo1.maven.org/maven2/se/alipsa/hfjinja/0.5.0/hfjinja-0.5.0.pom` returns `200`) and is listed on
+  `central.sonatype.com/artifact/se.alipsa/hfjinja` -- confirmed directly, not left as an open
+  question. (The legacy `search.maven.org` search-index API still returns `numFound: 0` for it as of
+  this writing -- a known indexing-lag artifact of that index, not evidence the artifact is
+  unavailable; do not re-trust that specific endpoint for freshly-published coordinates without
+  cross-checking `repo1.maven.org` directly.) A normal `implementation 'se.alipsa:hfjinja:0.5.0'`
+  Gradle dependency against `mavenCentral()` (already jmlx's only declared repository) is sufficient
+  -- no JitPack, source build, or local publish step needed. Its public API is a single class,
+  `se.alipsa.hfjinja.Template` (`Template.parse(String)` / `.render(Map<String,?>)`), zero runtime
+  dependencies, Java 21+, exceptions `TemplateSyntaxException`/`TemplateRenderException` (both extend
+  `HfJinjaException`) -- directly usable for HF chat templates with no adaptation layer needed beyond
+  building the `messages`/`add_generation_prompt`/`bos_token`/`eos_token` context map M3 already has
+  to assemble regardless of which Jinja path was chosen. Still unverified: whether its
+  byte-exact-vs.-Node-output differential corpus actually covers M3's target models
+  (Llama/Qwen/Mistral) specifically -- worth checking before depending on it for real, but the "port
+  or embed a JS engine" trade-off this section spent most of its length on is moot now.
 - **Build shape: `tokenizers-c` is a Rust `staticlib`, not a `cdylib` -- jmlx cannot load it directly
   the way `NativeLoader` loads `libmlxc.dylib`.** `tokenizers-cpp/rust/Cargo.toml` declares `crate-type
   = ["staticlib"]`; producing something `System.load()`-able would need either (a) a small additional
@@ -396,6 +406,36 @@ taking, not something to do unilaterally mid-spike. `req/plans/phase5-m2-plan.md
 written until that prototyping step also lands, nor until the FFM-vs-pure-Java architecture choice
 itself is actually made -- the desk research above narrows both (see D3's amendment for the pure-Java
 side, and the onig and panic bullets above for the FFM side's real cost) but resolves neither.
+
+**D3 resolution (M2 implemented): the FFM-vs-pure-Java architecture choice above is now made, not
+still open.** `req/plans/phase5-m2-plan.md` chose the pure-Java path over the `tokenizers-cpp`/FFM
+path this section spent most of its length de-risking, and it has since been implemented as the
+`jmlx-tokenizer` module (`se.alipsa.jmlx.tokenizer`) -- see the Status table above. This sidesteps
+every FFM-path risk this section documented (the Rust-panic-crosses-FFI hazard, the
+`token_ids`/`uint32_t` signedness mismatch, the `onig`/`fancy-regex` build fragility, and the
+Rust-toolchain dependency this project would otherwise not have needed) at the cost this section also
+named up front: a genuine from-scratch port -- `HfTokenizer` and its supporting classes for the
+byte-level-BPE pipeline, plus `hfjinja` (`se.alipsa:hfjinja:0.5.0`) for the chat-template half this
+section's `@huggingface/jinja`/option-2 bullet already preferred -- rather than a thin binding over
+already-battle-tested native code the way M1's `MLXIO` is. One correction to the amendment above:
+`se.alipsa:hfjinja:0.5.0` and `tools.jackson.core:jackson-databind:3.1.2` are resolved via
+`mavenLocal()` in this build environment, not `mavenCentral()` alone as that amendment assumed would
+suffice -- this environment cannot reach Maven Central directly (see `req/plans/phase5-m2-plan.md`'s
+own Findings). The "still open" paragraph immediately above and the rest of D3 are left in place as
+the historical record of the research that led here, per this document's own amend-don't-delete
+convention.
+
+**Second correction (PR #14 review round 3): the sentence directly above is itself stale.** Live
+dependency resolution against a stock `mavenCentral()`-only repository list
+(`./gradlew :jmlx-tokenizer:dependencies --configuration compileClasspath --refresh-dependencies`, and
+a direct `curl` against `repo1.maven.org`) confirms both `se.alipsa:hfjinja:0.5.0` and
+`tools.jackson.core:jackson-databind:3.1.2` resolve from Maven Central alone -- this build environment
+was never actually unable to reach it. The root `build.gradle`'s `mavenLocal()` is enabled for an
+unrelated, ordinary reason instead: `jmlx`'s own root project version is currently `0.5.0-SNAPSHOT`,
+and the shared `repositories {}` block adds `mavenLocal()` whenever that's true (the expected setup for
+resolving a locally-built, unreleased dependency during local development), not because Central itself
+was ever unreachable. `req/plans/phase5-m2-plan.md`'s own Findings section predates this root-cause
+diagnosis and should not be read as evidence of an actual network limitation.
 
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already
@@ -509,12 +549,13 @@ parameter (D2a above); `saveGguf` additionally builds and frees its own `mlx_io_
 paragraph and architecture-diagram class list to name `MLXIO` as the fifth native-loading-guard
 class alongside `MLX`/`MLXScope`/`NativeOps`/`MLXGrad`.
 
-### 2. Tokenizer integration (M2) — **DESK RESEARCH DONE, ARCHITECTURE CHOICE STILL OPEN — see D3's amendment**
+### 2. Tokenizer integration (M2) — **DONE — see the Status table and D3's resolution note**
 
-Not planned in detail here. Desk research (license, C-API existence, build shape, prior art on both
-sides, risks) is written up as D3's amendment above; `req/plans/phase5-m2-plan.md` still should not
-be written until both the FFM-vs-pure-Java choice is made and, if FFM is chosen, the load-time-cost
-prototype D3 also asked for actually lands.
+Planned in detail at `req/plans/phase5-m2-plan.md` and implemented as the `jmlx-tokenizer` module.
+The desk research that preceded it (license, C-API existence, build shape, prior art on both sides,
+risks) is written up as D3's amendment above; the FFM-vs-pure-Java choice it left open was resolved
+in favor of pure Java, so the load-time-cost prototype D3 also asked for was never needed and was not
+built.
 
 ### 3. Reference models — `LlamaModel`, `QwenModel` (M3) — **NOT STARTED — blocked on M1 and M2**
 
@@ -546,8 +587,11 @@ named scope boundary rather than left implicit.
   for M2.** See D3's amendment — MLX's own two other official language bindings (`mlx-lm`,
   `mlx-swift-lm`) both already solved this by depending on an external tokenizer package rather than
   MLX/mlx-c itself, and there is no roadmap signal anywhere suggesting that will change.
-- **Still open: M2's architecture question itself (FFM-bind a plain-C shim over HF `tokenizers` vs.
-  a pure-Java reimplementation) is genuinely two-sided, not resolved.** An earlier pass through this
+- **Resolved (pure-Java chosen and implemented — see the Status table and D3's resolution note
+  above): M2's architecture question itself (FFM-bind a plain-C shim over HF `tokenizers` vs.
+  a pure-Java reimplementation) is no longer open.** The two-sided analysis below is left in place as
+  the historical record of the research that led to that choice, per this document's own
+  amend-don't-delete convention. An earlier pass through this
   document concluded DJL's Rust/JNI choice settled it — that overstated things: Hugging Face's own
   `swift-transformers` independently chose a from-scratch pure-Swift reimplementation for the
   identical problem, so both directions now have a maintained, production-used precedent from a
@@ -558,20 +602,31 @@ named scope boundary rather than left implicit.
   cost, not an open unknown anymore. **The porting question is largely mooted since: `hfjinja`
   (`github.com/Alipsa/hfjinja`) is a released, dependency-free Java 21+ port of `@huggingface/jinja`
   itself — i.e. option 2 already done, by the same org as jmlx — so the chat-template half of the
-  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted. Its adoption
-  cost is not moot, though: it is confirmed absent from Maven Central (`numFound: 0`), so using it
-  today means JitPack, a source/composite build, or publishing it first — see D3's amendment.** What
-  remains genuinely open regardless of which tokenization direction (FFM vs. pure-Java) is chosen:
-  real load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a
+  pure-Java estimate (~3,860 of the ~7,700 lines) doesn't need porting at all if adopted. [Amended:
+  the sentence originally here claimed `hfjinja` was "confirmed absent from Maven Central
+  (`numFound: 0`)" and would need JitPack, a source build, or publishing first — that was
+  `search.maven.org`'s own stale index, not the true state of the repository.
+  `se.alipsa:hfjinja:0.5.0` genuinely resolves from `repo1.maven.org` and is exactly what
+  `jmlx-tokenizer` depends on today (via `mavenLocal()` in this build environment specifically, per
+  D3's amendment, not because the artifact itself is unpublished — see D3's amendment for the full
+  correction).]** **Further correction (PR #14 review round 3):** D3's own second correction
+  (Decisions section, above) applies here too — the "cannot reach Maven Central directly" premise in
+  the bracket just above was itself mistaken. Both dependencies resolve from Maven Central alone;
+  `mavenLocal()` is enabled only because `jmlx`'s own root project version is currently a
+  `-SNAPSHOT`, unrelated to either dependency's own publication state or reachability.
+  Now resolved by the same choice as above: M2 shipped as the pure-Java `jmlx-tokenizer` module using
+  `hfjinja` directly, so the FFM path's own remaining unknowns below were never prototyped and are
+  left here only as historical record, not as work still to be done. What
+  remained genuinely open at the time, regardless of which tokenization direction (FFM vs. pure-Java)
+  was chosen: real load-time cost for the FFM path (needs an actual build-and-measure prototype, blocked on a
   Rust toolchain decision), including which regex backend to build it with -- Llama/Qwen's
   pretokenizer regexes need lookahead/Unicode-class support that only `onig` or `fancy-regex` provide
   (plain `regex` is ruled out either way), but whether `fancy-regex`'s pure-Rust split behavior
   actually matches `onig`'s on these specific patterns is unconfirmed and belongs in that same
   prototype (see D3's amendment). Whether M3's reference models need general
   Jinja2 chat-template evaluation at all or can get away with hand-formatting a small, known set of
-  chat templates instead is still deferred to M3's own requirements (D4), though if `hfjinja` is
-  adopted and its Maven-availability cost is paid, that question loses most of its urgency, since the
-  "port vs. hand-format" trade-off it was weighing is no longer a real port.
+  chat templates instead is still deferred to M3's own requirements (D4); `hfjinja` is now adopted, so
+  the "port vs. hand-format" trade-off it was weighing is no longer a real port.
 
 No open question remains on the checkpoint-I/O (M1) side: `mlx_vector_string_get`'s ownership, the
 last unresolved item blocking `loadGguf`'s design, is settled — see Research findings above.

@@ -1,8 +1,9 @@
 /*
- * Root build script. Config shared by jmlx-ffi, jmlx-core and jmlx-examples
- * lives here; each module's own build.gradle only declares its plugin and
- * dependencies. See req/initial-plan.md §4 for the rationale behind the
- * native-access flags and the native-directory system property below.
+ * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer and
+ * jmlx-examples lives here; each module's own build.gradle only declares its
+ * plugin and dependencies. See req/initial-plan.md §4 for the rationale
+ * behind the native-access flags and the native-directory system property
+ * below.
  */
 
 plugins {
@@ -10,10 +11,40 @@ plugins {
 }
 
 allprojects {
+    group = 'se.alipsa'
+    version = '0.5.0-SNAPSHOT'
+}
+
+// mavenLocal() is only added when the jmlx project's own version (above) is a -SNAPSHOT
+// build -- the expected setup for resolving a locally-built, unreleased dependency (e.g.
+// testing against an unreleased hfjinja before it is published to Central) during local
+// development, not a build-hygiene concern. A real release build resolves every dependency
+// from mavenCentral() alone, so a stale same-GAV artifact sitting in ~/.m2/repository can
+// never silently win over Central with no diagnostic (see PR #14 review).
+allprojects {
     repositories {
         mavenCentral()
+        if (rootProject.version.toString().endsWith('-SNAPSHOT')) {
+            mavenLocal()
+        }
     }
 }
+
+// Read via the explicit VersionCatalogsExtension API, not the `libs.versions.x` generated
+// accessor: referencing that accessor from a root-script subprojects{} closure is an
+// implicit parent-project property lookup, deprecated as of Gradle 9.7 and an error in
+// Gradle 10 (see useJUnitJupiter below). orElseThrow with a message beats the bare .get()'s
+// context-free NoSuchElementException if the catalog alias is ever renamed.
+def junitJupiterVersion =
+    rootProject.extensions
+        .getByType(VersionCatalogsExtension)
+        .named('libs')
+        .findVersion('junit.jupiter')
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "build.gradle: no 'junit.jupiter' version alias in gradle/libs.versions.toml"))
+        .requiredVersion
 
 subprojects {
     apply plugin: 'java'
@@ -56,19 +87,32 @@ subprojects {
     testing {
         suites {
             test {
-                // Not libs.versions.junit.jupiter.get(): referencing the
-                // version-catalog accessor from a subprojects{} closure
-                // defined in the *root* script is an implicit parent-project
-                // property lookup, deprecated as of Gradle 9.7 and an error
-                // in Gradle 10. gradle/libs.versions.toml's junit-jupiter
-                // version is the source of truth for the artifact
-                // coordinate (see jmlx-ffi/build.gradle's
-                // testFixturesImplementation); this string only pins the
-                // JVM Test Suite plugin's own bundled-platform version and
-                // is kept in sync with it by hand.
-                useJUnitJupiter('6.0.1')
+                // junitJupiterVersion (above) is read from the same
+                // gradle/libs.versions.toml alias jmlx-ffi/build.gradle's
+                // testFixturesImplementation uses, via the explicit
+                // VersionCatalogsExtension API rather than the generated
+                // `libs.versions.x` accessor -- see that variable's own
+                // comment for why the accessor itself can't be used here.
+                useJUnitJupiter(junitJupiterVersion)
             }
         }
+    }
+
+    // useJUnitJupiter above adds org.junit.platform:junit-platform-launcher
+    // to testRuntimeOnly without an explicit version, relying on
+    // org.junit:junit-bom for version alignment; that alignment is not
+    // guaranteed to succeed in every environment (e.g. a mavenLocal() cache
+    // holding only junit-bom's .pom with no Gradle Module Metadata .module
+    // file resolves it to an empty version instead). Pinning it explicitly
+    // to the same catalog-sourced version as useJUnitJupiter above sidesteps
+    // that lookup entirely and keeps both in sync from one source of truth --
+    // but this reuse is only valid because JUnit 6 unified Jupiter's and the
+    // Platform's version numbers onto one release train. If the catalog's
+    // junit.jupiter alias is ever pinned back to a pre-6.0 (5.x) version,
+    // this line would request a junit-platform-launcher:5.x.y that does not
+    // exist; a genuine version split would need its own catalog alias here.
+    dependencies {
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitJupiterVersion}"
     }
 
     // req/initial-plan.md §4: an absolute path, since native/install/lib is

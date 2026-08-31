@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 
 /**
  * A byte-level BPE tokenizer loaded from a {@code tokenizer.json} file.
@@ -156,29 +157,80 @@ public final class HfTokenizer {
     return new HfTokenizer(TokenizerJsonLoader.load(tokenizerJsonPath));
   }
 
-  /** Returns the BOS id for the supported Qwen/Llama token naming conventions. */
-  public int bosTokenId() {
-    return specialTokenId("bos", BOS_TOKEN_NAMES);
+  /**
+   * Finds a BOS id by supported Qwen/Llama naming conventions when the tokenizer marks it special.
+   * Prefer {@link #bosTokenId(String)} when {@code tokenizer_config.json} supplies the BOS token.
+   */
+  public OptionalInt bosTokenId() {
+    return fallbackSpecialTokenId(BOS_TOKEN_NAMES);
   }
 
-  /** Returns the EOS id for the supported Qwen/Llama token naming conventions. */
-  public int eosTokenId() {
-    return specialTokenId("eos", EOS_TOKEN_NAMES);
+  /**
+   * Resolves a caller-supplied BOS token, typically from {@code tokenizer_config.json}. {@code
+   * null} and unknown tokens return empty.
+   */
+  public OptionalInt bosTokenId(String bosToken) {
+    return tokenId(bosToken);
   }
 
-  /** Returns the size needed for the model output head, including any added-token ids. */
+  /**
+   * Finds an EOS id by supported Qwen/Llama naming conventions when the tokenizer marks it special.
+   * Prefer {@link #eosTokenId(String)} when {@code tokenizer_config.json} supplies the EOS token.
+   */
+  public OptionalInt eosTokenId() {
+    return fallbackSpecialTokenId(EOS_TOKEN_NAMES);
+  }
+
+  /**
+   * Resolves a caller-supplied EOS token, typically from {@code tokenizer_config.json}. {@code
+   * null} and unknown tokens return empty.
+   */
+  public OptionalInt eosTokenId(String eosToken) {
+    return tokenId(eosToken);
+  }
+
+  /**
+   * Resolves all caller-supplied EOS tokens, preserving order. Use this for checkpoints such as
+   * Llama 3.1 that declare multiple generation terminators.
+   */
+  public List<Integer> eosTokenIds(List<String> eosTokens) {
+    Objects.requireNonNull(eosTokens, "HfTokenizer.eosTokenIds: eosTokens must not be null");
+    List<Integer> ids = new ArrayList<>(eosTokens.size());
+    for (String eosToken : eosTokens) {
+      OptionalInt id = tokenId(eosToken);
+      if (id.isEmpty()) {
+        throw new TokenizerException(
+            "HfTokenizer.eosTokenIds: no vocabulary entry for EOS token '" + eosToken + "'");
+      }
+      ids.add(id.getAsInt());
+    }
+    return List.copyOf(ids);
+  }
+
+  /**
+   * Returns the tokenizer's contiguous id range. This is not the model's output-head size; obtain
+   * that from the checkpoint's {@code config.json}.
+   */
   public int vocabSize() {
     return baseVocabularyMaxKnownId + 1;
   }
 
-  private int specialTokenId(String kind, List<String> names) {
+  private OptionalInt fallbackSpecialTokenId(List<String> names) {
     for (String name : names) {
       if (vocabulary.hasToken(name)) {
-        return vocabulary.idOf(name);
+        int id = vocabulary.idOf(name);
+        if (vocabulary.isSpecial(id)) {
+          return OptionalInt.of(id);
+        }
       }
     }
-    throw new TokenizerException(
-        "HfTokenizer: no " + kind + " token found; tried supported names " + names);
+    return OptionalInt.empty();
+  }
+
+  private OptionalInt tokenId(String token) {
+    return token != null && vocabulary.hasToken(token)
+        ? OptionalInt.of(vocabulary.idOf(token))
+        : OptionalInt.empty();
   }
 
   /** Encodes {@code text} into token ids. */

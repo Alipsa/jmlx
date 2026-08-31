@@ -1,7 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -15,9 +14,8 @@ import se.alipsa.hfjinja.Template;
 class ChatTemplateRendererTest {
 
   @Test
-  void cachesParsedTemplatesAndAllowsTheirReuse() {
+  void allowsParsedTemplatesToBeReused() {
     Template template = ChatTemplateRenderer.parse("{{ messages[0]['content'] }}");
-    assertSame(template, ChatTemplateRenderer.parse("{{ messages[0]['content'] }}"));
     assertEquals(
         "Hello",
         ChatTemplateRenderer.render(

@@ -4,14 +4,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import se.alipsa.hfjinja.HfJinjaException;
 import se.alipsa.hfjinja.Template;
 
 /** Renders a Hugging Face {@code chat_template} Jinja string via {@code hfjinja}. */
 public final class ChatTemplateRenderer {
-
-  private static final Map<String, Template> TEMPLATES = new ConcurrentHashMap<>();
 
   private ChatTemplateRenderer() {}
 
@@ -57,12 +54,12 @@ public final class ChatTemplateRenderer {
     }
   }
 
-  /** Parses and caches a chat template for callers rendering the same template repeatedly. */
+  /** Parses a chat template for callers to retain and render repeatedly. */
   public static Template parse(String chatTemplate) {
     Objects.requireNonNull(
         chatTemplate, "ChatTemplateRenderer.parse: chatTemplate must not be null");
     try {
-      return TEMPLATES.computeIfAbsent(chatTemplate, Template::parse);
+      return Template.parse(chatTemplate);
     } catch (HfJinjaException e) {
       throw new TokenizerException("ChatTemplateRenderer.parse: failed to parse chat template", e);
     }

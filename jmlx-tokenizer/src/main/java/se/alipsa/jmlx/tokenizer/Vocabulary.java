@@ -155,7 +155,10 @@ public final class Vocabulary {
     return maxKnownId;
   }
 
-  /** Number of ids in the contiguous vocabulary range needed for a model output head. */
+  /**
+   * Number of ids in the contiguous range from zero through this tokenizer's largest known id. This
+   * is not a checkpoint's model output-head size.
+   */
   public int vocabSize() {
     return maxKnownId + 1;
   }

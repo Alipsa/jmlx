@@ -7,6 +7,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 
 class HfTokenizerTest {
@@ -18,7 +19,11 @@ class HfTokenizerTest {
     assertEquals(List.of(9707, 11, 1879, 0), tokenizer.encode("Hello, world!", false));
     assertEquals(List.of(785, 3974, 13876, 38835), tokenizer.encode("The quick brown fox", false));
     assertEquals(List.of(220, 12621, 198), tokenizer.encode("  spaces\n", false));
-    assertEquals(151645, tokenizer.eosTokenId());
+    assertEquals(OptionalInt.empty(), tokenizer.bosTokenId());
+    assertEquals(OptionalInt.of(151645), tokenizer.eosTokenId());
+    assertEquals(OptionalInt.of(151643), tokenizer.eosTokenId("<|endoftext|>"));
+    assertEquals(
+        List.of(151645, 151643), tokenizer.eosTokenIds(List.of("<|im_end|>", "<|endoftext|>")));
     assertEquals(151665, tokenizer.vocabSize());
   }
 
@@ -70,9 +75,9 @@ class HfTokenizerTest {
   void exposesModelServingTokenIdsAndVocabularySize() {
     HfTokenizer qwen = HfTokenizer.fromFile(fixture("qwen-style.tokenizer.json"));
     HfTokenizer llama = HfTokenizer.fromFile(fixture("llama3-style.tokenizer.json"));
-    assertEquals(19, qwen.eosTokenId());
+    assertEquals(OptionalInt.of(19), qwen.eosTokenId());
     assertEquals(20, qwen.vocabSize());
-    assertEquals(128000, llama.bosTokenId());
+    assertEquals(OptionalInt.of(128000), llama.bosTokenId());
     assertEquals(128001, llama.vocabSize());
   }
 

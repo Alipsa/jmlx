@@ -95,6 +95,23 @@ class HfTokenizerTest {
   }
 
   @Test
+  void decodeSkipsAnIdBetweenTheRealVocabTopAndASparseTemplateIdInsteadOfThrowingAsAHole() {
+    // llama3-style-template-id-absent-from-vocab.tokenizer.json registers a single, arbitrarily
+    // sparse template id (999999) far above the real model.vocab's own top (16). Before this fix,
+    // Vocabulary#maxKnownId (999999, since the template id is merged into the same Vocabulary)
+    // was used directly as decode's above-vocab skip threshold, so every id between 17 and 999998
+    // -- a legitimate "sampled outside the real vocab" case, the entire reason the skip exists --
+    // was wrongly treated as an in-range hole and thrown on. HfTokenizer now tracks
+    // baseVocabularyMaxKnownId (model.vocab + added_tokens only, excluding template
+    // registrations) separately for this check, so an id in that gap is correctly skipped instead
+    // (PR #14 review round 6, finding 2).
+    HfTokenizer tokenizer =
+        HfTokenizer.fromFile(fixture("llama3-style-template-id-absent-from-vocab.tokenizer.json"));
+    assertEquals("", tokenizer.decode(List.of(500), false));
+    assertEquals("", tokenizer.decode(List.of(1000000), false));
+  }
+
+  @Test
   void templateSpecialTokenBelowMaxKnownIdIsRegisteredInsteadOfThrowingAsAnInRangeHole() {
     // The mirror failure mode of the test above: here the template's id (500) is unclaimed, but
     // is numerically below maxKnownId (128000, from an unrelated added token) -- so before this
@@ -132,6 +149,25 @@ class HfTokenizerTest {
     assertEquals(List.of(999999, 13, 16), ids);
     assertEquals("<|begin_of_text|>low the", tokenizer.decode(ids, false));
     assertEquals("<|begin_of_text|>low the", tokenizer.decode(ids, true));
+  }
+
+  @Test
+  void templateSpecialTokenMatchingAnExistingPlainModelVocabEntryKeepsItsRealSpecialFlag() {
+    // The mirror of the added_tokens variant above, for a template token matching a *plain*
+    // model.vocab entry instead -- id 15/"the" is an ordinary vocab entry, never touched by the
+    // added_tokens collision machinery at all, so it must never become special. Regressing this
+    // (unconditionally promoting every template-named token to special=true) would make
+    // skipSpecialTokens=true wrongly drop "the" from decode, distinguishably: "thelow the" (fixed)
+    // vs "low the" (regressed) (PR #14 review round 6, finding 4, covering the plain-model.vocab
+    // half of round 5 finding 1 that the added_tokens-only fixture above didn't exercise).
+    HfTokenizer tokenizer =
+        HfTokenizer.fromFile(
+            fixture(
+                "llama3-style-template-token-matches-existing-model-vocab-entry.tokenizer.json"));
+    List<Integer> ids = tokenizer.encode("low the", true);
+    assertEquals(List.of(15, 13, 16), ids);
+    assertEquals("thelow the", tokenizer.decode(ids, false));
+    assertEquals("thelow the", tokenizer.decode(ids, true));
   }
 
   @Test

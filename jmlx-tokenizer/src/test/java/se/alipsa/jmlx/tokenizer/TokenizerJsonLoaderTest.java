@@ -151,6 +151,33 @@ class TokenizerJsonLoaderTest {
   }
 
   @Test
+  void negativeDropoutThrows() {
+    Path path = validTokenizerJsonWith("dropout", "-1.0");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void nonNumericObjectDropoutThrows() {
+    // dropout.asDouble(0.0) silently returns its default 0.0 for a node it can't coerce to a
+    // number at all, which used to make an object value pass the same check as a genuine "0.0"
+    // (PR #14 review round 6, finding 3, correcting round 5's own dropout fix).
+    Path path = validTokenizerJsonWith("dropout", "{\"p\": 0.5}");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void nonNumericStringDropoutThrows() {
+    Path path = validTokenizerJsonWith("dropout", "\"half\"");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void nonNumericArrayDropoutThrows() {
+    Path path = validTokenizerJsonWith("dropout", "[0.5]");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
   void unkTokenThrows() {
     Path path = validTokenizerJsonWith("unk_token", "\"<unk>\"");
     assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));

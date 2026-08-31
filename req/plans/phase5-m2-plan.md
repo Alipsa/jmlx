@@ -459,6 +459,20 @@ eventual `new String(bytes, UTF_8)` in `ByteLevelDecoder` already matches `from_
 replacement-character behavior for whatever these raw bytes decode to, so no further change is
 needed there.
 
+**Amendment (PR #14 review, round 6, finding 6): the reachability description above overstated one
+case and, after round 6 finding 1 (`ByteLevelDecoder`, above), understated another.** "An id with no
+vocabulary entry" never actually reaches this method at all: `HfTokenizer#decode` filters such ids
+out (skip or throw) before ever producing a token string, so `decodeToBytes` never sees one. "A
+malformed added token" *did* describe a real gap at the time, but for a different reason than
+originally stated: with round 5's still-current literal-pass-through design, an `added_tokens`
+entry's content took the literal branch and never reached `decodeToBytes` at all -- the actually
+reachable case was a plain, non-added `model.vocab` token string (which, after round 5 finding 1,
+includes a template token matching one). Round 6 finding 1 changed this again: with the literal
+pass-through removed entirely, an `added_tokens` entry's own content *does* now reach
+`decodeToBytes` like every other token, restoring "a malformed/unusual added token" as a genuinely
+reachable case alongside the plain-vocab one. The method's own javadoc was corrected to describe
+both currently-reachable cases and explicitly rule out the id-with-no-entry case.
+
 **`ByteLevelCodingTest.java`:**
 
 ```java
@@ -906,6 +920,24 @@ not just `hasId`. `SpecialTokenInfoTest.java` gained a test that mutates the cal
 lists after construction and asserts the stored record is unaffected, exercising round 4 finding
 10's `List.copyOf` defense directly rather than only relying on it never having been observed to
 break.
+
+**Amendment (PR #14 review, round 6): two more findings in this same method family, one of them a
+regression in round 5's own fix.**
+
+- **Finding 3 (medium): round 5 finding 6's own narrowed `dropout` check was too permissive.**
+  `dropout.asDouble(0.0) > 0.0` silently returns the default `0.0` for *any* node `asDouble` can't
+  coerce to a number at all, not just for a genuine `0.0` -- verified directly: `{"dropout":
+  {"p": 0.5}}`, `{"dropout": "half"}`, `{"dropout": [0.5]}`, and `{"dropout": -1.0}` were all
+  wrongly accepted, all four of which the *previous* (round-4) `!isNull() && !isMissingNode()`
+  check correctly rejected. Fixed by whitelisting only an exact numeric zero instead:
+  `!(dropout.isNumber() && dropout.doubleValue() == 0.0)`. New tests cover all four
+  previously-silently-accepted shapes, plus a negative number.
+- **Finding 5 (low): `requireNoNormalization`'s thrown message always said "has normalized=true"**,
+  even when the offending value came from the `!special` default (round 5 finding 5) rather than an
+  explicit field in the file -- so for a file with no `normalized` key at all, the message named a
+  field the file doesn't contain. Fixed by checking `normalizedNode.isMissingNode() ||
+  normalizedNode.isNull()` and wording the message accordingly ("normalized absent, which defaults
+  to true for a non-special added token" vs. "normalized=true").
 
 **`TokenizerJsonTest.java`** (against the synthetic fixtures from Task 14 — written here but only
 runnable once Task 14 lands; note the dependency in the commit message):
@@ -1580,6 +1612,44 @@ class ByteLevelDecoderTest {
 }
 ```
 
+**Amendment (PR #14 review, round 6, finding 1): the literal-pass-through design above has no HF
+counterpart and was measured against the wrong reference implementation.** This class's own javadoc
+cited `Decoder.swift`'s `ByteLevelDecoder` (swift-transformers) -- the one class in this module not
+measured against HF's Rust source the rest of the plan holds itself to. Verified directly against
+`huggingface/tokenizers`: `TokenizerImpl::decode` resolves every id -- added-vocabulary or
+model-vocabulary, no distinction -- into one flat `Vec<String>` and passes all of it to `decoder
+.decode(tokens)`; `ByteLevel`'s own `decode_chain` then applies the *identical* per-character
+byte-level mapping (falling back to a token's own raw UTF-8 bytes per token on any unmapped
+character, exactly {@link ByteLevelCoding#decodeToBytes}'s round-5-finding-3 behavior) to every
+token, concatenating raw bytes across the *entire* sequence before one final `from_utf8_lossy` --
+there is no branch anywhere that treats an added token's string differently. For Qwen2.5's and
+Llama-3's real `added_tokens` (every one built from plain printable-ASCII characters, each already
+byte-level-identity-mapped) the two designs produce byte-identical output, which is why this was
+never caught by either target model's own round-trip tests. It stopped being purely theoretical
+after round 5 finding 1's fix, though: whether a *template* token gets byte-decoded or passed
+through literally now hinges entirely on `HfTokenizer`'s `hasToken` filter, making this branch
+load-bearing in a way it wasn't before. Fixed by removing the branch entirely -- `decode` now takes
+only `List<String> tokens`, accumulates every token's `ByteLevelCoding.decodeToBytes` output into
+one buffer, and converts it to a `String` once at the end, matching `decode_chain` exactly:
+
+```java
+public static String decode(List<String> tokens) {
+  Objects.requireNonNull(tokens, "ByteLevelDecoder.decode: tokens must not be null");
+  ByteArrayOutputStream pending = new ByteArrayOutputStream();
+  for (String token : tokens) {
+    pending.writeBytes(ByteLevelCoding.decodeToBytes(token));
+  }
+  return new String(pending.toByteArray(), StandardCharsets.UTF_8);
+}
+```
+
+`HfTokenizer`'s own `addedTokenContents` field (Task 12, below) is now entirely unused and removed
+along with it -- there is no longer anything for it to feed. `ByteLevelDecoderTest`'s
+`addedTokensPassThroughLiterallyBetweenDecodedText` test is renamed and repurposed to
+`specialTokenShapedStringDecodesToItselfSinceItIsAllPrintableAscii`, keeping the same input/output
+pair (still useful coverage: it shows the general byte-decode path reconstructs a real added
+token's content correctly, for the structural reason above -- not because of any special-casing).
+
 ## Task 12: `HfTokenizer`
 
 ```java
@@ -1843,6 +1913,38 @@ an existing non-special `added_tokens` entry -- finding 1), and
 `llama3-style-two-template-tokens-share-id-with-different-text.tokenizer.json` (the two directions
 of finding 2's self-contradiction, mirroring how round 4's own fixtures covered both directions of
 the `baseVocabulary` conflict check).
+
+**Amendment (PR #14 review, round 6): two more findings, one of them a real regression from round
+4's own `maxKnownId`-merging fix.**
+
+- **Finding 2 (medium): registering a template id into the same `Vocabulary` decode/encode both use
+  (round 4's own fix, above) interacts badly with `Vocabulary#maxKnownId`'s above-vocab skip
+  heuristic (round 4, finding 6) when the template id is a sparse outlier.** Verified end-to-end on
+  the shipped `llama3-style-template-id-absent-from-vocab.tokenizer.json` fixture, whose template
+  registers BOS as id `999999` while the real vocab tops out at `16`: `decode(200000)` and
+  `decode(999998)` both threw "in-range hole" instead of being skipped as legitimately above the
+  real vocab -- a single sparse template registration converted the *entire* range between the real
+  vocab's own top and that outlier into throwing holes, defeating the documented purpose of the skip
+  ("a sampled logit outside a checkpoint's trained vocab"). Fixed by tracking a separate
+  `baseVocabularyMaxKnownId` field -- computed from `baseVocabulary` (`model.vocab` + `added_tokens`
+  only, before template tokens are merged in) when there was a `baseVocabulary` to build, or
+  `this.vocabulary.maxKnownId()` directly when `templateTokens` was empty (in which case they're
+  identical anyway, per round 5 finding 11's short-circuit) -- and using that instead of
+  `vocabulary.maxKnownId()` in `decode`'s skip/throw check. The template id itself still resolves
+  correctly regardless, via `vocabulary.hasId`/`tokenOf`, since it's still merged into `this
+  .vocabulary` exactly as before; only the *skip-threshold* computation excludes it.
+- **Finding 4 (low): the round-5 finding-1 regression test only covered the `added_tokens` half of
+  the fix, not the plain-`model.vocab` half.** `templateSpecialTokenMatchingAnExistingNonSpecialAddedTokenKeepsItsRealSpecialFlag`
+  exercises a template token matching an existing `added_tokens` entry, but round 5 finding 1's own
+  filter (`!baseVocabulary.hasToken(t.content())`) applies identically to a template token matching
+  a *plain* `model.vocab` entry -- a case with no test at all, so a regression re-promoting such a
+  token to `special=true` would pass the suite untouched. Closed by a new
+  `llama3-style-template-token-matches-existing-model-vocab-entry.tokenizer.json` fixture (a
+  template naming id `15`/`"the"`, an ordinary `model.vocab` entry with no `added_tokens`
+  involvement at all) and `templateSpecialTokenMatchingAnExistingPlainModelVocabEntryKeepsItsRealSpecialFlag`,
+  asserting `decode(ids, true)` still includes `"the"` (`"thelow the"`) rather than silently
+  dropping it (`"low the"`, the regressed value) the way `skipSpecialTokens=true` would if the
+  token were wrongly promoted.
 
 ## Task 13: `ChatTemplateRenderer`
 

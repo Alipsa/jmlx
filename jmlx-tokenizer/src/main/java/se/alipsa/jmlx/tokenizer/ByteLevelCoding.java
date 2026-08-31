@@ -63,13 +63,19 @@ public final class ByteLevelCoding {
    * {@code ByteLevel::decode_chain} ({@code huggingface/tokenizers}' Rust source), which tries a
    * per-character mapping and falls back to {@code t.as_bytes()} for the *entire* token as soon as
    * any character fails, rather than erroring. This is a real, reachable case for this port, not
-   * just a defensive check: a token string built from an id with no vocabulary entry, or a
-   * malformed added token, can otherwise contain a character like a plain space (code point 32,
-   * itself not byte-level-printable -- see the static initializer above) that no legitimate
-   * byte-level token ever would. The eventual {@code new String(bytes, UTF_8)} in {@link
-   * ByteLevelDecoder} already matches {@code from_utf8_lossy}'s replacement-character behavior for
-   * whatever these raw bytes decode to, so no further change is needed there (PR #14 review round
-   * 5, finding 3).
+   * just a defensive check: a plain {@code model.vocab} token string -- which, after round 5
+   * finding 1's fix, can also be a template token matching an existing {@code model.vocab} entry --
+   * can contain a character like a plain space (code point 32, itself not byte-level-printable --
+   * see the static initializer above) that no legitimate byte-level BPE symbol ever would. Since
+   * {@link ByteLevelDecoder} stopped special-casing added-token strings with a literal pass-through
+   * (PR #14 review round 6, finding 1), an {@code added_tokens} entry's own content is reachable
+   * here too, for the same reason: neither case is unreachable the way an id with no vocabulary
+   * entry at all is (that case is filtered out in {@code HfTokenizer#decode} before any token
+   * string is ever produced, so it never reaches this method). The eventual {@code new
+   * String(bytes, UTF_8)} in {@link ByteLevelDecoder} already matches {@code from_utf8_lossy}'s
+   * replacement-character behavior for whatever these raw bytes decode to, so no further change is
+   * needed there (PR #14 review round 5, finding 3; reachability description corrected in round 6,
+   * finding 6, to account for round 6 finding 1's own change to {@link ByteLevelDecoder}).
    */
   public static byte[] decodeToBytes(String byteLevelText) {
     Objects.requireNonNull(

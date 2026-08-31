@@ -231,9 +231,15 @@ public final class TokenizerJsonLoader {
     }
     // "dropout": 0.0 is semantically identical to null/absent (no dropout applied) and must not
     // be rejected alongside a genuine positive value -- BpeMerger has no dropout behavior to
-    // diverge either way at 0.0 (PR #14 review round 5, finding 6).
+    // diverge either way at 0.0 (PR #14 review round 5, finding 6). Whitelisting only an exact
+    // numeric zero, rather than gating on dropout.asDouble(0.0) > 0.0, matters because asDouble
+    // silently returns its default for any node it can't coerce to a number at all -- an object,
+    // a string, or an array all produced 0.0 and were wrongly accepted by that check, the same as
+    // a genuine "dropout": 0.0 (PR #14 review round 6, finding 3, correcting round 5's own fix).
     JsonNode dropout = node.path("dropout");
-    if (!dropout.isNull() && !dropout.isMissingNode() && dropout.asDouble(0.0) > 0.0) {
+    if (!dropout.isNull()
+        && !dropout.isMissingNode()
+        && !(dropout.isNumber() && dropout.doubleValue() == 0.0)) {
       throw new TokenizerException(
           "TokenizerJsonLoader: unsupported model.dropout " + dropout + " (must be 0/null/absent)");
     }
@@ -342,12 +348,26 @@ public final class TokenizerJsonLoader {
 
   private static void requireNoNormalization(
       JsonNode entry, String content, boolean special, NormalizerKind normalizer) {
-    if (normalizer != NormalizerKind.NONE && entry.path("normalized").asBoolean(!special)) {
-      throw new TokenizerException(
-          "TokenizerJsonLoader: added_tokens['"
-              + content
-              + "'] has normalized=true, which AddedTokenSplitter does not implement");
+    if (normalizer == NormalizerKind.NONE) {
+      return;
     }
+    JsonNode normalizedNode = entry.path("normalized");
+    if (!normalizedNode.asBoolean(!special)) {
+      return;
+    }
+    // Distinguishing an explicit "normalized": true from an absent field defaulting to true (via
+    // !special, per HF's own serde) matters for the thrown message: naming a field the file
+    // doesn't actually contain would be misleading (PR #14 review round 6, finding 5).
+    String reason =
+        normalizedNode.isMissingNode() || normalizedNode.isNull()
+            ? "normalized absent, which defaults to true for a non-special added token"
+            : "normalized=true";
+    throw new TokenizerException(
+        "TokenizerJsonLoader: added_tokens['"
+            + content
+            + "'] has "
+            + reason
+            + ", which AddedTokenSplitter does not implement");
   }
 
   private static List<AddedToken> parseAddedTokens(JsonNode node, NormalizerKind normalizer) {

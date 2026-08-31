@@ -3,32 +3,32 @@ package se.alipsa.jmlx.tokenizer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /** A byte-level BPE tokenizer loaded from a {@code tokenizer.json} file. */
 public final class HfTokenizer {
 
   private final TokenizerJson json;
   private final Vocabulary vocabulary;
+  private final int baseVocabularyMaxKnownId;
   private final BpeMerger merger;
   private final ByteLevelPreTokenizer pretokenizer;
   private final AddedTokenSplitter addedTokenSplitter;
-  private final Set<String> addedTokenContents;
 
   private HfTokenizer(TokenizerJson json) {
     this.json = json;
     List<AddedToken> templateTokens = collectTemplateSpecialTokens(json.postProcessor());
     List<AddedToken> newTemplateTokens;
+    int baseMaxKnownId;
     if (templateTokens.isEmpty()) {
       // Skips building baseVocabulary below entirely when there's nothing to validate against
       // it -- Qwen2.5's own post_processor has no TemplateProcessing step at all, so this avoids
       // a second, otherwise-discarded Vocabulary construction over its full ~150k-entry
       // model.vocab merely to come back empty (PR #14 review round 5, finding 11).
       newTemplateTokens = List.of();
+      baseMaxKnownId = -1; // computed from this.vocabulary below instead -- see the assignment.
     } else {
       requireInternallyConsistentTemplateTokens(templateTokens);
       Vocabulary baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
@@ -37,11 +37,11 @@ public final class HfTokenizer {
       // entry or a "real" added_tokens entry -- is left exactly as baseVocabulary already has
       // it, not re-registered here as a brand-new AddedToken: doing that unconditionally used to
       // stamp special=true onto *every* template-named token regardless of its real status,
-      // corrupting addedTokenContents (forcing literal pass-through decode on what may be an
-      // ordinary vocab token) and specialIds (making skipSpecialTokens wrongly drop a token
-      // added_tokens itself declared special=false for) (PR #14 review round 5, finding 1).
+      // corrupting specialIds (making skipSpecialTokens wrongly drop a token added_tokens itself
+      // declared special=false for) (PR #14 review round 5, finding 1).
       newTemplateTokens =
           templateTokens.stream().filter(t -> !baseVocabulary.hasToken(t.content())).toList();
+      baseMaxKnownId = baseVocabulary.maxKnownId();
     }
     // Registering a genuinely-new validated template token as if it were an addedToken, rather
     // than leaving it merely "trusted but unregistered" in encode() below, is what makes
@@ -52,18 +52,27 @@ public final class HfTokenizer {
     List<AddedToken> mergedAddedTokens = new ArrayList<>(json.addedTokens());
     mergedAddedTokens.addAll(newTemplateTokens);
     this.vocabulary = new Vocabulary(json.model().vocab(), mergedAddedTokens);
+    // Deliberately NOT vocabulary.maxKnownId(): a template can register a single, arbitrarily
+    // sparse id far above the real vocab's own top (e.g. a fine-tune's BOS id declared as
+    // 999999 against a ~128k-entry vocab). Folding that outlier into decode()'s own
+    // above-maxKnownId skip threshold would misclassify every id between the real vocab's top
+    // and that outlier as an "in-range hole" instead of the legitimate above-vocab case the skip
+    // exists for -- verified end-to-end: with vocabulary.maxKnownId() used directly, decode() on
+    // an id far below the template outlier but still above the real vocab's own top wrongly
+    // threw instead of skipping. baseVocabularyMaxKnownId instead reflects only model.vocab +
+    // added_tokens (json.addedTokens(), not the template-only registrations above), so decode()'s
+    // skip/throw split still tracks the real vocabulary's own boundary; the template id itself
+    // still resolves correctly via vocabulary.hasId/tokenOf regardless, since it was merged above
+    // (PR #14 review round 6, finding 2).
+    this.baseVocabularyMaxKnownId =
+        templateTokens.isEmpty() ? vocabulary.maxKnownId() : baseMaxKnownId;
     this.merger = new BpeMerger(json.model());
     this.pretokenizer = new ByteLevelPreTokenizer(json.preTokenizer());
     // addedTokenSplitter is deliberately scoped to json.addedTokens() only, not
     // mergedAddedTokens: it splits raw input *text* at encode time, and HF's own AddedVocabulary
     // component never consults TemplateProcessing's special_tokens for that -- those are two
-    // independent mechanisms. addedTokenContents, by contrast, must include template-registered
-    // tokens too: it decides whether ByteLevelDecoder passes a resolved token through literally
-    // or byte-decodes it, and a template-only special token (see mergedAddedTokens above) needs
-    // the same literal pass-through decode() applies to a "real" added_tokens entry.
+    // independent mechanisms.
     this.addedTokenSplitter = new AddedTokenSplitter(json.addedTokens());
-    this.addedTokenContents = new HashSet<>();
-    mergedAddedTokens.forEach(t -> addedTokenContents.add(t.content()));
   }
 
   /**
@@ -192,8 +201,8 @@ public final class HfTokenizer {
   }
 
   /**
-   * Decodes token ids back into text. An id above {@link Vocabulary#maxKnownId} is skipped rather
-   * than aborting the whole decode -- e.g. Qwen2.5's {@code config.json} {@code vocab_size}
+   * Decodes token ids back into text. An id above {@link #baseVocabularyMaxKnownId} is skipped
+   * rather than aborting the whole decode -- e.g. Qwen2.5's {@code config.json} {@code vocab_size}
    * (152064) exceeds its tokenizer vocab (151665), so a sampled logit can legitimately fall in that
    * gap. An id within the known vocabulary range that still has no entry is a real hole (the wrong
    * tokenizer for the checkpoint, a mis-parsed {@code added_tokens}, a {@link Vocabulary} bug) and
@@ -207,18 +216,18 @@ public final class HfTokenizer {
         continue;
       }
       if (!vocabulary.hasId(id)) {
-        if (id > vocabulary.maxKnownId()) {
+        if (id > baseVocabularyMaxKnownId) {
           continue;
         }
         throw new TokenizerException(
             "HfTokenizer.decode: no vocabulary entry for id "
                 + id
                 + ", within the known vocabulary range (max "
-                + vocabulary.maxKnownId()
+                + baseVocabularyMaxKnownId
                 + ")");
       }
       tokens.add(vocabulary.tokenOf(id));
     }
-    return ByteLevelDecoder.decode(tokens, addedTokenContents);
+    return ByteLevelDecoder.decode(tokens);
   }
 }

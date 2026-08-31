@@ -606,7 +606,7 @@ tasks.register('releaseVerification', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'se.alipsa.jmlx.jinja.release.ReleaseVerifierMain'
-    def verificationHome = layout.projectDirectory.dir('.gradle-user/release-verification').asFile
+    def verificationHome = layout.buildDirectory.dir('release-verification-user-home').get().asFile
     args layout.projectDirectory.asFile.absolutePath, verificationHome.absolutePath,
         System.getProperty('java.home'), System.getProperty('java.vendor'), System.getProperty('java.version')
     if (providers.gradleProperty('releaseVerificationAllowDirty').present) args '--allow-dirty'

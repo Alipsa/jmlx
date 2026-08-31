@@ -87,7 +87,8 @@ class ReleaseVerifierMainTest {
     Files.writeString(evidence, "{\"archives\":[]}");
     assertThrows(
         IllegalStateException.class,
-        () -> ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
+        () ->
+            ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
   }
 
   @Test
@@ -98,7 +99,8 @@ class ReleaseVerifierMainTest {
         "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"secondSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}");
     assertThrows(
         IllegalStateException.class,
-        () -> ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
+        () ->
+            ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
   }
 
   @Test

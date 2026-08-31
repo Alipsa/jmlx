@@ -399,9 +399,8 @@ byte-level-BPE pipeline, plus the local `jmlx-jinja` module (`se.alipsa.jmlx.jin
 chat-template half this section's `@huggingface/jinja`/option-2 bullet already preferred -- rather than a thin binding over
 already-battle-tested native code the way M1's `MLXIO` is. One correction to the amendment above:
 `jmlx-jinja` is a source module, so it does not use Maven repository resolution; Jackson remains the
-tokenizer's external dependency. The "still open" paragraph immediately above and the rest of D3 are
-left in place as the historical record of the research that led here, per this document's own
-amend-don't-delete convention.
+tokenizer's external dependency. The surrounding research remains only as historical context for the
+pure-Java decision.
 
 **D4 — Reference models (M3) are pure composition, deferred until M1 and M2 both land.**
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already

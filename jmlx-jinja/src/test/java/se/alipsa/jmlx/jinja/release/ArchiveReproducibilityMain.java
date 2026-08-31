@@ -31,8 +31,10 @@ public final class ArchiveReproducibilityMain {
     try {
       runGit(project, "git", "worktree", "add", "--detach", sandbox.toString(), "HEAD");
       Path candidateModule = sandbox.resolve(moduleDirectory);
-      List<Path> first = buildAndCopy(candidateModule, userHome, offline, evidence.resolve("first"));
-      List<Path> second = buildAndCopy(candidateModule, userHome, offline, evidence.resolve("second"));
+      List<Path> first =
+          buildAndCopy(candidateModule, userHome, offline, evidence.resolve("first"));
+      List<Path> second =
+          buildAndCopy(candidateModule, userHome, offline, evidence.resolve("second"));
       for (int index = 0; index < first.size(); index++) {
         if (!sha256(first.get(index)).equals(sha256(second.get(index)))) {
           throw new IllegalStateException(
@@ -139,7 +141,8 @@ public final class ArchiveReproducibilityMain {
             .redirectErrorStream(true)
             .start();
     String output = new String(process.getInputStream().readAllBytes()).trim();
-    if (process.waitFor() != 0) throw new IllegalStateException("cannot find repository root: " + output);
+    if (process.waitFor() != 0)
+      throw new IllegalStateException("cannot find repository root: " + output);
     return Path.of(output).toAbsolutePath().normalize();
   }
 

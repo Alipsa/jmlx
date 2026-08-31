@@ -40,7 +40,7 @@ public final class ReleaseVerifierMain {
     Path retainedEvidence = source.resolve("build/reports/release-verification-evidence");
     prepareReport(report, retainedEvidence);
     verifyEnvironment(source, daemonVersion);
-    String status = output(source, "git", "status", "--porcelain");
+    String status = output(source, "git", "status", "--porcelain", "--", ".");
     if (!status.isBlank() && !allowDirty)
       throw new IllegalStateException("source checkout is dirty:\n" + status);
     String head = output(source, "git", "rev-parse", "HEAD").trim();
@@ -67,8 +67,16 @@ public final class ReleaseVerifierMain {
 
       gradle(candidateModule, userHome, true, "verifyReproducibleArchives");
       Path archiveEvidence = dependencyEvidence.resolve("archive-reproducibility.json");
-      copyEvidence(candidateModule, dependencyEvidence, "build/reports/archive-reproducibility.json");
+      copyEvidence(
+          candidateModule, dependencyEvidence, "build/reports/archive-reproducibility.json");
       gradle(candidateModule, userHome, true, "clean", "check");
+      gradle(
+          candidateModule,
+          userHome,
+          true,
+          "corpusCoverage",
+          "formatGoldenVerify",
+          "fuzzParserVerify");
       verifyRequiredTaskEvidence(candidateModule, source.resolve("req/release-verification.json"));
       gradle(
           candidateModule,
@@ -169,7 +177,9 @@ public final class ReleaseVerifierMain {
             "corpusCoverage",
             "build/reports/corpus-coverage.md",
             "formatGoldenVerify",
-            "build/formatGoldenVerify/verified");
+            "build/formatGoldenVerify/verified",
+            "fuzzParserVerify",
+            "build/reports/fuzz-parser.md");
     for (String task : stringArray(contract, "requiredTasks")) {
       String relative = evidence.get(task);
       if (relative == null)
@@ -406,7 +416,8 @@ public final class ReleaseVerifierMain {
 
   static String mainArchiveDigest(Path archiveEvidence, String coordinates) throws Exception {
     String[] coordinate = coordinates.split(":", -1);
-    if (coordinate.length != 3) throw new IllegalArgumentException("invalid coordinates: " + coordinates);
+    if (coordinate.length != 3)
+      throw new IllegalArgumentException("invalid coordinates: " + coordinates);
     Pattern mainArchiveDigest =
         Pattern.compile(
             "\\\"name\\\"\\s*:\\s*\\\""

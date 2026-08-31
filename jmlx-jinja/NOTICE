@@ -1,4 +1,4 @@
-hfjinja includes selected source material from @huggingface/jinja 0.5.9.
+jmlx-jinja includes selected source material from @huggingface/jinja 0.5.9.
 
 Upstream project: https://github.com/huggingface/huggingface.js
 Upstream license: MIT License (see upstream/vendor/LICENSE).

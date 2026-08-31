@@ -1061,9 +1061,7 @@ public final class Interpreter {
     var positional = new ArrayList<Value>();
     // LinkedHashMap preserves source insertion order so error reporting stays deterministic; the
     // returned map wraps this local unmodifiable rather than copying it via an order-agnostic
-    // factory — see this plan's Step 2 source guard in
-    // docs/superpowers/plans/2026-08-23-wp5-slice2-spread-call-arguments.md. keywords never
-    // escapes this method otherwise, so wrapping it directly is safe.
+    // factory. keywords never escapes this method otherwise, so wrapping it directly is safe.
     var keywords = new LinkedHashMap<String, Value>();
     boolean sawKeyword = false;
     for (var argument : args) {
@@ -1741,8 +1739,7 @@ public final class Interpreter {
               // argument expression can itself call this macro (e.g. `{% macro m(a=m()) %}`),
               // and evaluateExpression(kwarg.value(), ...) recurses back into this same lambda
               // before evaluateBlock(n.body(), ...) is ever reached. Entering here — before
-              // binding — closes that gap; see
-              // docs/superpowers/plans/2026-08-24-wp5-slice3-macros-call-and-filter-blocks.md.
+              // binding — closes that gap.
               //
               // enterMacro is called BEFORE the try, not inside it: enterMacro is
               // check-before-increment, so on the limit-exceeded path it never touches

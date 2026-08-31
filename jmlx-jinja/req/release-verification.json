@@ -6,6 +6,6 @@
   "exports": ["se.alipsa.jmlx.jinja"],
   "publishedRuntimeDependencies": [],
   "archives": ["jar", "sourcesJar", "javadocJar"],
-  "requiredTasks": ["upstreamVerify", "corpusCoverage", "formatGoldenVerify"],
+  "requiredTasks": ["upstreamVerify", "corpusCoverage", "formatGoldenVerify", "fuzzParserVerify"],
   "policyInputs": ["NOTICE", "req/model-fixture-policy.md", "CHANGELOG.md", "req/release-checklist.md"]
 }

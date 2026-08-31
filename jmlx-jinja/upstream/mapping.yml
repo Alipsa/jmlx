@@ -1,0 +1,38 @@
+# This lightweight ledger intentionally uses inline flow lists; upstreamVerify validates that form.
+ast.ts:
+  milestone: M1
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/internal/ast/Statement.java, src/main/java/se/alipsa/jmlx/jinja/internal/ast/Expression.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/internal/ast/AstInventoryTest.java]
+lexer.ts:
+  milestone: M1
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/internal/lexer/Lexer.java, src/main/java/se/alipsa/jmlx/jinja/internal/lexer/Token.java, src/main/java/se/alipsa/jmlx/jinja/internal/lexer/TokenType.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/internal/lexer/LexerTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/parser/FuzzParserRunnerTest.java]
+parser.ts:
+  milestone: M1
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/internal/parser/Parser.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/internal/parser/ParserTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/parser/AstSnapshotDifferentialTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/parser/FuzzParserRunnerTest.java]
+runtime.ts:
+  milestone: M2
+  # Runtime slices 1–3; small utils and index responsibilities live in Interpreter.
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/internal/runtime/Environment.java, src/main/java/se/alipsa/jmlx/jinja/internal/runtime/RenderBudget.java, src/main/java/se/alipsa/jmlx/jinja/internal/runtime/ExecResult.java, src/main/java/se/alipsa/jmlx/jinja/internal/runtime/Interpreter.java, src/main/java/se/alipsa/jmlx/jinja/internal/runtime/JsOperations.java, src/main/java/se/alipsa/jmlx/jinja/internal/JsFormat.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/internal/runtime/InterpreterTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/runtime/JsOperationsTest.java]
+utils.ts:
+  milestone: M2
+  # Ported runtime paths: range/strftime_now, slice, titleCase, and replace.
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/internal/runtime/Interpreter.java, src/main/java/se/alipsa/jmlx/jinja/internal/util/JsSlice.java, src/main/java/se/alipsa/jmlx/jinja/internal/util/PosixStrftime.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/internal/runtime/InterpreterTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/util/JsSliceTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/util/PosixStrftimeTest.java]
+index.ts:
+  milestone: M2
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/Template.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/TemplateFormatTest.java]
+format.ts:
+  milestone: M2
+  status: implemented
+  java: [src/main/java/se/alipsa/jmlx/jinja/internal/TemplateFormatter.java]
+  tests: [src/test/java/se/alipsa/jmlx/jinja/TemplateFormatTest.java]

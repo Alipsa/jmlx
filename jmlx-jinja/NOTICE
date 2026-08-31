@@ -1,0 +1,20 @@
+hfjinja includes selected source material from @huggingface/jinja 0.5.9.
+
+Upstream project: https://github.com/huggingface/huggingface.js
+Upstream license: MIT License (see upstream/vendor/LICENSE).
+Pinned commit: 41585aa8e776e0e4e1430ac2aad24506f74c3110.
+
+Model chat-template text is retained only for the approved fixtures recorded below.
+
+Model fixture intake is governed by req/model-fixture-policy.md. Model template text or rendered
+output requires a fixture-specific approval there; otherwise only hash-only fixture metadata may
+be retained.
+
+## Model fixtures
+
+| Model repository | Revision | Template path | License | Retained form | Notice | Model-card attribution |
+| --- | --- | --- | --- | --- | --- | --- |
+| `mistralai/Mistral-7B-Instruct-v0.3` | `c170c708c41dac9275d15a8fff4eca08d52bab71` | `tokenizer_config.json` `chat_template` | Apache-2.0 | Full template text in `src/test/resources/model-templates/mistral-7b-instruct-v0.3.jinja` | Apache-2.0; see `req/model-fixture-policy.md` | https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3/blob/c170c708c41dac9275d15a8fff4eca08d52bab71/README.md |
+| `Qwen/Qwen2.5-32B-Instruct` | `afb2829595f63efa3548e9d6b13aa66e61aa0f38` | `tokenizer_config.json` `chat_template` | Apache-2.0 | Full template text in `src/test/resources/model-templates/qwen2.5-32b-instruct.jinja` | Apache-2.0; see `req/model-fixture-policy.md` | https://huggingface.co/Qwen/Qwen2.5-32B-Instruct/blob/afb2829595f63efa3548e9d6b13aa66e61aa0f38/README.md |
+| `mlx-community/Qwen3.8-27B-4bit` | `3e6447f082e89cc7f0bc6e5441afd38dfce760ff` | `chat_template.jinja` | Apache-2.0; MLX conversion of `Qwen/Qwen3.8-27B` | Full template text in `src/test/resources/model-templates/qwen3.8-27b-4bit.jinja` | Apache-2.0; see `req/model-fixture-policy.md` | https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/blob/3e6447f082e89cc7f0bc6e5441afd38dfce760ff/README.md |
+| `stepfun-ai/step3` | `7bf55112c8b477c47f91ed7c5872a5a80015b099` | `chat_template.json` `chat_template` | Apache-2.0 | Full template text in `src/test/resources/model-templates/step3.jinja`; self-authored render golden in `step3-tooluse.expected.txt` | Apache-2.0; see `req/model-fixture-policy.md` | https://huggingface.co/stepfun-ai/step3/blob/7bf55112c8b477c47f91ed7c5872a5a80015b099/README.md |

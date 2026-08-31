@@ -1,0 +1,18 @@
+<s> You are helpful. # Tools 
+You may call one or more tools to assist with the user query. You are provided with tool schemas within <tools></tools> XML tags: <tools>{"type": "function", "function": {"name": "get_weather", "description": "Météo", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}}
+</tools> When making tool calls, use XML format to invoke tools and pass parameters: <｜tool_calls_begin｜>
+<｜tool_call_begin｜>
+function<｜tool_sep｜><steptml:invoke name="tool_name0"><steptml:parameter name="parameter_name0">[parameter value]</steptml:parameter>...</steptml:invoke><｜tool_call_end｜>
+<｜tool_call_begin｜>
+function<｜tool_sep｜><steptml:invoke name="tool_name1"><steptml:parameter name="parameter_name1">[parameter value]</steptml:parameter>...</steptml:invoke><｜tool_call_end｜>
+<｜tool_calls_end｜>
+Note: * You can invoke one or more tools in parallel. * Each tool call must be complete and self-contained within a single <steptml:toolcall></steptml:toolcall> block. <|BOT|>system
+ You are helpful. <|EOT|> Use tools. <|BOT|>user
+ What is the weather?<im_patch> <|EOT|><|BOT|>assistant
+ Checking <｜tool_calls_begin｜>
+<｜tool_call_begin>｜>
+function<｜tool_sep｜><steptml:invoke name="get_weather"><steptml:parameter name="city">Paris</steptml:parameter><steptml:parameter name="unit">C</steptml:parameter></steptml:invoke><｜tool_call_end｜>
+<｜tool_calls_end｜>
+<|EOT|><｜tool_outputs_begin｜>
+<｜tool_output_begin｜>
+ sunny <｜tool_output_end｜><｜tool_outputs_end｜>

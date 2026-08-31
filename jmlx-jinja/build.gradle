@@ -1,0 +1,425 @@
+plugins {
+    id 'java-library'
+}
+
+// hfjinja is a dependency-free Java 21 library; keep that promise even though
+// the rest of jmlx currently targets Java 25.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    // No runtime dependencies.
+}
+
+tasks.withType(Test).configureEach {
+    def canonicalIanaZones = file('tools/corpus/iana-time-zones.txt')
+    inputs.file(canonicalIanaZones)
+    systemProperty 'jmlx.jinja.canonicalIanaZones', canonicalIanaZones.absolutePath
+    maxParallelForks = 2
+    timeout = java.time.Duration.ofMinutes(5)
+}
+
+def upstreamLockFile = layout.projectDirectory.file('upstream/upstream-lock.json').asFile
+def astAllowlistFile = layout.projectDirectory.file('upstream/ast-allowlist.json').asFile
+def mappingFile = layout.projectDirectory.file('upstream/mapping.yml').asFile
+def projectDirectoryFile = layout.projectDirectory.asFile
+def vendorDir = layout.projectDirectory.dir('upstream/vendor').asFile
+def packageMetadataFile = new File(vendorDir, 'package.json')
+def astSourceFile = new File(vendorDir, 'src/ast.ts')
+def runtimeSourceFile = new File(vendorDir, 'src/runtime.ts')
+def utilsSourceFile = new File(vendorDir, 'src/utils.ts')
+def renderOptionsSourceFile = layout.projectDirectory.file('src/main/java/se/alipsa/jmlx/jinja/RenderOptions.java').asFile
+def upstreamVerifyMarker = layout.buildDirectory.file('upstreamVerify/verified').get().asFile
+
+tasks.register('upstreamVerify') {
+    group = 'verification'
+    description = 'Verifies pinned upstream provenance without fetching network data.'
+    def vendorFiles = {
+        def vendorRootPath = vendorDir.toPath()
+        if (!java.nio.file.Files.isDirectory(vendorRootPath)) {
+            return []
+        }
+        def stream = java.nio.file.Files.walk(vendorRootPath)
+        try {
+            stream
+                .filter { java.nio.file.Files.isRegularFile(it) }
+                .filter { path ->
+                    def relativePath = vendorRootPath.relativize(path).toString().replace(File.separatorChar, '/' as char)
+                    relativePath != '.DS_Store'
+                        && !relativePath.endsWith('/.DS_Store')
+                        && relativePath != 'node_modules'
+                        && !relativePath.startsWith('node_modules/')
+                        && !relativePath.contains('/node_modules/')
+                        && relativePath != '__snapshots__'
+                        && !relativePath.startsWith('__snapshots__/')
+                        && !relativePath.contains('/__snapshots__/')
+                }
+                .collect { it.toFile() }
+        } finally {
+            stream.close()
+        }
+    }
+    inputs.file(upstreamLockFile).withPropertyName('upstreamLock')
+    inputs.file(astAllowlistFile).withPropertyName('astAllowlist')
+    inputs.file(mappingFile).withPropertyName('mapping')
+    inputs.file(renderOptionsSourceFile).withPropertyName('renderOptionsSource')
+    inputs.files(vendorFiles).withPropertyName('vendorTree')
+    outputs.file(upstreamVerifyMarker).withPropertyName('verifiedMarker')
+    doLast {
+        if (!vendorDir.isDirectory()) {
+            throw new GradleException('Missing upstream/vendor')
+        }
+        def parsed = new groovy.json.JsonSlurper().parse(upstreamLockFile)
+        ['package', 'version', 'nodeVersion', 'commit', 'tarball', 'integrity', 'sha256',
+         'fixtureRevision', 'excludedFiles', 'astNodes', 'globals', 'files'].each {
+            if (!parsed.containsKey(it)) {
+                throw new GradleException("Upstream lock is missing '${it}'")
+            }
+        }
+        if (parsed.package != '@huggingface/jinja'
+            || !(parsed.version instanceof String && parsed.version ==~ /\d+\.\d+\.\d+/)
+            || !(parsed.nodeVersion instanceof String && parsed.nodeVersion ==~ /v\d+\.\d+\.\d+/)
+            || !(parsed.commit instanceof String && parsed.commit ==~ /[0-9a-f]{40}/)
+            || !(parsed.tarball instanceof String && parsed.tarball.startsWith('https://registry.npmjs.org/'))
+            || !(parsed.integrity instanceof String && parsed.integrity.startsWith('sha512-'))
+            || !(parsed.sha256 instanceof String && parsed.sha256 ==~ /[0-9a-f]{64}/)
+            || !(parsed.fixtureRevision instanceof String && !parsed.fixtureRevision.isBlank()
+                && parsed.fixtureRevision != 'initial')) {
+            throw new GradleException('Upstream lock contains invalid provenance metadata')
+        }
+        def packageMetadata = new groovy.json.JsonSlurper().parse(packageMetadataFile)
+        if (packageMetadata.name != parsed.package || packageMetadata.version != parsed.version) {
+            throw new GradleException('Upstream lock package/version does not match vendored package.json')
+        }
+        if (!(parsed.files instanceof Map) || parsed.files.isEmpty()) {
+            throw new GradleException('Upstream lock has no source file hashes')
+        }
+        if (!(parsed.excludedFiles instanceof Map)) {
+            throw new GradleException('Upstream lock excludedFiles must be a map')
+        }
+        def invalidExclusions = parsed.excludedFiles.findAll { relativePath, metadata ->
+            !(relativePath instanceof String && relativePath ==~ /[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*/)
+                || !(metadata instanceof Map)
+                || !(metadata.sha256 instanceof String && metadata.sha256 ==~ /[0-9a-f]{64}/)
+                || !(metadata.reason instanceof String && !metadata.reason.isBlank())
+        }
+        if (!invalidExclusions.isEmpty()) {
+            throw new GradleException("Upstream lock has invalid excluded files: ${invalidExclusions.keySet()}")
+        }
+        def vendorRootPath = vendorDir.toPath()
+        def vendorPaths = vendorFiles()
+            .collect { vendorRootPath.relativize(it.toPath()).toString().replace(File.separatorChar, '/' as char) }
+            .toSet()
+        def presentExclusions = vendorPaths.intersect(parsed.excludedFiles.keySet())
+        if (!presentExclusions.isEmpty()) {
+            throw new GradleException("Excluded vendored files must not be present: ${presentExclusions}")
+        }
+        if (parsed.files.keySet().toSet() != vendorPaths) {
+            def missingHashes = vendorPaths - parsed.files.keySet().toSet()
+            def staleHashes = parsed.files.keySet().toSet() - vendorPaths
+            throw new GradleException(
+                "Upstream lock file hashes do not cover exactly the vendored tree; missing=${missingHashes}, stale=${staleHashes}")
+        }
+        parsed.files.each { relativePath, expectedHash ->
+            def source = new File(vendorDir, relativePath)
+            if (!source.isFile()) {
+                throw new GradleException("Vendored upstream file is missing: ${relativePath}")
+            }
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(source.bytes)
+                .collect { String.format('%02x', it) }
+                .join()
+            if (digest != expectedHash) {
+                throw new GradleException("Vendored upstream hash mismatch: ${relativePath}")
+            }
+        }
+        def discoveredNodes = (astSourceFile.text =~ /(?m)^(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z0-9_]+)/)
+            .collect { it[1] }
+        if (discoveredNodes.toSet() != parsed.astNodes.toSet()) {
+            def missing = discoveredNodes.findAll { !parsed.astNodes.contains(it) }
+            def stale = parsed.astNodes.findAll { !discoveredNodes.contains(it) }
+            throw new GradleException("AST inventory mismatch; missing=${missing}, stale=${stale}")
+        }
+        if (!(parsed.globals instanceof List)) {
+            throw new GradleException('Upstream lock globals inventory must be a list')
+        }
+        def invalidGlobals = parsed.globals.findAll { global ->
+            !(global instanceof Map)
+                || !(global.name instanceof String && global.name ==~ /[A-Za-z_][A-Za-z0-9_]*/)
+                || !((global.arity instanceof Number && global.arity.intValue() >= 0)
+                    || (global.arity instanceof String && global.arity ==~ /\d+\.\.\d+/))
+                || !(global.hostSupplied instanceof Boolean)
+        }
+        if (!invalidGlobals.isEmpty()) {
+            throw new GradleException("Upstream lock has invalid global inventory entries: ${invalidGlobals}")
+        }
+        def builtInSet = renderOptionsSourceFile.text =~ /(?s)private static final Set<String> BUILTIN_GLOBALS\s*=\s*Set\.of\((.*?)\);/
+        if (!builtInSet.find()) {
+            throw new GradleException('Cannot find RenderOptions built-in global set')
+        }
+        def reservedBuiltIns = (builtInSet.group(1) =~ /"([A-Za-z_][A-Za-z0-9_]*)"/).collect { it[1] }
+        def expectedBuiltIns = (parsed.globals.findAll { !it.hostSupplied }.collect { it.name } + ['namespace']).unique()
+        if (reservedBuiltIns.toSet() != expectedBuiltIns.toSet() || reservedBuiltIns.size() != expectedBuiltIns.size()) {
+            throw new GradleException('RenderOptions built-in globals do not match the upstream lock inventory')
+        }
+        def discoveredGlobals = (runtimeSourceFile.text =~ /env\.set\("([A-Za-z_][A-Za-z0-9_]*)",/)
+            .collect { it[1] }
+        def lockedGlobals = parsed.globals.collect { it.name }
+        if (discoveredGlobals.toSet() != lockedGlobals.toSet() || discoveredGlobals.size() != lockedGlobals.size()) {
+            def missing = discoveredGlobals.findAll { !lockedGlobals.contains(it) }
+            def stale = lockedGlobals.findAll { !discoveredGlobals.contains(it) }
+            throw new GradleException("Global inventory mismatch; missing=${missing}, stale=${stale}")
+        }
+        def utilsSource = utilsSourceFile.text
+        def functionArity = { functionName ->
+            def match = utilsSource =~ "export\\s+function\\s+${functionName}\\(([^)]*)\\)"
+            if (!match.find()) {
+                throw new GradleException("Cannot determine arity for upstream global: ${functionName}")
+            }
+            def parameters = match.group(1).split(',').collect { it.trim() }.findAll { !it.isEmpty() }
+            def required = parameters.count { !it.contains('?') && !it.contains('=') }
+            return required == parameters.size() ? required : "${required}..${parameters.size()}".toString()
+        }
+        def expectedArities = [
+            false: 0, true: 0, none: 0, raise_exception: 1,
+            range: functionArity('range'), strftime_now: functionArity('strftime_now'),
+            True: 0, False: 0, None: 0
+        ]
+        def lockedArities = parsed.globals.collectEntries { [(it.name): it.arity] }
+        if (lockedArities != expectedArities) {
+            throw new GradleException("Global arity inventory mismatch; expected=${expectedArities}, actual=${lockedArities}")
+        }
+        def declaredNodes = new groovy.json.JsonSlurper().parse(astAllowlistFile)
+        def unaccountedNodes = discoveredNodes.findAll { !declaredNodes.containsKey(it) }
+        if (!unaccountedNodes.isEmpty()) {
+            throw new GradleException("Unaccounted AST nodes: ${unaccountedNodes.join(', ')}")
+        }
+        def mappingEntries = [:]
+        def currentMapping = null
+        mappingFile.eachLine { line ->
+            def section = line =~ /^([A-Za-z0-9_.-]+\.ts):\s*$/
+            if (section.matches()) {
+                currentMapping = section.group(1)
+                if (mappingEntries.containsKey(currentMapping)) {
+                    throw new GradleException("Duplicate mapping entry: ${currentMapping}")
+                }
+                mappingEntries[currentMapping] = [noImpact: false, hash: null, milestone: null, status: null,
+                                                  java: null, tests: null]
+            } else if (currentMapping != null && line.trim().startsWith('milestone:')) {
+                mappingEntries[currentMapping].milestone = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim().startsWith('status:')) {
+                mappingEntries[currentMapping].status = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim().startsWith('java:')) {
+                mappingEntries[currentMapping].java = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim().startsWith('tests:')) {
+                mappingEntries[currentMapping].tests = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim() == 'reviewed-no-port-impact:') {
+                mappingEntries[currentMapping].noImpact = true
+            } else if (currentMapping != null && line.trim().startsWith('sha256:')) {
+                mappingEntries[currentMapping].hash = line.substring(line.indexOf(':') + 1).trim()
+            }
+        }
+        parsed.files.findAll { relativePath, ignored -> relativePath.startsWith('src/') }.each { relativePath, expectedHash ->
+            def basename = new File(relativePath).name
+            if (!mappingEntries.containsKey(basename)) {
+                throw new GradleException("No mapping entry for upstream file: ${relativePath}")
+            }
+            if (mappingEntries[basename].noImpact && mappingEntries[basename].hash != expectedHash) {
+                throw new GradleException("Stale reviewed-no-port-impact hash: ${relativePath}")
+            }
+            def entry = mappingEntries[basename]
+            if (!(entry.milestone ==~ /M\d+/)) {
+                throw new GradleException("Mapping entry has invalid milestone: ${basename}")
+            }
+            if (entry.noImpact) {
+                if (entry.status != null || entry.java != null || entry.tests != null) {
+                    throw new GradleException("No-impact mapping must not declare a port status: ${basename}")
+                }
+            } else if (entry.status == 'planned') {
+                if (entry.java != '[]' || entry.tests != '[]') {
+                    throw new GradleException("Planned mapping must explicitly have no Java/tests yet: ${basename}")
+                }
+            } else if (entry.status == 'implemented') {
+                if (!(entry.java ==~ /\[\s*\S(?:.*\S)?\s*\]/)
+                    || !(entry.tests ==~ /\[\s*\S(?:.*\S)?\s*\]/)) {
+                    throw new GradleException("Implemented mapping must name Java and test coverage: ${basename}")
+                }
+                ((entry.java + entry.tests) =~ /(src\/[^,\]\s]+\.java)/).collect { it[1] }.each { declared ->
+                    if (!new File(projectDirectoryFile, declared).isFile()) {
+                        throw new GradleException("Mapping entry names a missing file: ${basename} -> ${declared}")
+                    }
+                }
+            } else {
+                throw new GradleException("Mapping entry has invalid status: ${basename}")
+            }
+        }
+        def plannedPackages = ['lexer.ts': 'internal/lexer', 'ast.ts': 'internal/ast',
+                               'parser.ts': 'internal/parser', 'runtime.ts': 'internal/runtime',
+                               'utils.ts': 'internal/util']
+        mappingEntries.each { basename, entry ->
+            def packagePath = plannedPackages[basename]
+            if (entry.status == 'planned' && packagePath != null
+                && new File(projectDirectoryFile, "src/main/java/se/alipsa/jmlx/jinja/${packagePath}").isDirectory()) {
+                throw new GradleException("Mapping entry is still 'planned' but its Java package exists: ${basename}")
+            }
+        }
+        def mappedSources = mappingEntries.keySet().collect { "src/${it}" }.toSet()
+        def vendoredSources = parsed.files.keySet().findAll { it.startsWith('src/') }.toSet()
+        def staleMappings = mappedSources - vendoredSources
+        if (!staleMappings.isEmpty()) {
+            throw new GradleException("Mapping entries do not correspond to upstream source: ${staleMappings}")
+        }
+        upstreamVerifyMarker.parentFile.mkdirs()
+        upstreamVerifyMarker.text = 'verified\n'
+    }
+}
+
+def nodeCorpusTestMarker = layout.buildDirectory.file('nodeCorpusTest/verified').get().asFile
+def nodeOracleVersionMarker = layout.buildDirectory.file('nodeOracleVersion/verified').get().asFile
+def nodeCorpusVerifyMarker = layout.buildDirectory.file('nodeCorpusVerify/verified').get().asFile
+def astSnapshotMarker = layout.buildDirectory.file('astSnapshotVerify/verified').get().asFile
+def fuzzParserTestMarker = layout.buildDirectory.file('fuzzParserTest/verified').get().asFile
+def fuzzParserVerifyReport = layout.buildDirectory.file('reports/fuzz-parser.md').get().asFile
+def formatGoldenMarker = layout.buildDirectory.file('formatGoldenVerify/verified').get().asFile
+def formatGoldenReport = layout.buildDirectory.file('reports/format-ast-coverage.md').get().asFile
+
+tasks.register('formatGoldenVerify', Exec) {
+    group = 'verification'
+    description = 'Verifies pinned Node template-format goldens and AST coverage.'
+    executable = 'node'
+    args 'tools/format/format-golden.mjs', '--vectors', 'src/test/resources/format/vectors.json',
+        '--check', 'src/test/resources/format/upstream-formatted.json', '--report', formatGoldenReport.absolutePath
+    inputs.files('tools/format/format-golden.mjs', 'src/test/resources/format/vectors.json',
+        'src/test/resources/format/upstream-formatted.json', 'upstream/vendor/dist/index.js',
+        'upstream/ast-allowlist.json', 'upstream/upstream-lock.json', 'tools/corpus/corpus.mjs',
+        'tools/corpus/error-patterns-0.5.9.json')
+    outputs.file(formatGoldenMarker).withPropertyName('verifiedMarker')
+    outputs.file(formatGoldenReport).withPropertyName('astCoverageReport')
+    doLast { formatGoldenMarker.parentFile.mkdirs(); formatGoldenMarker.text = "verified\n" }
+}
+
+tasks.register('astSnapshotVerify', Exec) {
+    group = 'verification'
+    description = 'Verifies checked-in AST snapshots against the pinned Node parser.'
+    executable = 'node'
+    args 'tools/ast-snapshot/snapshot.mjs', '--fixtures', 'src/test/resources/ast-snapshots/fixtures.json',
+        '--check', 'src/test/resources/ast-snapshots/upstream-parsed.txt'
+    inputs.files('tools/ast-snapshot/snapshot.mjs', 'tools/ast-snapshot/ast-serialize.mjs', 'src/test/resources/ast-snapshots/fixtures.json',
+        'src/test/resources/ast-snapshots/upstream-parsed.txt', 'upstream/vendor/dist/index.js')
+    outputs.file(astSnapshotMarker).withPropertyName('verifiedMarker')
+    doLast { astSnapshotMarker.parentFile.mkdirs(); astSnapshotMarker.text = "verified\n" }
+}
+
+tasks.register('fuzzParserTest', Exec) {
+    group = 'verification'
+    description = 'Tests deterministic parser fuzz candidate generation.'
+    executable = 'node'
+    args '--test', 'tools/fuzz/generate-parser-cases.test.mjs'
+    inputs.files('tools/fuzz/generate-parser-cases.mjs', 'tools/fuzz/generate-parser-cases.test.mjs',
+        'tools/fuzz/testdata/parser-cases-5eedc0de.ndjson')
+    outputs.file(fuzzParserTestMarker).withPropertyName('verifiedMarker')
+    doLast { fuzzParserTestMarker.parentFile.mkdirs(); fuzzParserTestMarker.text = 'verified\n' }
+}
+
+tasks.register('fuzzParserVerify', Exec) {
+    group = 'verification'
+    description = 'Differentially fuzzes the pinned Node and Java lexer/parser in bounded subprocesses.'
+    dependsOn tasks.named('testClasses')
+    executable = 'node'
+    args 'tools/fuzz/compare-parser-results.mjs', '--java', javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }.get().executablePath.asFile.absolutePath, '--java-classpath', sourceSets.test.runtimeClasspath.asPath,
+        '--report', fuzzParserVerifyReport.absolutePath
+    inputs.files('tools/fuzz/generate-parser-cases.mjs', 'tools/fuzz/node-parser-runner.mjs',
+        'tools/fuzz/compare-parser-results.mjs', 'tools/ast-snapshot/ast-serialize.mjs',
+        'src/test/resources/corpus/v1.jsonl', 'upstream/upstream-lock.json', 'upstream/vendor/dist/index.js', sourceSets.test.runtimeClasspath)
+    outputs.file(fuzzParserVerifyReport)
+    outputs.upToDateWhen { false }
+}
+
+tasks.register('nodeCorpusTest', Exec) {
+    group = 'verification'
+    description = 'Tests the versioned differential-corpus schema and error classifier.'
+    executable = 'node'
+    args '--test', 'tools/corpus/corpus.test.mjs'
+    inputs.files('tools/corpus/corpus.mjs', 'tools/corpus/iana-time-zones.txt', 'tools/corpus/corpus.test.mjs',
+        'tools/corpus/error-patterns-0.5.9.json', 'upstream/upstream-lock.json',
+        fileTree('src/test/resources/model-templates'))
+    outputs.file(nodeCorpusTestMarker).withPropertyName('verifiedMarker')
+    doLast {
+        nodeCorpusTestMarker.parentFile.mkdirs()
+        nodeCorpusTestMarker.text = 'verified\n'
+    }
+}
+
+tasks.register('nodeOracleVersion', Exec) {
+    group = 'verification'
+    description = 'Requires the exact Node version pinned for the differential oracle.'
+    executable = 'node'
+    args 'tools/corpus/check-node-version.mjs', '--lock', 'upstream/upstream-lock.json'
+    inputs.files('tools/corpus/check-node-version.mjs', 'upstream/upstream-lock.json')
+    outputs.file(nodeOracleVersionMarker).withPropertyName('verifiedMarker')
+    outputs.upToDateWhen { false }
+    doLast {
+        nodeOracleVersionMarker.parentFile.mkdirs()
+        nodeOracleVersionMarker.text = 'verified\n'
+    }
+}
+
+tasks.register('nodeCorpusVerify', Exec) {
+    group = 'verification'
+    description = 'Checks text-bearing corpus cases against the pinned Node oracle.'
+    executable = 'node'
+    args 'tools/corpus/run-node-oracle.mjs', '--corpus', 'src/test/resources/corpus/v1.jsonl',
+        '--patterns', 'tools/corpus/error-patterns-0.5.9.json', '--lock', 'upstream/upstream-lock.json'
+    inputs.files('tools/corpus/corpus.mjs', 'tools/corpus/iana-time-zones.txt', 'tools/corpus/run-node-oracle.mjs',
+        'tools/corpus/error-patterns-0.5.9.json', 'src/test/resources/corpus/v1.jsonl',
+        'upstream/vendor/dist/index.js', 'upstream/upstream-lock.json')
+    outputs.file(nodeCorpusVerifyMarker).withPropertyName('verifiedMarker')
+    doLast {
+        nodeCorpusVerifyMarker.parentFile.mkdirs()
+        nodeCorpusVerifyMarker.text = 'verified\n'
+    }
+}
+
+def corpusCoverageReport = layout.buildDirectory.file('reports/corpus-coverage.md').get().asFile
+tasks.register('corpusCoverage', Exec) {
+    group = 'verification'
+    description = 'Checks extracted corpus fixtures and writes their upstream coverage report.'
+    executable = 'node'
+    args 'tools/corpus/convert-upstream-tests.mjs', '--check', "--report=${corpusCoverageReport.absolutePath}"
+    inputs.files('tools/corpus/convert-upstream-tests.mjs', 'tools/corpus/corpus.mjs', 'tools/corpus/iana-time-zones.txt',
+        'src/test/resources/corpus/v1.jsonl', 'upstream/upstream-lock.json', 'upstream/corpus-source-inventory.json',
+        'upstream/vendor/src/runtime.ts',
+        fileTree('upstream/vendor/test') { include '**/*.test.js' })
+    outputs.file(corpusCoverageReport)
+}
+
+// upstreamVerify runs on every check because it needs no Node toolchain.
+tasks.named('check') {
+    dependsOn tasks.named('upstreamVerify')
+}
+
+// The Node-dependent verification tasks require the exact Node version pinned in
+// upstream/upstream-lock.json (currently 26.7.0). They are available as explicit
+// tasks but are not wired into `check` because jmlx does not otherwise require Node.
+def nodeDependentTasks = ['nodeCorpusTest', 'nodeOracleVersion', 'nodeCorpusVerify', 'corpusCoverage',
+                          'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify', 'formatGoldenVerify']
+def upstreamVerification = tasks.named('upstreamVerify')
+def nodeVersionVerification = tasks.named('nodeOracleVersion')
+def nodeTimeoutSeconds = [nodeCorpusTest: 120, nodeCorpusVerify: 300, corpusCoverage: 120, nodeOracleVersion: 30, astSnapshotVerify: 120, fuzzParserTest: 30, fuzzParserVerify: 120]
+nodeDependentTasks.each { taskName ->
+    tasks.named(taskName) {
+        dependsOn upstreamVerification
+        mustRunAfter upstreamVerification
+        timeout = java.time.Duration.ofSeconds(nodeTimeoutSeconds[taskName])
+    }
+}
+['nodeCorpusTest', 'nodeCorpusVerify', 'corpusCoverage', 'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify'].each { taskName ->
+    tasks.named(taskName) {
+        dependsOn nodeVersionVerification
+    }
+}

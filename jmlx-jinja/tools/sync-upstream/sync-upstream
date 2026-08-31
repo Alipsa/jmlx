@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/../.."
+
+usage() {
+  echo "Usage: tools/sync-upstream/sync-upstream {verify|report|refresh-lock}" >&2
+  exit 64
+}
+
+case "${1:-}" in
+  verify)
+    exec ./gradlew upstreamVerify
+    ;;
+  report)
+    node <<'NODE'
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const lock = JSON.parse(fs.readFileSync('upstream/upstream-lock.json', 'utf8'));
+const mapping = fs.readFileSync('upstream/mapping.yml', 'utf8');
+const entries = new Map();
+let current;
+for (const line of mapping.split(/\r?\n/)) {
+  const section = /^([A-Za-z0-9_.-]+\.ts):\s*$/.exec(line);
+  if (section) {
+    current = section[1];
+    entries.set(current, {});
+    continue;
+  }
+  if (!current) continue;
+  const property = /^\s+(milestone|status|java|tests):\s*(.*)$/.exec(line);
+  if (property) entries.get(current)[property[1]] = property[2];
+  if (line.trim() === 'reviewed-no-port-impact:') entries.get(current).noImpact = true;
+}
+
+const integrity = {verified: [], changed: [], missing: []};
+for (const [relative, expected] of Object.entries(lock.files)) {
+  const file = path.join('upstream/vendor', relative);
+  if (!fs.existsSync(file)) {
+    integrity.missing.push(relative);
+  } else if (crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== expected) {
+    integrity.changed.push(relative);
+  } else {
+    integrity.verified.push(relative);
+  }
+}
+
+const lines = [
+  '# Upstream provenance report',
+  '',
+  `Pinned package: \`${lock.package}@${lock.version}\``,
+  '',
+  '## Vendored file integrity',
+  '',
+  `- Verified: ${integrity.verified.length}`,
+  `- Changed: ${integrity.changed.length}`,
+  `- Missing: ${integrity.missing.length}`,
+];
+for (const [status, files] of Object.entries(integrity)) {
+  if (!files.length || status === 'verified') continue;
+  lines.push('', `### ${status[0].toUpperCase()}${status.slice(1)} files`, '');
+  lines.push(...files.map((file) => `- \`${file}\``));
+}
+if (Object.keys(lock.excludedFiles ?? {}).length) {
+  lines.push('', '## Policy exclusions', '');
+  for (const [file, metadata] of Object.entries(lock.excludedFiles)) {
+    lines.push(`- \`${file}\`: ${metadata.reason}`);
+  }
+}
+lines.push('', '## Mapping impact', '', '| Upstream source | Milestone | Status | Java | Tests |',
+  '| --- | --- | --- | --- | --- |');
+for (const relative of Object.keys(lock.files).filter((file) => file.startsWith('src/')).sort()) {
+  const name = path.basename(relative);
+  const entry = entries.get(name) ?? {};
+  lines.push(`| \`${relative}\` | ${entry.milestone ?? 'missing'} | ${entry.noImpact ? 'no impact' : entry.status ?? 'missing'} | ${entry.java ?? '—'} | ${entry.tests ?? '—'} |`);
+}
+const report = 'build/reports/upstream-diff.md';
+fs.mkdirSync(path.dirname(report), {recursive: true});
+fs.writeFileSync(report, `${lines.join('\n')}\n`);
+console.log(`Wrote ${report}`);
+NODE
+    ;;
+  refresh-lock)
+    echo "refresh-lock updates only vendored file hashes; review AST/global inventories manually." >&2
+    node <<'NODE'
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = 'upstream/vendor/';
+const lockPath = 'upstream/upstream-lock.json';
+const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+const files = {};
+const excluded = new Set(Object.keys(lock.excludedFiles ?? {}));
+// Keep this inclusion contract in sync with upstreamVerify: regular files (including file
+// symlinks), excluding .DS_Store and node_modules/__snapshots__ at any depth.
+const ignored = (relative) => relative === '.DS_Store'
+  || relative.endsWith('/.DS_Store')
+  || relative === 'node_modules'
+  || relative.startsWith('node_modules/')
+  || relative.includes('/node_modules/')
+  || relative === '__snapshots__'
+  || relative.startsWith('__snapshots__/')
+  || relative.includes('/__snapshots__/');
+const regularFile = (entry, entryPath) => {
+  if (entry.isFile()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  try {
+    return fs.statSync(entryPath).isFile();
+  } catch {
+    // Match Files.isRegularFile: dangling links and cycles are not vendored files.
+    return false;
+  }
+};
+const vendorFiles = (directory, relative = '') => fs.readdirSync(directory, {withFileTypes: true})
+  .flatMap((entry) => {
+    const entryRelative = relative ? `${relative}/${entry.name}` : entry.name;
+    if (ignored(entryRelative)) return [];
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return vendorFiles(entryPath, entryRelative);
+    return regularFile(entry, entryPath) ? [[entryRelative, entryPath]] : [];
+  });
+for (const [relative, file] of vendorFiles(root)) {
+  if (excluded.has(relative)) {
+    throw new Error(`Excluded vendored file is present: ${relative}`);
+  }
+  files[relative] = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+lock.files = Object.fromEntries(Object.entries(files).sort(([left], [right]) =>
+  left < right ? -1 : left > right ? 1 : 0));
+fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+NODE
+    ;;
+  *)
+    usage
+    ;;
+esac

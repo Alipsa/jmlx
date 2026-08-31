@@ -1,0 +1,381 @@
+=== NO_TEMPLATE "Hello world!"
+Program
+  body
+    StringLiteral
+      value
+        "Hello world!"
+=== TEXT_NODES "0{{ 'A' }}1{{ 'B' }}{{ 'C' }}2{{ 'D' }}3"
+Program
+  body
+    StringLiteral
+      value
+        "0"
+    StringLiteral
+      value
+        "A"
+    StringLiteral
+      value
+        "1"
+    StringLiteral
+      value
+        "B"
+    StringLiteral
+      value
+        "C"
+    StringLiteral
+      value
+        "2"
+    StringLiteral
+      value
+        "D"
+    StringLiteral
+      value
+        "3"
+=== IF_ONLY "{% if 1 == 1 %}{{ 'A' }}{% endif %}{{ 'B' }}"
+Program
+  body
+    If
+      test
+        BinaryExpression
+          operator
+            ComparisonBinaryOperator
+              value
+                "=="
+          left
+            IntegerLiteral
+              value
+                1
+          right
+            IntegerLiteral
+              value
+                1
+      body
+        StringLiteral
+          value
+            "A"
+      alternate
+    StringLiteral
+      value
+        "B"
+=== FOR_LOOP "{% for message in messages %}{{ message['content'] }}{% endfor %}"
+Program
+  body
+    For
+      loopvar
+        Identifier
+          value
+            "message"
+      iterable
+        Identifier
+          value
+            "messages"
+      body
+        MemberExpression
+          object
+            Identifier
+              value
+                "message"
+          property
+            StringLiteral
+              value
+                "content"
+          computed
+            true
+      defaultBlock
+=== OBJECT_LITERAL "{{ {'a': 1, 'b': 2} }}"
+Program
+  body
+    ObjectLiteral
+      value
+        key
+          StringLiteral
+            value
+              "a"
+        value
+          IntegerLiteral
+            value
+              1
+        key
+          StringLiteral
+            value
+              "b"
+        value
+          IntegerLiteral
+            value
+              2
+=== SLICE "{{ x[1:2] }}"
+Program
+  body
+    MemberExpression
+      object
+        Identifier
+          value
+            "x"
+      property
+        SliceExpression
+          start
+            IntegerLiteral
+              value
+                1
+          stop
+            IntegerLiteral
+              value
+                2
+          step
+            -
+      computed
+        true
+=== BLOCK_SET "{% set x %}line\\ntext{% endset %}"
+Program
+  body
+    Set
+      assignee
+        Identifier
+          value
+            "x"
+      value
+        -
+      body
+        StringLiteral
+          value
+            "line\\ntext"
+=== ESCAPED_SOURCE "{{ \"a\\\\nb\\\"c\" }}"
+Program
+  body
+    StringLiteral
+      value
+        "a\\nb\"c"
+=== FILTER "{{ x | upper }}"
+Program
+  body
+    FilterExpression
+      operand
+        Identifier
+          value
+            "x"
+      filter
+        Identifier
+          value
+            "upper"
+=== FILTER_WITH_CALL "{{ x | default('n/a') }}"
+Program
+  body
+    FilterExpression
+      operand
+        Identifier
+          value
+            "x"
+      filter
+        CallExpression
+          callee
+            Identifier
+              value
+                "default"
+          args
+            StringLiteral
+              value
+                "n/a"
+=== IS_TEST "{{ x is defined }}"
+Program
+  body
+    TestExpression
+      operand
+        Identifier
+          value
+            "x"
+      negate
+        false
+      test
+        Identifier
+          value
+            "defined"
+=== IS_NOT_TEST "{{ x is not defined }}"
+Program
+  body
+    TestExpression
+      operand
+        Identifier
+          value
+            "x"
+      negate
+        true
+      test
+        Identifier
+          value
+            "defined"
+=== MACRO "{% macro greet(name) %}Hi {{ name }}{% endmacro %}"
+Program
+  body
+    Macro
+      name
+        Identifier
+          value
+            "greet"
+      args
+        Identifier
+          value
+            "name"
+      body
+        StringLiteral
+          value
+            "Hi "
+        Identifier
+          value
+            "name"
+=== CALL_STATEMENT "{% call greet(1) %}body{% endcall %}"
+Program
+  body
+    CallStatement
+      call
+        CallExpression
+          callee
+            Identifier
+              value
+                "greet"
+          args
+            IntegerLiteral
+              value
+                1
+      callerArgs
+        -
+      body
+        StringLiteral
+          value
+            "body"
+=== TERNARY "{{ a if b else c }}"
+Program
+  body
+    Ternary
+      condition
+        Identifier
+          value
+            "b"
+      trueExpr
+        Identifier
+          value
+            "a"
+      falseExpr
+        Identifier
+          value
+            "c"
+=== SELECT "{{ a if b }}"
+Program
+  body
+    SelectExpression
+      lhs
+        Identifier
+          value
+            "a"
+      test
+        Identifier
+          value
+            "b"
+=== SPREAD_AND_KEYWORD_ARGS "{{ func(*args, x=1) }}"
+Program
+  body
+    CallExpression
+      callee
+        Identifier
+          value
+            "func"
+      args
+        SpreadExpression
+          argument
+            Identifier
+              value
+                "args"
+        KeywordArgumentExpression
+          key
+            Identifier
+              value
+                "x"
+          value
+            IntegerLiteral
+              value
+                1
+=== NOT_IN "{{ x not in y }}"
+Program
+  body
+    BinaryExpression
+      operator
+        Identifier
+          value
+            "not in"
+      left
+        Identifier
+          value
+            "x"
+      right
+        Identifier
+          value
+            "y"
+=== UNARY_NOT "{{ not x }}"
+Program
+  body
+    UnaryExpression
+      operator
+        Identifier
+          value
+            "not"
+      argument
+        Identifier
+          value
+            "x"
+=== TUPLE_LITERAL "{{ (1, 2, 3) }}"
+Program
+  body
+    TupleLiteral
+      value
+        IntegerLiteral
+          value
+            1
+        IntegerLiteral
+          value
+            2
+        IntegerLiteral
+          value
+            3
+=== CHAINED_MEMBER_CALL "{{ a.b.c[0](1)[1] }}"
+Program
+  body
+    MemberExpression
+      object
+        CallExpression
+          callee
+            MemberExpression
+              object
+                MemberExpression
+                  object
+                    MemberExpression
+                      object
+                        Identifier
+                          value
+                            "a"
+                      property
+                        Identifier
+                          value
+                            "b"
+                      computed
+                        false
+                  property
+                    Identifier
+                      value
+                        "c"
+                  computed
+                    false
+              property
+                IntegerLiteral
+                  value
+                    0
+              computed
+                true
+          args
+            IntegerLiteral
+              value
+                1
+      property
+        IntegerLiteral
+          value
+            1
+      computed
+        true

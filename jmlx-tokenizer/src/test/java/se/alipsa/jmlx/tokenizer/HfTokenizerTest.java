@@ -119,6 +119,44 @@ class HfTokenizerTest {
   }
 
   @Test
+  void templateSpecialTokenMatchingAnExistingNonSpecialAddedTokenKeepsItsRealSpecialFlag() {
+    // The template's special_tokens entry names an (id, text) pair that already exists as a
+    // *non-special* added_tokens entry (special: false) -- not merely absent from the vocabulary
+    // like the two tests above. Unconditionally re-registering it as a brand-new AddedToken with
+    // special hardcoded to true would make skipSpecialTokens=true wrongly drop it from decode,
+    // even though added_tokens itself says it is not special (PR #14 review round 5, finding 1).
+    HfTokenizer tokenizer =
+        HfTokenizer.fromFile(
+            fixture("llama3-style-template-token-matches-existing-added-token.tokenizer.json"));
+    List<Integer> ids = tokenizer.encode("low the", true);
+    assertEquals(List.of(999999, 13, 16), ids);
+    assertEquals("<|begin_of_text|>low the", tokenizer.decode(ids, false));
+    assertEquals("<|begin_of_text|>low the", tokenizer.decode(ids, true));
+  }
+
+  @Test
+  void loadingThrowsWhenTwoTemplateSpecialTokensShareTextWithDifferentIds() {
+    // Neither entry conflicts with baseVocabulary on its own (id 50/60 and text "<s>" are all
+    // absent from model.vocab/added_tokens) -- the contradiction is only visible by comparing the
+    // two TemplateProcessing special_tokens entries against each other, which
+    // requireNoTemplateVocabularyConflicts alone (round 4, finding 2) does not do (PR #14 review
+    // round 5, finding 2).
+    Path path =
+        fixture("llama3-style-two-template-tokens-share-text-with-different-ids.tokenizer.json");
+    assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(path));
+  }
+
+  @Test
+  void loadingThrowsWhenTwoTemplateSpecialTokensShareIdWithDifferentText() {
+    // The mirror of the test above: two entries both claim id 50, for two different texts ("<a>"
+    // and "<b>"), neither of which conflicts with baseVocabulary alone (PR #14 review round 5,
+    // finding 2).
+    Path path =
+        fixture("llama3-style-two-template-tokens-share-id-with-different-text.tokenizer.json");
+    assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(path));
+  }
+
+  @Test
   void loadingThrowsWhenATemplateSpecialTokenTextIsAlreadyKnownUnderADifferentId() {
     // The mirror of the test above: here the id (999999) has no vocabulary entry at all, but the
     // TEXT it's declared for ("<|begin_of_text|>") is already known under a different id (128000,

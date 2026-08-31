@@ -28,12 +28,13 @@ public final class TokenizerJsonLoader {
     try {
       JsonNode root = MAPPER.readTree(Files.newInputStream(path));
       requireByteLevelDecoder(root.path("decoder"));
+      NormalizerKind normalizer = parseNormalizer(root.path("normalizer"));
       return new TokenizerJson(
-          parseNormalizer(root.path("normalizer")),
+          normalizer,
           parsePreTokenizer(root.get("pre_tokenizer")),
           parsePostProcessor(root.path("post_processor")),
           parseModel(root.path("model")),
-          parseAddedTokens(root.path("added_tokens")));
+          parseAddedTokens(root.path("added_tokens"), normalizer));
     } catch (IOException | JacksonException e) {
       throw new TokenizerException("TokenizerJsonLoader.load: failed to parse " + path, e);
     }
@@ -74,9 +75,15 @@ public final class TokenizerJsonLoader {
    * {@code use_regex} is validated above) -- rejecting those values here would reject real,
    * correctly-loadable files for a divergence that does not actually exist (PR #14 review round 4,
    * finding 5 -- investigated and found not to apply, unlike findings 1/3/4 above).
+   *
+   * <p>Only checks {@code isMissingNode()}/{@code isNull()}, not a Java {@code null} {@code node}
+   * itself: the sole call site passes {@code root.path("decoder")}, and Jackson's {@code path()}
+   * (unlike {@code get()}, see {@link #parsePreTokenizer}) never returns Java {@code null} -- only
+   * ever a real node or a {@code MissingNode} -- so that branch was dead (PR #14 review round 5,
+   * finding 9).
    */
   private static void requireByteLevelDecoder(JsonNode node) {
-    if (node == null || node.isMissingNode() || node.isNull()) {
+    if (node.isMissingNode() || node.isNull()) {
       throw new TokenizerException(
           "TokenizerJsonLoader: tokenizer.json has no decoder (only 'ByteLevel' is supported, and"
               + " HfTokenizer#decode always uses ByteLevelDecoder)");
@@ -222,10 +229,13 @@ public final class TokenizerJsonLoader {
           "TokenizerJsonLoader: unsupported model.byte_fallback=true (this port assumes false --"
               + " see BpeMerger#merge)");
     }
+    // "dropout": 0.0 is semantically identical to null/absent (no dropout applied) and must not
+    // be rejected alongside a genuine positive value -- BpeMerger has no dropout behavior to
+    // diverge either way at 0.0 (PR #14 review round 5, finding 6).
     JsonNode dropout = node.path("dropout");
-    if (!dropout.isNull() && !dropout.isMissingNode()) {
+    if (!dropout.isNull() && !dropout.isMissingNode() && dropout.asDouble(0.0) > 0.0) {
       throw new TokenizerException(
-          "TokenizerJsonLoader: unsupported model.dropout " + dropout + " (must be null/absent)");
+          "TokenizerJsonLoader: unsupported model.dropout " + dropout + " (must be 0/null/absent)");
     }
     JsonNode unkToken = node.path("unk_token");
     if (!unkToken.isNull() && !unkToken.isMissingNode()) {
@@ -299,14 +309,26 @@ public final class TokenizerJsonLoader {
   }
 
   /**
-   * Requires an {@code added_tokens} entry's {@code lstrip}/{@code rstrip}/{@code single_word}/
-   * {@code normalized} fields to all be {@code false} -- {@link AddedTokenSplitter}'s own javadoc
-   * already documents that it implements none of them, so a fine-tune's added token declaring
-   * {@code lstrip: true} would otherwise load cleanly and tokenize adjacent whitespace differently
-   * from HF with no diagnostic (PR #14 review round 4, finding 7).
+   * Requires an {@code added_tokens} entry's {@code lstrip}/{@code rstrip}/{@code single_word}
+   * fields to all be {@code false} -- {@link AddedTokenSplitter}'s own javadoc already documents
+   * that it implements none of them, so a fine-tune's added token declaring {@code lstrip: true}
+   * would otherwise load cleanly and tokenize adjacent whitespace differently from HF with no
+   * diagnostic (PR #14 review round 4, finding 7).
+   *
+   * <p>{@code normalized} is checked separately, not folded into this loop, for two reasons (PR #14
+   * review round 5, finding 5): first, it only matters when {@code normalizer} isn't {@link
+   * NormalizerKind#NONE} -- HF routes an added token through a normalization trie only when a
+   * normalizer actually exists, so with no normalizer (true of the entire Llama-3 family, including
+   * this port's own {@code llama3-style} fixture), {@code normalized: true} vs {@code false} is a
+   * no-op distinction, not a real divergence from what {@link AddedTokenSplitter} leaves
+   * unimplemented. Second, HF's own serde defaults an absent {@code normalized} to {@code !special}
+   * (normalized by default unless the token is special), not uniformly to {@code false} like the
+   * three fields above -- so the check must default on {@code special} too, or a non-special token
+   * that omits {@code normalized} (which HF would still normalize) silently bypasses this
+   * validation.
    */
   private static void requireNoStrippingOrSingleWordFlags(JsonNode entry, String content) {
-    for (String field : List.of("lstrip", "rstrip", "single_word", "normalized")) {
+    for (String field : List.of("lstrip", "rstrip", "single_word")) {
       if (entry.path(field).asBoolean(false)) {
         throw new TokenizerException(
             "TokenizerJsonLoader: added_tokens['"
@@ -318,14 +340,24 @@ public final class TokenizerJsonLoader {
     }
   }
 
-  private static List<AddedToken> parseAddedTokens(JsonNode node) {
+  private static void requireNoNormalization(
+      JsonNode entry, String content, boolean special, NormalizerKind normalizer) {
+    if (normalizer != NormalizerKind.NONE && entry.path("normalized").asBoolean(!special)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: added_tokens['"
+              + content
+              + "'] has normalized=true, which AddedTokenSplitter does not implement");
+    }
+  }
+
+  private static List<AddedToken> parseAddedTokens(JsonNode node, NormalizerKind normalizer) {
     List<AddedToken> tokens = new ArrayList<>();
     for (JsonNode entry : node) {
       String content = entry.path("content").asString();
+      boolean special = entry.path("special").asBoolean(false);
       requireNoStrippingOrSingleWordFlags(entry, content);
-      tokens.add(
-          new AddedToken(
-              entry.path("id").asInt(), content, entry.path("special").asBoolean(false)));
+      requireNoNormalization(entry, content, special, normalizer);
+      tokens.add(new AddedToken(entry.path("id").asInt(), content, special));
     }
     return tokens;
   }

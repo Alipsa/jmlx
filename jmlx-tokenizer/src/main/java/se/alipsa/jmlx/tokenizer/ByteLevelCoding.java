@@ -57,6 +57,19 @@ public final class ByteLevelCoding {
    * UTF-8 character can be split across separate BPE tokens, so callers must concatenate the raw
    * bytes of every consecutive byte-level token before UTF-8-decoding the combined buffer (see
    * {@link ByteLevelDecoder}).
+   *
+   * <p>If any character of {@code byteLevelText} is not one of the 256 byte-level symbols, the
+   * whole string falls back to its own raw UTF-8 bytes instead of throwing -- matching HF's actual
+   * {@code ByteLevel::decode_chain} ({@code huggingface/tokenizers}' Rust source), which tries a
+   * per-character mapping and falls back to {@code t.as_bytes()} for the *entire* token as soon as
+   * any character fails, rather than erroring. This is a real, reachable case for this port, not
+   * just a defensive check: a token string built from an id with no vocabulary entry, or a
+   * malformed added token, can otherwise contain a character like a plain space (code point 32,
+   * itself not byte-level-printable -- see the static initializer above) that no legitimate
+   * byte-level token ever would. The eventual {@code new String(bytes, UTF_8)} in {@link
+   * ByteLevelDecoder} already matches {@code from_utf8_lossy}'s replacement-character behavior for
+   * whatever these raw bytes decode to, so no further change is needed there (PR #14 review round
+   * 5, finding 3).
    */
   public static byte[] decodeToBytes(String byteLevelText) {
     Objects.requireNonNull(
@@ -68,10 +81,7 @@ public final class ByteLevelCoding {
       int codePoint = byteLevelText.codePointAt(index);
       Integer b = CODE_POINT_TO_BYTE.get(codePoint);
       if (b == null) {
-        throw new TokenizerException(
-            "ByteLevelCoding.decodeToBytes: code point "
-                + codePoint
-                + " is not a valid byte-level character");
+        return byteLevelText.getBytes(StandardCharsets.UTF_8);
       }
       out[i++] = b.byteValue();
       index += Character.charCount(codePoint);

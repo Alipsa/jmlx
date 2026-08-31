@@ -11,8 +11,10 @@ class ByteLevelPreTokenizerTest {
   // The real Qwen2.5/Llama-3 regex (Qwen2.5's \p{N} variant), verified against each model's
   // actual tokenizer.json — see this plan's Findings section. No Pattern.UNICODE_CHARACTER_CLASS:
   // TokenizerJsonLoader doesn't compile it with that flag either, since HF's onig backend's
-  // \s/\S are ASCII-only (PR #14 review round 4, finding 1) -- see zeroWidthMatchDoesNotEmitAn
-  // EmptyChunk's sibling test below for the divergence this flag would otherwise reintroduce.
+  // \s/\S are ASCII-only (PR #14 review round 4, finding 1) -- see
+  // asciiOnlyWhitespaceClassMatchesOnigNotJavasUnicodeDefault below for the divergence this flag
+  // would otherwise reintroduce (PR #14 review round 5, finding 10, correcting this comment's
+  // cross-reference to the wrong sibling test).
   private static final Pattern QWEN_REGEX =
       Pattern.compile(
           "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r"

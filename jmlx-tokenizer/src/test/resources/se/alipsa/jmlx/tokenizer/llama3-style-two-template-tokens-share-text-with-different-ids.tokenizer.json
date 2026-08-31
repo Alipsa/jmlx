@@ -1,0 +1,31 @@
+{
+  "normalizer": null,
+  "pre_tokenizer": {
+    "type": "Sequence",
+    "pretokenizers": [
+      {"type": "Split", "pattern": {"Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"}, "behavior": "Isolated", "invert": false},
+      {"type": "ByteLevel", "add_prefix_space": false, "trim_offsets": true, "use_regex": false}
+    ]
+  },
+  "post_processor": {
+    "type": "Sequence",
+    "processors": [
+      {"type": "ByteLevel", "add_prefix_space": true, "trim_offsets": false, "use_regex": true},
+      {"type": "TemplateProcessing",
+        "single": [{"SpecialToken": {"id": "a", "type_id": 0}}, {"SpecialToken": {"id": "b", "type_id": 0}}, {"Sequence": {"id": "A", "type_id": 0}}],
+        "special_tokens": {
+          "a": {"id": "a", "ids": [50], "tokens": ["<s>"]},
+          "b": {"id": "b", "ids": [60], "tokens": ["<s>"]}
+        }}
+    ]
+  },
+  "decoder": {"type": "ByteLevel", "add_prefix_space": true, "trim_offsets": true, "use_regex": true},
+  "model": {
+    "type": "BPE",
+    "ignore_merges": true,
+    "vocab": {"l": 0, "o": 1, "w": 2, "t": 3, "h": 4, "e": 5, "n": 6, "s": 7, "r": 8, "i": 9, "d": 10,
+      "Ġ": 11, "lo": 12, "low": 13, "th": 14, "the": 15, "Ġthe": 16},
+    "merges": ["l o", "lo w", "t h", "th e", "Ġ the"]
+  },
+  "added_tokens": []
+}

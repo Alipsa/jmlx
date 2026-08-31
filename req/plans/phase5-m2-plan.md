@@ -114,7 +114,13 @@ against these real files, not reconstructions:
   resolve in this environment, so this plan pins Jackson to **`3.1.2`**, confirmed as a complete
   local artifact (`.jar`/`.pom`/sources, no partial/failed-download markers). A machine with real
   Maven Central access could use a newer Jackson 3.x release instead; this plan pins to what this
-  build can actually resolve today.
+  build can actually resolve today. [Amended (PR #14 review, round 5, finding 8): this sentence and
+  the two before it still restate the same retracted "cannot reach Maven Central" premise the
+  amendment at the top of this bullet already corrects for the sentence it immediately follows --
+  see Task 1's Step 1c amendment for the corrected diagnosis, and the dependency-table amendment
+  below for the corrected framing of this exact pin. `3.1.2` resolves from Maven Central directly
+  like any other 3.x release; it was never a local-artifact-availability constraint, only an
+  unreviewed pin against Central's then-current latest (`3.2.2`).]
 - **Jackson 3.1.2** (`tools.jackson.core:jackson-databind:3.1.2`) is the JSON parser: no JSON library
   exists anywhere in this repo today.
   Jackson 3 renamed several `JsonNode` accessors from its 2.x line (`asText()` → `asString()`,
@@ -438,6 +444,20 @@ public final class ByteLevelCoding {
 ```
 
 (Add `import java.util.Objects;` alongside the others.)
+
+**Amendment (PR #14 review, round 5, finding 3): `decodeToBytes` above throws where HF falls back.**
+The `if (b == null) throw ...` branch is stricter than HF's actual `ByteLevel::decode_chain`
+(`huggingface/tokenizers`'s Rust source), which tries a per-character mapping and, as soon as any
+character in a token fails to map, falls back to that *entire token's own raw UTF-8 bytes*
+(`.unwrap_or_else(|| t.as_bytes().to_vec())`) rather than erroring. This is a real, reachable case
+for this port, not just theoretical: a token string built from an id with no vocabulary entry, or a
+malformed added token, can contain a character like a plain space (code point 32, itself not
+byte-level-printable per the static initializer above) that no legitimate byte-level token ever
+would. The fix replaces the `throw` with `return byteLevelText.getBytes(StandardCharsets.UTF_8);`
+(a whole-string fallback, not per-character) as soon as the first unmapped code point is found. The
+eventual `new String(bytes, UTF_8)` in `ByteLevelDecoder` already matches `from_utf8_lossy`'s
+replacement-character behavior for whatever these raw bytes decode to, so no further change is
+needed there.
 
 **`ByteLevelCodingTest.java`:**
 
@@ -811,7 +831,11 @@ listing's overall shape but each closing a real silent-divergence gap.**
   which is Unicode-scoped by definition regardless of this flag. Fixed by dropping the flag
   entirely: `Pattern.compile(regex)`. `ByteLevelPreTokenizerTest`'s own `QWEN_REGEX` constant
   carried the same flag and was fixed identically, since it had structurally masked this from ever
-  being caught by that suite.
+  being caught by that suite. [Amended (PR #14 review, round 5, finding 10): the comment added above
+  `QWEN_REGEX` at the time named the wrong sibling test as the one demonstrating this divergence
+  (`zeroWidthMatchDoesNotEmitAnEmptyChunk`, an unrelated round-3 test about empty regex matches) --
+  the actual regression test added by this same fix is
+  `asciiOnlyWhitespaceClassMatchesOnigNotJavasUnicodeDefault`. Corrected the cross-reference.]
 - **Finding 3: five `model` fields -- `byte_fallback`, `dropout`, `unk_token`,
   `continuing_subword_prefix`, `end_of_word_suffix` -- were read nowhere**, the same class of gap
   the `decoder` fix above (round 3, finding 3) closed, left open on `model`. `byte_fallback: true`
@@ -840,6 +864,48 @@ listing's overall shape but each closing a real silent-divergence gap.**
   as if it had declared the one supported value instead of failing loudly. Changed to
   `asString(null)`, so an absent `behavior` now falls through to the same "unsupported behavior"
   throw as an explicit non-`"Isolated"` value.
+
+**Amendment (PR #14 review, round 5): three more findings in the same method family.**
+
+- **Finding 6: `requireInertModelFields`'s `dropout` check (finding 3 above) rejected any
+  non-null/non-missing value, including an explicit `"dropout": 0.0`**, even though `0.0` is
+  semantically identical to null/absent (no dropout applied) -- `BpeMerger` has no dropout behavior
+  to diverge either way at exactly `0.0`. Changed to `dropout.asDouble(0.0) > 0.0`, so only a
+  genuinely positive value throws.
+- **Finding 5: the `normalized` rejection folded into `requireNoStrippingOrSingleWordFlags` (finding
+  7 above) had two problems, not one.** First, it fires even when `normalizer` is `NormalizerKind.NONE`
+  (true of the entire Llama-3 family, including this plan's own `llama3-style` fixture) -- but HF
+  only routes an added token through a normalization trie when a normalizer actually exists, so with
+  none configured, `normalized: true` vs `false` is a no-op distinction, not a real divergence from
+  `AddedTokenSplitter`'s un-implemented normalization. Second, `parseAddedTokens` read an absent
+  `normalized` via `.asBoolean(false)`, but HF's own serde default is actually `!special` (normalized
+  by default unless the token is special) -- so the strict check was silently bypassed in exactly the
+  case (a non-special token omitting `normalized`) where HF really would normalize it. Fixed by
+  extracting a separate `requireNoNormalization(entry, content, special, normalizer)` that only
+  throws when `normalizer != NormalizerKind.NONE && entry.path("normalized").asBoolean(!special)`;
+  `load` now computes `normalizer` before `parseAddedTokens` and threads it through.
+- **Finding 9: `requireByteLevelDecoder`'s `node == null` branch was dead code.** The sole call site
+  passes `root.path("decoder")`, and Jackson's `path()` (unlike `get()`, used for `pre_tokenizer`
+  above) never returns Java `null` -- only ever a real node or a `MissingNode`. Removed; the
+  `isMissingNode()`/`isNull()` checks already cover every reachable case.
+
+**Amendment (PR #14 review, round 5, finding 4): most of round 4's own validations above --
+`requireInertModelFields`'s five checks, the missing/`null`-decoder case, `added_tokens`'
+four flags, and `Split.behavior` required-vs-wrong -- shipped with no dedicated test, reachable only
+incidentally (if at all) through `HfTokenizerTest`'s handful of full-tokenizer fixtures.** A new
+`TokenizerJsonLoaderTest.java` now exercises `TokenizerJsonLoader.load` directly against small,
+inline-written minimal `tokenizer.json` files (one field varied per test, via a `@TempDir`-backed
+helper rather than a new named fixture file per case) covering: missing/`null`/wrong-type `decoder`;
+missing vs. wrong `Split.behavior`; each of `byte_fallback`/`dropout`/`unk_token`/
+`continuing_subword_prefix`/`end_of_word_suffix` (including that `dropout: 0.0` and an explicit
+`null` `continuing_subword_prefix` do *not* throw, per findings 5/6 below); and each of
+`added_tokens`' `lstrip`/`rstrip`/`single_word`/`normalized` flags (the last one crossed with
+`normalizer` presence/absence and `special` true/false, per finding 5). `VocabularyTest.java` gained
+a test asserting `maxKnownId()`'s value directly after a vacating collision (finding 7's own repro),
+not just `hasId`. `SpecialTokenInfoTest.java` gained a test that mutates the caller's `ids`/`tokens`
+lists after construction and asserts the stored record is unaffected, exercising round 4 finding
+10's `List.copyOf` defense directly rather than only relying on it never having been observed to
+break.
 
 **`TokenizerJsonTest.java`** (against the synthetic fixtures from Task 14 — written here but only
 runnable once Task 14 lands; note the dependency in the commit message):
@@ -997,6 +1063,15 @@ tracks whichever token currently occupies an id"). Fixed by also calling
   the mirror of `hasId`/`tokenOf`, for `HfTokenizer`'s `TemplateProcessing` conflict check to detect
   a token *string* already claimed by a different id (not just an id already claiming a different
   string, which `hasId`/`tokenOf` alone can check).
+
+**Amendment (PR #14 review, round 5, finding 7): `maxKnownId`'s own javadoc still described its
+pre-round-4 computation.** Finding 6 immediately above changed the computation itself (final-pass
+over `idToToken.keySet()`, not an incremental running max) but left the accessor's javadoc reading
+"The largest id assigned by either `modelVocab` or `addedTokens`" -- which is exactly the stale,
+incremental-max description finding 6 fixed *code* to no longer match, using the same
+`Map.of("a", 1, "b", 2)` + `AddedToken(1, "b", false)` repro (id `2` was briefly assigned but is not
+"the largest id" any more once vacated). Reworded to "The largest id with a vocabulary entry *after*
+collision cleanup" and cross-referenced to the constructor's own javadoc.
 
 ## Task 6: `BpeMerger`
 
@@ -1716,6 +1791,58 @@ mirror-conflict case, using the original fixture content) and
 `llama3-style-template-id-below-max-known-id.tokenizer.json` (the second failure mode above -- a
 template id below an unrelated `maxKnownId`, to prove the fix isn't specific to the above-vocab
 symptom).
+
+**Amendment (PR #14 review, round 5): the constructor above has two more real gaps, both regressing
+round 4's own encode/decode-agreement fix, plus one perf suggestion.**
+
+- **Finding 1 (highest value): `collectTemplateSpecialTokens` above hardcodes `special = true` for
+  *every* template-declared `(id, text)` pair, unconditionally**, even when that exact pair already
+  exists in `baseVocabulary` -- whether as a plain `model.vocab` entry or as a "real" `added_tokens`
+  entry that may itself declare `special: false`. Merging such a token in anyway re-registers it as
+  a brand-new special `AddedToken`, corrupting `addedTokenContents` (forcing literal pass-through
+  decode on what may be an ordinary vocab token) and `specialIds` (making `skipSpecialTokens=true`
+  wrongly drop a token `added_tokens` itself declared not special). Verified end-to-end: an
+  `added_tokens` entry `{id: 999999, content: "<|begin_of_text|>", special: false}` also named by a
+  template's `special_tokens` makes `decode(ids, true)` drop it, even though the file's own
+  `added_tokens` says it is not special. Fixed by collecting all template tokens and validating them
+  as before, but filtering to only the ones **absent** from `baseVocabulary`
+  (`!baseVocabulary.hasToken(t.content())`) before merging them into `mergedAddedTokens` -- an
+  already-known token is left exactly as `baseVocabulary` already has it, real `special` flag and
+  all.
+- **Finding 2: `requireNoTemplateVocabularyConflicts` only validates each template token against
+  `baseVocabulary`, never against the *other* template tokens in the same `templateTokens` list.**
+  Two `special_tokens` entries that independently pass the `baseVocabulary` check can still
+  contradict *each other* -- e.g. two different ids both claiming text `"<s>"`, or the same id
+  claiming two different texts -- and both repros were verified to reach `Vocabulary`'s own
+  last-added-wins collision cleanup, which resolves the contradiction silently (vacating one id or
+  text, no diagnostic) instead of failing loudly, reintroducing the exact encode/decode disagreement
+  finding 2 (round 4) closed, just via a different cause. This also meant the "every such id was
+  already checked against ... by construction" comment on `encode`'s trust of a `ResolvedToken`'s
+  pre-resolved id was no longer reliably true. Fixed by adding
+  `requireInternallyConsistentTemplateTokens(templateTokens)` -- checked before the
+  `baseVocabulary` conflict check, using two plain `HashMap`s (id→text, text→id) with
+  `putIfAbsent` to detect either direction of self-contradiction -- called unconditionally on every
+  non-empty `templateTokens` list. With this in place, `encode`'s comment is accurate again: no
+  further wording change was needed there.
+- **Finding 11 (suggestion, not a bug): the constructor built a full `Vocabulary` over
+  `model.vocab` twice** -- once for `baseVocabulary`, once more for the final `this.vocabulary` --
+  doubling the map-construction cost over Qwen2.5's/Llama-3's real ~150k/~128k-entry vocabularies
+  purely to validate against a scratch copy. Rather than duplicating `Vocabulary`'s own
+  collision-resolution logic to avoid a second construction (which would create a second place that
+  logic has to stay correct), the constructor now short-circuits: `baseVocabulary` is only built,
+  and the finding-1/finding-2 checks above only run, when `collectTemplateSpecialTokens` actually
+  returns at least one token. Qwen2.5's own `post_processor` has no `TemplateProcessing` step at
+  all, so this fully avoids the double construction for that model's real, much larger vocabulary;
+  Llama-3 (which does have one BOS template token) still pays the double-construction cost, judged
+  an acceptable one-time load-time cost rather than a correctness-relevant hot path.
+
+New fixtures cover findings 1 and 2:
+`llama3-style-template-token-matches-existing-added-token.tokenizer.json` (a template token matching
+an existing non-special `added_tokens` entry -- finding 1), and
+`llama3-style-two-template-tokens-share-text-with-different-ids.tokenizer.json` /
+`llama3-style-two-template-tokens-share-id-with-different-text.tokenizer.json` (the two directions
+of finding 2's self-contradiction, mirroring how round 4's own fixtures covered both directions of
+the `baseVocabulary` conflict check).
 
 ## Task 13: `ChatTemplateRenderer`
 

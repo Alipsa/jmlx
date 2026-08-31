@@ -107,10 +107,15 @@ public final class Vocabulary {
   }
 
   /**
-   * The largest id assigned by either {@code modelVocab} or {@code addedTokens}. {@code
-   * HfTokenizer#decode} uses this to tell a legitimate above-vocab id (e.g. a sampled logit outside
-   * a checkpoint's trained vocab -- see {@link HfTokenizer#decode}) apart from an in-range hole,
-   * which is always a bug and should not be silently skipped.
+   * The largest id with a vocabulary entry *after* collision cleanup -- not simply the largest id
+   * ever assigned while constructing this {@link Vocabulary}: an id vacated by a later {@code
+   * addedTokens} collision (see the constructor's javadoc) no longer counts even though it was
+   * briefly assigned during construction, since it is no longer a real vocabulary entry (PR #14
+   * review round 5, finding 7, correcting this javadoc after round 4, finding 6, changed the
+   * computation itself but left this description of it stale). {@code HfTokenizer#decode} uses this
+   * to tell a legitimate above-vocab id (e.g. a sampled logit outside a checkpoint's trained vocab
+   * -- see {@link HfTokenizer#decode}) apart from an in-range hole, which is always a bug and
+   * should not be silently skipped.
    */
   public int maxKnownId() {
     return maxKnownId;

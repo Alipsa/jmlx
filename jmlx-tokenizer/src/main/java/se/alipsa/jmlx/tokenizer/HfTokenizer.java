@@ -2,8 +2,10 @@ package se.alipsa.jmlx.tokenizer;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -19,17 +21,36 @@ public final class HfTokenizer {
 
   private HfTokenizer(TokenizerJson json) {
     this.json = json;
-    Vocabulary baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
     List<AddedToken> templateTokens = collectTemplateSpecialTokens(json.postProcessor());
-    requireNoTemplateVocabularyConflicts(templateTokens, baseVocabulary);
-    // Registering validated template tokens as if they were addedTokens, rather than leaving
-    // them merely "trusted but unregistered" in encode() below, is what makes decode() agree with
-    // encode(): otherwise a template id with no other vocabulary entry either vanishes silently
-    // from decode's above-maxKnownId skip, or throws as an in-range hole if it happens to be
-    // numerically below some unrelated, larger id -- both observed with the pre-round-4 encode
-    // check (PR #14 review round 4, finding 2).
+    List<AddedToken> newTemplateTokens;
+    if (templateTokens.isEmpty()) {
+      // Skips building baseVocabulary below entirely when there's nothing to validate against
+      // it -- Qwen2.5's own post_processor has no TemplateProcessing step at all, so this avoids
+      // a second, otherwise-discarded Vocabulary construction over its full ~150k-entry
+      // model.vocab merely to come back empty (PR #14 review round 5, finding 11).
+      newTemplateTokens = List.of();
+    } else {
+      requireInternallyConsistentTemplateTokens(templateTokens);
+      Vocabulary baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
+      requireNoTemplateVocabularyConflicts(templateTokens, baseVocabulary);
+      // A template token already present in baseVocabulary -- whether as a plain model.vocab
+      // entry or a "real" added_tokens entry -- is left exactly as baseVocabulary already has
+      // it, not re-registered here as a brand-new AddedToken: doing that unconditionally used to
+      // stamp special=true onto *every* template-named token regardless of its real status,
+      // corrupting addedTokenContents (forcing literal pass-through decode on what may be an
+      // ordinary vocab token) and specialIds (making skipSpecialTokens wrongly drop a token
+      // added_tokens itself declared special=false for) (PR #14 review round 5, finding 1).
+      newTemplateTokens =
+          templateTokens.stream().filter(t -> !baseVocabulary.hasToken(t.content())).toList();
+    }
+    // Registering a genuinely-new validated template token as if it were an addedToken, rather
+    // than leaving it merely "trusted but unregistered" in encode() below, is what makes
+    // decode() agree with encode(): otherwise a template id with no other vocabulary entry
+    // either vanishes silently from decode's above-maxKnownId skip, or throws as an in-range
+    // hole if it happens to be numerically below some unrelated, larger id -- both observed with
+    // the pre-round-4 encode check (PR #14 review round 4, finding 2).
     List<AddedToken> mergedAddedTokens = new ArrayList<>(json.addedTokens());
-    mergedAddedTokens.addAll(templateTokens);
+    mergedAddedTokens.addAll(newTemplateTokens);
     this.vocabulary = new Vocabulary(json.model().vocab(), mergedAddedTokens);
     this.merger = new BpeMerger(json.model());
     this.pretokenizer = new ByteLevelPreTokenizer(json.preTokenizer());
@@ -60,6 +81,45 @@ public final class HfTokenizer {
       }
     }
     return tokens;
+  }
+
+  /**
+   * Requires every template-declared {@code (id, text)} pair to agree with every *other*
+   * template-declared pair, not just with {@code baseVocabulary} ({@link
+   * #requireNoTemplateVocabularyConflicts} below): two {@code special_tokens} entries can
+   * independently pass that check while still contradicting each other -- e.g. two different ids
+   * both claiming the text {@code "<s>"}, or the same id claiming two different texts. Left
+   * unchecked, both entries get merged into {@code mergedAddedTokens} and {@link Vocabulary}'s own
+   * last-added-wins collision cleanup resolves the contradiction silently (vacating one id or one
+   * text with no diagnostic), reintroducing the exact encode/decode disagreement finding 2 (round
+   * 4) was meant to close, just from a different cause (PR #14 review round 5, finding 2).
+   */
+  private static void requireInternallyConsistentTemplateTokens(List<AddedToken> templateTokens) {
+    Map<Integer, String> textById = new HashMap<>();
+    Map<String, Integer> idByText = new HashMap<>();
+    for (AddedToken t : templateTokens) {
+      String existingText = textById.putIfAbsent(t.id(), t.content());
+      if (existingText != null && !existingText.equals(t.content())) {
+        throw new TokenizerException(
+            "HfTokenizer: TemplateProcessing declares id "
+                + t.id()
+                + " for both '"
+                + existingText
+                + "' and '"
+                + t.content()
+                + "'");
+      }
+      Integer existingId = idByText.putIfAbsent(t.content(), t.id());
+      if (existingId != null && !existingId.equals(t.id())) {
+        throw new TokenizerException(
+            "HfTokenizer: TemplateProcessing declares '"
+                + t.content()
+                + "' for both id "
+                + existingId
+                + " and id "
+                + t.id());
+      }
+    }
   }
 
   /**

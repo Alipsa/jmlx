@@ -46,6 +46,19 @@ class VocabularyTest {
   }
 
   @Test
+  void maxKnownIdExcludesAModelVocabIdVacatedByAnAddedTokenCollision() {
+    // "b" -> 2 in model.vocab is vacated when an added token claims content "b" under a
+    // different id (1): id 2 is briefly assigned during construction but ends up with no
+    // vocabulary entry at all, so maxKnownId (1, from the surviving ids 0 and 1) must not still
+    // count it, or HfTokenizer#decode would treat a genuine above-vocab id as an in-range hole
+    // instead (PR #14 review round 5, finding 4, adding coverage for round 4 finding 6's fix).
+    Vocabulary vocabulary =
+        new Vocabulary(Map.of("a", 0, "b", 2), List.of(new AddedToken(1, "b", false)));
+    assertFalse(vocabulary.hasId(2));
+    assertEquals(1, vocabulary.maxKnownId());
+  }
+
+  @Test
   void maxKnownIdIncludesAnAddedTokenThatExceedsEveryModelVocabId() {
     Vocabulary vocabulary =
         new Vocabulary(Map.of("x", 5), List.of(new AddedToken(100, "<|extra|>", true)));

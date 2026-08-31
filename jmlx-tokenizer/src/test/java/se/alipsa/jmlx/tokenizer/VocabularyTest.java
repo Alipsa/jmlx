@@ -2,6 +2,7 @@ package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -9,6 +10,17 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class VocabularyTest {
+
+  @Test
+  void constructorThrowsWhenModelVocabHasTwoDifferentTokensSharingOneId() {
+    // Without this check, idOf("a") and idOf("b") both resolved to 5 while tokenOf(5) returned
+    // only whichever token modelVocab.forEach happened to iterate last -- silently breaking the
+    // mutual-inverse guarantee this constructor's own javadoc promises, with the winner
+    // depending on HashMap iteration order. TokenizerJsonLoader has its own, better-worded check
+    // for a real tokenizer.json file; this is Vocabulary's own defense-in-depth line for a direct
+    // caller like this test itself (PR #14 review round 8, finding 5).
+    assertThrows(TokenizerException.class, () -> new Vocabulary(Map.of("a", 5, "b", 5), List.of()));
+  }
 
   @Test
   void idOfAndTokenOfAreInverseWhenAnAddedTokenSharesAnIdWithADifferentModelVocabToken() {

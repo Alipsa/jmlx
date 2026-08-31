@@ -2,6 +2,7 @@ package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,22 @@ class BpeMergerTest {
   void withoutIgnoreMergesAndNoMergeRulesEachByteStaysItsOwnSymbol() {
     BpeMerger merger = new BpeMerger(new BpeModelConfig(BASE_VOCAB, Map.of(), false));
     assertEquals(List.of("l", "o", "w"), merger.merge("low"));
+  }
+
+  @Test
+  void mutatingTheVocabOrMergeRankMapAfterConstructionDoesNotAffectAnAlreadyBuiltBpeModelConfig() {
+    // BpeModelConfig's compact constructor defensively copies vocab/mergeRank (PR #14 review
+    // round 7, finding 3); without it, a caller mutating the map it passed in after construction
+    // would silently change BpeMerger's behavior mid-flight, since BpeMerger re-reads both maps
+    // directly via model.vocab()/model.mergeRank() on every merge() call rather than caching a
+    // snapshot (PR #14 review round 8, finding 4, adding the coverage that fix itself lacked).
+    Map<String, Integer> mutableVocab = new HashMap<>(BASE_VOCAB);
+    Map<String, Integer> mutableMergeRank = new HashMap<>(MERGE_RANK);
+    BpeModelConfig model = new BpeModelConfig(mutableVocab, mutableMergeRank, false);
+    mutableVocab.clear();
+    mutableMergeRank.clear();
+    BpeMerger merger = new BpeMerger(model);
+    assertEquals(List.of("low"), merger.merge("low"));
   }
 
   @Test

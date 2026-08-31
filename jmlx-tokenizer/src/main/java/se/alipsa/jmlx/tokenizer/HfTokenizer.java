@@ -7,7 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** A byte-level BPE tokenizer loaded from a {@code tokenizer.json} file. */
+/**
+ * A byte-level BPE tokenizer loaded from a {@code tokenizer.json} file.
+ *
+ * <p>Every instance field is immutable once construction finishes (a {@link Vocabulary}, a compiled
+ * merge table, precompiled regexes), and {@code encode}/{@code decode} allocate all of their own
+ * working state (e.g. a {@code Matcher}) per call rather than sharing any mutable field, so a
+ * single instance is safe for concurrent {@code encode}/{@code decode} calls from multiple threads
+ * -- relevant for M3's model-serving loop (PR #14 review round 7, finding 7).
+ */
 public final class HfTokenizer {
 
   private final TokenizerJson json;
@@ -21,17 +29,24 @@ public final class HfTokenizer {
     this.json = json;
     List<AddedToken> templateTokens = collectTemplateSpecialTokens(json.postProcessor());
     List<AddedToken> newTemplateTokens;
-    int baseMaxKnownId;
+    // null, not a sentinel int, stands for "no baseVocabulary was built:" the final assignment
+    // below reads this reference directly instead of re-testing templateTokens.isEmpty() a
+    // second time, so there is no parallel condition that could drift out of sync with it (PR
+    // #14 review round 7, finding 9, replacing an earlier -1 sentinel whose meaning depended on
+    // a ternary re-checking templateTokens.isEmpty() rather than on the value itself -- a
+    // refactor that dropped that ternary would have silently substituted -1 for the real
+    // boundary, making every non-negative id skip instead of throwing on a genuine hole).
+    Vocabulary baseVocabulary;
     if (templateTokens.isEmpty()) {
       // Skips building baseVocabulary below entirely when there's nothing to validate against
       // it -- Qwen2.5's own post_processor has no TemplateProcessing step at all, so this avoids
       // a second, otherwise-discarded Vocabulary construction over its full ~150k-entry
       // model.vocab merely to come back empty (PR #14 review round 5, finding 11).
       newTemplateTokens = List.of();
-      baseMaxKnownId = -1; // computed from this.vocabulary below instead -- see the assignment.
+      baseVocabulary = null;
     } else {
       requireInternallyConsistentTemplateTokens(templateTokens);
-      Vocabulary baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
+      baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
       requireNoTemplateVocabularyConflicts(templateTokens, baseVocabulary);
       // A template token already present in baseVocabulary -- whether as a plain model.vocab
       // entry or a "real" added_tokens entry -- is left exactly as baseVocabulary already has
@@ -41,7 +56,6 @@ public final class HfTokenizer {
       // declared special=false for) (PR #14 review round 5, finding 1).
       newTemplateTokens =
           templateTokens.stream().filter(t -> !baseVocabulary.hasToken(t.content())).toList();
-      baseMaxKnownId = baseVocabulary.maxKnownId();
     }
     // Registering a genuinely-new validated template token as if it were an addedToken, rather
     // than leaving it merely "trusted but unregistered" in encode() below, is what makes
@@ -65,7 +79,7 @@ public final class HfTokenizer {
     // still resolves correctly via vocabulary.hasId/tokenOf regardless, since it was merged above
     // (PR #14 review round 6, finding 2).
     this.baseVocabularyMaxKnownId =
-        templateTokens.isEmpty() ? vocabulary.maxKnownId() : baseMaxKnownId;
+        baseVocabulary != null ? baseVocabulary.maxKnownId() : vocabulary.maxKnownId();
     this.merger = new BpeMerger(json.model());
     this.pretokenizer = new ByteLevelPreTokenizer(json.preTokenizer());
     // addedTokenSplitter is deliberately scoped to json.addedTokens() only, not
@@ -201,12 +215,17 @@ public final class HfTokenizer {
   }
 
   /**
-   * Decodes token ids back into text. An id above {@link #baseVocabularyMaxKnownId} is skipped
-   * rather than aborting the whole decode -- e.g. Qwen2.5's {@code config.json} {@code vocab_size}
-   * (152064) exceeds its tokenizer vocab (151665), so a sampled logit can legitimately fall in that
-   * gap. An id within the known vocabulary range that still has no entry is a real hole (the wrong
-   * tokenizer for the checkpoint, a mis-parsed {@code added_tokens}, a {@link Vocabulary} bug) and
-   * still throws, so it can't be mistaken for the above-vocab case.
+   * Decodes token ids back into text. An id above this tokenizer's own known-vocabulary boundary --
+   * computed from {@code model.vocab} and {@code added_tokens} only, deliberately excluding any
+   * sparse {@code TemplateProcessing}-only registration (see the constructor and {@link
+   * Vocabulary#maxKnownId()}) -- is skipped rather than aborting the whole decode: e.g. Qwen2.5's
+   * {@code config.json} {@code vocab_size} (152064) exceeds its tokenizer vocab (151665), so a
+   * sampled logit can legitimately fall in that gap. An id within that boundary that still has no
+   * entry is a real hole (the wrong tokenizer for the checkpoint, a mis-parsed {@code
+   * added_tokens}, a {@link Vocabulary} bug) and still throws, so it can't be mistaken for the
+   * above-vocab case. Described in prose rather than {@code {@link #baseVocabularyMaxKnownId}}: a
+   * link to a private field does not resolve in generated public javadoc (PR #14 review round 7,
+   * finding 8).
    */
   public String decode(List<Integer> ids, boolean skipSpecialTokens) {
     Objects.requireNonNull(ids, "HfTokenizer.decode: ids must not be null");

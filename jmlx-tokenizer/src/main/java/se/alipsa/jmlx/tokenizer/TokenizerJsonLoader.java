@@ -40,6 +40,29 @@ public final class TokenizerJsonLoader {
     }
   }
 
+  /**
+   * Requires {@code node.path(field)} to be a genuine JSON boolean when present -- the same
+   * principle round 8 finding 3 applied to {@code normalized}, generalized to every other {@code
+   * asBoolean(default)} guard in this class that could otherwise fail open. Two distinct failure
+   * modes, both verified directly against this port's pinned Jackson version: a "must be false"
+   * guard (e.g. {@code byte_fallback}, {@code lstrip}) only rejects an explicit {@code true} --
+   * {@code "byte_fallback": "yes"} and {@code "lstrip": "yes"} both loaded cleanly, since neither
+   * string parses as the literal boolean {@code true} and {@code asBoolean(false)} silently returns
+   * its {@code false} default for the unrecognized string, defeating the very guard checking it. A
+   * real config value with no "must be" constraint (e.g. {@code model .ignore_merges}) has no guard
+   * to defeat, but the same silent coercion means a malformed, non-boolean value is misinterpreted
+   * as its default meaning instead of the file being rejected as malformed -- for {@code
+   * ignore_merges} specifically, silently flipping tokenization rather than merely skipping a
+   * validation (PR #14 review round 9, finding 3).
+   */
+  private static void requireBoolean(JsonNode node, String field, String description) {
+    JsonNode value = node.path(field);
+    if (!value.isMissingNode() && !value.isNull() && !value.isBoolean()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + description + " must be a boolean, got " + value);
+    }
+  }
+
   private static NormalizerKind parseNormalizer(JsonNode node) {
     if (node.isNull() || node.isMissingNode()) {
       return NormalizerKind.NONE;
@@ -123,7 +146,6 @@ public final class TokenizerJsonLoader {
               + steps.stream().map(s -> s.path("type").asString("?")).toList());
     }
     JsonNode splitStep = steps.get(0);
-    JsonNode byteLevelStep = steps.get(1);
     String behavior = splitStep.path("behavior").asString(null);
     if (!"Isolated".equals(behavior)) {
       throw new TokenizerException(
@@ -131,10 +153,13 @@ public final class TokenizerJsonLoader {
               + behavior
               + "' (only 'Isolated' is supported)");
     }
+    requireBoolean(splitStep, "invert", "pre_tokenizer Split invert");
     if (splitStep.path("invert").asBoolean(false)) {
       throw new TokenizerException(
           "TokenizerJsonLoader: unsupported pre_tokenizer Split invert=true");
     }
+    JsonNode byteLevelStep = steps.get(1);
+    requireBoolean(byteLevelStep, "use_regex", "pre_tokenizer ByteLevel use_regex");
     if (byteLevelStep.path("use_regex").asBoolean(false)) {
       throw new TokenizerException(
           "TokenizerJsonLoader: unsupported pre_tokenizer ByteLevel use_regex=true");
@@ -224,6 +249,7 @@ public final class TokenizerJsonLoader {
    * diagnostic at all (PR #14 review round 4, finding 3).
    */
   private static void requireInertModelFields(JsonNode node) {
+    requireBoolean(node, "byte_fallback", "model.byte_fallback");
     if (node.path("byte_fallback").asBoolean(false)) {
       throw new TokenizerException(
           "TokenizerJsonLoader: unsupported model.byte_fallback=true (this port assumes false --"
@@ -272,8 +298,28 @@ public final class TokenizerJsonLoader {
     }
     requireInertModelFields(node);
     Map<String, Integer> vocab = new HashMap<>();
+    // Rejects two different token strings sharing one id, not just the reverse (a token string
+    // repeated with two different ids, which a plain Map already can't represent): Vocabulary's
+    // own idToToken build (modelVocab.forEach((token, id) -> idToToken.put(id, token))) lets
+    // whichever token HashMap iterates last silently win that id, while tokenToId keeps both --
+    // so encode(firstToken) and decode(thatId) could disagree on which string it means, with
+    // neither side aware anything is wrong (PR #14 review round 7, finding 2).
+    Map<Integer, String> vocabTokenById = new HashMap<>();
     for (Map.Entry<String, JsonNode> entry : node.path("vocab").properties()) {
-      vocab.put(entry.getKey(), entry.getValue().asInt());
+      String token = entry.getKey();
+      int id = entry.getValue().asInt();
+      String existingToken = vocabTokenById.putIfAbsent(id, token);
+      if (existingToken != null && !existingToken.equals(token)) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: model.vocab has id "
+                + id
+                + " for both '"
+                + existingToken
+                + "' and '"
+                + token
+                + "'");
+      }
+      vocab.put(token, id);
     }
     if (vocab.isEmpty()) {
       // Mirrors the mergeRank.isEmpty() guard below: an empty vocab makes Vocabulary#maxKnownId
@@ -310,8 +356,95 @@ public final class TokenizerJsonLoader {
           "TokenizerJsonLoader: model.merges produced an empty merge table -- BpeMerger would"
               + " silently degrade to per-byte tokenization");
     }
+    requireBoolean(node, "ignore_merges", "model.ignore_merges");
     boolean ignoreMerges = node.path("ignore_merges").asBoolean(false);
     return new BpeModelConfig(vocab, mergeRank, ignoreMerges);
+  }
+
+  /**
+   * Requires an {@code added_tokens} entry to have a non-empty, string {@code content} and a
+   * present, integral {@code id} -- each otherwise silently coerced or defaulted rather than
+   * rejected: {@code entry.path("content").asString()} returns {@code ""} for a missing or {@code
+   * null} node (verified directly against this port's pinned Jackson version), and {@link
+   * AddedTokenSplitter} compiles every added token's content via {@code Pattern.quote} into one
+   * alternation regex -- an empty pattern matches at every position, interleaving the token's id
+   * between every character of the input and leaving every character unmerged, while decode still
+   * round-trips the original text (a passing round-trip text assertion hiding garbage ids). {@code
+   * entry.path("id").asInt()} likewise silently defaults to {@code 0} for a missing {@code id}, and
+   * {@link Vocabulary}'s own added-token collision cleanup then vacates whatever real {@code
+   * model.vocab} token currently owns id {@code 0}, making it permanently un-encodable with no
+   * diagnostic at either site (PR #14 review round 8, finding 1).
+   *
+   * <p>{@code isString()}/{@code isIntegralNumber()} close a second gap left by the presence-only
+   * checks above (PR #14 review round 9, finding 4): a present but non-string {@code content} (e.g.
+   * {@code 123}) or non-integral {@code id} (e.g. {@code "3"}, coerced, or {@code 100.9},
+   * truncated) both load without error otherwise -- and a truncated or type-coerced id landing on
+   * one {@code model.vocab} already owns re-triggers the exact collision-vacating finding 1 above
+   * was written to prevent. A genuinely non-coercible value ({@code {}}, {@code "abc"}) already
+   * throws today, but as a raw Jackson error wrapped into {@link #load}'s generic "failed to parse"
+   * message rather than this method's own specific diagnostic; checking the node type directly
+   * gives every case the same clear failure mode.
+   */
+  private static void requireValidAddedTokenIdentity(JsonNode entry) {
+    JsonNode contentNode = entry.path("content");
+    if (contentNode.isMissingNode()
+        || contentNode.isNull()
+        || !contentNode.isString()
+        || contentNode.asString().isEmpty()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: added_tokens entry has missing, empty, or non-string content: "
+              + entry);
+    }
+    JsonNode idNode = entry.path("id");
+    if (idNode.isMissingNode() || idNode.isNull() || !idNode.isIntegralNumber()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: added_tokens['"
+              + contentNode.asString()
+              + "'] has no integral id: "
+              + idNode);
+    }
+  }
+
+  /**
+   * Requires every {@code added_tokens} entry's {@code (id, content)} pair to agree with every
+   * *other* entry's, mirroring {@code model.vocab}'s own bijection check ({@link #parseModel}, PR
+   * #14 review round 7, finding 2) and {@code HfTokenizer}'s {@code
+   * requireInternallyConsistentTemplateTokens} for {@code TemplateProcessing} special tokens.
+   * {@code added_tokens} was the one declaration source with no such check: verified directly --
+   * two entries sharing one id under different content loaded cleanly, then {@link
+   * AddedTokenSplitter} (built from every entry's content) still split input text at the first
+   * entry's content while {@link Vocabulary}'s added-token collision cleanup had already vacated it
+   * in favor of the second, so encoding perfectly valid input threw "no vocabulary entry" for a
+   * token the file itself declared; the mirror case (one content under two different ids) loaded
+   * cleanly and then made {@code decode} throw for an id the file itself declared, once the second
+   * entry's collision vacated the first (PR #14 review round 9, finding 1).
+   */
+  private static void requireInternallyConsistentAddedTokens(List<AddedToken> tokens) {
+    Map<Integer, String> contentById = new HashMap<>();
+    Map<String, Integer> idByContent = new HashMap<>();
+    for (AddedToken t : tokens) {
+      String existingContent = contentById.putIfAbsent(t.id(), t.content());
+      if (existingContent != null && !existingContent.equals(t.content())) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: added_tokens declares id "
+                + t.id()
+                + " for both '"
+                + existingContent
+                + "' and '"
+                + t.content()
+                + "'");
+      }
+      Integer existingId = idByContent.putIfAbsent(t.content(), t.id());
+      if (existingId != null && !existingId.equals(t.id())) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: added_tokens declares '"
+                + t.content()
+                + "' for both id "
+                + existingId
+                + " and id "
+                + t.id());
+      }
+    }
   }
 
   /**
@@ -335,6 +468,7 @@ public final class TokenizerJsonLoader {
    */
   private static void requireNoStrippingOrSingleWordFlags(JsonNode entry, String content) {
     for (String field : List.of("lstrip", "rstrip", "single_word")) {
+      requireBoolean(entry, field, "added_tokens['" + content + "']." + field);
       if (entry.path(field).asBoolean(false)) {
         throw new TokenizerException(
             "TokenizerJsonLoader: added_tokens['"
@@ -352,12 +486,38 @@ public final class TokenizerJsonLoader {
       return;
     }
     JsonNode normalizedNode = entry.path("normalized");
+    // Rejects any present, non-boolean normalized value outright, before even considering what it
+    // would coerce to: asBoolean(default) silently returns its default for ANY node it can't
+    // coerce to a boolean at all (the same asDouble-style defect round 6 finding 3 fixed for
+    // dropout, here for asBoolean instead), but unlike dropout's numeric 0.0, there is no
+    // non-boolean normalized value this port can call semantically equivalent to a real boolean
+    // -- HF's own serde requires this field to be a genuine JSON boolean when present, so any
+    // other JSON type here is itself a file this port's target models never produce. Checking
+    // this first, rather than folding it into the reason branches below, closes two problems
+    // round 7 finding 4's three-branch version still had (PR #14 review round 8, finding 3):
+    // a string like "true" or a number like 1 reached the old "normalized=true" branch even for
+    // a *special* token, where that branch's "defaults to true for a non-special added token"
+    // wording is false on both counts (it isn't a default, and the token isn't non-special); and
+    // a string like "false" or a number like 0 coerced to boolean false regardless of the
+    // special-token default, silently bypassing this validation entirely for a file HF's own
+    // strictly-typed serde would itself reject.
+    if (!normalizedNode.isMissingNode()
+        && !normalizedNode.isNull()
+        && !normalizedNode.isBoolean()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: added_tokens['"
+              + content
+              + "'] has non-boolean normalized "
+              + normalizedNode
+              + " (HF's own serde requires a JSON boolean here)");
+    }
     if (!normalizedNode.asBoolean(!special)) {
       return;
     }
     // Distinguishing an explicit "normalized": true from an absent field defaulting to true (via
     // !special, per HF's own serde) matters for the thrown message: naming a field the file
-    // doesn't actually contain would be misleading (PR #14 review round 6, finding 5).
+    // doesn't actually contain would be misleading (PR #14 review round 6, finding 5). Only two
+    // branches remain now that the non-boolean case throws above instead of falling through here.
     String reason =
         normalizedNode.isMissingNode() || normalizedNode.isNull()
             ? "normalized absent, which defaults to true for a non-special added token"
@@ -373,12 +533,14 @@ public final class TokenizerJsonLoader {
   private static List<AddedToken> parseAddedTokens(JsonNode node, NormalizerKind normalizer) {
     List<AddedToken> tokens = new ArrayList<>();
     for (JsonNode entry : node) {
+      requireValidAddedTokenIdentity(entry);
       String content = entry.path("content").asString();
       boolean special = entry.path("special").asBoolean(false);
       requireNoStrippingOrSingleWordFlags(entry, content);
       requireNoNormalization(entry, content, special, normalizer);
       tokens.add(new AddedToken(entry.path("id").asInt(), content, special));
     }
+    requireInternallyConsistentAddedTokens(tokens);
     return tokens;
   }
 }

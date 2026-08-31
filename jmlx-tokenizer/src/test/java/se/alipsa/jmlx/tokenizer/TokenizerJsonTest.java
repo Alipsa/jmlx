@@ -9,6 +9,10 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,6 +44,29 @@ class TokenizerJsonTest {
     assertTrue(json.model().ignoreMerges());
     assertEquals(2, json.postProcessor().size());
     assertTrue(json.postProcessor().get(1) instanceof TemplateProcessingStep);
+  }
+
+  @Test
+  void mutatingThePostProcessorOrAddedTokensListAfterConstructionDoesNotAffectTheStoredJson() {
+    // TokenizerJson's compact constructor defensively copies postProcessor/addedTokens (PR #14
+    // review round 7, finding 3); without it, a caller mutating the list it passed in after
+    // construction would corrupt HfTokenizer's post-processing / added-token splitting mid-flight.
+    // This test (round 8, finding 4) is the coverage that fix itself lacked -- constructed
+    // directly rather than through TokenizerJsonLoader, since the loader never retains a
+    // reference to the lists it builds.
+    List<PostProcessorStep> mutablePostProcessor = new ArrayList<>(List.of(new ByteLevelStep()));
+    List<AddedToken> mutableAddedTokens = new ArrayList<>();
+    TokenizerJson json =
+        new TokenizerJson(
+            NormalizerKind.NONE,
+            new PreTokenizerConfig(Pattern.compile(".+"), false),
+            mutablePostProcessor,
+            new BpeModelConfig(Map.of("l", 0), Map.of("l o", 0), false),
+            mutableAddedTokens);
+    mutablePostProcessor.clear();
+    mutableAddedTokens.add(new AddedToken(99, "<x>", false));
+    assertEquals(1, json.postProcessor().size());
+    assertTrue(json.addedTokens().isEmpty());
   }
 
   @Test

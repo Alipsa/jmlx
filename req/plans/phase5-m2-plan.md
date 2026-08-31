@@ -939,6 +939,117 @@ regression in round 5's own fix.**
   normalizedNode.isNull()` and wording the message accordingly ("normalized absent, which defaults
   to true for a non-special added token" vs. "normalized=true").
 
+**Amendment (PR #14 review, round 7): three more findings in this same `parseModel`/`added_tokens`
+validation family.**
+
+- **Finding 2 (medium): `parseModel`'s `vocab` loop never rejected two different token strings
+  sharing one `model.vocab` id.** `Vocabulary`'s constructor copies `modelVocab` into `tokenToId`
+  wholesale (both colliding entries survive there) but builds `idToToken` via
+  `modelVocab.forEach((token, id) -> idToToken.put(id, token))`, so whichever token `HashMap`
+  happens to iterate last silently wins that id -- `idOf(firstToken)` and `idOf(secondToken)` both
+  still resolve, but `tokenOf(thatId)` only ever returns one of them, disagreeing with whichever
+  caller used the other string to encode. Unlike every other vocabulary contradiction this port
+  rejects (a template token conflicting with `baseVocabulary`, two template tokens conflicting with
+  each other, an `added_tokens` collision -- which `Vocabulary` resolves deterministically by
+  design, added-token-wins), this one was a genuinely malformed `model.vocab` with no rule to
+  resolve it by, and nothing caught it. `parseModel` now tracks `id -> token` as it builds `vocab`
+  and throws if a later entry's id already belongs to a different token string, mirroring
+  `HfTokenizer#requireInternallyConsistentTemplateTokens`'s own id/text contradiction check.
+  `TokenizerJsonLoaderTest.duplicateIdInModelVocabThrows` covers it.
+- **Finding 4 (low): `requireNoNormalization`'s round-6 message fix (finding 5 above) branched on
+  `isMissingNode()`/`isNull()`, but missed a third case -- present, but not coercible to a
+  boolean.** `normalizedNode.asBoolean(!special)` silently returns its default for *any* node it
+  can't coerce, not just an absent/null one -- the same `asDouble`-style defect round 6 finding 3
+  fixed for `dropout`, here for `asBoolean` instead. A value like `"normalized": "yes"` reaches the
+  same "would throw" branch as a literal `"normalized": true` but was reported by the "isNull ?
+  absent : true" branching as `"normalized=true"`, naming a boolean literal the file never wrote.
+  Fixed by checking `isBoolean()` first and adding a third message for the present-but-non-boolean
+  case, naming the actual value. `addedTokenNormalizedNonBooleanValueThrowsNamingTheActualValueNotTrueOrAbsent`
+  covers it, alongside new message-content assertions (not just `assertThrows`) on the two
+  already-existing branches -- finding 5, below.
+- **Finding 5 (low): neither round-6 message fix (finding 5 above) nor this round's finding 4 had a
+  test that actually pinned the message wording.** Both `addedTokenNormalizedTrueThrowsWhenANormalizerExists`
+  and `addedTokenNormalizedAbsentDefaultsToTrueForNonSpecialTokenAndStillThrows` only asserted
+  `TokenizerException.class`, so a revert to the pre-round-6 single message, or the pre-round-7
+  three-branch split collapsing back to two, would pass unnoticed -- unlike this port's other
+  message-sensitive fixes, which do assert content. Both tests now also assert
+  `getMessage().contains(...)` against the exact wording each branch is supposed to produce.
+
+Separately, `BpeModelConfig` and `TokenizerJson` (Step 4a, above) gained the same defensive-copy
+compact constructors `SpecialTokenInfo` (Task 4's finding-1 amendment) already has -- see the
+finding-3 amendment under Task 12, below, which covers all three records together since the
+motivating repro is `HfTokenizer`-shaped.
+
+**Amendment (PR #14 review, round 9): five more findings across `TokenizerJsonLoader` and
+`TemplateProcessingStep` (Step 4a), all fixed.**
+
+- **Finding 1 (medium): `added_tokens` was the one declaration source with no id<->content
+  bijection check.** `model.vocab` has one (round 7, finding 2, above) and `TemplateProcessing`
+  special tokens have one (`HfTokenizer#requireInternallyConsistentTemplateTokens`), but
+  `added_tokens` itself did not -- verified directly: `[{"id":100,"content":"<a>"},
+  {"id":100,"content":"<b>"}]` loaded cleanly, then `encode("<a>")` threw "no vocabulary entry for
+  token '<a>'" on perfectly valid input, because `AddedTokenSplitter` is built from every entry's
+  content and still split at `"<a>"` while `Vocabulary`'s added-token collision cleanup had already
+  vacated it in favor of `"<b>"`. The mirror case (one content under two different ids) loaded
+  cleanly and then made `decode` throw for an id the file itself declared. Fixed by a new
+  `requireInternallyConsistentAddedTokens`, mirroring `requireInternallyConsistentTemplateTokens`'s
+  own structure exactly, called once over the fully-built `List<AddedToken>` at the end of
+  `parseAddedTokens`.
+- **Finding 2 (medium): a `TemplateProcessing` step with a missing or empty `single` silently
+  discarded the entire encoded text, with no diagnostic.** Verified directly: a missing `single`
+  (parses to zero items) and an explicit `single: []` both made `encode("low", true)` return `[]`
+  instead of throwing -- `PostProcessorApplier#applyTemplate` rebuilds its whole output purely from
+  `step.single()`'s items, so a `single` with no `Sequence` item can never emit the real encoded
+  sequence under any `addSpecialTokens` setting (the same failure mode a `single` holding only
+  `SpecialToken` items reduces to once `addSpecialTokens=false` skips all of them too, or even
+  under `addSpecialTokens=true` if it never had a `Sequence` item to begin with). This is the
+  malformed-file route to exactly the failure round 8 finding 2's own test description named
+  ("clearing `single` made `apply` return an empty sequence") -- that fix closed the
+  post-construction-*mutation* route but left the *malformed-input* route open.
+  `TemplateProcessingStep`'s compact constructor (round 8, finding 2) now also requires at least
+  one `SequenceItem` in `single`, mirroring `SpecialTokenInfo`'s own precedent of validating a
+  vanishing-content invariant in the type itself.
+- **Finding 3 (low): the "reject non-boolean outright" principle (round 8, finding 3) was applied
+  only to `normalized`.** Every other `asBoolean(default)` guard in this class still failed open --
+  verified directly: `"lstrip": "yes"` and `"byte_fallback": "yes"` both loaded cleanly, each
+  defeating the very guard checking it, since neither string parses as the literal boolean `true`
+  and `asBoolean(false)` silently returns its `false` default for the unrecognized string. Same
+  exposure for `rstrip`, `single_word`, `pre_tokenizer` `Split.invert`, `pre_tokenizer`
+  `ByteLevel.use_regex`, and `model.ignore_merges` -- the last of which has no "must be false" guard
+  to defeat at all (it's a real config value), so a non-boolean there would silently flip
+  tokenization to whichever meaning `false` happens to mean, rather than merely bypassing a
+  validation. Fixed by a new shared `requireBoolean(node, field, description)` helper, called
+  before each of the six existing `asBoolean` guards above.
+- **Finding 4 (low): `added_tokens`' `id` was required present but never checked to actually be
+  integral, and `content` was never checked to actually be a string.** Verified directly:
+  `"id": "3"` (a JSON string) loads via `asInt()` as the coerced integer `3`, and `"id": 100.9`
+  loads as the silently truncated `100`; `{"content": 123}` becomes the stringified `"123"`. A
+  truncated or type-coerced id landing on one `model.vocab` already owns re-triggers the exact
+  collision-vacating behavior round 8 finding 1 was written to prevent. A genuinely non-coercible
+  value (`{}`, `"abc"`) already threw, but as a raw Jackson error wrapped into `load`'s generic
+  "failed to parse" message rather than `requireValidAddedTokenIdentity`'s own specific diagnostic.
+  Closed by adding `isString()`/`isIntegralNumber()` checks to that method.
+- **Finding 5 (low): `TemplateProcessingStep`'s round-8 `Map.copyOf(specialTokens)` discarded the
+  loader's own `LinkedHashMap` declaration order, and JDK immutable maps randomize their iteration
+  order per JVM run (not a bug -- a documented property).** Verified across four runs: the same
+  `LinkedHashMap` insertion order produced three different `Map.copyOf` iteration orders. Nothing
+  observable breaks today, since `requireInternallyConsistentTemplateTokens` rejects template
+  contradictions before iteration order matters to anything, but a future message-content
+  assertion over a multi-entry contradiction -- the exact direction round 8's own message-content
+  fixes push this suite in -- would flake on which entry's name lands in the thrown message. Fixed
+  by `Collections.unmodifiableMap(new LinkedHashMap<>(specialTokens))` instead, which keeps both
+  the defensive copy and the declaration order.
+
+New tests: `TokenizerJsonLoaderTest` gained `addedTokensSameIdDifferentContentThrows` /
+`addedTokensSameContentDifferentIdThrows` (finding 1), non-boolean variants of the existing
+`byte_fallback`/`lstrip`/`Split.invert`/`ByteLevel.use_regex`/`ignore_merges` tests (finding 3), and
+`addedTokenNonIntegralIdThrows` / `addedTokenStringIdThrows` / `addedTokenNonStringContentThrows`
+(finding 4). A new `TemplateProcessingStepTest.java` -- this type's first dedicated test file,
+mirroring `SpecialTokenInfoTest`'s role -- covers finding 2's invariant directly
+(`constructorThrowsWhenSingleIsEmpty`, `constructorThrowsWhenSingleHasOnlySpecialTokenItemsAndNoSequenceItem`,
+`doesNotThrowWhenSingleHasASequenceItemAlongsideSpecialTokenItems`) and finding 5's ordering fix
+(`constructorPreservesSpecialTokensInsertionOrder`).
+
 **`TokenizerJsonTest.java`** (against the synthetic fixtures from Task 14 — written here but only
 runnable once Task 14 lands; note the dependency in the commit message):
 
@@ -1104,6 +1215,28 @@ incremental-max description finding 6 fixed *code* to no longer match, using the
 `Map.of("a", 1, "b", 2)` + `AddedToken(1, "b", false)` repro (id `2` was briefly assigned but is not
 "the largest id" any more once vacated). Reworded to "The largest id with a vocabulary entry *after*
 collision cleanup" and cross-referenced to the constructor's own javadoc.
+
+**Amendment (PR #14 review, round 8, finding 5): `modelVocab`'s own id<->content bijection
+(mirroring `TokenizerJsonLoader`'s round-7 `model.vocab` check and `HfTokenizer`'s template-token
+check) was enforced only at the loader, not in `Vocabulary` itself**, even though this
+constructor's own javadoc promises `idOf`/`tokenOf` stay "exact mutual inverses." `Vocabulary` is
+public and constructed directly (every test in `VocabularyTest`, and potentially M3), so a
+loader-only check is bypassable. Fixed by the same check inside the constructor's own
+`modelVocab.forEach` loop, as a second, defense-in-depth line; the loader's own check stays too,
+for its better, file-specific message. **Amendment (PR #14 review, round 9, finding 6): that new
+check's guard, `existingToken != null && !existingToken.equals(token)`, had a dead second clause.**
+`modelVocab.forEach` iterates unique keys (it's a `Map`), so the only way `idToToken.put(id,
+token)` can return a non-null `existingToken` is when a *different* token key already claimed that
+id -- `existingToken.equals(token)` can never be true when `existingToken != null`, unlike the
+analogous list-based checks elsewhere (e.g. `requireInternallyConsistentTemplateTokens`,
+`requireInternallyConsistentAddedTokens` -- Task 4's own round-9 finding 1, above), where the
+input is a plain `List` and the exact same `(id, content)` pair really can appear twice without
+being a contradiction. Simplified to `if (existingToken != null)`, matching this codebase's own
+precedent of removing exactly this kind of unreachable defensive branch (round 4 finding 9, round
+7 finding 9). The structurally identical dead clause in `TokenizerJsonLoader#parseModel`'s own
+`model.vocab` check (round 7, finding 2, above) -- built the same way, over `JsonNode.properties()`,
+whose keys are likewise unique -- was not touched this round; noted here in case a future round
+wants it cleaned up too.
 
 ## Task 6: `BpeMerger`
 
@@ -1945,6 +2078,170 @@ the `baseVocabulary` conflict check).
   asserting `decode(ids, true)` still includes `"the"` (`"thelow the"`) rather than silently
   dropping it (`"low the"`, the regressed value) the way `skipSpecialTokens=true` would if the
   token were wrongly promoted.
+
+**Amendment (PR #14 review, round 7): five more findings -- one investigated and pushed back on as
+inconsistent with an existing, deliberately-designed test rather than implemented; the rest fixed.**
+
+- **Finding 1 (medium, investigated -- not applied as suggested): "the `baseVocabularyMaxKnownId`
+  fix (round 6, finding 2, above) closed only one of two identical doors -- it excludes a sparse
+  *template*-declared outlier from the skip threshold, but not a sparse *`added_tokens`*-declared
+  one."** Verified on `llama3-style-template-id-below-max-known-id.tokenizer.json` (real
+  `model.vocab` tops at 16, one real `added_tokens` entry at id `128000`): `decode(50)` throws as an
+  in-range hole, even though 50 sits in the gap between the real vocab's top and that added token.
+  The suggested fix -- exclude sparse `added_tokens` ids from the threshold the same way template-only
+  ids already are -- was investigated and found to directly contradict an existing, deliberately
+  designed regression test: `HfTokenizerTest.decodeThrowsOnAnInRangeIdWithNoVocabularyEntryInsteadOfSilentlyDroppingIt`,
+  against `qwen-style-with-id-gap.tokenizer.json`, is *structurally identical* to this fixture --
+  a dense low vocab (0-19) plus one sparse `added_tokens` entry far above it (id 100, `"<|extra|>"`)
+  -- and its own PR #14-review provenance explicitly requires `decode(50)` there to *throw*, not
+  skip, specifically because a sparse `added_tokens` id is a first-class vocabulary declaration by
+  the file's own author (unlike a template-only `special_tokens` reference, which HF's own semantics
+  -- see `ResolvedToken`'s javadoc -- allow to name an id with no vocabulary entry anywhere else in
+  the file). Both fixtures cannot be resolved the same way without either regressing the qwen-style
+  test's own established intent or leaving this finding's fixture's `decode(50)` throwing as
+  "expected" rather than "a bug": the two suggested alternatives (a known-id *set* instead of a
+  *max*, or narrowing the threshold computation further) were examined and neither actually
+  distinguishes "a sparse `added_tokens` id declares a real, if oddly-numbered, extension of the
+  vocabulary" (the qwen-style-with-id-gap case, where the gap is a hole) from "a sparse
+  `added_tokens` id is itself an isolated, disconnected outlier" (this finding's case, where the gap
+  is claimed to be legitimate) without an extra signal this port's inputs don't carry.
+  **Withdrawn (PR #14 review, round 8, finding 7): this is not an open question left for a future
+  round to resolve -- both `decodeThrowsOnAnInRangeIdWithNoVocabularyEntryInsteadOfSilentlyDroppingIt`
+  and `decodeStillThrowsOnAGenuineInRangeHoleBelowTheThresholdOnATemplateBearingFixture` (finding 6,
+  below) are correct, permanent behavior, not provisional pending a decision.** The distinction that
+  settles it: an `added_tokens` entry is a first-class vocabulary declaration by the tokenizer
+  file's own author -- if it's sparse, that sparsity is the file's own claim about its vocabulary,
+  and a gap below it is exactly the kind of thing this port's "throw on an in-range hole" behavior
+  exists to catch (the wrong tokenizer for a checkpoint, a mis-parsed `added_tokens`, a `Vocabulary`
+  bug). A `TemplateProcessing.special_tokens` reference is not a vocabulary declaration at all --
+  it's a post-processor's *use* of an id, and HF's own semantics (`ResolvedToken`'s javadoc) let it
+  name an id with no vocabulary entry anywhere else in the file, which is why round 6 finding 2
+  correctly excluded it from the threshold and this finding's suggestion to extend that exclusion to
+  `added_tokens` too does not carry over. Recorded here, not just in this round's own findings list,
+  because this plan is what the code's own comments point back to -- a future round re-reading only
+  round 7's original text without this correction could otherwise reopen a settled question.
+- **Finding 3 (medium): `BpeModelConfig` and `TokenizerJson` never got the defensive-copy compact
+  constructor `SpecialTokenInfo` gained (Task 4's finding-1 amendment) for exactly the same
+  exposure.** `BpeMerger` holds a `BpeModelConfig` by reference and re-reads `model.vocab()`/`model
+  .mergeRank()` directly on every `merge` call rather than caching a snapshot, so a caller mutating
+  either map after constructing a `BpeModelConfig` directly (reachable in tests, and the one thing
+  that kept `HfTokenizer` from being provably immutable -- see finding 7, below) changed
+  tokenization mid-flight; `TokenizerJson` retains its `postProcessor`/`addedTokens` lists for
+  `HfTokenizer`'s entire lifetime with the same exposure. Both records now have a compact
+  constructor `Map.copyOf`/`List.copyOf`-ing the mutable fields (and `ignoreMerges`,
+  `normalizer`/`preTokenizer`/`model` are left uncopied, having no mutable-collection exposure of
+  their own).
+- **Finding 6 (low): the round-6 finding-2 regression test's second assertion was vacuous, and
+  nothing exercised the complementary "still throws" case on a template-bearing fixture.**
+  `decodeSkipsAnIdBetweenTheRealVocabTopAndASparseTemplateIdInsteadOfThrowingAsAHole` asserted
+  `decode(1000000)` skips, but `1000000` already exceeded the *pre-fix* threshold too (`999999`,
+  the template id itself), so it passed under the old, buggy code just as well -- only `decode(500)`
+  actually pinned the fix. Changed the second id to `999998` (below the old threshold, so it only
+  skips under the fixed `baseVocabularyMaxKnownId`). Separately, added
+  `decodeStillThrowsOnAGenuineInRangeHoleBelowTheThresholdOnATemplateBearingFixture`, using
+  `llama3-style-template-id-below-max-known-id.tokenizer.json` (a template-bearing fixture whose
+  `baseVocabularyMaxKnownId` is 128000, from a real `added_tokens` entry, not the tiny real
+  `model.vocab`'s own top of 16) to assert `decode(50)` still throws -- the complementary half
+  finding 1, above, investigates further.
+- **Finding 7 (low): `HfTokenizer`'s thread-safety was real (every field final, no shared mutable
+  state, `Matcher`/etc. allocated per call) but undocumented**, worth stating for M3's model-serving
+  loop. Added to the class javadoc, now safe to state unconditionally once finding 3's defensive
+  copies close the one remaining way an external caller could still mutate shared state after
+  construction.
+- **Finding 8 (low): `decode`'s own javadoc linked `{@link #baseVocabularyMaxKnownId}`, a private
+  field, which does not resolve in generated public javadoc.** Reworded in prose instead, restoring
+  a link to the public `Vocabulary#maxKnownId()` concept it's approximating.
+- **Finding 9 (low): the constructor's `int baseMaxKnownId` used a `-1` sentinel whose meaning
+  depended on the final assignment's ternary re-testing `templateTokens.isEmpty()` a second time,
+  not on the sentinel value itself** -- a refactor that dropped that redundant ternary and read the
+  sentinel directly would have silently substituted `-1` for the real threshold, making every
+  non-negative id skip instead of throwing on a genuine hole (an empty-looking decode with no
+  diagnostic). Replaced with a nullable `Vocabulary baseVocabulary` local: `null` means "not built,"
+  read directly by the final assignment, with no parallel condition to drift out of sync.
+
+**Amendment (PR #14 review, round 8): six more findings, all fixed, plus finding 7's withdrawal of
+round 7 finding 1 recorded above and finding 8's noted-but-not-acted-on performance observation.**
+
+- **Finding 1 (medium): `parseAddedTokens` never validated that an `added_tokens` entry actually
+  has `content`/`id` at all.** Verified directly against this port's pinned Jackson version:
+  `entry.path("content").asString()` returns `""` for a missing or `null` node, and `AddedTokenSplitter`
+  compiles every added token's content via `Pattern.quote` into one alternation regex -- an empty
+  pattern matches at every position, so a missing/empty `content` silently interleaved the token's
+  id between every character of the input and left every character unmerged, while `decode` still
+  round-tripped the original text (a passing round-trip assertion hiding garbage encode ids).
+  Separately, `entry.path("id").asInt()` silently defaults to `0` for a missing `id`, and
+  `Vocabulary`'s own added-token collision cleanup then vacates whatever real `model.vocab` token
+  currently owns id `0`, making it permanently un-encodable with no diagnostic at either site. Fixed
+  by a new `requireValidAddedTokenIdentity`, called first in `parseAddedTokens`'s loop, alongside
+  the presence/type validation already there for `byte_fallback`/`dropout`/`unk_token`/`lstrip`/
+  `rstrip`/`single_word`/`normalized`.
+- **Finding 2 (medium): `TemplateProcessingStep` was the one loader-produced value type still
+  holding live, caller-mutable collections.** `TokenizerJson`'s own `List.copyOf(postProcessor)`
+  (round 7's own fix) is shallow -- it freezes the outer list, not the `TemplateProcessingStep`
+  instances inside it -- so a caller clearing a step's `single` list or removing a `specialTokens`
+  entry after loading still corrupted `PostProcessorApplier#apply` for every subsequent `encode`
+  call, verified through public API only: clearing `single` made `apply` return an empty sequence
+  instead of the real one, and removing a `specialTokens` entry turned a valid template into
+  `apply`'s "references unknown special token" throw. This also falsified two claims made in round
+  7's own amendments -- `HfTokenizer`'s class javadoc ("every instance field is immutable once
+  construction finishes") and finding 3's own text above ("the one remaining way an external caller
+  could still mutate shared state") -- both restored to true now that `TemplateProcessingStep` has
+  the same compact-constructor treatment `SpecialTokenInfo`/`BpeModelConfig`/`TokenizerJson` already
+  had.
+- **Finding 3 (low): non-boolean `normalized` values had two remaining problems even after round 7
+  finding 4's three-branch message fix.** Verified against the pinned Jackson version:
+  `"normalized": "true"` and `"normalized": 1` both coerce to boolean `true` regardless of the
+  `!special` default (Jackson's `asBoolean` parses literal `"true"`/`"false"` text, unlike
+  `asDouble`'s purely-numeric coercion), reaching the old "normalized=true" branch even for a
+  *special* token, where that branch's "defaults to true for a non-special added token" wording is
+  false on both counts (it isn't a default, and the token isn't non-special); and `"normalized":
+  "false"` / `"normalized": 0` coerce to `false` regardless of default, so the guard never fired at
+  all -- silently bypassing this validation for a file HF's own strictly-typed serde would itself
+  reject. Fixed by rejecting any present, non-boolean `normalized` value outright, before even
+  considering what it would coerce to -- closing both problems at once and removing the need for the
+  round-7 message's parenthetical, per the reasoning that unlike `dropout`'s numeric `0.0`, there is
+  no non-boolean `normalized` value this port can call semantically equivalent to a real boolean.
+- **Finding 4 (low): the round-7 defensive-copy fixes for `BpeModelConfig` and `TokenizerJson` had
+  no test of their own** -- reverting either compact constructor to a bare assignment would have
+  passed the whole suite untouched, unlike `SpecialTokenInfo`'s own round-5 copy, which
+  `SpecialTokenInfoTest` already pins. Closed by
+  `BpeMergerTest.mutatingTheVocabOrMergeRankMapAfterConstructionDoesNotAffectAnAlreadyBuiltBpeModelConfig`
+  (mutating the source maps after constructing a `BpeModelConfig`, then asserting `BpeMerger` still
+  merges as if they hadn't changed -- the repro `BpeModelConfig`'s own javadoc already cited) and
+  `TokenizerJsonTest.mutatingThePostProcessorOrAddedTokensListAfterConstructionDoesNotAffectTheStoredJson`
+  (constructing a `TokenizerJson` directly, since the loader itself never retains a reference to the
+  lists it builds).
+- **Finding 5 (low): the `model.vocab` duplicate-id invariant (round 7 finding 2) was enforced only
+  at `TokenizerJsonLoader`, not in `Vocabulary` itself**, even though the constructor's own javadoc
+  promises `idOf`/`tokenOf` stay "exact mutual inverses" -- verified directly: `new
+  Vocabulary(Map.of("a", 5, "b", 5), List.of())` still let `idOf("a")` and `idOf("b")` both resolve
+  to `5` while `tokenOf(5)` returned only whichever token `HashMap` iteration happened to visit last.
+  `Vocabulary` is public and constructed directly (every test in `VocabularyTest`, and potentially
+  M3 if it ever builds a vocabulary from something other than a `tokenizer.json`), so a loader-only
+  check is bypassable. `SpecialTokenInfo` adopted the opposite standard explicitly in round 3
+  ("Validating here, not just at the `TokenizerJsonLoader` call site..."); `Vocabulary`'s own
+  constructor now does the same, as a second, defense-in-depth line -- the loader's own check stays
+  too, for its better, file-specific message.
+- **Finding 6 (low): `duplicateIdInModelVocabThrows` (round 7's own new test) asserted only the
+  exception type**, unlike the round-7 `normalized`-message tests added in the same diff. Added
+  `assertTrue(e.getMessage().contains("id 0 for both"))`.
+
+Separately, **finding 8 (suggestion, not acted on): parsing/wrapping a full-size `model.vocab`
+builds roughly five full-vocab-sized maps** -- `parseModel`'s own `vocab` and its
+validation-only `vocabTokenById` (discarded once the loop ends), `BpeModelConfig`'s
+`Map.copyOf(vocab)`, and `Vocabulary`'s `tokenToId`/`idToToken` -- where `Vocabulary`'s own
+`idToToken` is exactly the inverse map `parseModel` already built and threw away. Noted because
+round 5 finding 11 established double `Vocabulary` construction as a cost worth avoiding, but
+weighed differently here: finding 11's fix was a wasted construction that Qwen2.5's own file shape
+(no `TemplateProcessing` step) let the constructor skip *entirely* for free. This finding's five
+maps are each used for something real (loader-side validation with a good message, `BpeModelConfig`'s
+own immutability guarantee, `Vocabulary`'s actual inverse lookup) and are paid by both target models
+unconditionally, at model-load time, not on any per-token hot path -- avoiding them would mean
+threading the loader's already-validated inverse map through `BpeModelConfig` and into `Vocabulary`'s
+constructor, coupling three classes this port otherwise keeps deliberately separate (see this
+plan's own preference for small single-responsibility types) to save a one-time, sub-second cost
+even at Qwen2.5's ~150k-entry scale. Left as-is; revisit only if model-load latency is ever actually
+measured and found to matter.
 
 ## Task 13: `ChatTemplateRenderer`
 

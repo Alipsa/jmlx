@@ -25,13 +25,47 @@ public final class Vocabulary {
    * currently occupies an id, not every added token that ever claimed it: an added token's own
    * {@code special} flag always wins for its id, including clearing a stale {@code true} left by an
    * earlier added token that collided on the same id.
+   *
+   * <p>{@code modelVocab} itself is required to have no two different token strings sharing one id
+   * -- verified directly: without this check, {@code new Vocabulary(Map.of("a", 5, "b", 5),
+   * List.of())} let {@code idOf("a")} and {@code idOf("b")} both resolve to {@code 5} while {@code
+   * tokenOf(5)} returned only whichever token {@code modelVocab.forEach} happened to iterate last,
+   * silently breaking the mutual-inverse guarantee this javadoc's first paragraph promises, with
+   * the winner depending on {@code HashMap} iteration order. {@link TokenizerJsonLoader#load}'s own
+   * loader-level check (Task 4's own amendment) already rejects this for a real {@code
+   * tokenizer.json} file with a better, file-specific message; this constructor's own check is a
+   * second, defense-in-depth line for {@code Vocabulary}'s broader public API -- callers exist,
+   * e.g. every test in {@code VocabularyTest}, that construct it directly from an arbitrary map,
+   * not through the loader (PR #14 review round 8, finding 5, following {@code SpecialTokenInfo}'s
+   * round-3 precedent of validating in the type itself, not just at one call site).
    */
   public Vocabulary(Map<String, Integer> modelVocab, List<AddedToken> addedTokens) {
     Objects.requireNonNull(modelVocab, "Vocabulary: modelVocab must not be null");
     Objects.requireNonNull(addedTokens, "Vocabulary: addedTokens must not be null");
     this.tokenToId = new HashMap<>(modelVocab);
     this.idToToken = new HashMap<>();
-    modelVocab.forEach((token, id) -> idToToken.put(id, token));
+    modelVocab.forEach(
+        (token, id) -> {
+          // No != token.equals(...) guard needed: modelVocab's keys are unique (it's a Map), so
+          // the only way idToToken.put(id, token) can return a non-null existingToken is when a
+          // DIFFERENT token key already claimed this id -- existingToken == token is structurally
+          // impossible here, unlike the analogous list-based checks elsewhere in this codebase
+          // (e.g. HfTokenizer#requireInternallyConsistentTemplateTokens), where the same (id,
+          // content) pair really can appear twice and must not be treated as a contradiction (PR
+          // #14 review round 9, finding 6, removing the dead clause this check was given when it
+          // was first written).
+          String existingToken = idToToken.put(id, token);
+          if (existingToken != null) {
+            throw new TokenizerException(
+                "Vocabulary: modelVocab has id "
+                    + id
+                    + " for both '"
+                    + existingToken
+                    + "' and '"
+                    + token
+                    + "'");
+          }
+        });
     this.specialIds = new HashSet<>();
     for (AddedToken t : addedTokens) {
       Integer previousIdForToken = tokenToId.get(t.content());

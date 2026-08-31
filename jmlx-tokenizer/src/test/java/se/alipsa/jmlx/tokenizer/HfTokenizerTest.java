@@ -105,10 +105,29 @@ class HfTokenizerTest {
     // baseVocabularyMaxKnownId (model.vocab + added_tokens only, excluding template
     // registrations) separately for this check, so an id in that gap is correctly skipped instead
     // (PR #14 review round 6, finding 2).
+    //
+    // 999998, not 1000000, pins the fix: 1000000 exceeds even the pre-fix threshold (999999, the
+    // template id itself), so it skipped under the old, buggy code too and would not have caught a
+    // regression back to it. 999998 is below that old threshold, so it only skips under the fixed
+    // baseVocabularyMaxKnownId (16) (PR #14 review round 7, finding 6, correcting round 6's own
+    // regression test, whose second assertion was vacuous for exactly this reason).
     HfTokenizer tokenizer =
         HfTokenizer.fromFile(fixture("llama3-style-template-id-absent-from-vocab.tokenizer.json"));
     assertEquals("", tokenizer.decode(List.of(500), false));
-    assertEquals("", tokenizer.decode(List.of(1000000), false));
+    assertEquals("", tokenizer.decode(List.of(999998), false));
+  }
+
+  @Test
+  void decodeStillThrowsOnAGenuineInRangeHoleBelowTheThresholdOnATemplateBearingFixture() {
+    // The complementary case the test above doesn't cover (PR #14 review round 7, finding 6):
+    // llama3-style-template-id-below-max-known-id.tokenizer.json has both a template registration
+    // (id 500) and a real added_tokens entry (id 128000), so baseVocabularyMaxKnownId is 128000,
+    // not the tiny real model.vocab's own top (16). An id like 50 -- no vocabulary entry, but well
+    // below that 128000 boundary -- must still throw as a genuine hole, not be swept up by the
+    // above-vocab skip, even on a fixture that also happens to carry a template token.
+    HfTokenizer tokenizer =
+        HfTokenizer.fromFile(fixture("llama3-style-template-id-below-max-known-id.tokenizer.json"));
+    assertThrows(TokenizerException.class, () -> tokenizer.decode(List.of(50), false));
   }
 
   @Test

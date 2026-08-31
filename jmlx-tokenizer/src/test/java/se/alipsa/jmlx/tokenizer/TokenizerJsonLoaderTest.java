@@ -1,7 +1,9 @@
 package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -125,8 +127,51 @@ class TokenizerJsonLoaderTest {
   }
 
   @Test
+  void preTokenizerSplitInvertNonBooleanThrows() {
+    // Same non-boolean-fails-open exposure as byte_fallback, for pre_tokenizer Split's own invert
+    // guard (PR #14 review round 9, finding 3).
+    String preTokenizer =
+        "{\"type\": \"Sequence\", \"pretokenizers\": [{\"type\": \"Split\", \"pattern\":"
+            + " {\"Regex\": \"\\\\w+\"}, \"behavior\": \"Isolated\", \"invert\": \"yes\"},"
+            + "{\"type\": \"ByteLevel\", \"add_prefix_space\": false, \"trim_offsets\": true,"
+            + " \"use_regex\": false}]}";
+    Path path = writeTokenizerJson(VALID_DECODER, preTokenizer, VALID_MODEL, "[]");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void preTokenizerByteLevelUseRegexNonBooleanThrows() {
+    String preTokenizer =
+        "{\"type\": \"Sequence\", \"pretokenizers\": [{\"type\": \"Split\", \"pattern\":"
+            + " {\"Regex\": \"\\\\w+\"}, \"behavior\": \"Isolated\", \"invert\": false},"
+            + "{\"type\": \"ByteLevel\", \"add_prefix_space\": false, \"trim_offsets\": true,"
+            + " \"use_regex\": \"yes\"}]}";
+    Path path = writeTokenizerJson(VALID_DECODER, preTokenizer, VALID_MODEL, "[]");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
   void byteFallbackTrueThrows() {
     Path path = validTokenizerJsonWith("byte_fallback", "true");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void byteFallbackNonBooleanThrows() {
+    // "yes" doesn't parse as the literal boolean true, so asBoolean(false) silently returned its
+    // false default and defeated this exact guard -- verified directly (PR #14 review round 9,
+    // finding 3, generalizing round 8 finding 3's non-boolean rejection beyond normalized).
+    Path path = validTokenizerJsonWith("byte_fallback", "\"yes\"");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void ignoreMergesNonBooleanThrows() {
+    // Unlike byte_fallback, ignore_merges has no "must be false" guard to defeat -- it's a real
+    // config value, so a non-boolean here would have silently flipped tokenization to whichever
+    // meaning the default happens to be, rather than merely bypassing a validation (PR #14 review
+    // round 9, finding 3).
+    Path path = validTokenizerJsonWith("ignore_merges", "\"yes\"");
     assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
   }
 
@@ -229,13 +274,26 @@ class TokenizerJsonLoaderTest {
   }
 
   @Test
+  void addedTokenLstripNonBooleanThrows() {
+    // Same non-boolean-fails-open exposure as byte_fallback, for added_tokens' own
+    // lstrip/rstrip/single_word guards (PR #14 review round 9, finding 3).
+    Path path = validTokenizerJsonWithAddedToken("\"lstrip\": \"yes\"");
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
   void addedTokenNormalizedTrueThrowsWhenANormalizerExists() {
     String addedTokens =
         "[{\"id\": 2, \"content\": \"<x>\", \"special\": false, \"normalized\": true}]";
     Path path =
         writeTokenizerJsonWithNormalizer(
             "{\"type\": \"NFC\"}", VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
-    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+    // The thrown message is the whole point of round 6 finding 5's fix -- pin its wording, not
+    // just that some TokenizerException is thrown, or a revert to the pre-round-6 message would
+    // pass this suite unnoticed (PR #14 review round 7, finding 5).
+    TokenizerException e =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+    assertTrue(e.getMessage().contains("normalized=true"), e.getMessage());
   }
 
   @Test
@@ -258,6 +316,160 @@ class TokenizerJsonLoaderTest {
     Path path =
         writeTokenizerJsonWithNormalizer(
             "{\"type\": \"NFC\"}", VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    // Pins the "absent" wording specifically, distinguishing it from the "normalized=true" case
+    // above -- both throw, but naming a field the file doesn't contain would be its own defect
+    // (PR #14 review round 6, finding 5; round 7, finding 5).
+    TokenizerException e =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+    assertTrue(e.getMessage().contains("normalized absent"), e.getMessage());
+  }
+
+  @Test
+  void addedTokenNormalizedNonBooleanValueThrowsNamingTheActualValueNotTrueOrAbsent() {
+    // asBoolean(default) silently returns its default for ANY node it can't coerce to a boolean,
+    // not just an absent/null one -- a string like "yes" reaches the same "would throw" branch as
+    // a literal "normalized": true. Since round 8 finding 3, a non-boolean value is now rejected
+    // outright before the true/false coercion is even considered, so this assertion also pins that
+    // the message names the actual offending value rather than a boolean literal the file never
+    // wrote (PR #14 review round 7, finding 4; round 8, finding 3).
+    String addedTokens =
+        "[{\"id\": 2, \"content\": \"<x>\", \"special\": false, \"normalized\": \"yes\"}]";
+    Path path =
+        writeTokenizerJsonWithNormalizer(
+            "{\"type\": \"NFC\"}", VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    TokenizerException e =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+    assertTrue(e.getMessage().contains("yes"), e.getMessage());
+    assertFalse(e.getMessage().contains("normalized=true"), e.getMessage());
+    assertFalse(e.getMessage().contains("normalized absent"), e.getMessage());
+  }
+
+  @Test
+  void addedTokenNormalizedStringFalseStillThrowsInsteadOfSilentlyBypassingValidation() {
+    // "false" (a JSON string, not a boolean) coerces via asBoolean to false regardless of the
+    // default, so the pre-round-8 check (!asBoolean(!special)) never fired here -- silently
+    // bypassing this validation entirely for a file HF's own strictly-typed serde would itself
+    // reject (PR #14 review round 8, finding 3).
+    String addedTokens =
+        "[{\"id\": 2, \"content\": \"<x>\", \"special\": false, \"normalized\": \"false\"}]";
+    Path path =
+        writeTokenizerJsonWithNormalizer(
+            "{\"type\": \"NFC\"}", VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokenNormalizedNumericOnASpecialTokenDoesNotClaimANonSpecialDefault() {
+    // A numeric 1 coerces to boolean true regardless of the special-token default, so the
+    // pre-round-8 three-branch message would have wrongly said "defaults to true for a
+    // non-special added token" even though special=true here -- it isn't a default, and the token
+    // isn't non-special (PR #14 review round 8, finding 3).
+    String addedTokens =
+        "[{\"id\": 2, \"content\": \"<x>\", \"special\": true, \"normalized\": 1}]";
+    Path path =
+        writeTokenizerJsonWithNormalizer(
+            "{\"type\": \"NFC\"}", VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    TokenizerException e =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+    assertFalse(e.getMessage().contains("non-special"), e.getMessage());
+  }
+
+  @Test
+  void duplicateIdInModelVocabThrows() {
+    // Two different token strings sharing one model.vocab id is a genuine internal contradiction
+    // Vocabulary can't represent correctly: idToToken keeps only whichever token HashMap iterates
+    // last, while tokenToId keeps both, so encode(theOtherToken) and decode(thatId) would silently
+    // disagree on which string the id means (PR #14 review round 7, finding 2).
+    String model = "{\"type\": \"BPE\", \"vocab\": {\"a\": 0, \"b\": 0}, \"merges\": [\"a b\"]}";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, model, "[]");
+    // Message-content assertion, matching the two sibling normalized-message tests above rather
+    // than only asserting the exception type (PR #14 review round 8, finding 6).
+    TokenizerException e =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+    assertTrue(e.getMessage().contains("id 0 for both"), e.getMessage());
+  }
+
+  @Test
+  void addedTokenMissingContentThrows() {
+    // AddedTokenSplitter compiles Pattern.quote(content) into its alternation regex; an empty or
+    // absent content compiles to a pattern that matches at every position, interleaving the
+    // token's id between every character of the input while decode still round-trips the
+    // original text -- a passing round-trip assertion hiding garbage encode ids (PR #14 review
+    // round 8, finding 1).
+    String addedTokens = "[{\"id\": 2, \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokenEmptyContentThrows() {
+    String addedTokens = "[{\"id\": 2, \"content\": \"\", \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokenMissingIdThrows() {
+    // An absent id defaults via asInt() to 0, and Vocabulary's added-token collision cleanup then
+    // vacates whatever real model.vocab token currently owns id 0, making it permanently
+    // un-encodable with no diagnostic at either site (PR #14 review round 8, finding 1).
+    String addedTokens = "[{\"content\": \"<x>\", \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokenNonIntegralIdThrows() {
+    // 100.9 loads via asInt() as a silently truncated 100 rather than being rejected as malformed
+    // (PR #14 review round 9, finding 4).
+    String addedTokens = "[{\"id\": 100.9, \"content\": \"<x>\", \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokenStringIdThrows() {
+    // "3" (a JSON string) loads via asInt() as the coerced integer 3 rather than being rejected
+    // (PR #14 review round 9, finding 4).
+    String addedTokens = "[{\"id\": \"3\", \"content\": \"<x>\", \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokenNonStringContentThrows() {
+    // A numeric 123 loads via asString() as the stringified "123" rather than being rejected (PR
+    // #14 review round 9, finding 4).
+    String addedTokens = "[{\"id\": 2, \"content\": 123, \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokensSameIdDifferentContentThrows() {
+    // added_tokens is the one declaration source with no id<->content bijection check: model.vocab
+    // has one (round 7, finding 2) and TemplateProcessing special tokens have one
+    // (requireInternallyConsistentTemplateTokens). Verified directly: this loaded cleanly, then
+    // AddedTokenSplitter (built from every entry's content) still split input text at "<a>" while
+    // Vocabulary's added-token collision cleanup had already vacated it in favor of "<b>", so
+    // encoding perfectly valid input threw "no vocabulary entry" for a token the file itself
+    // declared (PR #14 review round 9, finding 1).
+    String addedTokens =
+        "[{\"id\": 100, \"content\": \"<a>\", \"special\": false},"
+            + " {\"id\": 100, \"content\": \"<b>\", \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
+    assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void addedTokensSameContentDifferentIdThrows() {
+    // The mirror case: this loaded cleanly and then made decode(100) throw for an id the file
+    // itself declared, once the second entry's collision vacated the first (PR #14 review round
+    // 9, finding 1).
+    String addedTokens =
+        "[{\"id\": 100, \"content\": \"<x>\", \"special\": false},"
+            + " {\"id\": 101, \"content\": \"<x>\", \"special\": false}]";
+    Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, VALID_MODEL, addedTokens);
     assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
   }
 

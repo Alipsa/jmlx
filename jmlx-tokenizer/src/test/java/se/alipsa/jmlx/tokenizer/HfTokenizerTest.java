@@ -24,6 +24,9 @@ class HfTokenizerTest {
     assertEquals(OptionalInt.of(151643), tokenizer.eosTokenId("<|endoftext|>"));
     assertEquals(
         List.of(151645, 151643), tokenizer.eosTokenIds(List.of("<|im_end|>", "<|endoftext|>")));
+    assertThrows(TokenizerException.class, () -> tokenizer.bosTokenId("not-a-token"));
+    assertThrows(TokenizerException.class, () -> tokenizer.eosTokenId("not-a-token"));
+    assertThrows(TokenizerException.class, () -> tokenizer.eosTokenIds(List.of("not-a-token")));
     assertEquals(151665, tokenizer.vocabSize());
   }
 

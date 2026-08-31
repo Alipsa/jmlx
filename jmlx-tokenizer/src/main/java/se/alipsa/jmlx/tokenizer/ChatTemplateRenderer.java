@@ -15,7 +15,9 @@ public final class ChatTemplateRenderer {
   /**
    * Renders {@code chatTemplate} against the standard HF chat-template context variables, plus any
    * caller-supplied {@code extraContext} (e.g. {@code tools} for tool-calling templates) merged in
-   * underneath the fixed keys below.
+   * underneath the fixed keys below. This overload parses on each call; use {@link #parse(String)}
+   * and the {@link #render(Template, List, boolean, String, String, Map)} overload in a serving
+   * loop.
    */
   public static String render(
       String chatTemplate,

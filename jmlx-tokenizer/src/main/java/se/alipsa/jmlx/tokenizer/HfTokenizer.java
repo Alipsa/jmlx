@@ -167,10 +167,10 @@ public final class HfTokenizer {
 
   /**
    * Resolves a caller-supplied BOS token, typically from {@code tokenizer_config.json}. {@code
-   * null} and unknown tokens return empty.
+   * null} returns empty; an unknown non-null token throws.
    */
   public OptionalInt bosTokenId(String bosToken) {
-    return tokenId(bosToken);
+    return configuredTokenId(bosToken, "bosTokenId");
   }
 
   /**
@@ -183,24 +183,23 @@ public final class HfTokenizer {
 
   /**
    * Resolves a caller-supplied EOS token, typically from {@code tokenizer_config.json}. {@code
-   * null} and unknown tokens return empty.
+   * null} returns empty; an unknown non-null token throws.
    */
   public OptionalInt eosTokenId(String eosToken) {
-    return tokenId(eosToken);
+    return configuredTokenId(eosToken, "eosTokenId");
   }
 
   /**
-   * Resolves all caller-supplied EOS tokens, preserving order. Use this for checkpoints such as
-   * Llama 3.1 that declare multiple generation terminators.
+   * Resolves all caller-supplied EOS tokens, preserving order. Null and unknown entries throw. Use
+   * this for checkpoints such as Llama 3.1 that declare multiple generation terminators.
    */
   public List<Integer> eosTokenIds(List<String> eosTokens) {
     Objects.requireNonNull(eosTokens, "HfTokenizer.eosTokenIds: eosTokens must not be null");
     List<Integer> ids = new ArrayList<>(eosTokens.size());
     for (String eosToken : eosTokens) {
-      OptionalInt id = tokenId(eosToken);
+      OptionalInt id = configuredTokenId(eosToken, "eosTokenIds");
       if (id.isEmpty()) {
-        throw new TokenizerException(
-            "HfTokenizer.eosTokenIds: no vocabulary entry for EOS token '" + eosToken + "'");
+        throw new TokenizerException("HfTokenizer.eosTokenIds: EOS tokens must not contain null");
       }
       ids.add(id.getAsInt());
     }
@@ -227,10 +226,15 @@ public final class HfTokenizer {
     return OptionalInt.empty();
   }
 
-  private OptionalInt tokenId(String token) {
-    return token != null && vocabulary.hasToken(token)
-        ? OptionalInt.of(vocabulary.idOf(token))
-        : OptionalInt.empty();
+  private OptionalInt configuredTokenId(String token, String method) {
+    if (token == null) {
+      return OptionalInt.empty();
+    }
+    if (!vocabulary.hasToken(token)) {
+      throw new TokenizerException(
+          "HfTokenizer." + method + ": no vocabulary entry for token '" + token + "'");
+    }
+    return OptionalInt.of(vocabulary.idOf(token));
   }
 
   /** Encodes {@code text} into token ids. */

@@ -47,9 +47,11 @@ public final class PostProcessorApplier {
           }
           List<String> specialTokens = info.tokens();
           List<Integer> specialIds = info.ids();
+          // SpecialTokenInfo's own compact constructor guarantees specialIds.size() ==
+          // specialTokens.size(), so specialIds.get(i) is always in range here -- no null
+          // fallback needed (PR #14 review round 4, finding 9).
           for (int i = 0; i < specialTokens.size(); i++) {
-            Integer id = i < specialIds.size() ? specialIds.get(i) : null;
-            out.add(new ResolvedToken(specialTokens.get(i), id));
+            out.add(new ResolvedToken(specialTokens.get(i), specialIds.get(i)));
           }
         }
       }

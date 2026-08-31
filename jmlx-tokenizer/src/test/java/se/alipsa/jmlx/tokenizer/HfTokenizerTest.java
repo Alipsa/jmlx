@@ -79,27 +79,53 @@ class HfTokenizerTest {
   }
 
   @Test
-  void encodeTrustsATemplateSpecialTokenIdThatHasNoVocabularyEntryAtAll() {
-    // The template's special_tokens.ids value (999999) has no vocabulary entry at all -- HF's own
-    // TemplateProcessing performs no vocabulary lookup on special_tokens ids, and ResolvedToken's
-    // own javadoc documents exactly this case, so encode must trust it as-is rather than throw
-    // (PR #14 review round 3, finding 2/6, correcting round 2's finding 7, which rejected every
-    // unknown id and so also rejected this legitimate case).
+  void templateSpecialTokenAbsentFromBaseVocabIsRegisteredSoEncodeAndDecodeAgree() {
+    // The template's special_tokens.ids value (999999) has no vocabulary entry anywhere in
+    // model.vocab/added_tokens (this fixture, unlike its round-3 version, genuinely omits
+    // "<|begin_of_text|>" from both) -- HF's own TemplateProcessing performs no vocabulary lookup
+    // on special_tokens ids, and ResolvedToken's own javadoc documents exactly this case, so
+    // encode must trust it. Unlike round 3's fix, which trusted the id WITHOUT registering it,
+    // decode must also resolve it back correctly instead of silently dropping it as an
+    // above-vocab id (PR #14 review round 4, finding 2).
     HfTokenizer tokenizer =
         HfTokenizer.fromFile(fixture("llama3-style-template-id-absent-from-vocab.tokenizer.json"));
-    assertEquals(List.of(999999, 13, 16), tokenizer.encode("low the", true));
+    List<Integer> ids = tokenizer.encode("low the", true);
+    assertEquals(List.of(999999, 13, 16), ids);
+    assertEquals("<|begin_of_text|>low the", tokenizer.decode(ids, false));
   }
 
   @Test
-  void encodeThrowsWhenATemplateSpecialTokenIdConflictsWithADifferentVocabularyToken() {
-    // The template's special_tokens.ids value (15) is a real, existing vocabulary id -- but it
-    // belongs to "the", not "<|begin_of_text|>". Unlike an id with no vocabulary entry at all
-    // (see the test above), this is a genuine internal contradiction within the same file, and
-    // baking it in would silently swap in the wrong token wherever this id is later decoded (PR
-    // #14 review, finding 2).
+  void templateSpecialTokenBelowMaxKnownIdIsRegisteredInsteadOfThrowingAsAnInRangeHole() {
+    // The mirror failure mode of the test above: here the template's id (500) is unclaimed, but
+    // is numerically below maxKnownId (128000, from an unrelated added token) -- so before this
+    // id gets registered into the vocabulary, decode would treat it as a genuine in-range hole
+    // and throw, even though encode just accepted it (PR #14 review round 4, finding 2).
     HfTokenizer tokenizer =
-        HfTokenizer.fromFile(
-            fixture("llama3-style-template-id-conflicts-with-vocab.tokenizer.json"));
-    assertThrows(TokenizerException.class, () -> tokenizer.encode("low the", true));
+        HfTokenizer.fromFile(fixture("llama3-style-template-id-below-max-known-id.tokenizer.json"));
+    List<Integer> ids = tokenizer.encode("low the", true);
+    assertEquals(List.of(500, 13, 16), ids);
+    assertEquals("<|begin_of_text|>low the", tokenizer.decode(ids, false));
+  }
+
+  @Test
+  void loadingThrowsWhenATemplateSpecialTokenIdConflictsWithADifferentVocabularyToken() {
+    // The template's special_tokens.ids value (15) is a real, existing vocabulary id -- but it
+    // belongs to "the", not "<|begin_of_text|>". This is a genuine internal contradiction within
+    // the same file, and baking it in would silently swap in the wrong token wherever this id is
+    // later decoded. Caught at load time (HfTokenizer's constructor validates every template
+    // token up front), not deferred to the first encode() call (PR #14 review, finding 2).
+    Path path = fixture("llama3-style-template-id-conflicts-with-vocab.tokenizer.json");
+    assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(path));
+  }
+
+  @Test
+  void loadingThrowsWhenATemplateSpecialTokenTextIsAlreadyKnownUnderADifferentId() {
+    // The mirror of the test above: here the id (999999) has no vocabulary entry at all, but the
+    // TEXT it's declared for ("<|begin_of_text|>") is already known under a different id (128000,
+    // from both model.vocab and added_tokens). Round 3's check was one-directional -- it only
+    // tested "does this id belong to a different token," not "does this text belong to a
+    // different id" -- and missed exactly this case (PR #14 review round 4, finding 2).
+    Path path = fixture("llama3-style-template-id-mirrors-a-different-id.tokenizer.json");
+    assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(path));
   }
 }

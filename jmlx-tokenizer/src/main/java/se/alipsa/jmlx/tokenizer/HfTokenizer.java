@@ -19,12 +19,81 @@ public final class HfTokenizer {
 
   private HfTokenizer(TokenizerJson json) {
     this.json = json;
-    this.vocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
+    Vocabulary baseVocabulary = new Vocabulary(json.model().vocab(), json.addedTokens());
+    List<AddedToken> templateTokens = collectTemplateSpecialTokens(json.postProcessor());
+    requireNoTemplateVocabularyConflicts(templateTokens, baseVocabulary);
+    // Registering validated template tokens as if they were addedTokens, rather than leaving
+    // them merely "trusted but unregistered" in encode() below, is what makes decode() agree with
+    // encode(): otherwise a template id with no other vocabulary entry either vanishes silently
+    // from decode's above-maxKnownId skip, or throws as an in-range hole if it happens to be
+    // numerically below some unrelated, larger id -- both observed with the pre-round-4 encode
+    // check (PR #14 review round 4, finding 2).
+    List<AddedToken> mergedAddedTokens = new ArrayList<>(json.addedTokens());
+    mergedAddedTokens.addAll(templateTokens);
+    this.vocabulary = new Vocabulary(json.model().vocab(), mergedAddedTokens);
     this.merger = new BpeMerger(json.model());
     this.pretokenizer = new ByteLevelPreTokenizer(json.preTokenizer());
+    // addedTokenSplitter is deliberately scoped to json.addedTokens() only, not
+    // mergedAddedTokens: it splits raw input *text* at encode time, and HF's own AddedVocabulary
+    // component never consults TemplateProcessing's special_tokens for that -- those are two
+    // independent mechanisms. addedTokenContents, by contrast, must include template-registered
+    // tokens too: it decides whether ByteLevelDecoder passes a resolved token through literally
+    // or byte-decodes it, and a template-only special token (see mergedAddedTokens above) needs
+    // the same literal pass-through decode() applies to a "real" added_tokens entry.
     this.addedTokenSplitter = new AddedTokenSplitter(json.addedTokens());
     this.addedTokenContents = new HashSet<>();
-    json.addedTokens().forEach(t -> addedTokenContents.add(t.content()));
+    mergedAddedTokens.forEach(t -> addedTokenContents.add(t.content()));
+  }
+
+  /**
+   * Every {@code (id, text)} pair any {@code TemplateProcessing} step's special_tokens declares.
+   */
+  private static List<AddedToken> collectTemplateSpecialTokens(List<PostProcessorStep> steps) {
+    List<AddedToken> tokens = new ArrayList<>();
+    for (PostProcessorStep step : steps) {
+      if (step instanceof TemplateProcessingStep template) {
+        for (SpecialTokenInfo info : template.specialTokens().values()) {
+          for (int i = 0; i < info.ids().size(); i++) {
+            tokens.add(new AddedToken(info.ids().get(i), info.tokens().get(i), true));
+          }
+        }
+      }
+    }
+    return tokens;
+  }
+
+  /**
+   * Requires every template-declared {@code (id, text)} pair to not contradict {@code
+   * baseVocabulary} (built from just {@code model.vocab} + {@code added_tokens}) in either
+   * direction: {@code id} already meaning a *different* token, or {@code text} already meaning a
+   * *different* id. Either is a genuine internal contradiction within the same file -- not merely
+   * "unknown," which is the legitimate case {@link ResolvedToken}'s own javadoc documents and this
+   * check does not reject (PR #14 review, finding 2, correcting round 3's one-directional check,
+   * which only tested the first direction).
+   */
+  private static void requireNoTemplateVocabularyConflicts(
+      List<AddedToken> templateTokens, Vocabulary baseVocabulary) {
+    for (AddedToken t : templateTokens) {
+      if (baseVocabulary.hasId(t.id()) && !baseVocabulary.tokenOf(t.id()).equals(t.content())) {
+        throw new TokenizerException(
+            "HfTokenizer: TemplateProcessing special token '"
+                + t.content()
+                + "' has id "
+                + t.id()
+                + ", which the vocabulary maps to a different token '"
+                + baseVocabulary.tokenOf(t.id())
+                + "'");
+      }
+      if (baseVocabulary.hasToken(t.content()) && baseVocabulary.idOf(t.content()) != t.id()) {
+        throw new TokenizerException(
+            "HfTokenizer: TemplateProcessing special token '"
+                + t.content()
+                + "' is declared with id "
+                + t.id()
+                + ", but the vocabulary already maps it to a different id "
+                + baseVocabulary.idOf(t.content()));
+      }
+    }
   }
 
   /** Loads a tokenizer from a {@code tokenizer.json} file. */
@@ -52,31 +121,12 @@ public final class HfTokenizer {
         PostProcessorApplier.apply(json.postProcessor(), tokens, addSpecialTokens);
     List<Integer> ids = new ArrayList<>(processed.size());
     for (ResolvedToken token : processed) {
+      // A ResolvedToken's pre-resolved id (from a TemplateProcessing special token) is trusted
+      // directly, not re-validated here: every such id was already checked against, and merged
+      // into, this.vocabulary in the constructor (requireNoTemplateVocabularyConflicts), so
+      // hasId/tokenOf/idOf all already agree with it by construction.
       Integer id = token.id();
-      if (id != null) {
-        // A template id with no vocabulary entry at all is trusted as-is: HF's own
-        // TemplateProcessing performs no vocabulary lookup on special_tokens ids, and
-        // ResolvedToken's own javadoc documents exactly this case (a template can reference a
-        // special token whose id isn't duplicated anywhere in model.vocab/added_tokens). What
-        // must still be rejected is an id that collides with a *different*, already-known
-        // vocabulary token: that is a genuine internal contradiction within the same file (not
-        // merely "unknown"), and baking it in would silently swap in the wrong token wherever
-        // this id is later decoded (PR #14 review, finding 2, correcting round 2's finding 7,
-        // which rejected every unknown id and so also rejected this legitimate case).
-        if (vocabulary.hasId(id) && !vocabulary.tokenOf(id).equals(token.text())) {
-          throw new TokenizerException(
-              "HfTokenizer.encode: TemplateProcessing special token '"
-                  + token.text()
-                  + "' has id "
-                  + id
-                  + ", which the vocabulary maps to a different token '"
-                  + vocabulary.tokenOf(id)
-                  + "'");
-        }
-        ids.add(id);
-      } else {
-        ids.add(vocabulary.idOf(token.text()));
-      }
+      ids.add(id != null ? id : vocabulary.idOf(token.text()));
     }
     return ids;
   }

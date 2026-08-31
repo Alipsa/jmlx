@@ -57,8 +57,30 @@ public final class TokenizerJsonLoader {
    * HfTokenizer#decode} unconditionally calls {@link ByteLevelDecoder#decode}, so a file declaring
    * a {@code Sequence}/{@code Replace}/{@code Strip}/{@code ByteFallback}/{@code Metaspace} decoder
    * loaded silently and produced wrong text with no diagnostic (PR #14 review round 3, finding 3).
+   * A missing/{@code null} {@code decoder} (a shape HF's own serde really emits, unlike a required
+   * field such as {@code pre_tokenizer}) is deliberately rejected too, not defaulted to {@code
+   * ByteLevel}: silently guessing the decoder shape would be its own divergence, so this port
+   * requires it declared explicitly, with a message that says so rather than reusing the
+   * unsupported-type message's misleading {@code ''} (PR #14 review round 4, finding 4).
+   *
+   * <p>Only {@code type} is validated -- not {@code add_prefix_space}, {@code trim_offsets}, or
+   * {@code use_regex}, all three of which a real {@code tokenizer.json} decoder object can also
+   * declare. {@code ByteLevel}'s actual {@code decode_chain} (see the {@code
+   * huggingface/tokenizers} Rust source) reads none of them: {@code add_prefix_space}/{@code
+   * use_regex} only affect that same struct's separate {@code PreTokenizer} impl, and {@code
+   * trim_offsets} only affects its {@code PostProcessor} impl's span offsets, which this port
+   * doesn't track. Real Llama-3 files declare {@code add_prefix_space: true} and {@code use_regex:
+   * true} on the decoder specifically (unlike the pre-tokenizer's own {@code ByteLevel} step, where
+   * {@code use_regex} is validated above) -- rejecting those values here would reject real,
+   * correctly-loadable files for a divergence that does not actually exist (PR #14 review round 4,
+   * finding 5 -- investigated and found not to apply, unlike findings 1/3/4 above).
    */
   private static void requireByteLevelDecoder(JsonNode node) {
+    if (node == null || node.isMissingNode() || node.isNull()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: tokenizer.json has no decoder (only 'ByteLevel' is supported, and"
+              + " HfTokenizer#decode always uses ByteLevelDecoder)");
+    }
     String type = node.path("type").asString("");
     if (!"ByteLevel".equals(type)) {
       throw new TokenizerException(
@@ -75,7 +97,9 @@ public final class TokenizerJsonLoader {
    * implements (see Global Constraints in {@code req/plans/phase5-m2-plan.md}). A file using any
    * other shape (a different step order, an extra/missing step, {@code invert: true}, a non-
    * "Isolated" behavior, or {@code use_regex: true}) throws here instead of silently tokenizing
-   * differently from HF.
+   * differently from HF. {@code behavior} is required, not defaulted to {@code "Isolated"}: it
+   * isn't optional in HF's own serde, unlike every other field this method checks (PR #14 review
+   * round 4, finding 8).
    */
   private static PreTokenizerConfig parsePreTokenizer(JsonNode node) {
     if (node == null || !"Sequence".equals(node.path("type").asString(""))) {
@@ -93,7 +117,7 @@ public final class TokenizerJsonLoader {
     }
     JsonNode splitStep = steps.get(0);
     JsonNode byteLevelStep = steps.get(1);
-    String behavior = splitStep.path("behavior").asString("Isolated");
+    String behavior = splitStep.path("behavior").asString(null);
     if (!"Isolated".equals(behavior)) {
       throw new TokenizerException(
           "TokenizerJsonLoader: unsupported pre_tokenizer Split behavior '"
@@ -115,8 +139,13 @@ public final class TokenizerJsonLoader {
     }
     boolean addPrefixSpace = byteLevelStep.path("add_prefix_space").asBoolean(false);
     try {
-      return new PreTokenizerConfig(
-          Pattern.compile(regex, Pattern.UNICODE_CHARACTER_CLASS), addPrefixSpace);
+      // No Pattern.UNICODE_CHARACTER_CLASS: HF compiles this regex with onig (the default
+      // "onig" cargo feature), whose \s/\S/\w/\d/\b are ASCII-only, matching plain Java Pattern's
+      // own default. The flag would make \s Unicode-aware instead (e.g. matching U+00A0 NBSP),
+      // diverging from HF on any input containing Unicode whitespace -- and buys nothing for the
+      // Unicode-letter matching the flag was presumably added for, since \p{L} is already
+      // Unicode-scoped by definition regardless of this flag (PR #14 review round 4, finding 1).
+      return new PreTokenizerConfig(Pattern.compile(regex), addPrefixSpace);
     } catch (PatternSyntaxException e) {
       throw new TokenizerException(
           "TokenizerJsonLoader: invalid pre_tokenizer regex '" + regex + "'", e);
@@ -177,10 +206,55 @@ public final class TokenizerJsonLoader {
         "TokenizerJsonLoader: unsupported post_processor step type '" + type + "'");
   }
 
+  /**
+   * Requires the five {@code model} fields this port has no implementation for -- {@code
+   * byte_fallback}, {@code dropout}, {@code unk_token}, {@code continuing_subword_prefix}, {@code
+   * end_of_word_suffix} -- to be at their inert default for both target models (verified absent in
+   * Qwen2.5's and Llama-3's real {@code tokenizer.json} files -- see this plan's Findings). Each
+   * was previously read nowhere: {@code byte_fallback: true} would load silently and only surface
+   * as a {@link BpeMerger#merge} exception whose message admits the assumption was never checked; a
+   * {@code dropout} or {@code unk_token} would load and encode silently with different ids and no
+   * diagnostic at all (PR #14 review round 4, finding 3).
+   */
+  private static void requireInertModelFields(JsonNode node) {
+    if (node.path("byte_fallback").asBoolean(false)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported model.byte_fallback=true (this port assumes false --"
+              + " see BpeMerger#merge)");
+    }
+    JsonNode dropout = node.path("dropout");
+    if (!dropout.isNull() && !dropout.isMissingNode()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported model.dropout " + dropout + " (must be null/absent)");
+    }
+    JsonNode unkToken = node.path("unk_token");
+    if (!unkToken.isNull() && !unkToken.isMissingNode()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported model.unk_token "
+              + unkToken
+              + " (must be null/absent)");
+    }
+    String continuingSubwordPrefix = node.path("continuing_subword_prefix").asString("");
+    if (!continuingSubwordPrefix.isEmpty()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported model.continuing_subword_prefix '"
+              + continuingSubwordPrefix
+              + "' (must be empty/absent)");
+    }
+    String endOfWordSuffix = node.path("end_of_word_suffix").asString("");
+    if (!endOfWordSuffix.isEmpty()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported model.end_of_word_suffix '"
+              + endOfWordSuffix
+              + "' (must be empty/absent)");
+    }
+  }
+
   private static BpeModelConfig parseModel(JsonNode node) {
     if (!"BPE".equals(node.path("type").asString(""))) {
       throw new TokenizerException("TokenizerJsonLoader: expected model.type == 'BPE'");
     }
+    requireInertModelFields(node);
     Map<String, Integer> vocab = new HashMap<>();
     for (Map.Entry<String, JsonNode> entry : node.path("vocab").properties()) {
       vocab.put(entry.getKey(), entry.getValue().asInt());
@@ -224,14 +298,34 @@ public final class TokenizerJsonLoader {
     return new BpeModelConfig(vocab, mergeRank, ignoreMerges);
   }
 
+  /**
+   * Requires an {@code added_tokens} entry's {@code lstrip}/{@code rstrip}/{@code single_word}/
+   * {@code normalized} fields to all be {@code false} -- {@link AddedTokenSplitter}'s own javadoc
+   * already documents that it implements none of them, so a fine-tune's added token declaring
+   * {@code lstrip: true} would otherwise load cleanly and tokenize adjacent whitespace differently
+   * from HF with no diagnostic (PR #14 review round 4, finding 7).
+   */
+  private static void requireNoStrippingOrSingleWordFlags(JsonNode entry, String content) {
+    for (String field : List.of("lstrip", "rstrip", "single_word", "normalized")) {
+      if (entry.path(field).asBoolean(false)) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: added_tokens['"
+                + content
+                + "'] has "
+                + field
+                + "=true, which AddedTokenSplitter does not implement");
+      }
+    }
+  }
+
   private static List<AddedToken> parseAddedTokens(JsonNode node) {
     List<AddedToken> tokens = new ArrayList<>();
     for (JsonNode entry : node) {
+      String content = entry.path("content").asString();
+      requireNoStrippingOrSingleWordFlags(entry, content);
       tokens.add(
           new AddedToken(
-              entry.path("id").asInt(),
-              entry.path("content").asString(),
-              entry.path("special").asBoolean(false)));
+              entry.path("id").asInt(), content, entry.path("special").asBoolean(false)));
     }
     return tokens;
   }

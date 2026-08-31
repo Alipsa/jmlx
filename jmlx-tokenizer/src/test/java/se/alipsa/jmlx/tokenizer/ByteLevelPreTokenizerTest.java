@@ -9,7 +9,10 @@ import org.junit.jupiter.api.Test;
 class ByteLevelPreTokenizerTest {
 
   // The real Qwen2.5/Llama-3 regex (Qwen2.5's \p{N} variant), verified against each model's
-  // actual tokenizer.json — see this plan's Findings section.
+  // actual tokenizer.json — see this plan's Findings section. No Pattern.UNICODE_CHARACTER_CLASS:
+  // TokenizerJsonLoader doesn't compile it with that flag either, since HF's onig backend's
+  // \s/\S are ASCII-only (PR #14 review round 4, finding 1) -- see zeroWidthMatchDoesNotEmitAn
+  // EmptyChunk's sibling test below for the divergence this flag would otherwise reintroduce.
   private static final Pattern QWEN_REGEX =
       Pattern.compile(
           "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r"
@@ -18,8 +21,7 @@ class ByteLevelPreTokenizerTest {
               + "\\n"
               + "]*|\\s*[\\r"
               + "\\n"
-              + "]+|\\s+(?!\\S)|\\s+",
-          Pattern.UNICODE_CHARACTER_CLASS);
+              + "]+|\\s+(?!\\S)|\\s+");
 
   @Test
   void splitsWordAndLeadingSpaceIntoSeparateChunks() {
@@ -72,6 +74,20 @@ class ByteLevelPreTokenizerTest {
     ByteLevelPreTokenizer pretokenizer =
         new ByteLevelPreTokenizer(new PreTokenizerConfig(lettersOnly, false));
     assertEquals(List.of("hi", "!"), pretokenizer.split("hi!"));
+  }
+
+  @Test
+  void asciiOnlyWhitespaceClassMatchesOnigNotJavasUnicodeDefault() {
+    // Java's \s is ASCII-only unless Pattern.UNICODE_CHARACTER_CLASS is set; HF compiles this same
+    // regex with onig (the default "onig" cargo feature), whose \s is also ASCII-only, so NOT
+    // setting the flag is what matches HF. NBSP (U+00A0) is therefore neither \s, \p{L}, nor
+    // \p{N}, so it falls into the "any other run of chars" alternative and merges with an
+    // adjacent NBSP into one chunk instead of being treated as a whitespace boundary (PR #14
+    // review round 4, finding 1).
+    ByteLevelPreTokenizer pretokenizer =
+        new ByteLevelPreTokenizer(new PreTokenizerConfig(QWEN_REGEX, false));
+    assertEquals(
+        List.of("hi", ByteLevelCoding.encode("  "), "there"), pretokenizer.split("hi  there"));
   }
 
   @Test

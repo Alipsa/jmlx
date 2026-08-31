@@ -21,8 +21,10 @@
     "type": "BPE",
     "ignore_merges": true,
     "vocab": {"l": 0, "o": 1, "w": 2, "t": 3, "h": 4, "e": 5, "n": 6, "s": 7, "r": 8, "i": 9, "d": 10,
-      "Ġ": 11, "lo": 12, "low": 13, "th": 14, "the": 15, "Ġthe": 16},
+      "Ġ": 11, "lo": 12, "low": 13, "th": 14, "the": 15, "Ġthe": 16, "<|begin_of_text|>": 128000},
     "merges": ["l o", "lo w", "t h", "th e", "Ġ the"]
   },
-  "added_tokens": []
+  "added_tokens": [
+    {"id": 128000, "content": "<|begin_of_text|>", "special": true, "lstrip": false, "rstrip": false, "normalized": false, "single_word": false}
+  ]
 }

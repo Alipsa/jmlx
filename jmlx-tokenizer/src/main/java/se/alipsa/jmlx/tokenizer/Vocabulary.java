@@ -33,10 +33,6 @@ public final class Vocabulary {
     this.idToToken = new HashMap<>();
     modelVocab.forEach((token, id) -> idToToken.put(id, token));
     this.specialIds = new HashSet<>();
-    int max = -1;
-    for (int id : modelVocab.values()) {
-      max = Math.max(max, id);
-    }
     for (AddedToken t : addedTokens) {
       Integer previousIdForToken = tokenToId.get(t.content());
       if (previousIdForToken != null && !previousIdForToken.equals(t.id())) {
@@ -58,7 +54,15 @@ public final class Vocabulary {
       } else {
         specialIds.remove(t.id());
       }
-      max = Math.max(max, t.id());
+    }
+    // Computed from the final idToToken, not tracked incrementally across modelVocab/addedTokens
+    // as ids are added: an id later vacated by a collision (above) must not still count towards
+    // the max, or decode's skip-vs-throw split (see maxKnownId's own javadoc) treats a
+    // deliberately-unmapped id as an in-range hole instead of the above-vocab case it actually is
+    // (PR #14 review round 4, finding 6).
+    int max = -1;
+    for (int id : idToToken.keySet()) {
+      max = Math.max(max, id);
     }
     this.maxKnownId = max;
   }
@@ -91,6 +95,15 @@ public final class Vocabulary {
   /** Whether {@code id} has a vocabulary entry (see {@link HfTokenizer#decode}). */
   public boolean hasId(int id) {
     return idToToken.containsKey(id);
+  }
+
+  /**
+   * Whether {@code token} has a vocabulary entry (see {@link HfTokenizer}'s TemplateProcessing
+   * conflict check, which needs the mirror of {@link #hasId}/{@link #tokenOf}: a template id can be
+   * free while the token *string* it names is already claimed by a different id).
+   */
+  public boolean hasToken(String token) {
+    return tokenToId.containsKey(token);
   }
 
   /**

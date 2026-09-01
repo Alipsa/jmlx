@@ -117,10 +117,11 @@ subprojects {
     // req/initial-plan.md §4: an absolute path, since native/install/lib is
     // CWD-relative and resolves differently under :jmlx-core:test, an IDE
     // run, and :jmlx-examples:run. Computing the path string here touches no
-    // filesystem state (no exists() check), so it's safe under
-    // org.gradle.configuration-cache=true -- only NativeLoader's own
-    // resolution, at JVM execution time, decides whether the directory is
-    // actually usable.
+    // filesystem state (no exists() check), so it stays safe if
+    // org.gradle.configuration-cache is ever re-enabled (see gradle.properties --
+    // it's off today for an unrelated Spotless/config-cache bug, not because of
+    // anything here) -- only NativeLoader's own resolution, at JVM execution
+    // time, decides whether the directory is actually usable.
     def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
 
     tasks.withType(Test).configureEach {

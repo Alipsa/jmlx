@@ -35,6 +35,15 @@ public final class ReleaseScripts {
         scripts.add(script);
       }
     }
+    List<String> nonExecutable = new ArrayList<>();
+    for (File script : scripts) {
+      if (!script.canExecute()) {
+        nonExecutable.add(script.getPath());
+      }
+    }
+    if (!nonExecutable.isEmpty()) {
+      throw new IllegalStateException("release.sh scripts must be executable: " + nonExecutable);
+    }
     if (scripts.size() < 2) {
       return;
     }
@@ -44,16 +53,9 @@ public final class ReleaseScripts {
     File first = scripts.get(0);
     byte[] firstBytes = Files.readAllBytes(first.toPath());
     List<String> mismatched = new ArrayList<>();
-    List<String> nonExecutable = new ArrayList<>();
-    if (!first.canExecute()) {
-      nonExecutable.add(first.getPath());
-    }
     for (File script : scripts.subList(1, scripts.size())) {
       if (!Arrays.equals(firstBytes, Files.readAllBytes(script.toPath()))) {
         mismatched.add(script.getPath());
-      }
-      if (!script.canExecute()) {
-        nonExecutable.add(script.getPath());
       }
     }
     if (!mismatched.isEmpty()) {
@@ -62,9 +64,6 @@ public final class ReleaseScripts {
               + first
               + ": "
               + mismatched);
-    }
-    if (!nonExecutable.isEmpty()) {
-      throw new IllegalStateException("release.sh scripts must be executable: " + nonExecutable);
     }
   }
 }

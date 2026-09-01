@@ -94,6 +94,7 @@ public final class ArchiveReproducibilityMain {
             List.of(
                 repositoryRoot.resolve(wrapper).toString(),
                 "-Dorg.gradle.java.installations.auto-download=false",
+                "--no-build-cache",
                 "--gradle-user-home",
                 userHome.toString()));
     if (offline) {

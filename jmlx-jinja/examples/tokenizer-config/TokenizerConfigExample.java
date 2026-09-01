@@ -57,16 +57,24 @@ public final class TokenizerConfigExample {
         case 'u' -> {
           if (index + 4 >= value.length())
             throw new IllegalArgumentException("Invalid JSON Unicode escape");
-          try {
-            result.append((char) Integer.parseInt(value.substring(index + 1, index + 5), 16));
-          } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid JSON Unicode escape", e);
+          String hex = value.substring(index + 1, index + 5);
+          for (int hexIndex = 0; hexIndex < hex.length(); hexIndex++) {
+            if (!isAsciiHexDigit(hex.charAt(hexIndex))) {
+              throw new IllegalArgumentException("Invalid JSON Unicode escape");
+            }
           }
+          result.append((char) Integer.parseInt(hex, 16));
           index += 4;
         }
         default -> throw new IllegalArgumentException("Unsupported JSON string escape");
       }
     }
     return result.toString();
+  }
+
+  private static boolean isAsciiHexDigit(char character) {
+    return (character >= '0' && character <= '9')
+        || (character >= 'a' && character <= 'f')
+        || (character >= 'A' && character <= 'F');
   }
 }

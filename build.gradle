@@ -241,11 +241,10 @@ subprojects {
         // resolves mavenLocal() and could silently pick it up). Failing fast, before anything
         // is published anywhere, is cheaper than relying on every release to have credentials
         // configured correctly.
-        // Providers are resolved here, at configuration time, and captured in a plain Map --
-        // not read via `providers.gradleProperty(it)` directly inside `doLast`, which reads as
-        // "fail fast" but is actually a `Provider` access on the enclosing script object from an
-        // execution-time closure, unsupported under the configuration cache (the same category of
-        // problem the verifyNoSnapshotDependencies capture above exists to avoid).
+        // Providers are captured in a plain Map at configuration time and intentionally resolved
+        // via `.present` at task execution time. Retaining those captured providers, rather than
+        // looking them up from the enclosing script in `doLast`, stays safe if the configuration
+        // cache is re-enabled.
         def requiredCentralProperties =
                 ['signing.keyId', 'sonatypeUsername', 'sonatypePassword']
                         .collectEntries { [(it): providers.gradleProperty(it)] }

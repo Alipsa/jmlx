@@ -96,7 +96,7 @@ cd "$SCRIPT_DIR/.."                      # monorepo root — the wrapper lives h
 
 hfjinja's sdkman `source ~/.sdkman/bin/sdkman-init.sh` + `source jdk21` step is **dropped**. It
 was appropriate for a standalone single-module project pinned to one JDK; here the two modules
-target different releases (see the open question below), and Gradle toolchains already resolve
+both target Java 21 via their own toolchain overrides, and Gradle toolchains already resolve
 the correct JDK per module regardless of the daemon's own JVM. Verified empirically: this repo
 builds and tests clean today with no sdkman sourcing. Dropping it is also what keeps the two
 scripts byte-identical.
@@ -144,27 +144,27 @@ Releasing `jmlx-jinja`:
 Releasing `jmlx-tokenizer` additionally requires that it resolves a *released* jinja, so jinja's
 version in the repo must not be a SNAPSHOT at that moment. The guard enforces this.
 
-## Open question for review: `jmlx-tokenizer`'s bytecode target
+## Decision 5: `jmlx-tokenizer` targets Java 21
 
 `jmlx-jinja` deliberately overrides the toolchain to Java 21 to preserve hfjinja's compatibility
 promise, and its `req/release-verification.json` pins `bytecodeMajor: 65`. `jmlx-tokenizer`
-overrides nothing, so it inherits the root's Java **25** toolchain.
+overrode nothing, so it inherited the root's Java **25**. Publishing it unchanged would have
+shipped a Java-25-only artifact that consumers on 21–24 could not use — including anyone already
+consuming `jmlx-jinja` at 21.
 
-Publishing it unchanged therefore ships a Java-25-only artifact: consumers on 21–24 could not use
-it, including anyone already consuming `jmlx-jinja` at 21. `jmlx-tokenizer` is pure Java with no
-native dependency, so nothing forces 25 on it — the root's 25 is there for `jmlx-core`/`jmlx-ffi`,
-which need Panama FFM.
+Nothing forces 25 on `jmlx-tokenizer`: it is pure Java with no native dependency, and the root's
+25 exists for `jmlx-core`/`jmlx-ffi`, which need Panama FFM.
 
-Options:
+`jmlx-tokenizer` therefore adds a toolchain override to 21, matching `jmlx-jinja`.
 
-- **Target 21**, matching `jmlx-jinja`. Widest reach, consistent with the only other published
-  module, and costs only a toolchain override in `jmlx-tokenizer/build.gradle`. Requires
-  confirming the tokenizer sources use no Java 22+ language or API features.
-- **Target 25**, status quo. Zero work, but narrows the audience and makes the pair of published
-  artifacts inconsistent for no articulated reason.
+Verified rather than assumed, by adding the override and building:
 
-Recommendation: target 21. This is flagged rather than decided because it changes who can consume
-the published artifact, which is a product decision rather than a mechanical one.
+- `:jmlx-tokenizer:build` succeeds; `HfTokenizer.class` is bytecode major 65.
+- 133 tests run, 0 failures, 0 skipped.
+- `checkstyleMain`, `checkstyleTest`, and `spotlessCheck` all pass.
+- No Java 22+ language or API feature is used anywhere in the module.
+- No other module depends on `jmlx-tokenizer`, so lowering its target cannot affect the rest of
+  the build.
 
 ## Testing
 
@@ -179,9 +179,8 @@ targets the guards, which is where the actual risk is:
   `releaseVerification` remain keyless.
 - Confirm `./gradlew build` and `:jmlx-jinja:check` still pass, including the existing
   `verifyPublicationMetadata` and `verifyModuleDescriptor`.
-- If the open question resolves to "target 21": assert `jmlx-tokenizer`'s compiled classes are
-  bytecode major 65, the same way `jmlx-jinja`'s contract is checked, so the target cannot
-  silently drift back to the inherited 25.
+- Assert `jmlx-tokenizer`'s compiled classes are bytecode major 65, the same way `jmlx-jinja`'s
+  contract is checked, so the target cannot silently drift back to the inherited 25.
 
 ## Deliberately excluded
 

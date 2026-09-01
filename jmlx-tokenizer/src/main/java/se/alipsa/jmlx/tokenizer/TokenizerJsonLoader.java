@@ -308,7 +308,12 @@ public final class TokenizerJsonLoader {
     Map<Integer, String> vocabTokenById = new HashMap<>();
     for (Map.Entry<String, JsonNode> entry : node.path("vocab").properties()) {
       String token = entry.getKey();
-      int id = entry.getValue().asInt();
+      JsonNode idNode = entry.getValue();
+      if (idNode.isNull() || !idNode.isIntegralNumber()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: model.vocab['" + token + "'] has no integral id: " + idNode);
+      }
+      int id = idNode.asInt();
       String existingToken = vocabTokenById.putIfAbsent(id, token);
       if (existingToken != null && !existingToken.equals(token)) {
         throw new TokenizerException(

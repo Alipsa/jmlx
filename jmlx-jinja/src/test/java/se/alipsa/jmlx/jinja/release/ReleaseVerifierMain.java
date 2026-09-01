@@ -78,6 +78,10 @@ public final class ReleaseVerifierMain {
               + ":"
               + moduleVersion(candidateModule, userHome);
 
+      // Resolve exactly the same Java 21 toolchain that every nested candidate build needs before
+      // starting the archive/release matrix, while failure remains cheap and actionable.
+      gradle(candidateModule, userHome, false, "verifyJava21Toolchain");
+
       // Each destructive operation gets a separate Gradle process and graph.
       gradle(candidateModule, userHome, false, "verifyReproducibleArchives");
       gradle(candidateModule, userHome, false, "clean", "check");

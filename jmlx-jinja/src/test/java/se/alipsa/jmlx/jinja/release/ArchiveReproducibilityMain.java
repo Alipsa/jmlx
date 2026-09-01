@@ -52,7 +52,7 @@ public final class ArchiveReproducibilityMain {
     } finally {
       runQuietly(project, "git", "worktree", "remove", "--force", sandbox.toString());
       runQuietly(project, "git", "worktree", "prune");
-      Files.deleteIfExists(sandboxParent);
+      deleteTree(sandboxParent);
       deleteTree(evidence);
     }
   }

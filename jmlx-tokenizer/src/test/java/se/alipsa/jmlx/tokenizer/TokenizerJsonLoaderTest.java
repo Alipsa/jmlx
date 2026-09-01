@@ -406,6 +406,20 @@ class TokenizerJsonLoaderTest {
   }
 
   @Test
+  void modelVocabRequiresIntegralIds() {
+    for (String malformedId : new String[] {"null", "\"0\"", "{}", "100.9"}) {
+      String model =
+          "{\"type\": \"BPE\", \"vocab\": {\"a\": "
+              + malformedId
+              + ", \"b\": 1}, \"merges\": [\"a b\"]}";
+      Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, model, "[]");
+      TokenizerException failure =
+          assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+      assertTrue(failure.getMessage().contains("model.vocab['a'] has no integral id"));
+    }
+  }
+
+  @Test
   void addedTokenMissingContentThrows() {
     // AddedTokenSplitter compiles Pattern.quote(content) into its alternation regex; an empty or
     // absent content compiles to a pattern that matches at every position, interleaving the

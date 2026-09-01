@@ -632,6 +632,17 @@ abstract class ReleaseVerificationBytecodeArgument implements CommandLineArgumen
     }
 }
 
+tasks.register('verifyJava21Toolchain') {
+    group = 'verification'
+    description = 'Fails early unless Gradle can resolve the Java 21 toolchain used by this module.'
+    doLast {
+        def launcher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }.get()
+        logger.lifecycle("Resolved Java 21 toolchain: ${launcher.metadata.installationPath}")
+    }
+}
+
 tasks.register('verifyReproducibleArchives', JavaExec) {
     group = 'verification'
     description = 'Release-only: performs two independent clean archive builds and compares their bytes.'

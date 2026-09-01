@@ -288,6 +288,10 @@ subprojects {
             def releaseScripts = moduleDirs.collect { new File(it, 'release.sh') }.findAll { it.isFile() }
             def marker = layout.buildDirectory.file('verifyReleaseScriptsMatch/verified')
             inputs.files(releaseScripts)
+            // Gradle's file fingerprints cover contents but not POSIX mode bits. Keep the
+            // executable state as an explicit input because ReleaseScripts validates it too.
+            inputs.property('releaseScriptExecutability',
+                    releaseScripts.collectEntries { [(it.absolutePath): it.canExecute()] })
             outputs.file(marker)
             doLast {
                 se.alipsa.jmlx.buildsrc.ReleaseScripts.assertAllMatch(moduleDirs)
@@ -315,14 +319,11 @@ subprojects {
             dependsOn tasks.named('verifyReleaseScriptsMatch')
         }
 
-        // dependsOn above only adds edges, it imposes no *order* between them -- so a bare
-        // `release` could still run `bundle` (which depends on `publishToMavenLocal`, installing
-        // into ~/.m2) before `check`/the guards finish, which is exactly the "stale same-GAV
-        // artifact wins silently" mavenLocal() hazard release.sh's own comment warns about.
-        // mustRunAfter (not another dependsOn, which would pull `bundle` into `check`'s own task
-        // graph) only constrains relative order when both already run together, which `release`'s
-        // dependencies guarantee they do.
-        tasks.named('bundle') {
+        // The Nexus plugin makes bundle depend on publishToMavenLocal. Ordering bundle itself is
+        // too late: Gradle may execute that dependency (the task that writes ~/.m2) in parallel
+        // with the guards. Constrain every concrete Maven-local publish task instead, without
+        // pulling publication into check's own graph.
+        tasks.withType(org.gradle.api.publish.maven.tasks.PublishToMavenLocal).configureEach {
             mustRunAfter tasks.named('check'), tasks.named('verifyNoSnapshotDependencies'),
                     tasks.named('verifyCentralCredentialsPresent')
         }

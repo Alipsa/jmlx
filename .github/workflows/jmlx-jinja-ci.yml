@@ -18,6 +18,7 @@ on:
       - 'jmlx-tokenizer/**'
       - 'build.gradle'
       - 'settings.gradle'
+      - 'gradle.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/**'
       - 'config/checkstyle/checkstyle.xml'
@@ -28,6 +29,7 @@ on:
       - 'jmlx-tokenizer/**'
       - 'build.gradle'
       - 'settings.gradle'
+      - 'gradle.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/**'
       - 'config/checkstyle/checkstyle.xml'
@@ -57,7 +59,7 @@ jobs:
         run: |
           ./gradlew --no-configuration-cache \
             :jmlx-jinja:check \
-            :jmlx-tokenizer:test \
+            :jmlx-tokenizer:check \
             :jmlx-jinja:nodeCorpusTest \
             :jmlx-jinja:nodeOracleVersion \
             :jmlx-jinja:nodeCorpusVerify \

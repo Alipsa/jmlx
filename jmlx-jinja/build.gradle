@@ -532,8 +532,7 @@ tasks.register('verifyModuleDescriptor') {
 }
 
 abstract class ExampleModulePathArguments implements CommandLineArgumentProvider {
-    @InputFile
-    @PathSensitive(PathSensitivity.NONE)
+    @Classpath
     abstract RegularFileProperty getModuleJar()
 
     @Override

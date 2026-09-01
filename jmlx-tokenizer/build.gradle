@@ -2,6 +2,15 @@ plugins {
     id 'java-library'
 }
 
+// Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain
+// (which exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and
+// keeps both published artifacts consumable from Java 21 onward.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 dependencies {
     implementation libs.jackson.databind
     api project(':jmlx-jinja')

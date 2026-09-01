@@ -233,22 +233,46 @@ subprojects {
             }
         }
 
+        // `bundle` depends on `publishToMavenLocal`, which installs into ~/.m2 before Central is
+        // ever contacted. Without a configured signing key, `signing { required = ... }` above is
+        // false, so an unsigned bundle installs locally and only then fails at the Central upload
+        // step -- leaving a same-GAV, never-published release version sitting in ~/.m2, exactly the
+        // hazard the root build's own mavenLocal() comment warns about (any SNAPSHOT build in this
+        // repo resolves mavenLocal() and could silently pick it up). Failing fast, before anything
+        // is published anywhere, is cheaper than relying on every release to have credentials
+        // configured correctly.
+        tasks.register('verifyCentralCredentialsPresent') {
+            def moduleName = project.name
+            group = 'verification'
+            description = 'Fails if Central publishing credentials are missing, before anything is published.'
+            doLast {
+                def missing = ['signing.keyId', 'sonatypeUsername', 'sonatypePassword']
+                        .findAll { !providers.gradleProperty(it).present }
+                if (!missing.isEmpty()) {
+                    throw new GradleException(
+                            "Cannot release ${moduleName}: missing required properties: ${missing.join(', ')}.")
+                }
+            }
+        }
+
         // release.sh requests `build` and `release` as independent tasks, and Gradle imposes no
         // ordering between independently requested tasks -- without this edge, publishing could
         // begin before verification finished.
         tasks.named('release') {
-            dependsOn tasks.named('check'), tasks.named('verifyNoSnapshotDependencies')
+            dependsOn tasks.named('check'), tasks.named('verifyNoSnapshotDependencies'),
+                    tasks.named('verifyCentralCredentialsPresent')
         }
 
         // dependsOn above only adds edges, it imposes no *order* between them -- so a bare
         // `release` could still run `bundle` (which depends on `publishToMavenLocal`, installing
-        // into ~/.m2) before `check`/the guard finish, which is exactly the "stale same-GAV
+        // into ~/.m2) before `check`/the guards finish, which is exactly the "stale same-GAV
         // artifact wins silently" mavenLocal() hazard release.sh's own comment warns about.
         // mustRunAfter (not another dependsOn, which would pull `bundle` into `check`'s own task
         // graph) only constrains relative order when both already run together, which `release`'s
         // dependencies guarantee they do.
         tasks.named('bundle') {
-            mustRunAfter tasks.named('check'), tasks.named('verifyNoSnapshotDependencies')
+            mustRunAfter tasks.named('check'), tasks.named('verifyNoSnapshotDependencies'),
+                    tasks.named('verifyCentralCredentialsPresent')
         }
     }
 }

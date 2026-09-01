@@ -12,14 +12,16 @@ cd "$REPO_ROOT"
 # An independent release requires the module to carry its own version. Without this it silently
 # inherits the root version and every module would move in lockstep -- the exact accident this
 # tooling exists to prevent.
-if ! grep -qE "^version[[:space:]]*=[[:space:]]*'" "$MODULE/build.gradle"; then
+if ! grep -qE "^version[[:space:]]*=[[:space:]]*[\"']" "$MODULE/build.gradle"; then
   echo "$MODULE/build.gradle declares no version of its own; it would inherit the root version." >&2
   exit 1
 fi
 
 # Ask Gradle for the effective version rather than parsing build.gradle: authoritative, and not
-# fragile to formatting.
-VERSION=$(./gradlew -q ":$MODULE:properties" | sed -n 's/^version: //p' | head -n 1)
+# fragile to formatting. `properties` emits exactly one `version:` line, but stopping sed at the
+# first match (rather than piping through `head -n 1`) means a future duplicate can't turn into a
+# silent SIGPIPE/141 abort under `set -o pipefail`.
+VERSION=$(./gradlew -q ":$MODULE:properties" | sed -n 's/^version: //p;q')
 if [[ -z "$VERSION" ]]; then
   echo "Could not determine the version of $MODULE" >&2
   exit 1

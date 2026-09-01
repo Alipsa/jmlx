@@ -489,7 +489,17 @@ tasks.register('verifyPublicationMetadata') {
         if (value('groupId') != releaseGroup || value('artifactId') != releaseArtifact || value('version') != releaseVersion) {
             throw new GradleException('Generated POM coordinates do not match the project')
         }
-        if (contract.coordinates != "${releaseGroup}:${releaseArtifact}:${releaseVersion}") {
+        // Only group:artifact are checked here, not the version segment: the contract's
+        // "coordinates" field also carries a pinned version consumed by ReleaseVerifierMain (which
+        // needs a full GAV to resolve a specific candidate from its isolated repository), and that
+        // version is only meaningful -- and only updated -- as part of the separate, manual
+        // releaseVerification pre-flight (see req/release-checklist.md). Requiring it to equal the
+        // live project version here would force req/release-verification.json to be bumped in
+        // lockstep with build.gradle's version on every release and every post-release SNAPSHOT
+        // bump, purely to satisfy `check`; the POM-vs-project version comparison above already
+        // covers the one thing this task actually needs to guarantee.
+        def contractGroupArtifact = contract.coordinates.tokenize(':').take(2)
+        if (contractGroupArtifact != [releaseGroup, releaseArtifact]) {
             throw new GradleException('Release contract coordinates do not match the project')
         }
         def dependencies = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependencies' }

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** renamed the project from `hfjinja` to `jmlx-jinja` as part of its migration into
+  the `jmlx` monorepo. The Maven coordinate changed from `se.alipsa:hfjinja` to
+  `se.alipsa:jmlx-jinja`, and every package moved from `se.alipsa.hfjinja` to `se.alipsa.jmlx.jinja`
+  (including the JPMS module name). Existing consumers must update both their dependency
+  coordinate and their imports; there is no compatibility shim.
+
 ### Fixed
 
 - Require the complete verification suite, including parser fuzzing, before a Maven Central

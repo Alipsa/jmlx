@@ -41,7 +41,12 @@ public final class ReleaseVerifierMain {
     Path retainedEvidence = source.resolve("build/reports/release-verification-evidence");
     prepareReport(report, retainedEvidence);
     verifyEnvironment(source, daemonVersion);
-    String status = output(source, "git", "status", "--porcelain", "--", ".");
+    // Repo-wide, not `-- "."` scoped to the module directory: in this monorepo the build genuinely
+    // depends on root build.gradle/settings.gradle/gradle.properties/gradle/libs.versions.toml/
+    // gradle/wrapper -- the isolated worktree below materializes only committed state, so an
+    // uncommitted edit to any of those would otherwise pass this guard while the candidate matrix
+    // silently verifies a different build than the one just tested.
+    String status = output(source, "git", "status", "--porcelain");
     if (!status.isBlank() && !allowDirty) {
       throw new IllegalStateException("source checkout is dirty:\n" + status);
     }

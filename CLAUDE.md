@@ -113,10 +113,9 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
                                                     ByteLevelPreTokenizer, ByteLevelDecoder,
                                                     AddedTokenSplitter, TextNormalizer,
                                                     PostProcessorApplier, TokenizerException
-                 (no "|" above: pure Java, no dependency on jmlx-ffi or native/install/lib)
-
+       |
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
-                 (no "|" above: pure Java, no dependency on jmlx-ffi or native/install/lib)
+                 (no "|" above jmlx-jinja: pure Java, no dependency on jmlx-ffi or native/install/lib)
 ```
 
 Three native modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
@@ -125,12 +124,13 @@ keeping incremental builds fast and generated code out of review diffs. `jmlx-co
 `jmlx-ffi` as `implementation`, not `api` — `MLXArray`/`MLX` wrap raw `MemorySegment` handles behind
 plain Java types and never expose `jmlx-ffi` on their own public surface.
 
-**`jmlx-tokenizer` and `jmlx-jinja` are independent.** Both sit outside the native chain entirely and
-have no dependency on `jmlx-ffi`; they never touch `native/install/lib` and do not call
-`NativeLoader.ensureLoaded()`. `jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`) is a
-from-scratch Java port of the byte-level-BPE pipeline plus chat-template rendering; `jmlx-jinja` is
-the migrated former `hfjinja` project and provides `se.alipsa.jmlx.jinja.Template` for HF
-`chat_template` Jinja strings. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
+**`jmlx-tokenizer` and `jmlx-jinja` sit outside the native chain entirely.** Neither depends on
+`jmlx-ffi`; they never touch `native/install/lib` and do not call `NativeLoader.ensureLoaded()`. They
+are not independent of each other, though: `jmlx-tokenizer` declares `api project(':jmlx-jinja')` and
+`ChatTemplateRenderer` returns `jmlx-jinja`'s own `Template` type on its public API, since
+`jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`) is a from-scratch Java port of the
+byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-jinja`, the migrated
+former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
 Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
 below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
 

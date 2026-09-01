@@ -17,7 +17,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
-/** Runs every checked-in template-bearing corpus record through hfjinja's public API. */
+/** Runs every checked-in template-bearing corpus record through jmlx-jinja's public API. */
 class CorpusDifferentialTest {
   @TestFactory
   Stream<DynamicTest> matchesPinnedNodeCorpus() {

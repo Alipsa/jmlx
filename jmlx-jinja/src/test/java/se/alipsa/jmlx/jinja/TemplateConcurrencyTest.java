@@ -261,7 +261,7 @@ class TemplateConcurrencyTest {
   private static ThreadFactory daemonThreadFactory() {
     var sequence = new AtomicLong();
     return task -> {
-      var thread = new Thread(task, "hfjinja-concurrency-" + sequence.incrementAndGet());
+      var thread = new Thread(task, "jmlx-jinja-concurrency-" + sequence.incrementAndGet());
       thread.setDaemon(true);
       return thread;
     };

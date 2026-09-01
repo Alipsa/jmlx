@@ -9,6 +9,16 @@ rendering uses `se.alipsa:hfjinja:0.5.0` (Maven Central), the user's own Java po
 `@huggingface/jinja` — not the hand-format-per-model or GraalJS options D3's amendment also
 considered.
 
+**Amendment: `hfjinja` was migrated into this repository as `jmlx-jinja`.** Every reference below to
+`se.alipsa:hfjinja:0.5.0`, its resolution from Maven Central/`mavenLocal()`, the `hfjinja` version
+catalog alias, and `implementation libs.hfjinja` describes the design as of this plan's original
+spike and is no longer how the shipped module resolves the dependency — see `req/phase5-plan.md`'s
+own "the Jinja port now lives in this repository" amendment for the current shape. `jmlx-tokenizer`
+now declares `api project(':jmlx-jinja')` and imports `se.alipsa.jmlx.jinja.Template` /
+`se.alipsa.jmlx.jinja.HfJinjaException`, not the `se.alipsa.hfjinja` package this document's examples
+still show; the API itself (`Template.parse`/`.render`, the exception hierarchy) is unchanged by the
+migration.
+
 **Scope is deliberately narrower than "port swift-transformers."** `req/phase5-plan.md`'s own
 "ship exactly what's needed" precedent applies: M3's actual named targets are Llama-3-Instruct and
 Qwen2.5-Instruct, and both declare `"tokenizer_class": "PreTrainedTokenizerFast"` backed by a

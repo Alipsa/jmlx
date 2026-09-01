@@ -1,0 +1,52 @@
+# jmlx-jinja is a dependency-free, pure-Java module (no native/Apple Silicon requirement),
+# so this workflow runs on ubuntu-latest and is scoped to just that module -- it does not
+# attempt to cover jmlx-core/jmlx-ffi's native, macOS-only test suites.
+#
+# The Node-dependent tasks (see jmlx-jinja/build.gradle's nodeDependentTasks list) require the
+# exact Node version pinned in jmlx-jinja/upstream/upstream-lock.json and are not wired into
+# `check` for that reason; this workflow is what actually runs them, since jmlx-jinja was
+# migrated from the archived standalone hfjinja repo where they ran in its own CI.
+name: jmlx-jinja CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'jmlx-jinja/**'
+      - '.github/workflows/jmlx-jinja-ci.yml'
+  pull_request:
+    paths:
+      - 'jmlx-jinja/**'
+      - '.github/workflows/jmlx-jinja-ci.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.7.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run jmlx-jinja check and Node-oracle differential verification
+        run: |
+          ./gradlew --no-configuration-cache \
+            :jmlx-jinja:check \
+            :jmlx-jinja:nodeCorpusTest \
+            :jmlx-jinja:nodeOracleVersion \
+            :jmlx-jinja:nodeCorpusVerify \
+            :jmlx-jinja:corpusCoverage \
+            :jmlx-jinja:astSnapshotVerify \
+            :jmlx-jinja:fuzzParserTest \
+            :jmlx-jinja:fuzzParserVerify \
+            :jmlx-jinja:formatGoldenVerify
+        # --no-configuration-cache works around diffplug/spotless#2850 (NoClassDefFoundError
+        # from google-java-format on JDK 21/25 multi-module builds with config-cache enabled).

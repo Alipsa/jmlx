@@ -149,7 +149,7 @@ test('fails loudly for an unmatched upstream error', async () => {
 });
 
 test('rejects malformed error-pattern selectors', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'hfjinja-error-patterns-'));
+  const directory = await mkdtemp(join(tmpdir(), 'jmlx-jinja-error-patterns-'));
   const path = join(directory, 'patterns.json');
   const writePatterns = (pattern) => writeFile(path, JSON.stringify({version: 'test', patterns: [pattern]}), 'utf8');
   const pattern = {regex: '^error$', category: 'TYPE'};
@@ -168,7 +168,7 @@ test('rejects malformed error-pattern selectors', async () => {
 });
 
 test('preserves physical JSONL line numbers across blank lines', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'hfjinja-corpus-lines-'));
+  const directory = await mkdtemp(join(tmpdir(), 'jmlx-jinja-corpus-lines-'));
   const path = join(directory, 'corpus.jsonl');
   try {
     await writeFile(path, '{"id":"first"}\n\n{"id":"third"}\n', 'utf8');
@@ -181,7 +181,7 @@ test('preserves physical JSONL line numbers across blank lines', async () => {
 });
 
 test('identifies valid non-object JSON separately from invalid JSON', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'hfjinja-corpus-json-'));
+  const directory = await mkdtemp(join(tmpdir(), 'jmlx-jinja-corpus-json-'));
   const path = join(directory, 'corpus.jsonl');
   try {
     await writeFile(path, '42\n', 'utf8');
@@ -355,7 +355,7 @@ test('pins the remaining upstream runtime feature inventory against the Node ora
 });
 
 async function runOracle(records, environment = {}) {
-  const directory = await mkdtemp(join(tmpdir(), 'hfjinja-corpus-'));
+  const directory = await mkdtemp(join(tmpdir(), 'jmlx-jinja-corpus-'));
   const corpus = join(directory, 'corpus.jsonl');
   try {
     await writeFile(corpus, `${records.map((record) => JSON.stringify(record)).join('\n')}\n`, 'utf8');

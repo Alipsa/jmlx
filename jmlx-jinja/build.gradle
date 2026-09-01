@@ -404,11 +404,6 @@ tasks.register('corpusCoverage', Exec) {
     outputs.file(corpusCoverageReport)
 }
 
-// upstreamVerify runs on every check because it needs no Node toolchain.
-tasks.named('check') {
-    dependsOn tasks.named('upstreamVerify')
-}
-
 // The Node-dependent verification tasks require the exact Node version pinned in
 // upstream/upstream-lock.json (currently 26.7.0). They are available as explicit
 // tasks but are not wired into `check` because jmlx does not otherwise require Node.
@@ -477,7 +472,6 @@ def releaseGroup = group.toString()
 def releaseArtifact = name
 def releaseVersion = version.toString()
 
-// codenarc-disable UnnecessaryObjectReferences
 tasks.register('verifyPublicationMetadata') {
     group = 'verification'
     description = 'Verifies the generated publication POM against the release contract.'
@@ -535,6 +529,24 @@ tasks.register('verifyModuleDescriptor') {
             throw new GradleException("Module descriptor does not match release contract: ${descriptor}")
         }
     }
+}
+
+// examples/tokenizer-config is a standalone usage sample, not part of the published jar --
+// this task only guards that it keeps compiling against the current public API.
+tasks.register('compileTokenizerConfigExample', JavaCompile) {
+    group = 'verification'
+    description = 'Compiles the tokenizer-config example against the built jmlx-jinja classes.'
+    source = fileTree('examples/tokenizer-config') { include '*.java' }
+    classpath = sourceSets.main.output
+    destinationDirectory = layout.buildDirectory.dir('classes/examples/tokenizerConfig')
+}
+
+// upstreamVerify, verifyPublicationMetadata, verifyModuleDescriptor, and
+// compileTokenizerConfigExample all run on every check because none of them needs a Node
+// toolchain.
+tasks.named('check') {
+    dependsOn tasks.named('upstreamVerify'), tasks.named('verifyPublicationMetadata'),
+        tasks.named('verifyModuleDescriptor'), tasks.named('compileTokenizerConfigExample')
 }
 
 tasks.register('dependencyReview') {
@@ -616,4 +628,3 @@ tasks.register('releaseVerification', JavaExec) {
     outputs.upToDateWhen { false }
     outputs.cacheIf { false }
 }
-// codenarc-enable UnnecessaryObjectReferences

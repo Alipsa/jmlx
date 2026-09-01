@@ -26,8 +26,8 @@ public final class ArchiveReproducibilityMain {
     boolean offline = Boolean.parseBoolean(args[2]);
     Path report = Path.of(args[3]).toAbsolutePath().normalize();
     int bytecodeMajor = Integer.parseInt(args[4]);
-    Path evidence = Files.createTempDirectory("hfjinja-archive-evidence-");
-    Path sandboxParent = Files.createTempDirectory("hfjinja-archive-worktree-");
+    Path evidence = Files.createTempDirectory("jmlx-jinja-archive-evidence-");
+    Path sandboxParent = Files.createTempDirectory("jmlx-jinja-archive-worktree-");
     Path sandbox = sandboxParent.resolve("candidate");
     try {
       runGit(project, "git", "worktree", "add", "--detach", sandbox.toString(), "HEAD");

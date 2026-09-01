@@ -47,10 +47,10 @@ public final class ReleaseVerifierMain {
     }
     String head = output(source, "git", "rev-parse", "HEAD").trim();
     String coordinates = contractCoordinates(source.resolve("req/release-verification.json"));
-    Path parent = Files.createTempDirectory("hfjinja-release-worktree-");
+    Path parent = Files.createTempDirectory("jmlx-jinja-release-worktree-");
     Path worktree = parent.resolve("candidate");
-    Path dependencyEvidence = Files.createTempDirectory("hfjinja-dependency-evidence-");
-    Path repository = Files.createTempDirectory("hfjinja-release-repository-");
+    Path dependencyEvidence = Files.createTempDirectory("jmlx-jinja-dependency-evidence-");
+    Path repository = Files.createTempDirectory("jmlx-jinja-release-repository-");
     try {
       run(source, "git", "worktree", "add", "--detach", worktree.toString(), head);
       Path candidateModule = worktree.resolve(moduleDirectory);
@@ -198,7 +198,7 @@ public final class ReleaseVerifierMain {
 
   private static String runConsumer(
       Path candidate, Path userHome, Path repository, String coordinates) throws Exception {
-    Path consumer = Files.createTempDirectory("hfjinja-release-consumer-");
+    Path consumer = Files.createTempDirectory("jmlx-jinja-release-consumer-");
     String[] coordinate = coordinates.split(":", -1);
     if (coordinate.length != 3) {
       throw new IllegalStateException("invalid contract coordinates: " + coordinates);
@@ -207,7 +207,7 @@ public final class ReleaseVerifierMain {
       Files.writeString(
           consumer.resolve("settings.gradle"),
           "pluginManagement { repositories {"
-              + "} }\nrootProject.name = 'hfjinja-release-consumer'\n");
+              + "} }\nrootProject.name = 'jmlx-jinja-release-consumer'\n");
       String repositoryUri = repository.toUri().toString().replace("'", "\\'");
       Files.writeString(
           consumer.resolve("build.gradle"),

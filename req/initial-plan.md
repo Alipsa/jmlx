@@ -380,9 +380,14 @@ Critical files: `settings.gradle`, `lib/build.gradle` (becomes `jmlx-core/build.
   call through one loader class now makes that transition free. Note the
   `Enable-Native-Access: ALL-UNNAMED` manifest attribute is **not** an alternative — it applies only
   to a jar launched via `java -jar`.
-- **`org.gradle.configuration-cache=true` is enabled.** Do all native detection — filesystem probes,
-  environment reads — at **execution time**, never at configuration time, or the config cache is
-  poisoned.
+- **Write native detection — filesystem probes, environment reads — to run at execution time, never
+  at configuration time, or the config cache is poisoned, regardless of whether
+  `org.gradle.configuration-cache` is currently on.** [Amended: it's pinned `false` in
+  `gradle.properties` as of the jmlx-jinja migration — this JDK 21/25 multi-module build
+  reproducibly hits diffplug/spotless#2850 (`NoClassDefFoundError` from google-java-format under
+  config-cache reuse) intermittently, confirmed still present on spotless's newest release
+  (8.10.1) as of this writing, not just the pinned 8.9.0. The discipline above still governs any
+  code added here, since re-enabling config-cache should not require re-auditing it.]
 - Inject the native directory into tests and `run` as an **absolute path** via a system property.
   `native/install/lib` is CWD-relative and resolves differently under `:jmlx-core:test`, an IDE
   run, and `:jmlx-examples:run`.

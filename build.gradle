@@ -162,11 +162,44 @@ subprojects {
             }
         }
 
+        // Central rejects POMs referencing SNAPSHOT dependencies. jmlx-tokenizer depends on
+        // jmlx-jinja via project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate
+        // carrying jinja's current version -- so this is what forces jinja to be released first.
+        tasks.register('verifyNoSnapshotDependencies') {
+            group = 'verification'
+            description = 'Fails if the generated POM references any -SNAPSHOT dependency.'
+            dependsOn tasks.named('generatePomFileForMavenPublication')
+            def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+            inputs.file(pomFile)
+            doLast {
+                def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+                        .newDocumentBuilder().parse(pomFile.get().asFile)
+                def dependencyNodes = pom.getElementsByTagName('dependency')
+                def offenders = []
+                for (int i = 0; i < dependencyNodes.length; i++) {
+                    def dependency = dependencyNodes.item(i)
+                    def field = { String name ->
+                        dependency.childNodes.find {
+                            it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == name
+                        }?.textContent
+                    }
+                    if (field('version')?.endsWith('-SNAPSHOT')) {
+                        offenders << "${field('groupId')}:${field('artifactId')}:${field('version')}"
+                    }
+                }
+                if (!offenders.isEmpty()) {
+                    throw new GradleException(
+                            "Cannot release ${project.name}: POM references SNAPSHOT dependencies: " +
+                            "${offenders.join(', ')}. Release those modules first.")
+                }
+            }
+        }
+
         // release.sh requests `build` and `release` as independent tasks, and Gradle imposes no
         // ordering between independently requested tasks -- without this edge, publishing could
         // begin before verification finished.
         tasks.named('release') {
-            dependsOn tasks.named('check')
+            dependsOn tasks.named('check'), tasks.named('verifyNoSnapshotDependencies')
         }
     }
 }

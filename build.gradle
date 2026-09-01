@@ -141,27 +141,6 @@ subprojects {
     }
 }
 
-// release.sh is meant to be byte-identical in every releasable module (see its own header
-// comment: MODULE is derived from the script's own directory, so there is nothing
-// module-specific to differ on). A prior fix landed in jmlx-jinja/release.sh only, silently
-// leaving jmlx-tokenizer's copy stale and broken -- this makes that drift fail loudly instead of
-// silently, the next time either copy is touched.
-tasks.register('verifyReleaseScriptsMatch') {
-    group = 'verification'
-    description = 'Fails if jmlx-jinja/release.sh and jmlx-tokenizer/release.sh have drifted apart.'
-    def jinjaScript = layout.projectDirectory.file('jmlx-jinja/release.sh')
-    def tokenizerScript = layout.projectDirectory.file('jmlx-tokenizer/release.sh')
-    inputs.file(jinjaScript)
-    inputs.file(tokenizerScript)
-    doLast {
-        if (jinjaScript.asFile.bytes != tokenizerScript.asFile.bytes) {
-            throw new GradleException(
-                    'jmlx-jinja/release.sh and jmlx-tokenizer/release.sh have drifted -- ' +
-                    'they must stay byte-identical (see either file\'s own header comment).')
-        }
-    }
-}
-
 // Release wiring for publishable modules only. A module opts in by applying 'maven-publish';
 // jmlx-core/jmlx-ffi/jmlx-examples do not, and are unaffected. Kept here rather than duplicated
 // per module so there is one copy to keep correct -- the same reason Spotless is applied above.
@@ -281,6 +260,25 @@ subprojects {
             }
         }
 
+        // release.sh is meant to be byte-identical in every releasable module (see its own header
+        // comment: MODULE is derived from the script's own directory, so there is nothing
+        // module-specific to differ on). A prior fix landed in jmlx-jinja/release.sh only,
+        // silently leaving jmlx-tokenizer's copy stale and broken -- this makes that drift fail
+        // loudly instead. Registered per module (self-contained, via a plain filesystem scan in
+        // buildSrc) rather than as one shared root-level task depended on across projects: a
+        // cross-project `dependsOn rootProject.tasks.named(...)` edge is exactly the pattern
+        // Gradle's project-isolation work targets, and every module's own copy already knows
+        // where the repo root is without needing to reference another project's task.
+        tasks.register('verifyReleaseScriptsMatch') {
+            group = 'verification'
+            description = 'Fails if any releasable module\'s release.sh has drifted from the others.'
+            def repoRoot = rootProject.layout.projectDirectory.asFile
+            inputs.files(fileTree(rootProject.layout.projectDirectory) { include '*/release.sh' })
+            doLast {
+                se.alipsa.jmlx.buildsrc.ReleaseScripts.assertAllMatch(repoRoot)
+            }
+        }
+
         // release.sh requests `build` and `release` as independent tasks, and Gradle imposes no
         // ordering between independently requested tasks -- without this edge, publishing could
         // begin before verification finished.
@@ -296,7 +294,7 @@ subprojects {
         // dependencies above guarantee.
         tasks.named('check') {
             shouldRunAfter tasks.named('verifyCentralCredentialsPresent')
-            dependsOn rootProject.tasks.named('verifyReleaseScriptsMatch')
+            dependsOn tasks.named('verifyReleaseScriptsMatch')
         }
 
         // dependsOn above only adds edges, it imposes no *order* between them -- so a bare

@@ -14,8 +14,6 @@ import java.util.regex.Pattern;
 public final class ReleaseVerifierMain {
   private static final Pattern GROUP_ARTIFACT =
       Pattern.compile("\\\"groupArtifact\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
-  private static final Pattern MODULE_VERSION =
-      Pattern.compile("(?m)^version\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]");
   private static final Pattern JDK_MAJOR = Pattern.compile("\\\"jdkMajor\\\"\\s*:\\s*(\\d+)");
   private static final Pattern NODE_VERSION =
       Pattern.compile("\\\"nodeVersion\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
@@ -53,17 +51,6 @@ public final class ReleaseVerifierMain {
       throw new IllegalStateException("source checkout is dirty:\n" + status);
     }
     String head = output(source, "git", "rev-parse", "HEAD").trim();
-    // The full GAV is reconstructed here, not read as one pinned string from the contract: only
-    // group:artifact is genuinely a release-time contract (see verifyPublicationMetadata's own
-    // comment on the same point). Reading the version instead from the live, just-verified-clean
-    // source checkout means there is nothing left to keep in sync by hand -- previously this had
-    // to be bumped in req/release-verification.json in lockstep with build.gradle's version on
-    // every release and every post-release SNAPSHOT bump, and a missed bump surfaced only as a
-    // confusing dependency-resolution failure deep inside runConsumer below.
-    String coordinates =
-        contractGroupArtifact(source.resolve("req/release-verification.json"))
-            + ":"
-            + moduleVersion(source.resolve("build.gradle"));
     Path parent = Files.createTempDirectory("jmlx-jinja-release-worktree-");
     Path worktree = parent.resolve("candidate");
     Path dependencyEvidence = Files.createTempDirectory("jmlx-jinja-dependency-evidence-");
@@ -76,6 +63,20 @@ public final class ReleaseVerifierMain {
           worktree.resolve("gradle.properties"),
           "\norg.gradle.java.installations.auto-download=false\n",
           java.nio.file.StandardOpenOption.APPEND);
+
+      // The full GAV is reconstructed from the candidate worktree, not the live source checkout:
+      // everything downstream (runConsumer, publishedJar, mainArchiveDigest) operates on the
+      // committed HEAD just checked out above, not on the developer's working tree, and those two
+      // only agree when the tree is clean. Under -PreleaseVerificationAllowDirty an uncommitted
+      // version bump -- the single most likely uncommitted edit at release time -- would otherwise
+      // make `coordinates` name a version the candidate never built. Only group:artifact is
+      // genuinely a release-time contract (see verifyPublicationMetadata's own comment on the same
+      // point); reading the version live from the candidate means there is nothing left to keep in
+      // sync by hand.
+      final String coordinates =
+          contractGroupArtifact(candidateModule.resolve("req/release-verification.json"))
+              + ":"
+              + moduleVersion(candidateModule, userHome);
 
       // Each destructive operation gets a separate Gradle process and graph.
       gradle(candidateModule, userHome, false, "verifyReproducibleArchives");
@@ -409,8 +410,29 @@ public final class ReleaseVerifierMain {
     return match(contract, GROUP_ARTIFACT, "groupArtifact");
   }
 
-  private static String moduleVersion(Path moduleBuildFile) throws Exception {
-    return match(moduleBuildFile, MODULE_VERSION, "version");
+  // Ask Gradle for the effective version rather than parsing build.gradle, same principle as
+  // release.sh's own comment: authoritative, and not fragile to formatting or a computed/
+  // interpolated version line that a literal-quoted-string regex could never match.
+  private static String moduleVersion(Path project, Path userHome) throws Exception {
+    Path repositoryRoot = repositoryRoot(project);
+    String wrapper =
+        System.getProperty("os.name").toLowerCase().contains("win") ? "gradlew.bat" : "gradlew";
+    List<String> command =
+        List.of(
+            repositoryRoot.resolve(wrapper).toString(),
+            "-q",
+            "-Dorg.gradle.java.installations.auto-download=false",
+            "--gradle-user-home",
+            userHome.toString(),
+            "properties");
+    requireIsolation(command, false);
+    for (String line : output(project, command.toArray(String[]::new)).lines().toList()) {
+      if (line.startsWith("version: ")) {
+        return line.substring("version: ".length());
+      }
+    }
+    throw new IllegalStateException(
+        "no 'version: ' property reported by `gradle properties` for " + project);
   }
 
   private static int contractInt(Path contract, Pattern pattern, String name) throws Exception {

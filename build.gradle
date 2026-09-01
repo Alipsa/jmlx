@@ -16,16 +16,21 @@ allprojects {
     version = '0.5.0-SNAPSHOT'
 }
 
-// mavenLocal() is only added when the jmlx project's own version (above) is a -SNAPSHOT
-// build -- the expected setup for resolving a locally-built, unreleased dependency during
-// local development, not a build-hygiene concern. A real release build resolves every
-// dependency from mavenCentral() alone, so a stale same-GAV artifact sitting in
+// mavenLocal() is only added for a module's own -SNAPSHOT builds -- the expected setup for
+// resolving a locally-built, unreleased dependency during local development, not a build-hygiene
+// concern. A release module resolves dependencies from mavenCentral() alone, so a stale same-GAV
+// artifact sitting in
 // ~/.m2/repository can never silently win over Central with no diagnostic (see PR #14 review).
 allprojects {
-    repositories {
-        mavenCentral()
-        if (rootProject.version.toString().endsWith('-SNAPSHOT')) {
-            mavenLocal()
+    // A module's own build.gradle sets its independent version after this root convention is
+    // applied, so choose repositories after that script has evaluated rather than accidentally
+    // inspecting the inherited root SNAPSHOT version.
+    afterEvaluate {
+        repositories {
+            mavenCentral()
+            if (version.toString().endsWith('-SNAPSHOT')) {
+                mavenLocal()
+            }
         }
     }
 }
@@ -199,6 +204,8 @@ subprojects {
         // dependency check is what forces release order: jmlx-tokenizer depends on jmlx-jinja via
         // project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate carrying jinja's
         // current version, so this fails the tokenizer release while jinja is still a SNAPSHOT.
+        // Consequently, release tokenizer after jinja is released but before jinja is bumped to
+        // its next SNAPSHOT; CLAUDE.md documents that release window.
         // The own-version check exists because nothing on the Gradle side otherwise catches it:
         // the nexus-release-plugin's ReleaseTask just logs and returns 0 for a SNAPSHOT version,
         // so a bare `./gradlew :module:release` would report BUILD SUCCESSFUL having published
@@ -230,8 +237,8 @@ subprojects {
         // ever contacted. Without a configured signing key, `signing { required = ... }` above is
         // false, so an unsigned bundle installs locally and only then fails at the Central upload
         // step -- leaving a same-GAV, never-published release version sitting in ~/.m2, exactly the
-        // hazard the root build's own mavenLocal() comment warns about (any SNAPSHOT build in this
-        // repo resolves mavenLocal() and could silently pick it up). Failing fast, before anything
+        // hazard the root build's own mavenLocal() comment warns about (any SNAPSHOT module build
+        // resolves mavenLocal() and could silently pick it up). Failing fast, before anything
         // is published anywhere, is cheaper than relying on every release to have credentials
         // configured correctly.
         // Providers are resolved here, at configuration time, and captured in a plain Map --

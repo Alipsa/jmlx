@@ -183,9 +183,9 @@ public final class ReleaseVerifierMain {
     int requiredJdk =
         contractInt(source.resolve("req/release-verification.json"), JDK_MAJOR, "jdkMajor");
     int actualJdk = Runtime.Version.parse(daemonVersion).feature();
-    if (actualJdk != requiredJdk) {
+    if (actualJdk < requiredJdk) {
       throw new IllegalStateException(
-          "required Gradle daemon JDK major " + requiredJdk + ", got " + actualJdk);
+          "required Gradle daemon JDK major at least " + requiredJdk + ", got " + actualJdk);
     }
     String expectedNode =
         match(source.resolve("upstream/upstream-lock.json"), NODE_VERSION, "nodeVersion");

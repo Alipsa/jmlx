@@ -60,6 +60,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Check shared build logic
+        run: ./gradlew -p buildSrc check
+
       # Configuration cache is off repo-wide (see gradle.properties) because of
       # diffplug/spotless#2850, so no --no-configuration-cache flag is needed here.
       - name: Run jmlx-jinja/jmlx-tokenizer check and Node-oracle differential verification

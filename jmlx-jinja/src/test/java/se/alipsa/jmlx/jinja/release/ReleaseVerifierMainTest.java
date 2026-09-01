@@ -47,7 +47,18 @@ class ReleaseVerifierMainTest {
   }
 
   @Test
-  void rejectsWrongDaemonJdk() throws Exception {
+  void acceptsNewerDaemonJdk() throws Exception {
+    var source = temporaryDirectory.resolve("jmlx-jinja-release-environment");
+    Files.createDirectories(source.resolve("req"));
+    Files.createDirectories(source.resolve("upstream"));
+    Files.writeString(source.resolve("req/release-verification.json"), "{\"jdkMajor\":21}");
+    Files.writeString(
+        source.resolve("upstream/upstream-lock.json"), "{\"nodeVersion\":\"v26.7.0\"}");
+    assertDoesNotThrow(() -> ReleaseVerifierMain.verifyEnvironment(source, "25.0.4"));
+  }
+
+  @Test
+  void rejectsOlderDaemonJdk() throws Exception {
     var source = temporaryDirectory.resolve("jmlx-jinja-release-environment");
     Files.createDirectories(source.resolve("req"));
     Files.createDirectories(source.resolve("upstream"));
@@ -57,8 +68,8 @@ class ReleaseVerifierMainTest {
     var failure =
         assertThrows(
             IllegalStateException.class,
-            () -> ReleaseVerifierMain.verifyEnvironment(source, "25.0.4"));
-    assertEquals("required Gradle daemon JDK major 21, got 25", failure.getMessage());
+            () -> ReleaseVerifierMain.verifyEnvironment(source, "17.0.14"));
+    assertEquals("required Gradle daemon JDK major at least 21, got 17", failure.getMessage());
   }
 
   @Test

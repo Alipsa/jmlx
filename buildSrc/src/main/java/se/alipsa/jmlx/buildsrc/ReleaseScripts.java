@@ -44,17 +44,26 @@ public final class ReleaseScripts {
     File first = scripts.get(0);
     byte[] firstBytes = Files.readAllBytes(first.toPath());
     List<String> mismatched = new ArrayList<>();
+    List<String> nonExecutable = new ArrayList<>();
+    if (!first.canExecute()) {
+      nonExecutable.add(first.getPath());
+    }
     for (File script : scripts.subList(1, scripts.size())) {
       if (!Arrays.equals(firstBytes, Files.readAllBytes(script.toPath()))) {
         mismatched.add(script.getPath());
       }
+      if (!script.canExecute()) {
+        nonExecutable.add(script.getPath());
+      }
     }
-    if (!mismatched.isEmpty()) {
+    if (!mismatched.isEmpty() || !nonExecutable.isEmpty()) {
       throw new IllegalStateException(
           "release.sh has drifted -- these must stay byte-identical to "
               + first
               + ": "
-              + mismatched);
+              + mismatched
+              + "; scripts must also be executable: "
+              + nonExecutable);
     }
   }
 }

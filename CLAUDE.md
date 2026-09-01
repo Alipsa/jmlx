@@ -92,7 +92,9 @@ bumping is deliberately manual.
 
 **Release order matters.** `jmlx-tokenizer` depends on `jmlx-jinja` via `api project(...)`, which
 Gradle publishes as a concrete coordinate. `verifyNoSnapshotDependencies` fails the tokenizer
-release while jinja is still a SNAPSHOT, so jinja must be released first.
+release while jinja is still a SNAPSHOT. Release jinja first, then release tokenizer while jinja's
+released version is still checked out; only after both releases should jinja be bumped to its next
+`-SNAPSHOT` version.
 
 Signing and Central credentials come from Gradle properties (`signing.keyId`,
 `sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is
@@ -155,7 +157,7 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
                                                     PostProcessorApplier, TokenizerException
        |
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
-                 (no "|" above jmlx-jinja: pure Java, no dependency on jmlx-ffi or native/install/lib)
+                 pure Java; no dependency on jmlx-ffi or native/install/lib
 ```
 
 Three native modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating

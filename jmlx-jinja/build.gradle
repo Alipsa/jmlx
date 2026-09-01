@@ -16,6 +16,13 @@ java {
     withJavadocJar()
 }
 
+// Release verification compares independently rebuilt archive bytes. Archive entry timestamps
+// and iteration order must therefore not depend on the build machine or compilation time.
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 dependencies {
     // No runtime dependencies.
 }
@@ -566,6 +573,15 @@ tasks.register('compileTokenizerConfigExample', JavaCompile) {
 tasks.named('check') {
     dependsOn tasks.named('upstreamVerify'), tasks.named('verifyPublicationMetadata'),
         tasks.named('verifyModuleDescriptor'), tasks.named('compileTokenizerConfigExample')
+}
+
+// The root Spotless convention targets conventional source sets only; this standalone example is
+// also a maintained Java source and must be formatted with the rest of the module.
+spotless {
+    java {
+        target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java',
+            'examples/**/*.java'
+    }
 }
 
 tasks.register('dependencyReview') {

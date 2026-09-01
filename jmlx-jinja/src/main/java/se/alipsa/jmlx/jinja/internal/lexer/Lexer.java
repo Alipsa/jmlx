@@ -23,12 +23,13 @@ import se.alipsa.jmlx.jinja.TemplateSyntaxException;
 public final class Lexer {
   /**
    * The ECMA-262 WhiteSpace and LineTerminator character set, as a regex bracket-class body built
-   * from explicit backslash-u escapes. It is wider than Java's default whitespace notions: it adds
-   * NBSP, the Unicode {@code Zs} space separators, U+2028/U+2029, and U+FEFF, none of which {@link
-   * Character#isWhitespace} or {@link Pattern}'s default {@code \s} treat as whitespace. Kept in
-   * sync by hand with {@link #isJsWhitespace(char)} below — a bracket character class and a
-   * per-char predicate can't share one definition, since the class needs the {@code X-Y} range
-   * syntax that a plain predicate expresses as a numeric comparison instead.
+   * expressed mostly with explicit backslash-u escapes (plus literal ASCII space). It is wider than
+   * Java's default whitespace notions: it adds NBSP, the Unicode {@code Zs} space separators,
+   * U+2028/U+2029, and U+FEFF, none of which {@link Character#isWhitespace} or {@link Pattern}'s
+   * default {@code \s} treat as whitespace. Kept in sync by hand with {@link #isJsWhitespace(char)}
+   * below — a bracket character class and a per-char predicate can't share one definition, since
+   * the class needs the {@code X-Y} range syntax that a plain predicate expresses as a numeric
+   * comparison instead.
    */
   private static final String JS_WHITESPACE_CHAR_CLASS =
       "\\t\\n"

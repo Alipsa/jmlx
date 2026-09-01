@@ -94,7 +94,9 @@ public final class ReleaseVerifierMain {
           candidateModule,
           userHome,
           true,
+          "nodeCorpusVerify",
           "corpusCoverage",
+          "astSnapshotVerify",
           "formatGoldenVerify",
           "fuzzParserVerify");
       verifyRequiredTaskEvidence(
@@ -198,8 +200,12 @@ public final class ReleaseVerifierMain {
         java.util.Map.of(
             "upstreamVerify",
             "build/upstreamVerify/verified",
+            "nodeCorpusVerify",
+            "build/nodeCorpusVerify/verified",
             "corpusCoverage",
             "build/reports/corpus-coverage.md",
+            "astSnapshotVerify",
+            "build/astSnapshotVerify/verified",
             "formatGoldenVerify",
             "build/formatGoldenVerify/verified",
             "fuzzParserVerify",

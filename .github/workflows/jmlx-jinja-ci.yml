@@ -49,15 +49,20 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # node-version-file rather than a literal: jmlx-jinja/.nvmrc is the same file a
+      # developer's `nvm use` reads, so CI and local runs cannot drift apart. Its value is
+      # still checked against upstream/upstream-lock.json's nodeVersion by nodeOracleVersion.
       - uses: actions/setup-node@v4
         with:
-          node-version: '26.7.0'
+          node-version-file: jmlx-jinja/.nvmrc
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Configuration cache is off repo-wide (see gradle.properties) because of
+      # diffplug/spotless#2850, so no --no-configuration-cache flag is needed here.
       - name: Run jmlx-jinja/jmlx-tokenizer check and Node-oracle differential verification
         run: |
-          ./gradlew --no-configuration-cache \
+          ./gradlew \
             :jmlx-jinja:check \
             :jmlx-tokenizer:check \
             :jmlx-jinja:nodeCorpusTest \
@@ -68,5 +73,3 @@ jobs:
             :jmlx-jinja:fuzzParserTest \
             :jmlx-jinja:fuzzParserVerify \
             :jmlx-jinja:formatGoldenVerify
-        # --no-configuration-cache works around diffplug/spotless#2850 (NoClassDefFoundError
-        # from google-java-format on JDK 21/25 multi-module builds with config-cache enabled).

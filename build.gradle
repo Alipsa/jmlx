@@ -8,6 +8,7 @@
 
 plugins {
     id 'com.diffplug.spotless' version '8.9.0' apply false
+    id 'se.alipsa.nexus-release-plugin' version '2.2.0' apply false
 }
 
 allprojects {
@@ -132,5 +133,40 @@ subprojects {
         // narrows to --enable-native-access=se.alipsa.jmlx.ffi.
         jvmArgs('--enable-native-access=ALL-UNNAMED')
         systemProperty('jmlx.library.path', nativeLibDir)
+    }
+}
+
+// Release wiring for publishable modules only. A module opts in by applying 'maven-publish';
+// jmlx-core/jmlx-ffi/jmlx-examples do not, and are unaffected. Kept here rather than duplicated
+// per module so there is one copy to keep correct -- the same reason Spotless is applied above.
+subprojects {
+    plugins.withId('maven-publish') {
+        apply plugin: 'signing'
+        apply plugin: 'se.alipsa.nexus-release-plugin'
+
+        // The 'maven' publication is declared in the module's own build.gradle, which Gradle
+        // evaluates after this block runs, so the publication cannot be referenced eagerly here.
+        afterEvaluate {
+            // Central rejects unsigned release bundles, but signing must stay inert without a
+            // configured key so `check`, the jmlx-jinja CI workflow, and releaseVerification all
+            // remain keyless. Making this unconditional would break all three.
+            signing {
+                required = providers.gradleProperty('signing.keyId').present
+                sign publishing.publications.maven
+            }
+
+            nexusReleasePlugin {
+                userName = providers.gradleProperty('sonatypeUsername').orNull
+                password = providers.gradleProperty('sonatypePassword').orNull
+                mavenPublication = publishing.publications.maven
+            }
+        }
+
+        // release.sh requests `build` and `release` as independent tasks, and Gradle imposes no
+        // ordering between independently requested tasks -- without this edge, publishing could
+        // begin before verification finished.
+        tasks.named('release') {
+            dependsOn tasks.named('check')
+        }
     }
 }

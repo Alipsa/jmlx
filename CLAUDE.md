@@ -99,6 +99,12 @@ Signing and Central credentials come from Gradle properties (`signing.keyId`,
 inert when `signing.keyId` is absent, so `check` and CI stay keyless. Releasing is a local,
 credentialed, manual action — CI verifies but never publishes.
 
+`release.sh` runs `check` (via the `release` task's own dependencies), but not `jmlx-jinja`'s
+heavier `releaseVerification` matrix (isolated Gradle home, candidate-vs.-two-clean-archives diff,
+dependency-update review) — that is not part of `check` and stays a separate, manual step.
+`jmlx-jinja/req/release-checklist.md` is jinja's full release procedure; follow it, not just
+`release.sh`, before an actual jinja release.
+
 ## Code style
 
 Hand-written sources are Google Java Style, 2-space indent, 120-column width

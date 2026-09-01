@@ -147,31 +147,69 @@ subprojects {
         // The 'maven' publication is declared in the module's own build.gradle, which Gradle
         // evaluates after this block runs, so the publication cannot be referenced eagerly here.
         afterEvaluate {
+            // Guarded lookup, not publishing.publications.maven: a future module that applies
+            // 'maven-publish' but names its publication something else would otherwise hit an
+            // UnknownDomainObjectException here at configuration time, breaking `./gradlew build`
+            // for the *whole* repo with an error pointing at this root script instead of at the
+            // module that actually needs fixing.
+            def mavenPub = publishing.publications.findByName('maven')
+            if (mavenPub == null) {
+                throw new GradleException(
+                        "Project '${project.path}' applies 'maven-publish' but has no publication " +
+                        "named 'maven'. Name it 'maven' (see jmlx-jinja/build.gradle or " +
+                        "jmlx-tokenizer/build.gradle for the expected shape) so this root script's " +
+                        "signing/nexus-release wiring can find it.")
+            }
+
             // Central rejects unsigned release bundles, but signing must stay inert without a
             // configured key so `check`, the jmlx-jinja CI workflow, and releaseVerification all
             // remain keyless. Making this unconditional would break all three.
             signing {
                 required = providers.gradleProperty('signing.keyId').present
-                sign publishing.publications.maven
+                sign mavenPub
             }
 
             nexusReleasePlugin {
                 userName = providers.gradleProperty('sonatypeUsername').orNull
                 password = providers.gradleProperty('sonatypePassword').orNull
-                mavenPublication = publishing.publications.maven
+                mavenPublication = mavenPub
             }
         }
 
-        // Central rejects POMs referencing SNAPSHOT dependencies. jmlx-tokenizer depends on
-        // jmlx-jinja via project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate
-        // carrying jinja's current version -- so this is what forces jinja to be released first.
+        // Central rejects a SNAPSHOT release outright -- both a POM that references SNAPSHOT
+        // dependencies, and a SNAPSHOT version for the module being released itself. The
+        // dependency check is what forces release order: jmlx-tokenizer depends on jmlx-jinja via
+        // project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate carrying jinja's
+        // current version, so this fails the tokenizer release while jinja is still a SNAPSHOT.
+        // The own-version check exists because nothing on the Gradle side otherwise catches it:
+        // the nexus-release-plugin's ReleaseTask just logs and returns 0 for a SNAPSHOT version,
+        // so a bare `./gradlew :module:release` would report BUILD SUCCESSFUL having published
+        // nothing -- only release.sh's shell-level check caught that before this task did.
         tasks.register('verifyNoSnapshotDependencies') {
+            // `project.name`/`project.version` are read here -- at configuration time, inside
+            // this registration block -- rather than from `project` inside `doLast`: `Task.project`
+            // is deprecated at execution time, unsupported under the configuration cache, and a
+            // hard error in Gradle 10. This has to be `project.name`/`project.version` rather than
+            // the bare `name`/`version` a plain project-level script statement could use, because
+            // this closure's delegate is the *task* being registered, which shadows the project's
+            // own `name` property with the task's own name ('verifyNoSnapshotDependencies') --
+            // and it has to happen inside this lazily-realized block, not at the enclosing
+            // plugins.withId('maven-publish') level, which runs as soon as the module applies the
+            // plugin, i.e. before the module's own `version = ...` line executes, and would
+            // silently capture the root project's inherited version instead of the module's own.
+            def moduleName = project.name
+            def moduleVersion = project.version.toString()
             group = 'verification'
-            description = 'Fails if the generated POM references any -SNAPSHOT dependency.'
+            description = "Fails if ${moduleName}'s own version, or any dependency in its generated POM, " +
+                    'is a -SNAPSHOT.'
             dependsOn tasks.named('generatePomFileForMavenPublication')
             def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
             inputs.file(pomFile)
             doLast {
+                if (moduleVersion.endsWith('-SNAPSHOT')) {
+                    throw new GradleException(
+                            "Cannot release ${moduleName}: its own version (${moduleVersion}) is a SNAPSHOT.")
+                }
                 def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance()
                         .newDocumentBuilder().parse(pomFile.get().asFile)
                 def dependencyNodes = pom.getElementsByTagName('dependency')
@@ -189,7 +227,7 @@ subprojects {
                 }
                 if (!offenders.isEmpty()) {
                     throw new GradleException(
-                            "Cannot release ${project.name}: POM references SNAPSHOT dependencies: " +
+                            "Cannot release ${moduleName}: POM references SNAPSHOT dependencies: " +
                             "${offenders.join(', ')}. Release those modules first.")
                 }
             }
@@ -200,6 +238,17 @@ subprojects {
         // begin before verification finished.
         tasks.named('release') {
             dependsOn tasks.named('check'), tasks.named('verifyNoSnapshotDependencies')
+        }
+
+        // dependsOn above only adds edges, it imposes no *order* between them -- so a bare
+        // `release` could still run `bundle` (which depends on `publishToMavenLocal`, installing
+        // into ~/.m2) before `check`/the guard finish, which is exactly the "stale same-GAV
+        // artifact wins silently" mavenLocal() hazard release.sh's own comment warns about.
+        // mustRunAfter (not another dependsOn, which would pull `bundle` into `check`'s own task
+        // graph) only constrains relative order when both already run together, which `release`'s
+        // dependencies guarantee they do.
+        tasks.named('bundle') {
+            mustRunAfter tasks.named('check'), tasks.named('verifyNoSnapshotDependencies')
         }
     }
 }

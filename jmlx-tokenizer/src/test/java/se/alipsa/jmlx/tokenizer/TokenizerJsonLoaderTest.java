@@ -34,13 +34,20 @@ class TokenizerJsonLoaderTest {
 
   private Path writeTokenizerJson(
       String decoder, String preTokenizer, String model, String addedTokens) {
+    return writeTokenizerJson(decoder, preTokenizer, "null", model, addedTokens);
+  }
+
+  private Path writeTokenizerJson(
+      String decoder, String preTokenizer, String postProcessor, String model, String addedTokens) {
     String json =
         "{"
             + "\"normalizer\": null,"
             + "\"pre_tokenizer\": "
             + preTokenizer
             + ","
-            + "\"post_processor\": null,"
+            + "\"post_processor\": "
+            + postProcessor
+            + ","
             + "\"decoder\": "
             + decoder
             + ","
@@ -417,6 +424,35 @@ class TokenizerJsonLoaderTest {
           assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
       assertTrue(failure.getMessage().contains("model.vocab['a'] has no integral id"));
     }
+  }
+
+  @Test
+  void templateProcessingRequiresIntegralIdsAndStringTokens() {
+    String templateProcessing =
+        "{\"type\": \"TemplateProcessing\", \"single\": [{\"Sequence\": {}}], "
+            + "\"special_tokens\": {\"<S>\": {\"id\": \"<S>\", \"ids\": [%s], "
+            + "\"tokens\": [%s]}}}";
+    Path nonIntegralId =
+        writeTokenizerJson(
+            VALID_DECODER,
+            VALID_PRE_TOKENIZER,
+            templateProcessing.formatted("null", "\"<S>\""),
+            VALID_MODEL,
+            "[]");
+    TokenizerException idFailure =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(nonIntegralId));
+    assertTrue(idFailure.getMessage().contains("special token '<S>' has a non-integral id"));
+
+    Path nonStringToken =
+        writeTokenizerJson(
+            VALID_DECODER,
+            VALID_PRE_TOKENIZER,
+            templateProcessing.formatted("2", "null"),
+            VALID_MODEL,
+            "[]");
+    TokenizerException tokenFailure =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(nonStringToken));
+    assertTrue(tokenFailure.getMessage().contains("special token '<S>' has a non-string token"));
   }
 
   @Test

@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  * Reads the {@code <dependency>} elements of a generated Maven publication POM.
@@ -33,20 +32,36 @@ public final class PublishedPomDependencies {
     }
   }
 
-  /** Reads every {@code <dependency>} element in {@code pomFile}. */
+  /** Reads the direct {@code <project>/<dependencies>/<dependency>} elements in {@code pomFile}. */
   public static List<Dependency> read(File pomFile) throws Exception {
     var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pomFile);
-    NodeList dependencyNodes = document.getElementsByTagName("dependency");
     List<Dependency> result = new ArrayList<>();
-    for (int i = 0; i < dependencyNodes.getLength(); i++) {
-      Node dependency = dependencyNodes.item(i);
-      result.add(
-          new Dependency(
-              field(dependency, "groupId"),
-              field(dependency, "artifactId"),
-              field(dependency, "version")));
+    Node dependencies = child(document.getDocumentElement(), "dependencies");
+    if (dependencies == null) {
+      return result;
+    }
+    for (Node dependency = dependencies.getFirstChild();
+        dependency != null;
+        dependency = dependency.getNextSibling()) {
+      if (dependency.getNodeType() == Node.ELEMENT_NODE
+          && dependency.getNodeName().equals("dependency")) {
+        result.add(
+            new Dependency(
+                field(dependency, "groupId"),
+                field(dependency, "artifactId"),
+                field(dependency, "version")));
+      }
     }
     return result;
+  }
+
+  private static Node child(Node parent, String name) {
+    for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+      if (child.getNodeType() == Node.ELEMENT_NODE && child.getNodeName().equals(name)) {
+        return child;
+      }
+    }
+    return null;
   }
 
   private static String field(Node dependency, String name) {

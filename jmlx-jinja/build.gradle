@@ -502,9 +502,11 @@ tasks.register('verifyPublicationMetadata') {
         if (contract.groupArtifact != "${releaseGroup}:${releaseArtifact}") {
             throw new GradleException('Release contract coordinates do not match the project')
         }
-        def dependencyCount = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(releaseVerificationPom.get().asFile).size()
-        if (dependencyCount != contract.publishedRuntimeDependencies.size()) {
-            throw new GradleException('Generated POM contains unexpected published dependencies')
+        def actualDependencies = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(releaseVerificationPom.get().asFile)
+                .collect { it.groupArtifact() }.toSorted()
+        def expectedDependencies = contract.publishedRuntimeDependencies.collect { it.toString() }.toSorted()
+        if (actualDependencies != expectedDependencies) {
+            throw new GradleException("Generated POM dependencies differ from release contract; expected ${expectedDependencies}, found ${actualDependencies}")
         }
         ['name', 'description', 'url'].each { field ->
             if (value(field) == null || value(field).isBlank()) throw new GradleException("Generated POM is missing ${field}")
@@ -567,12 +569,32 @@ tasks.register('compileTokenizerConfigExample', JavaCompile) {
     destinationDirectory = layout.buildDirectory.dir('classes/examples/tokenizerConfig')
 }
 
+tasks.register('verifyTokenizerConfigExample', JavaExec) {
+    group = 'verification'
+    description = 'Runs the tokenizer-config example against a Unicode-escaped JSON template.'
+    dependsOn tasks.named('compileTokenizerConfigExample')
+    classpath = files(layout.buildDirectory.dir('classes/examples/tokenizerConfig'))
+    mainClass = 'example.TokenizerConfigExample'
+    jvmArgs '--module-path', tasks.named('jar').flatMap { it.archiveFile }.get().asFile.absolutePath,
+        '--add-modules', 'se.alipsa.jmlx.jinja'
+    args 'examples/tokenizer-config/tokenizer_config_unicode.json'
+    inputs.file('examples/tokenizer-config/tokenizer_config_unicode.json')
+    def rendered = new ByteArrayOutputStream()
+    standardOutput = rendered
+    doLast {
+        if (rendered.toString(java.nio.charset.StandardCharsets.UTF_8) != 'å') {
+            throw new GradleException("Tokenizer-config example rendered '${rendered}' instead of 'å'")
+        }
+    }
+}
+
 // upstreamVerify, verifyPublicationMetadata, verifyModuleDescriptor, and
 // compileTokenizerConfigExample all run on every check because none of them needs a Node
 // toolchain.
 tasks.named('check') {
     dependsOn tasks.named('upstreamVerify'), tasks.named('verifyPublicationMetadata'),
-        tasks.named('verifyModuleDescriptor'), tasks.named('compileTokenizerConfigExample')
+        tasks.named('verifyModuleDescriptor'), tasks.named('compileTokenizerConfigExample'),
+        tasks.named('verifyTokenizerConfigExample')
 }
 
 // The root Spotless convention targets conventional source sets only; this standalone example is

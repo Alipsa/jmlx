@@ -225,9 +225,31 @@ public final class TokenizerJsonLoader {
       for (Map.Entry<String, JsonNode> entry : node.path("special_tokens").properties()) {
         JsonNode v = entry.getValue();
         List<Integer> ids = new ArrayList<>();
-        v.path("ids").forEach(idNode -> ids.add(idNode.asInt()));
+        v.path("ids")
+            .forEach(
+                idNode -> {
+                  if (idNode.isNull() || !idNode.isIntegralNumber()) {
+                    throw new TokenizerException(
+                        "TokenizerJsonLoader: TemplateProcessing special token '"
+                            + entry.getKey()
+                            + "' has a non-integral id: "
+                            + idNode);
+                  }
+                  ids.add(idNode.asInt());
+                });
         List<String> tokens = new ArrayList<>();
-        v.path("tokens").forEach(tokenNode -> tokens.add(tokenNode.asString()));
+        v.path("tokens")
+            .forEach(
+                tokenNode -> {
+                  if (tokenNode.isNull() || !tokenNode.isTextual()) {
+                    throw new TokenizerException(
+                        "TokenizerJsonLoader: TemplateProcessing special token '"
+                            + entry.getKey()
+                            + "' has a non-string token: "
+                            + tokenNode);
+                  }
+                  tokens.add(tokenNode.asString());
+                });
         // SpecialTokenInfo's own compact constructor enforces the non-empty, equal-length
         // invariant (PR #14 review round 3, finding 1) -- no need to duplicate that check here.
         specialTokens.put(

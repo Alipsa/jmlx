@@ -56,14 +56,15 @@ public final class ReleaseScripts {
         nonExecutable.add(script.getPath());
       }
     }
-    if (!mismatched.isEmpty() || !nonExecutable.isEmpty()) {
+    if (!mismatched.isEmpty()) {
       throw new IllegalStateException(
           "release.sh has drifted -- these must stay byte-identical to "
               + first
               + ": "
-              + mismatched
-              + "; scripts must also be executable: "
-              + nonExecutable);
+              + mismatched);
+    }
+    if (!nonExecutable.isEmpty()) {
+      throw new IllegalStateException("release.sh scripts must be executable: " + nonExecutable);
     }
   }
 }

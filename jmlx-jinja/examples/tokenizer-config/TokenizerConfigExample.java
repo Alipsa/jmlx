@@ -54,6 +54,16 @@ public final class TokenizerConfigExample {
         case 'n' -> result.append('\n');
         case 'r' -> result.append('\r');
         case 't' -> result.append('\t');
+        case 'u' -> {
+          if (index + 4 >= value.length())
+            throw new IllegalArgumentException("Invalid JSON Unicode escape");
+          try {
+            result.append((char) Integer.parseInt(value.substring(index + 1, index + 5), 16));
+          } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid JSON Unicode escape", e);
+          }
+          index += 4;
+        }
         default -> throw new IllegalArgumentException("Unsupported JSON string escape");
       }
     }

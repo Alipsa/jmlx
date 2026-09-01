@@ -12,8 +12,10 @@ import java.util.regex.Pattern;
 
 /** Creates an isolated detached worktree and runs the release candidate matrix. */
 public final class ReleaseVerifierMain {
-  private static final Pattern COORDINATES =
-      Pattern.compile("\\\"coordinates\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
+  private static final Pattern GROUP_ARTIFACT =
+      Pattern.compile("\\\"groupArtifact\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
+  private static final Pattern MODULE_VERSION =
+      Pattern.compile("(?m)^version\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]");
   private static final Pattern JDK_MAJOR = Pattern.compile("\\\"jdkMajor\\\"\\s*:\\s*(\\d+)");
   private static final Pattern NODE_VERSION =
       Pattern.compile("\\\"nodeVersion\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
@@ -51,7 +53,17 @@ public final class ReleaseVerifierMain {
       throw new IllegalStateException("source checkout is dirty:\n" + status);
     }
     String head = output(source, "git", "rev-parse", "HEAD").trim();
-    String coordinates = contractCoordinates(source.resolve("req/release-verification.json"));
+    // The full GAV is reconstructed here, not read as one pinned string from the contract: only
+    // group:artifact is genuinely a release-time contract (see verifyPublicationMetadata's own
+    // comment on the same point). Reading the version instead from the live, just-verified-clean
+    // source checkout means there is nothing left to keep in sync by hand -- previously this had
+    // to be bumped in req/release-verification.json in lockstep with build.gradle's version on
+    // every release and every post-release SNAPSHOT bump, and a missed bump surfaced only as a
+    // confusing dependency-resolution failure deep inside runConsumer below.
+    String coordinates =
+        contractGroupArtifact(source.resolve("req/release-verification.json"))
+            + ":"
+            + moduleVersion(source.resolve("build.gradle"));
     Path parent = Files.createTempDirectory("jmlx-jinja-release-worktree-");
     Path worktree = parent.resolve("candidate");
     Path dependencyEvidence = Files.createTempDirectory("jmlx-jinja-dependency-evidence-");
@@ -393,8 +405,12 @@ public final class ReleaseVerifierMain {
             + "\"\n}\n");
   }
 
-  private static String contractCoordinates(Path contract) throws Exception {
-    return match(contract, COORDINATES, "coordinates");
+  private static String contractGroupArtifact(Path contract) throws Exception {
+    return match(contract, GROUP_ARTIFACT, "groupArtifact");
+  }
+
+  private static String moduleVersion(Path moduleBuildFile) throws Exception {
+    return match(moduleBuildFile, MODULE_VERSION, "version");
   }
 
   private static int contractInt(Path contract, Pattern pattern, String name) throws Exception {

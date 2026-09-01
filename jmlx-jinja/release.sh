@@ -18,10 +18,11 @@ if ! grep -qE "^version[[:space:]]*=[[:space:]]*[\"']" "$MODULE/build.gradle"; t
 fi
 
 # Ask Gradle for the effective version rather than parsing build.gradle: authoritative, and not
-# fragile to formatting. `properties` emits exactly one `version:` line, but stopping sed at the
-# first match (rather than piping through `head -n 1`) means a future duplicate can't turn into a
-# silent SIGPIPE/141 abort under `set -o pipefail`.
-VERSION=$(./gradlew -q ":$MODULE:properties" | sed -n 's/^version: //p;q')
+# fragile to formatting. awk exits right after printing the match, same intent as a `sed -n
+# '...;q'` would have -- but that form is empirically unreliable here: quitting sed immediately
+# after the match races the still-writing `gradlew` process for the rest of the pipe, and lost
+# more often than not in testing. awk's `exit` doesn't have that problem.
+VERSION=$(./gradlew -q ":$MODULE:properties" | awk '/^version: /{print $2; exit}')
 if [[ -z "$VERSION" ]]; then
   echo "Could not determine the version of $MODULE" >&2
   exit 1

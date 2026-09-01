@@ -12,14 +12,17 @@ cd "$REPO_ROOT"
 # An independent release requires the module to carry its own version. Without this it silently
 # inherits the root version and every module would move in lockstep -- the exact accident this
 # tooling exists to prevent.
-if ! grep -qE "^version[[:space:]]*=[[:space:]]*'" "$MODULE/build.gradle"; then
+if ! grep -qE "^version[[:space:]]*=[[:space:]]*[\"']" "$MODULE/build.gradle"; then
   echo "$MODULE/build.gradle declares no version of its own; it would inherit the root version." >&2
   exit 1
 fi
 
 # Ask Gradle for the effective version rather than parsing build.gradle: authoritative, and not
-# fragile to formatting.
-VERSION=$(./gradlew -q ":$MODULE:properties" | sed -n 's/^version: //p' | head -n 1)
+# fragile to formatting. awk exits right after printing the match, same intent as a `sed -n
+# '...;q'` would have -- but that form is empirically unreliable here: quitting sed immediately
+# after the match races the still-writing `gradlew` process for the rest of the pipe, and lost
+# more often than not in testing. awk's `exit` doesn't have that problem.
+VERSION=$(./gradlew -q ":$MODULE:properties" | awk '/^version: /{print $2; exit}')
 if [[ -z "$VERSION" ]]; then
   echo "Could not determine the version of $MODULE" >&2
   exit 1

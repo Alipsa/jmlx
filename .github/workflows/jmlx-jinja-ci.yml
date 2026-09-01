@@ -16,6 +16,7 @@ on:
     paths:
       - 'jmlx-jinja/**'
       - 'jmlx-tokenizer/**'
+      - 'buildSrc/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle.properties'
@@ -27,6 +28,7 @@ on:
     paths:
       - 'jmlx-jinja/**'
       - 'jmlx-tokenizer/**'
+      - 'buildSrc/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle.properties'

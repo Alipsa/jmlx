@@ -101,6 +101,12 @@ public final class TemplateSyntaxException extends HfJinjaException { }
 public final class TemplateRenderException extends HfJinjaException { }
 ```
 
+**Amendment: `HfJinjaException` was renamed to `JinjaException` when this project was migrated into
+the `jmlx` repository as `jmlx-jinja`.** The package move to `se.alipsa.jmlx.jinja` was already a
+breaking change for every consumer, so the rename rode along in the same release rather than
+costing a second break later. `TemplateSyntaxException`/`TemplateRenderException` and the rest of
+this API sketch are otherwise unchanged.
+
 `render` converts and copies the supplied value graph, retaining no caller collections. Supported
 inputs are `String`, `Boolean`, `Number` as defined by R11, Java arrays, `List<?>`, and
 `Map<String, ?>`. This admits ordinary Gson/Jackson/org.json number subclasses and plain

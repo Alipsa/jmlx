@@ -112,6 +112,10 @@ Hand-written sources are Google Java Style, 2-space indent, 120-column width
 derived from Google's own upstream artifacts, with deviations documented in comments at the top of
 each file). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from
 both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — never hand-edit them.
+`buildSrc` (shared Gradle build-logic helpers, e.g. `PublishedPomDependencies`) is a second, smaller
+exemption: it is its own isolated Gradle build, so root `build.gradle`'s `subprojects{}` conventions
+never reach it. It stays hand-formatted to the same style anyway; there is just no automated check
+enforcing that today.
 
 ```sh
 ./gradlew spotlessCheck                                      # verify formatting

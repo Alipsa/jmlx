@@ -66,19 +66,8 @@ tasks.register('verifyPublishedDependencies') {
     inputs.file(pomFile)
     inputs.property('expected', expected)
     doLast {
-        def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-                .newDocumentBuilder().parse(pomFile.get().asFile)
-        def dependencyNodes = pom.getElementsByTagName('dependency')
-        def actual = []
-        for (int i = 0; i < dependencyNodes.length; i++) {
-            def dependency = dependencyNodes.item(i)
-            def field = { String name ->
-                dependency.childNodes.find {
-                    it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == name
-                }?.textContent
-            }
-            actual << "${field('groupId')}:${field('artifactId')}".toString()
-        }
+        def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                .collect { it.groupArtifact() }
         if (actual.toSorted() != expected.toSorted()) {
             throw new GradleException(
                     "Published dependencies changed. Expected ${expected.toSorted()}, " +

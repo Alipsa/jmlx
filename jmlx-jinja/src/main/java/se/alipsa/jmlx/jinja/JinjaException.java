@@ -3,8 +3,8 @@ package se.alipsa.jmlx.jinja;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Base class for all documented hfjinja failures. */
-public class HfJinjaException extends RuntimeException {
+/** Base class for all documented jmlx-jinja failures. */
+public class JinjaException extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
   /** This failure's stable category. */
@@ -20,7 +20,7 @@ public class HfJinjaException extends RuntimeException {
    * @param category the failure's stable category
    * @param location where in the source the failure occurred, or null if not applicable
    */
-  public HfJinjaException(String message, ErrorCategory category, SourceLocation location) {
+  public JinjaException(String message, ErrorCategory category, SourceLocation location) {
     super(message);
     this.category = Objects.requireNonNull(category, "category");
     this.location = location;
@@ -34,7 +34,7 @@ public class HfJinjaException extends RuntimeException {
    * @param category the failure's stable category
    * @param location where in the source the failure occurred, or null if not applicable
    */
-  public HfJinjaException(
+  public JinjaException(
       String message, Throwable cause, ErrorCategory category, SourceLocation location) {
     super(message, cause);
     this.category = Objects.requireNonNull(category, "category");

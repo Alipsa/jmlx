@@ -63,16 +63,16 @@ class CorpusDifferentialTest {
             Template.parse(record.template(), templateOptions(record))
                 .render(record.context(), options),
             label);
-      } catch (HfJinjaException error) {
+      } catch (JinjaException error) {
         throw new AssertionError(
             label + " expected text but got " + error.category() + ": " + error.getMessage(),
             error);
       }
       return;
     }
-    HfJinjaException error =
+    JinjaException error =
         assertThrows(
-            HfJinjaException.class,
+            JinjaException.class,
             () ->
                 Template.parse(record.template(), templateOptions(record))
                     .render(record.context(), options),

@@ -7,8 +7,8 @@
  */
 
 plugins {
-    id 'com.diffplug.spotless' version '8.9.0' apply false
-    id 'se.alipsa.nexus-release-plugin' version '2.2.0' apply false
+    alias(libs.plugins.spotless) apply false
+    alias(libs.plugins.nexusRelease) apply false
 }
 
 allprojects {
@@ -34,17 +34,22 @@ allprojects {
 // accessor: referencing that accessor from a root-script subprojects{} closure is an
 // implicit parent-project property lookup, deprecated as of Gradle 9.7 and an error in
 // Gradle 10 (see useJUnitJupiter below). orElseThrow with a message beats the bare .get()'s
-// context-free NoSuchElementException if the catalog alias is ever renamed.
-def junitJupiterVersion =
+// context-free NoSuchElementException if the catalog alias is ever renamed. Shared by every
+// version read below that happens inside the subprojects{} closure, for the same reason.
+def catalogVersion = { String alias ->
     rootProject.extensions
         .getByType(VersionCatalogsExtension)
         .named('libs')
-        .findVersion('junit.jupiter')
+        .findVersion(alias)
         .orElseThrow(
             () ->
                 new IllegalStateException(
-                    "build.gradle: no 'junit.jupiter' version alias in gradle/libs.versions.toml"))
+                    "build.gradle: no '${alias}' version alias in gradle/libs.versions.toml"))
         .requiredVersion
+}
+def junitJupiterVersion = catalogVersion('junit.jupiter')
+def checkstyleVersion = catalogVersion('checkstyle')
+def googleJavaFormatVersion = catalogVersion('google.java.format')
 
 subprojects {
     apply plugin: 'java'
@@ -62,7 +67,7 @@ subprojects {
     // see config/checkstyle/checkstyle.xml for the checkstyle side, which
     // derives from Google's own upstream artifact).
     checkstyle {
-        toolVersion = '13.10.0'
+        toolVersion = checkstyleVersion
         configFile = rootProject.file('config/checkstyle/checkstyle.xml')
     }
 
@@ -78,7 +83,7 @@ subprojects {
             target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
             importOrder()
             removeUnusedImports()
-            googleJavaFormat('1.28.0').reflowLongStrings()
+            googleJavaFormat(googleJavaFormatVersion).reflowLongStrings()
             trimTrailingWhitespace()
             endWithNewline()
         }
@@ -144,9 +149,22 @@ subprojects {
         apply plugin: 'signing'
         apply plugin: 'se.alipsa.nexus-release-plugin'
 
+        // Captured here, once the module's own `version = ...` line has definitely already run
+        // (afterEvaluate fires only after the whole module build.gradle has been evaluated), rather
+        // than read directly inside verifyNoSnapshotDependencies/verifyCentralCredentialsPresent's
+        // own registration closures below: those are `tasks.register` closures, whose Gradle
+        // contract only guarantees they run when the task is realized, not at registration time --
+        // relying on that alone to explain why an *earlier*-firing read would be safe is exactly the
+        // kind of reasoning burden this capture avoids.
+        def moduleName
+        def moduleVersion
+
         // The 'maven' publication is declared in the module's own build.gradle, which Gradle
         // evaluates after this block runs, so the publication cannot be referenced eagerly here.
         afterEvaluate {
+            moduleName = project.name
+            moduleVersion = project.version.toString()
+
             // Guarded lookup, not publishing.publications.maven: a future module that applies
             // 'maven-publish' but names its publication something else would otherwise hit an
             // UnknownDomainObjectException here at configuration time, breaking `./gradlew build`
@@ -186,19 +204,6 @@ subprojects {
         // so a bare `./gradlew :module:release` would report BUILD SUCCESSFUL having published
         // nothing -- only release.sh's shell-level check caught that before this task did.
         tasks.register('verifyNoSnapshotDependencies') {
-            // `project.name`/`project.version` are read here -- at configuration time, inside
-            // this registration block -- rather than from `project` inside `doLast`: `Task.project`
-            // is deprecated at execution time, unsupported under the configuration cache, and a
-            // hard error in Gradle 10. This has to be `project.name`/`project.version` rather than
-            // the bare `name`/`version` a plain project-level script statement could use, because
-            // this closure's delegate is the *task* being registered, which shadows the project's
-            // own `name` property with the task's own name ('verifyNoSnapshotDependencies') --
-            // and it has to happen inside this lazily-realized block, not at the enclosing
-            // plugins.withId('maven-publish') level, which runs as soon as the module applies the
-            // plugin, i.e. before the module's own `version = ...` line executes, and would
-            // silently capture the root project's inherited version instead of the module's own.
-            def moduleName = project.name
-            def moduleVersion = project.version.toString()
             group = 'verification'
             description = "Fails if ${moduleName}'s own version, or any dependency in its generated POM, " +
                     'is a -SNAPSHOT.'
@@ -210,21 +215,9 @@ subprojects {
                     throw new GradleException(
                             "Cannot release ${moduleName}: its own version (${moduleVersion}) is a SNAPSHOT.")
                 }
-                def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-                        .newDocumentBuilder().parse(pomFile.get().asFile)
-                def dependencyNodes = pom.getElementsByTagName('dependency')
-                def offenders = []
-                for (int i = 0; i < dependencyNodes.length; i++) {
-                    def dependency = dependencyNodes.item(i)
-                    def field = { String name ->
-                        dependency.childNodes.find {
-                            it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == name
-                        }?.textContent
-                    }
-                    if (field('version')?.endsWith('-SNAPSHOT')) {
-                        offenders << "${field('groupId')}:${field('artifactId')}:${field('version')}"
-                    }
-                }
+                def offenders = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                        .findAll { it.version()?.endsWith('-SNAPSHOT') }
+                        .collect { it.coordinates() }
                 if (!offenders.isEmpty()) {
                     throw new GradleException(
                             "Cannot release ${moduleName}: POM references SNAPSHOT dependencies: " +
@@ -242,7 +235,6 @@ subprojects {
         // is published anywhere, is cheaper than relying on every release to have credentials
         // configured correctly.
         tasks.register('verifyCentralCredentialsPresent') {
-            def moduleName = project.name
             group = 'verification'
             description = 'Fails if Central publishing credentials are missing, before anything is published.'
             doLast {

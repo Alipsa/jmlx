@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import se.alipsa.jmlx.jinja.HfJinjaException;
+import se.alipsa.jmlx.jinja.JinjaException;
 import se.alipsa.jmlx.jinja.Template;
 
 /** Renders a Hugging Face {@code chat_template} Jinja string via {@code jmlx-jinja}. */
@@ -50,7 +50,7 @@ public final class ChatTemplateRenderer {
     context.put("eos_token", eosToken);
     try {
       return chatTemplate.render(context);
-    } catch (HfJinjaException e) {
+    } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);
     }
@@ -62,7 +62,7 @@ public final class ChatTemplateRenderer {
         chatTemplate, "ChatTemplateRenderer.parse: chatTemplate must not be null");
     try {
       return Template.parse(chatTemplate);
-    } catch (HfJinjaException e) {
+    } catch (JinjaException e) {
       throw new TokenizerException("ChatTemplateRenderer.parse: failed to parse chat template", e);
     }
   }

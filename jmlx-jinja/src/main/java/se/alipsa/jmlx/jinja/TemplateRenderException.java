@@ -1,7 +1,7 @@
 package se.alipsa.jmlx.jinja;
 
 /** A host-boundary or render-time error. */
-public final class TemplateRenderException extends HfJinjaException {
+public final class TemplateRenderException extends JinjaException {
   private static final long serialVersionUID = 1L;
 
   /**

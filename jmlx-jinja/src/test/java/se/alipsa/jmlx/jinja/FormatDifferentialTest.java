@@ -52,7 +52,7 @@ class FormatDifferentialTest {
             name + " original render");
         if (matcher.group("roundTrip").equals("reformat-fails")) {
           var failure =
-              assertThrows(HfJinjaException.class, () -> Template.parse(actual).render(context));
+              assertThrows(JinjaException.class, () -> Template.parse(actual).render(context));
           assertEquals(
               ErrorCategory.valueOf(required(matcher, "reformattedCategory")),
               failure.category(),

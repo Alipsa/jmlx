@@ -1,7 +1,7 @@
 package se.alipsa.jmlx.jinja;
 
 /** A template source error. */
-public final class TemplateSyntaxException extends HfJinjaException {
+public final class TemplateSyntaxException extends JinjaException {
   private static final long serialVersionUID = 1L;
 
   /**

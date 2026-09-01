@@ -502,8 +502,7 @@ tasks.register('verifyPublicationMetadata') {
         if (contractGroupArtifact != [releaseGroup, releaseArtifact]) {
             throw new GradleException('Release contract coordinates do not match the project')
         }
-        def dependencies = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependencies' }
-        def dependencyCount = dependencies == null ? 0 : dependencies.childNodes.count { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependency' }
+        def dependencyCount = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(releaseVerificationPom.get().asFile).size()
         if (dependencyCount != contract.publishedRuntimeDependencies.size()) {
             throw new GradleException('Generated POM contains unexpected published dependencies')
         }
@@ -589,9 +588,9 @@ tasks.register('dependencyReview') {
         if (!stagedReport.present || !stagedReport.get().isFile()) {
             throw new GradleException('dependencyReview requires -PreleaseVerificationDependencyReport=<staged online dependencyUpdates report>')
         }
-        def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(releaseVerificationPom.get().asFile)
-        def dependencies = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependencies' }
-        if (dependencies != null && dependencies.childNodes.any { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == 'dependency' }) throw new GradleException('Published POM has runtime dependencies')
+        if (!se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(releaseVerificationPom.get().asFile).isEmpty()) {
+            throw new GradleException('Published POM has runtime dependencies')
+        }
         def report = dependencyReviewOutput.get().asFile
         report.parentFile.mkdirs()
         report.text = "# Dependency review\n\nStaged online scan: `${stagedReport.get()}`\n\nPublished runtime dependencies: none\n\nThe Node oracle is lock-governed and is not upgraded by this review.\n"

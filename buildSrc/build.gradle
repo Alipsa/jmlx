@@ -1,0 +1,7 @@
+// Shared build-logic helpers used by more than one build.gradle in the main build (see
+// PublishedPomDependencies). buildSrc is its own isolated Gradle build; it does not inherit the
+// main build's toolchain/checkstyle/spotless conventions from root build.gradle's subprojects{}
+// block, and deliberately stays plain enough that it doesn't need to.
+plugins {
+    id 'java'
+}

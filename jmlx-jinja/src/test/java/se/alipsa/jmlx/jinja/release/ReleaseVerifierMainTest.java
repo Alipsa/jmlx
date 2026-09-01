@@ -48,7 +48,7 @@ class ReleaseVerifierMainTest {
 
   @Test
   void rejectsWrongDaemonJdk() throws Exception {
-    var source = temporaryDirectory.resolve("hfjinja-release-environment");
+    var source = temporaryDirectory.resolve("jmlx-jinja-release-environment");
     Files.createDirectories(source.resolve("req"));
     Files.createDirectories(source.resolve("upstream"));
     Files.writeString(source.resolve("req/release-verification.json"), "{\"jdkMajor\":21}");
@@ -63,9 +63,9 @@ class ReleaseVerifierMainTest {
 
   @Test
   void rejectsConsumerWithPluginRepository() throws Exception {
-    var consumer = Files.createDirectories(temporaryDirectory.resolve("hfjinja-consumer"));
-    var candidate = Files.createDirectories(temporaryDirectory.resolve("hfjinja-candidate"));
-    var repository = Files.createDirectories(temporaryDirectory.resolve("hfjinja-repository"));
+    var consumer = Files.createDirectories(temporaryDirectory.resolve("jmlx-jinja-consumer"));
+    var candidate = Files.createDirectories(temporaryDirectory.resolve("jmlx-jinja-candidate"));
+    var repository = Files.createDirectories(temporaryDirectory.resolve("jmlx-jinja-repository"));
     Files.writeString(candidate.resolve("gradlew"), "#!/bin/sh\n");
     Files.writeString(
         consumer.resolve("settings.gradle"),
@@ -83,7 +83,7 @@ class ReleaseVerifierMainTest {
 
   @Test
   void rejectsArchiveEvidenceWithoutMainJar() throws Exception {
-    var evidence = temporaryDirectory.resolve("hfjinja-archive-evidence.json");
+    var evidence = temporaryDirectory.resolve("jmlx-jinja-archive-evidence.json");
     Files.writeString(evidence, "{\"archives\":[]}");
     assertThrows(
         IllegalStateException.class,
@@ -93,7 +93,7 @@ class ReleaseVerifierMainTest {
 
   @Test
   void rejectsNonIdenticalArchiveEvidence() throws Exception {
-    var evidence = temporaryDirectory.resolve("hfjinja-archive-mismatch.json");
+    var evidence = temporaryDirectory.resolve("jmlx-jinja-archive-mismatch.json");
     Files.writeString(
         evidence,
         "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\""

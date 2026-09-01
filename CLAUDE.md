@@ -73,6 +73,32 @@ in its own JVM against a disposable copy of the native dir with `mlx.metallib` e
 from the regular `test` task because `NativeLoader.ensureLoaded()` caches its outcome, so it would race
 every other native test over the real staging directory if run in the same JVM.
 
+## Releasing a module
+
+`jmlx-jinja` and `jmlx-tokenizer` are published to Maven Central independently of each other and
+of the root project's version. Each has its own `release.sh`; the other three modules are not
+published (`jmlx-core`/`jmlx-ffi` would need native-artifact packaging designed first, and
+`jmlx-examples` is a demo).
+
+```sh
+./jmlx-jinja/release.sh        # publishes se.alipsa:jmlx-jinja
+./jmlx-tokenizer/release.sh    # publishes se.alipsa:jmlx-tokenizer
+```
+
+Both scripts refuse to publish a `-SNAPSHOT`, and refuse a module that has no `version` line of
+its own (which would mean it is silently riding the root version). To release: set the module's
+version to a release value, run its `release.sh`, then bump it to the next `-SNAPSHOT`. Version
+bumping is deliberately manual.
+
+**Release order matters.** `jmlx-tokenizer` depends on `jmlx-jinja` via `api project(...)`, which
+Gradle publishes as a concrete coordinate. `verifyNoSnapshotDependencies` fails the tokenizer
+release while jinja is still a SNAPSHOT, so jinja must be released first.
+
+Signing and Central credentials come from Gradle properties (`signing.keyId`,
+`sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is
+inert when `signing.keyId` is absent, so `check` and CI stay keyless. Releasing is a local,
+credentialed, manual action — CI verifies but never publishes.
+
 ## Code style
 
 Hand-written sources are Google Java Style, 2-space indent, 120-column width
@@ -133,6 +159,14 @@ byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-ji
 former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
 Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
 below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
+
+Both are also the only **published** modules, and each carries its own version independent of the
+root's `0.5.0-SNAPSHOT`: `jmlx-jinja` is `0.6.0-SNAPSHOT` (continuing the archived hfjinja
+project's line) and `jmlx-tokenizer` is `0.1.0-SNAPSHOT`. Both override the toolchain to **Java
+21** rather than inheriting the root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s
+Panama FFM, and neither pure-Java module needs it, so targeting 21 keeps the published artifacts
+usable by Java 21 consumers. `jmlx-tokenizer`'s `verifyBytecodeLevel` task enforces this. See
+"Releasing a module" above.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless

@@ -1,6 +1,6 @@
 # Independent module releases — design
 
-Status: approved, not yet implemented. Date: 2026-09-01.
+Status: implemented. Date: 2026-09-01.
 
 Scope: make `jmlx-jinja` and `jmlx-tokenizer` independently releasable to Maven Central, each
 driven by its own `release.sh`. No other module is in scope.

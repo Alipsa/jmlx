@@ -113,10 +113,13 @@ separate Spotless config file); linting is `config/checkstyle/checkstyle.xml`, d
 checkstyle's own bundled `google_checks.xml` with deviations documented in a comment at the top of
 that file. The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from
 both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — never hand-edit them.
-`buildSrc` (shared Gradle build-logic helpers, e.g. `PublishedPomDependencies`) is a second, smaller
-exemption: it is its own isolated Gradle build, so root `build.gradle`'s `subprojects{}` conventions
-never reach it. It stays hand-formatted to the same style anyway; there is just no automated check
-enforcing that today.
+`buildSrc` (shared Gradle build-logic helpers, e.g. `PublishedPomDependencies`) is its own isolated
+Gradle build, so root `build.gradle`'s `subprojects{}` conventions never reach it -- it applies the
+same checkstyle/Spotless configuration independently in its own `buildSrc/build.gradle` instead
+(duplicating the two tool versions, since it can't read the main build's
+`gradle/libs.versions.toml` either). That check is not wired into the main build's own
+`check`/`build` -- buildSrc is a separate Gradle build with no automatic cross-invocation -- so run
+it explicitly: `./gradlew -p buildSrc check`.
 
 ```sh
 ./gradlew spotlessCheck                                      # verify formatting

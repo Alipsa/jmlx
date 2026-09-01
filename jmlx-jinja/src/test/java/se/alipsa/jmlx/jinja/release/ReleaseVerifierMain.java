@@ -97,7 +97,8 @@ public final class ReleaseVerifierMain {
           "corpusCoverage",
           "formatGoldenVerify",
           "fuzzParserVerify");
-      verifyRequiredTaskEvidence(candidateModule, source.resolve("req/release-verification.json"));
+      verifyRequiredTaskEvidence(
+          candidateModule, candidateModule.resolve("req/release-verification.json"));
       gradle(
           candidateModule,
           userHome,
@@ -132,7 +133,7 @@ public final class ReleaseVerifierMain {
           status,
           allowDirty,
           worktree,
-          source,
+          candidateModule,
           published,
           resolvedDigest,
           coordinates,
@@ -345,7 +346,7 @@ public final class ReleaseVerifierMain {
       String status,
       boolean allowDirty,
       Path worktree,
-      Path source,
+      Path candidateModule,
       Path published,
       String resolvedDigest,
       String coordinates,
@@ -358,11 +359,15 @@ public final class ReleaseVerifierMain {
     String candidate =
         status.isBlank() && !allowDirty ? "PASSING CANDIDATE" : "NOT A RELEASE CANDIDATE";
     String javaVersion = daemonVendor + " " + daemonVersion + " (" + daemonJavaHome + ")";
-    String nodeVersion = output(source, "node", "--version").trim();
+    String nodeVersion = output(candidateModule, "node", "--version").trim();
+    // Read from the candidate worktree, not the live source checkout: this report describes the
+    // verified candidate, and under -PreleaseVerificationAllowDirty an uncommitted edit to a
+    // policy document (or to the policyInputs list itself) would otherwise be hashed into a report
+    // that is explicitly labeled "NOT A RELEASE CANDIDATE" as if it belonged to the candidate.
     List<String> policyInputs =
-        stringArray(source.resolve("req/release-verification.json"), "policyInputs");
+        stringArray(candidateModule.resolve("req/release-verification.json"), "policyInputs");
     policyInputs.add("upstream/upstream-lock.json");
-    String reviewInputs = digests(source, policyInputs);
+    String reviewInputs = digests(candidateModule, policyInputs);
     String body =
         "# Release verification\n\nStatus: "
             + candidate

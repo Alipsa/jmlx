@@ -272,10 +272,21 @@ subprojects {
         tasks.register('verifyReleaseScriptsMatch') {
             group = 'verification'
             description = 'Fails if any releasable module\'s release.sh has drifted from the others.'
-            def repoRoot = rootProject.layout.projectDirectory.asFile
-            inputs.files(fileTree(rootProject.layout.projectDirectory) { include '*/release.sh' })
+            // The declared subprojects' own directories (from settings.gradle, resolved at
+            // configuration time, independent of each subproject's own build-script evaluation
+            // order) -- not a filesystem scan of the whole repo root, which would also sweep in
+            // any unrelated release.sh a non-module directory (native/, scripts/, a vendored
+            // tree) might someday contain.
+            def moduleDirs = rootProject.subprojects.collect { it.projectDir }
+            def releaseScripts = moduleDirs.collect { new File(it, 'release.sh') }.findAll { it.isFile() }
+            def marker = layout.buildDirectory.file('verifyReleaseScriptsMatch/verified')
+            inputs.files(releaseScripts)
+            outputs.file(marker)
             doLast {
-                se.alipsa.jmlx.buildsrc.ReleaseScripts.assertAllMatch(repoRoot)
+                se.alipsa.jmlx.buildsrc.ReleaseScripts.assertAllMatch(moduleDirs)
+                def markerFile = marker.get().asFile
+                markerFile.parentFile.mkdirs()
+                markerFile.text = 'verified\n'
             }
         }
 

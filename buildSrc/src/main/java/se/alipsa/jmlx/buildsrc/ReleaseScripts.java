@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -12,24 +13,24 @@ import java.util.List;
  *
  * <p>Each module's own copy derives its module name from its own directory (see release.sh's own
  * header comment), so there is nothing module-specific to keep in sync -- any difference between
- * copies is drift, not an intentional variant. Discovering the set by scanning for {@code
- * <child>/release.sh} rather than naming the current two modules keeps this honest as modules are
- * added or removed, and keeps every module's own check self-contained (no cross-project task
- * dependency on a shared root-level task).
+ * copies is drift, not an intentional variant. The caller passes the exact set of module
+ * directories to check (the declared subprojects, resolved from settings.gradle at configuration
+ * time), not a filesystem scan of the whole repo root -- this stays honest as modules are added or
+ * removed without also sweeping in an unrelated release.sh some other top-level directory (a
+ * vendored tree, a tooling dir) might someday contain.
  */
 public final class ReleaseScripts {
 
   private ReleaseScripts() {}
 
-  /** Throws if two or more {@code <child>/release.sh} files directly under {@code repoRoot} differ. */
-  public static void assertAllMatch(File repoRoot) throws IOException {
-    File[] children = repoRoot.listFiles(File::isDirectory);
-    if (children == null) {
-      return;
-    }
+  /**
+   * Throws if two or more {@code release.sh} files directly under the given {@code moduleDirs}
+   * differ. Directories without a {@code release.sh} are silently skipped.
+   */
+  public static void assertAllMatch(List<File> moduleDirs) throws IOException {
     List<File> scripts = new ArrayList<>();
-    for (File child : children) {
-      File script = new File(child, "release.sh");
+    for (File moduleDir : moduleDirs) {
+      File script = new File(moduleDir, "release.sh");
       if (script.isFile()) {
         scripts.add(script);
       }
@@ -37,6 +38,9 @@ public final class ReleaseScripts {
     if (scripts.size() < 2) {
       return;
     }
+    // Sorted so the "byte-identical to" reference in the failure message is stable across
+    // machines instead of depending on filesystem/collection iteration order.
+    scripts.sort(Comparator.comparing(File::getPath));
     File first = scripts.get(0);
     byte[] firstBytes = Files.readAllBytes(first.toPath());
     List<String> mismatched = new ArrayList<>();

@@ -100,8 +100,10 @@ tasks.register('verifyBytecodeLevel') {
     inputs.dir(classesDir)
     doLast {
         def offenders = []
+        def classFileCount = 0
         classesDir.get().asFile.eachFileRecurse { file ->
             if (file.name.endsWith('.class')) {
+                classFileCount++
                 file.withDataInputStream { input ->
                     input.readInt()          // 0xCAFEBABE
                     input.readUnsignedShort() // minor
@@ -111,6 +113,15 @@ tasks.register('verifyBytecodeLevel') {
                     }
                 }
             }
+        }
+        // eachFileRecurse iterates zero times over a directory that exists but is empty --
+        // without this check a misconfigured source set or a relocated output directory (e.g.
+        // after a Gradle upgrade) would leave offenders empty and this task would report
+        // BUILD SUCCESSFUL having verified nothing, the exact silent-guard failure this task
+        // exists to prevent.
+        if (classFileCount == 0) {
+            throw new GradleException(
+                    "Expected to find compiled .class files under ${classesDir.get().asFile} but found none.")
         }
         if (!offenders.isEmpty()) {
             throw new GradleException(

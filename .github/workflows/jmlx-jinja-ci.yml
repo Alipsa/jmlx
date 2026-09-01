@@ -1,6 +1,8 @@
-# jmlx-jinja is a dependency-free, pure-Java module (no native/Apple Silicon requirement),
-# so this workflow runs on ubuntu-latest and is scoped to just that module -- it does not
-# attempt to cover jmlx-core/jmlx-ffi's native, macOS-only test suites.
+# jmlx-jinja and jmlx-tokenizer are both dependency-free, pure-Java modules (no native/Apple
+# Silicon requirement), so this workflow runs on ubuntu-latest and is scoped to just those two --
+# it does not attempt to cover jmlx-core/jmlx-ffi's native, macOS-only test suites. jmlx-tokenizer
+# is included because it declares `api project(':jmlx-jinja')`, so a jinja API change is most
+# likely to break it first.
 #
 # The Node-dependent tasks (see jmlx-jinja/build.gradle's nodeDependentTasks list) require the
 # exact Node version pinned in jmlx-jinja/upstream/upstream-lock.json and are not wired into
@@ -13,11 +15,26 @@ on:
     branches: [main]
     paths:
       - 'jmlx-jinja/**'
+      - 'jmlx-tokenizer/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/**'
+      - 'config/checkstyle/checkstyle.xml'
       - '.github/workflows/jmlx-jinja-ci.yml'
   pull_request:
     paths:
       - 'jmlx-jinja/**'
+      - 'jmlx-tokenizer/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/**'
+      - 'config/checkstyle/checkstyle.xml'
       - '.github/workflows/jmlx-jinja-ci.yml'
+
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -36,10 +53,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Run jmlx-jinja check and Node-oracle differential verification
+      - name: Run jmlx-jinja/jmlx-tokenizer check and Node-oracle differential verification
         run: |
           ./gradlew --no-configuration-cache \
             :jmlx-jinja:check \
+            :jmlx-tokenizer:test \
             :jmlx-jinja:nodeCorpusTest \
             :jmlx-jinja:nodeOracleVersion \
             :jmlx-jinja:nodeCorpusVerify \

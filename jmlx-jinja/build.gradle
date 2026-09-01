@@ -531,13 +531,31 @@ tasks.register('verifyModuleDescriptor') {
     }
 }
 
-// examples/tokenizer-config is a standalone usage sample, not part of the published jar --
-// this task only guards that it keeps compiling against the current public API.
+abstract class ExampleModulePathArguments implements CommandLineArgumentProvider {
+    @InputFile
+    @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getModuleJar()
+
+    @Override
+    Iterable<String> asArguments() {
+        ['--module-path', moduleJar.get().asFile.absolutePath, '--add-modules', 'se.alipsa.jmlx.jinja']
+    }
+}
+
+// examples/tokenizer-config is a standalone usage sample, not part of the published jar -- this
+// task only guards that it keeps compiling against the published module (module path, not
+// classpath, so a regression in module-info.java's exports fails this the same way it would fail
+// a real consumer following the README's `requires se.alipsa.jmlx.jinja;` usage).
 tasks.register('compileTokenizerConfigExample', JavaCompile) {
     group = 'verification'
-    description = 'Compiles the tokenizer-config example against the built jmlx-jinja classes.'
-    source = fileTree('examples/tokenizer-config') { include '*.java' }
-    classpath = sourceSets.main.output
+    description = 'Compiles the tokenizer-config example against the published jmlx-jinja module.'
+    dependsOn tasks.named('jar')
+    source = fileTree('examples/tokenizer-config') { include '**/*.java' }
+    classpath = files()
+    options.release = 21
+    def modulePathArguments = objects.newInstance(ExampleModulePathArguments)
+    modulePathArguments.moduleJar.set(tasks.named('jar').flatMap { it.archiveFile })
+    options.compilerArgumentProviders.add(modulePathArguments)
     destinationDirectory = layout.buildDirectory.dir('classes/examples/tokenizerConfig')
 }
 

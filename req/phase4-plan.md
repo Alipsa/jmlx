@@ -17,7 +17,7 @@
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | [PR #10](https://github.com/Alipsa/jmlx/pull/10), `59c9afe`, see req/plans/phase4-m3-plan.md |
 | M4 — `QuantizedLinear` (§8) | **Done** | this branch, see req/plans/phase4-m4-plan.md |
 | §9 — Documentation | **Done** | this branch, req/plans/phase4-m4-plan.md Task 3 |
-| §10 — CI, hosted ARM64 runner workflow (see note below) | **Workflow added; branch protection pending** | `native-ci.yml` |
+| §10 — CI, hosted ARM64 runner workflow (see note below) | **Workflow added; branch protection pending** | `jmlx-jinja-ci.yml` (`CI` workflow) |
 
 **M0d note.** Implemented only the ops its own "ops added at this merge point" list names
 (`array(scope, int[], int[])`, `zeros`, `ones`, `full`, `arange`, `stopGradient`) — deliberately
@@ -1077,21 +1077,23 @@ the plan that will act on it.
   the self-hosted-only premise above is obsolete. The runner is a fresh VM for every job, which means
   the workflow bootstraps the pinned MLX runtime before testing rather than relying on a pre-staged
   directory. See GitHub's [runner documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories).
-* **Scope:** run `./gradlew build` (which already chains `spotlessCheck`, `checkstyleMain`,
-  `checkstyleTest`, and every module's test suite) on pull-request updates against `main` and pushes
-  to `main`, then make that check required in branch protection so a red run blocks merge instead of
-  only a red local terminal.
+* **Scope:** one `CI` workflow runs two jobs on pull-request updates against `main` and pushes to
+  `main`: `java` runs the pure-Java Jinja/tokenizer checks and Node-oracle verification on Ubuntu;
+  `native` bootstraps MLX then runs the FFI/core/examples checks on hosted ARM64 macOS. This avoids
+  repeating the Jinja suite on macOS while retaining all native coverage. Make both checks required
+  in branch protection so a red run blocks merge instead of only a red local terminal.
 * **Fallback considered and rejected as the primary fix:** a local pre-push git hook running
   `./gradlew build`. Cheaper to set up, but it protects only pushes from a machine that has the hook
   installed — it does nothing for a PR pushed from elsewhere, and unlike a required CI check it is not
   visible on the PR page. Worth keeping as a fast local backstop *in addition to* the runner, not
   instead of it.
 
-**Implementation status:** `.github/workflows/native-ci.yml` now runs on GitHub-hosted `macos-26`,
-uses JDK 25, bootstraps the pinned native runtime with `scripts/bootstrap-native.sh`, and then runs
-`./gradlew build` for pull requests into `main` and pushes to `main`. Bootstrap failure fails the job,
-so native tests cannot be silently skipped. Configuring `Native CI / build` as a required
-branch-protection check remains repository-admin configuration outside this working tree.
+**Implementation status:** `.github/workflows/jmlx-jinja-ci.yml` defines the consolidated `CI`
+workflow. Its `native` job runs on GitHub-hosted `macos-26`, uses JDK 25, and bootstraps the pinned
+runtime with `scripts/bootstrap-native.sh`; bootstrap failure fails the job. Its Gradle invocation
+uses `--no-build-cache`, so native tests cannot be reported green from restored task output.
+Configuring the `CI / java` and `CI / native` checks as required branch-protection checks remains
+repository-admin configuration outside this working tree.
 
 ## Testing approach
 

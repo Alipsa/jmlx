@@ -72,8 +72,8 @@ public abstract class DecoderModel extends Module {
         child(
             "norm", new RMSNorm(scope, tensor(tensors, "model.norm.weight"), config.rmsNormEps()));
     MLXArray headWeight = tensors.get("lm_head.weight");
-    tiedOutput = headWeight == null && config.tieWordEmbeddings();
-    if (headWeight == null && !tiedOutput) {
+    tiedOutput = config.tieWordEmbeddings();
+    if (!tiedOutput && headWeight == null) {
       throw new IllegalArgumentException("checkpoint missing lm_head.weight");
     }
     lmHead = tiedOutput ? null : child("lmHead", new Linear(scope, headWeight, null));
@@ -147,7 +147,7 @@ public abstract class DecoderModel extends Module {
    */
   public final String generateText(
       HfTokenizer tokenizer, String prompt, int maxNewTokens, Set<Integer> eosTokenIds) {
-    return generateText(tokenizer, prompt, false, maxNewTokens, eosTokenIds);
+    return generateText(tokenizer, prompt, true, maxNewTokens, eosTokenIds);
   }
 
   /**

@@ -39,7 +39,9 @@ public record DecoderConfig(
     }
     int hiddenSize = requiredInt(node, "hidden_size");
     int heads = requiredInt(node, "num_attention_heads");
-    if (node.has("head_dim") && node.get("head_dim").intValue() * heads != hiddenSize) {
+    if (node.hasNonNull("head_dim")
+        && (!node.get("head_dim").canConvertToInt()
+            || node.get("head_dim").intValue() * heads != hiddenSize)) {
       throw new IllegalArgumentException(
           "config.json head_dim * num_attention_heads must equal hidden_size");
     }

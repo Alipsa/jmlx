@@ -55,7 +55,7 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-examples
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
@@ -178,6 +178,10 @@ byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-ji
 former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
 Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
 below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
+
+**`jmlx-models` is in the native chain.** It depends on `jmlx-core` for MLX inference and on
+`jmlx-tokenizer` for prompt encoding/decoding, so model loading and generation require the native
+bootstrap and participate in the same loading-order guarantees as `jmlx-core`.
 
 Both are also the only **published** modules, and each carries its own version independent of the
 root's `0.5.0-SNAPSHOT`: `jmlx-jinja` is `0.6.0-SNAPSHOT` (continuing the archived hfjinja

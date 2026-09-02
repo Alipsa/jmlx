@@ -16,7 +16,8 @@ final class CheckpointLoader {
 
   static Map<String, MLXArray> load(MLXScope scope, Path directory) throws IOException {
     Map<String, MLXArray> tensors = new LinkedHashMap<>();
-    for (Path file : checkpointFiles(directory)) {
+    java.util.List<Path> checkpointFiles = checkpointFiles(directory);
+    for (Path file : checkpointFiles) {
       for (var entry : MLXIO.loadSafetensors(scope, file.toString()).tensors().entrySet()) {
         if (tensors.putIfAbsent(entry.getKey(), entry.getValue()) != null) {
           throw new IllegalArgumentException(
@@ -24,13 +25,16 @@ final class CheckpointLoader {
         }
       }
     }
-    if (tensors.isEmpty())
-      throw new IllegalArgumentException("no .safetensors files in " + directory);
+    if (tensors.isEmpty()) {
+      throw new IllegalArgumentException(
+          "checkpoint contained no tensors" + (checkpointFiles.isEmpty() ? " or safetensors files" : ""));
+    }
     return tensors;
   }
 
   private static java.util.List<Path> checkpointFiles(Path directory) throws IOException {
-    Path index = directory.resolve("model.safetensors.index.json");
+    Path root = directory.toAbsolutePath().normalize();
+    Path index = root.resolve("model.safetensors.index.json");
     if (Files.isRegularFile(index)) {
       JsonNode weights = new ObjectMapper().readTree(index.toFile()).path("weight_map");
       if (!weights.isObject())
@@ -39,15 +43,18 @@ final class CheckpointLoader {
       java.util.HashSet<String> names = new java.util.HashSet<>();
       weights.properties().forEach(entry -> names.add(entry.getValue().asString()));
       for (String name : names.stream().sorted().toList()) {
-        Path file = directory.resolve(name).normalize();
-        if (!file.startsWith(directory.normalize()) || !Files.isRegularFile(file)) {
-          throw new IllegalArgumentException("safetensors index references missing shard " + name);
+        Path file = root.resolve(name).normalize();
+        if (!file.startsWith(root)) {
+          throw new IllegalArgumentException("safetensors index shard escapes checkpoint directory: " + name);
+        }
+        if (!Files.isRegularFile(file)) {
+          throw new IllegalArgumentException("safetensors index references missing regular shard " + name);
         }
         files.add(file);
       }
       return files;
     }
-    try (var files = Files.list(directory)) {
+    try (var files = Files.list(root)) {
       return files
           .filter(p -> p.getFileName().toString().endsWith(".safetensors"))
           .sorted()

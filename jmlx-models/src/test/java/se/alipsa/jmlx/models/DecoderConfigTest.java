@@ -35,4 +35,23 @@ class DecoderConfigTest {
         IllegalArgumentException.class,
         () -> new DecoderConfig("llama", 8, 10, 16, 1, 3, 2, 1e-6f, 10_000f, false));
   }
+
+  @Test
+  void acceptsNullHeadDimButRejectsUnsupportedRopeScaling(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    Files.writeString(
+        config,
+        """
+        {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"head_dim":null}
+        """);
+    assertEquals(4, DecoderConfig.fromFile(config).hiddenSize());
+    Files.writeString(
+        config,
+        """
+        {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"rope_scaling":{"type":"linear"}}
+        """);
+    assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+  }
 }

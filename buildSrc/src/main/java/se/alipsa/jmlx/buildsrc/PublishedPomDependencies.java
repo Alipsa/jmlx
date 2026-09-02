@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Node;
 
@@ -36,7 +37,7 @@ public final class PublishedPomDependencies {
 
   /** Reads the direct {@code <project>/<dependencies>/<dependency>} elements in {@code pomFile}. */
   public static List<Dependency> read(File pomFile) throws Exception {
-    var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pomFile);
+    var document = document(pomFile);
     List<Dependency> result = new ArrayList<>();
     Node dependencies = child(document.getDocumentElement(), "dependencies");
     if (dependencies == null) {
@@ -59,7 +60,7 @@ public final class PublishedPomDependencies {
 
   /** Returns the direct {@code <project>} child-element texts, keyed by element name. */
   public static Map<String, String> directChildTexts(File pomFile) throws Exception {
-    var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pomFile);
+    var document = document(pomFile);
     Map<String, String> result = new LinkedHashMap<>();
     Node project = document.getDocumentElement();
     for (Node child = project.getFirstChild(); child != null; child = child.getNextSibling()) {
@@ -68,6 +69,16 @@ public final class PublishedPomDependencies {
       }
     }
     return result;
+  }
+
+  private static org.w3c.dom.Document document(File pomFile) throws Exception {
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+    factory.setXIncludeAware(false);
+    factory.setExpandEntityReferences(false);
+    return factory.newDocumentBuilder().parse(pomFile);
   }
 
   private static Node child(Node parent, String name) {

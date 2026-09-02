@@ -1,0 +1,11 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api project(':jmlx-core')
+    api project(':jmlx-tokenizer')
+    implementation libs.jackson.databind
+
+    testImplementation testFixtures(project(':jmlx-ffi'))
+}

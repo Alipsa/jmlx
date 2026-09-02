@@ -252,6 +252,22 @@ public final class MLXOps {
   }
 
   /**
+   * Index of the largest value along {@code axis}. The result has dtype {@link DType#INT32}; set
+   * {@code keepdims} to retain the reduced axis as a singleton dimension. This is intentionally a
+   * native reduction rather than a Java-side scan of {@link MLXArray#toFloatArray()}, so greedy
+   * decoding can select its next token without copying an entire vocabulary's logits back from the
+   * GPU.
+   */
+  public static MLXArray argmaxAxis(MLXArray a, int axis, boolean keepdims) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "argmaxAxis",
+        () -> mlx_h.mlx_argmax_axis(res, a.handle(), axis, keepdims, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /**
    * Mean reduction along specified axes. {@code keepdims} controls whether reduced axes are kept as
    * singleton dimensions (true) or removed (false).
    */

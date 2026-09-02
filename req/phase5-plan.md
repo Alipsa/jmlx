@@ -532,6 +532,8 @@ decoder blocks. `generate(prompt, maxNewTokens, eosTokenIds)` keeps per-layer KV
 scope and greedily selects the next token from the final-position logits. `generateText` directly
 combines this with M2's `HfTokenizer`; callers can render a chat prompt first with
 `ChatTemplateRenderer`.
+Models declaring Hugging Face `rope_scaling` are explicitly rejected until scaled RoPE is implemented;
+this currently excludes Llama 3.1+ configurations.
 
 ## Testing approach
 

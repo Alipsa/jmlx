@@ -28,7 +28,9 @@ final class CheckpointLoader {
     if (tensors.isEmpty()) {
       throw new IllegalArgumentException(
           "checkpoint contained no tensors"
-              + (checkpointFiles.isEmpty() ? " or safetensors files" : ""));
+              + (checkpointFiles.isEmpty() ? " or safetensors files" : "")
+              + " in "
+              + directory.toAbsolutePath().normalize());
     }
     return tensors;
   }
@@ -42,7 +44,16 @@ final class CheckpointLoader {
         throw new IllegalArgumentException("invalid safetensors index: missing weight_map");
       java.util.List<Path> files = new java.util.ArrayList<>();
       java.util.HashSet<String> names = new java.util.HashSet<>();
-      weights.properties().forEach(entry -> names.add(entry.getValue().asString()));
+      weights
+          .properties()
+          .forEach(
+              entry -> {
+                if (!entry.getValue().isString()) {
+                  throw new IllegalArgumentException(
+                      "invalid safetensors index: weight_map values must be strings");
+                }
+                names.add(entry.getValue().asString());
+              });
       for (String name : names.stream().sorted().toList()) {
         Path file = root.resolve(name).normalize();
         if (!file.startsWith(root)) {

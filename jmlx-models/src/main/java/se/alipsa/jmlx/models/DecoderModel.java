@@ -72,7 +72,9 @@ public abstract class DecoderModel extends Module {
         child(
             "norm", new RMSNorm(scope, tensor(tensors, "model.norm.weight"), config.rmsNormEps()));
     MLXArray headWeight = tensors.get("lm_head.weight");
-    tiedOutput = config.tieWordEmbeddings();
+    // Prefer an explicit output head: some converted fine-tunes leave the source model's
+    // tie_word_embeddings flag set after untying and training lm_head.
+    tiedOutput = headWeight == null && config.tieWordEmbeddings();
     if (!tiedOutput && headWeight == null) {
       throw new IllegalArgumentException("checkpoint missing lm_head.weight");
     }
@@ -143,7 +145,8 @@ public abstract class DecoderModel extends Module {
 
   /**
    * Encodes {@code prompt}, greedily generates text, then decodes only the newly generated token
-   * ids. For chat models, render the chat prompt with M2's {@code ChatTemplateRenderer} first.
+   * ids, adding the tokenizer's normal special tokens. For an already-rendered chat prompt, use the
+   * overload with {@code addSpecialTokens=false}.
    */
   public final String generateText(
       HfTokenizer tokenizer, String prompt, int maxNewTokens, Set<Integer> eosTokenIds) {

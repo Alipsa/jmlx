@@ -14,7 +14,7 @@ Research findings section below leans on that same precedent for M1's own C-stri
 |---|---|---|
 | M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
 | M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus chat-template rendering through the local `jmlx-jinja` module, `se.alipsa.jmlx.jinja.Template`; its only external dependency is `tools.jackson.core:jackson-databind:3.1.2`) | Tasks 1-14 on `phase5-m2-tokenizer` (not yet merged to `main`) |
-| M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | **Done** — `jmlx-models` loads single or sharded Hugging Face safetensors, maps Llama/Qwen2 decoder weights, and provides cache-backed greedy generation | Working tree (pending commit) |
+| M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | **Done** — `jmlx-models` loads single or sharded Hugging Face safetensors, maps Llama/Qwen2 decoder weights, and provides cache-backed greedy generation | PR #16 (`764347b`, `9df0056`) |
 
 ## Context
 
@@ -529,8 +529,9 @@ built.
 `.safetensors` shard in the directory into the supplied model scope, and map the standard
 `model.layers.*` names to pre-norm RMS, grouped-query attention, rotary embeddings, and SwiGLU
 decoder blocks. `generate(prompt, maxNewTokens, eosTokenIds)` keeps per-layer KV caches in a child
-scope and greedily selects the next token from the final-position logits. `HfTokenizer` remains the
-companion API for encoding prompts and decoding generated IDs.
+scope and greedily selects the next token from the final-position logits. `generateText` directly
+combines this with M2's `HfTokenizer`; callers can render a chat prompt first with
+`ChatTemplateRenderer`.
 
 ## Testing approach
 

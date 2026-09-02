@@ -18,6 +18,7 @@ import se.alipsa.jmlx.nn.Linear;
 import se.alipsa.jmlx.nn.Module;
 import se.alipsa.jmlx.nn.RMSNorm;
 import se.alipsa.jmlx.nn.SwiGLU;
+import se.alipsa.jmlx.tokenizer.HfTokenizer;
 
 /** Inference-only pre-norm decoder shared by Llama and Qwen2 checkpoints. */
 public abstract class DecoderModel extends Module {
@@ -125,6 +126,20 @@ public abstract class DecoderModel extends Module {
       }
     }
     return List.copyOf(result);
+  }
+
+  /**
+   * Encodes {@code prompt}, greedily generates text, then decodes only the newly generated token
+   * ids. For chat models, render the chat prompt with M2's {@code ChatTemplateRenderer} first.
+   */
+  public final String generateText(
+      HfTokenizer tokenizer, String prompt, int maxNewTokens, Set<Integer> eosTokenIds) {
+    Objects.requireNonNull(tokenizer, "tokenizer");
+    Objects.requireNonNull(prompt, "prompt");
+    List<Integer> promptIds = tokenizer.encode(prompt, true);
+    int[] input = promptIds.stream().mapToInt(Integer::intValue).toArray();
+    List<Integer> allIds = generate(input, maxNewTokens, eosTokenIds);
+    return tokenizer.decode(allIds.subList(promptIds.size(), allIds.size()), true);
   }
 
   private static MLXArray tensor(Map<String, MLXArray> tensors, String name) {

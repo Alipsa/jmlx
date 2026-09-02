@@ -27,7 +27,8 @@ final class CheckpointLoader {
     }
     if (tensors.isEmpty()) {
       throw new IllegalArgumentException(
-          "checkpoint contained no tensors" + (checkpointFiles.isEmpty() ? " or safetensors files" : ""));
+          "checkpoint contained no tensors"
+              + (checkpointFiles.isEmpty() ? " or safetensors files" : ""));
     }
     return tensors;
   }
@@ -45,10 +46,12 @@ final class CheckpointLoader {
       for (String name : names.stream().sorted().toList()) {
         Path file = root.resolve(name).normalize();
         if (!file.startsWith(root)) {
-          throw new IllegalArgumentException("safetensors index shard escapes checkpoint directory: " + name);
+          throw new IllegalArgumentException(
+              "safetensors index shard escapes checkpoint directory: " + name);
         }
         if (!Files.isRegularFile(file)) {
-          throw new IllegalArgumentException("safetensors index references missing regular shard " + name);
+          throw new IllegalArgumentException(
+              "safetensors index references missing regular shard " + name);
         }
         files.add(file);
       }

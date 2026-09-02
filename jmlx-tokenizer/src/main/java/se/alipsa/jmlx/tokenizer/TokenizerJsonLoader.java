@@ -22,7 +22,12 @@ public final class TokenizerJsonLoader {
 
   private TokenizerJsonLoader() {}
 
-  /** Loads and parses {@code path} as a byte-level-BPE {@code tokenizer.json}. */
+  /**
+   * Loads and parses {@code path} as a byte-level-BPE {@code tokenizer.json}.
+   *
+   * @param path tokenizer configuration file
+   * @return parsed tokenizer configuration
+   */
   public static TokenizerJson load(Path path) {
     Objects.requireNonNull(path, "TokenizerJsonLoader.load: path must not be null");
     try {
@@ -241,7 +246,7 @@ public final class TokenizerJsonLoader {
         v.path("tokens")
             .forEach(
                 tokenNode -> {
-                  if (tokenNode.isNull() || !tokenNode.isTextual()) {
+                  if (tokenNode.isNull() || !tokenNode.isString()) {
                     throw new TokenizerException(
                         "TokenizerJsonLoader: TemplateProcessing special token '"
                             + entry.getKey()

@@ -488,12 +488,9 @@ tasks.register('verifyPublicationMetadata') {
     inputs.properties(group: releaseGroup, artifact: releaseArtifact, version: releaseVersion)
     doLast {
         def contract = new groovy.json.JsonSlurper().parse(releaseVerificationManifest)
-        def pom = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(releaseVerificationPom.get().asFile)
-        def value = { name ->
-            def direct = pom.documentElement.childNodes.find { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE && it.nodeName == name }
-            direct?.textContent
-        }
-        if (value('groupId') != releaseGroup || value('artifactId') != releaseArtifact || value('version') != releaseVersion) {
+        def pomFile = releaseVerificationPom.get().asFile
+        def values = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.directChildTexts(pomFile)
+        if (values['groupId'] != releaseGroup || values['artifactId'] != releaseArtifact || values['version'] != releaseVersion) {
             throw new GradleException('Generated POM coordinates do not match the project')
         }
         // The contract only pins group:artifact, not a version: ReleaseVerifierMain reconstructs
@@ -509,7 +506,8 @@ tasks.register('verifyPublicationMetadata') {
             throw new GradleException("Generated POM dependencies differ from release contract; expected ${expectedDependencies}, found ${actualDependencies}")
         }
         ['name', 'description', 'url'].each { field ->
-            if (value(field) == null || value(field).isBlank()) throw new GradleException("Generated POM is missing ${field}")
+            def value = values[field]
+            if (value == null || value.isBlank()) throw new GradleException("Generated POM is missing ${field}")
         }
     }
 }
@@ -576,7 +574,7 @@ tasks.register('verifyTokenizerConfigExample', JavaExec) {
     classpath = files(layout.buildDirectory.dir('classes/examples/tokenizerConfig'))
     mainClass = 'example.TokenizerConfigExample'
     jvmArgs '--module-path', tasks.named('jar').flatMap { it.archiveFile }.get().asFile.absolutePath,
-        '--add-modules', 'se.alipsa.jmlx.jinja'
+        '--add-modules', 'se.alipsa.jmlx.jinja', '-Dstdout.encoding=UTF-8'
     args 'examples/tokenizer-config/tokenizer_config_unicode.json'
     inputs.file('examples/tokenizer-config/tokenizer_config_unicode.json')
     def rendered = new ByteArrayOutputStream()

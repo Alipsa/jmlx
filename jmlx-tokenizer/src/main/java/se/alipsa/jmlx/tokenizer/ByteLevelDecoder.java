@@ -28,7 +28,12 @@ public final class ByteLevelDecoder {
 
   private ByteLevelDecoder() {}
 
-  /** Decodes {@code tokens} to text. */
+  /**
+   * Decodes {@code tokens} to text.
+   *
+   * @param tokens byte-level token strings
+   * @return decoded text
+   */
   public static String decode(List<String> tokens) {
     Objects.requireNonNull(tokens, "ByteLevelDecoder.decode: tokens must not be null");
     ByteArrayOutputStream pending = new ByteArrayOutputStream();

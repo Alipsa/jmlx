@@ -10,32 +10,14 @@
 # migrated from the archived standalone hfjinja repo where they ran in its own CI.
 name: jmlx-jinja CI
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
-    paths:
-      - 'jmlx-jinja/**'
-      - 'jmlx-tokenizer/**'
-      - 'buildSrc/**'
-      - 'build.gradle'
-      - 'settings.gradle'
-      - 'gradle.properties'
-      - 'gradle/libs.versions.toml'
-      - 'gradle/wrapper/**'
-      - 'config/checkstyle/checkstyle.xml'
-      - '.github/workflows/jmlx-jinja-ci.yml'
   pull_request:
-    paths:
-      - 'jmlx-jinja/**'
-      - 'jmlx-tokenizer/**'
-      - 'buildSrc/**'
-      - 'build.gradle'
-      - 'settings.gradle'
-      - 'gradle.properties'
-      - 'gradle/libs.versions.toml'
-      - 'gradle/wrapper/**'
-      - 'config/checkstyle/checkstyle.xml'
-      - '.github/workflows/jmlx-jinja-ci.yml'
 
 permissions:
   contents: read

@@ -150,7 +150,12 @@ public final class HfTokenizer {
     }
   }
 
-  /** Loads a tokenizer from a {@code tokenizer.json} file. */
+  /**
+   * Loads a tokenizer from a {@code tokenizer.json} file.
+   *
+   * @param tokenizerJsonPath tokenizer configuration file
+   * @return loaded tokenizer
+   */
   public static HfTokenizer fromFile(Path tokenizerJsonPath) {
     Objects.requireNonNull(
         tokenizerJsonPath, "HfTokenizer.fromFile: tokenizerJsonPath must not be null");
@@ -160,6 +165,8 @@ public final class HfTokenizer {
   /**
    * Finds a BOS id by supported Qwen/Llama naming conventions when the tokenizer marks it special.
    * Prefer {@link #bosTokenId(String)} when {@code tokenizer_config.json} supplies the BOS token.
+   *
+   * @return detected BOS id, if present
    */
   public OptionalInt bosTokenId() {
     return fallbackSpecialTokenId(BOS_TOKEN_NAMES);
@@ -168,6 +175,9 @@ public final class HfTokenizer {
   /**
    * Resolves a caller-supplied BOS token, typically from {@code tokenizer_config.json}. {@code
    * null} returns empty; an unknown non-null token throws.
+   *
+   * @param bosToken configured BOS token
+   * @return empty if {@code bosToken} is null; otherwise its resolved id
    */
   public OptionalInt bosTokenId(String bosToken) {
     return configuredTokenId(bosToken);
@@ -176,6 +186,8 @@ public final class HfTokenizer {
   /**
    * Finds an EOS id by supported Qwen/Llama naming conventions when the tokenizer marks it special.
    * Prefer {@link #eosTokenId(String)} when {@code tokenizer_config.json} supplies the EOS token.
+   *
+   * @return detected EOS id, if present
    */
   public OptionalInt eosTokenId() {
     return fallbackSpecialTokenId(EOS_TOKEN_NAMES);
@@ -184,6 +196,9 @@ public final class HfTokenizer {
   /**
    * Resolves a caller-supplied EOS token, typically from {@code tokenizer_config.json}. {@code
    * null} returns empty; an unknown non-null token throws.
+   *
+   * @param eosToken configured EOS token
+   * @return empty if {@code eosToken} is null; otherwise its resolved id
    */
   public OptionalInt eosTokenId(String eosToken) {
     return configuredTokenId(eosToken);
@@ -192,6 +207,9 @@ public final class HfTokenizer {
   /**
    * Resolves all caller-supplied EOS tokens, preserving order. Null and unknown entries throw. Use
    * this for checkpoints such as Llama 3.1 that declare multiple generation terminators.
+   *
+   * @param eosTokens configured EOS tokens
+   * @return corresponding token ids
    */
   public List<Integer> eosTokenIds(List<String> eosTokens) {
     Objects.requireNonNull(eosTokens, "HfTokenizer.eosTokenIds: eosTokens must not be null");
@@ -206,6 +224,8 @@ public final class HfTokenizer {
   /**
    * Returns the tokenizer's contiguous id range. This is not the model's output-head size; obtain
    * that from the checkpoint's {@code config.json}.
+   *
+   * @return one greater than the largest known token id
    */
   public int vocabSize() {
     return baseVocabularyMaxKnownId + 1;
@@ -234,7 +254,13 @@ public final class HfTokenizer {
     return OptionalInt.of(vocabulary.idOf(token));
   }
 
-  /** Encodes {@code text} into token ids. */
+  /**
+   * Encodes {@code text} into token ids.
+   *
+   * @param text text to encode
+   * @param addSpecialTokens whether to apply post-processor special tokens
+   * @return token ids
+   */
   public List<Integer> encode(String text, boolean addSpecialTokens) {
     Objects.requireNonNull(text, "HfTokenizer.encode: text must not be null");
     List<String> tokens = new ArrayList<>();
@@ -274,6 +300,10 @@ public final class HfTokenizer {
    * above-vocab case. Described in prose rather than {@code {@link #baseVocabularyMaxKnownId}}: a
    * link to a private field does not resolve in generated public javadoc (PR #14 review round 7,
    * finding 8).
+   *
+   * @param ids token ids to decode
+   * @param skipSpecialTokens whether to omit special tokens
+   * @return decoded text
    */
   public String decode(List<Integer> ids, boolean skipSpecialTokens) {
     Objects.requireNonNull(ids, "HfTokenizer.decode: ids must not be null");

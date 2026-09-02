@@ -3,7 +3,15 @@ package se.alipsa.jmlx.tokenizer;
 import java.util.List;
 import java.util.Objects;
 
-/** The parsed, byte-level-BPE-scoped contents of a {@code tokenizer.json} file. */
+/**
+ * The parsed, byte-level-BPE-scoped contents of a {@code tokenizer.json} file.
+ *
+ * @param normalizer input normalizer
+ * @param preTokenizer pre-tokenizer configuration
+ * @param postProcessor ordered post-processing steps
+ * @param model BPE model configuration
+ * @param addedTokens file-declared added tokens
+ */
 public record TokenizerJson(
     NormalizerKind normalizer,
     PreTokenizerConfig preTokenizer,

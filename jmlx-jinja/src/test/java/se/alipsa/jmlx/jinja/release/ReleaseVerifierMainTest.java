@@ -135,6 +135,30 @@ class ReleaseVerifierMainTest {
   }
 
   @Test
+  void ignoresSourcesAndJavadocArchivesWhenFindingTheMainJar() throws Exception {
+    var evidence = temporaryDirectory.resolve("jmlx-jinja-archive-evidence.json");
+    String digest = "a".repeat(64);
+    Files.writeString(
+        evidence,
+        "{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT-sources.jar\",\"firstSha256\":\""
+            + "b".repeat(64)
+            + "\",\"secondSha256\":\""
+            + "c".repeat(64)
+            + "\"},{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT-javadoc.jar\",\"firstSha256\":\""
+            + "d".repeat(64)
+            + "\",\"secondSha256\":\""
+            + "e".repeat(64)
+            + "\"},{\"name\":\"jmlx-jinja-0.6.0-SNAPSHOT.jar\",\"firstSha256\":\""
+            + digest
+            + "\",\"secondSha256\":\""
+            + digest
+            + "\"}");
+    assertEquals(
+        digest,
+        ReleaseVerifierMain.mainArchiveDigest(evidence, "se.alipsa:jmlx-jinja:0.6.0-SNAPSHOT"));
+  }
+
+  @Test
   void rejectsMissingRequiredTaskEvidence() throws Exception {
     var contract = temporaryDirectory.resolve("release-contract-required.json");
     Files.writeString(contract, "{\"requiredTasks\":[\"corpusCoverage\"]}");

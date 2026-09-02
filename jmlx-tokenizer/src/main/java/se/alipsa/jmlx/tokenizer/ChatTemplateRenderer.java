@@ -18,6 +18,14 @@ public final class ChatTemplateRenderer {
    * underneath the fixed keys below. This overload parses on each call; use {@link #parse(String)}
    * and the {@link #render(Template, List, boolean, String, String, Map)} overload in a serving
    * loop.
+   *
+   * @param chatTemplate template source
+   * @param messages chat messages
+   * @param addGenerationPrompt whether to add the generation prompt
+   * @param bosToken beginning-of-sequence token
+   * @param eosToken end-of-sequence token
+   * @param extraContext additional template values
+   * @return rendered prompt
    */
   public static String render(
       String chatTemplate,
@@ -30,7 +38,17 @@ public final class ChatTemplateRenderer {
         parse(chatTemplate), messages, addGenerationPrompt, bosToken, eosToken, extraContext);
   }
 
-  /** Renders a parsed chat template against the standard HF chat-template context variables. */
+  /**
+   * Renders a parsed chat template against the standard HF chat-template context variables.
+   *
+   * @param chatTemplate parsed template
+   * @param messages chat messages
+   * @param addGenerationPrompt whether to add the generation prompt
+   * @param bosToken beginning-of-sequence token
+   * @param eosToken end-of-sequence token
+   * @param extraContext additional template values
+   * @return rendered prompt
+   */
   public static String render(
       Template chatTemplate,
       List<Map<String, Object>> messages,
@@ -56,7 +74,12 @@ public final class ChatTemplateRenderer {
     }
   }
 
-  /** Parses a chat template for callers to retain and render repeatedly. */
+  /**
+   * Parses a chat template for callers to retain and render repeatedly.
+   *
+   * @param chatTemplate template source
+   * @return parsed template
+   */
   public static Template parse(String chatTemplate) {
     Objects.requireNonNull(
         chatTemplate, "ChatTemplateRenderer.parse: chatTemplate must not be null");

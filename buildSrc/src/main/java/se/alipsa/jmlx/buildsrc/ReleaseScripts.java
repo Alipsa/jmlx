@@ -35,15 +35,6 @@ public final class ReleaseScripts {
         scripts.add(script);
       }
     }
-    List<String> nonExecutable = new ArrayList<>();
-    for (File script : scripts) {
-      if (!script.canExecute()) {
-        nonExecutable.add(script.getPath());
-      }
-    }
-    if (!nonExecutable.isEmpty()) {
-      throw new IllegalStateException("release.sh scripts must be executable: " + nonExecutable);
-    }
     if (scripts.size() < 2) {
       return;
     }

@@ -36,7 +36,12 @@ public final class ByteLevelCoding {
 
   private ByteLevelCoding() {}
 
-  /** Encodes raw UTF-8 bytes as a byte-level string: one Unicode character per input byte. */
+  /**
+   * Encodes raw UTF-8 bytes as a byte-level string: one Unicode character per input byte.
+   *
+   * @param utf8Bytes bytes to encode
+   * @return byte-level representation
+   */
   public static String encode(byte[] utf8Bytes) {
     Objects.requireNonNull(utf8Bytes, "ByteLevelCoding.encode: utf8Bytes must not be null");
     StringBuilder sb = new StringBuilder(utf8Bytes.length);
@@ -46,7 +51,12 @@ public final class ByteLevelCoding {
     return sb.toString();
   }
 
-  /** Encodes a plain-text string (its UTF-8 bytes) as a byte-level string. */
+  /**
+   * Encodes a plain-text string (its UTF-8 bytes) as a byte-level string.
+   *
+   * @param text text to encode
+   * @return byte-level representation
+   */
   public static String encode(String text) {
     Objects.requireNonNull(text, "ByteLevelCoding.encode: text must not be null");
     return encode(text.getBytes(StandardCharsets.UTF_8));
@@ -76,6 +86,9 @@ public final class ByteLevelCoding {
    * replacement-character behavior for whatever these raw bytes decode to, so no further change is
    * needed there (PR #14 review round 5, finding 3; reachability description corrected in round 6,
    * finding 6, to account for round 6 finding 1's own change to {@link ByteLevelDecoder}).
+   *
+   * @param byteLevelText byte-level representation
+   * @return decoded bytes
    */
   public static byte[] decodeToBytes(String byteLevelText) {
     Objects.requireNonNull(

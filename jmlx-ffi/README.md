@@ -20,8 +20,8 @@ Apple Silicon. From a repository checkout, stage the native libraries first:
 ./scripts/bootstrap-native.sh
 ```
 
-The script produces `native/install/lib`, containing `libmlxc.dylib` and
-`mlx.metallib`. It requires the macOS/Xcode tooling and other prerequisites
+The script produces `native/install/lib`, containing `libmlxc.dylib`, `libmlx.dylib`,
+`libjaccl.dylib`, and `mlx.metallib`. It requires the macOS/Xcode tooling and other prerequisites
 listed in the script header.
 
 ## Use

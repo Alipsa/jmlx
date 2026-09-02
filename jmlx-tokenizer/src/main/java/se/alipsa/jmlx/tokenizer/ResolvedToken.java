@@ -8,5 +8,8 @@ package se.alipsa.jmlx.tokenizer;
  * token whose id is recorded there while its literal string is absent from {@code model.vocab} +
  * {@code added_tokens}, in which case a fresh string lookup would throw even though the correct id
  * was available all along.
+ *
+ * @param text token text
+ * @param id resolved token id, or null when it must be looked up by text
  */
 public record ResolvedToken(String text, Integer id) {}

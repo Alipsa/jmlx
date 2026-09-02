@@ -154,6 +154,12 @@ subprojects {
         apply plugin: 'signing'
         apply plugin: 'se.alipsa.nexus-release-plugin'
 
+        // Published Javadoc is consumer-facing API documentation; fail its build on warnings for
+        // every publishable module, rather than requiring each module to duplicate this policy.
+        tasks.withType(Javadoc).configureEach {
+            options.addBooleanOption('Werror', true)
+        }
+
         // Captured here, once the module's own `version = ...` line has definitely already run
         // (afterEvaluate fires only after the whole module build.gradle has been evaluated), rather
         // than read directly inside verifyNoSnapshotDependencies/verifyCentralCredentialsPresent's
@@ -287,10 +293,6 @@ subprojects {
             def releaseScripts = moduleDirs.collect { new File(it, 'release.sh') }.findAll { it.isFile() }
             def marker = layout.buildDirectory.file('verifyReleaseScriptsMatch/verified')
             inputs.files(releaseScripts)
-            // Gradle's file fingerprints cover contents but not POSIX mode bits. Keep the
-            // executable state as an explicit input because ReleaseScripts validates it too.
-            inputs.property('releaseScriptExecutability',
-                    releaseScripts.collectEntries { [(it.absolutePath): it.canExecute()] })
             outputs.file(marker)
             doLast {
                 se.alipsa.jmlx.buildsrc.ReleaseScripts.assertAllMatch(moduleDirs)

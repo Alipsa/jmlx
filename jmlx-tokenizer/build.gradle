@@ -19,6 +19,10 @@ java {
     withJavadocJar()
 }
 
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.tokenizer')
+}
+
 dependencies {
     implementation libs.jackson.databind
     api project(':jmlx-jinja')

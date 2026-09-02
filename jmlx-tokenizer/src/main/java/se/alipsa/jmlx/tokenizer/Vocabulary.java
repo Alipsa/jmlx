@@ -38,6 +38,9 @@ public final class Vocabulary {
    * e.g. every test in {@code VocabularyTest}, that construct it directly from an arbitrary map,
    * not through the loader (PR #14 review round 8, finding 5, following {@code SpecialTokenInfo}'s
    * round-3 precedent of validating in the type itself, not just at one call site).
+   *
+   * @param modelVocab model token-to-id mapping
+   * @param addedTokens added-token definitions
    */
   public Vocabulary(Map<String, Integer> modelVocab, List<AddedToken> addedTokens) {
     Objects.requireNonNull(modelVocab, "Vocabulary: modelVocab must not be null");
@@ -101,7 +104,12 @@ public final class Vocabulary {
     this.maxKnownId = max;
   }
 
-  /** Looks up a token string's id, throwing if it is not in the vocabulary. */
+  /**
+   * Looks up a token string's id, throwing if it is not in the vocabulary.
+   *
+   * @param token token text
+   * @return token id
+   */
   public int idOf(String token) {
     Objects.requireNonNull(token, "Vocabulary.idOf: token must not be null");
     Integer id = tokenToId.get(token);
@@ -112,7 +120,12 @@ public final class Vocabulary {
     return id;
   }
 
-  /** Looks up an id's token string, throwing if it is not in the vocabulary. */
+  /**
+   * Looks up an id's token string, throwing if it is not in the vocabulary.
+   *
+   * @param id token id
+   * @return token text
+   */
   public String tokenOf(int id) {
     String token = idToToken.get(id);
     if (token == null) {
@@ -121,12 +134,22 @@ public final class Vocabulary {
     return token;
   }
 
-  /** Whether {@code id} is one of the file's special (not just added) tokens. */
+  /**
+   * Whether {@code id} is one of the file's special (not just added) tokens.
+   *
+   * @param id token id
+   * @return whether the id is special
+   */
   public boolean isSpecial(int id) {
     return specialIds.contains(id);
   }
 
-  /** Whether {@code id} has a vocabulary entry (see {@link HfTokenizer#decode}). */
+  /**
+   * Whether {@code id} has a vocabulary entry (see {@link HfTokenizer#decode}).
+   *
+   * @param id token id
+   * @return whether the id is known
+   */
   public boolean hasId(int id) {
     return idToToken.containsKey(id);
   }
@@ -135,6 +158,9 @@ public final class Vocabulary {
    * Whether {@code token} has a vocabulary entry (see {@link HfTokenizer}'s TemplateProcessing
    * conflict check, which needs the mirror of {@link #hasId}/{@link #tokenOf}: a template id can be
    * free while the token *string* it names is already claimed by a different id).
+   *
+   * @param token token text
+   * @return whether the token is known
    */
   public boolean hasToken(String token) {
     return tokenToId.containsKey(token);
@@ -150,6 +176,8 @@ public final class Vocabulary {
    * to tell a legitimate above-vocab id (e.g. a sampled logit outside a checkpoint's trained vocab
    * -- see {@link HfTokenizer#decode}) apart from an in-range hole, which is always a bug and
    * should not be silently skipped.
+   *
+   * @return largest known token id
    */
   public int maxKnownId() {
     return maxKnownId;
@@ -158,6 +186,8 @@ public final class Vocabulary {
   /**
    * Number of ids in the contiguous range from zero through this tokenizer's largest known id. This
    * is not a checkpoint's model output-head size.
+   *
+   * @return vocabulary range size
    */
   public int vocabSize() {
     return maxKnownId + 1;

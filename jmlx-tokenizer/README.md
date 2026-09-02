@@ -31,8 +31,11 @@ import java.util.List;
 import java.util.Map;
 import se.alipsa.jmlx.tokenizer.ChatTemplateRenderer;
 
+var template = ChatTemplateRenderer.parse(
+    "{% for message in messages %}{{ message.content }}{% endfor %}"
+);
 var prompt = ChatTemplateRenderer.render(
-    "{% for message in messages %}{{ message.content }}{% endfor %}",
+    template,
     List.of(Map.of("role", "user", "content", "Hello")),
     true,
     "<s>",

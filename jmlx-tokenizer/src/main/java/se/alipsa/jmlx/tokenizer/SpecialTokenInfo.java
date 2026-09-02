@@ -11,6 +11,10 @@ import java.util.Objects;
  * entry after the shorter list runs out. Validating here, not just at the {@code
  * TokenizerJsonLoader} call site, means the invariant holds for this record no matter how it's
  * constructed (PR #14 review round 3, finding 1).
+ *
+ * @param id special token's JSON {@code id} field
+ * @param ids token ids to emit
+ * @param tokens token texts paired with {@code ids}
  */
 public record SpecialTokenInfo(String id, List<Integer> ids, List<String> tokens) {
 

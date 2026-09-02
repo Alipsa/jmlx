@@ -2,7 +2,9 @@ package se.alipsa.jmlx.buildsrc;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Node;
 
@@ -50,6 +52,19 @@ public final class PublishedPomDependencies {
                 field(dependency, "groupId"),
                 field(dependency, "artifactId"),
                 field(dependency, "version")));
+      }
+    }
+    return result;
+  }
+
+  /** Returns the direct {@code <project>} child-element texts, keyed by element name. */
+  public static Map<String, String> directChildTexts(File pomFile) throws Exception {
+    var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pomFile);
+    Map<String, String> result = new LinkedHashMap<>();
+    Node project = document.getDocumentElement();
+    for (Node child = project.getFirstChild(); child != null; child = child.getNextSibling()) {
+      if (child.getNodeType() == Node.ELEMENT_NODE) {
+        result.put(child.getNodeName(), child.getTextContent());
       }
     }
     return result;

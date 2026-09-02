@@ -264,7 +264,9 @@ public final class MLXOps {
     NativeOps.checked(
         "argmaxAxis",
         () -> mlx_h.mlx_argmax_axis(res, a.handle(), axis, keepdims, NativeOps.DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    // MLX's native argmax produces UINT32 indices. jmlx's index-consuming APIs use INT32, and
+    // this conversion is safe because an MLX array's dimensions are Java ints.
+    return MLX.astype(new MLXArray(scope, res), DType.INT32);
   }
 
   /**

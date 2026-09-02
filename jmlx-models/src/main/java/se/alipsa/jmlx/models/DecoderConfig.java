@@ -33,14 +33,24 @@ public record DecoderConfig(
   /** Reads the relevant, stable architecture fields from a Hugging Face {@code config.json}. */
   public static DecoderConfig fromFile(Path file) throws IOException {
     JsonNode node = new ObjectMapper().readTree(file.toFile());
+    if (node.hasNonNull("rope_scaling")) {
+      throw new IllegalArgumentException(
+          "config.json declares rope_scaling, which this decoder does not yet implement");
+    }
+    int hiddenSize = requiredInt(node, "hidden_size");
+    int heads = requiredInt(node, "num_attention_heads");
+    if (node.has("head_dim") && node.get("head_dim").intValue() * heads != hiddenSize) {
+      throw new IllegalArgumentException(
+          "config.json head_dim * num_attention_heads must equal hidden_size");
+    }
     return new DecoderConfig(
         requiredText(node, "model_type"),
         requiredInt(node, "vocab_size"),
-        requiredInt(node, "hidden_size"),
+        hiddenSize,
         requiredInt(node, "intermediate_size"),
         requiredInt(node, "num_hidden_layers"),
-        requiredInt(node, "num_attention_heads"),
-        node.path("num_key_value_heads").asInt(requiredInt(node, "num_attention_heads")),
+        heads,
+        node.path("num_key_value_heads").asInt(heads),
         (float) node.path("rms_norm_eps").asDouble(1e-6),
         (float) node.path("rope_theta").asDouble(10_000),
         node.path("tie_word_embeddings").asBoolean(false));
@@ -54,9 +64,9 @@ public record DecoderConfig(
   }
 
   private static String requiredText(JsonNode node, String name) {
-    if (!node.hasNonNull(name) || node.get(name).asText().isBlank()) {
+    if (!node.hasNonNull(name) || node.get(name).asString().isBlank()) {
       throw new IllegalArgumentException("config.json is missing string field '" + name + "'");
     }
-    return node.get(name).asText();
+    return node.get(name).asString();
   }
 }

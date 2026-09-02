@@ -83,17 +83,28 @@ public abstract class DecoderModel extends Module {
     return config;
   }
 
-  /** Returns logits shaped {@code [batch, sequence, vocab]} and advances one cache per layer. */
+  /**
+   * Returns logits shaped {@code [batch, sequence, vocab]} and advances one cache per layer. Each
+   * cache must be non-null and live in this model scope or a descendant scope that outlives this
+   * call; generation creates such caches automatically.
+   */
   public final MLXArray forward(MLXArray tokenIds, List<KVCache> caches) {
     Objects.requireNonNull(tokenIds, "tokenIds");
     if (tokenIds.ndim() != 2)
       throw new IllegalArgumentException("tokenIds must have shape [batch, sequence]");
+    Objects.requireNonNull(caches, "caches");
     if (caches.size() != layers.size())
       throw new IllegalArgumentException("one KVCache is required per decoder layer");
-    MLXArray x = embedding.forward(tokenIds);
-    for (int i = 0; i < layers.size(); i++) x = layers.get(i).forward(x, caches.get(i));
-    MLXArray normalized = norm.forward(x);
+    MLXArray normalized = normalizedHiddenStates(tokenIds, caches);
     return tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
+  }
+
+  private MLXArray normalizedHiddenStates(MLXArray tokenIds, List<KVCache> caches) {
+    MLXArray x = embedding.forward(tokenIds);
+    for (int i = 0; i < layers.size(); i++) {
+      x = layers.get(i).forward(x, Objects.requireNonNull(caches.get(i), "cache " + i));
+    }
+    return norm.forward(x);
   }
 
   /** Greedily generates up to {@code maxNewTokens}; prompt tokens are included in the result. */
@@ -111,12 +122,16 @@ public abstract class DecoderModel extends Module {
       for (int step = 0; step < maxNewTokens; step++) {
         try (MLXScope activation = generation.newChild()) {
           MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
-          MLXArray logits = forward(ids, caches);
-          int[] shape = logits.shape();
-          MLXArray last =
+          MLXArray normalized = normalizedHiddenStates(ids, caches);
+          int[] shape = normalized.shape();
+          MLXArray lastHiddenState =
               MLXShape.slice(
-                  logits, new int[] {0, shape[1] - 1, 0}, new int[] {1, shape[1], shape[2]});
-          int next = MLXOps.argmaxAxis(last, 2, false).toIntArray()[0];
+                  normalized,
+                  new int[] {0, shape[1] - 1, 0},
+                  new int[] {shape[0], shape[1], shape[2]});
+          MLXArray lastLogits =
+              tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
+          int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
           result.add(next);
           if (eosTokenIds.contains(next)) break;
           input = new int[] {next};
@@ -132,9 +147,22 @@ public abstract class DecoderModel extends Module {
    */
   public final String generateText(
       HfTokenizer tokenizer, String prompt, int maxNewTokens, Set<Integer> eosTokenIds) {
+    return generateText(tokenizer, prompt, false, maxNewTokens, eosTokenIds);
+  }
+
+  /**
+   * Encodes and greedily generates text. Pass {@code false} for a prompt already rendered by a chat
+   * template, because Hugging Face chat templates include their own BOS token.
+   */
+  public final String generateText(
+      HfTokenizer tokenizer,
+      String prompt,
+      boolean addSpecialTokens,
+      int maxNewTokens,
+      Set<Integer> eosTokenIds) {
     Objects.requireNonNull(tokenizer, "tokenizer");
     Objects.requireNonNull(prompt, "prompt");
-    List<Integer> promptIds = tokenizer.encode(prompt, true);
+    List<Integer> promptIds = tokenizer.encode(prompt, addSpecialTokens);
     int[] input = promptIds.stream().mapToInt(Integer::intValue).toArray();
     List<Integer> allIds = generate(input, maxNewTokens, eosTokenIds);
     return tokenizer.decode(allIds.subList(promptIds.size(), allIds.size()), true);

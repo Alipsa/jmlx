@@ -116,7 +116,13 @@ public final class GroupedQueryAttention extends Module {
     }
     MLXArray attended =
         MLXFast.scaledDotProductAttention(
-            q, repeatKeyValueHeads(k), repeatKeyValueHeads(v), scale, true, null, null);
+            q,
+            repeatKeyValueHeads(k, x.scope()),
+            repeatKeyValueHeads(v, x.scope()),
+            scale,
+            true,
+            null,
+            null);
     MLXArray merged = MLXShape.flatten(MLXShape.transpose(attended, new int[] {0, 2, 1, 3}), 2, 3);
     return oProj.forward(merged);
   }
@@ -127,17 +133,18 @@ public final class GroupedQueryAttention extends Module {
         new int[] {0, 2, 1, 3});
   }
 
-  private MLXArray repeatKeyValueHeads(MLXArray value) {
+  private MLXArray repeatKeyValueHeads(MLXArray value, MLXScope target) {
     if (queriesPerKeyValueHead == 1) {
       return value;
     }
     int[] shape = value.shape();
-    MLXArray expanded = MLXShape.expandDims(value, 2);
+    MLXArray expanded = MLXShape.expandDims(value, target, 2);
     MLXArray broadcast =
         MLXShape.broadcastTo(
             expanded,
+            target,
             new int[] {shape[0], numKeyValueHeads, queriesPerKeyValueHead, shape[2], shape[3]});
-    return MLXShape.flatten(broadcast, 1, 2);
+    return MLXShape.flatten(broadcast, target, 1, 2);
   }
 
   private static void requireWeight(String name, MLXArray weight, int out, int in) {

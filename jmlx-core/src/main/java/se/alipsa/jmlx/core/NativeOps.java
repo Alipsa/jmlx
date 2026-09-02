@@ -170,12 +170,16 @@ final class NativeOps {
    * reshape} inlines it for {@code mlx_reshape}.
    */
   static MLXArray shapeOp(String opName, MLXArray a, int[] param, ShapeOp op) {
-    MLXScope scope = a.scope();
+    return shapeOp(opName, a, a.scope(), param, op);
+  }
+
+  static MLXArray shapeOp(String opName, MLXArray a, MLXScope target, int[] param, ShapeOp op) {
+    MLXScope.innermost(a.scope(), target);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeParam = tmp.allocateFrom(ValueLayout.JAVA_INT, param);
-      MemorySegment res = mlx_h.mlx_array_new(scope);
+      MemorySegment res = mlx_h.mlx_array_new(target);
       checked(opName, () -> op.apply(res, a.handle(), nativeParam, param.length, DEFAULT_STREAM));
-      return new MLXArray(scope, res);
+      return new MLXArray(target, res);
     }
   }
 
@@ -222,10 +226,15 @@ final class NativeOps {
    * applies a two-argument-plus-stream operation.
    */
   static MLXArray axis2Op(String opName, MLXArray a, int axis1, int axis2, Axis2Op op) {
-    MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
+    return axis2Op(opName, a, a.scope(), axis1, axis2, op);
+  }
+
+  static MLXArray axis2Op(
+      String opName, MLXArray a, MLXScope target, int axis1, int axis2, Axis2Op op) {
+    MLXScope.innermost(a.scope(), target);
+    MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), axis1, axis2, DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    return new MLXArray(target, res);
   }
 
   @FunctionalInterface
@@ -241,10 +250,14 @@ final class NativeOps {
    * parameter is named generically in the functional interface below.
    */
   static MLXArray axisOp(String opName, MLXArray a, int param, AxisOp op) {
-    MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
+    return axisOp(opName, a, a.scope(), param, op);
+  }
+
+  static MLXArray axisOp(String opName, MLXArray a, MLXScope target, int param, AxisOp op) {
+    MLXScope.innermost(a.scope(), target);
+    MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), param, DEFAULT_STREAM));
-    return new MLXArray(scope, res);
+    return new MLXArray(target, res);
   }
 
   @FunctionalInterface

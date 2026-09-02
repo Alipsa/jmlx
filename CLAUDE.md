@@ -15,8 +15,8 @@ cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `r
 byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered. `jmlx-jinja` (the
 migrated former `hfjinja` project) is a dependency-free Java 21+ Hugging Face Jinja subset for
 chat-template rendering. `req/project-outline.md` describes the full multi-phase vision (autograd,
-`se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); the rest of Phase 5 (model
-implementations, i.e. M3) is not yet implemented.
+`se.alipsa.jmlx.nn`, safetensors/tokenizers, and model loading). Phase 5 M3 is implemented as
+`jmlx-models`, with local Hugging Face Llama/Qwen safetensors loading and greedy generation.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -158,6 +158,9 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
        |
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
                  pure Java; no dependency on jmlx-ffi or native/install/lib
+
+jmlx-models      se.alipsa.jmlx.models             LlamaModel, QwenModel, DecoderModel
+                 depends on jmlx-core + jmlx-tokenizer; native inference and generation
 ```
 
 Three native modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating

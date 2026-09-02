@@ -50,6 +50,12 @@ public final class MLXShape {
     return NativeOps.shapeOp("broadcastTo", a, targetShape, mlx_h::mlx_broadcast_to);
   }
 
+  /** Broadcasts into {@code target}, which must be related to {@code a}'s scope. */
+  public static MLXArray broadcastTo(MLXArray a, MLXScope target, int[] targetShape) {
+    requireBroadcastableTo(a, targetShape);
+    return NativeOps.shapeOp("broadcastTo", a, target, targetShape, mlx_h::mlx_broadcast_to);
+  }
+
   /**
    * Directional broadcast check for {@code broadcastTo(a, targetShape)}: requires {@code
    * broadcast_shapes(a.shape(), targetShape) == targetShape} (upstream {@code ops.cpp:1601-1613}),
@@ -260,6 +266,11 @@ public final class MLXShape {
     return NativeOps.axisOp("expandDims", a, axis, mlx_h::mlx_expand_dims);
   }
 
+  /** Inserts a size-1 axis, allocating the result into {@code target}. */
+  public static MLXArray expandDims(MLXArray a, MLXScope target, int axis) {
+    return NativeOps.axisOp("expandDims", a, target, axis, mlx_h::mlx_expand_dims);
+  }
+
   /**
    * Merges the axes from {@code startAxis} to {@code endAxis} (inclusive) into a single axis. Fits
    * the existing {@link NativeOps#axis2Op} exactly -- same {@code (res, a, int, int, stream)} shape
@@ -267,6 +278,11 @@ public final class MLXShape {
    */
   public static MLXArray flatten(MLXArray a, int startAxis, int endAxis) {
     return NativeOps.axis2Op("flatten", a, startAxis, endAxis, mlx_h::mlx_flatten);
+  }
+
+  /** Merges axes, allocating the result into {@code target}. */
+  public static MLXArray flatten(MLXArray a, MLXScope target, int startAxis, int endAxis) {
+    return NativeOps.axis2Op("flatten", a, target, startAxis, endAxis, mlx_h::mlx_flatten);
   }
 
   /**

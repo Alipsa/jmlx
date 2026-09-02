@@ -11,7 +11,14 @@ public final class PostProcessorApplier {
 
   private PostProcessorApplier() {}
 
-  /** Applies every step in {@code steps} to {@code tokens} in order. */
+  /**
+   * Applies every step in {@code steps} to {@code tokens} in order.
+   *
+   * @param steps post-processing steps
+   * @param tokens encoded token strings
+   * @param addSpecialTokens whether special tokens should be emitted
+   * @return processed tokens
+   */
   public static List<ResolvedToken> apply(
       List<PostProcessorStep> steps, List<String> tokens, boolean addSpecialTokens) {
     Objects.requireNonNull(steps, "PostProcessorApplier.apply: steps must not be null");

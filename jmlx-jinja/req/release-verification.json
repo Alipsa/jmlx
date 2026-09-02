@@ -1,0 +1,11 @@
+{
+  "jdkMajor": 21,
+  "bytecodeMajor": 65,
+  "groupArtifact": "se.alipsa:jmlx-jinja",
+  "module": "se.alipsa.jmlx.jinja",
+  "exports": ["se.alipsa.jmlx.jinja"],
+  "publishedRuntimeDependencies": [],
+  "archives": ["jar", "sourcesJar", "javadocJar"],
+  "requiredTasks": ["upstreamVerify", "nodeCorpusVerify", "corpusCoverage", "astSnapshotVerify", "formatGoldenVerify", "fuzzParserVerify"],
+  "policyInputs": ["NOTICE", "req/model-fixture-policy.md", "CHANGELOG.md", "req/release-checklist.md"]
+}

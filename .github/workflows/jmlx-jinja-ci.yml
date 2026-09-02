@@ -1,0 +1,62 @@
+# jmlx-jinja and jmlx-tokenizer are both dependency-free, pure-Java modules (no native/Apple
+# Silicon requirement), so this workflow runs on ubuntu-latest and is scoped to just those two --
+# it does not attempt to cover jmlx-core/jmlx-ffi's native, macOS-only test suites. jmlx-tokenizer
+# is included because it declares `api project(':jmlx-jinja')`, so a jinja API change is most
+# likely to break it first.
+#
+# The Node-dependent tasks (see jmlx-jinja/build.gradle's nodeDependentTasks list) require the
+# exact Node version pinned in jmlx-jinja/upstream/upstream-lock.json and are not wired into
+# `check` for that reason; this workflow is what actually runs them, since jmlx-jinja was
+# migrated from the archived standalone hfjinja repo where they ran in its own CI.
+name: jmlx-jinja CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # node-version-file rather than a literal: jmlx-jinja/.nvmrc is the same file a
+      # developer's `nvm use` reads, so CI and local runs cannot drift apart. Its value is
+      # still checked against upstream/upstream-lock.json's nodeVersion by nodeOracleVersion.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: jmlx-jinja/.nvmrc
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check shared build logic
+        run: ./gradlew -p buildSrc check
+
+      # Configuration cache is off repo-wide (see gradle.properties) because of
+      # diffplug/spotless#2850, so no --no-configuration-cache flag is needed here.
+      - name: Run jmlx-jinja/jmlx-tokenizer check and Node-oracle differential verification
+        run: |
+          ./gradlew \
+            :jmlx-jinja:check \
+            :jmlx-tokenizer:check \
+            :jmlx-jinja:nodeCorpusTest \
+            :jmlx-jinja:nodeOracleVersion \
+            :jmlx-jinja:nodeCorpusVerify \
+            :jmlx-jinja:corpusCoverage \
+            :jmlx-jinja:astSnapshotVerify \
+            :jmlx-jinja:fuzzParserTest \
+            :jmlx-jinja:fuzzParserVerify \
+            :jmlx-jinja:formatGoldenVerify

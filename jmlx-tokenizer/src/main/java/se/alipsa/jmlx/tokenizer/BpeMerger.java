@@ -10,12 +10,21 @@ public final class BpeMerger {
 
   private final BpeModelConfig model;
 
-  /** Prepares a BPE model's vocabulary and merge-rank tables for token merging. */
+  /**
+   * Prepares a BPE model's vocabulary and merge-rank tables for token merging.
+   *
+   * @param model BPE configuration
+   */
   public BpeMerger(BpeModelConfig model) {
     this.model = Objects.requireNonNull(model, "BpeMerger: model must not be null");
   }
 
-  /** Merges one byte-level-encoded pre-token chunk into its final BPE symbol sequence. */
+  /**
+   * Merges one byte-level-encoded pre-token chunk into its final BPE symbol sequence.
+   *
+   * @param byteLevelWord byte-level-encoded input chunk
+   * @return merged BPE symbols
+   */
   public List<String> merge(String byteLevelWord) {
     Objects.requireNonNull(byteLevelWord, "BpeMerger.merge: byteLevelWord must not be null");
     if (model.ignoreMerges() && model.vocab().containsKey(byteLevelWord)) {

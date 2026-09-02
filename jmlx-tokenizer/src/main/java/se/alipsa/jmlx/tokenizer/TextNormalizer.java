@@ -8,7 +8,13 @@ public final class TextNormalizer {
 
   private TextNormalizer() {}
 
-  /** Normalizes {@code text} per {@code kind}. */
+  /**
+   * Normalizes {@code text} per {@code kind}.
+   *
+   * @param kind normalizer to apply
+   * @param text input text
+   * @return normalized text
+   */
   public static String normalize(NormalizerKind kind, String text) {
     Objects.requireNonNull(kind, "TextNormalizer.normalize: kind must not be null");
     Objects.requireNonNull(text, "TextNormalizer.normalize: text must not be null");

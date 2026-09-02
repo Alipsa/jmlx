@@ -1,0 +1,73 @@
+{
+  "package": "@huggingface/jinja",
+  "version": "0.5.9",
+  "nodeVersion": "v26.7.0",
+  "commit": "41585aa8e776e0e4e1430ac2aad24506f74c3110",
+  "tarball": "https://registry.npmjs.org/@huggingface/jinja/-/jinja-0.5.9.tgz",
+  "integrity": "sha512-uWTG+l3VJRsl7EXxYizuL3P+cCPoc3cRqbWWRcQN0FhejRfbdq0RNhCmbY/YDtnTcz9icdLYuLDjsnz4d8JMuw==",
+  "sha256": "69941ebbbbc0b1c200d04cd99613e67cba4c3d92815d9add5a4b3491f0e74548",
+  "fixtureRevision": "no-imported-fixtures",
+  "excludedFiles": {
+    "README.md": {
+      "sha256": "b29fc242299a8564edba1f93c27382ca6580d662b5d4473d866e9047a3afedc2",
+      "reason": "Contains unapproved model-template examples and rendered output."
+    },
+    "test/e2e.test.js": {
+      "sha256": "1a54ef2ed41ee14ee63959b2d7edd421d725e45c50a96ca9116cb20baebad126",
+      "reason": "Contains unapproved model templates and rendered output."
+    }
+  },
+  "astNodes": [
+    "Statement", "Program", "If", "For", "Break", "Continue", "SetStatement", "Macro",
+    "Comment", "Expression", "MemberExpression", "CallExpression", "Identifier", "Literal",
+    "IntegerLiteral", "FloatLiteral", "StringLiteral", "ArrayLiteral", "TupleLiteral",
+    "ObjectLiteral", "BinaryExpression", "FilterExpression", "FilterStatement",
+    "SelectExpression", "TestExpression", "UnaryExpression", "SliceExpression",
+    "KeywordArgumentExpression", "SpreadExpression", "CallStatement", "Ternary"
+  ],
+  "globals": [
+    { "name": "false", "arity": 0, "hostSupplied": false },
+    { "name": "true", "arity": 0, "hostSupplied": false },
+    { "name": "none", "arity": 0, "hostSupplied": false },
+    { "name": "raise_exception", "arity": 1, "hostSupplied": false },
+    { "name": "range", "arity": "1..3", "hostSupplied": false },
+    { "name": "strftime_now", "arity": 1, "hostSupplied": false },
+    { "name": "True", "arity": 0, "hostSupplied": false },
+    { "name": "False", "arity": 0, "hostSupplied": false },
+    { "name": "None", "arity": 0, "hostSupplied": false }
+  ],
+  "files": {
+    "LICENSE": "d6e7b19451c1b3d1d66353bb4b1274138953b3bfd9ae60c56e77b1f548796982",
+    "dist/ast.d.ts": "311e7e15ba20a454cbd9e2e0be2800b1f9f1509418704f9b8165b5b936c746d5",
+    "dist/ast.d.ts.map": "abb5c5ee5d3e6705d02c2098391fe43ed95949ab50f38447b45ac6603b5a53d7",
+    "dist/format.d.ts": "aaf33b043bce90a6c9c9cf770ddae19da00439424806946fa4c31e8b77024877",
+    "dist/format.d.ts.map": "5d6b21befcb14ebd49249b93dbac529e5b23b482d4480344aee99a5a40251fa8",
+    "dist/index.cjs": "10a1db85a07bb5136830b641e140cce54b7f0bb21ccb4d2e237c9c7f17fdc488",
+    "dist/index.d.ts": "9f646a525985543fa4e1b324d9dee07cc4e5aabc981f145692e8764bf601db9b",
+    "dist/index.d.ts.map": "669b7fc4b95557a8b737c0c0d17ddd00e101eaa8dfb486e83f729a0ba185e145",
+    "dist/index.js": "bdedd709a35cc8cdcbf5307059589b9fd71e68c5544f42797e5ca1f1cadba8e5",
+    "dist/lexer.d.ts": "ff32e32c3543bbf246e8384e145a9c9e05557598924398c8b39d0ab267b87a91",
+    "dist/lexer.d.ts.map": "2eb6570d5a1ac8177d44810b9592fe490490f318e5d65dbdf675ec6410acbc64",
+    "dist/parser.d.ts": "50a099a44881640219060175d354366c8c1f5b1d14de49ea1ea58e42c86dbee3",
+    "dist/parser.d.ts.map": "ca08c24f61016cf4f8c1980607038419815c302983c84af7e66fa3812f1f46b7",
+    "dist/runtime.d.ts": "240bae4f4aa3d8c75d83a9f90311fc0dea7bc0eb06a8c24938f22852b695ffbf",
+    "dist/runtime.d.ts.map": "cee7367d1a3372b3d2e3cf2fb37dca9e13c6304c01e7e08a49813dad0d6d4ae9",
+    "dist/utils.d.ts": "17b02ced56a27dc6c6687a646d82710cfdb45d4dec95322ddc0582a0e465e7cd",
+    "dist/utils.d.ts.map": "5b64b0425efdb2248d9c7a365067f0206aeb9e7fc232249feb42e11e85d70a0a",
+    "package.json": "21c9de61acde2c2c8f9e8771457bd0e2f181cc18167389c243d19503249d82f1",
+    "src/ast.ts": "4e74da8d513ad575dd9ce6864db44ab8fa0f5eb5a7d9a903477617edf058faf0",
+    "src/format.ts": "ae4dd933ed99e933153c713667219d18a9689069560caecbfbf9c995d6674fd0",
+    "src/index.ts": "e05449bc732104e1956f4d5ba28a9c81de93fd0716e46f67d0e30c247bc924a0",
+    "src/lexer.ts": "582d40b40e0bf51400376b5b0a114d046762ad858b0f7f1c6909c62d90811429",
+    "src/parser.ts": "9036cdc609d69b4d5fdc32f10760c6506fe3cf525f9548d2c76cb0ff2043c35d",
+    "src/runtime.ts": "270bacbd2994a80200ac361dc25b0f6b7e1896f216bce83ba9182bbd454e928c",
+    "src/utils.ts": "57e44b8f45dc64d5ef9c51fa6bfb84994430aa99adc27dfe7c6eda87011484c9",
+    "test/.gitignore": "b4cebe9db79849ac0107d2f500436d6600f107bbc1c5e497da35a9f1871b8349",
+    "test/format.test.js": "671b51c7a62c86910232ddeaf4ed116507ab5ecf834351bfc1ce194956916164",
+    "test/interpreter.test.js": "d36218b3e789f94f754bd6e1e3bfa5b8f28838d685c5a7790e900104d2db2d1a",
+    "test/memory.test.js": "75486508062a0b0bd3e227de82f804a61be6e2487a95b5fdc359524417d3665f",
+    "test/templates.test.js": "a5704a9794435b539ae10117af7f534af5fe1bf977be24414812c59e94e19010",
+    "test/utils.test.js": "95ed2f094e78434cd125119bea7bc954c271a68b2096eecc4e55139b0ad5e243",
+    "tsconfig.json": "5c5e86ab5516c11e654cb885807f1d5690f6b5f51272f4ba16f4e3d3b5f7dc17"
+  }
+}

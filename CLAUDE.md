@@ -12,9 +12,11 @@ ops, relaxed matmul, `slice`, a batched `eval`) and `req/phase4-plan.md` (`se.al
 `Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
 cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/plans/phase5-m1-plan.md`
 (`MLXIO` -- safetensors/GGUF checkpoint I/O) and `req/plans/phase5-m2-plan.md` (`jmlx-tokenizer` --
-byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered. `req/project-outline.md`
-describes the full multi-phase vision (autograd, `se.alipsa.jmlx.nn`, safetensors/tokenizers, model
-loading); the rest of Phase 5 (model implementations, i.e. M3) is not yet implemented.
+byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered. `jmlx-jinja` (the
+migrated former `hfjinja` project) is a dependency-free Java 21+ Hugging Face Jinja subset for
+chat-template rendering. `req/project-outline.md` describes the full multi-phase vision (autograd,
+`se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); the rest of Phase 5 (model
+implementations, i.e. M3) is not yet implemented.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -53,10 +55,12 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-examples
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-examples
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
+./gradlew :jmlx-tokenizer:test  # pure-Java tokenizer tests (no native bootstrap needed)
+./gradlew :jmlx-jinja:test      # pure-Java Jinja tests (no native bootstrap needed)
 ```
 
 Every module's native-dependent tests are **skipped, not failed**, when `native/install/lib/mlx.metallib`
@@ -69,13 +73,55 @@ in its own JVM against a disposable copy of the native dir with `mlx.metallib` e
 from the regular `test` task because `NativeLoader.ensureLoaded()` caches its outcome, so it would race
 every other native test over the real staging directory if run in the same JVM.
 
+## Releasing a module
+
+`jmlx-jinja` and `jmlx-tokenizer` are published to Maven Central independently of each other and
+of the root project's version. Each has its own `release.sh`; the other three modules are not
+published (`jmlx-core`/`jmlx-ffi` would need native-artifact packaging designed first, and
+`jmlx-examples` is a demo).
+
+```sh
+./jmlx-jinja/release.sh        # publishes se.alipsa:jmlx-jinja
+./jmlx-tokenizer/release.sh    # publishes se.alipsa:jmlx-tokenizer
+```
+
+Both scripts refuse to publish a `-SNAPSHOT`, and refuse a module that has no `version` line of
+its own (which would mean it is silently riding the root version). To release: set the module's
+version to a release value, run its `release.sh`, then bump it to the next `-SNAPSHOT`. Version
+bumping is deliberately manual.
+
+**Release order matters.** `jmlx-tokenizer` depends on `jmlx-jinja` via `api project(...)`, which
+Gradle publishes as a concrete coordinate. `verifyNoSnapshotDependencies` fails the tokenizer
+release while jinja is still a SNAPSHOT. Release jinja first, then release tokenizer while jinja's
+released version is still checked out; only after both releases should jinja be bumped to its next
+`-SNAPSHOT` version.
+
+Signing and Central credentials come from Gradle properties (`signing.keyId`,
+`sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is
+inert when `signing.keyId` is absent, so `check` and CI stay keyless. Releasing is a local,
+credentialed, manual action — CI verifies but never publishes.
+
+`release.sh` runs `check` (via the `release` task's own dependencies), but not `jmlx-jinja`'s
+heavier `releaseVerification` matrix (isolated Gradle home, candidate-vs.-two-clean-archives diff,
+dependency-update review) — that is not part of `check` and stays a separate, manual step.
+`jmlx-jinja/req/release-checklist.md` is jinja's full release procedure; follow it, not just
+`release.sh`, before an actual jinja release.
+
 ## Code style
 
-Hand-written sources are Google Java Style, 2-space indent, 120-column width
-(`config/spotless/eclipse-java-google-style-120col.xml`, `config/checkstyle/checkstyle.xml` — both
-derived from Google's own upstream artifacts, with deviations documented in comments at the top of
-each file). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from
+Hand-written sources are Google Java Style, 2-space indent, 100-column width. Formatting is
+enforced by running `googleJavaFormat(...)` directly from root `build.gradle`'s Spotless block (no
+separate Spotless config file); linting is `config/checkstyle/checkstyle.xml`, derived from
+checkstyle's own bundled `google_checks.xml` with deviations documented in a comment at the top of
+that file. The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from
 both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — never hand-edit them.
+`buildSrc` (shared Gradle build-logic helpers, e.g. `PublishedPomDependencies`) is its own isolated
+Gradle build, so root `build.gradle`'s `subprojects{}` conventions never reach it -- it applies the
+same checkstyle/Spotless configuration independently in its own `buildSrc/build.gradle` instead
+(duplicating the two tool versions, since it can't read the main build's
+`gradle/libs.versions.toml` either). That check is not wired into the main build's own
+`check`/`build` -- buildSrc is a separate Gradle build with no automatic cross-invocation -- so run
+it explicitly: `./gradlew -p buildSrc check`.
 
 ```sh
 ./gradlew spotlessCheck                                      # verify formatting
@@ -109,25 +155,34 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
                                                     ByteLevelPreTokenizer, ByteLevelDecoder,
                                                     AddedTokenSplitter, TextNormalizer,
                                                     PostProcessorApplier, TokenizerException
-                 (no "|" above: pure Java, no dependency on jmlx-ffi or native/install/lib)
+       |
+jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
+                 pure Java; no dependency on jmlx-ffi or native/install/lib
 ```
 
-The native stack has three modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
+Three native modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
 it in `jmlx-ffi` means it compiles once and stays untouched by day-to-day iteration on `jmlx-core`,
 keeping incremental builds fast and generated code out of review diffs. `jmlx-core` depends on
 `jmlx-ffi` as `implementation`, not `api` — `MLXArray`/`MLX` wrap raw `MemorySegment` handles behind
 plain Java types and never expose `jmlx-ffi` on their own public surface.
 
-**A fourth module, `jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`), sits outside this
-native chain entirely — the first pure-Java module in this codebase.** It has no dependency on
-`jmlx-ffi` and never touches `native/install/lib`; its only dependencies are ordinary Maven artifacts
-— Jackson (`tools.jackson.core:jackson-databind`, for parsing `tokenizer.json`) and `hfjinja`
-(`se.alipsa:hfjinja`, for rendering HF `chat_template` Jinja strings). `HfTokenizer` is a from-scratch
-Java port of the byte-level-BPE pipeline (vocabulary/merges, byte-level pre-tokenization and decoding,
-normalization, added-token splitting, post-processing), not an FFM binding over `mlx-c` or any other
-native tokenizer library — unlike `jmlx-core`, it does not call `NativeLoader.ensureLoaded()` and is
-not part of the "Loading order matters" native-guard discussion below (which is specific to `MLX`,
-`MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
+**`jmlx-tokenizer` and `jmlx-jinja` sit outside the native chain entirely.** Neither depends on
+`jmlx-ffi`; they never touch `native/install/lib` and do not call `NativeLoader.ensureLoaded()`. They
+are not independent of each other, though: `jmlx-tokenizer` declares `api project(':jmlx-jinja')` and
+`ChatTemplateRenderer` returns `jmlx-jinja`'s own `Template` type on its public API, since
+`jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`) is a from-scratch Java port of the
+byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-jinja`, the migrated
+former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
+Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
+below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
+
+Both are also the only **published** modules, and each carries its own version independent of the
+root's `0.5.0-SNAPSHOT`: `jmlx-jinja` is `0.6.0-SNAPSHOT` (continuing the archived hfjinja
+project's line) and `jmlx-tokenizer` is `0.1.0-SNAPSHOT`. Both override the toolchain to **Java
+21** rather than inheriting the root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s
+Panama FFM, and neither pure-Java module needs it, so targeting 21 keeps the published artifacts
+usable by Java 21 consumers. `jmlx-tokenizer`'s `verifyBytecodeLevel` task enforces this. See
+"Releasing a module" above.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless

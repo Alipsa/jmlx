@@ -1,0 +1,696 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+// jmlx-jinja is a dependency-free Java 21 library; keep that promise even though
+// the rest of jmlx currently targets Java 25. It is versioned independently of the
+// other jmlx modules because it was migrated from the standalone hfjinja project.
+version = '0.6.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+// Release verification compares independently rebuilt archive bytes. Archive entry timestamps
+// and iteration order must therefore not depend on the build machine or compilation time.
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+dependencies {
+    // No runtime dependencies.
+}
+
+tasks.withType(Test).configureEach {
+    def canonicalIanaZones = file('tools/corpus/iana-time-zones.txt')
+    inputs.file(canonicalIanaZones)
+    systemProperty 'jmlx.jinja.canonicalIanaZones', canonicalIanaZones.absolutePath
+    maxParallelForks = 2
+    timeout = java.time.Duration.ofMinutes(5)
+}
+
+def upstreamLockFile = layout.projectDirectory.file('upstream/upstream-lock.json').asFile
+def astAllowlistFile = layout.projectDirectory.file('upstream/ast-allowlist.json').asFile
+def mappingFile = layout.projectDirectory.file('upstream/mapping.yml').asFile
+def projectDirectoryFile = layout.projectDirectory.asFile
+def vendorDir = layout.projectDirectory.dir('upstream/vendor').asFile
+def packageMetadataFile = new File(vendorDir, 'package.json')
+def astSourceFile = new File(vendorDir, 'src/ast.ts')
+def runtimeSourceFile = new File(vendorDir, 'src/runtime.ts')
+def utilsSourceFile = new File(vendorDir, 'src/utils.ts')
+def renderOptionsSourceFile = layout.projectDirectory.file('src/main/java/se/alipsa/jmlx/jinja/RenderOptions.java').asFile
+def upstreamVerifyMarker = layout.buildDirectory.file('upstreamVerify/verified').get().asFile
+
+tasks.register('upstreamVerify') {
+    group = 'verification'
+    description = 'Verifies pinned upstream provenance without fetching network data.'
+    def vendorFiles = {
+        def vendorRootPath = vendorDir.toPath()
+        if (!java.nio.file.Files.isDirectory(vendorRootPath)) {
+            return []
+        }
+        def stream = java.nio.file.Files.walk(vendorRootPath)
+        try {
+            stream
+                .filter { java.nio.file.Files.isRegularFile(it) }
+                .filter { path ->
+                    def relativePath = vendorRootPath.relativize(path).toString().replace(File.separatorChar, '/' as char)
+                    relativePath != '.DS_Store'
+                        && !relativePath.endsWith('/.DS_Store')
+                        && relativePath != 'node_modules'
+                        && !relativePath.startsWith('node_modules/')
+                        && !relativePath.contains('/node_modules/')
+                        && relativePath != '__snapshots__'
+                        && !relativePath.startsWith('__snapshots__/')
+                        && !relativePath.contains('/__snapshots__/')
+                }
+                .collect { it.toFile() }
+        } finally {
+            stream.close()
+        }
+    }
+    inputs.file(upstreamLockFile).withPropertyName('upstreamLock')
+    inputs.file(astAllowlistFile).withPropertyName('astAllowlist')
+    inputs.file(mappingFile).withPropertyName('mapping')
+    inputs.file(renderOptionsSourceFile).withPropertyName('renderOptionsSource')
+    inputs.files(vendorFiles).withPropertyName('vendorTree')
+    outputs.file(upstreamVerifyMarker).withPropertyName('verifiedMarker')
+    doLast {
+        if (!vendorDir.isDirectory()) {
+            throw new GradleException('Missing upstream/vendor')
+        }
+        def parsed = new groovy.json.JsonSlurper().parse(upstreamLockFile)
+        ['package', 'version', 'nodeVersion', 'commit', 'tarball', 'integrity', 'sha256',
+         'fixtureRevision', 'excludedFiles', 'astNodes', 'globals', 'files'].each {
+            if (!parsed.containsKey(it)) {
+                throw new GradleException("Upstream lock is missing '${it}'")
+            }
+        }
+        if (parsed.package != '@huggingface/jinja'
+            || !(parsed.version instanceof String && parsed.version ==~ /\d+\.\d+\.\d+/)
+            || !(parsed.nodeVersion instanceof String && parsed.nodeVersion ==~ /v\d+\.\d+\.\d+/)
+            || !(parsed.commit instanceof String && parsed.commit ==~ /[0-9a-f]{40}/)
+            || !(parsed.tarball instanceof String && parsed.tarball.startsWith('https://registry.npmjs.org/'))
+            || !(parsed.integrity instanceof String && parsed.integrity.startsWith('sha512-'))
+            || !(parsed.sha256 instanceof String && parsed.sha256 ==~ /[0-9a-f]{64}/)
+            || !(parsed.fixtureRevision instanceof String && !parsed.fixtureRevision.isBlank()
+                && parsed.fixtureRevision != 'initial')) {
+            throw new GradleException('Upstream lock contains invalid provenance metadata')
+        }
+        def packageMetadata = new groovy.json.JsonSlurper().parse(packageMetadataFile)
+        if (packageMetadata.name != parsed.package || packageMetadata.version != parsed.version) {
+            throw new GradleException('Upstream lock package/version does not match vendored package.json')
+        }
+        if (!(parsed.files instanceof Map) || parsed.files.isEmpty()) {
+            throw new GradleException('Upstream lock has no source file hashes')
+        }
+        if (!(parsed.excludedFiles instanceof Map)) {
+            throw new GradleException('Upstream lock excludedFiles must be a map')
+        }
+        def invalidExclusions = parsed.excludedFiles.findAll { relativePath, metadata ->
+            !(relativePath instanceof String && relativePath ==~ /[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*/)
+                || !(metadata instanceof Map)
+                || !(metadata.sha256 instanceof String && metadata.sha256 ==~ /[0-9a-f]{64}/)
+                || !(metadata.reason instanceof String && !metadata.reason.isBlank())
+        }
+        if (!invalidExclusions.isEmpty()) {
+            throw new GradleException("Upstream lock has invalid excluded files: ${invalidExclusions.keySet()}")
+        }
+        def vendorRootPath = vendorDir.toPath()
+        def vendorPaths = vendorFiles()
+            .collect { vendorRootPath.relativize(it.toPath()).toString().replace(File.separatorChar, '/' as char) }
+            .toSet()
+        def presentExclusions = vendorPaths.intersect(parsed.excludedFiles.keySet())
+        if (!presentExclusions.isEmpty()) {
+            throw new GradleException("Excluded vendored files must not be present: ${presentExclusions}")
+        }
+        if (parsed.files.keySet().toSet() != vendorPaths) {
+            def missingHashes = vendorPaths - parsed.files.keySet().toSet()
+            def staleHashes = parsed.files.keySet().toSet() - vendorPaths
+            throw new GradleException(
+                "Upstream lock file hashes do not cover exactly the vendored tree; missing=${missingHashes}, stale=${staleHashes}")
+        }
+        parsed.files.each { relativePath, expectedHash ->
+            def source = new File(vendorDir, relativePath)
+            if (!source.isFile()) {
+                throw new GradleException("Vendored upstream file is missing: ${relativePath}")
+            }
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(source.bytes)
+                .collect { String.format('%02x', it) }
+                .join()
+            if (digest != expectedHash) {
+                throw new GradleException("Vendored upstream hash mismatch: ${relativePath}")
+            }
+        }
+        def discoveredNodes = (astSourceFile.text =~ /(?m)^(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z0-9_]+)/)
+            .collect { it[1] }
+        if (discoveredNodes.toSet() != parsed.astNodes.toSet()) {
+            def missing = discoveredNodes.findAll { !parsed.astNodes.contains(it) }
+            def stale = parsed.astNodes.findAll { !discoveredNodes.contains(it) }
+            throw new GradleException("AST inventory mismatch; missing=${missing}, stale=${stale}")
+        }
+        if (!(parsed.globals instanceof List)) {
+            throw new GradleException('Upstream lock globals inventory must be a list')
+        }
+        def invalidGlobals = parsed.globals.findAll { global ->
+            !(global instanceof Map)
+                || !(global.name instanceof String && global.name ==~ /[A-Za-z_][A-Za-z0-9_]*/)
+                || !((global.arity instanceof Number && global.arity.intValue() >= 0)
+                    || (global.arity instanceof String && global.arity ==~ /\d+\.\.\d+/))
+                || !(global.hostSupplied instanceof Boolean)
+        }
+        if (!invalidGlobals.isEmpty()) {
+            throw new GradleException("Upstream lock has invalid global inventory entries: ${invalidGlobals}")
+        }
+        def builtInSet = renderOptionsSourceFile.text =~ /(?s)private static final Set<String> BUILTIN_GLOBALS\s*=\s*Set\.of\((.*?)\);/
+        if (!builtInSet.find()) {
+            throw new GradleException('Cannot find RenderOptions built-in global set')
+        }
+        def reservedBuiltIns = (builtInSet.group(1) =~ /"([A-Za-z_][A-Za-z0-9_]*)"/).collect { it[1] }
+        def expectedBuiltIns = (parsed.globals.findAll { !it.hostSupplied }.collect { it.name } + ['namespace']).unique()
+        if (reservedBuiltIns.toSet() != expectedBuiltIns.toSet() || reservedBuiltIns.size() != expectedBuiltIns.size()) {
+            throw new GradleException('RenderOptions built-in globals do not match the upstream lock inventory')
+        }
+        def discoveredGlobals = (runtimeSourceFile.text =~ /env\.set\("([A-Za-z_][A-Za-z0-9_]*)",/)
+            .collect { it[1] }
+        def lockedGlobals = parsed.globals.collect { it.name }
+        if (discoveredGlobals.toSet() != lockedGlobals.toSet() || discoveredGlobals.size() != lockedGlobals.size()) {
+            def missing = discoveredGlobals.findAll { !lockedGlobals.contains(it) }
+            def stale = lockedGlobals.findAll { !discoveredGlobals.contains(it) }
+            throw new GradleException("Global inventory mismatch; missing=${missing}, stale=${stale}")
+        }
+        def utilsSource = utilsSourceFile.text
+        def functionArity = { functionName ->
+            def match = utilsSource =~ "export\\s+function\\s+${functionName}\\(([^)]*)\\)"
+            if (!match.find()) {
+                throw new GradleException("Cannot determine arity for upstream global: ${functionName}")
+            }
+            def parameters = match.group(1).split(',').collect { it.trim() }.findAll { !it.isEmpty() }
+            def required = parameters.count { !it.contains('?') && !it.contains('=') }
+            return required == parameters.size() ? required : "${required}..${parameters.size()}".toString()
+        }
+        def expectedArities = [
+            false: 0, true: 0, none: 0, raise_exception: 1,
+            range: functionArity('range'), strftime_now: functionArity('strftime_now'),
+            True: 0, False: 0, None: 0
+        ]
+        def lockedArities = parsed.globals.collectEntries { [(it.name): it.arity] }
+        if (lockedArities != expectedArities) {
+            throw new GradleException("Global arity inventory mismatch; expected=${expectedArities}, actual=${lockedArities}")
+        }
+        def declaredNodes = new groovy.json.JsonSlurper().parse(astAllowlistFile)
+        def unaccountedNodes = discoveredNodes.findAll { !declaredNodes.containsKey(it) }
+        if (!unaccountedNodes.isEmpty()) {
+            throw new GradleException("Unaccounted AST nodes: ${unaccountedNodes.join(', ')}")
+        }
+        def mappingEntries = [:]
+        def currentMapping = null
+        mappingFile.eachLine { line ->
+            def section = line =~ /^([A-Za-z0-9_.-]+\.ts):\s*$/
+            if (section.matches()) {
+                currentMapping = section.group(1)
+                if (mappingEntries.containsKey(currentMapping)) {
+                    throw new GradleException("Duplicate mapping entry: ${currentMapping}")
+                }
+                mappingEntries[currentMapping] = [noImpact: false, hash: null, milestone: null, status: null,
+                                                  java: null, tests: null]
+            } else if (currentMapping != null && line.trim().startsWith('milestone:')) {
+                mappingEntries[currentMapping].milestone = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim().startsWith('status:')) {
+                mappingEntries[currentMapping].status = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim().startsWith('java:')) {
+                mappingEntries[currentMapping].java = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim().startsWith('tests:')) {
+                mappingEntries[currentMapping].tests = line.substring(line.indexOf(':') + 1).trim()
+            } else if (currentMapping != null && line.trim() == 'reviewed-no-port-impact:') {
+                mappingEntries[currentMapping].noImpact = true
+            } else if (currentMapping != null && line.trim().startsWith('sha256:')) {
+                mappingEntries[currentMapping].hash = line.substring(line.indexOf(':') + 1).trim()
+            }
+        }
+        parsed.files.findAll { relativePath, ignored -> relativePath.startsWith('src/') }.each { relativePath, expectedHash ->
+            def basename = new File(relativePath).name
+            if (!mappingEntries.containsKey(basename)) {
+                throw new GradleException("No mapping entry for upstream file: ${relativePath}")
+            }
+            if (mappingEntries[basename].noImpact && mappingEntries[basename].hash != expectedHash) {
+                throw new GradleException("Stale reviewed-no-port-impact hash: ${relativePath}")
+            }
+            def entry = mappingEntries[basename]
+            if (!(entry.milestone ==~ /M\d+/)) {
+                throw new GradleException("Mapping entry has invalid milestone: ${basename}")
+            }
+            if (entry.noImpact) {
+                if (entry.status != null || entry.java != null || entry.tests != null) {
+                    throw new GradleException("No-impact mapping must not declare a port status: ${basename}")
+                }
+            } else if (entry.status == 'planned') {
+                if (entry.java != '[]' || entry.tests != '[]') {
+                    throw new GradleException("Planned mapping must explicitly have no Java/tests yet: ${basename}")
+                }
+            } else if (entry.status == 'implemented') {
+                if (!(entry.java ==~ /\[\s*\S(?:.*\S)?\s*\]/)
+                    || !(entry.tests ==~ /\[\s*\S(?:.*\S)?\s*\]/)) {
+                    throw new GradleException("Implemented mapping must name Java and test coverage: ${basename}")
+                }
+                ((entry.java + entry.tests) =~ /(src\/[^,\]\s]+\.java)/).collect { it[1] }.each { declared ->
+                    if (!new File(projectDirectoryFile, declared).isFile()) {
+                        throw new GradleException("Mapping entry names a missing file: ${basename} -> ${declared}")
+                    }
+                }
+            } else {
+                throw new GradleException("Mapping entry has invalid status: ${basename}")
+            }
+        }
+        def plannedPackages = ['lexer.ts': 'internal/lexer', 'ast.ts': 'internal/ast',
+                               'parser.ts': 'internal/parser', 'runtime.ts': 'internal/runtime',
+                               'utils.ts': 'internal/util']
+        mappingEntries.each { basename, entry ->
+            def packagePath = plannedPackages[basename]
+            if (entry.status == 'planned' && packagePath != null
+                && new File(projectDirectoryFile, "src/main/java/se/alipsa/jmlx/jinja/${packagePath}").isDirectory()) {
+                throw new GradleException("Mapping entry is still 'planned' but its Java package exists: ${basename}")
+            }
+        }
+        def mappedSources = mappingEntries.keySet().collect { "src/${it}" }.toSet()
+        def vendoredSources = parsed.files.keySet().findAll { it.startsWith('src/') }.toSet()
+        def staleMappings = mappedSources - vendoredSources
+        if (!staleMappings.isEmpty()) {
+            throw new GradleException("Mapping entries do not correspond to upstream source: ${staleMappings}")
+        }
+        upstreamVerifyMarker.parentFile.mkdirs()
+        upstreamVerifyMarker.text = 'verified\n'
+    }
+}
+
+def nodeCorpusTestMarker = layout.buildDirectory.file('nodeCorpusTest/verified').get().asFile
+def nodeOracleVersionMarker = layout.buildDirectory.file('nodeOracleVersion/verified').get().asFile
+def nodeCorpusVerifyMarker = layout.buildDirectory.file('nodeCorpusVerify/verified').get().asFile
+def astSnapshotMarker = layout.buildDirectory.file('astSnapshotVerify/verified').get().asFile
+def fuzzParserTestMarker = layout.buildDirectory.file('fuzzParserTest/verified').get().asFile
+def fuzzParserVerifyReport = layout.buildDirectory.file('reports/fuzz-parser.md').get().asFile
+def formatGoldenMarker = layout.buildDirectory.file('formatGoldenVerify/verified').get().asFile
+def formatGoldenReport = layout.buildDirectory.file('reports/format-ast-coverage.md').get().asFile
+
+tasks.register('formatGoldenVerify', Exec) {
+    group = 'verification'
+    description = 'Verifies pinned Node template-format goldens and AST coverage.'
+    executable = 'node'
+    args 'tools/format/format-golden.mjs', '--vectors', 'src/test/resources/format/vectors.json',
+        '--check', 'src/test/resources/format/upstream-formatted.json', '--report', formatGoldenReport.absolutePath
+    inputs.files('tools/format/format-golden.mjs', 'src/test/resources/format/vectors.json',
+        'src/test/resources/format/upstream-formatted.json', 'upstream/vendor/dist/index.js',
+        'upstream/ast-allowlist.json', 'upstream/upstream-lock.json', 'tools/corpus/corpus.mjs',
+        'tools/corpus/error-patterns-0.5.9.json')
+    outputs.file(formatGoldenMarker).withPropertyName('verifiedMarker')
+    outputs.file(formatGoldenReport).withPropertyName('astCoverageReport')
+    doLast { formatGoldenMarker.parentFile.mkdirs(); formatGoldenMarker.text = "verified\n" }
+}
+
+tasks.register('astSnapshotVerify', Exec) {
+    group = 'verification'
+    description = 'Verifies checked-in AST snapshots against the pinned Node parser.'
+    executable = 'node'
+    args 'tools/ast-snapshot/snapshot.mjs', '--fixtures', 'src/test/resources/ast-snapshots/fixtures.json',
+        '--check', 'src/test/resources/ast-snapshots/upstream-parsed.txt'
+    inputs.files('tools/ast-snapshot/snapshot.mjs', 'tools/ast-snapshot/ast-serialize.mjs', 'src/test/resources/ast-snapshots/fixtures.json',
+        'src/test/resources/ast-snapshots/upstream-parsed.txt', 'upstream/vendor/dist/index.js')
+    outputs.file(astSnapshotMarker).withPropertyName('verifiedMarker')
+    doLast { astSnapshotMarker.parentFile.mkdirs(); astSnapshotMarker.text = "verified\n" }
+}
+
+tasks.register('fuzzParserTest', Exec) {
+    group = 'verification'
+    description = 'Tests deterministic parser fuzz candidate generation.'
+    executable = 'node'
+    args '--test', 'tools/fuzz/generate-parser-cases.test.mjs'
+    inputs.files('tools/fuzz/generate-parser-cases.mjs', 'tools/fuzz/generate-parser-cases.test.mjs',
+        'tools/fuzz/testdata/parser-cases-5eedc0de.ndjson')
+    outputs.file(fuzzParserTestMarker).withPropertyName('verifiedMarker')
+    doLast { fuzzParserTestMarker.parentFile.mkdirs(); fuzzParserTestMarker.text = 'verified\n' }
+}
+
+tasks.register('fuzzParserVerify', Exec) {
+    group = 'verification'
+    description = 'Differentially fuzzes the pinned Node and Java lexer/parser in bounded subprocesses.'
+    dependsOn tasks.named('testClasses')
+    executable = 'node'
+    args 'tools/fuzz/compare-parser-results.mjs', '--java', javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }.get().executablePath.asFile.absolutePath, '--java-classpath', sourceSets.test.runtimeClasspath.asPath,
+        '--report', fuzzParserVerifyReport.absolutePath
+    inputs.files('tools/fuzz/generate-parser-cases.mjs', 'tools/fuzz/node-parser-runner.mjs',
+        'tools/fuzz/compare-parser-results.mjs', 'tools/ast-snapshot/ast-serialize.mjs',
+        'src/test/resources/corpus/v1.jsonl', 'upstream/upstream-lock.json', 'upstream/vendor/dist/index.js', sourceSets.test.runtimeClasspath)
+    outputs.file(fuzzParserVerifyReport)
+    outputs.upToDateWhen { false }
+}
+
+tasks.register('nodeCorpusTest', Exec) {
+    group = 'verification'
+    description = 'Tests the versioned differential-corpus schema and error classifier.'
+    executable = 'node'
+    args '--test', 'tools/corpus/corpus.test.mjs'
+    inputs.files('tools/corpus/corpus.mjs', 'tools/corpus/iana-time-zones.txt', 'tools/corpus/corpus.test.mjs',
+        'tools/corpus/error-patterns-0.5.9.json', 'upstream/upstream-lock.json',
+        fileTree('src/test/resources/model-templates'))
+    outputs.file(nodeCorpusTestMarker).withPropertyName('verifiedMarker')
+    doLast {
+        nodeCorpusTestMarker.parentFile.mkdirs()
+        nodeCorpusTestMarker.text = 'verified\n'
+    }
+}
+
+tasks.register('nodeOracleVersion', Exec) {
+    group = 'verification'
+    description = 'Requires the exact Node version pinned for the differential oracle.'
+    executable = 'node'
+    args 'tools/corpus/check-node-version.mjs', '--lock', 'upstream/upstream-lock.json'
+    inputs.files('tools/corpus/check-node-version.mjs', 'upstream/upstream-lock.json')
+    outputs.file(nodeOracleVersionMarker).withPropertyName('verifiedMarker')
+    outputs.upToDateWhen { false }
+    doLast {
+        nodeOracleVersionMarker.parentFile.mkdirs()
+        nodeOracleVersionMarker.text = 'verified\n'
+    }
+}
+
+tasks.register('nodeCorpusVerify', Exec) {
+    group = 'verification'
+    description = 'Checks text-bearing corpus cases against the pinned Node oracle.'
+    executable = 'node'
+    args 'tools/corpus/run-node-oracle.mjs', '--corpus', 'src/test/resources/corpus/v1.jsonl',
+        '--patterns', 'tools/corpus/error-patterns-0.5.9.json', '--lock', 'upstream/upstream-lock.json'
+    inputs.files('tools/corpus/corpus.mjs', 'tools/corpus/iana-time-zones.txt', 'tools/corpus/run-node-oracle.mjs',
+        'tools/corpus/error-patterns-0.5.9.json', 'src/test/resources/corpus/v1.jsonl',
+        'upstream/vendor/dist/index.js', 'upstream/upstream-lock.json')
+    outputs.file(nodeCorpusVerifyMarker).withPropertyName('verifiedMarker')
+    doLast {
+        nodeCorpusVerifyMarker.parentFile.mkdirs()
+        nodeCorpusVerifyMarker.text = 'verified\n'
+    }
+}
+
+def corpusCoverageReport = layout.buildDirectory.file('reports/corpus-coverage.md').get().asFile
+tasks.register('corpusCoverage', Exec) {
+    group = 'verification'
+    description = 'Checks extracted corpus fixtures and writes their upstream coverage report.'
+    executable = 'node'
+    args 'tools/corpus/convert-upstream-tests.mjs', '--check', "--report=${corpusCoverageReport.absolutePath}"
+    inputs.files('tools/corpus/convert-upstream-tests.mjs', 'tools/corpus/corpus.mjs', 'tools/corpus/iana-time-zones.txt',
+        'src/test/resources/corpus/v1.jsonl', 'upstream/upstream-lock.json', 'upstream/corpus-source-inventory.json',
+        'upstream/vendor/src/runtime.ts',
+        fileTree('upstream/vendor/test') { include '**/*.test.js' })
+    outputs.file(corpusCoverageReport)
+}
+
+// The Node-dependent verification tasks require the exact Node version pinned in
+// upstream/upstream-lock.json (currently 26.7.0). They are available as explicit
+// tasks but are not wired into `check` because jmlx does not otherwise require Node.
+def nodeDependentTasks = ['nodeCorpusTest', 'nodeOracleVersion', 'nodeCorpusVerify', 'corpusCoverage',
+                          'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify', 'formatGoldenVerify']
+def upstreamVerification = tasks.named('upstreamVerify')
+def nodeVersionVerification = tasks.named('nodeOracleVersion')
+def nodeTimeoutSeconds = [nodeCorpusTest: 120, nodeCorpusVerify: 300, corpusCoverage: 120, nodeOracleVersion: 30,
+                          astSnapshotVerify: 120, fuzzParserTest: 30, fuzzParserVerify: 120, formatGoldenVerify: 120]
+nodeDependentTasks.each { taskName ->
+    tasks.named(taskName) {
+        dependsOn upstreamVerification
+        mustRunAfter upstreamVerification
+        timeout = java.time.Duration.ofSeconds(nodeTimeoutSeconds[taskName])
+    }
+}
+['nodeCorpusTest', 'nodeCorpusVerify', 'corpusCoverage', 'astSnapshotVerify', 'fuzzParserTest', 'fuzzParserVerify', 'formatGoldenVerify'].each { taskName ->
+    tasks.named(taskName) {
+        dependsOn nodeVersionVerification
+    }
+}
+
+// Publishing configuration so jmlx-jinja can be released independently of the other modules.
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-jinja'
+                description = 'Dependency-free Java port of @huggingface/jinja for Hugging Face chat templates.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+    if (providers.gradleProperty('releaseVerificationRepository').present) {
+        repositories {
+            maven {
+                name = 'releaseVerification'
+                url = uri(providers.gradleProperty('releaseVerificationRepository').get())
+            }
+        }
+    }
+}
+
+def releaseVerificationManifest = layout.projectDirectory.file('req/release-verification.json').asFile
+def releaseVerificationPom = layout.buildDirectory.file('publications/maven/pom-default.xml')
+def releaseVerificationJar = tasks.named('jar').flatMap { it.archiveFile }
+def releaseGroup = group.toString()
+def releaseArtifact = name
+def releaseVersion = version.toString()
+
+tasks.register('verifyPublicationMetadata') {
+    group = 'verification'
+    description = 'Verifies the generated publication POM against the release contract.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    inputs.file(releaseVerificationManifest)
+    inputs.file(releaseVerificationPom)
+    inputs.properties(group: releaseGroup, artifact: releaseArtifact, version: releaseVersion)
+    doLast {
+        def contract = new groovy.json.JsonSlurper().parse(releaseVerificationManifest)
+        def pomFile = releaseVerificationPom.get().asFile
+        def values = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.directChildTexts(pomFile)
+        if (values['groupId'] != releaseGroup || values['artifactId'] != releaseArtifact || values['version'] != releaseVersion) {
+            throw new GradleException('Generated POM coordinates do not match the project')
+        }
+        // The contract only pins group:artifact, not a version: ReleaseVerifierMain reconstructs
+        // the full GAV it needs by reading the live project version directly (see its own
+        // moduleVersion), so there is nothing version-shaped left to keep in sync by hand here.
+        if (contract.groupArtifact != "${releaseGroup}:${releaseArtifact}") {
+            throw new GradleException('Release contract coordinates do not match the project')
+        }
+        def actualDependencies = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(releaseVerificationPom.get().asFile)
+                .collect { it.groupArtifact() }.toSorted()
+        def expectedDependencies = contract.publishedRuntimeDependencies.collect { it.toString() }.toSorted()
+        if (actualDependencies != expectedDependencies) {
+            throw new GradleException("Generated POM dependencies differ from release contract; expected ${expectedDependencies}, found ${actualDependencies}")
+        }
+        ['name', 'description', 'url'].each { field ->
+            def value = values[field]
+            if (value == null || value.isBlank()) throw new GradleException("Generated POM is missing ${field}")
+        }
+    }
+}
+
+tasks.register('verifyModuleDescriptor') {
+    group = 'verification'
+    description = 'Verifies the published module name, export surface, and Java 21 bytecode level.'
+    dependsOn tasks.named('jar')
+    inputs.file(releaseVerificationManifest)
+    inputs.file(releaseVerificationJar)
+    doLast {
+        def contract = new groovy.json.JsonSlurper().parse(releaseVerificationManifest)
+        def jarFile = releaseVerificationJar.get().asFile
+        def zip = new java.util.zip.ZipFile(jarFile)
+        def bytes
+        try {
+            def entry = zip.getEntry('module-info.class')
+            if (entry == null) throw new GradleException("Published jar has no module-info.class: ${jarFile}")
+            bytes = zip.getInputStream(entry).bytes
+            int major = ((bytes[6] & 0xff) << 8) | (bytes[7] & 0xff)
+            if (major != contract.bytecodeMajor) throw new GradleException("Expected bytecode major ${contract.bytecodeMajor}, got ${major}")
+        } finally {
+            zip.close()
+        }
+        def descriptor = java.lang.module.ModuleDescriptor.read(java.nio.ByteBuffer.wrap(bytes))
+        def exports = descriptor.exports().collect { it.source() }
+        if (descriptor.name() != contract.module || exports.toSet() != contract.exports.toSet()) {
+            throw new GradleException("Module descriptor does not match release contract: ${descriptor}")
+        }
+    }
+}
+
+abstract class ExampleModulePathArguments implements CommandLineArgumentProvider {
+    @Classpath
+    abstract RegularFileProperty getModuleJar()
+
+    @Override
+    Iterable<String> asArguments() {
+        ['--module-path', moduleJar.get().asFile.absolutePath, '--add-modules', 'se.alipsa.jmlx.jinja']
+    }
+}
+
+// examples/tokenizer-config is a standalone usage sample, not part of the published jar -- this
+// task only guards that it keeps compiling against the published module (module path, not
+// classpath, so a regression in module-info.java's exports fails this the same way it would fail
+// a real consumer following the README's `requires se.alipsa.jmlx.jinja;` usage).
+tasks.register('compileTokenizerConfigExample', JavaCompile) {
+    group = 'verification'
+    description = 'Compiles the tokenizer-config example against the published jmlx-jinja module.'
+    dependsOn tasks.named('jar')
+    source = fileTree('examples/tokenizer-config') { include '**/*.java' }
+    classpath = files()
+    options.release = 21
+    def modulePathArguments = objects.newInstance(ExampleModulePathArguments)
+    modulePathArguments.moduleJar.set(tasks.named('jar').flatMap { it.archiveFile })
+    options.compilerArgumentProviders.add(modulePathArguments)
+    destinationDirectory = layout.buildDirectory.dir('classes/examples/tokenizerConfig')
+}
+
+tasks.register('verifyTokenizerConfigExample', JavaExec) {
+    group = 'verification'
+    description = 'Runs the tokenizer-config example against a Unicode-escaped JSON template.'
+    dependsOn tasks.named('compileTokenizerConfigExample')
+    classpath = files(layout.buildDirectory.dir('classes/examples/tokenizerConfig'))
+    mainClass = 'example.TokenizerConfigExample'
+    jvmArgs '--module-path', tasks.named('jar').flatMap { it.archiveFile }.get().asFile.absolutePath,
+        '--add-modules', 'se.alipsa.jmlx.jinja', '-Dstdout.encoding=UTF-8'
+    args 'examples/tokenizer-config/tokenizer_config_unicode.json'
+    inputs.file('examples/tokenizer-config/tokenizer_config_unicode.json')
+    def rendered = new ByteArrayOutputStream()
+    standardOutput = rendered
+    doLast {
+        if (rendered.toString(java.nio.charset.StandardCharsets.UTF_8) != 'å') {
+            throw new GradleException("Tokenizer-config example rendered '${rendered}' instead of 'å'")
+        }
+    }
+}
+
+// upstreamVerify, verifyPublicationMetadata, verifyModuleDescriptor, and
+// compileTokenizerConfigExample all run on every check because none of them needs a Node
+// toolchain.
+tasks.named('check') {
+    dependsOn tasks.named('upstreamVerify'), tasks.named('verifyPublicationMetadata'),
+        tasks.named('verifyModuleDescriptor'), tasks.named('compileTokenizerConfigExample'),
+        tasks.named('verifyTokenizerConfigExample')
+}
+
+// The root Spotless convention targets conventional source sets only; this standalone example is
+// also a maintained Java source and must be formatted with the rest of the module.
+spotless {
+    java {
+        target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java',
+            'examples/**/*.java'
+    }
+}
+
+tasks.register('dependencyReview') {
+    group = 'verification'
+    description = 'Reviews staged dependency-update evidence without resolving dependencies.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    def stagedReport = providers.gradleProperty('releaseVerificationDependencyReport').map { new File(it) }
+    def dependencyReviewOutput = layout.buildDirectory.file('reports/dependency-review.md')
+    inputs.file(stagedReport).optional()
+    inputs.file(releaseVerificationPom)
+    outputs.file(dependencyReviewOutput)
+    doLast {
+        if (!stagedReport.present || !stagedReport.get().isFile()) {
+            throw new GradleException('dependencyReview requires -PreleaseVerificationDependencyReport=<staged online dependencyUpdates report>')
+        }
+        if (!se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(releaseVerificationPom.get().asFile).isEmpty()) {
+            throw new GradleException('Published POM has runtime dependencies')
+        }
+        def report = dependencyReviewOutput.get().asFile
+        report.parentFile.mkdirs()
+        report.text = "# Dependency review\n\nStaged online scan: `${stagedReport.get()}`\n\nPublished runtime dependencies: none\n\nThe Node oracle is lock-governed and is not upgraded by this review.\n"
+    }
+}
+
+tasks.register('dependencyUpdates') {
+    group = 'help'
+    description = 'Writes the dependency update report used by release verification.'
+    def dependencyUpdatesReport = layout.buildDirectory.file('dependencyUpdates/report.txt')
+    outputs.file(dependencyUpdatesReport)
+    doLast {
+        def report = dependencyUpdatesReport.get().asFile
+        report.parentFile.mkdirs()
+        report.text = 'jmlx-jinja has no Maven runtime dependencies.\n'
+    }
+}
+
+def releaseVerificationBytecodeMajor = providers.fileContents(layout.projectDirectory.file('req/release-verification.json')).asText.map {
+    new groovy.json.JsonSlurper().parseText(it).bytecodeMajor.toString()
+}
+
+abstract class ReleaseVerificationBytecodeArgument implements CommandLineArgumentProvider {
+    @Input
+    abstract Property<String> getBytecodeMajor()
+
+    @Override
+    Iterable<String> asArguments() {
+        [bytecodeMajor.get()]
+    }
+}
+
+tasks.register('verifyJava21Toolchain') {
+    group = 'verification'
+    description = 'Fails early unless Gradle can resolve the Java 21 toolchain used by this module.'
+    doLast {
+        def launcher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }.get()
+        logger.lifecycle("Resolved Java 21 toolchain: ${launcher.metadata.installationPath}")
+    }
+}
+
+tasks.register('verifyReproducibleArchives', JavaExec) {
+    group = 'verification'
+    description = 'Release-only: performs two independent clean archive builds and compares their bytes.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.jinja.release.ArchiveReproducibilityMain'
+    args layout.projectDirectory.asFile.absolutePath, gradle.gradleUserHomeDir.absolutePath, gradle.startParameter.offline.toString(), layout.buildDirectory.file('reports/archive-reproducibility.json').get().asFile.absolutePath
+    def bytecodeArgument = objects.newInstance(ReleaseVerificationBytecodeArgument)
+    bytecodeArgument.bytecodeMajor.set(releaseVerificationBytecodeMajor)
+    argumentProviders.add(bytecodeArgument)
+    outputs.file(layout.buildDirectory.file('reports/archive-reproducibility.json'))
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+}
+
+tasks.register('releaseVerification', JavaExec) {
+    group = 'verification'
+    description = 'Runs the isolated clean-checkout release candidate verification matrix.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.jinja.release.ReleaseVerifierMain'
+    def verificationHome = layout.buildDirectory.dir('release-verification-user-home').get().asFile
+    args layout.projectDirectory.asFile.absolutePath, verificationHome.absolutePath,
+        System.getProperty('java.home'), System.getProperty('java.vendor'), System.getProperty('java.version')
+    if (providers.gradleProperty('releaseVerificationAllowDirty').present) args '--allow-dirty'
+    inputs.files(releaseVerificationManifest, file('upstream/upstream-lock.json'), file('NOTICE'), file('req/model-fixture-policy.md'),
+        file('CHANGELOG.md'), file('req/release-checklist.md'))
+    outputs.files(layout.buildDirectory.file('reports/release-verification.md'), layout.buildDirectory.file('reports/release-verification-evidence'))
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+}

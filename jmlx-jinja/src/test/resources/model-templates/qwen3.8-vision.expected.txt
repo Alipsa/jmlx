@@ -1,0 +1,2 @@
+<|im_start|>user
+Describe Picture 1: <|vision_start|><|image_pad|><|vision_end|> then Video 1: <|vision_start|><|video_pad|><|vision_end|><|im_end|>

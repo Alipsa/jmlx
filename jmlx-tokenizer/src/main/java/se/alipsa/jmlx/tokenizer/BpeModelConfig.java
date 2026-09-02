@@ -6,6 +6,10 @@ import java.util.Objects;
 /**
  * {@code tokenizer.json}'s {@code model} object, scoped to the byte-level-BPE fields this port
  * uses.
+ *
+ * @param vocab token text to id mapping
+ * @param mergeRank adjacent-pair merge ranks
+ * @param ignoreMerges whether a complete vocabulary token bypasses merging
  */
 public record BpeModelConfig(
     Map<String, Integer> vocab, Map<String, Integer> mergeRank, boolean ignoreMerges) {

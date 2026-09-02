@@ -6,7 +6,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** The {@code TemplateProcessing} post-processor step's {@code single} template. */
+/**
+ * The {@code TemplateProcessing} post-processor step's {@code single} template.
+ *
+ * @param single ordered template items
+ * @param specialTokens special-token definitions by id
+ */
 public record TemplateProcessingStep(
     List<TemplateItem> single, Map<String, SpecialTokenInfo> specialTokens)
     implements PostProcessorStep {

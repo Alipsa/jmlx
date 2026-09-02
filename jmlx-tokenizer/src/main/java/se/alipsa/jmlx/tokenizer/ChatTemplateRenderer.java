@@ -4,10 +4,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import se.alipsa.hfjinja.HfJinjaException;
-import se.alipsa.hfjinja.Template;
+import se.alipsa.jmlx.jinja.JinjaException;
+import se.alipsa.jmlx.jinja.Template;
 
-/** Renders a Hugging Face {@code chat_template} Jinja string via {@code hfjinja}. */
+/** Renders a Hugging Face {@code chat_template} Jinja string via {@code jmlx-jinja}. */
 public final class ChatTemplateRenderer {
 
   private ChatTemplateRenderer() {}
@@ -18,6 +18,14 @@ public final class ChatTemplateRenderer {
    * underneath the fixed keys below. This overload parses on each call; use {@link #parse(String)}
    * and the {@link #render(Template, List, boolean, String, String, Map)} overload in a serving
    * loop.
+   *
+   * @param chatTemplate template source
+   * @param messages chat messages
+   * @param addGenerationPrompt whether to add the generation prompt
+   * @param bosToken beginning-of-sequence token
+   * @param eosToken end-of-sequence token
+   * @param extraContext additional template values
+   * @return rendered prompt
    */
   public static String render(
       String chatTemplate,
@@ -30,7 +38,17 @@ public final class ChatTemplateRenderer {
         parse(chatTemplate), messages, addGenerationPrompt, bosToken, eosToken, extraContext);
   }
 
-  /** Renders a parsed chat template against the standard HF chat-template context variables. */
+  /**
+   * Renders a parsed chat template against the standard HF chat-template context variables.
+   *
+   * @param chatTemplate parsed template
+   * @param messages chat messages
+   * @param addGenerationPrompt whether to add the generation prompt
+   * @param bosToken beginning-of-sequence token
+   * @param eosToken end-of-sequence token
+   * @param extraContext additional template values
+   * @return rendered prompt
+   */
   public static String render(
       Template chatTemplate,
       List<Map<String, Object>> messages,
@@ -50,19 +68,24 @@ public final class ChatTemplateRenderer {
     context.put("eos_token", eosToken);
     try {
       return chatTemplate.render(context);
-    } catch (HfJinjaException e) {
+    } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);
     }
   }
 
-  /** Parses a chat template for callers to retain and render repeatedly. */
+  /**
+   * Parses a chat template for callers to retain and render repeatedly.
+   *
+   * @param chatTemplate template source
+   * @return parsed template
+   */
   public static Template parse(String chatTemplate) {
     Objects.requireNonNull(
         chatTemplate, "ChatTemplateRenderer.parse: chatTemplate must not be null");
     try {
       return Template.parse(chatTemplate);
-    } catch (HfJinjaException e) {
+    } catch (JinjaException e) {
       throw new TokenizerException("ChatTemplateRenderer.parse: failed to parse chat template", e);
     }
   }

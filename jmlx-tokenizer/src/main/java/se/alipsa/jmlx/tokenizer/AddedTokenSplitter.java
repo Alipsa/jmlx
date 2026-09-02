@@ -17,12 +17,19 @@ public final class AddedTokenSplitter {
   /**
    * One segment of split input: either literal added-token text, or plain text needing full
    * tokenization.
+   *
+   * @param text segment text
+   * @param isAddedToken whether this is a literal added token
    */
   public record Segment(String text, boolean isAddedToken) {}
 
   private final Pattern addedTokenPattern;
 
-  /** Builds a longest-first alternation regex from the added tokens' literal content. */
+  /**
+   * Builds a longest-first alternation regex from the added tokens' literal content.
+   *
+   * @param addedTokens tokens to recognize literally
+   */
   public AddedTokenSplitter(List<AddedToken> addedTokens) {
     Objects.requireNonNull(addedTokens, "AddedTokenSplitter: addedTokens must not be null");
     if (addedTokens.isEmpty()) {
@@ -40,6 +47,9 @@ public final class AddedTokenSplitter {
 
   /**
    * Splits {@code text} into ordered segments, tagging which ones are literal added-token strings.
+   *
+   * @param text input text
+   * @return ordered input segments
    */
   public List<Segment> split(String text) {
     Objects.requireNonNull(text, "AddedTokenSplitter.split: text must not be null");

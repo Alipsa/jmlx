@@ -1,13 +1,14 @@
 /*
- * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer and
- * jmlx-examples lives here; each module's own build.gradle only declares its
- * plugin and dependencies. See req/initial-plan.md §4 for the rationale
- * behind the native-access flags and the native-directory system property
- * below.
+ * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer,
+ * jmlx-jinja and jmlx-examples lives here; each module's own build.gradle only
+ * declares its plugin and dependencies. See req/initial-plan.md §4 for the
+ * rationale behind the native-access flags and the native-directory system
+ * property below.
  */
 
 plugins {
-    id 'com.diffplug.spotless' version '8.9.0' apply false
+    alias(libs.plugins.spotless) apply false
+    alias(libs.plugins.nexusRelease) apply false
 }
 
 allprojects {
@@ -15,17 +16,21 @@ allprojects {
     version = '0.5.0-SNAPSHOT'
 }
 
-// mavenLocal() is only added when the jmlx project's own version (above) is a -SNAPSHOT
-// build -- the expected setup for resolving a locally-built, unreleased dependency (e.g.
-// testing against an unreleased hfjinja before it is published to Central) during local
-// development, not a build-hygiene concern. A real release build resolves every dependency
-// from mavenCentral() alone, so a stale same-GAV artifact sitting in ~/.m2/repository can
-// never silently win over Central with no diagnostic (see PR #14 review).
+// mavenLocal() is only added for a module's own -SNAPSHOT builds -- the expected setup for
+// resolving a locally-built, unreleased dependency during local development, not a build-hygiene
+// concern. A release module resolves dependencies from mavenCentral() alone, so a stale same-GAV
+// artifact sitting in
+// ~/.m2/repository can never silently win over Central with no diagnostic (see PR #14 review).
 allprojects {
-    repositories {
-        mavenCentral()
-        if (rootProject.version.toString().endsWith('-SNAPSHOT')) {
-            mavenLocal()
+    // A module's own build.gradle sets its independent version after this root convention is
+    // applied, so choose repositories after that script has evaluated rather than accidentally
+    // inspecting the inherited root SNAPSHOT version.
+    afterEvaluate {
+        repositories {
+            mavenCentral()
+            if (version.toString().endsWith('-SNAPSHOT')) {
+                mavenLocal()
+            }
         }
     }
 }
@@ -34,17 +39,22 @@ allprojects {
 // accessor: referencing that accessor from a root-script subprojects{} closure is an
 // implicit parent-project property lookup, deprecated as of Gradle 9.7 and an error in
 // Gradle 10 (see useJUnitJupiter below). orElseThrow with a message beats the bare .get()'s
-// context-free NoSuchElementException if the catalog alias is ever renamed.
-def junitJupiterVersion =
+// context-free NoSuchElementException if the catalog alias is ever renamed. Shared by every
+// version read below that happens inside the subprojects{} closure, for the same reason.
+def catalogVersion = { String alias ->
     rootProject.extensions
         .getByType(VersionCatalogsExtension)
         .named('libs')
-        .findVersion('junit.jupiter')
+        .findVersion(alias)
         .orElseThrow(
             () ->
                 new IllegalStateException(
-                    "build.gradle: no 'junit.jupiter' version alias in gradle/libs.versions.toml"))
+                    "build.gradle: no '${alias}' version alias in gradle/libs.versions.toml"))
         .requiredVersion
+}
+def junitJupiterVersion = catalogVersion('junit.jupiter')
+def checkstyleVersion = catalogVersion('checkstyle')
+def googleJavaFormatVersion = catalogVersion('google.java.format')
 
 subprojects {
     apply plugin: 'java'
@@ -62,7 +72,7 @@ subprojects {
     // see config/checkstyle/checkstyle.xml for the checkstyle side, which
     // derives from Google's own upstream artifact).
     checkstyle {
-        toolVersion = '13.10.0'
+        toolVersion = checkstyleVersion
         configFile = rootProject.file('config/checkstyle/checkstyle.xml')
     }
 
@@ -78,7 +88,7 @@ subprojects {
             target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
             importOrder()
             removeUnusedImports()
-            googleJavaFormat('1.28.0').reflowLongStrings()
+            googleJavaFormat(googleJavaFormatVersion).reflowLongStrings()
             trimTrailingWhitespace()
             endWithNewline()
         }
@@ -118,10 +128,11 @@ subprojects {
     // req/initial-plan.md §4: an absolute path, since native/install/lib is
     // CWD-relative and resolves differently under :jmlx-core:test, an IDE
     // run, and :jmlx-examples:run. Computing the path string here touches no
-    // filesystem state (no exists() check), so it's safe under
-    // org.gradle.configuration-cache=true -- only NativeLoader's own
-    // resolution, at JVM execution time, decides whether the directory is
-    // actually usable.
+    // filesystem state (no exists() check), so it stays safe if
+    // org.gradle.configuration-cache is ever re-enabled (see gradle.properties --
+    // it's off today for an unrelated Spotless/config-cache bug, not because of
+    // anything here) -- only NativeLoader's own resolution, at JVM execution
+    // time, decides whether the directory is actually usable.
     def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
 
     tasks.withType(Test).configureEach {
@@ -132,5 +143,190 @@ subprojects {
         // narrows to --enable-native-access=se.alipsa.jmlx.ffi.
         jvmArgs('--enable-native-access=ALL-UNNAMED')
         systemProperty('jmlx.library.path', nativeLibDir)
+    }
+}
+
+// Release wiring for publishable modules only. A module opts in by applying 'maven-publish';
+// jmlx-core/jmlx-ffi/jmlx-examples do not, and are unaffected. Kept here rather than duplicated
+// per module so there is one copy to keep correct -- the same reason Spotless is applied above.
+subprojects {
+    plugins.withId('maven-publish') {
+        apply plugin: 'signing'
+        apply plugin: 'se.alipsa.nexus-release-plugin'
+
+        // Published Javadoc is consumer-facing API documentation; fail its build on warnings for
+        // every publishable module, rather than requiring each module to duplicate this policy.
+        tasks.withType(Javadoc).configureEach {
+            options.addBooleanOption('Werror', true)
+        }
+
+        // Captured here, once the module's own `version = ...` line has definitely already run
+        // (afterEvaluate fires only after the whole module build.gradle has been evaluated), rather
+        // than read directly inside verifyNoSnapshotDependencies/verifyCentralCredentialsPresent's
+        // own registration closures below: those are `tasks.register` closures, whose Gradle
+        // contract only guarantees they run when the task is realized, not at registration time --
+        // relying on that alone to explain why an *earlier*-firing read would be safe is exactly the
+        // kind of reasoning burden this capture avoids.
+        def moduleName
+        def moduleVersion
+
+        // The 'maven' publication is declared in the module's own build.gradle, which Gradle
+        // evaluates after this block runs, so the publication cannot be referenced eagerly here.
+        afterEvaluate {
+            moduleName = project.name
+            moduleVersion = project.version.toString()
+
+            // Guarded lookup, not publishing.publications.maven: a future module that applies
+            // 'maven-publish' but names its publication something else would otherwise hit an
+            // UnknownDomainObjectException here at configuration time, breaking `./gradlew build`
+            // for the *whole* repo with an error pointing at this root script instead of at the
+            // module that actually needs fixing.
+            def mavenPub = publishing.publications.findByName('maven')
+            if (mavenPub == null) {
+                throw new GradleException(
+                        "Project '${project.path}' applies 'maven-publish' but has no publication " +
+                        "named 'maven'. Name it 'maven' (see jmlx-jinja/build.gradle or " +
+                        "jmlx-tokenizer/build.gradle for the expected shape) so this root script's " +
+                        "signing/nexus-release wiring can find it.")
+            }
+
+            // Central rejects unsigned release bundles, but signing must stay inert without a
+            // configured key so `check`, the jmlx-jinja CI workflow, and releaseVerification all
+            // remain keyless. Making this unconditional would break all three.
+            signing {
+                required = providers.gradleProperty('signing.keyId').present
+                sign mavenPub
+            }
+
+            nexusReleasePlugin {
+                userName = providers.gradleProperty('sonatypeUsername').orNull
+                password = providers.gradleProperty('sonatypePassword').orNull
+                mavenPublication = mavenPub
+            }
+        }
+
+        // Central rejects a SNAPSHOT release outright -- both a POM that references SNAPSHOT
+        // dependencies, and a SNAPSHOT version for the module being released itself. The
+        // dependency check is what forces release order: jmlx-tokenizer depends on jmlx-jinja via
+        // project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate carrying jinja's
+        // current version, so this fails the tokenizer release while jinja is still a SNAPSHOT.
+        // Consequently, release tokenizer after jinja is released but before jinja is bumped to
+        // its next SNAPSHOT; CLAUDE.md documents that release window.
+        // The own-version check exists because nothing on the Gradle side otherwise catches it:
+        // the nexus-release-plugin's ReleaseTask just logs and returns 0 for a SNAPSHOT version,
+        // so a bare `./gradlew :module:release` would report BUILD SUCCESSFUL having published
+        // nothing -- only release.sh's shell-level check caught that before this task did.
+        tasks.register('verifyNoSnapshotDependencies') {
+            group = 'verification'
+            description = "Fails if ${moduleName}'s own version, or any dependency in its generated POM, " +
+                    'is a -SNAPSHOT.'
+            dependsOn tasks.named('generatePomFileForMavenPublication')
+            def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+            inputs.file(pomFile)
+            doLast {
+                if (moduleVersion.endsWith('-SNAPSHOT')) {
+                    throw new GradleException(
+                            "Cannot release ${moduleName}: its own version (${moduleVersion}) is a SNAPSHOT.")
+                }
+                def offenders = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                        .findAll { it.version()?.endsWith('-SNAPSHOT') }
+                        .collect { it.coordinates() }
+                if (!offenders.isEmpty()) {
+                    throw new GradleException(
+                            "Cannot release ${moduleName}: POM references SNAPSHOT dependencies: " +
+                            "${offenders.join(', ')}. Release those modules first.")
+                }
+            }
+        }
+
+        // `bundle` depends on `publishToMavenLocal`, which installs into ~/.m2 before Central is
+        // ever contacted. Without a configured signing key, `signing { required = ... }` above is
+        // false, so an unsigned bundle installs locally and only then fails at the Central upload
+        // step -- leaving a same-GAV, never-published release version sitting in ~/.m2, exactly the
+        // hazard the root build's own mavenLocal() comment warns about (any SNAPSHOT module build
+        // resolves mavenLocal() and could silently pick it up). Failing fast, before anything
+        // is published anywhere, is cheaper than relying on every release to have credentials
+        // configured correctly.
+        // Providers are captured in a plain Map at configuration time and intentionally resolved
+        // via `.present` at task execution time. Retaining those captured providers, rather than
+        // looking them up from the enclosing script in `doLast`, stays safe if the configuration
+        // cache is re-enabled.
+        def requiredCentralProperties =
+                ['signing.keyId', 'sonatypeUsername', 'sonatypePassword']
+                        .collectEntries { [(it): providers.gradleProperty(it)] }
+
+        tasks.register('verifyCentralCredentialsPresent') {
+            group = 'verification'
+            // "Present", not "valid": this only checks that the three properties are set, not that
+            // the key material actually signs or that the credentials actually authenticate. That's
+            // enough for the hazard this guards against -- signMavenPublication runs before
+            // publishToMavenLocal regardless, so a present-but-bad key still fails before ~/.m2 is
+            // touched; only a missing key skips straight past signing into an unsigned local install.
+            description = 'Fails if Central publishing credentials are missing, before anything is published.'
+            doLast {
+                def missing = requiredCentralProperties.findAll { key, value -> !value.present }.keySet()
+                if (!missing.isEmpty()) {
+                    throw new GradleException(
+                            "Cannot release ${moduleName}: missing required properties: ${missing.join(', ')}.")
+                }
+            }
+        }
+
+        // release.sh is meant to be byte-identical in every releasable module (see its own header
+        // comment: MODULE is derived from the script's own directory, so there is nothing
+        // module-specific to differ on). A prior fix landed in jmlx-jinja/release.sh only,
+        // silently leaving jmlx-tokenizer's copy stale and broken -- this makes that drift fail
+        // loudly instead. Registered per module (self-contained, via a plain filesystem scan in
+        // buildSrc) rather than as one shared root-level task depended on across projects: a
+        // cross-project `dependsOn rootProject.tasks.named(...)` edge is exactly the pattern
+        // Gradle's project-isolation work targets, and every module's own copy already knows
+        // where the repo root is without needing to reference another project's task.
+        tasks.register('verifyReleaseScriptsMatch') {
+            group = 'verification'
+            description = 'Fails if any releasable module\'s release.sh has drifted from the others.'
+            // The declared subprojects' own directories (from settings.gradle, resolved at
+            // configuration time, independent of each subproject's own build-script evaluation
+            // order) -- not a filesystem scan of the whole repo root, which would also sweep in
+            // any unrelated release.sh a non-module directory (native/, scripts/, a vendored
+            // tree) might someday contain.
+            def moduleDirs = rootProject.subprojects.collect { it.projectDir }
+            def releaseScripts = moduleDirs.collect { new File(it, 'release.sh') }.findAll { it.isFile() }
+            def marker = layout.buildDirectory.file('verifyReleaseScriptsMatch/verified')
+            inputs.files(releaseScripts)
+            outputs.file(marker)
+            doLast {
+                se.alipsa.jmlx.buildsrc.ReleaseScripts.assertAllMatch(moduleDirs)
+                def markerFile = marker.get().asFile
+                markerFile.parentFile.mkdirs()
+                markerFile.text = 'verified\n'
+            }
+        }
+
+        // release.sh requests `build` and `release` as independent tasks, and Gradle imposes no
+        // ordering between independently requested tasks -- without this edge, publishing could
+        // begin before verification finished.
+        tasks.named('release') {
+            dependsOn tasks.named('check'), tasks.named('verifyNoSnapshotDependencies'),
+                    tasks.named('verifyCentralCredentialsPresent')
+        }
+
+        // dependsOn alone imposes no *order* -- check's own (slow) work could otherwise run to
+        // completion before a missing credential is ever noticed, defeating "fail fast" in
+        // practice. shouldRunAfter (not mustRunAfter, which would force this even when check is
+        // requested on its own) only takes effect when both already run together, which release's
+        // dependencies above guarantee.
+        tasks.named('check') {
+            shouldRunAfter tasks.named('verifyCentralCredentialsPresent')
+            dependsOn tasks.named('verifyReleaseScriptsMatch')
+        }
+
+        // The Nexus plugin makes bundle depend on publishToMavenLocal. Ordering bundle itself is
+        // too late: Gradle may execute that dependency (the task that writes ~/.m2) in parallel
+        // with the guards. Constrain every concrete Maven-local publish task instead, without
+        // pulling publication into check's own graph.
+        tasks.withType(org.gradle.api.publish.maven.tasks.PublishToMavenLocal).configureEach {
+            mustRunAfter tasks.named('check'), tasks.named('verifyNoSnapshotDependencies'),
+                    tasks.named('verifyCentralCredentialsPresent')
+        }
     }
 }

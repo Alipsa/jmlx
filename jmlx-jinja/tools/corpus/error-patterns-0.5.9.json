@@ -1,0 +1,144 @@
+{
+  "version": "@huggingface/jinja@0.5.9",
+  "patterns": [
+    {
+      "regex": "^Unknown variable: (?<name>.+)$",
+      "category": "UNDEFINED_OR_ACCESS"
+    },
+    {
+      "regex": "^Object keys must be strings: got (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Cannot access property with non-string: got (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Variable already declared: (?<name>.+)$",
+      "category": "VALUE"
+    },
+    {
+      "regex": "^Cannot unpack non-iterable type: (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Unknown operator \"(?<op>.+)\" between (?<left>.+) and (?<right>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Parser Error: (?<detail>.+)$",
+      "category": "SYNTAX"
+    },
+    {
+      "regex": "^(?:Unexpected end of input|Unexpected character: .+|Unknown statement type: .+|Unexpected token: .+|Invalid LHS inside assignment expression: .+)$",
+      "category": "SYNTAX",
+      "comment": "Pinned templates.test.js lexer/parser error vectors"
+    },
+    {
+      "regex": "^Invalid count value: (?<count>-?\\d+)$",
+      "category": "VALUE",
+      "comment": "tojson(indent) rejects a negative String.repeat count"
+    },
+    {
+      "regex": "^(?<method>startswith|endswith)\\(\\) requires at least one argument$",
+      "category": "ARITY"
+    },
+    {
+      "regex": "^(?<method>startswith|endswith)\\(\\) argument must be a string or tuple of strings$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^(?<method>startswith|endswith)\\(\\) tuple elements must be strings$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Missing positional argument: (?<name>.+)$",
+      "category": "ARITY"
+    },
+    {
+      "regex": "^Unknown (?<type>ArrayValue|StringValue|NumericValue|ObjectValue|BooleanValue|FunctionValue) filter: (?<name>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Cannot apply filter \"(?<name>.+)\" to type: (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Cannot call something that is not a function: got (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Expected iterable or object type in for loop: got (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^`(?<name>selectattr|rejectattr)` can only be applied to array of objects$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^`map` expressions without `attribute` set are not currently supported\\.$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^wp7-eager-sentinel$",
+      "category": "EXPLICIT_RAISE"
+    },
+    {
+      "regex": "^arguments of `(?<name>selectattr|rejectattr)` must be strings$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Cannot convert to JSON: KeywordArgumentsValue$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^sep argument must be a string or null$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^maxsplit argument must be a number$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^replace\\(\\) arguments must be strings$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^replace\\(\\) requires at least two arguments$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Object key must be a string: got (?<type>.+)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^Positional arguments must come before keyword arguments$",
+      "category": "SYNTAX"
+    },
+    {
+      "regex": "^$",
+      "category": "SYNTAX",
+      "constructors": ["BreakControl", "ContinueControl"],
+      "comment": "Raw BreakControl/ContinueControl escaping an upstream macro or call block outside a loop"
+    },
+    {
+      "regex": "^Cannot read properties of undefined \\(reading 'type'\\)$",
+      "category": "SYNTAX",
+      "constructors": ["TypeError"],
+      "phases": ["parse"],
+      "comment": "Pinned parser crashes whose generic TypeError text also occurs in runtime failures"
+    },
+    {
+      "regex": "^Cannot read properties of undefined \\(reading '(?<property>toLowerCase|toUpperCase|toString|type|value|__bool__|builtins|includes|at|length)'\\)$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^undefined is not iterable(?: \\(cannot read property Symbol\\(Symbol\\.iterator\\)\\))?$",
+      "category": "TYPE"
+    },
+    {
+      "regex": "^(?:format2\\.replace is not a function|Cannot read properties of undefined \\(reading 'replace'\\))$",
+      "category": "TYPE"
+    }
+  ]
+}

@@ -10,7 +10,11 @@ public final class ByteLevelPreTokenizer {
 
   private final PreTokenizerConfig config;
 
-  /** Wraps the pre-tokenizer's split-regex and add-prefix-space configuration. */
+  /**
+   * Wraps the pre-tokenizer's split-regex and add-prefix-space configuration.
+   *
+   * @param config pre-tokenizer configuration
+   */
   public ByteLevelPreTokenizer(PreTokenizerConfig config) {
     this.config = Objects.requireNonNull(config, "ByteLevelPreTokenizer: config must not be null");
   }
@@ -29,6 +33,9 @@ public final class ByteLevelPreTokenizer {
    * match that instead of hard-failing where HF wouldn't. An unmatched span that turns out to be a
    * genuinely unrepresentable symbol still surfaces loudly, via {@link BpeMerger#merge}'s existing
    * no-vocabulary-entry check.
+   *
+   * @param text normalized input text
+   * @return byte-level-encoded chunks
    */
   public List<String> split(String text) {
     Objects.requireNonNull(text, "ByteLevelPreTokenizer.split: text must not be null");

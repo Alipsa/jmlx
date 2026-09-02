@@ -1,0 +1,23 @@
+[
+  {"name":"NO_TEMPLATE","source":"Hello world!","upstreamLine":10},
+  {"name":"TEXT_NODES","source":"0{{ 'A' }}1{{ 'B' }}{{ 'C' }}2{{ 'D' }}3","upstreamLine":11},
+  {"name":"IF_ONLY","source":"{% if 1 == 1 %}{{ 'A' }}{% endif %}{{ 'B' }}","upstreamLine":25},
+  {"name":"FOR_LOOP","source":"{% for message in messages %}{{ message['content'] }}{% endfor %}","upstreamLine":31},
+  {"name":"OBJECT_LITERAL","source":"{{ {'a': 1, 'b': 2} }}","upstreamLine":0},
+  {"name":"SLICE","source":"{{ x[1:2] }}","upstreamLine":0},
+  {"name":"BLOCK_SET","source":"{% set x %}line\\ntext{% endset %}","upstreamLine":0},
+  {"name":"ESCAPED_SOURCE","source":"{{ \"a\\\\nb\\\"c\" }}","upstreamLine":0},
+  {"name":"FILTER","source":"{{ x | upper }}","upstreamLine":0},
+  {"name":"FILTER_WITH_CALL","source":"{{ x | default('n/a') }}","upstreamLine":0},
+  {"name":"IS_TEST","source":"{{ x is defined }}","upstreamLine":0},
+  {"name":"IS_NOT_TEST","source":"{{ x is not defined }}","upstreamLine":0},
+  {"name":"MACRO","source":"{% macro greet(name) %}Hi {{ name }}{% endmacro %}","upstreamLine":0},
+  {"name":"CALL_STATEMENT","source":"{% call greet(1) %}body{% endcall %}","upstreamLine":0},
+  {"name":"TERNARY","source":"{{ a if b else c }}","upstreamLine":0},
+  {"name":"SELECT","source":"{{ a if b }}","upstreamLine":0},
+  {"name":"SPREAD_AND_KEYWORD_ARGS","source":"{{ func(*args, x=1) }}","upstreamLine":0},
+  {"name":"NOT_IN","source":"{{ x not in y }}","upstreamLine":0},
+  {"name":"UNARY_NOT","source":"{{ not x }}","upstreamLine":0},
+  {"name":"TUPLE_LITERAL","source":"{{ (1, 2, 3) }}","upstreamLine":0},
+  {"name":"CHAINED_MEMBER_CALL","source":"{{ a.b.c[0](1)[1] }}","upstreamLine":0}
+]

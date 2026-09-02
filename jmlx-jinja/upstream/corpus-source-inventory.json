@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "sources": {
+    "test/templates.test.js": {
+      "coverage": "differential-corpus",
+      "reason": "All serializable render and error vectors are generated; four function-context render vectors are named schema exclusions."
+    },
+    "test/interpreter.test.js": {
+      "coverage": "differential-corpus",
+      "reason": "All whitespace-control vectors are generated through the direct lexer/parser/interpreter oracle path."
+    },
+    "test/format.test.js": {
+      "coverage": "format-golden",
+      "evidence": "src/test/resources/format/vectors.json",
+      "reason": "The seven upstream formatter vectors retain exact source locations and run through the dedicated Node/Java formatter oracle."
+    },
+    "test/utils.test.js": {
+      "coverage": "direct-unit",
+      "evidence": "src/test/java/se/alipsa/jmlx/jinja/internal/util/JsSliceTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/util/PosixStrftimeTest.java, src/test/java/se/alipsa/jmlx/jinja/internal/runtime/InterpreterTest.java",
+      "reason": "These test non-public helper exports directly; their reachable Template behavior is covered by generated template vectors and focused Java helper tests."
+    },
+    "test/memory.test.js": {
+      "coverage": "policy-excluded",
+      "reason": "Contains a model-derived Granite Guardian template. It cannot enter text-bearing corpus material without a fixture-specific source and license record under model-fixture-policy.md."
+    },
+    "test/e2e.test.js": {
+      "coverage": "policy-excluded",
+      "reason": "Excluded by upstream-lock.json because it contains unapproved model templates and rendered output."
+    }
+  }
+}

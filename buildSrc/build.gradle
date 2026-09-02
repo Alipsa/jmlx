@@ -1,0 +1,32 @@
+// Shared build-logic helpers used by more than one build.gradle in the main build (see
+// PublishedPomDependencies, ReleaseScripts). buildSrc is its own isolated Gradle build: it does
+// not inherit the main build's plugin application from root build.gradle's subprojects{} block,
+// and it cannot read the main build's gradle/libs.versions.toml either (that catalog is scoped to
+// the main build's own settings, invisible from here) -- so the versions below are a deliberate,
+// small duplication of the ones already declared there, not an oversight. Applying the checks
+// directly here, rather than leaving buildSrc as a documented style exemption, keeps this file
+// held to the same 100-column Google Java Style the rest of the repo enforces.
+plugins {
+    id 'java'
+    id 'checkstyle'
+    id 'com.diffplug.spotless' version '8.9.0'
+}
+
+repositories {
+    mavenCentral()
+}
+
+checkstyle {
+    toolVersion = '13.10.0'
+    configFile = file('../config/checkstyle/checkstyle.xml')
+}
+
+spotless {
+    java {
+        importOrder()
+        removeUnusedImports()
+        googleJavaFormat('1.28.0').reflowLongStrings()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}

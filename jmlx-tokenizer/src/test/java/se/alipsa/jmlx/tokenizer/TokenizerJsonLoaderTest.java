@@ -34,13 +34,20 @@ class TokenizerJsonLoaderTest {
 
   private Path writeTokenizerJson(
       String decoder, String preTokenizer, String model, String addedTokens) {
+    return writeTokenizerJson(decoder, preTokenizer, "null", model, addedTokens);
+  }
+
+  private Path writeTokenizerJson(
+      String decoder, String preTokenizer, String postProcessor, String model, String addedTokens) {
     String json =
         "{"
             + "\"normalizer\": null,"
             + "\"pre_tokenizer\": "
             + preTokenizer
             + ","
-            + "\"post_processor\": null,"
+            + "\"post_processor\": "
+            + postProcessor
+            + ","
             + "\"decoder\": "
             + decoder
             + ","
@@ -403,6 +410,49 @@ class TokenizerJsonLoaderTest {
     TokenizerException e =
         assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
     assertTrue(e.getMessage().contains("id 0 for both"), e.getMessage());
+  }
+
+  @Test
+  void modelVocabRequiresIntegralIds() {
+    for (String malformedId : new String[] {"null", "\"0\"", "{}", "100.9"}) {
+      String model =
+          "{\"type\": \"BPE\", \"vocab\": {\"a\": "
+              + malformedId
+              + ", \"b\": 1}, \"merges\": [\"a b\"]}";
+      Path path = writeTokenizerJson(VALID_DECODER, VALID_PRE_TOKENIZER, model, "[]");
+      TokenizerException failure =
+          assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+      assertTrue(failure.getMessage().contains("model.vocab['a'] has no integral id"));
+    }
+  }
+
+  @Test
+  void templateProcessingRequiresIntegralIdsAndStringTokens() {
+    String templateProcessing =
+        "{\"type\": \"TemplateProcessing\", \"single\": [{\"Sequence\": {}}], "
+            + "\"special_tokens\": {\"<S>\": {\"id\": \"<S>\", \"ids\": [%s], "
+            + "\"tokens\": [%s]}}}";
+    Path nonIntegralId =
+        writeTokenizerJson(
+            VALID_DECODER,
+            VALID_PRE_TOKENIZER,
+            templateProcessing.formatted("null", "\"<S>\""),
+            VALID_MODEL,
+            "[]");
+    TokenizerException idFailure =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(nonIntegralId));
+    assertTrue(idFailure.getMessage().contains("special token '<S>' has a non-integral id"));
+
+    Path nonStringToken =
+        writeTokenizerJson(
+            VALID_DECODER,
+            VALID_PRE_TOKENIZER,
+            templateProcessing.formatted("2", "null"),
+            VALID_MODEL,
+            "[]");
+    TokenizerException tokenFailure =
+        assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(nonStringToken));
+    assertTrue(tokenFailure.getMessage().contains("special token '<S>' has a non-string token"));
   }
 
   @Test

@@ -12,4 +12,4 @@ plugins {
 }
 
 rootProject.name = 'jmlx'
-include('jmlx-ffi', 'jmlx-core', 'jmlx-tokenizer', 'jmlx-examples')
+include('jmlx-ffi', 'jmlx-core', 'jmlx-tokenizer', 'jmlx-jinja', 'jmlx-examples')

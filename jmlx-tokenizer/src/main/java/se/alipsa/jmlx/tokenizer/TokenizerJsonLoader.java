@@ -22,7 +22,12 @@ public final class TokenizerJsonLoader {
 
   private TokenizerJsonLoader() {}
 
-  /** Loads and parses {@code path} as a byte-level-BPE {@code tokenizer.json}. */
+  /**
+   * Loads and parses {@code path} as a byte-level-BPE {@code tokenizer.json}.
+   *
+   * @param path tokenizer configuration file
+   * @return parsed tokenizer configuration
+   */
   public static TokenizerJson load(Path path) {
     Objects.requireNonNull(path, "TokenizerJsonLoader.load: path must not be null");
     try {
@@ -225,9 +230,31 @@ public final class TokenizerJsonLoader {
       for (Map.Entry<String, JsonNode> entry : node.path("special_tokens").properties()) {
         JsonNode v = entry.getValue();
         List<Integer> ids = new ArrayList<>();
-        v.path("ids").forEach(idNode -> ids.add(idNode.asInt()));
+        v.path("ids")
+            .forEach(
+                idNode -> {
+                  if (idNode.isNull() || !idNode.isIntegralNumber()) {
+                    throw new TokenizerException(
+                        "TokenizerJsonLoader: TemplateProcessing special token '"
+                            + entry.getKey()
+                            + "' has a non-integral id: "
+                            + idNode);
+                  }
+                  ids.add(idNode.asInt());
+                });
         List<String> tokens = new ArrayList<>();
-        v.path("tokens").forEach(tokenNode -> tokens.add(tokenNode.asString()));
+        v.path("tokens")
+            .forEach(
+                tokenNode -> {
+                  if (tokenNode.isNull() || !tokenNode.isString()) {
+                    throw new TokenizerException(
+                        "TokenizerJsonLoader: TemplateProcessing special token '"
+                            + entry.getKey()
+                            + "' has a non-string token: "
+                            + tokenNode);
+                  }
+                  tokens.add(tokenNode.asString());
+                });
         // SpecialTokenInfo's own compact constructor enforces the non-empty, equal-length
         // invariant (PR #14 review round 3, finding 1) -- no need to duplicate that check here.
         specialTokens.put(
@@ -308,7 +335,12 @@ public final class TokenizerJsonLoader {
     Map<Integer, String> vocabTokenById = new HashMap<>();
     for (Map.Entry<String, JsonNode> entry : node.path("vocab").properties()) {
       String token = entry.getKey();
-      int id = entry.getValue().asInt();
+      JsonNode idNode = entry.getValue();
+      if (idNode.isNull() || !idNode.isIntegralNumber()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: model.vocab['" + token + "'] has no integral id: " + idNode);
+      }
+      int id = idNode.asInt();
       String existingToken = vocabTokenById.putIfAbsent(id, token);
       if (existingToken != null && !existingToken.equals(token)) {
         throw new TokenizerException(

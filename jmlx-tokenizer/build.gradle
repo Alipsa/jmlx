@@ -1,8 +1,128 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
+}
+
+// Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: an
+// "independent release" that inherits the root version is not independent at all. Starts a
+// fresh 0.1.0 line because jmlx-tokenizer has never been published.
+version = '0.1.0-SNAPSHOT'
+
+// Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain
+// (which exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and
+// keeps both published artifacts consumable from Java 21 onward.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.tokenizer')
 }
 
 dependencies {
     implementation libs.jackson.databind
-    implementation libs.hfjinja
+    api project(':jmlx-jinja')
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-tokenizer'
+                description = 'Pure-Java byte-level BPE tokenizer and Hugging Face chat-template rendering.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}
+
+// jmlx-jinja's verifyPublicationMetadata asserts *zero* published dependencies; jmlx-tokenizer
+// legitimately has two, so it asserts their exact identity instead. Deliberately different
+// checks -- conflating them would weaken jinja's stronger guarantee.
+tasks.register('verifyPublishedDependencies') {
+    group = 'verification'
+    description = 'Verifies the published POM declares exactly the expected dependencies.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+    def expected = ['se.alipsa:jmlx-jinja', 'tools.jackson.core:jackson-databind']
+    inputs.file(pomFile)
+    inputs.property('expected', expected)
+    doLast {
+        def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                .collect { it.groupArtifact() }
+        if (actual.toSorted() != expected.toSorted()) {
+            throw new GradleException(
+                    "Published dependencies changed. Expected ${expected.toSorted()}, " +
+                    "found ${actual.toSorted()}.")
+        }
+    }
+}
+
+// Decision 5's compatibility promise is only worth anything if it cannot silently regress: if
+// this override is ever removed, the module falls back to the root's Java 25 and the published
+// artifact stops working for Java 21 consumers. jmlx-jinja pins the same invariant via its
+// release-verification contract; jmlx-tokenizer has no module-info.java, so it asserts the
+// bytecode level directly instead.
+tasks.register('verifyBytecodeLevel') {
+    group = 'verification'
+    description = 'Verifies compiled classes are Java 21 (bytecode major 65).'
+    dependsOn tasks.named('compileJava')
+    def classesDir = layout.buildDirectory.dir('classes/java/main')
+    inputs.dir(classesDir)
+    doLast {
+        def offenders = []
+        def classFileCount = 0
+        classesDir.get().asFile.eachFileRecurse { file ->
+            if (file.name.endsWith('.class')) {
+                classFileCount++
+                file.withDataInputStream { input ->
+                    input.readInt()          // 0xCAFEBABE
+                    input.readUnsignedShort() // minor
+                    int major = input.readUnsignedShort()
+                    if (major != 65) {
+                        offenders << "${file.name}: major ${major}".toString()
+                    }
+                }
+            }
+        }
+        // eachFileRecurse iterates zero times over a directory that exists but is empty --
+        // without this check a misconfigured source set or a relocated output directory (e.g.
+        // after a Gradle upgrade) would leave offenders empty and this task would report
+        // BUILD SUCCESSFUL having verified nothing, the exact silent-guard failure this task
+        // exists to prevent.
+        if (classFileCount == 0) {
+            throw new GradleException(
+                    "Expected to find compiled .class files under ${classesDir.get().asFile} but found none.")
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException(
+                    "Expected Java 21 bytecode (major 65) but found: ${offenders.join(', ')}")
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyPublishedDependencies'), tasks.named('verifyBytecodeLevel')
 }

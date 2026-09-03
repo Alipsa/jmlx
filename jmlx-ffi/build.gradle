@@ -1,6 +1,16 @@
 plugins {
     id 'java-library'
     id 'java-test-fixtures'
+    id 'maven-publish'
+}
+
+// Own explicit line, independent of the root's 0.5.0-SNAPSHOT default going forward -- see
+// req/plans/native-artifact-packaging-plan.md. Same number it already carries via that default.
+version = '0.5.0-SNAPSHOT'
+
+java {
+    withSourcesJar()
+    withJavadocJar()
 }
 
 sourceSets {
@@ -22,18 +32,43 @@ tasks.named('checkstyleMain', Checkstyle) {
     source = fileTree(dir: 'src/main/java', include: '**/*.java')
 }
 
+// The root's reactive maven-publish wiring turns on Javadoc -Werror for every publishable module --
+// but src/main/generated/java is a huge committed jextract blob with no doc comments, and it must
+// stay byte-identical to scripts/regen-bindings.sh's output (no hand-editing it to add javadoc).
+// Same fix as checkstyleMain above: restrict Javadoc's source to the hand-written tree only.
+tasks.named('javadoc', Javadoc) {
+    source = fileTree(dir: 'src/main/java', include: '**/*.java')
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.ffi')
+}
+
 dependencies {
     // @EnabledIfNativeAvailable (testFixtures) is shared with jmlx-core and
     // jmlx-examples, which is the point of the testFixtures source set.
     testFixturesImplementation libs.junit.jupiter.api
 }
 
+// Deliberately off the default test classpath: this ~180MB dependency exists only to prove
+// NativeLoader's classpath-extraction fallback against the real, published-shape artifact --
+// pulling it onto every ordinary `test` run would slow down routine iteration for no benefit
+// (ClasspathNativeExtractorTest already covers the mechanics with tiny fake fixtures).
+configurations {
+    extractionFixture
+}
+
+dependencies {
+    extractionFixture project(':jmlx-native-macos-arm64')
+}
+
 // req/initial-plan.md, Testing approach, "Loader guard": NativeLoaderMissingMetallibTest
 // needs its own JVM and its own directory, or the result depends on test
 // order within a shared JVM (ensureLoaded() caches its outcome) and risks
-// racing every other native test over the real staging directory.
+// racing every other native test over the real staging directory. Same reasoning applies to
+// NativeLoaderExtractionFallbackTest below.
 test {
-    exclude '**/NativeLoaderMissingMetallibTest.class'
+    exclude '**/NativeLoaderMissingMetallibTest.class', '**/NativeLoaderExtractionFallbackTest.class'
 }
 
 def loaderGuardNativeDir = layout.buildDirectory.dir('loader-guard-native/lib')
@@ -56,3 +91,79 @@ tasks.register('loaderGuardTest', Test) {
 }
 
 check.dependsOn loaderGuardTest
+
+// Proves NativeLoader.ensureLoaded() actually succeeds via ClasspathNativeExtractor against the
+// real, published-shape jmlx-native-macos-arm64 artifact -- the one thing
+// ClasspathNativeExtractorTest's fake fixtures deliberately can't prove. Its own forked JVM for the
+// same reason loaderGuardTest needs one: ensureLoaded() caches its outcome.
+def extractionFallbackCacheDir = layout.buildDirectory.dir('extractionFallbackTest-cache')
+def stagedMetallib = rootProject.layout.projectDirectory.file('native/install/lib/mlx.metallib')
+
+tasks.register('extractionFallbackTest', Test) {
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath + configurations.extractionFixture
+    useJUnitPlatform()
+    include '**/NativeLoaderExtractionFallbackTest.class'
+    // Mirrors jmlx-native-macos-arm64's own stageNativeResources gate: without
+    // scripts/bootstrap-native.sh having run, that module's jar is empty and this test would
+    // genuinely fail (not just skip) -- but every other native-dependent test in this repo is
+    // SKIPPED, not failed, in that situation (see @EnabledIfNativeAvailable, CLAUDE.md). Gate on
+    // the same underlying signal so ./gradlew build keeps succeeding for a contributor who hasn't
+    // bootstrapped and doesn't need native functionality.
+    onlyIf {
+        def staged = stagedMetallib.asFile.isFile()
+        if (!staged) {
+            logger.warn(
+                    'jmlx-ffi: native/install/lib/mlx.metallib not found -- skipping extractionFallbackTest ' +
+                    '(run ./scripts/bootstrap-native.sh to exercise it for real).')
+        }
+        staged
+    }
+    // Overrides the root build.gradle default (pointed at the real native/install/lib): a blank
+    // string is NativeLoader's own "not set" contract, so this run is forced onto the extraction
+    // path this task exists to test, not the explicit-path one every other test uses.
+    systemProperty('jmlx.library.path', '')
+    // Root build.gradle only ever sets the system property above, never this env var -- but a
+    // developer's own shell might export it globally, which would silently make this test exercise
+    // the explicit-path branch instead of the one it claims to test.
+    environment.remove('JMLX_LIBRARY_PATH')
+    // Isolates this run's extraction cache from anything else on the machine/CI runner.
+    systemProperty('jmlx.native.cache.path', extractionFallbackCacheDir.get().asFile.absolutePath)
+}
+
+check.dependsOn extractionFallbackTest
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            // java-test-fixtures' variants have no Maven equivalent (test fixtures aren't a Maven
+            // concept); this is expected, not lossy for anything a Maven consumer needs.
+            suppressPomMetadataWarningsFor('testFixturesApiElements')
+            suppressPomMetadataWarningsFor('testFixturesRuntimeElements')
+            pom {
+                name = 'jmlx-ffi'
+                description = 'Generated FFM (Project Panama) bindings for mlx-c and the native runtime loader, underlying jmlx-core.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}

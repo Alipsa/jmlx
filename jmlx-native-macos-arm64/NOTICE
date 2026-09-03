@@ -1,0 +1,14 @@
+jmlx-native-macos-arm64 bundles precompiled binaries built from:
+
+- MLX (https://github.com/ml-explore/mlx) -- MIT License, Copyright (c) 2023 Apple Inc.
+- mlx-c (https://github.com/ml-explore/mlx-c) -- MIT License, Copyright (c) 2023 ml-explore.
+- metal-cpp (Apple's header-only Metal C++ interface, vendored inside MLX and compiled into
+  libmlx.dylib) -- Apache License 2.0, Copyright Apple Inc.
+
+See LICENSE in this module for the MIT text. The Apache License 2.0 full text is at
+https://www.apache.org/licenses/LICENSE-2.0 .
+
+Provenance: see scripts/bootstrap-native.sh for the exact pinned mlx-metal wheel version and mlx-c
+commit these binaries are built from, and native-pin.properties (packaged alongside the binaries in
+this jar, at se/alipsa/jmlx/native/macos-aarch64/native-pin.properties) for the pin baked into this
+specific build.

@@ -1,0 +1,9 @@
+jmlx-ffi includes committed jextract-generated Java bindings (src/main/generated/java) mechanically
+derived from mlx-c's public C headers (https://github.com/ml-explore/mlx-c) -- MIT License,
+Copyright (c) 2023 ml-explore.
+
+See the repo root LICENSE for the MIT text.
+
+This is distinct from se.alipsa:jmlx-native-macos-arm64's own NOTICE, which attributes the
+precompiled MLX/mlx-c/metal-cpp *binaries* jmlx-ffi's NativeLoader loads at runtime -- this module
+ships no binaries of its own.

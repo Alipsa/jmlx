@@ -1,0 +1,187 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+// Independent of the root's 0.5.0-SNAPSHOT and of jmlx-core/jmlx-ffi's own version line -- see
+// req/plans/native-artifact-packaging-plan.md. The real upstream pin (mlx-metal wheel version +
+// mlx-c commit) travels inside the jar as native-pin.properties instead of in this version string,
+// so this module's own SemVer stays independent of mlx-c's own independent versioning (already a
+// distinct axis per CLAUDE.md).
+version = '0.1.0-SNAPSHOT'
+
+// No Java source of its own -- this module's only payload is the native binaries below -- but
+// withSourcesJar()/withJavadocJar() keep its published artifact set consistent with every other
+// publishable module (both are harmless no-ops without any src/main/java).
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.native.macosarm64')
+}
+
+def stagedNativeDir = rootProject.layout.projectDirectory.dir('native/install/lib')
+def resourceRoot = 'se/alipsa/jmlx/native/macos-aarch64'
+def requiredFiles = ['libmlxc.dylib', 'libmlx.dylib', 'libjaccl.dylib', 'mlx.metallib', 'native-pin.properties']
+def generatedResourcesDir = layout.buildDirectory.dir('generated/nativeResources')
+
+// The 4 binaries + native-pin.properties only exist after a human/CI has run
+// scripts/bootstrap-native.sh; this task must never re-invoke that script itself (it does
+// long-running network/build work), but must also never silently produce an empty or partial jar
+// if the files are missing.
+//
+// Deliberately NOT a Copy task: Copy/Sync are @SkipWhenEmpty on their source -- when
+// stagedNativeDir is missing entirely (or empty), Gradle marks the task NO-SOURCE and skips it
+// without ever running doFirst/doLast, so the missing-file check below would silently never fire.
+// A plain task with a manual project.copy(...) call always executes its actions.
+// Captured at configuration time, not referenced from `project` inside doLast: Task.project at
+// execution time is deprecated (incompatible with the configuration cache).
+def fileSystemOperations = project.services.get(org.gradle.api.file.FileSystemOperations)
+
+// Every other module's native-dependent tests are SKIPPED, not failed, when native/install/lib
+// isn't staged (see @EnabledIfNativeAvailable and CLAUDE.md) so that ./gradlew build succeeds for
+// a contributor who hasn't run bootstrap-native.sh and doesn't need native functionality. This
+// module's own build must honor that same repo-wide invariant: gate staging on the same signal
+// NativeLoader itself checks first (mlx.metallib's presence), so a totally unstaged checkout
+// SKIPS this task (empty jar, no failure) rather than breaking the aggregate `build`/`check`.
+// A *partially* staged directory (mlx.metallib present but something else missing -- a broken or
+// interrupted bootstrap run) still fails loudly below: that state is never "not bootstrapped yet",
+// it's actually broken, and this module's own guarantee never to silently produce a corrupt jar
+// still applies once staging is attempted at all.
+def hasAnyStagedNativeFiles = { new File(stagedNativeDir.asFile, 'mlx.metallib').isFile() }
+
+tasks.register('stageNativeResources') {
+    group = 'build'
+    description = "Stages the mlx-c/MLX binaries bootstrap-native.sh produced into this module's resources."
+    def targetDir = generatedResourcesDir.map { it.dir(resourceRoot) }
+    outputs.dir(targetDir)
+    // Always rerun rather than declare inputs.dir(stagedNativeDir): that directory may not exist
+    // at all, and this copy is fast.
+    outputs.upToDateWhen { false }
+    onlyIf {
+        def staged = hasAnyStagedNativeFiles()
+        if (!staged) {
+            logger.warn(
+                    "jmlx-native-macos-arm64: native/install/lib/mlx.metallib not found -- run " +
+                    './scripts/bootstrap-native.sh to stage the native runtime, then rebuild this module ' +
+                    'for a real jar. Skipping (this module\'s jar will be empty).')
+        }
+        staged
+    }
+    doLast {
+        def missing = requiredFiles.findAll { !new File(stagedNativeDir.asFile, it).isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                    "Missing staged native files under ${stagedNativeDir.asFile}: ${missing.join(', ')} -- " +
+                    'run ./scripts/bootstrap-native.sh first, then retry this build.')
+        }
+        fileSystemOperations.copy {
+            from(stagedNativeDir) { include requiredFiles }
+            into targetDir.get()
+        }
+        requiredFiles.each { name ->
+            def f = new File(targetDir.get().asFile, name)
+            if (!f.isFile() || f.length() == 0) {
+                throw new GradleException("Staged resource ${name} is missing or empty after copy: ${f}")
+            }
+        }
+        def pinProps = new Properties()
+        new File(targetDir.get().asFile, 'native-pin.properties').withInputStream { pinProps.load(it) }
+        ['mlxMetalVersion', 'mlxcCommit'].each { key ->
+            def value = pinProps.getProperty(key)
+            if (value == null || value.isBlank()) {
+                throw new GradleException("native-pin.properties is missing a non-blank '${key}' entry")
+            }
+        }
+    }
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir generatedResourcesDir
+        }
+    }
+}
+
+tasks.named('processResources') { dependsOn tasks.named('stageNativeResources') }
+
+// sourcesJar (from withSourcesJar()) reads sourceSets.main.allSource, which includes the
+// generatedResourcesDir srcDir above -- the same implicit-dependency Gradle validates against
+// that processResources needed declaring.
+tasks.named('sourcesJar') { dependsOn tasks.named('stageNativeResources') }
+
+// Task 2's doLast only checks immediately after copying; this re-verifies the actual published
+// artifact (the built jar) has exactly the right entries on every check, independent of how the
+// resources got there.
+def metallibMinBytes = 100_000_000L // same floor as bootstrap-native.sh's own check
+
+tasks.register('verifyPackagedNativeResources') {
+    group = 'verification'
+    description = 'Verifies the built jar contains exactly the expected native resources.'
+    dependsOn tasks.named('jar')
+    def jarFile = tasks.named('jar').flatMap { it.archiveFile }
+    inputs.file(jarFile)
+    // Mirrors stageNativeResources' own onlyIf: an intentionally-empty jar (native/install/lib
+    // never staged) is not this check's business -- it exists to catch a jar that tried to package
+    // native resources and got it wrong, not to demand resources that were never supposed to be
+    // there yet.
+    onlyIf { hasAnyStagedNativeFiles() }
+    doLast {
+        def zip = new java.util.zip.ZipFile(jarFile.get().asFile)
+        try {
+            def entries = requiredFiles.collectEntries { name ->
+                [(name): zip.getEntry("${resourceRoot}/${name}")]
+            }
+            def missing = entries.findAll { name, entry -> entry == null }.keySet()
+            if (!missing.isEmpty()) {
+                throw new GradleException("Packaged jar is missing native resources: ${missing}")
+            }
+            def metallibSize = entries['mlx.metallib'].size
+            if (metallibSize < metallibMinBytes) {
+                throw new GradleException(
+                        "Packaged mlx.metallib is only ${metallibSize} bytes (expected >= ${metallibMinBytes})")
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.named('check') { dependsOn tasks.named('verifyPackagedNativeResources') }
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-native-macos-arm64'
+                description = 'Precompiled MLX/mlx-c native binaries for macOS on Apple Silicon (arm64), for jmlx-ffi\'s NativeLoader classpath-extraction fallback.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                    license {
+                        name = 'Apache License 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}

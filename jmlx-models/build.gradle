@@ -1,5 +1,27 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
+}
+
+// Fresh line -- jmlx-models has never been published, same reasoning jmlx-tokenizer used for its
+// own first version. Independent of the root's 0.5.0-SNAPSHOT and of jmlx-core/jmlx-ffi's own
+// (older, phase 1-4) version line -- see req/plans/native-artifact-packaging-plan.md.
+version = '0.1.0-SNAPSHOT'
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.models')
+}
+
+// Same reasoning as jmlx-core's own build.gradle: -Werror's "missing" doclint category only ever
+// flagged absent @param/@return/@throws tags on already-prose-documented, self-explanatory
+// parameters -- not a real content problem worth a wave of filler tags.
+tasks.named('javadoc', Javadoc) {
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
 dependencies {
@@ -9,3 +31,57 @@ dependencies {
 
     testImplementation testFixtures(project(':jmlx-ffi'))
 }
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-models'
+                description = 'Local Hugging Face Llama/Qwen2 safetensors decoder loading and greedy generation on jmlx-core.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}
+
+// jmlx-tokenizer's own verifyPublishedDependencies is the precedent this mirrors: jmlx-models
+// legitimately has non-trivial published dependencies, so this asserts their exact identity
+// rather than (like jmlx-jinja) asserting there are none.
+tasks.register('verifyPublishedDependencies') {
+    group = 'verification'
+    description = 'Verifies the published POM declares exactly the expected dependencies.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+    def expected = ['se.alipsa:jmlx-core', 'se.alipsa:jmlx-tokenizer', 'tools.jackson.core:jackson-databind']
+    inputs.file(pomFile)
+    inputs.property('expected', expected)
+    doLast {
+        def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                .collect { it.groupArtifact() }
+        if (actual.toSorted() != expected.toSorted()) {
+            throw new GradleException(
+                    "Published dependencies changed. Expected ${expected.toSorted()}, " +
+                    "found ${actual.toSorted()}.")
+        }
+    }
+}
+
+tasks.named('check') { dependsOn tasks.named('verifyPublishedDependencies') }

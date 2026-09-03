@@ -57,7 +57,7 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples, jmlx-native-macos-arm64
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
@@ -69,34 +69,53 @@ Every module's native-dependent tests are **skipped, not failed**, when `native/
 is absent — see `@EnabledIfNativeAvailable` (a `jmlx-ffi` test fixture, shared via `testFixtures`,
 delegating to `NativeLoader.ensureLoaded()` itself so the skip gate can never diverge from the real
 loader logic). Don't add a separate existence check to decide whether native tests should run.
+`jmlx-native-macos-arm64`'s own `stageNativeResources`/`verifyPackagedNativeResources` tasks and
+`jmlx-ffi`'s `extractionFallbackTest` (see below) honor the same invariant via an `onlyIf` gated on
+`native/install/lib/mlx.metallib`'s presence, so `./gradlew build` still succeeds for a contributor
+who hasn't bootstrapped.
 
 `jmlx-ffi` also has a `loaderGuardTest` task (wired into `check`) that exercises `NativeLoaderMissingMetallibTest`
 in its own JVM against a disposable copy of the native dir with `mlx.metallib` excluded — it's excluded
 from the regular `test` task because `NativeLoader.ensureLoaded()` caches its outcome, so it would race
-every other native test over the real staging directory if run in the same JVM.
+every other native test over the real staging directory if run in the same JVM. `extractionFallbackTest`
+(also wired into `check`) is the same pattern for `NativeLoaderExtractionFallbackTest`, forcing
+`NativeLoader` onto `ClasspathNativeExtractor`'s classpath-extraction fallback (blank
+`jmlx.library.path`, `JMLX_LIBRARY_PATH` removed, the real `jmlx-native-macos-arm64` jar on its
+classpath) to prove extraction works against the real, published-shape artifact — see
+`ClasspathNativeExtractorTest` for the same mechanics exercised against tiny fake fixtures instead.
 
 ## Releasing a module
 
-`jmlx-jinja` and `jmlx-tokenizer` are published to Maven Central independently of each other and
-of the root project's version. Each has its own `release.sh`; the other three modules are not
-published (`jmlx-core`/`jmlx-ffi` would need native-artifact packaging designed first, and
-`jmlx-examples` is a demo).
+Six modules publish to Maven Central independently of each other and of the root project's
+version: `jmlx-jinja`, `jmlx-tokenizer`, `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`, and
+`jmlx-models`. Each has its own `release.sh` (all six byte-identical, enforced by
+`verifyReleaseScriptsMatch`). `jmlx-examples` remains the sole unpublished module (an `application`
+demo, not a library).
 
 ```sh
-./jmlx-jinja/release.sh        # publishes se.alipsa:jmlx-jinja
-./jmlx-tokenizer/release.sh    # publishes se.alipsa:jmlx-tokenizer
+./jmlx-jinja/release.sh              # publishes se.alipsa:jmlx-jinja
+./jmlx-tokenizer/release.sh          # publishes se.alipsa:jmlx-tokenizer
+./jmlx-native-macos-arm64/release.sh # publishes se.alipsa:jmlx-native-macos-arm64
+./jmlx-ffi/release.sh                # publishes se.alipsa:jmlx-ffi
+./jmlx-core/release.sh               # publishes se.alipsa:jmlx-core
+./jmlx-models/release.sh             # publishes se.alipsa:jmlx-models
 ```
 
-Both scripts refuse to publish a `-SNAPSHOT`, and refuse a module that has no `version` line of
+Every script refuses to publish a `-SNAPSHOT`, and refuses a module that has no `version` line of
 its own (which would mean it is silently riding the root version). To release: set the module's
 version to a release value, run its `release.sh`, then bump it to the next `-SNAPSHOT`. Version
 bumping is deliberately manual.
 
-**Release order matters.** `jmlx-tokenizer` depends on `jmlx-jinja` via `api project(...)`, which
-Gradle publishes as a concrete coordinate. `verifyNoSnapshotDependencies` fails the tokenizer
-release while jinja is still a SNAPSHOT. Release jinja first, then release tokenizer while jinja's
-released version is still checked out; only after both releases should jinja be bumped to its next
-`-SNAPSHOT` version.
+**Release order matters, along two independent chains.** `jmlx-tokenizer` depends on `jmlx-jinja`
+via `api project(...)`; `jmlx-core` depends on `jmlx-ffi` via `implementation project(...)`;
+`jmlx-models` depends on both `jmlx-core` and `jmlx-tokenizer` via `api project(...)`. Gradle
+publishes every one of these as a concrete coordinate, and `verifyNoSnapshotDependencies` fails a
+release while any of them is still a SNAPSHOT. Release jinja before tokenizer, and ffi before core
+before models; `jmlx-native-macos-arm64` has no dependency relationship to either chain (`jmlx-core`
+deliberately does not depend on it — see its own build.gradle) and can be released independently of
+both. Release each chain's modules while the ones it depends on are still checked out at their
+released version; only after every release in a chain should its modules be bumped back to their
+next `-SNAPSHOT` versions.
 
 Signing and Central credentials come from Gradle properties (`signing.keyId`,
 `sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is
@@ -145,11 +164,18 @@ jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLine
                  se.alipsa.jmlx.memory              MLXScope
        |
 jmlx-ffi         se.alipsa.jmlx.ffi.*              committed jextract output
-                 NativeLoader                      hand-written
+                 NativeLoader                      hand-written, tries jmlx.library.path /
+                                                    JMLX_LIBRARY_PATH, then classpath extraction
+                 ClasspathNativeExtractor           extracts jmlx-native-macos-arm64's bundled
+                                                    binaries to a per-pin cache dir on disk
        |
 native/install/lib/  libmlxc.dylib                 built by scripts/bootstrap-native.sh
                      libmlx.dylib  libjaccl.dylib   staged from the mlx-metal wheel
-                     mlx.metallib                   staged from the mlx-metal wheel
+                     mlx.metallib  native-pin.properties  staged from the mlx-metal wheel
+
+jmlx-native-macos-arm64  se/alipsa/jmlx/native/macos-aarch64/  the same 4 binaries + pin file,
+                                                    packaged as classpath resources -- optional
+                                                    runtime dependency, not a build-time one
 
 jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRenderer,
                                                     TokenizerJson/TokenizerJsonLoader, Vocabulary,
@@ -185,13 +211,24 @@ below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXI
 `jmlx-tokenizer` for prompt encoding/decoding, so model loading and generation require the native
 bootstrap and participate in the same loading-order guarantees as `jmlx-core`.
 
-Both are also the only **published** modules, and each carries its own version independent of the
-root's `0.5.0-SNAPSHOT`: `jmlx-jinja` is `0.6.0-SNAPSHOT` (continuing the archived hfjinja
-project's line) and `jmlx-tokenizer` is `0.1.0-SNAPSHOT`. Both override the toolchain to **Java
-21** rather than inheriting the root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s
-Panama FFM, and neither pure-Java module needs it, so targeting 21 keeps the published artifacts
-usable by Java 21 consumers. `jmlx-tokenizer`'s `verifyBytecodeLevel` task enforces this. See
-"Releasing a module" above.
+Both override the toolchain to **Java 21** rather than inheriting the root's Java 25 — that 25
+exists for `jmlx-core`/`jmlx-ffi`'s Panama FFM, and neither pure-Java module needs it, so targeting
+21 keeps their published artifacts usable by Java 21 consumers. `jmlx-tokenizer`'s
+`verifyBytecodeLevel` task enforces this.
+
+**Six modules are published**, each carrying its own version independent of the root's
+`0.5.0-SNAPSHOT` (`jmlx-examples` is the sole exception, an `application` demo): `jmlx-jinja` is
+`0.6.0-SNAPSHOT` (continuing the archived hfjinja project's line), `jmlx-tokenizer` and
+`jmlx-native-macos-arm64` are both `0.1.0-SNAPSHOT` (neither has ever been published), `jmlx-ffi`
+and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward the number they
+already had via the root's default), and `jmlx-models` is `0.1.0-SNAPSHOT` (also never published).
+`jmlx-core`/`jmlx-models` disable Javadoc's `missing` doclint category (`-Xdoclint:all,-missing`)
+rather than retrofitting `@param`/`@return`/`@throws` tags onto an already prose-documented,
+pre-existing public surface — the root's reactive `maven-publish` wiring's `-Werror` still gates
+every other Javadoc problem. `jmlx-ffi` instead restricts Javadoc's (and `checkstyleMain`'s) source
+to its hand-written tree, excluding the committed jextract bindings entirely, for the same reason
+those bindings are exempt from Spotless/checkstyle (see "Code style" above). See "Releasing a
+module" above.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless

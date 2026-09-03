@@ -429,6 +429,16 @@ class MLXNumericTest {
   }
 
   @Test
+  void argmaxAxisReturnsInt32Indices() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1f, 5f, 3f, -2f, -1f, -3f}, new int[] {2, 3});
+      MLXArray result = MLXOps.argmaxAxis(a, 1, false);
+      assertEquals(DType.INT32, result.dtype());
+      assertArrayEquals(new int[] {1, 1}, result.toIntArray());
+    }
+  }
+
+  @Test
   void exp() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray a = MLX.array(scope, new float[] {0f, 1f}, new int[] {2});

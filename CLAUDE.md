@@ -15,8 +15,10 @@ cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `r
 byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered. `jmlx-jinja` (the
 migrated former `hfjinja` project) is a dependency-free Java 21+ Hugging Face Jinja subset for
 chat-template rendering. `req/project-outline.md` describes the full multi-phase vision (autograd,
-`se.alipsa.jmlx.nn`, safetensors/tokenizers, model loading); the rest of Phase 5 (model
-implementations, i.e. M3) is not yet implemented.
+`se.alipsa.jmlx.nn`, safetensors/tokenizers, and model loading). Phase 5 M3 is implemented as
+`jmlx-models`, with local Hugging Face Llama/Qwen safetensors loading and greedy generation.
+Configs declaring `rope_scaling` are rejected for now, so Llama 2 and Llama 3.0-era models are
+supported, while Llama 3.1+ requires RoPE scaling support first.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 
@@ -55,7 +57,7 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-examples
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
@@ -158,6 +160,9 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
        |
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
                  pure Java; no dependency on jmlx-ffi or native/install/lib
+
+jmlx-models      se.alipsa.jmlx.models             LlamaModel, QwenModel, DecoderModel
+                 depends on jmlx-core + jmlx-tokenizer; native inference and generation
 ```
 
 Three native modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
@@ -175,6 +180,10 @@ byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-ji
 former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
 Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
 below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
+
+**`jmlx-models` is in the native chain.** It depends on `jmlx-core` for MLX inference and on
+`jmlx-tokenizer` for prompt encoding/decoding, so model loading and generation require the native
+bootstrap and participate in the same loading-order guarantees as `jmlx-core`.
 
 Both are also the only **published** modules, and each carries its own version independent of the
 root's `0.5.0-SNAPSHOT`: `jmlx-jinja` is `0.6.0-SNAPSHOT` (continuing the archived hfjinja

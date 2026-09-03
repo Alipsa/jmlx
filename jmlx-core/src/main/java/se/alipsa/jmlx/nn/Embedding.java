@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.nn;
 
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -28,5 +29,14 @@ public final class Embedding extends Module implements UnaryModule {
   @Override
   public MLXArray forward(MLXArray indices) {
     return MLXShape.takeAxis(param("weight"), indices, 0);
+  }
+
+  /**
+   * Projects hidden states through this embedding table's transpose. This is the output head for a
+   * model that ties input embeddings and output logits, without registering the same parameter in
+   * two module subtrees.
+   */
+  public MLXArray project(MLXArray hiddenStates) {
+    return MLXOps.matmul(hiddenStates, MLXShape.transpose(param("weight"), hiddenStates.scope()));
   }
 }

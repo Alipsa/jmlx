@@ -1,6 +1,6 @@
 /*
  * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer,
- * jmlx-jinja and jmlx-examples lives here; each module's own build.gradle only
+ * jmlx-jinja, jmlx-models and jmlx-examples lives here; each module's own build.gradle only
  * declares its plugin and dependencies. See req/initial-plan.md §4 for the
  * rationale behind the native-access flags and the native-directory system
  * property below.

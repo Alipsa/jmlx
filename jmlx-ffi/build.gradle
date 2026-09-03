@@ -51,6 +51,9 @@ dependencies {
     // @EnabledIfNativeAvailable (testFixtures) is shared with jmlx-core and
     // jmlx-examples, which is the point of the testFixtures source set.
     testFixturesImplementation libs.junit.jupiter.api
+    // NativeLoaderExtractionFallbackTest reads NativeArtifact.pin() without making the native
+    // payload an ordinary test runtime dependency; its dedicated task adds that artifact at runtime.
+    testCompileOnly project(':jmlx-native-macos-arm64')
 }
 
 // Deliberately off the default test classpath: this ~180MB dependency exists only to prove

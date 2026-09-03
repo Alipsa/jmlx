@@ -47,8 +47,7 @@ def fileSystemOperations = project.services.get(org.gradle.api.file.FileSystemOp
 // resources and leaves a local jar empty. A missing pin alongside an otherwise old staged runtime
 // is a migration case; rerunning bootstrap validates it and writes the completion marker.
 def hasValidatedStagedNativeFiles = {
-    new File(stagedNativeDir.asFile, 'mlx.metallib').isFile() &&
-            new File(stagedNativeDir.asFile, 'native-pin.properties').isFile()
+    requiredFiles.every { new File(stagedNativeDir.asFile, it).isFile() }
 }
 
 tasks.register('stageNativeResources') {
@@ -80,12 +79,6 @@ tasks.register('stageNativeResources') {
                     './scripts/bootstrap-native.sh to stage the native runtime, then rebuild this module ' +
                     "for a real jar. Removing stale staged resources; this module's jar will be empty." + migrationHint)
             return
-        }
-        def missing = requiredFiles.findAll { !new File(stagedNativeDir.asFile, it).isFile() }
-        if (!missing.isEmpty()) {
-            throw new GradleException(
-                    "Missing staged native files under ${stagedNativeDir.asFile}: ${missing.join(', ')} -- " +
-                    'run ./scripts/bootstrap-native.sh first, then retry this build.')
         }
         fileSystemOperations.copy {
             from(stagedNativeDir) { include requiredFiles }

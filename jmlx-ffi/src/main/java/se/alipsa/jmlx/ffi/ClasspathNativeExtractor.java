@@ -52,8 +52,8 @@ final class ClasspathNativeExtractor {
   /** A leftover {@code .tmp-*} sibling older than this is assumed abandoned, not in-progress. */
   private static final Duration STALE_TMP_AGE = Duration.ofHours(1);
 
-  /** Prevents overlapping file locks from concurrent extraction calls in this JVM. */
-  private static final Object TARGET_MOVE_LOCK = new Object();
+  /** Prevents overlapping cache-wide file locks from concurrent extraction calls in this JVM. */
+  private static final Object EXTRACTION_LOCK = new Object();
 
   /** Only macOS/Apple Silicon has a published native artifact today. */
   static boolean isSupportedPlatform(String osName, String osArch) {
@@ -102,7 +102,10 @@ final class ClasspathNativeExtractor {
           extractAtomically(loader, resourceRoot, cacheRoot, target, cacheDescriptor));
     } catch (IOException e) {
       throw new NativeExtractionException(
-          "failed to extract bundled native libraries from the classpath", e);
+          "failed to extract bundled native libraries from the classpath. Configure a writable "
+              + "cache with -Djmlx.native.cache.path=<directory>, or bypass extraction with "
+              + "-Djmlx.library.path=<directory> or JMLX_LIBRARY_PATH=<directory>",
+          e);
     }
   }
 
@@ -198,10 +201,11 @@ final class ClasspathNativeExtractor {
   }
 
   /**
-   * Acquires a per-pin cross-process lock, rechecks the target under that lock, then copies every
-   * bundled file into a sibling temp directory (same filesystem as {@code cacheRoot}, required for
-   * the rename below to actually be atomic). Serializing before copying prevents losing processes
-   * from each writing a full native payload only to discard it after the rename race.
+   * Acquires a cache-wide cross-process lock, rechecks the target under that lock, then copies
+   * every bundled file into a sibling temp directory (same filesystem as {@code cacheRoot},
+   * required for the rename below to actually be atomic). This also serializes stale-temp cleanup:
+   * a temp name does not encode its pin, so a per-pin lock could not protect a slow extraction of
+   * another pin.
    */
   private static Path extractAtomically(
       ClassLoader loader,
@@ -211,15 +215,15 @@ final class ClasspathNativeExtractor {
       CacheDescriptor cacheDescriptor)
       throws IOException {
     Files.createDirectories(cacheRoot);
-    sweepStaleTempDirs(cacheRoot);
-    Path lockFile = target.resolveSibling("." + target.getFileName() + ".lock");
-    synchronized (TARGET_MOVE_LOCK) {
+    Path lockFile = cacheRoot.resolve(".extraction.lock");
+    synchronized (EXTRACTION_LOCK) {
       // POSIX closes all fcntl locks this process owns for a file when any descriptor for that file
       // closes. Opening and closing the channel inside this monitor prevents one local caller from
       // accidentally releasing another local caller's lock after it has acquired it.
       try (FileChannel channel =
           FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
         try (FileLock ignored = channel.lock()) {
+          sweepStaleTempDirs(cacheRoot);
           if (isComplete(target, cacheDescriptor.expectedSizes())) {
             return target;
           }

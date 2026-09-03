@@ -3,12 +3,16 @@ package se.alipsa.jmlx.ffi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Properties;
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.nativelib.macosarm64.NativeArtifact;
 
 /**
  * Runs ONLY via the {@code :jmlx-ffi:extractionFallbackTest} Gradle task, which forks its own JVM
@@ -30,11 +34,13 @@ class NativeLoaderExtractionFallbackTest {
     assertEquals("", System.getProperty("jmlx.library.path"));
     Path cacheRoot = Path.of(System.getProperty("jmlx.native.cache.path"));
     NativeLoader.ensureLoaded();
+    NativeArtifact.NativePin expectedPin = NativeArtifact.pin();
     try (var entries = Files.list(cacheRoot)) {
       Path extracted =
           entries
               .filter(Files::isDirectory)
               .filter(path -> !path.getFileName().toString().startsWith("."))
+              .filter(path -> hasPin(path, expectedPin))
               .findFirst()
               .orElseThrow();
       assertTrue(Files.isRegularFile(extracted.resolve("libmlxc.dylib")));
@@ -66,6 +72,17 @@ class NativeLoaderExtractionFallbackTest {
       assertEquals(0, mlx_h.mlx_array_free(sum));
       assertEquals(0, mlx_h.mlx_array_free(right));
       assertEquals(0, mlx_h.mlx_array_free(left));
+    }
+  }
+
+  private static boolean hasPin(Path directory, NativeArtifact.NativePin expected) {
+    Properties properties = new Properties();
+    try (InputStream input = Files.newInputStream(directory.resolve("native-pin.properties"))) {
+      properties.load(input);
+      return expected.mlxMetalVersion().equals(properties.getProperty("mlxMetalVersion"))
+          && expected.mlxcCommit().equals(properties.getProperty("mlxcCommit"));
+    } catch (IOException e) {
+      return false;
     }
   }
 }

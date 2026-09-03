@@ -211,9 +211,9 @@ below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXI
 `jmlx-tokenizer` for prompt encoding/decoding, so model loading and generation require the native
 bootstrap and participate in the same loading-order guarantees as `jmlx-core`.
 
-Both override the toolchain to **Java 21** rather than inheriting the root's Java 25 — that 25
-exists for `jmlx-core`/`jmlx-ffi`'s Panama FFM, and neither pure-Java module needs it, so targeting
-21 keeps their published artifacts usable by Java 21 consumers. `jmlx-tokenizer`'s
+`jmlx-tokenizer` and `jmlx-jinja` override the toolchain to **Java 21** rather than inheriting the
+root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s Panama FFM, and neither pure-Java
+module needs it, so targeting 21 keeps their published artifacts usable by Java 21 consumers. `jmlx-tokenizer`'s
 `verifyBytecodeLevel` task enforces this.
 
 **Six modules are published**, each carrying its own version independent of the root's

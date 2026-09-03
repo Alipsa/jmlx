@@ -58,7 +58,12 @@ public final class NativeLoader {
         // present-but-unloadable dylib (wrong arch, missing @rpath sibling,
         // unresolved symbol) -- must be caught here too, or the caching
         // contract above doesn't hold for the most likely real failure.
-        loadFailure = e;
+        // Extraction can fail transiently (for example disk exhaustion or a concurrent cache
+        // cleaner). Retrying it is safe and avoids poisoning a long-lived JVM for its lifetime.
+        // A bad explicit path or an unloadable dylib remains deterministic and is still cached.
+        if (!(e instanceof ClasspathNativeExtractor.NativeExtractionException)) {
+          loadFailure = e;
+        }
         throw e;
       }
     }

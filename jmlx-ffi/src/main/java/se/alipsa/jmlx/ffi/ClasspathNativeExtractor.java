@@ -3,6 +3,7 @@ package se.alipsa.jmlx.ffi;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -81,7 +82,7 @@ final class ClasspathNativeExtractor {
       }
       return Optional.of(extractAtomically(loader, resourceRoot, cacheRoot, target));
     } catch (IOException e) {
-      throw new IllegalStateException(
+      throw new NativeExtractionException(
           "failed to extract bundled native libraries from the classpath", e);
     }
   }
@@ -120,13 +121,29 @@ final class ClasspathNativeExtractor {
       if (resource == null) {
         throw new IOException("resource not found on classpath: " + resourceRoot + "/" + name);
       }
-      long size = resource.openConnection().getContentLengthLong();
+      long size = resourceSize(resource);
       if (size < 0) {
         throw new IOException("could not determine size of classpath resource: " + resource);
       }
       digest.update(Long.toString(size).getBytes(StandardCharsets.UTF_8));
     }
     return HexFormat.of().formatHex(digest.digest());
+  }
+
+  /**
+   * Finds a resource size without opening and retaining a {@code file:} URL connection. The normal
+   * test/IDE/exploded-classpath case uses that protocol; {@code FileURLConnection}'s content-length
+   * query opens a stream whose lifetime is otherwise left to GC.
+   */
+  private static long resourceSize(URL resource) throws IOException {
+    if ("file".equals(resource.getProtocol())) {
+      try {
+        return Files.size(Path.of(resource.toURI()));
+      } catch (URISyntaxException e) {
+        throw new IOException("invalid file resource URL: " + resource, e);
+      }
+    }
+    return resource.openConnection().getContentLengthLong();
   }
 
   private static MessageDigest sha256() {
@@ -198,7 +215,12 @@ final class ClasspathNativeExtractor {
         deleteQuietly(tmp);
         return;
       }
-      deleteQuietly(target);
+      // A process can finish its rename after the first isComplete(target) above but before this
+      // branch. Re-check immediately before deletion so a losing extractor never removes another
+      // process's newly published cache directory.
+      if (!isComplete(target)) {
+        deleteQuietly(target);
+      }
       try {
         Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
       } catch (IOException second) {
@@ -271,6 +293,16 @@ final class ClasspathNativeExtractor {
               });
     } catch (UncheckedIOException e) {
       throw e.getCause();
+    }
+  }
+
+  /**
+   * Marks a recoverable extraction failure so {@link NativeLoader} can allow a later retry in the
+   * same JVM. Library-load and configuration failures remain cached by {@code NativeLoader}.
+   */
+  static final class NativeExtractionException extends IllegalStateException {
+    NativeExtractionException(String message, IOException cause) {
+      super(message, cause);
     }
   }
 }

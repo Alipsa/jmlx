@@ -90,10 +90,8 @@ final class ClasspathNativeExtractor {
     try {
       cacheDescriptor = cacheDescriptorFor(loader, resourceRoot);
     } catch (IOException e) {
-      // Resource discovery is deterministic for the life of a classpath. Do not make a malformed
-      // native jar look like a transient disk failure and retry it on every loader entry point.
       throw new NativeExtractionException(
-          "bundled native artifact is incomplete or unreadable on the classpath", e, false);
+          "bundled native artifact is incomplete or unreadable on the classpath", e);
     }
     Path target = cacheRoot.resolve(cacheDescriptor.key());
     if (isComplete(target, cacheDescriptor.expectedSizes())) {
@@ -104,7 +102,7 @@ final class ClasspathNativeExtractor {
           extractAtomically(loader, resourceRoot, cacheRoot, target, cacheDescriptor));
     } catch (IOException e) {
       throw new NativeExtractionException(
-          "failed to extract bundled native libraries from the classpath", e, true);
+          "failed to extract bundled native libraries from the classpath", e);
     }
   }
 
@@ -215,9 +213,12 @@ final class ClasspathNativeExtractor {
     Files.createDirectories(cacheRoot);
     sweepStaleTempDirs(cacheRoot);
     Path lockFile = target.resolveSibling("." + target.getFileName() + ".lock");
-    try (FileChannel channel =
-        FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-      synchronized (TARGET_MOVE_LOCK) {
+    synchronized (TARGET_MOVE_LOCK) {
+      // POSIX closes all fcntl locks this process owns for a file when any descriptor for that file
+      // closes. Opening and closing the channel inside this monitor prevents one local caller from
+      // accidentally releasing another local caller's lock after it has acquired it.
+      try (FileChannel channel =
+          FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
         try (FileLock ignored = channel.lock()) {
           if (isComplete(target, cacheDescriptor.expectedSizes())) {
             return target;
@@ -340,17 +341,10 @@ final class ClasspathNativeExtractor {
     }
   }
 
-  /** Marks whether a native-artifact failure is retryable by {@link NativeLoader}. */
+  /** Identifies a classpath-native-artifact failure for {@link NativeLoader}'s cached cause. */
   static final class NativeExtractionException extends IllegalStateException {
-    private final boolean retryable;
-
-    NativeExtractionException(String message, IOException cause, boolean retryable) {
+    NativeExtractionException(String message, IOException cause) {
       super(message, cause);
-      this.retryable = retryable;
-    }
-
-    boolean isRetryable() {
-      return retryable;
     }
   }
 

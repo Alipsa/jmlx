@@ -42,6 +42,9 @@ tasks.named('javadoc', Javadoc) {
 
 tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.ffi')
+    // jmlx-ffi redistributes generated bindings derived from mlx-c; ship its attribution with the
+    // artifact rather than leaving it only in a source checkout.
+    from('NOTICE') { into 'META-INF' }
 }
 
 dependencies {
@@ -135,14 +138,20 @@ tasks.register('extractionFallbackTest', Test) {
 
 check.dependsOn extractionFallbackTest
 
+// Test fixtures are an internal Gradle test-support variant, not part of jmlx-ffi's public Maven
+// API. Skipping both variants prevents the JUnit fixture dependency and fixture jar leaking into
+// Central POM/module metadata while preserving testFixtures(project(':jmlx-ffi')) in this build.
+components.java.withVariantsFromConfiguration(configurations.testFixturesApiElements) {
+    skip()
+}
+components.java.withVariantsFromConfiguration(configurations.testFixturesRuntimeElements) {
+    skip()
+}
+
 publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            // java-test-fixtures' variants have no Maven equivalent (test fixtures aren't a Maven
-            // concept); this is expected, not lossy for anything a Maven consumer needs.
-            suppressPomMetadataWarningsFor('testFixturesApiElements')
-            suppressPomMetadataWarningsFor('testFixturesRuntimeElements')
             pom {
                 name = 'jmlx-ffi'
                 description = 'Generated FFM (Project Panama) bindings for mlx-c and the native runtime loader, underlying jmlx-core.'

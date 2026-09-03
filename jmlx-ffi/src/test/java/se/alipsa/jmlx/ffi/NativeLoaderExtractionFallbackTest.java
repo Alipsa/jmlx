@@ -31,7 +31,12 @@ class NativeLoaderExtractionFallbackTest {
     Path cacheRoot = Path.of(System.getProperty("jmlx.native.cache.path"));
     NativeLoader.ensureLoaded();
     try (var entries = Files.list(cacheRoot)) {
-      Path extracted = entries.filter(Files::isDirectory).findFirst().orElseThrow();
+      Path extracted =
+          entries
+              .filter(Files::isDirectory)
+              .filter(path -> !path.getFileName().toString().startsWith("."))
+              .findFirst()
+              .orElseThrow();
       assertTrue(Files.isRegularFile(extracted.resolve("libmlxc.dylib")));
       assertTrue(Files.isRegularFile(extracted.resolve("mlx.metallib")));
       assertTrue(Files.isRegularFile(extracted.resolve("native-pin.properties")));

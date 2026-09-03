@@ -168,14 +168,12 @@ class ClasspathNativeExtractorTest {
   }
 
   @Test
-  void malformedNativeArtifactFailureIsNotRetryable(@TempDir Path cacheRoot) {
-    ClasspathNativeExtractor.NativeExtractionException failure =
-        assertThrows(
-            ClasspathNativeExtractor.NativeExtractionException.class,
-            () ->
-                ClasspathNativeExtractor.extractIfAvailable(
-                    loader(), MISSING_PIN_FIXTURE_ROOT, cacheRoot));
-    assertFalse(failure.isRetryable());
+  void malformedNativeArtifactFailureIsReported(@TempDir Path cacheRoot) {
+    assertThrows(
+        ClasspathNativeExtractor.NativeExtractionException.class,
+        () ->
+            ClasspathNativeExtractor.extractIfAvailable(
+                loader(), MISSING_PIN_FIXTURE_ROOT, cacheRoot));
   }
 
   @Test

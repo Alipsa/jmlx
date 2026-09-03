@@ -31,23 +31,25 @@ public abstract class DecoderModel extends Module {
 
   /**
    * Builds every layer from {@code tensors}, keyed by their Hugging Face checkpoint names. {@code
-   * qkvBiasRequired} is a constructor argument, not a method a subclass overrides: reading it from
-   * an overridable hook here would run before the subclass's own field initializers (the classic
-   * Java construction-order hazard) -- see {@link QwenModel}'s and {@link LlamaModel}'s private
-   * constructors for how each architecture derives it.
+   * qkvBiasRequired}/{@code outBiasRequired} are constructor arguments, not methods a subclass
+   * overrides: reading them from an overridable hook here would run before the subclass's own field
+   * initializers (the classic Java construction-order hazard) -- see {@link QwenModel}'s and {@link
+   * LlamaModel}'s private constructors for how each architecture derives them. Neither simply reads
+   * {@link DecoderConfig#attentionBias()} directly: Qwen2 never defines that config.json field
+   * (hardcoding q/k/v bias -- but never o_proj bias -- in HF's modeling code instead), so a
+   * hand-edited Qwen2 config that happened to set it would otherwise reject an o_proj-bias-less
+   * checkpoint that is, in fact, perfectly valid.
    */
   protected DecoderModel(
       MLXScope scope,
       DecoderConfig config,
       Map<String, MLXArray> tensors,
-      boolean qkvBiasRequired) {
+      boolean qkvBiasRequired,
+      boolean outBiasRequired) {
     super(scope);
     this.config = Objects.requireNonNull(config, "config");
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
-    // o_proj bias is never hardcoded by any known architecture; only Llama's config.json flag
-    // calls for it.
-    boolean outBiasExpected = config.attentionBias();
     boolean mlpBiasExpected = config.mlpBias();
     List<DecoderBlock> built = new ArrayList<>();
     for (int i = 0; i < config.numHiddenLayers(); i++) {
@@ -67,7 +69,7 @@ public abstract class DecoderModel extends Module {
               tensor(tensors, p + "self_attn.v_proj.weight"),
               bias(tensors, p + "self_attn.v_proj.bias", qkvBiasRequired),
               tensor(tensors, p + "self_attn.o_proj.weight"),
-              bias(tensors, p + "self_attn.o_proj.bias", outBiasExpected));
+              bias(tensors, p + "self_attn.o_proj.bias", outBiasRequired));
       RMSNorm postNorm =
           new RMSNorm(
               scope, tensor(tensors, p + "post_attention_layernorm.weight"), config.rmsNormEps());

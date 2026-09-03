@@ -43,10 +43,13 @@ def fileSystemOperations = project.services.get(org.gradle.api.file.FileSystemOp
 // NativeLoader itself checks first (mlx.metallib's presence), so a totally unstaged checkout
 // produces an empty jar (without failing the aggregate `build`/`check`) rather than breaking it.
 // A *partially* staged directory (mlx.metallib present but something else missing -- a broken or
-// interrupted bootstrap run) still fails loudly below: that state is never "not bootstrapped yet",
-// it's actually broken, and this module's own guarantee never to silently produce a corrupt jar
-// still applies once staging is attempted at all.
-def hasAnyStagedNativeFiles = { new File(stagedNativeDir.asFile, 'mlx.metallib').isFile() }
+// interrupted bootstrap run) does not make a corrupt jar: staging removes any old generated
+// resources and leaves a local jar empty. A missing pin alongside an otherwise old staged runtime
+// is a migration case; rerunning bootstrap validates it and writes the completion marker.
+def hasValidatedStagedNativeFiles = {
+    new File(stagedNativeDir.asFile, 'mlx.metallib').isFile() &&
+            new File(stagedNativeDir.asFile, 'native-pin.properties').isFile()
+}
 
 tasks.register('stageNativeResources') {
     group = 'build'
@@ -63,14 +66,19 @@ tasks.register('stageNativeResources') {
         .skipWhenEmpty(false)
     // If Gradle has no prior input snapshot (for example after a daemon restart), an existing
     // generated directory must still not survive an unstaged build as stale package input.
-    outputs.upToDateWhen { hasAnyStagedNativeFiles() || !targetDir.get().asFile.exists() }
+    outputs.upToDateWhen { hasValidatedStagedNativeFiles() || !targetDir.get().asFile.exists() }
     doLast {
-        if (!hasAnyStagedNativeFiles()) {
+        if (!hasValidatedStagedNativeFiles()) {
             fileSystemOperations.delete { delete targetDir }
+            def metallib = new File(stagedNativeDir.asFile, 'mlx.metallib')
+            def pin = new File(stagedNativeDir.asFile, 'native-pin.properties')
+            def migrationHint = metallib.isFile() && !pin.isFile()
+                    ? ' Existing runtime has no native-pin.properties; re-run ./scripts/bootstrap-native.sh to validate and re-stage it.'
+                    : ''
             logger.warn(
-                    "jmlx-native-macos-arm64: native/install/lib/mlx.metallib not found -- run " +
+                    'jmlx-native-macos-arm64: validated native staging not found -- run ' +
                     './scripts/bootstrap-native.sh to stage the native runtime, then rebuild this module ' +
-                    'for a real jar. Removing stale staged resources; this module\'s jar will be empty.')
+                    "for a real jar. Removing stale staged resources; this module's jar will be empty." + migrationHint)
             return
         }
         def missing = requiredFiles.findAll { !new File(stagedNativeDir.asFile, it).isFile() }
@@ -121,7 +129,7 @@ tasks.register('verifyPackagedNativeResources') {
     // stageNativeResources is an always-actionable task so it can remove stale output. This check's
     // own onlyIf is lenient instead: an intentionally-empty jar (native/install/lib never staged)
     // is not its business. It catches a jar that tried to package native resources and got it wrong.
-    onlyIf { hasAnyStagedNativeFiles() }
+    onlyIf { hasValidatedStagedNativeFiles() }
     doLast {
         def zip = new java.util.zip.ZipFile(jarFile.get().asFile)
         try {
@@ -187,7 +195,7 @@ publishing {
 // unconditional gate rather than inheriting build-time leniency.
 tasks.withType(org.gradle.api.publish.maven.tasks.AbstractPublishToMaven).configureEach {
     doFirst {
-        if (!hasAnyStagedNativeFiles()) {
+        if (!hasValidatedStagedNativeFiles()) {
             throw new GradleException(
                     'Refusing to publish jmlx-native-macos-arm64 without staged native binaries -- ' +
                     'run ./scripts/bootstrap-native.sh first, then rebuild before publishing.')

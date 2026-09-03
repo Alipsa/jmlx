@@ -58,11 +58,13 @@ public final class NativeLoader {
         // present-but-unloadable dylib (wrong arch, missing @rpath sibling,
         // unresolved symbol) -- must be caught here too, or the caching
         // contract above doesn't hold for the most likely real failure.
-        // The production callers initialize from static initializers, so a failed first attempt
-        // already poisons those callers' classes. Caching every failure here keeps the remaining
-        // callers (including each native-test availability condition) from repeatedly attempting a
-        // large classpath extraction on a deterministically unwritable or full filesystem.
-        loadFailure = e;
+        // A multi-hundred-MB extraction can fail transiently (ENOSPC, a temporarily unwritable
+        // volume, or a network-mounted home directory). Let a direct loader caller retry that I/O
+        // path; explicit configuration and actual System.load failures remain deterministic and
+        // are cached. Static-initializer callers still fail normally on their first attempt.
+        if (!(e instanceof ClasspathNativeExtractor.NativeExtractionException)) {
+          loadFailure = e;
+        }
         throw e;
       }
     }

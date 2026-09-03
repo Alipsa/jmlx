@@ -5,9 +5,9 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -90,7 +90,7 @@ final class ClasspathNativeExtractor {
       }
       return Optional.of(extractAtomically(loader, resourceRoot, cacheRoot, target));
     } catch (IOException e) {
-      throw new IllegalStateException(
+      throw new NativeExtractionException(
           "failed to extract bundled native libraries from the classpath", e);
     }
   }
@@ -137,7 +137,7 @@ final class ClasspathNativeExtractor {
       if (size < 0) {
         throw new IOException("could not determine size of classpath resource: " + resource);
       }
-      digest.update(Long.toString(size).getBytes(StandardCharsets.UTF_8));
+      digest.update(ByteBuffer.allocate(Long.BYTES).putLong(size).array());
     }
     return HexFormat.of().formatHex(digest.digest());
   }
@@ -181,28 +181,39 @@ final class ClasspathNativeExtractor {
   }
 
   /**
-   * Copies every bundled file into a sibling temp directory (same filesystem as {@code cacheRoot},
-   * required for the rename below to actually be atomic), then hands off to {@link
-   * #moveIntoPlace(Path, Path)}.
+   * Acquires a per-pin cross-process lock, rechecks the target under that lock, then copies every
+   * bundled file into a sibling temp directory (same filesystem as {@code cacheRoot}, required for
+   * the rename below to actually be atomic). Serializing before copying prevents losing processes
+   * from each writing a full native payload only to discard it after the rename race.
    */
   private static Path extractAtomically(
       ClassLoader loader, String resourceRoot, Path cacheRoot, Path target) throws IOException {
     Files.createDirectories(cacheRoot);
     sweepStaleTempDirs(cacheRoot);
-    Path tmp = cacheRoot.resolve(".tmp-" + UUID.randomUUID());
-    Files.createDirectories(tmp);
-    try {
-      for (String name : BINARY_FILES) {
-        copyResource(loader, resourceRoot + "/" + name, tmp.resolve(name));
+    Path lockFile = target.resolveSibling("." + target.getFileName() + ".lock");
+    try (FileChannel channel =
+        FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+      synchronized (TARGET_MOVE_LOCK) {
+        try (FileLock ignored = channel.lock()) {
+          if (isComplete(target)) {
+            return target;
+          }
+          Path tmp = cacheRoot.resolve(".tmp-" + UUID.randomUUID());
+          Files.createDirectories(tmp);
+          try {
+            for (String name : BINARY_FILES) {
+              copyResource(loader, resourceRoot + "/" + name, tmp.resolve(name));
+            }
+            copyResource(loader, resourceRoot + "/" + PIN_FILE, tmp.resolve(PIN_FILE));
+            moveIntoPlaceLocked(tmp, target);
+          } catch (IOException e) {
+            // Best-effort: a failed cleanup of our own temp copy must never mask the real
+            // extraction failure being reported below.
+            deleteQuietly(tmp);
+            throw e;
+          }
+        }
       }
-      copyResource(loader, resourceRoot + "/" + PIN_FILE, tmp.resolve(PIN_FILE));
-      moveIntoPlace(tmp, target);
-      sweepObsoleteCacheDirs(cacheRoot, target);
-    } catch (IOException e) {
-      // Best-effort: a failed cleanup of our own temp copy must never mask the real extraction
-      // failure being reported below.
-      deleteQuietly(tmp);
-      throw e;
     }
     return target;
   }
@@ -220,19 +231,7 @@ final class ClasspathNativeExtractor {
    * that was lost; without clearing it, every subsequent JVM start would hit the same rename
    * failure forever. It's cleared and the rename retried once before giving up.
    */
-  private static void moveIntoPlace(Path tmp, Path target) throws IOException {
-    Path lockFile = target.resolveSibling("." + target.getFileName() + ".lock");
-    try (FileChannel channel =
-        FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-      synchronized (TARGET_MOVE_LOCK) {
-        try (FileLock ignored = channel.lock()) {
-          moveIntoPlaceLocked(tmp, target);
-        }
-      }
-    }
-  }
-
-  /** Performs the rename/recovery sequence while every jmlx process serializes this cache key. */
+  /** Performs the rename/recovery sequence while every jmlx process holds this cache key's lock. */
   private static void moveIntoPlaceLocked(Path tmp, Path target) throws IOException {
     try {
       Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
@@ -267,23 +266,6 @@ final class ClasspathNativeExtractor {
           .forEach(ClasspathNativeExtractor::deleteQuietly);
     } catch (IOException ignored) {
       // A failed sweep must never block extraction itself.
-    }
-  }
-
-  /**
-   * Keeps durable application storage bounded to the successfully extracted current pin. Lock and
-   * temp siblings are excluded: the former coordinates another process and the latter may be an
-   * in-progress extraction.
-   */
-  private static void sweepObsoleteCacheDirs(Path cacheRoot, Path current) {
-    try (Stream<Path> entries = Files.list(cacheRoot)) {
-      entries
-          .filter(Files::isDirectory)
-          .filter(p -> !p.equals(current))
-          .filter(p -> !p.getFileName().toString().startsWith("."))
-          .forEach(ClasspathNativeExtractor::deleteQuietly);
-    } catch (IOException ignored) {
-      // A failed cleanup must never block a successful extraction.
     }
   }
 
@@ -331,6 +313,13 @@ final class ClasspathNativeExtractor {
               });
     } catch (UncheckedIOException e) {
       throw e.getCause();
+    }
+  }
+
+  /** Marks an I/O extraction failure as retryable by {@link NativeLoader}. */
+  static final class NativeExtractionException extends IllegalStateException {
+    NativeExtractionException(String message, IOException cause) {
+      super(message, cause);
     }
   }
 }

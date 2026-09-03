@@ -98,6 +98,7 @@ check.dependsOn loaderGuardTest
 // same reason loaderGuardTest needs one: ensureLoaded() caches its outcome.
 def extractionFallbackCacheDir = layout.buildDirectory.dir('extractionFallbackTest-cache')
 def stagedMetallib = rootProject.layout.projectDirectory.file('native/install/lib/mlx.metallib')
+def stagedNativePin = rootProject.layout.projectDirectory.file('native/install/lib/native-pin.properties')
 
 tasks.register('extractionFallbackTest', Test) {
     dependsOn tasks.named('testClasses')
@@ -112,10 +113,10 @@ tasks.register('extractionFallbackTest', Test) {
     // the same underlying signal so ./gradlew build keeps succeeding for a contributor who hasn't
     // bootstrapped and doesn't need native functionality.
     onlyIf {
-        def staged = stagedMetallib.asFile.isFile()
+        def staged = stagedMetallib.asFile.isFile() && stagedNativePin.asFile.isFile()
         if (!staged) {
             logger.warn(
-                    'jmlx-ffi: native/install/lib/mlx.metallib not found -- skipping extractionFallbackTest ' +
+                    'jmlx-ffi: validated native staging not found -- skipping extractionFallbackTest ' +
                     '(run ./scripts/bootstrap-native.sh to exercise it for real).')
         }
         staged

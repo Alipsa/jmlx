@@ -31,6 +31,8 @@ class ClasspathNativeExtractorTest {
 
   private static final String FIXTURE_ROOT = "se/alipsa/jmlx/native-fixture/macos-aarch64";
   private static final String ALT_FIXTURE_ROOT = "se/alipsa/jmlx/native-fixture/macos-aarch64-alt";
+  private static final String SIZE_FIXTURE_ROOT =
+      "se/alipsa/jmlx/native-fixture/macos-aarch64-size";
   private static final List<String> BINARY_NAMES =
       List.of("libmlxc.dylib", "libmlx.dylib", "libjaccl.dylib", "mlx.metallib");
 
@@ -129,7 +131,19 @@ class ClasspathNativeExtractorTest {
             .orElseThrow();
     assertFalse(
         a.equals(b), "different native-pin.properties content must yield different cache keys");
-    assertTrue(Files.isDirectory(a));
+    assertTrue(Files.isDirectory(b));
+  }
+
+  @Test
+  void samePinWithDifferentBinarySizesExtractsToADifferentCacheSubdirectory(@TempDir Path cacheRoot)
+      throws IOException {
+    Path a =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    Path b =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), SIZE_FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    assertFalse(a.equals(b), "different binary sizes must affect the cache key");
     assertTrue(Files.isDirectory(b));
   }
 

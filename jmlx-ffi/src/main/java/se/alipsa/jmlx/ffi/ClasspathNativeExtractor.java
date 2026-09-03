@@ -5,10 +5,13 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -45,6 +48,9 @@ final class ClasspathNativeExtractor {
 
   /** A leftover {@code .tmp-*} sibling older than this is assumed abandoned, not in-progress. */
   private static final Duration STALE_TMP_AGE = Duration.ofHours(1);
+
+  /** Prevents overlapping file locks from concurrent extraction calls in this JVM. */
+  private static final Object TARGET_MOVE_LOCK = new Object();
 
   /** Only macOS/Apple Silicon has a published native artifact today. */
   static boolean isSupportedPlatform(String osName, String osArch) {
@@ -191,6 +197,7 @@ final class ClasspathNativeExtractor {
       }
       copyResource(loader, resourceRoot + "/" + PIN_FILE, tmp.resolve(PIN_FILE));
       moveIntoPlace(tmp, target);
+      sweepObsoleteCacheDirs(cacheRoot, target);
     } catch (IOException e) {
       // Best-effort: a failed cleanup of our own temp copy must never mask the real extraction
       // failure being reported below.
@@ -214,6 +221,19 @@ final class ClasspathNativeExtractor {
    * failure forever. It's cleared and the rename retried once before giving up.
    */
   private static void moveIntoPlace(Path tmp, Path target) throws IOException {
+    Path lockFile = target.resolveSibling("." + target.getFileName() + ".lock");
+    try (FileChannel channel =
+        FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+      synchronized (TARGET_MOVE_LOCK) {
+        try (FileLock ignored = channel.lock()) {
+          moveIntoPlaceLocked(tmp, target);
+        }
+      }
+    }
+  }
+
+  /** Performs the rename/recovery sequence while every jmlx process serializes this cache key. */
+  private static void moveIntoPlaceLocked(Path tmp, Path target) throws IOException {
     try {
       Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
     } catch (IOException first) {
@@ -221,12 +241,7 @@ final class ClasspathNativeExtractor {
         deleteQuietly(tmp);
         return;
       }
-      // A process can finish its rename after the first isComplete(target) above but before this
-      // branch. Re-check immediately before deletion so a losing extractor never removes another
-      // process's newly published cache directory.
-      if (!isComplete(target)) {
-        deleteQuietly(target);
-      }
+      deleteQuietly(target);
       try {
         Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
       } catch (IOException second) {
@@ -252,6 +267,23 @@ final class ClasspathNativeExtractor {
           .forEach(ClasspathNativeExtractor::deleteQuietly);
     } catch (IOException ignored) {
       // A failed sweep must never block extraction itself.
+    }
+  }
+
+  /**
+   * Keeps durable application storage bounded to the successfully extracted current pin. Lock and
+   * temp siblings are excluded: the former coordinates another process and the latter may be an
+   * in-progress extraction.
+   */
+  private static void sweepObsoleteCacheDirs(Path cacheRoot, Path current) {
+    try (Stream<Path> entries = Files.list(cacheRoot)) {
+      entries
+          .filter(Files::isDirectory)
+          .filter(p -> !p.equals(current))
+          .filter(p -> !p.getFileName().toString().startsWith("."))
+          .forEach(ClasspathNativeExtractor::deleteQuietly);
+    } catch (IOException ignored) {
+      // A failed cleanup must never block a successful extraction.
     }
   }
 

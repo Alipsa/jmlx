@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,8 +26,16 @@ import org.junit.jupiter.api.Test;
 class NativeLoaderExtractionFallbackTest {
 
   @Test
-  void ensureLoadedSucceedsViaClasspathExtraction() {
+  void ensureLoadedSucceedsViaClasspathExtraction() throws Exception {
+    assertEquals("", System.getProperty("jmlx.library.path"));
+    Path cacheRoot = Path.of(System.getProperty("jmlx.native.cache.path"));
     NativeLoader.ensureLoaded();
+    try (var entries = Files.list(cacheRoot)) {
+      Path extracted = entries.filter(Files::isDirectory).findFirst().orElseThrow();
+      assertTrue(Files.isRegularFile(extracted.resolve("libmlxc.dylib")));
+      assertTrue(Files.isRegularFile(extracted.resolve("mlx.metallib")));
+      assertTrue(Files.isRegularFile(extracted.resolve("native-pin.properties")));
+    }
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment dev = mlx_h.mlx_device_new(arena);
       assertEquals(0, mlx_h.mlx_get_default_device(dev));

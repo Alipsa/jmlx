@@ -29,6 +29,9 @@ tasks.named('javadoc', Javadoc) {
 }
 
 dependencies {
+    // A consumer opts into jmlx-native-macos-arm64 explicitly at runtime: keeping this optional
+    // avoids forcing an Apple-Silicon-only ~180MB artifact on users of the Java API (Decision 5 in
+    // req/plans/native-artifact-packaging-plan.md).
     // Not exposed on jmlx-core's own public API (MLXArray/MLX wrap raw
     // MemorySegment handles behind plain Java types), so implementation
     // rather than api. Published as a runtime-scope POM dependency, so a

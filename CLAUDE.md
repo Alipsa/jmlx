@@ -112,11 +112,13 @@ via `api project(...)`; `jmlx-core` depends on `jmlx-ffi` via `implementation pr
 `jmlx-models` depends on both `jmlx-core` and `jmlx-tokenizer` via `api project(...)`. Gradle
 publishes every one of these as a concrete coordinate, and `verifyNoSnapshotDependencies` fails a
 release while any of them is still a SNAPSHOT. Release jinja before tokenizer, and ffi before core
-before models; `jmlx-native-macos-arm64` has no dependency relationship to either chain (`jmlx-core`
-deliberately does not depend on it — see its own build.gradle) and can be released independently of
-both. Release each chain's modules while the ones it depends on are still checked out at their
-released version; only after every release in a chain should its modules be bumped back to their
-next `-SNAPSHOT` versions.
+before models. `jmlx-native-macos-arm64` has no published-POM dependency relationship to either
+chain, and jmlx-core deliberately does not depend on it (see Decision 5 in
+`req/plans/native-artifact-packaging-plan.md`); it can therefore be released independently. Its
+artifact is nevertheless a test-fixture build dependency of `jmlx-ffi`'s `extractionFallbackTest`,
+so `jmlx-ffi:check` and any ffi release build the native jar. Release each chain's modules while the
+ones it depends on are still checked out at their released version; only after every release in a
+chain should its modules be bumped back to their next `-SNAPSHOT` versions.
 
 Signing and Central credentials come from Gradle properties (`signing.keyId`,
 `sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is

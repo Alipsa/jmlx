@@ -26,11 +26,12 @@ already established (root `build.gradle`'s reactive `plugins.withId('maven-publi
    `req/project-outline.md`'s original naming) rather than a classifier on `jmlx-core`/`jmlx-ffi`.
    Simpler dependency resolution for a single platform; revisit only if/when a second platform
    (Linux, x86_64, other Apple Silicon) is actually built — no second build pipeline exists today.
-2. **The bundled binaries, not a classifier jar's source.** The module's jar contains no compiled
-   Java of its own — its only payload is `libmlxc.dylib`, `libmlx.dylib`, `libjaccl.dylib`,
-   `mlx.metallib`, and `native-pin.properties` as classpath resources under
-   `se/alipsa/jmlx/native/macos-aarch64/`. `withSourcesJar()`/`withJavadocJar()` are harmless no-ops
-   given no Java source, kept only for artifact-set consistency with the other publishable modules.
+2. **The bundled binaries plus a small metadata API, not a classifier jar's source.** The main jar
+   contains `libmlxc.dylib`, `libmlx.dylib`, `libjaccl.dylib`, `mlx.metallib`, and
+   `native-pin.properties` as classpath resources under `se/alipsa/jmlx/native/macos-aarch64/`, plus
+   `NativeArtifact`, a genuine Java API for resource and pin metadata. Native resources are attached
+   directly to the main jar rather than a source set, so `withSourcesJar()`/`withJavadocJar()` publish
+   the real metadata API without duplicating the binary payload.
 3. **`native-pin.properties` embeds the real upstream pin inside the jar** (written by
    `scripts/bootstrap-native.sh` right after staging the flat directory: `mlxMetalVersion`,
    `mlxcCommit`), rather than encoding it in the Maven version string. Keeps the module's own SemVer
@@ -49,7 +50,9 @@ already established (root `build.gradle`'s reactive `plugins.withId('maven-publi
    `jmlx.native.cache.path` system property (for sandboxed/read-only-home environments). The hash is
    SHA-256 of the packaged `native-pin.properties` bytes, so a JVM only pays the ~180MB extraction
    cost once per pin rather than on every process start, and a repin automatically gets a fresh
-   cache entry rather than reusing a stale one.
+   cache entry rather than reusing a stale one. After a successful extraction, obsolete completed
+   pin directories are removed so durable application storage does not accumulate one ~180MB copy
+   per release; temporary and lock siblings remain protected from concurrent extractors.
 7. **`jmlx-ffi`/`jmlx-core` get their own explicit `version = '0.5.0-SNAPSHOT'` line** (the same
    number they already carried via the root's `allprojects` default, made independent going
    forward); **`jmlx-models` starts a fresh `0.1.0-SNAPSHOT`** (never published, same reasoning

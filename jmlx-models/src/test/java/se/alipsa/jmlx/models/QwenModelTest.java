@@ -42,6 +42,30 @@ class QwenModelTest {
   }
 
   @Test
+  void qwen2IgnoresAttentionBiasConfigFlagForOutProj(@TempDir Path dir) throws Exception {
+    // Regression test for outBiasRequired: a Qwen2 config setting attention_bias (a field Qwen2
+    // never actually defines) must not make o_proj.bias required -- Qwen2 hardcodes bias=False
+    // for o_proj regardless. tinyCheckpoint() already has no o_proj.bias; that's the point.
+    Files.writeString(
+        dir.resolve("config.json"),
+        """
+        {"model_type":"qwen2","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":1,
+         "rms_norm_eps":0.000001,"rope_theta":10000,"tie_word_embeddings":true,
+         "attention_bias":true}
+        """);
+    try (MLXScope saveScope = new MLXScope()) {
+      Map<String, MLXArray> tensors = tinyCheckpoint(saveScope);
+      tensors.remove("lm_head.weight");
+      MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
+    }
+    try (MLXScope modelScope = new MLXScope()) {
+      QwenModel model = QwenModel.load(modelScope, dir);
+      assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
+    }
+  }
+
+  @Test
   void throwsWhenRequiredQwenBiasIsMissing(@TempDir Path dir) throws Exception {
     Files.writeString(
         dir.resolve("config.json"),

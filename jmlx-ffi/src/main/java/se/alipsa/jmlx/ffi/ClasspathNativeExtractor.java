@@ -57,9 +57,11 @@ final class ClasspathNativeExtractor {
 
   /**
    * Extracts the bundled binaries to the default per-pin cache directory under {@code
-   * ~/Library/Caches/se.alipsa.jmlx/native} (overridable via the {@code jmlx.native.cache.path}
-   * system property), or an empty {@link Optional} if {@code jmlx-native-macos-arm64} isn't on the
-   * classpath at all.
+   * ~/Library/Application Support/se.alipsa.jmlx/native} (overridable via the {@code
+   * jmlx.native.cache.path} system property), or an empty {@link Optional} if {@code
+   * jmlx-native-macos-arm64} isn't on the classpath at all. This is durable application data rather
+   * than {@code ~/Library/Caches}: MLX may not open {@code mlx.metallib} until the first kernel
+   * launch, after the dylibs have already been loaded.
    */
   static Optional<Path> extractIfAvailable() {
     return extractIfAvailable(
@@ -82,7 +84,7 @@ final class ClasspathNativeExtractor {
       }
       return Optional.of(extractAtomically(loader, resourceRoot, cacheRoot, target));
     } catch (IOException e) {
-      throw new NativeExtractionException(
+      throw new IllegalStateException(
           "failed to extract bundled native libraries from the classpath", e);
     }
   }
@@ -93,7 +95,11 @@ final class ClasspathNativeExtractor {
       return Path.of(override);
     }
     return Path.of(
-        System.getProperty("user.home"), "Library", "Caches", "se.alipsa.jmlx", "native");
+        System.getProperty("user.home"),
+        "Library",
+        "Application Support",
+        "se.alipsa.jmlx",
+        "native");
   }
 
   /**
@@ -293,16 +299,6 @@ final class ClasspathNativeExtractor {
               });
     } catch (UncheckedIOException e) {
       throw e.getCause();
-    }
-  }
-
-  /**
-   * Marks a recoverable extraction failure so {@link NativeLoader} can allow a later retry in the
-   * same JVM. Library-load and configuration failures remain cached by {@code NativeLoader}.
-   */
-  static final class NativeExtractionException extends IllegalStateException {
-    NativeExtractionException(String message, IOException cause) {
-      super(message, cause);
     }
   }
 }

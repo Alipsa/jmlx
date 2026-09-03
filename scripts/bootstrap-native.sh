@@ -214,14 +214,6 @@ RUNTIME_LIB_DIR="$INSTALL_DIR/lib"
 mkdir -p "$RUNTIME_LIB_DIR"
 cp "$WHEEL_DIR/mlx/lib/libmlx.dylib" "$WHEEL_DIR/mlx/lib/libjaccl.dylib" "$METALLIB_SRC" "$RUNTIME_LIB_DIR/"
 
-# Describes what's actually staged here -- useful standalone for a human to `cat`, and it's what
-# jmlx-native-macos-arm64 (req/plans/native-artifact-packaging-plan.md) embeds inside its jar as a
-# cache key for NativeLoader's classpath-extraction fallback.
-cat > "$RUNTIME_LIB_DIR/native-pin.properties" <<EOF
-mlxMetalVersion=${MLX_METAL_VERSION}
-mlxcCommit=${MLX_C_COMMIT}
-EOF
-
 # --- 7. Assert the result, don't trust it -------------------------------------
 # otool -L only dumps each LC_LOAD_DYLIB install name from the Mach-O header;
 # it never resolves them and never prints "not found" (that's ldd, which
@@ -262,6 +254,14 @@ done
 STAGED_METALLIB_SIZE="$(stat -f %z "$RUNTIME_LIB_DIR/mlx.metallib")"
 [[ "$STAGED_METALLIB_SIZE" -ge "$METALLIB_MIN_BYTES" ]] || die \
   "staged mlx.metallib is only $STAGED_METALLIB_SIZE bytes -- expected at least $METALLIB_MIN_BYTES"
+
+# Completion marker, written only after every runtime validation above passes. It is what
+# jmlx-native-macos-arm64 embeds as its cache key, and its absence makes a failed bootstrap visibly
+# incomplete to the packaging task rather than publishable as a seemingly complete native runtime.
+cat > "$RUNTIME_LIB_DIR/native-pin.properties" <<EOF
+mlxMetalVersion=${MLX_METAL_VERSION}
+mlxcCommit=${MLX_C_COMMIT}
+EOF
 
 log "native/install/lib:"
 ls -la "$RUNTIME_LIB_DIR"

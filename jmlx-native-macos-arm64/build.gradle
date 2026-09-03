@@ -10,12 +10,17 @@ plugins {
 // distinct axis per CLAUDE.md).
 version = '0.1.0-SNAPSHOT'
 
-// No Java source of its own -- this module's only payload is the native binaries below. A sources
-// jar would include the generated resource directory and duplicate the approximately 180MB binary
-// payload, so this intentionally publishes no -sources.jar. The tiny javadoc jar remains useful
-// as a conventional Maven companion artifact.
+// No Java source of its own -- this module's only payload is the native binaries below. A normal
+// withSourcesJar() would include the generated resource directory and duplicate the approximately
+// 180MB payload. Central nevertheless requires a -sources.jar, so publish an intentionally empty
+// companion jar instead. The tiny javadoc jar remains useful as a conventional Maven companion.
 java {
     withJavadocJar()
+}
+
+def emptySourcesJar = tasks.register('sourcesJar', Jar) {
+    archiveClassifier = 'sources'
+    // Deliberately no sourceSets.main input: sourcesJar must not package generated native resources.
 }
 
 tasks.named('jar') {
@@ -126,10 +131,9 @@ tasks.register('verifyPackagedNativeResources') {
     dependsOn tasks.named('jar')
     def jarFile = tasks.named('jar').flatMap { it.archiveFile }
     inputs.file(jarFile)
-    // Mirrors stageNativeResources' own onlyIf: an intentionally-empty jar (native/install/lib
-    // never staged) is not this check's business -- it exists to catch a jar that tried to package
-    // native resources and got it wrong, not to demand resources that were never supposed to be
-    // there yet.
+    // stageNativeResources is an always-actionable task so it can remove stale output. This check's
+    // own onlyIf is lenient instead: an intentionally-empty jar (native/install/lib never staged)
+    // is not its business. It catches a jar that tried to package native resources and got it wrong.
     onlyIf { hasAnyStagedNativeFiles() }
     doLast {
         def zip = new java.util.zip.ZipFile(jarFile.get().asFile)
@@ -158,6 +162,7 @@ publishing {
     publications {
         maven(MavenPublication) {
             from components.java
+            artifact(emptySourcesJar)
             pom {
                 name = 'jmlx-native-macos-arm64'
                 description = 'Precompiled MLX/mlx-c native binaries for macOS on Apple Silicon (arm64), for jmlx-ffi\'s NativeLoader classpath-extraction fallback.'
@@ -188,13 +193,12 @@ publishing {
     }
 }
 
-// stageNativeResources/verifyPackagedNativeResources's onlyIf gates above are deliberately lenient
-// -- an unstaged checkout SKIPS (not fails) so ./gradlew build/check stay green for a contributor
-// who hasn't bootstrapped. But release depends on check (root build.gradle), and a skipped task is
-// a *passing* task as far as that dependency is concerned: without a gate here, releasing from an
-// unstaged checkout would silently publish an empty jar to Maven Central -- a mistake that, unlike
-// a failed build, can never be taken back. Publishing (unlike check) must never be lenient about
-// this, so it gets its own hard, unconditional gate rather than reusing the build-time onlyIf.
+// stageNativeResources remains lenient by removing stale resources and producing an empty local jar
+// in an unstaged checkout; verifyPackagedNativeResources skips its assertion in that case. Release
+// depends on check, and a skipped verification is still passing: without a gate here, releasing from
+// an unstaged checkout would silently publish an empty jar to Maven Central -- a mistake that,
+// unlike a failed build, can never be taken back. Publishing must therefore use its own hard,
+// unconditional gate rather than inheriting build-time leniency.
 tasks.withType(org.gradle.api.publish.maven.tasks.AbstractPublishToMaven).configureEach {
     doFirst {
         if (!hasAnyStagedNativeFiles()) {

@@ -45,7 +45,7 @@ already established (root `build.gradle`'s reactive `plugins.withId('maven-publi
    decision of "system-installed vs. bundled native runtime" entirely with the consumer, matching
    `NativeLoader`'s existing `jmlx.library.path`/`JMLX_LIBRARY_PATH` precedent of never assuming one
    sourcing strategy.
-6. **Extraction cache: `~/Library/Caches/se.alipsa.jmlx/native/<hash>`**, overridable via a
+6. **Extraction directory: `~/Library/Application Support/se.alipsa.jmlx/native/<hash>`**, overridable via a
    `jmlx.native.cache.path` system property (for sandboxed/read-only-home environments). The hash is
    SHA-256 of the packaged `native-pin.properties` bytes, so a JVM only pays the ~180MB extraction
    cost once per pin rather than on every process start, and a repin automatically gets a fresh
@@ -120,7 +120,7 @@ mechanically derived from mlx-c's public C headers (MIT) — a distinct attribut
 ### 4. `maven-publish` wiring for the native module — **DONE**
 
 Mirrors `jmlx-tokenizer/build.gradle`'s shape (POM with two `<license>` entries: MIT + Apache-2.0),
-`Automatic-Module-Name: se.alipsa.jmlx.native.macosarm64`, byte-identical `release.sh`.
+`Automatic-Module-Name: se.alipsa.jmlx.nativelib.macosarm64`, byte-identical `release.sh`.
 
 ### 5. `ClasspathNativeExtractor` + `NativeLoader` fallback — **DONE**
 
@@ -180,7 +180,7 @@ guarantee — it legitimately has several.
 
 ### 8. CI — **DONE**
 
-`.github/workflows/jmlx-jinja-ci.yml`'s `native` job gained `:jmlx-native-macos-arm64:check`
+`.github/workflows/ci.yml`'s `native` job gained `:jmlx-native-macos-arm64:check`
 appended to its existing check line. `bootstrap-native.sh` already runs earlier in that job, so
 `native-pin.properties` exists before Gradle runs there.
 
@@ -210,10 +210,10 @@ done
 
 Fresh-clone-without-bootstrap invariant, re-verified after every amendment above (rename
 `native/install/lib` away, delete every module's `build/` directory, delete
-`~/Library/Caches/se.alipsa.jmlx`):
+`~/Library/Application Support/se.alipsa.jmlx`):
 
 ```sh
-./gradlew build -x :jmlx-jinja:test    # still BUILD SUCCESSFUL; native tasks SKIPPED with a warning
+./gradlew build -x :jmlx-jinja:test    # still BUILD SUCCESSFUL; stale native resources removed with a warning
 ```
 
 ## Deliberately out of scope
@@ -223,8 +223,8 @@ Fresh-clone-without-bootstrap invariant, re-verified after every amendment above
 - Multi-platform native artifacts (Linux, x86_64, other Apple Silicon) — no second build pipeline
   exists; the resource-path scheme (`macos-aarch64` as an explicit discriminator segment) leaves
   room for siblings if/when one is built.
-- Checksum verification of extracted files against an embedded manifest, and cross-version cache
-  garbage collection for `~/Library/Caches/se.alipsa.jmlx/native` — accepted as low-risk for v1
+- Checksum verification of extracted files against an embedded manifest, and cross-version extraction
+  directory garbage collection for `~/Library/Application Support/se.alipsa.jmlx/native` — accepted as low-risk for v1
   (Central's own artifact integrity already covers the classpath contents; per-pin cache growth is
   bounded and small in practice).
 

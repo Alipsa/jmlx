@@ -58,12 +58,11 @@ public final class NativeLoader {
         // present-but-unloadable dylib (wrong arch, missing @rpath sibling,
         // unresolved symbol) -- must be caught here too, or the caching
         // contract above doesn't hold for the most likely real failure.
-        // Extraction can fail transiently (for example disk exhaustion or a concurrent cache
-        // cleaner). Retrying it is safe and avoids poisoning a long-lived JVM for its lifetime.
-        // A bad explicit path or an unloadable dylib remains deterministic and is still cached.
-        if (!(e instanceof ClasspathNativeExtractor.NativeExtractionException)) {
-          loadFailure = e;
-        }
+        // The production callers initialize from static initializers, so a failed first attempt
+        // already poisons those callers' classes. Caching every failure here keeps the remaining
+        // callers (including each native-test availability condition) from repeatedly attempting a
+        // large classpath extraction on a deterministically unwritable or full filesystem.
+        loadFailure = e;
         throw e;
       }
     }

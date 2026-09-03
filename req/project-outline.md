@@ -165,4 +165,5 @@ original two-artifact, "universal binaries" sketch to the actual shape:
 At runtime, if neither the `jmlx.library.path` system property nor the `JMLX_LIBRARY_PATH`
 environment variable is set, `NativeLoader` automatically extracts the matching native binaries
 from `jmlx-native-macos-arm64`'s classpath resources (when that artifact is a dependency) to a
-per-pin cache directory under `~/Library/Caches/se.alipsa.jmlx/native` and loads them from there.
+per-pin durable application-data directory under `~/Library/Application Support/se.alipsa.jmlx/native`
+and loads them from there.

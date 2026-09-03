@@ -69,10 +69,11 @@ Every module's native-dependent tests are **skipped, not failed**, when `native/
 is absent — see `@EnabledIfNativeAvailable` (a `jmlx-ffi` test fixture, shared via `testFixtures`,
 delegating to `NativeLoader.ensureLoaded()` itself so the skip gate can never diverge from the real
 loader logic). Don't add a separate existence check to decide whether native tests should run.
-`jmlx-native-macos-arm64`'s own `stageNativeResources`/`verifyPackagedNativeResources` tasks and
-`jmlx-ffi`'s `extractionFallbackTest` (see below) honor the same invariant via an `onlyIf` gated on
-`native/install/lib/mlx.metallib`'s presence, so `./gradlew build` still succeeds for a contributor
-who hasn't bootstrapped.
+`jmlx-native-macos-arm64`'s `stageNativeResources` task is deliberately always actionable: when
+native files are absent it removes stale generated resources before making an empty local jar, while
+`verifyPackagedNativeResources` skips its content assertion. `jmlx-ffi`'s
+`extractionFallbackTest` (see below) follows the same unstaged-checkout invariant, so `./gradlew
+build` still succeeds for a contributor who has not bootstrapped.
 
 `jmlx-ffi` also has a `loaderGuardTest` task (wired into `check`) that exercises `NativeLoaderMissingMetallibTest`
 in its own JVM against a disposable copy of the native dir with `mlx.metallib` excluded — it's excluded
@@ -328,4 +329,6 @@ it. When touching `NativeLoader`, `MLXScope`, `MLX`, `NativeOps`, `MLXIO`, anyth
 `se.alipsa.jmlx.nn`, or the bootstrap/regen scripts, check whether the relevant decision is already
 recorded in one of these before re-deriving it. `req/project-outline.md` is the original,
 broader multi-phase vision; where it conflicts with `req/initial-plan.md` on scope or naming, the
-latter is authoritative for what's actually being built now.
+latter is authoritative for what's actually being built now. `req/full-roadmap.md` extends that
+outline after Phase 5: use it to select future phase/milestone scope and exit gates, then write the
+corresponding detailed plan under `req/plans/` before implementation.

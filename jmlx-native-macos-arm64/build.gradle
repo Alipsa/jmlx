@@ -10,22 +10,12 @@ plugins {
 // distinct axis per CLAUDE.md).
 version = '0.1.0-SNAPSHOT'
 
-// No Java source of its own -- this module's only payload is the native binaries below. A normal
-// withSourcesJar() would include the generated resource directory and duplicate the approximately
-// 180MB payload. Central nevertheless requires a -sources.jar, so publish an intentionally empty
-// companion jar instead. The tiny javadoc jar remains useful as a conventional Maven companion.
+// This module has a small Java metadata API alongside its native payload. Native resources are added
+// directly to the main jar below, rather than registered as source-set resources, so normal source
+// and Javadoc companion jars contain only the genuine Java API and never duplicate the ~180MB payload.
 java {
+    withSourcesJar()
     withJavadocJar()
-}
-
-def emptySourcesJar = tasks.register('sourcesJar', Jar) {
-    archiveClassifier = 'sources'
-    // Deliberately no sourceSets.main input: sourcesJar must not package generated native resources.
-}
-
-tasks.named('jar') {
-    // `native` is a Java keyword and therefore cannot be a module-name segment.
-    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
 }
 
 def stagedNativeDir = rootProject.layout.projectDirectory.dir('native/install/lib')
@@ -110,15 +100,12 @@ tasks.register('stageNativeResources') {
     }
 }
 
-sourceSets {
-    main {
-        resources {
-            srcDir generatedResourcesDir
-        }
-    }
+tasks.named('jar') {
+    // `native` is a Java keyword and therefore cannot be a module-name segment.
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
+    dependsOn tasks.named('stageNativeResources')
+    from(generatedResourcesDir)
 }
-
-tasks.named('processResources') { dependsOn tasks.named('stageNativeResources') }
 
 // Task 2's doLast only checks immediately after copying; this re-verifies the actual published
 // artifact (the built jar) has exactly the right entries on every check, independent of how the
@@ -162,7 +149,6 @@ publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            artifact(emptySourcesJar)
             pom {
                 name = 'jmlx-native-macos-arm64'
                 description = 'Precompiled MLX/mlx-c native binaries for macOS on Apple Silicon (arm64), for jmlx-ffi\'s NativeLoader classpath-extraction fallback.'

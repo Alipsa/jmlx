@@ -90,22 +90,23 @@ CLAUDE.md's own stated invariant) — empirically verified before this work star
 failure). The first version of `stageNativeResources`/`verifyPackagedNativeResources` *failed
 loudly* whenever `native/install/lib` was absent, which broke that invariant for the whole
 aggregate `./gradlew build` — a contributor who never bootstrapped and doesn't care about native
-functionality would now hit a hard failure on this one module. Fixed by gating both tasks on
-`onlyIf { native/install/lib/mlx.metallib exists }` (logging a clear warning and SKIPPING, not
-failing, when absent) — mirroring `@EnabledIfNativeAvailable`'s own skip semantics at the Gradle
-task level. A *partially* staged directory (`mlx.metallib` present but something else missing — a
-broken or interrupted bootstrap run) still fails loudly: that state is never "not bootstrapped
-yet," it's actually broken, and the "never silently produce a corrupt jar" guarantee still applies
-once staging is attempted at all. Verified all three states directly (unstaged → SKIPPED, BUILD
-SUCCESSFUL; partially staged → FAILED with the exact missing-files message; fully staged → normal
-success), and re-verified the whole-repo build tolerates a fresh, unbootstrapped checkout (see Task
-7's matching amendment for `jmlx-ffi:extractionFallbackTest`, and Task 6 below for the
-`sourcesJar`/`withSourcesJar()` variant of the exact same class of bug).
+functionality would now hit a hard failure on this one module. The final design leaves
+`stageNativeResources` always actionable: an unstaged checkout removes any stale generated resources
+and makes an empty local jar with a warning, while `verifyPackagedNativeResources` skips its content
+assertion. This avoids `onlyIf` retaining stale outputs. A *partially* staged directory
+(`mlx.metallib` present but something else missing — a broken or interrupted bootstrap run) still
+fails loudly: that state is never "not bootstrapped yet," it's actually broken, and the "never
+silently produce a corrupt jar" guarantee still applies once staging is attempted at all. Verified
+all three states directly (unstaged → warning and BUILD SUCCESSFUL; partially staged → FAILED with
+the exact missing-files message; fully staged → normal success), and re-verified the whole-repo build
+tolerates a fresh, unbootstrapped checkout (see Task 7's matching amendment for
+`jmlx-ffi:extractionFallbackTest`).
 
 ### 2. `native-pin.properties` — **DONE**
 
-`scripts/bootstrap-native.sh` writes it into `native/install/lib/` right after assembling the flat
-directory, from the script's own already-pinned `MLX_METAL_VERSION`/`MLX_C_COMMIT` constants.
+`scripts/bootstrap-native.sh` writes it into `native/install/lib/` only after the flat runtime passes
+its dlopen, codesign, and metallib-size validation, from the script's own already-pinned
+`MLX_METAL_VERSION`/`MLX_C_COMMIT` constants. Its presence is therefore the staging completion marker.
 
 ### 3. NOTICE/LICENSE — **DONE**
 
@@ -159,10 +160,11 @@ renamed away *and* every module's `build/` directory deleted (a prior successful
 `onlyIf`-skip doesn't clean previously-produced outputs — this masked the bug on the first
 verification attempt) — confirmed `SKIPPED` with a clear warning, `BUILD SUCCESSFUL`.
 
-Also hit: `withSourcesJar()`'s default `sourcesJar` task reads `sourceSets.main.allSource`, which
-includes the `generatedResourcesDir` srcDir Task 1 added — the same implicit-task-dependency
-problem Gradle's task validation catches, requiring an explicit
-`tasks.named('sourcesJar') { dependsOn tasks.named('stageNativeResources') }`.
+**Publication refinement:** the native module now has a small genuine Java metadata API
+(`NativeArtifact`). Generated native resources are fed directly to `jar` rather than registered as a
+source-set resource directory. Standard `withSourcesJar()`/`withJavadocJar()` consequently publish
+honest, small companion artifacts containing that API and its documentation without duplicating the
+native payload.
 
 ### 7. `jmlx-ffi`/`jmlx-core`/`jmlx-models` `maven-publish` wiring — **DONE**
 

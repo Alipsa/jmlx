@@ -7,7 +7,8 @@ import se.alipsa.jmlx.memory.MLXScope;
 /** Loads Hugging Face safetensors checkpoints whose {@code model_type} is {@code qwen2}. */
 public final class QwenModel extends DecoderModel {
   private QwenModel(MLXScope scope, DecoderConfig config, Path directory) throws IOException {
-    super(scope, requireQwen(config), CheckpointLoader.load(scope, directory));
+    // Qwen2 hardcodes a q/k/v bias in HF's modeling code; it is never a config.json field.
+    super(scope, requireQwen(config), CheckpointLoader.load(scope, directory), true);
   }
 
   /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
@@ -21,11 +22,5 @@ public final class QwenModel extends DecoderModel {
       throw new IllegalArgumentException("expected model_type qwen2, got " + config.modelType());
     }
     return config;
-  }
-
-  /** Qwen2 hardcodes a q/k/v bias in HF's modeling code; it is never a config.json field. */
-  @Override
-  protected boolean qkvBiasRequired(DecoderConfig config) {
-    return true;
   }
 }

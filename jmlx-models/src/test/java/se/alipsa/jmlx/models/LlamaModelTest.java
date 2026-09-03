@@ -1,11 +1,15 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.DType;
@@ -17,6 +21,26 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 @EnabledIfNativeAvailable
 class LlamaModelTest {
+  @Test
+  void loadsCheckpointAndGenerates(@TempDir Path dir) throws Exception {
+    Files.writeString(
+        dir.resolve("config.json"),
+        """
+        {"model_type":"llama","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":2,
+         "rms_norm_eps":0.000001,"rope_theta":10000,"tie_word_embeddings":true}
+        """);
+    try (MLXScope saveScope = new MLXScope()) {
+      Map<String, MLXArray> tensors = tinyCheckpoint(saveScope);
+      tensors.remove("lm_head.weight");
+      MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
+    }
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
+      assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
+    }
+  }
+
   @Test
   void throwsWhenConfigRequiresAttentionBiasButCheckpointHasNone(@TempDir Path dir)
       throws Exception {
@@ -34,7 +58,9 @@ class LlamaModelTest {
       MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
     }
     try (MLXScope modelScope = new MLXScope()) {
-      assertThrows(IllegalArgumentException.class, () -> LlamaModel.load(modelScope, dir));
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> LlamaModel.load(modelScope, dir));
+      assertTrue(e.getMessage().contains("self_attn.q_proj.bias"), e.getMessage());
     }
   }
 

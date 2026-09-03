@@ -29,15 +29,24 @@ public abstract class DecoderModel extends Module {
   private final Linear lmHead;
   private final boolean tiedOutput;
 
-  /** Builds every layer from {@code tensors}, keyed by their Hugging Face checkpoint names. */
-  protected DecoderModel(MLXScope scope, DecoderConfig config, Map<String, MLXArray> tensors) {
+  /**
+   * Builds every layer from {@code tensors}, keyed by their Hugging Face checkpoint names. {@code
+   * qkvBiasRequired} is a constructor argument, not a method a subclass overrides: reading it from
+   * an overridable hook here would run before the subclass's own field initializers (the classic
+   * Java construction-order hazard) -- see {@link QwenModel}'s and {@link LlamaModel}'s private
+   * constructors for how each architecture derives it.
+   */
+  protected DecoderModel(
+      MLXScope scope,
+      DecoderConfig config,
+      Map<String, MLXArray> tensors,
+      boolean qkvBiasRequired) {
     super(scope);
     this.config = Objects.requireNonNull(config, "config");
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
     // o_proj bias is never hardcoded by any known architecture; only Llama's config.json flag
-    // calls for it. qkvBiasRequired is the corresponding hook for q/k/v -- see its javadoc.
-    boolean qkvBiasExpected = qkvBiasRequired(config);
+    // calls for it.
     boolean outBiasExpected = config.attentionBias();
     boolean mlpBiasExpected = config.mlpBias();
     List<DecoderBlock> built = new ArrayList<>();
@@ -52,11 +61,11 @@ public abstract class DecoderModel extends Module {
               config.numKeyValueHeads(),
               config.ropeTheta(),
               tensor(tensors, p + "self_attn.q_proj.weight"),
-              bias(tensors, p + "self_attn.q_proj.bias", qkvBiasExpected),
+              bias(tensors, p + "self_attn.q_proj.bias", qkvBiasRequired),
               tensor(tensors, p + "self_attn.k_proj.weight"),
-              bias(tensors, p + "self_attn.k_proj.bias", qkvBiasExpected),
+              bias(tensors, p + "self_attn.k_proj.bias", qkvBiasRequired),
               tensor(tensors, p + "self_attn.v_proj.weight"),
-              bias(tensors, p + "self_attn.v_proj.bias", qkvBiasExpected),
+              bias(tensors, p + "self_attn.v_proj.bias", qkvBiasRequired),
               tensor(tensors, p + "self_attn.o_proj.weight"),
               bias(tensors, p + "self_attn.o_proj.bias", outBiasExpected));
       RMSNorm postNorm =
@@ -90,18 +99,6 @@ public abstract class DecoderModel extends Module {
   /** Returns the architecture configuration this model was built from. */
   public final DecoderConfig config() {
     return config;
-  }
-
-  /**
-   * Whether the q/k/v projections must carry a bias tensor. Defaults to {@link
-   * DecoderConfig#attentionBias()}, which is correct for Llama's explicit config.json flag. Qwen2
-   * hardcodes this bias in HF's modeling code rather than exposing it as a config field, so {@link
-   * QwenModel} overrides this to always return {@code true} -- keeping that architectural knowledge
-   * with the {@code model_type} check that already gatekeeps {@link QwenModel}, instead of this
-   * shared base class matching on {@code model_type} itself.
-   */
-  protected boolean qkvBiasRequired(DecoderConfig config) {
-    return config.attentionBias();
   }
 
   /**

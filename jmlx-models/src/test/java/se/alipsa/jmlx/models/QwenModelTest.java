@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,7 +57,9 @@ class QwenModelTest {
       MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
     }
     try (MLXScope modelScope = new MLXScope()) {
-      assertThrows(IllegalArgumentException.class, () -> QwenModel.load(modelScope, dir));
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> QwenModel.load(modelScope, dir));
+      assertTrue(e.getMessage().contains("self_attn.q_proj.bias"), e.getMessage());
     }
   }
 

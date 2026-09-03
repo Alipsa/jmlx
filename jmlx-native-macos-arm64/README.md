@@ -25,6 +25,14 @@ locally built runtime instead, set either `-Djmlx.library.path=/path/to/native/i
 `JMLX_LIBRARY_PATH=/path/to/native/install/lib`; an explicit path always takes precedence over the
 packaged artifact.
 
+## Cache maintenance
+
+The loader retains each per-pin cache directory. Automatically deleting an older one could break a
+running JVM that has loaded its dylibs but has not yet lazily opened `mlx.metallib`. To reclaim
+space after upgrading, stop all jmlx JVMs and delete unneeded directories under
+`~/Library/Application Support/se.alipsa.jmlx/native` (or the directory selected by
+`-Djmlx.native.cache.path`).
+
 The artifact supports macOS/aarch64 only. It has the automatic module name
 `se.alipsa.jmlx.nativelib.macosarm64`. `NativeArtifact.pin()` exposes the packaged `mlx-metal`
 version and mlx-c commit for diagnostics without loading the native libraries.

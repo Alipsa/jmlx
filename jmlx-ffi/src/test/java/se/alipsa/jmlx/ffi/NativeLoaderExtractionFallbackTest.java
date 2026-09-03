@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>{@link ClasspathNativeExtractorTest} already covers the extraction mechanics with tiny fake
  * fixtures; this is the one place that proves the real ~180MB artifact's contents actually let MLX
- * load and answer a real downcall (same shape as {@link NativeLoaderSmokeTest}).
+ * load and evaluate a GPU kernel, which forces MLX to open the colocated {@code mlx.metallib}.
  */
 class NativeLoaderExtractionFallbackTest {
 
@@ -46,6 +46,21 @@ class NativeLoaderExtractionFallbackTest {
       assertTrue(type == 0 || type == 1, "unexpected device type: " + type);
 
       assertEquals(0, mlx_h.mlx_device_free(dev));
+
+      // A device query does not open mlx.metallib. Force MLX onto the GPU and evaluate a genuine
+      // kernel so this fallback test proves the extracted flat layout includes the metallib MLX
+      // locates lazily beside libmlx.dylib.
+      MemorySegment gpu = mlx_h.mlx_device_new_type(arena, mlx_h.MLX_GPU(), 0);
+      assertEquals(0, mlx_h.mlx_set_default_device(gpu));
+      MemorySegment stream = mlx_h.mlx_default_gpu_stream_new(arena);
+      MemorySegment left = mlx_h.mlx_array_new_float32(arena, 1.0f);
+      MemorySegment right = mlx_h.mlx_array_new_float32(arena, 2.0f);
+      MemorySegment sum = mlx_h.mlx_array_new(arena);
+      assertEquals(0, mlx_h.mlx_add(sum, left, right, stream));
+      assertEquals(0, mlx_h.mlx_array_eval(sum));
+      assertEquals(0, mlx_h.mlx_array_free(sum));
+      assertEquals(0, mlx_h.mlx_array_free(right));
+      assertEquals(0, mlx_h.mlx_array_free(left));
     }
   }
 }

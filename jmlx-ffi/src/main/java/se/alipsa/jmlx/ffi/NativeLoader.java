@@ -12,8 +12,8 @@ import java.util.Optional;
  * <p>{@link #ensureLoaded()} is idempotent and caches its outcome, unlike a static initializer: a
  * static initializer gives {@code ExceptionInInitializerError} on first touch and a bare {@code
  * NoClassDefFoundError} with the cause discarded on every subsequent touch (req/initial-plan.md §5)
- * -- exactly what a confused contributor would hit on their second test run. This caches the
- * outcome and rethrows the original cause every time instead.
+ * -- exactly what a confused contributor would hit on their second test run. This caches successful
+ * loads and deterministic failures, rethrowing the original deterministic cause every time.
  */
 public final class NativeLoader {
 
@@ -61,7 +61,8 @@ public final class NativeLoader {
         // A multi-hundred-MB extraction can fail transiently (ENOSPC, a temporarily unwritable
         // volume, or a network-mounted home directory). Let a direct loader caller retry that I/O
         // path; explicit configuration and actual System.load failures remain deterministic and
-        // are cached. Static-initializer callers still fail normally on their first attempt.
+        // are cached. Existing static-initializer callers remain permanently unusable after their
+        // first transient failure; retryability is only available to direct ensureLoaded() callers.
         if (!(e instanceof ClasspathNativeExtractor.NativeExtractionException extractionFailure)
             || !extractionFailure.isRetryable()) {
           loadFailure = e;

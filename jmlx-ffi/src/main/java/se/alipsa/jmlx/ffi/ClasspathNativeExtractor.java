@@ -18,7 +18,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -29,8 +31,9 @@ import java.util.stream.Stream;
  * neither {@code jmlx.library.path} nor {@code JMLX_LIBRARY_PATH} is set.
  *
  * <p>Extraction is cached on disk, keyed by a hash of the packaged {@code native-pin.properties}
- * plus each binary's size (see {@link #cacheKeyFor}), so a JVM only pays the ~180MB extraction cost
- * once per pin rather than on every process start.
+ * plus each binary's size (see {@link #cacheDescriptorFor}), so a JVM only pays the ~180MB
+ * extraction cost once per pin rather than on every process start. Entries are retained rather than
+ * automatically evicted: another running JVM can still lazily open an older pin's metallib.
  */
 final class ClasspathNativeExtractor {
 
@@ -83,21 +86,22 @@ final class ClasspathNativeExtractor {
     if (loader.getResource(resourceRoot + "/mlx.metallib") == null) {
       return Optional.empty(); // the native jar simply isn't a dependency
     }
-    String cacheKey;
+    CacheDescriptor cacheDescriptor;
     try {
-      cacheKey = cacheKeyFor(loader, resourceRoot);
+      cacheDescriptor = cacheDescriptorFor(loader, resourceRoot);
     } catch (IOException e) {
       // Resource discovery is deterministic for the life of a classpath. Do not make a malformed
       // native jar look like a transient disk failure and retry it on every loader entry point.
       throw new NativeExtractionException(
           "bundled native artifact is incomplete or unreadable on the classpath", e, false);
     }
-    Path target = cacheRoot.resolve(cacheKey);
-    if (isComplete(target)) {
+    Path target = cacheRoot.resolve(cacheDescriptor.key());
+    if (isComplete(target, cacheDescriptor.expectedSizes())) {
       return Optional.of(target);
     }
     try {
-      return Optional.of(extractAtomically(loader, resourceRoot, cacheRoot, target));
+      return Optional.of(
+          extractAtomically(loader, resourceRoot, cacheRoot, target, cacheDescriptor));
     } catch (IOException e) {
       throw new NativeExtractionException(
           "failed to extract bundled native libraries from the classpath", e, true);
@@ -129,13 +133,17 @@ final class ClasspathNativeExtractor {
    * an accepted trade-off given how rarely this scenario occurs outside active development of this
    * repo itself.
    */
-  private static String cacheKeyFor(ClassLoader loader, String resourceRoot) throws IOException {
+  private static CacheDescriptor cacheDescriptorFor(ClassLoader loader, String resourceRoot)
+      throws IOException {
     MessageDigest digest = sha256();
+    Map<String, Long> expectedSizes = new LinkedHashMap<>();
     try (InputStream in = loader.getResourceAsStream(resourceRoot + "/" + PIN_FILE)) {
       if (in == null) {
         throw new IOException(PIN_FILE + " not found on classpath under " + resourceRoot);
       }
-      digest.update(in.readAllBytes());
+      byte[] pin = in.readAllBytes();
+      digest.update(pin);
+      expectedSizes.put(PIN_FILE, (long) pin.length);
     }
     for (String name : BINARY_FILES) {
       URL resource = loader.getResource(resourceRoot + "/" + name);
@@ -147,8 +155,10 @@ final class ClasspathNativeExtractor {
         throw new IOException("could not determine size of classpath resource: " + resource);
       }
       digest.update(ByteBuffer.allocate(Long.BYTES).putLong(size).array());
+      expectedSizes.put(name, size);
     }
-    return HexFormat.of().formatHex(digest.digest());
+    return new CacheDescriptor(
+        HexFormat.of().formatHex(digest.digest()), Map.copyOf(expectedSizes));
   }
 
   /**
@@ -175,15 +185,15 @@ final class ClasspathNativeExtractor {
     }
   }
 
-  private static boolean isComplete(Path dir) {
+  private static boolean isComplete(Path dir, Map<String, Long> expectedSizes) {
     return Files.isDirectory(dir)
-        && isNonEmptyFile(dir.resolve(PIN_FILE))
-        && BINARY_FILES.stream().allMatch(name -> isNonEmptyFile(dir.resolve(name)));
+        && expectedSizes.entrySet().stream()
+            .allMatch(entry -> hasExpectedSize(dir.resolve(entry.getKey()), entry.getValue()));
   }
 
-  private static boolean isNonEmptyFile(Path path) {
+  private static boolean hasExpectedSize(Path path, long expectedSize) {
     try {
-      return Files.isRegularFile(path) && Files.size(path) > 0;
+      return expectedSize > 0 && Files.isRegularFile(path) && Files.size(path) == expectedSize;
     } catch (IOException e) {
       return false;
     }
@@ -196,7 +206,12 @@ final class ClasspathNativeExtractor {
    * from each writing a full native payload only to discard it after the rename race.
    */
   private static Path extractAtomically(
-      ClassLoader loader, String resourceRoot, Path cacheRoot, Path target) throws IOException {
+      ClassLoader loader,
+      String resourceRoot,
+      Path cacheRoot,
+      Path target,
+      CacheDescriptor cacheDescriptor)
+      throws IOException {
     Files.createDirectories(cacheRoot);
     sweepStaleTempDirs(cacheRoot);
     Path lockFile = target.resolveSibling("." + target.getFileName() + ".lock");
@@ -204,7 +219,7 @@ final class ClasspathNativeExtractor {
         FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
       synchronized (TARGET_MOVE_LOCK) {
         try (FileLock ignored = channel.lock()) {
-          if (isComplete(target)) {
+          if (isComplete(target, cacheDescriptor.expectedSizes())) {
             return target;
           }
           Path tmp = cacheRoot.resolve(".tmp-" + UUID.randomUUID());
@@ -214,7 +229,7 @@ final class ClasspathNativeExtractor {
               copyResource(loader, resourceRoot + "/" + name, tmp.resolve(name));
             }
             copyResource(loader, resourceRoot + "/" + PIN_FILE, tmp.resolve(PIN_FILE));
-            moveIntoPlaceLocked(tmp, target);
+            moveIntoPlaceLocked(tmp, target, cacheDescriptor.expectedSizes());
           } catch (IOException e) {
             // Best-effort: a failed cleanup of our own temp copy must never mask the real
             // extraction failure being reported below.
@@ -240,11 +255,12 @@ final class ClasspathNativeExtractor {
    * that was lost; without clearing it, every subsequent JVM start would hit the same rename
    * failure forever. It's cleared and the rename retried once before giving up.
    */
-  private static void moveIntoPlaceLocked(Path tmp, Path target) throws IOException {
+  private static void moveIntoPlaceLocked(Path tmp, Path target, Map<String, Long> expectedSizes)
+      throws IOException {
     try {
       Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
     } catch (IOException first) {
-      if (isComplete(target)) {
+      if (isComplete(target, expectedSizes)) {
         deleteQuietly(tmp);
         return;
       }
@@ -252,7 +268,7 @@ final class ClasspathNativeExtractor {
       try {
         Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
       } catch (IOException second) {
-        if (isComplete(target)) {
+        if (isComplete(target, expectedSizes)) {
           deleteQuietly(tmp);
           return;
         }
@@ -337,4 +353,6 @@ final class ClasspathNativeExtractor {
       return retryable;
     }
   }
+
+  private record CacheDescriptor(String key, Map<String, Long> expectedSizes) {}
 }

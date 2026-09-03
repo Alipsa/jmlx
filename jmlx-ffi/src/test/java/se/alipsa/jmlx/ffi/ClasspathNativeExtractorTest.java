@@ -151,6 +151,23 @@ class ClasspathNativeExtractorTest {
   }
 
   @Test
+  void truncatedCacheFileIsReplaced(@TempDir Path cacheRoot) throws IOException {
+    Path extracted =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    Files.writeString(extracted.resolve("libmlxc.dylib"), "truncated");
+
+    Path repaired =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+
+    assertEquals(extracted, repaired);
+    assertEquals(
+        EXPECTED_FIXTURE_CONTENT.get("libmlxc.dylib"),
+        Files.readString(repaired.resolve("libmlxc.dylib")));
+  }
+
+  @Test
   void malformedNativeArtifactFailureIsNotRetryable(@TempDir Path cacheRoot) {
     ClasspathNativeExtractor.NativeExtractionException failure =
         assertThrows(

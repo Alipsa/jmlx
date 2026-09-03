@@ -49,6 +49,9 @@ final class ClasspathNativeExtractor {
 
   private static final String RESOURCE_ROOT = "se/alipsa/jmlx/native/macos-aarch64";
 
+  private static final String NATIVE_ARTIFACT_CLASS_RESOURCE =
+      "se/alipsa/jmlx/nativelib/macosarm64/NativeArtifact.class";
+
   /** A leftover {@code .tmp-*} sibling older than this is assumed abandoned, not in-progress. */
   private static final Duration STALE_TMP_AGE = Duration.ofHours(1);
 
@@ -84,6 +87,15 @@ final class ClasspathNativeExtractor {
   static Optional<Path> extractIfAvailable(
       ClassLoader loader, String resourceRoot, Path cacheRoot) {
     if (loader.getResource(resourceRoot + "/mlx.metallib") == null) {
+      if (RESOURCE_ROOT.equals(resourceRoot)
+          && loader.getResource(NATIVE_ARTIFACT_CLASS_RESOURCE) != null) {
+        throw new NativeExtractionException(
+            "jmlx-native-macos-arm64 is on the classpath but contains no native payload. "
+                + "Re-run scripts/bootstrap-native.sh before building or publishing that artifact, "
+                + "or bypass it with -Djmlx.library.path=<directory> or "
+                + "JMLX_LIBRARY_PATH=<directory>",
+            new IOException("native artifact has no " + RESOURCE_ROOT + "/mlx.metallib resource"));
+      }
       return Optional.empty(); // the native jar simply isn't a dependency
     }
     CacheDescriptor cacheDescriptor;
@@ -143,6 +155,9 @@ final class ClasspathNativeExtractor {
         throw new IOException(PIN_FILE + " not found on classpath under " + resourceRoot);
       }
       byte[] pin = in.readAllBytes();
+      if (pin.length == 0) {
+        throw new IOException(PIN_FILE + " is empty on the classpath under " + resourceRoot);
+      }
       digest.update(pin);
       expectedSizes.put(PIN_FILE, (long) pin.length);
     }
@@ -152,8 +167,9 @@ final class ClasspathNativeExtractor {
         throw new IOException("resource not found on classpath: " + resourceRoot + "/" + name);
       }
       long size = resourceSize(resource);
-      if (size < 0) {
-        throw new IOException("could not determine size of classpath resource: " + resource);
+      if (size <= 0) {
+        throw new IOException(
+            "classpath resource is missing, empty, or has unknown size: " + resource);
       }
       digest.update(ByteBuffer.allocate(Long.BYTES).putLong(size).array());
       expectedSizes.put(name, size);
@@ -257,8 +273,8 @@ final class ClasspathNativeExtractor {
    * target} means a race was lost fairly (contents for a given cache key are always identical), so
    * the loser's temp copy is simply discarded. An *incomplete* target -- left over from an
    * interrupted extraction, a half-deleted cache-cleaner pass, or disk exhaustion -- is not a race
-   * that was lost; without clearing it, every subsequent JVM start would hit the same rename
-   * failure forever. It's cleared and the rename retried once before giving up.
+   * that was lost. Its files are repaired in place from {@code tmp}, preserving the directory path
+   * so a JVM that already loaded its dylibs can still lazily open its metallib.
    */
   private static void moveIntoPlaceLocked(Path tmp, Path target, Map<String, Long> expectedSizes)
       throws IOException {
@@ -269,15 +285,20 @@ final class ClasspathNativeExtractor {
         deleteQuietly(tmp);
         return;
       }
-      deleteQuietly(target);
-      try {
-        Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
-      } catch (IOException second) {
-        if (isComplete(target, expectedSizes)) {
-          deleteQuietly(tmp);
-          return;
-        }
-        throw second;
+      if (!Files.isDirectory(target)) {
+        throw first;
+      }
+      repairInPlace(tmp, target);
+      deleteQuietly(tmp);
+    }
+  }
+
+  /** Restores an incomplete cache entry without removing its directory from a live JVM's path. */
+  private static void repairInPlace(Path tmp, Path target) throws IOException {
+    try (Stream<Path> files = Files.list(tmp)) {
+      for (Path source : files.toList()) {
+        Files.copy(
+            source, target.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
       }
     }
   }

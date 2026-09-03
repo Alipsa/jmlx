@@ -62,7 +62,8 @@ public final class NativeLoader {
         // volume, or a network-mounted home directory). Let a direct loader caller retry that I/O
         // path; explicit configuration and actual System.load failures remain deterministic and
         // are cached. Static-initializer callers still fail normally on their first attempt.
-        if (!(e instanceof ClasspathNativeExtractor.NativeExtractionException)) {
+        if (!(e instanceof ClasspathNativeExtractor.NativeExtractionException extractionFailure)
+            || !extractionFailure.isRetryable()) {
           loadFailure = e;
         }
         throw e;

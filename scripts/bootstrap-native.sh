@@ -212,6 +212,10 @@ cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR"
 # resolves the @rpath siblings the same way.
 RUNTIME_LIB_DIR="$INSTALL_DIR/lib"
 mkdir -p "$RUNTIME_LIB_DIR"
+# The pin is the completion marker consumed by packaging. Invalidate a prior successful run
+# before replacing any runtime files, so a failed re-bootstrap cannot pair new binaries with old
+# provenance and appear publishable.
+rm -f "$RUNTIME_LIB_DIR/native-pin.properties"
 cp "$WHEEL_DIR/mlx/lib/libmlx.dylib" "$WHEEL_DIR/mlx/lib/libjaccl.dylib" "$METALLIB_SRC" "$RUNTIME_LIB_DIR/"
 
 # --- 7. Assert the result, don't trust it -------------------------------------

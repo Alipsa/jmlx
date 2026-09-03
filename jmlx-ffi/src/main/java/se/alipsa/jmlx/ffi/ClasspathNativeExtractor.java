@@ -83,15 +83,24 @@ final class ClasspathNativeExtractor {
     if (loader.getResource(resourceRoot + "/mlx.metallib") == null) {
       return Optional.empty(); // the native jar simply isn't a dependency
     }
+    String cacheKey;
     try {
-      Path target = cacheRoot.resolve(cacheKeyFor(loader, resourceRoot));
-      if (isComplete(target)) {
-        return Optional.of(target);
-      }
+      cacheKey = cacheKeyFor(loader, resourceRoot);
+    } catch (IOException e) {
+      // Resource discovery is deterministic for the life of a classpath. Do not make a malformed
+      // native jar look like a transient disk failure and retry it on every loader entry point.
+      throw new NativeExtractionException(
+          "bundled native artifact is incomplete or unreadable on the classpath", e, false);
+    }
+    Path target = cacheRoot.resolve(cacheKey);
+    if (isComplete(target)) {
+      return Optional.of(target);
+    }
+    try {
       return Optional.of(extractAtomically(loader, resourceRoot, cacheRoot, target));
     } catch (IOException e) {
       throw new NativeExtractionException(
-          "failed to extract bundled native libraries from the classpath", e);
+          "failed to extract bundled native libraries from the classpath", e, true);
     }
   }
 
@@ -231,7 +240,6 @@ final class ClasspathNativeExtractor {
    * that was lost; without clearing it, every subsequent JVM start would hit the same rename
    * failure forever. It's cleared and the rename retried once before giving up.
    */
-  /** Performs the rename/recovery sequence while every jmlx process holds this cache key's lock. */
   private static void moveIntoPlaceLocked(Path tmp, Path target) throws IOException {
     try {
       Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
@@ -316,10 +324,17 @@ final class ClasspathNativeExtractor {
     }
   }
 
-  /** Marks an I/O extraction failure as retryable by {@link NativeLoader}. */
+  /** Marks whether a native-artifact failure is retryable by {@link NativeLoader}. */
   static final class NativeExtractionException extends IllegalStateException {
-    NativeExtractionException(String message, IOException cause) {
+    private final boolean retryable;
+
+    NativeExtractionException(String message, IOException cause, boolean retryable) {
       super(message, cause);
+      this.retryable = retryable;
+    }
+
+    boolean isRetryable() {
+      return retryable;
     }
   }
 }

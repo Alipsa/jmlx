@@ -113,6 +113,10 @@ tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
     dependsOn tasks.named('stageNativeResources')
     from(generatedResourcesDir)
+    // This artifact redistributes Apache-licensed MLX binaries. Keep the module's MIT license
+    // and third-party attribution in the actual runtime jar, not only in the source checkout.
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE') { into 'META-INF' }
 }
 
 // Task 2's doLast only checks immediately after copying; this re-verifies the actual published

@@ -2,6 +2,7 @@ package se.alipsa.jmlx.ffi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -33,6 +34,8 @@ class ClasspathNativeExtractorTest {
   private static final String ALT_FIXTURE_ROOT = "se/alipsa/jmlx/native-fixture/macos-aarch64-alt";
   private static final String SIZE_FIXTURE_ROOT =
       "se/alipsa/jmlx/native-fixture/macos-aarch64-size";
+  private static final String MISSING_PIN_FIXTURE_ROOT =
+      "se/alipsa/jmlx/native-fixture/macos-aarch64-missing-pin";
   private static final List<String> BINARY_NAMES =
       List.of("libmlxc.dylib", "libmlx.dylib", "libjaccl.dylib", "mlx.metallib");
 
@@ -145,6 +148,17 @@ class ClasspathNativeExtractorTest {
             .orElseThrow();
     assertFalse(a.equals(b), "different binary sizes must affect the cache key");
     assertTrue(Files.isDirectory(b));
+  }
+
+  @Test
+  void malformedNativeArtifactFailureIsNotRetryable(@TempDir Path cacheRoot) {
+    ClasspathNativeExtractor.NativeExtractionException failure =
+        assertThrows(
+            ClasspathNativeExtractor.NativeExtractionException.class,
+            () ->
+                ClasspathNativeExtractor.extractIfAvailable(
+                    loader(), MISSING_PIN_FIXTURE_ROOT, cacheRoot));
+    assertFalse(failure.isRetryable());
   }
 
   @Test

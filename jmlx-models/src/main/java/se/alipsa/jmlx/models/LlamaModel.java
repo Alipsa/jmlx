@@ -10,14 +10,16 @@ public final class LlamaModel extends DecoderModel {
     super(scope, requireLlama(config), CheckpointLoader.load(scope, directory));
   }
 
+  /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
   public static LlamaModel load(MLXScope scope, Path directory) throws IOException {
     return new LlamaModel(
         scope, DecoderConfig.fromFile(directory.resolve("config.json")), directory);
   }
 
   private static DecoderConfig requireLlama(DecoderConfig config) {
-    if (!"llama".equals(config.modelType()))
+    if (!"llama".equals(config.modelType())) {
       throw new IllegalArgumentException("expected model_type llama, got " + config.modelType());
+    }
     return config;
   }
 }

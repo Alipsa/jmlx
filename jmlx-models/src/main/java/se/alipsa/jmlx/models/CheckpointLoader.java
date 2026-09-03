@@ -3,20 +3,26 @@ package se.alipsa.jmlx.models;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.memory.MLXScope;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 final class CheckpointLoader {
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
   private CheckpointLoader() {}
 
   static Map<String, MLXArray> load(MLXScope scope, Path directory) throws IOException {
     Map<String, MLXArray> tensors = new LinkedHashMap<>();
-    java.util.List<Path> checkpointFiles = checkpointFiles(directory);
+    List<Path> checkpointFiles = checkpointFiles(directory);
     for (Path file : checkpointFiles) {
       for (var entry : MLXIO.loadSafetensors(scope, file.toString()).tensors().entrySet()) {
         if (tensors.putIfAbsent(entry.getKey(), entry.getValue()) != null) {
@@ -35,15 +41,22 @@ final class CheckpointLoader {
     return tensors;
   }
 
-  private static java.util.List<Path> checkpointFiles(Path directory) throws IOException {
+  private static List<Path> checkpointFiles(Path directory) throws IOException {
     Path root = directory.toAbsolutePath().normalize();
     Path index = root.resolve("model.safetensors.index.json");
     if (Files.isRegularFile(index)) {
-      JsonNode weights = new ObjectMapper().readTree(index.toFile()).path("weight_map");
-      if (!weights.isObject())
+      JsonNode indexRoot;
+      try {
+        indexRoot = MAPPER.readTree(index.toFile());
+      } catch (JacksonException e) {
+        throw new IOException("failed to read " + index, e);
+      }
+      JsonNode weights = indexRoot.path("weight_map");
+      if (!weights.isObject()) {
         throw new IllegalArgumentException("invalid safetensors index: missing weight_map");
-      java.util.List<Path> files = new java.util.ArrayList<>();
-      java.util.HashSet<String> names = new java.util.HashSet<>();
+      }
+      List<Path> files = new ArrayList<>();
+      HashSet<String> names = new HashSet<>();
       weights
           .properties()
           .forEach(
@@ -70,6 +83,7 @@ final class CheckpointLoader {
     }
     try (var files = Files.list(root)) {
       return files
+          .filter(Files::isRegularFile)
           .filter(p -> p.getFileName().toString().endsWith(".safetensors"))
           .sorted()
           .toList();

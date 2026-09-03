@@ -10,14 +10,16 @@ public final class QwenModel extends DecoderModel {
     super(scope, requireQwen(config), CheckpointLoader.load(scope, directory));
   }
 
+  /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
   public static QwenModel load(MLXScope scope, Path directory) throws IOException {
     return new QwenModel(
         scope, DecoderConfig.fromFile(directory.resolve("config.json")), directory);
   }
 
   private static DecoderConfig requireQwen(DecoderConfig config) {
-    if (!"qwen2".equals(config.modelType()))
+    if (!"qwen2".equals(config.modelType())) {
       throw new IllegalArgumentException("expected model_type qwen2, got " + config.modelType());
+    }
     return config;
   }
 }

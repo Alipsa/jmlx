@@ -21,10 +21,10 @@ public final class GroupedQueryAttention extends Module {
   private final int queriesPerKeyValueHead;
   private final float scale;
   private final float ropeTheta;
-  private final Linear qProj;
-  private final Linear kProj;
-  private final Linear vProj;
-  private final Linear oProj;
+  private final Linear queryProj;
+  private final Linear keyProj;
+  private final Linear valueProj;
+  private final Linear outProj;
 
   /**
    * Creates GQA from checkpoint-layout projection weights. Query and output weights are {@code
@@ -36,25 +36,25 @@ public final class GroupedQueryAttention extends Module {
       int numHeads,
       int numKeyValueHeads,
       float ropeTheta,
-      MLXArray qWeight,
-      MLXArray qBias,
-      MLXArray kWeight,
-      MLXArray kBias,
-      MLXArray vWeight,
-      MLXArray vBias,
-      MLXArray oWeight,
-      MLXArray oBias) {
+      MLXArray queryWeight,
+      MLXArray queryBias,
+      MLXArray keyWeight,
+      MLXArray keyBias,
+      MLXArray valueWeight,
+      MLXArray valueBias,
+      MLXArray outWeight,
+      MLXArray outBias) {
     super(scope);
-    Objects.requireNonNull(qWeight, "GroupedQueryAttention: qWeight must not be null");
-    Objects.requireNonNull(kWeight, "GroupedQueryAttention: kWeight must not be null");
-    Objects.requireNonNull(vWeight, "GroupedQueryAttention: vWeight must not be null");
-    Objects.requireNonNull(oWeight, "GroupedQueryAttention: oWeight must not be null");
-    if (qWeight.ndim() != 2 || qWeight.shape()[0] != qWeight.shape()[1]) {
+    Objects.requireNonNull(queryWeight, "GroupedQueryAttention: queryWeight must not be null");
+    Objects.requireNonNull(keyWeight, "GroupedQueryAttention: keyWeight must not be null");
+    Objects.requireNonNull(valueWeight, "GroupedQueryAttention: valueWeight must not be null");
+    Objects.requireNonNull(outWeight, "GroupedQueryAttention: outWeight must not be null");
+    if (queryWeight.ndim() != 2 || queryWeight.shape()[0] != queryWeight.shape()[1]) {
       throw new IllegalArgumentException(
-          "GroupedQueryAttention: qWeight must be square [embedDim, embedDim], got "
-              + Arrays.toString(qWeight.shape()));
+          "GroupedQueryAttention: queryWeight must be square [embedDim, embedDim], got "
+              + Arrays.toString(queryWeight.shape()));
     }
-    int embedDim = qWeight.shape()[0];
+    int embedDim = queryWeight.shape()[0];
     if (numHeads <= 0 || numKeyValueHeads <= 0 || numHeads % numKeyValueHeads != 0) {
       throw new IllegalArgumentException(
           "GroupedQueryAttention: numHeads must be a positive multiple of numKeyValueHeads, got "
@@ -71,19 +71,19 @@ public final class GroupedQueryAttention extends Module {
     }
     int derivedHeadDim = embedDim / numHeads;
     int keyValueDim = numKeyValueHeads * derivedHeadDim;
-    requireWeight("kWeight", kWeight, keyValueDim, embedDim);
-    requireWeight("vWeight", vWeight, keyValueDim, embedDim);
-    requireWeight("oWeight", oWeight, embedDim, embedDim);
+    requireWeight("keyWeight", keyWeight, keyValueDim, embedDim);
+    requireWeight("valueWeight", valueWeight, keyValueDim, embedDim);
+    requireWeight("outWeight", outWeight, embedDim, embedDim);
     this.numHeads = numHeads;
     this.numKeyValueHeads = numKeyValueHeads;
     headDim = derivedHeadDim;
     queriesPerKeyValueHead = numHeads / numKeyValueHeads;
     scale = (float) (1.0 / Math.sqrt(headDim));
     this.ropeTheta = ropeTheta;
-    qProj = child("qProj", new Linear(scope, qWeight, qBias));
-    kProj = child("kProj", new Linear(scope, kWeight, kBias));
-    vProj = child("vProj", new Linear(scope, vWeight, vBias));
-    oProj = child("oProj", new Linear(scope, oWeight, oBias));
+    queryProj = child("queryProj", new Linear(scope, queryWeight, queryBias));
+    keyProj = child("keyProj", new Linear(scope, keyWeight, keyBias));
+    valueProj = child("valueProj", new Linear(scope, valueWeight, valueBias));
+    outProj = child("outProj", new Linear(scope, outWeight, outBias));
   }
 
   /**
@@ -104,9 +104,9 @@ public final class GroupedQueryAttention extends Module {
     int batch = shape[0];
     int sequence = shape[1];
     int offset = cache == null ? 0 : cache.offset();
-    MLXArray q = toHeads(qProj.forward(x), batch, sequence, numHeads);
-    MLXArray k = toHeads(kProj.forward(x), batch, sequence, numKeyValueHeads);
-    MLXArray v = toHeads(vProj.forward(x), batch, sequence, numKeyValueHeads);
+    MLXArray q = toHeads(queryProj.forward(x), batch, sequence, numHeads);
+    MLXArray k = toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads);
+    MLXArray v = toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads);
     q = MLXFast.rope(q, headDim, false, ropeTheta, 1.0f, offset, null);
     k = MLXFast.rope(k, headDim, false, ropeTheta, 1.0f, offset, null);
     if (cache != null) {
@@ -124,7 +124,7 @@ public final class GroupedQueryAttention extends Module {
             null,
             null);
     MLXArray merged = MLXShape.flatten(MLXShape.transpose(attended, new int[] {0, 2, 1, 3}), 2, 3);
-    return oProj.forward(merged);
+    return outProj.forward(merged);
   }
 
   private MLXArray toHeads(MLXArray projected, int batch, int sequence, int heads) {

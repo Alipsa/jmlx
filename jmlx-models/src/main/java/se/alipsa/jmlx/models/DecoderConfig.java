@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -16,8 +17,13 @@ public record DecoderConfig(
     int numKeyValueHeads,
     float rmsNormEps,
     float ropeTheta,
-    boolean tieWordEmbeddings) {
+    boolean tieWordEmbeddings,
+    boolean attentionBias,
+    boolean mlpBias) {
 
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /** Validates decoder dimensions and the attention-head configuration. */
   public DecoderConfig {
     if (vocabSize <= 0 || hiddenSize <= 0 || intermediateSize <= 0 || numHiddenLayers <= 0) {
       throw new IllegalArgumentException("decoder dimensions must be positive");
@@ -32,10 +38,27 @@ public record DecoderConfig(
 
   /** Reads the relevant, stable architecture fields from a Hugging Face {@code config.json}. */
   public static DecoderConfig fromFile(Path file) throws IOException {
-    JsonNode node = new ObjectMapper().readTree(file.toFile());
+    JsonNode node;
+    try {
+      node = MAPPER.readTree(file.toFile());
+    } catch (JacksonException e) {
+      throw new IOException("failed to read " + file.toAbsolutePath().normalize(), e);
+    }
     if (node.hasNonNull("rope_scaling")) {
       throw new IllegalArgumentException(
           "config.json declares rope_scaling, which this decoder does not yet implement");
+    }
+    if (node.path("use_sliding_window").asBoolean(false)) {
+      throw new IllegalArgumentException(
+          "config.json enables sliding-window attention, which this decoder does not implement");
+    }
+    String hiddenAct = node.path("hidden_act").asString("silu");
+    if (!"silu".equals(hiddenAct)) {
+      throw new IllegalArgumentException(
+          "config.json declares hidden_act '"
+              + hiddenAct
+              + "', but this decoder only implements"
+              + " silu");
     }
     int hiddenSize = requiredInt(node, "hidden_size");
     int heads = requiredInt(node, "num_attention_heads");
@@ -55,7 +78,9 @@ public record DecoderConfig(
         node.path("num_key_value_heads").asInt(heads),
         (float) node.path("rms_norm_eps").asDouble(1e-6),
         (float) node.path("rope_theta").asDouble(10_000),
-        node.path("tie_word_embeddings").asBoolean(false));
+        node.path("tie_word_embeddings").asBoolean(false),
+        node.path("attention_bias").asBoolean(false),
+        node.path("mlp_bias").asBoolean(false));
   }
 
   private static int requiredInt(JsonNode node, String name) {

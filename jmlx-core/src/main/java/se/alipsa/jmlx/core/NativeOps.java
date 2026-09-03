@@ -148,6 +148,8 @@ final class NativeOps {
    * that a result's scope is always related to every operand it references.
    */
   static MLXArray unaryOp(String opName, MLXArray a, MLXScope target, UnaryOp op) {
+    // Validation only: throws if target is unrelated to a.scope(). The result (an ancestor or
+    // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
@@ -174,6 +176,8 @@ final class NativeOps {
   }
 
   static MLXArray shapeOp(String opName, MLXArray a, MLXScope target, int[] param, ShapeOp op) {
+    // Validation only: throws if target is unrelated to a.scope(). The result (an ancestor or
+    // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeParam = tmp.allocateFrom(ValueLayout.JAVA_INT, param);
@@ -231,6 +235,8 @@ final class NativeOps {
 
   static MLXArray axis2Op(
       String opName, MLXArray a, MLXScope target, int axis1, int axis2, Axis2Op op) {
+    // Validation only: throws if target is unrelated to a.scope(). The result (an ancestor or
+    // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), axis1, axis2, DEFAULT_STREAM));
@@ -254,6 +260,8 @@ final class NativeOps {
   }
 
   static MLXArray axisOp(String opName, MLXArray a, MLXScope target, int param, AxisOp op) {
+    // Validation only: throws if target is unrelated to a.scope(). The result (an ancestor or
+    // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
     checked(opName, () -> op.apply(res, a.handle(), param, DEFAULT_STREAM));

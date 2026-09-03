@@ -29,11 +29,17 @@ public abstract class DecoderModel extends Module {
   private final Linear lmHead;
   private final boolean tiedOutput;
 
+  /** Builds every layer from {@code tensors}, keyed by their Hugging Face checkpoint names. */
   protected DecoderModel(MLXScope scope, DecoderConfig config, Map<String, MLXArray> tensors) {
     super(scope);
     this.config = Objects.requireNonNull(config, "config");
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
+    // Qwen2's q/k/v projections always carry a bias (hardcoded in HF's modeling code, not a
+    // config.json field); o_proj never does. Llama exposes both as explicit config.json flags.
+    boolean qkvBiasExpected = "qwen2".equals(config.modelType()) || config.attentionBias();
+    boolean outBiasExpected = config.attentionBias();
+    boolean mlpBiasExpected = config.mlpBias();
     List<DecoderBlock> built = new ArrayList<>();
     for (int i = 0; i < config.numHiddenLayers(); i++) {
       String p = "model.layers." + i + ".";
@@ -46,13 +52,13 @@ public abstract class DecoderModel extends Module {
               config.numKeyValueHeads(),
               config.ropeTheta(),
               tensor(tensors, p + "self_attn.q_proj.weight"),
-              tensors.get(p + "self_attn.q_proj.bias"),
+              bias(tensors, p + "self_attn.q_proj.bias", qkvBiasExpected),
               tensor(tensors, p + "self_attn.k_proj.weight"),
-              tensors.get(p + "self_attn.k_proj.bias"),
+              bias(tensors, p + "self_attn.k_proj.bias", qkvBiasExpected),
               tensor(tensors, p + "self_attn.v_proj.weight"),
-              tensors.get(p + "self_attn.v_proj.bias"),
+              bias(tensors, p + "self_attn.v_proj.bias", qkvBiasExpected),
               tensor(tensors, p + "self_attn.o_proj.weight"),
-              tensors.get(p + "self_attn.o_proj.bias"));
+              bias(tensors, p + "self_attn.o_proj.bias", outBiasExpected));
       RMSNorm postNorm =
           new RMSNorm(
               scope, tensor(tensors, p + "post_attention_layernorm.weight"), config.rmsNormEps());
@@ -60,11 +66,11 @@ public abstract class DecoderModel extends Module {
           new SwiGLU(
               scope,
               tensor(tensors, p + "mlp.gate_proj.weight"),
-              tensors.get(p + "mlp.gate_proj.bias"),
+              bias(tensors, p + "mlp.gate_proj.bias", mlpBiasExpected),
               tensor(tensors, p + "mlp.up_proj.weight"),
-              tensors.get(p + "mlp.up_proj.bias"),
+              bias(tensors, p + "mlp.up_proj.bias", mlpBiasExpected),
               tensor(tensors, p + "mlp.down_proj.weight"),
-              tensors.get(p + "mlp.down_proj.bias"));
+              bias(tensors, p + "mlp.down_proj.bias", mlpBiasExpected));
       built.add(child("layer" + i, new DecoderBlock(scope, inputNorm, attention, postNorm, mlp)));
     }
     layers = List.copyOf(built);
@@ -81,6 +87,7 @@ public abstract class DecoderModel extends Module {
     lmHead = tiedOutput ? null : child("lmHead", new Linear(scope, headWeight, null));
   }
 
+  /** Returns the architecture configuration this model was built from. */
   public final DecoderConfig config() {
     return config;
   }
@@ -92,11 +99,13 @@ public abstract class DecoderModel extends Module {
    */
   public final MLXArray forward(MLXArray tokenIds, List<KVCache> caches) {
     Objects.requireNonNull(tokenIds, "tokenIds");
-    if (tokenIds.ndim() != 2)
+    if (tokenIds.ndim() != 2) {
       throw new IllegalArgumentException("tokenIds must have shape [batch, sequence]");
+    }
     Objects.requireNonNull(caches, "caches");
-    if (caches.size() != layers.size())
+    if (caches.size() != layers.size()) {
       throw new IllegalArgumentException("one KVCache is required per decoder layer");
+    }
     MLXArray normalized = normalizedHiddenStates(tokenIds, caches);
     return tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
   }
@@ -111,15 +120,22 @@ public abstract class DecoderModel extends Module {
 
   /** Greedily generates up to {@code maxNewTokens}; prompt tokens are included in the result. */
   public final List<Integer> generate(int[] prompt, int maxNewTokens, Set<Integer> eosTokenIds) {
-    if (prompt == null || prompt.length == 0)
+    if (prompt == null || prompt.length == 0) {
       throw new IllegalArgumentException("prompt must not be empty");
-    if (maxNewTokens < 0) throw new IllegalArgumentException("maxNewTokens must be non-negative");
+    }
+    if (maxNewTokens < 0) {
+      throw new IllegalArgumentException("maxNewTokens must be non-negative");
+    }
     Objects.requireNonNull(eosTokenIds, "eosTokenIds");
     List<Integer> result = new ArrayList<>();
-    for (int id : prompt) result.add(id);
+    for (int id : prompt) {
+      result.add(id);
+    }
     try (MLXScope generation = scope().newChild()) {
       List<KVCache> caches = new ArrayList<>();
-      for (int i = 0; i < layers.size(); i++) caches.add(new KVCache(generation));
+      for (int i = 0; i < layers.size(); i++) {
+        caches.add(new KVCache(generation));
+      }
       int[] input = prompt;
       for (int step = 0; step < maxNewTokens; step++) {
         try (MLXScope activation = generation.newChild()) {
@@ -135,7 +151,9 @@ public abstract class DecoderModel extends Module {
               tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
           int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
           result.add(next);
-          if (eosTokenIds.contains(next)) break;
+          if (eosTokenIds.contains(next)) {
+            break;
+          }
           input = new int[] {next};
         }
       }
@@ -173,8 +191,22 @@ public abstract class DecoderModel extends Module {
 
   private static MLXArray tensor(Map<String, MLXArray> tensors, String name) {
     MLXArray tensor = tensors.get(name);
-    if (tensor == null)
+    if (tensor == null) {
       throw new IllegalArgumentException("checkpoint missing tensor '" + name + "'");
+    }
     return tensor;
+  }
+
+  /**
+   * Returns the bias tensor {@code name}, or {@code null} if this architecture's config does not
+   * call for one. Throws if {@code expected} is {@code true} but the checkpoint lacks it -- a
+   * silently-null bias here would otherwise compute wrong attention/MLP output with no diagnostic.
+   */
+  private static MLXArray bias(Map<String, MLXArray> tensors, String name, boolean expected) {
+    MLXArray bias = tensors.get(name);
+    if (expected && bias == null) {
+      throw new IllegalArgumentException("checkpoint missing required bias tensor '" + name + "'");
+    }
+    return bias;
   }
 }

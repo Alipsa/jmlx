@@ -33,7 +33,7 @@ class DecoderConfigTest {
   void rejectsHeadConfigurationsThatCannotUseGroupedQueryAttention() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> new DecoderConfig("llama", 8, 10, 16, 1, 3, 2, 1e-6f, 10_000f, false));
+        () -> new DecoderConfig("llama", 8, 10, 16, 1, 3, 2, 1e-6f, 10_000f, false, false, false));
   }
 
   @Test
@@ -53,5 +53,49 @@ class DecoderConfigTest {
          "num_hidden_layers":1,"num_attention_heads":2,"rope_scaling":{"type":"linear"}}
         """);
     assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+  }
+
+  @Test
+  void rejectsSlidingWindowAttention(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    Files.writeString(
+        config,
+        """
+        {"model_type":"qwen2","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"use_sliding_window":true}
+        """);
+    assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+  }
+
+  @Test
+  void rejectsUnsupportedHiddenActivation(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    Files.writeString(
+        config,
+        """
+        {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"hidden_act":"gelu"}
+        """);
+    assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+  }
+
+  @Test
+  void readsAttentionAndMlpBiasFlags(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    Files.writeString(
+        config,
+        """
+        {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"attention_bias":true,"mlp_bias":true}
+        """);
+    DecoderConfig parsed = DecoderConfig.fromFile(config);
+    assertEquals(true, parsed.attentionBias());
+    assertEquals(true, parsed.mlpBias());
+  }
+
+  @Test
+  void failsWithIoExceptionWhenConfigFileIsMissing(@TempDir Path dir) {
+    assertThrows(
+        java.io.IOException.class, () -> DecoderConfig.fromFile(dir.resolve("missing.json")));
   }
 }

@@ -57,9 +57,14 @@ tasks.register('stageNativeResources') {
     description = "Stages the mlx-c/MLX binaries bootstrap-native.sh produced into this module's resources."
     def targetDir = generatedResourcesDir.map { it.dir(resourceRoot) }
     outputs.dir(targetDir)
-    // Always rerun rather than declare inputs.dir(stagedNativeDir): that directory may not exist
-    // at all, and this copy is fast.
-    outputs.upToDateWhen { false }
+    // inputs.files (not inputs.dir(stagedNativeDir)): that directory may not exist at all, and
+    // a FileTree tolerates a missing root where inputs.dir does not. skipWhenEmpty(false) is the
+    // same fix stageNativeResources already needed once (see the "Deliberately NOT a Copy task"
+    // comment above): an empty/missing source must never make Gradle silently skip this task's
+    // actions -- onlyIf below is what decides skip-vs-run, not an empty input set.
+    inputs.files(fileTree(stagedNativeDir) { include requiredFiles })
+        .withPropertyName('stagedNativeFiles')
+        .skipWhenEmpty(false)
     onlyIf {
         def staged = hasAnyStagedNativeFiles()
         if (!staged) {
@@ -182,6 +187,23 @@ publishing {
                     url = 'https://github.com/Alipsa/jmlx'
                 }
             }
+        }
+    }
+}
+
+// stageNativeResources/verifyPackagedNativeResources's onlyIf gates above are deliberately lenient
+// -- an unstaged checkout SKIPS (not fails) so ./gradlew build/check stay green for a contributor
+// who hasn't bootstrapped. But release depends on check (root build.gradle), and a skipped task is
+// a *passing* task as far as that dependency is concerned: without a gate here, releasing from an
+// unstaged checkout would silently publish an empty jar to Maven Central -- a mistake that, unlike
+// a failed build, can never be taken back. Publishing (unlike check) must never be lenient about
+// this, so it gets its own hard, unconditional gate rather than reusing the build-time onlyIf.
+tasks.withType(org.gradle.api.publish.maven.tasks.AbstractPublishToMaven).configureEach {
+    doFirst {
+        if (!hasAnyStagedNativeFiles()) {
+            throw new GradleException(
+                    'Refusing to publish jmlx-native-macos-arm64 without staged native binaries -- ' +
+                    'run ./scripts/bootstrap-native.sh first, then rebuild before publishing.')
         }
     }
 }

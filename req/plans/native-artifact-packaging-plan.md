@@ -227,3 +227,53 @@ Fresh-clone-without-bootstrap invariant, re-verified after every amendment above
   garbage collection for `~/Library/Caches/se.alipsa.jmlx/native` — accepted as low-risk for v1
   (Central's own artifact integrity already covers the classpath contents; per-pin cache growth is
   bounded and small in practice).
+
+## Post-PR review amendments
+
+External review of PR #17 found three real gaps and several worthwhile hardening suggestions, all
+verified against the actual code (not taken on faith) before fixing:
+
+- **`jmlx-native-macos-arm64`'s publish path had no hard gate.** `stageNativeResources` and
+  `verifyPackagedNativeResources` deliberately `onlyIf`-skip (not fail) on an unstaged checkout so
+  `check`/`build` stay green — but `release` (`build.gradle:308`) `dependsOn check`, and a skipped
+  task is a *passing* dependency. Reproduced directly: hiding `mlx.metallib` and running
+  `publishToMavenLocal` completed successfully with an empty jar before this fix. `check`/`build`
+  must stay lenient; publishing must not, since a bad Central release can never be taken back. Fixed
+  with an unconditional `doFirst` gate on every `AbstractPublishToMaven` task (covers `release` and
+  `publishToMavenLocal` alike), re-verified: fails loudly when unstaged, succeeds normally once
+  binaries are staged again.
+- **`ClasspathNativeExtractor`'s stale-target and cleanup-failure bugs.** A `target` directory that
+  exists but is incomplete (interrupted extraction, a cache cleaner deleting one file, disk
+  exhaustion) made `Files.move(..., ATOMIC_MOVE)` fail with a non-`EEXIST` `IOException`
+  (`ENOTEMPTY`) forever after — `isComplete(target)` stayed false on every retry, so the failure was
+  permanent and self-perpetuating rather than self-healing. Fixed by deleting an incomplete `target`
+  and retrying the rename once. Separately, cleanup of the loser's temp copy (or of `tmp` on a
+  genuine extraction failure) used the throwing `deleteRecursively`, so a failed *cleanup* could mask
+  a successful extraction or the real underlying error; both call sites now use a best-effort
+  `deleteQuietly`.
+- **`stageNativeResources` re-copied the ~180MB staged directory on every single build** —
+  `outputs.upToDateWhen { false }` was the (unnecessary) workaround for a missing directory breaking
+  `inputs.dir`; a `FileTree` tolerates a missing root fine. Replaced with a real
+  `inputs.files(fileTree(...)).skipWhenEmpty(false)` declaration; re-verified the task is now
+  `UP-TO-DATE` on a second run with nothing changed.
+- **Cache-key hardening**: the key hashed only `native-pin.properties`, so a contributor rebuilding
+  the binaries locally at an unchanged pin (exactly the local `mavenLocal()`-publish workflow this
+  repo's own tooling expects) would silently hit a stale cache entry. Mixed each binary's byte size
+  (cheap: `URL#openConnection()` reports length without reading content) into the key — deliberately
+  *not* a full content hash, since hashing ~180MB on every JVM start would defeat the point of the
+  cache; a same-size local rebuild still collides, an accepted residual gap. Also: `isComplete` now
+  requires `native-pin.properties` itself (previously ignored, despite defining the key), stale
+  `.tmp-*` siblings older than an hour are swept best-effort on each extraction attempt, and the hex
+  encoding uses `HexFormat` instead of a per-byte `String.format` loop.
+- **Not changed**: a suggestion to hash all four binaries' full contents into the cache key was
+  deliberately not adopted (see above — the cost is paid on every JVM start, not just on a rebuild).
+  A question about Maven Central's artifact-size limits was researched, not coded: the Publisher
+  Portal's per-upload bundle limit is 1GB; this module's payload (~182MB of binaries plus small
+  sources/javadoc/POM) is well under that for a single release.
+
+Re-verified after all of the above: `./gradlew build -x :jmlx-jinja:test` green; `:jmlx-ffi:test
+--tests "*ClasspathNativeExtractorTest*"` and `:jmlx-ffi:extractionFallbackTest` (the real
+~180MB-artifact end-to-end path) both green; the fresh-clone-without-bootstrap invariant re-checked
+directly (hid `mlx.metallib`, ran `publishToMavenLocal`, confirmed the new hard failure, restored
+the file, confirmed a normal publish succeeds and cleaned up the resulting `mavenLocal()` test
+artifact).

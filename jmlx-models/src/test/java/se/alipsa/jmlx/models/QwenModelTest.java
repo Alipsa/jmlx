@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +37,26 @@ class QwenModelTest {
     try (MLXScope modelScope = new MLXScope()) {
       QwenModel model = QwenModel.load(modelScope, dir);
       assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
+    }
+  }
+
+  @Test
+  void throwsWhenRequiredQwenBiasIsMissing(@TempDir Path dir) throws Exception {
+    Files.writeString(
+        dir.resolve("config.json"),
+        """
+        {"model_type":"qwen2","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":1,
+         "rms_norm_eps":0.000001,"rope_theta":10000,"tie_word_embeddings":true}
+        """);
+    try (MLXScope saveScope = new MLXScope()) {
+      Map<String, MLXArray> tensors = tinyCheckpoint(saveScope);
+      tensors.remove("lm_head.weight");
+      tensors.remove("model.layers.0.self_attn.q_proj.bias");
+      MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
+    }
+    try (MLXScope modelScope = new MLXScope()) {
+      assertThrows(IllegalArgumentException.class, () -> QwenModel.load(modelScope, dir));
     }
   }
 

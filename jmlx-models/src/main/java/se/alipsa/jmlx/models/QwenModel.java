@@ -22,4 +22,10 @@ public final class QwenModel extends DecoderModel {
     }
     return config;
   }
+
+  /** Qwen2 hardcodes a q/k/v bias in HF's modeling code; it is never a config.json field. */
+  @Override
+  protected boolean qkvBiasRequired(DecoderConfig config) {
+    return true;
+  }
 }

@@ -2,7 +2,9 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,7 @@ class DecoderConfigTest {
     assertEquals("qwen2", parsed.modelType());
     assertEquals(2, parsed.numKeyValueHeads());
     assertEquals(1_000_000f, parsed.ropeTheta());
-    assertEquals(true, parsed.tieWordEmbeddings());
+    assertTrue(parsed.tieWordEmbeddings());
   }
 
   @Test
@@ -80,6 +82,18 @@ class DecoderConfigTest {
   }
 
   @Test
+  void acceptsSwishAsAnAliasForSilu(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    Files.writeString(
+        config,
+        """
+        {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"hidden_act":"swish"}
+        """);
+    assertEquals(4, DecoderConfig.fromFile(config).hiddenSize());
+  }
+
+  @Test
   void readsAttentionAndMlpBiasFlags(@TempDir Path dir) throws Exception {
     Path config = dir.resolve("config.json");
     Files.writeString(
@@ -89,13 +103,12 @@ class DecoderConfigTest {
          "num_hidden_layers":1,"num_attention_heads":2,"attention_bias":true,"mlp_bias":true}
         """);
     DecoderConfig parsed = DecoderConfig.fromFile(config);
-    assertEquals(true, parsed.attentionBias());
-    assertEquals(true, parsed.mlpBias());
+    assertTrue(parsed.attentionBias());
+    assertTrue(parsed.mlpBias());
   }
 
   @Test
   void failsWithIoExceptionWhenConfigFileIsMissing(@TempDir Path dir) {
-    assertThrows(
-        java.io.IOException.class, () -> DecoderConfig.fromFile(dir.resolve("missing.json")));
+    assertThrows(IOException.class, () -> DecoderConfig.fromFile(dir.resolve("missing.json")));
   }
 }

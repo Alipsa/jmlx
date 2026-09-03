@@ -53,7 +53,9 @@ public record DecoderConfig(
           "config.json enables sliding-window attention, which this decoder does not implement");
     }
     String hiddenAct = node.path("hidden_act").asString("silu");
-    if (!"silu".equals(hiddenAct)) {
+    // HF's ACT2CLS maps both "silu" and "swish" to nn.SiLU -- the same function SwiGLU
+    // implements, not two different activations.
+    if (!"silu".equals(hiddenAct) && !"swish".equals(hiddenAct)) {
       throw new IllegalArgumentException(
           "config.json declares hidden_act '"
               + hiddenAct

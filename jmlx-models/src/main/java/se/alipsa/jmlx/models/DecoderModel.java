@@ -35,9 +35,9 @@ public abstract class DecoderModel extends Module {
     this.config = Objects.requireNonNull(config, "config");
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
-    // Qwen2's q/k/v projections always carry a bias (hardcoded in HF's modeling code, not a
-    // config.json field); o_proj never does. Llama exposes both as explicit config.json flags.
-    boolean qkvBiasExpected = "qwen2".equals(config.modelType()) || config.attentionBias();
+    // o_proj bias is never hardcoded by any known architecture; only Llama's config.json flag
+    // calls for it. qkvBiasRequired is the corresponding hook for q/k/v -- see its javadoc.
+    boolean qkvBiasExpected = qkvBiasRequired(config);
     boolean outBiasExpected = config.attentionBias();
     boolean mlpBiasExpected = config.mlpBias();
     List<DecoderBlock> built = new ArrayList<>();
@@ -90,6 +90,18 @@ public abstract class DecoderModel extends Module {
   /** Returns the architecture configuration this model was built from. */
   public final DecoderConfig config() {
     return config;
+  }
+
+  /**
+   * Whether the q/k/v projections must carry a bias tensor. Defaults to {@link
+   * DecoderConfig#attentionBias()}, which is correct for Llama's explicit config.json flag. Qwen2
+   * hardcodes this bias in HF's modeling code rather than exposing it as a config field, so {@link
+   * QwenModel} overrides this to always return {@code true} -- keeping that architectural knowledge
+   * with the {@code model_type} check that already gatekeeps {@link QwenModel}, instead of this
+   * shared base class matching on {@code model_type} itself.
+   */
+  protected boolean qkvBiasRequired(DecoderConfig config) {
+    return config.attentionBias();
   }
 
   /**

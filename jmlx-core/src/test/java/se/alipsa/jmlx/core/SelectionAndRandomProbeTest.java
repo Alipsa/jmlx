@@ -1,9 +1,9 @@
 package se.alipsa.jmlx.core;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.lang.foreign.MemorySegment;
-import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.mlx_h;
@@ -12,10 +12,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Records the native selection and explicit-key behavior required to accept the Phase 6 contract.
  *
- * <p>The first run intentionally reports observations rather than freezing unverified values as
- * goldens. Copy the {@code PHASE6_PROBE} lines from an Apple-Silicon run into {@code
- * req/plans/phase6-0b-probe-findings.md}; the subsequent change turns those observations into
- * stable assertions and removes the reporting-only wording.
+ * <p>The assertions record observations from the MLX pins in {@code scripts/bootstrap-native.sh}.
  */
 @EnabledIfNativeAvailable
 class SelectionAndRandomProbeTest {
@@ -37,34 +34,34 @@ class SelectionAndRandomProbeTest {
       MLX.eval(
           argmax, topk, sorted, argsorted, partitioned, argpartitioned, key, split, categorical);
 
-      assertEquals(DType.UINT32, argmax.dtype(), "native argmax dtype before facade conversion");
-      System.out.println("PHASE6_PROBE argmax=" + exact(argmax));
-      System.out.println("PHASE6_PROBE topk=" + floating(topk));
-      System.out.println("PHASE6_PROBE sort=" + floating(sorted));
-      System.out.println("PHASE6_PROBE argsort=" + exact(argsorted));
-      System.out.println("PHASE6_PROBE partition=" + floating(partitioned));
-      System.out.println("PHASE6_PROBE argpartition=" + exact(argpartitioned));
-      System.out.println("PHASE6_PROBE key=" + exact(key));
-      System.out.println("PHASE6_PROBE split_num=" + exact(split));
-      System.out.println("PHASE6_PROBE categorical=" + exact(categorical));
+      assertExact(argmax, DType.UINT32, new int[] {2}, new int[] {1, 0});
+      assertFloating(topk, new int[] {2, 2}, new float[] {3f, 3f, 5f, 5f});
+      assertFloating(sorted, new int[] {2, 4}, new float[] {1f, 2f, 3f, 3f, 0f, 4f, 5f, 5f});
+      assertExact(argsorted, DType.UINT32, new int[] {2, 4}, new int[] {0, 3, 1, 2, 3, 2, 0, 1});
+      assertFloating(partitioned, new int[] {2, 4}, new float[] {1f, 2f, 3f, 3f, 0f, 4f, 5f, 5f});
+      assertExact(
+          argpartitioned, DType.UINT32, new int[] {2, 4}, new int[] {0, 3, 1, 2, 3, 2, 0, 1});
+      assertExact(key, DType.UINT32, new int[] {2}, new int[] {0, 42});
+      assertExact(
+          split,
+          DType.UINT32,
+          new int[] {3, 2},
+          new int[] {-1160419002, -561808247, -548466209, 894150801, 801545058, -1931765865});
+      assertExact(categorical, DType.UINT32, new int[] {2}, new int[] {1, 0});
     }
   }
 
-  private static String floating(MLXArray array) {
-    return array.dtype()
-        + " "
-        + Arrays.toString(array.shape())
-        + " "
-        + Arrays.toString(array.toFloatArray());
+  private static void assertFloating(MLXArray actual, int[] shape, float[] values) {
+    assertEquals(DType.FLOAT32, actual.dtype());
+    assertArrayEquals(shape, actual.shape());
+    assertArrayEquals(values, actual.toFloatArray());
   }
 
-  private static String exact(MLXArray array) {
-    MLXArray int32 = array.dtype() == DType.INT32 ? array : MLX.astype(array, DType.INT32);
-    return array.dtype()
-        + " "
-        + Arrays.toString(array.shape())
-        + " "
-        + Arrays.toString(int32.toIntArray());
+  private static void assertExact(MLXArray actual, DType dtype, int[] shape, int[] values) {
+    assertEquals(dtype, actual.dtype());
+    assertArrayEquals(shape, actual.shape());
+    MLXArray int32 = actual.dtype() == DType.INT32 ? actual : MLX.astype(actual, DType.INT32);
+    assertArrayEquals(values, int32.toIntArray());
   }
 
   private static MLXArray rawArgmaxAxis(MLXScope scope, MLXArray array, int axis) {

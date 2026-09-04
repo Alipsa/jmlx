@@ -39,6 +39,16 @@ class DecoderConfigTest {
   }
 
   @Test
+  void validatesDirectModelTypeConstruction() {
+    assertThrows(
+        NullPointerException.class,
+        () -> new DecoderConfig(null, 8, 4, 8, 1, 2, 1, 1e-6f, 10_000f, false, false, false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new DecoderConfig(" ", 8, 4, 8, 1, 2, 1, 1e-6f, 10_000f, false, false, false));
+  }
+
+  @Test
   void acceptsNullHeadDimButRejectsUnsupportedRopeScaling(@TempDir Path dir) throws Exception {
     Path config = dir.resolve("config.json");
     Files.writeString(
@@ -55,6 +65,24 @@ class DecoderConfigTest {
          "num_hidden_layers":1,"num_attention_heads":2,"rope_scaling":{"type":"linear"}}
         """);
     assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+  }
+
+  @Test
+  void rejectsQuantizedWeightConfigurations(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    for (String field : java.util.List.of("quantization", "quantization_config")) {
+      Files.writeString(
+          config,
+          """
+          {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+           "num_hidden_layers":1,"num_attention_heads":2,"%s":{"group_size":64,"bits":4}}
+          """
+              .formatted(field));
+
+      IllegalArgumentException error =
+          assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+      assertTrue(error.getMessage().contains("quantized weights"), error.getMessage());
+    }
   }
 
   @Test

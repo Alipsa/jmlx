@@ -38,6 +38,17 @@ class QwenModelTest {
     try (MLXScope modelScope = new MLXScope()) {
       QwenModel model = QwenModel.load(modelScope, dir);
       assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
+      TextGenerationModel common = TextGenerationModels.load(modelScope, dir);
+      assertEquals(
+          List.of(1, 0, 0),
+          common
+              .generate(
+                  new GenerationRequest(
+                      new int[] {1},
+                      GenerationConfig.greedyDefaults(2, Set.of()),
+                      CancellationToken.NONE),
+                  ignored -> {})
+              .tokenIds());
     }
   }
 
@@ -84,6 +95,22 @@ class QwenModelTest {
       IllegalArgumentException e =
           assertThrows(IllegalArgumentException.class, () -> QwenModel.load(modelScope, dir));
       assertTrue(e.getMessage().contains("self_attn.q_proj.bias"), e.getMessage());
+    }
+  }
+
+  @Test
+  void rejectsLlamaBeforeAttemptingCheckpointLoad(@TempDir Path dir) throws Exception {
+    Files.writeString(
+        dir.resolve("config.json"),
+        """
+        {"model_type":"llama","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":2}
+        """);
+
+    try (MLXScope scope = new MLXScope()) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> QwenModel.load(scope, dir));
+      assertTrue(e.getMessage().contains("expected model_type qwen2"), e.getMessage());
     }
   }
 

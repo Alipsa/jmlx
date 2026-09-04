@@ -11,7 +11,7 @@ public final class LlamaModel extends DecoderModel {
     // hardcoded like Qwen2's.
     super(
         scope,
-        requireLlama(config),
+        config,
         CheckpointLoader.load(scope, directory),
         config.attentionBias(),
         config.attentionBias());
@@ -19,14 +19,11 @@ public final class LlamaModel extends DecoderModel {
 
   /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
   public static LlamaModel load(MLXScope scope, Path directory) throws IOException {
-    return new LlamaModel(
-        scope, DecoderConfig.fromFile(directory.resolve("config.json")), directory);
+    return TextGenerationModels.loadDecoder(scope, directory, "llama", LlamaModel.class);
   }
 
-  private static DecoderConfig requireLlama(DecoderConfig config) {
-    if (!"llama".equals(config.modelType())) {
-      throw new IllegalArgumentException("expected model_type llama, got " + config.modelType());
-    }
-    return config;
+  static LlamaModel create(MLXScope scope, DecoderConfig config, Path directory)
+      throws IOException {
+    return new LlamaModel(scope, config, directory);
   }
 }

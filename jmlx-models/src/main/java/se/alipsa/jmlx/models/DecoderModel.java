@@ -1,10 +1,12 @@
 package se.alipsa.jmlx.models;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
@@ -21,8 +23,10 @@ import se.alipsa.jmlx.nn.SwiGLU;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 
 /** Inference-only pre-norm decoder shared by Llama and Qwen2 checkpoints. */
-public abstract class DecoderModel extends Module {
+public abstract class DecoderModel extends Module implements TextGenerationModel {
+  private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
   private final DecoderConfig config;
+  private final ModelMetadata metadata;
   private final Embedding embedding;
   private final List<DecoderBlock> layers;
   private final RMSNorm norm;
@@ -48,6 +52,8 @@ public abstract class DecoderModel extends Module {
       boolean outBiasRequired) {
     super(scope);
     this.config = Objects.requireNonNull(config, "config");
+    metadata =
+        new DecoderMetadata(config.modelType(), config.vocabSize(), config.numHiddenLayers());
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
     boolean mlpBiasExpected = config.mlpBias();
@@ -98,9 +104,17 @@ public abstract class DecoderModel extends Module {
     lmHead = tiedOutput ? null : child("lmHead", new Linear(scope, headWeight, null));
   }
 
-  /** Returns the architecture configuration this model was built from. */
+  /**
+   * Returns this decoder architecture's detailed configuration. Use {@link #metadata()} from code
+   * that supports multiple model architectures; it deliberately exposes only stable common fields.
+   */
   public final DecoderConfig config() {
     return config;
+  }
+
+  @Override
+  public final ModelMetadata metadata() {
+    return metadata;
   }
 
   /**
@@ -134,42 +148,103 @@ public abstract class DecoderModel extends Module {
     if (prompt == null || prompt.length == 0) {
       throw new IllegalArgumentException("prompt must not be empty");
     }
-    if (maxNewTokens < 0) {
-      throw new IllegalArgumentException("maxNewTokens must be non-negative");
-    }
-    Objects.requireNonNull(eosTokenIds, "eosTokenIds");
-    List<Integer> result = new ArrayList<>();
-    for (int id : prompt) {
-      result.add(id);
-    }
-    try (MLXScope generation = scope().newChild()) {
-      List<KVCache> caches = new ArrayList<>();
-      for (int i = 0; i < layers.size(); i++) {
-        caches.add(new KVCache(generation));
-      }
-      int[] input = prompt;
-      for (int step = 0; step < maxNewTokens; step++) {
-        try (MLXScope activation = generation.newChild()) {
-          MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
-          MLXArray normalized = normalizedHiddenStates(ids, caches);
-          int[] shape = normalized.shape();
-          MLXArray lastHiddenState =
-              MLXShape.slice(
-                  normalized,
-                  new int[] {0, shape[1] - 1, 0},
-                  new int[] {shape[0], shape[1], shape[2]});
-          MLXArray lastLogits =
-              tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
-          int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
-          result.add(next);
-          if (eosTokenIds.contains(next)) {
+    GenerationResult result =
+        generate(
+            new GenerationRequest(
+                prompt,
+                GenerationConfig.greedyDefaults(maxNewTokens, eosTokenIds),
+                CancellationToken.NONE),
+            ignored -> {});
+    return result.tokenIds();
+  }
+
+  /**
+   * Runs the currently supported deterministic greedy policy and emits token plus terminal events.
+   */
+  @Override
+  public final GenerationResult generate(
+      GenerationRequest request, Consumer<GenerationEvent> listener) {
+    Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(listener, "listener");
+    GenerationConfig policy = request.config();
+    requireGreedy(policy);
+    int[] prompt = request.promptTokenIds();
+    List<Integer> generated = new ArrayList<>();
+    FinishReason reason = FinishReason.MAX_TOKENS;
+    if (!request.cancellationToken().isCancelled()) {
+      try (MLXScope generation = scope().newChild()) {
+        List<KVCache> caches = new ArrayList<>();
+        for (int i = 0; i < layers.size(); i++) {
+          caches.add(new KVCache(generation));
+        }
+        int[] input = prompt;
+        for (int step = 0; step < policy.maxNewTokens(); step++) {
+          if (request.cancellationToken().isCancelled()) {
+            reason = FinishReason.CANCELLED;
             break;
           }
-          input = new int[] {next};
+          try (MLXScope activation = generation.newChild()) {
+            MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
+            MLXArray normalized = normalizedHiddenStates(ids, caches);
+            int[] shape = normalized.shape();
+            MLXArray lastHiddenState =
+                MLXShape.slice(
+                    normalized,
+                    new int[] {0, shape[1] - 1, 0},
+                    new int[] {shape[0], shape[1], shape[2]});
+            MLXArray lastLogits =
+                tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
+            int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
+            boolean eos = policy.eosTokenIds().contains(next);
+            if (!eos && policy.stopTokenIds().contains(next)) {
+              reason = FinishReason.STOP_TOKEN;
+              break;
+            }
+            generated.add(next);
+            try {
+              listener.accept(GenerationEvent.token(next));
+            } catch (RuntimeException e) {
+              throw new GenerationAbortedException(toList(prompt), generated, e);
+            }
+            if (eos) {
+              reason = FinishReason.EOS;
+              break;
+            }
+            input = new int[] {next};
+          }
         }
       }
+    } else {
+      reason = FinishReason.CANCELLED;
     }
-    return List.copyOf(result);
+    GenerationResult result = new GenerationResult(toList(prompt), generated, reason, List.of());
+    try {
+      listener.accept(GenerationEvent.finished(reason));
+    } catch (RuntimeException e) {
+      LOGGER.log(System.Logger.Level.WARNING, "generation terminal listener failed", e);
+    }
+    return result;
+  }
+
+  private static List<Integer> toList(int[] ids) {
+    return Arrays.stream(ids).boxed().toList();
+  }
+
+  private static void requireGreedy(GenerationConfig config) {
+    if (config.temperature() != 0
+        || config.topK() != 0
+        || config.topP() != 1
+        || config.minP() != 0
+        || config.repetitionPenalty() != 1
+        || config.frequencyPenalty() != 0
+        || config.presencePenalty() != 0
+        || config.seed().isPresent()
+        || config.logProbabilities()) {
+      throw new UnsupportedOperationException(
+          "this release supports only greedy policy values: temperature=0, topK=0, topP=1, "
+              + "minP=0, repetitionPenalty=1, frequencyPenalty=0, presencePenalty=0, no seed, "
+              + "and no log probabilities");
+    }
   }
 
   /**

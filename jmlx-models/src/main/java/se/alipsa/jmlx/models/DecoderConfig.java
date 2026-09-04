@@ -25,6 +25,7 @@ public record DecoderConfig(
 
   /** Validates decoder dimensions and the attention-head configuration. */
   public DecoderConfig {
+    modelType = ModelTypes.requireValid(modelType);
     if (vocabSize <= 0 || hiddenSize <= 0 || intermediateSize <= 0 || numHiddenLayers <= 0) {
       throw new IllegalArgumentException("decoder dimensions must be positive");
     }
@@ -47,6 +48,10 @@ public record DecoderConfig(
     if (node.hasNonNull("rope_scaling")) {
       throw new IllegalArgumentException(
           "config.json declares rope_scaling, which this decoder does not yet implement");
+    }
+    if (node.hasNonNull("quantization") || node.hasNonNull("quantization_config")) {
+      throw new IllegalArgumentException(
+          "config.json declares quantized weights, which this decoder does not yet implement");
     }
     if (node.path("use_sliding_window").asBoolean(false)) {
       throw new IllegalArgumentException(

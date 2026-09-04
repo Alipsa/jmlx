@@ -190,7 +190,10 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRen
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
                  pure Java; no dependency on jmlx-ffi or native/install/lib
 
-jmlx-models      se.alipsa.jmlx.models             LlamaModel, QwenModel, DecoderModel
+jmlx-models      se.alipsa.jmlx.models             TextGenerationModel, TextGenerationModels,
+                                                    GenerationConfig/Request/Result/Event,
+                                                    CancellationToken, FinishReason, ModelMetadata,
+                                                    LlamaModel, QwenModel, DecoderModel
                  depends on jmlx-core + jmlx-tokenizer; native inference and generation
 ```
 

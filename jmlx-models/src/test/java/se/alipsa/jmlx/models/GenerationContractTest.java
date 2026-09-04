@@ -34,6 +34,22 @@ class GenerationContractTest {
     assertThrows(
         IllegalArgumentException.class,
         () ->
+            new GenerationConfig(
+                1,
+                OptionalLong.empty(),
+                Float.POSITIVE_INFINITY,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                Set.of(),
+                Set.of(),
+                false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
             new GenerationRequest(
                 new int[0], GenerationConfig.greedyDefaults(0, Set.of()), CancellationToken.NONE));
   }

@@ -14,12 +14,9 @@ public final class QwenModel extends DecoderModel {
 
   /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
   public static QwenModel load(MLXScope scope, Path directory) throws IOException {
-    DecoderModel model = TextGenerationModels.load(scope, directory);
-    if (model instanceof QwenModel qwen) {
-      return qwen;
-    }
-    throw new IllegalArgumentException(
-        "expected model_type qwen2, got " + model.config().modelType());
+    DecoderConfig config = DecoderConfig.fromFile(directory.resolve("config.json"));
+    requireQwen(config);
+    return (QwenModel) TextGenerationModels.load(scope, directory, config);
   }
 
   static QwenModel create(MLXScope scope, DecoderConfig config, Path directory) throws IOException {

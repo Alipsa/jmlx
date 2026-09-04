@@ -33,6 +33,8 @@ try (MLXScope scope = new MLXScope()) {
   TextGenerationModel model = TextGenerationModels.load(scope, modelDirectory);
   HfTokenizer tokenizer = HfTokenizer.fromFile(modelDirectory.resolve("tokenizer.json"));
   int[] prompt = tokenizer.encode("Hello", true).stream().mapToInt(Integer::intValue).toArray();
+  List<Integer> generated = new ArrayList<>();
+  String[] decoded = {""};
   GenerationResult result = model.generate(
       new GenerationRequest(
           prompt,
@@ -40,13 +42,18 @@ try (MLXScope scope = new MLXScope()) {
           CancellationToken.NONE),
       event -> {
         if (event.tokenId() != null) {
-          System.out.print(tokenizer.decode(List.of(event.tokenId()), true));
+          generated.add(event.tokenId());
+          String whole = tokenizer.decode(generated, true);
+          System.out.print(whole.substring(decoded[0].length()));
+          decoded[0] = whole;
         }
       });
 }
 ```
 
-`LlamaModel.load` and `QwenModel.load` remain compatibility entry points; both delegate to the
+Buffer generated IDs before decoding: byte-level BPE may split one Unicode code point across tokens,
+so decoding a single token independently corrupts non-ASCII output. `LlamaModel.load` and
+`QwenModel.load` remain compatibility entry points; both delegate to the
 common loader. For chat models, render the model's chat template through
 `HfTokenizer`/`ChatTemplateRenderer` before constructing the explicit token-ID request. The event
 callback runs synchronously on the thread which owns the generation scope. A cancelling thread may

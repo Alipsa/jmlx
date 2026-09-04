@@ -132,6 +132,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
 
   /** Greedily generates up to {@code maxNewTokens}; prompt tokens are included in the result. */
   public final List<Integer> generate(int[] prompt, int maxNewTokens, Set<Integer> eosTokenIds) {
+    if (prompt == null || prompt.length == 0) {
+      throw new IllegalArgumentException("prompt must not be empty");
+    }
     GenerationResult result =
         generate(
             new GenerationRequest(
@@ -150,8 +153,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       GenerationRequest request, Consumer<GenerationEvent> listener) {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(listener, "listener");
-    GenerationConfig config = request.config();
-    requireGreedy(config);
+    GenerationConfig policy = request.config();
+    requireGreedy(policy);
     int[] prompt = request.promptTokenIds();
     List<Integer> generated = new ArrayList<>();
     FinishReason reason = FinishReason.MAX_TOKENS;
@@ -166,7 +169,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
         caches.add(new KVCache(generation));
       }
       int[] input = prompt;
-      for (int step = 0; step < config.maxNewTokens(); step++) {
+      for (int step = 0; step < policy.maxNewTokens(); step++) {
         if (request.cancellationToken().isCancelled()) {
           reason = FinishReason.CANCELLED;
           break;
@@ -185,11 +188,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
           int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
           generated.add(next);
           listener.accept(GenerationEvent.token(next));
-          if (config.stopTokenIds().contains(next)) {
+          if (policy.stopTokenIds().contains(next)) {
             reason = FinishReason.STOP_TOKEN;
             break;
           }
-          if (config.eosTokenIds().contains(next)) {
+          if (policy.eosTokenIds().contains(next)) {
             reason = FinishReason.EOS;
             break;
           }

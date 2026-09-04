@@ -26,7 +26,7 @@ public record GenerationConfig(
       throw new IllegalArgumentException("maxNewTokens must be non-negative");
     }
     Objects.requireNonNull(seed, "seed");
-    if (Float.isNaN(temperature) || temperature < 0) {
+    if (!Float.isFinite(temperature) || temperature < 0) {
       throw new IllegalArgumentException("temperature must be non-negative");
     }
     if (topK < 0) {

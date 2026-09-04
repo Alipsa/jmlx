@@ -14,6 +14,14 @@ public final class TextGenerationModels {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(directory, "directory");
     DecoderConfig config = DecoderConfig.fromFile(directory.resolve("config.json"));
+    return load(scope, directory, config);
+  }
+
+  static DecoderModel load(MLXScope scope, Path directory, DecoderConfig config)
+      throws IOException {
+    Objects.requireNonNull(scope, "scope");
+    Objects.requireNonNull(directory, "directory");
+    Objects.requireNonNull(config, "config");
     return switch (config.modelType()) {
       case "llama" -> LlamaModel.create(scope, config, directory);
       case "qwen2" -> QwenModel.create(scope, config, directory);

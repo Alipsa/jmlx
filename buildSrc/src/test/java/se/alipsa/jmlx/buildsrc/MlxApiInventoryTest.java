@@ -202,7 +202,7 @@ class MlxApiInventoryTest {
     IllegalStateException failure =
         assertThrows(IllegalStateException.class, () -> MlxApiInventory.render(root));
 
-    assertTrue(failure.getMessage().contains("Expected callable mlx_h bindings missing"));
+    assertTrue(failure.getMessage().contains("Expected variadic invoker canary bindings missing"));
   }
 
   @Test

@@ -7,9 +7,10 @@
  */
 
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
+
 plugins {
     id 'base'
-    id 'java-base'
+    id 'jvm-toolchains'
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.nexusRelease) apply false
 }
@@ -68,7 +69,7 @@ tasks.named('verifyMlxApiInventory') {
 tasks.register('verifyMlxApiCallSites', JavaExec) {
     group = 'verification'
     description = 'Fails when handwritten Java reaches an unrecorded generated MLX binding.'
-    classpath = files(layout.projectDirectory.dir('buildSrc/build/classes/java/main'))
+    classpath = files(MlxApiInventory.protectionDomain.codeSource.location)
     mainClass = 'se.alipsa.jmlx.buildsrc.MlxApiCallSites'
     args projectDir.toString(), projectJavaVersion.toString()
     javaLauncher = javaToolchains.launcherFor {

@@ -42,13 +42,9 @@ public final class MlxApiInventory {
   // different generated shape from ordinary holders. Check all six by name so either shape change
   // cannot silently remove them from the inventory.
   private static final Set<String> REQUIRED_SYMBOLS =
-      Set.of(
-          "mlx_array_new",
-          "mlx_array_free",
-          "mlx_array_new_data",
-          "mlx_array_new_data_managed",
-          "_mlx_error",
-          "mlx_node_namer_new");
+      Set.of("mlx_array_new", "mlx_array_free", "mlx_array_new_data", "mlx_array_new_data_managed");
+  private static final Set<String> VARIADIC_INVOKER_CANARIES =
+      Set.of("_mlx_error", "mlx_node_namer_new");
   private static final Set<String> STATUSES =
       Set.of(
           "unplanned",
@@ -151,6 +147,15 @@ public final class MlxApiInventory {
           "Expected callable mlx_h bindings missing from the inventory: "
               + missingRequired
               + ". The generated binding layout or inventory parser may have changed.");
+    }
+    Set<String> missingVariadicCanaries = new TreeSet<>(VARIADIC_INVOKER_CANARIES);
+    missingVariadicCanaries.removeAll(symbols);
+    if (!missingVariadicCanaries.isEmpty()) {
+      throw new IllegalStateException(
+          "Expected variadic invoker canary bindings missing from the inventory: "
+              + missingVariadicCanaries
+              + ". The upstream header may have removed them, or the generated invoker shape may"
+              + " have changed.");
     }
     TreeSet<Entry> entries = new TreeSet<>(Comparator.comparing(Entry::identity));
     for (String symbol : symbols) {

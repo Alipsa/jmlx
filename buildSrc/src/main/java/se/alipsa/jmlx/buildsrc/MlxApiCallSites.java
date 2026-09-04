@@ -32,17 +32,18 @@ public final class MlxApiCallSites {
   private static final String FFI_PACKAGE = "se.alipsa.jmlx.ffi.";
   private static final String FFI_PACKAGE_NAME = "se.alipsa.jmlx.ffi";
   private static final String GENERATED_DIRECTORY = "jmlx-ffi/src/main/generated/java";
-  private static final Set<String> MLX_H_INFRASTRUCTURE = Set.of("upcallHandle");
+  private static final Set<String> MLX_H_INFRASTRUCTURE =
+      Set.of("align", "traceDowncall", "TRACE_DOWNCALLS", "upcallHandle");
 
   private MlxApiCallSites() {}
 
   /** Fails with every unrecorded generated-binding use in handwritten Java source. */
   public static void verify(Path repositoryRoot) throws IOException {
-    Map<String, Set<String>> mappingSources = MlxApiInventory.mappingSources(repositoryRoot);
-    Set<String> generatedTypes = MlxApiInventory.generatedTypes(repositoryRoot);
+    MlxApiInventory.GuardData guardData = MlxApiInventory.guardData(repositoryRoot);
     List<Violation> violations = new ArrayList<>();
     for (Path source : handwrittenJavaSources(repositoryRoot)) {
-      violations.addAll(scan(repositoryRoot, source, mappingSources, generatedTypes));
+      violations.addAll(
+          scan(repositoryRoot, source, guardData.mappingSources(), guardData.generatedTypes()));
     }
     if (!violations.isEmpty()) {
       violations.sort(Comparator.comparing(Violation::path).thenComparingLong(Violation::line));
@@ -69,7 +70,10 @@ public final class MlxApiCallSites {
               path -> {
                 Path relative = repositoryRoot.relativize(path);
                 return !relative.startsWith(GENERATED_DIRECTORY)
-                    && relative.toString().matches(".*(^|/)src/(main|test|testFixtures)/java/.*");
+                    && !relative.startsWith(".git")
+                    && !relative.startsWith(".gradle")
+                    && !relative.startsWith("native")
+                    && !relative.toString().contains("/build/");
               })
           .sorted()
           .toList();
@@ -137,7 +141,7 @@ public final class MlxApiCallSites {
       if (owner.equals("mlx_h") || owner.endsWith(".mlx_h")) {
         if (member.startsWith("mlx_") || member.startsWith("MLX_")) {
           record("mlx_h." + member, tree);
-        } else if (!isNamedInfrastructure(member) && !member.contains("$")) {
+        } else if (!isNamedInfrastructure(member)) {
           record("mlx_h." + member, tree);
         }
       } else if (owner.startsWith(FFI_PACKAGE)) {

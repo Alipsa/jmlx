@@ -2,21 +2,18 @@
   "records": [
     {
       "bindings": [
-        "mlx_h.mlx_add", "mlx_h.mlx_arange", "mlx_h.mlx_array_data_float32", "mlx_h.mlx_array_data_int32",
-        "mlx_h.mlx_array_dtype", "mlx_h.mlx_array_eval", "mlx_h.mlx_array_free",
-        "mlx_h.mlx_array_ndim", "mlx_h.mlx_array_new", "mlx_h.mlx_array_new_bool",
+        "mlx_h.mlx_add", "mlx_h.mlx_arange", "mlx_h.mlx_array_new", "mlx_h.mlx_array_new_bool",
         "mlx_h.mlx_array_new_data", "mlx_h.mlx_array_new_float32", "mlx_h.mlx_array_new_int",
-        "mlx_h.mlx_array_set", "mlx_h.mlx_array_shape", "mlx_h.mlx_array_size", "mlx_h.mlx_astype",
         "mlx_h.mlx_contiguous",
         "mlx_h.mlx_default_cpu_stream_new", "mlx_h.mlx_default_gpu_stream_new",
         "mlx_h.mlx_dequantize", "mlx_h.mlx_device_free", "mlx_h.mlx_device_get_type",
         "mlx_h.mlx_device_new", "mlx_h.mlx_device_new_type", "mlx_h.mlx_eval",
         "mlx_h.mlx_full", "mlx_h.mlx_get_active_memory",
-        "mlx_h.mlx_get_default_device", "mlx_h.mlx_get_default_stream", "mlx_h.mlx_ones", "mlx_h.mlx_reshape",
+        "mlx_h.mlx_get_default_device", "mlx_h.mlx_get_default_stream", "mlx_h.mlx_ones",
         "mlx_h.mlx_set_default_device", "mlx_h.mlx_set_error_handler",
-        "mlx_h.mlx_slice", "mlx_h.mlx_softmax_axis", "mlx_h.mlx_sort_axis", "mlx_h.mlx_split",
+        "mlx_h.mlx_sort_axis",
         "mlx_h.mlx_stream_new", "mlx_h.mlx_string_data", "mlx_h.mlx_string_free",
-        "mlx_h.mlx_string_new", "mlx_h.mlx_sum", "mlx_h.mlx_take_axis",
+        "mlx_h.mlx_string_new", "mlx_h.mlx_sum",
         "mlx_h.mlx_vector_array_free", "mlx_h.mlx_vector_array_get", "mlx_h.mlx_vector_array_new",
         "mlx_h.mlx_vector_array_new_data", "mlx_h.mlx_vector_array_set_data",
         "mlx_h.mlx_vector_array_size", "mlx_h.mlx_vector_string_append_value",
@@ -25,8 +22,36 @@
       ],
       "category": "downcall",
       "status": "implemented",
-      "facadeOrReason": "Existing handwritten core/FFI facade support",
-      "tests": "Existing module tests"
+      "facadeOrReason": "MLX and NativeOps implementation support",
+      "tests": "MLXNumericTest; MLXEvalTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_array_data_float32", "mlx_h.mlx_array_data_int32", "mlx_h.mlx_array_dtype",
+        "mlx_h.mlx_array_eval", "mlx_h.mlx_array_ndim", "mlx_h.mlx_array_set",
+        "mlx_h.mlx_array_shape", "mlx_h.mlx_array_size", "mlx_h.mlx_astype"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXArray",
+      "tests": "MLXArrayTest; MLXNumericTest"
+    },
+    {
+      "bindings": ["mlx_h.mlx_array_free"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXScope",
+      "tests": "MLXScopeTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_reshape", "mlx_h.mlx_slice", "mlx_h.mlx_softmax_axis", "mlx_h.mlx_split",
+        "mlx_h.mlx_take_axis"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXShape",
+      "tests": "MLXNumericTest"
     },
     {
       "bindings": [
@@ -108,22 +133,36 @@
     {
       "bindings": [
         "mlx_h.MLX_BFLOAT16", "mlx_h.MLX_BOOL", "mlx_h.MLX_FLOAT16", "mlx_h.MLX_FLOAT32",
-        "mlx_h.MLX_GPU", "mlx_h.MLX_INT32", "mlx_h.MLX_UINT32"
+        "mlx_h.MLX_INT32", "mlx_h.MLX_UINT32"
       ],
       "category": "constant",
       "status": "implemented",
-      "facadeOrReason": "Existing dtype/device facade support",
-      "tests": "Existing module tests"
+      "facadeOrReason": "DType",
+      "tests": "MLXNumericTest"
+    },
+    {
+      "bindings": ["mlx_h.MLX_GPU"],
+      "category": "constant",
+      "status": "implemented",
+      "facadeOrReason": "MLX default device support",
+      "tests": "MLXGpuVerificationTest"
     },
     {
       "bindings": [
-        "mlx_array_", "mlx_closure_", "mlx_optional_dtype_", "mlx_optional_float_",
-        "mlx_optional_int_", "mlx_stream_", "mlx_vector_array_"
+        "mlx_array_", "mlx_optional_dtype_", "mlx_optional_float_", "mlx_optional_int_",
+        "mlx_stream_", "mlx_vector_array_"
       ],
       "category": "layout/accessor",
       "status": "implemented",
-      "facadeOrReason": "Existing handwritten core/FFI implementation infrastructure",
-      "tests": "Existing module tests"
+      "facadeOrReason": "NativeOps implementation infrastructure",
+      "tests": "MLXNumericTest; MLXQuantTest"
+    },
+    {
+      "bindings": ["mlx_closure_"],
+      "category": "layout/accessor",
+      "status": "implemented",
+      "facadeOrReason": "MLXGrad callback implementation",
+      "tests": "MLXGradTest"
     },
     {
       "bindings": ["mlx_closure_new_func$fun"],

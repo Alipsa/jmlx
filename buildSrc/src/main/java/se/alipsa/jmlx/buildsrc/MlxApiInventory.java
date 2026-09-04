@@ -51,7 +51,7 @@ public final class MlxApiInventory {
   public static String render(Path repositoryRoot) throws IOException {
     List<Entry> entries = discover(repositoryRoot);
     Map<String, Mapping> mappings = readMappings(repositoryRoot.resolve(MAPPING_FILE));
-    validateMappings(entries, mappings);
+    validateMappings(repositoryRoot, entries, mappings);
 
     StringBuilder out = new StringBuilder();
     out.append("# MLX API inventory\n\n");
@@ -66,15 +66,17 @@ public final class MlxApiInventory {
     out.append("- mlx-metal: `").append(pin(bootstrap, "MLX_METAL_VERSION")).append("`\n");
     out.append("- mlx-c: `").append(pin(bootstrap, "MLX_C_COMMIT")).append("`\n");
     appendTotals(out, entries, mappings);
-    out.append("\n| Generated binding | Category | Status | Facade / reason | Tests | Probe |\n");
-    out.append("| --- | --- | --- | --- | --- | --- |\n");
+    out.append(
+        "\n| Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |\n");
+    out.append("| --- | --- | --- | --- | --- | --- | --- |\n");
     for (Entry entry : entries) {
       Mapping mapping = mappings.get(entry.identity());
       out.append("| `").append(entry.identity()).append("` | ").append(entry.category().label());
       out.append(" | ").append(mapping == null ? "unplanned" : mapping.status());
       out.append(" | ").append(mapping == null ? "—" : markdown(mapping.facadeOrReason()));
       out.append(" | ").append(mapping == null ? "—" : markdown(mapping.tests()));
-      out.append(" | ").append(mapping == null ? "—" : markdown(mapping.probe())).append(" |\n");
+      out.append(" | ").append(mapping == null ? "—" : markdown(mapping.probe()));
+      out.append(" | ").append(mapping == null ? "—" : markdown(mapping.scope())).append(" |\n");
     }
     return out.toString();
   }
@@ -84,37 +86,22 @@ public final class MlxApiInventory {
     Files.writeString(output, render(repositoryRoot), StandardCharsets.UTF_8);
   }
 
-  /** Returns every generated identity with an explicit, non-unplanned mapping record. */
-  static Set<String> explicitMappings(Path repositoryRoot) throws IOException {
+  /** Returns the data needed by the handwritten-source guard from one discovery/mapping pass. */
+  static GuardData guardData(Path repositoryRoot) throws IOException {
     List<Entry> entries = discover(repositoryRoot);
     Map<String, Mapping> mappings = readMappings(repositoryRoot.resolve(MAPPING_FILE));
-    validateMappings(entries, mappings);
-    return Set.copyOf(mappings.keySet());
-  }
-
-  /** Returns generated layout/accessor and upcall type identities, including jextract aliases. */
-  static Set<String> generatedTypes(Path repositoryRoot) throws IOException {
+    validateMappings(repositoryRoot, entries, mappings);
     Set<String> types = new TreeSet<>();
-    for (Entry entry : discover(repositoryRoot)) {
+    for (Entry entry : entries) {
       if (entry.category() == Category.LAYOUT || entry.category() == Category.UPCALL) {
         types.add(entry.identity());
       }
     }
-    return Set.copyOf(types);
-  }
-
-  /**
-   * Returns exact source-path restrictions for explicit records; an empty set means unrestricted.
-   */
-  static Map<String, Set<String>> mappingSources(Path repositoryRoot) throws IOException {
-    List<Entry> entries = discover(repositoryRoot);
-    Map<String, Mapping> mappings = readMappings(repositoryRoot.resolve(MAPPING_FILE));
-    validateMappings(entries, mappings);
     Map<String, Set<String>> sources = new HashMap<>();
     for (Mapping mapping : mappings.values()) {
       sources.put(mapping.binding(), mapping.sources());
     }
-    return Map.copyOf(sources);
+    return new GuardData(Map.copyOf(sources), Set.copyOf(types));
   }
 
   private static List<Entry> discover(Path repositoryRoot) throws IOException {
@@ -153,7 +140,9 @@ public final class MlxApiInventory {
           .filter(name -> !name.equals("mlx_h"))
           .forEach(
               name -> {
-                if (name.contains("$fun")
+                if (name.equals("mlx_h$shared")) {
+                  entries.add(new Entry(name, Category.INFRASTRUCTURE));
+                } else if (name.contains("$fun")
                     || name.contains("$dtor")
                     || name.equals("mlx_error_handler_func")) {
                   entries.add(new Entry(name, Category.UPCALL));
@@ -202,7 +191,8 @@ public final class MlxApiInventory {
     return mappings;
   }
 
-  private static void validateMappings(List<Entry> entries, Map<String, Mapping> mappings) {
+  private static void validateMappings(
+      Path repositoryRoot, List<Entry> entries, Map<String, Mapping> mappings) {
     Map<String, Category> known = new HashMap<>();
     for (Entry entry : entries) {
       known.put(entry.identity(), entry.category());
@@ -221,6 +211,11 @@ public final class MlxApiInventory {
                 + mapping.category().label()
                 + ", but generated binding is "
                 + category.label());
+      }
+      for (String source : mapping.sources()) {
+        if (!Files.isRegularFile(repositoryRoot.resolve(source))) {
+          throw new IllegalArgumentException("Stale inventory mapping source path: " + source);
+        }
       }
     }
   }
@@ -284,7 +279,8 @@ public final class MlxApiInventory {
     DOWNCALL("downcall"),
     CONSTANT("constant"),
     LAYOUT("layout/accessor"),
-    UPCALL("upcall interface");
+    UPCALL("upcall interface"),
+    INFRASTRUCTURE("jextract infrastructure");
 
     private final String label;
 
@@ -307,6 +303,8 @@ public final class MlxApiInventory {
   }
 
   private record Entry(String identity, Category category) {}
+
+  record GuardData(Map<String, Set<String>> mappingSources, Set<String> generatedTypes) {}
 
   private record Mapping(
       String binding,
@@ -350,6 +348,10 @@ public final class MlxApiInventory {
                 sources(object)));
       }
       return mappings;
+    }
+
+    String scope() {
+      return sources.isEmpty() ? "all handwritten source" : String.join("<br>", sources);
     }
 
     private static List<String> bindings(Map<?, ?> object) {

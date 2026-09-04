@@ -108,6 +108,9 @@ class MlxApiInventoryTest {
             + "\"status\":\"planned\",\"facadeOrReason\":\"probe\",\"tests\":\"test\","
             + "\"sources\":[\"jmlx-core/src/test/java/sample/Allowed.java\"]}]}";
     Path root = fixture(mappings);
+    Path allowed = root.resolve("jmlx-core/src/test/java/sample/Allowed.java");
+    Files.createDirectories(allowed.getParent());
+    Files.writeString(allowed, "class Allowed {}");
     Path source = root.resolve("jmlx-core/src/main/java/sample/Disallowed.java");
     Files.createDirectories(source.getParent());
     Files.writeString(
@@ -119,6 +122,20 @@ class MlxApiInventoryTest {
         assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
 
     assertTrue(failure.getMessage().contains("mlx_h.mlx_array_free"));
+  }
+
+  @Test
+  void rejectsStaleScopedMappingPath() throws Exception {
+    String mappings =
+        "{\"records\":[{\"binding\":\"mlx_h.mlx_array_free\",\"category\":\"downcall\","
+            + "\"status\":\"planned\",\"facadeOrReason\":\"probe\",\"tests\":\"test\","
+            + "\"sources\":[\"jmlx-core/src/test/java/sample/Missing.java\"]}]}";
+
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class, () -> MlxApiInventory.render(fixture(mappings)));
+
+    assertTrue(failure.getMessage().contains("Stale inventory mapping source path"));
   }
 
   @Test

@@ -43,7 +43,10 @@ public final class MlxApiCallSites {
 
   private MlxApiCallSites() {}
 
-  /** Entry point for the Java-25 toolchain task declared in the root build. */
+  /**
+   * Entry point for the toolchain task declared in the root build; the required parser feature
+   * level is the second argument.
+   */
   public static void main(String[] arguments) {
     try {
       if (arguments.length != 2) {
@@ -51,8 +54,12 @@ public final class MlxApiCallSites {
             "Usage: MlxApiCallSites <repository-root> <java-feature>");
       }
       verify(Path.of(arguments[0]), Integer.parseInt(arguments[1]));
-    } catch (IOException | RuntimeException exception) {
-      System.err.println(exception.getMessage());
+    } catch (IllegalArgumentException | IllegalStateException reported) {
+      System.err.println(
+          reported.getMessage() == null ? reported.getClass().getName() : reported.getMessage());
+      System.exit(1);
+    } catch (IOException | RuntimeException unexpected) {
+      unexpected.printStackTrace();
       System.exit(1);
     }
   }

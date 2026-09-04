@@ -198,7 +198,14 @@ public final class MlxApiInventory {
     if (!Files.isRegularFile(mappingFile)) {
       throw new IllegalArgumentException("Missing required inventory mapping file: " + mappingFile);
     }
-    Object root = new JsonParser(Files.readString(mappingFile, StandardCharsets.UTF_8)).parse();
+    Object root;
+    try {
+      root = new JsonParser(Files.readString(mappingFile, StandardCharsets.UTF_8)).parse();
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException(
+          "Invalid inventory mapping file " + mappingFile + ": " + exception.getMessage(),
+          exception);
+    }
     if (!(root instanceof Map<?, ?> rootObject) || rootObject.size() != 1) {
       throw new IllegalArgumentException(
           "Inventory mapping must be a JSON object containing only 'records'");

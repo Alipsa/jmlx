@@ -51,6 +51,17 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void identifiesTheMappingFileWhenItsJsonIsMalformed() throws Exception {
+    Path root = fixture("{\"records\":[");
+
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> MlxApiInventory.render(root));
+
+    assertTrue(failure.getMessage().contains("Invalid inventory mapping file"));
+    assertTrue(failure.getMessage().contains("mlx-api-inventory-overrides.json"));
+  }
+
+  @Test
   void callSiteGuardRejectsOnlyUnmappedSyntaxUses() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
     Path source = root.resolve("jmlx-core/src/main/java/sample/Example.java");

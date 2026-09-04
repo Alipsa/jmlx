@@ -12,6 +12,8 @@ plugins {
     id 'com.diffplug.spotless' version '8.9.0'
 }
 
+// buildSrc is loaded by the Gradle daemon, which may run on Java 21 even though the forked
+// call-site scanner uses the root project's newer toolchain. Keep its bytecode daemon-compatible.
 tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }

@@ -47,6 +47,10 @@ try (MLXScope scope = new MLXScope()) {
 }
 ```
 
+`TextGenerationModel.metadata()` exposes architecture-neutral fields such as `modelType`, vocabulary
+size, and layer count. Decoder-specific settings remain available from `DecoderModel.config()` when
+working with the current Llama/Qwen implementations directly.
+
 Byte-level BPE may split one Unicode code point across tokens, so do not decode individual event
 tokens. Decode the complete generated-ID sequence as above; a tokenizer-aware streaming decoder is
 planned for a later Phase 6 milestone. `LlamaModel.load` and `QwenModel.load` remain compatibility

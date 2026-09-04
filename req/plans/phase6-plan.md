@@ -97,9 +97,11 @@ and 6.1's oracle and Tier-A tests need 6.0b's infrastructure. Later milestones b
    `planned`; include model architecture, tokenizer family, chat-template status, checkpoint form,
    quantization, RoPE/scaling, context/cache policy, and license/access notes.
 3. Add the public types described above, with complete resource ownership and threading javadocs.
-   Establish only the minimal architecture-descriptor seam and a common loader that dispatches on
-   `model_type`; 6.3 expands descriptors into the full capability mapping. Keep `LlamaModel.load`
-   and `QwenModel.load` as compatibility entry points delegating to that common loader.
+   Establish only the minimal architecture-descriptor seam: the public, read-only
+   `ModelMetadata` exposes stable common fields while its internal implementation remains
+   expandable for 6.3's full capability mapping. Add a common loader that dispatches on
+   `model_type`; keep `LlamaModel.load` and `QwenModel.load` as compatibility entry points
+   delegating to that common loader.
 4. Move current greedy generation behind `GenerationConfig.greedyDefaults()` and add a streaming
    adapter that emits the same token sequence and one terminal event. Preserve prompt token IDs in
    results and decode only generated IDs for text deltas.

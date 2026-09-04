@@ -1,17 +1,16 @@
 package se.alipsa.jmlx.models;
 
-import java.util.Objects;
+/**
+ * Read-only, architecture-neutral metadata exposed by a loaded text-generation model.
+ * Implementations are internal and may gain additional metadata as architectural support expands.
+ */
+public sealed interface ModelMetadata permits DecoderMetadata {
+  /** The Hugging Face {@code model_type}. */
+  String modelType();
 
-/** Architecture-neutral metadata exposed by a loaded text-generation model. */
-public record ModelMetadata(String modelType, int vocabSize, int numHiddenLayers) {
-  /** Validates the stable metadata shared by decoder architectures. */
-  public ModelMetadata {
-    Objects.requireNonNull(modelType, "modelType");
-    if (modelType.isBlank()) {
-      throw new IllegalArgumentException("modelType must not be blank");
-    }
-    if (vocabSize <= 0 || numHiddenLayers <= 0) {
-      throw new IllegalArgumentException("model metadata dimensions must be positive");
-    }
-  }
+  /** The vocabulary size. */
+  int vocabSize();
+
+  /** The number of decoder layers. */
+  int numHiddenLayers();
 }

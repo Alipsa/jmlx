@@ -52,7 +52,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       boolean outBiasRequired) {
     super(scope);
     this.config = Objects.requireNonNull(config, "config");
-    metadata = new ModelMetadata(config.modelType(), config.vocabSize(), config.numHiddenLayers());
+    metadata =
+        new DecoderMetadata(config.modelType(), config.vocabSize(), config.numHiddenLayers());
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
     boolean mlpBiasExpected = config.mlpBias();
@@ -103,7 +104,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     lmHead = tiedOutput ? null : child("lmHead", new Linear(scope, headWeight, null));
   }
 
-  /** Returns the architecture configuration this model was built from. */
+  /**
+   * Returns this decoder architecture's detailed configuration. Use {@link #metadata()} from code
+   * that supports multiple model architectures; it deliberately exposes only stable common fields.
+   */
   public final DecoderConfig config() {
     return config;
   }

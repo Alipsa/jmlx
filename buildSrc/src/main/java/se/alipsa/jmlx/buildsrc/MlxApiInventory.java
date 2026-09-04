@@ -92,6 +92,31 @@ public final class MlxApiInventory {
     return Set.copyOf(mappings.keySet());
   }
 
+  /** Returns generated layout/accessor and upcall type identities, including jextract aliases. */
+  static Set<String> generatedTypes(Path repositoryRoot) throws IOException {
+    Set<String> types = new TreeSet<>();
+    for (Entry entry : discover(repositoryRoot)) {
+      if (entry.category() == Category.LAYOUT || entry.category() == Category.UPCALL) {
+        types.add(entry.identity());
+      }
+    }
+    return Set.copyOf(types);
+  }
+
+  /**
+   * Returns exact source-path restrictions for explicit records; an empty set means unrestricted.
+   */
+  static Map<String, Set<String>> mappingSources(Path repositoryRoot) throws IOException {
+    List<Entry> entries = discover(repositoryRoot);
+    Map<String, Mapping> mappings = readMappings(repositoryRoot.resolve(MAPPING_FILE));
+    validateMappings(entries, mappings);
+    Map<String, Set<String>> sources = new HashMap<>();
+    for (Mapping mapping : mappings.values()) {
+      sources.put(mapping.binding(), mapping.sources());
+    }
+    return Map.copyOf(sources);
+  }
+
   private static List<Entry> discover(Path repositoryRoot) throws IOException {
     Path directory = repositoryRoot.resolve(BINDING_DIRECTORY);
     String binding = Files.readString(directory.resolve("mlx_h.java"), StandardCharsets.UTF_8);
@@ -125,15 +150,15 @@ public final class MlxApiInventory {
       files
           .filter(path -> path.getFileName().toString().endsWith(".java"))
           .map(path -> path.getFileName().toString().replaceFirst("\\.java$", ""))
-          .filter(name -> !name.equals("mlx_h") && !name.equals("mlx_h$shared"))
+          .filter(name -> !name.equals("mlx_h"))
           .forEach(
               name -> {
-                if (name.endsWith("_")) {
-                  entries.add(new Entry(name, Category.LAYOUT));
-                } else if (name.contains("$fun")
+                if (name.contains("$fun")
                     || name.contains("$dtor")
                     || name.equals("mlx_error_handler_func")) {
                   entries.add(new Entry(name, Category.UPCALL));
+                } else {
+                  entries.add(new Entry(name, Category.LAYOUT));
                 }
               });
     }
@@ -289,10 +314,19 @@ public final class MlxApiInventory {
       String status,
       String facadeOrReason,
       String tests,
-      String probe) {
+      String probe,
+      Set<String> sources) {
     static List<Mapping> from(Map<?, ?> object) {
       Set<String> allowed =
-          Set.of("binding", "bindings", "category", "status", "facadeOrReason", "tests", "probe");
+          Set.of(
+              "binding",
+              "bindings",
+              "category",
+              "status",
+              "facadeOrReason",
+              "tests",
+              "probe",
+              "sources");
       if (!allowed.containsAll(object.keySet())) {
         throw new IllegalArgumentException("Inventory mapping record contains an unknown field");
       }
@@ -312,7 +346,8 @@ public final class MlxApiInventory {
                 status,
                 required(object, "facadeOrReason"),
                 required(object, "tests"),
-                optional(object, "probe")));
+                optional(object, "probe"),
+                sources(object)));
       }
       return mappings;
     }
@@ -341,6 +376,31 @@ public final class MlxApiInventory {
         bindings.add(binding);
       }
       return bindings;
+    }
+
+    private static Set<String> sources(Map<?, ?> object) {
+      Object value = object.get("sources");
+      if (value == null) {
+        return Set.of();
+      }
+      if (!(value instanceof List<?> values) || values.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Inventory mapping field 'sources' must be a non-empty array");
+      }
+      Set<String> sources = new TreeSet<>();
+      for (Object member : values) {
+        if (!(member instanceof String source)
+            || source.isBlank()
+            || source.startsWith("/")
+            || source.contains("..")
+            || source.contains("*")
+            || source.contains("?")) {
+          throw new IllegalArgumentException(
+              "Inventory mapping sources must be exact, relative paths without wildcards");
+        }
+        sources.add(source);
+      }
+      return Set.copyOf(sources);
     }
 
     private static String required(Map<?, ?> object, String field) {

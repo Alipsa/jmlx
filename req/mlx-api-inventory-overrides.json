@@ -7,35 +7,16 @@
         "mlx_h.mlx_array_ndim", "mlx_h.mlx_array_new", "mlx_h.mlx_array_new_bool",
         "mlx_h.mlx_array_new_data", "mlx_h.mlx_array_new_float32", "mlx_h.mlx_array_new_int",
         "mlx_h.mlx_array_set", "mlx_h.mlx_array_shape", "mlx_h.mlx_array_size", "mlx_h.mlx_astype",
-        "mlx_h.mlx_closure_free", "mlx_h.mlx_closure_new_func",
-        "mlx_h.mlx_closure_value_and_grad_apply", "mlx_h.mlx_closure_value_and_grad_free",
-        "mlx_h.mlx_closure_value_and_grad_new", "mlx_h.mlx_contiguous",
+        "mlx_h.mlx_contiguous",
         "mlx_h.mlx_default_cpu_stream_new", "mlx_h.mlx_default_gpu_stream_new",
         "mlx_h.mlx_dequantize", "mlx_h.mlx_device_free", "mlx_h.mlx_device_get_type",
         "mlx_h.mlx_device_new", "mlx_h.mlx_device_new_type", "mlx_h.mlx_eval",
-        "mlx_h.mlx_fast_layer_norm", "mlx_h.mlx_fast_rms_norm", "mlx_h.mlx_fast_rope",
-        "mlx_h.mlx_fast_scaled_dot_product_attention", "mlx_h.mlx_full", "mlx_h.mlx_get_active_memory",
-        "mlx_h.mlx_get_default_device", "mlx_h.mlx_get_default_stream", "mlx_h.mlx_io_gguf_free",
-        "mlx_h.mlx_io_gguf_get_array", "mlx_h.mlx_io_gguf_get_keys",
-        "mlx_h.mlx_io_gguf_get_metadata_array", "mlx_h.mlx_io_gguf_get_metadata_string",
-        "mlx_h.mlx_io_gguf_get_metadata_vector_string", "mlx_h.mlx_io_gguf_has_metadata_array",
-        "mlx_h.mlx_io_gguf_has_metadata_string", "mlx_h.mlx_io_gguf_has_metadata_vector_string",
-        "mlx_h.mlx_io_gguf_new", "mlx_h.mlx_io_gguf_set_array",
-        "mlx_h.mlx_io_gguf_set_metadata_array", "mlx_h.mlx_io_gguf_set_metadata_string",
-        "mlx_h.mlx_io_gguf_set_metadata_vector_string", "mlx_h.mlx_load_gguf",
-        "mlx_h.mlx_load_safetensors", "mlx_h.mlx_map_string_to_array_free",
-        "mlx_h.mlx_map_string_to_array_insert", "mlx_h.mlx_map_string_to_array_iterator_free",
-        "mlx_h.mlx_map_string_to_array_iterator_new", "mlx_h.mlx_map_string_to_array_iterator_next",
-        "mlx_h.mlx_map_string_to_array_new", "mlx_h.mlx_map_string_to_string_free",
-        "mlx_h.mlx_map_string_to_string_insert", "mlx_h.mlx_map_string_to_string_iterator_free",
-        "mlx_h.mlx_map_string_to_string_iterator_new", "mlx_h.mlx_map_string_to_string_iterator_next",
-        "mlx_h.mlx_map_string_to_string_new", "mlx_h.mlx_ones", "mlx_h.mlx_quantize",
-        "mlx_h.mlx_quantized_matmul", "mlx_h.mlx_random_normal", "mlx_h.mlx_random_seed",
-        "mlx_h.mlx_random_uniform", "mlx_h.mlx_reshape", "mlx_h.mlx_save_gguf",
-        "mlx_h.mlx_save_safetensors", "mlx_h.mlx_set_default_device", "mlx_h.mlx_set_error_handler",
+        "mlx_h.mlx_full", "mlx_h.mlx_get_active_memory",
+        "mlx_h.mlx_get_default_device", "mlx_h.mlx_get_default_stream", "mlx_h.mlx_ones", "mlx_h.mlx_reshape",
+        "mlx_h.mlx_set_default_device", "mlx_h.mlx_set_error_handler",
         "mlx_h.mlx_slice", "mlx_h.mlx_softmax_axis", "mlx_h.mlx_sort_axis", "mlx_h.mlx_split",
         "mlx_h.mlx_stream_new", "mlx_h.mlx_string_data", "mlx_h.mlx_string_free",
-        "mlx_h.mlx_string_new", "mlx_h.mlx_sum", "mlx_h.mlx_take_axis", "mlx_h.mlx_value_and_grad",
+        "mlx_h.mlx_string_new", "mlx_h.mlx_sum", "mlx_h.mlx_take_axis",
         "mlx_h.mlx_vector_array_free", "mlx_h.mlx_vector_array_get", "mlx_h.mlx_vector_array_new",
         "mlx_h.mlx_vector_array_new_data", "mlx_h.mlx_vector_array_set_data",
         "mlx_h.mlx_vector_array_size", "mlx_h.mlx_vector_string_append_value",
@@ -49,7 +30,71 @@
     },
     {
       "bindings": [
-        "mlx_h.mlx_argmax_axis", "mlx_h.mlx_argpartition_axis", "mlx_h.mlx_argsort_axis",
+        "mlx_h.mlx_io_gguf_free", "mlx_h.mlx_io_gguf_get_array", "mlx_h.mlx_io_gguf_get_keys",
+        "mlx_h.mlx_io_gguf_get_metadata_array", "mlx_h.mlx_io_gguf_get_metadata_string",
+        "mlx_h.mlx_io_gguf_get_metadata_vector_string", "mlx_h.mlx_io_gguf_has_metadata_array",
+        "mlx_h.mlx_io_gguf_has_metadata_string", "mlx_h.mlx_io_gguf_has_metadata_vector_string",
+        "mlx_h.mlx_io_gguf_new", "mlx_h.mlx_io_gguf_set_array",
+        "mlx_h.mlx_io_gguf_set_metadata_array", "mlx_h.mlx_io_gguf_set_metadata_string",
+        "mlx_h.mlx_io_gguf_set_metadata_vector_string", "mlx_h.mlx_load_gguf",
+        "mlx_h.mlx_load_safetensors", "mlx_h.mlx_map_string_to_array_free",
+        "mlx_h.mlx_map_string_to_array_insert", "mlx_h.mlx_map_string_to_array_iterator_free",
+        "mlx_h.mlx_map_string_to_array_iterator_new", "mlx_h.mlx_map_string_to_array_iterator_next",
+        "mlx_h.mlx_map_string_to_array_new", "mlx_h.mlx_map_string_to_string_free",
+        "mlx_h.mlx_map_string_to_string_insert", "mlx_h.mlx_map_string_to_string_iterator_free",
+        "mlx_h.mlx_map_string_to_string_iterator_new", "mlx_h.mlx_map_string_to_string_iterator_next",
+        "mlx_h.mlx_map_string_to_string_new", "mlx_h.mlx_save_gguf", "mlx_h.mlx_save_safetensors"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXIO",
+      "tests": "MLXIOTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_closure_free", "mlx_h.mlx_closure_new_func",
+        "mlx_h.mlx_closure_value_and_grad_apply", "mlx_h.mlx_closure_value_and_grad_free",
+        "mlx_h.mlx_closure_value_and_grad_new", "mlx_h.mlx_value_and_grad"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXGrad",
+      "tests": "MLXGradTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_fast_layer_norm", "mlx_h.mlx_fast_rms_norm", "mlx_h.mlx_fast_rope",
+        "mlx_h.mlx_fast_scaled_dot_product_attention"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXFast",
+      "tests": "MLXFastTest"
+    },
+    {
+      "bindings": ["mlx_h.mlx_quantize", "mlx_h.mlx_quantized_matmul"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXQuant",
+      "tests": "MLXQuantTest"
+    },
+    {
+      "bindings": ["mlx_h.mlx_random_normal", "mlx_h.mlx_random_seed", "mlx_h.mlx_random_uniform"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXRandom",
+      "tests": "MLXRandomTest"
+    },
+    {
+      "bindings": ["mlx_h.mlx_argmax_axis"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXOps.argmaxAxis",
+      "tests": "MLXOpsTest; SelectionAndRandomProbeTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_argpartition_axis", "mlx_h.mlx_argsort_axis",
         "mlx_h.mlx_partition_axis", "mlx_h.mlx_random_categorical", "mlx_h.mlx_random_key",
         "mlx_h.mlx_random_split_num", "mlx_h.mlx_topk_axis"
       ],
@@ -57,7 +102,8 @@
       "status": "planned",
       "facadeOrReason": "Phase 6.1 selection/random candidate; direct use is probe-only",
       "tests": "SelectionAndRandomProbeTest",
-      "probe": "req/plans/phase6-0b-probe-findings.md"
+      "probe": "req/plans/phase6-0b-probe-findings.md",
+      "sources": ["jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java"]
     },
     {
       "bindings": [

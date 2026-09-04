@@ -8,17 +8,21 @@ row is reporting only: handwritten use requires an explicit mapping record.
 
 - mlx-metal: `0.31.2`
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
-- generated entries: 696
-- by category: downcall=616, constant=23, layout/accessor=34, upcall interface=23
-- by status: implemented=117, planned=8, unplanned=571
+- generated entries: 731
+- by category: downcall=616, constant=23, layout/accessor=69, upcall interface=23
+- by status: implemented=118, planned=7, unplanned=606
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe |
 | --- | --- | --- | --- | --- | --- |
+| `mlx_array` | layout/accessor | unplanned | — | — | — |
 | `mlx_array_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
 | `mlx_array_new_data_managed$dtor` | upcall interface | unplanned | — | — | — |
 | `mlx_array_new_data_managed_payload$dtor` | upcall interface | unplanned | — | — | — |
+| `mlx_closure` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
+| `mlx_closure_custom` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_custom_` | layout/accessor | unplanned | — | — | — |
+| `mlx_closure_custom_jvp` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_custom_jvp_` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_custom_jvp_new_func$fun` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_custom_jvp_new_func_payload$dtor` | upcall interface | unplanned | — | — | — |
@@ -26,10 +30,12 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_closure_custom_new_func$fun` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_custom_new_func_payload$dtor` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_custom_new_func_payload$fun` | upcall interface | unplanned | — | — | — |
+| `mlx_closure_custom_vmap` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_custom_vmap_` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_custom_vmap_new_func$fun` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_custom_vmap_new_func_payload$dtor` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_custom_vmap_new_func_payload$fun` | upcall interface | unplanned | — | — | — |
+| `mlx_closure_kwargs` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_kwargs_` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_kwargs_new_func$fun` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_kwargs_new_func_payload$dtor` | upcall interface | unplanned | — | — | — |
@@ -38,19 +44,29 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_closure_new_func_payload$dtor` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_new_func_payload$fun` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_new_unary$fun` | upcall interface | unplanned | — | — | — |
+| `mlx_closure_value_and_grad` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_value_and_grad_` | layout/accessor | unplanned | — | — | — |
 | `mlx_closure_value_and_grad_new_func$fun` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_value_and_grad_new_func_payload$dtor` | upcall interface | unplanned | — | — | — |
 | `mlx_closure_value_and_grad_new_func_payload$fun` | upcall interface | unplanned | — | — | — |
+| `mlx_device` | layout/accessor | unplanned | — | — | — |
 | `mlx_device_` | layout/accessor | unplanned | — | — | — |
+| `mlx_device_info` | layout/accessor | unplanned | — | — | — |
 | `mlx_device_info_` | layout/accessor | unplanned | — | — | — |
+| `mlx_distributed_group` | layout/accessor | unplanned | — | — | — |
 | `mlx_distributed_group_` | layout/accessor | unplanned | — | — | — |
 | `mlx_error_handler_func` | upcall interface | unplanned | — | — | — |
+| `mlx_fast_cuda_kernel` | layout/accessor | unplanned | — | — | — |
 | `mlx_fast_cuda_kernel_` | layout/accessor | unplanned | — | — | — |
+| `mlx_fast_cuda_kernel_config` | layout/accessor | unplanned | — | — | — |
 | `mlx_fast_cuda_kernel_config_` | layout/accessor | unplanned | — | — | — |
+| `mlx_fast_metal_kernel` | layout/accessor | unplanned | — | — | — |
 | `mlx_fast_metal_kernel_` | layout/accessor | unplanned | — | — | — |
+| `mlx_fast_metal_kernel_config` | layout/accessor | unplanned | — | — | — |
 | `mlx_fast_metal_kernel_config_` | layout/accessor | unplanned | — | — | — |
+| `mlx_function_exporter` | layout/accessor | unplanned | — | — | — |
 | `mlx_function_exporter_` | layout/accessor | unplanned | — | — | — |
+| `mlx_h$shared` | layout/accessor | unplanned | — | — | — |
 | `mlx_h.MLX_BFLOAT16` | constant | implemented | Existing dtype/device facade support | Existing module tests | — |
 | `mlx_h.MLX_BOOL` | constant | implemented | Existing dtype/device facade support | Existing module tests | — |
 | `mlx_h.MLX_COMPILE_MODE_DISABLED` | constant | unplanned | — | — | — |
@@ -98,7 +114,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_arctan2` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_arctanh` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_argmax` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_argmax_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md |
+| `mlx_h.mlx_argmax_axis` | downcall | implemented | MLXOps.argmaxAxis | MLXOpsTest; SelectionAndRandomProbeTest | — |
 | `mlx_h.mlx_argmin` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_argmin_axis` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_argpartition` | downcall | unplanned | — | — | — |
@@ -201,7 +217,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_closure_custom_vmap_new_func` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_custom_vmap_new_func_payload` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_custom_vmap_set` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_closure_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_closure_free` | downcall | implemented | MLXGrad | MLXGradTest | — |
 | `mlx_h.mlx_closure_kwargs_apply` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_kwargs_free` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_kwargs_new` | downcall | unplanned | — | — | — |
@@ -209,13 +225,13 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_closure_kwargs_new_func_payload` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_kwargs_set` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_new` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_closure_new_func` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_closure_new_func` | downcall | implemented | MLXGrad | MLXGradTest | — |
 | `mlx_h.mlx_closure_new_func_payload` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_new_unary` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_set` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_closure_value_and_grad_apply` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_closure_value_and_grad_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_closure_value_and_grad_new` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_closure_value_and_grad_apply` | downcall | implemented | MLXGrad | MLXGradTest | — |
+| `mlx_h.mlx_closure_value_and_grad_free` | downcall | implemented | MLXGrad | MLXGradTest | — |
+| `mlx_h.mlx_closure_value_and_grad_new` | downcall | implemented | MLXGrad | MLXGradTest | — |
 | `mlx_h.mlx_closure_value_and_grad_new_func` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_value_and_grad_new_func_payload` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_closure_value_and_grad_set` | downcall | unplanned | — | — | — |
@@ -317,7 +333,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fast_cuda_kernel_config_set_verbose` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_free` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_new` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_fast_layer_norm` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_fast_layer_norm` | downcall | implemented | MLXFast | MLXFastTest | — |
 | `mlx_h.mlx_fast_metal_kernel_apply` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fast_metal_kernel_config_add_output_arg` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fast_metal_kernel_config_add_template_arg_bool` | downcall | unplanned | — | — | — |
@@ -331,10 +347,10 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fast_metal_kernel_config_set_verbose` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fast_metal_kernel_free` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fast_metal_kernel_new` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_fast_rms_norm` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_fast_rope` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_fast_rms_norm` | downcall | implemented | MLXFast | MLXFastTest | — |
+| `mlx_h.mlx_fast_rope` | downcall | implemented | MLXFast | MLXFastTest | — |
 | `mlx_h.mlx_fast_rope_dynamic` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_fast_scaled_dot_product_attention` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_fast_scaled_dot_product_attention` | downcall | implemented | MLXFast | MLXFastTest | — |
 | `mlx_h.mlx_fft_fft` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fft_fft2` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_fft_fftfreq` | downcall | unplanned | — | — | — |
@@ -383,20 +399,20 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_imported_function_free` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_imported_function_new` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_inner` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_io_gguf_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_get_array` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_get_keys` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_get_metadata_array` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_get_metadata_string` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_get_metadata_vector_string` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_has_metadata_array` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_has_metadata_string` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_has_metadata_vector_string` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_new` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_set_array` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_set_metadata_array` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_set_metadata_string` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_io_gguf_set_metadata_vector_string` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_io_gguf_free` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_get_array` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_get_keys` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_get_metadata_array` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_get_metadata_string` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_get_metadata_vector_string` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_has_metadata_array` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_has_metadata_string` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_has_metadata_vector_string` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_new` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_set_array` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_set_metadata_array` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_set_metadata_string` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_io_gguf_set_metadata_vector_string` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_io_reader_descriptor` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_io_reader_free` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_io_reader_new` | downcall | unplanned | — | — | — |
@@ -437,9 +453,9 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_linalg_tri_inv` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_linspace` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_load` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_load_gguf` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_load_gguf` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_load_reader` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_load_safetensors` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_load_safetensors` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_load_safetensors_reader` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_log` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_log10` | downcall | unplanned | — | — | — |
@@ -453,21 +469,21 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_logsumexp` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_logsumexp_axes` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_logsumexp_axis` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_map_string_to_array_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_map_string_to_array_free` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_map_string_to_array_get` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_map_string_to_array_insert` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_array_iterator_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_array_iterator_new` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_array_iterator_next` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_array_new` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_map_string_to_array_insert` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_array_iterator_free` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_array_iterator_new` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_array_iterator_next` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_array_new` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_map_string_to_array_set` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_map_string_to_string_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_map_string_to_string_free` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_map_string_to_string_get` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_map_string_to_string_insert` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_string_iterator_free` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_string_iterator_new` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_string_iterator_next` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_map_string_to_string_new` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_map_string_to_string_insert` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_string_iterator_free` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_string_iterator_new` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_string_iterator_next` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_map_string_to_string_new` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_map_string_to_string_set` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_masked_scatter` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_matmul` | downcall | unplanned | — | — | — |
@@ -510,8 +526,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_prod_axis` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_put_along_axis` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_qqmm` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_quantize` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_quantized_matmul` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_quantize` | downcall | implemented | MLXQuant | MLXQuantTest | — |
+| `mlx_h.mlx_quantized_matmul` | downcall | implemented | MLXQuant | MLXQuantTest | — |
 | `mlx_h.mlx_radians` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_bernoulli` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_bits` | downcall | unplanned | — | — | — |
@@ -522,16 +538,16 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_random_key` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md |
 | `mlx_h.mlx_random_laplace` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_multivariate_normal` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_random_normal` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_random_normal` | downcall | implemented | MLXRandom | MLXRandomTest | — |
 | `mlx_h.mlx_random_normal_broadcast` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_permutation` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_permutation_arange` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_randint` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_random_seed` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_random_seed` | downcall | implemented | MLXRandom | MLXRandomTest | — |
 | `mlx_h.mlx_random_split` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_random_split_num` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md |
 | `mlx_h.mlx_random_truncated_normal` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_random_uniform` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_random_uniform` | downcall | implemented | MLXRandom | MLXRandomTest | — |
 | `mlx_h.mlx_real` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_reciprocal` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_remainder` | downcall | unplanned | — | — | — |
@@ -546,8 +562,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_round` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_rsqrt` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_save` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_save_gguf` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
-| `mlx_h.mlx_save_safetensors` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_save_gguf` | downcall | implemented | MLXIO | MLXIOTest | — |
+| `mlx_h.mlx_save_safetensors` | downcall | implemented | MLXIO | MLXIOTest | — |
 | `mlx_h.mlx_save_safetensors_writer` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_save_writer` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_scatter` | downcall | unplanned | — | — | — |
@@ -636,7 +652,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_tril` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_triu` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_unflatten` | downcall | unplanned | — | — | — |
-| `mlx_h.mlx_value_and_grad` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
+| `mlx_h.mlx_value_and_grad` | downcall | implemented | MLXGrad | MLXGradTest | — |
 | `mlx_h.mlx_var` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_var_axes` | downcall | unplanned | — | — | — |
 | `mlx_h.mlx_var_axis` | downcall | unplanned | — | — | — |
@@ -690,23 +706,42 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_where` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
 | `mlx_h.mlx_zeros` | downcall | implemented | Existing handwritten core/FFI facade support | Existing module tests | — |
 | `mlx_h.mlx_zeros_like` | downcall | unplanned | — | — | — |
+| `mlx_imported_function` | layout/accessor | unplanned | — | — | — |
 | `mlx_imported_function_` | layout/accessor | unplanned | — | — | — |
+| `mlx_io_gguf` | layout/accessor | unplanned | — | — | — |
 | `mlx_io_gguf_` | layout/accessor | unplanned | — | — | — |
+| `mlx_io_reader` | layout/accessor | unplanned | — | — | — |
 | `mlx_io_reader_` | layout/accessor | unplanned | — | — | — |
+| `mlx_io_vtable` | layout/accessor | unplanned | — | — | — |
 | `mlx_io_vtable_` | layout/accessor | unplanned | — | — | — |
+| `mlx_io_writer` | layout/accessor | unplanned | — | — | — |
 | `mlx_io_writer_` | layout/accessor | unplanned | — | — | — |
+| `mlx_map_string_to_array` | layout/accessor | unplanned | — | — | — |
 | `mlx_map_string_to_array_` | layout/accessor | unplanned | — | — | — |
+| `mlx_map_string_to_array_iterator` | layout/accessor | unplanned | — | — | — |
 | `mlx_map_string_to_array_iterator_` | layout/accessor | unplanned | — | — | — |
+| `mlx_map_string_to_string` | layout/accessor | unplanned | — | — | — |
 | `mlx_map_string_to_string_` | layout/accessor | unplanned | — | — | — |
+| `mlx_map_string_to_string_iterator` | layout/accessor | unplanned | — | — | — |
 | `mlx_map_string_to_string_iterator_` | layout/accessor | unplanned | — | — | — |
+| `mlx_node_namer` | layout/accessor | unplanned | — | — | — |
 | `mlx_node_namer_` | layout/accessor | unplanned | — | — | — |
+| `mlx_optional_dtype` | layout/accessor | unplanned | — | — | — |
 | `mlx_optional_dtype_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
+| `mlx_optional_float` | layout/accessor | unplanned | — | — | — |
 | `mlx_optional_float_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
+| `mlx_optional_int` | layout/accessor | unplanned | — | — | — |
 | `mlx_optional_int_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
 | `mlx_set_error_handler$dtor` | upcall interface | unplanned | — | — | — |
+| `mlx_stream` | layout/accessor | unplanned | — | — | — |
 | `mlx_stream_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
+| `mlx_string` | layout/accessor | unplanned | — | — | — |
 | `mlx_string_` | layout/accessor | unplanned | — | — | — |
+| `mlx_vector_array` | layout/accessor | unplanned | — | — | — |
 | `mlx_vector_array_` | layout/accessor | implemented | Existing handwritten core/FFI implementation infrastructure | Existing module tests | — |
+| `mlx_vector_int` | layout/accessor | unplanned | — | — | — |
 | `mlx_vector_int_` | layout/accessor | unplanned | — | — | — |
+| `mlx_vector_string` | layout/accessor | unplanned | — | — | — |
 | `mlx_vector_string_` | layout/accessor | unplanned | — | — | — |
+| `mlx_vector_vector_array` | layout/accessor | unplanned | — | — | — |
 | `mlx_vector_vector_array_` | layout/accessor | unplanned | — | — | — |

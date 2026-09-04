@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.buildsrc;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,7 +53,7 @@ class MlxApiInventoryTest {
   @Test
   void callSiteGuardRejectsOnlyUnmappedSyntaxUses() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
-    Path source = root.resolve("sample/Example.java");
+    Path source = root.resolve("jmlx-core/src/main/java/sample/Example.java");
     Files.createDirectories(source.getParent());
     Files.writeString(
         source,
@@ -73,6 +74,67 @@ class MlxApiInventoryTest {
 
     assertTrue(failure.getMessage().contains("mlx_h.mlx_array_free"));
     assertTrue(!failure.getMessage().contains("mlx_h.mlx_missing"));
+  }
+
+  @Test
+  void callSiteGuardRejectsGeneratedAliasesQualifiedUsesAndStarImports() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+    Files.writeString(
+        root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_array.java"), "");
+    Path source = root.resolve("jmlx-core/src/main/java/sample/Example.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(
+        source,
+        """
+        import se.alipsa.jmlx.ffi.*;
+        class Example {
+          void use(java.lang.foreign.MemorySegment segment) {
+            se.alipsa.jmlx.ffi.mlx_array.ctx(segment);
+          }
+        }
+        """);
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
+
+    assertTrue(failure.getMessage().contains("mlx_array"));
+    assertTrue(failure.getMessage().contains("star imports are not allowed"));
+  }
+
+  @Test
+  void callSiteGuardRestrictsScopedMappingsToTheirExactSource() throws Exception {
+    String mappings =
+        "{\"records\":[{\"binding\":\"mlx_h.mlx_array_free\",\"category\":\"downcall\","
+            + "\"status\":\"planned\",\"facadeOrReason\":\"probe\",\"tests\":\"test\","
+            + "\"sources\":[\"jmlx-core/src/test/java/sample/Allowed.java\"]}]}";
+    Path root = fixture(mappings);
+    Path source = root.resolve("jmlx-core/src/main/java/sample/Disallowed.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(
+        source,
+        "import se.alipsa.jmlx.ffi.mlx_h; class Disallowed { void use() { mlx_h.mlx_array_free(); }"
+            + " }");
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
+
+    assertTrue(failure.getMessage().contains("mlx_h.mlx_array_free"));
+  }
+
+  @Test
+  void callSiteGuardExcludesGeneratedSourcesAndNamedJextractInfrastructure() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+    Files.writeString(
+        root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/Generated.java"),
+        "class Generated { void use() { mlx_h.mlx_array_free(); } }");
+    Path source = root.resolve("jmlx-core/src/main/java/sample/Infrastructure.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(
+        source,
+        "import se.alipsa.jmlx.ffi.mlx_h; class Infrastructure { Object value = mlx_h.C_POINTER;"
+            + " }");
+
+    assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
   }
 
   private Path fixture(String mappings) throws IOException {

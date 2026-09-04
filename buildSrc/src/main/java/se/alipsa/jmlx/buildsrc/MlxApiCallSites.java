@@ -30,16 +30,19 @@ import javax.tools.ToolProvider;
 public final class MlxApiCallSites {
 
   private static final String FFI_PACKAGE = "se.alipsa.jmlx.ffi.";
+  private static final String FFI_PACKAGE_NAME = "se.alipsa.jmlx.ffi";
   private static final String GENERATED_DIRECTORY = "jmlx-ffi/src/main/generated/java";
+  private static final Set<String> MLX_H_INFRASTRUCTURE = Set.of("upcallHandle");
 
   private MlxApiCallSites() {}
 
   /** Fails with every unrecorded generated-binding use in handwritten Java source. */
   public static void verify(Path repositoryRoot) throws IOException {
-    Set<String> mapped = MlxApiInventory.explicitMappings(repositoryRoot);
+    Map<String, Set<String>> mappingSources = MlxApiInventory.mappingSources(repositoryRoot);
+    Set<String> generatedTypes = MlxApiInventory.generatedTypes(repositoryRoot);
     List<Violation> violations = new ArrayList<>();
     for (Path source : handwrittenJavaSources(repositoryRoot)) {
-      violations.addAll(scan(repositoryRoot, source, mapped));
+      violations.addAll(scan(repositoryRoot, source, mappingSources, generatedTypes));
     }
     if (!violations.isEmpty()) {
       violations.sort(Comparator.comparing(Violation::path).thenComparingLong(Violation::line));
@@ -62,14 +65,22 @@ public final class MlxApiCallSites {
     try (Stream<Path> paths = Files.walk(repositoryRoot)) {
       return paths
           .filter(path -> path.toString().endsWith(".java"))
-          .filter(path -> !repositoryRoot.relativize(path).startsWith(GENERATED_DIRECTORY))
-          .filter(path -> !path.toString().contains("/build/"))
+          .filter(
+              path -> {
+                Path relative = repositoryRoot.relativize(path);
+                return !relative.startsWith(GENERATED_DIRECTORY)
+                    && relative.toString().matches(".*(^|/)src/(main|test|testFixtures)/java/.*");
+              })
           .sorted()
           .toList();
     }
   }
 
-  private static List<Violation> scan(Path repositoryRoot, Path source, Set<String> mapped)
+  private static List<Violation> scan(
+      Path repositoryRoot,
+      Path source,
+      Map<String, Set<String>> mappingSources,
+      Set<String> generatedTypes)
       throws IOException {
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     if (compiler == null) {
@@ -84,7 +95,8 @@ public final class MlxApiCallSites {
       SourcePositions positions = Trees.instance(task).getSourcePositions();
       List<Violation> violations = new ArrayList<>();
       for (CompilationUnitTree unit : units) {
-        new Scanner(repositoryRoot, unit, positions, mapped, violations).scan(unit, null);
+        new Scanner(repositoryRoot, unit, positions, mappingSources, generatedTypes, violations)
+            .scan(unit, null);
       }
       return violations;
     }
@@ -96,7 +108,8 @@ public final class MlxApiCallSites {
     private final Path repositoryRoot;
     private final CompilationUnitTree unit;
     private final SourcePositions positions;
-    private final Set<String> mapped;
+    private final Map<String, Set<String>> mappingSources;
+    private final Set<String> generatedTypes;
     private final List<Violation> violations;
     private final Map<String, String> imports = new HashMap<>();
     private final Set<String> seen = new HashSet<>();
@@ -105,12 +118,14 @@ public final class MlxApiCallSites {
         Path repositoryRoot,
         CompilationUnitTree unit,
         SourcePositions positions,
-        Set<String> mapped,
+        Map<String, Set<String>> mappingSources,
+        Set<String> generatedTypes,
         List<Violation> violations) {
       this.repositoryRoot = repositoryRoot;
       this.unit = unit;
       this.positions = positions;
-      this.mapped = mapped;
+      this.mappingSources = mappingSources;
+      this.generatedTypes = generatedTypes;
       this.violations = violations;
       readImports(unit.getImports());
     }
@@ -120,9 +135,16 @@ public final class MlxApiCallSites {
       String owner = tree.getExpression().toString();
       String member = tree.getIdentifier().toString();
       if (owner.equals("mlx_h") || owner.endsWith(".mlx_h")) {
-        record("mlx_h." + member, tree, member.startsWith("mlx_") || member.startsWith("MLX_"));
-      } else if (owner.startsWith(FFI_PACKAGE) && isGeneratedType(member)) {
-        record(member, tree, true);
+        if (member.startsWith("mlx_") || member.startsWith("MLX_")) {
+          record("mlx_h." + member, tree);
+        } else if (!isNamedInfrastructure(member) && !member.contains("$")) {
+          record("mlx_h." + member, tree);
+        }
+      } else if (owner.startsWith(FFI_PACKAGE)) {
+        String type = owner.substring(owner.lastIndexOf('.') + 1);
+        if (generatedTypes.contains(type)) {
+          record(type, tree);
+        }
       }
       return super.visitMemberSelect(tree, unused);
     }
@@ -131,7 +153,7 @@ public final class MlxApiCallSites {
     public Void visitIdentifier(IdentifierTree tree, Void unused) {
       String identity = imports.get(tree.getName().toString());
       if (identity != null) {
-        record(identity, tree, true);
+        record(identity, tree);
       }
       return super.visitIdentifier(tree, unused);
     }
@@ -143,27 +165,38 @@ public final class MlxApiCallSites {
           continue;
         }
         String suffix = imported.substring(FFI_PACKAGE.length());
+        if (suffix.equals("*") || suffix.endsWith(".*")) {
+          rejectStarImport(importTree);
+          continue;
+        }
         if (importTree.isStatic()) {
           if (suffix.startsWith("mlx_h.mlx_") || suffix.startsWith("mlx_h.MLX_")) {
-            record("mlx_h." + suffix.substring("mlx_h.".length()), importTree, true);
+            record("mlx_h." + suffix.substring("mlx_h.".length()), importTree);
           }
-        } else if (isGeneratedType(suffix)) {
+        } else if (generatedTypes.contains(suffix)) {
           imports.put(suffix, suffix);
         }
       }
     }
 
-    private static boolean isGeneratedType(String name) {
-      return name.endsWith("_")
-          || name.contains("$fun")
-          || name.contains("$dtor")
-          || name.equals("mlx_error_handler_func");
+    private static boolean isNamedInfrastructure(String member) {
+      return member.startsWith("C_") || MLX_H_INFRASTRUCTURE.contains(member);
     }
 
-    private void record(String identity, Tree tree, boolean generatedIdentity) {
-      if (!generatedIdentity || mapped.contains(identity)) {
+    private void record(String identity, Tree tree) {
+      Set<String> sources = mappingSources.get(identity);
+      String source = repositoryRoot.relativize(Path.of(unit.getSourceFile().toUri())).toString();
+      if (sources != null && (sources.isEmpty() || sources.contains(source))) {
         return;
       }
+      addViolation(identity, tree);
+    }
+
+    private void rejectStarImport(ImportTree tree) {
+      addViolation(FFI_PACKAGE_NAME + ".* (star imports are not allowed)", tree);
+    }
+
+    private void addViolation(String identity, Tree tree) {
       long position = positions.getStartPosition(unit, tree);
       long line = unit.getLineMap().getLineNumber(position);
       String key = line + ":" + identity;

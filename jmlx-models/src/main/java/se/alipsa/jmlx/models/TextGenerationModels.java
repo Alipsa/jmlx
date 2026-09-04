@@ -28,6 +28,7 @@ public final class TextGenerationModels {
       throw new IllegalArgumentException(
           "expected model_type " + expectedModelType + ", got " + config.modelType());
     }
+    // Keeps legacy typed entry points safe if a future descriptor mapping changes its model class.
     return expectedClass.cast(loadDecoder(scope, directory, config));
   }
 

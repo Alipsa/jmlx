@@ -6,16 +6,17 @@ import java.util.function.Consumer;
  * Public local text-generation API. Native work runs only on the generation scope's owner thread.
  */
 public interface TextGenerationModel extends AutoCloseable {
-  /** Returns the architecture configuration declared by this checkpoint. */
-  DecoderConfig config();
+  /** Returns stable metadata without exposing an architecture-specific configuration type. */
+  ModelMetadata metadata();
 
   /**
    * Generates tokens and synchronously sends token events followed by one terminal event to {@code
    * listener}. EOS has precedence when a token belongs to both EOS and stop sets; neither
-   * terminating token is sent as a token event. If a token listener throws, generation aborts, its
-   * native scopes are closed, and a {@link GenerationAbortedException} exposes the partial token
-   * sequence. A terminal-listener exception is logged because generation has already completed and
-   * its result remains available.
+   * terminating token is sent as a token event. For legacy compatibility, an EOS ID remains in
+   * {@link GenerationResult#generatedTokenIds()}, while an explicit stop-token ID is excluded. If a
+   * token listener throws, generation aborts, its native scopes are closed, and a {@link
+   * GenerationAbortedException} exposes the partial token sequence. A terminal-listener exception
+   * is logged because generation has already completed and its result remains available.
    */
   GenerationResult generate(GenerationRequest request, Consumer<GenerationEvent> listener);
 

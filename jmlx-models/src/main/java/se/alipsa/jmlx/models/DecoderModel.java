@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,6 +26,7 @@ import se.alipsa.jmlx.tokenizer.HfTokenizer;
 public abstract class DecoderModel extends Module implements TextGenerationModel {
   private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
   private final DecoderConfig config;
+  private final ModelMetadata metadata;
   private final Embedding embedding;
   private final List<DecoderBlock> layers;
   private final RMSNorm norm;
@@ -50,6 +52,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       boolean outBiasRequired) {
     super(scope);
     this.config = Objects.requireNonNull(config, "config");
+    metadata = new ModelMetadata(config.modelType(), config.vocabSize(), config.numHiddenLayers());
     embedding =
         child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
     boolean mlpBiasExpected = config.mlpBias();
@@ -101,9 +104,13 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   /** Returns the architecture configuration this model was built from. */
-  @Override
   public final DecoderConfig config() {
     return config;
+  }
+
+  @Override
+  public final ModelMetadata metadata() {
+    return metadata;
   }
 
   /**
@@ -217,7 +224,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private static List<Integer> toList(int[] ids) {
-    return java.util.Arrays.stream(ids).boxed().toList();
+    return Arrays.stream(ids).boxed().toList();
   }
 
   private static void requireGreedy(GenerationConfig config) {

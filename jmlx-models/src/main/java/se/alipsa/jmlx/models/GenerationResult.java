@@ -2,9 +2,11 @@ package se.alipsa.jmlx.models;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Immutable result of a completed generation, retaining prompt and generated token IDs separately.
+ * For legacy compatibility, EOS is retained in generated IDs; an explicit stop token is excluded.
  */
 public record GenerationResult(
     List<Integer> promptTokenIds,
@@ -21,7 +23,6 @@ public record GenerationResult(
 
   /** Returns prompt followed by generated IDs. */
   public List<Integer> tokenIds() {
-    return java.util.stream.Stream.concat(promptTokenIds.stream(), generatedTokenIds.stream())
-        .toList();
+    return Stream.concat(promptTokenIds.stream(), generatedTokenIds.stream()).toList();
   }
 }

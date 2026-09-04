@@ -1,7 +1,6 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +34,7 @@ class LlamaModelTest {
       assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
       assertThrows(IllegalArgumentException.class, () -> model.generate(null, 2, Set.of()));
       TextGenerationModel common = TextGenerationModels.load(modelScope, dir);
-      assertEquals(4, common.config().vocabSize());
+      assertEquals(4, common.metadata().vocabSize());
       List<GenerationEvent> events = new ArrayList<>();
       GenerationResult result =
           common.generate(
@@ -105,7 +104,6 @@ class LlamaModelTest {
       AtomicBoolean cancelled = new AtomicBoolean();
       AtomicReference<Thread> pollingThread = new AtomicReference<>();
       AtomicReference<Thread> generationThread = new AtomicReference<>();
-      AtomicReference<Thread> cancellingThread = new AtomicReference<>();
       GenerationResult cancelledResult =
           model.generate(
               new GenerationRequest(
@@ -121,7 +119,6 @@ class LlamaModelTest {
                     Thread.ofPlatform()
                         .start(
                             () -> {
-                              cancellingThread.set(Thread.currentThread());
                               cancelled.set(true);
                             });
                 try {
@@ -135,7 +132,6 @@ class LlamaModelTest {
       assertEquals(List.of(0), cancelledResult.generatedTokenIds());
       assertEquals(Thread.currentThread(), pollingThread.get());
       assertEquals(Thread.currentThread(), generationThread.get());
-      assertNotSame(cancellingThread.get(), generationThread.get());
     }
   }
 

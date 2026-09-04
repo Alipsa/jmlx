@@ -7,6 +7,7 @@
  */
 
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
+import se.alipsa.jmlx.buildsrc.MlxApiCallSites
 
 plugins {
     id 'base'
@@ -19,7 +20,8 @@ tasks.register('generateMlxApiInventory') {
     description = 'Generates the checked-in MLX binding inventory from committed sources.'
     def output = layout.projectDirectory.file('req/mlx-api-inventory.md')
     inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
-    inputs.file(layout.projectDirectory.file('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java'))
+    inputs.dir(layout.projectDirectory.dir('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi'))
+    inputs.file(layout.projectDirectory.file('req/mlx-api-inventory-overrides.json'))
     outputs.file(output)
     doLast {
         MlxApiInventory.write(projectDir.toPath(), output.asFile.toPath())
@@ -60,11 +62,21 @@ tasks.named('verifyMlxApiInventory') {
     mustRunAfter tasks.named('generateMlxApiInventory')
 }
 
+// This source-only guard deliberately has no compile dependency: it parses handwritten Java with
+// the JDK compiler tree API, so Ubuntu can run it without resolving the Java 25 project toolchain.
+tasks.register('verifyMlxApiCallSites') {
+    group = 'verification'
+    description = 'Fails when handwritten Java reaches an unrecorded generated MLX binding.'
+    doLast {
+        MlxApiCallSites.verify(projectDir.toPath())
+    }
+}
+
 tasks.named('check') {
     // The root has no Java lifecycle plugin. Applying `base` creates this `check` lifecycle task
     // so repository-wide verifications can run once from CI without pretending that a module-local
     // check covers handwritten source in every module.
-    dependsOn tasks.named('verifyMlxApiInventory')
+    dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites')
 }
 
 allprojects {

@@ -153,6 +153,27 @@ class MlxApiInventoryTest {
 
     assertTrue(
         failure.getMessage().contains("remove the stale inventory mapping"), failure::getMessage);
+    assertTrue(failure.getMessage().contains("MLX binding inventory guard failures"));
+  }
+
+  @Test
+  void callSiteGuardAllowsDocumentationOnlyMappingsWithoutUses() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "unsupported-by-runtime"));
+
+    assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
+  }
+
+  @Test
+  void rejectsVariadicCandidatesThatDoNotMatchTheInvokerShape() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+    Path binding = root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java");
+    Files.writeString(
+        binding, binding().replace("makeInvoker(MemoryLayout... layouts)", "makeInvoker()"));
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiInventory.render(root));
+
+    assertTrue(failure.getMessage().contains("downcall implementations matched"));
   }
 
   @Test

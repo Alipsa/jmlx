@@ -55,7 +55,7 @@ public final class MlxApiCallSites {
             guardData.mappingSources(),
             guardData.generatedTypes(),
             observed));
-    for (String mapping : guardData.mappingSources().keySet()) {
+    for (String mapping : guardData.observedUseRequired()) {
       if (!observed.contains(mapping)) {
         violations.add(
             new Violation(
@@ -67,7 +67,7 @@ public final class MlxApiCallSites {
     }
     if (!violations.isEmpty()) {
       violations.sort(Comparator.comparing(Violation::path).thenComparingLong(Violation::line));
-      StringBuilder message = new StringBuilder("Unrecorded generated MLX binding use(s):\n");
+      StringBuilder message = new StringBuilder("MLX binding inventory guard failures:\n");
       for (Violation violation : violations) {
         message
             .append("- ")
@@ -114,7 +114,6 @@ public final class MlxApiCallSites {
         || relative.startsWith(".git")
         || relative.startsWith(".gradle")
         || relative.startsWith("native")
-        || relative.startsWith("build")
         || (relative.getFileName() != null && relative.getFileName().toString().equals("build"));
   }
 

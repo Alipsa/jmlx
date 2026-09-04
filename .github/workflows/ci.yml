@@ -47,11 +47,23 @@ jobs:
       - name: Check shared build logic
         run: ./gradlew -p buildSrc check
 
+      # The handwritten-source guard parses Java 25 source directly, while the pure-Java module
+      # checks below intentionally run on Java 21.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
       # Root `check` owns repository-wide verification (currently the generated MLX inventory).
       # Module checks below do not execute it, so invoke it explicitly rather than assuming a
       # module lifecycle task covers handwritten source across the repository.
       - name: Run root verification
         run: ./gradlew :check
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
 
       # Configuration cache is off repo-wide (see gradle.properties) because of
       # diffplug/spotless#2850, so no --no-configuration-cache flag is needed here.

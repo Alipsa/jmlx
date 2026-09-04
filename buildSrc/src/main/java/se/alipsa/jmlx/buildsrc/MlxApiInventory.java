@@ -32,6 +32,8 @@ public final class MlxApiInventory {
       Pattern.compile(
           "(?ms)^    public static class (_?mlx_[a-z0-9_]+) \\{.*?^        public static \\1"
               + " makeInvoker\\(MemoryLayout\\.\\.\\. layouts\\)");
+  private static final Pattern VARIADIC_INVOKER_CANDIDATE =
+      Pattern.compile("(?m)^    public static class (_?mlx_[a-z0-9_]+) \\{");
   private static final Pattern CONSTANT =
       Pattern.compile("(?m)^    public static int (MLX_[A-Z0-9_]+)\\(\\)");
 
@@ -105,7 +107,13 @@ public final class MlxApiInventory {
     for (Mapping mapping : mappings.values()) {
       sources.put(mapping.binding(), mapping.sources());
     }
-    return new GuardData(Map.copyOf(sources), Set.copyOf(types));
+    Set<String> observedUseRequired = new TreeSet<>();
+    for (Mapping mapping : mappings.values()) {
+      if (mapping.status().equals("implemented") || mapping.status().equals("planned")) {
+        observedUseRequired.add(mapping.binding());
+      }
+    }
+    return new GuardData(Map.copyOf(sources), Set.copyOf(types), Set.copyOf(observedUseRequired));
   }
 
   private static List<Entry> discover(Path repositoryRoot) throws IOException {
@@ -113,9 +121,12 @@ public final class MlxApiInventory {
     String binding = Files.readString(directory.resolve("mlx_h.java"), StandardCharsets.UTF_8);
     Set<String> symbols = matches(binding, METHOD);
     Set<String> variadicInvokers = matches(binding, VARIADIC_INVOKER);
+    int variadicCandidates = matches(binding, VARIADIC_INVOKER_CANDIDATE).size();
     symbols.addAll(variadicInvokers);
-    int holders = countDowncallHolders(binding) + variadicInvokers.size();
-    if (holders == 0 || symbols.size() != holders) {
+    int holders = countDowncallHolders(binding) + variadicCandidates;
+    if (holders == 0
+        || variadicInvokers.size() != variadicCandidates
+        || symbols.size() != holders) {
       throw new IllegalStateException(
           "Only "
               + symbols.size()
@@ -311,7 +322,10 @@ public final class MlxApiInventory {
 
   private record Entry(String identity, Category category) {}
 
-  record GuardData(Map<String, Set<String>> mappingSources, Set<String> generatedTypes) {}
+  record GuardData(
+      Map<String, Set<String>> mappingSources,
+      Set<String> generatedTypes,
+      Set<String> observedUseRequired) {}
 
   private record Mapping(
       String binding,

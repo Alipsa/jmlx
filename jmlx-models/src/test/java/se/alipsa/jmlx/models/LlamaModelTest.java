@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -177,18 +178,7 @@ class LlamaModelTest {
                   new GenerationRequest(
                       new int[] {1},
                       new GenerationConfig(
-                          1,
-                          java.util.OptionalLong.empty(),
-                          1,
-                          0,
-                          1,
-                          0,
-                          1,
-                          0,
-                          0,
-                          Set.of(),
-                          Set.of(),
-                          false),
+                          1, OptionalLong.empty(), 1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false),
                       CancellationToken.NONE),
                   ignored -> {}));
     }

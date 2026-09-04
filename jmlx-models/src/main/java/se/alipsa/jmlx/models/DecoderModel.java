@@ -23,6 +23,7 @@ import se.alipsa.jmlx.tokenizer.HfTokenizer;
 
 /** Inference-only pre-norm decoder shared by Llama and Qwen2 checkpoints. */
 public abstract class DecoderModel extends Module implements TextGenerationModel {
+  private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
   private final DecoderConfig config;
   private final Embedding embedding;
   private final List<DecoderBlock> layers;
@@ -191,7 +192,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               reason = FinishReason.STOP_TOKEN;
               break;
             }
-            listener.accept(GenerationEvent.token(next));
+            try {
+              listener.accept(GenerationEvent.token(next));
+            } catch (RuntimeException e) {
+              throw new GenerationAbortedException(toList(prompt), generated, e);
+            }
             input = new int[] {next};
           }
         }
@@ -202,8 +207,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     GenerationResult result = new GenerationResult(toList(prompt), generated, reason, List.of());
     try {
       listener.accept(GenerationEvent.finished(reason));
-    } catch (RuntimeException ignored) {
-      // A terminal callback cannot invalidate fully completed native work or its result.
+    } catch (RuntimeException e) {
+      LOGGER.log(System.Logger.Level.WARNING, "generation terminal listener failed", e);
     }
     return result;
   }
@@ -227,7 +232,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
         || config.seed().isPresent()
         || config.logProbabilities()) {
       throw new UnsupportedOperationException(
-          "sampling and log probabilities are implemented in Phase 6.1; use greedyDefaults");
+          "this release supports only greedy policy values: temperature=0, topK=0, topP=1, "
+              + "minP=0, repetitionPenalty=1, frequencyPenalty=0, presencePenalty=0, no seed, "
+              + "and no log probabilities");
     }
   }
 

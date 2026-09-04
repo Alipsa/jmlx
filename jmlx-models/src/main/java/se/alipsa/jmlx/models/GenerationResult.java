@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.models;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -21,7 +22,7 @@ public record GenerationResult(
 
   /** Returns prompt followed by generated IDs. */
   public List<Integer> tokenIds() {
-    java.util.ArrayList<Integer> all = new java.util.ArrayList<>(promptTokenIds);
+    List<Integer> all = new ArrayList<>(promptTokenIds);
     all.addAll(generatedTokenIds);
     return List.copyOf(all);
   }

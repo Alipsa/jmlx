@@ -1,6 +1,8 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -57,7 +59,7 @@ class LlamaModelTest {
       assertEquals(FinishReason.MAX_TOKENS, result.finishReason());
       assertEquals(
           List.of(0, 0), events.subList(0, 2).stream().map(GenerationEvent::tokenId).toList());
-      assertEquals(null, events.getLast().tokenId());
+      assertNull(events.getLast().tokenId());
       assertEquals(FinishReason.MAX_TOKENS, events.getLast().finishReason());
 
       GenerationResult eos =
@@ -126,7 +128,7 @@ class LlamaModelTest {
       assertEquals(FinishReason.CANCELLED, cancelledResult.finishReason());
       assertEquals(List.of(0), cancelledResult.generatedTokenIds());
       assertEquals(Thread.currentThread(), pollingThread.get());
-      assertTrue(cancellingThread.get() != pollingThread.get());
+      assertNotSame(cancellingThread.get(), pollingThread.get());
 
       assertThrows(
           UnsupportedOperationException.class,
@@ -150,20 +152,23 @@ class LlamaModelTest {
                       CancellationToken.NONE),
                   ignored -> {}));
       List<GenerationEvent> failedListenerEvents = new ArrayList<>();
-      assertThrows(
-          IllegalStateException.class,
-          () ->
-              model.generate(
-                  new GenerationRequest(
-                      new int[] {1},
-                      GenerationConfig.greedyDefaults(2, Set.of()),
-                      CancellationToken.NONE),
-                  event -> {
-                    failedListenerEvents.add(event);
-                    throw new IllegalStateException("listener failed");
-                  }));
+      GenerationAbortedException listenerFailure =
+          assertThrows(
+              GenerationAbortedException.class,
+              () ->
+                  model.generate(
+                      new GenerationRequest(
+                          new int[] {1},
+                          GenerationConfig.greedyDefaults(2, Set.of()),
+                          CancellationToken.NONE),
+                      event -> {
+                        failedListenerEvents.add(event);
+                        throw new IllegalStateException("listener failed");
+                      }));
       assertEquals(1, failedListenerEvents.size());
       assertEquals(0, failedListenerEvents.getFirst().tokenId());
+      assertEquals(List.of(1), listenerFailure.promptTokenIds());
+      assertEquals(List.of(0), listenerFailure.generatedTokenIds());
       GenerationResult terminalListenerFailure =
           model.generate(
               new GenerationRequest(
@@ -177,6 +182,8 @@ class LlamaModelTest {
       assertEquals(List.of(1, 0), model.generate(new int[] {1}, 1, Set.of()));
 
       long baseline = NativeMemoryProbe.activeMemoryBytes();
+      // MLX's active-memory counter excludes cached allocator blocks; the 4 KiB allowance absorbs
+      // small runner-side bookkeeping while remaining far below one leaked decoder activation.
       for (int i = 0; i < 20; i++) {
         model.generate(new int[] {1}, 2, Set.of());
         model.generate(new int[] {1}, 2, Set.of(0));

@@ -17,7 +17,7 @@
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | [PR #10](https://github.com/Alipsa/jmlx/pull/10), `59c9afe`, see req/plans/phase4-m3-plan.md |
 | M4 — `QuantizedLinear` (§8) | **Done** | this branch, see req/plans/phase4-m4-plan.md |
 | §9 — Documentation | **Done** | this branch, req/plans/phase4-m4-plan.md Task 3 |
-| §10 — CI, hosted ARM64 runner workflow (see note below) | **Workflow added; branch protection pending** | `jmlx-jinja-ci.yml` (`CI` workflow) |
+| §10 — CI, hosted ARM64 runner workflow (see note below) | **Workflow added; branch protection pending** | `ci.yml` (`CI` workflow) |
 
 **M0d note.** Implemented only the ops its own "ops added at this merge point" list names
 (`array(scope, int[], int[])`, `zeros`, `ones`, `full`, `arange`, `stopGradient`) — deliberately
@@ -1088,7 +1088,7 @@ the plan that will act on it.
   visible on the PR page. Worth keeping as a fast local backstop *in addition to* the runner, not
   instead of it.
 
-**Implementation status:** `.github/workflows/jmlx-jinja-ci.yml` defines the consolidated `CI`
+**Implementation status:** `.github/workflows/ci.yml` defines the consolidated `CI`
 workflow. Its `native` job runs on GitHub-hosted `macos-26`, uses JDK 25, and bootstraps the pinned
 runtime with `scripts/bootstrap-native.sh`; bootstrap failure fails the job. Its Gradle invocation
 uses `--no-build-cache`, so native tests cannot be reported green from restored task output.

@@ -12,4 +12,11 @@ plugins {
 }
 
 rootProject.name = 'jmlx'
-include('jmlx-ffi', 'jmlx-core', 'jmlx-tokenizer', 'jmlx-jinja', 'jmlx-models', 'jmlx-examples')
+include(
+    'jmlx-ffi',
+    'jmlx-core',
+    'jmlx-tokenizer',
+    'jmlx-jinja',
+    'jmlx-models',
+    'jmlx-examples',
+    'jmlx-native-macos-arm64')

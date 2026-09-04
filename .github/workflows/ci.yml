@@ -87,4 +87,4 @@ jobs:
       # Gradle's build cache here: a cached test result would not demonstrate
       # that MLX tests executed on this Apple-Silicon runner.
       - name: Run native module checks
-        run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check
+        run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check :jmlx-native-macos-arm64:check :jmlx-ffi:assemble :jmlx-core:assemble :jmlx-models:assemble :jmlx-native-macos-arm64:assemble

@@ -146,9 +146,10 @@ subprojects {
     }
 }
 
-// Release wiring for publishable modules only. A module opts in by applying 'maven-publish';
-// jmlx-core/jmlx-ffi/jmlx-examples do not, and are unaffected. Kept here rather than duplicated
-// per module so there is one copy to keep correct -- the same reason Spotless is applied above.
+// Release wiring for publishable modules only. A module opts in by applying 'maven-publish'; today
+// that includes jmlx-jinja, jmlx-tokenizer, jmlx-ffi, jmlx-core, jmlx-models and
+// jmlx-native-macos-arm64 (jmlx-examples does not). Kept here rather than duplicated per module so
+// there is one copy to keep correct -- the same reason Spotless is applied above.
 subprojects {
     plugins.withId('maven-publish') {
         apply plugin: 'signing'

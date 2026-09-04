@@ -1,12 +1,73 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
+}
+
+// Own explicit line, independent of the root's 0.5.0-SNAPSHOT default going forward -- see
+// req/plans/native-artifact-packaging-plan.md. Same number it already carries via that default.
+version = '0.5.0-SNAPSHOT'
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.core')
+}
+
+// The root's reactive maven-publish wiring turns on Javadoc -Werror for every publishable module.
+// Unlike jmlx-ffi's fix (excluding generated code with no doc comments at all), jmlx-core's public
+// surface already carries a real prose summary on nearly every element; -Werror's "missing"
+// doclint category was only ever flagging absent @param/@return/enum-constant tags on
+// self-explanatory parameters (MLXArray a, int axis, int[] shape, ...) -- writing "@param a the
+// array" filler for ~100 of these would be pure noise, not real documentation. Disabling only the
+// "missing" doclint category keeps -Werror gating genuine problems (broken @link, malformed HTML)
+// while not demanding tag-completeness this codebase never enforced before.
+tasks.named('javadoc', Javadoc) {
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
 dependencies {
+    // A consumer opts into jmlx-native-macos-arm64 explicitly at runtime: keeping this optional
+    // avoids forcing an Apple-Silicon-only ~180MB artifact on users of the Java API (Decision 5 in
+    // req/plans/native-artifact-packaging-plan.md).
     // Not exposed on jmlx-core's own public API (MLXArray/MLX wrap raw
     // MemorySegment handles behind plain Java types), so implementation
-    // rather than api.
+    // rather than api. Published as a runtime-scope POM dependency, so a
+    // consumer of jmlx-core gets jmlx-ffi automatically without adding it
+    // themselves.
     implementation project(':jmlx-ffi')
 
     testImplementation testFixtures(project(':jmlx-ffi'))
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-core'
+                description = 'Idiomatic Java 25 tensor operations and se.alipsa.jmlx.nn neural network modules for Apple Silicon MLX. Requires a native runtime: clone the repo and run scripts/bootstrap-native.sh, set jmlx.library.path/JMLX_LIBRARY_PATH yourself, or add se.alipsa:jmlx-native-macos-arm64 as a runtime dependency. Consumers must also pass --enable-native-access=ALL-UNNAMED on their own JVM.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
 }

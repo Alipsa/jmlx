@@ -4,6 +4,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 
 /**
  * Loads {@code libmlxc.dylib} and installs mlx-c's error handler.
@@ -57,6 +58,11 @@ public final class NativeLoader {
         // present-but-unloadable dylib (wrong arch, missing @rpath sibling,
         // unresolved symbol) -- must be caught here too, or the caching
         // contract above doesn't hold for the most likely real failure.
+        // Extraction failures can be transient, but every production facade currently invokes this
+        // method from a static initializer. Retrying in another facade after one initializer has
+        // failed produces a split process where the loader is healthy but that facade is
+        // permanently unusable. Cache every failure until a future explicit reset/retry API can
+        // make that state transition coherent across all facades.
         loadFailure = e;
         throw e;
       }
@@ -99,7 +105,9 @@ public final class NativeLoader {
    * Resolves the directory containing {@code libmlxc.dylib} and its siblings. In order: the {@code
    * jmlx.library.path} system property (this is also how the Gradle build injects an absolute path
    * -- see root build.gradle and jmlx-examples/build.gradle), then the {@code JMLX_LIBRARY_PATH}
-   * environment variable.
+   * environment variable, then -- if neither is set and a {@code se.alipsa:jmlx-native-macos-arm64}
+   * dependency is on the classpath -- {@link ClasspathNativeExtractor} extracting the bundled
+   * binaries to a per-pin cache directory.
    */
   private static Path resolveLibraryDir() {
     String prop = System.getProperty("jmlx.library.path");
@@ -110,10 +118,25 @@ public final class NativeLoader {
     if (env != null && !env.isBlank()) {
       return Path.of(env);
     }
+    if (ClasspathNativeExtractor.isSupportedPlatform()) {
+      Optional<Path> extracted = ClasspathNativeExtractor.extractIfAvailable();
+      if (extracted.isPresent()) {
+        return extracted.get();
+      }
+    }
     throw new IllegalStateException(
         "native library directory not specified -- set the 'jmlx.library.path' system property"
             + " or the JMLX_LIBRARY_PATH environment variable to the directory produced by"
-            + " scripts/bootstrap-native.sh (native/install/lib)");
+            + " scripts/bootstrap-native.sh (native/install/lib), or add a runtime dependency on"
+            + " se.alipsa:jmlx-native-macos-arm64 so the bundled native libraries can be"
+            + " extracted automatically"
+            + (ClasspathNativeExtractor.isSupportedPlatform()
+                ? ""
+                : " (note: no published native artifact exists for your platform -- os.name="
+                    + System.getProperty("os.name")
+                    + ", os.arch="
+                    + System.getProperty("os.arch")
+                    + " -- only macOS/aarch64 is supported today)"));
   }
 
   // Kept alive for the process lifetime: the upcall stub must remain valid
@@ -157,6 +180,8 @@ public final class NativeLoader {
    * <p>The mlx-c error handler runs synchronously on the same thread that made the failing call, so
    * this is thread-local rather than shared -- see the thread-confinement contract on
    * MLXScope/MLXArray.
+   *
+   * @return the last observed native error message, or {@code null}
    */
   public static String lastNativeError() {
     return LAST_NATIVE_ERROR.get();

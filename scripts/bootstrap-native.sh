@@ -203,6 +203,12 @@ log "Fast path confirmed: no _deps/mlx-src, MLX found under the wheel prefix"
 log "Building mlxc"
 cmake --build "$BUILD_DIR" -j"$(sysctl -n hw.ncpu)"
 
+# native-pin.properties is the completion marker consumed by packaging. Invalidate a prior
+# successful run before cmake --install can replace libmlxc.dylib, so interruption at any later
+# point cannot pair changed runtime files with old provenance and appear publishable.
+RUNTIME_LIB_DIR="$INSTALL_DIR/lib"
+rm -f "$RUNTIME_LIB_DIR/native-pin.properties"
+
 log "Installing mlxc headers + library to $INSTALL_DIR"
 cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR"
 
@@ -210,7 +216,6 @@ cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR"
 # Runtime invariant (req/initial-plan.md): all four artifacts live in one flat
 # directory. MLX finds mlx.metallib by colocation with its own image, and dyld
 # resolves the @rpath siblings the same way.
-RUNTIME_LIB_DIR="$INSTALL_DIR/lib"
 mkdir -p "$RUNTIME_LIB_DIR"
 cp "$WHEEL_DIR/mlx/lib/libmlx.dylib" "$WHEEL_DIR/mlx/lib/libjaccl.dylib" "$METALLIB_SRC" "$RUNTIME_LIB_DIR/"
 
@@ -254,6 +259,14 @@ done
 STAGED_METALLIB_SIZE="$(stat -f %z "$RUNTIME_LIB_DIR/mlx.metallib")"
 [[ "$STAGED_METALLIB_SIZE" -ge "$METALLIB_MIN_BYTES" ]] || die \
   "staged mlx.metallib is only $STAGED_METALLIB_SIZE bytes -- expected at least $METALLIB_MIN_BYTES"
+
+# Completion marker, written only after every runtime validation above passes. It is what
+# jmlx-native-macos-arm64 embeds as its cache key, and its absence makes a failed bootstrap visibly
+# incomplete to the packaging task rather than publishable as a seemingly complete native runtime.
+cat > "$RUNTIME_LIB_DIR/native-pin.properties" <<EOF
+mlxMetalVersion=${MLX_METAL_VERSION}
+mlxcCommit=${MLX_C_COMMIT}
+EOF
 
 log "native/install/lib:"
 ls -la "$RUNTIME_LIB_DIR"

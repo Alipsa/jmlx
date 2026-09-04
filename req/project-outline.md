@@ -153,9 +153,17 @@ public class JMLXDemo {
 
 ### Packaging & Distribution Strategy
 
+**Implemented** (see `req/plans/native-artifact-packaging-plan.md`) — corrected from this section's
+original two-artifact, "universal binaries" sketch to the actual shape:
+
 | Target Artifact | Contents | Execution Environment |
 | --- | --- | --- |
-| `jmlx-core-25.jar` | Java classes, FFM abstractions, high-level `se.alipsa.jmlx.nn` | Any OS with Java 25+ |
-| `jmlx-native-macos-arm64.jar` | Compiled `libmlx.dylib` & `libmlx_c.dylib` universal binaries | macOS (M1/M2/M3/M4 Apple Silicon) |
+| `jmlx-core-*.jar` | Java classes, FFM abstractions, high-level `se.alipsa.jmlx.nn` | Any OS with Java 25+ (native functionality still requires the artifact below on macOS/arm64) |
+| `jmlx-ffi-*.jar` | Generated FFM bindings, `NativeLoader`, `ClasspathNativeExtractor` | Any OS with Java 25+ |
+| `jmlx-native-macos-arm64-*.jar` | The 4 flat `native/install/lib/` files (`libmlxc.dylib`, `libmlx.dylib`, `libjaccl.dylib`, `mlx.metallib`) plus `native-pin.properties`, as classpath resources under `se/alipsa/jmlx/native/macos-aarch64/` -- arm64-only, no universal/x86_64 binary | macOS on Apple Silicon (M1 and later) |
 
-At runtime, `jmlx` automatically extracts and loads the matching `libmlx.dylib` native dynamic library from the classpath if no system-installed `mlx-c` library is found.
+At runtime, if neither the `jmlx.library.path` system property nor the `JMLX_LIBRARY_PATH`
+environment variable is set, `NativeLoader` automatically extracts the matching native binaries
+from `jmlx-native-macos-arm64`'s classpath resources (when that artifact is a dependency) to a
+per-pin durable application-data directory under `~/Library/Application Support/se.alipsa.jmlx/native`
+and loads them from there.

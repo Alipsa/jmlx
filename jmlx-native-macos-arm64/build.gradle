@@ -1,0 +1,215 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+// Independent of the root's 0.5.0-SNAPSHOT and of jmlx-core/jmlx-ffi's own version line -- see
+// req/plans/native-artifact-packaging-plan.md. The real upstream pin (mlx-metal wheel version +
+// mlx-c commit) travels inside the jar as native-pin.properties instead of in this version string,
+// so this module's own SemVer stays independent of mlx-c's own independent versioning (already a
+// distinct axis per CLAUDE.md).
+version = '0.1.0-SNAPSHOT'
+
+// This module has a small Java metadata API alongside its native payload. Native resources are added
+// directly to the main jar below, rather than registered as source-set resources, so normal source
+// and Javadoc companion jars contain only the genuine Java API and never duplicate the ~180MB payload.
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+def stagedNativeDir = rootProject.layout.projectDirectory.dir('native/install/lib')
+def resourceRoot = 'se/alipsa/jmlx/native/macos-aarch64'
+def requiredFiles = ['libmlxc.dylib', 'libmlx.dylib', 'libjaccl.dylib', 'mlx.metallib', 'native-pin.properties']
+def generatedResourcesDir = layout.buildDirectory.dir('generated/nativeResources')
+
+// The 4 binaries + native-pin.properties only exist after a human/CI has run
+// scripts/bootstrap-native.sh; this task must never re-invoke that script itself (it does
+// long-running network/build work), but must also never silently produce an empty or partial jar
+// if the files are missing.
+//
+// Deliberately NOT a Copy task: Copy/Sync are @SkipWhenEmpty on their source -- when
+// stagedNativeDir is missing entirely (or empty), Gradle marks the task NO-SOURCE and skips it
+// without ever running doFirst/doLast, so the missing-file check below would silently never fire.
+// A plain task with a manual project.copy(...) call always executes its actions.
+// Captured at configuration time, not referenced from `project` inside doLast: Task.project at
+// execution time is deprecated (incompatible with the configuration cache).
+def fileSystemOperations = project.services.get(org.gradle.api.file.FileSystemOperations)
+
+// Every other module's native-dependent tests are SKIPPED, not failed, when native/install/lib
+// isn't staged (see @EnabledIfNativeAvailable and CLAUDE.md) so that ./gradlew build succeeds for
+// a contributor who hasn't run bootstrap-native.sh and doesn't need native functionality. This
+// module's own build must honor that same repo-wide invariant: gate staging on the same signal
+// NativeLoader itself checks first (mlx.metallib's presence), so a totally unstaged checkout
+// produces an empty jar (without failing the aggregate `build`/`check`) rather than breaking it.
+// A *partially* staged directory (mlx.metallib present but something else missing -- a broken or
+// interrupted bootstrap run) does not make a corrupt jar: staging removes any old generated
+// resources and leaves a local jar empty. A missing pin alongside an otherwise old staged runtime
+// is a migration case; rerunning bootstrap validates it and writes the completion marker.
+def hasValidatedStagedNativeFiles = {
+    requiredFiles.every { new File(stagedNativeDir.asFile, it).isFile() }
+}
+
+tasks.register('stageNativeResources') {
+    group = 'build'
+    description = "Stages the mlx-c/MLX binaries bootstrap-native.sh produced into this module's resources."
+    def targetDir = generatedResourcesDir.map { it.dir(resourceRoot) }
+    outputs.dir(targetDir)
+    // inputs.files (not inputs.dir(stagedNativeDir)): that directory may not exist at all, and
+    // a FileTree tolerates a missing root where inputs.dir does not. skipWhenEmpty(false) is the
+    // same fix stageNativeResources already needed once (see the "Deliberately NOT a Copy task"
+    // comment above): an empty/missing source must never make Gradle silently skip this task's
+    // actions. In particular, an unstaged build must delete output from an earlier staged build.
+    inputs.files(fileTree(stagedNativeDir) { include requiredFiles })
+        .withPropertyName('stagedNativeFiles')
+        .skipWhenEmpty(false)
+    // If Gradle has no prior input snapshot (for example after a daemon restart), an existing
+    // generated directory must still not survive an unstaged build as stale package input.
+    outputs.upToDateWhen { hasValidatedStagedNativeFiles() || !targetDir.get().asFile.exists() }
+    doLast {
+        if (!hasValidatedStagedNativeFiles()) {
+            fileSystemOperations.delete { delete targetDir }
+            def metallib = new File(stagedNativeDir.asFile, 'mlx.metallib')
+            def pin = new File(stagedNativeDir.asFile, 'native-pin.properties')
+            def migrationHint = metallib.isFile() && !pin.isFile()
+                    ? ' Existing runtime has no native-pin.properties; re-run ./scripts/bootstrap-native.sh to validate and re-stage it.'
+                    : ''
+            logger.warn(
+                    'jmlx-native-macos-arm64: validated native staging not found -- run ' +
+                    './scripts/bootstrap-native.sh to stage the native runtime, then rebuild this module ' +
+                    "for a real jar. Removing stale staged resources; this module's jar will be empty." + migrationHint)
+            return
+        }
+        fileSystemOperations.copy {
+            from(stagedNativeDir) { include requiredFiles }
+            into targetDir.get()
+        }
+        requiredFiles.each { name ->
+            def f = new File(targetDir.get().asFile, name)
+            if (!f.isFile() || f.length() == 0) {
+                throw new GradleException("Staged resource ${name} is missing or empty after copy: ${f}")
+            }
+        }
+        def pinProps = new Properties()
+        new File(targetDir.get().asFile, 'native-pin.properties').withInputStream { pinProps.load(it) }
+        ['mlxMetalVersion', 'mlxcCommit'].each { key ->
+            def value = pinProps.getProperty(key)
+            if (value == null || value.isBlank()) {
+                throw new GradleException("native-pin.properties is missing a non-blank '${key}' entry")
+            }
+        }
+    }
+}
+
+tasks.named('jar') {
+    // `native` is a Java keyword and therefore cannot be a module-name segment.
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
+    dependsOn tasks.named('stageNativeResources')
+    from(generatedResourcesDir)
+    // MLX/mlx-c are MIT; libmlx.dylib also embeds Apache-2.0-licensed metal-cpp. Keep the module's
+    // license and third-party attribution in the actual runtime jar, not only in the source checkout.
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE') { into 'META-INF' }
+}
+
+// Task 2's doLast only checks immediately after copying; this re-verifies the actual published
+// artifact (the built jar) has exactly the right entries on every check, independent of how the
+// resources got there.
+def metallibMinBytes = 100_000_000L // same floor as bootstrap-native.sh's own check
+
+tasks.register('verifyPackagedNativeResources') {
+    group = 'verification'
+    description = 'Verifies the built jar contains exactly the expected native resources.'
+    dependsOn tasks.named('jar')
+    def jarFile = tasks.named('jar').flatMap { it.archiveFile }
+    inputs.file(jarFile)
+    // stageNativeResources is an always-actionable task so it can remove stale output. This check's
+    // own onlyIf is lenient instead: an intentionally-empty jar (native/install/lib never staged)
+    // is not its business. It catches a jar that tried to package native resources and got it wrong.
+    onlyIf { hasValidatedStagedNativeFiles() }
+    doLast {
+        def zip = new java.util.zip.ZipFile(jarFile.get().asFile)
+        try {
+            def entries = requiredFiles.collectEntries { name ->
+                [(name): zip.getEntry("${resourceRoot}/${name}")]
+            }
+            def missing = entries.findAll { name, entry -> entry == null }.keySet()
+            if (!missing.isEmpty()) {
+                throw new GradleException("Packaged jar is missing native resources: ${missing}")
+            }
+            def empty = entries.findAll { name, entry -> entry.size <= 0 }.keySet()
+            if (!empty.isEmpty()) {
+                throw new GradleException("Packaged jar has empty native resources: ${empty}")
+            }
+            def metallibSize = entries['mlx.metallib'].size
+            if (metallibSize < metallibMinBytes) {
+                throw new GradleException(
+                        "Packaged mlx.metallib is only ${metallibSize} bytes (expected >= ${metallibMinBytes})")
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.named('check') { dependsOn tasks.named('verifyPackagedNativeResources') }
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-native-macos-arm64'
+                description = 'Precompiled MLX/mlx-c native binaries for macOS on Apple Silicon (arm64), for jmlx-ffi\'s NativeLoader classpath-extraction fallback.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                    license {
+                        name = 'Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                withXml {
+                    def licenses = asNode().licenses[0].license
+                    def mit = licenses.find { it.name.text() == 'MIT License' }
+                    def apache = licenses.find { it.name.text() == 'Apache License, Version 2.0' }
+                    if (mit == null || apache == null) {
+                        throw new GradleException('Expected MIT and Apache-2.0 license entries in the native POM')
+                    }
+                    mit.appendNode('comments', 'Applies to the jmlx native artifact code.')
+                    apache.appendNode('comments', 'Applies to vendored metal-cpp compiled into libmlx.dylib.')
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}
+
+// stageNativeResources remains lenient by removing stale resources and producing an empty local jar
+// in an unstaged checkout; verifyPackagedNativeResources skips its assertion in that case. Release
+// depends on check, and a skipped verification is still passing: without a gate here, releasing from
+// an unstaged checkout would silently publish an empty jar to Maven Central -- a mistake that,
+// unlike a failed build, can never be taken back. Publishing must therefore use its own hard,
+// unconditional gate rather than inheriting build-time leniency.
+tasks.withType(org.gradle.api.publish.maven.tasks.AbstractPublishToMaven).configureEach {
+    doFirst {
+        if (!hasValidatedStagedNativeFiles()) {
+            throw new GradleException(
+                    'Refusing to publish jmlx-native-macos-arm64 without staged native binaries -- ' +
+                    'run ./scripts/bootstrap-native.sh first, then rebuild before publishing.')
+        }
+    }
+}

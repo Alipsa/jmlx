@@ -78,6 +78,22 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void abbreviatesLargeBindingsListsInMappingSchemaErrors() throws Exception {
+    Path root =
+        fixture(
+            "{\"records\":[{\"bindings\":[\"mlx_h.mlx_array_new\",\"mlx_h.mlx_array_free\","
+                + "\"mlx_h.mlx_array_new_data\",\"mlx_h.mlx_array_new_data_managed\"],"
+                + "\"category\":\"downcall\",\"status\":\"implemented\","
+                + "\"facadeOrReason\":\"reason\",\"tests\":\"test\",\"notes\":\"remove me\"}]}");
+
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> MlxApiInventory.render(root));
+
+    assertTrue(failure.getMessage().contains("[mlx_h.mlx_array_new, … 3 more]"));
+    assertTrue(!failure.getMessage().contains("mlx_h.mlx_array_new_data_managed] contains"));
+  }
+
+  @Test
   void callSiteGuardRejectsOnlyUnmappedSyntaxUses() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
     Path source = root.resolve("jmlx-core/src/main/java/sample/Example.java");

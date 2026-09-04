@@ -495,7 +495,12 @@ public final class MlxApiInventory {
       }
       Object bindings = object.get("bindings");
       if (bindings != null) {
-        return "Inventory mapping record at index " + index + " for bindings " + bindings;
+        List<?> values = bindings instanceof List<?> list ? list : List.of(bindings);
+        String shown =
+            values.size() <= 3
+                ? values.toString()
+                : "[" + values.get(0) + ", … " + (values.size() - 1) + " more]";
+        return "Inventory mapping record at index " + index + " for bindings " + shown;
       }
       return "Inventory mapping record at index " + index;
     }

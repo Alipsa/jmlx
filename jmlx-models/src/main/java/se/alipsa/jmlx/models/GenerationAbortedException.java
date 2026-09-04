@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * A token listener aborted generation; the generated token IDs delivered before the failure remain
- * available.
+ * A token listener aborted generation; generated token IDs remain available. The sequence includes
+ * the token whose listener callback threw, if one had already been selected.
  */
 public final class GenerationAbortedException extends IllegalStateException {
   private final List<Integer> promptTokenIds;
@@ -14,7 +14,7 @@ public final class GenerationAbortedException extends IllegalStateException {
   GenerationAbortedException(
       List<Integer> promptTokenIds, List<Integer> generatedTokenIds, RuntimeException cause) {
     super(
-        "generation listener aborted after " + generatedTokenIds.size() + " generated token(s)",
+        "generation listener aborted after generating " + generatedTokenIds.size() + " token(s)",
         cause);
     this.promptTokenIds = List.copyOf(Objects.requireNonNull(promptTokenIds, "promptTokenIds"));
     this.generatedTokenIds =
@@ -26,7 +26,7 @@ public final class GenerationAbortedException extends IllegalStateException {
     return promptTokenIds;
   }
 
-  /** Generated token IDs delivered before the listener failed. */
+  /** Generated token IDs, including the selected token whose listener callback may have failed. */
   public List<Integer> generatedTokenIds() {
     return generatedTokenIds;
   }

@@ -19,8 +19,17 @@ public final class LlamaModel extends DecoderModel {
 
   /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
   public static LlamaModel load(MLXScope scope, Path directory) throws IOException {
-    return new LlamaModel(
-        scope, DecoderConfig.fromFile(directory.resolve("config.json")), directory);
+    DecoderModel model = TextGenerationModels.load(scope, directory);
+    if (model instanceof LlamaModel llama) {
+      return llama;
+    }
+    throw new IllegalArgumentException(
+        "expected model_type llama, got " + model.config().modelType());
+  }
+
+  static LlamaModel create(MLXScope scope, DecoderConfig config, Path directory)
+      throws IOException {
+    return new LlamaModel(scope, config, directory);
   }
 
   private static DecoderConfig requireLlama(DecoderConfig config) {

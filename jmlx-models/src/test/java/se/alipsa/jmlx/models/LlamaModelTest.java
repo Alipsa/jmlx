@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,22 @@ class LlamaModelTest {
     try (MLXScope modelScope = new MLXScope()) {
       LlamaModel model = LlamaModel.load(modelScope, dir);
       assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
+      List<GenerationEvent> events = new ArrayList<>();
+      GenerationResult result =
+          TextGenerationModels.load(modelScope, dir)
+              .generate(
+                  new GenerationRequest(
+                      new int[] {1},
+                      GenerationConfig.greedyDefaults(2, Set.of()),
+                      CancellationToken.NONE),
+                  events::add);
+      assertEquals(List.of(1), result.promptTokenIds());
+      assertEquals(List.of(0, 0), result.generatedTokenIds());
+      assertEquals(FinishReason.MAX_TOKENS, result.finishReason());
+      assertEquals(
+          List.of(0, 0), events.subList(0, 2).stream().map(GenerationEvent::tokenId).toList());
+      assertEquals(null, events.getLast().tokenId());
+      assertEquals(FinishReason.MAX_TOKENS, events.getLast().finishReason());
     }
   }
 

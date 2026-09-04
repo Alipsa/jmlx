@@ -5,9 +5,11 @@ safetensors checkpoints and provides inference-only Llama and Qwen2-style decode
 pure-Java Hugging Face tokenizer.
 
 It is intentionally a focused reference-model module, not a general model-serving framework. The
-current API supports greedy generation; sampling, streaming, batching, additional architectures,
-and RoPE scaling are planned in Phase 6. In particular, configurations declaring `rope_scaling` are
-rejected, so Llama 3.1+ checkpoints are not supported yet.
+current public API supports deterministic greedy generation with synchronous token events.
+Sampling, batching, additional architectures, and RoPE scaling are planned in later Phase 6
+milestones. In particular, configurations declaring `rope_scaling` are rejected, so Llama 3.1+
+checkpoints are not supported yet. See the [Phase 6 compatibility matrix](../req/phase6-compatibility.md)
+for the precise support boundary.
 
 ## Use
 
@@ -28,16 +30,27 @@ indexed shards), and `tokenizer.json`:
 
 ```java
 try (MLXScope scope = new MLXScope()) {
-  LlamaModel model = LlamaModel.load(scope, modelDirectory);
+  TextGenerationModel model = TextGenerationModels.load(scope, modelDirectory);
   HfTokenizer tokenizer = HfTokenizer.fromFile(modelDirectory.resolve("tokenizer.json"));
-  String completion =
-      model.generateText(tokenizer, "Hello", 64, Set.of(tokenizer.eosTokenId().orElseThrow()));
+  int[] prompt = tokenizer.encode("Hello", true).stream().mapToInt(Integer::intValue).toArray();
+  GenerationResult result = model.generate(
+      new GenerationRequest(
+          prompt,
+          GenerationConfig.greedyDefaults(64, Set.of(tokenizer.eosTokenId().orElseThrow())),
+          CancellationToken.NONE),
+      event -> {
+        if (event.tokenId() != null) {
+          System.out.print(tokenizer.decode(List.of(event.tokenId()), true));
+        }
+      });
 }
 ```
 
-`QwenModel.load(scope, modelDirectory)` has the same shape. For chat models, render the model's
-chat template through `HfTokenizer`/`ChatTemplateRenderer` before calling the overload that disables
-automatic special tokens for an already-rendered prompt.
+`LlamaModel.load` and `QwenModel.load` remain compatibility entry points; both delegate to the
+common loader. For chat models, render the model's chat template through
+`HfTokenizer`/`ChatTemplateRenderer` before constructing the explicit token-ID request. The event
+callback runs synchronously on the thread which owns the generation scope. A cancelling thread may
+only change the `CancellationToken`; it must never touch model or native resources.
 
 ## Resource ownership
 

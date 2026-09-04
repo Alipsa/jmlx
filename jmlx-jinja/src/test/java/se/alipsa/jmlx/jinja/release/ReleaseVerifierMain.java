@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -185,6 +186,11 @@ public final class ReleaseVerifierMain {
   }
 
   static void verifyEnvironment(Path source, String daemonVersion) throws Exception {
+    verifyEnvironment(source, daemonVersion, () -> output(source, "node", "--version").trim());
+  }
+
+  static void verifyEnvironment(Path source, String daemonVersion, Callable<String> nodeVersion)
+      throws Exception {
     int requiredJdk =
         contractInt(source.resolve("req/release-verification.json"), JDK_MAJOR, "jdkMajor");
     int actualJdk = Runtime.Version.parse(daemonVersion).feature();
@@ -194,7 +200,7 @@ public final class ReleaseVerifierMain {
     }
     String expectedNode =
         match(source.resolve("upstream/upstream-lock.json"), NODE_VERSION, "nodeVersion");
-    String actualNode = output(source, "node", "--version").trim();
+    String actualNode = nodeVersion.call();
     if (!expectedNode.equals(actualNode)) {
       throw new IllegalStateException("required Node " + expectedNode + ", got " + actualNode);
     }

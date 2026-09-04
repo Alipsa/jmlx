@@ -6,9 +6,65 @@
  * property below.
  */
 
+import se.alipsa.jmlx.buildsrc.MlxApiInventory
+
 plugins {
+    id 'base'
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.nexusRelease) apply false
+}
+
+tasks.register('generateMlxApiInventory') {
+    group = 'documentation'
+    description = 'Generates the checked-in MLX binding inventory from committed sources.'
+    def output = layout.projectDirectory.file('req/mlx-api-inventory.md')
+    inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    inputs.file(layout.projectDirectory.file('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java'))
+    outputs.file(output)
+    doLast {
+        MlxApiInventory.write(projectDir.toPath(), output.asFile.toPath())
+    }
+}
+
+// Deliberately declares no inputs/outputs: this is a verification task that must always run, and
+// with no outputs Gradle can never treat it as up-to-date regardless -- declaring inputs here would
+// be inert at best and, since it would still omit req/mlx-api-inventory.md itself, misleadingly
+// incomplete.
+tasks.register('verifyMlxApiInventory') {
+    group = 'verification'
+    description = 'Fails when the checked-in MLX binding inventory is stale.'
+    def inventory = layout.projectDirectory.file('req/mlx-api-inventory.md')
+    doLast {
+        def expected = MlxApiInventory.render(projectDir.toPath())
+        def actual = inventory.asFile.isFile() ? inventory.asFile.getText('UTF-8') : null
+        if (actual != expected) {
+            def message = new StringBuilder('req/mlx-api-inventory.md is stale; run ./gradlew generateMlxApiInventory')
+            if (actual != null) {
+                def expectedLines = expected.split('\n', -1)
+                def actualLines = actual.split('\n', -1)
+                def firstDiff = 0
+                while (firstDiff < expectedLines.length && firstDiff < actualLines.length
+                        && expectedLines[firstDiff] == actualLines[firstDiff]) {
+                    firstDiff++
+                }
+                def expectedLine = firstDiff < expectedLines.length ? expectedLines[firstDiff] : '<end of file>'
+                def actualLine = firstDiff < actualLines.length ? actualLines[firstDiff] : '<end of file>'
+                message.append(" (first difference at line ${firstDiff + 1}: expected '${expectedLine}', found '${actualLine}')")
+            }
+            throw new GradleException(message.toString())
+        }
+    }
+}
+
+tasks.named('verifyMlxApiInventory') {
+    mustRunAfter tasks.named('generateMlxApiInventory')
+}
+
+tasks.named('check') {
+    // The root has no Java lifecycle plugin. Applying `base` creates this `check` lifecycle task
+    // so repository-wide verifications can run once from CI without pretending that a module-local
+    // check covers handwritten source in every module.
+    dependsOn tasks.named('verifyMlxApiInventory')
 }
 
 allprojects {

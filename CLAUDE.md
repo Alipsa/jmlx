@@ -48,6 +48,11 @@ on the fly. Only regenerate them if the pinned mlx-c commit changes:
 After running it, `git diff --exit-code jmlx-ffi/src/main/generated/java` must be clean if nothing
 should have changed — this is the bindings-drift check.
 
+```sh
+# Required after binding or native-pin changes; root :check verifies it is current.
+./gradlew generateMlxApiInventory
+```
+
 `scripts/checkDependencies.zsh` is a read-only report of available updates (Gradle plugins/deps, the
 wrapper, the pinned `mlx-metal` version, and — since mlx-c versions independently of MLX — the mlx-c
 tag that pairs with a newer wheel). `scripts/updateMlx.zsh <mlx-c-commit-sha>` repins `MLX_C_COMMIT` in

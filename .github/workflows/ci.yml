@@ -47,6 +47,12 @@ jobs:
       - name: Check shared build logic
         run: ./gradlew -p buildSrc check
 
+      # Root `check` owns repository-wide verification (currently the generated MLX inventory).
+      # Module checks below do not execute it, so invoke it explicitly rather than assuming a
+      # module lifecycle task covers handwritten source across the repository.
+      - name: Run root verification
+        run: ./gradlew :check
+
       # Configuration cache is off repo-wide (see gradle.properties) because of
       # diffplug/spotless#2850, so no --no-configuration-cache flag is needed here.
       - name: Run jmlx-jinja/jmlx-tokenizer check and Node-oracle differential verification
@@ -82,6 +88,10 @@ jobs:
       - name: Bootstrap pinned MLX runtime
         shell: bash
         run: ./scripts/bootstrap-native.sh
+
+      - name: Run root verification
+        # Retained for native-job-only root checks, such as generated-header coverage.
+        run: ./gradlew :check
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use
       # Gradle's build cache here: a cached test result would not demonstrate

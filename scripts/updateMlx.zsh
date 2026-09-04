@@ -71,7 +71,7 @@ rollback() {
     cp "$BOOTSTRAP_BACKUP" "$BOOTSTRAP_SCRIPT"
     warn "aborting -- reverted scripts/bootstrap-native.sh to its state from before this run (git diff scripts/bootstrap-native.sh should now be clean if it was clean going in)"
     if [[ -n "$BOOTSTRAP_COMPLETED" ]]; then
-      warn "note: native/ was already rebuilt against $NEW_COMMIT before this failure and is NOT reverted -- re-run ./scripts/bootstrap-native.sh (now back on $OLD_COMMIT) before ./gradlew build, or the staged libraries and the committed bindings will disagree"
+      warn "note: native/, jmlx-ffi/src/main/generated/java, and req/mlx-api-inventory.md may already reflect $NEW_COMMIT and are NOT reverted -- re-run ./scripts/bootstrap-native.sh and ./scripts/regen-bindings.sh (now back on $OLD_COMMIT), then ./gradlew generateMlxApiInventory before ./gradlew build"
     fi
   fi
   rm -f "$BOOTSTRAP_BACKUP"
@@ -94,8 +94,12 @@ BOOTSTRAP_COMPLETED=1
 log "Running regen-bindings.sh"
 "$REPO_ROOT/scripts/regen-bindings.sh"
 
+log "Regenerating the checked-in MLX API inventory"
+"$REPO_ROOT/gradlew" -p "$REPO_ROOT" generateMlxApiInventory
+
 log "Done. Next steps:"
 log "  1. ./gradlew build -- confirm everything still compiles and passes against the new bindings."
 log "  2. git diff --exit-code jmlx-ffi/src/main/generated/java -- if this is non-empty, the bindings actually changed; review the diff."
-log "  3. git diff scripts/bootstrap-native.sh -- review the repinned commit."
-log "  4. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."
+log "  3. git diff req/mlx-api-inventory.md -- review the regenerated inventory, since a bindings diff changes the symbol set it renders."
+log "  4. git diff scripts/bootstrap-native.sh -- review the repinned commit."
+log "  5. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."

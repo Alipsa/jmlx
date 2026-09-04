@@ -15,6 +15,7 @@ public final class MlxApiInventory {
   private static final Pattern PIN = Pattern.compile("(?m)^([A-Z_]+)=\"([^\"]+)\"$");
   private static final Pattern METHOD =
       Pattern.compile("(?m)^    public static [^\\n(]+ (mlx_[a-z0-9_]+)\\(");
+  private static final int MINIMUM_CALLABLE_BINDINGS = 600;
 
   private MlxApiInventory() {}
 
@@ -32,6 +33,14 @@ public final class MlxApiInventory {
     Matcher matcher = METHOD.matcher(binding);
     while (matcher.find()) {
       symbols.add(matcher.group(1));
+    }
+    if (symbols.size() < MINIMUM_CALLABLE_BINDINGS) {
+      throw new IllegalStateException(
+          "Only "
+              + symbols.size()
+              + " callable mlx_h bindings were found; expected at least "
+              + MINIMUM_CALLABLE_BINDINGS
+              + ". The generated binding layout or inventory parser may have changed.");
     }
     String metal = pin(bootstrap, "MLX_METAL_VERSION");
     StringBuilder out = new StringBuilder();

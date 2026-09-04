@@ -43,6 +43,9 @@ on the fly. Only regenerate them if the pinned mlx-c commit changes:
 
 ```sh
 ./scripts/regen-bindings.sh
+
+# Required after binding or native-pin changes; root :check verifies it is current.
+./gradlew generateMlxApiInventory
 ```
 
 After running it, `git diff --exit-code jmlx-ffi/src/main/generated/java` must be clean if nothing

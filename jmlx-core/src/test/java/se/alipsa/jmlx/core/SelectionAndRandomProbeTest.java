@@ -2,6 +2,7 @@ package se.alipsa.jmlx.core;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.foreign.MemorySegment;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class SelectionAndRandomProbeTest {
   void recordsPinnedSelectionAndExplicitKeyBehavior() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray logits =
-          MLX.array(scope, new float[] {1f, 3f, 3f, 2f, 5f, 5f, 4f, 0f}, new int[] {2, 4});
+          MLX.array(scope, new float[] {1f, 3f, 2f, 0f, 5f, 4f, 3f, 0f}, new int[] {2, 4});
       MLXArray argmax = rawArgmaxAxis(scope, logits, 1);
       MLXArray topk = rawTopkAxis(scope, logits, 2, 1);
       MLXArray sorted = rawSortAxis(scope, logits, 1);
@@ -35,12 +36,11 @@ class SelectionAndRandomProbeTest {
           argmax, topk, sorted, argsorted, partitioned, argpartitioned, key, split, categorical);
 
       assertExact(argmax, DType.UINT32, new int[] {2}, new int[] {1, 0});
-      assertFloating(topk, new int[] {2, 2}, new float[] {3f, 3f, 5f, 5f});
-      assertFloating(sorted, new int[] {2, 4}, new float[] {1f, 2f, 3f, 3f, 0f, 4f, 5f, 5f});
-      assertExact(argsorted, DType.UINT32, new int[] {2, 4}, new int[] {0, 3, 1, 2, 3, 2, 0, 1});
-      assertFloating(partitioned, new int[] {2, 4}, new float[] {1f, 2f, 3f, 3f, 0f, 4f, 5f, 5f});
-      assertExact(
-          argpartitioned, DType.UINT32, new int[] {2, 4}, new int[] {0, 3, 1, 2, 3, 2, 0, 1});
+      assertFloating(topk, new int[] {2, 2}, new float[] {3f, 2f, 5f, 4f});
+      assertFloating(sorted, new int[] {2, 4}, new float[] {0f, 1f, 2f, 3f, 0f, 3f, 4f, 5f});
+      assertExact(argsorted, DType.UINT32, new int[] {2, 4}, new int[] {3, 0, 2, 1, 3, 2, 1, 0});
+      assertPartition(partitioned, logits, 1);
+      assertArgPartition(argpartitioned, logits, 1);
       assertExact(key, DType.UINT32, new int[] {2}, new int[] {0, 42});
       assertExact(
           split,
@@ -62,6 +62,43 @@ class SelectionAndRandomProbeTest {
     assertArrayEquals(shape, actual.shape());
     MLXArray int32 = actual.dtype() == DType.INT32 ? actual : MLX.astype(actual, DType.INT32);
     assertArrayEquals(values, int32.toIntArray());
+  }
+
+  private static void assertPartition(MLXArray partitioned, MLXArray original, int kth) {
+    assertEquals(DType.FLOAT32, partitioned.dtype());
+    assertArrayEquals(original.shape(), partitioned.shape());
+    float[] values = partitioned.toFloatArray();
+    for (int row = 0; row < original.shape()[0]; row++) {
+      int start = row * original.shape()[1];
+      float pivot = values[start + kth];
+      for (int index = 0; index < original.shape()[1]; index++) {
+        if (index < kth) {
+          assertTrue(values[start + index] <= pivot);
+        } else if (index > kth) {
+          assertTrue(values[start + index] >= pivot);
+        }
+      }
+    }
+  }
+
+  private static void assertArgPartition(MLXArray indices, MLXArray original, int kth) {
+    assertEquals(DType.UINT32, indices.dtype());
+    assertArrayEquals(original.shape(), indices.shape());
+    MLXArray int32 = MLX.astype(indices, DType.INT32);
+    int[] values = int32.toIntArray();
+    float[] source = original.toFloatArray();
+    for (int row = 0; row < original.shape()[0]; row++) {
+      int start = row * original.shape()[1];
+      float pivot = source[start + values[start + kth]];
+      for (int index = 0; index < original.shape()[1]; index++) {
+        float value = source[start + values[start + index]];
+        if (index < kth) {
+          assertTrue(value <= pivot);
+        } else if (index > kth) {
+          assertTrue(value >= pivot);
+        }
+      }
+    }
   }
 
   private static MLXArray rawArgmaxAxis(MLXScope scope, MLXArray array, int axis) {

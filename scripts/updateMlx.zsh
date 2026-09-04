@@ -94,6 +94,10 @@ BOOTSTRAP_COMPLETED=1
 log "Running regen-bindings.sh"
 "$REPO_ROOT/scripts/regen-bindings.sh"
 
+log "Regenerating the checked-in MLX API inventory"
+cd "$REPO_ROOT"
+./gradlew generateMlxApiInventory
+
 log "Done. Next steps:"
 log "  1. ./gradlew build -- confirm everything still compiles and passes against the new bindings."
 log "  2. git diff --exit-code jmlx-ffi/src/main/generated/java -- if this is non-empty, the bindings actually changed; review the diff."

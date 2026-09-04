@@ -43,8 +43,27 @@ public final class MlxApiCallSites {
 
   private MlxApiCallSites() {}
 
+  /** Entry point for the Java-25 toolchain task declared in the root build. */
+  public static void main(String[] arguments) throws IOException {
+    if (arguments.length != 2) {
+      throw new IllegalArgumentException("Usage: MlxApiCallSites <repository-root> <java-feature>");
+    }
+    verify(Path.of(arguments[0]), Integer.parseInt(arguments[1]));
+  }
+
   /** Fails with every unrecorded generated-binding use in handwritten Java source. */
   public static void verify(Path repositoryRoot) throws IOException {
+    verify(repositoryRoot, 0);
+  }
+
+  static void verify(Path repositoryRoot, int requiredJavaFeature) throws IOException {
+    if (Runtime.version().feature() < requiredJavaFeature) {
+      throw new IllegalStateException(
+          "verifyMlxApiCallSites requires JDK >= "
+              + requiredJavaFeature
+              + " to parse this project's Java sources; running JDK is "
+              + Runtime.version().feature());
+    }
     MlxApiInventory.GuardData guardData = MlxApiInventory.guardData(repositoryRoot);
     List<Violation> violations = new ArrayList<>();
     Set<String> observed = new HashSet<>();

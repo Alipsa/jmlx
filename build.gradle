@@ -7,13 +7,14 @@
  */
 
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
-import se.alipsa.jmlx.buildsrc.MlxApiCallSites
-
 plugins {
     id 'base'
+    id 'java-base'
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.nexusRelease) apply false
 }
+
+def projectJavaVersion = 25
 
 tasks.register('generateMlxApiInventory') {
     group = 'documentation'
@@ -62,18 +63,16 @@ tasks.named('verifyMlxApiInventory') {
     mustRunAfter tasks.named('generateMlxApiInventory')
 }
 
-// This source-only guard parses handwritten Java with the JDK compiler tree API. It requires the
-// project's Java 25 toolchain so parsing coverage cannot silently lag the source language level.
-tasks.register('verifyMlxApiCallSites') {
+// This source-only guard runs under the project's Java toolchain, so parsing coverage cannot
+// silently lag the source language level or constrain the Gradle daemon's Java version.
+tasks.register('verifyMlxApiCallSites', JavaExec) {
     group = 'verification'
     description = 'Fails when handwritten Java reaches an unrecorded generated MLX binding.'
-    doLast {
-        if (Runtime.version().feature() < 25) {
-            throw new GradleException(
-                "verifyMlxApiCallSites requires JDK >= 25 to parse this project's Java sources; "
-                    + "running JDK is ${Runtime.version().feature()}")
-        }
-        MlxApiCallSites.verify(projectDir.toPath())
+    classpath = files(layout.projectDirectory.dir('buildSrc/build/classes/java/main'))
+    mainClass = 'se.alipsa.jmlx.buildsrc.MlxApiCallSites'
+    args projectDir.toString(), projectJavaVersion.toString()
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(projectJavaVersion)
     }
 }
 
@@ -136,7 +135,7 @@ subprojects {
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(25)
+            languageVersion = JavaLanguageVersion.of(projectJavaVersion)
         }
     }
 

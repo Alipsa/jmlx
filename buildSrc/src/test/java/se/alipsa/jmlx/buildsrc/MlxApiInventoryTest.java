@@ -22,8 +22,8 @@ class MlxApiInventoryTest {
     String first = MlxApiInventory.render(root);
 
     assertEquals(first, MlxApiInventory.render(root));
-    assertTrue(first.contains("generated entries: 8"));
-    assertTrue(first.contains("downcall=5, constant=1, layout/accessor=1, upcall interface=1"));
+    assertTrue(first.contains("generated entries: 9"));
+    assertTrue(first.contains("downcall=6, constant=1, layout/accessor=1, upcall interface=1"));
     assertTrue(first.contains("| `mlx_h.MLX_FLOAT32` | constant | unplanned"));
     assertTrue(first.contains("| `mlx_h.mlx_array_new` | downcall | implemented | reason | test"));
     assertTrue(first.indexOf("`mlx_array_`") < first.indexOf("`mlx_h.MLX_FLOAT32`"));
@@ -145,6 +145,18 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void callSiteGuardRejectsAnInsufficientParserRuntime() throws Exception {
+    Path root = fixture("{\"records\":[]}");
+
+    IllegalStateException failure =
+        assertThrows(
+            IllegalStateException.class,
+            () -> MlxApiCallSites.verify(root, Runtime.version().feature() + 1));
+
+    assertTrue(failure.getMessage().contains("verifyMlxApiCallSites requires JDK >="));
+  }
+
+  @Test
   void callSiteGuardRejectsMappingsWithoutObservedUses() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
 
@@ -159,8 +171,10 @@ class MlxApiInventoryTest {
   @Test
   void callSiteGuardAllowsDocumentationOnlyMappingsWithoutUses() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "unsupported-by-runtime"));
+    Path planned = fixture(record("mlx_h.mlx_array_new", "planned"));
 
     assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
+    assertDoesNotThrow(() -> MlxApiCallSites.verify(planned));
   }
 
   @Test
@@ -174,6 +188,21 @@ class MlxApiInventoryTest {
         assertThrows(IllegalStateException.class, () -> MlxApiInventory.render(root));
 
     assertTrue(failure.getMessage().contains("downcall implementations matched"));
+  }
+
+  @Test
+  void rejectsVariadicInvokerClassDeclarationChanges() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+    Path binding = root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java");
+    Files.writeString(
+        binding,
+        binding()
+            .replace("public static class _mlx_error", "public static final class _mlx_error"));
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiInventory.render(root));
+
+    assertTrue(failure.getMessage().contains("Expected callable mlx_h bindings missing"));
   }
 
   @Test
@@ -257,8 +286,10 @@ class MlxApiInventoryTest {
         "    public static int mlx_array_free() {",
         "    public static int mlx_array_new_data() {",
         "    public static int mlx_array_new_data_managed() {",
-        "    public static class mlx_variadic {",
-        "        public static mlx_variadic makeInvoker(MemoryLayout... layouts) {",
+        "    public static class _mlx_error {",
+        "        public static _mlx_error makeInvoker(MemoryLayout... layouts) {",
+        "    public static class mlx_node_namer_new {",
+        "        public static mlx_node_namer_new makeInvoker(MemoryLayout... layouts) {",
         "    public static int MLX_FLOAT32() {");
   }
 

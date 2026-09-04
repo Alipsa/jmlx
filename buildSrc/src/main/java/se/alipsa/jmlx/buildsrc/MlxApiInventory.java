@@ -38,10 +38,17 @@ public final class MlxApiInventory {
       Pattern.compile("(?m)^    public static int (MLX_[A-Z0-9_]+)\\(\\)");
 
   // CLAUDE.md documents that an unfiltered jextract run silently drops exactly these four
-  // mlx_array constructor/destructor symbols with no warning; the holder-shape check below
-  // would not reliably catch losing just these four, so check for them by name as well.
+  // mlx_array constructor/destructor symbols with no warning. The variadic classes also have a
+  // different generated shape from ordinary holders. Check all six by name so either shape change
+  // cannot silently remove them from the inventory.
   private static final Set<String> REQUIRED_SYMBOLS =
-      Set.of("mlx_array_new", "mlx_array_free", "mlx_array_new_data", "mlx_array_new_data_managed");
+      Set.of(
+          "mlx_array_new",
+          "mlx_array_free",
+          "mlx_array_new_data",
+          "mlx_array_new_data_managed",
+          "_mlx_error",
+          "mlx_node_namer_new");
   private static final Set<String> STATUSES =
       Set.of(
           "unplanned",
@@ -109,7 +116,8 @@ public final class MlxApiInventory {
     }
     Set<String> observedUseRequired = new TreeSet<>();
     for (Mapping mapping : mappings.values()) {
-      if (mapping.status().equals("implemented") || mapping.status().equals("planned")) {
+      if (mapping.status().equals("implemented")
+          || (mapping.status().equals("planned") && !mapping.sources().isEmpty())) {
         observedUseRequired.add(mapping.binding());
       }
     }

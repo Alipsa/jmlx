@@ -72,14 +72,14 @@ becoming the public API.
 ## Delivery order
 
 Each numbered milestone is a separately reviewable PR series. Milestones 6.0 and 6.0b may proceed
-in parallel. 6.1 starts only after both complete: the RNG/selection probes inform the accepted
-contract, and 6.1's oracle and Tier-A tests need 6.0b's infrastructure. Later milestones build in
-order.
+in parallel, except that 6.0's public contract cannot be accepted until 6.0b.1's probe findings are
+reviewed. 6.1 starts only after both complete: the RNG/selection probes inform the accepted contract,
+and 6.1's oracle and Tier-A tests need 6.0b's infrastructure. Later milestones build in order.
 
 | Milestone | Primary modules | Exit evidence |
 | --- | --- | --- |
 | 6.0 Contract and M3 record | `jmlx-models`, docs | new path has no model-specific branches; legacy APIs only delegate |
-| 6.0b Inventory and test infrastructure | `buildSrc`, `jmlx-ffi`, CI, docs | inventory and native-call guard run in CI |
+| 6.0b Inventory and test infrastructure | `buildSrc`, `jmlx-ffi`, CI, docs | reviewed probe findings; inventory and native-call guard run in CI |
 | 6.1 Generation and sampling | `jmlx-core`, `jmlx-models` | reproducible greedy and seeded sampling |
 | 6.2 Tokenizer compatibility | `jmlx-tokenizer`, `jmlx-models` | every supported model has reference goldens |
 | 6.3 Architectures/checkpoints | `jmlx-core`, `jmlx-models` | capability fixtures and real-artifact coverage |
@@ -118,8 +118,9 @@ retrospective are reviewed with the code.
 1. Before accepting the 6.0 public contract, probe the pinned behavior of `mlx_argmax_axis`,
    `mlx_topk`, `mlx_sort`/`mlx_argsort`, `mlx_partition`, categorical sampling, and explicit
    random-key/split operations. Record ownership, shape, dtype, lazy-evaluation, tie-breaking, and
-   RNG behavior. If key/split semantics cannot support one independent RNG stream per request,
-   revise the contract before 6.1 starts.
+   RNG behavior in `req/plans/phase6-0b-probe-findings.md`; fold the resulting native-surface facts
+   into the generated inventory in task 2. If key/split semantics cannot support one independent RNG
+   stream per request, revise the contract before 6.1 starts.
 2. Generate `req/mlx-api-inventory.md` from the committed `mlx_h` bindings. It records both native
    pins from `scripts/bootstrap-native.sh`, native symbol/group, public facade, status, and test
    location. Generated output must be deterministic and checked in.
@@ -143,9 +144,9 @@ retrospective are reviewed with the code.
      expected output metadata. Run only by `workflow_dispatch` or a scheduled workflow. Never put
      multi-GB downloads or private tokens in required PR checks.
 
-**Gate:** inventory generation and call-site verification are green in CI; a Tier-A model and
-tokenizer fixture runs natively with no external credentials; the oracle's exact provenance is
-recorded.
+**Gate:** argmax tie-breaking and RNG key/split probe findings are recorded and reviewed; inventory
+generation and call-site verification are green in CI; a Tier-A model and tokenizer fixture runs
+natively with no external credentials; the oracle's exact provenance is recorded.
 
 ## 6.1 — Sampling and streaming generation
 

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -70,10 +71,7 @@ class LlamaModelTest {
       assertEquals(List.of(0), eos.generatedTokenIds());
       assertEquals(
           eos.generatedTokenIds(),
-          eosEvents.stream()
-              .map(GenerationEvent::tokenId)
-              .filter(java.util.Objects::nonNull)
-              .toList());
+          eosEvents.stream().map(GenerationEvent::tokenId).filter(Objects::nonNull).toList());
 
       List<GenerationEvent> stopEvents = new ArrayList<>();
       GenerationResult stopped =
@@ -99,7 +97,13 @@ class LlamaModelTest {
                       CancellationToken.NONE),
                   bothTerminalEvents::add)
               .finishReason());
-      assertEquals(FinishReason.EOS, bothTerminalEvents.getFirst().finishReason());
+      assertEquals(
+          List.of(0),
+          bothTerminalEvents.stream()
+              .map(GenerationEvent::tokenId)
+              .filter(Objects::nonNull)
+              .toList());
+      assertEquals(FinishReason.EOS, bothTerminalEvents.getLast().finishReason());
     }
   }
 

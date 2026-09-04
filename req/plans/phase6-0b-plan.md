@@ -26,6 +26,12 @@ nor sampling APIs.
 
 ## Implementation slices
 
+These slices are workstreams, not a serial implementation order. Start slice 3 immediately (or in
+parallel with slices 1–2): its probes depend only on the existing scope/native infrastructure, and
+their reviewed findings are the parent plan's 6.0b.1 prerequisite for accepting the already-merged
+6.0 contract. Slices 1–2 supply durable inventory/guard infrastructure and must finish before the
+6.0b gate, but must not delay probe execution or any required correction to the shipped 6.0 claim.
+
 ### 1. Deterministic inventory
 
 Apply Gradle's `base` plugin in the root `build.gradle` to create the root lifecycle `check` task,
@@ -73,8 +79,11 @@ Java 25 toolchain. It scans handwritten source and requires an explicit mapping-
 3. generated upcall interfaces, including generated `$fun` and `$dtor` names; and
 4. generated `mlx_h` enum/constant accessors, including dtype/device constants.
 
-Use a Java parser or token-aware scanner, not substring matching, so comments, literals, and imports
-do not fail. A use is a violation when its symbol/type has no explicit record in
+Implement the scanner with the JDK compiler tree API (`JavaCompiler`/`JavacTask` and `com.sun.source`
+trees), not a hand-rolled lexer or a new third-party parsing dependency. This works in the Java 21
+Ubuntu CI job without compiling project sources or resolving the Java 25 toolchain; inspect imports
+and member-select/invocation trees to resolve generated FFI identities while naturally excluding
+comments and string literals. A use is a violation when its symbol/type has no explicit record in
 `req/mlx-api-inventory-overrides.json`, or when its explicit record is `unplanned`; a matching
 auto-rendered inventory row is not sufficient. Exclude generated and build output. Explicitly classify jextract implementation
 infrastructure (`mlx_h.C_*` layouts and `mlx_h.upcallHandle`) as named non-violations rather than

@@ -24,9 +24,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
 /**
  * Exercises {@link ClasspathNativeExtractor}'s extraction mechanics using tiny fake fixture files
@@ -280,6 +283,31 @@ class ClasspathNativeExtractorTest {
   }
 
   @Test
+  void interruptedRepairStagesInTheCacheRoot(@TempDir Path cacheRoot) throws IOException {
+    Path extracted =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    Files.writeString(extracted.resolve("libmlxc.dylib"), "truncated");
+    AtomicReference<Path> staged = new AtomicReference<>();
+
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            ClasspathNativeExtractor.extractIfAvailable(
+                loader(),
+                FIXTURE_ROOT,
+                cacheRoot,
+                path -> {
+                  staged.set(path);
+                  throw new IllegalStateException("simulate an interrupted repair");
+                }));
+
+    assertEquals(cacheRoot, staged.get().getParent());
+    assertFalse(staged.get().startsWith(extracted));
+  }
+
+  @Test
+  @ResourceLock(Resources.SYSTEM_PROPERTIES)
   void validatesAndBoundsConfiguredLockTimeout(@TempDir Path cacheRoot) {
     String property = "jmlx.native.lock.timeout.seconds";
     String previous = System.getProperty(property);
@@ -293,10 +321,15 @@ class ClasspathNativeExtractorTest {
       ClasspathNativeExtractor.NativeExtractionException failure =
           assertThrows(
               ClasspathNativeExtractor.NativeExtractionException.class,
-              () ->
-                  ClasspathNativeExtractor.extractIfAvailable(
-                      loader(), SIZE_FIXTURE_ROOT, cacheRoot));
+              () -> ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot));
       assertTrue(failure.getMessage().contains(property));
+
+      System.setProperty(property, "0");
+      ClasspathNativeExtractor.NativeExtractionException nonPositiveFailure =
+          assertThrows(
+              ClasspathNativeExtractor.NativeExtractionException.class,
+              () -> ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot));
+      assertTrue(nonPositiveFailure.getMessage().contains(property));
     } finally {
       if (previous == null) {
         System.clearProperty(property);

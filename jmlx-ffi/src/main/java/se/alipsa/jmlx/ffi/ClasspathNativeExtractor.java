@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -100,6 +101,15 @@ final class ClasspathNativeExtractor {
    */
   static Optional<Path> extractIfAvailable(
       ClassLoader loader, String resourceRoot, Path cacheRoot) {
+    return extractIfAvailable(loader, resourceRoot, cacheRoot, ignored -> {});
+  }
+
+  /** Test seam that observes a repair staging file after it has been copied but before its move. */
+  static Optional<Path> extractIfAvailable(
+      ClassLoader loader,
+      String resourceRoot,
+      Path cacheRoot,
+      Consumer<Path> repairStagingObserver) {
     if (loader.getResource(resourceRoot + "/mlx.metallib") == null) {
       if (RESOURCE_ROOT.equals(resourceRoot)
           && loader.getResource(NATIVE_ARTIFACT_CLASS_RESOURCE) != null) {
@@ -112,6 +122,20 @@ final class ClasspathNativeExtractor {
       }
       return Optional.empty(); // the native jar simply isn't a dependency
     }
+    Duration lockTimeout;
+    try {
+      // Validate this before the warm-cache return. A bad JVM option must not be hidden until a
+      // later pin bump or a first start on another machine needs to extract.
+      lockTimeout = lockTimeout();
+    } catch (IOException e) {
+      throw new NativeExtractionException(
+          "invalid native extraction lock timeout. Set -D"
+              + LOCK_TIMEOUT_PROPERTY
+              + "=<positive seconds> (maximum "
+              + MAX_LOCK_TIMEOUT.toDays()
+              + " days).",
+          e);
+    }
     CacheDescriptor cacheDescriptor;
     try {
       cacheDescriptor = cacheDescriptorFor(loader, resourceRoot);
@@ -123,21 +147,16 @@ final class ClasspathNativeExtractor {
     if (isComplete(target, cacheDescriptor.expectedSizes())) {
       return Optional.of(target);
     }
-    Duration lockTimeout;
-    try {
-      lockTimeout = lockTimeout();
-    } catch (IOException e) {
-      throw new NativeExtractionException(
-          "invalid native extraction lock timeout. Set -D"
-              + LOCK_TIMEOUT_PROPERTY
-              + "=<positive seconds> (maximum "
-              + MAX_LOCK_TIMEOUT.toDays()
-              + " days).",
-          e);
-    }
     try {
       return Optional.of(
-          extractAtomically(loader, resourceRoot, cacheRoot, target, cacheDescriptor, lockTimeout));
+          extractAtomically(
+              loader,
+              resourceRoot,
+              cacheRoot,
+              target,
+              cacheDescriptor,
+              lockTimeout,
+              repairStagingObserver));
     } catch (IOException e) {
       throw new NativeExtractionException(
           "failed to extract bundled native libraries from the classpath. Configure a writable "
@@ -271,7 +290,8 @@ final class ClasspathNativeExtractor {
       Path cacheRoot,
       Path target,
       CacheDescriptor cacheDescriptor,
-      Duration lockTimeout)
+      Duration lockTimeout,
+      Consumer<Path> repairStagingObserver)
       throws IOException {
     Files.createDirectories(cacheRoot);
     Path lockFile = cacheRoot.resolve(".extraction.lock");
@@ -293,7 +313,8 @@ final class ClasspathNativeExtractor {
               copyResource(loader, resourceRoot + "/" + name, tmp.resolve(name));
             }
             copyResource(loader, resourceRoot + "/" + PIN_FILE, tmp.resolve(PIN_FILE));
-            moveIntoPlaceLocked(tmp, target, cacheDescriptor.expectedSizes());
+            moveIntoPlaceLocked(
+                tmp, target, cacheDescriptor.expectedSizes(), repairStagingObserver);
           } catch (IOException e) {
             // Best-effort: a failed cleanup of our own temp copy must never mask the real
             // extraction failure being reported below.
@@ -361,7 +382,8 @@ final class ClasspathNativeExtractor {
    * that was lost. Its files are repaired in place from {@code tmp}, preserving the directory path
    * so a JVM that already loaded its dylibs can still lazily open its metallib.
    */
-  private static void moveIntoPlaceLocked(Path tmp, Path target, Map<String, Long> expectedSizes)
+  private static void moveIntoPlaceLocked(
+      Path tmp, Path target, Map<String, Long> expectedSizes, Consumer<Path> repairStagingObserver)
       throws IOException {
     try {
       Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
@@ -382,13 +404,14 @@ final class ClasspathNativeExtractor {
         }
         return;
       }
-      repairInPlace(tmp, target);
+      repairInPlace(tmp, target, repairStagingObserver);
       deleteQuietly(tmp);
     }
   }
 
   /** Restores an incomplete cache entry without removing its directory from a live JVM's path. */
-  private static void repairInPlace(Path tmp, Path target) throws IOException {
+  private static void repairInPlace(Path tmp, Path target, Consumer<Path> repairStagingObserver)
+      throws IOException {
     try (Stream<Path> files = Files.list(tmp)) {
       for (Path source : files.toList()) {
         Path destination = target.resolve(source.getFileName());
@@ -397,6 +420,7 @@ final class ClasspathNativeExtractor {
         Path staged = target.getParent().resolve(".tmp-repair-" + UUID.randomUUID());
         try {
           Files.copy(source, staged);
+          repairStagingObserver.accept(staged);
           Files.move(
               staged,
               destination,

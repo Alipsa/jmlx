@@ -2,6 +2,7 @@ package se.alipsa.jmlx.ffi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -311,6 +312,31 @@ class ClasspathNativeExtractorTest {
           entries.anyMatch(path -> path.getFileName().toString().startsWith(".tmp-")),
           "failed repair left an extraction temp behind");
     }
+  }
+
+  @Test
+  void preservesSpecificNativeExtractionFailures(@TempDir Path cacheRoot) throws IOException {
+    Path extracted =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    Files.writeString(extracted.resolve("libmlxc.dylib"), "truncated");
+    ClasspathNativeExtractor.NativeExtractionException injected =
+        new ClasspathNativeExtractor.NativeExtractionException(
+            "cache entry is corrupt beyond repair", new IOException("fixture failure"));
+
+    ClasspathNativeExtractor.NativeExtractionException failure =
+        assertThrows(
+            ClasspathNativeExtractor.NativeExtractionException.class,
+            () ->
+                ClasspathNativeExtractor.extractIfAvailable(
+                    loader(),
+                    FIXTURE_ROOT,
+                    cacheRoot,
+                    path -> {
+                      throw injected;
+                    }));
+
+    assertSame(injected, failure);
   }
 
   @Test

@@ -169,6 +169,8 @@ final class ClasspathNativeExtractor {
               + "cache with -Djmlx.native.cache.path=<directory>, or bypass extraction with "
               + "-Djmlx.library.path=<directory> or JMLX_LIBRARY_PATH=<directory>",
           new IOException("overlapping lock for " + cacheRoot.resolve(".extraction.lock"), e));
+    } catch (NativeExtractionException e) {
+      throw e;
     } catch (RuntimeException e) {
       throw new NativeExtractionException(
           "failed to extract bundled native libraries from the classpath. Configure a writable "

@@ -71,7 +71,7 @@ rollback() {
     cp "$BOOTSTRAP_BACKUP" "$BOOTSTRAP_SCRIPT"
     warn "aborting -- reverted scripts/bootstrap-native.sh to its state from before this run (git diff scripts/bootstrap-native.sh should now be clean if it was clean going in)"
     if [[ -n "$BOOTSTRAP_COMPLETED" ]]; then
-      warn "note: native/ was already rebuilt against $NEW_COMMIT before this failure and is NOT reverted -- re-run ./scripts/bootstrap-native.sh (now back on $OLD_COMMIT) before ./gradlew build, or the staged libraries and the committed bindings will disagree"
+      warn "note: native/, jmlx-ffi/src/main/generated/java, and req/mlx-api-inventory.md may already reflect $NEW_COMMIT and are NOT reverted -- re-run ./scripts/bootstrap-native.sh and ./scripts/regen-bindings.sh (now back on $OLD_COMMIT), then ./gradlew generateMlxApiInventory before ./gradlew build"
     fi
   fi
   rm -f "$BOOTSTRAP_BACKUP"

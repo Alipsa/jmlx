@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.mlx_h;
@@ -17,6 +18,17 @@ import se.alipsa.jmlx.memory.MLXScope;
  */
 @EnabledIfNativeAvailable
 class SelectionAndRandomProbeTest {
+
+  @Test
+  void recordsFirstTiedIndexAwayFromZero() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray tied = MLX.array(scope, new float[] {1f, 3f, 3f, 0f}, new int[] {1, 4});
+      MLXArray argmax = rawArgmaxAxis(scope, tied, 1);
+      MLX.eval(argmax);
+
+      assertExact(argmax, DType.UINT32, new int[] {1}, new int[] {1});
+    }
+  }
 
   @Test
   void recordsPinnedSelectionAndExplicitKeyBehavior() {
@@ -74,11 +86,11 @@ class SelectionAndRandomProbeTest {
     float[] source = original.toFloatArray();
     int cols = original.shape()[1];
     for (int row = 0; row < rows; row++) {
-      float[] rowActual = java.util.Arrays.copyOfRange(actual, row * k, row * k + k);
-      float[] rowSource = java.util.Arrays.copyOfRange(source, row * cols, row * cols + cols);
-      java.util.Arrays.sort(rowActual);
-      java.util.Arrays.sort(rowSource);
-      float[] expected = java.util.Arrays.copyOfRange(rowSource, cols - k, cols);
+      float[] rowActual = Arrays.copyOfRange(actual, row * k, row * k + k);
+      float[] rowSource = Arrays.copyOfRange(source, row * cols, row * cols + cols);
+      Arrays.sort(rowActual);
+      Arrays.sort(rowSource);
+      float[] expected = Arrays.copyOfRange(rowSource, cols - k, cols);
       assertArrayEquals(expected, rowActual);
     }
   }

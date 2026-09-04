@@ -90,6 +90,7 @@ jobs:
         run: ./scripts/bootstrap-native.sh
 
       - name: Run root verification
+        # Retained for native-job-only root checks, such as generated-header coverage.
         run: ./gradlew :check
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use

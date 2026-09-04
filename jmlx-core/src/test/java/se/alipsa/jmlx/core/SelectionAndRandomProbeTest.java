@@ -36,7 +36,7 @@ class SelectionAndRandomProbeTest {
           argmax, topk, sorted, argsorted, partitioned, argpartitioned, key, split, categorical);
 
       assertExact(argmax, DType.UINT32, new int[] {2}, new int[] {1, 0});
-      assertFloating(topk, new int[] {2, 2}, new float[] {3f, 2f, 5f, 4f});
+      assertTopK(topk, logits, 2);
       assertFloating(sorted, new int[] {2, 4}, new float[] {0f, 1f, 2f, 3f, 0f, 3f, 4f, 5f});
       assertExact(argsorted, DType.UINT32, new int[] {2, 4}, new int[] {3, 0, 2, 1, 3, 2, 1, 0});
       assertPartition(partitioned, logits, 1);
@@ -48,6 +48,38 @@ class SelectionAndRandomProbeTest {
           new int[] {3, 2},
           new int[] {-1160419002, -561808247, -548466209, 894150801, 801545058, -1931765865});
       assertExact(categorical, DType.UINT32, new int[] {2}, new int[] {1, 0});
+    }
+  }
+
+  @Test
+  void recordsArgmaxTieBreaking() {
+    try (MLXScope scope = new MLXScope()) {
+      // Each row has a repeated maximum (row 0: value 3 at indices 0 and 2; row 1: value 5 at
+      // indices 0 and 1), so this specifically exercises tie-breaking, unlike the distinct-valued
+      // logits used above.
+      MLXArray tiedLogits =
+          MLX.array(scope, new float[] {3f, 1f, 3f, 0f, 5f, 5f, 4f, 0f}, new int[] {2, 4});
+      MLXArray argmax = rawArgmaxAxis(scope, tiedLogits, 1);
+      MLX.eval(argmax);
+
+      assertExact(argmax, DType.UINT32, new int[] {2}, new int[] {0, 0});
+    }
+  }
+
+  private static void assertTopK(MLXArray topk, MLXArray original, int k) {
+    assertEquals(DType.FLOAT32, topk.dtype());
+    int rows = original.shape()[0];
+    assertArrayEquals(new int[] {rows, k}, topk.shape());
+    float[] actual = topk.toFloatArray();
+    float[] source = original.toFloatArray();
+    int cols = original.shape()[1];
+    for (int row = 0; row < rows; row++) {
+      float[] rowActual = java.util.Arrays.copyOfRange(actual, row * k, row * k + k);
+      float[] rowSource = java.util.Arrays.copyOfRange(source, row * cols, row * cols + cols);
+      java.util.Arrays.sort(rowActual);
+      java.util.Arrays.sort(rowSource);
+      float[] expected = java.util.Arrays.copyOfRange(rowSource, cols - k, cols);
+      assertArrayEquals(expected, rowActual);
     }
   }
 

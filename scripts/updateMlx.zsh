@@ -95,11 +95,11 @@ log "Running regen-bindings.sh"
 "$REPO_ROOT/scripts/regen-bindings.sh"
 
 log "Regenerating the checked-in MLX API inventory"
-cd "$REPO_ROOT"
-./gradlew generateMlxApiInventory
+"$REPO_ROOT/gradlew" -p "$REPO_ROOT" generateMlxApiInventory
 
 log "Done. Next steps:"
 log "  1. ./gradlew build -- confirm everything still compiles and passes against the new bindings."
 log "  2. git diff --exit-code jmlx-ffi/src/main/generated/java -- if this is non-empty, the bindings actually changed; review the diff."
-log "  3. git diff scripts/bootstrap-native.sh -- review the repinned commit."
-log "  4. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."
+log "  3. git diff req/mlx-api-inventory.md -- review the regenerated inventory, since a bindings diff changes the symbol set it renders."
+log "  4. git diff scripts/bootstrap-native.sh -- review the repinned commit."
+log "  5. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."

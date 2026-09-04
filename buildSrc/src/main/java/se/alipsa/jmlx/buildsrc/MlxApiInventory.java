@@ -17,13 +17,16 @@ public final class MlxApiInventory {
       Pattern.compile("(?m)^    public static [^\\n(]+ (mlx_[a-z0-9_]+)\\(");
   private static final int MINIMUM_CALLABLE_BINDINGS = 600;
 
+  // CLAUDE.md documents that an unfiltered jextract run silently drops exactly these four
+  // mlx_array constructor/destructor symbols with no warning; the count floor above would not
+  // reliably catch losing just these four, so check for them by name as well.
+  private static final Set<String> REQUIRED_SYMBOLS =
+      Set.of("mlx_array_new", "mlx_array_free", "mlx_array_new_data", "mlx_array_new_data_managed");
+
   private MlxApiInventory() {}
 
   /** Returns the complete checked-in inventory text for {@code repositoryRoot}. */
   public static String render(Path repositoryRoot) throws IOException {
-    String bootstrap =
-        Files.readString(
-            repositoryRoot.resolve("scripts/bootstrap-native.sh"), StandardCharsets.UTF_8);
     String binding =
         Files.readString(
             repositoryRoot.resolve(
@@ -42,6 +45,17 @@ public final class MlxApiInventory {
               + MINIMUM_CALLABLE_BINDINGS
               + ". The generated binding layout or inventory parser may have changed.");
     }
+    Set<String> missingRequired = new TreeSet<>(REQUIRED_SYMBOLS);
+    missingRequired.removeAll(symbols);
+    if (!missingRequired.isEmpty()) {
+      throw new IllegalStateException(
+          "Expected callable mlx_h bindings missing from the inventory: "
+              + missingRequired
+              + ". The generated binding layout or inventory parser may have changed.");
+    }
+    String bootstrap =
+        Files.readString(
+            repositoryRoot.resolve("scripts/bootstrap-native.sh"), StandardCharsets.UTF_8);
     String metal = pin(bootstrap, "MLX_METAL_VERSION");
     StringBuilder out = new StringBuilder();
     out.append("# MLX API inventory\n\n");

@@ -12,9 +12,13 @@ import java.net.URLConnection;
 import java.net.URLStreamHandler;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -244,6 +248,62 @@ class ClasspathNativeExtractorTest {
     assertEquals(
         EXPECTED_FIXTURE_CONTENT.get("libmlxc.dylib"),
         Files.readString(repaired.resolve("libmlxc.dylib")));
+  }
+
+  @Test
+  void repairSweepsStaleRootStagingAndLeavesOnlyNativeFiles(@TempDir Path cacheRoot)
+      throws IOException {
+    Path extracted =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    Path staleStaging = cacheRoot.resolve(".tmp-repair-orphan");
+    Files.writeString(staleStaging, "abandoned repair staging");
+    Files.setLastModifiedTime(
+        staleStaging, FileTime.from(Instant.now().minus(Duration.ofHours(2))));
+    Files.writeString(extracted.resolve("libmlxc.dylib"), "truncated");
+
+    Path repaired =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+
+    assertFalse(Files.exists(staleStaging), "stale root staging was not swept");
+    try (var entries = Files.list(repaired)) {
+      assertEquals(
+          Set.of(
+              "libmlxc.dylib",
+              "libmlx.dylib",
+              "libjaccl.dylib",
+              "mlx.metallib",
+              "native-pin.properties"),
+          entries.map(path -> path.getFileName().toString()).collect(Collectors.toSet()));
+    }
+  }
+
+  @Test
+  void validatesAndBoundsConfiguredLockTimeout(@TempDir Path cacheRoot) {
+    String property = "jmlx.native.lock.timeout.seconds";
+    String previous = System.getProperty(property);
+    try {
+      System.setProperty(property, "9223372036854775807");
+      assertTrue(
+          ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+              .isPresent());
+
+      System.setProperty(property, "not-a-duration");
+      ClasspathNativeExtractor.NativeExtractionException failure =
+          assertThrows(
+              ClasspathNativeExtractor.NativeExtractionException.class,
+              () ->
+                  ClasspathNativeExtractor.extractIfAvailable(
+                      loader(), SIZE_FIXTURE_ROOT, cacheRoot));
+      assertTrue(failure.getMessage().contains(property));
+    } finally {
+      if (previous == null) {
+        System.clearProperty(property);
+      } else {
+        System.setProperty(property, previous);
+      }
+    }
   }
 
   @Test

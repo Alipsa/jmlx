@@ -62,6 +62,11 @@ final class ClasspathNativeExtractor {
   /** A peer JVM that never releases the cache lock must not hang native loading forever. */
   private static final Duration DEFAULT_LOCK_TIMEOUT = Duration.ofMinutes(5);
 
+  /**
+   * Bounds configured lock waits to an Instant-safe value while still accommodating slow storage.
+   */
+  private static final Duration MAX_LOCK_TIMEOUT = Duration.ofDays(365);
+
   /** Prevents overlapping cache-wide file locks from concurrent extraction calls in this JVM. */
   private static final Object EXTRACTION_LOCK = new Object();
 
@@ -77,10 +82,12 @@ final class ClasspathNativeExtractor {
   /**
    * Extracts the bundled binaries to the default per-pin cache directory under {@code
    * ~/Library/Application Support/se.alipsa.jmlx/native} (overridable via the {@code
-   * jmlx.native.cache.path} system property), or an empty {@link Optional} if {@code
-   * jmlx-native-macos-arm64} isn't on the classpath at all. This is durable application data rather
-   * than {@code ~/Library/Caches}: MLX may not open {@code mlx.metallib} until the first kernel
-   * launch, after the dylibs have already been loaded.
+   * jmlx.native.cache.path} system property). On slow or shared storage, the cache-wide extraction
+   * lock wait is configurable with {@code jmlx.native.lock.timeout.seconds} (default five minutes,
+   * maximum 365 days). Returns an empty {@link Optional} if {@code jmlx-native-macos-arm64} isn't
+   * on the classpath at all. This is durable application data rather than {@code ~/Library/Caches}:
+   * MLX may not open {@code mlx.metallib} until the first kernel launch, after the dylibs have
+   * already been loaded.
    */
   static Optional<Path> extractIfAvailable() {
     return extractIfAvailable(
@@ -116,9 +123,21 @@ final class ClasspathNativeExtractor {
     if (isComplete(target, cacheDescriptor.expectedSizes())) {
       return Optional.of(target);
     }
+    Duration lockTimeout;
+    try {
+      lockTimeout = lockTimeout();
+    } catch (IOException e) {
+      throw new NativeExtractionException(
+          "invalid native extraction lock timeout. Set -D"
+              + LOCK_TIMEOUT_PROPERTY
+              + "=<positive seconds> (maximum "
+              + MAX_LOCK_TIMEOUT.toDays()
+              + " days).",
+          e);
+    }
     try {
       return Optional.of(
-          extractAtomically(loader, resourceRoot, cacheRoot, target, cacheDescriptor));
+          extractAtomically(loader, resourceRoot, cacheRoot, target, cacheDescriptor, lockTimeout));
     } catch (IOException e) {
       throw new NativeExtractionException(
           "failed to extract bundled native libraries from the classpath. Configure a writable "
@@ -251,7 +270,8 @@ final class ClasspathNativeExtractor {
       String resourceRoot,
       Path cacheRoot,
       Path target,
-      CacheDescriptor cacheDescriptor)
+      CacheDescriptor cacheDescriptor,
+      Duration lockTimeout)
       throws IOException {
     Files.createDirectories(cacheRoot);
     Path lockFile = cacheRoot.resolve(".extraction.lock");
@@ -261,7 +281,7 @@ final class ClasspathNativeExtractor {
       // accidentally releasing another local caller's lock after it has acquired it.
       try (FileChannel channel =
           FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-        try (FileLock ignored = acquireLock(channel, lockFile)) {
+        try (FileLock ignored = acquireLock(channel, lockFile, lockTimeout)) {
           sweepStaleTempDirs(cacheRoot);
           if (isComplete(target, cacheDescriptor.expectedSizes())) {
             return target;
@@ -286,8 +306,9 @@ final class ClasspathNativeExtractor {
     return target;
   }
 
-  private static FileLock acquireLock(FileChannel channel, Path lockFile) throws IOException {
-    Instant deadline = Instant.now().plus(lockTimeout());
+  private static FileLock acquireLock(FileChannel channel, Path lockFile, Duration lockTimeout)
+      throws IOException {
+    Instant deadline = Instant.now().plus(lockTimeout);
     while (Instant.now().isBefore(deadline)) {
       FileLock lock = channel.tryLock();
       if (lock != null) {
@@ -319,7 +340,7 @@ final class ClasspathNativeExtractor {
       if (seconds <= 0) {
         throw new NumberFormatException("must be positive");
       }
-      return Duration.ofSeconds(seconds);
+      return Duration.ofSeconds(Math.min(seconds, MAX_LOCK_TIMEOUT.toSeconds()));
     } catch (NumberFormatException | ArithmeticException e) {
       throw new IOException(
           "invalid -D" + LOCK_TIMEOUT_PROPERTY + "=" + configured + "; expected positive seconds",

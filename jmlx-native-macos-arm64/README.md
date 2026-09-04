@@ -33,6 +33,10 @@ space after upgrading, stop all jmlx JVMs and delete unneeded directories under
 `~/Library/Application Support/se.alipsa.jmlx/native` (or the directory selected by
 `-Djmlx.native.cache.path`).
 
+The extraction lock waits up to five minutes by default. On slow or shared storage, configure a
+longer wait with `-Djmlx.native.lock.timeout.seconds=<positive-seconds>`; values are capped at 365
+days.
+
 The artifact supports macOS/aarch64 only. It has the automatic module name
 `se.alipsa.jmlx.nativelib.macosarm64`. `NativeArtifact.pin()` exposes the packaged `mlx-metal`
 version and mlx-c commit for diagnostics without loading the native libraries.

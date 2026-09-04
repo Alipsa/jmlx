@@ -8,9 +8,9 @@ row is reporting only: handwritten use requires an explicit mapping record.
 
 - mlx-metal: `0.31.2`
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
-- generated entries: 731
-- by category: downcall=616, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=118, planned=7, unplanned=606
+- generated entries: 733
+- by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
+- by status: implemented=157, planned=7, unplanned=569
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -95,6 +95,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h._mlx_array_is_contiguous` | downcall | unplanned | — | — | — | — |
 | `mlx_h._mlx_array_is_row_contiguous` | downcall | unplanned | — | — | — | — |
 | `mlx_h._mlx_array_wait` | downcall | unplanned | — | — | — | — |
+| `mlx_h._mlx_error` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_abs` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_add` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_addmm` | downcall | unplanned | — | — | — | — |
@@ -193,7 +194,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_blackman` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_block_masked_mm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_broadcast_arrays` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_broadcast_to` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_broadcast_to` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_ceil` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_checkpoint` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_clear_cache` | downcall | unplanned | — | — | — | — |
@@ -237,7 +238,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_closure_value_and_grad_set` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_compile` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_concatenate` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_concatenate_axis` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_concatenate_axis` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_conjugate` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_contiguous` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_conv1d` | downcall | unplanned | — | — | — | — |
@@ -248,7 +249,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_conv_transpose2d` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_conv_transpose3d` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_copy` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_cos` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_cos` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_cosh` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cuda_is_available` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cummax` | downcall | unplanned | — | — | — | — |
@@ -303,17 +304,17 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_distributed_recv_like` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_send` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_sum_scatter` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_divide` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_divide` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_divmod` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_dtype_size` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_einsum` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_enable_compile` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_equal` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_erf` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_equal` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_erf` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_erfinv` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_eval` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_exp` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_expand_dims` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_exp` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_expand_dims` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_expand_dims_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_expm1` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_export_function` | downcall | unplanned | — | — | — | — |
@@ -367,7 +368,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fft_rfft2` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fft_rfftfreq` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fft_rfftn` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_flatten` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_flatten` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_floor` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_floor_divide` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_from_fp8` | downcall | unplanned | — | — | — | — |
@@ -387,8 +388,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_get_default_stream` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_get_memory_limit` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_peak_memory` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_greater` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_greater_equal` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_greater` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_greater_equal` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_hadamard_transform` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_hamming` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_hanning` | downcall | unplanned | — | — | — | — |
@@ -398,7 +399,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_imported_function_apply_kwargs` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_imported_function_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_imported_function_new` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_inner` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_inner` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_io_gguf_free` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
 | `mlx_h.mlx_io_gguf_get_array` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
 | `mlx_h.mlx_io_gguf_get_keys` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
@@ -430,8 +431,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_jvp` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_kron` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_left_shift` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_less` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_less_equal` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_less` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_less_equal` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_linalg_cholesky` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_cholesky_inv` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_cross` | downcall | unplanned | — | — | — | — |
@@ -457,7 +458,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_load_reader` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_load_safetensors` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
 | `mlx_h.mlx_load_safetensors_reader` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_log` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_log` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_log10` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_log1p` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_log2` | downcall | unplanned | — | — | — | — |
@@ -486,13 +487,13 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_map_string_to_string_new` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
 | `mlx_h.mlx_map_string_to_string_set` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_masked_scatter` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_matmul` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_matmul` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_max` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_max_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_max_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_maximum` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_maximum` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_mean` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_mean_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_mean_axes` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_mean_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_median` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_meshgrid` | downcall | unplanned | — | — | — | — |
@@ -504,22 +505,23 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_min_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_minimum` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_moveaxis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_multiply` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_multiply` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_nan_to_num` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_negative` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_negative` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_node_namer_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_node_namer_get_name` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_node_namer_new` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_node_namer_set_name` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_not_equal` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_number_of_elements` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_ones` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_ones_like` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_outer` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_outer` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_pad` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_pad_symmetric` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_partition` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_partition_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
-| `mlx_h.mlx_power` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_power` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_print_graph` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_prod` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_prod_axes` | downcall | unplanned | — | — | — | — |
@@ -560,7 +562,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_roll_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_roll_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_round` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_rsqrt` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_rsqrt` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_save` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_save_gguf` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
 | `mlx_h.mlx_save_safetensors` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
@@ -585,9 +587,9 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_set_error_handler` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_set_memory_limit` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_set_wired_limit` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_sigmoid` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_sigmoid` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_sign` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_sin` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_sin` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_sinh` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_slice` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_slice_dynamic` | downcall | unplanned | — | — | — | — |
@@ -604,17 +606,17 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_sort_axis` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_split` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_split_sections` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_sqrt` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_square` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_squeeze` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_squeeze_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_sqrt` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_square` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_squeeze` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_squeeze_axes` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_squeeze_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stack` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stack_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_stop_gradient` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stop_gradient` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_stream_equal` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_get_device` | downcall | unplanned | — | — | — | — |
@@ -628,17 +630,17 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_string_new` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_string_new_data` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_string_set` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_subtract` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_subtract` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_sum` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_sum_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_sum_axes` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_sum_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_swapaxes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_swapaxes` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_synchronize` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_take` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_take` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_take_along_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_take_axis` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_tan` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_tanh` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_tanh` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_tensordot` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_tensordot_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_tile` | downcall | unplanned | — | — | — | — |
@@ -646,11 +648,11 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_topk` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_topk_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_trace` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_transpose` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_transpose_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_transpose` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_transpose_axes` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_tri` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_tril` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_triu` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_tril` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
+| `mlx_h.mlx_triu` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_unflatten` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_value_and_grad` | downcall | implemented | MLXGrad | MLXGradTest | — | all handwritten source |
 | `mlx_h.mlx_var` | downcall | unplanned | — | — | — | — |

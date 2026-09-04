@@ -28,6 +28,10 @@ public final class MlxApiInventory {
       Pattern.compile("(?m)^    public static [^\\n(]+ (_?mlx_[a-z0-9_]+)\\(");
   private static final Pattern DOWNCALL_HOLDER =
       Pattern.compile("(?m)^    private static class (_?mlx_[a-z0-9_]+) \\{");
+  private static final Pattern VARIADIC_INVOKER =
+      Pattern.compile(
+          "(?ms)^    public static class (_?mlx_[a-z0-9_]+) \\{.*?^        public static \\1"
+              + " makeInvoker\\(MemoryLayout\\.\\.\\. layouts\\)");
   private static final Pattern CONSTANT =
       Pattern.compile("(?m)^    public static int (MLX_[A-Z0-9_]+)\\(\\)");
 
@@ -108,15 +112,18 @@ public final class MlxApiInventory {
     Path directory = repositoryRoot.resolve(BINDING_DIRECTORY);
     String binding = Files.readString(directory.resolve("mlx_h.java"), StandardCharsets.UTF_8);
     Set<String> symbols = matches(binding, METHOD);
-    int holders = countDowncallHolders(binding);
+    Set<String> variadicInvokers = matches(binding, VARIADIC_INVOKER);
+    symbols.addAll(variadicInvokers);
+    int holders = countDowncallHolders(binding) + variadicInvokers.size();
     if (holders == 0 || symbols.size() != holders) {
       throw new IllegalStateException(
           "Only "
               + symbols.size()
               + " of "
               + holders
-              + " mlx_h downcall holders matched; expected every holder to have a public downcall. "
-              + "The generated binding layout or inventory parser may have changed.");
+              + " mlx_h downcall implementations matched; expected every holder or variadic invoker"
+              + " to have a public downcall. The generated binding layout or inventory parser may"
+              + " have changed.");
     }
     Set<String> missingRequired = new TreeSet<>(REQUIRED_SYMBOLS);
     missingRequired.removeAll(symbols);

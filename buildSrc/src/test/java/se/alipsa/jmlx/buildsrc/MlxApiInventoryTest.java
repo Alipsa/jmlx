@@ -22,8 +22,8 @@ class MlxApiInventoryTest {
     String first = MlxApiInventory.render(root);
 
     assertEquals(first, MlxApiInventory.render(root));
-    assertTrue(first.contains("generated entries: 7"));
-    assertTrue(first.contains("downcall=4, constant=1, layout/accessor=1, upcall interface=1"));
+    assertTrue(first.contains("generated entries: 8"));
+    assertTrue(first.contains("downcall=5, constant=1, layout/accessor=1, upcall interface=1"));
     assertTrue(first.contains("| `mlx_h.MLX_FLOAT32` | constant | unplanned"));
     assertTrue(first.contains("| `mlx_h.mlx_array_new` | downcall | implemented | reason | test"));
     assertTrue(first.indexOf("`mlx_array_`") < first.indexOf("`mlx_h.MLX_FLOAT32`"));
@@ -99,6 +99,60 @@ class MlxApiInventoryTest {
 
     assertTrue(failure.getMessage().contains("mlx_array"));
     assertTrue(failure.getMessage().contains("star imports are not allowed"));
+    assertTrue(failure.getMessage().contains("replace the star import with explicit"));
+  }
+
+  @Test
+  void callSiteGuardRejectsMethodReferencesAndFullyQualifiedTypes() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+    Files.writeString(
+        root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_array.java"), "");
+    Path source = root.resolve("jmlx-core/src/main/java/sample/Example.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(
+        source,
+        """
+        import java.util.function.Supplier;
+        import se.alipsa.jmlx.ffi.mlx_h;
+        class Example {
+          Supplier<Object> one = mlx_h::mlx_array_free;
+          Supplier<Object> two = se.alipsa.jmlx.ffi.mlx_h::mlx_array_free;
+          Supplier<Object> three = se.alipsa.jmlx.ffi.mlx_array::ctx;
+        }
+        """);
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
+
+    assertTrue(failure.getMessage().contains("mlx_h.mlx_array_free"));
+    assertTrue(failure.getMessage().contains("mlx_array"));
+  }
+
+  @Test
+  void callSiteGuardFailsWhenAHandwrittenSourceCannotBeParsed() throws Exception {
+    Path root = fixture("{\"records\":[]}");
+    Path source = root.resolve("jmlx-core/src/main/java/sample/Broken.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(
+        source,
+        "import se.alipsa.jmlx.ffi.mlx_h; class Broken { void use() { mlx_h.mlx_array_free(); } }"
+            + " }");
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
+
+    assertTrue(failure.getMessage().contains("Unable to parse handwritten Java source"));
+  }
+
+  @Test
+  void callSiteGuardRejectsMappingsWithoutObservedUses() throws Exception {
+    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
+
+    assertTrue(
+        failure.getMessage().contains("remove the stale inventory mapping"), failure::getMessage);
   }
 
   @Test
@@ -140,7 +194,7 @@ class MlxApiInventoryTest {
 
   @Test
   void callSiteGuardExcludesGeneratedSourcesAndNamedJextractInfrastructure() throws Exception {
-    Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
+    Path root = fixture("{\"records\":[]}");
     Files.writeString(
         root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/Generated.java"),
         "class Generated { void use() { mlx_h.mlx_array_free(); } }");
@@ -182,6 +236,8 @@ class MlxApiInventoryTest {
         "    public static int mlx_array_free() {",
         "    public static int mlx_array_new_data() {",
         "    public static int mlx_array_new_data_managed() {",
+        "    public static class mlx_variadic {",
+        "        public static mlx_variadic makeInvoker(MemoryLayout... layouts) {",
         "    public static int MLX_FLOAT32() {");
   }
 

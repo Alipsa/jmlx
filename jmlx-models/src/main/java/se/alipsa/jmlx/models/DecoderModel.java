@@ -195,13 +195,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             MLXArray lastLogits =
                 tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
             int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
-            if (policy.eosTokenIds().contains(next)) {
-              // The legacy generate overload includes EOS in its returned sequence.
-              generated.add(next);
-              reason = FinishReason.EOS;
-              break;
-            }
-            if (policy.stopTokenIds().contains(next)) {
+            boolean eos = policy.eosTokenIds().contains(next);
+            if (!eos && policy.stopTokenIds().contains(next)) {
               reason = FinishReason.STOP_TOKEN;
               break;
             }
@@ -210,6 +205,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               listener.accept(GenerationEvent.token(next));
             } catch (RuntimeException e) {
               throw new GenerationAbortedException(toList(prompt), generated, e);
+            }
+            if (eos) {
+              reason = FinishReason.EOS;
+              break;
             }
             input = new int[] {next};
           }

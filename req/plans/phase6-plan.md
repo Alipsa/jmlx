@@ -221,7 +221,9 @@ unsupported artifacts fail before a partial model is returned.
 ## 6.4 — Prefill/decode performance and cache lifecycle
 
 1. Split generation internally into prefill and single-token decode paths. Avoid rebuilding prompt
-   arrays or recomputing cached keys/values during decode.
+   arrays or recomputing cached keys/values during decode. Preserve the public cancellation
+   contract: it is observed before prefill and between decode steps, not during an in-progress
+   prefill; any finer-grained cancellation requires separately reviewed native support.
 2. Extend `KVCache` with explicit capacity, reset, fork, reorder, and sliding-window eviction
    semantics. Its current close-on-append ownership contract makes direct sharing unsafe: initially
    implement fork/reorder by copying or rebuilding owned arrays. Sharing is permitted only after a

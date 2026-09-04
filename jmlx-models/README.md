@@ -58,7 +58,8 @@ entry points; both delegate to the common loader. For chat models, render the mo
 through `HfTokenizer`/`ChatTemplateRenderer`, then encode that rendered text with
 `addSpecialTokens=false`: templates ordinarily include their own BOS token. The event callback runs
 synchronously on the thread which owns the generation scope. A cancelling thread may only change
-the `CancellationToken`; it must never touch model or native resources.
+the `CancellationToken`; it must never touch model or native resources. Cancellation is observed
+before prefill and between decode steps, not during an in-progress prompt prefill.
 
 ## Resource ownership
 

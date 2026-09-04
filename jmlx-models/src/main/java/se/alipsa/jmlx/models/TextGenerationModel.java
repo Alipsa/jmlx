@@ -11,16 +11,21 @@ public interface TextGenerationModel extends AutoCloseable {
 
   /**
    * Generates tokens and synchronously sends token events followed by one terminal event to {@code
-   * listener}. EOS has precedence when a token belongs to both EOS and stop sets; neither
-   * terminating token is sent as a token event. For legacy compatibility, an EOS ID remains in
-   * {@link GenerationResult#generatedTokenIds()}, while an explicit stop-token ID is excluded. If a
-   * token listener throws, generation aborts, its native scopes are closed, and a {@link
-   * GenerationAbortedException} exposes the partial token sequence. A terminal-listener exception
-   * is logged because generation has already completed and its result remains available.
+   * listener}. EOS has precedence when a token belongs to both EOS and stop sets. For legacy
+   * compatibility, an EOS ID remains in {@link GenerationResult#generatedTokenIds()} and is sent as
+   * a token event; an explicit stop-token ID is excluded from both. If a token listener throws,
+   * generation aborts, its native scopes are closed, and a {@link GenerationAbortedException}
+   * exposes the partial token sequence; no terminal event is sent after that listener failure. A
+   * terminal-listener exception is logged because generation has already completed and its result
+   * remains available.
    */
   GenerationResult generate(GenerationRequest request, Consumer<GenerationEvent> listener);
 
-  /** Closes only resources owned directly by this model. Scope-taking loaders own none. */
+  /**
+   * Closes resources owned directly by this model. Every current implementation is loaded into a
+   * caller-owned scope and owns no independent resources, so this is currently a no-op; a future
+   * owning loader may provide an implementation that closes its own scope.
+   */
   @Override
   default void close() {}
 }

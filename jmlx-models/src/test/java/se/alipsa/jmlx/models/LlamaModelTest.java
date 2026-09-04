@@ -58,15 +58,22 @@ class LlamaModelTest {
     writeTinyLlamaCheckpoint(dir);
     try (MLXScope modelScope = new MLXScope()) {
       LlamaModel model = LlamaModel.load(modelScope, dir);
+      List<GenerationEvent> eosEvents = new ArrayList<>();
       GenerationResult eos =
           model.generate(
               new GenerationRequest(
                   new int[] {1},
                   GenerationConfig.greedyDefaults(2, Set.of(0)),
                   CancellationToken.NONE),
-              ignored -> {});
+              eosEvents::add);
       assertEquals(FinishReason.EOS, eos.finishReason());
       assertEquals(List.of(0), eos.generatedTokenIds());
+      assertEquals(
+          eos.generatedTokenIds(),
+          eosEvents.stream()
+              .map(GenerationEvent::tokenId)
+              .filter(java.util.Objects::nonNull)
+              .toList());
 
       List<GenerationEvent> stopEvents = new ArrayList<>();
       GenerationResult stopped =
@@ -132,6 +139,25 @@ class LlamaModelTest {
       assertEquals(List.of(0), cancelledResult.generatedTokenIds());
       assertEquals(Thread.currentThread(), pollingThread.get());
       assertEquals(Thread.currentThread(), generationThread.get());
+    }
+  }
+
+  @Test
+  void cancellationBeforePrefillEmitsOnlyATerminalEvent(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
+      List<GenerationEvent> events = new ArrayList<>();
+
+      GenerationResult result =
+          model.generate(
+              new GenerationRequest(
+                  new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), () -> true),
+              events::add);
+
+      assertEquals(FinishReason.CANCELLED, result.finishReason());
+      assertEquals(List.of(), result.generatedTokenIds());
+      assertEquals(List.of(GenerationEvent.finished(FinishReason.CANCELLED)), events);
     }
   }
 
@@ -205,38 +231,12 @@ class LlamaModelTest {
     writeTinyLlamaCheckpoint(dir);
     try (MLXScope modelScope = new MLXScope()) {
       LlamaModel model = LlamaModel.load(modelScope, dir);
+      exerciseTerminalPaths(model);
       long baseline = NativeMemoryProbe.activeMemoryBytes();
       // MLX's active-memory counter excludes cached allocator blocks; the 4 KiB allowance absorbs
       // small runner-side bookkeeping while remaining far below one leaked decoder activation.
       for (int i = 0; i < 20; i++) {
-        model.generate(new int[] {1}, 2, Set.of());
-        model.generate(new int[] {1}, 2, Set.of(0));
-        model.generate(
-            new GenerationRequest(
-                new int[] {1},
-                GenerationConfig.greedyDefaults(2, Set.of(), Set.of(0)),
-                CancellationToken.NONE),
-            ignored -> {});
-        model.generate(
-            new GenerationRequest(
-                new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), () -> true),
-            ignored -> {});
-        assertThrows(
-            GenerationAbortedException.class,
-            () ->
-                model.generate(
-                    new GenerationRequest(
-                        new int[] {1},
-                        GenerationConfig.greedyDefaults(2, Set.of()),
-                        CancellationToken.NONE),
-                    event -> {
-                      throw new IllegalStateException("listener failed");
-                    }));
-        AtomicBoolean cancelled = new AtomicBoolean();
-        model.generate(
-            new GenerationRequest(
-                new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), cancelled::get),
-            event -> cancelled.set(true));
+        exerciseTerminalPaths(model);
       }
       long after = NativeMemoryProbe.activeMemoryBytes();
       assertTrue(
@@ -247,6 +247,37 @@ class LlamaModelTest {
               + after
               + ")");
     }
+  }
+
+  private static void exerciseTerminalPaths(LlamaModel model) {
+    model.generate(new int[] {1}, 2, Set.of());
+    model.generate(new int[] {1}, 2, Set.of(0));
+    model.generate(
+        new GenerationRequest(
+            new int[] {1},
+            GenerationConfig.greedyDefaults(2, Set.of(), Set.of(0)),
+            CancellationToken.NONE),
+        ignored -> {});
+    model.generate(
+        new GenerationRequest(
+            new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), () -> true),
+        ignored -> {});
+    assertThrows(
+        GenerationAbortedException.class,
+        () ->
+            model.generate(
+                new GenerationRequest(
+                    new int[] {1},
+                    GenerationConfig.greedyDefaults(2, Set.of()),
+                    CancellationToken.NONE),
+                event -> {
+                  throw new IllegalStateException("listener failed");
+                }));
+    AtomicBoolean cancelled = new AtomicBoolean();
+    model.generate(
+        new GenerationRequest(
+            new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), cancelled::get),
+        event -> cancelled.set(true));
   }
 
   private static void writeTinyLlamaCheckpoint(Path dir) throws Exception {

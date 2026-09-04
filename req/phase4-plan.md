@@ -17,7 +17,7 @@
 | M3 — RoPE, MultiHeadAttention, KV cache (§7) | **Done** | [PR #10](https://github.com/Alipsa/jmlx/pull/10), `59c9afe`, see req/plans/phase4-m3-plan.md |
 | M4 — `QuantizedLinear` (§8) | **Done** | this branch, see req/plans/phase4-m4-plan.md |
 | §9 — Documentation | **Done** | this branch, req/plans/phase4-m4-plan.md Task 3 |
-| §10 — CI, hosted ARM64 runner workflow (see note below) | **Workflow added; branch protection pending** | `ci.yml` (`CI` workflow) |
+| §10 — CI, hosted ARM64 runner workflow (see note below) | **Done — workflow and required-check ruleset active** | `ci.yml` (`CI` workflow), `Protect main` ruleset |
 
 **M0d note.** Implemented only the ops its own "ops added at this merge point" list names
 (`array(scope, int[], int[])`, `zeros`, `ones`, `full`, `arange`, `stopGradient`) — deliberately
@@ -1067,7 +1067,7 @@ nullables (§2's table).
   changes in this phase (cross-scope ops, child-scope lifetime) are visible in the demo rather than
   only in tests.
 
-### 10. CI — hosted ARM64 runner for `./gradlew build` — **WORKFLOW ADDED; BRANCH PROTECTION PENDING**
+### 10. CI — hosted ARM64 runner for `./gradlew build` — **DONE**
 
 Found as a gap during M1's PR #6 review (see Status note above), not part of the original Phase 4
 design — recorded here as the concrete follow-up rather than a GitHub issue, so it stays attached to
@@ -1080,8 +1080,8 @@ the plan that will act on it.
 * **Scope:** one `CI` workflow runs two jobs on pull-request updates against `main` and pushes to
   `main`: `java` runs the pure-Java Jinja/tokenizer checks and Node-oracle verification on Ubuntu;
   `native` bootstraps MLX then runs the FFI/core/examples checks on hosted ARM64 macOS. This avoids
-  repeating the Jinja suite on macOS while retaining all native coverage. Make both checks required
-  in branch protection so a red run blocks merge instead of only a red local terminal.
+  repeating the Jinja suite on macOS while retaining all native coverage. The active `Protect main`
+  repository ruleset requires both checks, so a red run blocks merge rather than only a local terminal.
 * **Fallback considered and rejected as the primary fix:** a local pre-push git hook running
   `./gradlew build`. Cheaper to set up, but it protects only pushes from a machine that has the hook
   installed — it does nothing for a PR pushed from elsewhere, and unlike a required CI check it is not
@@ -1092,8 +1092,8 @@ the plan that will act on it.
 workflow. Its `native` job runs on GitHub-hosted `macos-26`, uses JDK 25, and bootstraps the pinned
 runtime with `scripts/bootstrap-native.sh`; bootstrap failure fails the job. Its Gradle invocation
 uses `--no-build-cache`, so native tests cannot be reported green from restored task output.
-Configuring the `CI / java` and `CI / native` checks as required branch-protection checks remains
-repository-admin configuration outside this working tree.
+The active `Protect main` repository ruleset requires the `java` and `native` checks, requires pull
+requests, and blocks deletion and non-fast-forward updates to the default branch.
 
 ## Testing approach
 

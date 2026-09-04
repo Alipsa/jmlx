@@ -4,16 +4,15 @@
 
 **Branch:** this phase started on `phase5-plan`, off `main` at `f28a327` (PR #11, Phase 4 M4
 `QuantizedLinear`, merged); M1 has since merged to `main` via PR #12 (`5c85f8c`) and that branch is
-deleted. Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4 plus §9 documentation **Done** —
-but not "fully Done": §10 (CI, self-hosted runner) is still **Not started**, per that document's own
-Status table. (M0d is also `Done` only in a scoped-down sense — six generic op-body helpers
+deleted. Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4, §9 documentation, and §10's
+hosted ARM64 CI workflow plus required-check ruleset **Done**. (M0d is also `Done` only in a scoped-down sense — six generic op-body helpers
 deliberately deferred past their original merge point, per that table's own M0d note; this document's
 Research findings section below leans on that same precedent for M1's own C-string helper.)
 
 | Item | Status | Commit |
 |---|---|---|
 | M1 — Checkpoint I/O: `MLXIO`, safetensors + GGUF (§1) | **Done** (`req/plans/phase5-m1-plan.md`'s own amendments record two runtime-discovered fixes beyond the original plan) | `5c85f8c` (PR #12) |
-| M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus chat-template rendering through the local `jmlx-jinja` module, `se.alipsa.jmlx.jinja.Template`; its only external dependency is `tools.jackson.core:jackson-databind:3.1.2`) | Tasks 1-14 on `phase5-m2-tokenizer` (not yet merged to `main`) |
+| M2 — Tokenizer integration (§2) | **Done** (implemented as the new `jmlx-tokenizer` module, `se.alipsa.jmlx.tokenizer` -- a pure-Java byte-level BPE tokenizer plus chat-template rendering through the local `jmlx-jinja` module, `se.alipsa.jmlx.jinja.Template`; its only external dependency is `tools.jackson.core:jackson-databind:3.1.2`) | PR #14 (`f6760ae`) |
 | M3 — Reference models: `LlamaModel`, `QwenModel` (§3) | **Done** — `jmlx-models` loads single or sharded Hugging Face safetensors, maps Llama/Qwen2 decoder weights, and provides cache-backed greedy generation | PR #16 (`764347b`, `9df0056`) |
 
 ## Context

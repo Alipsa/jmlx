@@ -106,8 +106,8 @@ tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
     dependsOn tasks.named('stageNativeResources')
     from(generatedResourcesDir)
-    // This artifact redistributes Apache-licensed MLX binaries. Keep the module's MIT license
-    // and third-party attribution in the actual runtime jar, not only in the source checkout.
+    // MLX/mlx-c are MIT; libmlx.dylib also embeds Apache-2.0-licensed metal-cpp. Keep the module's
+    // license and third-party attribution in the actual runtime jar, not only in the source checkout.
     from('LICENSE') { into 'META-INF' }
     from('NOTICE') { into 'META-INF' }
 }
@@ -137,6 +137,10 @@ tasks.register('verifyPackagedNativeResources') {
             if (!missing.isEmpty()) {
                 throw new GradleException("Packaged jar is missing native resources: ${missing}")
             }
+            def empty = entries.findAll { name, entry -> entry.size <= 0 }.keySet()
+            if (!empty.isEmpty()) {
+                throw new GradleException("Packaged jar has empty native resources: ${empty}")
+            }
             def metallibSize = entries['mlx.metallib'].size
             if (metallibSize < metallibMinBytes) {
                 throw new GradleException(
@@ -163,6 +167,15 @@ publishing {
                         name = 'MIT License'
                         url = 'https://opensource.org/license/mit'
                     }
+                    license {
+                        name = 'Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                withXml {
+                    def licenses = asNode().licenses[0].license
+                    licenses[0].appendNode('comments', 'Applies to the jmlx native artifact code.')
+                    licenses[1].appendNode('comments', 'Applies to vendored metal-cpp compiled into libmlx.dylib.')
                 }
                 developers {
                     developer {

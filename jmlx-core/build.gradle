@@ -48,7 +48,7 @@ publishing {
             from components.java
             pom {
                 name = 'jmlx-core'
-                description = 'Idiomatic Java 25 tensor operations and se.alipsa.jmlx.nn neural network modules for Apple Silicon MLX. Requires a native runtime: run the bundled scripts/bootstrap-native.sh, set jmlx.library.path/JMLX_LIBRARY_PATH yourself, or add se.alipsa:jmlx-native-macos-arm64 as a runtime dependency. Consumers must also pass --enable-native-access=ALL-UNNAMED on their own JVM.'
+                description = 'Idiomatic Java 25 tensor operations and se.alipsa.jmlx.nn neural network modules for Apple Silicon MLX. Requires a native runtime: clone the repo and run scripts/bootstrap-native.sh, set jmlx.library.path/JMLX_LIBRARY_PATH yourself, or add se.alipsa:jmlx-native-macos-arm64 as a runtime dependency. Consumers must also pass --enable-native-access=ALL-UNNAMED on their own JVM.'
                 url = 'https://github.com/Alipsa/jmlx'
                 licenses {
                     license {

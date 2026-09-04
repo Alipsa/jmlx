@@ -8,7 +8,9 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -54,6 +56,9 @@ final class ClasspathNativeExtractor {
 
   /** A leftover {@code .tmp-*} sibling older than this is assumed abandoned, not in-progress. */
   private static final Duration STALE_TMP_AGE = Duration.ofHours(1);
+
+  /** A peer JVM that never releases the cache lock must not hang native loading forever. */
+  private static final Duration LOCK_TIMEOUT = Duration.ofMinutes(5);
 
   /** Prevents overlapping cache-wide file locks from concurrent extraction calls in this JVM. */
   private static final Object EXTRACTION_LOCK = new Object();
@@ -118,6 +123,12 @@ final class ClasspathNativeExtractor {
               + "cache with -Djmlx.native.cache.path=<directory>, or bypass extraction with "
               + "-Djmlx.library.path=<directory> or JMLX_LIBRARY_PATH=<directory>",
           e);
+    } catch (OverlappingFileLockException e) {
+      throw new NativeExtractionException(
+          "native extraction cache is already locked in this JVM. Configure a separate writable "
+              + "cache with -Djmlx.native.cache.path=<directory>, or bypass extraction with "
+              + "-Djmlx.library.path=<directory> or JMLX_LIBRARY_PATH=<directory>",
+          new IOException("overlapping lock for " + cacheRoot.resolve(".extraction.lock"), e));
     }
   }
 
@@ -168,8 +179,7 @@ final class ClasspathNativeExtractor {
       }
       long size = resourceSize(resource);
       if (size <= 0) {
-        throw new IOException(
-            "classpath resource is missing, empty, or has unknown size: " + resource);
+        throw new IOException("classpath resource is missing or empty: " + resource);
       }
       digest.update(ByteBuffer.allocate(Long.BYTES).putLong(size).array());
       expectedSizes.put(name, size);
@@ -179,9 +189,9 @@ final class ClasspathNativeExtractor {
   }
 
   /**
-   * Finds a resource size without opening and retaining a {@code file:} URL connection. The normal
-   * test/IDE/exploded-classpath case uses that protocol; {@code FileURLConnection}'s content-length
-   * query opens a stream whose lifetime is otherwise left to GC.
+   * Finds a resource size without opening and retaining a {@code file:} URL connection. If another
+   * URL handler cannot report a content length, count its stream as a compatibility fallback for
+   * nested jars and custom classpaths.
    */
   private static long resourceSize(URL resource) throws IOException {
     if ("file".equals(resource.getProtocol())) {
@@ -191,7 +201,18 @@ final class ClasspathNativeExtractor {
         throw new IOException("invalid file resource URL: " + resource, e);
       }
     }
-    return resource.openConnection().getContentLengthLong();
+    long reportedSize = resource.openConnection().getContentLengthLong();
+    if (reportedSize >= 0) {
+      return reportedSize;
+    }
+    try (InputStream in = resource.openStream()) {
+      long size = 0;
+      byte[] buffer = new byte[8192];
+      for (int read; (read = in.read(buffer)) != -1; ) {
+        size += read;
+      }
+      return size;
+    }
   }
 
   private static MessageDigest sha256() {
@@ -203,7 +224,7 @@ final class ClasspathNativeExtractor {
   }
 
   private static boolean isComplete(Path dir, Map<String, Long> expectedSizes) {
-    return Files.isDirectory(dir)
+    return Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)
         && expectedSizes.entrySet().stream()
             .allMatch(entry -> hasExpectedSize(dir.resolve(entry.getKey()), entry.getValue()));
   }
@@ -238,7 +259,7 @@ final class ClasspathNativeExtractor {
       // accidentally releasing another local caller's lock after it has acquired it.
       try (FileChannel channel =
           FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-        try (FileLock ignored = channel.lock()) {
+        try (FileLock ignored = acquireLock(channel, lockFile)) {
           sweepStaleTempDirs(cacheRoot);
           if (isComplete(target, cacheDescriptor.expectedSizes())) {
             return target;
@@ -263,6 +284,24 @@ final class ClasspathNativeExtractor {
     return target;
   }
 
+  private static FileLock acquireLock(FileChannel channel, Path lockFile) throws IOException {
+    Instant deadline = Instant.now().plus(LOCK_TIMEOUT);
+    while (Instant.now().isBefore(deadline)) {
+      FileLock lock = channel.tryLock();
+      if (lock != null) {
+        return lock;
+      }
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            "interrupted while waiting for native extraction lock: " + lockFile, e);
+      }
+    }
+    throw new IOException("timed out waiting for native extraction lock: " + lockFile);
+  }
+
   /**
    * Renames {@code tmp} onto {@code target}. A losing rename -- another thread or process finished
    * extracting the same cache key first -- is reported by the platform as {@link
@@ -285,8 +324,17 @@ final class ClasspathNativeExtractor {
         deleteQuietly(tmp);
         return;
       }
-      if (!Files.isDirectory(target)) {
-        throw first;
+      if (!Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
+        // A stale file or symlink at the cache-key path cannot be repaired in place. We hold the
+        // cache-wide lock, so remove it and retry the move just as we repair incomplete folders.
+        try {
+          Files.deleteIfExists(target);
+          Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException retry) {
+          first.addSuppressed(retry);
+          throw first;
+        }
+        return;
       }
       repairInPlace(tmp, target);
       deleteQuietly(tmp);
@@ -295,10 +343,31 @@ final class ClasspathNativeExtractor {
 
   /** Restores an incomplete cache entry without removing its directory from a live JVM's path. */
   private static void repairInPlace(Path tmp, Path target) throws IOException {
+    sweepStaleRepairFiles(target);
     try (Stream<Path> files = Files.list(tmp)) {
       for (Path source : files.toList()) {
-        Files.copy(
-            source, target.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+        Path destination = target.resolve(source.getFileName());
+        Path staged = target.resolve(".tmp-repair-" + UUID.randomUUID());
+        try {
+          Files.copy(source, staged);
+          Files.move(
+              staged,
+              destination,
+              StandardCopyOption.ATOMIC_MOVE,
+              StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+          Files.deleteIfExists(staged);
+        }
+      }
+    }
+  }
+
+  /** Removes abandoned same-directory repair staging files while the cache-wide lock is held. */
+  private static void sweepStaleRepairFiles(Path target) throws IOException {
+    try (Stream<Path> entries = Files.list(target)) {
+      for (Path entry :
+          entries.filter(p -> p.getFileName().toString().startsWith(".tmp-repair-")).toList()) {
+        deleteQuietly(entry);
       }
     }
   }
@@ -367,7 +436,7 @@ final class ClasspathNativeExtractor {
   }
 
   /** Identifies a classpath-native-artifact failure for {@link NativeLoader}'s cached cause. */
-  static final class NativeExtractionException extends IllegalStateException {
+  public static final class NativeExtractionException extends IllegalStateException {
     NativeExtractionException(String message, IOException cause) {
       super(message, cause);
     }

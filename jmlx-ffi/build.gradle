@@ -151,6 +151,25 @@ components.java.withVariantsFromConfiguration(configurations.testFixturesRuntime
     skip()
 }
 
+// Test fixtures are intentionally skipped above, so the public jmlx-ffi POM must remain free of
+// their JUnit dependency and fixture variant metadata.
+tasks.register('verifyPublishedDependencies') {
+    group = 'verification'
+    description = 'Verifies the published POM declares no dependencies.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+    inputs.file(pomFile)
+    doLast {
+        def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                .collect { it.groupArtifact() }
+        if (!actual.isEmpty()) {
+            throw new GradleException("Published dependencies changed. Expected none, found ${actual.toSorted()}.")
+        }
+    }
+}
+
+tasks.named('check') { dependsOn tasks.named('verifyPublishedDependencies') }
+
 publishing {
     publications {
         maven(MavenPublication) {

@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -43,12 +47,74 @@ class ClasspathNativeExtractorTest {
     return ClasspathNativeExtractorTest.class.getClassLoader();
   }
 
+  private static ClassLoader loaderWithUnknownContentLengths() {
+    return new ClassLoader(loader()) {
+      @Override
+      public URL getResource(String name) {
+        URL delegate = super.getResource(name);
+        if (delegate == null || !name.startsWith(FIXTURE_ROOT)) {
+          return delegate;
+        }
+        try {
+          return new URL(
+              null,
+              "fixture:" + delegate,
+              new URLStreamHandler() {
+                @Override
+                protected URLConnection openConnection(URL ignored) {
+                  return new URLConnection(ignored) {
+                    @Override
+                    public void connect() {}
+
+                    @Override
+                    public InputStream getInputStream() throws IOException {
+                      return delegate.openStream();
+                    }
+
+                    @Override
+                    public long getContentLengthLong() {
+                      return -1;
+                    }
+                  };
+                }
+              });
+        } catch (IOException e) {
+          throw new AssertionError(e);
+        }
+      }
+    };
+  }
+
   @Test
   void returnsEmptyWhenTheResourceRootIsNotOnTheClasspath(@TempDir Path cacheRoot) {
     Optional<Path> result =
         ClasspathNativeExtractor.extractIfAvailable(
             loader(), "se/alipsa/jmlx/native-fixture/does-not-exist", cacheRoot);
     assertTrue(result.isEmpty());
+  }
+
+  @Test
+  void reportsNativeArtifactWithoutPayload(@TempDir Path cacheRoot) {
+    ClassLoader nativeArtifactOnlyLoader =
+        new ClassLoader(null) {
+          @Override
+          public URL getResource(String name) {
+            if (name.equals("se/alipsa/jmlx/nativelib/macosarm64/NativeArtifact.class")) {
+              return ClasspathNativeExtractorTest.class.getResource(
+                  "ClasspathNativeExtractorTest.class");
+            }
+            return null;
+          }
+        };
+
+    ClasspathNativeExtractor.NativeExtractionException failure =
+        assertThrows(
+            ClasspathNativeExtractor.NativeExtractionException.class,
+            () ->
+                ClasspathNativeExtractor.extractIfAvailable(
+                    nativeArtifactOnlyLoader, "se/alipsa/jmlx/native/macos-aarch64", cacheRoot));
+
+    assertTrue(failure.getMessage().contains("contains no native payload"));
   }
 
   private static final Map<String, String> EXPECTED_FIXTURE_CONTENT =
@@ -66,6 +132,19 @@ class ClasspathNativeExtractorTest {
     for (String name : BINARY_NAMES) {
       assertEquals(EXPECTED_FIXTURE_CONTENT.get(name), Files.readString(dir.resolve(name)));
     }
+  }
+
+  @Test
+  void extractsWhenAReadableUrlDoesNotReportItsContentLength(@TempDir Path cacheRoot)
+      throws IOException {
+    Path dir =
+        ClasspathNativeExtractor.extractIfAvailable(
+                loaderWithUnknownContentLengths(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+
+    assertEquals(
+        EXPECTED_FIXTURE_CONTENT.get("mlx.metallib"),
+        Files.readString(dir.resolve("mlx.metallib")));
   }
 
   @Test
@@ -162,6 +241,30 @@ class ClasspathNativeExtractorTest {
             .orElseThrow();
 
     assertEquals(extracted, repaired);
+    assertEquals(
+        EXPECTED_FIXTURE_CONTENT.get("libmlxc.dylib"),
+        Files.readString(repaired.resolve("libmlxc.dylib")));
+  }
+
+  @Test
+  void nonDirectoryCacheTargetIsReplaced(@TempDir Path cacheRoot) throws IOException {
+    Path extracted =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+    Files.delete(extracted.resolve("libmlxc.dylib"));
+    Files.delete(extracted.resolve("libmlx.dylib"));
+    Files.delete(extracted.resolve("libjaccl.dylib"));
+    Files.delete(extracted.resolve("mlx.metallib"));
+    Files.delete(extracted.resolve("native-pin.properties"));
+    Files.delete(extracted);
+    Files.writeString(extracted, "stray cache entry");
+
+    Path repaired =
+        ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
+            .orElseThrow();
+
+    assertEquals(extracted, repaired);
+    assertTrue(Files.isDirectory(repaired));
     assertEquals(
         EXPECTED_FIXTURE_CONTENT.get("libmlxc.dylib"),
         Files.readString(repaired.resolve("libmlxc.dylib")));

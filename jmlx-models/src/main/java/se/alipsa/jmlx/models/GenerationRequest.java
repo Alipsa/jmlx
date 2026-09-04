@@ -3,7 +3,11 @@ package se.alipsa.jmlx.models;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** A tokenized generation request; prompt rendering and special-token policy stay explicit. */
+/**
+ * A request from already-rendered token IDs. Prompt-text input and an explicit special-token policy
+ * are intentionally deferred to Phase 6.2; callers render templates and tokenize before creating a
+ * request in this release.
+ */
 public final class GenerationRequest {
   private final int[] promptTokenIds;
   private final GenerationConfig config;

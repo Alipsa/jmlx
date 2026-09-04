@@ -49,6 +49,10 @@ public record DecoderConfig(
       throw new IllegalArgumentException(
           "config.json declares rope_scaling, which this decoder does not yet implement");
     }
+    if (node.hasNonNull("quantization") || node.hasNonNull("quantization_config")) {
+      throw new IllegalArgumentException(
+          "config.json declares quantized weights, which this decoder does not yet implement");
+    }
     if (node.path("use_sliding_window").asBoolean(false)) {
       throw new IllegalArgumentException(
           "config.json enables sliding-window attention, which this decoder does not implement");

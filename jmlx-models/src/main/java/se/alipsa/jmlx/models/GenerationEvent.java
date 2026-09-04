@@ -1,6 +1,10 @@
 package se.alipsa.jmlx.models;
 
-/** One generated token, or the terminal event when {@link #finishReason()} is non-null. */
+/**
+ * One generated token, or the terminal event when {@link #finishReason()} is non-null. In this
+ * release {@link #textDelta()} and {@link #logProbability()} are always {@code null}: a
+ * tokenizer-aware streaming adapter and log probabilities arrive in later Phase 6 milestones.
+ */
 public record GenerationEvent(
     Integer tokenId, String textDelta, Double logProbability, FinishReason finishReason) {
   /** Validates that this is either a token event or a terminal event, never both. */
@@ -11,7 +15,10 @@ public record GenerationEvent(
     }
   }
 
-  /** Creates a token event. A null text delta means no tokenizer-aware adapter decoded it. */
+  /**
+   * Creates a token event. Null text and log-probability fields are not implemented in this
+   * release.
+   */
   public static GenerationEvent token(int tokenId) {
     return new GenerationEvent(tokenId, null, null, null);
   }

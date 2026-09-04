@@ -7,6 +7,8 @@ import java.util.stream.Stream;
 /**
  * Immutable result of a completed generation, retaining prompt and generated token IDs separately.
  * For legacy compatibility, EOS is retained in generated IDs; an explicit stop token is excluded.
+ * {@link #logProbabilities()} is always empty in this release because log probabilities are not yet
+ * implemented.
  */
 public record GenerationResult(
     List<Integer> promptTokenIds,

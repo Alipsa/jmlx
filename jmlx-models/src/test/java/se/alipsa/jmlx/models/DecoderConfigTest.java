@@ -68,6 +68,24 @@ class DecoderConfigTest {
   }
 
   @Test
+  void rejectsQuantizedWeightConfigurations(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    for (String field : java.util.List.of("quantization", "quantization_config")) {
+      Files.writeString(
+          config,
+          """
+          {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
+           "num_hidden_layers":1,"num_attention_heads":2,"%s":{"group_size":64,"bits":4}}
+          """
+              .formatted(field));
+
+      IllegalArgumentException error =
+          assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+      assertTrue(error.getMessage().contains("quantized weights"), error.getMessage());
+    }
+  }
+
+  @Test
   void rejectsSlidingWindowAttention(@TempDir Path dir) throws Exception {
     Path config = dir.resolve("config.json");
     Files.writeString(

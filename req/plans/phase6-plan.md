@@ -49,14 +49,15 @@ becoming the public API.
      top-k, top-p, min-p, repetition/frequency/presence penalties, EOS/stop token IDs, and optional
      log probabilities. Its defaults reproduce today's greedy behavior. Cache
      capacity and eviction are added only in 6.4, rather than accepted and ignored here.
-   - `GenerationRequest` — prompt token IDs or text plus an explicit special-token policy, config,
-     and cancellation token. Chat-template rendering stays explicit rather than being silently
-     inferred from arbitrary prompt text.
+   - `GenerationRequest` — in 6.0, already-rendered prompt token IDs, config, and cancellation
+     token. Prompt-text input and an explicit special-token policy are deferred to 6.2, so template
+     rendering remains explicit rather than silently inferred from arbitrary prompt text.
    - `GenerationEvent` — token ID, decoded text delta, optional log probability, and finish reason.
-     A callback-based streaming method is the initial API. It runs synchronously on the thread that
-     owns the generation scope: the caller in direct generation and the scheduler worker in batched
-     generation. Reactive Streams and asynchronous executors are out of scope until an application
-     needs them.
+     In 6.0, text deltas and log probabilities are absent; the tokenizer-aware delta adapter lands
+     in 6.2 and log probabilities in 6.1. A callback-based streaming method is the initial API. It
+     runs synchronously on the thread that owns the generation scope: the caller in direct
+     generation and the scheduler worker in batched generation. Reactive Streams and asynchronous
+     executors are out of scope until an application needs them.
    - `GenerationResult` and `FinishReason` — complete token sequence, generated token count, final
      reason (`EOS`, `STOP_TOKEN`, `MAX_TOKENS`, `CANCELLED`), and optional collected log
      probabilities.
@@ -104,7 +105,7 @@ and 6.1's oracle and Tier-A tests need 6.0b's infrastructure. Later milestones b
    delegating to that common loader.
 4. Move current greedy generation behind `GenerationConfig.greedyDefaults()` and add a streaming
    adapter that emits the same token sequence and one terminal event. Preserve prompt token IDs in
-   results and decode only generated IDs for text deltas.
+   results; reserve tokenizer-aware text deltas for 6.2, where only generated IDs are decoded.
 5. Add tiny native tests for: Llama/Qwen common loader dispatch, greedy output equivalence with the
    old API, event order, EOS/max-token stopping, callback-thrown exception cleanup, cancellation
    before prefill and between decode steps, and scope cleanup after every terminal path. Assert that

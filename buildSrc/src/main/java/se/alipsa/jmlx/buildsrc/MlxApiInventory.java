@@ -198,35 +198,39 @@ public final class MlxApiInventory {
     if (!Files.isRegularFile(mappingFile)) {
       throw new IllegalArgumentException("Missing required inventory mapping file: " + mappingFile);
     }
-    Object root;
     try {
-      root = new JsonParser(Files.readString(mappingFile, StandardCharsets.UTF_8)).parse();
+      Object root = new JsonParser(Files.readString(mappingFile, StandardCharsets.UTF_8)).parse();
+      if (!(root instanceof Map<?, ?> rootObject) || rootObject.size() != 1) {
+        throw new IllegalArgumentException(
+            "Inventory mapping must be a JSON object containing only 'records'");
+      }
+      Object records = rootObject.get("records");
+      if (!(records instanceof List<?> recordList)) {
+        throw new IllegalArgumentException("Inventory mapping field 'records' must be an array");
+      }
+      Map<String, Mapping> mappings = new HashMap<>();
+      for (int index = 0; index < recordList.size(); index++) {
+        Object record = recordList.get(index);
+        if (!(record instanceof Map<?, ?> object)) {
+          throw new IllegalArgumentException(
+              "Inventory mapping record at index "
+                  + index
+                  + " must be an object; found "
+                  + String.valueOf(record));
+        }
+        for (Mapping mapping : Mapping.from(object, index)) {
+          if (mappings.put(mapping.binding(), mapping) != null) {
+            throw new IllegalArgumentException(
+                "Duplicate inventory mapping record: " + mapping.binding());
+          }
+        }
+      }
+      return mappings;
     } catch (IllegalArgumentException exception) {
       throw new IllegalArgumentException(
           "Invalid inventory mapping file " + mappingFile + ": " + exception.getMessage(),
           exception);
     }
-    if (!(root instanceof Map<?, ?> rootObject) || rootObject.size() != 1) {
-      throw new IllegalArgumentException(
-          "Inventory mapping must be a JSON object containing only 'records'");
-    }
-    Object records = rootObject.get("records");
-    if (!(records instanceof List<?> recordList)) {
-      throw new IllegalArgumentException("Inventory mapping field 'records' must be an array");
-    }
-    Map<String, Mapping> mappings = new HashMap<>();
-    for (Object record : recordList) {
-      if (!(record instanceof Map<?, ?> object)) {
-        throw new IllegalArgumentException("Each inventory mapping record must be an object");
-      }
-      for (Mapping mapping : Mapping.from(object)) {
-        if (mappings.put(mapping.binding(), mapping) != null) {
-          throw new IllegalArgumentException(
-              "Duplicate inventory mapping record: " + mapping.binding());
-        }
-      }
-    }
-    return mappings;
   }
 
   private static void validateMappings(
@@ -355,7 +359,8 @@ public final class MlxApiInventory {
       String tests,
       String probe,
       Set<String> sources) {
-    static List<Mapping> from(Map<?, ?> object) {
+    static List<Mapping> from(Map<?, ?> object, int index) {
+      String context = context(object, index);
       Set<String> allowed =
           Set.of(
               "binding",
@@ -366,15 +371,25 @@ public final class MlxApiInventory {
               "tests",
               "probe",
               "sources");
-      if (!allowed.containsAll(object.keySet())) {
-        throw new IllegalArgumentException("Inventory mapping record contains an unknown field");
+      for (Object field : object.keySet()) {
+        if (!(field instanceof String name) || !allowed.contains(name)) {
+          throw new IllegalArgumentException(
+              context + " contains an unknown field: '" + String.valueOf(field) + "'");
+        }
       }
-      List<String> bindings = bindings(object);
-      Category category = Category.required(required(object, "category"));
-      String status = required(object, "status");
+      List<String> bindings = bindings(object, context);
+      String categoryValue = required(object, "category", context);
+      Category category;
+      try {
+        category = Category.required(categoryValue);
+      } catch (IllegalArgumentException exception) {
+        throw new IllegalArgumentException(
+            context + " has an unknown 'category' value: '" + categoryValue + "'", exception);
+      }
+      String status = required(object, "status", context);
       if (!STATUSES.contains(status) || status.equals("unplanned")) {
         throw new IllegalArgumentException(
-            "Inventory mapping has invalid explicit status: " + status);
+            context + " has an invalid explicit 'status' value: '" + status + "'");
       }
       List<Mapping> mappings = new ArrayList<>();
       for (String binding : bindings) {
@@ -383,10 +398,10 @@ public final class MlxApiInventory {
                 binding,
                 category,
                 status,
-                required(object, "facadeOrReason"),
-                required(object, "tests"),
-                optional(object, "probe"),
-                sources(object)));
+                required(object, "facadeOrReason", context),
+                required(object, "tests", context),
+                optional(object, "probe", context),
+                sources(object, context)));
       }
       return mappings;
     }
@@ -395,40 +410,44 @@ public final class MlxApiInventory {
       return sources.isEmpty() ? "all handwritten source" : String.join("<br>", sources);
     }
 
-    private static List<String> bindings(Map<?, ?> object) {
+    private static List<String> bindings(Map<?, ?> object, String context) {
       boolean hasBinding = object.containsKey("binding");
       boolean hasBindings = object.containsKey("bindings");
       if (hasBinding == hasBindings) {
         throw new IllegalArgumentException(
-            "Inventory mapping record requires exactly one of 'binding' or 'bindings'");
+            context + " requires exactly one of 'binding' or 'bindings'");
       }
       if (hasBinding) {
-        return List.of(required(object, "binding"));
+        return List.of(required(object, "binding", context));
       }
       Object value = object.get("bindings");
       if (!(value instanceof List<?> values) || values.isEmpty()) {
         throw new IllegalArgumentException(
-            "Inventory mapping field 'bindings' must be a non-empty array");
+            context
+                + " field 'bindings' must be a non-empty array; found "
+                + String.valueOf(value));
       }
       List<String> bindings = new ArrayList<>();
       for (Object member : values) {
         if (!(member instanceof String binding) || binding.isBlank()) {
           throw new IllegalArgumentException(
-              "Inventory mapping field 'bindings' must contain non-empty strings");
+              context
+                  + " field 'bindings' must contain non-empty strings; found "
+                  + String.valueOf(member));
         }
         bindings.add(binding);
       }
       return bindings;
     }
 
-    private static Set<String> sources(Map<?, ?> object) {
+    private static Set<String> sources(Map<?, ?> object, String context) {
       Object value = object.get("sources");
       if (value == null) {
         return Set.of();
       }
       if (!(value instanceof List<?> values) || values.isEmpty()) {
         throw new IllegalArgumentException(
-            "Inventory mapping field 'sources' must be a non-empty array");
+            context + " field 'sources' must be a non-empty array; found " + String.valueOf(value));
       }
       Set<String> sources = new TreeSet<>();
       for (Object member : values) {
@@ -439,32 +458,46 @@ public final class MlxApiInventory {
             || source.contains("*")
             || source.contains("?")) {
           throw new IllegalArgumentException(
-              "Inventory mapping sources must be exact, relative paths without wildcards");
+              context
+                  + " field 'sources' must contain exact relative paths without wildcards; found '"
+                  + String.valueOf(member)
+                  + "'");
         }
         sources.add(source);
       }
       return Set.copyOf(sources);
     }
 
-    private static String required(Map<?, ?> object, String field) {
-      String value = optional(object, field);
+    private static String required(Map<?, ?> object, String field, String context) {
+      String value = optional(object, field, context);
       if (value == null || value.isBlank()) {
-        throw new IllegalArgumentException(
-            "Inventory mapping record requires non-empty '" + field + "'");
+        throw new IllegalArgumentException(context + " requires a non-empty '" + field + "' field");
       }
       return value;
     }
 
-    private static String optional(Map<?, ?> object, String field) {
+    private static String optional(Map<?, ?> object, String field, String context) {
       Object value = object.get(field);
       if (value == null) {
         return null;
       }
       if (!(value instanceof String string)) {
         throw new IllegalArgumentException(
-            "Inventory mapping field '" + field + "' must be a string");
+            context + " field '" + field + "' must be a string; found " + String.valueOf(value));
       }
       return string;
+    }
+
+    private static String context(Map<?, ?> object, int index) {
+      Object binding = object.get("binding");
+      if (binding instanceof String value && !value.isBlank()) {
+        return "Inventory mapping record at index " + index + " for '" + value + "'";
+      }
+      Object bindings = object.get("bindings");
+      if (bindings != null) {
+        return "Inventory mapping record at index " + index + " for bindings " + bindings;
+      }
+      return "Inventory mapping record at index " + index;
     }
   }
 

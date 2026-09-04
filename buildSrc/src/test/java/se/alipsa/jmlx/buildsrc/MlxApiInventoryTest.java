@@ -62,6 +62,22 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void identifiesTheRecordAndFieldForMappingSchemaErrors() throws Exception {
+    Path root =
+        fixture(
+            "{\"records\":[{\"binding\":\"mlx_h.mlx_array_new\",\"category\":\"downcall\","
+                + "\"status\":\"implemented\",\"facadeOrReason\":\"reason\",\"tests\":\"test\","
+                + "\"notes\":\"remove me\"}]}");
+
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> MlxApiInventory.render(root));
+
+    assertTrue(failure.getMessage().contains("mlx-api-inventory-overrides.json"));
+    assertTrue(failure.getMessage().contains("at index 0 for 'mlx_h.mlx_array_new'"));
+    assertTrue(failure.getMessage().contains("unknown field: 'notes'"));
+  }
+
+  @Test
   void callSiteGuardRejectsOnlyUnmappedSyntaxUses() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
     Path source = root.resolve("jmlx-core/src/main/java/sample/Example.java");

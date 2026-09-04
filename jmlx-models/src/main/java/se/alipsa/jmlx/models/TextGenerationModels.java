@@ -17,6 +17,8 @@ public final class TextGenerationModels {
   static <T extends DecoderModel> T loadDecoder(
       MLXScope scope, Path directory, String expectedModelType, Class<T> expectedClass)
       throws IOException {
+    Objects.requireNonNull(directory, "directory");
+    Objects.requireNonNull(expectedModelType, "expectedModelType");
     Objects.requireNonNull(expectedClass, "expectedClass");
     DecoderConfig config = DecoderConfig.fromFile(directory.resolve("config.json"));
     if (!expectedModelType.equals(config.modelType())) {

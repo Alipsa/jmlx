@@ -6,9 +6,46 @@
  * property below.
  */
 
+import se.alipsa.jmlx.buildsrc.MlxApiInventory
+
 plugins {
+    id 'base'
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.nexusRelease) apply false
+}
+
+// The root has no Java lifecycle plugin. Applying `base` above deliberately creates this `check`
+// lifecycle task so repository-wide verifications can run once from CI without pretending that a
+// module-local check covers handwritten source in every module.
+tasks.register('generateMlxApiInventory') {
+    group = 'documentation'
+    description = 'Generates the checked-in MLX binding inventory from committed sources.'
+    def output = layout.projectDirectory.file('req/mlx-api-inventory.md')
+    inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    inputs.file(layout.projectDirectory.file('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java'))
+    outputs.file(output)
+    doLast {
+        MlxApiInventory.write(projectDir.toPath(), output.asFile.toPath())
+    }
+}
+
+tasks.register('verifyMlxApiInventory') {
+    group = 'verification'
+    description = 'Fails when the checked-in MLX binding inventory is stale.'
+    def inventory = layout.projectDirectory.file('req/mlx-api-inventory.md')
+    inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    inputs.file(layout.projectDirectory.file('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java'))
+    inputs.file(inventory)
+    doLast {
+        def expected = MlxApiInventory.render(projectDir.toPath())
+        if (!inventory.asFile.isFile() || inventory.asFile.getText('UTF-8') != expected) {
+            throw new GradleException('req/mlx-api-inventory.md is stale; run ./gradlew generateMlxApiInventory')
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyMlxApiInventory')
 }
 
 allprojects {

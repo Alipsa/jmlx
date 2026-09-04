@@ -254,7 +254,7 @@ class ClasspathNativeExtractorTest {
   }
 
   @Test
-  void repairSweepsStaleRootStagingAndLeavesOnlyNativeFiles(@TempDir Path cacheRoot)
+  void repairSweepsStaleRootStagingAndRestoresNativeFiles(@TempDir Path cacheRoot)
       throws IOException {
     Path extracted =
         ClasspathNativeExtractor.extractIfAvailable(loader(), FIXTURE_ROOT, cacheRoot)
@@ -290,20 +290,27 @@ class ClasspathNativeExtractorTest {
     Files.writeString(extracted.resolve("libmlxc.dylib"), "truncated");
     AtomicReference<Path> staged = new AtomicReference<>();
 
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            ClasspathNativeExtractor.extractIfAvailable(
-                loader(),
-                FIXTURE_ROOT,
-                cacheRoot,
-                path -> {
-                  staged.set(path);
-                  throw new IllegalStateException("simulate an interrupted repair");
-                }));
+    ClasspathNativeExtractor.NativeExtractionException failure =
+        assertThrows(
+            ClasspathNativeExtractor.NativeExtractionException.class,
+            () ->
+                ClasspathNativeExtractor.extractIfAvailable(
+                    loader(),
+                    FIXTURE_ROOT,
+                    cacheRoot,
+                    path -> {
+                      staged.set(path);
+                      throw new IllegalStateException("simulate an interrupted repair");
+                    }));
 
+    assertEquals("simulate an interrupted repair", failure.getCause().getCause().getMessage());
     assertEquals(cacheRoot, staged.get().getParent());
     assertFalse(staged.get().startsWith(extracted));
+    try (var entries = Files.list(cacheRoot)) {
+      assertFalse(
+          entries.anyMatch(path -> path.getFileName().toString().startsWith(".tmp-")),
+          "failed repair left an extraction temp behind");
+    }
   }
 
   @Test

@@ -169,6 +169,12 @@ final class ClasspathNativeExtractor {
               + "cache with -Djmlx.native.cache.path=<directory>, or bypass extraction with "
               + "-Djmlx.library.path=<directory> or JMLX_LIBRARY_PATH=<directory>",
           new IOException("overlapping lock for " + cacheRoot.resolve(".extraction.lock"), e));
+    } catch (RuntimeException e) {
+      throw new NativeExtractionException(
+          "failed to extract bundled native libraries from the classpath. Configure a writable "
+              + "cache with -Djmlx.native.cache.path=<directory>, or bypass extraction with "
+              + "-Djmlx.library.path=<directory> or JMLX_LIBRARY_PATH=<directory>",
+          new IOException("unexpected native extraction failure", e));
     }
   }
 
@@ -315,7 +321,7 @@ final class ClasspathNativeExtractor {
             copyResource(loader, resourceRoot + "/" + PIN_FILE, tmp.resolve(PIN_FILE));
             moveIntoPlaceLocked(
                 tmp, target, cacheDescriptor.expectedSizes(), repairStagingObserver);
-          } catch (IOException e) {
+          } catch (IOException | RuntimeException e) {
             // Best-effort: a failed cleanup of our own temp copy must never mask the real
             // extraction failure being reported below.
             deleteQuietly(tmp);

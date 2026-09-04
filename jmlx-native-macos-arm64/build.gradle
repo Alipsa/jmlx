@@ -174,8 +174,13 @@ publishing {
                 }
                 withXml {
                     def licenses = asNode().licenses[0].license
-                    licenses[0].appendNode('comments', 'Applies to the jmlx native artifact code.')
-                    licenses[1].appendNode('comments', 'Applies to vendored metal-cpp compiled into libmlx.dylib.')
+                    def mit = licenses.find { it.name.text() == 'MIT License' }
+                    def apache = licenses.find { it.name.text() == 'Apache License, Version 2.0' }
+                    if (mit == null || apache == null) {
+                        throw new GradleException('Expected MIT and Apache-2.0 license entries in the native POM')
+                    }
+                    mit.appendNode('comments', 'Applies to the jmlx native artifact code.')
+                    apache.appendNode('comments', 'Applies to vendored metal-cpp compiled into libmlx.dylib.')
                 }
                 developers {
                     developer {

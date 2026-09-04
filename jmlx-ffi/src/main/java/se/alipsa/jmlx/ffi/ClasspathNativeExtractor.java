@@ -57,8 +57,10 @@ final class ClasspathNativeExtractor {
   /** A leftover {@code .tmp-*} sibling older than this is assumed abandoned, not in-progress. */
   private static final Duration STALE_TMP_AGE = Duration.ofHours(1);
 
+  private static final String LOCK_TIMEOUT_PROPERTY = "jmlx.native.lock.timeout.seconds";
+
   /** A peer JVM that never releases the cache lock must not hang native loading forever. */
-  private static final Duration LOCK_TIMEOUT = Duration.ofMinutes(5);
+  private static final Duration DEFAULT_LOCK_TIMEOUT = Duration.ofMinutes(5);
 
   /** Prevents overlapping cache-wide file locks from concurrent extraction calls in this JVM. */
   private static final Object EXTRACTION_LOCK = new Object();
@@ -285,7 +287,7 @@ final class ClasspathNativeExtractor {
   }
 
   private static FileLock acquireLock(FileChannel channel, Path lockFile) throws IOException {
-    Instant deadline = Instant.now().plus(LOCK_TIMEOUT);
+    Instant deadline = Instant.now().plus(lockTimeout());
     while (Instant.now().isBefore(deadline)) {
       FileLock lock = channel.tryLock();
       if (lock != null) {
@@ -299,7 +301,30 @@ final class ClasspathNativeExtractor {
             "interrupted while waiting for native extraction lock: " + lockFile, e);
       }
     }
-    throw new IOException("timed out waiting for native extraction lock: " + lockFile);
+    throw new IOException(
+        "timed out waiting for native extraction lock: "
+            + lockFile
+            + ". Increase -D"
+            + LOCK_TIMEOUT_PROPERTY
+            + "=<positive seconds> for slow or shared storage.");
+  }
+
+  private static Duration lockTimeout() throws IOException {
+    String configured = System.getProperty(LOCK_TIMEOUT_PROPERTY);
+    if (configured == null || configured.isBlank()) {
+      return DEFAULT_LOCK_TIMEOUT;
+    }
+    try {
+      long seconds = Long.parseLong(configured);
+      if (seconds <= 0) {
+        throw new NumberFormatException("must be positive");
+      }
+      return Duration.ofSeconds(seconds);
+    } catch (NumberFormatException | ArithmeticException e) {
+      throw new IOException(
+          "invalid -D" + LOCK_TIMEOUT_PROPERTY + "=" + configured + "; expected positive seconds",
+          e);
+    }
   }
 
   /**
@@ -343,11 +368,12 @@ final class ClasspathNativeExtractor {
 
   /** Restores an incomplete cache entry without removing its directory from a live JVM's path. */
   private static void repairInPlace(Path tmp, Path target) throws IOException {
-    sweepStaleRepairFiles(target);
     try (Stream<Path> files = Files.list(tmp)) {
       for (Path source : files.toList()) {
         Path destination = target.resolve(source.getFileName());
-        Path staged = target.resolve(".tmp-repair-" + UUID.randomUUID());
+        // Staging beside, rather than inside, the cache entry keeps crashed repairs eligible for
+        // the cache-root .tmp-* sweep even after this target has become complete again.
+        Path staged = target.getParent().resolve(".tmp-repair-" + UUID.randomUUID());
         try {
           Files.copy(source, staged);
           Files.move(
@@ -356,18 +382,9 @@ final class ClasspathNativeExtractor {
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
         } finally {
-          Files.deleteIfExists(staged);
+          // Cleanup is best-effort: it must not hide a copy or atomic-move failure.
+          deleteQuietly(staged);
         }
-      }
-    }
-  }
-
-  /** Removes abandoned same-directory repair staging files while the cache-wide lock is held. */
-  private static void sweepStaleRepairFiles(Path target) throws IOException {
-    try (Stream<Path> entries = Files.list(target)) {
-      for (Path entry :
-          entries.filter(p -> p.getFileName().toString().startsWith(".tmp-repair-")).toList()) {
-        deleteQuietly(entry);
       }
     }
   }
@@ -436,7 +453,7 @@ final class ClasspathNativeExtractor {
   }
 
   /** Identifies a classpath-native-artifact failure for {@link NativeLoader}'s cached cause. */
-  public static final class NativeExtractionException extends IllegalStateException {
+  static final class NativeExtractionException extends IllegalStateException {
     NativeExtractionException(String message, IOException cause) {
       super(message, cause);
     }

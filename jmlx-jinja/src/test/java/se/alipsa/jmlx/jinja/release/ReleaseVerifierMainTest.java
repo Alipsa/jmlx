@@ -54,7 +54,7 @@ class ReleaseVerifierMainTest {
     Files.writeString(source.resolve("req/release-verification.json"), "{\"jdkMajor\":21}");
     Files.writeString(
         source.resolve("upstream/upstream-lock.json"), "{\"nodeVersion\":\"v26.7.0\"}");
-    assertDoesNotThrow(() -> ReleaseVerifierMain.verifyEnvironment(source, "25.0.4"));
+    assertDoesNotThrow(() -> ReleaseVerifierMain.verifyEnvironment(source, "25.0.4", "v26.7.0"));
   }
 
   @Test
@@ -68,7 +68,7 @@ class ReleaseVerifierMainTest {
     var failure =
         assertThrows(
             IllegalStateException.class,
-            () -> ReleaseVerifierMain.verifyEnvironment(source, "17.0.14"));
+            () -> ReleaseVerifierMain.verifyEnvironment(source, "17.0.14", "v26.7.0"));
     assertEquals("required Gradle daemon JDK major at least 21, got 17", failure.getMessage());
   }
 

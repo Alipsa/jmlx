@@ -185,6 +185,11 @@ public final class ReleaseVerifierMain {
   }
 
   static void verifyEnvironment(Path source, String daemonVersion) throws Exception {
+    verifyEnvironment(source, daemonVersion, output(source, "node", "--version").trim());
+  }
+
+  static void verifyEnvironment(Path source, String daemonVersion, String actualNode)
+      throws Exception {
     int requiredJdk =
         contractInt(source.resolve("req/release-verification.json"), JDK_MAJOR, "jdkMajor");
     int actualJdk = Runtime.Version.parse(daemonVersion).feature();
@@ -194,7 +199,6 @@ public final class ReleaseVerifierMain {
     }
     String expectedNode =
         match(source.resolve("upstream/upstream-lock.json"), NODE_VERSION, "nodeVersion");
-    String actualNode = output(source, "node", "--version").trim();
     if (!expectedNode.equals(actualNode)) {
       throw new IllegalStateException("required Node " + expectedNode + ", got " + actualNode);
     }

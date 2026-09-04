@@ -63,4 +63,15 @@ class GenerationContractTest {
     assertEquals(List.of(3), result.generatedTokenIds());
     assertEquals(List.of(1, 2, 3), result.tokenIds());
   }
+
+  @Test
+  void greedyDefaultsAcceptsExplicitStopTokensAndEventsHaveOneKind() {
+    GenerationConfig policy = GenerationConfig.greedyDefaults(2, Set.of(1), Set.of(2));
+
+    assertEquals(Set.of(1), policy.eosTokenIds());
+    assertEquals(Set.of(2), policy.stopTokenIds());
+    assertThrows(IllegalArgumentException.class, () -> new GenerationEvent(null, null, null, null));
+    assertThrows(
+        IllegalArgumentException.class, () -> new GenerationEvent(1, null, null, FinishReason.EOS));
+  }
 }

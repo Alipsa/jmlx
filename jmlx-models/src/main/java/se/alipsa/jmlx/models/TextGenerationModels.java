@@ -10,14 +10,14 @@ public final class TextGenerationModels {
   private TextGenerationModels() {}
 
   /** Loads a supported model using the {@code model_type} declared in {@code config.json}. */
-  public static DecoderModel load(MLXScope scope, Path directory) throws IOException {
+  public static TextGenerationModel load(MLXScope scope, Path directory) throws IOException {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(directory, "directory");
     DecoderConfig config = DecoderConfig.fromFile(directory.resolve("config.json"));
-    return load(scope, directory, config);
+    return loadDecoder(scope, directory, config);
   }
 
-  static DecoderModel load(MLXScope scope, Path directory, DecoderConfig config)
+  static DecoderModel loadDecoder(MLXScope scope, Path directory, DecoderConfig config)
       throws IOException {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(directory, "directory");

@@ -33,8 +33,6 @@ try (MLXScope scope = new MLXScope()) {
   TextGenerationModel model = TextGenerationModels.load(scope, modelDirectory);
   HfTokenizer tokenizer = HfTokenizer.fromFile(modelDirectory.resolve("tokenizer.json"));
   int[] prompt = tokenizer.encode("Hello", true).stream().mapToInt(Integer::intValue).toArray();
-  List<Integer> generated = new ArrayList<>();
-  String[] decoded = {""};
   GenerationResult result = model.generate(
       new GenerationRequest(
           prompt,
@@ -42,22 +40,21 @@ try (MLXScope scope = new MLXScope()) {
           CancellationToken.NONE),
       event -> {
         if (event.tokenId() != null) {
-          generated.add(event.tokenId());
-          String whole = tokenizer.decode(generated, true);
-          System.out.print(whole.substring(decoded[0].length()));
-          decoded[0] = whole;
+          System.out.println("generated token " + event.tokenId());
         }
       });
+  System.out.println(tokenizer.decode(result.generatedTokenIds(), true));
 }
 ```
 
-Buffer generated IDs before decoding: byte-level BPE may split one Unicode code point across tokens,
-so decoding a single token independently corrupts non-ASCII output. `LlamaModel.load` and
-`QwenModel.load` remain compatibility entry points; both delegate to the
-common loader. For chat models, render the model's chat template through
-`HfTokenizer`/`ChatTemplateRenderer` before constructing the explicit token-ID request. The event
-callback runs synchronously on the thread which owns the generation scope. A cancelling thread may
-only change the `CancellationToken`; it must never touch model or native resources.
+Byte-level BPE may split one Unicode code point across tokens, so do not decode individual event
+tokens. Decode the complete generated-ID sequence as above; a tokenizer-aware streaming decoder is
+planned for a later Phase 6 milestone. `LlamaModel.load` and `QwenModel.load` remain compatibility
+entry points; both delegate to the common loader. For chat models, render the model's chat template
+through `HfTokenizer`/`ChatTemplateRenderer`, then encode that rendered text with
+`addSpecialTokens=false`: templates ordinarily include their own BOS token. The event callback runs
+synchronously on the thread which owns the generation scope. A cancelling thread may only change
+the `CancellationToken`; it must never touch model or native resources.
 
 ## Resource ownership
 

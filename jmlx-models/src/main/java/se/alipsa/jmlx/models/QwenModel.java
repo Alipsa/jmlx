@@ -16,7 +16,7 @@ public final class QwenModel extends DecoderModel {
   public static QwenModel load(MLXScope scope, Path directory) throws IOException {
     DecoderConfig config = DecoderConfig.fromFile(directory.resolve("config.json"));
     requireQwen(config);
-    return (QwenModel) TextGenerationModels.load(scope, directory, config);
+    return create(scope, config, directory);
   }
 
   static QwenModel create(MLXScope scope, DecoderConfig config, Path directory) throws IOException {

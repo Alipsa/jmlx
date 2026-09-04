@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Objects;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -25,6 +26,10 @@ public record DecoderConfig(
 
   /** Validates decoder dimensions and the attention-head configuration. */
   public DecoderConfig {
+    Objects.requireNonNull(modelType, "modelType");
+    if (modelType.isBlank()) {
+      throw new IllegalArgumentException("modelType must not be blank");
+    }
     if (vocabSize <= 0 || hiddenSize <= 0 || intermediateSize <= 0 || numHiddenLayers <= 0) {
       throw new IllegalArgumentException("decoder dimensions must be positive");
     }

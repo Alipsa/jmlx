@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.DType;
@@ -19,6 +20,7 @@ import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
+import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
 
 @EnabledIfNativeAvailable
@@ -68,25 +70,63 @@ class LlamaModelTest {
       assertEquals(FinishReason.EOS, eos.finishReason());
       assertEquals(List.of(0), eos.generatedTokenIds());
 
-      GenerationConfig stopPolicy =
-          new GenerationConfig(
-              2, java.util.OptionalLong.empty(), 0, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(0), false);
+      List<GenerationEvent> stopEvents = new ArrayList<>();
+      GenerationResult stopped =
+          model.generate(
+              new GenerationRequest(
+                  new int[] {1},
+                  GenerationConfig.greedyDefaults(2, Set.of(), Set.of(0)),
+                  CancellationToken.NONE),
+              stopEvents::add);
+      assertEquals(FinishReason.STOP_TOKEN, stopped.finishReason());
+      assertEquals(List.of(0), stopped.generatedTokenIds());
+      assertEquals(1, stopEvents.size());
+      assertEquals(FinishReason.STOP_TOKEN, stopEvents.getFirst().finishReason());
+
+      List<GenerationEvent> bothTerminalEvents = new ArrayList<>();
       assertEquals(
-          FinishReason.STOP_TOKEN,
+          FinishReason.EOS,
           model
               .generate(
-                  new GenerationRequest(new int[] {1}, stopPolicy, CancellationToken.NONE),
-                  ignored -> {})
+                  new GenerationRequest(
+                      new int[] {1},
+                      GenerationConfig.greedyDefaults(2, Set.of(0), Set.of(0)),
+                      CancellationToken.NONE),
+                  bothTerminalEvents::add)
               .finishReason());
+      assertEquals(FinishReason.EOS, bothTerminalEvents.getFirst().finishReason());
 
       AtomicBoolean cancelled = new AtomicBoolean();
+      AtomicReference<Thread> pollingThread = new AtomicReference<>();
+      AtomicReference<Thread> cancellingThread = new AtomicReference<>();
       GenerationResult cancelledResult =
           model.generate(
               new GenerationRequest(
-                  new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), cancelled::get),
-              event -> cancelled.set(event.tokenId() != null));
+                  new int[] {1},
+                  GenerationConfig.greedyDefaults(2, Set.of()),
+                  () -> {
+                    pollingThread.set(Thread.currentThread());
+                    return cancelled.get();
+                  }),
+              event -> {
+                Thread canceller =
+                    Thread.ofPlatform()
+                        .start(
+                            () -> {
+                              cancellingThread.set(Thread.currentThread());
+                              cancelled.set(true);
+                            });
+                try {
+                  canceller.join();
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  throw new AssertionError(e);
+                }
+              });
       assertEquals(FinishReason.CANCELLED, cancelledResult.finishReason());
       assertEquals(List.of(0), cancelledResult.generatedTokenIds());
+      assertEquals(Thread.currentThread(), pollingThread.get());
+      assertTrue(cancellingThread.get() != pollingThread.get());
 
       assertThrows(
           UnsupportedOperationException.class,
@@ -124,7 +164,41 @@ class LlamaModelTest {
                   }));
       assertEquals(1, failedListenerEvents.size());
       assertEquals(0, failedListenerEvents.getFirst().tokenId());
+      GenerationResult terminalListenerFailure =
+          model.generate(
+              new GenerationRequest(
+                  new int[] {1},
+                  GenerationConfig.greedyDefaults(0, Set.of()),
+                  CancellationToken.NONE),
+              event -> {
+                throw new IllegalStateException("terminal listener failed");
+              });
+      assertEquals(FinishReason.MAX_TOKENS, terminalListenerFailure.finishReason());
       assertEquals(List.of(1, 0), model.generate(new int[] {1}, 1, Set.of()));
+
+      long baseline = NativeMemoryProbe.activeMemoryBytes();
+      for (int i = 0; i < 20; i++) {
+        model.generate(new int[] {1}, 2, Set.of());
+        model.generate(new int[] {1}, 2, Set.of(0));
+        model.generate(
+            new GenerationRequest(
+                new int[] {1},
+                GenerationConfig.greedyDefaults(2, Set.of(), Set.of(0)),
+                CancellationToken.NONE),
+            ignored -> {});
+        model.generate(
+            new GenerationRequest(
+                new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), () -> true),
+            ignored -> {});
+      }
+      long after = NativeMemoryProbe.activeMemoryBytes();
+      assertTrue(
+          after <= baseline + 4096,
+          "generation scopes leaked native memory (baseline="
+              + baseline
+              + ", after="
+              + after
+              + ")");
     }
   }
 

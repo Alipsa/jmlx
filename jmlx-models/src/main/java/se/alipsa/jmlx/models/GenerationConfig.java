@@ -1,6 +1,5 @@
 package se.alipsa.jmlx.models;
 
-import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -43,8 +42,14 @@ public record GenerationConfig(
 
   /** The legacy decoder's deterministic greedy policy. */
   public static GenerationConfig greedyDefaults(int maxNewTokens, Set<Integer> eosTokenIds) {
+    return greedyDefaults(maxNewTokens, eosTokenIds, Set.of());
+  }
+
+  /** Deterministic greedy policy with explicit non-EOS stop token IDs. */
+  public static GenerationConfig greedyDefaults(
+      int maxNewTokens, Set<Integer> eosTokenIds, Set<Integer> stopTokenIds) {
     return new GenerationConfig(
-        maxNewTokens, OptionalLong.empty(), 0, 0, 1, 0, 1, 0, 0, eosTokenIds, Set.of(), false);
+        maxNewTokens, OptionalLong.empty(), 0, 0, 1, 0, 1, 0, 0, eosTokenIds, stopTokenIds, false);
   }
 
   private static Set<Integer> immutableIds(String name, Set<Integer> ids) {
@@ -52,7 +57,7 @@ public record GenerationConfig(
     if (ids.stream().anyMatch(Objects::isNull)) {
       throw new IllegalArgumentException(name + " must not contain null");
     }
-    return Set.copyOf(new LinkedHashSet<>(ids));
+    return Set.copyOf(ids);
   }
 
   private static void probability(String name, float value) {

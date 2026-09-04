@@ -38,9 +38,17 @@ class QwenModelTest {
     try (MLXScope modelScope = new MLXScope()) {
       QwenModel model = QwenModel.load(modelScope, dir);
       assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
-      DecoderModel common = TextGenerationModels.load(modelScope, dir);
-      assertTrue(common instanceof QwenModel);
-      assertEquals(List.of(1, 0, 0), common.generate(new int[] {1}, 2, Set.of()));
+      TextGenerationModel common = TextGenerationModels.load(modelScope, dir);
+      assertEquals(
+          List.of(1, 0, 0),
+          common
+              .generate(
+                  new GenerationRequest(
+                      new int[] {1},
+                      GenerationConfig.greedyDefaults(2, Set.of()),
+                      CancellationToken.NONE),
+                  ignored -> {})
+              .tokenIds());
     }
   }
 

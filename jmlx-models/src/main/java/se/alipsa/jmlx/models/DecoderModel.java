@@ -158,50 +158,54 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     int[] prompt = request.promptTokenIds();
     List<Integer> generated = new ArrayList<>();
     FinishReason reason = FinishReason.MAX_TOKENS;
-    if (request.cancellationToken().isCancelled()) {
+    if (!request.cancellationToken().isCancelled()) {
+      try (MLXScope generation = scope().newChild()) {
+        List<KVCache> caches = new ArrayList<>();
+        for (int i = 0; i < layers.size(); i++) {
+          caches.add(new KVCache(generation));
+        }
+        int[] input = prompt;
+        for (int step = 0; step < policy.maxNewTokens(); step++) {
+          if (request.cancellationToken().isCancelled()) {
+            reason = FinishReason.CANCELLED;
+            break;
+          }
+          try (MLXScope activation = generation.newChild()) {
+            MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
+            MLXArray normalized = normalizedHiddenStates(ids, caches);
+            int[] shape = normalized.shape();
+            MLXArray lastHiddenState =
+                MLXShape.slice(
+                    normalized,
+                    new int[] {0, shape[1] - 1, 0},
+                    new int[] {shape[0], shape[1], shape[2]});
+            MLXArray lastLogits =
+                tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
+            int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
+            generated.add(next);
+            if (policy.eosTokenIds().contains(next)) {
+              reason = FinishReason.EOS;
+              break;
+            }
+            if (policy.stopTokenIds().contains(next)) {
+              reason = FinishReason.STOP_TOKEN;
+              break;
+            }
+            listener.accept(GenerationEvent.token(next));
+            input = new int[] {next};
+          }
+        }
+      }
+    } else {
       reason = FinishReason.CANCELLED;
+    }
+    GenerationResult result = new GenerationResult(toList(prompt), generated, reason, List.of());
+    try {
       listener.accept(GenerationEvent.finished(reason));
-      return new GenerationResult(toList(prompt), generated, reason, List.of());
+    } catch (RuntimeException ignored) {
+      // A terminal callback cannot invalidate fully completed native work or its result.
     }
-    try (MLXScope generation = scope().newChild()) {
-      List<KVCache> caches = new ArrayList<>();
-      for (int i = 0; i < layers.size(); i++) {
-        caches.add(new KVCache(generation));
-      }
-      int[] input = prompt;
-      for (int step = 0; step < policy.maxNewTokens(); step++) {
-        if (request.cancellationToken().isCancelled()) {
-          reason = FinishReason.CANCELLED;
-          break;
-        }
-        try (MLXScope activation = generation.newChild()) {
-          MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
-          MLXArray normalized = normalizedHiddenStates(ids, caches);
-          int[] shape = normalized.shape();
-          MLXArray lastHiddenState =
-              MLXShape.slice(
-                  normalized,
-                  new int[] {0, shape[1] - 1, 0},
-                  new int[] {shape[0], shape[1], shape[2]});
-          MLXArray lastLogits =
-              tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
-          int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
-          generated.add(next);
-          listener.accept(GenerationEvent.token(next));
-          if (policy.stopTokenIds().contains(next)) {
-            reason = FinishReason.STOP_TOKEN;
-            break;
-          }
-          if (policy.eosTokenIds().contains(next)) {
-            reason = FinishReason.EOS;
-            break;
-          }
-          input = new int[] {next};
-        }
-      }
-    }
-    listener.accept(GenerationEvent.finished(reason));
-    return new GenerationResult(toList(prompt), generated, reason, List.of());
+    return result;
   }
 
   private static List<Integer> toList(int[] ids) {

@@ -21,7 +21,7 @@ public final class LlamaModel extends DecoderModel {
   public static LlamaModel load(MLXScope scope, Path directory) throws IOException {
     DecoderConfig config = DecoderConfig.fromFile(directory.resolve("config.json"));
     requireLlama(config);
-    return (LlamaModel) TextGenerationModels.load(scope, directory, config);
+    return create(scope, config, directory);
   }
 
   static LlamaModel create(MLXScope scope, DecoderConfig config, Path directory)

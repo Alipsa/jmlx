@@ -3,6 +3,14 @@ package se.alipsa.jmlx.models;
 /** One generated token, or the terminal event when {@link #finishReason()} is non-null. */
 public record GenerationEvent(
     Integer tokenId, String textDelta, Double logProbability, FinishReason finishReason) {
+  /** Validates that this is either a token event or a terminal event, never both. */
+  public GenerationEvent {
+    if ((tokenId == null) == (finishReason == null)) {
+      throw new IllegalArgumentException(
+          "an event must contain exactly one of tokenId or finishReason");
+    }
+  }
+
   /** Creates a token event. A null text delta means no tokenizer-aware adapter decoded it. */
   public static GenerationEvent token(int tokenId) {
     return new GenerationEvent(tokenId, null, null, null);

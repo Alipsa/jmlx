@@ -26,7 +26,7 @@ public record GenerationConfig(
     }
     Objects.requireNonNull(seed, "seed");
     if (!Float.isFinite(temperature) || temperature < 0) {
-      throw new IllegalArgumentException("temperature must be non-negative");
+      throw new IllegalArgumentException("temperature must be finite and non-negative");
     }
     if (topK < 0) {
       throw new IllegalArgumentException("topK must be non-negative");
@@ -62,13 +62,13 @@ public record GenerationConfig(
 
   private static void probability(String name, float value) {
     if (!Float.isFinite(value) || value < 0 || value > 1) {
-      throw new IllegalArgumentException(name + " must be between zero and one");
+      throw new IllegalArgumentException(name + " must be finite and between zero and one");
     }
   }
 
   private static void positive(String name, float value) {
     if (!Float.isFinite(value) || value <= 0) {
-      throw new IllegalArgumentException(name + " must be positive");
+      throw new IllegalArgumentException(name + " must be finite and positive");
     }
   }
 

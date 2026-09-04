@@ -39,6 +39,16 @@ class DecoderConfigTest {
   }
 
   @Test
+  void validatesDirectModelTypeConstruction() {
+    assertThrows(
+        NullPointerException.class,
+        () -> new DecoderConfig(null, 8, 4, 8, 1, 2, 1, 1e-6f, 10_000f, false, false, false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new DecoderConfig(" ", 8, 4, 8, 1, 2, 1, 1e-6f, 10_000f, false, false, false));
+  }
+
+  @Test
   void acceptsNullHeadDimButRejectsUnsupportedRopeScaling(@TempDir Path dir) throws Exception {
     Path config = dir.resolve("config.json");
     Files.writeString(

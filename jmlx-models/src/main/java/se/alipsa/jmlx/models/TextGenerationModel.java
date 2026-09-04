@@ -6,6 +6,9 @@ import java.util.function.Consumer;
  * Public local text-generation API. Native work runs only on the generation scope's owner thread.
  */
 public interface TextGenerationModel extends AutoCloseable {
+  /** Returns the architecture configuration declared by this checkpoint. */
+  DecoderConfig config();
+
   /**
    * Generates tokens and synchronously sends token events followed by one terminal event to {@code
    * listener}. EOS has precedence when a token belongs to both EOS and stop sets; neither

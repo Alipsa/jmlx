@@ -3,6 +3,7 @@ package se.alipsa.jmlx.models;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.OptionalLong;
@@ -31,22 +32,24 @@ class GenerationContractTest {
         () ->
             new GenerationConfig(
                 1, OptionalLong.empty(), -1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false));
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            new GenerationConfig(
-                1,
-                OptionalLong.empty(),
-                Float.POSITIVE_INFINITY,
-                0,
-                1,
-                0,
-                1,
-                0,
-                0,
-                Set.of(),
-                Set.of(),
-                false));
+    IllegalArgumentException temperature =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new GenerationConfig(
+                    1,
+                    OptionalLong.empty(),
+                    Float.POSITIVE_INFINITY,
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    0,
+                    Set.of(),
+                    Set.of(),
+                    false));
+    assertTrue(temperature.getMessage().contains("finite"));
     assertThrows(
         IllegalArgumentException.class,
         () ->

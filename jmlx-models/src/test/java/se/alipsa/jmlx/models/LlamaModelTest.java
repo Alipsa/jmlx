@@ -28,32 +28,22 @@ import se.alipsa.jmlx.memory.MLXScope;
 @EnabledIfNativeAvailable
 class LlamaModelTest {
   @Test
-  void loadsCheckpointAndGenerates(@TempDir Path dir) throws Exception {
-    Files.writeString(
-        dir.resolve("config.json"),
-        """
-        {"model_type":"llama","vocab_size":4,"hidden_size":4,"intermediate_size":8,
-         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":2,
-         "rms_norm_eps":0.000001,"rope_theta":10000,"tie_word_embeddings":true}
-        """);
-    try (MLXScope saveScope = new MLXScope()) {
-      Map<String, MLXArray> tensors = tinyCheckpoint(saveScope);
-      tensors.remove("lm_head.weight");
-      MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
-    }
+  void legacyAndCommonGenerationAgree(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
     try (MLXScope modelScope = new MLXScope()) {
       LlamaModel model = LlamaModel.load(modelScope, dir);
       assertEquals(List.of(1, 0, 0), model.generate(new int[] {1}, 2, Set.of()));
       assertThrows(IllegalArgumentException.class, () -> model.generate(null, 2, Set.of()));
+      TextGenerationModel common = TextGenerationModels.load(modelScope, dir);
+      assertEquals(4, common.config().vocabSize());
       List<GenerationEvent> events = new ArrayList<>();
       GenerationResult result =
-          TextGenerationModels.load(modelScope, dir)
-              .generate(
-                  new GenerationRequest(
-                      new int[] {1},
-                      GenerationConfig.greedyDefaults(2, Set.of()),
-                      CancellationToken.NONE),
-                  events::add);
+          common.generate(
+              new GenerationRequest(
+                  new int[] {1},
+                  GenerationConfig.greedyDefaults(2, Set.of()),
+                  CancellationToken.NONE),
+              events::add);
       assertEquals(List.of(1), result.promptTokenIds());
       assertEquals(List.of(0, 0), result.generatedTokenIds());
       assertEquals(FinishReason.MAX_TOKENS, result.finishReason());
@@ -61,7 +51,14 @@ class LlamaModelTest {
           List.of(0, 0), events.subList(0, 2).stream().map(GenerationEvent::tokenId).toList());
       assertNull(events.getLast().tokenId());
       assertEquals(FinishReason.MAX_TOKENS, events.getLast().finishReason());
+    }
+  }
 
+  @Test
+  void reportsEosStopAndMaxTokenTermination(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
       GenerationResult eos =
           model.generate(
               new GenerationRequest(
@@ -81,7 +78,7 @@ class LlamaModelTest {
                   CancellationToken.NONE),
               stopEvents::add);
       assertEquals(FinishReason.STOP_TOKEN, stopped.finishReason());
-      assertEquals(List.of(0), stopped.generatedTokenIds());
+      assertEquals(List.of(), stopped.generatedTokenIds());
       assertEquals(1, stopEvents.size());
       assertEquals(FinishReason.STOP_TOKEN, stopEvents.getFirst().finishReason());
 
@@ -97,9 +94,17 @@ class LlamaModelTest {
                   bothTerminalEvents::add)
               .finishReason());
       assertEquals(FinishReason.EOS, bothTerminalEvents.getFirst().finishReason());
+    }
+  }
 
+  @Test
+  void cancellationIsPolledByTheGenerationThread(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
       AtomicBoolean cancelled = new AtomicBoolean();
       AtomicReference<Thread> pollingThread = new AtomicReference<>();
+      AtomicReference<Thread> generationThread = new AtomicReference<>();
       AtomicReference<Thread> cancellingThread = new AtomicReference<>();
       GenerationResult cancelledResult =
           model.generate(
@@ -111,6 +116,7 @@ class LlamaModelTest {
                     return cancelled.get();
                   }),
               event -> {
+                generationThread.set(Thread.currentThread());
                 Thread canceller =
                     Thread.ofPlatform()
                         .start(
@@ -128,8 +134,16 @@ class LlamaModelTest {
       assertEquals(FinishReason.CANCELLED, cancelledResult.finishReason());
       assertEquals(List.of(0), cancelledResult.generatedTokenIds());
       assertEquals(Thread.currentThread(), pollingThread.get());
-      assertNotSame(cancellingThread.get(), pollingThread.get());
+      assertEquals(Thread.currentThread(), generationThread.get());
+      assertNotSame(cancellingThread.get(), generationThread.get());
+    }
+  }
 
+  @Test
+  void rejectsNonGreedyPolicy(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
       assertThrows(
           UnsupportedOperationException.class,
           () ->
@@ -151,6 +165,14 @@ class LlamaModelTest {
                           false),
                       CancellationToken.NONE),
                   ignored -> {}));
+    }
+  }
+
+  @Test
+  void listenerFailuresHaveDefinedCompletionBehavior(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
       List<GenerationEvent> failedListenerEvents = new ArrayList<>();
       GenerationAbortedException listenerFailure =
           assertThrows(
@@ -179,8 +201,14 @@ class LlamaModelTest {
                 throw new IllegalStateException("terminal listener failed");
               });
       assertEquals(FinishReason.MAX_TOKENS, terminalListenerFailure.finishReason());
-      assertEquals(List.of(1, 0), model.generate(new int[] {1}, 1, Set.of()));
+    }
+  }
 
+  @Test
+  void closesGenerationScopesOnEveryTerminalPath(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
       long baseline = NativeMemoryProbe.activeMemoryBytes();
       // MLX's active-memory counter excludes cached allocator blocks; the 4 KiB allowance absorbs
       // small runner-side bookkeeping while remaining far below one leaked decoder activation.
@@ -197,6 +225,22 @@ class LlamaModelTest {
             new GenerationRequest(
                 new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), () -> true),
             ignored -> {});
+        assertThrows(
+            GenerationAbortedException.class,
+            () ->
+                model.generate(
+                    new GenerationRequest(
+                        new int[] {1},
+                        GenerationConfig.greedyDefaults(2, Set.of()),
+                        CancellationToken.NONE),
+                    event -> {
+                      throw new IllegalStateException("listener failed");
+                    }));
+        AtomicBoolean cancelled = new AtomicBoolean();
+        model.generate(
+            new GenerationRequest(
+                new int[] {1}, GenerationConfig.greedyDefaults(2, Set.of()), cancelled::get),
+            event -> cancelled.set(true));
       }
       long after = NativeMemoryProbe.activeMemoryBytes();
       assertTrue(
@@ -209,6 +253,21 @@ class LlamaModelTest {
     }
   }
 
+  private static void writeTinyLlamaCheckpoint(Path dir) throws Exception {
+    Files.writeString(
+        dir.resolve("config.json"),
+        """
+        {"model_type":"llama","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":2,
+         "rms_norm_eps":0.000001,"rope_theta":10000,"tie_word_embeddings":true}
+        """);
+    try (MLXScope saveScope = new MLXScope()) {
+      Map<String, MLXArray> tensors = tinyCheckpoint(saveScope);
+      tensors.remove("lm_head.weight");
+      MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
+    }
+  }
+
   @Test
   void rejectsQwenBeforeAttemptingCheckpointLoad(@TempDir Path dir) throws Exception {
     Files.writeString(
@@ -218,9 +277,11 @@ class LlamaModelTest {
          "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":1}
         """);
 
-    IllegalArgumentException e =
-        assertThrows(IllegalArgumentException.class, () -> LlamaModel.load(null, dir));
-    assertTrue(e.getMessage().contains("expected model_type llama"), e.getMessage());
+    try (MLXScope scope = new MLXScope()) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> LlamaModel.load(scope, dir));
+      assertTrue(e.getMessage().contains("expected model_type llama"), e.getMessage());
+    }
   }
 
   @Test

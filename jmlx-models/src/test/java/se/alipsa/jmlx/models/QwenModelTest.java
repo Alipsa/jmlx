@@ -107,9 +107,11 @@ class QwenModelTest {
          "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":2}
         """);
 
-    IllegalArgumentException e =
-        assertThrows(IllegalArgumentException.class, () -> QwenModel.load(null, dir));
-    assertTrue(e.getMessage().contains("expected model_type qwen2"), e.getMessage());
+    try (MLXScope scope = new MLXScope()) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> QwenModel.load(scope, dir));
+      assertTrue(e.getMessage().contains("expected model_type qwen2"), e.getMessage());
+    }
   }
 
   private static Map<String, MLXArray> tinyCheckpoint(MLXScope scope) {

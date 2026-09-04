@@ -101,6 +101,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   /** Returns the architecture configuration this model was built from. */
+  @Override
   public final DecoderConfig config() {
     return config;
   }
@@ -183,8 +184,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             MLXArray lastLogits =
                 tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
             int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
-            generated.add(next);
             if (policy.eosTokenIds().contains(next)) {
+              // The legacy generate overload includes EOS in its returned sequence.
+              generated.add(next);
               reason = FinishReason.EOS;
               break;
             }
@@ -192,6 +194,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               reason = FinishReason.STOP_TOKEN;
               break;
             }
+            generated.add(next);
             try {
               listener.accept(GenerationEvent.token(next));
             } catch (RuntimeException e) {
@@ -214,11 +217,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private static List<Integer> toList(int[] ids) {
-    List<Integer> result = new ArrayList<>(ids.length);
-    for (int id : ids) {
-      result.add(id);
-    }
-    return List.copyOf(result);
+    return java.util.Arrays.stream(ids).boxed().toList();
   }
 
   private static void requireGreedy(GenerationConfig config) {

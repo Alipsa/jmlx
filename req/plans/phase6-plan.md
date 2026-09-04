@@ -24,9 +24,9 @@ The existing model implementation is intentionally narrow:
 - Native CI already bootstraps the pinned runtime on hosted ARM64 macOS; pure-Java tokenizer checks
   run separately on Ubuntu.
 
-Do not extend `DecoderModel.generate` piecemeal into the public serving API. Preserve it as a
-compatibility adapter during migration, then deprecate it only after the new API demonstrates the
-same greedy output against the same fixture.
+Do not extend `DecoderModel.generate` piecemeal into the public serving API. Preserve legacy entry
+points as thin delegating adapters during migration, then deprecate them only after the new API
+demonstrates the same greedy output against the same fixture.
 
 ## Public-contract decisions
 
@@ -36,7 +36,9 @@ becoming the public API.
 1. Keep the public inference API in `jmlx-models`; do not add an HTTP server or a new module.
 2. A loaded model is bound to a caller-owned `MLXScope`. A generation owns a child scope and releases
    its activations and caches when it completes, is cancelled, or fails. Events never expose an
-   `MLXArray` or any native-owned value.
+   `MLXArray` or any native-owned value. A cancellation token is the only cross-thread-safe object
+   in a request: the scope-owning thread polls it at prefill/decode boundaries, and a cancelling
+   thread never reads, closes, or otherwise touches native state.
 3. Add the following stable Java-facing types in `se.alipsa.jmlx.models`:
 
    - `TextGenerationModel extends AutoCloseable` — model metadata, `generate`, and streaming
@@ -44,15 +46,17 @@ becoming the public API.
      may create an owning scope, while the existing scope-taking loader remains available for
      advanced callers.
    - `GenerationConfig` — immutable validated configuration: max new tokens, seed, temperature,
-     top-k, top-p, min-p, repetition/frequency/presence penalties, EOS/stop token IDs, optional
-     log probabilities, and cache policy. Its defaults reproduce today's greedy behavior.
+     top-k, top-p, min-p, repetition/frequency/presence penalties, EOS/stop token IDs, and optional
+     log probabilities. Its defaults reproduce today's greedy behavior. Cache
+     capacity and eviction are added only in 6.4, rather than accepted and ignored here.
    - `GenerationRequest` — prompt token IDs or text plus an explicit special-token policy, config,
      and cancellation token. Chat-template rendering stays explicit rather than being silently
      inferred from arbitrary prompt text.
    - `GenerationEvent` — token ID, decoded text delta, optional log probability, and finish reason.
-     A callback-based streaming method is the initial API; it runs callbacks synchronously on the
-     calling thread. Reactive Streams and asynchronous executors are out of scope until an
-     application needs them.
+     A callback-based streaming method is the initial API. It runs synchronously on the thread that
+     owns the generation scope: the caller in direct generation and the scheduler worker in batched
+     generation. Reactive Streams and asynchronous executors are out of scope until an application
+     needs them.
    - `GenerationResult` and `FinishReason` — complete token sequence, generated token count, final
      reason (`EOS`, `STOP_TOKEN`, `MAX_TOKENS`, `CANCELLED`), and optional collected log
      probabilities.
@@ -68,11 +72,13 @@ becoming the public API.
 ## Delivery order
 
 Each numbered milestone is a separately reviewable PR series. Milestones 6.0 and 6.0b may proceed
-in parallel; 6.1 starts after the public contract is accepted. Later milestones build in order.
+in parallel. 6.1 starts only after both complete: the RNG/selection probes inform the accepted
+contract, and 6.1's oracle and Tier-A tests need 6.0b's infrastructure. Later milestones build in
+order.
 
 | Milestone | Primary modules | Exit evidence |
 | --- | --- | --- |
-| 6.0 Contract and M3 record | `jmlx-models`, docs | Llama/Qwen use the new API without a shim |
+| 6.0 Contract and M3 record | `jmlx-models`, docs | new path has no model-specific branches; legacy APIs only delegate |
 | 6.0b Inventory and test infrastructure | `buildSrc`, `jmlx-ffi`, CI, docs | inventory and native-call guard run in CI |
 | 6.1 Generation and sampling | `jmlx-core`, `jmlx-models` | reproducible greedy and seeded sampling |
 | 6.2 Tokenizer compatibility | `jmlx-tokenizer`, `jmlx-models` | every supported model has reference goldens |
@@ -91,35 +97,45 @@ in parallel; 6.1 starts after the public contract is accepted. Later milestones 
    `planned`; include model architecture, tokenizer family, chat-template status, checkpoint form,
    quantization, RoPE/scaling, context/cache policy, and license/access notes.
 3. Add the public types described above, with complete resource ownership and threading javadocs.
-   Implement a model factory that dispatches on `model_type`; keep `LlamaModel.load` and
-   `QwenModel.load` as compatibility entry points delegating to the common loader.
+   Establish only the minimal architecture-descriptor seam and a common loader that dispatches on
+   `model_type`; 6.3 expands descriptors into the full capability mapping. Keep `LlamaModel.load`
+   and `QwenModel.load` as compatibility entry points delegating to that common loader.
 4. Move current greedy generation behind `GenerationConfig.greedyDefaults()` and add a streaming
    adapter that emits the same token sequence and one terminal event. Preserve prompt token IDs in
    results and decode only generated IDs for text deltas.
 5. Add tiny native tests for: Llama/Qwen common loader dispatch, greedy output equivalence with the
    old API, event order, EOS/max-token stopping, callback-thrown exception cleanup, cancellation
-   before prefill and between decode steps, and scope cleanup after every terminal path.
+   before prefill and between decode steps, and scope cleanup after every terminal path. Assert that
+   cancellation itself never runs native work on the cancelling thread.
 6. Update `jmlx-models/README.md` with the API, limitations, and compatibility-matrix link.
 
-**Gate:** both existing architectures pass through the common API with no output change; the matrix
-and M3 retrospective are reviewed with the code.
+**Gate:** both existing architectures pass through the common API with no output change, and legacy
+entry points contain no independent model-loading or generation logic; the matrix and M3
+retrospective are reviewed with the code.
 
 ## 6.0b — Native inventory, oracle, and fixtures
 
-1. Generate `req/mlx-api-inventory.md` from the committed `mlx_h` bindings. It records both native
+1. Before accepting the 6.0 public contract, probe the pinned behavior of `mlx_argmax_axis`,
+   `mlx_topk`, `mlx_sort`/`mlx_argsort`, `mlx_partition`, categorical sampling, and explicit
+   random-key/split operations. Record ownership, shape, dtype, lazy-evaluation, tie-breaking, and
+   RNG behavior. If key/split semantics cannot support one independent RNG stream per request,
+   revise the contract before 6.1 starts.
+2. Generate `req/mlx-api-inventory.md` from the committed `mlx_h` bindings. It records both native
    pins from `scripts/bootstrap-native.sh`, native symbol/group, public facade, status, and test
    location. Generated output must be deterministic and checked in.
-2. Add a `buildSrc` verification task that scans handwritten Java sources for generated FFI downcalls,
-   generated layout/accessor types, and generated upcall interfaces. It fails unless every use has
-   a matching inventory entry. Exclude generated bindings and narrowly document each intentional
-   test-only exception.
-3. Establish `tools/mlx-oracle/` as a pinned Python MLX environment. Its lock/provenance document
-   states whether its MLX version matches the Java runtime pin, how it is installed on macOS ARM64,
-   and which generated goldens are committed. Oracle failure must never be interpreted as a Java
-   correctness result without reporting versions.
-4. Add a Gradle task for small oracle fixtures. Run it in the existing `native` CI job only after
+3. Define the call-site scan in a `buildSrc` convention plugin, but register its verification task
+   on the main build's `check`, where it can scan handwritten project sources. It covers generated
+   FFI downcalls, generated layout/accessor types, and generated upcall interfaces, and fails unless
+   every use has a matching inventory entry. Exclude generated bindings and narrowly document each
+   intentional test-only exception. `buildSrc:check` remains the separate shared-build-logic check.
+4. Establish `tools/mlx-oracle/` as a Python MLX environment whose version/provenance is derived
+   from `scripts/bootstrap-native.sh`, the single source of truth for the Java runtime pins. Its
+   generated lock/provenance document states how it is installed on macOS ARM64 and which goldens
+   are committed. Oracle failure must never be interpreted as a Java correctness result without
+   reporting versions.
+5. Add a Gradle task for small oracle fixtures. Run it in the existing `native` CI job only after
    bootstrap. Keep it deterministic, small, and credential-free.
-5. Define fixture tiers:
+6. Define fixture tiers:
 
    - Tier A: tiny configs, randomly initialized safetensors, tokenizer inputs, prompt/token goldens,
      and capability fixtures committed under module test resources. They run for every relevant PR.
@@ -133,27 +149,26 @@ recorded.
 
 ## 6.1 — Sampling and streaming generation
 
-1. Before selecting an algorithm, probe the exact pinned mlx-c declarations for `mlx_topk`,
-   `mlx_sort`/`mlx_argsort`, `mlx_partition`, categorical sampling, and explicit random-key/split
-   operations. Record ownership, shape, dtype, lazy-evaluation, tie-breaking, and RNG behavior in
-   the inventory and an implementation finding. If explicit key/split support differs from the
-   binding expectation, stop and revise the API contract rather than falling back to global RNG.
-2. Add only the core facade operations selected by that probe, probably `MLXOps.topk`/sorting and
+1. Add only the core facade operations selected by the 6.0b probe, probably `MLXOps.topk`/sorting and
    `MLXRandom` explicit key, split, and categorical methods. Every native temporary follows the
    existing `MLXScope`/`NativeOps` cleanup pattern; no model code reaches `ffi`.
+2. Convert logits to `FLOAT32` at the head of the sampling pipeline, before penalties, temperature,
+   filtering, normalization, and categorical selection. Greedy `argmax` retains its current native
+   dtype fast path; its tie-breaking rule is part of the 6.0b probe and reproducibility contract.
 3. Implement logits processing as a pure, ordered pipeline with tests for each stage: repetition,
    frequency, and presence penalties; temperature; top-k; top-p; min-p; and final categorical draw.
    Validate NaN/infinity logits, zero temperature, invalid probability ranges, empty candidates,
    duplicate stop IDs, and out-of-vocabulary IDs before native execution.
 4. Track one explicit RNG state per request. Splitting a batch or cancelling one request must not
    perturb the random sequence of another request. Greedy mode must not consume a random key.
-5. Define `logprobs` precisely: report the selected token's log probability from the post-policy
-   distribution, and reject requests for unsupported alternatives rather than returning ambiguous
-   values.
+5. Define `logprobs` precisely: report the selected token's log probability from the post-policy,
+   post-truncation-renormalized distribution, and reject requests for unsupported alternatives
+   rather than returning ambiguous values. This deliberately differs from the common pre-policy
+   HF/OpenAI convention and must be prominent in the API javadocs and README.
 
-**Tests:** hand-calculated logits, Python-oracle distributions for fixed seeds, same-seed repeat
-tests, different-seed divergence tests that avoid flaky statistical claims, stop handling,
-cancellation, and Llama/Qwen tiny-checkpoint integration tests.
+**Tests:** hand-calculated logits, Python-oracle distributions for fixed seeds, same-seed repeats in
+one JVM and in fresh JVMs, different-seed divergence tests that avoid flaky statistical claims, stop
+handling, cancellation, and Llama/Qwen tiny-checkpoint integration tests.
 
 **Gate:** greedy output is unchanged; seeded output is reproducible for the stated tuple; all policy
 corner cases are specified and tested.
@@ -172,8 +187,9 @@ corner cases are specified and tested.
 4. Keep tokenization pure Java. Any native/tokenizers-cpp alternative requires a separately reviewed
    compatibility and performance probe and cannot silently replace the Java implementation.
 
-**Gate:** every matrix row can load its tokenizer, render its documented chat prompt, and match
-committed HF-reference token and text goldens.
+**Gate:** every compatibility-matrix row implemented by 6.2 can load its tokenizer, render its
+documented chat prompt, and match committed HF-reference token and text goldens. Each family added
+in 6.3 brings its own tokenizer/template golden before its row becomes supported.
 
 ## 6.3 — Architecture and checkpoint capability matrix
 
@@ -181,9 +197,12 @@ committed HF-reference token and text goldens.
    layout/bias, normalization, MLP activation/layout, tied output, RoPE variant, sliding-window
    masking, and checkpoint-name mapping. A descriptor validates every required and forbidden tensor
    before constructing any model layer.
-2. Add RoPE scaling before accepting configs that declare it. Implement and test linear,
-   dynamic-NTK, Llama 3, and YaRN forms required by the approved matrix. Probe numerical agreement
-   with the oracle at multiple positions; do not treat a parsed config field as support.
+2. Add RoPE scaling before accepting configs that declare it. `MLXFast.rope` already accepts
+   `scale` and a frequency array, so linear scaling is the scale parameter and dynamic-NTK, Llama 3,
+   and YaRN primarily require Java config parsing and inverse-frequency construction. Probe only
+   `mlx_fast_rope_dynamic`'s behavior and whether YaRN's attention-temperature factor needs a
+   separate surface; then verify numerical agreement with the oracle at multiple positions. Do not
+   treat a parsed config field as support.
 3. Add families one capability at a time: Mistral (sliding-window), Gemma, Phi, then one MoE family
    such as Mixtral. Each family requires a written mapping table from `config.json`/tensor names to
    capabilities, a tiny safetensors fixture, golden prefill and decode token IDs, and one Tier-B
@@ -200,8 +219,10 @@ unsupported artifacts fail before a partial model is returned.
 1. Split generation internally into prefill and single-token decode paths. Avoid rebuilding prompt
    arrays or recomputing cached keys/values during decode.
 2. Extend `KVCache` with explicit capacity, reset, fork, reorder, and sliding-window eviction
-   semantics. Define whether fork/reorder copies or shares native arrays and test that closing one
-   path cannot invalidate another.
+   semantics. Its current close-on-append ownership contract makes direct sharing unsafe: initially
+   implement fork/reorder by copying or rebuilding owned arrays. Sharing is permitted only after a
+   separately reviewed ownership/refcount redesign proves that closing or appending one fork cannot
+   invalidate another.
 3. Implement batch-safe positions and masks, then cache quantization only after an MLX capability
    probe establishes representation, accuracy, and ownership semantics.
 4. Add `jmlx-examples` benchmark harnesses for cold load, prefill, one-token decode, sustained
@@ -220,7 +241,8 @@ correct; reproducible benchmark data exists for every supported family.
    queue depth and batch size, groups compatible decode work, handles unequal completion lengths,
    provides back-pressure, and isolates cancellation and RNG state per request.
 2. Define scheduler threading explicitly. Native calls remain confined to its worker/owned scopes;
-   callbacks receive immutable Java events and must not block the worker indefinitely. Start with a
+   callbacks receive immutable Java events on that worker and must not block it indefinitely. The
+   direct path invokes callbacks on the caller because it owns that generation scope. Start with a
    documented single-worker implementation and add concurrency only with profiling evidence.
 3. Add package smoke tests that resolve the published module graph in a clean Gradle home, include
    `jmlx-native-macos-arm64`, load a Tier-A checkpoint, render a chat prompt, and stream a short
@@ -228,10 +250,21 @@ correct; reproducible benchmark data exists for every supported family.
 4. Publish `jmlx-models` examples, model-cache/download guidance (or a separately scoped resolver),
    the compatibility report, benchmark method/results, licenses/notices, and explicit unsupported
    features. Do not imply support for arbitrary Hugging Face models.
-5. Run the documented release order and release verification on real macOS ARM64: `jmlx-jinja` →
-   `jmlx-tokenizer`; `jmlx-native-macos-arm64` → `jmlx-ffi` → `jmlx-core` → `jmlx-models`. Release
-   only after all module versions and published dependencies are non-SNAPSHOT and the clean-consumer
-   smoke test uses Central-resolved artifacts.
+5. Run the documented release order and release verification on real macOS ARM64. The actual
+   published-dependency graph is:
+
+   ```text
+   jmlx-jinja → jmlx-tokenizer ─┐
+                                ├→ jmlx-models
+   jmlx-ffi → jmlx-core ────────┘
+   jmlx-native-macos-arm64  (independent; build-time fixture of jmlx-ffi:check only)
+   ```
+
+   Release prerequisite modules before their dependents while their checked-out versions are the
+   just-published non-SNAPSHOT values. The intended first-Central versions are `jmlx-jinja` 0.6.0,
+   `jmlx-tokenizer` 0.1.0, `jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi` 0.5.0, `jmlx-core` 0.5.0,
+   and `jmlx-models` 0.1.0. Only after all dependent releases and a Central-resolved clean-consumer
+   smoke test pass may each line advance to its next `-SNAPSHOT`.
 
 **Phase gate:** a documented Java program performs chat prompt rendering, reproducible streamed
 sampling, bounded multi-request generation, and deterministic cleanup against supported models.

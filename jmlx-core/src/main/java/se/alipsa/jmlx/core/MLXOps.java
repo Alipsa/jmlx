@@ -375,4 +375,49 @@ public final class MLXOps {
         () -> mlx_h.mlx_softmax_axis(res, a.handle(), axis, precise, NativeOps.DEFAULT_STREAM));
     return new MLXArray(scope, res);
   }
+
+  /** Stable indices that sort {@code a} along {@code axis}, returned as INT32. */
+  public static MLXArray argsortAxis(MLXArray a, int axis) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "argsortAxis",
+        () -> mlx_h.mlx_argsort_axis(res, a.handle(), axis, NativeOps.DEFAULT_STREAM));
+    return MLX.astype(new MLXArray(scope, res), DType.INT32);
+  }
+
+  /** Cumulative sum along {@code axis}, with native reverse and inclusive semantics exposed. */
+  public static MLXArray cumulativeSumAxis(
+      MLXArray a, int axis, boolean reverse, boolean inclusive) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "cumulativeSumAxis",
+        () ->
+            mlx_h.mlx_cumsum(res, a.handle(), axis, reverse, inclusive, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /** Elementwise finite predicate. The result dtype is BOOL. */
+  public static MLXArray isFinite(MLXArray a) {
+    return NativeOps.unaryOp("isFinite", a, mlx_h::mlx_isfinite);
+  }
+
+  /** Whether every element is truthy, reduced to a rank-0 BOOL scalar. */
+  public static MLXArray all(MLXArray a) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("all", () -> mlx_h.mlx_all(res, a.handle(), false, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /** Numerically stable log-sum-exp along {@code axis}. */
+  public static MLXArray logSumExpAxis(MLXArray a, int axis, boolean keepdims) {
+    MLXScope scope = a.scope();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "logSumExpAxis",
+        () -> mlx_h.mlx_logsumexp_axis(res, a.handle(), axis, keepdims, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
 }

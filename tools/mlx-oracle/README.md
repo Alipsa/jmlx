@@ -11,13 +11,14 @@ On Apple Silicon:
 ./gradlew verifyMlxOracle verifyMlxOracleFixtures
 ```
 
-The committed fixture explicitly selects the GPU and records its device, values, shapes, and dtypes
+The committed fixtures explicitly select the GPU and record their device, values, shapes, and dtypes
 in canonical JSON. Float values are serialized to seven decimal places after MLX evaluation to keep
 the checked-in representation concise. Verification still compares the canonical JSON exactly; the
 rounding is not a cross-device or cross-version numerical tolerance.
 Environment verification also compares the bootstrap-derived pins with the staged native runtime's
 `native-pin.properties` whenever that completion marker is present.
-`generateMlxOracleFixtures` is the only task allowed to rewrite expected JSON. Review its diff and
+Each `*.input.json` maps to the same basename with `*.expected.json`; verification rejects missing
+or orphan partners. `generateMlxOracleFixtures` is the only task allowed to rewrite expected JSON. Review its diff and
 record provenance changes whenever the native pins change. An oracle setup/version failure is an
 infrastructure failure; it is not evidence that Java output is incorrect.
 

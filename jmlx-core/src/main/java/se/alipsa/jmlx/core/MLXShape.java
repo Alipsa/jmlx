@@ -161,6 +161,44 @@ public final class MLXShape {
   }
 
   /**
+   * Takes values elementwise along {@code axis}. Unlike {@link #takeAxis}, this does not insert the
+   * full indices shape: {@code indices} must be broadcast-compatible with {@code a} outside the
+   * selected axis.
+   */
+  public static MLXArray takeAlongAxis(MLXArray a, MLXArray indices, int axis) {
+    MLXScope scope = NativeOps.scopeOf("takeAlongAxis", a, indices);
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "takeAlongAxis",
+        () ->
+            mlx_h.mlx_take_along_axis(
+                res, a.handle(), indices.handle(), axis, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /**
+   * Returns {@code a} with {@code values} written at elementwise {@code indices} along {@code
+   * axis}. This operation is lazy, like {@link #take} and {@link #takeAxis}. The pinned native
+   * operation does not bounds-check index values, so callers must establish that every index is
+   * valid.
+   */
+  public static MLXArray putAlongAxis(MLXArray a, MLXArray indices, MLXArray values, int axis) {
+    MLXScope scope = NativeOps.scopeOf("putAlongAxis", a, indices, values);
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "putAlongAxis",
+        () ->
+            mlx_h.mlx_put_along_axis(
+                res,
+                a.handle(),
+                indices.handle(),
+                values.handle(),
+                axis,
+                NativeOps.DEFAULT_STREAM));
+    return new MLXArray(scope, res);
+  }
+
+  /**
    * Slices {@code a} along every axis using {@code start} (inclusive) and {@code stop} (exclusive),
    * with every axis implicitly strided by 1. Equivalent to {@link #slice(MLXArray, int[], int[],
    * int[])} with an all-ones {@code strides}.

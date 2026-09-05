@@ -164,12 +164,20 @@ tasks.register('generateMlxOracleFixtures', Exec) {
     configureMlxOracle(delegate)
     dependsOn tasks.named('verifyMlxOracle')
     inputs.file(mlxOracleDir.file('runner.py'))
-    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
-    outputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
+    def fixtureInputs = fileTree(mlxOracleDir.dir('fixtures')) { include '*.input.json' }
+    def fixtureOutputs = providers.provider {
+        fixtureInputs.files.collect { new File(it.parentFile, it.name.replace('.input.json', '.expected.json')) }
+    }
+    inputs.files(fixtureInputs)
+    inputs.property('existingExpectedFixtureNames', providers.provider {
+        fileTree(mlxOracleDir.dir('fixtures')) { include '*.expected.json' }
+                .files.collect { it.name }.sort()
+    })
+    outputs.files(fixtureOutputs)
     args mlxOracleDir.file('runner.py').asFile,
-            '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--fixtures-dir', mlxOracleDir.file('fixtures').asFile,
             '--provenance', mlxOracleDir.file('provenance.json').asFile,
-            '--output', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
+            '--generate-all'
 }
 
 tasks.register('verifyMlxOracleFixtures', Exec) {
@@ -179,12 +187,11 @@ tasks.register('verifyMlxOracleFixtures', Exec) {
     dependsOn tasks.named('verifyMlxOracle')
     mustRunAfter tasks.named('generateMlxOracleFixtures')
     inputs.file(mlxOracleDir.file('runner.py'))
-    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
-    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
+    inputs.files(fileTree(mlxOracleDir.dir('fixtures')) { include '*.input.json', '*.expected.json' })
     args mlxOracleDir.file('runner.py').asFile,
-            '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--fixtures-dir', mlxOracleDir.file('fixtures').asFile,
             '--provenance', mlxOracleDir.file('provenance.json').asFile,
-            '--verify', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
+            '--verify-all'
 }
 
 // This source-only guard runs under the project's Java toolchain, so parsing coverage cannot

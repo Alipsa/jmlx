@@ -69,9 +69,9 @@ two-output-split, and categorical results in a parent scope, closes the child sc
 input before first evaluation, and only then evaluates and reads the results. Successful execution
 therefore establishes both lazy graph ownership and cleanup through the ordinary `MLXScope` paths.
 
-This follow-up was compiled on Linux, where `@EnabledIfNativeAvailable` correctly skipped all four
-tests. Its behavioral assertions require the documented macOS/Apple-Silicon command above (or the
-native CI job) before the new observations are treated as accepted.
+PR #22's macOS/Apple-Silicon native job executed all four probes successfully against the recorded
+MLX v0.31.2 pins. The observations below are therefore accepted native evidence rather than the
+Linux-provisional results recorded while this follow-up was authored.
 
 ## Decisions
 
@@ -80,13 +80,12 @@ native CI job) before the new observations are treated as accepted.
   intentionally converts the native UINT32 result to INT32; the direct probe establishes the native
   dtype.
 - Phase 6.1 must use axis-aware selection on decoder logits, not the flattening operations. Flat
-  variants and two-way split now have committed follow-up assertions; native execution remains the
-  acceptance gate.
+  variants and two-way split have committed assertions that passed PR #22's native gate.
 - `mlx_random_key` plus `mlx_random_split_num` produces a stable explicit-key sequence and is viable
   for per-request state. Phase 6.1 must keep one key per request and must not use global
   `MLXRandom.seed` in generation.
-- Lazy-evaluation/ownership assertions are now committed and deliberately evaluate only after their
-  input scope closes; native execution remains required before accepting any facade operation.
+- Lazy-evaluation/ownership assertions deliberately evaluate only after their input scope closes;
+  they passed PR #22's native gate before the facade operations were accepted.
 
 The existing README claim of deterministic greedy generation is consistent with the observed argmax
 tie-breaking; no Phase 6.0 contract correction is needed.

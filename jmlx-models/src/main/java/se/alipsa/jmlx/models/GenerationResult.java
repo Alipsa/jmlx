@@ -7,8 +7,8 @@ import java.util.stream.Stream;
 /**
  * Immutable result of a completed generation, retaining prompt and generated token IDs separately.
  * For legacy compatibility, EOS is retained in generated IDs; an explicit stop token is excluded.
- * {@link #logProbabilities()} is always empty in this release because log probabilities are not yet
- * implemented.
+ * {@link #logProbabilities()} is empty when not requested, otherwise it aligns one-to-one with the
+ * generated IDs.
  */
 public record GenerationResult(
     List<Integer> promptTokenIds,
@@ -21,6 +21,10 @@ public record GenerationResult(
     generatedTokenIds = List.copyOf(Objects.requireNonNull(generatedTokenIds, "generatedTokenIds"));
     finishReason = Objects.requireNonNull(finishReason, "finishReason");
     logProbabilities = List.copyOf(Objects.requireNonNull(logProbabilities, "logProbabilities"));
+    if (!logProbabilities.isEmpty() && logProbabilities.size() != generatedTokenIds.size()) {
+      throw new IllegalArgumentException(
+          "logProbabilities must be empty or match generatedTokenIds cardinality");
+    }
   }
 
   /** Returns prompt followed by generated IDs. */

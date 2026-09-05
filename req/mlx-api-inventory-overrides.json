@@ -125,31 +125,41 @@
         "mlx_h.mlx_tanh", "mlx_h.mlx_sqrt", "mlx_h.mlx_rsqrt", "mlx_h.mlx_square",
         "mlx_h.mlx_negative", "mlx_h.mlx_sum_axes", "mlx_h.mlx_mean_axes", "mlx_h.mlx_inner",
         "mlx_h.mlx_outer", "mlx_h.mlx_less", "mlx_h.mlx_less_equal", "mlx_h.mlx_greater",
-        "mlx_h.mlx_greater_equal", "mlx_h.mlx_equal"
+        "mlx_h.mlx_greater_equal", "mlx_h.mlx_equal", "mlx_h.mlx_all",
+        "mlx_h.mlx_argsort_axis", "mlx_h.mlx_cumsum", "mlx_h.mlx_isfinite",
+        "mlx_h.mlx_logsumexp_axis"
       ],
       "category": "downcall",
       "status": "implemented",
       "facadeOrReason": "MLXOps",
-      "tests": "MLXArrayTest"
+      "tests": "MLXArrayTest; MLXSamplingOpsTest"
     },
     {
       "bindings": [
         "mlx_h.mlx_broadcast_to", "mlx_h.mlx_squeeze", "mlx_h.mlx_squeeze_axes",
         "mlx_h.mlx_transpose", "mlx_h.mlx_transpose_axes", "mlx_h.mlx_swapaxes", "mlx_h.mlx_take",
         "mlx_h.mlx_concatenate_axis", "mlx_h.mlx_expand_dims", "mlx_h.mlx_flatten",
-        "mlx_h.mlx_tril", "mlx_h.mlx_triu"
+        "mlx_h.mlx_tril", "mlx_h.mlx_triu", "mlx_h.mlx_take_along_axis",
+        "mlx_h.mlx_put_along_axis"
       ],
       "category": "downcall",
       "status": "implemented",
       "facadeOrReason": "MLXShape",
-      "tests": "MLXArrayTest"
+      "tests": "MLXArrayTest; MLXSamplingOpsTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_random_categorical", "mlx_h.mlx_random_key", "mlx_h.mlx_random_split_num"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXRandom explicit-key sampling",
+      "tests": "MLXSamplingOpsTest; SelectionAndRandomProbeTest"
     },
     {
       "bindings": [
         "mlx_h.mlx_argpartition", "mlx_h.mlx_argpartition_axis", "mlx_h.mlx_argsort",
-        "mlx_h.mlx_argsort_axis", "mlx_h.mlx_partition", "mlx_h.mlx_partition_axis",
-        "mlx_h.mlx_random_categorical", "mlx_h.mlx_random_key", "mlx_h.mlx_random_split",
-        "mlx_h.mlx_random_split_num",
+        "mlx_h.mlx_partition", "mlx_h.mlx_partition_axis", "mlx_h.mlx_random_split",
         "mlx_h.mlx_sort", "mlx_h.mlx_topk", "mlx_h.mlx_topk_axis"
       ],
       "category": "downcall",

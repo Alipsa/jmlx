@@ -6,13 +6,18 @@ runs on every relevant pull request; no test downloads a model or tokenizer.
 | Fixture | Input / seed | Golden | Test or verifier |
 | --- | --- | --- | --- |
 | Python MLX array oracle | GPU; FLOAT32 logits `[[1,3,2],[5,4,3]]`, axis 1 | FLOAT32 doubled/softmax `[2,3]`; UINT32 argmax `[2]` with values `[1,0]` | `verifyMlxOracleFixtures` |
+| Python MLX sampling oracle | GPU; six canonical greedy, penalty, filtering, and combined policies with explicit keys | Ordered post-policy logits, split keys, selected IDs, and post-filter log probabilities | `verifyMlxOracleFixtures`; `SamplingOracleTest.matchesCommittedPythonSelectionsAndLogProbabilities` |
 | Llama tiny decoder | generated zero-valued 1-layer safetensors; prompt `[1]`; two decode steps | common and legacy token IDs `[1,0,0]` | `LlamaModelTest.legacyAndCommonGenerationAgree` |
+| Fresh-JVM seeded Llama sampling | same tiny decoder; prompt `[1]`; seeds 42 and 7; 5/20 decode steps | committed exact token/logprob streams; short request is a prefix | `LlamaModelTest.seededSamplingRepeatsAcrossFreshJvmsAndRetainsPrefixes` |
 | Qwen2 tiny decoder | generated zero-valued 1-layer GQA safetensors; prompt `[1]`; two decode steps | common and legacy token IDs `[1,0,0]` | `QwenModelTest.loadsCheckpointAndGeneratesWithGroupedQueryCache` |
 | Qwen-style byte BPE | text `low the`, no special tokens | IDs `[13,16]`; decoded text `low the` | `HfTokenizerTest.qwenStyleEncodeDecodeRoundTrips` |
 | Llama-style byte BPE | text `low the`, special tokens enabled | IDs `[128000,13,16]`; decoded text `low the` when special tokens are skipped | `HfTokenizerTest` Llama 3 golden tests |
 
-`verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces its committed
-oracle output. A Java-side differential comparison against that JSON belongs to a later milestone.
+`verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces every committed
+oracle output. The original array row remains an environment self-check; Phase 6.1 closes the Java
+differential loop for the sampling row by consuming its vocabulary-ordered post-filter logits,
+selected IDs, and log probabilities in `SamplingOracleTest`. The other intermediate stage arrays
+remain directly reviewable evidence.
 
 The decoder tests generate safetensors through `MLXIO.saveSafetensors`; no opaque binary checkpoint
 is committed. `LlamaModelTest.closesGenerationScopesOnEveryTerminalPath` covers repeated cleanup,

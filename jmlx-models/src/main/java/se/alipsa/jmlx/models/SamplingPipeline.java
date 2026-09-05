@@ -14,6 +14,11 @@ import se.alipsa.jmlx.memory.MLXScope;
 final class SamplingPipeline implements AutoCloseable {
   private static final int VOCABULARY_AXIS = 2;
 
+  /**
+   * Internal selection whose logits array is owned by the caller's activation scope and is valid
+   * only until that scope closes. The array contains penalized logits in greedy mode and
+   * vocabulary-ordered post-filter logits in sampled mode.
+   */
   record Selection(int tokenId, Double logProbability, MLXArray vocabularyLogits) {}
 
   private final MLXScope generationScope;

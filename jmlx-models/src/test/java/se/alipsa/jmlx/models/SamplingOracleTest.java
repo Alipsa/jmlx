@@ -62,8 +62,8 @@ class SamplingOracleTest {
             actual.logProbability(),
             1e-6,
             name);
-        JsonNode expectedVocabularyLogits = expectedCase.get("vocabularyLogits");
-        if (expectedVocabularyLogits != null) {
+        if (policy.temperature() != 0) {
+          JsonNode expectedVocabularyLogits = required(expectedCase, "vocabularyLogits");
           assertArrayEquals(
               floatsWithInfinity(expectedVocabularyLogits),
               actual.vocabularyLogits().toFloatArray(),

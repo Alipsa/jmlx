@@ -208,7 +208,11 @@ def main() -> None:
             if args.generate_all:
                 expected_path.write_text(actual)
             elif actual != expected_path.read_text():
-                raise SystemExit(f"oracle fixture is stale: {expected_path}")
+                raise SystemExit(
+                    f"oracle fixture is stale: {expected_path}\n"
+                    f"expected: {expected_path.read_text()}"
+                    f"actual:   {actual}"
+                )
             else:
                 print(f"MLX oracle fixture verified: {expected_path}")
         return

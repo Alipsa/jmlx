@@ -65,7 +65,7 @@ For each decode step, process the final-token logits along the vocabulary axis i
 
 ```text
 model logits
-  → cast to FLOAT32 and reject any NaN or ±infinity
+  → cast to FLOAT32 and record a finiteness flag checked after the single evaluation
   → repetition penalty over prompt + previously emitted tokens
   → frequency penalty over prompt + previously emitted tokens
   → presence penalty over prompt + previously emitted tokens
@@ -105,10 +105,13 @@ keeps candidates whose current probability is at least `minP * maxProbability`. 
 preserve at least the highest-ranked candidate. Compute masks in sorted order, then form the inverse
 mapping by scattering the sorted filtered logits back with
 `putAlongAxis(destination, sortedTokenIds, filteredSortedLogits, vocabularyAxis)`. The destination is
-a vocabulary-shaped negative-infinity tensor, so the scatter restores original vocabulary order in
-O(V) without a second O(V log V) argsort. Call categorical only after that restoration. Thus a fixed
-key is applied to the same index order as direct Python MLX/`mlx_lm`; the oracle must not reproduce a
-jmlx-only sorted-domain draw.
+a vocabulary-shaped zero tensor, but its initial value is deliberately irrelevant: `sortedTokenIds`
+is a full permutation and every destination position is overwritten. The scatter restores original
+vocabulary order in O(V) without a second O(V log V) argsort. If a later optimization scatters only a
+retained prefix, it must change the fill to negative infinity and add a regression for excluded
+positions rather than reusing this full-permutation assumption. Call categorical only after the
+restoration. Thus a fixed key is applied to the same index order as direct Python MLX/`mlx_lm`; the
+oracle must not reproduce a jmlx-only sorted-domain draw.
 
 This index-order parity is not a claim of complete sampler parity with `mlx_lm`. Phase 6.1 follows
 the roadmap/Hugging Face stage order—temperature before top-k, top-p, and min-p—whereas current
@@ -125,13 +128,15 @@ out of scope.
 - The public `Set<Integer>` fields cannot represent duplicate IDs. Preserve immutable-set copying,
   explicitly test EOS/stop overlap, and retain EOS precedence. Do not claim to reject duplicates
   that the API has already collapsed.
-- Build the finite flag and selection as one lazy graph rather than synchronizing before selection.
-  Feed downstream selection a sanitized `where(isFinite, logits, zero)` value so invalid logits
-  cannot make categorical fail first, then call `MLX.eval(finiteFlag, selectedIndex, selectedLogprob)`
-  once (omitting the logprob output when disabled). Inspect the finite flag before returning or
-  emitting the selected token. This preserves fail-loud attribution without adding a second GPU
-  submission/host round-trip to every decode step. An all-masked/empty distribution is an internal
-  error with the stage named in the message, never a native categorical failure.
+- Build the finite flag and selection from the same original-logit lazy graph rather than
+  synchronizing before selection. Do not sanitize with `where`: no selected entry point in the
+  pinned argmax/categorical path reports NaN as a native status failure, and an extra vocabulary-
+  sized replacement kernel would not improve attribution. Cast the BOOL finite scalar to INT32,
+  then call `MLX.eval(finiteFlagInt32, selectedIndex, selectedLogprob)` once (omitting the logprob
+  output when disabled). Read and inspect the already-evaluated finite flag before returning or
+  emitting the selected token. This preserves fail-loud attribution without a pre-selection GPU
+  submission/host round-trip. An all-masked/empty distribution is an internal error with the stage
+  named in the message, never a native categorical failure.
 - EOS remains in generated IDs and receives a token event/log probability. An explicit stop token
   remains excluded from generated IDs/events/log probabilities. When log probabilities are
   requested, `GenerationResult.logProbabilities().size()` equals `generatedTokenIds().size()` and
@@ -201,14 +206,19 @@ accepts final-token logits, immutable policy, vocabulary size, token-frequency s
 request RNG state, and returns a small immutable selection containing token ID and optional log
 probability.
 
+Keep `SamplingPipeline`, `PenaltyInputs`, and their test-accessed helpers package-private and test
+them from the same Java package. They do not appear in generated Javadocs or the published public API;
+do not add public/reflective diagnostic bridges for tests.
+
 Keep token counts in a Java insertion-ordered map keyed only by distinct prompt/emitted token IDs and
 update it once per emitted token. Use a sparse native update, not a dense `float[vocabSize]` upload:
 materialize `[distinctSeen]` token IDs and counts in the per-step activation scope, gather only those
 logits with `takeAlongAxis`, apply repetition/frequency/presence math to that compact vector, and
 write the adjusted values back with `putAlongAxis`. The host and transfer work is therefore
-O(distinct history), not O(vocabulary), while the logits remain on-device. Add a test using a
-151,936-token vocabulary shape and short history that asserts the adjustment buffers are history-
-sized through a package-private diagnostic seam, without allocating a dense Java vector.
+O(distinct history), not O(vocabulary), while the logits remain on-device. Represent these actual
+inputs with a package-private immutable `PenaltyInputs` value used by production code, not a
+test-only diagnostic hook. A pure-Java test with a 151,936-token vocabulary and short history asserts
+that its ID/count arrays are distinct-history-sized without allocating a dense vocabulary vector.
 
 For sampled mode, hold exactly one current key in the generation scope. Per step, create the split
 result and child views in the activation scope: child 0 is hoisted as the next generation-scope key
@@ -222,19 +232,21 @@ release sequence are part of the reproducibility tuple.
 
 Implement filtering on sorted logits. Use argsort plus token-ID secondary ordering, gather logits,
 and apply positional/cumulative masks with negative infinity. Scatter the filtered sorted logits into
-a vocabulary-shaped negative-infinity destination at `sortedTokenIds`; do not sort the permutation a
-second time. Call categorical only on that vocabulary-ordered tensor, so fixed-seed behavior matches
-direct Python MLX's categorical index domain rather than a permuted domain.
+a vocabulary-shaped zero destination at the full `sortedTokenIds` permutation; every element is
+overwritten, so the fill value is not part of the result. Do not sort the permutation a second time.
+Call categorical only on that vocabulary-ordered tensor, so fixed-seed behavior matches direct
+Python MLX's categorical index domain rather than a permuted domain.
 
 For an optional log probability, gather the selected filtered logit and subtract
 `logSumExpAxis(vocabularyOrderedFilteredLogits, vocabularyAxis, true)`. Do not calculate
 `log(softmax(...))`, which is less stable at masked `-infinity` entries, and do not expose
 alternative-token log probabilities in 6.1.
 
-Build the finite flag, sanitized policy graph, categorical/argmax result, and optional logprob as one
-lazy graph and evaluate their terminal scalars together. The pipeline exposes no intermediate
-readback barrier; its native test should use an evaluation/submission diagnostic or equivalent test
-seam to prevent a second per-token synchronization from being introduced later.
+Build the finite flag, categorical/argmax result, and optional logprob as one lazy graph and evaluate
+their terminal scalars together. The implementation invariant is exactly one explicit `MLX.eval`
+per step and no `toIntArray`/`toFloatArray` readback before it; enforce this in code review and keep
+the terminal readbacks adjacent to that evaluation. Do not add evaluation counters or test-only
+diagnostic seams to shipped classes merely to restate this visible control-flow rule.
 
 ### 3. Decoder integration and public results
 

@@ -134,9 +134,13 @@ out of scope.
   sized replacement kernel would not improve attribution. Cast the BOOL finite scalar to INT32,
   then call `MLX.eval(finiteFlagInt32, selectedIndex, selectedLogprob)` once (omitting the logprob
   output when disabled). Read and inspect the already-evaluated finite flag before returning or
-  emitting the selected token. This preserves fail-loud attribution without a pre-selection GPU
-  submission/host round-trip. An all-masked/empty distribution is an internal error with the stage
-  named in the message, never a native categorical failure.
+  emitting the selected token. If false, throw
+  `IllegalStateException("sampling logits must be finite")`; the native
+  `SamplingPipelineTest.rejectsNonFiniteLogitsAsPolicyError` must assert this exact jmlx-side type and
+  message and explicitly reject an `MLXException` from `NativeOps.checked`. This test discharges the
+  pinned-runtime premise behind omitting the sanitizer. The design preserves fail-loud attribution
+  without a pre-selection GPU submission/host round-trip. An all-masked/empty distribution is an
+  internal error with the stage named in the message, never a native categorical failure.
 - EOS remains in generated IDs and receives a token event/log probability. An explicit stop token
   remains excluded from generated IDs/events/log probabilities. When log probabilities are
   requested, `GenerationResult.logProbabilities().size()` equals `generatedTokenIds().size()` and
@@ -220,15 +224,18 @@ inputs with a package-private immutable `PenaltyInputs` value used by production
 test-only diagnostic hook. A pure-Java test with a 151,936-token vocabulary and short history asserts
 that its ID/count arrays are distinct-history-sized without allocating a dense vocabulary vector.
 
-For sampled mode, hold exactly one current key in the generation scope. Per step, create the split
-result and child views in the activation scope: child 0 is hoisted as the next generation-scope key
-and child 1 is the categorical draw key. After those result graphs have captured their inputs, call
+For sampled mode, hold exactly one current key in the generation scope. Per step, create the
+`[2, 2]` split result in the activation scope. Extract child 0 with
+`slice(split, [0, 0], [1, 2])` and child 1 with `slice(split, [1, 0], [2, 2])`, then squeeze axis 0
+from each `[1, 2]` view so both satisfy the UINT32 `[2]` key contract. Hoist the squeezed child 0—not
+the `[2, 2]` split parent or unsqueezed view—as the next generation-scope key; use squeezed child 1
+as the categorical draw key. After those result graphs have captured their inputs, call
 `currentKey.close()`—which routes through `MLXScope.free`—before assigning the successor. The
-activation close releases the split array, draw-key view, and every other temporary. At all times the
-generation scope therefore owns at most one live current key plus the newly hoisted successor during
-replacement; it does not accumulate one key per token. Pin lazy safety with a test that closes the
-old key before first evaluation of the categorical result. This fixed child ordering and early-
-release sequence are part of the reproducibility tuple.
+activation close releases the split array, child views, draw key, and every other temporary. At all
+times the generation scope therefore owns at most one live current key plus the newly hoisted
+successor during replacement; it does not accumulate one key per token. Pin lazy safety with a test
+that closes the old key before first evaluation of the categorical result. This fixed child ordering
+and early-release sequence are part of the reproducibility tuple.
 
 Implement filtering on sorted logits. Use argsort plus token-ID secondary ordering, gather logits,
 and apply positional/cumulative masks with negative infinity. Scatter the filtered sorted logits into
@@ -246,7 +253,9 @@ Build the finite flag, categorical/argmax result, and optional logprob as one la
 their terminal scalars together. The implementation invariant is exactly one explicit `MLX.eval`
 per step and no `toIntArray`/`toFloatArray` readback before it; enforce this in code review and keep
 the terminal readbacks adjacent to that evaluation. Do not add evaluation counters or test-only
-diagnostic seams to shipped classes merely to restate this visible control-flow rule.
+diagnostic seams to shipped classes merely to restate this visible control-flow rule. Automated
+per-token submission/latency regression detection is therefore an accepted gap in Phase 6.1; native
+functional and memory gates do not claim to measure it.
 
 ### 3. Decoder integration and public results
 
@@ -314,7 +323,8 @@ Test in layers:
 - native pipeline: one focused test per ordered stage, combined policy, finite-logit rejection,
   top-p/min-p boundaries, ties, no empty candidate set, selected log probability, and key ownership;
 - model integration: Llama and Qwen tiny checkpoints, unchanged greedy goldens, seeded repeatability,
-  logprob event/result alignment, cancellation, listener failure, and every terminal path;
+  same-seed max-token prefix stability, logprob event/result alignment, cancellation, listener
+  failure, and every terminal path;
 - resource regression: repeated sampled generation and failures remain within the existing bounded
   native-memory allowance;
 - oracle/subprocess: committed Python differential cases and fresh-JVM reproducibility.
@@ -370,6 +380,9 @@ Accept Phase 6.1 only when:
 - the legacy and common greedy paths retain their existing token outputs and consume no RNG key;
 - explicit-seed tokens and selected log probabilities repeat in-process and across fresh JVMs on the
   recorded tuple;
+- for the same prompt, policy, and seed, a request with `maxNewTokens = 5` exactly matches the first
+  five token/logprob pairs from `maxNewTokens = 20`, proving the key chain is advanced per step
+  rather than pre-split from the requested length;
 - cancellation or completion of one independently executed request cannot perturb another request's
   seeded sequence;
 - stop/EOS/logprob cardinality and listener behavior match the documented contract;

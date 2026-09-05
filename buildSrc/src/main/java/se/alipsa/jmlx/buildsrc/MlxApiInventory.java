@@ -114,7 +114,9 @@ public final class MlxApiInventory {
     validateMappings(repositoryRoot, entries, mappings, repositorySources);
     Set<String> types = new TreeSet<>();
     for (Entry entry : entries) {
-      if (entry.category() == Category.LAYOUT || entry.category() == Category.UPCALL) {
+      if (entry.category() == Category.LAYOUT
+          || entry.category() == Category.UPCALL
+          || entry.category() == Category.INFRASTRUCTURE) {
         types.add(entry.identity());
       }
     }

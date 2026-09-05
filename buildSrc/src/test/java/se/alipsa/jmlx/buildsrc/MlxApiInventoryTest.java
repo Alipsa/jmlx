@@ -387,6 +387,38 @@ class MlxApiInventoryTest {
     assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
   }
 
+  @Test
+  void callSiteGuardExplicitlyAllowsOnlySharedCLayoutInfrastructure() throws Exception {
+    Path allowed = fixture("{\"records\":[]}");
+    Files.writeString(
+        allowed.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h$shared.java"),
+        "");
+    Path allowedSource = allowed.resolve("jmlx-core/src/main/java/sample/Allowed.java");
+    Files.createDirectories(allowedSource.getParent());
+    Files.writeString(
+        allowedSource,
+        "import se.alipsa.jmlx.ffi.mlx_h$shared;"
+            + " import static se.alipsa.jmlx.ffi.mlx_h$shared.C_INT;"
+            + " class Allowed { Object one = mlx_h$shared.C_BOOL; Object two = C_INT; }");
+
+    assertDoesNotThrow(() -> MlxApiCallSites.verify(allowed));
+
+    Path rejected = fixture("{\"records\":[]}");
+    Files.writeString(
+        rejected.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h$shared.java"),
+        "");
+    Path rejectedSource = rejected.resolve("jmlx-core/src/main/java/sample/Rejected.java");
+    Files.createDirectories(rejectedSource.getParent());
+    Files.writeString(
+        rejectedSource,
+        "import se.alipsa.jmlx.ffi.mlx_h$shared;"
+            + " class Rejected { Object value = mlx_h$shared.futureMember; }");
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(rejected));
+    assertTrue(failure.getMessage().contains("mlx_h$shared"), failure::getMessage);
+  }
+
   private Path fixture(String mappings) throws IOException {
     Path root = Files.createTempDirectory(temporaryDirectory, "inventory-");
     Path bindings = root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi");

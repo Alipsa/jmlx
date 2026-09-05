@@ -8,6 +8,7 @@ import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
+import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
@@ -33,6 +34,7 @@ public final class MlxApiCallSites {
 
   private static final String FFI_PACKAGE = "se.alipsa.jmlx.ffi.";
   private static final String FFI_PACKAGE_NAME = "se.alipsa.jmlx.ffi";
+  private static final String SHARED_INFRASTRUCTURE_TYPE = "mlx_h$shared";
   private static final Set<String> MLX_H_INFRASTRUCTURE =
       Set.of(
           "align",
@@ -233,10 +235,11 @@ public final class MlxApiCallSites {
     public Void visitIdentifier(IdentifierTree tree, Void unused) {
       String name = tree.getName().toString();
       String identity = imports.get(name);
-      if (identity != null) {
+      if (identity == null && inFfiPackage && generatedTypes.contains(name)) {
+        identity = name;
+      }
+      if (identity != null && !isAllowedSharedInfrastructureQualifier(identity, tree)) {
         record(identity, tree);
-      } else if (inFfiPackage && generatedTypes.contains(name)) {
-        record(name, tree);
       }
       return super.visitIdentifier(tree, unused);
     }
@@ -261,6 +264,11 @@ public final class MlxApiCallSites {
                 && !isNamedInfrastructure(member)) {
               record("mlx_h." + member, importTree);
             }
+          } else if (suffix.startsWith(SHARED_INFRASTRUCTURE_TYPE + ".")) {
+            String member = suffix.substring((SHARED_INFRASTRUCTURE_TYPE + ".").length());
+            if (!member.startsWith("C_")) {
+              record(SHARED_INFRASTRUCTURE_TYPE, importTree);
+            }
           }
         } else if (generatedTypes.contains(suffix)) {
           imports.put(suffix, suffix);
@@ -274,6 +282,20 @@ public final class MlxApiCallSites {
           || member.matches("_?mlx_[A-Za-z0-9_]+\\$(handle|descriptor|address)");
     }
 
+    private boolean isAllowedSharedInfrastructureQualifier(String identity, IdentifierTree tree) {
+      if (!identity.equals(SHARED_INFRASTRUCTURE_TYPE)) {
+        return false;
+      }
+      TreePath path = getCurrentPath();
+      if (path == null || path.getParentPath() == null) {
+        return false;
+      }
+      Tree parent = path.getParentPath().getLeaf();
+      return parent instanceof MemberSelectTree memberSelect
+          && memberSelect.getExpression() == tree
+          && memberSelect.getIdentifier().toString().startsWith("C_");
+    }
+
     private void recordMember(String owner, String member, Tree tree) {
       if (owner.equals("mlx_h") || owner.endsWith(".mlx_h")) {
         if (!isNamedInfrastructure(member)) {
@@ -285,7 +307,9 @@ public final class MlxApiCallSites {
           owner.startsWith(FFI_PACKAGE) ? owner.substring(owner.lastIndexOf('.') + 1) : owner;
       if (generatedTypes.contains(type)
           && (owner.startsWith(FFI_PACKAGE) || imports.containsKey(type))) {
-        record(type, tree);
+        if (!type.equals(SHARED_INFRASTRUCTURE_TYPE) || !member.startsWith("C_")) {
+          record(type, tree);
+        }
       }
     }
 

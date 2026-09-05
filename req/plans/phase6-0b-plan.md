@@ -64,6 +64,10 @@ unbound declarations from `unsupported-by-runtime` entries. Render it separately
 native job with `verifyMlxApiHeaderCoverage`. `verifyMlxApiInventory` remains fully reproducible on
 Ubuntu because it has no staged-header-dependent output.
 
+**Implemented:** the separate report covers functions, enum constants, and named public C types,
+records the staged header-tree SHA-256 and both native pins, and lists rather than rejects both
+directions of mismatch. Its verification remains native-job-only.
+
 Test renderer ordering, byte-identical repeat output, automatic-unplanned rendering, explicit
 mapping validation, stale/unknown/duplicate mappings, missing pins, and rendered fields with small
 binding/bootstrap fixtures in `buildSrc`.

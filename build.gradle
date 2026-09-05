@@ -6,6 +6,7 @@
  * property below.
  */
 
+import se.alipsa.jmlx.buildsrc.MlxApiHeaderCoverage
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
 import se.alipsa.jmlx.buildsrc.MlxPins
 
@@ -68,6 +69,51 @@ tasks.register('verifyMlxApiInventory') {
 
 tasks.named('verifyMlxApiInventory') {
     mustRunAfter tasks.named('generateMlxApiInventory')
+}
+
+def stagedMlxHeaders = layout.projectDirectory.dir('native/install/include/mlx/c')
+def stagedNativePinFile = layout.projectDirectory.file('native/install/lib/native-pin.properties')
+def mlxHeaderCoverageReport = layout.projectDirectory.file('req/mlx-api-header-coverage.md')
+
+tasks.register('generateMlxApiHeaderCoverage') {
+    group = 'documentation'
+    description = 'Generates native header-to-binding coverage evidence from staged mlx-c headers.'
+    inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    inputs.dir(layout.projectDirectory.dir('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi'))
+    // File collections tolerate an absent pre-bootstrap path, allowing the renderer to emit its
+    // actionable bootstrap diagnostic instead of Gradle rejecting task configuration first.
+    inputs.files(stagedMlxHeaders, stagedNativePinFile)
+    outputs.file(mlxHeaderCoverageReport)
+    doLast {
+        MlxApiHeaderCoverage.write(
+                projectDir.toPath(),
+                stagedMlxHeaders.asFile.toPath(),
+                stagedNativePinFile.asFile.toPath(),
+                mlxHeaderCoverageReport.asFile.toPath())
+    }
+}
+
+// Native-only verification deliberately has no declared inputs or outputs and therefore always
+// renders against the currently staged headers. It is not attached to ordinary root check.
+tasks.register('verifyMlxApiHeaderCoverage') {
+    group = 'verification'
+    description = 'Fails when native header-to-binding coverage evidence is stale.'
+    doLast {
+        def expected = MlxApiHeaderCoverage.render(
+                projectDir.toPath(),
+                stagedMlxHeaders.asFile.toPath(),
+                stagedNativePinFile.asFile.toPath())
+        def report = mlxHeaderCoverageReport.asFile
+        def actual = report.isFile() ? report.getText('UTF-8') : null
+        if (actual != expected) {
+            throw new GradleException(
+                    'req/mlx-api-header-coverage.md is stale; run ./gradlew generateMlxApiHeaderCoverage')
+        }
+    }
+}
+
+tasks.named('verifyMlxApiHeaderCoverage') {
+    mustRunAfter tasks.named('generateMlxApiHeaderCoverage')
 }
 
 def mlxPins = providers.provider { MlxPins.read(projectDir.toPath()) }

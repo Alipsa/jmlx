@@ -55,6 +55,10 @@ should have changed — this is the bindings-drift check.
 
 # Verifies every handwritten generated-binding use has an explicit non-unplanned mapping.
 ./gradlew verifyMlxApiCallSites
+
+# Native-only: verifies the staged public mlx-c headers still match the committed bindings report.
+# Regenerate with generateMlxApiHeaderCoverage after native pin or binding changes.
+./gradlew verifyMlxApiHeaderCoverage
 ```
 
 The Python MLX oracle is an explicit macOS/arm64-only fixture tool. It is not invoked by ordinary

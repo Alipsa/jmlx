@@ -99,7 +99,7 @@ jobs:
 
       - name: Run root verification
         # Runs the repository-wide source guards after native bootstrap and oracle setup.
-        run: ./gradlew :check verifyMlxOracle verifyMlxOracleFixtures
+        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use
       # Gradle's build cache here: a cached test result would not demonstrate

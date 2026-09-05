@@ -131,6 +131,15 @@ public final class MlxApiInventory {
     return new GuardData(Map.copyOf(sources), Set.copyOf(types), Set.copyOf(observedUseRequired));
   }
 
+  /** Returns generated binding identities and their inventory category labels. */
+  static Map<String, String> generatedBindingCategories(Path repositoryRoot) throws IOException {
+    Map<String, String> categories = new TreeMap<>();
+    for (Entry entry : discover(repositoryRoot)) {
+      categories.put(entry.identity(), entry.category().label());
+    }
+    return Map.copyOf(categories);
+  }
+
   private static List<Entry> discover(Path repositoryRoot) throws IOException {
     Path directory = repositoryRoot.resolve(BINDING_DIRECTORY);
     String binding = Files.readString(directory.resolve("mlx_h.java"), StandardCharsets.UTF_8);

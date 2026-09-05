@@ -19,6 +19,7 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.tokenizer.HfTokenizer;
 
 @EnabledIfNativeAvailable
 class QwenModelTest {
@@ -62,6 +63,20 @@ class QwenModelTest {
               new GenerationRequest(new int[] {1}, sampled, CancellationToken.NONE), ignored -> {});
       assertEquals(first.generatedTokenIds(), repeat.generatedTokenIds());
       assertEquals(first.logProbabilities(), repeat.logProbabilities());
+
+      Path tokenizerPath = writeTinyTokenizer(dir);
+      HfTokenizer tokenizer = HfTokenizer.fromFile(tokenizerPath);
+      GenerationResult text =
+          model.generate(
+              GenerationRequest.text(
+                  tokenizer,
+                  "p",
+                  PromptSpecialTokens.OMIT,
+                  GenerationConfig.greedyDefaults(2, Set.of()),
+                  CancellationToken.NONE),
+              ignored -> {});
+      assertEquals(List.of(0, 0), text.generatedTokenIds());
+      assertEquals("aa", text.generatedText());
     }
   }
 
@@ -147,6 +162,26 @@ class QwenModelTest {
     tensors.put(p + "mlp.up_proj.weight", zeros(scope, 8, 4));
     tensors.put(p + "mlp.down_proj.weight", zeros(scope, 4, 8));
     return tensors;
+  }
+
+  private static Path writeTinyTokenizer(Path directory) throws Exception {
+    Path path = directory.resolve("tokenizer.json");
+    Files.writeString(
+        path,
+        """
+        {
+          "version":"1.0","truncation":null,"padding":null,"added_tokens":[],
+          "normalizer":null,
+          "pre_tokenizer":{"type":"ByteLevel","add_prefix_space":false,
+                           "trim_offsets":true,"use_regex":false},
+          "post_processor":null,"decoder":{"type":"ByteLevel"},
+          "model":{"type":"BPE","dropout":null,"unk_token":null,
+                   "continuing_subword_prefix":"","end_of_word_suffix":"",
+                   "fuse_unk":false,"byte_fallback":false,"ignore_merges":false,
+                   "vocab":{"a":0,"p":1,"x":2,"y":3},"merges":[]}
+        }
+        """);
+    return path;
   }
 
   private static MLXArray zeros(MLXScope scope, int... shape) {

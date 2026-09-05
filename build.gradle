@@ -194,6 +194,72 @@ tasks.register('verifyMlxOracleFixtures', Exec) {
             '--verify-all'
 }
 
+def tokenizerOracleDir = layout.projectDirectory.dir('tools/tokenizer-oracle')
+def tokenizerOraclePython = tokenizerOracleDir.file('.venv/bin/python').asFile
+def configureTokenizerOracle = { Exec task ->
+    task.inputs.file(tokenizerOracleDir.file('requirements.in'))
+    task.inputs.file(tokenizerOracleDir.file('requirements.lock'))
+    task.inputs.file(tokenizerOracleDir.file('provenance.json'))
+    task.executable = tokenizerOraclePython
+    task.doFirst {
+        if (!tokenizerOraclePython.isFile()) {
+            throw new GradleException(
+                    'Tokenizer oracle environment is missing; run ./tools/tokenizer-oracle/install.sh')
+        }
+    }
+}
+
+tasks.register('verifyTokenizerOracle', Exec) {
+    group = 'verification'
+    description = 'Verifies the pinned Hugging Face tokenizer oracle environment.'
+    configureTokenizerOracle(delegate)
+    inputs.file(tokenizerOracleDir.file('verify_environment.py'))
+    args tokenizerOracleDir.file('verify_environment.py').asFile,
+            tokenizerOracleDir.file('provenance.json').asFile
+}
+
+tasks.register('generateTokenizerOracleFixtures', Exec) {
+    group = 'documentation'
+    description = 'Regenerates canonical tokenizer fixtures with the pinned reference runtime.'
+    configureTokenizerOracle(delegate)
+    dependsOn tasks.named('verifyTokenizerOracle')
+    inputs.file(tokenizerOracleDir.file('runner.py'))
+    def fixtureInputs = fileTree(tokenizerOracleDir.dir('fixtures')) {
+        include '*.input.json', '*.tokenizer.json'
+    }
+    def fixtureOutputs = providers.provider {
+        fileTree(tokenizerOracleDir.dir('fixtures')) { include '*.input.json' }.files.collect {
+            new File(it.parentFile, it.name.replace('.input.json', '.expected.json'))
+        }
+    }
+    inputs.files(fixtureInputs)
+    inputs.property('existingExpectedFixtureNames', providers.provider {
+        fileTree(tokenizerOracleDir.dir('fixtures')) { include '*.expected.json' }
+                .files.collect { it.name }.sort()
+    })
+    outputs.files(fixtureOutputs)
+    args tokenizerOracleDir.file('runner.py').asFile,
+            '--fixtures-dir', tokenizerOracleDir.file('fixtures').asFile,
+            '--provenance', tokenizerOracleDir.file('provenance.json').asFile,
+            '--generate-all'
+}
+
+tasks.register('verifyTokenizerOracleFixtures', Exec) {
+    group = 'verification'
+    description = 'Verifies committed tokenizer fixtures with the pinned reference runtime.'
+    configureTokenizerOracle(delegate)
+    dependsOn tasks.named('verifyTokenizerOracle')
+    mustRunAfter tasks.named('generateTokenizerOracleFixtures')
+    inputs.file(tokenizerOracleDir.file('runner.py'))
+    inputs.files(fileTree(tokenizerOracleDir.dir('fixtures')) {
+        include '*.input.json', '*.expected.json', '*.tokenizer.json'
+    })
+    args tokenizerOracleDir.file('runner.py').asFile,
+            '--fixtures-dir', tokenizerOracleDir.file('fixtures').asFile,
+            '--provenance', tokenizerOracleDir.file('provenance.json').asFile,
+            '--verify-all'
+}
+
 // This source-only guard runs under the project's Java toolchain, so parsing coverage cannot
 // silently lag the source language level or constrain the Gradle daemon's Java version.
 tasks.register('verifyMlxApiCallSites', JavaExec) {

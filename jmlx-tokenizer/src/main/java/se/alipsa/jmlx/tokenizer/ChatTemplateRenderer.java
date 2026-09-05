@@ -75,6 +75,36 @@ public final class ChatTemplateRenderer {
   }
 
   /**
+   * Renders source against a fully assembled Hugging Face template context.
+   *
+   * @param chatTemplate template source
+   * @param context complete immutable render context
+   * @return rendered prompt
+   */
+  public static String render(String chatTemplate, Map<String, Object> context) {
+    return render(parse(chatTemplate), context);
+  }
+
+  /**
+   * Renders a parsed template against a fully assembled Hugging Face template context.
+   *
+   * @param chatTemplate parsed template
+   * @param context complete immutable render context
+   * @return rendered prompt
+   */
+  public static String render(Template chatTemplate, Map<String, Object> context) {
+    Objects.requireNonNull(
+        chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
+    Objects.requireNonNull(context, "ChatTemplateRenderer.render: context must not be null");
+    try {
+      return chatTemplate.render(Map.copyOf(context));
+    } catch (JinjaException e) {
+      throw new TokenizerException(
+          "ChatTemplateRenderer.render: failed to render chat template", e);
+    }
+  }
+
+  /**
    * Parses a chat template for callers to retain and render repeatedly.
    *
    * @param chatTemplate template source

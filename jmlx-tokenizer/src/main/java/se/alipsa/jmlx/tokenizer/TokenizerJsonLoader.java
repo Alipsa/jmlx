@@ -45,6 +45,583 @@ public final class TokenizerJsonLoader {
     }
   }
 
+  static TokenizerDefinition loadDefinition(Path path) {
+    Objects.requireNonNull(path, "TokenizerJsonLoader.loadDefinition: path must not be null");
+    try {
+      JsonNode root = MAPPER.readTree(Files.newInputStream(path));
+      JsonNode normalizer = nullableComponent(root, "normalizer");
+      JsonNode preTokenizer = requiredComponent(root, "pre_tokenizer");
+      JsonNode decoder = requiredComponent(root, "decoder");
+      validateNormalizer(normalizer, "normalizer");
+      validatePreTokenizer(preTokenizer, "pre_tokenizer");
+      validateDecoder(decoder, "decoder");
+      TokenizerDefinition.Model model = parseFlexibleModel(root.path("model"));
+      List<AddedToken> addedTokens = parseFlexibleAddedTokens(root.path("added_tokens"));
+      return new TokenizerDefinition(
+          normalizer,
+          preTokenizer,
+          parseFlexiblePostProcessor(root.path("post_processor")),
+          model,
+          decoder,
+          addedTokens,
+          parseConfiguredDefaults(root, configuredVocabulary(model.vocab(), addedTokens)));
+    } catch (IOException | JacksonException e) {
+      throw new TokenizerException("TokenizerJsonLoader: failed to parse " + path, e);
+    }
+  }
+
+  private static JsonNode nullableComponent(JsonNode root, String field) {
+    JsonNode node = root.get(field);
+    return node == null || node.isNull() ? null : node;
+  }
+
+  private static JsonNode requiredComponent(JsonNode root, String field) {
+    JsonNode node = root.get(field);
+    if (node == null || node.isNull() || !node.isObject()) {
+      throw new TokenizerException("TokenizerJsonLoader: " + field + " must be an object");
+    }
+    return node;
+  }
+
+  private static String componentType(JsonNode node, String path) {
+    JsonNode type = node.path("type");
+    if (!type.isString() || type.asString().isEmpty()) {
+      throw new TokenizerException("TokenizerJsonLoader: " + path + ".type must be a string");
+    }
+    return type.asString();
+  }
+
+  private static void validateNormalizer(JsonNode node, String path) {
+    if (node == null) {
+      return;
+    }
+    String type = componentType(node, path);
+    if ("Precompiled".equals(type)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported " + path + ".type 'Precompiled'");
+    }
+    if ("Sequence".equals(type)) {
+      if (!node.path("normalizers").isArray()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: " + path + ".normalizers must be an array");
+      }
+      int index = 0;
+      for (JsonNode child : node.path("normalizers")) {
+        validateNormalizer(child, path + ".normalizers[" + index++ + "]");
+      }
+      return;
+    }
+    if (!List.of(
+            "NFC",
+            "NFD",
+            "NFKC",
+            "NFKD",
+            "Lowercase",
+            "StripAccents",
+            "Replace",
+            "Strip",
+            "Prepend",
+            "BertNormalizer")
+        .contains(type)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
+    }
+    switch (type) {
+      case "Replace" -> {
+        validatePattern(node.path("pattern"), path + ".pattern");
+        optionalString(node, "content", "", path);
+      }
+      case "Strip" -> {
+        optionalBoolean(node, "strip_left", true, path);
+        optionalBoolean(node, "strip_right", true, path);
+      }
+      case "Prepend" -> optionalString(node, "prepend", "", path);
+      case "BertNormalizer" -> {
+        optionalBoolean(node, "clean_text", true, path);
+        optionalBoolean(node, "handle_chinese_chars", true, path);
+        optionalBoolean(node, "lowercase", true, path);
+        JsonNode accents = node.path("strip_accents");
+        if (!accents.isMissingNode() && !accents.isNull() && !accents.isBoolean()) {
+          throw new TokenizerException(
+              "TokenizerJsonLoader: " + path + ".strip_accents must be boolean or null");
+        }
+      }
+      default -> {
+        // The Unicode-form, lowercase, and accent steps have no behavioral fields.
+      }
+    }
+  }
+
+  private static void validatePreTokenizer(JsonNode node, String path) {
+    String type = componentType(node, path);
+    if ("Sequence".equals(type)) {
+      if (!node.path("pretokenizers").isArray()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: " + path + ".pretokenizers must be an array");
+      }
+      int index = 0;
+      for (JsonNode child : node.path("pretokenizers")) {
+        validatePreTokenizer(child, path + ".pretokenizers[" + index++ + "]");
+      }
+      return;
+    }
+    if (!List.of(
+            "ByteLevel", "Metaspace", "Whitespace", "WhitespaceSplit", "BertPreTokenizer", "Split")
+        .contains(type)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
+    }
+    switch (type) {
+      case "ByteLevel" -> {
+        optionalBoolean(node, "add_prefix_space", false, path);
+        optionalBoolean(node, "trim_offsets", true, path);
+        optionalBoolean(node, "use_regex", true, path);
+      }
+      case "Metaspace" -> {
+        requireSingleScalar(optionalString(node, "replacement", "▁", path), path + ".replacement");
+        validatePrependScheme(node, path);
+        optionalBoolean(node, "split", true, path);
+      }
+      case "Split" -> {
+        validatePattern(node.path("pattern"), path + ".pattern");
+        String behavior = optionalString(node, "behavior", "Removed", path);
+        if (!List.of("Removed", "Isolated", "MergedWithPrevious", "Contiguous")
+            .contains(behavior)) {
+          throw new TokenizerException(
+              "TokenizerJsonLoader: " + path + ".behavior is unsupported: " + behavior);
+        }
+        optionalBoolean(node, "invert", false, path);
+      }
+      default -> {
+        // Whitespace and BertPreTokenizer have no behavioral fields.
+      }
+    }
+  }
+
+  private static void validateDecoder(JsonNode node, String path) {
+    String type = componentType(node, path);
+    if ("Sequence".equals(type)) {
+      if (!node.path("decoders").isArray()) {
+        throw new TokenizerException("TokenizerJsonLoader: " + path + ".decoders must be an array");
+      }
+      int index = 0;
+      for (JsonNode child : node.path("decoders")) {
+        validateDecoder(child, path + ".decoders[" + index++ + "]");
+      }
+      return;
+    }
+    if (!List.of("ByteLevel", "Metaspace", "WordPiece", "Replace", "Strip", "ByteFallback", "Fuse")
+        .contains(type)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
+    }
+    switch (type) {
+      case "Metaspace" -> {
+        requireSingleScalar(optionalString(node, "replacement", "▁", path), path + ".replacement");
+        validatePrependScheme(node, path);
+      }
+      case "WordPiece" -> {
+        optionalString(node, "prefix", "##", path);
+        optionalBoolean(node, "cleanup", true, path);
+      }
+      case "Replace" -> {
+        validatePattern(node.path("pattern"), path + ".pattern");
+        optionalString(node, "content", "", path);
+      }
+      case "Strip" -> {
+        requireSingleScalar(optionalString(node, "content", " ", path), path + ".content");
+        requireNonNegativeInt(node, "start", path);
+        requireNonNegativeInt(node, "stop", path);
+      }
+      default -> {
+        // ByteLevel, ByteFallback, and Fuse have no behavioral fields used by decoding.
+      }
+    }
+  }
+
+  private static void validatePattern(JsonNode pattern, String path) {
+    if (!pattern.isObject()
+        || (pattern.path("String").isMissingNode() == pattern.path("Regex").isMissingNode())
+        || (!pattern.path("String").isMissingNode() && !pattern.path("String").isString())
+        || (!pattern.path("Regex").isMissingNode() && !pattern.path("Regex").isString())) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + " must contain exactly one String or Regex value");
+    }
+  }
+
+  private static void validatePrependScheme(JsonNode node, String path) {
+    String scheme = optionalString(node, "prepend_scheme", "always", path).toLowerCase();
+    if (!List.of("always", "first", "never").contains(scheme)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + ".prepend_scheme is unsupported: " + scheme);
+    }
+  }
+
+  private static void requireSingleScalar(String value, String path) {
+    if (value.codePointCount(0, value.length()) != 1) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + " must contain one Unicode scalar");
+    }
+  }
+
+  private static void requireNonNegativeInt(JsonNode node, String field, String path) {
+    JsonNode value = node.path(field);
+    if (!value.isIntegralNumber() || value.intValue() < 0) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + "." + field + " must be a non-negative integer");
+    }
+  }
+
+  private static TokenizerDefinition.Model parseFlexibleModel(JsonNode node) {
+    String type = componentType(node, "model");
+    return switch (type) {
+      case "BPE" -> parseFlexibleBpe(node);
+      case "Unigram" -> parseUnigram(node);
+      case "WordPiece" -> parseWordPiece(node);
+      default ->
+          throw new TokenizerException(
+              "TokenizerJsonLoader: unsupported model.type '" + type + "'");
+    };
+  }
+
+  private static TokenizerDefinition.Bpe parseFlexibleBpe(JsonNode node) {
+    Map<String, Integer> vocab = parseObjectVocabulary(node.path("vocab"), "model.vocab");
+    final Map<String, Integer> mergeRanks = parseMergeRanks(node.path("merges"));
+    JsonNode dropout = node.path("dropout");
+    if (!dropout.isMissingNode()
+        && !dropout.isNull()
+        && !(dropout.isNumber() && dropout.doubleValue() == 0.0)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: model.dropout must be null, absent, or zero");
+    }
+    boolean byteFallback = optionalBoolean(node, "byte_fallback", false, "model");
+    boolean fuseUnknown = optionalBoolean(node, "fuse_unk", false, "model");
+    boolean ignoreMerges = optionalBoolean(node, "ignore_merges", false, "model");
+    String unknown = optionalString(node, "unk_token", null, "model");
+    String prefix = optionalString(node, "continuing_subword_prefix", "", "model");
+    String suffix = optionalString(node, "end_of_word_suffix", "", "model");
+    if (unknown != null && !vocab.containsKey(unknown)) {
+      throw new TokenizerException("TokenizerJsonLoader: model.unk_token is not in model.vocab");
+    }
+    if (byteFallback) {
+      validateByteFallbackTokens(vocab);
+    }
+    return new TokenizerDefinition.Bpe(
+        vocab, mergeRanks, unknown, fuseUnknown, byteFallback, prefix, suffix, ignoreMerges);
+  }
+
+  private static TokenizerDefinition.Unigram parseUnigram(JsonNode node) {
+    JsonNode values = node.path("vocab");
+    if (!values.isArray() || values.isEmpty()) {
+      throw new TokenizerException("TokenizerJsonLoader: model.vocab must be a non-empty array");
+    }
+    List<String> tokens = new ArrayList<>();
+    List<Double> scores = new ArrayList<>();
+    Map<String, Integer> vocab = new LinkedHashMap<>();
+    for (int index = 0; index < values.size(); index++) {
+      JsonNode value = values.get(index);
+      if (!value.isArray()
+          || value.size() != 2
+          || !value.get(0).isString()
+          || !value.get(1).isNumber()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: model.vocab[" + index + "] must be [token, score]");
+      }
+      String token = value.get(0).asString();
+      if (vocab.putIfAbsent(token, index) != null) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: duplicate Unigram token '" + token + "'");
+      }
+      tokens.add(token);
+      scores.add(value.get(1).doubleValue());
+    }
+    int unknownId = requiredInt(node, "unk_id", "model");
+    if (unknownId < 0 || unknownId >= tokens.size()) {
+      throw new TokenizerException("TokenizerJsonLoader: model.unk_id is outside model.vocab");
+    }
+    boolean byteFallback = optionalBoolean(node, "byte_fallback", false, "model");
+    if (byteFallback) {
+      validateByteFallbackTokens(vocab);
+    }
+    return new TokenizerDefinition.Unigram(vocab, tokens, scores, unknownId, byteFallback);
+  }
+
+  private static void validateByteFallbackTokens(Map<String, Integer> vocab) {
+    Pattern canonical = Pattern.compile("<0x[0-9A-F]{2}>");
+    for (String token : vocab.keySet()) {
+      if (token.startsWith("<0x") && !canonical.matcher(token).matches()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: malformed byte fallback token '" + token + "'");
+      }
+    }
+  }
+
+  private static TokenizerDefinition.WordPiece parseWordPiece(JsonNode node) {
+    Map<String, Integer> vocab = parseObjectVocabulary(node.path("vocab"), "model.vocab");
+    String unknown = optionalString(node, "unk_token", null, "model");
+    if (unknown == null || !vocab.containsKey(unknown)) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: model.unk_token must name a vocabulary token");
+    }
+    String prefix = optionalString(node, "continuing_subword_prefix", "##", "model");
+    int maximum = node.path("max_input_chars_per_word").asInt(100);
+    if (maximum <= 0) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: model.max_input_chars_per_word must be positive");
+    }
+    return new TokenizerDefinition.WordPiece(vocab, unknown, prefix, maximum);
+  }
+
+  private static Map<String, Integer> parseObjectVocabulary(JsonNode node, String path) {
+    if (!node.isObject() || node.isEmpty()) {
+      throw new TokenizerException("TokenizerJsonLoader: " + path + " must be a non-empty object");
+    }
+    Map<String, Integer> vocab = new LinkedHashMap<>();
+    Map<Integer, String> byId = new HashMap<>();
+    for (Map.Entry<String, JsonNode> entry : node.properties()) {
+      if (!entry.getValue().isIntegralNumber()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: " + path + "['" + entry.getKey() + "'] must be an integer");
+      }
+      int id = entry.getValue().intValue();
+      String other = byId.putIfAbsent(id, entry.getKey());
+      if (other != null) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: " + path + " id " + id + " is duplicated");
+      }
+      vocab.put(entry.getKey(), id);
+    }
+    return vocab;
+  }
+
+  private static Map<String, Integer> parseMergeRanks(JsonNode node) {
+    if (!node.isArray()) {
+      throw new TokenizerException("TokenizerJsonLoader: model.merges must be an array");
+    }
+    Map<String, Integer> ranks = new LinkedHashMap<>();
+    for (int index = 0; index < node.size(); index++) {
+      JsonNode merge = node.get(index);
+      String pair;
+      if (merge.isArray() && merge.size() == 2) {
+        pair = merge.get(0).asString() + " " + merge.get(1).asString();
+      } else if (merge.isString()) {
+        pair = merge.asString();
+      } else {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: model.merges[" + index + "] is not a pair");
+      }
+      ranks.putIfAbsent(pair, index);
+    }
+    return ranks;
+  }
+
+  private static List<AddedToken> parseFlexibleAddedTokens(JsonNode node) {
+    List<AddedToken> result = new ArrayList<>();
+    if (node.isMissingNode() || node.isNull()) {
+      return result;
+    }
+    if (!node.isArray()) {
+      throw new TokenizerException("TokenizerJsonLoader: added_tokens must be an array");
+    }
+    for (int index = 0; index < node.size(); index++) {
+      JsonNode entry = node.get(index);
+      requireValidAddedTokenIdentity(entry);
+      String path = "added_tokens[" + index + "]";
+      boolean special = optionalBoolean(entry, "special", false, path);
+      result.add(
+          new AddedToken(
+              entry.path("id").intValue(),
+              entry.path("content").asString(),
+              optionalBoolean(entry, "single_word", false, path),
+              optionalBoolean(entry, "lstrip", false, path),
+              optionalBoolean(entry, "rstrip", false, path),
+              optionalBoolean(entry, "normalized", !special, path),
+              special));
+    }
+    requireInternallyConsistentAddedTokens(result);
+    return result;
+  }
+
+  private static List<PostProcessorStep> parseFlexiblePostProcessor(JsonNode node) {
+    List<PostProcessorStep> result = new ArrayList<>();
+    if (node.isMissingNode() || node.isNull()) {
+      return result;
+    }
+    parseFlexiblePostProcessor(node, "post_processor", result);
+    return result;
+  }
+
+  private static void parseFlexiblePostProcessor(
+      JsonNode node, String path, List<PostProcessorStep> result) {
+    String type = componentType(node, path);
+    if ("Sequence".equals(type)) {
+      int index = 0;
+      for (JsonNode child : node.path("processors")) {
+        parseFlexiblePostProcessor(child, path + ".processors[" + index++ + "]", result);
+      }
+      return;
+    }
+    if ("ByteLevel".equals(type)) {
+      result.add(new ByteLevelStep(optionalBoolean(node, "trim_offsets", true, path)));
+      return;
+    }
+    if ("TemplateProcessing".equals(type)) {
+      result.add(parseTemplateProcessing(node));
+      return;
+    }
+    if ("BertProcessing".equals(type)) {
+      result.add(
+          new BertProcessingStep(
+              parseTokenPair(node.path("sep"), path + ".sep"),
+              parseTokenPair(node.path("cls"), path + ".cls")));
+      return;
+    }
+    throw new TokenizerException(
+        "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
+  }
+
+  private static ResolvedToken parseTokenPair(JsonNode node, String path) {
+    if (!node.isArray()
+        || node.size() != 2
+        || !node.get(0).isString()
+        || !node.get(1).isIntegralNumber()) {
+      throw new TokenizerException("TokenizerJsonLoader: " + path + " must be [token, id]");
+    }
+    return new ResolvedToken(node.get(0).asString(), node.get(1).intValue());
+  }
+
+  private static TemplateProcessingStep parseTemplateProcessing(JsonNode node) {
+    List<TemplateItem> single = new ArrayList<>();
+    for (JsonNode item : node.path("single")) {
+      if (item.has("SpecialToken")) {
+        single.add(new SpecialTokenItem(item.path("SpecialToken").path("id").asString()));
+      } else if (item.has("Sequence")) {
+        single.add(new SequenceItem());
+      } else {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: unrecognized TemplateProcessing item " + item);
+      }
+    }
+    Map<String, SpecialTokenInfo> specialTokens = new LinkedHashMap<>();
+    for (Map.Entry<String, JsonNode> entry : node.path("special_tokens").properties()) {
+      JsonNode value = entry.getValue();
+      List<Integer> ids = new ArrayList<>();
+      List<String> tokens = new ArrayList<>();
+      value.path("ids").forEach(id -> ids.add(id.intValue()));
+      value.path("tokens").forEach(token -> tokens.add(token.asString()));
+      specialTokens.put(
+          entry.getKey(), new SpecialTokenInfo(value.path("id").asString(), ids, tokens));
+    }
+    return new TemplateProcessingStep(single, specialTokens);
+  }
+
+  private static EncodingOptions parseConfiguredDefaults(
+      JsonNode root, Map<String, Integer> vocabulary) {
+    Truncation truncation = Truncation.disabled();
+    JsonNode truncationNode = root.path("truncation");
+    if (!truncationNode.isMissingNode() && !truncationNode.isNull()) {
+      String strategy = optionalString(truncationNode, "strategy", "LongestFirst", "truncation");
+      if (!"LongestFirst".equals(strategy) && !"OnlyFirst".equals(strategy)) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: truncation.strategy is pair-only or unsupported: " + strategy);
+      }
+      int stride = truncationNode.path("stride").asInt(0);
+      if (stride != 0) {
+        throw new TokenizerException("TokenizerJsonLoader: truncation.stride must be zero");
+      }
+      truncation =
+          new Truncation(
+              requiredInt(truncationNode, "max_length", "truncation"),
+              parseDirection(truncationNode, "direction", Direction.RIGHT, "truncation"));
+    }
+    Padding padding = Padding.disabled();
+    JsonNode paddingNode = root.path("padding");
+    if (!paddingNode.isMissingNode() && !paddingNode.isNull()) {
+      JsonNode strategy = paddingNode.path("strategy");
+      JsonNode fixed = strategy.path("Fixed");
+      if (!strategy.isObject() || !fixed.isIntegralNumber() || fixed.intValue() <= 0) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: padding.strategy must be {\"Fixed\": positive length} "
+                + "for single-sequence defaults");
+      }
+      JsonNode multiple = paddingNode.path("pad_to_multiple_of");
+      if (!multiple.isMissingNode() && !multiple.isNull()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: padding.pad_to_multiple_of is unsupported");
+      }
+      int id = requiredInt(paddingNode, "pad_id", "padding");
+      String token = optionalString(paddingNode, "pad_token", null, "padding");
+      if (token == null || !vocabulary.containsKey(token) || vocabulary.get(token) != id) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: padding token/id must resolve to model.vocab");
+      }
+      padding =
+          new Padding(
+              fixed.intValue(),
+              parseDirection(paddingNode, "direction", Direction.RIGHT, "padding"),
+              id,
+              token,
+              paddingNode.path("pad_type_id").asInt(0));
+    }
+    return new EncodingOptions(true, truncation, padding);
+  }
+
+  private static Map<String, Integer> configuredVocabulary(
+      Map<String, Integer> modelVocabulary, List<AddedToken> addedTokens) {
+    Map<String, Integer> result = new LinkedHashMap<>(modelVocabulary);
+    for (AddedToken token : addedTokens) {
+      result.put(token.content(), token.id());
+    }
+    return result;
+  }
+
+  private static Direction parseDirection(
+      JsonNode node, String field, Direction defaultValue, String path) {
+    String value = optionalString(node, field, defaultValue.name().toLowerCase(), path);
+    return switch (value.toLowerCase()) {
+      case "left" -> Direction.LEFT;
+      case "right" -> Direction.RIGHT;
+      default ->
+          throw new TokenizerException(
+              "TokenizerJsonLoader: " + path + "." + field + " must be left or right");
+    };
+  }
+
+  private static boolean optionalBoolean(
+      JsonNode node, String field, boolean defaultValue, String path) {
+    JsonNode value = node.path(field);
+    if (value.isMissingNode() || value.isNull()) {
+      return defaultValue;
+    }
+    if (!value.isBoolean()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + "." + field + " must be a boolean");
+    }
+    return value.booleanValue();
+  }
+
+  private static String optionalString(
+      JsonNode node, String field, String defaultValue, String path) {
+    JsonNode value = node.path(field);
+    if (value.isMissingNode() || value.isNull()) {
+      return defaultValue;
+    }
+    if (!value.isString()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + "." + field + " must be a string");
+    }
+    return value.asString();
+  }
+
+  private static int requiredInt(JsonNode node, String field, String path) {
+    JsonNode value = node.path(field);
+    if (!value.isIntegralNumber()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + "." + field + " must be an integer");
+    }
+    return value.intValue();
+  }
+
   /**
    * Requires {@code node.path(field)} to be a genuine JSON boolean when present -- the same
    * principle round 8 finding 3 applied to {@code normalized}, generalized to every other {@code

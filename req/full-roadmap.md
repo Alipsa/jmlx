@@ -153,8 +153,11 @@ Complete special-token handling, truncation/padding, offset behavior where expos
 compatibility for target models.  Keep it pure Java unless a separately approved performance or
 compatibility probe proves that impossible.
 
-**Exit gate:** every Phase-6 model artifact can load its tokenizer and render its documented chat
-prompt; encode/decode and template goldens match the selected Hugging Face reference artifacts.
+**Exit gate:** the implemented Llama/Qwen model artifacts can load tokenizer metadata/templates and
+produce reference prompt goldens; ByteLevel/Metaspace BPE, non-Precompiled Unigram, and
+Bert/WordPiece component fixtures match the pinned Hugging Face oracle. Tokenizer-directory and
+chat-template goldens for Mistral, Gemma, Phi, and Mixtral land with their 6.3 model loaders, so a
+synthetic tokenizer fixture does not prematurely upgrade an architecture's compatibility claim.
 
 ### 6.3 — Architecture and checkpoint breadth
 

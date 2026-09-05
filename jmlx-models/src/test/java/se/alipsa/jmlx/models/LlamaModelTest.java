@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,6 +27,8 @@ import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.tokenizer.HfTokenizer;
+import se.alipsa.jmlx.tokenizer.TokenizerException;
 
 @EnabledIfNativeAvailable
 class LlamaModelTest {
@@ -237,6 +240,73 @@ class LlamaModelTest {
   }
 
   @Test
+  void tokenizerBackedRequestsStreamTextAndFlushPreCancelledRequests(@TempDir Path dir)
+      throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    Path tokenizerPath = writeTinyTextTokenizer(dir);
+    HfTokenizer tokenizer = HfTokenizer.fromFile(tokenizerPath);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
+      List<GenerationEvent> events = new ArrayList<>();
+      GenerationResult result =
+          model.generate(
+              GenerationRequest.text(
+                  tokenizer,
+                  "p",
+                  PromptSpecialTokens.OMIT,
+                  GenerationConfig.greedyDefaults(2, Set.of()),
+                  CancellationToken.NONE),
+              events::add);
+      assertEquals(List.of(0, 0), result.generatedTokenIds());
+      assertEquals("aa", result.generatedText());
+      assertEquals(List.of("a", "a", ""), events.stream().map(GenerationEvent::textDelta).toList());
+
+      List<GenerationEvent> cancelledEvents = new ArrayList<>();
+      GenerationResult cancelled =
+          model.generate(
+              GenerationRequest.text(
+                  tokenizer,
+                  "p",
+                  PromptSpecialTokens.OMIT,
+                  GenerationConfig.greedyDefaults(2, Set.of()),
+                  () -> true),
+              cancelledEvents::add);
+      assertEquals("", cancelled.generatedText());
+      assertEquals(List.of(GenerationEvent.finished(FinishReason.CANCELLED, "")), cancelledEvents);
+    }
+  }
+
+  @Test
+  void tokenizerDecodeFailureIsAContextualGenerationAbort(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    Path tokenizerPath = writeTinyTextTokenizer(dir);
+    String json = Files.readString(tokenizerPath).replace("\"a\":0,", "");
+    Files.writeString(tokenizerPath, json);
+    HfTokenizer tokenizer = HfTokenizer.fromFile(tokenizerPath);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
+      List<GenerationEvent> events = new ArrayList<>();
+      GenerationAbortedException failure =
+          assertThrows(
+              GenerationAbortedException.class,
+              () ->
+                  model.generate(
+                      GenerationRequest.text(
+                          tokenizer,
+                          "p",
+                          PromptSpecialTokens.OMIT,
+                          GenerationConfig.greedyDefaults(1, Set.of()),
+                          CancellationToken.NONE),
+                      events::add));
+      assertEquals("output decoder", failure.stage());
+      assertEquals(0, failure.failingTokenId());
+      assertEquals(List.of(0), failure.generatedTokenIds());
+      assertTrue(events.isEmpty());
+      assertInstanceOf(TokenizerException.class, failure.getCause());
+    }
+  }
+
+  @Test
   void sampledPolicyWithoutASeedFailsAtConfigurationConstruction() {
     assertThrows(
         IllegalArgumentException.class,
@@ -417,6 +487,27 @@ class LlamaModelTest {
       tensors.remove("lm_head.weight");
       MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
     }
+  }
+
+  private static Path writeTinyTextTokenizer(Path dir) throws Exception {
+    Path path = dir.resolve("tokenizer.json");
+    Files.writeString(
+        path,
+        """
+        {
+          "version":"1.0","truncation":null,"padding":null,"added_tokens":[],
+          "normalizer":null,
+          "pre_tokenizer":{"type":"ByteLevel","add_prefix_space":false,
+                           "trim_offsets":true,"use_regex":false},
+          "post_processor":null,
+          "decoder":{"type":"ByteLevel"},
+          "model":{"type":"BPE","dropout":null,"unk_token":null,
+                   "continuing_subword_prefix":"","end_of_word_suffix":"",
+                   "fuse_unk":false,"byte_fallback":false,"ignore_merges":false,
+                   "vocab":{"a":0,"p":1,"x":2,"y":3},"merges":[]}
+        }
+        """);
+    return path;
   }
 
   @Test

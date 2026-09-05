@@ -1,0 +1,49 @@
+{
+  "fixtures": [
+    {
+      "name": "wordpiece",
+      "tokenizer": "wordpiece.tokenizer.json",
+      "cases": [
+        {"name": "bert-basic", "text": "Héllo worlds!", "addSpecialTokens": true},
+        {"name": "bert-combining-supplementary", "text": "Héllo 你🫠", "addSpecialTokens": false},
+        {"name": "bert-chinese", "text": "你 hello", "addSpecialTokens": false},
+        {"name": "bert-unknown", "text": "missing", "addSpecialTokens": false},
+        {
+          "name": "bert-truncate-pad",
+          "text": "hello worlds! hello",
+          "addSpecialTokens": true,
+          "truncation": {"max_length": 5, "direction": "right", "strategy": "longest_first", "stride": 0},
+          "padding": {"length": 7, "direction": "right", "pad_id": 0, "pad_token": "[PAD]", "pad_type_id": 0}
+        }
+      ]
+    },
+    {
+      "name": "unigram",
+      "tokenizer": "unigram.tokenizer.json",
+      "cases": [
+        {"name": "unigram-segmentation", "text": "Hello world", "addSpecialTokens": false},
+        {"name": "unigram-tie", "text": "ll", "addSpecialTokens": false},
+        {"name": "unigram-unknown", "text": "Hello x", "addSpecialTokens": false},
+        {"name": "unigram-byte-fallback", "text": "Hello €", "addSpecialTokens": false}
+      ]
+    },
+    {
+      "name": "metaspace-bpe",
+      "tokenizer": "metaspace-bpe.tokenizer.json",
+      "cases": [
+        {"name": "metaspace-known", "text": "hello world", "addSpecialTokens": false},
+        {"name": "metaspace-unknown", "text": "hello x", "addSpecialTokens": false},
+        {"name": "metaspace-byte-fallback", "text": "hello €", "addSpecialTokens": false}
+      ]
+    },
+    {
+      "name": "added-token-flags",
+      "tokenizer": "added-token.tokenizer.json",
+      "cases": [
+        {"name": "normalized-single-word", "text": "x SPECIAL y", "addSpecialTokens": false},
+        {"name": "strip-whitespace", "text": "x  <tag>  y", "addSpecialTokens": false},
+        {"name": "single-word-rejects-substring", "text": "xSPECIAL", "addSpecialTokens": false}
+      ]
+    }
+  ]
+}

@@ -6,8 +6,8 @@ not evidence that an arbitrary Hugging Face artifact will load.
 
 | Architecture | Status | Verification | Tokenizer / chat template | Checkpoint | Quantization | RoPE / context/cache policy | License / access notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Llama pre-norm decoder | implemented | verified-with-synthetic-fixture | byte-level BPE; caller renders chat prompt | safetensors, including index shards | float weights only | base RoPE; no scaling; unbounded per-generation cache | Tier-B artifact and license/access record pending |
-| Qwen2 pre-norm GQA decoder | implemented | verified-with-synthetic-fixture | byte-level BPE; caller renders chat prompt | safetensors, including index shards | float weights only | base RoPE; no scaling; unbounded per-generation cache | Tier-B artifact and license/access record pending |
+| Llama pre-norm decoder | implemented | verified-with-synthetic-fixture | ByteLevel BPE; directory metadata/templates and tokenizer-backed text streaming | safetensors, including index shards | float weights only | base RoPE; no scaling; unbounded per-generation cache | Tier-B artifact and license/access record pending |
+| Qwen2 pre-norm GQA decoder | implemented | verified-with-synthetic-fixture | ByteLevel BPE; directory metadata/templates and tokenizer-backed text streaming | safetensors, including index shards | float weights only | base RoPE; no scaling; unbounded per-generation cache | Tier-B artifact and license/access record pending |
 | Mistral | planned (6.3) | no verification | tokenizer/template golden required | safetensors | undecided | sliding window required | Tier-B artifact/license/access record required |
 | Gemma | planned (6.3) | no verification | tokenizer/template golden required | safetensors | undecided | descriptor-dependent | Tier-B artifact/license/access record required |
 | Phi | planned (6.3) | no verification | tokenizer/template golden required | safetensors | undecided | descriptor-dependent | Tier-B artifact/license/access record required |
@@ -17,3 +17,8 @@ The supported runtime is macOS on Apple Silicon with Java 25 and the MLX pins in
 `scripts/bootstrap-native.sh`. Artifact licensing and access requirements are recorded alongside
 each future Tier-B fixture; this matrix intentionally makes no claim that every public Hugging Face
 checkpoint is compatible.
+
+The independent pure-Java tokenizer module additionally verifies synthetic/reference fixtures for
+Metaspace BPE, Metaspace Unigram, and Bert/WordPiece. Those capabilities do not upgrade the planned
+Mistral, Gemma, Phi, or Mixtral model rows: their checkpoint loaders and real-artifact
+tokenizer/template goldens remain Phase 6.3. SentencePiece `Precompiled` normalizers are rejected.

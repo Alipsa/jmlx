@@ -180,7 +180,14 @@ def canonical(value: dict) -> str:
 
 def stale_fixture_message(path: Path, expected: str, actual: str) -> str:
     def pretty_lines(document: str) -> list[str]:
-        pretty = json.dumps(json.loads(document), indent=2, sort_keys=True) + "\n"
+        try:
+            parsed = json.loads(document)
+        except json.JSONDecodeError:
+            lines = document.splitlines(keepends=True)
+            if lines and not lines[-1].endswith(("\n", "\r")):
+                lines[-1] += "\n"
+            return lines
+        pretty = json.dumps(parsed, indent=2, sort_keys=True) + "\n"
         return pretty.splitlines(keepends=True)
 
     difference = "".join(
@@ -191,6 +198,11 @@ def stale_fixture_message(path: Path, expected: str, actual: str) -> str:
             tofile=f"{path} (generated)",
         )
     )
+    if not difference:
+        difference = (
+            "documents are structurally identical; the committed file is not in canonical form "
+            "(key order, separators, indentation, or trailing newline)\n"
+        )
     return f"oracle fixture is stale: {path}\n{difference}"
 
 
@@ -230,7 +242,6 @@ def main() -> None:
                     raise SystemExit(
                         stale_fixture_message(expected_path, expected_text, actual)
                     )
-            if not args.generate_all:
                 print(f"MLX oracle fixture verified: {expected_path}")
         return
 

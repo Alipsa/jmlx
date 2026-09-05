@@ -64,6 +64,10 @@ unbound declarations from `unsupported-by-runtime` entries. Render it separately
 native job with `verifyMlxApiHeaderCoverage`. `verifyMlxApiInventory` remains fully reproducible on
 Ubuntu because it has no staged-header-dependent output.
 
+**Implemented:** the separate report covers functions, enum constants, and named public C types,
+records the staged header-tree SHA-256 and both native pins, and lists rather than rejects both
+directions of mismatch. Its verification remains native-job-only.
+
 Test renderer ordering, byte-identical repeat output, automatic-unplanned rendering, explicit
 mapping validation, stale/unknown/duplicate mappings, missing pins, and rendered fields with small
 binding/bootstrap fixtures in `buildSrc`.
@@ -135,6 +139,10 @@ records from the inventory.
 
 ### 4. Pin-derived Python oracle
 
+**Implemented:** CPython 3.12 on macOS 26 arm64, with `mlx`/`mlx-metal` 0.31.2 locked by wheel hash.
+The canonical fixture records evaluated values, shapes, and dtypes; bootstrap-derived values reach
+the verifier through the shared `MlxPins` parser.
+
 Create `tools/mlx-oracle/` with a JSON-in/canonical-JSON-out reference runner. It is used to
 explicitly generate and verify named fixtures, never invoked by ordinary Java unit tests.
 
@@ -150,6 +158,9 @@ Fail clearly on pin/version mismatch and report oracle infrastructure failure ra
 Java incorrectness.
 
 ### 5. Tier-A fixtures and CI
+
+**Implemented fixture set:** see `req/phase6-tier-a-fixtures.md`; the real-artifact intake template
+is `req/phase6-tier-b-artifacts.md`.
 
 Commit small documented fixture specifications/seeds, prompt and token data, expected shapes/dtypes,
 and oracle JSON. Generate tiny safetensors during tests using the established

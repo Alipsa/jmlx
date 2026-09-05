@@ -6,7 +6,9 @@
  * property below.
  */
 
+import se.alipsa.jmlx.buildsrc.MlxApiHeaderCoverage
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
+import se.alipsa.jmlx.buildsrc.MlxPins
 
 plugins {
     id 'base'
@@ -26,7 +28,7 @@ tasks.register('generateMlxApiInventory') {
     inputs.file(layout.projectDirectory.file('req/mlx-api-inventory-overrides.json'))
     inputs.files(fileTree(projectDir) {
         include '**/src/test/java/**/*.java', '**/src/testFixtures/java/**/*.java'
-        exclude '**/.git/**', '**/.gradle/**', '**/build/**', '**/native/**'
+        exclude '**/.git/**', '**/.gradle/**', '**/.venv/**', '**/build/**', '**/native/**'
     })
     inputs.files(providers.provider { MlxApiInventory.probeFiles(projectDir.toPath()) })
     outputs.file(output)
@@ -67,6 +69,122 @@ tasks.register('verifyMlxApiInventory') {
 
 tasks.named('verifyMlxApiInventory') {
     mustRunAfter tasks.named('generateMlxApiInventory')
+}
+
+def stagedMlxHeaders = layout.projectDirectory.dir('native/install/include/mlx/c')
+def stagedNativePinFile = layout.projectDirectory.file('native/install/lib/native-pin.properties')
+def mlxHeaderCoverageReport = layout.projectDirectory.file('req/mlx-api-header-coverage.md')
+
+tasks.register('generateMlxApiHeaderCoverage') {
+    group = 'documentation'
+    description = 'Generates native header-to-binding coverage evidence from staged mlx-c headers.'
+    inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    inputs.dir(layout.projectDirectory.dir('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi'))
+    // File collections tolerate an absent pre-bootstrap path, allowing the renderer to emit its
+    // actionable bootstrap diagnostic instead of Gradle rejecting task configuration first.
+    inputs.files(stagedMlxHeaders, stagedNativePinFile)
+    outputs.file(mlxHeaderCoverageReport)
+    doLast {
+        MlxApiHeaderCoverage.write(
+                projectDir.toPath(),
+                stagedMlxHeaders.asFile.toPath(),
+                stagedNativePinFile.asFile.toPath(),
+                mlxHeaderCoverageReport.asFile.toPath())
+    }
+}
+
+// Native-only verification deliberately has no declared inputs or outputs and therefore always
+// renders against the currently staged headers. It is not attached to ordinary root check.
+tasks.register('verifyMlxApiHeaderCoverage') {
+    group = 'verification'
+    description = 'Fails when native header-to-binding coverage evidence is stale.'
+    doLast {
+        def expected = MlxApiHeaderCoverage.render(
+                projectDir.toPath(),
+                stagedMlxHeaders.asFile.toPath(),
+                stagedNativePinFile.asFile.toPath())
+        def report = mlxHeaderCoverageReport.asFile
+        def actual = report.isFile() ? report.getText('UTF-8') : null
+        if (actual != expected) {
+            throw new GradleException(
+                    'req/mlx-api-header-coverage.md is stale; run ./gradlew generateMlxApiHeaderCoverage')
+        }
+    }
+}
+
+tasks.named('verifyMlxApiHeaderCoverage') {
+    mustRunAfter tasks.named('generateMlxApiHeaderCoverage')
+}
+
+def mlxPins = providers.provider { MlxPins.read(projectDir.toPath()) }
+def mlxOracleDir = layout.projectDirectory.dir('tools/mlx-oracle')
+def mlxOraclePython = mlxOracleDir.file('.venv/bin/python').asFile
+def stagedNativePins = layout.projectDirectory.file('native/install/lib/native-pin.properties')
+def configureMlxOracle = { Exec task ->
+    task.inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    task.inputs.file(mlxOracleDir.file('requirements.lock'))
+    task.inputs.file(mlxOracleDir.file('provenance.json'))
+    task.inputs.property('mlxMetalVersion', mlxPins.map { it.required('MLX_METAL_VERSION') })
+    task.inputs.property('mlxMetalWheelUrl', mlxPins.map { it.required('MLX_METAL_WHEEL_URL') })
+    task.inputs.property('mlxMetalWheelSha256', mlxPins.map { it.required('MLX_METAL_WHEEL_SHA256') })
+    task.inputs.property('mlxCCommit', mlxPins.map { it.required('MLX_C_COMMIT') })
+    task.executable = mlxOraclePython
+    task.doFirst {
+        if (!mlxOraclePython.isFile()) {
+            throw new GradleException(
+                    'MLX oracle environment is missing; run ./tools/mlx-oracle/install.sh on macOS arm64')
+        }
+    }
+}
+
+tasks.register('verifyMlxOracle', Exec) {
+    group = 'verification'
+    description = 'Verifies the pinned Python MLX oracle environment and provenance.'
+    configureMlxOracle(delegate)
+    inputs.file(mlxOracleDir.file('verify_environment.py'))
+    // A FileCollection may contain an absent optional marker; inputs.file(...).optional() still
+    // validates a configured path and rejects it before the task's friendly environment check.
+    inputs.files(stagedNativePins)
+    args mlxOracleDir.file('verify_environment.py').asFile,
+            '--lock', mlxOracleDir.file('requirements.lock').asFile,
+            '--provenance', mlxOracleDir.file('provenance.json').asFile,
+            '--staged-pins', stagedNativePins.asFile
+    doFirst {
+        def pins = mlxPins.get()
+        args '--mlx-metal-version', pins.required('MLX_METAL_VERSION'),
+                '--mlx-metal-url', pins.required('MLX_METAL_WHEEL_URL'),
+                '--mlx-metal-sha256', pins.required('MLX_METAL_WHEEL_SHA256'),
+                '--mlx-c-commit', pins.required('MLX_C_COMMIT')
+    }
+}
+
+tasks.register('generateMlxOracleFixtures', Exec) {
+    group = 'documentation'
+    description = 'Regenerates committed canonical JSON fixtures with the pinned Python MLX oracle.'
+    configureMlxOracle(delegate)
+    dependsOn tasks.named('verifyMlxOracle')
+    inputs.file(mlxOracleDir.file('runner.py'))
+    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
+    outputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
+    args mlxOracleDir.file('runner.py').asFile,
+            '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--provenance', mlxOracleDir.file('provenance.json').asFile,
+            '--output', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
+}
+
+tasks.register('verifyMlxOracleFixtures', Exec) {
+    group = 'verification'
+    description = 'Verifies committed canonical JSON fixtures with the pinned Python MLX oracle.'
+    configureMlxOracle(delegate)
+    dependsOn tasks.named('verifyMlxOracle')
+    mustRunAfter tasks.named('generateMlxOracleFixtures')
+    inputs.file(mlxOracleDir.file('runner.py'))
+    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
+    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
+    args mlxOracleDir.file('runner.py').asFile,
+            '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--provenance', mlxOracleDir.file('provenance.json').asFile,
+            '--verify', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
 }
 
 // This source-only guard runs under the project's Java toolchain, so parsing coverage cannot

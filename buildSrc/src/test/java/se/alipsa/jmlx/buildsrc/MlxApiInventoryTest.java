@@ -315,6 +315,34 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void ignoresJavaSourcesInsideToolVirtualEnvironments() throws Exception {
+    String mappings =
+        record("mlx_h.mlx_array_new", "implemented")
+            .replace("\"tests\":\"test\"", "\"tests\":\"VenvOnlyTest\"");
+    Path root = fixture(mappings);
+    Path virtualEnvironmentSource =
+        root.resolve("tools/mlx-oracle/.venv/lib/site-packages/VenvOnlyTest.java");
+    Files.createDirectories(virtualEnvironmentSource.getParent());
+    Files.writeString(virtualEnvironmentSource, "class VenvOnlyTest {}");
+
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> MlxApiInventory.render(root));
+
+    assertTrue(failure.getMessage().contains("Stale inventory mapping test class: VenvOnlyTest"));
+  }
+
+  @Test
+  void callSiteGuardDoesNotParseJavaSourcesInsideToolVirtualEnvironments() throws Exception {
+    Path root = fixture("{\"records\":[]}");
+    Path virtualEnvironmentSource =
+        root.resolve("tools/mlx-oracle/.venv/lib/site-packages/Broken.java");
+    Files.createDirectories(virtualEnvironmentSource.getParent());
+    Files.writeString(virtualEnvironmentSource, "this is not Java");
+
+    assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
+  }
+
+  @Test
   void acceptsTestFixtureClassAsTestEvidence() throws Exception {
     String mappings =
         record("mlx_h.mlx_array_new", "implemented")

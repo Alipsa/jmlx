@@ -68,6 +68,7 @@ final class RepositorySources {
     return relative.startsWith(GENERATED_DIRECTORY)
         || directoryName.equals(".git")
         || directoryName.equals(".gradle")
+        || directoryName.equals(".venv")
         || directoryName.equals("native")
         || directoryName.equals("build");
   }

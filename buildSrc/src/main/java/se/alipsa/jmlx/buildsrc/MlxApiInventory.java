@@ -23,7 +23,6 @@ public final class MlxApiInventory {
   private static final Path BINDING_DIRECTORY =
       Path.of("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi");
   private static final Path MAPPING_FILE = Path.of("req/mlx-api-inventory-overrides.json");
-  private static final Pattern PIN = Pattern.compile("(?m)^([A-Z_]+)=\"([^\"]+)\"$");
   private static final Pattern METHOD =
       Pattern.compile("(?m)^    public static [^\\n(]+ (_?mlx_[A-Za-z0-9_]+)\\(");
   private static final Pattern DOWNCALL_HOLDER =
@@ -69,11 +68,9 @@ public final class MlxApiInventory {
     out.append(
         "generated layout/accessor types and upcall interfaces. An auto-rendered `unplanned`\n");
     out.append("row is reporting only: handwritten use requires an explicit mapping record.\n\n");
-    String bootstrap =
-        Files.readString(
-            repositoryRoot.resolve("scripts/bootstrap-native.sh"), StandardCharsets.UTF_8);
-    out.append("- mlx-metal: `").append(pin(bootstrap, "MLX_METAL_VERSION")).append("`\n");
-    out.append("- mlx-c: `").append(pin(bootstrap, "MLX_C_COMMIT")).append("`\n");
+    MlxPins pins = MlxPins.read(repositoryRoot);
+    out.append("- mlx-metal: `").append(pins.required("MLX_METAL_VERSION")).append("`\n");
+    out.append("- mlx-c: `").append(pins.required("MLX_C_COMMIT")).append("`\n");
     appendTotals(out, entries, mappings);
     out.append(
         "\n| Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |\n");
@@ -132,6 +129,15 @@ public final class MlxApiInventory {
       }
     }
     return new GuardData(Map.copyOf(sources), Set.copyOf(types), Set.copyOf(observedUseRequired));
+  }
+
+  /** Returns generated binding identities and their inventory category labels. */
+  static Map<String, String> generatedBindingCategories(Path repositoryRoot) throws IOException {
+    Map<String, String> categories = new TreeMap<>();
+    for (Entry entry : discover(repositoryRoot)) {
+      categories.put(entry.identity(), entry.category().label());
+    }
+    return Map.copyOf(categories);
   }
 
   private static List<Entry> discover(Path repositoryRoot) throws IOException {
@@ -331,16 +337,6 @@ public final class MlxApiInventory {
 
   private static String markdown(String value) {
     return value == null || value.isEmpty() ? "—" : value.replace("|", "\\|");
-  }
-
-  private static String pin(String bootstrap, String name) {
-    Matcher matcher = PIN.matcher(bootstrap);
-    while (matcher.find()) {
-      if (matcher.group(1).equals(name)) {
-        return matcher.group(2);
-      }
-    }
-    throw new IllegalArgumentException("scripts/bootstrap-native.sh does not define " + name);
   }
 
   private static int countDowncallHolders(String binding) {

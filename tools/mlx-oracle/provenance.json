@@ -1,0 +1,16 @@
+{
+  "platform": {"system": "Darwin", "machine": "arm64", "macOSMajor": "26"},
+  "device": {"type": "gpu"},
+  "python": {"majorMinor": "3.12"},
+  "mlx": {
+    "version": "0.31.2",
+    "url": "https://files.pythonhosted.org/packages/3b/15/0d1dc0597644e5e7b011ca954ba0c47e13cd880a3b909b0c3f1b4d8bf8f1/mlx-0.31.2-cp312-cp312-macosx_26_0_arm64.whl",
+    "sha256": "51ca102db641b01e7cb083ce8ecb580e281530a141a7ca12544bb370641630ae"
+  },
+  "mlxMetal": {
+    "version": "0.31.2",
+    "url": "https://files.pythonhosted.org/packages/99/82/11fd62a8d7a3e96e5c43220b17de0151e3f10101f8bb3b865f5bd9cdd074/mlx_metal-0.31.2-py3-none-macosx_26_0_arm64.whl",
+    "sha256": "84ffb60ee503f03eb684f5fb168d5cff31e2a16b7f27c1731eaf7662bd6e9b46"
+  },
+  "mlxCCommit": "fba4470b89073180056c9ea46c443051375f7399"
+}

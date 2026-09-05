@@ -146,9 +146,11 @@
     },
     {
       "bindings": [
-        "mlx_h.mlx_argpartition_axis", "mlx_h.mlx_argsort_axis",
-        "mlx_h.mlx_partition_axis", "mlx_h.mlx_random_categorical", "mlx_h.mlx_random_key",
-        "mlx_h.mlx_random_split_num", "mlx_h.mlx_topk_axis"
+        "mlx_h.mlx_argpartition", "mlx_h.mlx_argpartition_axis", "mlx_h.mlx_argsort",
+        "mlx_h.mlx_argsort_axis", "mlx_h.mlx_partition", "mlx_h.mlx_partition_axis",
+        "mlx_h.mlx_random_categorical", "mlx_h.mlx_random_key", "mlx_h.mlx_random_split",
+        "mlx_h.mlx_random_split_num",
+        "mlx_h.mlx_sort", "mlx_h.mlx_topk", "mlx_h.mlx_topk_axis"
       ],
       "category": "downcall",
       "status": "planned",

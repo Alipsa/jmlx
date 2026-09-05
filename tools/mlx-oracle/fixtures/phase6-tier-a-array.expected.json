@@ -1,0 +1,1 @@
+{"argmax":{"dtype":"uint32","shape":[2],"values":[1,0]},"device":"gpu","doubled":{"dtype":"float32","shape":[2,3],"values":[[2.0,6.0,4.0],[10.0,8.0,6.0]]},"fixture":"phase6-tier-a-array","softmax":{"dtype":"float32","shape":[2,3],"values":[[0.0900306,0.665241,0.2447285],[0.665241,0.2447285,0.0900306]]}}

@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -9,7 +10,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
-import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.DecoderBlock;
@@ -159,7 +159,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   /**
-   * Runs the currently supported deterministic greedy policy and emits token plus terminal events.
+   * Runs the requested greedy or explicitly seeded sampling policy and emits token plus terminal
+   * events synchronously on the calling thread.
    */
   @Override
   public final GenerationResult generate(
@@ -167,12 +168,15 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(listener, "listener");
     GenerationConfig policy = request.config();
-    requireGreedy(policy);
     int[] prompt = request.promptTokenIds();
+    validateTokenIds(prompt, policy, config.vocabSize());
     List<Integer> generated = new ArrayList<>();
+    List<Double> logProbabilities = new ArrayList<>();
+    LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(prompt);
     FinishReason reason = FinishReason.MAX_TOKENS;
     if (!request.cancellationToken().isCancelled()) {
-      try (MLXScope generation = scope().newChild()) {
+      try (MLXScope generation = scope().newChild();
+          SamplingPipeline sampler = new SamplingPipeline(generation, policy, config.vocabSize())) {
         List<KVCache> caches = new ArrayList<>();
         for (int i = 0; i < layers.size(); i++) {
           caches.add(new KVCache(generation));
@@ -194,15 +198,25 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
                     new int[] {shape[0], shape[1], shape[2]});
             MLXArray lastLogits =
                 tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
-            int next = MLXOps.argmaxAxis(lastLogits, 2, false).toIntArray()[0];
+            SamplingPipeline.Selection selection =
+                sampler.select(
+                    lastLogits, PenaltyInputs.from(frequencies, config.vocabSize()), step);
+            int next = selection.tokenId();
             boolean eos = policy.eosTokenIds().contains(next);
             if (!eos && policy.stopTokenIds().contains(next)) {
               reason = FinishReason.STOP_TOKEN;
               break;
             }
             generated.add(next);
+            frequencies.merge(next, 1, Integer::sum);
+            if (selection.logProbability() != null) {
+              logProbabilities.add(selection.logProbability());
+            }
             try {
-              listener.accept(GenerationEvent.token(next));
+              listener.accept(
+                  selection.logProbability() == null
+                      ? GenerationEvent.token(next)
+                      : GenerationEvent.token(next, selection.logProbability()));
             } catch (RuntimeException e) {
               throw new GenerationAbortedException(toList(prompt), generated, e);
             }
@@ -217,7 +231,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     } else {
       reason = FinishReason.CANCELLED;
     }
-    GenerationResult result = new GenerationResult(toList(prompt), generated, reason, List.of());
+    GenerationResult result =
+        new GenerationResult(toList(prompt), generated, reason, logProbabilities);
     try {
       listener.accept(GenerationEvent.finished(reason));
     } catch (RuntimeException e) {
@@ -230,20 +245,26 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     return Arrays.stream(ids).boxed().toList();
   }
 
-  private static void requireGreedy(GenerationConfig config) {
-    if (config.temperature() != 0
-        || config.topK() != 0
-        || config.topP() != 1
-        || config.minP() != 0
-        || config.repetitionPenalty() != 1
-        || config.frequencyPenalty() != 0
-        || config.presencePenalty() != 0
-        || config.seed().isPresent()
-        || config.logProbabilities()) {
-      throw new UnsupportedOperationException(
-          "this release supports only greedy policy values: temperature=0, topK=0, topP=1, "
-              + "minP=0, repetitionPenalty=1, frequencyPenalty=0, presencePenalty=0, no seed, "
-              + "and no log probabilities");
+  private static void validateTokenIds(int[] prompt, GenerationConfig policy, int vocabularySize) {
+    for (int token : prompt) {
+      requireTokenId("prompt", token, vocabularySize);
+    }
+    for (int token : policy.eosTokenIds()) {
+      requireTokenId("EOS", token, vocabularySize);
+    }
+    for (int token : policy.stopTokenIds()) {
+      requireTokenId("stop", token, vocabularySize);
+    }
+    if (policy.topK() > vocabularySize) {
+      throw new IllegalArgumentException(
+          "topK " + policy.topK() + " exceeds vocabulary size " + vocabularySize);
+    }
+  }
+
+  private static void requireTokenId(String kind, int token, int vocabularySize) {
+    if (token < 0 || token >= vocabularySize) {
+      throw new IllegalArgumentException(
+          kind + " token ID " + token + " outside vocabulary [0, " + vocabularySize + ")");
     }
   }
 

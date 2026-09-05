@@ -134,13 +134,16 @@ out of scope.
   sized replacement kernel would not improve attribution. Cast the BOOL finite scalar to INT32,
   then call `MLX.eval(finiteFlagInt32, selectedIndex, selectedLogprob)` once (omitting the logprob
   output when disabled). Read and inspect the already-evaluated finite flag before returning or
-  emitting the selected token. If false, throw
-  `IllegalStateException("sampling logits must be finite")`; the native
-  `SamplingPipelineTest.rejectsNonFiniteLogitsAsPolicyError` must assert this exact jmlx-side type and
-  message and explicitly reject an `MLXException` from `NativeOps.checked`. This test discharges the
-  pinned-runtime premise behind omitting the sanitizer. The design preserves fail-loud attribution
-  without a pre-selection GPU submission/host round-trip. An all-masked/empty distribution is an
-  internal error with the stage named in the message, never a native categorical failure.
+  emitting the selected token. If false, throw `IllegalStateException` with the template
+  `sampling stage finite-logit validation failed at decode step <step>: logits must be finite`. The
+  native `SamplingPipelineTest.rejectsNonFiniteLogitsAsPolicyError` must assert this exact jmlx-side
+  type and message shape and explicitly reject an `MLXException` from `NativeOps.checked`. This test
+  discharges the pinned-runtime premise behind omitting the sanitizer. The design preserves fail-loud
+  attribution without a pre-selection GPU submission/host round-trip. An all-masked/empty
+  distribution throws the same type with
+  `sampling stage <stage> produced no candidates at decode step <step>`; it never surfaces as a
+  native categorical failure. Pass the zero-based decode-step index into the pipeline solely for
+  these diagnostics.
 - EOS remains in generated IDs and receives a token event/log probability. An explicit stop token
   remains excluded from generated IDs/events/log probabilities. When log probabilities are
   requested, `GenerationResult.logProbabilities().size()` equals `generatedTokenIds().size()` and
@@ -265,9 +268,10 @@ single-token decode, cancellation polling, and activation-scope boundaries uncha
 
 - Initialize token counts and request RNG once per `generate` call.
 - Preserve current token output for finite logits under the default greedy policy and keep its direct
-  argmax fast path. Deliberate behavior changes are: non-finite logits now fail before argmax;
-  selected log probabilities become legal; and invalid seed/temperature/filter combinations fail at
-  `GenerationConfig` construction rather than later in `DecoderModel.requireGreedy`. In particular,
+  argmax fast path. Deliberate behavior changes are: non-finite logits now fail before the selected
+  token is returned or emitted; selected log probabilities become legal; and invalid
+  seed/temperature/filter combinations fail at `GenerationConfig` construction rather than later in
+  `DecoderModel.requireGreedy`. In particular,
   the current `LlamaModelTest.rejectsNonGreedyPolicy` temperature-1/empty-seed fixture changes from an
   `UnsupportedOperationException` at `generate` to an `IllegalArgumentException` at construction.
   Rename/update that test and add separate valid sampled-generation coverage; this observable timing

@@ -32,7 +32,7 @@ class GenerationContractTest {
         () ->
             new GenerationConfig(
                 1, OptionalLong.empty(), -1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false));
-    IllegalArgumentException temperature =
+    final IllegalArgumentException temperature =
         assertThrows(
             IllegalArgumentException.class,
             () ->
@@ -49,6 +49,18 @@ class GenerationContractTest {
                     Set.of(),
                     Set.of(),
                     false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new GenerationConfig(
+                1, OptionalLong.empty(), 1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new GenerationConfig(
+                1, OptionalLong.of(1), 0, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false));
+    assertThrows(
+        IllegalArgumentException.class, () -> GenerationConfig.samplingDefaults(1, 1, 0, Set.of()));
     assertTrue(temperature.getMessage().contains("finite"));
     assertThrows(
         IllegalArgumentException.class,
@@ -65,6 +77,11 @@ class GenerationContractTest {
     assertEquals(List.of(1, 2), result.promptTokenIds());
     assertEquals(List.of(3), result.generatedTokenIds());
     assertEquals(List.of(1, 2, 3), result.tokenIds());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new GenerationResult(
+                List.of(1), List.of(2, 3), FinishReason.MAX_TOKENS, List.of(-0.5)));
   }
 
   @Test
@@ -76,5 +93,18 @@ class GenerationContractTest {
     assertThrows(IllegalArgumentException.class, () -> new GenerationEvent(null, null, null, null));
     assertThrows(
         IllegalArgumentException.class, () -> new GenerationEvent(1, null, null, FinishReason.EOS));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new GenerationEvent(null, null, -0.5, FinishReason.EOS));
+  }
+
+  @Test
+  void penaltyInputsScaleWithDistinctHistoryRatherThanVocabulary() {
+    java.util.LinkedHashMap<Integer, Integer> frequencies =
+        PenaltyInputs.frequencies(new int[] {7, 7, 42, 7});
+    PenaltyInputs inputs = PenaltyInputs.from(frequencies, 151_936);
+
+    assertArrayEquals(new int[] {7, 42}, inputs.tokenIds());
+    assertArrayEquals(new float[] {3, 1}, inputs.counts());
   }
 }

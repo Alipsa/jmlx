@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,15 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 @EnabledIfNativeAvailable
 class LlamaModelTest {
+  // The checkpoint below produces four equal zero logits. These are the pinned MLX v0.31.2
+  // Threefry/gumbel categorical streams under SamplingPipeline's child-0-successor,
+  // child-1-draw split convention; log(1/4) is read back through FLOAT32.
+  private static final String LOG_QUARTER = "-1.3862943649291992";
+  private static final String EXPECTED_SEED_42 =
+      sampledGolden(new int[] {3, 2, 2, 3, 0, 2, 3, 1, 2, 2, 3, 0, 1, 3, 0, 2, 0, 1, 0, 2});
+  private static final String EXPECTED_SEED_7 =
+      sampledGolden(new int[] {2, 2, 1, 0, 2, 2, 2, 1, 0, 3, 3, 0, 2, 0, 0, 1, 3, 0, 2, 1});
+
   @Test
   void legacyAndCommonGenerationAgree(@TempDir Path dir) throws Exception {
     writeTinyLlamaCheckpoint(dir);
@@ -56,6 +66,66 @@ class LlamaModelTest {
   }
 
   @Test
+  void seededSamplingRepeatsAndShorterRequestsArePrefixes(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
+      GenerationConfig twoTokens = sampledConfig(2);
+      List<GenerationEvent> events = new ArrayList<>();
+
+      GenerationResult first =
+          model.generate(
+              new GenerationRequest(new int[] {1}, twoTokens, CancellationToken.NONE), events::add);
+      GenerationResult repeat =
+          model.generate(
+              new GenerationRequest(new int[] {1}, twoTokens, CancellationToken.NONE),
+              ignored -> {});
+      GenerationResult prefix =
+          model.generate(
+              new GenerationRequest(new int[] {1}, sampledConfig(1), CancellationToken.NONE),
+              ignored -> {});
+      AtomicBoolean cancel = new AtomicBoolean();
+      final GenerationResult cancelled =
+          model.generate(
+              new GenerationRequest(new int[] {1}, twoTokens, cancel::get),
+              event -> cancel.set(true));
+      final GenerationResult afterCancellation =
+          model.generate(
+              new GenerationRequest(new int[] {1}, twoTokens, CancellationToken.NONE),
+              ignored -> {});
+
+      assertEquals(first.generatedTokenIds(), repeat.generatedTokenIds());
+      assertEquals(first.logProbabilities(), repeat.logProbabilities());
+      assertEquals(first.generatedTokenIds().subList(0, 1), prefix.generatedTokenIds());
+      assertEquals(first.logProbabilities().subList(0, 1), prefix.logProbabilities());
+      assertEquals(FinishReason.CANCELLED, cancelled.finishReason());
+      assertEquals(first.generatedTokenIds().subList(0, 1), cancelled.generatedTokenIds());
+      assertEquals(first.generatedTokenIds(), afterCancellation.generatedTokenIds());
+      assertEquals(first.logProbabilities(), afterCancellation.logProbabilities());
+      assertEquals(first.generatedTokenIds().size() + 1, events.size());
+      for (int i = 0; i < first.generatedTokenIds().size(); i++) {
+        assertEquals(first.generatedTokenIds().get(i), events.get(i).tokenId());
+        assertEquals(first.logProbabilities().get(i), events.get(i).logProbability());
+      }
+    }
+  }
+
+  @Test
+  void seededSamplingRepeatsAcrossFreshJvmsAndRetainsPrefixes(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+
+    String longFirst = runSamplingProbe(dir, 42, 20);
+    String longRepeat = runSamplingProbe(dir, 42, 20);
+    String shortPrefix = runSamplingProbe(dir, 42, 5);
+    final String differentSeed = runSamplingProbe(dir, 7, 20);
+
+    assertEquals(longFirst, longRepeat);
+    assertTrue(longFirst.startsWith(shortPrefix + ";"));
+    assertEquals(EXPECTED_SEED_42, longFirst);
+    assertEquals(EXPECTED_SEED_7, differentSeed);
+  }
+
+  @Test
   void reportsEosStopAndMaxTokenTermination(@TempDir Path dir) throws Exception {
     writeTinyLlamaCheckpoint(dir);
     try (MLXScope modelScope = new MLXScope()) {
@@ -64,12 +134,12 @@ class LlamaModelTest {
       GenerationResult eos =
           model.generate(
               new GenerationRequest(
-                  new int[] {1},
-                  GenerationConfig.greedyDefaults(2, Set.of(0)),
-                  CancellationToken.NONE),
+                  new int[] {1}, greedyWithLogProb(2, Set.of(0), Set.of()), CancellationToken.NONE),
               eosEvents::add);
       assertEquals(FinishReason.EOS, eos.finishReason());
       assertEquals(List.of(0), eos.generatedTokenIds());
+      assertEquals(List.of(0.0), eos.logProbabilities());
+      assertEquals(0.0, eosEvents.getFirst().logProbability());
       assertEquals(
           eos.generatedTokenIds(),
           eosEvents.stream().map(GenerationEvent::tokenId).filter(Objects::nonNull).toList());
@@ -167,21 +237,74 @@ class LlamaModelTest {
   }
 
   @Test
-  void rejectsNonGreedyPolicy(@TempDir Path dir) throws Exception {
+  void sampledPolicyWithoutASeedFailsAtConfigurationConstruction() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new GenerationConfig(
+                1, OptionalLong.empty(), 1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false));
+  }
+
+  @Test
+  void rejectsIdsAndTopKOutsideTheModelVocabulary(@TempDir Path dir) throws Exception {
     writeTinyLlamaCheckpoint(dir);
     try (MLXScope modelScope = new MLXScope()) {
       LlamaModel model = LlamaModel.load(modelScope, dir);
       assertThrows(
-          UnsupportedOperationException.class,
+          IllegalArgumentException.class,
           () ->
               model.generate(
                   new GenerationRequest(
-                      new int[] {1},
-                      new GenerationConfig(
-                          1, OptionalLong.empty(), 1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false),
+                      new int[] {4},
+                      GenerationConfig.greedyDefaults(1, Set.of()),
                       CancellationToken.NONE),
                   ignored -> {}));
+      GenerationConfig oversizedTopK =
+          new GenerationConfig(
+              1, OptionalLong.of(42), 1, 5, 1, 0, 1, 0, 0, Set.of(), Set.of(), false);
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              model.generate(
+                  new GenerationRequest(new int[] {1}, oversizedTopK, CancellationToken.NONE),
+                  ignored -> {}));
     }
+  }
+
+  private static GenerationConfig sampledConfig(int maxNewTokens) {
+    return new GenerationConfig(
+        maxNewTokens, OptionalLong.of(42), 1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), true);
+  }
+
+  private static GenerationConfig greedyWithLogProb(
+      int maxNewTokens, Set<Integer> eosTokenIds, Set<Integer> stopTokenIds) {
+    return new GenerationConfig(
+        maxNewTokens, OptionalLong.empty(), 0, 0, 1, 0, 1, 0, 0, eosTokenIds, stopTokenIds, true);
+  }
+
+  private static String runSamplingProbe(Path modelDirectory, long seed, int maxNewTokens)
+      throws Exception {
+    List<String> command = new ArrayList<>();
+    command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
+    command.add("--enable-native-access=ALL-UNNAMED");
+    command.add("-Djmlx.library.path=" + System.getProperty("jmlx.library.path"));
+    command.add("-cp");
+    command.add(System.getProperty("java.class.path"));
+    command.add(SamplingSubprocessProbe.class.getName());
+    command.add(modelDirectory.toString());
+    command.add(Long.toString(seed));
+    command.add(Integer.toString(maxNewTokens));
+    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+    String output = new String(process.getInputStream().readAllBytes()).trim();
+    assertEquals(0, process.waitFor(), output);
+    return output.lines().reduce((ignored, last) -> last).orElse("");
+  }
+
+  private static String sampledGolden(int[] tokenIds) {
+    return Arrays.stream(tokenIds)
+        .mapToObj(token -> token + "," + LOG_QUARTER)
+        .reduce((left, right) -> left + ";" + right)
+        .orElse("");
   }
 
   @Test
@@ -245,6 +368,9 @@ class LlamaModelTest {
 
   private static void exerciseTerminalPaths(LlamaModel model) {
     model.generate(new int[] {1}, 2, Set.of());
+    model.generate(
+        new GenerationRequest(new int[] {1}, sampledConfig(2), CancellationToken.NONE),
+        ignored -> {});
     model.generate(new int[] {1}, 2, Set.of(0));
     model.generate(
         new GenerationRequest(

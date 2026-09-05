@@ -1,0 +1,47 @@
+{
+  "fixture": "phase6-1-sampling",
+  "device": "gpu",
+  "cases": [
+    {
+      "name": "greedy",
+      "logits": [1.0, 3.0, 2.0, 0.0],
+      "history": {},
+      "policy": {"temperature": 0.0, "topK": 0, "topP": 1.0, "minP": 0.0, "repetitionPenalty": 1.0, "frequencyPenalty": 0.0, "presencePenalty": 0.0}
+    },
+    {
+      "name": "penalties-only",
+      "logits": [1000.0, -1000.0, -1001.0, -1002.0],
+      "history": {"0": 2, "2": 1},
+      "seed": 42,
+      "policy": {"temperature": 1.0, "topK": 0, "topP": 1.0, "minP": 0.0, "repetitionPenalty": 2.0, "frequencyPenalty": 1.0, "presencePenalty": 0.5}
+    },
+    {
+      "name": "top-k",
+      "logits": [1.0, 3.0, 2.0, 0.0],
+      "history": {},
+      "seed": 42,
+      "policy": {"temperature": 1.0, "topK": 1, "topP": 1.0, "minP": 0.0, "repetitionPenalty": 1.0, "frequencyPenalty": 0.0, "presencePenalty": 0.0}
+    },
+    {
+      "name": "top-p-boundary",
+      "logits": [1.0, 3.0, 2.0, 0.0],
+      "history": {},
+      "seed": 42,
+      "policy": {"temperature": 1.0, "topK": 0, "topP": 0.8, "minP": 0.0, "repetitionPenalty": 1.0, "frequencyPenalty": 0.0, "presencePenalty": 0.0}
+    },
+    {
+      "name": "min-p-boundary",
+      "logits": [1.0, 3.0, 2.0, 0.0],
+      "history": {},
+      "seed": 42,
+      "policy": {"temperature": 1.0, "topK": 0, "topP": 1.0, "minP": 0.36, "repetitionPenalty": 1.0, "frequencyPenalty": 0.0, "presencePenalty": 0.0}
+    },
+    {
+      "name": "combined",
+      "logits": [2.0, 5.0, 4.0, 1.0],
+      "history": {"1": 2, "3": 1},
+      "seed": 42,
+      "policy": {"temperature": 0.75, "topK": 1, "topP": 0.9, "minP": 0.1, "repetitionPenalty": 1.2, "frequencyPenalty": 0.25, "presencePenalty": 0.1}
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,6 +50,18 @@ class QwenModelTest {
                       CancellationToken.NONE),
                   ignored -> {})
               .tokenIds());
+
+      GenerationConfig sampled =
+          new GenerationConfig(
+              2, OptionalLong.of(42), 1, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), true);
+      GenerationResult first =
+          model.generate(
+              new GenerationRequest(new int[] {1}, sampled, CancellationToken.NONE), ignored -> {});
+      GenerationResult repeat =
+          model.generate(
+              new GenerationRequest(new int[] {1}, sampled, CancellationToken.NONE), ignored -> {});
+      assertEquals(first.generatedTokenIds(), repeat.generatedTokenIds());
+      assertEquals(first.logProbabilities(), repeat.logProbabilities());
     }
   }
 

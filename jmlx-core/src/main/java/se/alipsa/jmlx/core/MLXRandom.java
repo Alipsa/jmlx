@@ -3,6 +3,8 @@ package se.alipsa.jmlx.core;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.Arrays;
+import java.util.Objects;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_array_;
 import se.alipsa.jmlx.ffi.mlx_h;
@@ -12,9 +14,8 @@ import se.alipsa.jmlx.memory.MLXScope;
  * Home for {@code seed}, {@code normal} and {@code uniform} (req/phase4-plan.md §1, §5), landed in
  * M1 for weight initialization onto a class created empty during M0a's pure-motion facade split, so
  * M1 could add ops to an address that already existed rather than growing {@link MLX} past the
- * point §1 named as its split trigger. {@code key}/{@code split} (explicit PRNG keys) have no
- * caller yet and are not implemented. See {@link MLX}'s javadoc for the index of every sibling this
- * facade was split into.
+ * point §1 named as its split trigger. See {@link MLX}'s javadoc for the index of every sibling
+ * this facade was split into.
  */
 public final class MLXRandom {
 
@@ -26,6 +27,62 @@ public final class MLXRandom {
    */
   public static void seed(long seed) {
     NativeOps.checked("seed", () -> mlx_h.mlx_random_seed(seed));
+  }
+
+  /** Creates an explicit UINT32 key with shape {@code [2]} from {@code seed}. */
+  public static MLXArray key(MLXScope scope, long seed) {
+    Objects.requireNonNull(scope, "scope").checkAccess();
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked("key", () -> mlx_h.mlx_random_key(res, seed));
+    return new MLXArray(scope, res);
+  }
+
+  /**
+   * Splits {@code key} into {@code count} independent keys shaped {@code [count, 2]}, allocating
+   * the result into {@code target}. The parent key is not mutated.
+   */
+  public static MLXArray split(MLXArray key, int count, MLXScope target) {
+    requireKey(key, "split");
+    Objects.requireNonNull(target, "target").checkAccess();
+    if (count <= 0) {
+      throw new IllegalArgumentException("split: count must be positive");
+    }
+    if (!key.scope().isAncestorOf(target)) {
+      throw new IllegalArgumentException("split: target must be the key scope or a descendant");
+    }
+    MemorySegment res = mlx_h.mlx_array_new(target);
+    NativeOps.checked(
+        "split",
+        () -> mlx_h.mlx_random_split_num(res, key.handle(), count, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(target, res);
+  }
+
+  /** Draws one categorical index along {@code axis} with an explicit key, returning INT32. */
+  public static MLXArray categorical(MLXArray logits, int axis, MLXArray key) {
+    Objects.requireNonNull(logits, "logits");
+    requireKey(key, "categorical");
+    if (logits.dtype() != DType.FLOAT32) {
+      throw new IllegalArgumentException("categorical: logits must have dtype FLOAT32");
+    }
+    int normalizedAxis = axis < 0 ? axis + logits.ndim() : axis;
+    if (normalizedAxis < 0 || normalizedAxis >= logits.ndim()) {
+      throw new IllegalArgumentException("categorical: axis out of range: " + axis);
+    }
+    MLXScope scope = NativeOps.scopeOf("categorical", logits, key);
+    MemorySegment res = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "categorical",
+        () ->
+            mlx_h.mlx_random_categorical(
+                res, logits.handle(), normalizedAxis, key.handle(), NativeOps.DEFAULT_STREAM));
+    return MLX.astype(new MLXArray(scope, res), DType.INT32);
+  }
+
+  private static void requireKey(MLXArray key, String operation) {
+    Objects.requireNonNull(key, "key");
+    if (key.dtype() != DType.UINT32 || !Arrays.equals(key.shape(), new int[] {2})) {
+      throw new IllegalArgumentException(operation + ": key must have dtype UINT32 and shape [2]");
+    }
   }
 
   /**

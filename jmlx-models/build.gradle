@@ -38,7 +38,7 @@ publishing {
             from components.java
             pom {
                 name = 'jmlx-models'
-                description = 'Local Hugging Face Llama/Qwen2 safetensors decoder loading and greedy generation on jmlx-core.'
+                description = 'Local Hugging Face Llama/Qwen2 safetensors decoder loading and seeded generation on jmlx-core.'
                 url = 'https://github.com/Alipsa/jmlx'
                 licenses {
                     license {
@@ -85,3 +85,7 @@ tasks.register('verifyPublishedDependencies') {
 }
 
 tasks.named('check') { dependsOn tasks.named('verifyPublishedDependencies') }
+
+tasks.withType(Test).configureEach {
+    systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
+}

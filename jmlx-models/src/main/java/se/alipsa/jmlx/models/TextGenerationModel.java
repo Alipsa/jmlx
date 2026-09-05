@@ -17,7 +17,8 @@ public interface TextGenerationModel extends AutoCloseable {
    * generation aborts, its native scopes are closed, and a {@link GenerationAbortedException}
    * exposes the partial token sequence; no terminal event is sent after that listener failure. A
    * terminal-listener exception is logged because generation has already completed and its result
-   * remains available.
+   * remains available. Sampling is request-local and requires an explicit seed; when requested,
+   * token-event and result log probabilities describe the selected token after every policy filter.
    */
   GenerationResult generate(GenerationRequest request, Consumer<GenerationEvent> listener);
 

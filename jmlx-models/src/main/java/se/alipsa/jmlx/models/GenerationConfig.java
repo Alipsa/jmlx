@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 
-/** Immutable generation policy. Sampling fields are validated here and implemented in Phase 6.1. */
+/** Immutable greedy or explicitly seeded sampling policy. */
 public record GenerationConfig(
     int maxNewTokens,
     OptionalLong seed,
@@ -38,6 +38,14 @@ public record GenerationConfig(
     finite("presencePenalty", presencePenalty);
     eosTokenIds = immutableIds("eosTokenIds", eosTokenIds);
     stopTokenIds = immutableIds("stopTokenIds", stopTokenIds);
+    if (temperature == 0) {
+      if (seed.isPresent() || topK != 0 || topP != 1 || minP != 0) {
+        throw new IllegalArgumentException(
+            "greedy mode requires no seed, topK=0, topP=1, and minP=0");
+      }
+    } else if (seed.isEmpty()) {
+      throw new IllegalArgumentException("sampled mode requires an explicit seed");
+    }
   }
 
   /** The legacy decoder's deterministic greedy policy. */
@@ -50,6 +58,37 @@ public record GenerationConfig(
       int maxNewTokens, Set<Integer> eosTokenIds, Set<Integer> stopTokenIds) {
     return new GenerationConfig(
         maxNewTokens, OptionalLong.empty(), 0, 0, 1, 0, 1, 0, 0, eosTokenIds, stopTokenIds, false);
+  }
+
+  /** Seeded sampling with filtering disabled and penalties at their neutral values. */
+  public static GenerationConfig samplingDefaults(
+      int maxNewTokens, long seed, float temperature, Set<Integer> eosTokenIds) {
+    return samplingDefaults(maxNewTokens, seed, temperature, eosTokenIds, Set.of());
+  }
+
+  /** Seeded sampling defaults with explicit non-EOS stop token IDs. */
+  public static GenerationConfig samplingDefaults(
+      int maxNewTokens,
+      long seed,
+      float temperature,
+      Set<Integer> eosTokenIds,
+      Set<Integer> stopTokenIds) {
+    if (!(temperature > 0)) {
+      throw new IllegalArgumentException("samplingDefaults temperature must be positive");
+    }
+    return new GenerationConfig(
+        maxNewTokens,
+        OptionalLong.of(seed),
+        temperature,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        eosTokenIds,
+        stopTokenIds,
+        false);
   }
 
   private static Set<Integer> immutableIds(String name, Set<Integer> ids) {

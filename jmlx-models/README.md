@@ -5,9 +5,9 @@ safetensors checkpoints and provides inference-only Llama and Qwen2-style decode
 pure-Java Hugging Face tokenizer.
 
 It is intentionally a focused reference-model module, not a general model-serving framework. The
-current public API supports deterministic greedy generation with synchronous token events.
-Sampling, batching, additional architectures, and RoPE scaling are planned in later Phase 6
-milestones. In particular, configurations declaring `rope_scaling` are rejected, so Llama 3.1+
+current public API supports deterministic greedy generation and explicitly seeded sampling with
+synchronous token events. Batching, additional architectures, and RoPE scaling are planned in later
+Phase 6 milestones. In particular, configurations declaring `rope_scaling` are rejected, so Llama 3.1+
 checkpoints are not supported yet. See the [Phase 6 compatibility matrix](../req/phase6-compatibility.md)
 for the precise support boundary.
 
@@ -21,6 +21,26 @@ dependencies {
   runtimeOnly("se.alipsa:jmlx-native-macos-arm64:<version>")
 }
 ```
+
+For sampling, supply a positive temperature and explicit request-local seed. The complete policy
+also supports repetition, frequency, and presence penalties plus top-k, top-p, and min-p filters:
+
+```java
+GenerationConfig sampled = new GenerationConfig(
+    64, OptionalLong.of(42), 0.8f, 40, 0.95f, 0.05f,
+    1.1f, 0.0f, 0.0f, Set.of(eosId), Set.of(), true);
+GenerationResult result = model.generate(
+    new GenerationRequest(prompt, sampled, CancellationToken.NONE),
+    event -> {
+      if (event.tokenId() != null) {
+        System.out.printf("token=%d logp=%f%n", event.tokenId(), event.logProbability());
+      }
+    });
+```
+
+Selected-token log probabilities describe the final, filtered and renormalized distribution; they
+do not expose alternative-token probabilities. Greedy requests may also ask for log probabilities,
+which are reported as `0.0` by API convention. `textDelta` remains unsupported and null.
 
 The native artifact supports macOS on Apple Silicon. It is extracted automatically unless
 `jmlx.library.path` or `JMLX_LIBRARY_PATH` points to a locally staged runtime.
@@ -60,6 +80,10 @@ through `HfTokenizer`/`ChatTemplateRenderer`, then encode that rendered text wit
 synchronously on the thread which owns the generation scope. A cancelling thread may only change
 the `CancellationToken`; it must never touch model or native resources. Cancellation is observed
 before prefill and between decode steps, not during an in-progress prompt prefill.
+
+To reproduce sampled output, record the jmlx commit, native MLX pins, macOS/device, model/checkpoint,
+prompt token IDs and batch shape, the complete generation policy, and seed. A request owns its key
+chain: another request, cancellation, or process-global `MLXRandom.seed` state cannot perturb it.
 
 ## Resource ownership
 

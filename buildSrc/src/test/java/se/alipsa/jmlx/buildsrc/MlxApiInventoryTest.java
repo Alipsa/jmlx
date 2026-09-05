@@ -315,6 +315,20 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void acceptsTestFixtureClassAsTestEvidence() throws Exception {
+    String mappings =
+        record("mlx_h.mlx_array_new", "implemented")
+            .replace("\"tests\":\"test\"", "\"tests\":\"NativeMemoryProbe\"");
+    Path root = fixture(mappings);
+    Path testFixture =
+        root.resolve("jmlx-ffi/src/testFixtures/java/se/alipsa/jmlx/ffi/NativeMemoryProbe.java");
+    Files.createDirectories(testFixture.getParent());
+    Files.writeString(testFixture, "class NativeMemoryProbe {}");
+
+    assertDoesNotThrow(() -> MlxApiInventory.render(root));
+  }
+
+  @Test
   void rejectsStaleMappingProbePath() throws Exception {
     String mappings =
         "{\"records\":[{\"binding\":\"mlx_h.mlx_array_new\",\"category\":\"downcall\","

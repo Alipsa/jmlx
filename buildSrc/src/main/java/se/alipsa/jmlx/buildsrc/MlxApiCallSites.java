@@ -85,13 +85,15 @@ public final class MlxApiCallSites {
               + " to parse this project's Java sources; running JDK is "
               + Runtime.version().feature());
     }
-    MlxApiInventory.GuardData guardData = MlxApiInventory.guardData(repositoryRoot);
+    List<Path> handwrittenSources = handwrittenJavaSources(repositoryRoot);
+    MlxApiInventory.GuardData guardData =
+        MlxApiInventory.guardData(repositoryRoot, handwrittenSources);
     List<Violation> violations = new ArrayList<>();
     Set<String> observed = new HashSet<>();
     violations.addAll(
         scan(
             repositoryRoot,
-            handwrittenJavaSources(repositoryRoot),
+            handwrittenSources,
             guardData.mappingSources(),
             guardData.generatedTypes(),
             observed));
@@ -321,7 +323,7 @@ public final class MlxApiCallSites {
       String type =
           owner.startsWith(FFI_PACKAGE) ? owner.substring(owner.lastIndexOf('.') + 1) : owner;
       if (generatedTypes.contains(type)
-          && (owner.startsWith(FFI_PACKAGE) || imports.containsKey(type) || inFfiPackage)) {
+          && (owner.startsWith(FFI_PACKAGE) || imports.containsKey(type))) {
         record(type, tree);
       }
     }

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import difflib
 import json
 import math
 from pathlib import Path
@@ -177,6 +178,22 @@ def canonical(value: dict) -> str:
     return json.dumps(value, allow_nan=False, separators=(",", ":"), sort_keys=True) + "\n"
 
 
+def stale_fixture_message(path: Path, expected: str, actual: str) -> str:
+    def pretty_lines(document: str) -> list[str]:
+        pretty = json.dumps(json.loads(document), indent=2, sort_keys=True) + "\n"
+        return pretty.splitlines(keepends=True)
+
+    difference = "".join(
+        difflib.unified_diff(
+            pretty_lines(expected),
+            pretty_lines(actual),
+            fromfile=f"{path} (committed)",
+            tofile=f"{path} (generated)",
+        )
+    )
+    return f"oracle fixture is stale: {path}\n{difference}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     source = parser.add_mutually_exclusive_group(required=True)
@@ -207,13 +224,13 @@ def main() -> None:
             actual = canonical(run(json.loads(input_path.read_text()), provenance))
             if args.generate_all:
                 expected_path.write_text(actual)
-            elif actual != expected_path.read_text():
-                raise SystemExit(
-                    f"oracle fixture is stale: {expected_path}\n"
-                    f"expected: {expected_path.read_text()}"
-                    f"actual:   {actual}"
-                )
             else:
+                expected_text = expected_path.read_text()
+                if actual != expected_text:
+                    raise SystemExit(
+                        stale_fixture_message(expected_path, expected_text, actual)
+                    )
+            if not args.generate_all:
                 print(f"MLX oracle fixture verified: {expected_path}")
         return
 
@@ -228,9 +245,7 @@ def main() -> None:
         return
     expected = args.verify.read_text()
     if actual != expected:
-        raise SystemExit(
-            f"oracle fixture is stale: {args.verify}\nexpected: {expected}actual:   {actual}"
-        )
+        raise SystemExit(stale_fixture_message(args.verify, expected, actual))
     print(f"MLX oracle fixture verified: {args.verify}")
 
 

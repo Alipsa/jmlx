@@ -10,16 +10,25 @@ import se.alipsa.jmlx.buildsrc.MlxApiInventory
 
 plugins {
     id 'base'
+    id 'jvm-toolchains'
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.nexusRelease) apply false
 }
+
+def projectJavaVersion = 25
 
 tasks.register('generateMlxApiInventory') {
     group = 'documentation'
     description = 'Generates the checked-in MLX binding inventory from committed sources.'
     def output = layout.projectDirectory.file('req/mlx-api-inventory.md')
     inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
-    inputs.file(layout.projectDirectory.file('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java'))
+    inputs.dir(layout.projectDirectory.dir('jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi'))
+    inputs.file(layout.projectDirectory.file('req/mlx-api-inventory-overrides.json'))
+    inputs.files(fileTree(projectDir) {
+        include '**/src/test/java/**/*.java', '**/src/testFixtures/java/**/*.java'
+        exclude '**/.git/**', '**/.gradle/**', '**/build/**', '**/native/**'
+    })
+    inputs.files(providers.provider { MlxApiInventory.probeFiles(projectDir.toPath()) })
     outputs.file(output)
     doLast {
         MlxApiInventory.write(projectDir.toPath(), output.asFile.toPath())
@@ -60,11 +69,24 @@ tasks.named('verifyMlxApiInventory') {
     mustRunAfter tasks.named('generateMlxApiInventory')
 }
 
+// This source-only guard runs under the project's Java toolchain, so parsing coverage cannot
+// silently lag the source language level or constrain the Gradle daemon's Java version.
+tasks.register('verifyMlxApiCallSites', JavaExec) {
+    group = 'verification'
+    description = 'Fails when handwritten Java reaches an unrecorded generated MLX binding.'
+    classpath = files(MlxApiInventory.protectionDomain.codeSource.location)
+    mainClass = 'se.alipsa.jmlx.buildsrc.MlxApiCallSites'
+    args projectDir.toString(), projectJavaVersion.toString()
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(projectJavaVersion)
+    }
+}
+
 tasks.named('check') {
     // The root has no Java lifecycle plugin. Applying `base` creates this `check` lifecycle task
     // so repository-wide verifications can run once from CI without pretending that a module-local
     // check covers handwritten source in every module.
-    dependsOn tasks.named('verifyMlxApiInventory')
+    dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites')
 }
 
 allprojects {
@@ -119,7 +141,7 @@ subprojects {
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(25)
+            languageVersion = JavaLanguageVersion.of(projectJavaVersion)
         }
     }
 

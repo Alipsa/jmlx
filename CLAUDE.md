@@ -50,7 +50,11 @@ should have changed — this is the bindings-drift check.
 
 ```sh
 # Required after binding or native-pin changes; root :check verifies it is current.
+# Update req/mlx-api-inventory-overrides.json first when a binding gains an explicit status.
 ./gradlew generateMlxApiInventory
+
+# Verifies every handwritten generated-binding use has an explicit non-unplanned mapping.
+./gradlew verifyMlxApiCallSites
 ```
 
 `scripts/checkDependencies.zsh` is a read-only report of available updates (Gradle plugins/deps, the

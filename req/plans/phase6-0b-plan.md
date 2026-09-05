@@ -71,8 +71,10 @@ binding/bootstrap fixtures in `buildSrc`.
 ### 2. Native-call guard
 
 Add root `verifyMlxApiCallSites` in `buildSrc`, wired to root `check`. It is source-only and has no
-compile/task dependency, so it remains runnable in the Ubuntu CI environment without resolving the
-Java 25 toolchain. It scans handwritten source and requires an explicit mapping-file record for:
+project compilation dependency, but it deliberately resolves the Java 25 toolchain so the compiler
+tree parser accepts every source construct used by the project. The Ubuntu job provisions that JDK
+through the Foojay resolver configured in `settings.gradle`; on a cold cache this costs one extra
+JDK download. It scans handwritten source and requires an explicit mapping-file record for:
 
 1. `mlx_h.mlx_*` downcalls;
 2. generated layout/accessor type uses such as `mlx_array_`;
@@ -81,7 +83,8 @@ Java 25 toolchain. It scans handwritten source and requires an explicit mapping-
 
 Implement the scanner with the JDK compiler tree API (`JavaCompiler`/`JavacTask` and `com.sun.source`
 trees), not a hand-rolled lexer or a new third-party parsing dependency. This works in the Java 21
-Ubuntu CI job without compiling project sources or resolving the Java 25 toolchain; inspect imports
+Ubuntu CI job without compiling project sources because the JavaExec scanner launches on the
+auto-provisioned Java 25 toolchain; a Java 21 parser cannot accept `--release 25`. Inspect imports
 and member-select/invocation trees to resolve generated FFI identities while naturally excluding
 comments and string literals. A use is a violation when its symbol/type has no explicit record in
 `req/mlx-api-inventory-overrides.json`, or when its explicit record is `unplanned`; a matching

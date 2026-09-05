@@ -18,7 +18,7 @@ command -v "$PYTHON_BIN" >/dev/null || {
   exit 1
 }
 
-"$PYTHON_BIN" -m venv "$VENV"
+"$PYTHON_BIN" -m venv --clear "$VENV"
 "$VENV/bin/python" -m pip install \
   --require-hashes \
   --only-binary=:all: \

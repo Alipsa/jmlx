@@ -35,6 +35,18 @@ def read_lock(path: Path) -> dict[str, tuple[str, str]]:
     return entries
 
 
+def verify_runtime(device: str) -> None:
+    try:
+        import mlx.core as mx
+
+        devices = {"cpu": mx.cpu, "gpu": mx.gpu}
+        mx.set_default_device(devices[device])
+        value = mx.array([1.0], dtype=mx.float32)
+        mx.eval(value)
+    except Exception as error:
+        raise SystemExit(f"MLX oracle runtime smoke check failed: {error}") from error
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--lock", type=Path, required=True)
@@ -76,8 +88,10 @@ def main() -> None:
         args.mlx_metal_sha256,
     )
     require_equal("mlx-c commit", provenance["mlxCCommit"], args.mlx_c_commit)
-    if provenance["device"]["type"] not in {"cpu", "gpu"}:
-        raise SystemExit(f"unsupported oracle device: {provenance['device']['type']}")
+    device = provenance["device"]["type"]
+    if device not in {"cpu", "gpu"}:
+        raise SystemExit(f"unsupported oracle device: {device}")
+    verify_runtime(device)
 
     if args.staged_pins.is_file():
         staged = read_properties(args.staged_pins)

@@ -93,28 +93,20 @@ public final class MlxApiHeaderCoverage {
         output, render(repositoryRoot, headerDirectory, nativePinFile), StandardCharsets.UTF_8);
   }
 
-  /** CLI entry point used for native-only report generation. */
-  public static void main(String[] args) throws IOException {
-    if (args.length != 4) {
-      throw new IllegalArgumentException(
-          "Usage: MlxApiHeaderCoverage <repository-root> <header-directory> <native-pin-file>"
-              + " <output>");
-    }
-    write(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]), Path.of(args[3]));
-  }
-
   private static List<Path> headers(Path headerDirectory) throws IOException {
     if (!Files.isDirectory(headerDirectory)) {
       throw new IllegalArgumentException(
           "Staged mlx-c headers are missing; run ./scripts/bootstrap-native.sh: "
               + headerDirectory);
     }
-    try (Stream<Path> files = Files.list(headerDirectory)) {
+    try (Stream<Path> files = Files.walk(headerDirectory)) {
       List<Path> headers =
           files
               .filter(Files::isRegularFile)
               .filter(path -> path.getFileName().toString().endsWith(".h"))
-              .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+              .sorted(
+                  Comparator.comparing(
+                      path -> headerDirectory.relativize(path).toString().replace('\\', '/')))
               .toList();
       if (headers.isEmpty()) {
         throw new IllegalArgumentException(

@@ -28,8 +28,8 @@ class MlxApiHeaderCoverageTest {
     assertTrue(first.contains("declared-and-bound: 8"), first);
     assertTrue(first.contains("declared-but-not-bound: 6"), first);
     assertTrue(first.contains("bound-without-header-match: 2"), first);
-    assertTrue(first.contains("`mlx_h.mlx_header_only` | function | `array.h`"), first);
-    assertTrue(first.contains("`mlx_header_only_type` | named type | `array.h`"), first);
+    assertTrue(first.contains("`mlx_h.mlx_header_only` | function | `array/array.h`"), first);
+    assertTrue(first.contains("`mlx_header_only_type` | named type | `array/array.h`"), first);
     assertTrue(first.contains("`mlx_callback$fun` | upcall interface"), first);
   }
 
@@ -69,8 +69,9 @@ class MlxApiHeaderCoverageTest {
     Files.writeString(bindings.resolve("mlx_callback$fun.java"), "package fixture;");
 
     Path headers = Files.createDirectories(root.resolve("native/install/include/mlx/c"));
+    Path nestedHeaders = Files.createDirectories(headers.resolve("array"));
     Files.writeString(
-        headers.resolve("array.h"),
+        nestedHeaders.resolve("array.h"),
         """
         #define MLX_ARRAY_H
         #define mlx_macro(x) x

@@ -2,7 +2,8 @@
 #
 # Repins scripts/bootstrap-native.sh's MLX_C_COMMIT to a new mlx-c commit,
 # then re-runs bootstrap-native.sh and regen-bindings.sh so the staged
-# native/ tree and the committed jextract bindings both reflect it.
+# native/ tree, committed jextract bindings, inventory, and native header
+# coverage report all reflect it.
 #
 # Deliberately does NOT touch MLX_METAL_VERSION/URL/SHA256: mlx-c is
 # versioned independently of MLX, and bootstrap-native.sh's own
@@ -71,7 +72,7 @@ rollback() {
     cp "$BOOTSTRAP_BACKUP" "$BOOTSTRAP_SCRIPT"
     warn "aborting -- reverted scripts/bootstrap-native.sh to its state from before this run (git diff scripts/bootstrap-native.sh should now be clean if it was clean going in)"
     if [[ -n "$BOOTSTRAP_COMPLETED" ]]; then
-      warn "note: native/, jmlx-ffi/src/main/generated/java, and req/mlx-api-inventory.md may already reflect $NEW_COMMIT and are NOT reverted -- re-run ./scripts/bootstrap-native.sh and ./scripts/regen-bindings.sh (now back on $OLD_COMMIT), then ./gradlew generateMlxApiInventory before ./gradlew build"
+      warn "note: native/, jmlx-ffi/src/main/generated/java, and generated API reports may already reflect $NEW_COMMIT and are NOT reverted -- re-run ./scripts/bootstrap-native.sh and ./scripts/regen-bindings.sh (now back on $OLD_COMMIT), then regenerate both MLX API reports before ./gradlew build"
     fi
   fi
   rm -f "$BOOTSTRAP_BACKUP"
@@ -97,9 +98,18 @@ log "Running regen-bindings.sh"
 log "Regenerating the checked-in MLX API inventory"
 "$REPO_ROOT/gradlew" -p "$REPO_ROOT" generateMlxApiInventory
 
+log "Regenerating the checked-in MLX API header coverage report"
+"$REPO_ROOT/gradlew" -p "$REPO_ROOT" generateMlxApiHeaderCoverage
+
 log "Done. Next steps:"
-log "  1. ./gradlew build -- confirm everything still compiles and passes against the new bindings."
-log "  2. git diff --exit-code jmlx-ffi/src/main/generated/java -- if this is non-empty, the bindings actually changed; review the diff."
-log "  3. git diff req/mlx-api-inventory.md -- review the regenerated inventory, since a bindings diff changes the symbol set it renders."
-log "  4. git diff scripts/bootstrap-native.sh -- review the repinned commit."
-log "  5. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."
+log "  1. Update tools/mlx-oracle/provenance.json's mlxCCommit to $NEW_COMMIT. If the paired mlx/"
+log "     mlx-metal pins also changed, update their versions, URLs, and hashes there and in"
+log "     tools/mlx-oracle/requirements.lock before running either oracle fixture task."
+log "  2. ./tools/mlx-oracle/install.sh && ./gradlew generateMlxOracleFixtures -- rebuild the"
+log "     hash-locked environment, verify the edited provenance, and regenerate the fixture."
+log "  3. ./gradlew build verifyMlxApiHeaderCoverage verifyMlxOracleFixtures -- confirm the"
+log "     Java build, native coverage evidence, and oracle fixture against the new pins."
+log "  4. git diff --exit-code jmlx-ffi/src/main/generated/java -- if this is non-empty, the bindings actually changed; review the diff."
+log "  5. git diff req/mlx-api-inventory.md req/mlx-api-header-coverage.md -- review both regenerated API reports."
+log "  6. git diff scripts/bootstrap-native.sh tools/mlx-oracle/provenance.json tools/mlx-oracle/requirements.lock -- review every repinned source of truth."
+log "  7. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."

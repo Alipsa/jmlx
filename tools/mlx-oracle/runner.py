@@ -25,9 +25,15 @@ def run(specification: dict, provenance: dict) -> dict:
     if specification.get("fixture") != "phase6-tier-a-array":
         raise ValueError(f"unknown fixture: {specification.get('fixture')}")
     device = specification.get("device")
-    if device != provenance["device"]["type"] or device != "gpu":
-        raise ValueError(f"oracle fixture requires the recorded GPU device, found: {device}")
-    mx.set_default_device(mx.gpu)
+    recorded_device = provenance["device"]["type"]
+    if device != recorded_device:
+        raise ValueError(
+            f"oracle fixture device {device} does not match recorded device {recorded_device}"
+        )
+    devices = {"cpu": mx.cpu, "gpu": mx.gpu}
+    if device not in devices:
+        raise ValueError(f"unsupported oracle device: {device}")
+    mx.set_default_device(devices[device])
     logits = mx.array(specification["logits"], dtype=mx.float32)
     doubled = logits * mx.array(2.0, dtype=mx.float32)
     softmax = mx.softmax(logits, axis=1)

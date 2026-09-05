@@ -76,7 +76,8 @@ def main() -> None:
         args.mlx_metal_sha256,
     )
     require_equal("mlx-c commit", provenance["mlxCCommit"], args.mlx_c_commit)
-    require_equal("oracle device", provenance["device"]["type"], "gpu")
+    if provenance["device"]["type"] not in {"cpu", "gpu"}:
+        raise SystemExit(f"unsupported oracle device: {provenance['device']['type']}")
 
     if args.staged_pins.is_file():
         staged = read_properties(args.staged_pins)

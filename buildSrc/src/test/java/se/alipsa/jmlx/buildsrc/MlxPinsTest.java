@@ -56,4 +56,24 @@ class MlxPinsTest {
 
     assertTrue(failure.getMessage().contains("unsupported shell expansion"), failure::getMessage);
   }
+
+  @Test
+  void identifiesDeclaredButUnparseableTransitiveReferences(@TempDir Path repositoryRoot)
+      throws Exception {
+    Path scripts = Files.createDirectories(repositoryRoot.resolve("scripts"));
+    Files.writeString(
+        scripts.resolve("bootstrap-native.sh"),
+        "REPO_ROOT=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)\"\n"
+            + "NATIVE_DIR=\"$REPO_ROOT/native\"\n"
+            + "INSTALL_DIR=\"$NATIVE_DIR/install\"\n"
+            + "RUNTIME_LIB_DIR=\"$INSTALL_DIR/lib\"\n");
+
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> MlxPins.read(repositoryRoot).required("RUNTIME_LIB_DIR"));
+
+    assertTrue(failure.getMessage().contains("defines REPO_ROOT"), failure::getMessage);
+    assertTrue(failure.getMessage().contains("unsupported shell construct"), failure::getMessage);
+  }
 }

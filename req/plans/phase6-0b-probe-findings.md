@@ -46,19 +46,47 @@ row 1: value 5 at indices 0 and 1), specifically exercises argmax tie-breaking. 
 `SelectionAndRandomProbeTest.recordsFirstTiedIndexAwayFromZero` separately uses
 `[1, 3, 3, 0]` and observes `[1]`, confirming that first-index tie-breaking is not an index-0 bias.
 
+## Follow-up probe coverage
+
+`SelectionAndRandomProbeTest` now also contains the remaining acceptance probes. They use the same
+`[[1, 3, 2, 0], [5, 4, 3, 0]]` input and distinguish the flat entry points from their axis-aware
+counterparts by asserting one-dimensional result shapes. Flat sort has the exact expected result
+`[0, 0, 1, 2, 3, 3, 4, 5]`; top-k is checked as an order-independent multiset; argsort is checked as
+a permutation whose indexed values are nondecreasing; and both partition variants are checked by
+their pivot invariants. Valid boundary cases cover `topk(k=8)`, `partition(kth=0)`, and
+`argpartition(kth=7)`.
+
+The two-output `mlx_random_split` result is compared both with `mlx_random_split_num(key, 2)` and
+with the committed UINT32 golden. Its Java signed-INT32 representation is
+`[-1829035798, -615737125, 255383827, 267815257]`. The probe also checks that the siblings differ
+and the parent remains `[0, 42]`. This expectation follows from the pinned MLX implementation, where
+the two-output overload splits the `split(key, 2)` array in order; the native test remains the
+runtime regression evidence.
+
+Categorical coverage now repeats the same call with the same key, checks the pinned `[1, 0]` result,
+and rejects an axis outside the logits rank. A separate ownership test creates flat-sort,
+two-output-split, and categorical results in a parent scope, closes the child scope containing every
+input before first evaluation, and only then evaluates and reads the results. Successful execution
+therefore establishes both lazy graph ownership and cleanup through the ordinary `MLXScope` paths.
+
+This follow-up was compiled on Linux, where `@EnabledIfNativeAvailable` correctly skipped all four
+tests. Its behavioral assertions require the documented macOS/Apple-Silicon command above (or the
+native CI job) before the new observations are treated as accepted.
+
 ## Decisions
 
 - Greedy decoding retains the existing axis-aware `mlx_argmax_axis` path. Equal maxima select the
   first index along the axis, evidenced by the dedicated tie probes above. `MLXOps.argmaxAxis`
   intentionally converts the native UINT32 result to INT32; the direct probe establishes the native
   dtype.
-- Phase 6.1 must use axis-aware selection on decoder logits, not the flattening operations. The flat
-  variants and two-way split remain pending a follow-up probe.
+- Phase 6.1 must use axis-aware selection on decoder logits, not the flattening operations. Flat
+  variants and two-way split now have committed follow-up assertions; native execution remains the
+  acceptance gate.
 - `mlx_random_key` plus `mlx_random_split_num` produces a stable explicit-key sequence and is viable
   for per-request state. Phase 6.1 must keep one key per request and must not use global
   `MLXRandom.seed` in generation.
-- These results establish evaluated values only. A dedicated lazy-evaluation/ownership probe remains
-  required before accepting any facade operation.
+- Lazy-evaluation/ownership assertions are now committed and deliberately evaluate only after their
+  input scope closes; native execution remains required before accepting any facade operation.
 
 The existing README claim of deterministic greedy generation is consistent with the observed argmax
 tie-breaking; no Phase 6.0 contract correction is needed.

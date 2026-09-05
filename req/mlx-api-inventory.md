@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=158, planned=7, unplanned=568
+- by status: implemented=158, planned=13, unplanned=562
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -118,9 +118,9 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_argmax_axis` | downcall | implemented | MLXOps.argmaxAxis | MLXNumericTest; SelectionAndRandomProbeTest | — | all handwritten source |
 | `mlx_h.mlx_argmin` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_argmin_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_argpartition` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_argpartition` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_argpartition_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
-| `mlx_h.mlx_argsort` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_argsort` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_argsort_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_array_data_bool` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_array_data_complex64` | downcall | unplanned | — | — | — | — |
@@ -519,7 +519,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_outer` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_pad` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_pad_symmetric` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_partition` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_partition` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_partition_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_power` | downcall | implemented | MLXOps | MLXArrayTest | — | all handwritten source |
 | `mlx_h.mlx_print_graph` | downcall | unplanned | — | — | — | — |
@@ -546,7 +546,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_random_permutation_arange` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_random_randint` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_random_seed` | downcall | implemented | MLXRandom | MLXRandomTest | — | all handwritten source |
-| `mlx_h.mlx_random_split` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_random_split` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_random_split_num` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_random_truncated_normal` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_random_uniform` | downcall | implemented | MLXRandom | MLXRandomTest | — | all handwritten source |
@@ -602,7 +602,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_softmax` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_softmax_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_softmax_axis` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
-| `mlx_h.mlx_sort` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_sort` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_sort_axis` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_split` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_split_sections` | downcall | unplanned | — | — | — | — |
@@ -645,7 +645,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_tensordot_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_tile` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_to_fp8` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_topk` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_topk` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_topk_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_trace` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_transpose` | downcall | implemented | MLXShape | MLXArrayTest | — | all handwritten source |

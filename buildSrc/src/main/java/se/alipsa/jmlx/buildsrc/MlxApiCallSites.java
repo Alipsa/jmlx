@@ -11,11 +11,7 @@ import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -37,7 +33,6 @@ public final class MlxApiCallSites {
 
   private static final String FFI_PACKAGE = "se.alipsa.jmlx.ffi.";
   private static final String FFI_PACKAGE_NAME = "se.alipsa.jmlx.ffi";
-  private static final String GENERATED_DIRECTORY = "jmlx-ffi/src/main/generated/java";
   private static final Set<String> MLX_H_INFRASTRUCTURE =
       Set.of(
           "align",
@@ -85,15 +80,15 @@ public final class MlxApiCallSites {
               + " to parse this project's Java sources; running JDK is "
               + Runtime.version().feature());
     }
-    List<Path> handwrittenSources = handwrittenJavaSources(repositoryRoot);
+    RepositorySources repositorySources = RepositorySources.discover(repositoryRoot);
     MlxApiInventory.GuardData guardData =
-        MlxApiInventory.guardData(repositoryRoot, handwrittenSources);
+        MlxApiInventory.guardData(repositoryRoot, repositorySources);
     List<Violation> violations = new ArrayList<>();
     Set<String> observed = new HashSet<>();
     violations.addAll(
         scan(
             repositoryRoot,
-            handwrittenSources,
+            repositorySources.handwrittenJavaSources(),
             guardData.mappingSources(),
             guardData.generatedTypes(),
             observed));
@@ -124,40 +119,6 @@ public final class MlxApiCallSites {
       }
       throw new IllegalStateException(message.toString());
     }
-  }
-
-  static List<Path> handwrittenJavaSources(Path repositoryRoot) throws IOException {
-    List<Path> sources = new ArrayList<>();
-    Files.walkFileTree(
-        repositoryRoot,
-        new SimpleFileVisitor<>() {
-          @Override
-          public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
-            return excluded(repositoryRoot, directory)
-                ? FileVisitResult.SKIP_SUBTREE
-                : FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-            if (file.toString().endsWith(".java")) {
-              sources.add(file);
-            }
-            return FileVisitResult.CONTINUE;
-          }
-        });
-    sources.sort(Comparator.naturalOrder());
-    return List.copyOf(sources);
-  }
-
-  private static boolean excluded(Path repositoryRoot, Path path) {
-    Path relative = repositoryRoot.relativize(path);
-    String directoryName = relative.getFileName() == null ? "" : relative.getFileName().toString();
-    return relative.startsWith(GENERATED_DIRECTORY)
-        || directoryName.equals(".git")
-        || directoryName.equals(".gradle")
-        || directoryName.equals("native")
-        || directoryName.equals("build");
   }
 
   private static List<Violation> scan(

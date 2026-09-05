@@ -15,7 +15,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Deterministically renders the checked-in inventory of the committed jextract MLX binding. */
@@ -61,8 +60,7 @@ public final class MlxApiInventory {
   public static String render(Path repositoryRoot) throws IOException {
     List<Entry> entries = discover(repositoryRoot);
     Map<String, Mapping> mappings = readMappings(repositoryRoot.resolve(MAPPING_FILE));
-    validateMappings(
-        repositoryRoot, entries, mappings, MlxApiCallSites.handwrittenJavaSources(repositoryRoot));
+    validateMappings(repositoryRoot, entries, mappings, RepositorySources.discover(repositoryRoot));
 
     StringBuilder out = new StringBuilder();
     out.append("# MLX API inventory\n\n");
@@ -109,11 +107,11 @@ public final class MlxApiInventory {
   }
 
   /** Returns the data needed by the handwritten-source guard from one discovery/mapping pass. */
-  static GuardData guardData(Path repositoryRoot, List<Path> handwrittenSources)
+  static GuardData guardData(Path repositoryRoot, RepositorySources repositorySources)
       throws IOException {
     List<Entry> entries = discover(repositoryRoot);
     Map<String, Mapping> mappings = readMappings(repositoryRoot.resolve(MAPPING_FILE));
-    validateMappings(repositoryRoot, entries, mappings, handwrittenSources);
+    validateMappings(repositoryRoot, entries, mappings, repositorySources);
     Set<String> types = new TreeSet<>();
     for (Entry entry : entries) {
       if (entry.category() == Category.LAYOUT || entry.category() == Category.UPCALL) {
@@ -251,9 +249,9 @@ public final class MlxApiInventory {
       Path repositoryRoot,
       List<Entry> entries,
       Map<String, Mapping> mappings,
-      List<Path> handwrittenSources) {
+      RepositorySources repositorySources) {
     Map<String, Category> known = new HashMap<>();
-    Set<String> javaSourceFiles = javaSourceFileNames(repositoryRoot, handwrittenSources);
+    Set<String> javaSourceFiles = repositorySources.testJavaFileNames();
     for (Entry entry : entries) {
       known.put(entry.identity(), entry.category());
     }
@@ -290,26 +288,6 @@ public final class MlxApiInventory {
         }
       }
     }
-  }
-
-  private static Set<String> javaSourceFileNames(
-      Path repositoryRoot, List<Path> handwrittenSources) {
-    return handwrittenSources.stream()
-        .filter(path -> isTestJavaSource(repositoryRoot.relativize(path)))
-        .map(path -> path.getFileName().toString())
-        .collect(Collectors.toUnmodifiableSet());
-  }
-
-  private static boolean isTestJavaSource(Path relative) {
-    for (int index = 0; index + 2 < relative.getNameCount(); index++) {
-      if (relative.getName(index).toString().equals("src")
-          && (relative.getName(index + 1).toString().equals("test")
-              || relative.getName(index + 1).toString().equals("testFixtures"))
-          && relative.getName(index + 2).toString().equals("java")) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private static void appendTotals(

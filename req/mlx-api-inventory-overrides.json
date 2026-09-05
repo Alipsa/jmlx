@@ -115,7 +115,7 @@
       "category": "downcall",
       "status": "implemented",
       "facadeOrReason": "MLXOps.argmaxAxis",
-      "tests": "MLXOpsTest; SelectionAndRandomProbeTest"
+      "tests": "MLXNumericTest; SelectionAndRandomProbeTest"
     },
     {
       "bindings": [
@@ -197,6 +197,13 @@
       "status": "implemented",
       "facadeOrReason": "Existing MLXGrad callback implementation",
       "tests": "MLXGradTest"
+    },
+    {
+      "bindings": ["mlx_error_handler_func"],
+      "category": "upcall interface",
+      "status": "implemented",
+      "facadeOrReason": "NativeLoader error-handler installation",
+      "tests": "MLXNativeErrorTest"
     }
   ]
 }

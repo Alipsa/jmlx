@@ -25,17 +25,17 @@ public final class MlxApiInventory {
   private static final Path MAPPING_FILE = Path.of("req/mlx-api-inventory-overrides.json");
   private static final Pattern PIN = Pattern.compile("(?m)^([A-Z_]+)=\"([^\"]+)\"$");
   private static final Pattern METHOD =
-      Pattern.compile("(?m)^    public static [^\\n(]+ (_?mlx_[a-z0-9_]+)\\(");
+      Pattern.compile("(?m)^    public static [^\\n(]+ (_?mlx_[A-Za-z0-9_]+)\\(");
   private static final Pattern DOWNCALL_HOLDER =
-      Pattern.compile("(?m)^    private static class (_?mlx_[a-z0-9_]+) \\{");
+      Pattern.compile("(?m)^    private static class (_?mlx_[A-Za-z0-9_]+) \\{");
   private static final Pattern VARIADIC_INVOKER =
       Pattern.compile(
-          "(?ms)^    public static class (_?mlx_[a-z0-9_]+) \\{.*?^        public static \\1"
+          "(?ms)^    public static class (_?mlx_[A-Za-z0-9_]+) \\{.*?^        public static \\1"
               + " makeInvoker\\(MemoryLayout\\.\\.\\. layouts\\)");
   private static final Pattern VARIADIC_INVOKER_CANDIDATE =
-      Pattern.compile("(?m)^    public static class (_?mlx_[a-z0-9_]+) \\{");
+      Pattern.compile("(?m)^    public static class (_?mlx_[A-Za-z0-9_]+) \\{");
   private static final Pattern CONSTANT =
-      Pattern.compile("(?m)^    public static int (MLX_[A-Z0-9_]+)\\(\\)");
+      Pattern.compile("(?m)^    public static [A-Za-z]+ (MLX_[A-Z0-9_]+)\\(\\)");
 
   // CLAUDE.md documents that an unfiltered jextract run silently drops exactly these four
   // mlx_array constructor/destructor symbols with no warning. The variadic classes also have a
@@ -236,6 +236,7 @@ public final class MlxApiInventory {
   private static void validateMappings(
       Path repositoryRoot, List<Entry> entries, Map<String, Mapping> mappings) {
     Map<String, Category> known = new HashMap<>();
+    Set<String> javaSourceFiles = javaSourceFileNames(repositoryRoot);
     for (Entry entry : entries) {
       known.put(entry.identity(), entry.category());
     }
@@ -259,6 +260,34 @@ public final class MlxApiInventory {
           throw new IllegalArgumentException("Stale inventory mapping source path: " + source);
         }
       }
+      if (mapping.probe() != null
+          && !Files.isRegularFile(repositoryRoot.resolve(mapping.probe()))) {
+        throw new IllegalArgumentException(
+            "Stale inventory mapping probe path: " + mapping.probe());
+      }
+      for (String test : mapping.tests().split(";")) {
+        String testName = test.trim();
+        String testFile = testName + ".java";
+        if (!javaSourceFiles.contains(testFile)) {
+          throw new IllegalArgumentException("Stale inventory mapping test class: " + testName);
+        }
+      }
+    }
+  }
+
+  private static Set<String> javaSourceFileNames(Path repositoryRoot) {
+    try (Stream<Path> files =
+        Files.find(
+            repositoryRoot,
+            Integer.MAX_VALUE,
+            (path, attributes) ->
+                attributes.isRegularFile() && path.getFileName().toString().endsWith(".java"))) {
+      return files
+          .map(path -> path.getFileName().toString())
+          .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    } catch (IOException exception) {
+      throw new IllegalStateException(
+          "Unable to find Java sources for inventory validation", exception);
     }
   }
 

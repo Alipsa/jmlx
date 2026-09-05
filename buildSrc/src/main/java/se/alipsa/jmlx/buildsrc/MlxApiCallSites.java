@@ -39,7 +39,13 @@ public final class MlxApiCallSites {
   private static final String FFI_PACKAGE_NAME = "se.alipsa.jmlx.ffi";
   private static final String GENERATED_DIRECTORY = "jmlx-ffi/src/main/generated/java";
   private static final Set<String> MLX_H_INFRASTRUCTURE =
-      Set.of("align", "traceDowncall", "TRACE_DOWNCALLS", "upcallHandle");
+      Set.of(
+          "align",
+          "LIBRARY_ARENA",
+          "SYMBOL_LOOKUP",
+          "traceDowncall",
+          "TRACE_DOWNCALLS",
+          "upcallHandle");
 
   private MlxApiCallSites() {}
 
@@ -144,11 +150,12 @@ public final class MlxApiCallSites {
 
   private static boolean excluded(Path repositoryRoot, Path path) {
     Path relative = repositoryRoot.relativize(path);
+    String directoryName = relative.getFileName() == null ? "" : relative.getFileName().toString();
     return relative.startsWith(GENERATED_DIRECTORY)
         || relative.startsWith(".git")
-        || relative.startsWith(".gradle")
-        || relative.startsWith("native")
-        || (relative.getFileName() != null && relative.getFileName().toString().equals("build"));
+        || directoryName.equals(".gradle")
+        || directoryName.equals("native")
+        || directoryName.equals("build");
   }
 
   private static List<Violation> scan(
@@ -220,6 +227,7 @@ public final class MlxApiCallSites {
     private final List<Violation> violations;
     private final Set<String> observed;
     private final String sourcePath;
+    private final boolean inFfiPackage;
     private final Map<String, String> imports = new HashMap<>();
     private final Set<String> seen = new HashSet<>();
 
@@ -238,6 +246,9 @@ public final class MlxApiCallSites {
       this.violations = violations;
       this.observed = observed;
       this.sourcePath = repositoryRoot.relativize(Path.of(unit.getSourceFile().toUri())).toString();
+      this.inFfiPackage =
+          unit.getPackageName() != null
+              && unit.getPackageName().toString().equals(FFI_PACKAGE_NAME);
       readImports(unit.getImports());
     }
 
@@ -276,8 +287,14 @@ public final class MlxApiCallSites {
           continue;
         }
         if (importTree.isStatic()) {
-          if (suffix.startsWith("mlx_h.mlx_") || suffix.startsWith("mlx_h.MLX_")) {
-            record("mlx_h." + suffix.substring("mlx_h.".length()), importTree);
+          if (suffix.startsWith("mlx_h.")) {
+            String member = suffix.substring("mlx_h.".length());
+            if ((member.startsWith("mlx_")
+                    || member.startsWith("_mlx_")
+                    || member.startsWith("MLX_"))
+                && !isNamedInfrastructure(member)) {
+              record("mlx_h." + member, importTree);
+            }
           }
         } else if (generatedTypes.contains(suffix)) {
           imports.put(suffix, suffix);
@@ -286,7 +303,9 @@ public final class MlxApiCallSites {
     }
 
     private static boolean isNamedInfrastructure(String member) {
-      return member.startsWith("C_") || MLX_H_INFRASTRUCTURE.contains(member);
+      return member.startsWith("C_")
+          || MLX_H_INFRASTRUCTURE.contains(member)
+          || member.matches("_?mlx_[A-Za-z0-9_]+\\$(handle|descriptor|address)");
     }
 
     private void recordMember(String owner, String member, Tree tree) {
@@ -299,7 +318,7 @@ public final class MlxApiCallSites {
       String type =
           owner.startsWith(FFI_PACKAGE) ? owner.substring(owner.lastIndexOf('.') + 1) : owner;
       if (generatedTypes.contains(type)
-          && (owner.startsWith(FFI_PACKAGE) || imports.containsKey(type))) {
+          && (owner.startsWith(FFI_PACKAGE) || imports.containsKey(type) || inFfiPackage)) {
         record(type, tree);
       }
     }

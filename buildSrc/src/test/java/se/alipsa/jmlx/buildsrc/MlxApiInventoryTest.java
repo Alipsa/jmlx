@@ -146,6 +146,22 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void callSiteGuardRejectsBareGeneratedTypeUsesInsideTheFfiPackage() throws Exception {
+    Path root = fixture("{\"records\":[]}");
+    Path source = root.resolve("jmlx-ffi/src/main/java/se/alipsa/jmlx/ffi/Example.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(
+        source,
+        "package se.alipsa.jmlx.ffi; class Example { Object value ="
+            + " mlx_callback$fun.allocate(); }");
+
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
+
+    assertTrue(failure.getMessage().contains("mlx_callback$fun"), failure::getMessage);
+  }
+
+  @Test
   void callSiteGuardRejectsMethodReferencesAndFullyQualifiedTypes() throws Exception {
     Path root = fixture(record("mlx_h.mlx_array_new", "implemented"));
     Files.writeString(
@@ -286,6 +302,50 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void rejectsStaleMappingTestClass() throws Exception {
+    String mappings =
+        record("mlx_h.mlx_array_new", "implemented")
+            .replace("\"tests\":\"test\"", "\"tests\":\"MissingTest\"");
+
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class, () -> MlxApiInventory.render(fixture(mappings)));
+
+    assertTrue(failure.getMessage().contains("Stale inventory mapping test class: MissingTest"));
+  }
+
+  @Test
+  void rejectsStaleMappingProbePath() throws Exception {
+    String mappings =
+        "{\"records\":[{\"binding\":\"mlx_h.mlx_array_new\",\"category\":\"downcall\","
+            + "\"status\":\"planned\",\"facadeOrReason\":\"probe\",\"tests\":\"test\","
+            + "\"probe\":\"req/plans/missing.md\"}]}";
+
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class, () -> MlxApiInventory.render(fixture(mappings)));
+
+    assertTrue(failure.getMessage().contains("Stale inventory mapping probe path"));
+  }
+
+  @Test
+  void discoversCamelCaseDowncallsAndNonIntConstants() throws Exception {
+    Path root = fixture("{\"records\":[]}");
+    Path binding = root.resolve("jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/mlx_h.java");
+    Files.writeString(
+        binding,
+        binding()
+            + "\n    private static class mlx_fooBar {"
+            + "\n    public static long mlx_fooBar() {"
+            + "\n    public static long MLX_BIG_CONSTANT() {");
+
+    String inventory = MlxApiInventory.render(root);
+
+    assertTrue(inventory.contains("| `mlx_h.mlx_fooBar` | downcall | unplanned"));
+    assertTrue(inventory.contains("| `mlx_h.MLX_BIG_CONSTANT` | constant | unplanned"));
+  }
+
+  @Test
   void callSiteGuardExcludesGeneratedSourcesAndNamedJextractInfrastructure() throws Exception {
     Path root = fixture("{\"records\":[]}");
     Files.writeString(
@@ -295,8 +355,20 @@ class MlxApiInventoryTest {
     Files.createDirectories(source.getParent());
     Files.writeString(
         source,
-        "import se.alipsa.jmlx.ffi.mlx_h; class Infrastructure { Object value = mlx_h.C_POINTER;"
-            + " }");
+        "import se.alipsa.jmlx.ffi.mlx_h;"
+            + " import static se.alipsa.jmlx.ffi.mlx_h.mlx_array_free$handle;"
+            + " class Infrastructure {"
+            + " Object layout = mlx_h.C_POINTER; Object arena = mlx_h.LIBRARY_ARENA;"
+            + " Object lookup = mlx_h.SYMBOL_LOOKUP; Object handle = mlx_h.mlx_array_new$handle();"
+            + " Object descriptor = mlx_h.mlx_array_new$descriptor();"
+            + " Object address = mlx_h.mlx_array_new$address();"
+            + " Object importedHandle = mlx_array_free$handle(); }");
+    Path nestedGradle = root.resolve("buildSrc/.gradle/Broken.java");
+    Files.createDirectories(nestedGradle.getParent());
+    Files.writeString(nestedGradle, "this is not Java");
+    Path nestedNative = root.resolve("jmlx-ffi/native/Broken.java");
+    Files.createDirectories(nestedNative.getParent());
+    Files.writeString(nestedNative, "this is not Java");
 
     assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
   }
@@ -311,6 +383,9 @@ class MlxApiInventoryTest {
         root.resolve("scripts/bootstrap-native.sh"),
         "MLX_METAL_VERSION=\"1.2.3\"\nMLX_C_COMMIT=\"abc\"\n");
     Files.writeString(root.resolve("req/mlx-api-inventory-overrides.json"), mappings);
+    Path placeholderTest = root.resolve("src/test/java/test.java");
+    Files.createDirectories(placeholderTest.getParent());
+    Files.writeString(placeholderTest, "class test {}");
     Files.writeString(bindings.resolve("mlx_h.java"), binding());
     Files.writeString(bindings.resolve("mlx_array_.java"), "package fixture;");
     Files.writeString(bindings.resolve("mlx_callback$fun.java"), "package fixture;");

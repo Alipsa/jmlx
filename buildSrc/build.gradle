@@ -14,6 +14,12 @@ plugins {
 
 // buildSrc is loaded by the Gradle daemon, which may run on Java 21 even though the forked
 // call-site scanner uses the root project's newer toolchain. Keep its bytecode daemon-compatible.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }

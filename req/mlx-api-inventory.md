@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=157, planned=7, unplanned=569
+- by status: implemented=158, planned=7, unplanned=568
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -55,7 +55,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_device_info_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_distributed_group` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_distributed_group_` | layout/accessor | unplanned | — | — | — | — |
-| `mlx_error_handler_func` | upcall interface | unplanned | — | — | — | — |
+| `mlx_error_handler_func` | upcall interface | implemented | NativeLoader error-handler installation | MLXNativeErrorTest | — | all handwritten source |
 | `mlx_fast_cuda_kernel` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_fast_cuda_kernel_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_fast_cuda_kernel_config` | layout/accessor | unplanned | — | — | — | — |
@@ -115,7 +115,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_arctan2` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_arctanh` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_argmax` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_argmax_axis` | downcall | implemented | MLXOps.argmaxAxis | MLXOpsTest; SelectionAndRandomProbeTest | — | all handwritten source |
+| `mlx_h.mlx_argmax_axis` | downcall | implemented | MLXOps.argmaxAxis | MLXNumericTest; SelectionAndRandomProbeTest | — | all handwritten source |
 | `mlx_h.mlx_argmin` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_argmin_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_argpartition` | downcall | unplanned | — | — | — | — |

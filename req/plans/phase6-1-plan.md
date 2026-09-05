@@ -46,8 +46,10 @@ semantics.
 - In greedy mode, require the filtering defaults (`topK == 0`, `topP == 1`, `minP == 0`) and an empty
   seed. Reject non-default sampling-only fields rather than silently ignoring them; in particular,
   a present greedy seed would advertise reproducibility state that the no-RNG path never consumes.
-- `temperature > 0` is sampled mode and requires an explicit seed. Reject `OptionalLong.empty()`;
-  do not generate an unrecoverable implicit seed. Never use MLX's global RNG.
+- `temperature > 0` is sampled mode and requires an explicit seed. Enforce this cross-field rule in
+  `GenerationConfig`'s compact constructor: `OptionalLong.empty()` throws
+  `IllegalArgumentException` at configuration construction, before a model or native scope is
+  involved. Do not generate an unrecoverable implicit seed and never use MLX's global RNG.
 - `logProbabilities` is valid in either mode. Greedy reports `0.0` by explicit API convention, not as
   the `temperature → 0+` limit: a k-way tied maximum has limit `log(1/k)`. Sampled mode reports the
   selected token's natural-log probability after all filters and final renormalization.
@@ -73,6 +75,7 @@ model logits
   → top-k mask
   → top-p mask (preserve the boundary token)
   → min-p mask
+  → scatter filtered logits back to original vocabulary order
   → categorical draw with this step's explicit child key
   → selected-token post-filter log probability, when requested
 ```
@@ -86,20 +89,32 @@ Penalty semantics are fixed as follows:
 - history includes the full prompt and every emitted token, including EOS; an explicit stop token is
   selected but neither emitted nor added to history because generation terminates immediately.
 
-Filtering uses stable token identity, not an assumed tie order from `topk`. The exact pinned MLX
-`v0.31.2` source documents `argsort` as stable in
+Filtering uses stable token identity, not an assumed tie order from `topk`. The Python binding
+docstring for the exact pinned MLX `v0.31.2` shared core `argsort` operation—which mlx-c's
+`mlx_argsort_axis` wraps—documents stability in
 [`python/src/ops.cpp` lines 2852–2855](https://github.com/ml-explore/mlx/blob/v0.31.2/python/src/ops.cpp#L2852-L2855).
 Apply ascending argsort to negated logits in original vocabulary order so the result is descending
 by logit with token ID ascending as the secondary order. Add a native tie regression for the pinned
-runtime, but treat the cited upstream contract—not the observation—as the semantic basis.
+runtime, but treat the cited shared-core contract—not the observation—as the semantic basis. The
+same docstring says NaNs sort last; explicit finite-logit rejection remains belt-and-braces validation
+that provides a jmlx policy error instead of making sort placement load-bearing.
 
 `topK == 0`, `topP == 1`, and `minP == 0` disable their stages. Top-p uses cumulative probability
 after the top-k mask and keeps the first token whose inclusion reaches the threshold. Min-p then
 keeps candidates whose current probability is at least `minP * maxProbability`. Every filter must
 preserve at least the highest-ranked candidate. Compute masks in sorted order, then form the inverse
-permutation with `argsortAxis(sortedTokenIds)` and gather the filtered logits back into original
-vocabulary order before categorical selection. Thus a fixed key is applied to the same index order
-as direct Python MLX/`mlx_lm`; the oracle must not reproduce a jmlx-only sorted-domain draw.
+mapping by scattering the sorted filtered logits back with
+`putAlongAxis(destination, sortedTokenIds, filteredSortedLogits, vocabularyAxis)`. The destination is
+a vocabulary-shaped negative-infinity tensor, so the scatter restores original vocabulary order in
+O(V) without a second O(V log V) argsort. Call categorical only after that restoration. Thus a fixed
+key is applied to the same index order as direct Python MLX/`mlx_lm`; the oracle must not reproduce a
+jmlx-only sorted-domain draw.
+
+This index-order parity is not a claim of complete sampler parity with `mlx_lm`. Phase 6.1 follows
+the roadmap/Hugging Face stage order—temperature before top-k, top-p, and min-p—whereas current
+`mlx_lm` applies temperature inside categorical after filtering. The Python oracle implements this
+plan's declared stage order; matching `mlx_lm` output for `temperature != 1` with an active filter is
+out of scope.
 
 ### Validation and terminal behavior
 
@@ -110,8 +125,13 @@ as direct Python MLX/`mlx_lm`; the oracle must not reproduce a jmlx-only sorted-
 - The public `Set<Integer>` fields cannot represent duplicate IDs. Preserve immutable-set copying,
   explicitly test EOS/stop overlap, and retain EOS precedence. Do not claim to reject duplicates
   that the API has already collapsed.
-- Validate the step logits before categorical selection. An all-masked/empty distribution is an
-  internal error with the stage named in the message, never a native categorical failure.
+- Build the finite flag and selection as one lazy graph rather than synchronizing before selection.
+  Feed downstream selection a sanitized `where(isFinite, logits, zero)` value so invalid logits
+  cannot make categorical fail first, then call `MLX.eval(finiteFlag, selectedIndex, selectedLogprob)`
+  once (omitting the logprob output when disabled). Inspect the finite flag before returning or
+  emitting the selected token. This preserves fail-loud attribution without adding a second GPU
+  submission/host round-trip to every decode step. An all-masked/empty distribution is an internal
+  error with the stage named in the message, never a native categorical failure.
 - EOS remains in generated IDs and receives a token event/log probability. An explicit stop token
   remains excluded from generated IDs/events/log probabilities. When log probabilities are
   requested, `GenerationResult.logProbabilities().size()` equals `generatedTokenIds().size()` and
@@ -135,8 +155,8 @@ dtype-conversion, and error-reporting patterns:
   parameters of `mlx_cumsum` and following the existing axis-suffixed facade naming;
 - `MLXOps.isFinite` plus scalar `MLXOps.all` for fail-loud logit validation;
 - `MLXOps.logSumExpAxis` for stable selected-token log probabilities;
-- `MLXShape.takeAlongAxis` and `putAlongAxis` for sorted lookup, inverse-permutation gather, and
-  sparse penalty updates;
+- `MLXShape.takeAlongAxis` and `putAlongAxis` for sorted lookup, vocabulary-order scatter, and sparse
+  penalty updates;
 - `MLXRandom.key(scope, seed)`, `MLXRandom.split(key, count, targetScope)`, and
   `MLXRandom.categorical(logits, axis, key)`.
 
@@ -150,10 +170,12 @@ split does not mutate its parent.
 Document `takeAlongAxis` beside the existing `takeAxis` with an explicit contrast: `takeAxis`
 inserts the full index-array shape at one axis, while `takeAlongAxis` performs elementwise aligned
 gather and requires its index shape to be broadcast-compatible with the non-selected dimensions.
-Give `putAlongAxis` the corresponding aligned-update contract and validate indices before native
-execution because native scatter does not provide a safe bounds check. This facade deliberately
-reads back its INT32 index tensor to validate the small sparse index set; the sampling path never
-passes a vocabulary-sized tensor, and its tests must account for this synchronization point.
+Give `putAlongAxis` the corresponding aligned-update contract and keep it lazy like `take` and
+`takeAxis`; do not read back an index tensor inside a general facade. Its Javadoc must warn that
+native scatter does not bounds-check index values. The sampling path validates history token IDs in
+Java before constructing their index array, while argsort-produced permutation indices are bounded
+by construction. Test both source validations without turning the public operation into an eager
+synchronization point.
 
 Do not expose the flat sort/top-k/partition variants. The sampling pipeline does not need them, and
 the 6.0b probe proved they flatten decoder logits. Keep their exact-source probe inventory records;
@@ -199,15 +221,20 @@ old key before first evaluation of the categorical result. This fixed child orde
 release sequence are part of the reproducibility tuple.
 
 Implement filtering on sorted logits. Use argsort plus token-ID secondary ordering, gather logits,
-and apply positional/cumulative masks with negative infinity. Compute the inverse permutation with a
-second argsort of the unique sorted token IDs and gather the filtered logits back to vocabulary
-order. Call categorical only on that vocabulary-ordered tensor, so fixed-seed behavior matches direct
-Python MLX rather than a permuted categorical domain.
+and apply positional/cumulative masks with negative infinity. Scatter the filtered sorted logits into
+a vocabulary-shaped negative-infinity destination at `sortedTokenIds`; do not sort the permutation a
+second time. Call categorical only on that vocabulary-ordered tensor, so fixed-seed behavior matches
+direct Python MLX's categorical index domain rather than a permuted domain.
 
 For an optional log probability, gather the selected filtered logit and subtract
-`logSumExpAxis(filteredLogits, vocabularyAxis, true)`. Do not calculate `log(softmax(...))`, which is
-less stable at masked `-infinity` entries, and do not expose alternative-token log probabilities in
-6.1.
+`logSumExpAxis(vocabularyOrderedFilteredLogits, vocabularyAxis, true)`. Do not calculate
+`log(softmax(...))`, which is less stable at masked `-infinity` entries, and do not expose
+alternative-token log probabilities in 6.1.
+
+Build the finite flag, sanitized policy graph, categorical/argmax result, and optional logprob as one
+lazy graph and evaluate their terminal scalars together. The pipeline exposes no intermediate
+readback barrier; its native test should use an evaluation/submission diagnostic or equivalent test
+seam to prevent a second per-token synchronization from being introduced later.
 
 ### 3. Decoder integration and public results
 
@@ -218,8 +245,13 @@ single-token decode, cancellation polling, and activation-scope boundaries uncha
 - Initialize token counts and request RNG once per `generate` call.
 - Preserve current token output for finite logits under the default greedy policy and keep its direct
   argmax fast path. Deliberate behavior changes are: non-finite logits now fail before argmax;
-  selected log probabilities become legal; and the already-rejected seed/non-default filter cases
-  move from `DecoderModel.requireGreedy` to explicit config/policy validation.
+  selected log probabilities become legal; and invalid seed/temperature/filter combinations fail at
+  `GenerationConfig` construction rather than later in `DecoderModel.requireGreedy`. In particular,
+  the current `LlamaModelTest.rejectsNonGreedyPolicy` temperature-1/empty-seed fixture changes from an
+  `UnsupportedOperationException` at `generate` to an `IllegalArgumentException` at construction.
+  Rename/update that test and add separate valid sampled-generation coverage; this observable timing
+  and exception-type change is accepted because `jmlx-models` remains unpublished
+  `0.1.0-SNAPSHOT`.
 - Populate `GenerationEvent.logProbability` and `GenerationResult.logProbabilities` only when
   requested; otherwise retain null event values and an empty result list.
 - Leave `textDelta` null. Tokenizer-aware incremental Unicode decoding belongs to Phase 6.2.
@@ -252,9 +284,10 @@ verification.
 Do not change the existing array fixture's meaning. Unlike Phase 6.0b, close the sampling
 differential loop: a native Java test reads the committed Python sampling JSON and compares Java
 stage distributions/selections on the same pinned tuple. The Python runner computes masks in sorted
-order, applies the inverse permutation, and calls `mx.random.categorical` in original vocabulary
-order exactly as the Java design does. Keep ordinary Java tests independent of Python execution;
-only committed JSON crosses the boundary.
+order, scatters them back to vocabulary order, and calls `mx.random.categorical` there exactly as
+the Java design does. It must also apply temperature before filtering even though current `mlx_lm`
+orders those stages differently. Keep ordinary Java tests independent of Python execution; only
+committed JSON crosses the boundary.
 
 Add a small native subprocess probe that runs the same seeded request in two fresh JVMs and compares
 canonical token/logprob output. Use committed exact outputs for two deliberately chosen seeds to

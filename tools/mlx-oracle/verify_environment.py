@@ -42,7 +42,7 @@ def verify_runtime(device: str) -> None:
         devices = {"cpu": mx.cpu, "gpu": mx.gpu}
         mx.set_default_device(devices[device])
         value = mx.array([1.0], dtype=mx.float32)
-        mx.eval(value)
+        mx.eval(value + value)
     except Exception as error:
         raise SystemExit(f"MLX oracle runtime smoke check failed: {error}") from error
 

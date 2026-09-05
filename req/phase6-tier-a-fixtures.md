@@ -11,6 +11,9 @@ runs on every relevant pull request; no test downloads a model or tokenizer.
 | Qwen-style byte BPE | text `low the`, no special tokens | IDs `[13,16]`; decoded text `low the` | `HfTokenizerTest.qwenStyleEncodeDecodeRoundTrips` |
 | Llama-style byte BPE | text `low the`, special tokens enabled | IDs `[128000,13,16]`; decoded text `low the` when special tokens are skipped | `HfTokenizerTest` Llama 3 golden tests |
 
+`verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces its committed
+oracle output. A Java-side differential comparison against that JSON belongs to a later milestone.
+
 The decoder tests generate safetensors through `MLXIO.saveSafetensors`; no opaque binary checkpoint
 is committed. `LlamaModelTest.closesGenerationScopesOnEveryTerminalPath` covers repeated cleanup,
 listener failure, cancellation, EOS, stop-token, and max-token paths. The Python oracle's input and

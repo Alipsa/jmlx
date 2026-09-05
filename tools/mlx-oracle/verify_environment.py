@@ -40,7 +40,7 @@ def main() -> None:
     parser.add_argument("--lock", type=Path, required=True)
     parser.add_argument("--provenance", type=Path, required=True)
     parser.add_argument("--staged-pins", type=Path, required=True)
-    parser.add_argument("--mlx-version", required=True)
+    parser.add_argument("--mlx-metal-version", required=True)
     parser.add_argument("--mlx-metal-url", required=True)
     parser.add_argument("--mlx-metal-sha256", required=True)
     parser.add_argument("--mlx-c-commit", required=True)
@@ -64,9 +64,8 @@ def main() -> None:
         importlib.metadata.version("mlx-metal"),
         provenance["mlxMetal"]["version"],
     )
-    require_equal("mlx pin", provenance["mlx"]["version"], args.mlx_version)
     require_equal(
-        "mlx-metal pin", provenance["mlxMetal"]["version"], args.mlx_version
+        "mlx-metal pin", provenance["mlxMetal"]["version"], args.mlx_metal_version
     )
     require_equal(
         "mlx-metal URL", provenance["mlxMetal"]["url"], args.mlx_metal_url
@@ -77,11 +76,14 @@ def main() -> None:
         args.mlx_metal_sha256,
     )
     require_equal("mlx-c commit", provenance["mlxCCommit"], args.mlx_c_commit)
+    require_equal("oracle device", provenance["device"]["type"], "gpu")
 
     if args.staged_pins.is_file():
         staged = read_properties(args.staged_pins)
         require_equal(
-            "staged mlx-metal version", staged.get("mlxMetalVersion", "<missing>"), args.mlx_version
+            "staged mlx-metal version",
+            staged.get("mlxMetalVersion", "<missing>"),
+            args.mlx_metal_version,
         )
         require_equal(
             "staged mlx-c commit", staged.get("mlxcCommit", "<missing>"), args.mlx_c_commit

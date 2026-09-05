@@ -96,14 +96,16 @@ tasks.register('verifyMlxOracle', Exec) {
     description = 'Verifies the pinned Python MLX oracle environment and provenance.'
     configureMlxOracle(delegate)
     inputs.file(mlxOracleDir.file('verify_environment.py'))
-    inputs.file(stagedNativePins).optional()
+    // A FileCollection may contain an absent optional marker; inputs.file(...).optional() still
+    // validates a configured path and rejects it before the task's friendly environment check.
+    inputs.files(stagedNativePins)
     args mlxOracleDir.file('verify_environment.py').asFile,
             '--lock', mlxOracleDir.file('requirements.lock').asFile,
             '--provenance', mlxOracleDir.file('provenance.json').asFile,
             '--staged-pins', stagedNativePins.asFile
     doFirst {
         def pins = mlxPins.get()
-        args '--mlx-version', pins.required('MLX_METAL_VERSION'),
+        args '--mlx-metal-version', pins.required('MLX_METAL_VERSION'),
                 '--mlx-metal-url', pins.required('MLX_METAL_WHEEL_URL'),
                 '--mlx-metal-sha256', pins.required('MLX_METAL_WHEEL_SHA256'),
                 '--mlx-c-commit', pins.required('MLX_C_COMMIT')
@@ -120,6 +122,7 @@ tasks.register('generateMlxOracleFixtures', Exec) {
     outputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
     args mlxOracleDir.file('runner.py').asFile,
             '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--provenance', mlxOracleDir.file('provenance.json').asFile,
             '--output', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
 }
 
@@ -128,11 +131,13 @@ tasks.register('verifyMlxOracleFixtures', Exec) {
     description = 'Verifies committed canonical JSON fixtures with the pinned Python MLX oracle.'
     configureMlxOracle(delegate)
     dependsOn tasks.named('verifyMlxOracle')
+    mustRunAfter tasks.named('generateMlxOracleFixtures')
     inputs.file(mlxOracleDir.file('runner.py'))
     inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
     inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
     args mlxOracleDir.file('runner.py').asFile,
             '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--provenance', mlxOracleDir.file('provenance.json').asFile,
             '--verify', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
 }
 

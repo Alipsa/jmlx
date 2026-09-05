@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
 public final class MlxPins {
 
   private static final Pattern ASSIGNMENT = Pattern.compile("(?m)^([A-Z][A-Z0-9_]*)=\"([^\"]+)\"$");
-  private static final Pattern REFERENCE = Pattern.compile("\\$\\{([A-Z][A-Z0-9_]*)}");
+  private static final Pattern REFERENCE =
+      Pattern.compile("\\$(?:\\{([A-Z][A-Z0-9_]*)}|([A-Z][A-Z0-9_]*))");
   private final Map<String, String> values;
 
   private MlxPins(Map<String, String> values) {
@@ -52,11 +53,16 @@ public final class MlxPins {
     Matcher matcher = REFERENCE.matcher(value);
     StringBuilder expanded = new StringBuilder();
     while (matcher.find()) {
+      String referencedName = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
       matcher.appendReplacement(
-          expanded, Matcher.quoteReplacement(resolve(matcher.group(1), resolving)));
+          expanded, Matcher.quoteReplacement(resolve(referencedName, resolving)));
     }
     matcher.appendTail(expanded);
     resolving.remove(name);
+    if (expanded.indexOf("$") >= 0) {
+      throw new IllegalArgumentException(
+          "scripts/bootstrap-native.sh pin " + name + " contains an unsupported shell expansion");
+    }
     return expanded.toString();
   }
 }

@@ -11,8 +11,9 @@ On Apple Silicon:
 ./gradlew verifyMlxOracle verifyMlxOracleFixtures
 ```
 
-The committed fixture records values, shapes, and dtypes in canonical JSON. Float values are rounded
-to seven decimal places only after MLX evaluation so diffs remain stable and reviewable.
+The committed fixture explicitly selects the GPU and records its device, values, shapes, and dtypes
+in canonical JSON. All float values are rounded to seven decimal places only after MLX evaluation so
+diffs remain stable and reviewable.
 Environment verification also compares the bootstrap-derived pins with the staged native runtime's
 `native-pin.properties` whenever that completion marker is present.
 `generateMlxOracleFixtures` is the only task allowed to rewrite expected JSON. Review its diff and

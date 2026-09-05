@@ -1,5 +1,6 @@
 {
   "platform": {"system": "Darwin", "machine": "arm64", "macOSMajor": "26"},
+  "device": {"type": "gpu"},
   "python": {"majorMinor": "3.12"},
   "mlx": {
     "version": "0.31.2",

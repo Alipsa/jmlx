@@ -21,9 +21,13 @@ def dtype_name(array) -> str:
     raise ValueError(f"unexpected oracle dtype: {array.dtype}")
 
 
-def run(specification: dict) -> dict:
+def run(specification: dict, provenance: dict) -> dict:
     if specification.get("fixture") != "phase6-tier-a-array":
         raise ValueError(f"unknown fixture: {specification.get('fixture')}")
+    device = specification.get("device")
+    if device != provenance["device"]["type"] or device != "gpu":
+        raise ValueError(f"oracle fixture requires the recorded GPU device, found: {device}")
+    mx.set_default_device(mx.gpu)
     logits = mx.array(specification["logits"], dtype=mx.float32)
     doubled = logits * mx.array(2.0, dtype=mx.float32)
     softmax = mx.softmax(logits, axis=1)
@@ -31,6 +35,7 @@ def run(specification: dict) -> dict:
     mx.eval(doubled, softmax, argmax)
     return {
         "fixture": specification["fixture"],
+        "device": device,
         "argmax": {
             "dtype": dtype_name(argmax),
             "shape": list(argmax.shape),
@@ -39,7 +44,7 @@ def run(specification: dict) -> dict:
         "doubled": {
             "dtype": dtype_name(doubled),
             "shape": list(doubled.shape),
-            "values": doubled.tolist(),
+            "values": rounded(doubled.tolist()),
         },
         "softmax": {
             "dtype": dtype_name(softmax),
@@ -56,12 +61,15 @@ def canonical(value: dict) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--provenance", type=Path, required=True)
     output = parser.add_mutually_exclusive_group(required=True)
     output.add_argument("--output", type=Path)
     output.add_argument("--verify", type=Path)
     args = parser.parse_args()
 
-    actual = canonical(run(json.loads(args.input.read_text())))
+    actual = canonical(
+        run(json.loads(args.input.read_text()), json.loads(args.provenance.read_text()))
+    )
     if args.output:
         args.output.write_text(actual)
         return

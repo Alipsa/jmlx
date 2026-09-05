@@ -124,7 +124,7 @@ public final class MlxApiCallSites {
     }
   }
 
-  private static List<Path> handwrittenJavaSources(Path repositoryRoot) throws IOException {
+  static List<Path> handwrittenJavaSources(Path repositoryRoot) throws IOException {
     List<Path> sources = new ArrayList<>();
     Files.walkFileTree(
         repositoryRoot,
@@ -152,7 +152,7 @@ public final class MlxApiCallSites {
     Path relative = repositoryRoot.relativize(path);
     String directoryName = relative.getFileName() == null ? "" : relative.getFileName().toString();
     return relative.startsWith(GENERATED_DIRECTORY)
-        || relative.startsWith(".git")
+        || directoryName.equals(".git")
         || directoryName.equals(".gradle")
         || directoryName.equals("native")
         || directoryName.equals("build");
@@ -268,9 +268,12 @@ public final class MlxApiCallSites {
 
     @Override
     public Void visitIdentifier(IdentifierTree tree, Void unused) {
-      String identity = imports.get(tree.getName().toString());
+      String name = tree.getName().toString();
+      String identity = imports.get(name);
       if (identity != null) {
         record(identity, tree);
+      } else if (inFfiPackage && generatedTypes.contains(name)) {
+        record(name, tree);
       }
       return super.visitIdentifier(tree, unused);
     }

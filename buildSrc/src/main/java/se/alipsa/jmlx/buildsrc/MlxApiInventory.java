@@ -15,6 +15,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Deterministically renders the checked-in inventory of the committed jextract MLX binding. */
@@ -276,19 +277,26 @@ public final class MlxApiInventory {
   }
 
   private static Set<String> javaSourceFileNames(Path repositoryRoot) {
-    try (Stream<Path> files =
-        Files.find(
-            repositoryRoot,
-            Integer.MAX_VALUE,
-            (path, attributes) ->
-                attributes.isRegularFile() && path.getFileName().toString().endsWith(".java"))) {
+    try (Stream<Path> files = MlxApiCallSites.handwrittenJavaSources(repositoryRoot).stream()) {
       return files
+          .filter(path -> isTestJavaSource(repositoryRoot.relativize(path)))
           .map(path -> path.getFileName().toString())
-          .collect(java.util.stream.Collectors.toUnmodifiableSet());
+          .collect(Collectors.toUnmodifiableSet());
     } catch (IOException exception) {
       throw new IllegalStateException(
           "Unable to find Java sources for inventory validation", exception);
     }
+  }
+
+  private static boolean isTestJavaSource(Path relative) {
+    for (int index = 0; index + 2 < relative.getNameCount(); index++) {
+      if (relative.getName(index).toString().equals("src")
+          && relative.getName(index + 1).toString().equals("test")
+          && relative.getName(index + 2).toString().equals("java")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void appendTotals(

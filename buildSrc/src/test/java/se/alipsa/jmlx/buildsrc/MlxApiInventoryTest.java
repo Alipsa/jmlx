@@ -146,19 +146,16 @@ class MlxApiInventoryTest {
   }
 
   @Test
-  void callSiteGuardRejectsBareGeneratedTypeUsesInsideTheFfiPackage() throws Exception {
+  void callSiteGuardRejectsTypeOnlyGeneratedUsesInsideTheFfiPackage() throws Exception {
     Path root = fixture("{\"records\":[]}");
     Path source = root.resolve("jmlx-ffi/src/main/java/se/alipsa/jmlx/ffi/Example.java");
     Files.createDirectories(source.getParent());
-    Files.writeString(
-        source,
-        "package se.alipsa.jmlx.ffi; class Example { Object value ="
-            + " mlx_callback$fun.allocate(); }");
+    Files.writeString(source, "package se.alipsa.jmlx.ffi; class Example { mlx_array_ value; }");
 
     IllegalStateException failure =
         assertThrows(IllegalStateException.class, () -> MlxApiCallSites.verify(root));
 
-    assertTrue(failure.getMessage().contains("mlx_callback$fun"), failure::getMessage);
+    assertTrue(failure.getMessage().contains("mlx_array_"), failure::getMessage);
   }
 
   @Test
@@ -306,10 +303,13 @@ class MlxApiInventoryTest {
     String mappings =
         record("mlx_h.mlx_array_new", "implemented")
             .replace("\"tests\":\"test\"", "\"tests\":\"MissingTest\"");
+    Path root = fixture(mappings);
+    Path staleBuildOutput = root.resolve("jmlx-core/build/tmp/stale/MissingTest.java");
+    Files.createDirectories(staleBuildOutput.getParent());
+    Files.writeString(staleBuildOutput, "class MissingTest {}");
 
     IllegalArgumentException failure =
-        assertThrows(
-            IllegalArgumentException.class, () -> MlxApiInventory.render(fixture(mappings)));
+        assertThrows(IllegalArgumentException.class, () -> MlxApiInventory.render(root));
 
     assertTrue(failure.getMessage().contains("Stale inventory mapping test class: MissingTest"));
   }

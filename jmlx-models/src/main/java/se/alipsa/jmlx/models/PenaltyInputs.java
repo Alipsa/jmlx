@@ -51,4 +51,12 @@ record PenaltyInputs(int[] tokenIds, float[] counts) {
   public float[] counts() {
     return counts.clone();
   }
+
+  int[] rawTokenIds() {
+    return tokenIds;
+  }
+
+  float[] rawCounts() {
+    return counts;
+  }
 }

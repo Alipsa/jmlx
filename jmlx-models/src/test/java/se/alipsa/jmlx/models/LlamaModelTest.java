@@ -284,10 +284,14 @@ class LlamaModelTest {
 
   private static String runSamplingProbe(Path modelDirectory, long seed, int maxNewTokens)
       throws Exception {
+    String libraryPath =
+        Objects.requireNonNull(
+            System.getProperty("jmlx.library.path"),
+            "jmlx.library.path must be set by jmlx-models/build.gradle");
     List<String> command = new ArrayList<>();
     command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
     command.add("--enable-native-access=ALL-UNNAMED");
-    command.add("-Djmlx.library.path=" + System.getProperty("jmlx.library.path"));
+    command.add("-Djmlx.library.path=" + libraryPath);
     command.add("-cp");
     command.add(System.getProperty("java.class.path"));
     command.add(SamplingSubprocessProbe.class.getName());

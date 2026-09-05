@@ -1,11 +1,14 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -23,18 +26,28 @@ class SamplingOracleTest {
 
   @Test
   void matchesCommittedPythonSelectionsAndLogProbabilities() throws Exception {
-    Path fixtures =
-        Path.of(System.getProperty("jmlx.repository.root"), "tools/mlx-oracle/fixtures");
+    String repositoryRoot =
+        Objects.requireNonNull(
+            System.getProperty("jmlx.repository.root"),
+            "jmlx.repository.root must be set by jmlx-models/build.gradle");
+    Path fixtures = Path.of(repositoryRoot, "tools/mlx-oracle/fixtures");
     JsonNode input = MAPPER.readTree(fixtures.resolve("phase6-1-sampling.input.json").toFile());
     JsonNode expected =
         MAPPER.readTree(fixtures.resolve("phase6-1-sampling.expected.json").toFile());
+    JsonNode inputCases = required(input, "cases");
+    JsonNode expectedCases = required(expected, "cases");
+    assertTrue(inputCases.isArray() && !inputCases.isEmpty(), "oracle cases must be non-empty");
+    assertTrue(expectedCases.isArray(), "expected oracle cases must be an array");
+    assertEquals(inputCases.size(), expectedCases.size(), "oracle case counts");
 
-    for (int caseIndex = 0; caseIndex < input.path("cases").size(); caseIndex++) {
-      JsonNode inputCase = input.path("cases").get(caseIndex);
-      JsonNode expectedCase = expected.path("cases").get(caseIndex);
-      float[] logits = floats(inputCase.path("logits"));
+    for (int caseIndex = 0; caseIndex < inputCases.size(); caseIndex++) {
+      JsonNode inputCase = inputCases.get(caseIndex);
+      JsonNode expectedCase = expectedCases.get(caseIndex);
+      String name = required(inputCase, "name").textValue();
+      assertEquals(name, required(expectedCase, "name").textValue(), "oracle case order");
+      float[] logits = floats(required(inputCase, "logits"));
       GenerationConfig policy = policy(inputCase);
-      LinkedHashMap<Integer, Integer> history = history(inputCase.path("history"));
+      LinkedHashMap<Integer, Integer> history = history(required(inputCase, "history"));
 
       try (MLXScope generation = new MLXScope();
           SamplingPipeline pipeline = new SamplingPipeline(generation, policy, logits.length);
@@ -43,36 +56,41 @@ class SamplingOracleTest {
         SamplingPipeline.Selection actual =
             pipeline.select(array, PenaltyInputs.from(history, logits.length), 0);
 
+        assertEquals(required(expectedCase, "selectedToken").intValue(), actual.tokenId(), name);
         assertEquals(
-            expectedCase.path("selectedToken").intValue(),
-            actual.tokenId(),
-            inputCase.path("name").textValue());
-        assertEquals(
-            expectedCase.path("selectedLogProbability").doubleValue(),
+            required(expectedCase, "selectedLogProbability").doubleValue(),
             actual.logProbability(),
             1e-6,
-            inputCase.path("name").textValue());
+            name);
+        JsonNode expectedVocabularyLogits = expectedCase.get("vocabularyLogits");
+        if (expectedVocabularyLogits != null) {
+          assertArrayEquals(
+              floatsWithInfinity(expectedVocabularyLogits),
+              actual.vocabularyLogits().toFloatArray(),
+              1e-6f,
+              name);
+        }
       }
     }
   }
 
   private static GenerationConfig policy(JsonNode inputCase) {
-    JsonNode policy = inputCase.path("policy");
-    float temperature = (float) policy.path("temperature").doubleValue();
+    JsonNode policy = required(inputCase, "policy");
+    float temperature = (float) required(policy, "temperature").doubleValue();
     OptionalLong seed =
         temperature == 0
             ? OptionalLong.empty()
-            : OptionalLong.of(inputCase.path("seed").longValue());
+            : OptionalLong.of(required(inputCase, "seed").longValue());
     return new GenerationConfig(
         1,
         seed,
         temperature,
-        policy.path("topK").intValue(),
-        (float) policy.path("topP").doubleValue(),
-        (float) policy.path("minP").doubleValue(),
-        (float) policy.path("repetitionPenalty").doubleValue(),
-        (float) policy.path("frequencyPenalty").doubleValue(),
-        (float) policy.path("presencePenalty").doubleValue(),
+        required(policy, "topK").intValue(),
+        (float) required(policy, "topP").doubleValue(),
+        (float) required(policy, "minP").doubleValue(),
+        (float) required(policy, "repetitionPenalty").doubleValue(),
+        (float) required(policy, "frequencyPenalty").doubleValue(),
+        (float) required(policy, "presencePenalty").doubleValue(),
         Set.of(),
         Set.of(),
         true);
@@ -94,5 +112,26 @@ class SamplingOracleTest {
       result[i] = (float) node.get(i).doubleValue();
     }
     return result;
+  }
+
+  private static float[] floatsWithInfinity(JsonNode node) {
+    float[] result = new float[node.size()];
+    for (int i = 0; i < result.length; i++) {
+      JsonNode value = node.get(i);
+      if (!value.isTextual()) {
+        result[i] = (float) value.doubleValue();
+      } else if ("Infinity".equals(value.textValue())) {
+        result[i] = Float.POSITIVE_INFINITY;
+      } else if ("-Infinity".equals(value.textValue())) {
+        result[i] = Float.NEGATIVE_INFINITY;
+      } else {
+        throw new IllegalArgumentException("unexpected oracle float value: " + value.textValue());
+      }
+    }
+    return result;
+  }
+
+  private static JsonNode required(JsonNode parent, String field) {
+    return Objects.requireNonNull(parent.get(field), "missing oracle field: " + field);
   }
 }

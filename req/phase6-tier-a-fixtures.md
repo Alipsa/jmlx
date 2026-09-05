@@ -15,8 +15,9 @@ runs on every relevant pull request; no test downloads a model or tokenizer.
 
 `verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces every committed
 oracle output. The original array row remains an environment self-check; Phase 6.1 closes the Java
-differential loop for the sampling row by consuming its selected IDs and log probabilities in
-`SamplingOracleTest`, while the stage arrays remain directly reviewable evidence.
+differential loop for the sampling row by consuming its vocabulary-ordered post-filter logits,
+selected IDs, and log probabilities in `SamplingOracleTest`. The other intermediate stage arrays
+remain directly reviewable evidence.
 
 The decoder tests generate safetensors through `MLXIO.saveSafetensors`; no opaque binary checkpoint
 is committed. `LlamaModelTest.closesGenerationScopesOnEveryTerminalPath` covers repeated cleanup,

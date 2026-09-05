@@ -128,22 +128,24 @@ out of scope.
 - The public `Set<Integer>` fields cannot represent duplicate IDs. Preserve immutable-set copying,
   explicitly test EOS/stop overlap, and retain EOS precedence. Do not claim to reject duplicates
   that the API has already collapsed.
-- Build the finite flag and selection from the same original-logit lazy graph rather than
+- Build the finite flags and selection in the same lazy graph rather than
   synchronizing before selection. Do not sanitize with `where`: no selected entry point in the
   pinned argmax/categorical path reports NaN as a native status failure, and an extra vocabulary-
   sized replacement kernel would not improve attribution. Cast the BOOL finite scalar to INT32,
-  then call `MLX.eval(finiteFlagInt32, selectedIndex, selectedLogprob)` once (omitting the logprob
-  output when disabled). Read and inspect the already-evaluated finite flag before returning or
-  emitting the selected token. If false, throw `IllegalStateException` with the template
+  then call `MLX.eval(inputFiniteFlagInt32, temperedFiniteFlagInt32, selectedIndex,
+  selectedLogprob)` once (omitting the sampled-only outputs as appropriate). Read and inspect the
+  already-evaluated flags before returning or emitting the selected token. An invalid input throws
+  `IllegalStateException` with the template
   `sampling stage finite-logit validation failed at decode step <step>: logits must be finite`. The
   native `SamplingPipelineTest.rejectsNonFiniteLogitsAsPolicyError` must assert this exact jmlx-side
   type and message shape and explicitly reject an `MLXException` from `NativeOps.checked`. This test
-  discharges the pinned-runtime premise behind omitting the sanitizer. The design preserves fail-loud
-  attribution without a pre-selection GPU submission/host round-trip. An all-masked/empty
-  distribution throws the same type with
-  `sampling stage <stage> produced no candidates at decode step <step>`; it never surfaces as a
-  native categorical failure. Pass the zero-based decode-step index into the pipeline solely for
-  these diagnostics.
+  discharges the pinned-runtime premise behind omitting the sanitizer. Validate the tempered logits
+  too, so an extreme positive temperature divisor is attributed with
+  `sampling stage temperature scaling failed at decode step <step>: tempered logits must be finite`
+  instead of guessing that a later filter removed every candidate. The configured filters all
+  preserve sorted rank zero, so finite tempered logits prove the distribution is non-empty. The
+  design preserves fail-loud attribution without a pre-selection GPU submission/host round-trip.
+  Pass the zero-based decode-step index into the pipeline solely for these diagnostics.
 - EOS remains in generated IDs and receives a token event/log probability. An explicit stop token
   remains excluded from generated IDs/events/log probabilities. When log probabilities are
   requested, `GenerationResult.logProbabilities().size()` equals `generatedTokenIds().size()` and
@@ -211,7 +213,9 @@ and cleanup on native failure.
 Create a package-private `SamplingPipeline` in `jmlx-models`, independent of Llama/Qwen classes. It
 accepts final-token logits, immutable policy, vocabulary size, token-frequency state, and an optional
 request RNG state, and returns a small immutable selection containing token ID and optional log
-probability.
+probability. The package-private selection also retains the activation-scoped vocabulary-ordered
+logits array, allowing the same-package oracle test to inspect the graph result without adding a
+public or test-only callback; production callers do not materialize that array on the host.
 
 Keep `SamplingPipeline`, `PenaltyInputs`, and their test-accessed helpers package-private and test
 them from the same Java package. They do not appear in generated Javadocs or the published public API;
@@ -226,6 +230,8 @@ O(distinct history), not O(vocabulary), while the logits remain on-device. Repre
 inputs with a package-private immutable `PenaltyInputs` value used by production code, not a
 test-only diagnostic hook. A pure-Java test with a 151,936-token vocabulary and short history asserts
 that its ID/count arrays are distinct-history-sized without allocating a dense vocabulary vector.
+Retain defensive record accessors, but let the same-package sampling hot path use package-private
+raw accessors so each decode step does not clone both compact arrays again.
 
 For sampled mode, hold exactly one current key in the generation scope. Per step, create the
 `[2, 2]` split result in the activation scope. Extract child 0 with
@@ -244,6 +250,10 @@ Implement filtering on sorted logits. Use argsort plus token-ID secondary orderi
 and apply positional/cumulative masks with negative infinity. Scatter the filtered sorted logits into
 a vocabulary-shaped zero destination at the full `sortedTokenIds` permutation; every element is
 overwritten, so the fill value is not part of the result. Do not sort the permutation a second time.
+When top-k, top-p, and min-p are all disabled, use the tempered logits directly: sorting, gathering,
+and scattering a full identity policy is unnecessary O(V log V) work. When filtering is enabled,
+create the loop-invariant reshaped vocabulary-rank tensor once in the generation scope rather than
+once per decode step.
 Call categorical only on that vocabulary-ordered tensor, so fixed-seed behavior matches direct
 Python MLX's categorical index domain rather than a permuted domain.
 
@@ -308,11 +318,12 @@ verification.
 
 Do not change the existing array fixture's meaning. Unlike Phase 6.0b, close the sampling
 differential loop: a native Java test reads the committed Python sampling JSON and compares Java
-stage distributions/selections on the same pinned tuple. The Python runner computes masks in sorted
-order, scatters them back to vocabulary order, and calls `mx.random.categorical` there exactly as
-the Java design does. It must also apply temperature before filtering even though current `mlx_lm`
-orders those stages differently. Keep ordinary Java tests independent of Python execution; only
-committed JSON crosses the boundary.
+vocabulary-ordered post-filter distributions and selections on the same pinned tuple. Retain the
+other intermediate arrays as directly reviewable oracle evidence. The Python runner computes masks
+in sorted order, scatters them back to vocabulary order, and calls `mx.random.categorical` there
+exactly as the Java design does. It must also apply temperature before filtering even though current
+`mlx_lm` orders those stages differently. Keep ordinary Java tests independent of Python execution;
+only committed JSON crosses the boundary.
 
 Add a small native subprocess probe that runs the same seeded request in two fresh JVMs and compares
 canonical token/logprob output. Use committed exact outputs for two deliberately chosen seeds to

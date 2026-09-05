@@ -14,11 +14,13 @@ import se.alipsa.jmlx.memory.MLXScope;
 final class SamplingPipeline implements AutoCloseable {
   private static final int VOCABULARY_AXIS = 2;
 
-  record Selection(int tokenId, Double logProbability) {}
+  record Selection(int tokenId, Double logProbability, MLXArray vocabularyLogits) {}
 
   private final MLXScope generationScope;
   private final GenerationConfig policy;
   private final int vocabularySize;
+  private final boolean filtering;
+  private final MLXArray rankIndices;
   private MLXArray currentKey;
 
   SamplingPipeline(MLXScope generationScope, GenerationConfig policy, int vocabularySize) {
@@ -32,6 +34,13 @@ final class SamplingPipeline implements AutoCloseable {
           "topK " + policy.topK() + " exceeds vocabulary size " + vocabularySize);
     }
     this.vocabularySize = vocabularySize;
+    filtering = policy.topK() != 0 || policy.topP() != 1 || policy.minP() != 0;
+    rankIndices =
+        filtering && (policy.topK() != 0 || policy.topP() == 0)
+            ? MLXShape.reshape(
+                MLX.arange(generationScope, 0, vocabularySize, 1, DType.INT32),
+                new int[] {1, 1, vocabularySize})
+            : null;
     currentKey =
         policy.temperature() > 0
             ? MLXRandom.key(generationScope, policy.seed().orElseThrow())
@@ -49,48 +58,52 @@ final class SamplingPipeline implements AutoCloseable {
       MLXArray selected = MLXOps.argmaxAxis(adjusted, VOCABULARY_AXIS, false);
       MLX.eval(finite, selected);
       requireFinite(finite, decodeStep);
-      return new Selection(selected.toIntArray()[0], policy.logProbabilities() ? 0.0 : null);
+      return new Selection(
+          selected.toIntArray()[0], policy.logProbabilities() ? 0.0 : null, adjusted);
     }
 
     MLXArray temperature = scalar(logits.scope(), policy.temperature());
     MLXArray tempered = MLXOps.divide(adjusted, temperature);
-    MLXArray sortedTokenIds = MLXOps.argsortAxis(MLXOps.negative(tempered), VOCABULARY_AXIS);
-    MLXArray filtered = MLXShape.takeAlongAxis(tempered, sortedTokenIds, VOCABULARY_AXIS);
-    MLXArray negativeInfinity =
-        MLX.full(logits.scope(), new int[] {1}, Float.NEGATIVE_INFINITY, DType.FLOAT32);
-    filtered = applyTopK(filtered, negativeInfinity);
-    filtered = applyTopP(filtered, negativeInfinity);
-    filtered = applyMinP(filtered, negativeInfinity);
-    MLXArray vocabularyOrdered =
-        MLXShape.putAlongAxis(
-            MLX.zeros(logits.scope(), logits.shape(), DType.FLOAT32),
-            sortedTokenIds,
-            filtered,
-            VOCABULARY_AXIS);
+    MLXArray temperedFinite = MLX.astype(MLXOps.all(MLXOps.isFinite(tempered)), DType.INT32);
+    MLXArray vocabularyOrdered = filtering ? applyFilters(tempered) : tempered;
     MLXArray drawKey = advanceKey(logits.scope());
     MLXArray selected = MLXRandom.categorical(vocabularyOrdered, VOCABULARY_AXIS, drawKey);
     MLXArray logNormalizer = MLXOps.logSumExpAxis(vocabularyOrdered, VOCABULARY_AXIS, true);
-    MLXArray hasCandidates = MLX.astype(MLXOps.all(MLXOps.isFinite(logNormalizer)), DType.INT32);
     MLXArray selectedLogProbability =
         policy.logProbabilities()
             ? selectedLogProbability(vocabularyOrdered, selected, logNormalizer)
             : null;
 
     if (selectedLogProbability == null) {
-      MLX.eval(finite, hasCandidates, selected);
+      MLX.eval(finite, temperedFinite, selected);
     } else {
-      MLX.eval(finite, hasCandidates, selected, selectedLogProbability);
+      MLX.eval(finite, temperedFinite, selected, selectedLogProbability);
     }
     requireFinite(finite, decodeStep);
-    requireCandidates(hasCandidates, decodeStep);
+    requireTemperedFinite(temperedFinite, decodeStep);
     int token = selected.toIntArray()[0];
     Double logProbability =
         selectedLogProbability == null ? null : (double) selectedLogProbability.toFloatArray()[0];
-    return new Selection(token, logProbability);
+    return new Selection(token, logProbability, vocabularyOrdered);
+  }
+
+  private MLXArray applyFilters(MLXArray tempered) {
+    MLXArray sortedTokenIds = MLXOps.argsortAxis(MLXOps.negative(tempered), VOCABULARY_AXIS);
+    MLXArray filtered = MLXShape.takeAlongAxis(tempered, sortedTokenIds, VOCABULARY_AXIS);
+    MLXArray negativeInfinity =
+        MLX.full(tempered.scope(), new int[] {1}, Float.NEGATIVE_INFINITY, DType.FLOAT32);
+    filtered = applyTopK(filtered, negativeInfinity);
+    filtered = applyTopP(filtered, negativeInfinity);
+    filtered = applyMinP(filtered, negativeInfinity);
+    return MLXShape.putAlongAxis(
+        MLX.zeros(tempered.scope(), tempered.shape(), DType.FLOAT32),
+        sortedTokenIds,
+        filtered,
+        VOCABULARY_AXIS);
   }
 
   private MLXArray applyPenalties(MLXArray logits, PenaltyInputs inputs) {
-    int[] ids = inputs.tokenIds();
+    int[] ids = inputs.rawTokenIds();
     if (ids.length == 0
         || (policy.repetitionPenalty() == 1
             && policy.frequencyPenalty() == 0
@@ -117,7 +130,7 @@ final class SamplingPipeline implements AutoCloseable {
               MLXOps.multiply(adjusted, penalty));
     }
     if (policy.frequencyPenalty() != 0) {
-      MLXArray counts = MLX.array(logits.scope(), inputs.counts(), indexShape);
+      MLXArray counts = MLX.array(logits.scope(), inputs.rawCounts(), indexShape);
       adjusted =
           MLXOps.subtract(
               adjusted, MLXOps.multiply(counts, scalar(logits.scope(), policy.frequencyPenalty())));
@@ -132,12 +145,9 @@ final class SamplingPipeline implements AutoCloseable {
     if (policy.topK() == 0) {
       return sorted;
     }
-    MLXArray ranks =
-        MLXShape.reshape(
-            MLX.arange(sorted.scope(), 0, vocabularySize, 1, DType.INT32),
-            new int[] {1, 1, vocabularySize});
     MLXArray keep =
-        MLXOps.less(ranks, MLX.full(sorted.scope(), new int[] {1}, policy.topK(), DType.INT32));
+        MLXOps.less(
+            rankIndices, MLX.full(sorted.scope(), new int[] {1}, policy.topK(), DType.INT32));
     return MLXOps.where(keep, sorted, negativeInfinity);
   }
 
@@ -146,11 +156,8 @@ final class SamplingPipeline implements AutoCloseable {
       return sorted;
     }
     if (policy.topP() == 0) {
-      MLXArray ranks =
-          MLXShape.reshape(
-              MLX.arange(sorted.scope(), 0, vocabularySize, 1, DType.INT32),
-              new int[] {1, 1, vocabularySize});
-      MLXArray first = MLXOps.less(ranks, MLX.full(sorted.scope(), new int[] {1}, 1, DType.INT32));
+      MLXArray first =
+          MLXOps.less(rankIndices, MLX.full(sorted.scope(), new int[] {1}, 1, DType.INT32));
       return MLXOps.where(first, sorted, negativeInfinity);
     }
     MLXArray probabilities = MLXOps.softmaxAxis(sorted, VOCABULARY_AXIS, true);
@@ -213,16 +220,12 @@ final class SamplingPipeline implements AutoCloseable {
     }
   }
 
-  private void requireCandidates(MLXArray hasCandidates, int decodeStep) {
-    if (hasCandidates.toIntArray()[0] == 0) {
-      String stage =
-          policy.minP() > 0
-              ? "min-p filtering"
-              : policy.topP() < 1
-                  ? "top-p filtering"
-                  : policy.topK() > 0 ? "top-k filtering" : "categorical distribution";
+  private static void requireTemperedFinite(MLXArray finite, int decodeStep) {
+    if (finite.toIntArray()[0] == 0) {
       throw new IllegalStateException(
-          "sampling stage " + stage + " produced no candidates at decode step " + decodeStep);
+          "sampling stage temperature scaling failed at decode step "
+              + decodeStep
+              + ": tempered logits must be finite");
     }
   }
 

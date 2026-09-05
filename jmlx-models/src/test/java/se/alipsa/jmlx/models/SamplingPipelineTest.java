@@ -45,7 +45,8 @@ class SamplingPipelineTest {
     SamplingPipeline.Selection first = select(policy);
     SamplingPipeline.Selection second = select(policy);
 
-    assertEquals(first, second);
+    assertEquals(first.tokenId(), second.tokenId());
+    assertEquals(first.logProbability(), second.logProbability());
     assertTrue(first.tokenId() >= 0 && first.tokenId() < 4);
     assertTrue(Double.isFinite(first.logProbability()));
     assertTrue(first.logProbability() <= 0);
@@ -60,18 +61,40 @@ class SamplingPipelineTest {
       MLXArray logits =
           MLX.array(activation, new float[] {1, Float.NaN, 2, 0}, new int[] {1, 1, 4});
 
-      IllegalStateException failure =
+      RuntimeException failure =
           assertThrows(
-              IllegalStateException.class,
+              RuntimeException.class,
               () -> pipeline.select(logits, new PenaltyInputs(new int[0], new float[0]), 7));
+      IllegalStateException policyFailure = assertInstanceOf(IllegalStateException.class, failure);
 
       assertTrue(
-          failure
+          policyFailure
               .getMessage()
               .contains(
                   "sampling stage finite-logit validation failed at decode step 7: logits must be"
                       + " finite"));
-      assertInstanceOf(IllegalStateException.class, failure);
+    }
+  }
+
+  @Test
+  void attributesTemperatureOverflowToScaling() {
+    GenerationConfig policy =
+        new GenerationConfig(
+            1, OptionalLong.of(42), Float.MIN_VALUE, 0, 1, 0, 1, 0, 0, Set.of(), Set.of(), false);
+    try (MLXScope generation = new MLXScope();
+        SamplingPipeline pipeline = new SamplingPipeline(generation, policy, 2);
+        MLXScope activation = generation.newChild()) {
+      MLXArray logits = MLX.array(activation, new float[] {1, 0}, new int[] {1, 1, 2});
+
+      IllegalStateException failure =
+          assertThrows(
+              IllegalStateException.class,
+              () -> pipeline.select(logits, new PenaltyInputs(new int[0], new float[0]), 3));
+
+      assertEquals(
+          "sampling stage temperature scaling failed at decode step 3: tempered logits must be"
+              + " finite",
+          failure.getMessage());
     }
   }
 

@@ -57,6 +57,20 @@ should have changed — this is the bindings-drift check.
 ./gradlew verifyMlxApiCallSites
 ```
 
+The Python MLX oracle is an explicit macOS/arm64-only fixture tool. It is not invoked by ordinary
+Java tests. Install its CPython 3.12 environment from the hash-locked frontend/backend wheels, then
+verify the recorded environment and canonical fixtures:
+
+```sh
+./tools/mlx-oracle/install.sh
+./gradlew verifyMlxOracle verifyMlxOracleFixtures
+```
+
+Only `./gradlew generateMlxOracleFixtures` rewrites the committed oracle JSON. Review that diff and
+the recorded provenance whenever native pins change. Tier-A inputs and Java goldens are documented
+in `req/phase6-tier-a-fixtures.md`; `req/phase6-tier-b-artifacts.md` is the opt-in real-artifact
+manifest.
+
 `scripts/checkDependencies.zsh` is a read-only report of available updates (Gradle plugins/deps, the
 wrapper, the pinned `mlx-metal` version, and — since mlx-c versions independently of MLX — the mlx-c
 tag that pairs with a newer wheel). `scripts/updateMlx.zsh <mlx-c-commit-sha>` repins `MLX_C_COMMIT` in

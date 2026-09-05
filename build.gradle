@@ -7,6 +7,7 @@
  */
 
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
+import se.alipsa.jmlx.buildsrc.MlxPins
 
 plugins {
     id 'base'
@@ -67,6 +68,72 @@ tasks.register('verifyMlxApiInventory') {
 
 tasks.named('verifyMlxApiInventory') {
     mustRunAfter tasks.named('generateMlxApiInventory')
+}
+
+def mlxPins = providers.provider { MlxPins.read(projectDir.toPath()) }
+def mlxOracleDir = layout.projectDirectory.dir('tools/mlx-oracle')
+def mlxOraclePython = mlxOracleDir.file('.venv/bin/python').asFile
+def stagedNativePins = layout.projectDirectory.file('native/install/lib/native-pin.properties')
+def configureMlxOracle = { Exec task ->
+    task.inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
+    task.inputs.file(mlxOracleDir.file('requirements.lock'))
+    task.inputs.file(mlxOracleDir.file('provenance.json'))
+    task.inputs.property('mlxMetalVersion', mlxPins.map { it.required('MLX_METAL_VERSION') })
+    task.inputs.property('mlxMetalWheelUrl', mlxPins.map { it.required('MLX_METAL_WHEEL_URL') })
+    task.inputs.property('mlxMetalWheelSha256', mlxPins.map { it.required('MLX_METAL_WHEEL_SHA256') })
+    task.inputs.property('mlxCCommit', mlxPins.map { it.required('MLX_C_COMMIT') })
+    task.executable = mlxOraclePython
+    task.doFirst {
+        if (!mlxOraclePython.isFile()) {
+            throw new GradleException(
+                    'MLX oracle environment is missing; run ./tools/mlx-oracle/install.sh on macOS arm64')
+        }
+    }
+}
+
+tasks.register('verifyMlxOracle', Exec) {
+    group = 'verification'
+    description = 'Verifies the pinned Python MLX oracle environment and provenance.'
+    configureMlxOracle(delegate)
+    inputs.file(mlxOracleDir.file('verify_environment.py'))
+    inputs.file(stagedNativePins).optional()
+    args mlxOracleDir.file('verify_environment.py').asFile,
+            '--lock', mlxOracleDir.file('requirements.lock').asFile,
+            '--provenance', mlxOracleDir.file('provenance.json').asFile,
+            '--staged-pins', stagedNativePins.asFile
+    doFirst {
+        def pins = mlxPins.get()
+        args '--mlx-version', pins.required('MLX_METAL_VERSION'),
+                '--mlx-metal-url', pins.required('MLX_METAL_WHEEL_URL'),
+                '--mlx-metal-sha256', pins.required('MLX_METAL_WHEEL_SHA256'),
+                '--mlx-c-commit', pins.required('MLX_C_COMMIT')
+    }
+}
+
+tasks.register('generateMlxOracleFixtures', Exec) {
+    group = 'documentation'
+    description = 'Regenerates committed canonical JSON fixtures with the pinned Python MLX oracle.'
+    configureMlxOracle(delegate)
+    dependsOn tasks.named('verifyMlxOracle')
+    inputs.file(mlxOracleDir.file('runner.py'))
+    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
+    outputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
+    args mlxOracleDir.file('runner.py').asFile,
+            '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--output', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
+}
+
+tasks.register('verifyMlxOracleFixtures', Exec) {
+    group = 'verification'
+    description = 'Verifies committed canonical JSON fixtures with the pinned Python MLX oracle.'
+    configureMlxOracle(delegate)
+    dependsOn tasks.named('verifyMlxOracle')
+    inputs.file(mlxOracleDir.file('runner.py'))
+    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json'))
+    inputs.file(mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json'))
+    args mlxOracleDir.file('runner.py').asFile,
+            '--input', mlxOracleDir.file('fixtures/phase6-tier-a-array.input.json').asFile,
+            '--verify', mlxOracleDir.file('fixtures/phase6-tier-a-array.expected.json').asFile
 }
 
 // This source-only guard runs under the project's Java toolchain, so parsing coverage cannot

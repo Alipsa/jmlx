@@ -135,6 +135,10 @@ records from the inventory.
 
 ### 4. Pin-derived Python oracle
 
+**Implemented:** CPython 3.12 on macOS 26 arm64, with `mlx`/`mlx-metal` 0.31.2 locked by wheel hash.
+The canonical fixture records evaluated values, shapes, and dtypes; bootstrap-derived values reach
+the verifier through the shared `MlxPins` parser.
+
 Create `tools/mlx-oracle/` with a JSON-in/canonical-JSON-out reference runner. It is used to
 explicitly generate and verify named fixtures, never invoked by ordinary Java unit tests.
 
@@ -150,6 +154,9 @@ Fail clearly on pin/version mismatch and report oracle infrastructure failure ra
 Java incorrectness.
 
 ### 5. Tier-A fixtures and CI
+
+**Implemented fixture set:** see `req/phase6-tier-a-fixtures.md`; the real-artifact intake template
+is `req/phase6-tier-b-artifacts.md`.
 
 Commit small documented fixture specifications/seeds, prompt and token data, expected shapes/dtypes,
 and oracle JSON. Generate tiny safetensors during tests using the established

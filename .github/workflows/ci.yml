@@ -83,15 +83,23 @@ jobs:
           java-version: '25'
           architecture: aarch64
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Bootstrap pinned MLX runtime
         shell: bash
         run: ./scripts/bootstrap-native.sh
 
+      - name: Install hash-locked Python MLX oracle
+        shell: bash
+        run: ./tools/mlx-oracle/install.sh
+
       - name: Run root verification
-        # Retained for native-job-only root checks, such as generated-header coverage.
-        run: ./gradlew :check
+        # Runs the repository-wide source guards after native bootstrap and oracle setup.
+        run: ./gradlew :check verifyMlxOracle verifyMlxOracleFixtures
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use
       # Gradle's build cache here: a cached test result would not demonstrate

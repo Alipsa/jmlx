@@ -37,5 +37,8 @@ build
 # Native toolchain artifacts (built/staged by scripts/bootstrap-native.sh)
 /native/
 
+# Hash-locked Python MLX reference environment (created explicitly on Apple Silicon)
+/tools/mlx-oracle/.venv/
+
 # Subagent-driven-development scratch workspace
 /.superpowers/

@@ -12,6 +12,10 @@ runs on every relevant pull request; no test downloads a model or tokenizer.
 | Qwen2 tiny decoder | generated zero-valued 1-layer GQA safetensors; prompt `[1]`; two decode steps | common and legacy token IDs `[1,0,0]` | `QwenModelTest.loadsCheckpointAndGeneratesWithGroupedQueryCache` |
 | Qwen-style byte BPE | text `low the`, no special tokens | IDs `[13,16]`; decoded text `low the` | `HfTokenizerTest.qwenStyleEncodeDecodeRoundTrips` |
 | Llama-style byte BPE | text `low the`, special tokens enabled | IDs `[128000,13,16]`; decoded text `low the` when special tokens are skipped | `HfTokenizerTest` Llama 3 golden tests |
+| Hugging Face tokenizer component oracle | committed WordPiece/Bert, Metaspace-BPE, Metaspace-Unigram, and added-token JSON; ASCII, accented, CJK, supplementary, unknown/byte-fallback, truncation/padding inputs | IDs, decoded text, UTF-8 byte offsets, type IDs, attention mask, and special-token mask | `verifyTokenizerOracleFixtures`; `TokenizerOracleTest.componentFamiliesMatchPinnedOracle` |
+| Tokenizer directory/chat contracts | local tokenizer config and Jinja templates; reserved context and template-only IDs | metadata/template precedence, rendered text, collision failures, incremental split-UTF-8 decode | `Phase62TokenizerContractTest` |
+| Tokenizer-backed tiny decoder | generated tiny Llama checkpoint and local tokenizer; normal and pre-cancelled requests | generated IDs, event deltas/flush, result text, contextual decode abort | `LlamaModelTest.tokenizerBackedRequestsStreamTextAndFlushPreCancelledRequests`; `LlamaModelTest.tokenizerDecodeFailureIsAContextualGenerationAbort` |
+| Tokenizer-backed Qwen2 tiny decoder | generated zero-valued 1-layer GQA safetensors and local tokenizer | generated IDs `[0,0]`; generated text `aa` | `QwenModelTest.loadsCheckpointAndGeneratesWithGroupedQueryCache` |
 
 `verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces every committed
 oracle output. The original array row remains an environment self-check; Phase 6.1 closes the Java
@@ -24,3 +28,10 @@ is committed. `LlamaModelTest.closesGenerationScopesOnEveryTerminalPath` covers 
 listener failure, cancellation, EOS, stop-token, and max-token paths. The Python oracle's input and
 canonical expected output live under `tools/mlx-oracle/fixtures/`; its exact interpreter/package
 provenance is `tools/mlx-oracle/provenance.json`.
+
+The tokenizer oracle is the pinned Python binding over Hugging Face's Rust implementation. It runs
+offline against committed synthetic files under `tools/tokenizer-oracle/fixtures`; exact package,
+platform, and source-file hashes are recorded in `tools/tokenizer-oracle/provenance.json`. Its raw
+Python offsets are Unicode-code-point indices and the runner converts them to the public jmlx
+half-open UTF-8 byte-offset contract before comparison. These fixtures prove tokenizer components,
+not additional model architectures or unrestricted compatibility with public artifacts.

@@ -1,0 +1,25 @@
+{
+  "fixtureSources": {
+    "added-token.tokenizer.json": "2347b11421fc85d43f759dcafa1a0390028ac60b191a2b8e48074fa225c08ba7",
+    "metaspace-bpe.tokenizer.json": "df49965a99eca472c5225b5ed669c26bcdde6208d4a8862623423125dc6c7940",
+    "phase6-2-components.input.json": "1e423e5137673695e4e4881f7605d5f5de826193639706c116481b199728e784",
+    "unigram.tokenizer.json": "5f530ac97373853dc4591f4fbb5420cb6d3152c148461db82419e7ae54aad5f2",
+    "wordpiece.tokenizer.json": "59d7c5bcbc59fe6df4caae77f74fae1e896c6094a41c64ec79ff7af406393111"
+  },
+  "networkPolicy": "Fixtures load committed local tokenizer files only; no Hub calls are permitted.",
+  "platforms": [
+    {
+      "machine": "x86_64",
+      "system": "Linux"
+    },
+    {
+      "machine": "arm64",
+      "system": "Darwin"
+    }
+  ],
+  "python": [
+    3,
+    12
+  ],
+  "tokenizers": "0.23.2"
+}

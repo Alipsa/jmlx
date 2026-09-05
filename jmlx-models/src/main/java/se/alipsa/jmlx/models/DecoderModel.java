@@ -21,6 +21,8 @@ import se.alipsa.jmlx.nn.Module;
 import se.alipsa.jmlx.nn.RMSNorm;
 import se.alipsa.jmlx.nn.SwiGLU;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
+import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
+import se.alipsa.jmlx.tokenizer.TokenizerException;
 
 /** Inference-only pre-norm decoder shared by Llama and Qwen2 checkpoints. */
 public abstract class DecoderModel extends Module implements TextGenerationModel {
@@ -170,11 +172,22 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     GenerationConfig policy = request.config();
     int[] prompt = request.promptTokenIds();
     validateTokenIds(prompt, policy, config.vocabSize());
+    HfTokenizer tokenizer = request.tokenizer();
+    if (tokenizer != null && tokenizer.vocabSize() > config.vocabSize()) {
+      throw new IllegalArgumentException(
+          "tokenizer vocabulary size "
+              + tokenizer.vocabSize()
+              + " exceeds checkpoint vocabulary size "
+              + config.vocabSize());
+    }
     List<Integer> generated = new ArrayList<>();
     List<Double> logProbabilities = new ArrayList<>();
+    StringBuilder generatedText = tokenizer == null ? null : new StringBuilder();
+    IncrementalTokenDecoder decoder = null;
     LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(prompt);
     FinishReason reason = FinishReason.MAX_TOKENS;
     if (!request.cancellationToken().isCancelled()) {
+      decoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
       try (MLXScope generation = scope().newChild();
           SamplingPipeline sampler = new SamplingPipeline(generation, policy, config.vocabSize())) {
         List<KVCache> caches = new ArrayList<>();
@@ -212,11 +225,18 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             if (selection.logProbability() != null) {
               logProbabilities.add(selection.logProbability());
             }
+            String textDelta = null;
+            if (decoder != null) {
+              try {
+                textDelta = decoder.append(next);
+                generatedText.append(textDelta);
+              } catch (TokenizerException e) {
+                throw new GenerationAbortedException(
+                    toList(prompt), generated, "output decoder", next, e);
+              }
+            }
             try {
-              listener.accept(
-                  selection.logProbability() == null
-                      ? GenerationEvent.token(next)
-                      : GenerationEvent.token(next, selection.logProbability()));
+              listener.accept(tokenEvent(next, textDelta, selection.logProbability()));
             } catch (RuntimeException e) {
               throw new GenerationAbortedException(toList(prompt), generated, e);
             }
@@ -231,14 +251,46 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     } else {
       reason = FinishReason.CANCELLED;
     }
+    String terminalDelta = null;
+    if (tokenizer != null) {
+      terminalDelta = "";
+      if (decoder != null) {
+        try {
+          terminalDelta = decoder.finish();
+        } catch (TokenizerException e) {
+          throw new GenerationAbortedException(
+              toList(prompt), generated, "output decoder finish", null, e);
+        }
+      }
+      generatedText.append(terminalDelta);
+    }
     GenerationResult result =
-        new GenerationResult(toList(prompt), generated, reason, logProbabilities);
+        new GenerationResult(
+            toList(prompt),
+            generated,
+            reason,
+            logProbabilities,
+            generatedText == null ? null : generatedText.toString());
     try {
-      listener.accept(GenerationEvent.finished(reason));
+      listener.accept(
+          terminalDelta == null
+              ? GenerationEvent.finished(reason)
+              : GenerationEvent.finished(reason, terminalDelta));
     } catch (RuntimeException e) {
       LOGGER.log(System.Logger.Level.WARNING, "generation terminal listener failed", e);
     }
     return result;
+  }
+
+  private static GenerationEvent tokenEvent(int tokenId, String textDelta, Double logProbability) {
+    if (textDelta == null) {
+      return logProbability == null
+          ? GenerationEvent.token(tokenId)
+          : GenerationEvent.token(tokenId, logProbability);
+    }
+    return logProbability == null
+        ? GenerationEvent.token(tokenId, textDelta)
+        : GenerationEvent.token(tokenId, textDelta, logProbability);
   }
 
   private static List<Integer> toList(int[] ids) {
@@ -290,10 +342,14 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       Set<Integer> eosTokenIds) {
     Objects.requireNonNull(tokenizer, "tokenizer");
     Objects.requireNonNull(prompt, "prompt");
-    List<Integer> promptIds = tokenizer.encode(prompt, addSpecialTokens);
-    int[] input = promptIds.stream().mapToInt(Integer::intValue).toArray();
-    List<Integer> allIds = generate(input, maxNewTokens, eosTokenIds);
-    return tokenizer.decode(allIds.subList(promptIds.size(), allIds.size()), true);
+    GenerationRequest request =
+        GenerationRequest.text(
+            tokenizer,
+            prompt,
+            addSpecialTokens ? PromptSpecialTokens.ADD : PromptSpecialTokens.OMIT,
+            GenerationConfig.greedyDefaults(maxNewTokens, eosTokenIds),
+            CancellationToken.NONE);
+    return generate(request, ignored -> {}).generatedText();
   }
 
   private static MLXArray tensor(Map<String, MLXArray> tensors, String name) {

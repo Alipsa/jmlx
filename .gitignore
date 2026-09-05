@@ -39,6 +39,7 @@ build
 
 # Hash-locked Python MLX reference environment (created explicitly on Apple Silicon)
 /tools/mlx-oracle/.venv/
+/tools/tokenizer-oracle/.venv/
 
 # Python bytecode
 __pycache__/

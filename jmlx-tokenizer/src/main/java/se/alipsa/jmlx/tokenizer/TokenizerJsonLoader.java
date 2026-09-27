@@ -50,10 +50,12 @@ public final class TokenizerJsonLoader {
     try {
       JsonNode root = MAPPER.readTree(Files.newInputStream(path));
       JsonNode normalizer = nullableComponent(root, "normalizer");
-      JsonNode preTokenizer = requiredComponent(root, "pre_tokenizer");
+      JsonNode preTokenizer = nullableComponent(root, "pre_tokenizer");
       JsonNode decoder = requiredComponent(root, "decoder");
       validateNormalizer(normalizer, "normalizer");
-      validatePreTokenizer(preTokenizer, "pre_tokenizer");
+      if (preTokenizer != null) {
+        validatePreTokenizer(preTokenizer, "pre_tokenizer");
+      }
       validateDecoder(decoder, "decoder");
       TokenizerDefinition.Model model = parseFlexibleModel(root.path("model"));
       List<AddedToken> addedTokens = parseFlexibleAddedTokens(root.path("added_tokens"));
@@ -64,7 +66,8 @@ public final class TokenizerJsonLoader {
           model,
           decoder,
           addedTokens,
-          parseConfiguredDefaults(root, configuredVocabulary(model.vocab(), addedTokens)));
+          parseConfiguredDefaults(root, configuredVocabulary(model.vocab(), addedTokens)),
+          trimByteLevelOffsets(root.path("post_processor")));
     } catch (IOException | JacksonException e) {
       throw new TokenizerException("TokenizerJsonLoader: failed to parse " + path, e);
     }
@@ -462,7 +465,8 @@ public final class TokenizerJsonLoader {
       return;
     }
     if ("ByteLevel".equals(type)) {
-      result.add(new ByteLevelStep(optionalBoolean(node, "trim_offsets", true, path)));
+      optionalBoolean(node, "trim_offsets", true, path);
+      result.add(new ByteLevelStep());
       return;
     }
     if ("TemplateProcessing".equals(type)) {
@@ -470,14 +474,38 @@ public final class TokenizerJsonLoader {
       return;
     }
     if ("BertProcessing".equals(type)) {
+      ResolvedToken separator = parseTokenPair(node.path("sep"), path + ".sep");
+      ResolvedToken classification = parseTokenPair(node.path("cls"), path + ".cls");
       result.add(
-          new BertProcessingStep(
-              parseTokenPair(node.path("sep"), path + ".sep"),
-              parseTokenPair(node.path("cls"), path + ".cls")));
+          new TemplateProcessingStep(
+              List.of(new SpecialTokenItem("cls"), new SequenceItem(), new SpecialTokenItem("sep")),
+              Map.of(
+                  "cls",
+                      new SpecialTokenInfo(
+                          "cls", List.of(classification.id()), List.of(classification.text())),
+                  "sep",
+                      new SpecialTokenInfo(
+                          "sep", List.of(separator.id()), List.of(separator.text())))));
       return;
     }
     throw new TokenizerException(
         "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
+  }
+
+  private static boolean trimByteLevelOffsets(JsonNode node) {
+    if (node.isMissingNode() || node.isNull()) {
+      return false;
+    }
+    if ("Sequence".equals(node.path("type").asString())) {
+      for (JsonNode child : node.path("processors")) {
+        if (trimByteLevelOffsets(child)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return "ByteLevel".equals(node.path("type").asString())
+        && node.path("trim_offsets").asBoolean(true);
   }
 
   private static ResolvedToken parseTokenPair(JsonNode node, String path) {

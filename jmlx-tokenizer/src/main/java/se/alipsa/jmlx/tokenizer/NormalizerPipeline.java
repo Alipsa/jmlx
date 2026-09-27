@@ -169,7 +169,11 @@ final class NormalizerPipeline {
     List<AlignedText.Unit> units = new ArrayList<>();
     for (AlignedText.Unit unit : input.units()) {
       int cp = unit.value().codePointAt(0);
-      if (clean && (cp == 0 || cp == 0xfffd || Character.isISOControl(cp))) {
+      if (clean
+          && (cp == 0
+              || cp == 0xfffd
+              || Character.isISOControl(cp)
+              || Character.getType(cp) == Character.FORMAT)) {
         if (Character.isWhitespace(cp)) {
           units.add(new AlignedText.Unit(" ", unit.startByte(), unit.endByte()));
         }

@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "truncation": null,
+  "padding": null,
+  "added_tokens": [],
+  "normalizer": null,
+  "pre_tokenizer": null,
+  "post_processor": null,
+  "decoder": {
+    "type": "Fuse"
+  },
+  "model": {
+    "type": "Unigram",
+    "unk_id": 0,
+    "byte_fallback": false,
+    "vocab": [
+      [
+        "<unk>",
+        0.0
+      ],
+      [
+        "a",
+        -1.0
+      ],
+      [
+        "b",
+        -1.0
+      ],
+      [
+        "c",
+        -1.0
+      ],
+      [
+        "ab",
+        -0.2
+      ],
+      [
+        "abc",
+        -0.1
+      ]
+    ]
+  }
+}

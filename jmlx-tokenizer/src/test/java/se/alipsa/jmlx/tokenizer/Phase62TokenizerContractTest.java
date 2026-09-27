@@ -53,6 +53,53 @@ class Phase62TokenizerContractTest {
   }
 
   @Test
+  void directorySidesControlConfiguredDefaultsAndShortPaddingIsNoOp() throws Exception {
+    ObjectNode root = (ObjectNode) MAPPER.readTree(wordPieceFixture().toFile());
+    root.set(
+        "truncation",
+        MAPPER.readTree(
+            """
+            {"direction":"Right","max_length":3,"strategy":"LongestFirst","stride":0}
+            """));
+    root.set(
+        "padding",
+        MAPPER.readTree(
+            """
+            {"strategy":{"Fixed":5},"direction":"Right",
+             "pad_to_multiple_of":null,"pad_id":0,"pad_type_id":0,"pad_token":"[PAD]"}
+            """));
+    MAPPER.writeValue(temporaryDirectory.resolve("tokenizer.json").toFile(), root);
+    Files.writeString(
+        temporaryDirectory.resolve("tokenizer_config.json"),
+        """
+        {"padding_side":"left","truncation_side":"left"}
+        """);
+    HfTokenizer directory = HfTokenizer.fromDirectory(temporaryDirectory);
+    assertEquals(
+        List.of(0, 0, 6, 7, 4), directory.encodeWithDefaults("hello worlds! hello", false).ids());
+    assertEquals(
+        List.of(4, 5, 6, 0, 0),
+        HfTokenizer.fromFile(temporaryDirectory.resolve("tokenizer.json"))
+            .encodeWithDefaults("hello worlds! hello", false)
+            .ids());
+
+    root.set("truncation", MAPPER.readTree("null"));
+    root.set(
+        "padding",
+        MAPPER.readTree(
+            """
+            {"strategy":{"Fixed":3},"direction":"Right",
+             "pad_to_multiple_of":null,"pad_id":0,"pad_type_id":0,"pad_token":"[PAD]"}
+            """));
+    MAPPER.writeValue(temporaryDirectory.resolve("tokenizer.json").toFile(), root);
+    assertEquals(
+        List.of(4, 5, 6, 7, 4),
+        HfTokenizer.fromDirectory(temporaryDirectory)
+            .encodeWithDefaults("hello worlds! hello", false)
+            .ids());
+  }
+
+  @Test
   void directoryLoadsMetadataAndReservedChatContext() throws Exception {
     Files.copy(wordPieceFixture(), temporaryDirectory.resolve("tokenizer.json"));
     Files.writeString(

@@ -33,7 +33,12 @@ final class TokenizerDirectoryLoader {
     Map<String, Template> templates = loadTemplates(directory, config);
     TokenizerMetadata metadata =
         metadata(config, templates.keySet().stream().sorted().toList(), runtime);
-    return new Bundle(definition, metadata, templates);
+    return new Bundle(
+        runtime,
+        metadata,
+        templates,
+        config.path("padding_side").isString(),
+        config.path("truncation_side").isString());
   }
 
   private static JsonNode readOptionalJson(Path path) {
@@ -70,6 +75,7 @@ final class TokenizerDirectoryLoader {
     }
     Path rootTemplate = directory.resolve("chat_template.jinja");
     if (Files.isRegularFile(rootTemplate)) {
+      // Hugging Face gives the standalone template priority over the config's default.
       sources.put("default", readTemplate(rootTemplate));
     }
     Path additional = directory.resolve("additional_chat_templates");
@@ -188,7 +194,9 @@ final class TokenizerDirectoryLoader {
   }
 
   record Bundle(
-      TokenizerDefinition definition,
+      TokenizerRuntime runtime,
       TokenizerMetadata metadata,
-      Map<String, Template> templates) {}
+      Map<String, Template> templates,
+      boolean hasPaddingSide,
+      boolean hasTruncationSide) {}
 }

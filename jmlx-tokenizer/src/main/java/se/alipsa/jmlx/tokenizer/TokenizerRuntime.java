@@ -114,7 +114,8 @@ final class TokenizerRuntime {
 
   private TokenPiece added(AddedTokenMatcher.Segment segment) {
     AddedToken token = segment.token();
-    return new TokenPiece(token.content(), segment.text().offset(), token.id(), 0, token.special());
+    return new TokenPiece(
+        segment.text().text(), segment.text().offset(), token.id(), 0, token.special());
   }
 
   String decode(List<Integer> ids, boolean skipSpecialTokens) {
@@ -145,15 +146,10 @@ final class TokenizerRuntime {
     for (PostProcessorStep step : definition.postProcessor()) {
       if (step instanceof TemplateProcessingStep template) {
         result = applyTemplate(template, result, addSpecialTokens);
-      } else if (step instanceof BertProcessingStep bert && addSpecialTokens) {
-        List<TokenPiece> processed = new ArrayList<>();
-        processed.add(special(bert.classification()));
-        processed.addAll(result);
-        processed.add(special(bert.separator()));
-        result = processed;
-      } else if (step instanceof ByteLevelStep byteLevel && byteLevel.trimOffsets()) {
-        result = trimSyntheticSpaces(result);
       }
+    }
+    if (definition.trimByteLevelOffsets()) {
+      result = trimSyntheticSpaces(result);
     }
     return result;
   }
@@ -180,18 +176,26 @@ final class TokenizerRuntime {
     return result;
   }
 
-  private static TokenPiece special(ResolvedToken token) {
-    return new TokenPiece(token.text(), TokenOffset.NONE, token.id(), 0, true);
-  }
-
   private static List<TokenPiece> trimSyntheticSpaces(List<TokenPiece> input) {
     List<TokenPiece> result = new ArrayList<>(input.size());
+    int contentIndex = 0;
     for (TokenPiece piece : input) {
+      int start = piece.offset().startByte();
+      int end = piece.offset().endByte();
+      if (!piece.special() && contentIndex++ > 0 && start < end) {
+        int spaces = 0;
+        while (spaces < piece.text().length() && piece.text().charAt(spaces) == 'Ġ') {
+          spaces++;
+        }
+        start = Math.min(end, start + spaces);
+      }
       result.add(
-          piece.offset().startByte() == piece.offset().endByte()
-              ? new TokenPiece(
-                  piece.text(), TokenOffset.NONE, piece.id(), piece.typeId(), piece.special())
-              : piece);
+          new TokenPiece(
+              piece.text(),
+              new TokenOffset(start, end),
+              piece.id(),
+              piece.typeId(),
+              piece.special()));
     }
     return result;
   }
@@ -207,9 +211,8 @@ final class TokenizerRuntime {
   }
 
   private List<TokenPiece> pad(List<TokenPiece> input, Padding padding) {
-    if (input.size() > padding.length()) {
-      throw new TokenizerException(
-          "TokenizerRuntime: encoded sequence exceeds fixed padding length " + padding.length());
+    if (input.size() >= padding.length()) {
+      return input;
     }
     int count = padding.length() - input.size();
     TokenPiece pad =
@@ -245,6 +248,7 @@ final class TokenizerRuntime {
     List<Integer> attention = new ArrayList<>(pieces.size());
     List<Integer> special = new ArrayList<>(pieces.size());
     List<TokenOffset> offsets = new ArrayList<>(pieces.size());
+    List<String> tokens = new ArrayList<>(pieces.size());
     for (TokenPiece piece : pieces) {
       int id = piece.id() == null ? vocabulary.idOf(piece.text()) : piece.id();
       ids.add(id);
@@ -252,8 +256,9 @@ final class TokenizerRuntime {
       attention.add(piece.padding() ? 0 : 1);
       special.add(piece.special() ? 1 : 0);
       offsets.add(piece.offset());
+      tokens.add(piece.text());
     }
-    return new TokenizerEncoding(ids, types, attention, special, offsets);
+    return new TokenizerEncoding(ids, types, attention, special, offsets, tokens);
   }
 
   private static List<AddedToken> collectTemplateTokens(List<PostProcessorStep> steps) {
@@ -265,9 +270,6 @@ final class TokenizerRuntime {
             result.add(new AddedToken(info.ids().get(index), info.tokens().get(index), true));
           }
         }
-      } else if (step instanceof BertProcessingStep bert) {
-        result.add(new AddedToken(bert.separator().id(), bert.separator().text(), true));
-        result.add(new AddedToken(bert.classification().id(), bert.classification().text(), true));
       }
     }
     return result;

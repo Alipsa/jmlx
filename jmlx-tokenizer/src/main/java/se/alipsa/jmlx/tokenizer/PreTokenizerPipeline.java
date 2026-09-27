@@ -230,6 +230,8 @@ final class PreTokenizerPipeline {
           List<AlignedText.Unit> merged = new ArrayList<>(previous.units());
           merged.addAll(slice(input, matcher.start(), matcher.end()).units());
           result.add(new AlignedText(merged));
+        } else if ("MergedWithPrevious".equals(behavior)) {
+          result.add(slice(input, matcher.start(), matcher.end()));
         } else {
           throw new TokenizerException(
               "PreTokenizerPipeline: unsupported Split.behavior '" + behavior + "'");

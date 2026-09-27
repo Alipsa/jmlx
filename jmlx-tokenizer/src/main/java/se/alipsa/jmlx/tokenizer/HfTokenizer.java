@@ -29,20 +29,26 @@ public final class HfTokenizer {
   private final TokenizerRuntime runtime;
   private final TokenizerMetadata metadata;
   private final Map<String, Template> chatTemplates;
+  private final boolean hasPaddingSide;
+  private final boolean hasTruncationSide;
 
   private HfTokenizer(TokenizerDefinition definition) {
-    this(definition, TokenizerMetadata.empty(), Map.of());
+    this(new TokenizerRuntime(definition), TokenizerMetadata.empty(), Map.of(), false, false);
   }
 
   private HfTokenizer(
-      TokenizerDefinition definition,
+      TokenizerRuntime runtime,
       TokenizerMetadata metadata,
-      Map<String, Template> chatTemplates) {
-    this.runtime = new TokenizerRuntime(definition);
+      Map<String, Template> chatTemplates,
+      boolean hasPaddingSide,
+      boolean hasTruncationSide) {
+    this.runtime = runtime;
     this.vocabulary = runtime.vocabulary();
     this.baseVocabularyMaxKnownId = runtime.vocabSize() - 1;
     this.metadata = Objects.requireNonNull(metadata, "metadata");
     this.chatTemplates = Map.copyOf(chatTemplates);
+    this.hasPaddingSide = hasPaddingSide;
+    this.hasTruncationSide = hasTruncationSide;
   }
 
   /**
@@ -66,7 +72,12 @@ public final class HfTokenizer {
   public static HfTokenizer fromDirectory(Path modelDirectory) {
     Objects.requireNonNull(modelDirectory, "HfTokenizer.fromDirectory: modelDirectory");
     TokenizerDirectoryLoader.Bundle bundle = TokenizerDirectoryLoader.load(modelDirectory);
-    return new HfTokenizer(bundle.definition(), bundle.metadata(), bundle.templates());
+    return new HfTokenizer(
+        bundle.runtime(),
+        bundle.metadata(),
+        bundle.templates(),
+        bundle.hasPaddingSide(),
+        bundle.hasTruncationSide());
   }
 
   /**
@@ -91,6 +102,9 @@ public final class HfTokenizer {
     List<Map<String, Object>> safeMessages =
         messages.stream().map(HfTokenizer::validatedMessage).toList();
     String name = options.templateName();
+    if (chatTemplates.isEmpty()) {
+      throw new TokenizerException("HfTokenizer.renderChat: no chat templates are configured");
+    }
     if (name.isEmpty()) {
       if (chatTemplates.containsKey("default")) {
         name = "default";
@@ -272,7 +286,25 @@ public final class HfTokenizer {
    */
   public TokenizerEncoding encodeWithDefaults(String text, boolean addSpecialTokens) {
     Objects.requireNonNull(text, "HfTokenizer.encodeWithDefaults: text must not be null");
-    return runtime.encode(text, runtime.configuredDefaults(addSpecialTokens));
+    EncodingOptions defaults = runtime.configuredDefaults(addSpecialTokens);
+    if (hasPaddingSide || hasTruncationSide) {
+      Truncation truncation = defaults.truncation();
+      Padding padding = defaults.padding();
+      if (hasTruncationSide && truncation.enabled()) {
+        truncation = new Truncation(truncation.maxLength(), metadata.truncationSide());
+      }
+      if (hasPaddingSide && padding.enabled()) {
+        padding =
+            new Padding(
+                padding.length(),
+                metadata.paddingSide(),
+                padding.padId(),
+                padding.padToken(),
+                padding.padTypeId());
+      }
+      defaults = new EncodingOptions(addSpecialTokens, truncation, padding);
+    }
+    return runtime.encode(text, defaults);
   }
 
   /**

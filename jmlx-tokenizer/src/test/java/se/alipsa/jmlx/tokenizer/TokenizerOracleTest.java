@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -41,6 +42,7 @@ class TokenizerOracleTest {
         TokenizerEncoding encoding =
             tokenizer.encode(testCase.required("text").asString(), options(testCase));
         assertEquals(ints(expectedCase.required("ids")), encoding.ids(), name);
+        assertEquals(strings(expectedCase.required("tokens")), encoding.tokens(), name);
         assertEquals(ints(expectedCase.required("typeIds")), encoding.typeIds(), name);
         assertEquals(ints(expectedCase.required("attentionMask")), encoding.attentionMask(), name);
         assertEquals(
@@ -67,7 +69,7 @@ class TokenizerOracleTest {
       truncation =
           new Truncation(
               value.required("max_length").intValue(),
-              Direction.valueOf(value.required("direction").asString().toUpperCase()));
+              Direction.valueOf(value.required("direction").asString().toUpperCase(Locale.ROOT)));
     }
     Padding padding = Padding.disabled();
     if (testCase.has("padding")) {
@@ -75,7 +77,7 @@ class TokenizerOracleTest {
       padding =
           new Padding(
               value.required("length").intValue(),
-              Direction.valueOf(value.required("direction").asString().toUpperCase()),
+              Direction.valueOf(value.required("direction").asString().toUpperCase(Locale.ROOT)),
               value.required("pad_id").intValue(),
               value.required("pad_token").asString(),
               value.required("pad_type_id").intValue());
@@ -86,6 +88,12 @@ class TokenizerOracleTest {
   private static List<Integer> ints(JsonNode values) {
     List<Integer> result = new ArrayList<>();
     values.forEach(value -> result.add(value.intValue()));
+    return result;
+  }
+
+  private static List<String> strings(JsonNode values) {
+    List<String> result = new ArrayList<>();
+    values.forEach(value -> result.add(value.asString()));
     return result;
   }
 

@@ -13,7 +13,8 @@ record TokenizerDefinition(
     Model model,
     JsonNode decoder,
     List<AddedToken> addedTokens,
-    EncodingOptions configuredDefaults) {
+    EncodingOptions configuredDefaults,
+    boolean trimByteLevelOffsets) {
 
   TokenizerDefinition {
     normalizer = normalizer == null ? null : normalizer.deepCopy();

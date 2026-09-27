@@ -200,15 +200,32 @@ final class TokenizerModels {
             reversed.add(bytes.get(index));
           }
         } else {
-          reversed.add(new TokenPiece(token, offset));
+          reversed.add(new TokenPiece(value, offset, id, 0, false));
         }
+      } else if (id == model.unknownId()) {
+        reversed.add(new TokenPiece(join(input.units().subList(start, end)), offset, id, 0, false));
       } else {
         reversed.add(new TokenPiece(token, offset));
       }
     }
     List<TokenPiece> result = new ArrayList<>(reversed.size());
     for (int index = reversed.size() - 1; index >= 0; index--) {
-      result.add(reversed.get(index));
+      TokenPiece piece = reversed.get(index);
+      if (piece.id() != null && piece.id() == model.unknownId() && !result.isEmpty()) {
+        TokenPiece prior = result.getLast();
+        if (prior.id() != null && prior.id() == model.unknownId()) {
+          result.set(
+              result.size() - 1,
+              new TokenPiece(
+                  prior.text() + piece.text(),
+                  new TokenOffset(prior.offset().startByte(), piece.offset().endByte()),
+                  model.unknownId(),
+                  0,
+                  false));
+          continue;
+        }
+      }
+      result.add(piece);
     }
     return result;
   }

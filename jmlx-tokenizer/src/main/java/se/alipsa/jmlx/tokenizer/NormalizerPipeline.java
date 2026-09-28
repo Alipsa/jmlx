@@ -141,7 +141,7 @@ final class NormalizerPipeline {
     if (patternNode.has("String")) {
       expression = Pattern.quote(patternNode.path("String").asString());
     } else if (patternNode.has("Regex")) {
-      expression = patternNode.path("Regex").asString();
+      expression = OnigRegex.whitespace(patternNode.path("Regex").asString());
     } else {
       throw new TokenizerException("NormalizerPipeline: Replace.pattern is unsupported");
     }
@@ -186,14 +186,7 @@ final class NormalizerPipeline {
     List<AlignedText.Unit> units = new ArrayList<>();
     for (AlignedText.Unit unit : input.units()) {
       int cp = unit.value().codePointAt(0);
-      if (clean
-          && (cp == 0
-              || cp == 0xfffd
-              || Character.isISOControl(cp)
-              || Character.getType(cp) == Character.FORMAT)) {
-        if (UnicodeWhitespace.isWhitespace(cp)) {
-          units.add(new AlignedText.Unit(" ", unit.startByte(), unit.endByte()));
-        }
+      if (clean && (cp == 0 || cp == 0xfffd || isControl(cp))) {
         continue;
       }
       if (UnicodeWhitespace.isWhitespace(cp)) {
@@ -216,7 +209,20 @@ final class NormalizerPipeline {
   private static boolean isChinese(int cp) {
     return (cp >= 0x4e00 && cp <= 0x9fff)
         || (cp >= 0x3400 && cp <= 0x4dbf)
+        || (cp >= 0xf900 && cp <= 0xfaff)
         || (cp >= 0x20000 && cp <= 0x2fa1f);
+  }
+
+  private static boolean isControl(int cp) {
+    if (cp == '\t' || cp == '\n' || cp == '\r') {
+      return false;
+    }
+    int type = Character.getType(cp);
+    return type == Character.CONTROL
+        || type == Character.FORMAT
+        || type == Character.SURROGATE
+        || type == Character.PRIVATE_USE
+        || type == Character.UNASSIGNED;
   }
 
   private static int[] unitAtChar(AlignedText input) {

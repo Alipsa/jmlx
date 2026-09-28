@@ -170,8 +170,8 @@ final class TokenizerModels {
         }
       }
       if (model.unknownToken() == null) {
-        throw new TokenizerException(
-            "TokenizerModels: BPE symbol '" + node.symbol + "' has no vocabulary entry");
+        fictionalPos += node.trueLength;
+        continue;
       }
       if (pendingLength > 0 && !model.fuseUnknown()) {
         output.add(
@@ -192,7 +192,11 @@ final class TokenizerModels {
   }
 
   private static TokenOffset bpeOffset(int[] alignStart, int[] alignEnd, int start, int length) {
-    return new TokenOffset(alignStart[start], alignEnd[start + length - 1]);
+    int last = alignStart.length - 1;
+    if (start > last) {
+      return new TokenOffset(alignEnd[last], alignEnd[last]);
+    }
+    return new TokenOffset(alignStart[start], alignEnd[Math.min(last, start + length - 1)]);
   }
 
   private static void addCandidate(

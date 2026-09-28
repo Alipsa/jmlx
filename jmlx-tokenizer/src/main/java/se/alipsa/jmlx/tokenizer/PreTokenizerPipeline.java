@@ -23,7 +23,9 @@ final class PreTokenizerPipeline {
               + "|\\p{IsWhite_Space}+(?!\\P{IsWhite_Space})"
               + "|\\p{IsWhite_Space}+");
   private static final Pattern WHITESPACE_PATTERN =
-      Pattern.compile("[\\p{L}\\p{N}_]+|[^\\p{L}\\p{N}_\\p{IsWhite_Space}]+");
+      Pattern.compile(
+          "[\\p{L}\\p{M}\\p{Nd}\\p{Pc}]+|[^\\p{L}\\p{M}\\p{Nd}\\p{Pc}\\p{IsWhite_Space}]+");
+  private static final Pattern WHITESPACE_SPLIT_PATTERN = Pattern.compile("[^\\p{IsWhite_Space}]+");
 
   private PreTokenizerPipeline() {}
 
@@ -148,7 +150,7 @@ final class PreTokenizerPipeline {
   }
 
   private static List<AlignedText> whitespaceSplit(AlignedText input) {
-    return matches(input, Pattern.compile("\\S+"));
+    return matches(input, WHITESPACE_SPLIT_PATTERN);
   }
 
   private static List<AlignedText> bert(AlignedText input) {
@@ -196,7 +198,7 @@ final class PreTokenizerPipeline {
     JsonNode patternNode = config.path("pattern");
     String expression;
     if (patternNode.has("Regex")) {
-      expression = patternNode.path("Regex").asString();
+      expression = OnigRegex.whitespace(patternNode.path("Regex").asString());
     } else if (patternNode.has("String")) {
       expression = Pattern.quote(patternNode.path("String").asString());
     } else {

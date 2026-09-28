@@ -81,28 +81,26 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
     }
     StringBuilder result = new StringBuilder();
     if (fallbackBytes.size() > 0) {
-      result.append(new String(fallbackBytes.toByteArray(), StandardCharsets.UTF_8));
+      result.append(metaspace(DecoderPipeline.decodeFallbackBytes(fallbackBytes.toByteArray())));
       fallbackBytes.reset();
     }
     if (!end) {
-      result.append(token);
+      result.append(metaspace(token));
     }
-    return metaspace(result.toString());
+    return result.toString();
   }
 
   private String metaspace(String token) {
     JsonNode component = singleComponent(decoder, "Metaspace");
     String replacement = component.path("replacement").asString("▁");
-    String value = token.replace(replacement, " ");
     String scheme = component.path("prepend_scheme").asString("always");
     if (firstText) {
       firstText = false;
-      if (("always".equalsIgnoreCase(scheme) || "first".equalsIgnoreCase(scheme))
-          && value.startsWith(" ")) {
-        return value.substring(1);
-      }
+      return "never".equalsIgnoreCase(scheme)
+          ? token.replace(replacement, " ")
+          : token.replace(replacement, "");
     }
-    return value;
+    return token.replace(replacement, " ");
   }
 
   private String wordPiece(String token, boolean end) {
@@ -111,7 +109,7 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
     boolean cleanup = component.path("cleanup").asBoolean(true);
     if (!end) {
       String raw;
-      if (token.startsWith(prefix)) {
+      if (!firstText && token.startsWith(prefix)) {
         raw = token.substring(prefix.length());
       } else {
         raw = firstText ? token : " " + token;

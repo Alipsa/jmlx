@@ -1,6 +1,10 @@
 package se.alipsa.jmlx.tokenizer;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,11 +39,11 @@ final class DecoderPipeline {
       return result;
     }
     return switch (type) {
-      case "ByteLevel" -> List.of(ByteLevelDecoder.decode(tokens));
-      case "Metaspace" -> List.of(metaspace(config, tokens));
-      case "WordPiece" -> List.of(wordPiece(config, tokens));
+      case "ByteLevel" -> byteLevel(tokens);
+      case "Metaspace" -> metaspace(config, tokens);
+      case "WordPiece" -> wordPiece(config, tokens);
       case "Replace" -> replace(config, tokens);
-      case "Strip" -> List.of(strip(config, String.join("", tokens)));
+      case "Strip" -> tokens.stream().map(token -> strip(config, token)).toList();
       case "ByteFallback" -> byteFallback(tokens);
       case "Fuse" -> List.of(String.join("", tokens));
       default ->
@@ -47,35 +51,38 @@ final class DecoderPipeline {
     };
   }
 
-  private static String metaspace(JsonNode config, List<String> tokens) {
+  private static List<String> metaspace(JsonNode config, List<String> tokens) {
     String replacement = config.path("replacement").asString("▁");
-    String result = String.join("", tokens).replace(replacement, " ");
     String scheme = config.path("prepend_scheme").asString("always");
-    if (("always".equalsIgnoreCase(scheme) || "first".equalsIgnoreCase(scheme))
-        && result.startsWith(" ")) {
-      return result.substring(1);
+    List<String> result = new ArrayList<>(tokens.size());
+    for (int index = 0; index < tokens.size(); index++) {
+      String token = tokens.get(index);
+      result.add(
+          index == 0 && !"never".equalsIgnoreCase(scheme)
+              ? token.replace(replacement, "")
+              : token.replace(replacement, " "));
     }
     return result;
   }
 
-  private static String wordPiece(JsonNode config, List<String> tokens) {
+  private static List<String> wordPiece(JsonNode config, List<String> tokens) {
     String prefix = config.path("prefix").asString("##");
     boolean cleanup = config.path("cleanup").asBoolean(true);
-    StringBuilder result = new StringBuilder();
-    for (String token : tokens) {
-      if (token.startsWith(prefix)) {
-        result.append(token.substring(prefix.length()));
+    List<String> result = new ArrayList<>(tokens.size());
+    for (int index = 0; index < tokens.size(); index++) {
+      String token = tokens.get(index);
+      String value;
+      if (index > 0 && token.startsWith(prefix)) {
+        value = token.substring(prefix.length());
       } else {
-        if (!result.isEmpty()) {
-          result.append(' ');
-        }
-        result.append(token);
+        value = index == 0 ? token : " " + token;
       }
+      result.add(cleanup ? cleanupWordPiece(value) : value);
     }
-    String value = result.toString();
-    if (!cleanup) {
-      return value;
-    }
+    return result;
+  }
+
+  private static String cleanupWordPiece(String value) {
     return value
         .replace(" .", ".")
         .replace(" ?", "?")
@@ -94,7 +101,7 @@ final class DecoderPipeline {
     String target =
         pattern.has("String")
             ? Pattern.quote(pattern.path("String").asString())
-            : pattern.path("Regex").asString();
+            : OnigRegex.whitespace(pattern.path("Regex").asString());
     // content is a literal replacement string, not a $1/backreference template (PR #24 review
     // round 2, finding 7) -- quoteReplacement keeps a literal `$` or `\` from being misread as one.
     String replacement = Matcher.quoteReplacement(config.path("content").asString());
@@ -136,8 +143,49 @@ final class DecoderPipeline {
 
   private static void flushBytes(ByteArrayOutputStream bytes, List<String> result) {
     if (bytes.size() > 0) {
-      result.add(new String(bytes.toByteArray(), StandardCharsets.UTF_8));
+      result.add(decodeFallbackBytes(bytes.toByteArray()));
       bytes.reset();
     }
+  }
+
+  static String decodeFallbackBytes(byte[] bytes) {
+    try {
+      return StandardCharsets.UTF_8
+          .newDecoder()
+          .onMalformedInput(CodingErrorAction.REPORT)
+          .onUnmappableCharacter(CodingErrorAction.REPORT)
+          .decode(ByteBuffer.wrap(bytes))
+          .toString();
+    } catch (CharacterCodingException e) {
+      return "\ufffd".repeat(bytes.length);
+    }
+  }
+
+  private static List<String> byteLevel(List<String> tokens) {
+    var decoder =
+        StandardCharsets.UTF_8
+            .newDecoder()
+            .onMalformedInput(CodingErrorAction.REPLACE)
+            .onUnmappableCharacter(CodingErrorAction.REPLACE);
+    byte[] pending = new byte[0];
+    List<String> result = new ArrayList<>(tokens.size());
+    for (int index = 0; index < tokens.size(); index++) {
+      byte[] next = ByteLevelCoding.decodeToBytes(tokens.get(index));
+      byte[] combined = new byte[pending.length + next.length];
+      System.arraycopy(pending, 0, combined, 0, pending.length);
+      System.arraycopy(next, 0, combined, pending.length, next.length);
+      ByteBuffer input = ByteBuffer.wrap(combined);
+      CharBuffer output = CharBuffer.allocate(Math.max(8, combined.length * 2 + 2));
+      boolean last = index + 1 == tokens.size();
+      decoder.decode(input, output, last);
+      if (last) {
+        decoder.flush(output);
+      }
+      pending = new byte[input.remaining()];
+      input.get(pending);
+      output.flip();
+      result.add(output.toString());
+    }
+    return result;
   }
 }

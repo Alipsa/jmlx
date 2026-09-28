@@ -816,8 +816,7 @@ public final class TokenizerJsonLoader {
       // file's own regex string still spells \s/\S literally (see e.g. Qwen2.5's tokenizer.json),
       // so both are substituted with the Unicode-scoped classes before compiling -- \p{L}/\p{N}
       // need no such substitution, being Unicode-scoped by definition already.
-      String unicodeAware =
-          regex.replace("\\s", "\\p{IsWhite_Space}").replace("\\S", "\\P{IsWhite_Space}");
+      String unicodeAware = OnigRegex.whitespace(regex);
       return new PreTokenizerConfig(Pattern.compile(unicodeAware), addPrefixSpace);
     } catch (PatternSyntaxException e) {
       throw new TokenizerException(

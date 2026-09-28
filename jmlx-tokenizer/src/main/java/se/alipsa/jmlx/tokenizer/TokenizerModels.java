@@ -33,6 +33,7 @@ final class TokenizerModels {
     List<BpeNode> nodes = new ArrayList<>();
     for (int index = 0; index < input.units().size(); index++) {
       AlignedText.Unit unit = input.units().get(index);
+      int trueLength = unit.value().getBytes(StandardCharsets.UTF_8).length;
       String symbol = unit.value();
       if (index > 0) {
         symbol = model.continuingSubwordPrefix() + symbol;
@@ -40,7 +41,7 @@ final class TokenizerModels {
       if (index + 1 == input.units().size()) {
         symbol += model.endOfWordSuffix();
       }
-      nodes.add(new BpeNode(symbol, new TokenOffset(unit.startByte(), unit.endByte())));
+      nodes.add(new BpeNode(symbol, trueLength));
     }
     for (int index = 0; index < nodes.size(); index++) {
       nodes.get(index).previous = index - 1;
@@ -64,7 +65,7 @@ final class TokenizerModels {
         continue;
       }
       left.symbol += right.symbol;
-      left.offset = new TokenOffset(left.offset.startByte(), right.offset.endByte());
+      left.trueLength += right.trueLength;
       left.version++;
       left.next = right.next;
       right.live = false;
@@ -78,12 +79,105 @@ final class TokenizerModels {
         addCandidate(model, nodes, candidates, candidate.left(), left.next);
       }
     }
+    return emitBpeTokens(model, input, nodes);
+  }
+
+  /**
+   * Mirrors HF's {@code BPE::merge_word} per-character loop plus {@code Word::get_offsets_iter} and
+   * {@code PreTokenizedString::into_encoding}'s offset conversion. HF tracks each emitted symbol's
+   * length in the *normalized* string only (a vocab hit or merged span uses the true summed byte
+   * length of the characters it represents; a byte-fallback token always uses length 1, regardless
+   * of its source character's true byte length; a deferred/pending unk uses the summed true length
+   * of only the characters that actually became unk, captured at the moment each fails, and is
+   * emitted -- i.e. consumes its position -- only when flushed) and only at the very end converts a
+   * cumulative normalized-byte position range back to an original offset, via a table mapping each
+   * normalized byte to the original character it came from. Because a byte-fallback success does
+   * not flush a still-pending unk, the unk's cumulative position (and therefore its final offset)
+   * reflects wherever its *flush* lands in this consumption order, not its own character's true
+   * position -- producing surprising but oracle-verified offset swaps whenever byte-fallback and a
+   * deferred unk interleave in the same word (PR #24 review round 2, finding 2's offset half, on
+   * top of its token-order half already fixed above).
+   */
+  private static List<TokenPiece> emitBpeTokens(
+      TokenizerDefinition.Bpe model, AlignedText input, List<BpeNode> nodes) {
+    int totalBytes = 0;
+    for (AlignedText.Unit unit : input.units()) {
+      totalBytes += unit.value().getBytes(StandardCharsets.UTF_8).length;
+    }
+    int[] alignStart = new int[totalBytes];
+    int[] alignEnd = new int[totalBytes];
+    int position = 0;
+    for (AlignedText.Unit unit : input.units()) {
+      int length = unit.value().getBytes(StandardCharsets.UTF_8).length;
+      for (int i = 0; i < length; i++) {
+        alignStart[position] = unit.startByte();
+        alignEnd[position] = unit.endByte();
+        position++;
+      }
+    }
+
     List<TokenPiece> output = new ArrayList<>();
+    int fictionalPos = 0;
+    int pendingLength = 0;
     for (int index = 0; index >= 0; index = nodes.get(index).next) {
       BpeNode node = nodes.get(index);
-      appendBpeSymbol(model, node.symbol, node.offset, output);
+      if (model.vocab().containsKey(node.symbol)) {
+        if (pendingLength > 0) {
+          output.add(
+              new TokenPiece(
+                  model.unknownToken(),
+                  bpeOffset(alignStart, alignEnd, fictionalPos, pendingLength)));
+          fictionalPos += pendingLength;
+          pendingLength = 0;
+        }
+        output.add(
+            new TokenPiece(
+                node.symbol, bpeOffset(alignStart, alignEnd, fictionalPos, node.trueLength)));
+        fictionalPos += node.trueLength;
+        continue;
+      }
+      if (model.byteFallback()) {
+        List<String> fallback = new ArrayList<>();
+        for (byte value : node.symbol.getBytes(StandardCharsets.UTF_8)) {
+          String token = String.format("<0x%02X>", value & 0xff);
+          if (!model.vocab().containsKey(token)) {
+            fallback.clear();
+            break;
+          }
+          fallback.add(token);
+        }
+        if (!fallback.isEmpty()) {
+          for (String token : fallback) {
+            output.add(new TokenPiece(token, bpeOffset(alignStart, alignEnd, fictionalPos, 1)));
+            fictionalPos += 1;
+          }
+          continue;
+        }
+      }
+      if (model.unknownToken() == null) {
+        throw new TokenizerException(
+            "TokenizerModels: BPE symbol '" + node.symbol + "' has no vocabulary entry");
+      }
+      if (pendingLength > 0 && !model.fuseUnknown()) {
+        output.add(
+            new TokenPiece(
+                model.unknownToken(),
+                bpeOffset(alignStart, alignEnd, fictionalPos, pendingLength)));
+        fictionalPos += pendingLength;
+        pendingLength = 0;
+      }
+      pendingLength += node.trueLength;
+    }
+    if (pendingLength > 0) {
+      output.add(
+          new TokenPiece(
+              model.unknownToken(), bpeOffset(alignStart, alignEnd, fictionalPos, pendingLength)));
     }
     return output;
+  }
+
+  private static TokenOffset bpeOffset(int[] alignStart, int[] alignEnd, int start, int length) {
+    return new TokenOffset(alignStart[start], alignEnd[start + length - 1]);
   }
 
   private static void addCandidate(
@@ -98,44 +192,6 @@ final class TokenizerModels {
     if (rank != null) {
       candidates.add(new BpeCandidate(rank, left, right, a.version, b.version));
     }
-  }
-
-  private static void appendBpeSymbol(
-      TokenizerDefinition.Bpe model, String symbol, TokenOffset offset, List<TokenPiece> output) {
-    if (model.vocab().containsKey(symbol)) {
-      output.add(new TokenPiece(symbol, offset));
-      return;
-    }
-    if (model.byteFallback()) {
-      List<String> fallback = new ArrayList<>();
-      for (byte value : symbol.getBytes(StandardCharsets.UTF_8)) {
-        String token = String.format("<0x%02X>", value & 0xff);
-        if (!model.vocab().containsKey(token)) {
-          fallback.clear();
-          break;
-        }
-        fallback.add(token);
-      }
-      if (!fallback.isEmpty()) {
-        fallback.forEach(token -> output.add(new TokenPiece(token, offset)));
-        return;
-      }
-    }
-    if (model.unknownToken() != null) {
-      if (model.fuseUnknown()
-          && !output.isEmpty()
-          && output.getLast().text().equals(model.unknownToken())) {
-        TokenPiece previous = output.removeLast();
-        output.add(
-            new TokenPiece(
-                previous.text(), new TokenOffset(previous.offset().startByte(), offset.endByte())));
-      } else {
-        output.add(new TokenPiece(model.unknownToken(), offset));
-      }
-      return;
-    }
-    throw new TokenizerException(
-        "TokenizerModels: BPE symbol '" + symbol + "' has no vocabulary entry");
   }
 
   private static List<TokenPiece> unigram(TokenizerDefinition.Unigram model, AlignedText input) {
@@ -192,48 +248,49 @@ final class TokenizerModels {
         }
       }
     }
-    List<TokenPiece> reversed = new ArrayList<>();
+    // HF's encode_optimized backtracks the lattice into a Vec<String>, fusing every consecutive
+    // run of unk nodes into ONE string first (fuse_unk), and only then does tokenize() attempt
+    // byte-fallback -- on that whole fused string as a single all-or-nothing unit, never on the
+    // individual lattice nodes that composed it. A run where any single byte lacks a <0xXX> vocab
+    // entry falls back to one plain <unk> token covering the entire run, not a byte/unk split
+    // (PR #24 review round 2, finding 1, correcting PR #24 review round 1, finding 3's fix, which
+    // byte-fell-back each unk lattice node independently).
+    List<int[]> spans = new ArrayList<>();
     for (int end = size; end > 0; end = previous[end]) {
       int start = previous[end];
-      int id = tokenIds[end];
-      String token = model.tokens().get(id);
+      spans.add(new int[] {start, end, tokenIds[end]});
+    }
+    List<TokenPiece> result = new ArrayList<>();
+    for (int index = spans.size() - 1; index >= 0; ) {
+      int[] span = spans.get(index);
+      if (span[2] != model.unknownId()) {
+        result.add(
+            new TokenPiece(
+                model.tokens().get(span[2]),
+                new TokenOffset(
+                    input.units().get(span[0]).startByte(),
+                    input.units().get(span[1] - 1).endByte())));
+        index--;
+        continue;
+      }
+      int runStart = index;
+      while (runStart - 1 >= 0 && spans.get(runStart - 1)[2] == model.unknownId()) {
+        runStart--;
+      }
+      int fusedStart = spans.get(index)[0];
+      int fusedEnd = spans.get(runStart)[1];
       TokenOffset offset =
           new TokenOffset(
-              input.units().get(start).startByte(), input.units().get(end - 1).endByte());
-      if (id == model.unknownId() && model.byteFallback()) {
-        String value = join(input.units().subList(start, end));
-        List<TokenPiece> bytes = byteFallback(model.vocab(), value, offset);
-        if (bytes != null) {
-          for (int index = bytes.size() - 1; index >= 0; index--) {
-            reversed.add(bytes.get(index));
-          }
-        } else {
-          reversed.add(new TokenPiece(value, offset, id, 0, false));
-        }
-      } else if (id == model.unknownId()) {
-        reversed.add(new TokenPiece(join(input.units().subList(start, end)), offset, id, 0, false));
+              input.units().get(fusedStart).startByte(), input.units().get(fusedEnd - 1).endByte());
+      String value = join(input.units().subList(fusedStart, fusedEnd));
+      List<TokenPiece> bytes =
+          model.byteFallback() ? byteFallback(model.vocab(), value, offset) : null;
+      if (bytes != null) {
+        result.addAll(bytes);
       } else {
-        reversed.add(new TokenPiece(token, offset));
+        result.add(new TokenPiece(value, offset, model.unknownId(), 0, false));
       }
-    }
-    List<TokenPiece> result = new ArrayList<>(reversed.size());
-    for (int index = reversed.size() - 1; index >= 0; index--) {
-      TokenPiece piece = reversed.get(index);
-      if (piece.id() != null && piece.id() == model.unknownId() && !result.isEmpty()) {
-        TokenPiece prior = result.getLast();
-        if (prior.id() != null && prior.id() == model.unknownId()) {
-          result.set(
-              result.size() - 1,
-              new TokenPiece(
-                  prior.text() + piece.text(),
-                  new TokenOffset(prior.offset().startByte(), piece.offset().endByte()),
-                  model.unknownId(),
-                  0,
-                  false));
-          continue;
-        }
-      }
-      result.add(piece);
+      index = runStart - 1;
     }
     return result;
   }
@@ -321,15 +378,15 @@ final class TokenizerModels {
 
   private static final class BpeNode {
     private String symbol;
-    private TokenOffset offset;
+    private int trueLength;
     private int previous;
     private int next;
     private int version;
     private boolean live = true;
 
-    private BpeNode(String symbol, TokenOffset offset) {
+    private BpeNode(String symbol, int trueLength) {
       this.symbol = symbol;
-      this.offset = offset;
+      this.trueLength = trueLength;
     }
   }
 

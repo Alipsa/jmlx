@@ -10,11 +10,20 @@ import tools.jackson.databind.JsonNode;
 /** Applies supported pre-tokenizer components to aligned text spans. */
 final class PreTokenizerPipeline {
 
+  // onig's \s is Unicode White_Space (matches U+00A0 NBSP, U+2007, etc.), not ASCII-only --
+  // verified against the pinned oracle on NBSP runs of length 1-4, which showed the same
+  // "merge in groups, treating a maximal *ASCII*-space-adjoining run specially" behavior as
+  // \p{IsWhite_Space} and not plain \s (PR #24 review round 2, finding 3). Only \s/\S here needs
+  // the explicit Unicode class: \p{N} is already Unicode-scoped by definition, and this regex has
+  // no \d/\w/\b for onig's separate ASCII-only-\w semantics to matter.
   private static final Pattern BYTE_LEVEL_PATTERN =
       Pattern.compile(
-          "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+          "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+"
+              + "| ?[^\\p{IsWhite_Space}\\p{L}\\p{N}]+"
+              + "|\\p{IsWhite_Space}+(?!\\P{IsWhite_Space})"
+              + "|\\p{IsWhite_Space}+");
   private static final Pattern WHITESPACE_PATTERN =
-      Pattern.compile("[\\p{L}\\p{N}_]+|[^\\p{L}\\p{N}_\\s]+");
+      Pattern.compile("[\\p{L}\\p{N}_]+|[^\\p{L}\\p{N}_\\p{IsWhite_Space}]+");
 
   private PreTokenizerPipeline() {}
 
@@ -90,7 +99,8 @@ final class PreTokenizerPipeline {
     boolean shouldPrepend =
         !input.units().isEmpty()
             && !input.text().startsWith(" ")
-            && ("always".equals(scheme) || "first".equals(scheme));
+            && ("always".equals(scheme)
+                || ("first".equals(scheme) && input.units().getFirst().startByte() == 0));
     if (shouldPrepend) {
       AlignedText.Unit first = input.units().getFirst();
       replacement
@@ -146,7 +156,7 @@ final class PreTokenizerPipeline {
     List<AlignedText.Unit> current = new ArrayList<>();
     for (AlignedText.Unit unit : input.units()) {
       int cp = unit.value().codePointAt(0);
-      if (Character.isWhitespace(cp)) {
+      if (UnicodeWhitespace.isWhitespace(cp)) {
         flush(current, result);
         current = new ArrayList<>();
       } else if (isPunctuation(cp)) {

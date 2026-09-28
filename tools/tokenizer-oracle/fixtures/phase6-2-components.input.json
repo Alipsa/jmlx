@@ -84,6 +84,16 @@
           "name": "unigram-byte-fallback",
           "text": "Hello €",
           "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-fused-unknown-run",
+          "text": "Hello x€",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-all-fused-unknown-run",
+          "text": "zz€zz",
+          "addSpecialTokens": false
         }
       ]
     },
@@ -104,6 +114,16 @@
         {
           "name": "metaspace-byte-fallback",
           "text": "hello €",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "metaspace-fused-then-flushed-unknown",
+          "text": "hello x€",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "metaspace-byte-fallback-then-deferred-unknown",
+          "text": "ab€cd",
           "addSpecialTokens": false
         }
       ]
@@ -184,6 +204,11 @@
           "name": "bytelevel-digits-and-letters",
           "text": "a1234b",
           "addSpecialTokens": false
+        },
+        {
+          "name": "bytelevel-nbsp",
+          "text": "a b",
+          "addSpecialTokens": false
         }
       ]
     },
@@ -236,6 +261,44 @@
         {
           "name": "split-merged-match-at-zero",
           "text": "ab",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "metaspace-prepend-first",
+      "tokenizer": "metaspace-prepend-first.tokenizer.json",
+      "cases": [
+        {
+          "name": "prepend-first-only-first-split-gets-prefix",
+          "text": "hello world",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "prepend-normalizer",
+      "tokenizer": "prepend-normalizer.tokenizer.json",
+      "cases": [
+        {
+          "name": "prepend-empty-input-not-prepended",
+          "text": "",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "prepend-nonempty-input-prepended",
+          "text": "hi",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "strip-accents-normalizer",
+      "tokenizer": "strip-accents-normalizer.tokenizer.json",
+      "cases": [
+        {
+          "name": "standalone-strip-accents-ignores-precomposed",
+          "text": "café",
           "addSpecialTokens": false
         }
       ]

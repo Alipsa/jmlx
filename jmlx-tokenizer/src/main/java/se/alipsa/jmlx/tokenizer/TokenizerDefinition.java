@@ -22,7 +22,7 @@ record TokenizerDefinition(
     preTokenizer = preTokenizer == null ? null : preTokenizer.deepCopy();
     postProcessor = List.copyOf(postProcessor);
     model = Objects.requireNonNull(model, "model");
-    decoder = Objects.requireNonNull(decoder, "decoder").deepCopy();
+    decoder = decoder == null ? null : decoder.deepCopy();
     addedTokens = List.copyOf(addedTokens);
     configuredDefaults = Objects.requireNonNull(configuredDefaults, "configuredDefaults");
   }

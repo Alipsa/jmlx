@@ -90,7 +90,7 @@ final class AddedTokenMatcher {
     int result = index;
     while (result > 0) {
       int cp = text.codePointBefore(result);
-      if (!Character.isWhitespace(cp)) {
+      if (!UnicodeWhitespace.isWhitespace(cp)) {
         break;
       }
       result -= Character.charCount(cp);
@@ -102,7 +102,7 @@ final class AddedTokenMatcher {
     int result = index;
     while (result < text.length()) {
       int cp = text.codePointAt(result);
-      if (!Character.isWhitespace(cp)) {
+      if (!UnicodeWhitespace.isWhitespace(cp)) {
         break;
       }
       result += Character.charCount(cp);

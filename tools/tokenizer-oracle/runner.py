@@ -29,7 +29,7 @@ def run_fixture(input_path: Path, provenance: dict) -> dict:
         raise SystemExit(
             f"tokenizer oracle input differs from provenance: {input_path.name}"
         )
-    specification = json.loads(input_path.read_text())
+    specification = json.loads(input_path.read_text(encoding="utf-8"))
     fixtures = []
     root = input_path.parent.resolve()
     for fixture in specification["fixtures"]:
@@ -116,7 +116,7 @@ def main() -> None:
     args = parser.parse_args()
 
     os.environ["HF_HUB_OFFLINE"] = "1"
-    provenance = json.loads(args.provenance.read_text())
+    provenance = json.loads(args.provenance.read_text(encoding="utf-8"))
     inputs = sorted(args.fixtures_dir.glob("*.input.json"))
     if not inputs:
         raise SystemExit("no tokenizer oracle input fixtures found")
@@ -133,11 +133,11 @@ def main() -> None:
         )
         actual = canonical(run_fixture(input_path, provenance))
         if args.generate_all:
-            expected_path.write_text(actual)
+            expected_path.write_text(actual, encoding="utf-8")
         else:
             if not expected_path.is_file():
                 raise SystemExit(f"tokenizer oracle fixture is missing: {expected_path}")
-            expected = expected_path.read_text()
+            expected = expected_path.read_text(encoding="utf-8")
             if actual != expected:
                 raise SystemExit(stale_message(expected_path, expected, actual))
             print(f"Tokenizer oracle fixture verified: {expected_path}")

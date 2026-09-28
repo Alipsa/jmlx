@@ -66,6 +66,21 @@ class TokenizerOracleTest {
     Truncation truncation = Truncation.disabled();
     if (testCase.has("truncation")) {
       JsonNode value = testCase.required("truncation");
+      // This port only implements HF's "longest_first" strategy with stride 0 (no pair-sequence
+      // truncation, no overflow-encoding output) -- a fixture asking for anything else would
+      // silently compare against oracle output this port cannot actually reproduce, rather than
+      // failing loudly on the untested gap (PR #24 review round 2, suggestion: stride/strategy/
+      // overflowing are read by runner.py but dropped here).
+      String strategy = value.path("strategy").asString("longest_first");
+      int stride = value.path("stride").asInt(0);
+      if (!"longest_first".equals(strategy) || stride != 0) {
+        throw new TokenizerException(
+            "TokenizerOracleTest: truncation.strategy='"
+                + strategy
+                + "', stride="
+                + stride
+                + " is unsupported by this port's Truncation");
+      }
       truncation =
           new Truncation(
               value.required("max_length").intValue(),

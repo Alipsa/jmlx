@@ -32,8 +32,8 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
   RuntimeIncrementalDecoder(TokenizerRuntime runtime, boolean skipSpecialTokens, JsonNode decoder) {
     this.runtime = runtime;
     this.skipSpecialTokens = skipSpecialTokens;
-    this.decoder = decoder.deepCopy();
-    this.mode = mode(decoder);
+    this.decoder = decoder == null ? null : decoder.deepCopy();
+    this.mode = decoder == null ? Mode.BUFFERED : mode(decoder);
   }
 
   @Override

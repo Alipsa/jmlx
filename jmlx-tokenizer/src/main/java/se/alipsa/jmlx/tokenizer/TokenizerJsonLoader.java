@@ -51,12 +51,14 @@ public final class TokenizerJsonLoader {
       JsonNode root = MAPPER.readTree(Files.newInputStream(path));
       JsonNode normalizer = nullableComponent(root, "normalizer");
       JsonNode preTokenizer = nullableComponent(root, "pre_tokenizer");
-      JsonNode decoder = requiredComponent(root, "decoder");
+      JsonNode decoder = nullableComponent(root, "decoder");
       validateNormalizer(normalizer, "normalizer");
       if (preTokenizer != null) {
         validatePreTokenizer(preTokenizer, "pre_tokenizer");
       }
-      validateDecoder(decoder, "decoder");
+      if (decoder != null) {
+        validateDecoder(decoder, "decoder");
+      }
       TokenizerDefinition.Model model = parseFlexibleModel(root.path("model"));
       List<AddedToken> addedTokens = parseFlexibleAddedTokens(root.path("added_tokens"));
       JsonNode byteLevelStep = findTrimmingByteLevelStep(root.path("post_processor"));
@@ -78,14 +80,6 @@ public final class TokenizerJsonLoader {
   private static JsonNode nullableComponent(JsonNode root, String field) {
     JsonNode node = root.get(field);
     return node == null || node.isNull() ? null : node;
-  }
-
-  private static JsonNode requiredComponent(JsonNode root, String field) {
-    JsonNode node = root.get(field);
-    if (node == null || node.isNull() || !node.isObject()) {
-      throw new TokenizerException("TokenizerJsonLoader: " + field + " must be an object");
-    }
-    return node;
   }
 
   private static String componentType(JsonNode node, String path) {
@@ -805,13 +799,15 @@ public final class TokenizerJsonLoader {
     requireBoolean(byteLevelStep, "add_prefix_space", "pre_tokenizer ByteLevel add_prefix_space");
     boolean addPrefixSpace = byteLevelStep.path("add_prefix_space").asBoolean(false);
     try {
-      // No Pattern.UNICODE_CHARACTER_CLASS: HF compiles this regex with onig (the default
-      // "onig" cargo feature), whose \s/\S/\w/\d/\b are ASCII-only, matching plain Java Pattern's
-      // own default. The flag would make \s Unicode-aware instead (e.g. matching U+00A0 NBSP),
-      // diverging from HF on any input containing Unicode whitespace -- and buys nothing for the
-      // Unicode-letter matching the flag was presumably added for, since \p{L} is already
-      // Unicode-scoped by definition regardless of this flag (PR #14 review round 4, finding 1).
-      return new PreTokenizerConfig(Pattern.compile(regex), addPrefixSpace);
+      // onig's \s is Unicode White_Space (e.g. matches U+00A0 NBSP), not ASCII-only -- verified
+      // against the pinned oracle on NBSP runs, contradicting this method's prior comment here
+      // (PR #24 review round 2, finding 3, correcting PR #14 review round 4, finding 1). The
+      // file's own regex string still spells \s/\S literally (see e.g. Qwen2.5's tokenizer.json),
+      // so both are substituted with the Unicode-scoped classes before compiling -- \p{L}/\p{N}
+      // need no such substitution, being Unicode-scoped by definition already.
+      String unicodeAware =
+          regex.replace("\\s", "\\p{IsWhite_Space}").replace("\\S", "\\P{IsWhite_Space}");
+      return new PreTokenizerConfig(Pattern.compile(unicodeAware), addPrefixSpace);
     } catch (PatternSyntaxException e) {
       throw new TokenizerException(
           "TokenizerJsonLoader: invalid pre_tokenizer regex '" + regex + "'", e);

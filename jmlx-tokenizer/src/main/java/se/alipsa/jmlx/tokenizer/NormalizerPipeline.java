@@ -25,7 +25,7 @@ final class NormalizerPipeline {
       case "NFKC" -> unicode(input, Normalizer.Form.NFKC);
       case "NFKD" -> unicode(input, Normalizer.Form.NFKD);
       case "Lowercase" -> map(input, value -> value.toLowerCase(Locale.ROOT));
-      case "StripAccents" -> stripAccents(input);
+      case "StripAccents" -> filterMarks(input);
       case "Replace" -> replace(config, input);
       case "Strip" -> strip(config, input);
       case "Prepend" -> prepend(config, input);
@@ -74,10 +74,19 @@ final class NormalizerPipeline {
     return new AlignedText(output);
   }
 
-  private static AlignedText stripAccents(AlignedText input) {
-    AlignedText decomposed = unicode(input, Normalizer.Form.NFD);
+  /**
+   * HF's standalone {@code StripAccents} normalizer never decomposes text itself -- it only drops
+   * combining marks already present as individual code points (Rust's {@code is_combining_mark}). A
+   * precomposed character like {@code é} (U+00E9) is untouched unless an earlier step (e.g. NFD)
+   * already decomposed it (PR #24 review round 2, finding 6).
+   */
+  private static AlignedText filterMarks(AlignedText input) {
     return new AlignedText(
-        decomposed.units().stream().filter(unit -> !isMark(unit.value().codePointAt(0))).toList());
+        input.units().stream().filter(unit -> !isMark(unit.value().codePointAt(0))).toList());
+  }
+
+  private static AlignedText nfdThenFilterMarks(AlignedText input) {
+    return filterMarks(unicode(input, Normalizer.Form.NFD));
   }
 
   private static boolean isMark(int codePoint) {
@@ -88,9 +97,12 @@ final class NormalizerPipeline {
   }
 
   private static AlignedText prepend(JsonNode config, AlignedText input) {
+    if (input.units().isEmpty()) {
+      return input;
+    }
     String prefix = config.path("prepend").asString();
     List<AlignedText.Unit> output = new ArrayList<>();
-    int boundary = input.units().isEmpty() ? 0 : input.units().getFirst().startByte();
+    int boundary = input.units().getFirst().startByte();
     addMapped(output, prefix, boundary, boundary);
     output.addAll(input.units());
     return new AlignedText(output);
@@ -111,25 +123,22 @@ final class NormalizerPipeline {
   }
 
   private static boolean isWhitespace(AlignedText.Unit unit) {
-    return Character.isWhitespace(unit.value().codePointAt(0));
+    return UnicodeWhitespace.isWhitespace(unit.value().codePointAt(0));
   }
 
   private static AlignedText replace(JsonNode config, AlignedText input) {
     JsonNode patternNode = config.path("pattern");
     String expression;
-    boolean literal;
     if (patternNode.has("String")) {
       expression = Pattern.quote(patternNode.path("String").asString());
-      literal = true;
     } else if (patternNode.has("Regex")) {
       expression = patternNode.path("Regex").asString();
-      literal = false;
     } else {
       throw new TokenizerException("NormalizerPipeline: Replace.pattern is unsupported");
     }
     String replacement = config.path("content").asString();
     try {
-      return replaceMatches(input, Pattern.compile(expression), replacement, literal);
+      return replaceMatches(input, Pattern.compile(expression), replacement);
     } catch (RuntimeException e) {
       if (e instanceof TokenizerException) {
         throw e;
@@ -139,7 +148,7 @@ final class NormalizerPipeline {
   }
 
   private static AlignedText replaceMatches(
-      AlignedText input, Pattern pattern, String replacement, boolean literalReplacement) {
+      AlignedText input, Pattern pattern, String replacement) {
     String text = input.text();
     int[] unitAtChar = unitAtChar(input);
     Matcher matcher = pattern.matcher(text);
@@ -148,11 +157,10 @@ final class NormalizerPipeline {
     while (matcher.find()) {
       appendRange(input, unitAtChar, last, matcher.start(), output);
       TokenOffset range = range(input, unitAtChar, matcher.start(), matcher.end());
-      String value =
-          literalReplacement
-              ? replacement
-              : pattern.matcher(matcher.group()).replaceFirst(replacement);
-      addMapped(output, value, range.startByte(), range.endByte());
+      // HF's Replace treats `content` as a literal replacement string, never a `$1`/backreference
+      // template -- Matcher.replaceFirst/replaceAll would otherwise throw on a literal `$` in
+      // content, or misinterpret it as a group reference (PR #24 review round 2, finding 7).
+      addMapped(output, replacement, range.startByte(), range.endByte());
       last = matcher.end();
     }
     appendRange(input, unitAtChar, last, text.length(), output);
@@ -174,12 +182,12 @@ final class NormalizerPipeline {
               || cp == 0xfffd
               || Character.isISOControl(cp)
               || Character.getType(cp) == Character.FORMAT)) {
-        if (Character.isWhitespace(cp)) {
+        if (UnicodeWhitespace.isWhitespace(cp)) {
           units.add(new AlignedText.Unit(" ", unit.startByte(), unit.endByte()));
         }
         continue;
       }
-      if (Character.isWhitespace(cp)) {
+      if (UnicodeWhitespace.isWhitespace(cp)) {
         units.add(new AlignedText.Unit(" ", unit.startByte(), unit.endByte()));
       } else if (chinese && isChinese(cp)) {
         units.add(new AlignedText.Unit(" ", unit.startByte(), unit.startByte()));
@@ -193,7 +201,7 @@ final class NormalizerPipeline {
     if (lowercase) {
       result = map(result, value -> value.toLowerCase(Locale.ROOT));
     }
-    return accents ? stripAccents(result) : result;
+    return accents ? nfdThenFilterMarks(result) : result;
   }
 
   private static boolean isChinese(int cp) {

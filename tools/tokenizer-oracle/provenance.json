@@ -2,7 +2,10 @@
   "fixtureSources": {
     "added-token.tokenizer.json": "2347b11421fc85d43f759dcafa1a0390028ac60b191a2b8e48074fa225c08ba7",
     "metaspace-bpe.tokenizer.json": "df49965a99eca472c5225b5ed669c26bcdde6208d4a8862623423125dc6c7940",
-    "phase6-2-components.input.json": "32211a2d6ed929820e474ff5b1e49d9f009e1612da343a0581fdd3a6f0da8c2b",
+    "phase6-2-components.input.json": "82225d25e25bc247c12f0342b67693e140227d90a31420db40a1edc9c68a8e3e",
+    "metaspace-prepend-first.tokenizer.json": "7b6170be0692fa9620da4c356b67f32b1567d85a38bbc27f1ce020b26a72f801",
+    "prepend-normalizer.tokenizer.json": "fbfed3ff866fff6922265d0c576eb363832fa7fc2e097cd9509227267eefb92d",
+    "strip-accents-normalizer.tokenizer.json": "efe7f327b8fc43e74d5d933969ed5a284d3a2223dcdead175dbb965c3d03577d",
     "added-token-adjacent.tokenizer.json": "3ab07df5524a64e02d1e9b57b1daeb76891c56e86a6866e5ef7b0a6bdc972bc6",
     "unigram.tokenizer.json": "5f530ac97373853dc4591f4fbb5420cb6d3152c148461db82419e7ae54aad5f2",
     "wordpiece.tokenizer.json": "59d7c5bcbc59fe6df4caae77f74fae1e896c6094a41c64ec79ff7af406393111",

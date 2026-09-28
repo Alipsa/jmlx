@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 
@@ -15,6 +16,11 @@ final class DecoderPipeline {
   private DecoderPipeline() {}
 
   static String decode(JsonNode config, List<String> tokens) {
+    // A tokenizer.json with no decoder configured (`decoder: null`, valid HF JSON) falls back to
+    // HF's own `Tokenizer::decode` default: join the resolved token strings with a plain space.
+    if (config == null) {
+      return String.join(" ", tokens);
+    }
     List<String> result = apply(config, List.copyOf(tokens));
     return String.join("", result);
   }
@@ -89,7 +95,9 @@ final class DecoderPipeline {
         pattern.has("String")
             ? Pattern.quote(pattern.path("String").asString())
             : pattern.path("Regex").asString();
-    String replacement = config.path("content").asString();
+    // content is a literal replacement string, not a $1/backreference template (PR #24 review
+    // round 2, finding 7) -- quoteReplacement keeps a literal `$` or `\` from being misread as one.
+    String replacement = Matcher.quoteReplacement(config.path("content").asString());
     Pattern compiled = Pattern.compile(target);
     return tokens.stream().map(token -> compiled.matcher(token).replaceAll(replacement)).toList();
   }

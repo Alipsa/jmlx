@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    provenance = json.loads(Path(sys.argv[1]).read_text())
+    provenance = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     actual_platform = {"system": platform.system(), "machine": platform.machine()}
     if actual_platform not in provenance["platforms"]:
         raise SystemExit(f"unsupported tokenizer oracle platform: {actual_platform}")
@@ -21,10 +21,8 @@ def main() -> None:
         raise SystemExit(
             f"tokenizer oracle requires tokenizers {provenance['tokenizers']}, found {version}"
         )
-    from tokenizers import Tokenizer
+    from tokenizers import Tokenizer  # noqa: F401  -- raises ImportError if unimportable
 
-    if Tokenizer is None:
-        raise SystemExit("tokenizers runtime import failed")
     print(
         f"Tokenizer oracle verified: Python {sys.version_info.major}."
         f"{sys.version_info.minor}, tokenizers {version}, "

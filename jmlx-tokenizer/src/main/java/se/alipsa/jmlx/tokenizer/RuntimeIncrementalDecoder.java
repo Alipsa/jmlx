@@ -15,7 +15,6 @@ import tools.jackson.databind.JsonNode;
 final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
 
   private static final Pattern BYTE_TOKEN = Pattern.compile("<0x[0-9A-Fa-f]{2}>");
-  private static final int WORDPIECE_PENDING_CHARS = 5;
 
   private final TokenizerRuntime runtime;
   private final boolean skipSpecialTokens;
@@ -26,7 +25,6 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
   private final ByteArrayOutputStream fallbackBytes = new ByteArrayOutputStream();
   private byte[] pendingUtf8 = new byte[0];
   private boolean firstText = true;
-  private String wordPiecePending = "";
   private boolean finished;
 
   RuntimeIncrementalDecoder(TokenizerRuntime runtime, boolean skipSpecialTokens, JsonNode decoder) {
@@ -104,54 +102,18 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
   }
 
   private String wordPiece(String token, boolean end) {
+    if (end) {
+      return "";
+    }
     JsonNode component = singleComponent(decoder, "WordPiece");
     String prefix = component.path("prefix").asString("##");
     boolean cleanup = component.path("cleanup").asBoolean(true);
-    if (!end) {
-      String raw;
-      if (!firstText && token.startsWith(prefix)) {
-        raw = token.substring(prefix.length());
-      } else {
-        raw = firstText ? token : " " + token;
-      }
-      firstText = false;
-      wordPiecePending += raw;
-    }
-    if (!cleanup) {
-      String result = wordPiecePending;
-      wordPiecePending = "";
-      return result;
-    }
-    String cleaned = cleanupWordPiece(wordPiecePending);
-    if (!end && cleaned.length() <= WORDPIECE_PENDING_CHARS) {
-      wordPiecePending = cleaned;
-      return "";
-    }
-    if (end) {
-      wordPiecePending = "";
-      return cleaned;
-    }
-    int emit = cleaned.length() - WORDPIECE_PENDING_CHARS;
-    if (emit > 0 && Character.isHighSurrogate(cleaned.charAt(emit - 1))) {
-      emit--;
-    }
-    String result = cleaned.substring(0, emit);
-    wordPiecePending = cleaned.substring(emit);
-    return result;
-  }
-
-  private static String cleanupWordPiece(String value) {
-    return value
-        .replace(" .", ".")
-        .replace(" ?", "?")
-        .replace(" !", "!")
-        .replace(" ,", ",")
-        .replace(" ' ", "'")
-        .replace(" n't", "n't")
-        .replace(" 'm", "'m")
-        .replace(" 's", "'s")
-        .replace(" 've", "'ve")
-        .replace(" 're", "'re");
+    String raw =
+        !firstText && token.startsWith(prefix)
+            ? token.substring(prefix.length())
+            : firstText ? token : " " + token;
+    firstText = false;
+    return cleanup ? DecoderPipeline.cleanupWordPiece(raw) : raw;
   }
 
   private String decodeUtf8(byte[] bytes, boolean end) {

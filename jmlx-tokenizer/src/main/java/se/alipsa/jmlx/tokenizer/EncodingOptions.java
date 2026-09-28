@@ -14,10 +14,6 @@ public record EncodingOptions(boolean addSpecialTokens, Truncation truncation, P
   public EncodingOptions {
     truncation = Objects.requireNonNull(truncation, "truncation");
     padding = Objects.requireNonNull(padding, "padding");
-    if (truncation.enabled() && padding.enabled() && padding.length() < truncation.maxLength()) {
-      throw new IllegalArgumentException(
-          "Padding length must not be smaller than truncation length");
-    }
   }
 
   /**

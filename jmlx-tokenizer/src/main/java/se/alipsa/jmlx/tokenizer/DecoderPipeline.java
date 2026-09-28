@@ -82,7 +82,7 @@ final class DecoderPipeline {
     return result;
   }
 
-  private static String cleanupWordPiece(String value) {
+  static String cleanupWordPiece(String value) {
     return value
         .replace(" .", ".")
         .replace(" ?", "?")
@@ -93,7 +93,8 @@ final class DecoderPipeline {
         .replace(" 'm", "'m")
         .replace(" 's", "'s")
         .replace(" 've", "'ve")
-        .replace(" 're", "'re");
+        .replace(" 're", "'re")
+        .replace(" do not", " don't");
   }
 
   private static List<String> replace(JsonNode config, List<String> tokens) {
@@ -101,7 +102,7 @@ final class DecoderPipeline {
     String target =
         pattern.has("String")
             ? Pattern.quote(pattern.path("String").asString())
-            : OnigRegex.whitespace(pattern.path("Regex").asString());
+            : OnigRegex.translate(pattern.path("Regex").asString());
     // content is a literal replacement string, not a $1/backreference template (PR #24 review
     // round 2, finding 7) -- quoteReplacement keeps a literal `$` or `\` from being misread as one.
     String replacement = Matcher.quoteReplacement(config.path("content").asString());

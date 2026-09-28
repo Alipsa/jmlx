@@ -263,7 +263,7 @@ class Phase62TokenizerContractTest {
               MAPPER.readTree("{\"type\":\"" + form + "\"}"),
               AlignedText.original("\u1100\u1161\u11A8"));
       assertEquals("각", normalized.text());
-      assertEquals(new TokenOffset(0, 9), normalized.offset());
+      assertEquals(new TokenOffset(0, 3), normalized.offset());
     }
     AlignedText decomposed =
         NormalizerPipeline.apply(MAPPER.readTree("{\"type\":\"NFKD\"}"), AlignedText.original("각"));

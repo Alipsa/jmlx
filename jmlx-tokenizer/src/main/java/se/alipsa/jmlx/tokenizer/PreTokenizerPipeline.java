@@ -24,7 +24,7 @@ final class PreTokenizerPipeline {
               + "|\\p{IsWhite_Space}+");
   private static final Pattern WHITESPACE_PATTERN =
       Pattern.compile(
-          "[\\p{L}\\p{M}\\p{Nd}\\p{Pc}]+|[^\\p{L}\\p{M}\\p{Nd}\\p{Pc}\\p{IsWhite_Space}]+");
+          "[\\p{IsAlphabetic}\\p{M}\\p{Nd}\\p{Pc}\\u200c\\u200d]+|[^\\p{IsAlphabetic}\\p{M}\\p{Nd}\\p{Pc}\\u200c\\u200d\\p{IsWhite_Space}]+");
   private static final Pattern WHITESPACE_SPLIT_PATTERN = Pattern.compile("[^\\p{IsWhite_Space}]+");
 
   private PreTokenizerPipeline() {}
@@ -69,8 +69,8 @@ final class PreTokenizerPipeline {
     AlignedText value = input;
     if (prefix && !value.units().isEmpty() && !value.text().startsWith(" ")) {
       List<AlignedText.Unit> units = new ArrayList<>();
-      int boundary = value.units().getFirst().startByte();
-      units.add(new AlignedText.Unit(" ", boundary, boundary));
+      AlignedText.Unit first = value.units().getFirst();
+      units.add(new AlignedText.Unit(" ", first.startByte(), first.endByte()));
       units.addAll(value.units());
       value = new AlignedText(units);
     }
@@ -101,6 +101,7 @@ final class PreTokenizerPipeline {
     boolean shouldPrepend =
         !input.units().isEmpty()
             && !input.text().startsWith(replacement)
+            && !input.text().startsWith(" ")
             && ("always".equals(scheme)
                 || ("first".equals(scheme) && input.units().getFirst().startByte() == 0));
     if (shouldPrepend) {
@@ -198,7 +199,7 @@ final class PreTokenizerPipeline {
     JsonNode patternNode = config.path("pattern");
     String expression;
     if (patternNode.has("Regex")) {
-      expression = OnigRegex.whitespace(patternNode.path("Regex").asString());
+      expression = OnigRegex.translate(patternNode.path("Regex").asString());
     } else if (patternNode.has("String")) {
       expression = Pattern.quote(patternNode.path("String").asString());
     } else {

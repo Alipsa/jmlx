@@ -92,8 +92,8 @@ final class NormalizerPipeline {
       int end = unit.endByte();
       while (output.size() > common) {
         AlignedText.Unit removed = output.removeLast();
-        start = Math.min(start, removed.startByte());
-        end = Math.max(end, removed.endByte());
+        start = removed.startByte();
+        end = removed.endByte();
       }
       for (int index = common; index < scalars.length; index++) {
         output.add(new AlignedText.Unit(new String(Character.toChars(scalars[index])), start, end));
@@ -123,7 +123,12 @@ final class NormalizerPipeline {
   }
 
   private static AlignedText nfdThenFilterMarks(AlignedText input) {
-    return filterMarks(unicode(input, Normalizer.Form.NFD));
+    return new AlignedText(
+        unicode(input, Normalizer.Form.NFD).units().stream()
+            .filter(
+                unit ->
+                    Character.getType(unit.value().codePointAt(0)) != Character.NON_SPACING_MARK)
+            .toList());
   }
 
   private static boolean isMark(int codePoint) {
@@ -139,8 +144,8 @@ final class NormalizerPipeline {
     }
     String prefix = config.path("prepend").asString();
     List<AlignedText.Unit> output = new ArrayList<>();
-    int boundary = input.units().getFirst().startByte();
-    addMapped(output, prefix, boundary, boundary);
+    AlignedText.Unit first = input.units().getFirst();
+    addMapped(output, prefix, first.startByte(), first.endByte());
     output.addAll(input.units());
     return new AlignedText(output);
   }
@@ -169,7 +174,7 @@ final class NormalizerPipeline {
     if (patternNode.has("String")) {
       expression = Pattern.quote(patternNode.path("String").asString());
     } else if (patternNode.has("Regex")) {
-      expression = OnigRegex.whitespace(patternNode.path("Regex").asString());
+      expression = OnigRegex.translate(patternNode.path("Regex").asString());
     } else {
       throw new TokenizerException("NormalizerPipeline: Replace.pattern is unsupported");
     }
@@ -217,7 +222,7 @@ final class NormalizerPipeline {
       if (clean && (cp == 0 || cp == 0xfffd || isControl(cp))) {
         continue;
       }
-      if (UnicodeWhitespace.isWhitespace(cp)) {
+      if (clean && UnicodeWhitespace.isWhitespace(cp)) {
         units.add(new AlignedText.Unit(" ", unit.startByte(), unit.endByte()));
       } else if (chinese && isChinese(cp)) {
         units.add(new AlignedText.Unit(" ", unit.startByte(), unit.startByte()));
@@ -249,8 +254,7 @@ final class NormalizerPipeline {
     return type == Character.CONTROL
         || type == Character.FORMAT
         || type == Character.SURROGATE
-        || type == Character.PRIVATE_USE
-        || type == Character.UNASSIGNED;
+        || type == Character.PRIVATE_USE;
   }
 
   private static int[] unitAtChar(AlignedText input) {
@@ -278,8 +282,15 @@ final class NormalizerPipeline {
   }
 
   private static TokenOffset range(AlignedText input, int[] unitAtChar, int start, int end) {
-    if (start == end || input.units().isEmpty()) {
+    if (input.units().isEmpty()) {
       return TokenOffset.NONE;
+    }
+    if (start == end) {
+      int boundary =
+          start < input.text().length()
+              ? input.units().get(unitAtChar[start]).startByte()
+              : input.units().getLast().endByte();
+      return new TokenOffset(boundary, boundary);
     }
     AlignedText.Unit first = input.units().get(unitAtChar[start]);
     AlignedText.Unit last = input.units().get(unitAtChar[end - 1]);

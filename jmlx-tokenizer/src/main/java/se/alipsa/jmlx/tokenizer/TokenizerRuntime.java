@@ -116,8 +116,7 @@ final class TokenizerRuntime {
 
   private TokenPiece added(AddedTokenMatcher.Segment segment) {
     AddedToken token = segment.token();
-    return new TokenPiece(
-        segment.text().text(), segment.text().offset(), token.id(), 0, token.special());
+    return new TokenPiece(segment.text().text(), segment.text().offset(), token.id(), 0, false);
   }
 
   String decode(List<Integer> ids, boolean skipSpecialTokens) {

@@ -246,6 +246,9 @@ public final class TokenizerJsonLoader {
       throw new TokenizerException(
           "TokenizerJsonLoader: " + path + " must contain exactly one String or Regex value");
     }
+    if (pattern.has("Regex")) {
+      OnigRegex.translate(pattern.path("Regex").asString());
+    }
   }
 
   private static void validatePrependScheme(JsonNode node, String path) {

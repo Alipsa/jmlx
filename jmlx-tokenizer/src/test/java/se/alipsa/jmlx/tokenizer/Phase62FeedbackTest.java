@@ -35,6 +35,21 @@ class Phase62FeedbackTest {
                 json(
                     "{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\",\"split\":false}"),
                 AlignedText.original("▁abc"))));
+    JsonNode metaspace =
+        json(
+            "{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\",\"split\":false}");
+    assertEquals(
+        List.of("▁a"), texts(PreTokenizerPipeline.apply(metaspace, AlignedText.original(" a"))));
+    assertEquals(
+        List.of("▁▁a"), texts(PreTokenizerPipeline.apply(metaspace, AlignedText.original("  a"))));
+    Path fixtures =
+        Path.of(System.getProperty("jmlx.repository.root"), "tools/tokenizer-oracle/fixtures");
+    HfTokenizer bpe = HfTokenizer.fromFile(fixtures.resolve("metaspace-bpe.tokenizer.json"));
+    assertEquals(List.of(13, 1, 17), bpe.encode(" hello world", false));
+    assertEquals(List.of(1, 13), bpe.encode("  hello", false));
+    HfTokenizer unigram = HfTokenizer.fromFile(fixtures.resolve("unigram.tokenizer.json"));
+    assertEquals(List.of(9, 10), unigram.encode(" hello world", false));
+    assertEquals(List.of(9), unigram.encode("\u00a0hello", false));
   }
 
   @Test
@@ -84,6 +99,130 @@ class Phase62FeedbackTest {
     assertEquals(
         List.of("a", "①", "b"),
         texts(PreTokenizerPipeline.apply(whitespace, AlignedText.original("a①b"))));
+    assertEquals(
+        List.of("aⅧb"), texts(PreTokenizerPipeline.apply(whitespace, AlignedText.original("aⅧb"))));
+    assertEquals(
+        List.of("he\u200dllo"),
+        texts(PreTokenizerPipeline.apply(whitespace, AlignedText.original("he\u200dllo"))));
+  }
+
+  @Test
+  void onigRegexClassesUseUnicodeAndPosixDigit() throws Exception {
+    assertEquals(
+        List.of("a", "١٢", "b"),
+        texts(
+            PreTokenizerPipeline.apply(
+                json(
+                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\d+\"},\"behavior\":\"Isolated\"}"),
+                AlignedText.original("a١٢b"))));
+    assertEquals(
+        List.of("aéb"),
+        texts(
+            PreTokenizerPipeline.apply(
+                json(
+                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\w+\"},\"behavior\":\"Isolated\"}"),
+                AlignedText.original("aéb"))));
+    assertEquals(
+        List.of("a", "12", "b"),
+        texts(
+            PreTokenizerPipeline.apply(
+                json(
+                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"[[:digit:]]+\"},\"behavior\":\"Isolated\"}"),
+                AlignedText.original("a12b"))));
+    assertEquals(
+        "#",
+        NormalizerPipeline.apply(
+                json("{\"type\":\"Replace\",\"pattern\":{\"Regex\":\"\\\\w+\"},\"content\":\"#\"}"),
+                AlignedText.original("a你b"))
+            .text());
+  }
+
+  @Test
+  void bertCleanAndAccentRulesMatchHf() throws Exception {
+    JsonNode unclean =
+        json(
+            "{\"type\":\"BertNormalizer\",\"clean_text\":false,\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":false}");
+    assertEquals(
+        "a\tb\nc\u00a0d",
+        NormalizerPipeline.apply(unclean, AlignedText.original("a\tb\nc\u00a0d")).text());
+    JsonNode clean =
+        json(
+            "{\"type\":\"BertNormalizer\",\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":false}");
+    assertEquals(
+        "\u0378z", NormalizerPipeline.apply(clean, AlignedText.original("\u0378z")).text());
+    JsonNode accents =
+        json(
+            "{\"type\":\"BertNormalizer\",\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":true}");
+    assertEquals("कार", NormalizerPipeline.apply(accents, AlignedText.original("कार")).text());
+    assertEquals("अः", NormalizerPipeline.apply(accents, AlignedText.original("अः")).text());
+    assertEquals(
+        "a\u0488", NormalizerPipeline.apply(accents, AlignedText.original("a\u0488")).text());
+  }
+
+  @Test
+  void insertedAndComposedTextKeepsSourceOffsets() throws Exception {
+    AlignedText prepended =
+        NormalizerPipeline.apply(
+            json("{\"type\":\"Prepend\",\"prepend\":\"_\"}"), AlignedText.original("hi"));
+    assertEquals(0, prepended.units().getFirst().startByte());
+    assertEquals(1, prepended.units().getFirst().endByte());
+    AlignedText byteLevel =
+        PreTokenizerPipeline.apply(
+                json("{\"type\":\"ByteLevel\",\"add_prefix_space\":true,\"use_regex\":false}"),
+                AlignedText.original("hi"))
+            .getFirst();
+    assertEquals(0, byteLevel.units().getFirst().startByte());
+    assertEquals(1, byteLevel.units().getFirst().endByte());
+    AlignedText composed =
+        NormalizerPipeline.apply(json("{\"type\":\"NFC\"}"), AlignedText.original("e\u0301"));
+    assertEquals(composed.offset(), new TokenOffset(0, 1));
+    AlignedText replaced =
+        NormalizerPipeline.apply(
+            json("{\"type\":\"Replace\",\"pattern\":{\"Regex\":\"\\\\b\"},\"content\":\"|\"}"),
+            AlignedText.original("ab cd"));
+    AlignedText.Unit inserted =
+        replaced.units().stream().filter(u -> u.value().equals("|")).toList().get(2);
+    assertEquals(new TokenOffset(3, 3), new TokenOffset(inserted.startByte(), inserted.endByte()));
+  }
+
+  @Test
+  void incrementalWordPieceCleanupStaysWithinTokens() throws Exception {
+    JsonNode decoder = json("{\"type\":\"WordPiece\",\"prefix\":\"##\",\"cleanup\":true}");
+    Map<String, Integer> vocab = Map.of("x", 0, "'", 1, "y", 2, " do not", 3);
+    assertEquals("x ' y", incremental(decoder, vocab, List.of(0, 1, 2)));
+    assertEquals("x ' y", DecoderPipeline.decode(decoder, List.of("x", "'", "y")));
+    assertEquals(" don't", incremental(decoder, vocab, List.of(3)));
+    assertEquals(" don't", DecoderPipeline.decode(decoder, List.of(" do not")));
+  }
+
+  @Test
+  void inputAddedTokensAreNotMarkedAsPostProcessorSpecialTokens() {
+    TokenizerDefinition definition =
+        new TokenizerDefinition(
+            null,
+            null,
+            List.of(),
+            new TokenizerDefinition.WordPiece(Map.of("x", 0, "[UNK]", 1), "[UNK]", "##", 100),
+            null,
+            List.of(new AddedToken(2, "<A>", true)),
+            EncodingOptions.unbounded(false),
+            false,
+            false);
+    TokenizerEncoding encoding =
+        new TokenizerRuntime(definition).encode("x<A>x", EncodingOptions.unbounded(false));
+    assertEquals(List.of(0, 2, 0), encoding.ids());
+    assertEquals(List.of(0, 0, 0), encoding.specialTokensMask());
+  }
+
+  @Test
+  void fixedPaddingCanBeShorterThanTruncationLimit() {
+    EncodingOptions options =
+        new EncodingOptions(
+            true,
+            new Truncation(8, Direction.RIGHT),
+            new Padding(4, Direction.RIGHT, 0, "[PAD]", 0));
+    assertEquals(8, options.truncation().maxLength());
+    assertEquals(4, options.padding().length());
   }
 
   @Test

@@ -389,9 +389,15 @@ public final class TokenizerJsonLoader {
     Map<String, Integer> vocab = new LinkedHashMap<>();
     Map<Integer, String> byId = new HashMap<>();
     for (Map.Entry<String, JsonNode> entry : node.properties()) {
-      if (!entry.getValue().isIntegralNumber()) {
+      if (!entry.getValue().isIntegralNumber()
+          || !entry.getValue().canConvertToInt()
+          || entry.getValue().intValue() < 0) {
         throw new TokenizerException(
-            "TokenizerJsonLoader: " + path + "['" + entry.getKey() + "'] must be an integer");
+            "TokenizerJsonLoader: "
+                + path
+                + "['"
+                + entry.getKey()
+                + "'] must be a non-negative int");
       }
       int id = entry.getValue().intValue();
       String other = byId.putIfAbsent(id, entry.getKey());
@@ -477,7 +483,7 @@ public final class TokenizerJsonLoader {
       return;
     }
     if ("TemplateProcessing".equals(type)) {
-      result.add(parseTemplateProcessing(node));
+      result.add(parseTemplateProcessing(node, path));
       return;
     }
     if ("BertProcessing".equals(type)) {
@@ -535,9 +541,14 @@ public final class TokenizerJsonLoader {
     return new ResolvedToken(node.get(0).asString(), node.get(1).intValue());
   }
 
-  private static TemplateProcessingStep parseTemplateProcessing(JsonNode node) {
+  private static TemplateProcessingStep parseTemplateProcessing(JsonNode node, String path) {
+    JsonNode singleNode = node.path("single");
+    if (!singleNode.isArray() || singleNode.isEmpty()) {
+      throw new TokenizerException(
+          "TokenizerJsonLoader: " + path + ".single must be a non-empty array");
+    }
     List<TemplateItem> single = new ArrayList<>();
-    for (JsonNode item : node.path("single")) {
+    for (JsonNode item : singleNode) {
       if (item.has("SpecialToken")) {
         single.add(new SpecialTokenItem(item.path("SpecialToken").path("id").asString()));
       } else if (item.has("Sequence")) {
@@ -1053,11 +1064,15 @@ public final class TokenizerJsonLoader {
               + entry);
     }
     JsonNode idNode = entry.path("id");
-    if (idNode.isMissingNode() || idNode.isNull() || !idNode.isIntegralNumber()) {
+    if (idNode.isMissingNode()
+        || idNode.isNull()
+        || !idNode.isIntegralNumber()
+        || !idNode.canConvertToInt()
+        || idNode.intValue() < 0) {
       throw new TokenizerException(
           "TokenizerJsonLoader: added_tokens['"
               + contentNode.asString()
-              + "'] has no integral id: "
+              + "'] has no non-negative int id: "
               + idNode);
     }
   }

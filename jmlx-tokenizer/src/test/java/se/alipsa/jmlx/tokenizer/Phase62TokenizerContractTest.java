@@ -256,6 +256,76 @@ class Phase62TokenizerContractTest {
   }
 
   @Test
+  void unicodeNormalizationComposesAcrossNonMarkScalarsAndTracksSourceRange() throws Exception {
+    for (String form : List.of("NFC", "NFKC")) {
+      AlignedText normalized =
+          NormalizerPipeline.apply(
+              MAPPER.readTree("{\"type\":\"" + form + "\"}"),
+              AlignedText.original("\u1100\u1161\u11A8"));
+      assertEquals("각", normalized.text());
+      assertEquals(new TokenOffset(0, 9), normalized.offset());
+    }
+    AlignedText decomposed =
+        NormalizerPipeline.apply(MAPPER.readTree("{\"type\":\"NFKD\"}"), AlignedText.original("각"));
+    assertEquals("\u1100\u1161\u11A8", decomposed.text());
+    assertTrue(
+        decomposed.units().stream().allMatch(unit -> unit.startByte() == 0 && unit.endByte() == 3));
+  }
+
+  @Test
+  void vocabularyAndAddedTokenIdsMustFitNonNegativeInt() throws Exception {
+    for (String id : List.of("-1", "2147483648")) {
+      ObjectNode root = (ObjectNode) MAPPER.readTree(wordPieceFixture().toFile());
+      ((ObjectNode) root.path("model").path("vocab")).put("bad", Long.parseLong(id));
+      Path vocabFile = temporaryDirectory.resolve("bad-vocab-" + id + ".json");
+      MAPPER.writeValue(vocabFile.toFile(), root);
+      assertTrue(
+          assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(vocabFile))
+              .getMessage()
+              .contains("model.vocab['bad']"));
+
+      root = (ObjectNode) MAPPER.readTree(wordPieceFixture().toFile());
+      ((ObjectNode) root.withArray("added_tokens").get(0)).put("id", Long.parseLong(id));
+      Path addedFile = temporaryDirectory.resolve("bad-added-" + id + ".json");
+      MAPPER.writeValue(addedFile.toFile(), root);
+      assertTrue(
+          assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(addedFile))
+              .getMessage()
+              .contains("added_tokens"));
+    }
+  }
+
+  @Test
+  void ignoreMergesEmitsUnmergedSymbolsWhenWholeTokenIsAbsent() {
+    Map<String, Integer> vocab = Map.of("a", 0, "b!", 1, "ab!", 2);
+    TokenizerDefinition.Bpe ignored =
+        new TokenizerDefinition.Bpe(vocab, Map.of("a b!", 0), null, false, false, "", "!", true);
+    TokenizerDefinition.Bpe enabled =
+        new TokenizerDefinition.Bpe(vocab, Map.of("a b!", 0), null, false, false, "", "!", false);
+    AlignedText input = AlignedText.original("ab");
+    assertEquals(
+        List.of("a", "b!"),
+        TokenizerModels.encode(ignored, input).stream().map(TokenPiece::text).toList());
+    assertEquals(
+        List.of("ab!"),
+        TokenizerModels.encode(enabled, input).stream().map(TokenPiece::text).toList());
+  }
+
+  @Test
+  void pairOnlyTemplateIsRejectedWithJsonPath() throws Exception {
+    ObjectNode root = (ObjectNode) MAPPER.readTree(wordPieceFixture().toFile());
+    root.set(
+        "post_processor",
+        MAPPER.readTree("{\"type\":\"TemplateProcessing\",\"pair\":[{\"Sequence\":{}}]}"));
+    Path file = temporaryDirectory.resolve("pair-only.json");
+    MAPPER.writeValue(file.toFile(), root);
+    assertTrue(
+        assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(file))
+            .getMessage()
+            .contains("post_processor.single"));
+  }
+
+  @Test
   void unigramTrieKeepsLongInputBounded() {
     HfTokenizer tokenizer =
         HfTokenizer.fromFile(

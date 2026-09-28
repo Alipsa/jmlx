@@ -44,23 +44,32 @@ final class NormalizerPipeline {
   }
 
   private static AlignedText unicode(AlignedText input, Normalizer.Form form) {
+    String original = input.text();
+    if (Normalizer.isNormalized(original, form)) {
+      return input;
+    }
     List<AlignedText.Unit> output = new ArrayList<>();
-    List<AlignedText.Unit> units = input.units();
-    for (int index = 0; index < units.size(); ) {
-      int end = index + 1;
-      while (end < units.size() && isMark(units.get(end).value().codePointAt(0))) {
-        end++;
+    StringBuilder prefix = new StringBuilder();
+    for (AlignedText.Unit unit : input.units()) {
+      prefix.append(unit.value());
+      String normalized = Normalizer.normalize(prefix, form);
+      int[] scalars = normalized.codePoints().toArray();
+      int common = 0;
+      while (common < output.size()
+          && common < scalars.length
+          && output.get(common).value().codePointAt(0) == scalars[common]) {
+        common++;
       }
-      StringBuilder cluster = new StringBuilder();
-      for (int i = index; i < end; i++) {
-        cluster.append(units.get(i).value());
+      int start = unit.startByte();
+      int end = unit.endByte();
+      while (output.size() > common) {
+        AlignedText.Unit removed = output.removeLast();
+        start = Math.min(start, removed.startByte());
+        end = Math.max(end, removed.endByte());
       }
-      addMapped(
-          output,
-          Normalizer.normalize(cluster, form),
-          units.get(index).startByte(),
-          units.get(end - 1).endByte());
-      index = end;
+      for (int index = common; index < scalars.length; index++) {
+        output.add(new AlignedText.Unit(new String(Character.toChars(scalars[index])), start, end));
+      }
     }
     return new AlignedText(output);
   }

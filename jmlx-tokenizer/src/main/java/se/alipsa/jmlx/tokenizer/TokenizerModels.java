@@ -14,6 +14,19 @@ final class TokenizerModels {
 
   private TokenizerModels() {}
 
+  interface Encoder {
+    List<TokenPiece> encode(AlignedText input);
+  }
+
+  static Encoder prepare(TokenizerDefinition.Model model) {
+    if (model instanceof TokenizerDefinition.Unigram unigram) {
+      TrieNode trie = unigramTrie(unigram);
+      double unknownScore = unigramUnknownScore(unigram);
+      return input -> unigram(unigram, input, trie, unknownScore);
+    }
+    return input -> encode(model, input);
+  }
+
   static List<TokenPiece> encode(TokenizerDefinition.Model model, AlignedText input) {
     return switch (model) {
       case TokenizerDefinition.Bpe bpe -> bpe(bpe, input);
@@ -50,8 +63,10 @@ final class TokenizerModels {
     PriorityQueue<BpeCandidate> candidates =
         new PriorityQueue<>(
             Comparator.comparingInt(BpeCandidate::rank).thenComparingInt(BpeCandidate::left));
-    for (int index = 0; index + 1 < nodes.size(); index++) {
-      addCandidate(model, nodes, candidates, index, index + 1);
+    if (!model.ignoreMerges()) {
+      for (int index = 0; index + 1 < nodes.size(); index++) {
+        addCandidate(model, nodes, candidates, index, index + 1);
+      }
     }
     while (!candidates.isEmpty()) {
       BpeCandidate candidate = candidates.remove();
@@ -195,18 +210,21 @@ final class TokenizerModels {
   }
 
   private static List<TokenPiece> unigram(TokenizerDefinition.Unigram model, AlignedText input) {
+    return unigram(model, input, unigramTrie(model), unigramUnknownScore(model));
+  }
+
+  private static List<TokenPiece> unigram(
+      TokenizerDefinition.Unigram model, AlignedText input, TrieNode trie, double unknownScore) {
     int size = input.units().size();
     if (size == 0) {
       return List.of();
     }
-    final double unknownScore = unigramUnknownScore(model);
     double[] best = new double[size + 1];
     Arrays.fill(best, Double.NEGATIVE_INFINITY);
     best[0] = 0.0;
     int[] previous = new int[size + 1];
     int[] tokenIds = new int[size + 1];
     Arrays.fill(tokenIds, -1);
-    TrieNode trie = unigramTrie(model);
     for (int start = 0; start < size; start++) {
       if (!Double.isFinite(best[start])) {
         continue;

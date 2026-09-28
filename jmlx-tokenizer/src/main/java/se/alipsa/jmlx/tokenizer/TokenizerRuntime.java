@@ -9,11 +9,13 @@ import java.util.Objects;
 final class TokenizerRuntime {
 
   private final TokenizerDefinition definition;
+  private final TokenizerModels.Encoder modelEncoder;
   private final Vocabulary vocabulary;
   private final int baseVocabularyMaxKnownId;
 
   TokenizerRuntime(TokenizerDefinition definition) {
     this.definition = Objects.requireNonNull(definition, "definition");
+    this.modelEncoder = TokenizerModels.prepare(definition.model());
     List<AddedToken> templateTokens = collectTemplateTokens(definition.postProcessor());
     Vocabulary base = new Vocabulary(definition.model().vocab(), definition.addedTokens());
     requireCompatible(templateTokens, base);
@@ -105,7 +107,7 @@ final class TokenizerRuntime {
         }
         for (AlignedText pretoken :
             PreTokenizerPipeline.apply(definition.preTokenizer(), segment.text())) {
-          result.addAll(TokenizerModels.encode(definition.model(), pretoken));
+          result.addAll(modelEncoder.encode(pretoken));
         }
       }
     }

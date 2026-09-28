@@ -1,8 +1,10 @@
 package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,40 @@ import tools.jackson.databind.ObjectMapper;
 class Phase62FeedbackTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  @Test
+  void adjacentSplitMatchesStaySeparateWhenMergedWithPrevious() throws Exception {
+    assertEquals(
+        List.of("ba", "a", "b"),
+        texts(
+            PreTokenizerPipeline.apply(
+                json(
+                    "{\"type\":\"Split\",\"pattern\":{\"String\":\"a\"},\"behavior\":\"MergedWithPrevious\"}"),
+                AlignedText.original("baab"))));
+  }
+
+  @Test
+  void metaspaceRecognizesExistingLeadingReplacement() throws Exception {
+    assertEquals(
+        List.of("▁abc"),
+        texts(
+            PreTokenizerPipeline.apply(
+                json(
+                    "{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\",\"split\":false}"),
+                AlignedText.original("▁abc"))));
+  }
+
+  @Test
+  void unicodeNormalizationOfLongDecomposedTextStaysBounded() throws Exception {
+    JsonNode nfc = json("{\"type\":\"NFC\"}");
+    String input = "Cafe\u0301 ".repeat(10_000);
+    assertTimeout(
+        Duration.ofSeconds(5),
+        () ->
+            assertEquals(
+                "Café ".repeat(10_000),
+                NormalizerPipeline.apply(nfc, AlignedText.original(input)).text()));
+  }
 
   @Test
   void splitAndReplaceTreatOnigWhitespaceAsUnicodeWhiteSpace() throws Exception {
@@ -82,7 +118,11 @@ class Phase62FeedbackTest {
         json(
             "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteLevel\"},{\"type\":\"Strip\",\"content\":\""
                 + " \",\"start\":1,\"stop\":0}]}");
-    assertEquals("ab", DecoderPipeline.decode(byteLevelStrip, List.of("Ġa", "Ġb")));
+    assertEquals("a b", DecoderPipeline.decode(byteLevelStrip, List.of("Ġa", "Ġb")));
+    JsonNode byteLevelReplace =
+        json(
+            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteLevel\"},{\"type\":\"Replace\",\"pattern\":{\"String\":\"ab\"},\"content\":\"X\"}]}");
+    assertEquals("X", DecoderPipeline.decode(byteLevelReplace, List.of("a", "b")));
     assertEquals(
         "\ufffd\ufffda",
         DecoderPipeline.decode(

@@ -100,7 +100,7 @@ final class PreTokenizerPipeline {
     List<AlignedText.Unit> units = new ArrayList<>();
     boolean shouldPrepend =
         !input.units().isEmpty()
-            && !input.text().startsWith(" ")
+            && !input.text().startsWith(replacement)
             && ("always".equals(scheme)
                 || ("first".equals(scheme) && input.units().getFirst().startByte() == 0));
     if (shouldPrepend) {
@@ -237,7 +237,9 @@ final class PreTokenizerPipeline {
           result.add(new AlignedText(merged));
         } else if ("Isolated".equals(behavior) || "Contiguous".equals(behavior)) {
           result.add(slice(input, unitAtChar, matcher.start(), matcher.end()));
-        } else if ("MergedWithPrevious".equals(behavior) && !result.isEmpty()) {
+        } else if ("MergedWithPrevious".equals(behavior)
+            && matcher.start() != previousMatchEnd
+            && !result.isEmpty()) {
           AlignedText previous = result.removeLast();
           List<AlignedText.Unit> merged = new ArrayList<>(previous.units());
           merged.addAll(slice(input, unitAtChar, matcher.start(), matcher.end()).units());

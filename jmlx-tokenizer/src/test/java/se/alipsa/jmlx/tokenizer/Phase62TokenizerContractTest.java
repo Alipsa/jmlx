@@ -296,7 +296,7 @@ class Phase62TokenizerContractTest {
   }
 
   @Test
-  void ignoreMergesEmitsUnmergedSymbolsWhenWholeTokenIsAbsent() {
+  void ignoreMergesStillMergesWhenWholeTokenIsAbsent() {
     Map<String, Integer> vocab = Map.of("a", 0, "b!", 1, "ab!", 2);
     TokenizerDefinition.Bpe ignored =
         new TokenizerDefinition.Bpe(vocab, Map.of("a b!", 0), null, false, false, "", "!", true);
@@ -304,11 +304,24 @@ class Phase62TokenizerContractTest {
         new TokenizerDefinition.Bpe(vocab, Map.of("a b!", 0), null, false, false, "", "!", false);
     AlignedText input = AlignedText.original("ab");
     assertEquals(
-        List.of("a", "b!"),
+        List.of("ab!"),
         TokenizerModels.encode(ignored, input).stream().map(TokenPiece::text).toList());
     assertEquals(
         List.of("ab!"),
         TokenizerModels.encode(enabled, input).stream().map(TokenPiece::text).toList());
+    TokenizerDefinition.Bpe wholeHit =
+        new TokenizerDefinition.Bpe(
+            Map.of("a", 0, "b!", 1, "ab!", 2, "ab", 3),
+            Map.of("a b!", 0),
+            null,
+            false,
+            false,
+            "",
+            "!",
+            true);
+    assertEquals(
+        List.of("ab"),
+        TokenizerModels.encode(wholeHit, input).stream().map(TokenPiece::text).toList());
   }
 
   @Test
@@ -323,6 +336,28 @@ class Phase62TokenizerContractTest {
         assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(file))
             .getMessage()
             .contains("post_processor.single"));
+  }
+
+  @Test
+  void templateSpecialTokenIdsAndTokensRejectCoercedValues() throws Exception {
+    for (String malformed :
+        List.of(
+            "{\"id\":\"[CLS]\",\"ids\":[\"1\"],\"tokens\":[\"[CLS]\"]}",
+            "{\"id\":\"[CLS]\",\"ids\":[2],\"tokens\":[2]}")) {
+      ObjectNode root = (ObjectNode) MAPPER.readTree(wordPieceFixture().toFile());
+      root.set(
+          "post_processor",
+          MAPPER.readTree(
+              "{\"type\":\"TemplateProcessing\",\"single\":[{\"SpecialToken\":{\"id\":\"[CLS]\"}},{\"Sequence\":{}}],\"special_tokens\":{\"[CLS]\":"
+                  + malformed
+                  + "}}"));
+      Path file = temporaryDirectory.resolve("bad-template-" + malformed.hashCode() + ".json");
+      MAPPER.writeValue(file.toFile(), root);
+      assertTrue(
+          assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(file))
+              .getMessage()
+              .contains(malformed.contains("\"1\"") ? "non-integral id" : "non-string token"));
+    }
   }
 
   @Test

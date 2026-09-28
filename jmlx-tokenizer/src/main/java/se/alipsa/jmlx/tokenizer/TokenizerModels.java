@@ -63,10 +63,8 @@ final class TokenizerModels {
     PriorityQueue<BpeCandidate> candidates =
         new PriorityQueue<>(
             Comparator.comparingInt(BpeCandidate::rank).thenComparingInt(BpeCandidate::left));
-    if (!model.ignoreMerges()) {
-      for (int index = 0; index + 1 < nodes.size(); index++) {
-        addCandidate(model, nodes, candidates, index, index + 1);
-      }
+    for (int index = 0; index + 1 < nodes.size(); index++) {
+      addCandidate(model, nodes, candidates, index, index + 1);
     }
     while (!candidates.isEmpty()) {
       BpeCandidate candidate = candidates.remove();

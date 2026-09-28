@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.text.BreakIterator;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,8 +50,35 @@ final class NormalizerPipeline {
       return input;
     }
     List<AlignedText.Unit> output = new ArrayList<>();
+    // Grapheme boundaries keep a combining sequence (and a Hangul Jamo syllable) together.
+    // Normalize each cluster independently so an accent near the start of a document does not
+    // cause every later character to re-normalize the entire growing document prefix.
+    BreakIterator clusters = BreakIterator.getCharacterInstance(Locale.ROOT);
+    clusters.setText(original);
+    int unitIndex = 0;
+    for (int start = clusters.first(), end = clusters.next();
+        end != BreakIterator.DONE;
+        start = end, end = clusters.next()) {
+      int firstUnit = unitIndex;
+      int position = start;
+      while (position < end) {
+        position += input.units().get(unitIndex++).value().length();
+      }
+      String cluster = original.substring(start, end);
+      if (Normalizer.isNormalized(cluster, form)) {
+        output.addAll(input.units().subList(firstUnit, unitIndex));
+      } else {
+        normalizeCluster(input.units().subList(firstUnit, unitIndex), form, output);
+      }
+    }
+    return new AlignedText(output);
+  }
+
+  private static void normalizeCluster(
+      List<AlignedText.Unit> units, Normalizer.Form form, List<AlignedText.Unit> result) {
+    List<AlignedText.Unit> output = new ArrayList<>();
     StringBuilder prefix = new StringBuilder();
-    for (AlignedText.Unit unit : input.units()) {
+    for (AlignedText.Unit unit : units) {
       prefix.append(unit.value());
       String normalized = Normalizer.normalize(prefix, form);
       int[] scalars = normalized.codePoints().toArray();
@@ -71,7 +99,7 @@ final class NormalizerPipeline {
         output.add(new AlignedText.Unit(new String(Character.toChars(scalars[index])), start, end));
       }
     }
-    return new AlignedText(output);
+    result.addAll(output);
   }
 
   private static AlignedText map(

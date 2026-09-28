@@ -186,6 +186,6 @@ final class DecoderPipeline {
       output.flip();
       result.add(output.toString());
     }
-    return result;
+    return List.of(String.join("", result));
   }
 }

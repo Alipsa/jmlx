@@ -563,8 +563,32 @@ public final class TokenizerJsonLoader {
       JsonNode value = entry.getValue();
       List<Integer> ids = new ArrayList<>();
       List<String> tokens = new ArrayList<>();
-      value.path("ids").forEach(id -> ids.add(id.intValue()));
-      value.path("tokens").forEach(token -> tokens.add(token.asString()));
+      value
+          .path("ids")
+          .forEach(
+              id -> {
+                if (!id.isIntegralNumber()) {
+                  throw new TokenizerException(
+                      "TokenizerJsonLoader: TemplateProcessing special token '"
+                          + entry.getKey()
+                          + "' has a non-integral id: "
+                          + id);
+                }
+                ids.add(id.intValue());
+              });
+      value
+          .path("tokens")
+          .forEach(
+              token -> {
+                if (!token.isString()) {
+                  throw new TokenizerException(
+                      "TokenizerJsonLoader: TemplateProcessing special token '"
+                          + entry.getKey()
+                          + "' has a non-string token: "
+                          + token);
+                }
+                tokens.add(token.asString());
+              });
       specialTokens.put(
           entry.getKey(), new SpecialTokenInfo(value.path("id").asString(), ids, tokens));
     }

@@ -59,6 +59,7 @@ public final class TokenizerJsonLoader {
       validateDecoder(decoder, "decoder");
       TokenizerDefinition.Model model = parseFlexibleModel(root.path("model"));
       List<AddedToken> addedTokens = parseFlexibleAddedTokens(root.path("added_tokens"));
+      JsonNode byteLevelStep = findTrimmingByteLevelStep(root.path("post_processor"));
       return new TokenizerDefinition(
           normalizer,
           preTokenizer,
@@ -67,7 +68,8 @@ public final class TokenizerJsonLoader {
           decoder,
           addedTokens,
           parseConfiguredDefaults(root, configuredVocabulary(model.vocab(), addedTokens)),
-          trimByteLevelOffsets(root.path("post_processor")));
+          byteLevelStep != null,
+          byteLevelStep != null && byteLevelStep.path("add_prefix_space").asBoolean(false));
     } catch (IOException | JacksonException e) {
       throw new TokenizerException("TokenizerJsonLoader: failed to parse " + path, e);
     }
@@ -233,8 +235,8 @@ public final class TokenizerJsonLoader {
       }
       case "Strip" -> {
         requireSingleScalar(optionalString(node, "content", " ", path), path + ".content");
-        requireNonNegativeInt(node, "start", path);
-        requireNonNegativeInt(node, "stop", path);
+        optionalNonNegativeInt(node, "start", path);
+        optionalNonNegativeInt(node, "stop", path);
       }
       default -> {
         // ByteLevel, ByteFallback, and Fuse have no behavioral fields used by decoding.
@@ -267,8 +269,19 @@ public final class TokenizerJsonLoader {
     }
   }
 
-  private static void requireNonNegativeInt(JsonNode node, String field, String path) {
+  /**
+   * Requires {@code node.path(field)}, when present, to be a non-negative integer -- but unlike
+   * {@link #requireNonNegativeInt}, tolerates it being absent entirely, defaulting to {@code 0}
+   * (matching HF's own serde default for {@code Strip.start}/{@code Strip.stop}, both of which are
+   * optional there while {@code content} is the only field this decoder shape truly requires). A
+   * committed {@code {"type":"Strip","content":" "}} decoder -- which loads cleanly in HF -- would
+   * otherwise be rejected here as missing {@code start}/{@code stop} (PR #24 review, finding 8).
+   */
+  private static void optionalNonNegativeInt(JsonNode node, String field, String path) {
     JsonNode value = node.path(field);
+    if (value.isMissingNode() || value.isNull()) {
+      return;
+    }
     if (!value.isIntegralNumber() || value.intValue() < 0) {
       throw new TokenizerException(
           "TokenizerJsonLoader: " + path + "." + field + " must be a non-negative integer");
@@ -492,20 +505,30 @@ public final class TokenizerJsonLoader {
         "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
   }
 
-  private static boolean trimByteLevelOffsets(JsonNode node) {
+  /**
+   * Finds the {@code post_processor}'s {@code ByteLevel} step with {@code trim_offsets} enabled, if
+   * any -- {@code null} otherwise. Returns the matching step's own node (not just a boolean) so the
+   * caller can also read that step's own {@code add_prefix_space}, which {@link
+   * TokenizerRuntime#trimSyntheticSpaces} needs to replicate HF's {@code process_offsets} exemption
+   * for the first token's synthesized leading space.
+   */
+  private static JsonNode findTrimmingByteLevelStep(JsonNode node) {
     if (node.isMissingNode() || node.isNull()) {
-      return false;
+      return null;
     }
     if ("Sequence".equals(node.path("type").asString())) {
       for (JsonNode child : node.path("processors")) {
-        if (trimByteLevelOffsets(child)) {
-          return true;
+        JsonNode found = findTrimmingByteLevelStep(child);
+        if (found != null) {
+          return found;
         }
       }
-      return false;
+      return null;
     }
     return "ByteLevel".equals(node.path("type").asString())
-        && node.path("trim_offsets").asBoolean(true);
+            && node.path("trim_offsets").asBoolean(true)
+        ? node
+        : null;
   }
 
   private static ResolvedToken parseTokenPair(JsonNode node, String path) {

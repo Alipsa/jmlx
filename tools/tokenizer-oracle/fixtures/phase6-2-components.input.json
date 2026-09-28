@@ -130,6 +130,17 @@
       ]
     },
     {
+      "name": "added-token-adjacent-strip",
+      "tokenizer": "added-token-adjacent.tokenizer.json",
+      "cases": [
+        {
+          "name": "rstrip-then-lstrip-no-overlap",
+          "text": "x <a> <b> y",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
       "name": "null-pretokenizer-unigram",
       "tokenizer": "null-pretokenizer-unigram.tokenizer.json",
       "cases": [
@@ -167,6 +178,37 @@
         {
           "name": "bytelevel-leading-space",
           "text": " a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bytelevel-digits-and-letters",
+          "text": "a1234b",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "bytelevel-bpe-no-prefix",
+      "tokenizer": "bytelevel-bpe-no-prefix.tokenizer.json",
+      "cases": [
+        {
+          "name": "no-prefix-leading-space-trimmed",
+          "text": " a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "no-prefix-two-leading-spaces",
+          "text": "  a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "no-prefix-no-leading-space",
+          "text": "a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "no-prefix-mid-word-space",
+          "text": "a b",
           "addSpecialTokens": false
         }
       ]

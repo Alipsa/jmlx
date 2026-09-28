@@ -14,7 +14,8 @@ record TokenizerDefinition(
     JsonNode decoder,
     List<AddedToken> addedTokens,
     EncodingOptions configuredDefaults,
-    boolean trimByteLevelOffsets) {
+    boolean trimByteLevelOffsets,
+    boolean byteLevelAddPrefixSpace) {
 
   TokenizerDefinition {
     normalizer = normalizer == null ? null : normalizer.deepCopy();

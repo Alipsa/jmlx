@@ -12,8 +12,7 @@ final class PreTokenizerPipeline {
 
   private static final Pattern BYTE_LEVEL_PATTERN =
       Pattern.compile(
-          "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?+\\p{L}+|"
-              + "\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]++[\\r\\n]*|\\s*[\\r\\n]|\\s+(?!\\S)|\\s+");
+          "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
   private static final Pattern WHITESPACE_PATTERN =
       Pattern.compile("[\\p{L}\\p{N}_]+|[^\\p{L}\\p{N}_\\s]+");
 
@@ -207,13 +206,14 @@ final class PreTokenizerPipeline {
   private static List<AlignedText> splitByBehavior(
       AlignedText input, Pattern pattern, String behavior) {
     String text = input.text();
+    int[] unitAtChar = unitAtChar(input);
     Matcher matcher = pattern.matcher(text);
     List<AlignedText> result = new ArrayList<>();
     int last = 0;
     int previousMatchEnd = -1;
     while (matcher.find()) {
       if (matcher.start() > last) {
-        result.add(slice(input, last, matcher.start()));
+        result.add(slice(input, unitAtChar, last, matcher.start()));
       }
       if (!matcher.group().isEmpty() && !"Removed".equals(behavior)) {
         if ("Contiguous".equals(behavior)
@@ -221,17 +221,17 @@ final class PreTokenizerPipeline {
             && !result.isEmpty()) {
           AlignedText previous = result.removeLast();
           List<AlignedText.Unit> merged = new ArrayList<>(previous.units());
-          merged.addAll(slice(input, matcher.start(), matcher.end()).units());
+          merged.addAll(slice(input, unitAtChar, matcher.start(), matcher.end()).units());
           result.add(new AlignedText(merged));
         } else if ("Isolated".equals(behavior) || "Contiguous".equals(behavior)) {
-          result.add(slice(input, matcher.start(), matcher.end()));
+          result.add(slice(input, unitAtChar, matcher.start(), matcher.end()));
         } else if ("MergedWithPrevious".equals(behavior) && !result.isEmpty()) {
           AlignedText previous = result.removeLast();
           List<AlignedText.Unit> merged = new ArrayList<>(previous.units());
-          merged.addAll(slice(input, matcher.start(), matcher.end()).units());
+          merged.addAll(slice(input, unitAtChar, matcher.start(), matcher.end()).units());
           result.add(new AlignedText(merged));
         } else if ("MergedWithPrevious".equals(behavior)) {
-          result.add(slice(input, matcher.start(), matcher.end()));
+          result.add(slice(input, unitAtChar, matcher.start(), matcher.end()));
         } else {
           throw new TokenizerException(
               "PreTokenizerPipeline: unsupported Split.behavior '" + behavior + "'");
@@ -241,32 +241,53 @@ final class PreTokenizerPipeline {
       previousMatchEnd = matcher.end();
     }
     if (last < text.length()) {
-      result.add(slice(input, last, text.length()));
+      result.add(slice(input, unitAtChar, last, text.length()));
     }
     return result;
   }
 
   private static List<AlignedText> matches(AlignedText input, Pattern pattern) {
+    int[] unitAtChar = unitAtChar(input);
     Matcher matcher = pattern.matcher(input.text());
     List<AlignedText> result = new ArrayList<>();
     while (matcher.find()) {
       if (!matcher.group().isEmpty()) {
-        result.add(slice(input, matcher.start(), matcher.end()));
+        result.add(slice(input, unitAtChar, matcher.start(), matcher.end()));
       }
     }
     return result;
   }
 
-  private static AlignedText slice(AlignedText input, int startChar, int endChar) {
-    List<AlignedText.Unit> result = new ArrayList<>();
+  /**
+   * Maps every char index in {@code input.text()} to the index of the unit it belongs to, so {@link
+   * #slice} can locate a match's boundary units in O(1) instead of rescanning every unit of the
+   * whole input per match -- {@code matches}/{@code splitByBehavior} each call it once per
+   * pre-tokenized span and reuse it across every match found within that span, since match starts
+   * are visited in increasing order but a single forward-only cursor would not survive the
+   * lookbehind/backtracking a caller-supplied regex can still perform (PR #24 review, finding 5).
+   */
+  private static int[] unitAtChar(AlignedText input) {
+    String text = input.text();
+    int[] result = new int[text.length() + 1];
     int charIndex = 0;
-    for (AlignedText.Unit unit : input.units()) {
-      int next = charIndex + unit.value().length();
-      if (next > startChar && charIndex < endChar) {
-        result.add(unit);
+    List<AlignedText.Unit> units = input.units();
+    for (int unit = 0; unit < units.size(); unit++) {
+      String value = units.get(unit).value();
+      for (int i = 0; i < value.length(); i++) {
+        result[charIndex++] = unit;
       }
-      charIndex = next;
     }
-    return new AlignedText(result);
+    result[text.length()] = units.size();
+    return result;
+  }
+
+  private static AlignedText slice(
+      AlignedText input, int[] unitAtChar, int startChar, int endChar) {
+    if (startChar >= endChar) {
+      return new AlignedText(List.of());
+    }
+    int first = unitAtChar[startChar];
+    int last = unitAtChar[endChar - 1];
+    return new AlignedText(input.units().subList(first, last + 1));
   }
 }

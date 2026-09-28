@@ -69,7 +69,9 @@ String finalDelta = decoder.finish();
 
 Each accepted ID yields a stable, possibly empty delta and `finish()` flushes incomplete UTF-8 with
 the same replacement behavior as full decoding. Decoder state is request-local and may not be used
-after `finish()`.
+after `finish()`. Not every `decoder` shape in `tokenizer.json` has an incremental implementation;
+for one that doesn't, `append()` always returns `""` and the full text is only available from
+`finish()`. Check `decoder.streams()` before relying on per-token deltas.
 
 ## Build and verify
 

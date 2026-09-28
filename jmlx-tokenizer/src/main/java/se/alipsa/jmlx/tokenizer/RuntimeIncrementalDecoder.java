@@ -37,6 +37,11 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
   }
 
   @Override
+  public boolean streams() {
+    return mode != Mode.BUFFERED;
+  }
+
+  @Override
   public String append(int tokenId) {
     requireOpen();
     TokenizerRuntime.DecodableToken token = runtime.decodableToken(tokenId, skipSpecialTokens);

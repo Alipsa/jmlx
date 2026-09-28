@@ -176,26 +176,45 @@ final class TokenizerRuntime {
     return result;
   }
 
-  private static List<TokenPiece> trimSyntheticSpaces(List<TokenPiece> input) {
+  /**
+   * Replicates HF's {@code ByteLevel} post-processor {@code process_offsets} (see {@code
+   * huggingface/tokenizers}'s {@code byte_level.rs}) exactly: for each token, count leading and
+   * trailing synthetic-space ({@code 'Ġ'}) characters in its own text and trim that many bytes off
+   * each side of its offset, clamped so start never passes end. The one exemption is the very first
+   * token in the list: when {@code add_prefix_space} is set and it has exactly one leading space,
+   * that space is the one the pre-tokenizer itself synthesized, so it is left untrimmed instead of
+   * being treated as if it existed in the original input.
+   */
+  private List<TokenPiece> trimSyntheticSpaces(List<TokenPiece> input) {
     List<TokenPiece> result = new ArrayList<>(input.size());
-    int contentIndex = 0;
-    for (TokenPiece piece : input) {
+    for (int index = 0; index < input.size(); index++) {
+      TokenPiece piece = input.get(index);
       int start = piece.offset().startByte();
       int end = piece.offset().endByte();
-      if (!piece.special() && contentIndex++ > 0 && start < end) {
-        int spaces = 0;
-        while (spaces < piece.text().length() && piece.text().charAt(spaces) == 'Ġ') {
-          spaces++;
+      String text = piece.text();
+      int leading = 0;
+      while (leading < text.length() && text.charAt(leading) == 'Ġ') {
+        leading++;
+      }
+      int trailing = 0;
+      while (trailing < text.length() && text.charAt(text.length() - 1 - trailing) == 'Ġ') {
+        trailing++;
+      }
+      if (leading > 0 || trailing > 0) {
+        if (leading > 0) {
+          boolean isFirst = index == 0 || start == 0;
+          if (isFirst && definition.byteLevelAddPrefixSpace() && leading == 1) {
+            leading = 0;
+          }
+          start = Math.min(start + leading, end);
         }
-        start = Math.min(end, start + spaces);
+        if (trailing > 0 && end >= trailing) {
+          end = Math.max(end - trailing, start);
+        }
       }
       result.add(
           new TokenPiece(
-              piece.text(),
-              new TokenOffset(start, end),
-              piece.id(),
-              piece.typeId(),
-              piece.special()));
+              text, new TokenOffset(start, end), piece.id(), piece.typeId(), piece.special()));
     }
     return result;
   }

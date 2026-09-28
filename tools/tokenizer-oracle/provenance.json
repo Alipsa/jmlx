@@ -2,11 +2,13 @@
   "fixtureSources": {
     "added-token.tokenizer.json": "2347b11421fc85d43f759dcafa1a0390028ac60b191a2b8e48074fa225c08ba7",
     "metaspace-bpe.tokenizer.json": "df49965a99eca472c5225b5ed669c26bcdde6208d4a8862623423125dc6c7940",
-    "phase6-2-components.input.json": "1dea766eb3aa91ded040c6f4b88562401d667d9b95fb635933b6231524d97b3a",
+    "phase6-2-components.input.json": "32211a2d6ed929820e474ff5b1e49d9f009e1612da343a0581fdd3a6f0da8c2b",
+    "added-token-adjacent.tokenizer.json": "3ab07df5524a64e02d1e9b57b1daeb76891c56e86a6866e5ef7b0a6bdc972bc6",
     "unigram.tokenizer.json": "5f530ac97373853dc4591f4fbb5420cb6d3152c148461db82419e7ae54aad5f2",
     "wordpiece.tokenizer.json": "59d7c5bcbc59fe6df4caae77f74fae1e896c6094a41c64ec79ff7af406393111",
     "null-pretokenizer-unigram.tokenizer.json": "dfab8ff976d0cc5975a72d4d89fe375a46e7a72f37f21cfc73be0444db3e8f36",
     "bytelevel-bpe.tokenizer.json": "93cb1750941e740921796a7a51d5ad993e96d1328a718548292108a0714cd81f",
+    "bytelevel-bpe-no-prefix.tokenizer.json": "6e6a6d5a3fe9aca071e4f53fdf6d16b776333c5f381b8658954b996a3be69a2e",
     "split-at-zero-bytelevel.tokenizer.json": "7645fb3e08f7cfb1be9b6be144243f50ad8b80f419a8abbed9d99c21e611ff13",
     "split-leading-merged.tokenizer.json": "a71f13c333920bc6265b4e876146c75194a883755917d76dfa3a3b73c5c2fc4a"
   },

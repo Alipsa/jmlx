@@ -143,6 +143,7 @@ final class TokenizerModels {
     if (size == 0) {
       return List.of();
     }
+    final double unknownScore = unigramUnknownScore(model);
     double[] best = new double[size + 1];
     Arrays.fill(best, Double.NEGATIVE_INFINITY);
     best[0] = 0.0;
@@ -155,7 +156,7 @@ final class TokenizerModels {
         continue;
       }
       TrieNode node = trie;
-      boolean found = false;
+      boolean hasSingleCodePointMatch = false;
       for (int end = start + 1; end <= size; end++) {
         int codePoint = input.units().get(end - 1).value().codePointAt(0);
         node = node.children.get(codePoint);
@@ -163,7 +164,9 @@ final class TokenizerModels {
           break;
         }
         if (node.tokenId >= 0) {
-          found = true;
+          if (end == start + 1) {
+            hasSingleCodePointMatch = true;
+          }
           int id = node.tokenId;
           double score = best[start] + model.scores().get(id);
           // Start positions are visited left-to-right, so retaining the existing path on an exact
@@ -175,8 +178,13 @@ final class TokenizerModels {
           }
         }
       }
-      if (!found) {
-        double score = best[start] + model.scores().get(model.unknownId());
+      // Mirrors HF's Unigram::populate_nodes: the unknown-token fallback competes at every
+      // position lacking a single-code-point vocabulary match, even when a longer match exists
+      // there too, and always scores at minScore - 10.0 (K_UNK_PENALTY) rather than whatever score
+      // the vocabulary happens to declare for <unk> -- both keep the lattice fully connected while
+      // still yielding to any real match with the same or better score (PR #24 review, finding 3).
+      if (!hasSingleCodePointMatch) {
+        double score = best[start] + unknownScore;
         if (score > best[start + 1]) {
           best[start + 1] = score;
           previous[start + 1] = start;
@@ -228,6 +236,22 @@ final class TokenizerModels {
       result.add(piece);
     }
     return result;
+  }
+
+  private static final double UNIGRAM_UNKNOWN_PENALTY = 10.0;
+
+  /**
+   * The unknown-token lattice score HF's Unigram model actually uses: the vocabulary's own lowest
+   * declared score, minus {@code K_UNK_PENALTY} (10.0) -- not whatever score the file declares for
+   * the {@code <unk>} entry itself, which HF's own {@code populate_nodes}/{@code encode_optimized}
+   * never reads for this purpose (PR #24 review, finding 3).
+   */
+  private static double unigramUnknownScore(TokenizerDefinition.Unigram model) {
+    double minScore = Double.POSITIVE_INFINITY;
+    for (double score : model.scores()) {
+      minScore = Math.min(minScore, score);
+    }
+    return minScore - UNIGRAM_UNKNOWN_PENALTY;
   }
 
   private static TrieNode unigramTrie(TokenizerDefinition.Unigram model) {

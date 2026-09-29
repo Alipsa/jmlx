@@ -61,7 +61,7 @@ Inputs and failure modes the roadmap implies but no single task's happy-path tes
 likely first. Each line has a pinning test in the owning task.
 
 1. **`config.json` fields that are present but unsupported** (`rope_scaling` with an unknown
-   `rope_type`, `sliding_window` with `use_sliding_window=false`, `layer_types`, `quantization`,
+   `rope_type`, `use_sliding_window=true` on Qwen2, unsupported `layer_types`, `quantization`,
    `num_local_experts` on a dense family): expected is a load-time `IllegalArgumentException` naming the
    key, never a model that computes something else. (Tasks 1, 3, 7, 8, 9)
 2. **Checkpoint with an extra, unexpected tensor** (for example `model.layers.0.self_attn.rotary_emb.inv_freq`
@@ -121,7 +121,7 @@ These fix what "Mistral, Gemma, Phi and one MoE family" means so the milestone i
 
 | Family | `model_type` in 6.3 | Capabilities added | Explicitly deferred |
 | --- | --- | --- | --- |
-| Llama / Qwen2 | `llama`, `qwen2` | descriptor form of today's behavior; RoPE scaling (linear, dynamic-NTK, llama3, YaRN) | Qwen2 `use_sliding_window` / `max_window_layers` stays rejected |
+| Llama / Qwen2 | `llama`, `qwen2` | descriptor form of today's behavior; RoPE scaling (linear, dynamic-NTK, llama3, YaRN) | Qwen2 sliding-window attention when `use_sliding_window=true` stays rejected |
 | Mistral | `mistral` | sliding-window attention on every layer | per-layer window schedules |
 | Gemma | `gemma` (v1) | `(1 + weight)` RMSNorm, sqrt(hidden) embedding scale, explicit `head_dim`, `gelu_pytorch_tanh` GeGLU, tied head | `gemma2`/`gemma3` (softcapping, extra norms, alternating windows) |
 | Phi | `phi3` | fused `qkv_proj` and `gate_up_proj` checkpoint mapping, optional sliding window | `phi` (Phi-2: LayerNorm, parallel block), `longrope` scaling |
@@ -140,10 +140,13 @@ Other decisions:
    `rebind` and `ModuleGrad`). Add `public abstract class UnaryLayer extends Module implements
    UnaryModule` in `jmlx-core`; `Linear` and `QuantizedLinear` change from `extends Module implements
    UnaryModule` to `extends UnaryLayer` (source-compatible). Likewise `public abstract class
-   CachedAttention extends Module { public abstract MLXArray forward(MLXArray x, KVCache cache); }`
-   is the shared attention abstraction; `GroupedQueryAttention` and `DecoderAttention` extend it, and
-   `DecoderBlock` holds `CachedAttention` and `UnaryLayer mlp`. Child names stay `inputNorm`,
-   `attention`, `postAttentionNorm`, `mlp`, so existing parameter paths do not change (pinned by a
+   CachedAttention extends Module { public abstract MLXArray forward(MLXArray x, KVCache cache,
+   MLXArray attentionMask); public MLXArray forward(MLXArray x, KVCache cache) { ... } }`
+   is the shared attention abstraction; `GroupedQueryAttention` and `DecoderAttention` extend it.
+   The two-argument overload delegates with a null mask for existing callers. `DecoderBlock` holds
+   `CachedAttention` and `UnaryLayer mlp`, and accepts an optional shared mask in its forward path.
+   Child names stay `inputNorm`, `attention`, `postAttentionNorm`, `mlp`, so existing parameter paths
+   do not change (pinned by a
    test that asserts the exact `parameters()` key set of a tiny Llama before and after).
 4. **MoE computes every expert densely** and selects with `where(selected, expertOutput, 0)` (never a
    multiply: `inf * 0` is NaN, plausible for a bf16 expert on tokens it was not routed).
@@ -155,9 +158,13 @@ Other decisions:
    `ArchitectureMappings`: `consumed` (keys it reads) and `ignored` (key → one-line reason, for keys
    with no effect on inference: `architectures`, `torch_dtype`, `dtype`, `transformers_version`,
    `bos/eos/pad_token_id`, `initializer_range`, `attention_dropout`, `*_pdrop`, `use_cache`,
-   `max_position_embeddings` (recorded, not enforced), `pretraining_tp`, `router_aux_loss_coef`,
-   `router_jitter_noise`, `output_router_logits` only when `false`, `sliding_window` only when the
-   family does not read it and the value is `null`). A key in neither table is **not** rejected (that
+   `pretraining_tp`, `router_aux_loss_coef`,
+   `router_jitter_noise`, `output_router_logits` only when `false`). Qwen2 consumes
+   `use_sliding_window`, `sliding_window` and `max_window_layers`: when the flag is `false`, the
+   latter two are parsed but have no effect, including when non-null; only `true` is rejected.
+   `max_position_embeddings` is consumed by RoPE scaling variants that use it (including the dynamic
+   fallback and YaRN), and may be recorded without enforcing a context limit for other variants.
+   A key in neither table is **not** rejected (that
    would break every new transformers release) but is `System.Logger` WARNING-logged once per load with
    the key name; a key that *changes numerics* is handled by an explicit named rejection rule instead
    (`quantization(_config)`, unknown `rope_type`, `layer_types` containing anything but
@@ -178,7 +185,7 @@ Other decisions:
 
 Created in `jmlx-models/src/main/java/se/alipsa/jmlx/models/`:
 
-- `ArchitectureDescriptor.java` — immutable capability record (attention, norm, mlp, rope, head, moe).
+- `ArchitectureDescriptor.java` — public immutable capability record (attention, norm, mlp, rope, head, moe).
 - `ArchitectureMappings.java` — `model_type` → descriptor parsing; owns every `config.json` rejection.
 - `TensorPlan.java` — required/optional/forbidden/ignored tensor keys; `validate(Set<String>)`.
 - `DecoderAssembler.java` — builds `jmlx-core` components from a validated descriptor and tensors.
@@ -189,7 +196,8 @@ Created in `jmlx-core/src/main/java/se/alipsa/jmlx/`:
 - `nn/UnaryLayer.java`, `nn/CachedAttention.java` — module-tree-safe abstractions (Decision 3).
 - `nn/DecoderAttention.java`, `nn/AttentionMask.java` — explicit `head_dim`, `RopeSpec`, causal or
   sliding-window masking.
-- `nn/GatedMlp.java`, `nn/MoeMlp.java` — gated MLP with selectable activation; routed experts.
+- `nn/Activation.java`, `nn/GatedMlp.java`, `nn/MoeMlp.java` — shared activation enum, gated MLP;
+  routed experts.
 - `nn/RMSNorm.java` gains an optional weight offset (Gemma); `nn/DecoderBlock.java` gains a
   component-based constructor.
 
@@ -199,7 +207,7 @@ builders), `TinyCheckpoints.java` (seeded non-zero checkpoint writer, Task 5). C
 `QwenModel`, `MLXOps` (logical-and), `req/mlx-api-inventory-overrides.json`, `req/phase6-compatibility.md`,
 `req/phase6-tier-a-fixtures.md`, `req/phase6-tier-b-artifacts.md`, `jmlx-models/README.md`,
 `build.gradle` (`verifyHfReferenceGoldens`, `tierB` Spotless/Checkstyle wiring), `jmlx-models/build.gradle`
-(`tierB` source set), `.github/workflows/tier-b.yml`.
+(`tierB` source set), `.github/workflows/ci.yml`, `.github/workflows/tier-b.yml`.
 
 ---
 
@@ -212,7 +220,7 @@ misreading, so the goldens come from Hugging Face's own code, run once offline a
 **Files:**
 - Create: `tools/hf-reference/README.md`, `requirements.in`, `requirements.lock` (hash-locked CPU
   `torch` + `transformers` + `safetensors`, Python 3.12), `generate.py`, `provenance.json`
-- Create: `tools/hf-reference/goldens/{rope,mistral,phi3,gemma,mixtral}.json` and the tiny
+- Create: `tools/hf-reference/goldens/{rope,llama,qwen2,llama31,mistral,phi3,gemma,mixtral}.json` and the tiny
   `*.safetensors` checkpoints they were computed from (`goldens/checkpoints/<family>/`)
 - Modify: `build.gradle` — `verifyHfReferenceGoldens` (pure Gradle/Java: recompute SHA-256 of every file
   under `goldens/` and compare with `provenance.json`); wired into root `check`. There is deliberately
@@ -227,14 +235,26 @@ misreading, so the goldens come from Hugging Face's own code, run once offline a
   `torch.manual_seed`, saved with `save_pretrained`, so Java reads exactly these safetensors).
 - Consumes: nothing from Java.
 
-- [ ] **Step 1:** Write `generate.py` taking `--family` and `--out`; it builds a tiny config per family
+- [ ] **Step 1:** Pin an exact `transformers` version in `requirements.in` and the hash lock. Write
+  `generate.py` taking `--family` and `--out`; it builds a tiny config for `llama`, `qwen2`,
+  `llama31`, `mistral`, `phi3`, `gemma` and `mixtral`
   (hidden ≥ 64 so the same checkpoints serve the quantization probe, GQA `kv < heads`, 2 layers), saves
   the model, runs prefill and greedy decode, and writes JSON with `float` values rounded to 7 digits.
+  After `save_pretrained`, assert the saved tensor names match a Python-owned manifest of the
+  Hub-style names required by each family's `TensorPlan` (especially Mixtral's
+  `block_sparse_moe.experts.{e}.w1/w2/w3.weight`); the tool consumes no Java code;
+  fail generation on fused or renamed tensors rather than committing unusable goldens.
+  Document in `tools/hf-reference/README.md` that the Python name manifest must stay in sync
+  with `ArchitectureMappings.tensorPlan`; the Java golden tests are the final cross-check.
+  The `llama31` tiny config uses `original_max_position_embeddings=64` and enough rotary
+  dimensions to exercise the unchanged, interpolated and divided Llama 3 frequency bands;
+  assert those bands are nonempty in the generator.
 - [ ] **Step 2:** `python -m venv` + `pip install --require-hashes -r requirements.lock`; run once per
   family; record Python, `torch`, `transformers` and `safetensors` versions, the commit of
   `modeling_rope_utils.py` semantics used, host OS/arch, and file hashes in `provenance.json`.
-- [ ] **Step 3:** Add `verifyHfReferenceGoldens` and a Java test `HfReferenceProvenanceTest` (pure Java,
-  runs on Ubuntu) that fails on any hash drift. Document in the README that regenerating is a reviewed,
+- [ ] **Step 3:** Add `verifyHfReferenceGoldens` and a `jmlx-models` test
+  `HfReferenceProvenanceTest` (pure Java, runs on Ubuntu) that fails on any hash drift.
+  Document in the README that regenerating is a reviewed,
   manual step and that a repin changes the goldens' expected diff.
 - [ ] **Step 4:** Run `./gradlew verifyHfReferenceGoldens :check`. Expected: PASS.
 - [ ] **Step 5: Commit**
@@ -256,16 +276,23 @@ then falls back to `verified-with-synthetic-fixture` without an independent refe
 - Create: `jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureDescriptor.java`
 - Create: `jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureMappings.java`
 - Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/RopeSpec.java` (sealed interface with `Base` only; Task 3 completes it)
+- Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/Activation.java` (`SILU`, `GELU`,
+  `GELU_TANH`; Task 5 uses it in `GatedMlp`)
 - Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderConfig.java`
 - Test: `jmlx-models/src/test/java/se/alipsa/jmlx/models/ArchitectureMappingsTest.java`
 
 **Interfaces:**
 - Produces:
-  - `record ArchitectureDescriptor(DecoderConfig dimensions, int headDim, Norm norm, Mlp mlp, Attention attention, Head head, Embedding embedding, Moe moe)` with nested records/enums
+  - `public record ArchitectureDescriptor(DecoderConfig dimensions, int headDim, int rotaryDims,
+    RopeSpec rope, Norm norm, Mlp mlp, Attention attention, Head head, Embedding embedding, Moe moe)`
+    with nested records/enums
     `Norm(NormKind kind, float eps, boolean weightOffset)`, `Mlp(MlpLayout layout, Activation activation, boolean bias)`,
     `Attention(boolean qkvBias, boolean outBias, boolean fusedQkv, Integer slidingWindow)`, `Head(boolean tied)`,
     `Embedding(boolean scaleBySqrtHidden)`, `Moe(int experts, int topK)` (null when dense).
-    `MlpLayout` is `SEPARATE_GATE_UP`, `FUSED_GATE_UP`; `Activation` is `SILU`, `GELU_TANH`.
+    `MlpLayout` is `SEPARATE_GATE_UP`, `FUSED_GATE_UP`; public `Activation` lives in `jmlx-core`
+    (which owns `GatedMlp`) and has `SILU`, `GELU`, `GELU_TANH`. Qualify nested descriptor types
+    such as `ArchitectureDescriptor.Embedding` and `ArchitectureDescriptor.Attention` in the
+    assembler to distinguish them from `se.alipsa.jmlx.nn.Embedding`.
   - `static ArchitectureDescriptor ArchitectureMappings.parse(JsonNode config)` — throws
     `IllegalArgumentException` naming the key for anything unsupported.
   - `static Set<String> ArchitectureMappings.supportedModelTypes()`.
@@ -336,6 +363,24 @@ class ArchitectureMappingsTest {
   }
 
   @Test
+  void layerTypesLengthMustMatchLayerCount() {
+    var e = assertThrows(IllegalArgumentException.class, () -> ArchitectureMappings.parse(json("""
+        {"model_type":"llama","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":2,"num_attention_heads":2,"layer_types":["full_attention"]}""")));
+    assertTrue(e.getMessage().contains("layer_types"));
+  }
+
+  @Test
+  void qwen2IgnoresDisabledSlidingWindowSettings() {
+    // Also load a copied real Qwen2.5 config.json (for example 0.5B) as a regression fixture.
+    var d = ArchitectureMappings.parse(json("""
+        {"model_type":"qwen2","vocab_size":4,"hidden_size":4,"intermediate_size":8,
+         "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":1,
+         "use_sliding_window":false,"sliding_window":32768,"max_window_layers":28}"""));
+    assertNull(d.attention().slidingWindow());
+  }
+
+  @Test
   void conflictingRopeThetaLocationsAreRejected() {
     assertThrows(IllegalArgumentException.class, () -> ArchitectureMappings.parse(json("""
         {"model_type":"llama","vocab_size":4,"hidden_size":4,"intermediate_size":8,
@@ -352,6 +397,11 @@ class ArchitectureMappingsTest {
 }
 ```
 
+`ArchitectureMappingsTest` also reads a copied real Qwen2.5 `config.json` from test resources
+(record its Hub repository and immutable revision beside the fixture). Assert that its non-null
+`sliding_window` and `max_window_layers` load when `use_sliding_window=false`, and that changing
+only the flag to `true` produces a named rejection.
+
 - [ ] **Step 2: Run to verify failure**
 
 Run: `./gradlew :jmlx-models:test --tests "*ArchitectureMappingsTest"`
@@ -359,20 +409,24 @@ Expected: FAIL — `ArchitectureMappings` does not exist.
 
 - [ ] **Step 3: Implement**
 
-Create the descriptor records exactly as listed under Interfaces, with compact-constructor validation
-(positive `headDim`, `slidingWindow > 0` when present, `experts >= topK >= 1`). In
+Create the descriptor records as listed under Interfaces, with compact-constructor validation
+(positive `headDim`, even `rotaryDims` in `1..headDim`, `slidingWindow > 0` when present,
+`experts >= topK >= 1`). In
 `ArchitectureMappings.parse`, read `model_type` and dispatch through a `Map<String, Function<JsonNode,
 ArchitectureDescriptor>>`; `llama` and `qwen2` reuse the checks that today live in
-`DecoderConfig.fromFile` (moved, not copied: `quantization(_config)`, `use_sliding_window`,
+`DecoderConfig.fromFile` (moved, not copied: `quantization(_config)`, `use_sliding_window=true`,
 `hidden_act` in {silu, swish}, `head_dim * heads == hidden`). Keep `rope_scaling` rejected here with the
 existing message until Task 3 replaces it. Change `DecoderConfig.fromFile` to read the tree, call
 `ArchitectureMappings.parse`, and return `descriptor.dimensions()`. **Behavior change:** `fromFile`
 previously accepted any `model_type` (and only `TextGenerationModels` rejected unknown ones); it now
 throws for an unregistered type. Note it in the class javadoc and the README.
-The mapping cannot compile until `rope()` exists, so this task adds a `Rope rope` component holding
+The descriptor's `rope()` component initially holds
 `RopeSpec.Base(theta)` only (parsing `rope_theta` from the top level or `rope_parameters`); Task 3
 extends the parsing to scaling variants. `RopeSpec` (a tiny sealed interface with `Base`) is therefore
-created here in `jmlx-core` and completed in Task 3.
+created here in `jmlx-core` and completed in Task 3. Set `rotaryDims=headDim` until Task 3 parses
+`partial_rotary_factor`. Validate `layer_types` length against `num_hidden_layers` even when every
+entry is `full_attention`. Include a copied real Qwen2.5 `config.json` test resource with non-null
+`sliding_window` and `max_window_layers`, and reject Qwen2 only when `use_sliding_window=true`.
 
 - [ ] **Step 4: Run the new and existing config tests**
 
@@ -385,7 +439,9 @@ Expected: PASS (every existing `DecoderConfigTest` assertion and message unchang
 git add jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureDescriptor.java \
   jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureMappings.java \
   jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderConfig.java \
-  jmlx-models/src/test/java/se/alipsa/jmlx/models/ArchitectureMappingsTest.java
+  jmlx-models/src/test/java/se/alipsa/jmlx/models/ArchitectureMappingsTest.java \
+  jmlx-models/src/test/resources/ jmlx-core/src/main/java/se/alipsa/jmlx/nn/RopeSpec.java \
+  jmlx-core/src/main/java/se/alipsa/jmlx/nn/Activation.java
 git commit -m "Add architecture descriptor and model_type mappings for Llama and Qwen2"
 ```
 
@@ -395,9 +451,13 @@ git commit -m "Add architecture descriptor and model_type mappings for Llama and
 - Create: `jmlx-models/src/main/java/se/alipsa/jmlx/models/TensorPlan.java`
 - Create: `jmlx-models/src/main/java/se/alipsa/jmlx/models/SafetensorsHeaders.java` (pure Java)
 - Create (test): `jmlx-models/src/test/java/se/alipsa/jmlx/models/TestDescriptors.java` — static builders
-  `llama(int layers, boolean attentionBias)`, `qwen2(int layers)`, etc. returning descriptors without JSON
+  `llama(int layers, boolean attentionBias)`, `llama(int layers, boolean attentionBias, boolean tiedHead)`,
+  `qwen2(int layers)`, etc. returning descriptors without JSON
 - Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/CheckpointLoader.java` (header pre-check)
 - Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureMappings.java` (`tensorPlan(descriptor)`)
+- Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/TextGenerationModels.java`,
+  `LlamaModel.java`, `QwenModel.java` (carry the descriptor into the loader while retaining the
+  existing decoder constructor until Task 5)
 - Test: `jmlx-models/src/test/java/se/alipsa/jmlx/models/TensorPlanTest.java`,
   `jmlx-models/src/test/java/se/alipsa/jmlx/models/CheckpointIndexTest.java`
 
@@ -411,13 +471,32 @@ git commit -m "Add architecture descriptor and model_type mappings for Llama and
     descriptor (per-layer keys expanded for `0..numHiddenLayers-1`).
   - `static Map<Path, Set<String>> SafetensorsHeaders.tensorNames(List<Path> files)` — reads only the
     8-byte little-endian header length and the JSON header of each file (no tensor data, no native
-    code), rejecting a header length above 100 MB or beyond the file size.
-  - `CheckpointLoader.load` runs a **pre-load** check using those names, *before* any
+    code), rejecting a header length above 100 MB or beyond the file size. Exclude the optional
+    `__metadata__` object from tensor names; its entries (for example `{"format":"pt"}`) are not tensors.
+  - `CheckpointLoader.load(scope, directory, TensorPlan plan)` runs a **pre-load** check using those
+    names, *before* any
     `MLXIO.loadSafetensors` call: it throws when an index `weight_map` key is absent from every shard,
     when a shard tensor is absent from the index, or when the index maps a key to a different shard
-    than the one containing it. In the no-index path it ignores `consolidated.safetensors`
+    than the one containing it. It then calls `plan.validate` on the union of header tensor names,
+    before allocating native arrays. In the no-index path it ignores `consolidated.safetensors`
     (Mistral repos ship it beside sharded weights) only when a `model*.safetensors` set is also
     present, and names the ignored file in a `System.Logger` message; if it is the only file it loads.
+  - `CheckpointLoader.preflight(directory, plan)` is package-private, pure Java, and returns the
+    selected shard paths and validated tensor-name set. A package-private
+    `load(scope, directory, plan, Loader loader)` overload calls it before invoking `loader` for
+    any shard; `Loader` is a package-private functional interface with
+    `MLXIO.SafetensorsResult load(MLXScope scope, Path shard)`. The three-argument production
+    overload delegates to this one with `MLXIO.loadSafetensors(scope, shard.toString())`.
+    The four-argument overload runs `preflight` **before** `Objects.requireNonNull(scope)` or any
+    native call. Tests pass `scope=null` and inject a loader that throws if invoked when a
+    preflight error is expected. A valid preflight with null scope fails by name at the later
+    null check.
+  - `TextGenerationModels` parses `config.json` into one `ArchitectureDescriptor` and passes it to
+    `LlamaModel.create` or `QwenModel.create`. Their existing constructors pass
+    `descriptor.dimensions()` to the old `DecoderModel` constructor and
+    `ArchitectureMappings.tensorPlan(descriptor)` to `CheckpointLoader.load`. Public typed
+    `load` methods and `DecoderConfig.fromFile` keep their signatures; Task 5 replaces only the
+    decoder construction path.
 - Consumes: `ArchitectureDescriptor` (Task 1).
 
 - [ ] **Step 1: Write the failing tests (pure Java, no native)**
@@ -487,11 +566,18 @@ class TensorPlanTest {
 
 `CheckpointIndexTest` is **pure Java** (runs on Ubuntu CI): it writes minimal safetensors files by hand
 (8-byte length + JSON header, zero-length data section is enough for header parsing) and an index that
-(a) names a tensor in no shard, (b) omits a shard tensor, (c) maps a key to the wrong shard; each must fail
+  (a) names a tensor in no shard, (b) omits a shard tensor, (c) maps a key to the wrong shard; each must fail
 with a message naming the tensor key **without any native library loaded** (assert by running the test
 class in a JVM where `NativeLoader` is never touched, i.e. no `@EnabledIfNativeAvailable`). A fourth case
-places `consolidated.safetensors` beside `model-00001-of-00002.safetensors` files with no index and expects
-the consolidated file to be ignored; a fifth has it alone and expects it to load its header.
+  places `consolidated.safetensors` beside `model-00001-of-00002.safetensors` files with no index and expects
+  the consolidated file to be ignored; a fifth has it alone and expects it to load its header. Add an
+  indexed-shard case with `"__metadata__":{"format":"pt"}` in a header; it must validate the
+  tensor names without reporting `__metadata__` as an unindexed tensor (use `preflight`, which
+  returns before native load). Add a malformed tensor-plan case using the loader overload and
+  assert the injected loader's call count remains zero. Use the same overload with
+  `scope=null` for missing/wrong index cases, and assert the named preflight error takes
+  precedence over the null-scope check. None of these tests creates an `MLXScope` or touches
+  the native library.
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -507,9 +593,17 @@ exports; HF ignores it too). `tensorPlan` puts the biases the descriptor does no
 `forbidden` with capability text (for example `attention_bias=false`), the tied-head `lm_head.weight`
 into `optional`, and Qwen2's `o_proj.bias` into `forbidden`. `CheckpointLoader.load` compares the index
 `weight_map` keys with the union of header tensor names *before loading any shard* and throws on either
-difference (fail before allocating native memory).
-Do not call `plan.validate` from the loader; `DecoderAssembler` (Task 5) calls it once with
-`tensors.keySet()` before constructing anything.
+difference. Exclude `__metadata__` before comparing keys. Call `plan.validate` on that same union
+before the first `MLXIO.loadSafetensors` call, so an invalid checkpoint does not allocate gigabytes
+in the caller's scope. `LlamaModel`, `QwenModel` and subsequent families pass the descriptor's
+`TensorPlan` to the loader. `DecoderAssembler` may assert the already validated key set, but it is
+not the first validation gate.
+Update `TextGenerationModels.readConfig` to read `config.json` as a `JsonNode`, return the
+descriptor from `ArchitectureMappings.parse`, and dispatch on `descriptor.modelType()`; pass
+that descriptor to both typed model factories. Preserve the existing `IOException` context
+for an unreadable config file.
+Until Task 5, each factory still calls the old `DecoderModel` constructor with
+`descriptor.dimensions()` and its existing bias flags, while its loader call uses the plan.
 
 - [ ] **Step 4: Run tests**
 
@@ -521,10 +615,15 @@ unexpected; fix the plan (not the test) only if HF's own modeling code loads tha
 
 ```bash
 git add jmlx-models/src/main/java/se/alipsa/jmlx/models/TensorPlan.java \
+  jmlx-models/src/main/java/se/alipsa/jmlx/models/SafetensorsHeaders.java \
   jmlx-models/src/main/java/se/alipsa/jmlx/models/CheckpointLoader.java \
   jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureMappings.java \
+  jmlx-models/src/main/java/se/alipsa/jmlx/models/TextGenerationModels.java \
+  jmlx-models/src/main/java/se/alipsa/jmlx/models/LlamaModel.java \
+  jmlx-models/src/main/java/se/alipsa/jmlx/models/QwenModel.java \
   jmlx-models/src/test/java/se/alipsa/jmlx/models/TensorPlanTest.java \
-  jmlx-models/src/test/java/se/alipsa/jmlx/models/CheckpointIndexTest.java
+  jmlx-models/src/test/java/se/alipsa/jmlx/models/CheckpointIndexTest.java \
+  jmlx-models/src/test/java/se/alipsa/jmlx/models/TestDescriptors.java
 git commit -m "Validate checkpoint tensors against a per-architecture plan"
 ```
 
@@ -534,7 +633,8 @@ git commit -m "Validate checkpoint tensors against a per-architecture plan"
 
 **Files:**
 - Modify: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/RopeSpec.java` (created in Task 1; add the scaling variants)
-- Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureDescriptor.java` (`Rope rope`)
+- Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureDescriptor.java`
+  (`rope` and `rotaryDims` components established in Task 1)
 - Modify: `jmlx-models/src/main/java/se/alipsa/jmlx/models/ArchitectureMappings.java` (parse `rope_scaling`)
 - Modify: `req/mlx-api-inventory-overrides.json` only if the probe below selects `mlx_fast_rope_dynamic`
 - Test: `jmlx-core/src/test/java/se/alipsa/jmlx/nn/RopeSpecTest.java` (pure Java math),
@@ -553,13 +653,14 @@ git commit -m "Validate checkpoint tensors against a per-architecture plan"
   - `double[] RopeSpec.frequencies(int rotaryDims, int sequenceLength)` — the *period* array MLX's
     `freqs` argument expects (`base^(2i/dims)` scaled per variant), length `rotaryDims/2`. Only
     `DynamicNtk` reads `sequenceLength`.
-  - `boolean RopeSpec.isStatic()` — `true` for `Base`, `Linear`, `Llama3`, `Yarn`; their `freqs` array
-    is built **once** in the model scope (by `DecoderAssembler`, shared by every layer) and never per
-    layer per step. Only `DynamicNtk` (`false`) rebuilds per call, in the step scope. `Linear` needs no
-    `freqs` at all: it calls `rope(base=theta, scale=1/factor)`.
+  - `boolean RopeSpec.isStatic()` — `true` for `Base`, `Linear`, `Llama3`, `Yarn`.
+    `Llama3`/`Yarn` periods are built **once** in the model scope (by `DecoderAssembler`, shared by
+    every layer). `Base` and `Linear` need no `freqs` array; `DynamicNtk` (`false`) builds periods
+    per call in the step scope.
   - `float RopeSpec.scale()` (the `scale` argument; `1/factor` for `Linear`, else `1`) and
     `float RopeSpec.attentionScaling()` (HF's `attention_scaling`: YaRN's factor, else `1`).
-  - `static MLXArray RopeSpec.apply(MLXArray x, int rotaryDims, int offset, MLXArray staticFreqs)` —
+  - `default MLXArray RopeSpec.apply(MLXArray x, int rotaryDims, int offset,
+    MLXArray staticFreqs)` — an instance method on the selected spec and
     the **single production code path** that applies RoPE to `[.., T, headDim]`. It rotates only
     `x[..., :rotaryDims]`, multiplies **only that rotated slice** by `attentionScaling()` (HF scales
     cos/sin, which only touches rotated dimensions; mlx-lm's `YarnRoPE` likewise does
@@ -643,6 +744,10 @@ because the logits see the factor on both sides), and **never** the pass-through
 requirement and is wrong for `partial_rotary_factor < 1`. If the probe shows `MLXFast.rope` cannot rotate
 a strict prefix of the head dimension with `dims < x.shape[-1]`, `apply` slices, rotates, scales and
 concatenates explicitly.
+`Base` calls `MLXFast.rope` with `base=theta` and no `freqs`; `Linear` uses `base=theta`,
+`scale=1/factor` and no `freqs`. `Llama3`/`Yarn` use the assembler's static periods, while
+`DynamicNtk` builds periods for the current sequence length in the step scope. The instance method
+owns this dispatch and the rotated-slice scaling.
 
 `ArchitectureMappings` parses `rope_scaling` (or the newer `rope_parameters`, whose `rope_theta` is read
 per Scope decision 7): `rope_type` (fall back to
@@ -654,6 +759,9 @@ a missing or non-numeric one by name; an unknown sub-key that could change frequ
 name (Scope decision 6). Also parse `partial_rotary_factor` (default 1.0) into
 `rotaryDims = (int)(headDim * factor)`, which must be even and `<= headDim`.
 `RopeScalingConfigTest` covers each accepted type, each rejection, and the missing-field messages.
+Add a YaRN case where `max_position_embeddings` differs from
+`factor * original_max_position_embeddings`; compare the parsed factor/frequencies to HF rather
+than deriving the factor from only one field.
 
 - [ ] **Step 5: Run tests**
 
@@ -683,6 +791,10 @@ git commit -m "Add RoPE scaling specs and rope_scaling config mapping"
 **Files:**
 - Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/DecoderAttention.java`
 - Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/AttentionMask.java`
+- Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/UnaryLayer.java`,
+  `nn/CachedAttention.java`
+- Modify: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/Linear.java`, `nn/QuantizedLinear.java`,
+  `nn/GroupedQueryAttention.java` to extend the new base classes.
 - Modify: `jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java` (`logicalAnd`), `req/mlx-api-inventory-overrides.json`
   (`mlx_logical_and` → implemented), then `./gradlew generateMlxApiInventory`
 - Test: `jmlx-core/src/test/java/se/alipsa/jmlx/nn/DecoderAttentionTest.java`,
@@ -702,7 +814,14 @@ git commit -m "Add RoPE scaling specs and rope_scaling config mapping"
     "valueProj"|"outProj", …)` so parameter paths match `GroupedQueryAttention`'s. It delegates every
     rotation to `RopeSpec.apply` (Task 3) and exposes a package-private
     `MLXArray attend(MLXArray q, MLXArray k, MLXArray v, int offset)` seam used by the window test.
-  - `GroupedQueryAttention` is changed to `extends CachedAttention` (behavior untouched).
+  - `GroupedQueryAttention` changes its superclass to `CachedAttention` and implements the
+    three-argument method by requiring a null mask; its existing two-argument behavior stays
+    unchanged. Task 5 leaves it available for existing tests and callers.
+  - For a windowed `DecoderAttention`, the two-argument `forward(x, cache)` rejects a missing
+    mask with an `IllegalArgumentException` naming `slidingWindow` when the predicted key length
+    exceeds the window. Check before projection or cache append, so a failed call leaves the
+    cache unchanged. Callers use the three-argument overload with a correctly shaped mask;
+    a window at least as large as key length uses plain causal attention without a mask.
   - **Window semantics (pinned):** a query at absolute position `p` attends key `j` iff
     `j <= p && p - j < window` — exactly `window` keys, including itself. This matches Hugging Face
     `transformers`' `sliding_window_overlay` mask (`kv_idx > q_idx - sliding_window`), cited by file and
@@ -712,8 +831,6 @@ git commit -m "Add RoPE scaling specs and rope_scaling config mapping"
     reason); the eager/SDPA form above is the one pinned. Unlike `GroupedQueryAttention`, `headDim` is
     explicit (Gemma: `numHeads * headDim != hidden`), so the output projection maps
     `numHeads*headDim → hidden`.
-  - `GroupedQueryAttention` is left untouched and unused by new code; Task 5 stops using it, and it is
-    deleted in Task 5 only if no test or example references it (otherwise kept as-is).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -737,6 +854,9 @@ last-position output, two differing only in token 2 give identical output; repea
 returns `[1, T, 4]`. (4) `rotaryDims < headDim` leaves the trailing dimensions un-rotated
 (compare against manually concatenated rotated/unrotated slices), including with a `Yarn` spec whose
 `attentionScaling != 1` (pass-through dims must be unscaled).
+Add a direct two-argument call test: when a window is smaller than the predicted key length,
+it throws before changing the cache. A `window >= keyLength` test observes `causal=true` with
+no explicit mask.
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -750,15 +870,16 @@ Mask: build `pos = arange(keyLength-queryLength, keyLength)` as `[q,1]` and `j =
 `logicalAnd`. Allocate every temporary in the caller's step scope, never the model scope (the
 `GELU`/`Linear` scope rule in `CLAUDE.md`).
 
-`DecoderAttention.forward`: project, reshape to heads, multiply `q`/`k` by
-`rope.queryKeyMultiplier()` when it is not `1`, call `MLXFast.rope(x, rotaryDims, false, base?, rope.scale(),
-cache.offset(), freqsOrNull)` where `Base` passes `theta` and no freqs (bit-identical to today's call)
-and every other variant passes `base=null` plus the `freqs` array from `rope.frequencies(rotaryDims,
-offset + sequence)`; append to the cache; call `scaledDotProductAttention` with `causal=true` when
-`slidingWindow == null`, else `causal=false` and `maskArr = AttentionMask.slidingWindow(...)`. Keep
-key/value head repetition exactly as `GroupedQueryAttention` does it. Cache the `freqs` array per
-`(rotaryDims, offset+sequence)` only if the probe in Task 3 shows a measurable cost; otherwise rebuild
-per call in the step scope.
+`DecoderAttention.forward`: project, reshape to heads, then delegate q/k rotation to
+`rope.apply(q, rotaryDims, cache.offset(), staticFreqs)` and the corresponding k call. Append to
+the cache; call `scaledDotProductAttention` with `causal=true` when `slidingWindow == null` or
+`slidingWindow >= keyLength`, else require a correctly shaped `attentionMask` and use
+`causal=false` with that mask. Keep key/value
+head repetition exactly as `GroupedQueryAttention` does it. Build one sliding mask per decode step
+in `DecoderModel` and share it across layers via `CachedAttention.forward(x, cache, attentionMask)`;
+validate the mask shape and do not rebuild it for every layer. Dynamic periods are built per call
+in the step scope; static periods are
+shared from the model scope.
 
 - [ ] **Step 4: Run tests**
 
@@ -778,16 +899,18 @@ git commit -m "Add DecoderAttention with explicit head_dim, RoPE specs and slidi
 
 **Files:**
 - Create: `jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderAssembler.java`
-- Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/GatedMlp.java`, `nn/UnaryLayer.java`,
-  `nn/CachedAttention.java`
+- Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/GatedMlp.java` (`Activation` was created in
+  Task 1; `UnaryLayer` and `CachedAttention` in Task 4)
 - Create (test): `jmlx-models/src/test/java/se/alipsa/jmlx/models/TinyCheckpoints.java` — seeded,
   **non-zero** checkpoint writer (moved here from Task 6 so the refactor is checked by something that can
   fail), and `GoldenCapture.java` (one-off capture helper)
 - Modify: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/DecoderBlock.java`, `nn/RMSNorm.java`,
-  `nn/Linear.java`, `nn/QuantizedLinear.java`, `nn/GroupedQueryAttention.java`, `nn/SwiGLU.java`
+  `nn/SwiGLU.java`; `jmlx-core/src/main/java/se/alipsa/jmlx/core/MLX.java` only if the
+  bf16-plus-float32 promotion test requires an explicit-target cast overload
 - Modify: `jmlx-models/.../DecoderModel.java`, `LlamaModel.java`, `QwenModel.java`, `TextGenerationModels.java`
 - Test: `jmlx-models/src/test/java/se/alipsa/jmlx/models/LlamaModelTest.java` and `QwenModelTest.java`
-  (unchanged goldens), new `DecoderAssemblerTest.java`, `DecoderRefactorGoldenTest.java`
+  (unchanged goldens), new `DecoderAssemblerTest.java`, `DecoderRefactorGoldenTest.java`,
+  `jmlx-core/src/test/java/se/alipsa/jmlx/nn/RMSNormTest.java`
 
 **Interfaces:**
 - Consumes: `ArchitectureDescriptor`, `TensorPlan` (Tasks 1–2), `DecoderAttention` (Task 4).
@@ -797,22 +920,37 @@ git commit -m "Add DecoderAttention with explicit head_dim, RoPE specs and slidi
     `down(act(gate(x)) * up(x))`. `Activation.SILU` is exactly today's `SwiGLU`, which stays
     source-compatible (extends `UnaryLayer`, behavior unchanged).
   - `RMSNorm(MLXScope, MLXArray weight, float eps, boolean weightOffset)`; the three-argument
-    constructor stays and means `weightOffset=false`. The offset form stores `weight + 1` **once at
-    construction** (computed in float32 and cast back to the checkpoint dtype, as HF does) as the norm's
-    parameter value, so `forward` is a plain `rmsNorm` with no per-call op.
+    constructor stays and means `weightOffset=false`. Keep checkpoint `weight` as the registered
+    parameter, so `parameters()`, updates, rebind and `ModuleGrad` expose the original value.
+    For the offset form, `forward` creates
+    `MLX.full(x.scope(), new int[] {1}, 1f, DType.FLOAT32)` and calls
+    `MLXOps.add(one, param("weight"))`. With the activation scope beneath the model scope,
+    the two-operand result belongs to the activation scope and float32 plus bf16 must promote
+    to float32. Assert that dtype in the bf16 test; if MLX does not promote it, add an
+    `MLX.astype(weight, DType.FLOAT32, x.scope())` overload that allocates the cast in the
+    activation scope and use that result for the addition. Multiply the float32 normalized
+    input by this offset and cast the product to the input dtype, matching HF's Gemma
+    operation order. Add a code comment citing `Module.scope()`'s rule: a unary
+    `astype(weight)` allocates in the model scope once per forward. Do not cache the
+    derived vector: `ModuleGrad` rebinds traced parameter arrays without calling
+    `onParametersUpdated`, so a cache would disconnect the gradient.
+    Factor the offset creation into a package-private helper used by `forward`; the bf16 test
+    asserts its dtype is FLOAT32, its scope equals `x.scope()`, and its values differ from a
+    bf16-rounded `1+w` case.
   - `DecoderBlock`'s fields become `CachedAttention attention` and `UnaryLayer mlp`; a new constructor
     `(MLXScope, RMSNorm, CachedAttention, RMSNorm, UnaryLayer)` is added and the existing
     `(…, GroupedQueryAttention, …, SwiGLU)` constructor is kept and delegates. Child names stay
     `inputNorm`, `attention`, `postAttentionNorm`, `mlp`.
-  - `MoeMlp` (Task 9) also extends `UnaryLayer`. `UnaryLayer`/`CachedAttention` are introduced by
-    whichever of Task 4/5 compiles first; the other reuses them.
+  - `MoeMlp` (Task 9) also extends `UnaryLayer`. `UnaryLayer`/`CachedAttention` were introduced
+    in Task 4.
   - `TinyCheckpoints.randomLlama(dir, seed, kvHeads, attentionBias, tiedHead)` and
     `randomQwen2(dir, seed)`: hidden ≥ 64 (so the same files serve the Task 10a quantization probe),
     `num_attention_heads=4`, GQA with `kv < heads`, weights drawn from a fixed `MLXRandom` key and stored
     with `MLXIO.saveSafetensors`.
   - `static Assembled DecoderAssembler.assemble(MLXScope scope, ArchitectureDescriptor d, Map<String,MLXArray> tensors)`
     where `Assembled(Embedding embedding, List<DecoderBlock> layers, RMSNorm finalNorm, Linear lmHead /*null when tied*/)`.
-    First statement: `ArchitectureMappings.tensorPlan(d).validate(tensors.keySet())`.
+    It receives tensors already validated against header names by `CheckpointLoader`; assert the
+    loaded key set matches the validated set before constructing layers.
   - `DecoderModel`'s protected constructor becomes `(MLXScope, ArchitectureDescriptor, Map<String,MLXArray>)`;
     the old `(scope, DecoderConfig, tensors, boolean, boolean)` constructor is removed (it is
     `protected` in an abstract class with only `LlamaModel`/`QwenModel` subclasses, both final and both
@@ -820,8 +958,17 @@ git commit -m "Add DecoderAttention with explicit head_dim, RoPE specs and slidi
 
 - [ ] **Step 1: Write the failing test**
 
-`DecoderAssemblerTest`: a checkpoint missing `model.layers.0.mlp.down_proj.weight` throws before any
-layer is built (validate through `TensorPlan`; assert no `Module` child was registered).
+`DecoderAssemblerTest`: a checkpoint missing `model.layers.0.mlp.down_proj.weight` fails in the
+header validation path before native load; use Task 2's package-private
+`CheckpointLoader.load(scope, directory, plan, Loader)` overload with an injected counting loader
+and assert its call count is zero. This can fail if validation is moved
+back after loading; `assemble` is static and has no observable child registration count.
+Add a two-layer `DecoderModel` test that observes the same mask array passed to both layers for
+one decode step; this is where per-step mask sharing is implemented.
+`RMSNormTest` uses `ModuleGrad` on the offset form with a nonzero float32 input of shape
+`[1, H]` and `sum(norm.forward(x))` loss. The `weight[j]` gradient must equal that single
+row's normalized `x[j]` within `1e-5` and contain a nonzero entry; repeat after `rebind`
+to guard the traced-parameter path.
 
 `DecoderRefactorGoldenTest` is the real refactor guard. The existing tiny fixtures are all zeros
 (`zeros(scope, …)` in `LlamaModelTest`/`QwenModelTest`), so every logit is equal and they cannot detect a
@@ -833,6 +980,8 @@ scope behavior and stay unchanged, but they are **not** the numeric golden. Writ
 `jmlx-models/src/test/resources/golden/refactor-<name>.json` holding the full-prompt logits (8-token
 prompt), two greedy decode IDs with their logits, and the exact `parameters()` key set. After the refactor
 the test asserts logits to `1e-6`, identical greedy IDs and an identical parameter key set (Decision 3).
+Also load `goldens/checkpoints/llama/` and `goldens/checkpoints/qwen2/` from Task 0 and compare
+prefill/decode logits to their independent HF goldens at an explicit `1e-4` float32 tolerance.
 
 - [ ] **Step 2: Capture goldens on the untouched code, run tests to verify the new ones fail**
 
@@ -873,25 +1022,34 @@ git commit -m "Build the decoder from architecture descriptors instead of Llama/
 **Files:**
 - Test: `jmlx-core/src/test/java/se/alipsa/jmlx/nn/RopeReferenceTest.java`,
   `jmlx-models/src/test/java/se/alipsa/jmlx/models/RopeScalingModelTest.java`
-- Consumes (from Task 0): `tools/hf-reference/goldens/rope.json`. The Python **MLX** oracle
+- Consumes (from Task 0): `tools/hf-reference/goldens/rope.json` and
+  `tools/hf-reference/goldens/checkpoints/llama31/`. The Python **MLX** oracle
   (`tools/mlx-oracle/`) is not used for RoPE values: it would be a second implementation ported by the
   same author from the same HF source, so the two could share one misreading.
 
 **Interfaces:**
-- Consumes: `RopeSpec` including `RopeSpec.apply(x, rotaryDims, offset, staticFreqs)` (Task 3).
+- Consumes: `RopeSpec` including its instance `apply(x, rotaryDims, offset, staticFreqs)` (Task 3).
 - Produces: nothing new. `RopeReferenceTest` calls **`RopeSpec.apply` itself** — the production path — and
   does not re-implement the `MLXFast.rope` call.
 
 Cases in `rope.json` (produced offline by HF `ROPE_INIT_FUNCTIONS` + HF's own rotary application):
-`{linear, dynamic, llama3, yarn}` × offsets `{0, 1, 7, 100, original_max_position_embeddings + 3}` ×
-`(headDim=8, rotaryDims ∈ {8, 4})`, plus **YaRN with `rotaryDims=4 < headDim=8` and a non-unit
-`attention_factor`** (Review Focus 4: pass-through dims unscaled), YaRN `truncate=false`, and a YaRN case
-with an explicit `attention_factor`. Each entry stores HF's `inv_freq`, `attention_scaling`, the input `x`
-`[1,2,T,8]` and HF's rotated output.
+frequency-only cases use `original_max_position_embeddings=8192`, `headDim=64`, and rotary
+dimensions `64` and `32`, including a YaRN case where `max_position_embeddings` differs from
+`factor * original_max_position_embeddings`. Assert that the fixture includes unchanged,
+interpolated and divided Llama 3 frequencies and both ends of the YaRN ramp; fail generation
+if a regime has no sample. These pure Java comparisons are unaffected by float32 rotation-angle
+rounding. Numeric `apply` cases use `original_max_position_embeddings=64`, `headDim=64`,
+`rotaryDims ∈ {64, 32}`, offsets `{0, 1, 7, 60, 67}`, and the same regime-coverage assertions.
+Include YaRN partial rotary dimensions with a non-unit and an explicit `attention_factor`, plus
+`truncate=false`; pass-through dimensions must stay unscaled. Each numeric entry stores HF's
+`inv_freq`, `attention_scaling`, input `x` `[1,2,T,64]` and HF's rotated output.
 
 - [ ] **Step 1: Write the failing test.** `RopeReferenceTest` (a) checks `RopeSpec.frequencies` against HF's
   `1/inv_freq` and `attentionScaling()` against HF's `attention_scaling` to `1e-6` (pure Java, runs on
-  Ubuntu), and (b) natively runs `RopeSpec.apply` and compares to HF's rotated output to `1e-5`.
+  Ubuntu), and (b) natively runs the spec instance's `apply` and compares to HF's rotated output
+  with absolute tolerance `1e-4` for the small-offset fixture. If the fixture uses larger positions,
+  set a per-case tolerance from float32 angle ULP at that position and record it in `rope.json`.
+  Put `@EnabledIfNativeAvailable` on the native method only, so the frequency cases run on Linux.
 - [ ] **Step 2: Run to verify failure**
 
 Run: `./gradlew :jmlx-core:test --tests "*RopeReferenceTest"`
@@ -899,13 +1057,13 @@ Expected: FAIL until Task 3's implementation matches HF. Any disagreement is a r
 the plan's reading of HF; fix `RopeSpec`, never the golden.
 - [ ] **Step 3: Fix until green.** Note in the test javadoc the one place HF and MLX are known to differ
   (MLX `freqs` are periods, HF `inv_freq` are reciprocals) and how the test converts.
-- [ ] **Step 4: End-to-end Llama 3.1-style tiny model.** `RopeScalingModelTest` uses
-  `TinyCheckpoints.randomLlama` (Task 5; seeded, non-zero, hidden ≥ 64) with
+- [ ] **Step 4: End-to-end Llama 3.1-style tiny model.** `RopeScalingModelTest` loads
+  `goldens/checkpoints/llama31/` (Task 0; seeded, non-zero, hidden ≥ 64) with
   `"rope_scaling":{"rope_type":"llama3","factor":8.0,"low_freq_factor":1.0,"high_freq_factor":4.0,
-  "original_max_position_embeddings":8}` and asserts (a) it loads (rejected before 6.3), (b) a 12-token
+  "original_max_position_embeddings":64}` and asserts (a) it loads (rejected before 6.3), (b) a 12-token
   prompt's logits differ from the same checkpoint without scaling, (c) generation is deterministic across
-  two runs, and (d) logits match a `transformers` golden for the same tiny checkpoint if Task 0 produced
-  one for this configuration (it should: add a `llama31` entry to `goldens/`).
+  two runs, and (d) logits match `goldens/llama31.json` for the same committed tiny checkpoint
+  with absolute tolerance `1e-4` in float32.
 - [ ] **Step 5: Run tests and commit**
 
 Run: `./gradlew :jmlx-core:test :jmlx-models:test verifyHfReferenceGoldens`
@@ -948,12 +1106,13 @@ deferred). Native (`MistralModelTest`, `Phi3ModelTest`, seeded non-zero tiny che
    layers the receptive field grows to `layers * window`, so the property test uses one layer; the
    multi-layer case asserts only the HF golden); (b) reference: Mistral tiny logits for a 10-token prompt
    and two decode steps equal the committed `transformers` golden
-   (`tools/hf-reference/goldens/mistral.json`, Task 0), which pins the window boundary to HF's mask;
+   (`tools/hf-reference/goldens/mistral.json`, Task 0), within `1e-4` absolute in float32,
+   which pins the window boundary to HF's mask;
    (c) `sliding_window=null` (Mistral v0.2/0.3) equals full causal attention.
 2. **Phi-3 fused mapping** — build the same weights once as separate `q/k/v`, `gate/up` (loaded as
    `llama`) and once fused (loaded as `phi3`); logits agree to `1e-6`, pinning the split order (`q,k,v` and
    `gate,up`). The Phi-3 tiny model's logits also match `goldens/phi3.json`. Both tests read the **same
-   committed safetensors** the `transformers` reference used
+   committed safetensors** the `transformers` reference used, within `1e-4` absolute in float32
    (`tools/hf-reference/goldens/checkpoints/<family>/`), so Java and HF share weights by construction.
 3. Missing/extra tensor cases from Task 2 for each family (forbidden separate `q_proj` on `phi3`,
    forbidden fused `qkv_proj` on `mistral`).
@@ -994,6 +1153,7 @@ git commit -m "Add Mistral sliding-window and Phi-3 fused-projection decoders"
   tanh-GELU needs ops not present (`tanh`, `power`/`square` exist)
 - Create: `jmlx-models/.../GemmaModel.java`
 - Test: `GemmaModelTest.java`, `jmlx-core/src/test/java/se/alipsa/jmlx/nn/ActivationsTest.java` additions
+  and `RMSNormTest.java` bf16/forward-value cases
 
 **Interfaces:**
 - Produces: `Activation.GELU_TANH` = `0.5*x*(1+tanh(sqrt(2/pi)*(x+0.044715*x^3)))` (HF
@@ -1010,18 +1170,26 @@ git commit -m "Add Mistral sliding-window and Phi-3 fused-projection decoders"
   constructor, which has no `headDim` field and whose `hidden % heads == 0` check real Gemma v1 configs
   already satisfy; the Tier-A tiny Gemma must satisfy it too. The relaxation applies only to families whose
   mapping declares an explicit head dimension; a Llama config with a mismatched `head_dim` stays rejected.
-  **Activation precedence** follows HF: `hidden_activation` if present, else `hidden_act`. A null/absent
-  `hidden_activation` means `gelu_pytorch_tanh` (HF's Gemma default); an explicit `gelu_pytorch_tanh` or
+  **Activation precedence** follows HF: use a non-null `hidden_activation` when present; when it is
+  null or absent use Gemma v1's `gelu_pytorch_tanh` default, regardless of `hidden_act`. Add a config
+  test for `{"hidden_act":"gelu","hidden_activation":null}` expecting `GELU_TANH`.
+  An explicit `gelu_pytorch_tanh` or
   `gelu_new` maps to `GELU_TANH`; an explicit `gelu` maps to the **exact** `GELU`; anything else is
   rejected by name. `tie_word_embeddings` defaults **true** for Gemma (unlike Llama's false).
   `gemma2`/`gemma3` `model_type` are rejected with "deferred to a later milestone".
-- Behavior (native, seeded non-zero tiny checkpoint): (1) the `RMSNorm` offset form equals
-  `rmsNorm(x, 1+w)`, adds no per-call op (assert the stored parameter is `w+1`), and with a bfloat16 weight
-  the stored value equals the float32 sum cast back; (2) embedding output is scaled by `sqrt(hidden)` **in
+- Behavior (native, seeded non-zero tiny checkpoint): (1) the `RMSNorm` offset form computes
+  normalized `x.float()` times `(1 + w.float())` and casts the product to the input dtype; assert
+  the registered parameter remains `w` after construction, update and rebind, and that forward
+  output changes after rebind; the Task 5 `ModuleGrad` test uses one `[1, H]` row and asserts
+  that each `weight[j]` gradient equals that row's normalized `x[j]` within `1e-5` in float32,
+  with nonzero entries. Include a bf16 case asserting the offset is float32 and pre-rounding `1+w`
+  changes the result; (2) embedding output is scaled by `sqrt(hidden)` **in
   the working dtype** (HF casts the normalizer to the hidden dtype: assert on the float32 fixture and note
   bf16 rounding in a comment for Tier B); (3) a tiny Gemma prefill/decode result (`GemmaModelTest`) equal to
   `goldens/gemma.json` from Hugging Face `transformers` (Task 0) over the committed safetensors both sides
   read, so the Java model is checked against Hugging Face's own implementation, not a port of it.
+  Compare prefill and decode logits with `1e-4` absolute tolerance in float32; record a separate
+  measured tolerance before asserting any bf16 Tier-B numeric comparison.
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -1057,7 +1225,7 @@ git commit -m "Add Gemma v1 decoder: offset RMSNorm, scaled embeddings, GeGLU an
 - Create: `jmlx-core/src/main/java/se/alipsa/jmlx/nn/MoeMlp.java`
 - Modify: `ArchitectureMappings.java`, `TensorPlan` builders, `DecoderAssembler.java`, `TextGenerationModels.java`;
   `MLXOps.java`/`MLXShape.java` only for ops the probe below shows missing (`mlx_topk_axis`,
-  `mlx_argpartition_axis` are `planned`; 6.1's `SamplingPipeline` already uses top-k selection — reuse its facade)
+  `mlx_argpartition_axis` are `planned`; start with `MLXOps.argsortAxis` per the tie probe)
 - Create: `jmlx-models/.../MixtralModel.java`
 - Test: `jmlx-core/src/test/java/se/alipsa/jmlx/nn/MoeMlpTest.java`, `MoeRoutingProbeTest.java`,
   `jmlx-models/src/test/java/se/alipsa/jmlx/models/MixtralModelTest.java` (reference: Task 0's `mixtral.json`)
@@ -1066,7 +1234,8 @@ git commit -m "Add Gemma v1 decoder: offset RMSNorm, scaled embeddings, GeGLU an
 - Produces: `MoeMlp extends UnaryLayer`, `MoeMlp(MLXScope, UnaryLayer router, List<GatedMlp> experts,
   int topK)`, children `router` and `expert0..expertN-1`. `forward(x [B,T,H])`:
   `logits = router(x)` `[B,T,E]`; `probs = softmax(logits, axis=-1)` in float32; select the `topK`
-  indices; `weights = probs[top] / sum(probs[top])` (Mixtral renormalises); output
+  indices; `weights = probs[top] / sum(probs[top])` (Mixtral renormalises), then cast the
+  routing weights to the hidden-state dtype before multiplying expert outputs, as HF does; output
   `Σ_e where(selected_e, weight_e · expert_e(x), 0)` computed densely. Unselected experts are masked with
   **`where`, never multiplied by a zero weight**: `inf * 0` is NaN, plausible for a bf16 expert on tokens it
   was not routed to. Constructor rejects `topK < 1 || topK > experts.size()`.
@@ -1074,7 +1243,7 @@ git commit -m "Add Gemma v1 decoder: offset RMSNorm, scaled embeddings, GeGLU an
   only for `argmaxAxis`; its `argsort` case only checked a sorted permutation, and `MLXOps.argsortAxis`'s
   javadoc says "Stable" without a probe behind it. Step 1 adds `MoeRoutingProbeTest` recording, on the
   pinned MLX, whether `argsortAxis` (on negated probabilities) is stable for exact ties and whether
-  `topk`/`argpartition` (from 6.1's facade, if present) break ties by lowest index. **If `argsort` is not
+  `topk`/`argpartition` (if added after the probe) break ties by lowest index. **If `argsort` is not
   provably stable, top-1 uses `argmaxAxis` (probed, first index) and top-k>1 builds its selection by
   `topK` successive `argmax` + mask passes**, which inherit the probed rule. HF uses `torch.topk`, whose
   tie order is unspecified, so Review Focus 5 asserts *determinism* (identical result across 100 runs and
@@ -1091,7 +1260,8 @@ git commit -m "Add Gemma v1 decoder: offset RMSNorm, scaled embeddings, GeGLU an
 `MoeMlpTest`: (1) **top_k == experts** — output equals the softmax-weighted sum of all experts (Review
 Focus 5); (2) **top_k=1, tied router logits** — chooses expert 0, identically across 100 runs and for every
 batch/token position; (3) **weights renormalise** — for `top_k=2` of 4, selected weights sum to 1 within
-`1e-6`; (4) an expert with zero weights contributes zero; (5) **NaN safety** — an unselected expert whose
+`1e-6`; assert the selected routing weights are cast to the hidden dtype after renormalization,
+including bf16; (4) an expert with zero weights contributes zero; (5) **NaN safety** — an unselected expert whose
 weights produce `inf` on the input does not poison the output (build one with a huge weight and assert a
 finite result equal to the routed experts' sum); (6) the dense formulation equals a per-token loop reference
 in plain `float[]` math on a 2-token, 3-expert, hidden-4 case.
@@ -1104,14 +1274,15 @@ is honored through the same `DecoderAttention` window as Mistral (the family sha
 6); `output_router_logits=true` is rejected by name; a dense family carrying `num_local_experts` is
 rejected (Review Focus 1). The reference is `tools/hf-reference/goldens/mixtral.json`: a 2-layer, 4-expert,
 top-2 tiny `transformers` Mixtral saved to `goldens/checkpoints/mixtral/`, with prefill logits and two greedy
-decode steps; Java reads the **same safetensors** and asserts `1e-4`.
+decode steps; Java reads the **same safetensors** and asserts `1e-4` absolute in float32.
 
 - [ ] **Step 2: Run to verify failure, then implement**
 
 Run: `./gradlew :jmlx-core:test --tests "*MoeMlpTest" && ./gradlew :jmlx-models:test --tests "*MixtralModelTest"`
 Expected: FAIL. Implement `MoeMlp` with only ops already exposed (`softmaxAxis`, `argsortAxis` descending
 via negation, `takeAlongAxis`, `where`, `sum`, `divide`, `multiply`); add `topk`-style facades only if
-`SamplingPipeline` does not already expose one reusable from `jmlx-core` — check first and reuse.
+the tie probe requires them. `SamplingPipeline` is package-private in `jmlx-models` and exposes no
+facade usable from `jmlx-core`.
 Build the `[B,T,E]` routing tensor by comparing an `arange(E)` against the selected indices (`equal` +
 `where`), avoiding scatter ops that are `unplanned`.
 
@@ -1234,12 +1405,15 @@ Spotless `googleJavaFormat` target and register `checkstyleTierB`, then include 
   mismatch as a warning, never a silent pass.
 - [ ] `tier-b.yml`: `workflow_dispatch` plus a weekly `schedule`, `macos-26` (or the recorded self-hosted
   runner), `actions/cache` keyed on the manifest revision, `HF_TOKEN` from a repository secret used
-  **only** for gated rows, a hard size cap enforced before download. It is never a required check.
+  **only** for gated rows, a hard size cap enforced before download. Run
+  `./scripts/bootstrap-native.sh` before `tierBTest` or any model load, as the native CI job does.
+  It is never a required check.
 - [ ] Commit: `git commit -m "Record Tier-B artifacts and add the opt-in real-artifact workflow"`
 
 **10d — Documentation and matrix**
 
 **Files:** Modify `req/phase6-compatibility.md`, `req/phase6-tier-a-fixtures.md`, `jmlx-models/README.md`,
+`.github/workflows/ci.yml`,
 `jmlx-models/build.gradle` (POM description), `CLAUDE.md` (supported architectures sentence, RoPE
 scaling now supported), `req/plans/phase5-m3-retrospective.md` is left as history.
 
@@ -1253,6 +1427,14 @@ scaling now supported), `req/plans/phase5-m3-retrospective.md` is left as histor
   mapping equivalence, Gemma and Mixtral tiny goldens, family tokenizer goldens, and `TensorPlan` tests.
 - [ ] README: supported-architectures list, `rope_scaling` support, an "unsupported and how it fails"
   table (quantization unless 10a′, `gemma2`, `longrope`, unknown tensors), and the cache-memory caveat.
+- [ ] Ubuntu CI: add `:jmlx-core:test` to the Java job. On 2026-09-29,
+  `./gradlew --no-build-cache :jmlx-core:test --rerun-tasks` passed on Linux with
+  `native/install/lib` absent; all existing core test classes carry
+  `@EnabledIfNativeAvailable`. Keep each new native-touching test method gated, while the pure
+  Java `RopeSpecTest` and `RopeReferenceTest` frequency cases run on Ubuntu. Run the same
+  command again after adding those tests and before merging the CI change.
+  `HfReferenceProvenanceTest` lives in `jmlx-models` and runs under the existing
+  `:jmlx-models:check`.
 - [ ] Commit: `git commit -m "Update the compatibility matrix and docs for Phase 6.3"`
 
 ---
@@ -1264,7 +1446,7 @@ Platform-independent (Ubuntu CI job, no native):
 ```text
 ./gradlew -p buildSrc check
 ./gradlew :check verifyHfReferenceGoldens
-./gradlew :jmlx-tokenizer:check :jmlx-models:check
+./gradlew :jmlx-core:test :jmlx-tokenizer:check :jmlx-models:check
 ./gradlew verifyTokenizerOracle verifyTokenizerOracleFixtures
 ```
 

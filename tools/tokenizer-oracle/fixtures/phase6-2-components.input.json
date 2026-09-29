@@ -1,0 +1,363 @@
+{
+  "fixtures": [
+    {
+      "name": "wordpiece",
+      "tokenizer": "wordpiece.tokenizer.json",
+      "cases": [
+        {
+          "name": "bert-basic",
+          "text": "Héllo worlds!",
+          "addSpecialTokens": true
+        },
+        {
+          "name": "bert-combining-supplementary",
+          "text": "Héllo 你🫠",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bert-chinese",
+          "text": "你 hello",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bert-unknown",
+          "text": "missing",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bert-truncate-pad",
+          "text": "hello worlds! hello",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 5,
+            "direction": "right",
+            "strategy": "longest_first",
+            "stride": 0
+          },
+          "padding": {
+            "length": 7,
+            "direction": "right",
+            "pad_id": 0,
+            "pad_token": "[PAD]",
+            "pad_type_id": 0
+          }
+        },
+        {
+          "name": "bert-format-character",
+          "text": "he‍llo",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bert-padding-shorter-than-encoding",
+          "text": "hello worlds! hello",
+          "addSpecialTokens": false,
+          "padding": {
+            "length": 3,
+            "direction": "right",
+            "pad_id": 0,
+            "pad_token": "[PAD]",
+            "pad_type_id": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "unigram",
+      "tokenizer": "unigram.tokenizer.json",
+      "cases": [
+        {
+          "name": "unigram-segmentation",
+          "text": "Hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-tie",
+          "text": "ll",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-unknown",
+          "text": "Hello x",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-byte-fallback",
+          "text": "Hello €",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-fused-unknown-run",
+          "text": "Hello x€",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-all-fused-unknown-run",
+          "text": "zz€zz",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "metaspace-bpe",
+      "tokenizer": "metaspace-bpe.tokenizer.json",
+      "cases": [
+        {
+          "name": "metaspace-known",
+          "text": "hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "metaspace-unknown",
+          "text": "hello x",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "metaspace-byte-fallback",
+          "text": "hello €",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "metaspace-fused-then-flushed-unknown",
+          "text": "hello x€",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "metaspace-byte-fallback-then-deferred-unknown",
+          "text": "ab€cd",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "added-token-flags",
+      "tokenizer": "added-token.tokenizer.json",
+      "cases": [
+        {
+          "name": "normalized-single-word",
+          "text": "x SPECIAL y",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "strip-whitespace",
+          "text": "x  <tag>  y",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-substring",
+          "text": "xSPECIAL",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "added-token-adjacent-strip",
+      "tokenizer": "added-token-adjacent.tokenizer.json",
+      "cases": [
+        {
+          "name": "rstrip-then-lstrip-no-overlap",
+          "text": "x <a> <b> y",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "added-token-single-word-skip",
+      "tokenizer": "added-token-single-word-skip.tokenizer.json",
+      "cases": [
+        {
+          "name": "rejected-single-word-hides-inner-token",
+          "text": "xabc",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "accepted-single-word-still-matches",
+          "text": "x ab c",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-combining-mark-before",
+          "text": "éab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-combining-mark-after",
+          "text": "ab́",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-connector-punctuation",
+          "text": "‿ab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-letter-number",
+          "text": "Ⅰab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-zero-width-joiner",
+          "text": "‍ab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-spacing-mark",
+          "text": "ःab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-accepts-superscript-neighbour",
+          "text": "²ab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-accepts-hyphen-neighbour",
+          "text": "-ab",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "null-pretokenizer-unigram",
+      "tokenizer": "null-pretokenizer-unigram.tokenizer.json",
+      "cases": [
+        {
+          "name": "unigram-known",
+          "text": "abc",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-consecutive-unknown",
+          "text": "abzz",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "unigram-all-unknown",
+          "text": "zz",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "bytelevel-bpe",
+      "tokenizer": "bytelevel-bpe.tokenizer.json",
+      "cases": [
+        {
+          "name": "bytelevel-prefix-trim",
+          "text": "a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bytelevel-spaces",
+          "text": "a b",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bytelevel-leading-space",
+          "text": " a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bytelevel-digits-and-letters",
+          "text": "a1234b",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bytelevel-nbsp",
+          "text": "a b",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "bytelevel-bpe-no-prefix",
+      "tokenizer": "bytelevel-bpe-no-prefix.tokenizer.json",
+      "cases": [
+        {
+          "name": "no-prefix-leading-space-trimmed",
+          "text": " a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "no-prefix-two-leading-spaces",
+          "text": "  a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "no-prefix-no-leading-space",
+          "text": "a",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "no-prefix-mid-word-space",
+          "text": "a b",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "split-at-zero-bytelevel",
+      "tokenizer": "split-at-zero-bytelevel.tokenizer.json",
+      "cases": [
+        {
+          "name": "split-match-at-zero",
+          "text": "a b",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "split-match-at-zero-adjacent",
+          "text": "ab",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "split-leading-merged",
+      "tokenizer": "split-leading-merged.tokenizer.json",
+      "cases": [
+        {
+          "name": "split-merged-match-at-zero",
+          "text": "ab",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "metaspace-prepend-first",
+      "tokenizer": "metaspace-prepend-first.tokenizer.json",
+      "cases": [
+        {
+          "name": "prepend-first-only-first-split-gets-prefix",
+          "text": "hello world",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "prepend-normalizer",
+      "tokenizer": "prepend-normalizer.tokenizer.json",
+      "cases": [
+        {
+          "name": "prepend-empty-input-not-prepended",
+          "text": "",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "prepend-nonempty-input-prepended",
+          "text": "hi",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "strip-accents-normalizer",
+      "tokenizer": "strip-accents-normalizer.tokenizer.json",
+      "cases": [
+        {
+          "name": "standalone-strip-accents-ignores-precomposed",
+          "text": "café",
+          "addSpecialTokens": false
+        }
+      ]
+    }
+  ]
+}

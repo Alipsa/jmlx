@@ -75,6 +75,23 @@ the recorded provenance whenever native pins change. Tier-A inputs and Java gold
 in `req/phase6-tier-a-fixtures.md`; `req/phase6-tier-b-artifacts.md` is the opt-in real-artifact
 manifest.
 
+The Python Hugging Face `tokenizers` oracle (`tools/tokenizer-oracle/`) is the equivalent fixture
+tool for `jmlx-tokenizer`: a hash-locked CPython 3.12 venv pinning `tokenizers==0.23.2`, used to
+generate ground truth for `TokenizerOracleTest` and to verify committed fixtures under
+`tools/tokenizer-oracle/fixtures/` (`*.tokenizer.json` inputs, `*.input.json` test-case specs,
+`*.expected.json` canonical oracle output). Install and verify with:
+
+```sh
+./tools/tokenizer-oracle/install.sh
+./gradlew verifyTokenizerOracle verifyTokenizerOracleFixtures
+```
+
+Only `./gradlew generateTokenizerOracleFixtures` rewrites a fixture's committed `*.expected.json`;
+review that diff whenever a fixture input or tokenizer JSON changes. Every `*.tokenizer.json` and
+`*.input.json` fixture source is SHA-256-pinned in `tools/tokenizer-oracle/provenance.json`, checked
+by `runner.py` before use -- a tampered or stale fixture source fails the build rather than silently
+comparing against drifted input.
+
 `scripts/checkDependencies.zsh` is a read-only report of available updates (Gradle plugins/deps, the
 wrapper, the pinned `mlx-metal` version, and — since mlx-c versions independently of MLX — the mlx-c
 tag that pairs with a newer wheel). `scripts/updateMlx.zsh <mlx-c-commit-sha>` repins `MLX_C_COMMIT` in

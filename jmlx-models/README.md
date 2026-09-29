@@ -2,91 +2,65 @@
 
 Reference local decoder-model implementations built on jmlx. The module loads Hugging Face
 safetensors checkpoints and provides inference-only Llama and Qwen2-style decoder models with a
-pure-Java Hugging Face tokenizer.
+pure-Java Hugging Face tokenizer. The native runtime supports macOS on Apple Silicon.
 
-It is intentionally a focused reference-model module, not a general model-serving framework. The
-current public API supports deterministic greedy generation and explicitly seeded sampling with
-synchronous token events. Batching, additional architectures, and RoPE scaling are planned in later
-Phase 6 milestones. In particular, configurations declaring `rope_scaling` are rejected, so Llama 3.1+
-checkpoints are not supported yet. See the [Phase 6 compatibility matrix](../req/phase6-compatibility.md)
-for the precise support boundary.
+The API supports greedy generation and explicitly seeded sampling, synchronous token/text events,
+raw-text and configured-chat requests, penalties, and top-k/top-p/min-p filtering. Additional model
+architectures, quantization, RoPE scaling, and serving infrastructure remain later Phase 6 work; see
+the [compatibility matrix](../req/phase6-compatibility.md).
 
-## Use
+## Load and generate text
 
-Add `jmlx-models` and the native runtime companion at runtime:
-
-```groovy
-dependencies {
-  implementation("se.alipsa:jmlx-models:<version>")
-  runtimeOnly("se.alipsa:jmlx-native-macos-arm64:<version>")
-}
-```
-
-For sampling, supply a positive temperature and explicit request-local seed. The complete policy
-also supports repetition, frequency, and presence penalties plus top-k, top-p, and min-p filters:
-
-```java
-GenerationConfig sampled = new GenerationConfig(
-    64, OptionalLong.of(42), 0.8f, 40, 0.95f, 0.05f,
-    1.1f, 0.0f, 0.0f, Set.of(eosId), Set.of(), true);
-GenerationResult result = model.generate(
-    new GenerationRequest(prompt, sampled, CancellationToken.NONE),
-    event -> {
-      if (event.tokenId() != null) {
-        System.out.printf("token=%d logp=%f%n", event.tokenId(), event.logProbability());
-      }
-    });
-```
-
-Selected-token log probabilities describe the final, filtered and renormalized distribution; they
-do not expose alternative-token probabilities. Greedy requests may also ask for log probabilities,
-which are reported as `0.0` by API convention. `textDelta` remains unsupported and null.
-
-The native artifact supports macOS on Apple Silicon. It is extracted automatically unless
-`jmlx.library.path` or `JMLX_LIBRARY_PATH` points to a locally staged runtime.
-
-Load a local Hugging Face model directory containing `config.json`, safetensors files (including
-indexed shards), and `tokenizer.json`:
+Add `jmlx-models` and the native companion at runtime, then keep the model scope open for the model's
+lifetime:
 
 ```java
 try (MLXScope scope = new MLXScope()) {
   TextGenerationModel model = TextGenerationModels.load(scope, modelDirectory);
-  HfTokenizer tokenizer = HfTokenizer.fromFile(modelDirectory.resolve("tokenizer.json"));
-  int[] prompt = tokenizer.encode("Hello", true).stream().mapToInt(Integer::intValue).toArray();
+  HfTokenizer tokenizer = HfTokenizer.fromDirectory(modelDirectory);
+  int eos = tokenizer.eosTokenId(tokenizer.metadata().eosToken().orElseThrow()).orElseThrow();
+  GenerationConfig config = GenerationConfig.greedyDefaults(64, Set.of(eos));
+
   GenerationResult result = model.generate(
-      new GenerationRequest(
-          prompt,
-          GenerationConfig.greedyDefaults(64, Set.of(tokenizer.eosTokenId().orElseThrow())),
-          CancellationToken.NONE),
+      GenerationRequest.text(
+          tokenizer, "Hello", PromptSpecialTokens.ADD, config, CancellationToken.NONE),
       event -> {
-        if (event.tokenId() != null) {
-          System.out.println("generated token " + event.tokenId());
+        if (event.textDelta() != null) {
+          System.out.print(event.textDelta());
         }
       });
-  System.out.println(tokenizer.decode(result.generatedTokenIds(), true));
+  System.out.println("\ncomplete: " + result.generatedText());
 }
 ```
 
-`TextGenerationModel.metadata()` exposes architecture-neutral fields such as `modelType`, vocabulary
-size, and layer count. Decoder-specific settings remain available from `DecoderModel.config()` when
-working with the current Llama/Qwen implementations directly.
+For chat, the template owns special tokens and the request enforces omission automatically:
 
-Byte-level BPE may split one Unicode code point across tokens, so do not decode individual event
-tokens. Decode the complete generated-ID sequence as above; a tokenizer-aware streaming decoder is
-planned for a later Phase 6 milestone. `LlamaModel.load` and `QwenModel.load` remain compatibility
-entry points; both delegate to the common loader. For chat models, render the model's chat template
-through `HfTokenizer`/`ChatTemplateRenderer`, then encode that rendered text with
-`addSpecialTokens=false`: templates ordinarily include their own BOS token. The event callback runs
-synchronously on the thread which owns the generation scope. A cancelling thread may only change
-the `CancellationToken`; it must never touch model or native resources. Cancellation is observed
-before prefill and between decode steps, not during an in-progress prompt prefill.
+```java
+GenerationRequest request = GenerationRequest.chat(
+    tokenizer,
+    List.of(Map.of("role", "user", "content", "Hello")),
+    ChatTemplateOptions.defaults(true),
+    config,
+    CancellationToken.NONE);
+```
 
-To reproduce sampled output, record the jmlx commit, native MLX pins, macOS/device, model/checkpoint,
-prompt token IDs and batch shape, the complete generation policy, and seed. A request owns its key
-chain: another request, cancellation, or process-global `MLXRandom.seed` state cannot perturb it.
+Use the existing `GenerationRequest(int[], ...)` constructor for pretokenized input. Its event
+`textDelta` and result `generatedText` remain null. Tokenizer-backed requests produce non-null,
+possibly empty deltas; the terminal event can carry the decoder's final UTF-8 flush. Concatenating
+all token and terminal deltas equals `GenerationResult.generatedText()`.
 
-## Resource ownership
+For sampling, use a positive temperature and explicit request-local seed. Selected-token log
+probabilities describe the final filtered and renormalized distribution; greedy log probability is
+`0.0` by API convention. Record the jmlx/MLX pins, checkpoint, prompt IDs, complete generation
+policy, and seed when reproducibility matters.
 
-Models own checkpoint tensors in the supplied `MLXScope`. Keep that scope open for the entire model
-and generation lifetime, then close it to release native memory. Generation creates and closes its
-own child scopes and KV caches; callers do not need to manage those intermediates.
+## Errors, cancellation, and ownership
+
+Prompt tokenization happens before native generation begins. A generated-ID decode failure is
+reported as `GenerationAbortedException` with prompt/generated evidence and the failing ID; its token
+event and terminal event are not emitted. Listener failures have the same contextual wrapper.
+Cancellation is observed before prefill and between decode steps.
+
+Models own checkpoint tensors in their supplied `MLXScope`. Generation owns and closes child scopes,
+caches, sampler state, and incremental decoder state; callers do not manage those intermediates.
+Only the cancellation token may be changed from another thread.

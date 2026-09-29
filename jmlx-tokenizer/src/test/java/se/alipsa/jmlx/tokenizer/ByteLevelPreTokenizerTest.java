@@ -15,21 +15,21 @@ class ByteLevelPreTokenizerTest {
   }
 
   // The real Qwen2.5/Llama-3 regex (Qwen2.5's \p{N} variant), verified against each model's
-  // actual tokenizer.json — see this plan's Findings section. No Pattern.UNICODE_CHARACTER_CLASS:
-  // TokenizerJsonLoader doesn't compile it with that flag either, since HF's onig backend's
-  // \s/\S are ASCII-only (PR #14 review round 4, finding 1) -- see
-  // asciiOnlyWhitespaceClassMatchesOnigNotJavasUnicodeDefault below for the divergence this flag
-  // would otherwise reintroduce (PR #14 review round 5, finding 10, correcting this comment's
-  // cross-reference to the wrong sibling test).
+  // actual tokenizer.json — see this plan's Findings section. \s/\S substituted with
+  // \p{IsWhite_Space}/\P{IsWhite_Space}: HF's onig backend's \s is Unicode White_Space (e.g.
+  // matches U+00A0 NBSP), not ASCII-only, matching what TokenizerJsonLoader.parsePreTokenizer
+  // itself substitutes before compiling a file's regex (PR #24 review round 2, finding 3,
+  // correcting PR #14 review round 4, finding 1 and PR #14 review round 5, finding 10 -- see
+  // unicodeWhitespaceClassMatchesOnigNotJavasAsciiOnlyDefault below).
   private static final Pattern QWEN_REGEX =
       Pattern.compile(
           "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r"
               + "\\n"
-              + "\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r"
+              + "\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\p{IsWhite_Space}\\p{L}\\p{N}]+[\\r"
               + "\\n"
-              + "]*|\\s*[\\r"
+              + "]*|\\p{IsWhite_Space}*[\\r"
               + "\\n"
-              + "]+|\\s+(?!\\S)|\\s+");
+              + "]+|\\p{IsWhite_Space}+(?!\\P{IsWhite_Space})|\\p{IsWhite_Space}+");
 
   @Test
   void splitsWordAndLeadingSpaceIntoSeparateChunks() {
@@ -85,17 +85,34 @@ class ByteLevelPreTokenizerTest {
   }
 
   @Test
-  void asciiOnlyWhitespaceClassMatchesOnigNotJavasUnicodeDefault() {
-    // Java's \s is ASCII-only unless Pattern.UNICODE_CHARACTER_CLASS is set; HF compiles this same
-    // regex with onig (the default "onig" cargo feature), whose \s is also ASCII-only, so NOT
-    // setting the flag is what matches HF. NBSP (U+00A0) is therefore neither \s, \p{L}, nor
-    // \p{N}, so it falls into the "any other run of chars" alternative and merges with an
-    // adjacent NBSP into one chunk instead of being treated as a whitespace boundary (PR #14
-    // review round 4, finding 1).
+  void twoWhitespaceCharsSplitAsOneChunkThenALeadingSpacePlusWord() {
+    // "\s+(?!\S)" only refuses to consume the very last whitespace character of a run (so the
+    // next word's own " ?<word>" alternative can claim a single leading space) -- verified
+    // against the pinned oracle: a run of two whitespace characters (ASCII space or NBSP alike)
+    // splits as [word, one-whitespace-char, one-whitespace-char + next-word], never as
+    // [word, both-whitespace-chars-fused, next-word] (PR #24 review round 2, finding 3, correcting
+    // this test's own prior, oracle-contradicted expectation from PR #14 review round 4/5).
     ByteLevelPreTokenizer pretokenizer =
         new ByteLevelPreTokenizer(new PreTokenizerConfig(QWEN_REGEX, false));
     assertEquals(
-        List.of("hi", ByteLevelCoding.encode("  "), "there"), pretokenizer.split("hi  there"));
+        List.of("hi", ByteLevelCoding.encode(" "), ByteLevelCoding.encode(" there")),
+        pretokenizer.split("hi  there"));
+  }
+
+  @Test
+  void nbspSplitsIdenticallyToAsciiSpaceUnderOnigsUnicodeWhitespace() {
+    // HF compiles this regex with onig (the default "onig" cargo feature), whose \s is Unicode
+    // White_Space, not ASCII-only -- verified against the pinned oracle: NBSP (U+00A0) splits a
+    // two-character whitespace run exactly like two ASCII spaces do (see
+    // twoWhitespaceCharsSplitAsOneChunkThenALeadingSpacePlusWord above), not as one merged
+    // "any other run of chars" chunk (PR #24 review round 2, finding 3, correcting PR #14 review
+    // round 4, finding 1).
+    ByteLevelPreTokenizer pretokenizer =
+        new ByteLevelPreTokenizer(new PreTokenizerConfig(QWEN_REGEX, false));
+    String nbsp = " ";
+    assertEquals(
+        List.of("hi", ByteLevelCoding.encode(nbsp), ByteLevelCoding.encode(nbsp + "there")),
+        pretokenizer.split("hi" + nbsp + nbsp + "there"));
   }
 
   @Test

@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "truncation": null,
+  "padding": null,
+  "added_tokens": [{"id": 0, "content": "<unk>", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": false}],
+  "normalizer": null,
+  "pre_tokenizer": {"type": "Metaspace", "replacement": "▁", "prepend_scheme": "always", "split": true},
+  "post_processor": null,
+  "decoder": {
+    "type": "Sequence",
+    "decoders": [
+      {"type": "ByteFallback"},
+      {"type": "Metaspace", "replacement": "▁", "prepend_scheme": "always"}
+    ]
+  },
+  "model": {
+    "type": "BPE",
+    "dropout": null,
+    "unk_token": "<unk>",
+    "continuing_subword_prefix": "",
+    "end_of_word_suffix": "",
+    "fuse_unk": true,
+    "byte_fallback": true,
+    "ignore_merges": false,
+    "vocab": {"<unk>": 0, "▁": 1, "h": 2, "e": 3, "l": 4, "o": 5, "w": 6, "r": 7, "d": 8, "▁h": 9, "▁he": 10, "▁hel": 11, "▁hell": 12, "▁hello": 13, "wo": 14, "wor": 15, "worl": 16, "world": 17, "<0xE2>": 18, "<0x82>": 19, "<0xAC>": 20},
+    "merges": ["▁ h", "▁h e", "▁he l", "▁hel l", "▁hell o", "w o", "wo r", "wor l", "worl d"]
+  }
+}

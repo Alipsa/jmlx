@@ -6,7 +6,11 @@ import java.util.Objects;
 
 /**
  * Applies a {@code tokenizer.json} post-processor's steps to an already-encoded token-string list.
+ *
+ * @deprecated no longer used by {@link HfTokenizer}, whose pipeline supports more components than
+ *     this class; use {@link HfTokenizer} for post-processing that matches Hugging Face
  */
+@Deprecated
 public final class PostProcessorApplier {
 
   private PostProcessorApplier() {}

@@ -23,7 +23,11 @@ import java.util.Objects;
  * difference from the literal pass-through it replaces; it matters for a hypothetical added token
  * whose content contains a character outside that identity range, which HF would still byte-decode
  * (or fall back to raw UTF-8 bytes for) rather than pass through verbatim.
+ *
+ * @deprecated no longer used by {@link HfTokenizer}, whose pipeline supports more components than
+ *     this class; use {@link HfTokenizer} for byte-level decoding that matches Hugging Face
  */
+@Deprecated
 public final class ByteLevelDecoder {
 
   private ByteLevelDecoder() {}

@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,36 @@ public final class ChatTemplateRenderer {
     context.put("eos_token", eosToken);
     try {
       return chatTemplate.render(context);
+    } catch (JinjaException e) {
+      throw new TokenizerException(
+          "ChatTemplateRenderer.render: failed to render chat template", e);
+    }
+  }
+
+  /**
+   * Renders source against a fully assembled Hugging Face template context.
+   *
+   * @param chatTemplate template source
+   * @param context complete immutable render context
+   * @return rendered prompt
+   */
+  public static String render(String chatTemplate, Map<String, Object> context) {
+    return render(parse(chatTemplate), context);
+  }
+
+  /**
+   * Renders a parsed template against a fully assembled Hugging Face template context.
+   *
+   * @param chatTemplate parsed template
+   * @param context complete immutable render context
+   * @return rendered prompt
+   */
+  public static String render(Template chatTemplate, Map<String, Object> context) {
+    Objects.requireNonNull(
+        chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
+    Objects.requireNonNull(context, "ChatTemplateRenderer.render: context must not be null");
+    try {
+      return chatTemplate.render(Collections.unmodifiableMap(new HashMap<>(context)));
     } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);

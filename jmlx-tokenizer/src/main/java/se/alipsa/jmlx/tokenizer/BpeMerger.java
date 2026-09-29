@@ -5,7 +5,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.PriorityQueue;
 
-/** The byte-level BPE merge algorithm: repeatedly applies the lowest-rank adjacent-pair merge. */
+/**
+ * The byte-level BPE merge algorithm: repeatedly applies the lowest-rank adjacent-pair merge.
+ *
+ * @deprecated no longer used by {@link HfTokenizer}, whose pipeline supports more components than
+ *     this class; use {@link HfTokenizer} for BPE merging that matches Hugging Face
+ */
+@Deprecated
 public final class BpeMerger {
 
   private final BpeModelConfig model;

@@ -5,7 +5,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
 
-/** Splits normalized text into byte-level-encoded pre-token chunks via the model's Split regex. */
+/**
+ * Splits normalized text into byte-level-encoded pre-token chunks via the model's Split regex.
+ *
+ * @deprecated no longer used by {@link HfTokenizer}, whose pipeline supports more components than
+ *     this class; use {@link HfTokenizer} for byte-level pre-tokenization that matches Hugging Face
+ */
+@Deprecated
 public final class ByteLevelPreTokenizer {
 
   private final PreTokenizerConfig config;

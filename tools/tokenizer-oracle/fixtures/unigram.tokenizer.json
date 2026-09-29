@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "truncation": null,
+  "padding": null,
+  "added_tokens": [],
+  "normalizer": {"type": "Sequence", "normalizers": [{"type": "NFKC"}, {"type": "Lowercase"}]},
+  "pre_tokenizer": {"type": "Metaspace", "replacement": "▁", "prepend_scheme": "always", "split": true},
+  "post_processor": null,
+  "decoder": {
+    "type": "Sequence",
+    "decoders": [
+      {"type": "ByteFallback"},
+      {"type": "Metaspace", "replacement": "▁", "prepend_scheme": "always"}
+    ]
+  },
+  "model": {
+    "type": "Unigram",
+    "unk_id": 0,
+    "byte_fallback": true,
+    "vocab": [
+      ["<unk>", 0.0],
+      ["▁", -1.0],
+      ["h", -1.0],
+      ["e", -1.0],
+      ["l", -1.0],
+      ["o", -1.0],
+      ["w", -1.0],
+      ["r", -1.0],
+      ["d", -1.0],
+      ["▁hello", -0.1],
+      ["▁world", -0.2],
+      ["ll", -2.0],
+      ["<0xE2>", -1.0],
+      ["<0x82>", -1.0],
+      ["<0xAC>", -1.0]
+    ]
+  }
+}

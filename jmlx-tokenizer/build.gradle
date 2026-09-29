@@ -28,13 +28,17 @@ dependencies {
     api project(':jmlx-jinja')
 }
 
+tasks.withType(Test).configureEach {
+    systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
+}
+
 publishing {
     publications {
         maven(MavenPublication) {
             from components.java
             pom {
                 name = 'jmlx-tokenizer'
-                description = 'Pure-Java byte-level BPE tokenizer and Hugging Face chat-template rendering.'
+                description = 'Pure-Java Hugging Face ByteLevel/Metaspace BPE, Unigram, and Bert/WordPiece tokenizer with chat-template rendering.'
                 url = 'https://github.com/Alipsa/jmlx'
                 licenses {
                     license {

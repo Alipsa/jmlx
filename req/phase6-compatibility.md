@@ -25,8 +25,8 @@ and establish component and chat-rendering behavior, not byte-level parity with 
 SentencePiece `Precompiled` normalizers are rejected. The [2026-09-29 macOS native CI run](https://github.com/Alipsa/jmlx/actions/runs/36627571854)
 executed the Phase 6.3 attention, MoE, Llama/Qwen, Mistral, Gemma, Phi-3 and Mixtral suites;
 the workflow checks their JUnit XML to prevent a silent native skip. The
-[Llama](https://github.com/Alipsa/jmlx/actions/runs/36638509366),
-[Qwen](https://github.com/Alipsa/jmlx/actions/runs/36638509366), and
-[Mistral](https://github.com/Alipsa/jmlx/actions/runs/36638509366) pinned real-artifact jobs
+[Llama](https://github.com/Alipsa/jmlx/actions/runs/36640308134),
+[Qwen](https://github.com/Alipsa/jmlx/actions/runs/36640308134), and
+[Mistral](https://github.com/Alipsa/jmlx/actions/runs/36640308134) pinned real-artifact jobs
 asserted 16 greedy IDs on the recorded runner pin; the other rows retain
 synthetic-fixture status.

@@ -48,17 +48,6 @@ jobs:
         run: python3 tools/tier-b/download.py "$JMLX_TIER_B_MANIFEST" "$JMLX_TIER_B_MODEL_DIR"
       - name: Bootstrap pinned native runtime
         run: ./scripts/bootstrap-native.sh
-      - name: Load recorded exact-token oracle
-        run: |
-          python3 - <<'PY' >> "$GITHUB_ENV"
-          import json
-          import os
-          from pathlib import Path
-
-          manifest = json.loads(Path(os.environ['JMLX_TIER_B_MANIFEST']).read_text())
-          print('JMLX_TIER_B_RECORDED_PIN=' + manifest.get('recorded_pin', ''))
-          print('JMLX_TIER_B_EXPECTED_TOKENS=' + ','.join(map(str, manifest.get('expected_token_ids', []))))
-          PY
       - name: Run pinned smoke test
         run: ./gradlew --no-build-cache :jmlx-models:tierBTest
       - name: Report observed output and assert test executed

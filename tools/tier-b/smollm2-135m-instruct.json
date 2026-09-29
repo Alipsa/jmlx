@@ -2,6 +2,9 @@
   "repository": "HuggingFaceTB/SmolLM2-135M-Instruct",
   "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
   "max_total_bytes": 300000000,
+  "expected_chat_text": "<|im_start|>system\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\n<|im_start|>user\nHello, my name is<|im_end|>\n",
+  "expected_chat_ids": [1, 9690, 198, 2683, 359, 253, 5356, 5646, 11173, 3365, 3511, 308, 34519, 28, 7018, 411, 407, 19712, 8182, 2, 198, 1, 4093, 198, 19556, 28, 957, 1462, 314, 2, 198],
+  "expected_prompt_ids": [19556, 28, 957, 1462, 314],
   "files": {
     "config.json": {
       "sha256": "8eb740e8bbe4cff95ea7b4588d17a2432deb16e8075bc5828ff7ba9be94d982a",

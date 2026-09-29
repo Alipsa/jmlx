@@ -56,6 +56,7 @@ final class PreTokenizerPipeline {
             case "WhitespaceSplit" -> whitespaceSplit(input);
             case "BertPreTokenizer" -> bert(input);
             case "Split" -> split(config, input);
+            case "Digits" -> digits(config, input);
             default ->
                 throw new TokenizerException(
                     "PreTokenizerPipeline: unsupported type '" + type + "'");
@@ -153,6 +154,29 @@ final class PreTokenizerPipeline {
 
   private static List<AlignedText> whitespaceSplit(AlignedText input) {
     return matches(input, WHITESPACE_SPLIT_PATTERN);
+  }
+
+  private static List<AlignedText> digits(JsonNode config, AlignedText input) {
+    boolean individual = config.path("individual_digits").asBoolean(false);
+    List<AlignedText> result = new ArrayList<>();
+    List<AlignedText.Unit> current = new ArrayList<>();
+    boolean currentNumeric = false;
+    for (AlignedText.Unit unit : input.units()) {
+      int codePoint = unit.value().codePointAt(0);
+      int category = Character.getType(codePoint);
+      boolean numeric =
+          category == Character.DECIMAL_DIGIT_NUMBER
+              || category == Character.LETTER_NUMBER
+              || category == Character.OTHER_NUMBER;
+      if (!current.isEmpty() && (numeric != currentNumeric || (numeric && individual))) {
+        flush(current, result);
+        current = new ArrayList<>();
+      }
+      current.add(unit);
+      currentNumeric = numeric;
+    }
+    flush(current, result);
+    return result;
   }
 
   private static List<AlignedText> bert(AlignedText input) {

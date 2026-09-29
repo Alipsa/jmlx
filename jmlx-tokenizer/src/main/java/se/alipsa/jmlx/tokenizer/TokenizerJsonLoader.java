@@ -165,7 +165,13 @@ public final class TokenizerJsonLoader {
       return;
     }
     if (!List.of(
-            "ByteLevel", "Metaspace", "Whitespace", "WhitespaceSplit", "BertPreTokenizer", "Split")
+            "ByteLevel",
+            "Metaspace",
+            "Whitespace",
+            "WhitespaceSplit",
+            "BertPreTokenizer",
+            "Split",
+            "Digits")
         .contains(type)) {
       throw new TokenizerException(
           "TokenizerJsonLoader: unsupported " + path + ".type '" + type + "'");
@@ -194,6 +200,7 @@ public final class TokenizerJsonLoader {
               "TokenizerJsonLoader: " + path + ".invert=true is unsupported");
         }
       }
+      case "Digits" -> optionalBoolean(node, "individual_digits", false, path);
       default -> {
         // Whitespace and BertPreTokenizer have no behavioral fields.
       }

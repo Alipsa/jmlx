@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -19,6 +18,8 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.KVCache;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Opt-in checkpoint check; exact IDs are asserted only for a recorded device/runtime pin. */
 class TierBSmokeTest {
@@ -29,6 +30,9 @@ class TierBSmokeTest {
     String directory = System.getProperty("jmlx.tier.b.model.dir", "");
     assumeTrue(!directory.isBlank(), "Set JMLX_TIER_B_MODEL_DIR to run Tier B");
     Path modelDirectory = Path.of(directory);
+    String manifestPath = System.getProperty("jmlx.tier.b.manifest", "");
+    JsonNode manifest =
+        manifestPath.isBlank() ? null : new ObjectMapper().readTree(Path.of(manifestPath).toFile());
     HfTokenizer tokenizer = HfTokenizer.fromDirectory(modelDirectory);
     String rendered =
         tokenizer.renderChat(
@@ -37,6 +41,11 @@ class TierBSmokeTest {
     assertFalse(rendered.isBlank());
     List<Integer> promptIds = tokenizer.encode(rendered, false);
     assertFalse(promptIds.isEmpty());
+    if (manifest != null) {
+      assertEquals(manifest.path("expected_chat_text").asString(), rendered);
+      assertEquals(ids(manifest.path("expected_chat_ids")), promptIds);
+      assertEquals(ids(manifest.path("expected_prompt_ids")), tokenizer.encode(PROMPT, false));
+    }
     int[] ids = promptIds.stream().mapToInt(Integer::intValue).toArray();
 
     try (RssSampler rss = new RssSampler();
@@ -83,18 +92,28 @@ class TierBSmokeTest {
               + ", generated_ids="
               + result.generatedTokenIds());
 
-      String recordedPin = System.getProperty("jmlx.tier.b.recorded.pin", "");
-      String expectedTokens = System.getProperty("jmlx.tier.b.expected.tokens", "");
-      if (!recordedPin.isBlank() && recordedPin.equals(pin) && !expectedTokens.isBlank()) {
-        List<Integer> expected =
-            Arrays.stream(expectedTokens.split(",")).map(Integer::parseInt).toList();
-        assertEquals(expected, result.generatedTokenIds());
+      String recordedPin = manifest == null ? "" : manifest.path("recorded_pin").asString("");
+      JsonNode expectedTokens = manifest == null ? null : manifest.path("expected_token_ids");
+      if (!recordedPin.isBlank()
+          && recordedPin.equals(pin)
+          && expectedTokens != null
+          && expectedTokens.isArray()) {
+        assertEquals(ids(expectedTokens), result.generatedTokenIds());
       } else {
         System.err.println(
             "Tier B structural pass only: device/macOS/MLX pin differs or exact IDs are"
                 + " unrecorded");
       }
     }
+  }
+
+  private static List<Integer> ids(JsonNode values) {
+    assertTrue(values.isArray(), "expected ID list must be an array");
+    List<Integer> result = new ArrayList<>();
+    for (JsonNode value : values) {
+      result.add(value.asInt());
+    }
+    return result;
   }
 
   private static String runtimePin() throws Exception {

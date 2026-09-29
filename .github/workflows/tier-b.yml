@@ -10,12 +10,25 @@ permissions:
   contents: read
 
 jobs:
-  qwen2:
+  artifact:
     runs-on: macos-26
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: qwen2
+            model_type: qwen2
+            revision: 7ae557604adf67be50417f59c2c2f167def9a775
+            manifest: tools/tier-b/qwen2.5-0.5b-instruct.json
+          - name: llama
+            model_type: llama
+            revision: 12fd25f77366fa6b3b4b768ec3050bf629380bac
+            manifest: tools/tier-b/smollm2-135m-instruct.json
     env:
-      JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/qwen2
-      JMLX_TIER_B_MODEL_TYPE: qwen2
+      JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
+      JMLX_TIER_B_MODEL_TYPE: ${{ matrix.model_type }}
+      JMLX_TIER_B_MANIFEST: ${{ matrix.manifest }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -29,21 +42,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/.tier-b/qwen2
-          key: tier-b-qwen2-7ae557604adf67be50417f59c2c2f167def9a775
+          path: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
+          key: tier-b-${{ matrix.name }}-${{ matrix.revision }}
       - name: Download pinned public artifact with hard size cap
-        run: python3 tools/tier-b/download.py tools/tier-b/qwen2.5-0.5b-instruct.json "$JMLX_TIER_B_MODEL_DIR"
+        run: python3 tools/tier-b/download.py "$JMLX_TIER_B_MANIFEST" "$JMLX_TIER_B_MODEL_DIR"
       - name: Bootstrap pinned native runtime
         run: ./scripts/bootstrap-native.sh
       - name: Load recorded exact-token oracle
         run: |
           python3 - <<'PY' >> "$GITHUB_ENV"
           import json
+          import os
           from pathlib import Path
 
-          manifest = json.loads(Path('tools/tier-b/qwen2.5-0.5b-instruct.json').read_text())
-          print('JMLX_TIER_B_RECORDED_PIN=' + manifest['recorded_pin'])
-          print('JMLX_TIER_B_EXPECTED_TOKENS=' + ','.join(map(str, manifest['expected_token_ids'])))
+          manifest = json.loads(Path(os.environ['JMLX_TIER_B_MANIFEST']).read_text())
+          print('JMLX_TIER_B_RECORDED_PIN=' + manifest.get('recorded_pin', ''))
+          print('JMLX_TIER_B_EXPECTED_TOKENS=' + ','.join(map(str, manifest.get('expected_token_ids', []))))
           PY
       - name: Run pinned smoke test
         run: ./gradlew --no-build-cache :jmlx-models:tierBTest

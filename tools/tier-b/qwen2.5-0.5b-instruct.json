@@ -2,6 +2,10 @@
   "repository": "Qwen/Qwen2.5-0.5B-Instruct",
   "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
   "max_total_bytes": 1100000000,
+  "recorded_pin": "Apple M1 (Virtual)|macOS=26.6.2|arch=aarch64|mlx-metal=0.31.2|mlx-c=fba4470b89073180056c9ea46c443051375f7399|batch=1",
+  "expected_token_ids": [8515, 323, 358, 1079, 264, 220, 16, 22, 1042, 2310, 8593, 13, 358, 614, 1012, 28604],
+  "observed_peak_test_jvm_rss_kib": 1018112,
+  "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36629361234",
   "files": {
     "config.json": {
       "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",

@@ -35,7 +35,17 @@ jobs:
         run: python3 tools/tier-b/download.py tools/tier-b/qwen2.5-0.5b-instruct.json "$JMLX_TIER_B_MODEL_DIR"
       - name: Bootstrap pinned native runtime
         run: ./scripts/bootstrap-native.sh
-      - name: Run structural smoke test
+      - name: Load recorded exact-token oracle
+        run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path('tools/tier-b/qwen2.5-0.5b-instruct.json').read_text())
+          print('JMLX_TIER_B_RECORDED_PIN=' + manifest['recorded_pin'])
+          print('JMLX_TIER_B_EXPECTED_TOKENS=' + ','.join(map(str, manifest['expected_token_ids'])))
+          PY
+      - name: Run pinned smoke test
         run: ./gradlew --no-build-cache :jmlx-models:tierBTest
       - name: Report observed output and assert test executed
         run: |

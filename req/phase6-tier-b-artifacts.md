@@ -6,9 +6,9 @@ must record every field below before an artifact is accepted as compatibility ev
 
 | Architecture | Repository candidate | Revision | File hashes | License / access | Expected output and runtime pin | Download / peak memory | Trigger owner | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Llama | [HuggingFaceTB/SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) | `12fd25f77366fa6b3b4b768ec3050bf629380bac` | all consumed files in [`tools/tier-b/smollm2-135m-instruct.json`](../tools/tier-b/smollm2-135m-instruct.json) | Apache-2.0; public | `model_type=llama`; output and runtime pin pending first run | 271,169,733 bytes consumed; 300,000,000-byte cap; peak RSS unmeasured | project maintainer | candidate pending; scheduled structural probe |
-| Qwen2 | [Qwen/Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) | `7ae557604adf67be50417f59c2c2f167def9a775` | all consumed files in [`tools/tier-b/qwen2.5-0.5b-instruct.json`](../tools/tier-b/qwen2.5-0.5b-instruct.json) | Apache-2.0; public | `model_type=qwen2`; exact 16 IDs and full device/macOS/MLX pin in machine manifest | 995,137,433 bytes consumed; 1,100,000,000-byte cap; highest sampled test-JVM RSS 1,018,112 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/36629740554) |
-| Mistral | pending a ≤1B Mistral-architecture artifact | — | — | pending | — | unmeasured | project maintainer | candidate pending |
+| Llama | [HuggingFaceTB/SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) | `12fd25f77366fa6b3b4b768ec3050bf629380bac` | all consumed files in [`tools/tier-b/smollm2-135m-instruct.json`](../tools/tier-b/smollm2-135m-instruct.json) | Apache-2.0; public | `model_type=llama`; exact 16 IDs, chat text/IDs, and runtime pin in machine manifest | 271,169,733 bytes consumed; 300,000,000-byte cap; highest sampled test-JVM RSS 459,616 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/36631526619) |
+| Qwen2 | [Qwen/Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) | `7ae557604adf67be50417f59c2c2f167def9a775` | all consumed files in [`tools/tier-b/qwen2.5-0.5b-instruct.json`](../tools/tier-b/qwen2.5-0.5b-instruct.json) | Apache-2.0; public | `model_type=qwen2`; exact 16 IDs, chat text/IDs, and runtime pin in machine manifest | 995,137,433 bytes consumed; 1,100,000,000-byte cap; highest sampled test-JVM RSS 1,018,112 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/36631526619) |
+| Mistral | [OuteAI/Lite-Mistral-150M-v2-Instruct](https://huggingface.co/OuteAI/Lite-Mistral-150M-v2-Instruct) | `6e2f90cbf312921289b3b8c29cb34cbdb6cb708e` | all consumed files in [`tools/tier-b/lite-mistral-150m-v2-instruct.json`](../tools/tier-b/lite-mistral-150m-v2-instruct.json) | Apache-2.0; public | `model_type=mistral`; chat text/IDs pinned; generated IDs and runtime pin pending | 627,886,087 bytes consumed; 650,000,000-byte cap; peak RSS unmeasured | project maintainer | candidate pending; scheduled structural probe |
 | Gemma v1 | [google/gemma-2b](https://huggingface.co/google/gemma-2b) | — | — | Gemma terms acceptance and token required | — | about 5.02 GB weights plus runtime; peak unmeasured | project maintainer | candidate pending |
 | Phi-3 | [microsoft/Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct) | — | — | MIT; public | — | index reports 7,642,159,104 bytes of weights, exceeding hosted runner RAM before runtime overhead | self-hosted runner owner pending | candidate pending |
 | Mixtral | pending a small licensed Mixtral-architecture artifact | — | — | pending | — | unmeasured | project maintainer | candidate pending |
@@ -24,11 +24,12 @@ terms; its file listing shows a 4.95 GB shard and a 67.1 MB shard. Qwen's exact-
 `fba4470b89073180056c9ea46c443051375f7399`; it produced the 16 IDs in the machine
 manifest. Its highest sampled **test JVM RSS** across two runs was 1,018,112 KiB. That
 measurement does not include separate Gradle processes or all unified GPU allocations; the
-successful hosted-runner load is the practical fit evidence. The remaining rows are candidate
-evaluations, not Tier-B evidence.
+successful hosted-runner load is the practical fit evidence. Llama's exact-token run used the
+same recorded Apple M1/macOS/MLX pin; the highest sampled test-JVM RSS across its two runs
+was 459,616 KiB. The remaining rows are candidate evaluations, not Tier-B evidence.
 
 The opt-in `tierBTest` source set accepts a local checkpoint. The scheduled Tier-B workflow
-downloads only pinned public Qwen files with per-file and total hard caps, checks every SHA-256,
+downloads only pinned public Llama and Qwen files with per-file and total hard caps, checks every SHA-256,
 bootstraps native MLX, and asserts exact greedy IDs when its measured device/macOS/MLX pin
 matches. On a different pin it reports a structural pass and does not claim token parity.
 

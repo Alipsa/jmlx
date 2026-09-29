@@ -25,6 +25,10 @@ jobs:
             model_type: llama
             revision: 12fd25f77366fa6b3b4b768ec3050bf629380bac
             manifest: tools/tier-b/smollm2-135m-instruct.json
+          - name: mistral
+            model_type: mistral
+            revision: 6e2f90cbf312921289b3b8c29cb34cbdb6cb708e
+            manifest: tools/tier-b/lite-mistral-150m-v2-instruct.json
     env:
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_MODEL_TYPE: ${{ matrix.model_type }}

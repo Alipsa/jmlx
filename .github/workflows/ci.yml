@@ -20,11 +20,21 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      tier_b:
+        description: Run the pinned public Tier B artifact probe
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  tier_b_probe:
+    if: github.event_name == 'workflow_dispatch' && inputs.tier_b
+    uses: ./.github/workflows/tier-b.yml
+
   java:
     runs-on: ubuntu-latest
     env:

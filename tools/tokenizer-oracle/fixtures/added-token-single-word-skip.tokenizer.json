@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "truncation": null,
+  "padding": null,
+  "added_tokens": [
+    {"id": 0, "content": "[UNK]", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true},
+    {"id": 8, "content": "ab", "single_word": true, "lstrip": false, "rstrip": false, "normalized": false, "special": false},
+    {"id": 9, "content": "b", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": false}
+  ],
+  "normalizer": null,
+  "pre_tokenizer": {"type": "WhitespaceSplit"},
+  "post_processor": null,
+  "decoder": {"type": "WordPiece", "prefix": "##", "cleanup": false},
+  "model": {
+    "type": "WordPiece",
+    "unk_token": "[UNK]",
+    "continuing_subword_prefix": "##",
+    "max_input_chars_per_word": 100,
+    "vocab": {"[UNK]": 0, "x": 1, "xa": 2, "##a": 3, "##b": 4, "##c": 5, "a": 6, "c": 7}
+  }
+}

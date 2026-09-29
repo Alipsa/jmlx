@@ -75,6 +75,18 @@ class Pr24FeedbackTest {
   }
 
   @Test
+  void singleWordRejectionSkipsTheWholeRejectedSpan() {
+    List<AddedToken> tokens =
+        List.of(
+            new AddedToken(10, "ab", true, false, false, false, false),
+            new AddedToken(11, "b", false, false, false, false, false));
+    AddedTokenMatcher matcher = new AddedTokenMatcher(tokens, false, null);
+    List<AddedTokenMatcher.Segment> segments = matcher.split(AlignedText.original("xabc"));
+    assertEquals(1, segments.size());
+    assertEquals(null, segments.get(0).token());
+  }
+
+  @Test
   void addedTokenMatcherPrefersLongestAmongSharedFirstCodePoint() {
     List<AddedToken> tokens =
         List.of(new AddedToken(1, "<a>", true), new AddedToken(2, "<a><b>", true));

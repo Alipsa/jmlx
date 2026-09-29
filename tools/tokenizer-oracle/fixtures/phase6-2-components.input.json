@@ -161,6 +161,22 @@
       ]
     },
     {
+      "name": "added-token-single-word-skip",
+      "tokenizer": "added-token-single-word-skip.tokenizer.json",
+      "cases": [
+        {
+          "name": "rejected-single-word-hides-inner-token",
+          "text": "xabc",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "accepted-single-word-still-matches",
+          "text": "x ab c",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
       "name": "null-pretokenizer-unigram",
       "tokenizer": "null-pretokenizer-unigram.tokenizer.json",
       "cases": [

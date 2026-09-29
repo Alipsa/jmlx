@@ -48,9 +48,14 @@ final class AddedTokenMatcher {
     int last = 0;
     int index = 0;
     while (index < text.length()) {
-      Candidate match = bestMatch(text, index);
+      Candidate match = longestMatch(text, index);
       if (match == null) {
         index += Character.charCount(text.codePointAt(index));
+        continue;
+      }
+      int matchEnd = index + match.content().length();
+      if (match.token().singleWord() && !isWholeWord(text, index, matchEnd)) {
+        index = matchEnd;
         continue;
       }
       int consumeStart =
@@ -71,19 +76,17 @@ final class AddedTokenMatcher {
     return result;
   }
 
-  // Like HF, the longest match at a position wins outright; a single_word rejection of it does
-  // not fall back to a shorter token at the same position.
-  private Candidate bestMatch(String text, int index) {
+  // Like HF's leftmost-longest find_iter: the longest match at a position wins outright. When
+  // single_word then rejects it, the search resumes after that match's end, so neither a shorter
+  // token at the same position nor one inside the rejected span can match.
+  private Candidate longestMatch(String text, int index) {
     List<Candidate> bucket = byFirstCodePoint.get(text.codePointAt(index));
     if (bucket == null) {
       return null;
     }
     for (Candidate candidate : bucket) {
       if (text.startsWith(candidate.content(), index)) {
-        return !candidate.token().singleWord()
-                || isWholeWord(text, index, index + candidate.content().length())
-            ? candidate
-            : null;
+        return candidate;
       }
     }
     return null;

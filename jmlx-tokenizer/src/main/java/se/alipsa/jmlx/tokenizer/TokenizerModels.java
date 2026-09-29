@@ -77,7 +77,11 @@ final class TokenizerModels {
           || right.version != candidate.rightVersion()) {
         continue;
       }
-      left.symbol += right.symbol;
+      String prefix = model.continuingSubwordPrefix();
+      left.symbol +=
+          !prefix.isEmpty() && right.symbol.startsWith(prefix)
+              ? right.symbol.substring(prefix.length())
+              : right.symbol;
       left.trueLength += right.trueLength;
       left.version++;
       left.next = right.next;

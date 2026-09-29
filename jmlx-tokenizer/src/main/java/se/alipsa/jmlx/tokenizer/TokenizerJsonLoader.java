@@ -189,7 +189,10 @@ public final class TokenizerJsonLoader {
           throw new TokenizerException(
               "TokenizerJsonLoader: " + path + ".behavior is unsupported: " + behavior);
         }
-        optionalBoolean(node, "invert", false, path);
+        if (optionalBoolean(node, "invert", false, path)) {
+          throw new TokenizerException(
+              "TokenizerJsonLoader: " + path + ".invert=true is unsupported");
+        }
       }
       default -> {
         // Whitespace and BertPreTokenizer have no behavioral fields.

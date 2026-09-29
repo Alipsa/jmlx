@@ -10,12 +10,18 @@ final class TokenizerRuntime {
 
   private final TokenizerDefinition definition;
   private final TokenizerModels.Encoder modelEncoder;
+  private final AddedTokenMatcher rawMatcher;
+  private final AddedTokenMatcher normalizedMatcher;
   private final Vocabulary vocabulary;
   private final int baseVocabularyMaxKnownId;
 
   TokenizerRuntime(TokenizerDefinition definition) {
     this.definition = Objects.requireNonNull(definition, "definition");
     this.modelEncoder = TokenizerModels.prepare(definition.model());
+    this.rawMatcher =
+        new AddedTokenMatcher(definition.addedTokens(), false, definition.normalizer());
+    this.normalizedMatcher =
+        new AddedTokenMatcher(definition.addedTokens(), true, definition.normalizer());
     List<AddedToken> templateTokens = collectTemplateTokens(definition.postProcessor());
     Vocabulary base = new Vocabulary(definition.model().vocab(), definition.addedTokens());
     requireCompatible(templateTokens, base);
@@ -90,17 +96,13 @@ final class TokenizerRuntime {
   private List<TokenPiece> encodeInput(String text) {
     AlignedText original = AlignedText.original(text);
     List<TokenPiece> result = new ArrayList<>();
-    for (AddedTokenMatcher.Segment raw :
-        AddedTokenMatcher.split(
-            original, definition.addedTokens(), false, definition.normalizer())) {
+    for (AddedTokenMatcher.Segment raw : rawMatcher.split(original)) {
       if (raw.token() != null) {
         result.add(added(raw));
         continue;
       }
       AlignedText normalized = NormalizerPipeline.apply(definition.normalizer(), raw.text());
-      for (AddedTokenMatcher.Segment segment :
-          AddedTokenMatcher.split(
-              normalized, definition.addedTokens(), true, definition.normalizer())) {
+      for (AddedTokenMatcher.Segment segment : normalizedMatcher.split(normalized)) {
         if (segment.token() != null) {
           result.add(added(segment));
           continue;

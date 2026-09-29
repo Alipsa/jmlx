@@ -11,7 +11,11 @@ import java.util.stream.Collectors;
 /**
  * Splits input text around literal added-token strings (longest-first, no lstrip/rstrip — see
  * Findings).
+ *
+ * @deprecated no longer used by {@link HfTokenizer}, whose pipeline supports more components than
+ *     this class; use {@link HfTokenizer} for added-token splitting that matches Hugging Face
  */
+@Deprecated
 public final class AddedTokenSplitter {
 
   /**

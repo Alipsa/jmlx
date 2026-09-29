@@ -2,7 +2,9 @@ package se.alipsa.jmlx.tokenizer;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -142,7 +144,7 @@ public final class HfTokenizer {
     if (!(content instanceof String)) {
       throw new TokenizerException("HfTokenizer.renderChat: message content must be text");
     }
-    return Map.copyOf(message);
+    return Collections.unmodifiableMap(new LinkedHashMap<>(message));
   }
 
   private static void putToken(

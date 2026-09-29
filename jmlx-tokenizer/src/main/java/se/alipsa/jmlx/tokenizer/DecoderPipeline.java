@@ -8,6 +8,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
@@ -98,6 +99,11 @@ final class DecoderPipeline {
   }
 
   private static List<String> replace(JsonNode config, List<String> tokens) {
+    UnaryOperator<String> replacer = replacer(config);
+    return tokens.stream().map(replacer).toList();
+  }
+
+  static UnaryOperator<String> replacer(JsonNode config) {
     JsonNode pattern = config.path("pattern");
     String target =
         pattern.has("String")
@@ -107,7 +113,7 @@ final class DecoderPipeline {
     // round 2, finding 7) -- quoteReplacement keeps a literal `$` or `\` from being misread as one.
     String replacement = Matcher.quoteReplacement(config.path("content").asString());
     Pattern compiled = Pattern.compile(target);
-    return tokens.stream().map(token -> compiled.matcher(token).replaceAll(replacement)).toList();
+    return token -> compiled.matcher(token).replaceAll(replacement);
   }
 
   private static String strip(JsonNode config, String value) {

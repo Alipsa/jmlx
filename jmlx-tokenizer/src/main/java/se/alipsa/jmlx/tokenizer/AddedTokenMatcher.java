@@ -1,32 +1,54 @@
 package se.alipsa.jmlx.tokenizer;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import tools.jackson.databind.JsonNode;
 
 /** Longest-first added-token matching with stripping and word-boundary behavior. */
 final class AddedTokenMatcher {
 
-  private AddedTokenMatcher() {}
+  private final Map<Integer, List<Candidate>> byFirstCodePoint = new HashMap<>();
+  private final boolean empty;
 
-  static List<Segment> split(
-      AlignedText input, List<AddedToken> tokens, boolean normalized, JsonNode normalizer) {
-    List<AddedToken> candidates =
-        tokens.stream().filter(token -> token.normalized() == normalized).toList();
-    if (candidates.isEmpty() || input.units().isEmpty()) {
+  /**
+   * Prepares the candidates whose {@code normalized} flag equals {@code normalized}, bucketed by
+   * first code point and ordered longest-first so a lookup only scans tokens that can match there.
+   */
+  AddedTokenMatcher(List<AddedToken> tokens, boolean normalized, JsonNode normalizer) {
+    for (AddedToken token : tokens) {
+      if (token.normalized() != normalized) {
+        continue;
+      }
+      String content =
+          token.normalized()
+              ? NormalizerPipeline.apply(normalizer, AlignedText.original(token.content())).text()
+              : token.content();
+      if (!content.isEmpty()) {
+        byFirstCodePoint
+            .computeIfAbsent(content.codePointAt(0), key -> new ArrayList<>())
+            .add(new Candidate(token, content));
+      }
+    }
+    byFirstCodePoint
+        .values()
+        .forEach(list -> list.sort(Comparator.comparingInt(c -> -c.content().length())));
+    empty = byFirstCodePoint.isEmpty();
+  }
+
+  List<Segment> split(AlignedText input) {
+    if (empty || input.units().isEmpty()) {
       return List.of(new Segment(input, null));
     }
     String text = input.text();
     int[] unitAtChar = unitAtChar(input);
-    // Normalizing every candidate's content once per call, rather than once per (position,
-    // candidate) pair inside bestMatch's loop, avoids re-running the full normalizer pipeline at
-    // every character position -- it does not depend on index (PR #24 review, finding 6).
-    List<String> candidateContents = normalizedContents(candidates, normalizer);
     List<Segment> result = new ArrayList<>();
     int last = 0;
     int index = 0;
     while (index < text.length()) {
-      Match match = bestMatch(text, index, candidates, candidateContents);
+      Candidate match = bestMatch(text, index);
       if (match == null) {
         index += Character.charCount(text.codePointAt(index));
         continue;
@@ -49,31 +71,22 @@ final class AddedTokenMatcher {
     return result;
   }
 
-  private static List<String> normalizedContents(List<AddedToken> candidates, JsonNode normalizer) {
-    List<String> result = new ArrayList<>(candidates.size());
-    for (AddedToken token : candidates) {
-      result.add(
-          token.normalized()
-              ? NormalizerPipeline.apply(normalizer, AlignedText.original(token.content())).text()
-              : token.content());
+  // Like HF, the longest match at a position wins outright; a single_word rejection of it does
+  // not fall back to a shorter token at the same position.
+  private Candidate bestMatch(String text, int index) {
+    List<Candidate> bucket = byFirstCodePoint.get(text.codePointAt(index));
+    if (bucket == null) {
+      return null;
     }
-    return result;
-  }
-
-  private static Match bestMatch(
-      String text, int index, List<AddedToken> candidates, List<String> candidateContents) {
-    Match best = null;
-    for (int i = 0; i < candidates.size(); i++) {
-      AddedToken token = candidates.get(i);
-      String content = candidateContents.get(i);
-      if (!content.isEmpty()
-          && text.startsWith(content, index)
-          && (!token.singleWord() || isWholeWord(text, index, index + content.length()))
-          && (best == null || content.length() > best.content().length())) {
-        best = new Match(token, content);
+    for (Candidate candidate : bucket) {
+      if (text.startsWith(candidate.content(), index)) {
+        return !candidate.token().singleWord()
+                || isWholeWord(text, index, index + candidate.content().length())
+            ? candidate
+            : null;
       }
     }
-    return best;
+    return null;
   }
 
   private static boolean isWholeWord(String text, int start, int end) {
@@ -114,8 +127,7 @@ final class AddedTokenMatcher {
    * Maps every char index in {@code input.text()} to the index of the unit it belongs to, so {@link
    * #slice} can locate a match's boundary units in O(1) instead of rescanning every unit of the
    * whole input per match -- {@code split} calls it once per segment and reuses it across every
-   * match found within that segment (PR #24 review, finding 5; mirrors the same fix in {@link
-   * PreTokenizerPipeline}).
+   * match found within that segment.
    */
   private static int[] unitAtChar(AlignedText input) {
     String text = input.text();
@@ -144,5 +156,5 @@ final class AddedTokenMatcher {
 
   record Segment(AlignedText text, AddedToken token) {}
 
-  private record Match(AddedToken token, String content) {}
+  private record Candidate(AddedToken token, String content) {}
 }

@@ -8,6 +8,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 
@@ -23,6 +24,9 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
   private final java.nio.charset.CharsetDecoder utf8 = newUtf8Decoder();
   private final List<Integer> bufferedIds = new ArrayList<>();
   private final ByteArrayOutputStream fallbackBytes = new ByteArrayOutputStream();
+  private final UnaryOperator<String> replacer;
+  private final char stripContent;
+  private int stripRemaining;
   private byte[] pendingUtf8 = new byte[0];
   private boolean firstText = true;
   private boolean finished;
@@ -32,6 +36,15 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
     this.skipSpecialTokens = skipSpecialTokens;
     this.decoder = decoder == null ? null : decoder.deepCopy();
     this.mode = decoder == null ? Mode.BUFFERED : mode(decoder);
+    if (mode == Mode.REPLACE_FALLBACK_STRIP) {
+      this.replacer = DecoderPipeline.replacer(decoder.path("decoders").get(0));
+      JsonNode strip = decoder.path("decoders").get(3);
+      this.stripContent = strip.path("content").asString(" ").charAt(0);
+      this.stripRemaining = strip.path("start").asInt(0);
+    } else {
+      this.replacer = null;
+      this.stripContent = ' ';
+    }
   }
 
   @Override
@@ -52,6 +65,7 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
       case METASPACE -> metaspace(text);
       case BYTE_FALLBACK_METASPACE -> byteFallbackMetaspace(text, false);
       case WORDPIECE -> wordPiece(text, false);
+      case REPLACE_FALLBACK_STRIP -> replaceFallbackStrip(text, false);
       case BUFFERED -> {
         bufferedIds.add(tokenId);
         yield "";
@@ -68,8 +82,36 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
       case METASPACE -> "";
       case BYTE_FALLBACK_METASPACE -> byteFallbackMetaspace("", true);
       case WORDPIECE -> wordPiece("", true);
+      case REPLACE_FALLBACK_STRIP -> replaceFallbackStrip("", true);
       case BUFFERED -> runtime.decode(bufferedIds, skipSpecialTokens);
     };
+  }
+
+  // Streams Sequence[Replace, ByteFallback, Fuse, Strip(stop=0)] (Llama 2): Replace applies to
+  // ordinary tokens only, byte-fallback runs are decoded as a group, and Strip removes at most
+  // `start` leading characters from the fused output, so only the leading emitted text is stripped.
+  private String replaceFallbackStrip(String token, boolean end) {
+    if (!end && BYTE_TOKEN.matcher(token).matches()) {
+      fallbackBytes.write(Integer.parseInt(token.substring(3, 5), 16));
+      return "";
+    }
+    StringBuilder chunk = new StringBuilder();
+    if (fallbackBytes.size() > 0) {
+      chunk.append(DecoderPipeline.decodeFallbackBytes(fallbackBytes.toByteArray()));
+      fallbackBytes.reset();
+    }
+    if (!end) {
+      chunk.append(replacer.apply(token));
+    }
+    int skip = 0;
+    while (stripRemaining > 0 && skip < chunk.length() && chunk.charAt(skip) == stripContent) {
+      skip++;
+      stripRemaining--;
+    }
+    if (skip < chunk.length()) {
+      stripRemaining = 0;
+    }
+    return chunk.substring(skip);
   }
 
   private String byteFallbackMetaspace(String token, boolean end) {
@@ -155,7 +197,25 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
     if (isSequence(config, "ByteFallback", "Metaspace")) {
       return Mode.BYTE_FALLBACK_METASPACE;
     }
+    if (isReplaceFallbackStrip(config)) {
+      return Mode.REPLACE_FALLBACK_STRIP;
+    }
     return Mode.BUFFERED;
+  }
+
+  private static boolean isReplaceFallbackStrip(JsonNode config) {
+    JsonNode steps = config.path("decoders");
+    if (!"Sequence".equals(config.path("type").asString()) || steps.size() != 4) {
+      return false;
+    }
+    String[] expected = {"Replace", "ByteFallback", "Fuse", "Strip"};
+    for (int i = 0; i < expected.length; i++) {
+      if (!expected[i].equals(steps.get(i).path("type").asString())) {
+        return false;
+      }
+    }
+    JsonNode strip = steps.get(3);
+    return strip.path("stop").asInt(0) == 0 && strip.path("content").asString(" ").length() == 1;
   }
 
   private static boolean isOnly(JsonNode config, String type) {
@@ -205,6 +265,7 @@ final class RuntimeIncrementalDecoder implements IncrementalTokenDecoder {
     METASPACE,
     BYTE_FALLBACK_METASPACE,
     WORDPIECE,
+    REPLACE_FALLBACK_STRIP,
     BUFFERED
   }
 }

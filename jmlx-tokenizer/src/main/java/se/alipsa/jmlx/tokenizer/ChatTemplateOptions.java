@@ -1,5 +1,7 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -31,7 +33,9 @@ public record ChatTemplateOptions(
    */
   public ChatTemplateOptions {
     templateName = Objects.requireNonNull(templateName, "templateName");
-    extraContext = Map.copyOf(Objects.requireNonNull(extraContext, "extraContext"));
+    extraContext =
+        Collections.unmodifiableMap(
+            new LinkedHashMap<>(Objects.requireNonNull(extraContext, "extraContext")));
     for (String key : extraContext.keySet()) {
       if (RESERVED.contains(key)) {
         throw new IllegalArgumentException(

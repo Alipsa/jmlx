@@ -89,12 +89,7 @@ final class TokenizerDirectoryLoader {
                 path -> {
                   String filename = path.getFileName().toString();
                   String name = filename.substring(0, filename.length() - ".jinja".length());
-                  if (name.isEmpty()
-                      || ".".equals(name)
-                      || "..".equals(name)
-                      || name.contains("/")
-                      || name.contains("\\")
-                      || Files.isSymbolicLink(path)) {
+                  if (name.isEmpty() || ".".equals(name) || "..".equals(name)) {
                     throw new TokenizerException(
                         "TokenizerDirectoryLoader: invalid chat template name '" + name + "'");
                   }

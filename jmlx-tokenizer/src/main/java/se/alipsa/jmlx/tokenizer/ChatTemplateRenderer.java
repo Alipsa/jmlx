@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +98,7 @@ public final class ChatTemplateRenderer {
         chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
     Objects.requireNonNull(context, "ChatTemplateRenderer.render: context must not be null");
     try {
-      return chatTemplate.render(Map.copyOf(context));
+      return chatTemplate.render(Collections.unmodifiableMap(new HashMap<>(context)));
     } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);

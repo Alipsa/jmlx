@@ -5,10 +5,14 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 
 /** Longest-first added-token matching with stripping and word-boundary behavior. */
 final class AddedTokenMatcher {
+
+  private static final Pattern WORD =
+      Pattern.compile("[" + PreTokenizerPipeline.WORD_CHARACTERS + "]");
 
   private final Map<Integer, List<Candidate>> byFirstCodePoint = new HashMap<>();
   private final boolean empty;
@@ -99,7 +103,7 @@ final class AddedTokenMatcher {
   }
 
   private static boolean isWord(int codePoint) {
-    return Character.isLetterOrDigit(codePoint) || codePoint == '_';
+    return WORD.matcher(Character.toString(codePoint)).matches();
   }
 
   private static int precedingWhitespace(String text, int index) {

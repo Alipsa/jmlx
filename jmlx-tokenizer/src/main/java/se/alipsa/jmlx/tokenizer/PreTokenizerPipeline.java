@@ -22,9 +22,10 @@ final class PreTokenizerPipeline {
               + "| ?[^\\p{IsWhite_Space}\\p{L}\\p{N}]+"
               + "|\\p{IsWhite_Space}+(?!\\P{IsWhite_Space})"
               + "|\\p{IsWhite_Space}+");
+  // Unicode \w as Rust's regex defines it; shared with AddedTokenMatcher's single_word boundaries.
+  static final String WORD_CHARACTERS = "\\p{IsAlphabetic}\\p{M}\\p{Nd}\\p{Pc}\\u200c\\u200d";
   private static final Pattern WHITESPACE_PATTERN =
-      Pattern.compile(
-          "[\\p{IsAlphabetic}\\p{M}\\p{Nd}\\p{Pc}\\u200c\\u200d]+|[^\\p{IsAlphabetic}\\p{M}\\p{Nd}\\p{Pc}\\u200c\\u200d\\p{IsWhite_Space}]+");
+      Pattern.compile("[" + WORD_CHARACTERS + "]+|[^" + WORD_CHARACTERS + "\\p{IsWhite_Space}]+");
   private static final Pattern WHITESPACE_SPLIT_PATTERN = Pattern.compile("[^\\p{IsWhite_Space}]+");
 
   private PreTokenizerPipeline() {}

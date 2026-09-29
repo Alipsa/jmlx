@@ -173,6 +173,46 @@
           "name": "accepted-single-word-still-matches",
           "text": "x ab c",
           "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-combining-mark-before",
+          "text": "éab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-combining-mark-after",
+          "text": "ab́",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-connector-punctuation",
+          "text": "‿ab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-letter-number",
+          "text": "Ⅰab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-zero-width-joiner",
+          "text": "‍ab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-rejects-spacing-mark",
+          "text": "ःab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-accepts-superscript-neighbour",
+          "text": "²ab",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "single-word-accepts-hyphen-neighbour",
+          "text": "-ab",
+          "addSpecialTokens": false
         }
       ]
     },

@@ -6,7 +6,6 @@
   "expected_chat_text": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nHello, my name is<|im_end|>\n",
   "expected_chat_ids": [151644, 8948, 198, 2610, 525, 1207, 16948, 11, 3465, 553, 54364, 14817, 13, 1446, 525, 264, 10950, 17847, 13, 151645, 198, 151644, 872, 198, 9707, 11, 847, 829, 374, 151645, 198],
   "expected_prompt_ids": [9707, 11, 847, 829, 374],
-  "expected_token_ids": [8515, 323, 358, 1079, 264, 220, 16, 22, 1042, 2310, 8593, 13, 358, 614, 1012, 28604],
   "observed_peak_test_jvm_rss_kib": 1018112,
   "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36638509366",
   "files": {

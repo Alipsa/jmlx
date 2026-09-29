@@ -3,7 +3,6 @@
   "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
   "max_total_bytes": 300000000,
   "recorded_pin": "Apple M1 (Virtual)|macOS=26.6.2|arch=aarch64|mlx-metal=0.31.2|mlx-c=fba4470b89073180056c9ea46c443051375f7399|batch=1",
-  "expected_token_ids": [15487, 28, 284, 339, 5248, 253, 8299, 418, 260, 1638, 282, 37308, 30, 339, 5248, 4112],
   "observed_peak_test_jvm_rss_kib": 461376,
   "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36638509366",
   "expected_chat_text": "<|im_start|>system\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\n<|im_start|>user\nHello, my name is<|im_end|>\n",

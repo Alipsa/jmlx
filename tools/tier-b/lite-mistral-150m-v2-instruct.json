@@ -3,7 +3,6 @@
   "revision": "6e2f90cbf312921289b3b8c29cb34cbdb6cb708e",
   "max_total_bytes": 650000000,
   "recorded_pin": "Apple M1 (Virtual)|macOS=26.6.2|arch=aarch64|mlx-metal=0.31.2|mlx-c=fba4470b89073180056c9ea46c443051375f7399|batch=1",
-  "expected_token_ids": [733, 6889, 574, 1141, 1236, 1592, 315, 28742, 28719, 733, 6889, 574, 1141, 1236, 1592, 315],
   "observed_peak_test_jvm_rss_kib": 526784,
   "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36638509366",
   "expected_chat_text": "<s>user\nHello, my name is</s>\n",

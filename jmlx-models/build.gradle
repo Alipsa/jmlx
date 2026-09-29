@@ -29,7 +29,7 @@ sourceSets {
         java.srcDir 'src/tierB/java'
         compileClasspath += sourceSets.main.output + sourceSets.test.output +
                 sourceSets.test.compileClasspath
-        runtimeClasspath += output + compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.test.runtimeClasspath
     }
 }
 

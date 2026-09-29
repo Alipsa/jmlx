@@ -1,0 +1,8 @@
+{
+  "tokenizer_class": "PreTrainedTokenizerFast",
+  "bos_token": "<bos>",
+  "eos_token": "<eos>",
+  "unk_token": "<unk>",
+  "chat_template": "{{ bos_token }}{%- for message in messages %}{%- if message['role'] == 'system' %}{{ '<start_of_turn>user\\n' + message['content'] + '<end_of_turn>\\n' }}{%- elif message['role'] == 'user' %}{{ '<start_of_turn>user\\n' + message['content'] + '<end_of_turn>\\n' }}{%- elif message['role'] == 'assistant' %}{{ '<start_of_turn>model\\n' + message['content'] + '<end_of_turn>\\n' }}{%- endif %}{%- endfor %}{%- if add_generation_prompt %}{{ '<start_of_turn>model\\n' }}{%- endif %}",
+  "model_max_length": 128
+}

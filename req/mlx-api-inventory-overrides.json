@@ -118,6 +118,13 @@
       "tests": "MLXNumericTest; SelectionAndRandomProbeTest"
     },
     {
+      "bindings": ["mlx_h.mlx_logical_and"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXOps.logicalAnd",
+      "tests": "AttentionMaskTest"
+    },
+    {
       "bindings": [
         "mlx_h.mlx_subtract", "mlx_h.mlx_multiply", "mlx_h.mlx_divide", "mlx_h.mlx_maximum",
         "mlx_h.mlx_power", "mlx_h.mlx_matmul", "mlx_h.mlx_stop_gradient", "mlx_h.mlx_exp",

@@ -24,12 +24,36 @@ tasks.named('javadoc', Javadoc) {
     options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
+sourceSets {
+    tierB {
+        java.srcDir 'src/tierB/java'
+        compileClasspath += sourceSets.main.output + sourceSets.test.output +
+                sourceSets.test.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
 dependencies {
     api project(':jmlx-core')
     api project(':jmlx-tokenizer')
     implementation libs.jackson.databind
 
     testImplementation testFixtures(project(':jmlx-ffi'))
+    tierBImplementation sourceSets.test.output
+    tierBImplementation testFixtures(project(':jmlx-ffi'))
+}
+
+tasks.register('tierBTest', Test) {
+    group = 'verification'
+    description = 'Runs opt-in real-checkpoint smoke tests when JMLX_TIER_B_MODEL_DIR is set.'
+    testClassesDirs = sourceSets.tierB.output.classesDirs
+    classpath = sourceSets.tierB.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty 'jmlx.tier.b.model.dir', System.getenv('JMLX_TIER_B_MODEL_DIR') ?: ''
+    systemProperty 'jmlx.tier.b.expected.model.type', System.getenv('JMLX_TIER_B_MODEL_TYPE') ?: ''
+    systemProperty 'jmlx.tier.b.expected.tokens', System.getenv('JMLX_TIER_B_EXPECTED_TOKENS') ?: ''
+    systemProperty 'jmlx.tier.b.pin', System.getenv('JMLX_TIER_B_PIN') ?: ''
+    systemProperty 'jmlx.tier.b.recorded.pin', System.getenv('JMLX_TIER_B_RECORDED_PIN') ?: ''
 }
 
 publishing {
@@ -38,7 +62,7 @@ publishing {
             from components.java
             pom {
                 name = 'jmlx-models'
-                description = 'Local Hugging Face Llama/Qwen2 safetensors decoder loading and seeded generation on jmlx-core.'
+                description = 'Local Hugging Face Llama, Qwen2, Mistral, Gemma, Phi-3 and Mixtral safetensors decoder loading and seeded generation on jmlx-core.'
                 url = 'https://github.com/Alipsa/jmlx'
                 licenses {
                     license {

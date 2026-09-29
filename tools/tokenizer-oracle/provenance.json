@@ -14,7 +14,12 @@
     "bytelevel-bpe-no-prefix.tokenizer.json": "6e6a6d5a3fe9aca071e4f53fdf6d16b776333c5f381b8658954b996a3be69a2e",
     "split-at-zero-bytelevel.tokenizer.json": "7645fb3e08f7cfb1be9b6be144243f50ad8b80f419a8abbed9d99c21e611ff13",
     "split-leading-merged.tokenizer.json": "a71f13c333920bc6265b4e876146c75194a883755917d76dfa3a3b73c5c2fc4a",
-    "added-token-single-word-skip.tokenizer.json": "2ce4f0a309f2b96f2e3e92a2bf28093068df5b5d65762ca2a91cbf697cff812d"
+    "added-token-single-word-skip.tokenizer.json": "2ce4f0a309f2b96f2e3e92a2bf28093068df5b5d65762ca2a91cbf697cff812d",
+    "phase6-3-mistral.tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
+    "phase6-3-gemma.tokenizer.json": "1fccc34ec0abf2526ba7200919689093de6f73468cca26bba726e9622b3ebf5d",
+    "phase6-3-phi3.tokenizer.json": "e66be4592820e5d63d09e2f209d9b4ffe81a034d468d5589e77b2ccbe7cdb9b6",
+    "phase6-3-mixtral.tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
+    "phase6-3-families.input.json": "e4f242e0220f7ffc8bded8e1eb65af1b979d7a56d4db0bdc1be63144b81db9db"
   },
   "networkPolicy": "Fixtures load committed local tokenizer files only; no Hub calls are permitted.",
   "platforms": [

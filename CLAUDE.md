@@ -17,8 +17,9 @@ migrated former `hfjinja` project) is a dependency-free Java 21+ Hugging Face Ji
 chat-template rendering. `req/project-outline.md` describes the full multi-phase vision (autograd,
 `se.alipsa.jmlx.nn`, safetensors/tokenizers, and model loading). Phase 5 M3 is implemented as
 `jmlx-models`, with local Hugging Face Llama/Qwen safetensors loading and greedy generation.
-Configs declaring `rope_scaling` are rejected for now, so Llama 2 and Llama 3.0-era models are
-supported, while Llama 3.1+ requires RoPE scaling support first.
+Phase 6.3 adds descriptor-driven Llama, Qwen2, Mistral, Gemma v1, Phi-3, and Mixtral decoders,
+including linear, dynamic NTK, Llama 3, and YaRN RoPE scaling. The new families' native golden
+tests still need a macOS run before compatibility is marked verified.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
 

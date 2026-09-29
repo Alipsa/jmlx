@@ -1,0 +1,240 @@
+{
+  "family": "phi3",
+  "cases": [
+    {
+      "name": "plain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|user|>\nhello<|end|>\n",
+      "ids": [
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "plain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|user|>\nhello<|end|>\n<|assistant|>\n",
+      "ids": [
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0,
+        25,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "system_user",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|system|>\nhelpful<|end|>\n<|user|>\nhello<|end|>\n",
+      "ids": [
+        23,
+        1,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        26,
+        1,
+        0,
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "system_user",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|system|>\nhelpful<|end|>\n<|user|>\nhello<|end|>\n<|assistant|>\n",
+      "ids": [
+        23,
+        1,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        26,
+        1,
+        0,
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0,
+        25,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "multi_turn",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|user|>\nhello<|end|>\n<|assistant|>\nworld<|end|>\n<|user|>\nhello<|end|>\n",
+      "ids": [
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0,
+        25,
+        1,
+        0,
+        17,
+        26,
+        1,
+        0,
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "multi_turn",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|user|>\nhello<|end|>\n<|assistant|>\nworld<|end|>\n<|user|>\nhello<|end|>\n<|assistant|>\n",
+      "ids": [
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0,
+        25,
+        1,
+        0,
+        17,
+        26,
+        1,
+        0,
+        24,
+        1,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        26,
+        1,
+        0,
+        25,
+        1,
+        0
+      ]
+    }
+  ]
+}

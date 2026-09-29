@@ -1,13 +1,30 @@
 # jmlx-models
 
 Reference local decoder-model implementations built on jmlx. The module loads Hugging Face
-safetensors checkpoints and provides inference-only Llama and Qwen2-style decoder models with a
-pure-Java Hugging Face tokenizer. The native runtime supports macOS on Apple Silicon.
+safetensors checkpoints and provides inference-only Llama, Qwen2, Mistral, Gemma v1, Phi-3, and
+Mixtral decoders with a pure-Java Hugging Face tokenizer. The native runtime supports macOS on Apple
+Silicon. The four new families have committed Hugging Face tiny-checkpoint references; their native
+numeric tests still require a macOS run before compatibility is verified.
 
 The API supports greedy generation and explicitly seeded sampling, synchronous token/text events,
 raw-text and configured-chat requests, penalties, and top-k/top-p/min-p filtering. Additional model
-architectures, quantization, RoPE scaling, and serving infrastructure remain later Phase 6 work; see
+quantization and serving infrastructure remain later Phase 6 work; see
 the [compatibility matrix](../req/phase6-compatibility.md).
+
+The descriptor validates supported `config.json` capabilities and checkpoint tensor names before
+constructing decoder layers. RoPE supports base, linear, dynamic NTK, Llama 3, and YaRN scaling.
+Dynamic NTK uses the sequence length at each call; cached keys retain their earlier rotation, so
+output can depend on prefill chunking. Sliding-window attention masks the full cache, whose memory
+use grows with generation length until Phase 6.4. Mixtral computes every expert densely and masks
+unselected outputs.
+
+| Unsupported input | Load-time result |
+| --- | --- |
+| Quantized safetensors or GGUF | `quantization` / `quantization_config` or checkpoint format is rejected; float safetensors only |
+| `gemma2`, `gemma3`, Phi-2 `phi` | Unsupported `model_type` named |
+| Phi-3 `longrope` | Unsupported `rope_scaling.rope_type` named |
+| Unknown checkpoint tensor or forbidden projection bias | Tensor key named by the preflight validator |
+| Qwen2 `use_sliding_window=true` | Config key named |
 
 ## Load and generate text
 

@@ -1,0 +1,8 @@
+{
+  "tokenizer_class": "PreTrainedTokenizerFast",
+  "bos_token": "<s>",
+  "eos_token": "</s>",
+  "unk_token": "<unk>",
+  "chat_template": "{%- for message in messages %}{{ '<|' + message['role'] + '|>\\n' + message['content'] + '<|end|>\\n' }}{%- endfor %}{%- if add_generation_prompt %}{{ '<|assistant|>\\n' }}{%- endif %}",
+  "model_max_length": 128
+}

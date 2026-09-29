@@ -62,7 +62,8 @@ class DecoderConfigTest {
         config,
         """
         {"model_type":"llama","vocab_size":8,"hidden_size":4,"intermediate_size":8,
-         "num_hidden_layers":1,"num_attention_heads":2,"rope_scaling":{"type":"linear"}}
+         "num_hidden_layers":1,"num_attention_heads":2,
+         "rope_scaling":{"rope_type":"longrope","factor":4}}
         """);
     assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
   }

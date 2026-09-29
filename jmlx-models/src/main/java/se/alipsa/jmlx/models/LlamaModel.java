@@ -6,15 +6,12 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /** Loads Hugging Face safetensors checkpoints whose {@code model_type} is {@code llama}. */
 public final class LlamaModel extends DecoderModel {
-  private LlamaModel(MLXScope scope, DecoderConfig config, Path directory) throws IOException {
-    // Llama's q/k/v and o_proj bias are both config.json's explicit attention_bias flag, not
-    // hardcoded like Qwen2's.
+  private LlamaModel(MLXScope scope, ArchitectureDescriptor descriptor, Path directory)
+      throws IOException {
     super(
         scope,
-        config,
-        CheckpointLoader.load(scope, directory),
-        config.attentionBias(),
-        config.attentionBias());
+        descriptor,
+        CheckpointLoader.load(scope, directory, ArchitectureMappings.tensorPlan(descriptor)));
   }
 
   /** Loads {@code directory}'s {@code config.json} and safetensors checkpoint shards. */
@@ -22,8 +19,8 @@ public final class LlamaModel extends DecoderModel {
     return TextGenerationModels.loadDecoder(scope, directory, "llama", LlamaModel.class);
   }
 
-  static LlamaModel create(MLXScope scope, DecoderConfig config, Path directory)
+  static LlamaModel create(MLXScope scope, ArchitectureDescriptor descriptor, Path directory)
       throws IOException {
-    return new LlamaModel(scope, config, directory);
+    return new LlamaModel(scope, descriptor, directory);
   }
 }

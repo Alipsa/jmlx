@@ -1,0 +1,38 @@
+name: Tier B real artifact
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  qwen2:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/qwen2
+      JMLX_TIER_B_MODEL_TYPE: qwen2
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          architecture: aarch64
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.tier-b/qwen2
+          key: tier-b-qwen2-7ae557604adf67be50417f59c2c2f167def9a775
+      - name: Download pinned public artifact with hard size cap
+        run: python3 tools/tier-b/download.py tools/tier-b/qwen2.5-0.5b-instruct.json "$JMLX_TIER_B_MODEL_DIR"
+      - name: Bootstrap pinned native runtime
+        run: ./scripts/bootstrap-native.sh
+      - name: Run structural smoke test
+        run: ./gradlew --no-build-cache :jmlx-models:tierBTest

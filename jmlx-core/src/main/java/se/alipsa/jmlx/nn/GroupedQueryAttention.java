@@ -13,7 +13,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * heads while keys and values have {@code numKeyValueHeads} heads, each shared by a contiguous
  * group of query heads.
  */
-public final class GroupedQueryAttention extends Module {
+public final class GroupedQueryAttention extends CachedAttention {
 
   private final int numHeads;
   private final int numKeyValueHeads;
@@ -91,7 +91,11 @@ public final class GroupedQueryAttention extends Module {
    * {@code cache} is supplied, it retains the un-repeated key/value heads across calls; expansion
    * to query-head count occurs only for the attention operation.
    */
-  public MLXArray forward(MLXArray x, KVCache cache) {
+  @Override
+  public MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask) {
+    if (attentionMask != null) {
+      throw new IllegalArgumentException("GroupedQueryAttention does not accept attentionMask");
+    }
     Objects.requireNonNull(x, "GroupedQueryAttention.forward: x must not be null");
     int[] shape = x.shape();
     if (shape.length != 3 || shape[2] != numHeads * headDim) {

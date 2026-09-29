@@ -13,7 +13,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * {@code weight}'s own (model) scope. This is req/phase4-plan.md §2's withdrawn-cache mitigation
  * record -- do not reintroduce a cached {@code W.T} field.
  */
-public final class Linear extends Module implements UnaryModule {
+public final class Linear extends UnaryLayer {
 
   private final boolean hasBias;
 

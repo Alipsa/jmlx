@@ -45,7 +45,7 @@ jobs:
 
           result = Path('jmlx-models/build/test-results/tierBTest/TEST-se.alipsa.jmlx.models.TierBSmokeTest.xml')
           suite = ElementTree.parse(result).getroot()
-          if (int(suite.attrib['tests']) != 1 or int(suite.attrib.get('skipped', 0)) != 0:
+          if int(suite.attrib['tests']) != 1 or int(suite.attrib.get('skipped', 0)) != 0:
               raise SystemExit('Tier B smoke test did not execute')
           if int(suite.attrib.get('failures', 0)) or int(suite.attrib.get('errors', 0)):
               raise SystemExit('Tier B smoke test failed')

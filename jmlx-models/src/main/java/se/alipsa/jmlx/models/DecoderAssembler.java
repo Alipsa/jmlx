@@ -79,7 +79,7 @@ public final class DecoderAssembler {
       layers.add(new DecoderBlock(scope, input, attention, post, mlp));
     }
     RMSNorm finalNorm = norm(scope, descriptor, tensors, "model.norm.weight");
-    MLXArray headWeight = tensors.get("lm_head.weight");
+    MLXArray headWeight = descriptor.head().tied() ? null : tensors.get("lm_head.weight");
     if (headWeight == null && !descriptor.head().tied()) {
       throw new IllegalArgumentException("checkpoint missing lm_head.weight");
     }

@@ -153,6 +153,23 @@ class ArchitectureMappingsTest {
   }
 
   @Test
+  void mixtralRejectsUnimplementedExpertBiases() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"mixtral","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,
+                         "num_attention_heads":2,"num_key_value_heads":1,
+                         "num_local_experts":2,"num_experts_per_tok":1,"mlp_bias":true}
+                        """)));
+    assertTrue(error.getMessage().contains("mlp_bias"));
+  }
+
+  @Test
   void mistralRejectsPerLayerSchedules() {
     var error =
         assertThrows(

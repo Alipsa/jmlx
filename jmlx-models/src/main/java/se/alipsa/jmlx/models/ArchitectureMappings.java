@@ -285,6 +285,9 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException(
           "config.json gemma attention_bias or mlp_bias is unsupported");
     }
+    if ("mixtral".equals(modelType) && mlpBias) {
+      throw new IllegalArgumentException("config.json mixtral mlp_bias=true is unsupported");
+    }
     Activation activation = Activation.SILU;
     if (gemma) {
       String gemmaActivation =

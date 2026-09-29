@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,13 +11,39 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import se.alipsa.jmlx.core.DType;
+import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXIO;
+import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
+import se.alipsa.jmlx.memory.MLXScope;
+import tools.jackson.databind.ObjectMapper;
 
 /** Header validation guards decoder assembly before native safetensors loading. */
 class DecoderAssemblerTest {
+
+  @Test
+  @EnabledIfNativeAvailable
+  void tiedEmbeddingIgnoresOptionalOutputHead(@TempDir Path directory) throws Exception {
+    TinyCheckpoints.randomLlama(directory, 42, 2, false, true);
+    ArchitectureDescriptor descriptor =
+        ArchitectureMappings.parse(
+            new ObjectMapper().readTree(directory.resolve("config.json").toFile()));
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          new java.util.LinkedHashMap<>(
+              MLXIO
+                  .loadSafetensors(scope, directory.resolve("model.safetensors").toString())
+                  .tensors());
+      tensors.put("lm_head.weight", MLX.zeros(scope, new int[] {128, 64}, DType.FLOAT32));
+      assertNull(DecoderAssembler.assemble(scope, descriptor, tensors).lmHead());
+    }
+  }
 
   @Test
   void missingMlpTensorStopsBeforeNativeLoad(@TempDir Path directory) throws IOException {

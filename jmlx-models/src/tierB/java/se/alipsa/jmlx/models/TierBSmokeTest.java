@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -17,6 +19,7 @@ import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.KVCache;
+import se.alipsa.jmlx.tokenizer.ChatTemplateOptions;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -34,10 +37,9 @@ class TierBSmokeTest {
     JsonNode manifest =
         manifestPath.isBlank() ? null : new ObjectMapper().readTree(Path.of(manifestPath).toFile());
     HfTokenizer tokenizer = HfTokenizer.fromDirectory(modelDirectory);
-    String rendered =
-        tokenizer.renderChat(
-            List.of(java.util.Map.of("role", "user", "content", PROMPT)),
-            se.alipsa.jmlx.tokenizer.ChatTemplateOptions.defaults(false));
+    List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", PROMPT));
+    ChatTemplateOptions chatOptions = ChatTemplateOptions.defaults(false);
+    String rendered = tokenizer.renderChat(messages, chatOptions);
     assertFalse(rendered.isBlank());
     List<Integer> promptIds = tokenizer.encode(rendered, false);
     assertFalse(promptIds.isEmpty());
@@ -47,6 +49,14 @@ class TierBSmokeTest {
       assertEquals(ids(manifest.path("expected_prompt_ids")), tokenizer.encode(PROMPT, false));
     }
     int[] ids = promptIds.stream().mapToInt(Integer::intValue).toArray();
+    GenerationRequest request =
+        GenerationRequest.chat(
+            tokenizer,
+            messages,
+            chatOptions,
+            GenerationConfig.greedyDefaults(16, Set.of()),
+            CancellationToken.NONE);
+    assertArrayEquals(ids, request.promptTokenIds());
 
     try (RssSampler rss = new RssSampler();
         MLXScope scope = new MLXScope();
@@ -67,15 +77,7 @@ class TierBSmokeTest {
       for (float value : logits.toFloatArray()) {
         assertFalse(Float.isNaN(value), "NaN logit");
       }
-      GenerationResult result =
-          model.generate(
-              GenerationRequest.text(
-                  tokenizer,
-                  PROMPT,
-                  PromptSpecialTokens.ADD,
-                  GenerationConfig.greedyDefaults(16, Set.of()),
-                  CancellationToken.NONE),
-              ignored -> {});
+      GenerationResult result = model.generate(request, ignored -> {});
       assertEquals(16, result.generatedTokenIds().size());
       assertFalse(result.generatedText().isBlank());
       assertFalse(tokenizer.decode(result.generatedTokenIds(), false).isBlank());

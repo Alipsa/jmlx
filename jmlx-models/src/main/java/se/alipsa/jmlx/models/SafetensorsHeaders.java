@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -26,20 +27,14 @@ final class SafetensorsHeaders {
     for (Path file : files) {
       try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
         ByteBuffer length = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-        if (channel.read(length) != Long.BYTES) {
-          throw new IllegalArgumentException("invalid safetensors header in " + file);
-        }
+        readFully(channel, length, "invalid safetensors header in " + file);
         length.flip();
         long count = length.getLong();
         if (count < 0 || count > MAX_HEADER_BYTES || count > channel.size() - Long.BYTES) {
           throw new IllegalArgumentException("invalid safetensors header length in " + file);
         }
         ByteBuffer bytes = ByteBuffer.allocate((int) count);
-        while (bytes.hasRemaining()) {
-          if (channel.read(bytes) < 0) {
-            throw new IllegalArgumentException("truncated safetensors header in " + file);
-          }
-        }
+        readFully(channel, bytes, "truncated safetensors header in " + file);
         JsonNode root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
         if (root == null || !root.isObject()) {
           throw new IllegalArgumentException("invalid safetensors header JSON in " + file);
@@ -53,5 +48,14 @@ final class SafetensorsHeaders {
       }
     }
     return names;
+  }
+
+  static void readFully(ReadableByteChannel channel, ByteBuffer target, String eofMessage)
+      throws IOException {
+    while (target.hasRemaining()) {
+      if (channel.read(target) < 0) {
+        throw new IllegalArgumentException(eofMessage);
+      }
+    }
   }
 }

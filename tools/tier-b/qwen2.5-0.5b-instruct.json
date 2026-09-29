@@ -8,7 +8,7 @@
   "expected_prompt_ids": [9707, 11, 847, 829, 374],
   "expected_token_ids": [8515, 323, 358, 1079, 264, 220, 16, 22, 1042, 2310, 8593, 13, 358, 614, 1012, 28604],
   "observed_peak_test_jvm_rss_kib": 1018112,
-  "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36629740554",
+  "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36638509366",
   "files": {
     "config.json": {
       "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",

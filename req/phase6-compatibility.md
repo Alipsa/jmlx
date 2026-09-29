@@ -7,7 +7,7 @@ not evidence that an arbitrary Hugging Face artifact will load.
 | Architecture | Status | Verification | Tokenizer / chat template | Checkpoint | Quantization | RoPE / context/cache policy | License / access notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Llama pre-norm decoder | implemented | verified-with-synthetic-fixture, including scaled RoPE | ByteLevel BPE; directory metadata/templates and tokenizer-backed text streaming | float safetensors, including index shards | float weights only | base, linear, dynamic NTK, Llama 3, YaRN RoPE; unbounded per-generation cache | Tier-B artifact and license/access record pending |
-| Qwen2 pre-norm GQA decoder | implemented | verified-with-synthetic-fixture, including scaled RoPE | ByteLevel BPE; directory metadata/templates and tokenizer-backed text streaming | float safetensors, including index shards | float weights only | base, linear, dynamic NTK, Llama 3, YaRN RoPE; `use_sliding_window=true` rejected | Pinned real-artifact structural run pending |
+| Qwen2 pre-norm GQA decoder | implemented | verified-with-real-artifact on recorded Tier-B pin; scaled RoPE verified with synthetic fixtures | ByteLevel BPE; directory metadata/templates and tokenizer-backed text streaming | float safetensors, including index shards | float weights only | base, linear, dynamic NTK, Llama 3, YaRN RoPE; `use_sliding_window=true` rejected | Public Apache-2.0 artifact; exact run in Tier-B manifest |
 | Mistral | implemented | verified-with-synthetic-fixture against Hugging Face tiny-checkpoint logits | Synthetic family tokenizer with Mistral template; text/ID golden | float safetensors, including index shards | float weights only | optional sliding-window masking; cache unbounded until 6.4 | Tier-B artifact/license/access record pending |
 | Gemma v1 | implemented | verified-with-synthetic-fixture against Hugging Face tiny-checkpoint logits | Synthetic family tokenizer/template; text/ID golden | float safetensors, including index shards | float weights only | explicit head dimension and base RoPE; cache unbounded | Tier-B artifact/license/access record pending |
 | Phi-3 | implemented | verified-with-synthetic-fixture against Hugging Face tiny-checkpoint logits | Synthetic family tokenizer/template; text/ID golden | float safetensors with fused QKV and gate/up projections | float weights only | optional sliding-window masking; `longrope` rejected; cache unbounded until 6.4 | Tier-B artifact/license/access record pending |
@@ -24,5 +24,7 @@ Metaspace BPE, Metaspace Unigram, and Bert/WordPiece. Phase 6.3 family tokenizer
 and establish component and chat-rendering behavior, not byte-level parity with a production tokenizer.
 SentencePiece `Precompiled` normalizers are rejected. The [2026-09-29 macOS native CI run](https://github.com/Alipsa/jmlx/actions/runs/36627571854)
 executed the Phase 6.3 attention, MoE, Llama/Qwen, Mistral, Gemma, Phi-3 and Mixtral suites;
-the workflow checks their JUnit XML to prevent a silent native skip. No row claims
-`verified-with-real-artifact` until its pinned Tier-B run is recorded.
+the workflow checks their JUnit XML to prevent a silent native skip. Qwen's
+[pinned real-artifact run](https://github.com/Alipsa/jmlx/actions/runs/36629740554)
+also asserted 16 exact greedy IDs on the recorded runner pin; the other rows retain
+synthetic-fixture status.

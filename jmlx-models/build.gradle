@@ -52,7 +52,6 @@ tasks.register('tierBTest', Test) {
     systemProperty 'jmlx.tier.b.model.dir', System.getenv('JMLX_TIER_B_MODEL_DIR') ?: ''
     systemProperty 'jmlx.tier.b.expected.model.type', System.getenv('JMLX_TIER_B_MODEL_TYPE') ?: ''
     systemProperty 'jmlx.tier.b.expected.tokens', System.getenv('JMLX_TIER_B_EXPECTED_TOKENS') ?: ''
-    systemProperty 'jmlx.tier.b.pin', System.getenv('JMLX_TIER_B_PIN') ?: ''
     systemProperty 'jmlx.tier.b.recorded.pin', System.getenv('JMLX_TIER_B_RECORDED_PIN') ?: ''
 }
 

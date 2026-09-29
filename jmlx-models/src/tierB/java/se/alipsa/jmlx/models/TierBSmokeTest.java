@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -36,7 +39,8 @@ class TierBSmokeTest {
     assertFalse(promptIds.isEmpty());
     int[] ids = promptIds.stream().mapToInt(Integer::intValue).toArray();
 
-    try (MLXScope scope = new MLXScope();
+    try (RssSampler rss = new RssSampler();
+        MLXScope scope = new MLXScope();
         MLXScope activation = scope.newChild()) {
       TextGenerationModel model = TextGenerationModels.load(scope, modelDirectory);
       String expectedType = System.getProperty("jmlx.tier.b.expected.model.type", "");
@@ -66,21 +70,19 @@ class TierBSmokeTest {
       assertEquals(16, result.generatedTokenIds().size());
       assertFalse(result.generatedText().isBlank());
       assertFalse(tokenizer.decode(result.generatedTokenIds(), false).isBlank());
+      String pin = runtimePin();
       System.out.println(
           "Tier B observed: model_type="
               + model.metadata().modelType()
-              + ", os="
-              + System.getProperty("os.name")
-              + " "
-              + System.getProperty("os.version")
-              + ", arch="
-              + System.getProperty("os.arch")
+              + ", pin="
+              + pin
               + ", java="
               + Runtime.version()
+              + ", peak_test_jvm_rss_kib="
+              + rss.peakKiB()
               + ", generated_ids="
               + result.generatedTokenIds());
 
-      String pin = System.getProperty("jmlx.tier.b.pin", "");
       String recordedPin = System.getProperty("jmlx.tier.b.recorded.pin", "");
       String expectedTokens = System.getProperty("jmlx.tier.b.expected.tokens", "");
       if (!recordedPin.isBlank() && recordedPin.equals(pin) && !expectedTokens.isBlank()) {
@@ -92,6 +94,71 @@ class TierBSmokeTest {
             "Tier B structural pass only: device/macOS/MLX pin differs or exact IDs are"
                 + " unrecorded");
       }
+    }
+  }
+
+  private static String runtimePin() throws Exception {
+    Path file =
+        Path.of(
+            System.getProperty("jmlx.repository.root"), "native/install/lib/native-pin.properties");
+    Properties nativePin = new Properties();
+    try (var input = Files.newInputStream(file)) {
+      nativePin.load(input);
+    }
+    Process device =
+        new ProcessBuilder("/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string").start();
+    String hardware = new String(device.getInputStream().readAllBytes()).trim();
+    if (device.waitFor() != 0 || hardware.isBlank()) {
+      throw new IllegalStateException("cannot identify Tier B Apple Silicon device");
+    }
+    return hardware
+        + "|macOS="
+        + System.getProperty("os.version")
+        + "|arch="
+        + System.getProperty("os.arch")
+        + "|mlx-metal="
+        + nativePin.getProperty("mlxMetalVersion")
+        + "|mlx-c="
+        + nativePin.getProperty("mlxcCommit")
+        + "|batch=1";
+  }
+
+  private static final class RssSampler implements AutoCloseable {
+    private final AtomicLong peakKiB = new AtomicLong();
+    private final Thread worker = Thread.ofVirtual().start(this::sample);
+
+    private void sample() {
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          Process process =
+              new ProcessBuilder(
+                      "/bin/ps", "-o", "rss=", "-p", Long.toString(ProcessHandle.current().pid()))
+                  .start();
+          String output = new String(process.getInputStream().readAllBytes()).trim();
+          if (process.waitFor() == 0 && !output.isBlank()) {
+            peakKiB.accumulateAndGet(Long.parseLong(output), Math::max);
+          }
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } catch (Exception e) {
+          throw new IllegalStateException("cannot sample Tier B JVM resident memory", e);
+        }
+      }
+    }
+
+    private long peakKiB() {
+      long value = peakKiB.get();
+      if (value == 0) {
+        throw new IllegalStateException("Tier B JVM resident memory was not measured");
+      }
+      return value;
+    }
+
+    @Override
+    public void close() throws InterruptedException {
+      worker.interrupt();
+      worker.join();
     }
   }
 }

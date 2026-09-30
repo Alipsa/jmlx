@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,6 +26,18 @@ class TensorPlanTest {
     assertTrue(message.contains("missing tensor 'model.norm.weight'"));
     assertTrue(message.contains("forbidden tensor 'model.layers.0.self_attn.q_proj.bias'"));
     assertTrue(message.contains("unexpected tensor 'model.layers.0.mystery.weight'"));
+    assertFalse(message.contains("bias disabled"), message);
+  }
+
+  @Test
+  void layoutForbiddenWeightIsNotBlamedOnBias() {
+    TensorPlan plan = llamaPlan(false);
+    Set<String> have = new HashSet<>(plan.required());
+    have.add("model.layers.0.self_attn.qkv_proj.weight");
+    String message =
+        assertThrows(IllegalArgumentException.class, () -> plan.validate(have)).getMessage();
+    assertTrue(message.contains("forbidden tensor 'model.layers.0.self_attn.qkv_proj.weight'"));
+    assertFalse(message.contains("bias"), message);
   }
 
   @Test

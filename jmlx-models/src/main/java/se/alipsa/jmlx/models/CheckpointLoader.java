@@ -28,28 +28,10 @@ final class CheckpointLoader {
 
   record Preflight(List<Path> shards, Set<String> tensorNames) {}
 
-  private CheckpointLoader() {}
+  /** Shards to read plus the validated index {@code weight_map}, or null without an index. */
+  private record CheckpointFiles(List<Path> shards, JsonNode weightMap) {}
 
-  static Map<String, MLXArray> load(MLXScope scope, Path directory) throws IOException {
-    Map<String, MLXArray> tensors = new LinkedHashMap<>();
-    List<Path> checkpointFiles = checkpointFiles(directory);
-    for (Path file : checkpointFiles) {
-      for (var entry : MLXIO.loadSafetensors(scope, file.toString()).tensors().entrySet()) {
-        if (tensors.putIfAbsent(entry.getKey(), entry.getValue()) != null) {
-          throw new IllegalArgumentException(
-              "duplicate tensor in checkpoint shards: " + entry.getKey());
-        }
-      }
-    }
-    if (tensors.isEmpty()) {
-      throw new IllegalArgumentException(
-          "checkpoint contained no tensors"
-              + (checkpointFiles.isEmpty() ? " or safetensors files" : "")
-              + " in "
-              + directory.toAbsolutePath().normalize());
-    }
-    return tensors;
-  }
+  private CheckpointLoader() {}
 
   static Map<String, MLXArray> load(MLXScope scope, Path directory, TensorPlan plan)
       throws IOException {
@@ -77,8 +59,8 @@ final class CheckpointLoader {
     Objects.requireNonNull(directory, "directory");
     Objects.requireNonNull(plan, "plan");
     Path root = directory.toAbsolutePath().normalize();
-    Path index = root.resolve("model.safetensors.index.json");
-    List<Path> shards = checkpointFiles(directory);
+    CheckpointFiles files = checkpointFiles(directory);
+    List<Path> shards = files.shards();
     Map<Path, Set<String>> byShard = SafetensorsHeaders.tensorNames(shards);
     Map<String, Path> actual = new LinkedHashMap<>();
     for (var entry : byShard.entrySet()) {
@@ -90,16 +72,8 @@ final class CheckpointLoader {
         }
       }
     }
-    if (Files.isRegularFile(index)) {
-      JsonNode weights;
-      try {
-        weights = MAPPER.readTree(index.toFile()).path("weight_map");
-      } catch (JacksonException e) {
-        throw new IOException("failed to read " + index, e);
-      }
-      if (!weights.isObject()) {
-        throw new IllegalArgumentException("invalid safetensors index: missing weight_map");
-      }
+    JsonNode weights = files.weightMap();
+    if (weights != null) {
       for (var entry : weights.properties()) {
         String key = entry.getKey();
         Path found = actual.get(key);
@@ -122,7 +96,7 @@ final class CheckpointLoader {
     return new Preflight(List.copyOf(shards), Set.copyOf(actual.keySet()));
   }
 
-  private static List<Path> checkpointFiles(Path directory) throws IOException {
+  private static CheckpointFiles checkpointFiles(Path directory) throws IOException {
     Path root = directory.toAbsolutePath().normalize();
     Path index = root.resolve("model.safetensors.index.json");
     if (Files.isRegularFile(index)) {
@@ -160,7 +134,7 @@ final class CheckpointLoader {
         }
         files.add(file);
       }
-      return files;
+      return new CheckpointFiles(files, weights);
     }
     try (var files = Files.list(root)) {
       List<Path> selected =
@@ -175,10 +149,11 @@ final class CheckpointLoader {
         Path consolidated = root.resolve("consolidated.safetensors");
         if (selected.contains(consolidated)) {
           LOGGER.log(System.Logger.Level.INFO, "ignoring " + consolidated);
-          return selected.stream().filter(p -> !p.equals(consolidated)).toList();
+          return new CheckpointFiles(
+              selected.stream().filter(p -> !p.equals(consolidated)).toList(), null);
         }
       }
-      return selected;
+      return new CheckpointFiles(selected, null);
     }
   }
 }

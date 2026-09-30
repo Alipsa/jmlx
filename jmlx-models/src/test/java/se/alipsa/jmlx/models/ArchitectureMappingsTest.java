@@ -231,6 +231,25 @@ class ArchitectureMappingsTest {
   }
 
   @Test
+  void gemmaValidatesHiddenActEvenWhenHiddenActivationIsPresent() {
+    for (String hiddenAct : List.of("relu", "silu")) {
+      var error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ArchitectureMappings.parse(
+                      json(
+                          """
+                          {"model_type":"gemma","vocab_size":16,"hidden_size":8,
+                           "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                           "head_dim":6,"hidden_act":"%s","hidden_activation":"gelu"}
+                          """
+                              .formatted(hiddenAct))));
+      assertTrue(error.getMessage().contains("hidden_act '" + hiddenAct + "'"), hiddenAct);
+    }
+  }
+
+  @Test
   void gemmaRequiresExplicitHeadDimension() {
     var error =
         assertThrows(

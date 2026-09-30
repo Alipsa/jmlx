@@ -26,7 +26,10 @@ public record TensorPlan(
     available.stream()
         .filter(forbidden::contains)
         .sorted()
-        .forEach(k -> problems.add("forbidden tensor '" + k + "' (capability: bias disabled)"));
+        .forEach(
+            k ->
+                problems.add(
+                    "forbidden tensor '" + k + "' (not used by this architecture configuration)"));
     available.stream()
         .filter(k -> !required.contains(k) && !optional.contains(k) && !forbidden.contains(k))
         .filter(k -> ignored.stream().noneMatch(p -> p.matcher(k).matches()))

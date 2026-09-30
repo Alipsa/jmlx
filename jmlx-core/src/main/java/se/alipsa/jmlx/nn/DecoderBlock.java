@@ -58,9 +58,16 @@ public final class DecoderBlock extends Module {
 
   /** Applies the block with a mask shared by decoder layers in this forward step. */
   public MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask) {
+    return forward(x, cache, attentionMask, null);
+  }
+
+  /** Applies the block with a mask and dynamic rotary frequencies shared across layers. */
+  public MLXArray forward(
+      MLXArray x, KVCache cache, MLXArray attentionMask, MLXArray stepFrequencies) {
     Objects.requireNonNull(x, "DecoderBlock.forward: x must not be null");
     MLXArray afterAttention =
-        MLXOps.add(x, attention.forward(inputNorm.forward(x), cache, attentionMask));
+        MLXOps.add(
+            x, attention.forward(inputNorm.forward(x), cache, attentionMask, stepFrequencies));
     return MLXOps.add(afterAttention, mlp.forward(postAttentionNorm.forward(afterAttention)));
   }
 }

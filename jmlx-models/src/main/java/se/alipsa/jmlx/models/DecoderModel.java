@@ -88,6 +88,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private MLXArray normalizedHiddenStates(MLXArray tokenIds, List<KVCache> caches) {
+    for (int i = 0; i < caches.size(); i++) {
+      Objects.requireNonNull(caches.get(i), "cache " + i);
+    }
     MLXArray x = embedding.forward(tokenIds);
     if (descriptor.embedding().scaleBySqrtHidden()) {
       MLXArray scale =
@@ -103,8 +106,13 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
                 caches.get(0).offset() + tokenIds.shape()[1],
                 window)
             : null;
+    MLXArray stepFrequencies =
+        descriptor
+            .rope()
+            .stepFrequencies(
+                x.scope(), descriptor.rotaryDims(), caches.get(0).offset() + tokenIds.shape()[1]);
     for (int i = 0; i < layers.size(); i++) {
-      x = layers.get(i).forward(x, Objects.requireNonNull(caches.get(i), "cache " + i), mask);
+      x = layers.get(i).forward(x, caches.get(i), mask, stepFrequencies);
     }
     return norm.forward(x);
   }

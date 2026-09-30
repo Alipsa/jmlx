@@ -6,6 +6,7 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXFast;
 import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
+import se.alipsa.jmlx.memory.MLXScope;
 
 /** Immutable rotary-position specification with Hugging Face compatible scaling variants. */
 public sealed interface RopeSpec
@@ -89,6 +90,23 @@ public sealed interface RopeSpec
     return (float) mscale(yarn.factor(), 1);
   }
 
+  /**
+   * Builds the frequency array for a step ending at {@code sequenceLength}, or returns {@code null}
+   * when this variant is static and callers should share one precomputed array instead.
+   */
+  default MLXArray stepFrequencies(MLXScope scope, int rotaryDims, int sequenceLength) {
+    return isStatic() ? null : frequencyArray(scope, rotaryDims, sequenceLength);
+  }
+
+  private MLXArray frequencyArray(MLXScope scope, int rotaryDims, int sequenceLength) {
+    double[] periods = frequencies(rotaryDims, sequenceLength);
+    float[] data = new float[periods.length];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (float) periods[i];
+    }
+    return MLX.array(scope, data, new int[] {data.length});
+  }
+
   /** Applies RoPE to the rotary prefix and preserves any remaining head coordinates. */
   default MLXArray apply(MLXArray x, int rotaryDims, int offset, MLXArray staticFreqs) {
     Objects.requireNonNull(x, "x");
@@ -106,22 +124,17 @@ public sealed interface RopeSpec
       prefix = MLXShape.slice(x, start, stop);
     }
     MLXArray freqs = staticFreqs;
-    if ((this instanceof DynamicNtk || this instanceof Llama3 || this instanceof Yarn)
-        && freqs == null) {
-      double[] periods = frequencies(rotaryDims, offset + shape[last - 1]);
-      float[] data = new float[periods.length];
-      for (int i = 0; i < data.length; i++) {
-        data[i] = (float) periods[i];
-      }
-      freqs = MLX.array(x.scope(), data, new int[] {data.length});
+    if (freqs == null && !(this instanceof Base) && !(this instanceof Linear)) {
+      freqs = frequencyArray(x.scope(), rotaryDims, offset + shape[last - 1]);
     }
     MLXArray rotated =
         MLXFast.rope(
             prefix, rotaryDims, false, freqs == null ? theta() : null, scale(), offset, freqs);
-    if (attentionScaling() != 1) {
+    float attentionScaling = attentionScaling();
+    if (attentionScaling != 1) {
       rotated =
           MLXOps.multiply(
-              rotated, MLX.array(x.scope(), new float[] {attentionScaling()}, new int[] {1}));
+              rotated, MLX.full(x.scope(), new int[] {1}, attentionScaling, rotated.dtype()));
     }
     if (rotaryDims == shape[last]) {
       return rotated;

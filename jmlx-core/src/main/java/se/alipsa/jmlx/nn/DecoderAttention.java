@@ -69,6 +69,12 @@ public final class DecoderAttention extends CachedAttention {
 
   @Override
   public MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask) {
+    return forward(x, cache, attentionMask, null);
+  }
+
+  @Override
+  public MLXArray forward(
+      MLXArray x, KVCache cache, MLXArray attentionMask, MLXArray stepFrequencies) {
     Objects.requireNonNull(x, "x");
     int[] shape = x.shape();
     if (shape.length != 3 || shape[1] <= 0) {
@@ -89,11 +95,18 @@ public final class DecoderAttention extends CachedAttention {
             "slidingWindow attentionMask must be BOOL [" + sequence + ", " + keyLength + "]");
       }
     }
-    MLXArray q = toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
-    MLXArray k = toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
-    MLXArray v = toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
-    q = rope.apply(q, rotaryDims, offset, staticFreqs);
-    k = rope.apply(k, rotaryDims, offset, staticFreqs);
+    MLXArray freqs = staticFreqs != null ? staticFreqs : stepFrequencies;
+    if (freqs == null) {
+      // Computed once here rather than inside each apply() so q and k share one upload.
+      freqs = rope.stepFrequencies(x.scope(), rotaryDims, keyLength);
+    }
+    MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
+    MLXArray k =
+        AttentionHeads.toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
+    MLXArray v =
+        AttentionHeads.toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
+    q = rope.apply(q, rotaryDims, offset, freqs);
+    k = rope.apply(k, rotaryDims, offset, freqs);
     if (cache != null) {
       cache.append(k, v);
       k = cache.keys();
@@ -120,40 +133,11 @@ public final class DecoderAttention extends CachedAttention {
   private MLXArray attendWithMask(MLXArray q, MLXArray k, MLXArray v, MLXArray mask) {
     return MLXFast.scaledDotProductAttention(
         q,
-        repeatKeyValueHeads(k, q.scope()),
-        repeatKeyValueHeads(v, q.scope()),
+        AttentionHeads.repeatKeyValueHeads(k, q.scope(), numKeyValueHeads, queriesPerKeyValueHead),
+        AttentionHeads.repeatKeyValueHeads(v, q.scope(), numKeyValueHeads, queriesPerKeyValueHead),
         scale,
         mask == null,
         mask,
         null);
-  }
-
-  private static MLXArray toHeads(
-      MLXArray projected, int batch, int sequence, int heads, int headDim) {
-    int[] expected = {batch, sequence, heads * headDim};
-    if (!Arrays.equals(projected.shape(), expected)) {
-      throw new IllegalArgumentException(
-          "projection must produce "
-              + Arrays.toString(expected)
-              + ", got "
-              + Arrays.toString(projected.shape()));
-    }
-    return MLXShape.transpose(
-        MLXShape.reshape(projected, new int[] {batch, sequence, heads, headDim}),
-        new int[] {0, 2, 1, 3});
-  }
-
-  private MLXArray repeatKeyValueHeads(MLXArray value, MLXScope target) {
-    if (queriesPerKeyValueHead == 1) {
-      return value;
-    }
-    int[] shape = value.shape();
-    MLXArray expanded = MLXShape.expandDims(value, target, 2);
-    MLXArray broadcast =
-        MLXShape.broadcastTo(
-            expanded,
-            target,
-            new int[] {shape[0], numKeyValueHeads, queriesPerKeyValueHead, shape[2], shape[3]});
-    return MLXShape.flatten(broadcast, target, 1, 2);
   }
 }

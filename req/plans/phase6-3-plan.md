@@ -534,7 +534,7 @@ class TensorPlanTest {
 
   @Test
   void explicitLmHeadIsAllowedWhenTied() {
-    // Existing behavior: an explicit lm_head.weight wins even when tie_word_embeddings=true.
+    // A tied head tolerates an explicit lm_head.weight but ignores it (HF ties and replaces it).
     Set<String> have = new HashSet<>(llamaPlan(false).required());
     have.add("lm_head.weight");
     llamaPlan(false).validate(have);

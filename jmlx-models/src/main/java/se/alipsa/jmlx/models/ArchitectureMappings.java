@@ -23,6 +23,10 @@ import tools.jackson.databind.JsonNode;
 public final class ArchitectureMappings {
   private static final System.Logger LOGGER =
       System.getLogger(ArchitectureMappings.class.getName());
+  // Gemma v1 checkpoints ship hidden_act "gelu" next to hidden_activation "gelu_pytorch_tanh";
+  // hidden_activation (then the tanh default) selects the activation, hidden_act is only validated.
+  private static final Set<String> GEMMA_ACTIVATIONS =
+      Set.of("gelu", "gelu_pytorch_tanh", "gelu_new");
   private static final Set<String> CONSUMED =
       Set.of(
           "model_type",
@@ -201,8 +205,10 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException(
           "config.json head_dim * num_attention_heads must equal hidden_size");
     }
-    String hiddenAct = node.path("hidden_act").asString("silu");
-    if (!gemma && !"silu".equals(hiddenAct) && !"swish".equals(hiddenAct)) {
+    String hiddenAct = node.path("hidden_act").asString(gemma ? "gelu_pytorch_tanh" : "silu");
+    if (gemma
+        ? !GEMMA_ACTIVATIONS.contains(hiddenAct)
+        : !"silu".equals(hiddenAct) && !"swish".equals(hiddenAct)) {
       throw new IllegalArgumentException(
           "config.json declares hidden_act '"
               + hiddenAct
@@ -445,7 +451,7 @@ public final class ArchitectureMappings {
     return switch (type) {
       case "linear" -> new RopeSpec.Linear(theta, factor);
       case "dynamic" ->
-          new RopeSpec.DynamicNtk(theta, factor, optionalContext(source, config, prefix));
+          new RopeSpec.DynamicNtk(theta, factor, requiredInt(config, "max_position_embeddings"));
       case "llama3" ->
           new RopeSpec.Llama3(
               theta,

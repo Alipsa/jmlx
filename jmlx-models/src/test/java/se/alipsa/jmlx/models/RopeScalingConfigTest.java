@@ -74,4 +74,14 @@ class RopeScalingConfigTest {
         assertThrows(IllegalArgumentException.class, () -> parse("{\"rope_type\":\"linear\"}"));
     assertTrue(error.getMessage().contains("factor"), error.getMessage());
   }
+
+  @Test
+  void dynamicNtkUsesMaxPositionEmbeddingsNotOriginalContext() {
+    ArchitectureDescriptor d =
+        parse(
+            """
+            {"rope_type":"dynamic","factor":4,"original_max_position_embeddings":16}
+            """);
+    assertEquals(64, ((RopeSpec.DynamicNtk) d.rope()).maxPositions());
+  }
 }

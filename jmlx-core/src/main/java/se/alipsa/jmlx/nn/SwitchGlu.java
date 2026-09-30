@@ -91,9 +91,9 @@ public final class SwitchGlu extends Module {
    * slots, before routing weights are applied. {@code indices} must be INT32 {@code [B, T, K]} with
    * every value in {@code [0, experts())}: the native gather does not bounds-check, so an
    * out-of-range index returns unspecified values instead of failing. {@code indices} must live in
-   * {@code x}'s scope or a descendant of it: every array derived from them is allocated into their
-   * scope, so indices kept in an ancestor (for example the model scope) would leak those arrays
-   * until it closes.
+   * {@code x}'s scope or a descendant of it; otherwise an {@link IllegalArgumentException} is
+   * thrown, since every array derived from them is allocated into their scope and indices kept in
+   * an ancestor (for example the model scope) would leak those arrays until it closes.
    */
   public MLXArray forward(MLXArray x, MLXArray indices) {
     Objects.requireNonNull(indices, "indices");

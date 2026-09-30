@@ -3,6 +3,7 @@ package se.alipsa.jmlx.nn;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestReporter;
@@ -92,7 +93,7 @@ class MoeMlpBenchmarkTest {
       }
       rounds[r] = (System.nanoTime() - start) / 1e6 / RUNS_PER_ROUND;
     }
-    java.util.Arrays.sort(rounds);
+    Arrays.sort(rounds);
     return rounds[ROUNDS / 2];
   }
 

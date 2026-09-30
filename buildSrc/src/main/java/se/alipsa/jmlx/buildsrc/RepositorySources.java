@@ -68,6 +68,9 @@ final class RepositorySources {
     return relative.startsWith(GENERATED_DIRECTORY)
         || directoryName.equals(".git")
         || directoryName.equals(".gradle")
+        // Agent worktrees are whole checkouts of other branches, including their own copy of the
+        // generated bindings, which would otherwise be scanned as handwritten sources.
+        || directoryName.equals(".claude")
         || directoryName.equals(".venv")
         || directoryName.equals("native")
         || directoryName.equals("build");

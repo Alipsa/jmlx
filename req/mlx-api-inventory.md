@@ -379,7 +379,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_function_exporter_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_function_exporter_new` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_gather_mm` | downcall | implemented | MLXOps.gatherMatmul; MLXShape.stack | MLXGatherOpsTest | — | all handwritten source |
+| `mlx_h.mlx_gather_mm` | downcall | implemented | MLXOps.gatherMatmul | MLXGatherOpsTest | — | all handwritten source |
 | `mlx_h.mlx_gather_qmm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather_single` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_active_memory` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
@@ -612,7 +612,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_squeeze_axes` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_squeeze_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stack` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_stack_axis` | downcall | implemented | MLXOps.gatherMatmul; MLXShape.stack | MLXGatherOpsTest | — | all handwritten source |
+| `mlx_h.mlx_stack_axis` | downcall | implemented | MLXShape.stack | MLXGatherOpsTest | — | all handwritten source |
 | `mlx_h.mlx_std` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std_axis` | downcall | unplanned | — | — | — | — |

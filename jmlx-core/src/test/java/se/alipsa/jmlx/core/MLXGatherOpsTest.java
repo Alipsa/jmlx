@@ -85,6 +85,21 @@ class MLXGatherOpsTest {
   }
 
   @Test
+  void bothIntegerOperandsAreRejectedBeforeNative() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new int[] {1, 2}, new int[] {1, 1, 2});
+      MLXArray b = MLX.array(scope, new int[] {1, 0, 0, 1}, new int[] {1, 2, 2});
+      MLXArray idx = MLX.array(scope, new int[] {0}, new int[] {1});
+      String message =
+          assertThrows(
+                  IllegalArgumentException.class, () -> MLXOps.gatherMatmul(a, b, null, idx, false))
+              .getMessage();
+      assertEquals(
+          "gatherMatmul: requires at least one inexact dtype, got INT32 and INT32", message);
+    }
+  }
+
+  @Test
   void resultLandsInInnermostOperandScope() {
     try (MLXScope model = new MLXScope();
         MLXScope step = model.newChild()) {

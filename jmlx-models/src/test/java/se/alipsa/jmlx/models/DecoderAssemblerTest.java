@@ -62,6 +62,39 @@ class DecoderAssemblerTest {
 
   @Test
   @EnabledIfNativeAvailable
+  void mixedExpertDtypesNameTheTensorKey() throws Exception {
+    String key = "model.layers.1.block_sparse_moe.experts.2.w2.weight";
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors = mixtralTensors(scope);
+      tensors.put(key, MLX.zeros(scope, new int[] {64, 128}, DType.BFLOAT16));
+      String message =
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () -> DecoderAssembler.assemble(scope, mixtralDescriptor(), tensors))
+              .getMessage();
+      assertTrue(message.contains(key), message);
+      assertTrue(message.contains("BFLOAT16"), message);
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
+  void failedAssemblyLeavesEveryExpertSourceOpen() throws Exception {
+    String bad = "model.layers.1.block_sparse_moe.experts.2.w2.weight";
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors = mixtralTensors(scope);
+      tensors.put(bad, MLX.zeros(scope, new int[] {3, 3}, DType.FLOAT32));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> DecoderAssembler.assemble(scope, mixtralDescriptor(), tensors));
+      for (Map.Entry<String, MLXArray> entry : tensors.entrySet()) {
+        entry.getValue().shape(); // throws IllegalStateException if a source was closed
+      }
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
   void mismatchedExpertShapeNamesTheTensorKey() throws Exception {
     String key = "model.layers.1.block_sparse_moe.experts.2.w2.weight";
     try (MLXScope scope = new MLXScope()) {

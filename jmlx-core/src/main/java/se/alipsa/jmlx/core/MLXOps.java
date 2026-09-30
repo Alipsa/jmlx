@@ -90,12 +90,21 @@ public final class MLXOps {
    * index values, so an out-of-range index returns unspecified values instead of failing. {@code
    * sortedIndices} is a performance hint that the indices are non-decreasing; it never changes the
    * result on the pinned runtime, so no test can catch a wrong value. Get it right at the call
-   * site. The result is allocated into the innermost scope of every non-null operand.
+   * site. Like {@link #matmul}, at least one of {@code a}/{@code b} must have an inexact dtype; two
+   * integer operands are rejected before reaching native. The result is allocated into the
+   * innermost scope of every non-null operand.
    */
   public static MLXArray gatherMatmul(
       MLXArray a, MLXArray b, MLXArray lhsIndices, MLXArray rhsIndices, boolean sortedIndices) {
     Objects.requireNonNull(a, "gatherMatmul: a must not be null");
     Objects.requireNonNull(b, "gatherMatmul: b must not be null");
+    if (!a.dtype().isInexact() && !b.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "gatherMatmul: requires at least one inexact dtype, got "
+              + a.dtype()
+              + " and "
+              + b.dtype());
+    }
     MLXScope scope = NativeOps.scopeOf("gatherMatmul", a, b, lhsIndices, rhsIndices);
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment lhs = NativeOps.nullableHandle(lhsIndices, tmp);

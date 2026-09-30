@@ -142,10 +142,17 @@
       "tests": "MLXArrayTest; MLXSamplingOpsTest"
     },
     {
-      "bindings": ["mlx_h.mlx_gather_mm", "mlx_h.mlx_stack_axis"],
+      "bindings": ["mlx_h.mlx_gather_mm"],
       "category": "downcall",
       "status": "implemented",
-      "facadeOrReason": "MLXOps.gatherMatmul; MLXShape.stack",
+      "facadeOrReason": "MLXOps.gatherMatmul",
+      "tests": "MLXGatherOpsTest"
+    },
+    {
+      "bindings": ["mlx_h.mlx_stack_axis"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXShape.stack",
       "tests": "MLXGatherOpsTest"
     },
     {

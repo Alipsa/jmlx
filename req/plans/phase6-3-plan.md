@@ -1240,6 +1240,10 @@ git commit -m "Add Gemma v1 decoder: offset RMSNorm, scaled embeddings, GeGLU an
   `jmlx-models/src/test/java/se/alipsa/jmlx/models/MixtralModelTest.java` (reference: Task 0's `mixtral.json`)
 
 **Interfaces:**
+- **Superseded by `req/plans/phase6-3-performance.md`:** `MoeMlp` is now
+  `MoeMlp(MLXScope, UnaryLayer router, SwitchGlu experts, int topK)` with children `router` and
+  `experts` (stacked weights, only the selected experts evaluated). The text below describes the
+  original dense design, which survives as the test oracle `DenseMoeReference`.
 - Produces: `MoeMlp extends UnaryLayer`, `MoeMlp(MLXScope, UnaryLayer router, List<GatedMlp> experts,
   int topK)`, children `router` and `expert0..expertN-1`. `forward(x [B,T,H])`:
   `logits = router(x)` `[B,T,E]`; `probs = softmax(logits, axis=-1)` in float32; select the `topK`

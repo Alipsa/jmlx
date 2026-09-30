@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXShape;
@@ -35,7 +36,9 @@ public final class DecoderAssembler {
   /**
    * Builds a decoder after confirming that loaded tensor keys still satisfy the header plan. For
    * mixture-of-experts layers, the per-expert {@code block_sparse_moe.experts.*} arrays in {@code
-   * tensors} are stacked and then closed, so the caller must not use them afterwards.
+   * tensors} are stacked and then closed, so the caller must not use them afterwards. Every layer's
+   * expert tensors are validated (shape, then a shared dtype per kind) before the first one is
+   * closed, so a checkpoint that fails validation leaves {@code tensors} untouched.
    */
   public static Assembled assemble(
       MLXScope scope, ArchitectureDescriptor descriptor, Map<String, MLXArray> tensors) {
@@ -43,6 +46,12 @@ public final class DecoderAssembler {
     Objects.requireNonNull(descriptor, "descriptor");
     Objects.requireNonNull(tensors, "tensors");
     ArchitectureMappings.tensorPlan(descriptor).validate(tensors.keySet());
+    if (descriptor.moe() != null) {
+      // All layers are validated before any is stacked: stacking closes the per-expert sources.
+      for (int i = 0; i < descriptor.dimensions().numHiddenLayers(); i++) {
+        validateExperts(descriptor, tensors, "model.layers." + i + ".block_sparse_moe.");
+      }
+    }
     MLXArray staticFreqs = descriptor.rope().staticFrequencies(scope, descriptor.rotaryDims());
     Embedding embedding = new Embedding(scope, tensor(tensors, "model.embed_tokens.weight"));
     List<DecoderBlock> layers = new ArrayList<>();
@@ -124,17 +133,6 @@ public final class DecoderAssembler {
       Map<String, MLXArray> tensors,
       String prefix) {
     int experts = descriptor.moe().experts();
-    int hidden = descriptor.dimensions().hiddenSize();
-    int intermediate = descriptor.dimensions().intermediateSize();
-    // Validate all three kinds before stacking any, so a bad tensor fails before a source closes.
-    for (String kind : new String[] {"w1", "w3", "w2"}) {
-      boolean down = kind.equals("w2");
-      for (int e = 0; e < experts; e++) {
-        String key = prefix + "experts." + e + "." + kind + ".weight";
-        requireShape(
-            tensor(tensors, key), key, down ? hidden : intermediate, down ? intermediate : hidden);
-      }
-    }
     SwitchGlu stacked =
         new SwitchGlu(
             scope,
@@ -147,6 +145,39 @@ public final class DecoderAssembler {
         projection(scope, tensors, prefix + "gate", false),
         stacked,
         descriptor.moe().topK());
+  }
+
+  /**
+   * Checks every expert tensor of one layer by key: its shape, and that all experts of a kind share
+   * one dtype so stacking cannot silently promote the whole layer.
+   */
+  private static void validateExperts(
+      ArchitectureDescriptor descriptor, Map<String, MLXArray> tensors, String prefix) {
+    int experts = descriptor.moe().experts();
+    int hidden = descriptor.dimensions().hiddenSize();
+    int intermediate = descriptor.dimensions().intermediateSize();
+    for (String kind : new String[] {"w1", "w3", "w2"}) {
+      boolean down = kind.equals("w2");
+      DType expected = null;
+      for (int e = 0; e < experts; e++) {
+        String key = prefix + "experts." + e + "." + kind + ".weight";
+        MLXArray weight = tensor(tensors, key);
+        requireShape(weight, key, down ? hidden : intermediate, down ? intermediate : hidden);
+        if (expected == null) {
+          expected = weight.dtype();
+        } else if (weight.dtype() != expected) {
+          throw new IllegalArgumentException(
+              "checkpoint tensor '"
+                  + key
+                  + "' has dtype "
+                  + weight.dtype()
+                  + " but the other "
+                  + kind
+                  + " experts in this layer are "
+                  + expected);
+        }
+      }
+    }
   }
 
   /**

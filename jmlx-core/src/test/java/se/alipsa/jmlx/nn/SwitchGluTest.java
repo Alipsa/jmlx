@@ -21,7 +21,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 class SwitchGluTest {
 
   private static final float EPS = 1e-4f;
-  // Package-private: MoeMlpTest and MoeMlpBenchmarkTest reuse these fixtures.
+  // Package-private: MoeMlpTest reuses these fixtures.
   static final int E = 4;
   static final int H = 6;
   static final int F = 5;

@@ -4,8 +4,9 @@
 lifecycle semantics, and publish reproducible performance and native-memory measurements for every
 supported decoder family.
 
-**Sources:** `req/full-roadmap.md` §6.4 and `req/plans/phase6-plan.md` §6.4. Phase 6.5 owns the
-request scheduler; this milestone provides the batch-safe cache and mask primitives it needs.
+**Sources:** `req/full-roadmap.md` §6.4 and `req/plans/phase6-plan.md` §6.4. Phase 6.4.1 owns
+packed-KV attention and quantized retention after this milestone; Phase 6.5 owns the request
+scheduler. This milestone provides the batch-safe cache and mask primitives both need.
 
 **Implementation locations:** `jmlx-core/src/main/java/se/alipsa/jmlx/nn/` (`KVCachePolicy`, `KVCache`,
 `AttentionMask`, `CachedAttention`, `DecoderBlock`, `DecoderAttention`,
@@ -279,6 +280,10 @@ runtime is Java 25 on macOS Apple Silicon, mlx-c `fba4470` and `mlx-metal==0.31.
 
 ### 4. Add cache quantization only on a successful probe
 
+The pinned native probe failed the attention-memory gate. The two unchecked implementation items
+below move to **6.4.1** (`req/plans/phase6-4-1-plan.md`), after this 6.4 PR closes and before 6.5.
+The explicit unsupported policy factories remain in place until 6.4.1 passes its own gate.
+
 - [ ] If Task 0 proves a usable representation, add an opt-in quantized cache policy with bits,
   group size and an explicit accuracy envelope. Keep model weights unchanged. Quantized keys and
   values, scales, and any metadata must obey the same reset/fork/reorder/evict ownership rules.
@@ -347,8 +352,8 @@ prefill/decode and nonzero starts;
 batch masks handle unequal positions without padding leakage; both other public attention classes
 reject unsupported cache states; and a reproducible synthetic-fixture report contains tokens/s and
 peak native memory for all six supported families, with separately labeled Tier-B runs for the
-three currently runnable Tier-B families. Quantized cache is accepted only
-with the recorded capability, accuracy, ownership and memory evidence described above.
+three currently runnable Tier-B families. The named unsupported quantized policy is the 6.4
+outcome; enabling quantized retention requires the separate 6.4.1 gate.
 
 ## Source coverage
 
@@ -364,7 +369,7 @@ Every requirement from both sources, and where this plan covers it.
 | Reset, fork, reorder for batched decoding | roadmap; phase6-plan 2 | Contracts (Ownership); Task 2 |
 | Fork/reorder by copying; sharing only after a reviewed refcount design | phase6-plan 2 | Contracts (Ownership); Task 2; Deferred |
 | Batch-safe positions and masks | roadmap; phase6-plan 3 | Contracts (Positions, Batch validity); Task 3 |
-| Cache quantization only after a probe of representation, accuracy and ownership | roadmap; phase6-plan 3 | Task 0 probe; Task 4 |
+| Cache quantization only after a probe of representation, accuracy and ownership | roadmap; phase6-plan 3 | Task 0 probe; Task 4 failed-probe outcome; Phase 6.4.1 follow-up |
 | Benchmark: cold load, prefill, one-token decode, sustained generation | roadmap; phase6-plan 4 | Tasks 0 and 5 |
 | Benchmark: memory growth and peak native memory | roadmap; phase6-plan 4 | Tasks 0 and 5 |
 | Report metadata: commit, Java, macOS/device, both native pins, model revision/hash, config, batch, context, warm-up, samples | phase6-plan 4 | Task 0 |

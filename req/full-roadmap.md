@@ -187,6 +187,19 @@ baseline is recorded.
 **Exit gate:** repeated generation has bounded native memory; long-context/sliding-window behavior
 is correct; the benchmark reports tokens/s and peak memory reproducibly for every supported family.
 
+### 6.4.1 — Quantized KV retention and packed attention
+
+After closing 6.4, implement an opt-in packed-KV attention path that attends to compressed keys
+and values without materializing the entire float cache per decode step. The pinned runtime's SDPA
+rejects packed K/V, so this requires a separately measured attention implementation (for example,
+a fused native kernel or bounded-block streaming attention). Support the 16-dimensional heads used
+by the synthetic family fixtures, preserve the existing FULL and SLIDING cache contracts, and leave
+float retention as the default. Follow `req/plans/phase6-4-1-plan.md`.
+
+**Exit gate:** the opt-in mode passes accuracy and cache lifecycle tests across supported families,
+has lower steady and peak native memory than float retention at a documented long context, and
+publishes decode throughput alongside the float baseline. Complete 6.4.1 before starting 6.5.
+
 ### 6.5 — Batched serving primitives and release hardening
 
 Provide bounded multi-request batching primitives suitable for embedding in an application (not an

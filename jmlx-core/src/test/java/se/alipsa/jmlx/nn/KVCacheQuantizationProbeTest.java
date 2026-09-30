@@ -9,6 +9,7 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXFast;
 import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.core.MLXQuant;
+import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -109,6 +110,40 @@ class KVCacheQuantizationProbeTest {
       }
     }
     assertTrue(successes > 0, "pinned runtime has no usable cache-shaped affine quantization");
+  }
+
+  @Test
+  void paddedSixteenDimensionalHead() {
+    int headDim = 16;
+    int length = 64;
+    float[] values = new float[length * headDim];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = (float) Math.sin(i * 0.031) * 0.25f;
+    }
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray source = MLX.array(scope, values, new int[] {1, 1, length, headDim});
+      MLXArray zeroPad = MLX.zeros(scope, new int[] {1, 1, length, headDim}, source.dtype());
+      MLXArray padded = MLXShape.concatenate(new MLXArray[] {source, zeroPad}, 3);
+      MLXArray[] packed = MLXQuant.quantize(padded, 32, 4, "affine", null);
+      MLX.eval(packed);
+      long packedBytes = Arrays.stream(packed).mapToLong(KVCacheQuantizationProbeTest::bytes).sum();
+      MLXMemory.resetPeak();
+      MLXArray unpacked =
+          MLXQuant.dequantize(packed[0], packed[1], packed[2], 32, 4, "affine", null, null);
+      MLXArray restored =
+          MLXShape.slice(unpacked, new int[] {0, 0, 0, 0}, new int[] {1, 1, length, 16});
+      MLX.eval(restored);
+      long peak = MLXMemory.peakBytes();
+      float maxError = 0;
+      float[] roundTrip = restored.toFloatArray();
+      for (int i = 0; i < values.length; i++) {
+        maxError = Math.max(maxError, Math.abs(values[i] - roundTrip[i]));
+      }
+      System.out.printf(
+          "KV_QUANT_PADDED headDim=16 bits=4 group=32 packedBytes=%d floatBytes=%d maxError=%g"
+              + " dequantPeak=%d%n",
+          packedBytes, bytes(source), maxError, peak);
+    }
   }
 
   private static long bytes(MLXArray array) {

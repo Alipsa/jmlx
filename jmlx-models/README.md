@@ -14,8 +14,13 @@ the [compatibility matrix](../req/phase6-compatibility.md).
 The descriptor validates supported `config.json` capabilities and checkpoint tensor names before
 constructing decoder layers. RoPE supports base, linear, dynamic NTK, Llama 3, and YaRN scaling.
 Dynamic NTK uses the sequence length at each call; cached keys retain their earlier rotation, so
-output can depend on prefill chunking. Sliding-window attention masks the full cache, whose memory
-use grows with generation length until Phase 6.4. Mixtral evaluates only the
+output can depend on prefill chunking. Every generation request defaults to a FULL cache, including
+checkpoints with a sliding attention window. A checkpoint with a non-null `sliding_window` may opt
+into post-attention cache eviction with
+`request.withCachePolicy(GenerationCachePolicy.slidingWindowFromModel())`; a FULL cache keeps all
+keys and still applies the model's attention mask. `GenerationCachePolicy.full(capacity)` rejects
+requests that cannot fit before prefill. A sliding request is rejected if the loaded checkpoint has
+no window. Mixtral evaluates only the
 `num_experts_per_tok` experts selected per token (gathered matmul over expert weights stacked
 at load time).
 
@@ -71,6 +76,13 @@ For sampling, use a positive temperature and explicit request-local seed. Select
 probabilities describe the final filtered and renormalized distribution; greedy log probability is
 `0.0` by API convention. Record the jmlx/MLX pins, checkpoint, prompt IDs, complete generation
 policy, and seed when reproducibility matters.
+
+`DecoderModel.forward(tokenIds, caches)` now evaluates logits and cache tensors before returning;
+an exception after a layer advances poisons the whole cache set until every cache is reset.
+`forward(tokenIds, caches, validLengths)` accepts left-padded batched rows and a positive valid
+length per row. Dynamic NTK rejects unequal-position batches. Cache quantization remains
+unsupported pending a native representation and attention-memory probe. The opt-in benchmark and
+its measurement contract are documented in [Phase 6.4 benchmark](../req/phase6-4-benchmark.md).
 
 ## Errors, cancellation, and ownership
 

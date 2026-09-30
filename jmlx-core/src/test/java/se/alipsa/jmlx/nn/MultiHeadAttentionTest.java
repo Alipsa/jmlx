@@ -17,6 +17,23 @@ import se.alipsa.jmlx.memory.MLXScope;
 @EnabledIfNativeAvailable
 class MultiHeadAttentionTest {
 
+  @Test
+  void rejectsSlidingAndRaggedCachesBeforeProjection() {
+    try (MLXScope scope = new MLXScope()) {
+      MultiHeadAttention attention =
+          new MultiHeadAttention(
+              scope, HEADS, stackedIdentityQkvWeight(scope), null, identityWeight(scope), null);
+      MLXArray x = MLX.zeros(scope, new int[] {2, 1, EMBED_DIM}, DType.FLOAT32);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> attention.forward(x, new KVCache(scope, KVCachePolicy.slidingWindow(2)), true));
+      KVCache ragged = new KVCache(scope);
+      MLXArray kv = MLX.zeros(scope, new int[] {2, HEADS, 2, HEAD_DIM}, DType.FLOAT32);
+      ragged.append(kv, kv, new int[] {1, 2});
+      assertThrows(IllegalArgumentException.class, () -> attention.forward(x, ragged, true));
+    }
+  }
+
   private static final float EPS = 1e-3f;
   private static final int BATCH = 1;
   private static final int HEADS = 2;

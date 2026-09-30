@@ -29,6 +29,32 @@ public abstract class CachedAttention extends Module {
     return forward(x, cache, attentionMask);
   }
 
+  /**
+   * Batch-aware extension. Existing subclasses continue to work for uniform, unpadded input; ragged
+   * input requires an override that understands per-row positions and a batched mask.
+   */
+  public MLXArray forward(
+      MLXArray x,
+      KVCache cache,
+      MLXArray attentionMask,
+      MLXArray stepFrequencies,
+      int[] validLengths) {
+    if (validLengths == null || validLengths.length != x.shape()[0]) {
+      throw new IllegalArgumentException("one valid length is required per batch row");
+    }
+    for (int valid : validLengths) {
+      if (valid != x.shape()[1]) {
+        throw new UnsupportedOperationException(
+            "attention subclass does not support ragged batches");
+      }
+    }
+    if (cache != null && !cache.isUniform()) {
+      throw new UnsupportedOperationException(
+          "attention subclass does not support unequal positions");
+    }
+    return forward(x, cache, attentionMask, stepFrequencies);
+  }
+
   /** Applies attention without an explicit mask. */
   public MLXArray forward(MLXArray x, KVCache cache) {
     return forward(x, cache, null);

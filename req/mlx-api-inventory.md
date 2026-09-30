@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=171, planned=9, unplanned=553
+- by status: implemented=175, planned=9, unplanned=549
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -350,7 +350,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fast_metal_kernel_new` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_rms_norm` | downcall | implemented | MLXFast | MLXFastTest | — | all handwritten source |
 | `mlx_h.mlx_fast_rope` | downcall | implemented | MLXFast | MLXFastTest | — | all handwritten source |
-| `mlx_h.mlx_fast_rope_dynamic` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_fast_rope_dynamic` | downcall | implemented | MLXFast.ropeDynamic | BatchRopeProbeTest | — | all handwritten source |
 | `mlx_h.mlx_fast_scaled_dot_product_attention` | downcall | implemented | MLXFast | MLXFastTest | — | all handwritten source |
 | `mlx_h.mlx_fft_fft` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fft_fft2` | downcall | unplanned | — | — | — | — |
@@ -383,11 +383,11 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_gather_qmm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather_single` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_active_memory` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_get_cache_memory` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_get_cache_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_get_default_device` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_get_default_stream` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_get_memory_limit` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_get_peak_memory` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_get_peak_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_greater` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_greater_equal` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_hadamard_transform` | downcall | unplanned | — | — | — | — |
@@ -555,7 +555,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_remainder` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_repeat` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_repeat_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_reset_peak_memory` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_reset_peak_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_reshape` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_right_shift` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_roll` | downcall | unplanned | — | — | — | — |

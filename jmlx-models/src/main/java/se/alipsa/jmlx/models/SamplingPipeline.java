@@ -26,11 +26,21 @@ final class SamplingPipeline implements AutoCloseable {
   private final int vocabularySize;
   private final boolean filtering;
   private final MLXArray rankIndices;
+  private final StepBoundaryEvaluator evaluator;
   private MLXArray currentKey;
 
   SamplingPipeline(MLXScope generationScope, GenerationConfig policy, int vocabularySize) {
+    this(generationScope, policy, vocabularySize, StepBoundaryEvaluator.NATIVE);
+  }
+
+  SamplingPipeline(
+      MLXScope generationScope,
+      GenerationConfig policy,
+      int vocabularySize,
+      StepBoundaryEvaluator evaluator) {
     this.generationScope = Objects.requireNonNull(generationScope, "generationScope");
     this.policy = Objects.requireNonNull(policy, "policy");
+    this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
     if (vocabularySize <= 0) {
       throw new IllegalArgumentException("vocabularySize must be positive");
     }
@@ -53,6 +63,11 @@ final class SamplingPipeline implements AutoCloseable {
   }
 
   Selection select(MLXArray modelLogits, PenaltyInputs penaltyInputs, int decodeStep) {
+    return select(modelLogits, penaltyInputs, decodeStep, new MLXArray[0]);
+  }
+
+  Selection select(
+      MLXArray modelLogits, PenaltyInputs penaltyInputs, int decodeStep, MLXArray... cacheArrays) {
     requireLogits(modelLogits);
     MLXArray logits =
         modelLogits.dtype() == DType.FLOAT32 ? modelLogits : MLX.astype(modelLogits, DType.FLOAT32);
@@ -61,7 +76,7 @@ final class SamplingPipeline implements AutoCloseable {
 
     if (policy.temperature() == 0) {
       MLXArray selected = MLXOps.argmaxAxis(adjusted, VOCABULARY_AXIS, false);
-      MLX.eval(finite, selected);
+      evalWithCaches(cacheArrays, finite, selected);
       requireFinite(finite, decodeStep);
       return new Selection(
           selected.toIntArray()[0], policy.logProbabilities() ? 0.0 : null, adjusted);
@@ -80,9 +95,9 @@ final class SamplingPipeline implements AutoCloseable {
             : null;
 
     if (selectedLogProbability == null) {
-      MLX.eval(finite, temperedFinite, selected);
+      evalWithCaches(cacheArrays, finite, temperedFinite, selected);
     } else {
-      MLX.eval(finite, temperedFinite, selected, selectedLogProbability);
+      evalWithCaches(cacheArrays, finite, temperedFinite, selected, selectedLogProbability);
     }
     requireFinite(finite, decodeStep);
     requireTemperedFinite(temperedFinite, decodeStep);
@@ -90,6 +105,12 @@ final class SamplingPipeline implements AutoCloseable {
     Double logProbability =
         selectedLogProbability == null ? null : (double) selectedLogProbability.toFloatArray()[0];
     return new Selection(token, logProbability, vocabularyOrdered);
+  }
+
+  private void evalWithCaches(MLXArray[] cacheArrays, MLXArray... selectionArrays) {
+    MLXArray[] all = Arrays.copyOf(selectionArrays, selectionArrays.length + cacheArrays.length);
+    System.arraycopy(cacheArrays, 0, all, selectionArrays.length, cacheArrays.length);
+    evaluator.evaluate(all);
   }
 
   private MLXArray applyFilters(MLXArray tempered) {

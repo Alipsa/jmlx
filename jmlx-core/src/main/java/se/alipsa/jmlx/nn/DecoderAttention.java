@@ -83,43 +83,131 @@ public final class DecoderAttention extends CachedAttention {
   @Override
   public MLXArray forward(
       MLXArray x, KVCache cache, MLXArray attentionMask, MLXArray stepFrequencies) {
+    return forwardInternal(x, cache, attentionMask, stepFrequencies, null);
+  }
+
+  @Override
+  public MLXArray forward(
+      MLXArray x,
+      KVCache cache,
+      MLXArray attentionMask,
+      MLXArray stepFrequencies,
+      int[] validLengths) {
+    return forwardInternal(x, cache, attentionMask, stepFrequencies, validLengths);
+  }
+
+  private MLXArray forwardInternal(
+      MLXArray x,
+      KVCache cache,
+      MLXArray attentionMask,
+      MLXArray stepFrequencies,
+      int[] validLengths) {
     Objects.requireNonNull(x, "x");
     int[] shape = x.shape();
-    if (shape.length != 3 || shape[1] <= 0) {
+    if (shape.length != 3 || shape[0] <= 0 || shape[1] <= 0) {
       throw new IllegalArgumentException("DecoderAttention: x must be [batch, sequence, hidden]");
     }
     final int batch = shape[0];
-    int sequence = shape[1];
-    int offset = cache == null ? 0 : cache.offset();
-    int keyLength = offset + sequence;
+    final int sequence = shape[1];
+    if (validLengths != null && validLengths.length != batch) {
+      throw new IllegalArgumentException("one valid length is required per batch row");
+    }
+    if (cache != null
+        && cache.policy().evicts()
+        && !Objects.equals(slidingWindow, cache.policy().limit())) {
+      throw new IllegalArgumentException("SLIDING_WINDOW cache must match layer window");
+    }
+    if (cache != null && cache.isPoisoned()) {
+      throw new IllegalStateException("DecoderAttention cache is poisoned; reset before reuse");
+    }
+    if (validLengths == null
+        && cache != null
+        && (!cache.isUniform()
+            || (cache.batchSize() > 0 && cache.rowLength(0) != cache.length()))) {
+      throw new IllegalArgumentException("left-padded cache requires batch valid lengths");
+    }
+    final int offset = validLengths == null && cache != null ? cache.offset() : 0;
+    if (validLengths == null && (long) offset + sequence > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("attention position overflow");
+    }
+    int keyLength = validLengths == null ? (cache == null ? 0 : cache.length()) + sequence : 0;
+    if (validLengths != null) {
+      for (int row = 0; row < batch; row++) {
+        if (validLengths[row] <= 0 || validLengths[row] > sequence) {
+          throw new IllegalArgumentException("invalid batch row length");
+        }
+        if (cache != null
+            && cache.batchSize() > 0
+            && (long) cache.nextPosition(row) + validLengths[row] > Integer.MAX_VALUE) {
+          throw new IllegalArgumentException("attention batch position overflow");
+        }
+        keyLength =
+            Math.max(
+                keyLength,
+                (cache == null || cache.batchSize() == 0 ? 0 : cache.rowLength(row))
+                    + validLengths[row]);
+      }
+    }
     boolean windowed = slidingWindow != null && slidingWindow < keyLength;
     if (windowed && attentionMask == null) {
       throw new IllegalArgumentException("slidingWindow requires an attentionMask");
     }
+    int[] expectedMask =
+        validLengths == null
+            ? new int[] {sequence, keyLength}
+            : new int[] {batch, 1, sequence, keyLength};
     if (attentionMask != null
         && (attentionMask.dtype() != DType.BOOL
-            || !Arrays.equals(attentionMask.shape(), new int[] {sequence, keyLength}))) {
+            || !Arrays.equals(attentionMask.shape(), expectedMask))) {
       throw new IllegalArgumentException(
-          "attentionMask must be BOOL [" + sequence + ", " + keyLength + "]");
+          "attentionMask must be BOOL " + Arrays.toString(expectedMask));
     }
     MLXArray freqs = staticFreqs != null ? staticFreqs : stepFrequencies;
     if (freqs == null) {
       // Only dynamic specs reach here; computed once so q and k share one upload.
-      freqs = rope.stepFrequencies(x.scope(), rotaryDims, keyLength);
+      int ending = offset + sequence;
+      if (validLengths != null) {
+        ending = 0;
+        for (int row = 0; row < batch; row++) {
+          ending =
+              Math.max(
+                  ending,
+                  (cache == null || cache.batchSize() == 0 ? 0 : cache.nextPosition(row))
+                      + validLengths[row]);
+        }
+      }
+      freqs = rope.stepFrequencies(x.scope(), rotaryDims, ending);
     }
     MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
     MLXArray k =
         AttentionHeads.toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
     MLXArray v =
         AttentionHeads.toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
-    q = rope.apply(q, rotaryDims, offset, freqs);
-    k = rope.apply(k, rotaryDims, offset, freqs);
+    if (validLengths == null) {
+      q = rope.apply(q, rotaryDims, offset, freqs);
+      k = rope.apply(k, rotaryDims, offset, freqs);
+    } else {
+      int[] positions = new int[batch];
+      for (int row = 0; row < batch; row++) {
+        positions[row] = cache == null || cache.batchSize() == 0 ? 0 : cache.nextPosition(row);
+      }
+      q = rope.apply(q, rotaryDims, positions, validLengths, freqs);
+      k = rope.apply(k, rotaryDims, positions, validLengths, freqs);
+    }
     if (cache != null) {
-      cache.append(k, v);
+      if (validLengths == null) {
+        cache.append(k, v);
+      } else {
+        cache.append(k, v, validLengths);
+      }
       k = cache.keys();
       v = cache.values();
     }
     MLXArray attended = attendWithMask(q, k, v, attentionMask);
+    // The attention graph owns the complete keys by value. Evict only after constructing it.
+    if (cache != null && cache.policy().evicts()) {
+      cache.trimToLast(Math.min(cache.length(), slidingWindow - 1));
+    }
     MLXArray merged = MLXShape.flatten(MLXShape.transpose(attended, new int[] {0, 2, 1, 3}), 2, 3);
     return outProj.forward(merged);
   }

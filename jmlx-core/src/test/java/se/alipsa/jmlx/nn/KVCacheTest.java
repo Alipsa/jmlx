@@ -175,4 +175,107 @@ class KVCacheTest {
               + " KVCache.append is not closing the previous keys/values handle after hoisting)");
     }
   }
+
+  @Test
+  void boundedFullRejectsBeforeChangingCacheAndResetAllowsReuse() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope, KVCachePolicy.full(1));
+      MLXArray k = MLX.array(scope, new float[] {1}, new int[] {1, 1, 1, 1});
+      cache.append(k, k);
+      assertThrows(IllegalArgumentException.class, () -> cache.append(k, k));
+      assertEquals(1, cache.offset());
+      assertArrayEquals(new float[] {1}, cache.keys().toFloatArray(), EPS);
+      cache.poison();
+      assertThrows(IllegalStateException.class, () -> cache.append(k, k));
+      cache.reset();
+      assertEquals(0, cache.offset());
+      cache.append(k, k);
+      assertEquals(1, cache.offset());
+    }
+  }
+
+  @Test
+  void slidingTrimPreservesAbsolutePosition() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope, KVCachePolicy.slidingWindow(2));
+      MLXArray k = MLX.array(scope, new float[] {1, 2, 3}, new int[] {1, 1, 3, 1});
+      cache.append(k, k);
+      cache.trimToLast(1);
+      assertEquals(3, cache.nextPosition());
+      assertEquals(2, cache.startPosition());
+      assertEquals(1, cache.length());
+      assertArrayEquals(new float[] {3}, cache.keys().toFloatArray(), EPS);
+      cache.append(
+          MLX.array(scope, new float[] {4}, new int[] {1, 1, 1, 1}),
+          MLX.array(scope, new float[] {4}, new int[] {1, 1, 1, 1}));
+      assertArrayEquals(new float[] {3, 4}, cache.keys().toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void reorderMaterializesIndependentRowsBeforeReturning() {
+    try (MLXScope destination = new MLXScope()) {
+      KVCache reordered;
+      try (MLXScope source = destination.newChild()) {
+        KVCache cache = new KVCache(source);
+        MLXArray data = MLX.array(source, new float[] {1, 2}, new int[] {2, 1, 1, 1});
+        cache.append(data, data);
+        reordered = cache.reorder(new int[] {1, 1, 0}, destination);
+        assertThrows(
+            IllegalArgumentException.class, () -> cache.reorder(new int[] {2}, destination));
+      }
+      assertArrayEquals(new float[] {2, 2, 1}, reordered.keys().toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void reorderShortRaggedRowRestoresItsPaddedWidthAndPosition() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope);
+      MLXArray data = MLX.array(scope, new float[] {0, 7, 2, 3}, new int[] {2, 1, 2, 1});
+      cache.append(data, data, new int[] {1, 2});
+      KVCache selected = cache.reorder(new int[] {0}, scope);
+      assertEquals(1, selected.offset());
+      assertEquals(1, selected.length());
+      assertArrayEquals(new float[] {7}, selected.keys().toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void forkIntoSiblingScopeSurvivesSourceClose() {
+    try (MLXScope parent = new MLXScope();
+        MLXScope destination = parent.newChild()) {
+      KVCache copy;
+      try (MLXScope source = parent.newChild()) {
+        KVCache cache = new KVCache(source);
+        MLXArray data = MLX.array(source, new float[] {5}, new int[] {1, 1, 1, 1});
+        cache.append(data, data);
+        copy = cache.fork(destination);
+      }
+      assertArrayEquals(new float[] {5}, copy.keys().toFloatArray(), EPS);
+    }
+  }
+
+  @Test
+  void reorderedSubsetDoesNotRetainFullSourceBuffer() {
+    int width = 8192;
+    int positions = 50;
+    try (MLXScope parent = new MLXScope();
+        MLXScope destination = parent.newChild()) {
+      long baseline = NativeMemoryProbe.activeMemoryBytes();
+      KVCache selected;
+      try (MLXScope source = parent.newChild()) {
+        KVCache cache = new KVCache(source);
+        float[] contents = new float[2 * positions * width];
+        MLXArray data = MLX.array(source, contents, new int[] {2, 1, positions, width});
+        cache.append(data, data);
+        selected = cache.reorder(new int[] {1}, destination);
+      }
+      MLX.eval(selected.keys(), selected.values());
+      long oneRowBytes = 2L * positions * width * Float.BYTES;
+      assertTrue(
+          NativeMemoryProbe.activeMemoryBytes() - baseline <= oneRowBytes + 1024 * 1024,
+          "reordered cache retained the full two-row source backing allocation");
+    }
+  }
 }

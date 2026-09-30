@@ -99,6 +99,14 @@ public final class MultiHeadAttention extends Module {
     }
     int batch = shape[0];
     int seq = shape[1];
+    if (cache != null
+        && (cache.policy().mode() != KVCachePolicy.Mode.FULL
+            || !cache.isUniform()
+            || (cache.batchSize() > 0 && cache.rowLength(0) != cache.length())
+            || cache.startPosition() != 0)) {
+      throw new IllegalArgumentException(
+          "MultiHeadAttention requires a uniform FULL cache starting at zero");
+    }
     int offset = cache != null ? cache.offset() : 0;
 
     MLXArray qkv = qkvProj.forward(x); // [batch, seq, 3*embedDim]

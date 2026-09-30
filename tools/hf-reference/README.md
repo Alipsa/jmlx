@@ -22,6 +22,10 @@ cd ../..
 ```
 
 `--family` also accepts one family name or `rope` for a targeted regeneration.
+To regenerate only the additional Mistral window-boundary references from the committed
+checkpoint without changing `mistral.json`, run
+`tools/hf-reference/.venv/bin/python tools/hf-reference/generate.py --family mistral --window-cases --out tools/hf-reference/goldens`
+from the repository root. The new file stays within the fixture's 128-position context limit.
 The generator checks every saved tensor key against a Python-owned Hub-style
 manifest. Keep that manifest in sync with `ArchitectureMappings.tensorPlan`;
 the Java golden tests are the final cross-check. A mismatch stops generation.

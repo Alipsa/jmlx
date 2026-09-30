@@ -134,17 +134,23 @@ jobs:
       - name: Run native module checks
         run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check :jmlx-native-macos-arm64:check :jmlx-ffi:assemble :jmlx-core:assemble :jmlx-models:assemble :jmlx-native-macos-arm64:assemble
 
-      - name: Assert Phase 6.3 native suites executed
+      - name: Assert required native suites executed
         run: |
           python3 - <<'PY'
           from pathlib import Path
           from xml.etree import ElementTree
 
           suites = {
-              'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest'],
+              'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest',
+                            'KVCacheTest', 'KVCacheMemoryPlateauTest',
+                            'KVCacheQuantizationProbeTest', 'AttentionMaskTest',
+                            'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
+                            'BatchAttentionMaskTest', 'BatchRopeProbeTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
-                              'QuantizedCheckpointProbeTest'],
+                              'QuantizedCheckpointProbeTest', 'DecoderCacheLifecycleTest',
+                              'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
+                              'DecoderForwardPoisoningTest'],
           }
           for module, names in suites.items():
               root = Path(module) / 'build/test-results/test'
@@ -158,4 +164,29 @@ jobs:
                   if tests == 0 or skipped == tests:
                       raise SystemExit(f'{module}/{name}: native tests did not execute')
                   print(f'{module}/{name}: {tests - skipped}/{tests} executed')
+          PY
+
+      - name: Upload native quantization probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kv-cache-quantization-probe
+          path: jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheQuantizationProbeTest.xml
+          if-no-files-found: warn
+
+      - name: Smoke test decode benchmark JSON
+        run: |
+          ./gradlew :jmlx-examples:benchmarkDecode \
+            --args="${PWD}/tools/hf-reference/goldens/checkpoints/llama ${PWD}/build/phase6-4-ci 1,2 2 1 0 full"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('build/phase6-4-ci.json').read_text())
+          required = ('schema', 'checkpoint_sha256', 'cold_load_ns', 'prefill_ns',
+                      'one_token_decode_ns', 'sustained_generation_ns',
+                      'tokens_per_second_median', 'peak_generation_active_bytes',
+                      'active_per_generated_token_bytes')
+          missing = [field for field in required if field not in data]
+          if missing or data['schema'] != 'jmlx-decode-benchmark-1':
+              raise SystemExit(f'benchmark JSON invalid: missing={missing}')
           PY

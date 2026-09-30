@@ -107,6 +107,44 @@ public final class MLXFast {
     }
   }
 
+  /**
+   * Rotary kernel with an array-valued offset. The pinned runtime exposes this primitive, but
+   * callers must verify that their offset shape broadcasts as intended; decoder batch RoPE uses the
+   * tested per-row slice path until that native shape contract is established.
+   */
+  public static MLXArray ropeDynamic(
+      MLXArray x,
+      int dims,
+      boolean traditional,
+      Float base,
+      float scale,
+      MLXArray offset,
+      MLXArray freqs) {
+    if (offset == null) {
+      throw new IllegalArgumentException("ropeDynamic requires an offset array");
+    }
+    MLXScope scope = NativeOps.scopeOf("ropeDynamic", x, offset, freqs);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment baseStruct = NativeOps.optFloat(tmp, base);
+      MemorySegment freqsHandle = NativeOps.nullableHandle(freqs, tmp);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "ropeDynamic",
+          () ->
+              mlx_h.mlx_fast_rope_dynamic(
+                  res,
+                  x.handle(),
+                  dims,
+                  traditional,
+                  baseStruct,
+                  scale,
+                  offset.handle(),
+                  freqsHandle,
+                  NativeOps.DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
+  }
+
   private static final MemorySegment MASK_MODE_NONE = NativeOps.cstr("");
   private static final MemorySegment MASK_MODE_CAUSAL = NativeOps.cstr("causal");
   private static final MemorySegment MASK_MODE_ARRAY = NativeOps.cstr("array");

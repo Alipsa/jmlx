@@ -152,6 +152,9 @@ Other decisions:
    multiply: `inf * 0` is NaN, plausible for a bf16 expert on tokens it was not routed).
    This is correct and simple; the cost (E/top_k times the MLP FLOPs) is a documented 6.4 optimization
    target, not a 6.3 defect. Only Tier-A-sized MoE is asserted for speed-insensitive tests.
+   **Superseded by `req/plans/phase6-3-performance.md`:** `MoeMlp` now routes through
+   `SwitchGlu`/`mlx_gather_mm`; the dense algorithm survives as the test oracle
+   `DenseMoeReference`.
 5. **No cache eviction in 6.3.** Sliding-window layers mask by absolute position over the full cache;
    memory stays unbounded per generation until 6.4, and the compatibility matrix says so.
 6. **Config field policy (replaces the old deny-list).** Each family mapping owns two tables in
@@ -1237,6 +1240,10 @@ git commit -m "Add Gemma v1 decoder: offset RMSNorm, scaled embeddings, GeGLU an
   `jmlx-models/src/test/java/se/alipsa/jmlx/models/MixtralModelTest.java` (reference: Task 0's `mixtral.json`)
 
 **Interfaces:**
+- **Superseded by `req/plans/phase6-3-performance.md`:** `MoeMlp` is now
+  `MoeMlp(MLXScope, UnaryLayer router, SwitchGlu experts, int topK)` with children `router` and
+  `experts` (stacked weights, only the selected experts evaluated). The text below describes the
+  original dense design, which survives as the test oracle `DenseMoeReference`.
 - Produces: `MoeMlp extends UnaryLayer`, `MoeMlp(MLXScope, UnaryLayer router, List<GatedMlp> experts,
   int topK)`, children `router` and `expert0..expertN-1`. `forward(x [B,T,H])`:
   `logits = router(x)` `[B,T,E]`; `probs = softmax(logits, axis=-1)` in float32; select the `topK`
@@ -1494,7 +1501,8 @@ Run Spotless, Checkstyle, Javadoc and `git diff --check` before each task's comm
   labelled `verified-with-synthetic-fixture` without an independent reference.
 - Dynamic-NTK output depends on prefill chunking (cache keeps old rotation, matching HF); documented, not
   "fixed".
-- Cache memory stays unbounded and MoE compute stays dense until 6.4.
+- Cache memory stays unbounded until 6.4. (MoE compute stopped being dense in
+  `req/plans/phase6-3-performance.md`.)
 - Behavior changes to checkpoints/configs that load today (extra biases rejected, unknown `model_type`
   from `DecoderConfig.fromFile`) are listed in the Baseline and pinned by regression tests.
 
@@ -1527,8 +1535,8 @@ Accept Phase 6.3 only when:
 
 - `gemma2`/`gemma3`, Phi-2 (`phi`), `longrope`, shared-expert or expert-parallel MoE, per-layer window
   schedules, Qwen2 `use_sliding_window`.
-- Cache capacity, sliding-window *eviction*, cache quantization, fork/reorder (6.4); dense MoE
-  performance work (6.4); batching (6.5).
+- Cache capacity, sliding-window *eviction*, cache quantization, fork/reorder (6.4); batching (6.5).
+  (Dense MoE performance work is done: see `req/plans/phase6-3-performance.md`.)
 - Running `transformers`/`torch` in CI or adding them to the pinned oracle environments (they stay in the
   offline Task 0 tool only).
 - Model downloading, caching and license acceptance inside the library; multimodal and encoder-decoder

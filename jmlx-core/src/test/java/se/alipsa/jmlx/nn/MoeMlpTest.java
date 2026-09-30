@@ -5,205 +5,392 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXOps;
+import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
-/** Routing and dense expert aggregation tests. */
+/** Gathered MoE routing checked against the dense Phase 6.3 oracle. */
 @EnabledIfNativeAvailable
 class MoeMlpTest {
 
-  private static final float EPS = 1e-5f;
-  private static final float SILU_ONE = (float) (1.0 / (1.0 + Math.exp(-1.0)));
+  private static final float EPS = 1e-4f;
+  private static final int E = SwitchGluTest.E;
+  private static final int H = SwitchGluTest.H;
+
+  /** Zero-weight router whose logits are exactly {@code biases} for every token. */
+  private static Linear biasRouter(MLXScope scope, float... biases) {
+    return new Linear(
+        scope,
+        MLX.zeros(scope, new int[] {biases.length, H}, DType.FLOAT32),
+        MLX.array(scope, biases, new int[] {biases.length}));
+  }
+
+  /** Input-dependent router, so different tokens pick different experts. */
+  private static Linear patternRouter(MLXScope scope) {
+    return new Linear(
+        scope, MLX.array(scope, SwitchGluTest.pattern(E * H, 77), new int[] {E, H}), null);
+  }
+
+  private static void assertMatchesOracle(int tokens, int topK) {
+    try (MLXScope model = new MLXScope();
+        MLXScope step = model.newChild()) {
+      MLXArray[][] w = SwitchGluTest.expertWeights(model);
+      MoeMlp moe =
+          new MoeMlp(
+              model,
+              patternRouter(model),
+              SwitchGluTest.switchGlu(model, w, Activation.SILU),
+              topK);
+      DenseMoeReference oracle =
+          new DenseMoeReference(
+              model,
+              patternRouter(model),
+              SwitchGluTest.denseExperts(model, w, Activation.SILU),
+              topK);
+      MLXArray x = MLX.array(step, SwitchGluTest.pattern(tokens * H, 3), new int[] {1, tokens, H});
+      assertArrayEquals(oracle.forward(x).toFloatArray(), moe.forward(x).toFloatArray(), EPS);
+    }
+  }
 
   @Test
   void rejectsInvalidTopK() {
     try (MLXScope scope = new MLXScope()) {
-      List<GatedMlp> experts = List.of(constantExpert(scope, 1));
+      SwitchGlu experts =
+          SwitchGluTest.switchGlu(scope, SwitchGluTest.expertWeights(scope), Activation.SILU);
       assertThrows(
-          IllegalArgumentException.class, () -> new MoeMlp(scope, router(scope, 0), experts, 0));
+          IllegalArgumentException.class,
+          () -> new MoeMlp(scope, biasRouter(scope, 0, 0, 0, 0), experts, 0));
       assertThrows(
-          IllegalArgumentException.class, () -> new MoeMlp(scope, router(scope, 0), experts, 2));
+          IllegalArgumentException.class,
+          () -> new MoeMlp(scope, biasRouter(scope, 0, 0, 0, 0), experts, E + 1));
     }
   }
 
   @Test
-  void selectingEveryExpertEqualsSoftmaxWeightedSum() {
-    try (MLXScope scope = new MLXScope()) {
-      MoeMlp moe =
-          new MoeMlp(
-              scope,
-              router(scope, 0, 1, 2),
-              List.of(constantExpert(scope, 2), constantExpert(scope, 4), constantExpert(scope, 8)),
-              3);
-      MLXArray input = MLX.array(scope, new float[] {1, 2}, new int[] {1, 2, 1});
-      double z = 1 + Math.E + Math.exp(2);
-      float expected = (float) ((2 + 4 * Math.E + 8 * Math.exp(2)) / z);
-      assertArrayEquals(new float[] {expected, expected}, moe.forward(input).toFloatArray(), EPS);
-      assertTrue(moe.parameters().containsKey("expert0.gateProj.weight"));
-      assertTrue(moe.parameters().containsKey("router.weight"));
-    }
+  void matchesDenseOracleOnBothSidesOfSortThreshold() {
+    assertMatchesOracle(3, 2); // 6 slots: unsorted path
+    assertMatchesOracle(40, 2); // 80 slots >= SwitchGlu.SORT_THRESHOLD: sorted path
+  }
+
+  @Test
+  void selectingEveryExpertMatchesDenseOracle() {
+    assertMatchesOracle(5, E);
+    assertMatchesOracle(40, E);
   }
 
   @Test
   void exactTiesChooseFirstExpertAcrossTokensAndRuns() {
-    try (MLXScope scope = new MLXScope()) {
+    try (MLXScope model = new MLXScope();
+        MLXScope step = model.newChild()) {
+      MLXArray[][] w = SwitchGluTest.expertWeights(model);
       MoeMlp moe =
           new MoeMlp(
-              scope,
-              router(scope, 0, 0, 0),
-              List.of(constantExpert(scope, 3), constantExpert(scope, 5), constantExpert(scope, 7)),
+              model,
+              biasRouter(model, 0, 0, 0, 0),
+              SwitchGluTest.switchGlu(model, w, Activation.SILU),
               1);
-      MLXArray input = MLX.array(scope, new float[12], new int[] {2, 6, 1});
+      GatedMlp first = SwitchGluTest.denseExperts(model, w, Activation.SILU).get(0);
+      MLXArray x = MLX.array(step, SwitchGluTest.pattern(2 * 6 * H, 4), new int[] {2, 6, H});
+      float[] expected = first.forward(x).toFloatArray();
       for (int run = 0; run < 100; run++) {
-        float[] actual = moe.forward(input).toFloatArray();
-        for (float value : actual) {
-          assertEquals(3, value, EPS);
-        }
+        assertArrayEquals(expected, moe.forward(x).toFloatArray(), EPS);
       }
     }
   }
 
   @Test
-  void topTwoWeightsRenormaliseAndIgnoreUnselectedInfiniteExpert() {
-    try (MLXScope scope = new MLXScope()) {
-      List<GatedMlp> experts = new ArrayList<>();
-      experts.add(constantExpert(scope, 2));
-      experts.add(constantExpert(scope, 4));
-      experts.add(constantExpert(scope, 100));
-      experts.add(infiniteExpert(scope));
-      MoeMlp moe = new MoeMlp(scope, router(scope, 2, 1, 0, -1), experts, 2);
-      MLXArray input = MLX.array(scope, new float[] {1}, new int[] {1, 1, 1});
-      float expected = (float) ((2 * Math.exp(2) + 4 * Math.E) / (Math.exp(2) + Math.E));
-      float actual = moe.forward(input).toFloatArray()[0];
-      assertTrue(Float.isFinite(actual));
-      assertEquals(expected, actual, EPS);
-    }
-  }
-
-  @Test
-  void denseResultMatchesPerTokenReferenceWithHiddenFour() {
-    try (MLXScope scope = new MLXScope()) {
-      float[] input = {1, 2, 0.5f, -1, 0.25f, -0.5f, 1.5f, 2};
-      float[] routerWeights = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
-      Linear router = new Linear(scope, MLX.array(scope, routerWeights, new int[] {3, 4}), null);
+  void unselectedInfiniteExpertNeverAffectsOutput() {
+    try (MLXScope model = new MLXScope();
+        MLXScope step = model.newChild()) {
+      MLXArray[][] w = SwitchGluTest.expertWeights(model);
+      w[E - 1][2] = MLX.full(model, new int[] {H, SwitchGluTest.F}, Float.MAX_VALUE, DType.FLOAT32);
       MoeMlp moe =
           new MoeMlp(
-              scope,
-              router,
-              List.of(diagonalExpert(scope, 1), diagonalExpert(scope, 2), diagonalExpert(scope, 3)),
+              model,
+              biasRouter(model, 2, 1, 0, -1),
+              SwitchGluTest.switchGlu(model, w, Activation.SILU),
               2);
-      float[] actual = moe.forward(MLX.array(scope, input, new int[] {1, 2, 4})).toFloatArray();
-      float[] expected = new float[8];
-      for (int token = 0; token < 2; token++) {
-        float[] logits = {input[token * 4], input[token * 4 + 1], input[token * 4 + 2]};
-        int first = 0;
-        int second = 1;
-        for (int expert = 0; expert < 3; expert++) {
-          if (logits[expert] > logits[first]) {
-            second = first;
-            first = expert;
-          } else if (expert != first && (second == first || logits[expert] > logits[second])) {
-            second = expert;
-          }
-        }
-        double firstWeight = Math.exp(logits[first]);
-        double secondWeight = Math.exp(logits[second]);
-        double scale =
-            ((first + 1) * firstWeight + (second + 1) * secondWeight)
-                / (firstWeight + secondWeight);
-        for (int hidden = 0; hidden < 4; hidden++) {
-          float value = input[token * 4 + hidden];
-          expected[token * 4 + hidden] = (float) (scale * value * value / (1 + Math.exp(-value)));
-        }
+      DenseMoeReference oracle =
+          new DenseMoeReference(
+              model,
+              biasRouter(model, 2, 1, 0, -1),
+              SwitchGluTest.denseExperts(model, w, Activation.SILU),
+              2);
+      MLXArray x = MLX.array(step, SwitchGluTest.pattern(3 * H, 8), new int[] {1, 3, H});
+      float[] actual = moe.forward(x).toFloatArray();
+      for (float v : actual) {
+        assertTrue(Float.isFinite(v));
       }
-      assertArrayEquals(expected, actual, EPS);
+      assertArrayEquals(oracle.forward(x).toFloatArray(), actual, EPS);
     }
   }
 
   @Test
   void bf16OutputUsesHiddenStateDtype() {
     try (MLXScope scope = new MLXScope()) {
+      MLXArray[][] w = SwitchGluTest.expertWeights(scope);
+      for (MLXArray[] e : w) {
+        for (int kind = 0; kind < 3; kind++) {
+          e[kind] = MLX.astype(e[kind], DType.BFLOAT16);
+        }
+      }
+      Linear router =
+          new Linear(
+              scope,
+              MLX.astype(MLX.zeros(scope, new int[] {E, H}, DType.FLOAT32), DType.BFLOAT16),
+              MLX.astype(
+                  MLX.array(scope, new float[] {1, 0, 0, 0}, new int[] {E}), DType.BFLOAT16));
+      MoeMlp moe = new MoeMlp(scope, router, SwitchGluTest.switchGlu(scope, w, Activation.SILU), 2);
+      MLXArray x =
+          MLX.astype(
+              MLX.array(scope, SwitchGluTest.pattern(H, 1), new int[] {1, 1, H}), DType.BFLOAT16);
+      assertEquals(DType.BFLOAT16, moe.forward(x).dtype());
+    }
+  }
+
+  @Test
+  void registersRouterAndStackedExpertParameters() {
+    try (MLXScope scope = new MLXScope()) {
       MoeMlp moe =
           new MoeMlp(
-              scope, bf16Router(scope), List.of(bf16Expert(scope, 2), bf16Expert(scope, 4)), 2);
-      MLXArray input =
-          MLX.astype(MLX.array(scope, new float[] {1}, new int[] {1, 1, 1}), DType.BFLOAT16);
-      assertEquals(DType.BFLOAT16, moe.forward(input).dtype());
+              scope,
+              biasRouter(scope, 0, 0, 0, 0),
+              SwitchGluTest.switchGlu(scope, SwitchGluTest.expertWeights(scope), Activation.SILU),
+              2);
+      assertEquals(
+          List.of(
+              "router.weight",
+              "router.bias",
+              "experts.gateWeight",
+              "experts.upWeight",
+              "experts.downWeight"),
+          List.copyOf(moe.parameters().keySet()));
     }
   }
 
-  private static Linear router(MLXScope scope, float... biases) {
-    return new Linear(
-        scope,
-        MLX.array(scope, new float[biases.length], new int[] {biases.length, 1}),
-        MLX.array(scope, biases, new int[] {biases.length}));
+  /**
+   * Review Focus 1: {@code ModuleGrad} through the gathered route must not hit GatherMM's "Cannot
+   * calculate VJP with respect to indices" error, must give exactly zero gradient to never-selected
+   * experts, and must equal the dense oracle's per-expert gradients -- on the unsorted path (3
+   * tokens x top-2 = 6 slots) AND the sorted path (40 x 2 = 80 slots >= SORT_THRESHOLD), since
+   * every realistic training step takes the sorted one.
+   */
+  @Test
+  void gradientsFlowOnlyToSelectedExperts() {
+    assertGradientsMatchOracle(3);
+    assertGradientsMatchOracle(40);
   }
 
-  private static GatedMlp constantExpert(MLXScope scope, float value) {
-    return expert(scope, 1, value / SILU_ONE);
-  }
-
-  private static GatedMlp infiniteExpert(MLXScope scope) {
-    return expert(scope, 100, Float.MAX_VALUE);
-  }
-
-  private static GatedMlp diagonalExpert(MLXScope scope, float multiplier) {
-    float[] identity = new float[16];
-    float[] scaled = new float[16];
-    for (int i = 0; i < 4; i++) {
-      identity[i * 4 + i] = 1;
-      scaled[i * 4 + i] = multiplier;
+  private static void assertGradientsMatchOracle(int tokens) {
+    try (MLXScope model = new MLXScope()) {
+      MLXArray[][] w = SwitchGluTest.expertWeights(model);
+      // Biases 2, 1, 0, -1 with top-2: experts 0 and 1 always win; 2 and 3 are never selected.
+      MoeMlp moe =
+          new MoeMlp(
+              model,
+              biasRouter(model, 2, 1, 0, -1),
+              SwitchGluTest.switchGlu(model, w, Activation.SILU),
+              2);
+      DenseMoeReference oracle =
+          new DenseMoeReference(
+              model,
+              biasRouter(model, 2, 1, 0, -1),
+              SwitchGluTest.denseExperts(model, w, Activation.SILU),
+              2);
+      try (ModuleGrad gathered =
+              ModuleGrad.of(moe, (p, in) -> new MLXArray[] {MLXOps.sum(moe.forward(in[0]))});
+          ModuleGrad dense =
+              ModuleGrad.of(oracle, (p, in) -> new MLXArray[] {MLXOps.sum(oracle.forward(in[0]))});
+          MLXScope step = model.newChild()) {
+        MLXArray x =
+            MLX.array(step, SwitchGluTest.pattern(tokens * H, 6), new int[] {1, tokens, H});
+        var gatheredGrads = gathered.apply(step, new MLXArray[] {x}).grads();
+        var denseGrads = dense.apply(step, new MLXArray[] {x}).grads();
+        assertEquals(
+            List.of(
+                "router.weight",
+                "router.bias",
+                "experts.gateWeight",
+                "experts.upWeight",
+                "experts.downWeight"),
+            List.copyOf(gatheredGrads.keySet()));
+        for (String router : List.of("router.weight", "router.bias")) {
+          assertArrayEquals(
+              denseGrads.get(router).toFloatArray(),
+              gatheredGrads.get(router).toFloatArray(),
+              EPS,
+              router);
+        }
+        for (String kind : List.of("gate", "up", "down")) {
+          MLXArray stacked = gatheredGrads.get("experts." + kind + "Weight");
+          int[] shape = stacked.shape();
+          for (int e = 0; e < E; e++) {
+            float[] slice =
+                MLXShape.slice(stacked, new int[] {e, 0, 0}, new int[] {e + 1, shape[1], shape[2]})
+                    .toFloatArray();
+            assertArrayEquals(
+                denseGrads.get("expert" + e + "." + kind + "Proj.weight").toFloatArray(),
+                slice,
+                EPS,
+                kind + " expert " + e + " tokens=" + tokens);
+            if (e >= 2) {
+              assertArrayEquals(new float[slice.length], slice, 0f, kind + " expert " + e);
+            }
+          }
+        }
+      }
     }
-    return new GatedMlp(
-        scope,
-        new Linear(scope, MLX.array(scope, identity, new int[] {4, 4}), null),
-        new Linear(scope, MLX.array(scope, identity, new int[] {4, 4}), null),
-        new Linear(scope, MLX.array(scope, scaled, new int[] {4, 4}), null),
-        Activation.SILU);
   }
 
-  private static Linear bf16Router(MLXScope scope) {
-    return new Linear(
-        scope,
-        MLX.astype(MLX.array(scope, new float[2], new int[] {2, 1}), DType.BFLOAT16),
-        MLX.astype(MLX.array(scope, new float[] {1, 0}, new int[] {2}), DType.BFLOAT16));
+  // ---- Absolute anchors: exact closed forms, independent of DenseMoeReference -------------
+
+  /** Router picks logits from the first 3 input coordinates: {@code logits = x[..., :3]}. */
+  private static Linear selectorRouter(MLXScope scope, DType dtype) {
+    float[] w = new float[3 * 4];
+    for (int e = 0; e < 3; e++) {
+      w[e * 4 + e] = 1;
+    }
+    return new Linear(scope, MLX.astype(MLX.array(scope, w, new int[] {3, 4}), dtype), null);
   }
 
-  private static GatedMlp bf16Expert(MLXScope scope, float value) {
-    return new GatedMlp(
-        scope,
-        bf16Linear(scope, 0, 1),
-        bf16Linear(scope, 0, 1),
-        bf16Linear(scope, value / SILU_ONE, 0),
-        Activation.SILU);
+  /** 3 experts, H=F=4: gate = up = identity, down = (e + 1) * identity. */
+  private static SwitchGlu diagonalExperts(MLXScope scope, DType dtype) {
+    MLXArray[] gate = new MLXArray[3];
+    MLXArray[] down = new MLXArray[3];
+    for (int e = 0; e < 3; e++) {
+      float[] identity = new float[16];
+      float[] scaled = new float[16];
+      for (int i = 0; i < 4; i++) {
+        identity[i * 4 + i] = 1;
+        scaled[i * 4 + i] = e + 1;
+      }
+      gate[e] = MLX.astype(MLX.array(scope, identity, new int[] {4, 4}), dtype);
+      down[e] = MLX.astype(MLX.array(scope, scaled, new int[] {4, 4}), dtype);
+    }
+    MLXArray g = MLXShape.stack(gate, 0);
+    return new SwitchGlu(scope, g, g, MLXShape.stack(down, 0), Activation.SILU);
   }
 
-  private static Linear bf16Linear(MLXScope scope, float weight, float bias) {
-    return new Linear(
-        scope,
-        MLX.astype(MLX.array(scope, new float[] {weight}, new int[] {1, 1}), DType.BFLOAT16),
-        MLX.astype(MLX.array(scope, new float[] {bias}, new int[] {1}), DType.BFLOAT16));
+  /**
+   * Exact expected output: per token, softmax over {@code x[:3]}, successive-argmax top-k (lowest
+   * index on ties), renormalised weights w_j, and output {@code sum_j w_j * (j + 1) * silu(x) * x}
+   * elementwise. Computed in double from {@code input} as given, so half-precision callers pass the
+   * dtype-rounded input.
+   */
+  private static float[] closedForm(float[] input, int topK) {
+    float[] out = new float[input.length];
+    for (int token = 0; token < input.length / 4; token++) {
+      double[] p = new double[3];
+      double max = Double.NEGATIVE_INFINITY;
+      for (int e = 0; e < 3; e++) {
+        max = Math.max(max, input[token * 4 + e]);
+      }
+      double z = 0;
+      for (int e = 0; e < 3; e++) {
+        p[e] = Math.exp(input[token * 4 + e] - max);
+        z += p[e];
+      }
+      boolean[] taken = new boolean[3];
+      double selected = 0;
+      double weighted = 0;
+      for (int k = 0; k < topK; k++) {
+        int best = -1;
+        for (int e = 0; e < 3; e++) {
+          if (!taken[e] && (best < 0 || p[e] > p[best])) {
+            best = e;
+          }
+        }
+        taken[best] = true;
+        selected += p[best];
+        weighted += (best + 1) * p[best];
+      }
+      double scale = weighted / selected;
+      for (int h = 0; h < 4; h++) {
+        double v = input[token * 4 + h];
+        out[token * 4 + h] = (float) (scale * v * v / (1 + Math.exp(-v)));
+      }
+    }
+    return out;
   }
 
-  private static GatedMlp expert(MLXScope scope, float gateBias, float downWeight) {
-    return new GatedMlp(
-        scope,
-        linear(scope, 0, gateBias),
-        linear(scope, 0, 1),
-        linear(scope, downWeight, 0),
-        Activation.SILU);
+  /** Inputs in [-2, 2] so routing varies per token. */
+  private static float[] anchorInput(int tokens) {
+    float[] x = new float[tokens * 4];
+    for (int i = 0; i < x.length; i++) {
+      x[i] = (float) (2 * Math.sin(0.37 * i + 3.9));
+    }
+    return x;
   }
 
-  private static Linear linear(MLXScope scope, float weight, float bias) {
-    return new Linear(
-        scope,
-        MLX.array(scope, new float[] {weight}, new int[] {1, 1}),
-        MLX.array(scope, new float[] {bias}, new int[] {1}));
+  /** Replaces the dropped Phase 6.3 closed-form tests; float32, both paths, top-k 2 and 3. */
+  @Test
+  void float32MatchesClosedFormOnBothPaths() {
+    for (int tokens : new int[] {2, 40}) {
+      for (int topK : new int[] {2, 3}) {
+        try (MLXScope scope = new MLXScope()) {
+          MoeMlp moe =
+              new MoeMlp(
+                  scope,
+                  selectorRouter(scope, DType.FLOAT32),
+                  diagonalExperts(scope, DType.FLOAT32),
+                  topK);
+          float[] input = anchorInput(tokens);
+          float[] actual =
+              moe.forward(MLX.array(scope, input, new int[] {1, tokens, 4})).toFloatArray();
+          assertArrayEquals(
+              closedForm(input, topK), actual, 1e-5f, "tokens=" + tokens + " topK=" + topK);
+        }
+      }
+    }
+  }
+
+  /**
+   * Review Focus 3: bf16/f16 values, not just dtype. Bounds are Verified facts 8's (probe worst
+   * case bf16 0.0076, f16 0.0011 on |a - r| / (|r| + 1)). The reference is evaluated on the
+   * dtype-rounded input, so input quantisation is not counted as model error.
+   */
+  @Test
+  void halfPrecisionMatchesClosedFormOnBothPaths() {
+    for (DType dtype : new DType[] {DType.BFLOAT16, DType.FLOAT16}) {
+      double bound = dtype == DType.BFLOAT16 ? 0.02 : 0.005;
+      for (int tokens : new int[] {2, 40}) {
+        for (int topK : new int[] {2, 3}) {
+          try (MLXScope scope = new MLXScope()) {
+            MoeMlp moe =
+                new MoeMlp(
+                    scope, selectorRouter(scope, dtype), diagonalExperts(scope, dtype), topK);
+            MLXArray x =
+                MLX.astype(MLX.array(scope, anchorInput(tokens), new int[] {1, tokens, 4}), dtype);
+            float[] rounded = x.toFloatArray();
+            MLXArray y = moe.forward(x);
+            assertEquals(dtype, y.dtype());
+            float[] actual = y.toFloatArray();
+            float[] expected = closedForm(rounded, topK);
+            for (int i = 0; i < actual.length; i++) {
+              double err = Math.abs(actual[i] - expected[i]) / (Math.abs(expected[i]) + 1);
+              assertTrue(
+                  err <= bound,
+                  dtype
+                      + " tokens="
+                      + tokens
+                      + " topK="
+                      + topK
+                      + " index "
+                      + i
+                      + ": "
+                      + actual[i]
+                      + " vs "
+                      + expected[i]);
+            }
+          }
+        }
+      }
+    }
   }
 }

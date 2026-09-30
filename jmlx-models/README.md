@@ -15,8 +15,9 @@ The descriptor validates supported `config.json` capabilities and checkpoint ten
 constructing decoder layers. RoPE supports base, linear, dynamic NTK, Llama 3, and YaRN scaling.
 Dynamic NTK uses the sequence length at each call; cached keys retain their earlier rotation, so
 output can depend on prefill chunking. Sliding-window attention masks the full cache, whose memory
-use grows with generation length until Phase 6.4. Mixtral computes every expert densely and masks
-unselected outputs.
+use grows with generation length until Phase 6.4. Mixtral evaluates only the
+`num_experts_per_tok` experts selected per token (gathered matmul over expert weights stacked
+at load time).
 
 | Unsupported input | Load-time result |
 | --- | --- |

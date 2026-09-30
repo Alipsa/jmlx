@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=169, planned=9, unplanned=555
+- by status: implemented=171, planned=9, unplanned=553
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -379,7 +379,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_function_exporter_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_function_exporter_new` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_gather_mm` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_gather_mm` | downcall | implemented | MLXOps.gatherMatmul | MLXGatherOpsTest | — | all handwritten source |
 | `mlx_h.mlx_gather_qmm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather_single` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_active_memory` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
@@ -612,7 +612,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_squeeze_axes` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_squeeze_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stack` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_stack_axis` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stack_axis` | downcall | implemented | MLXShape.stack | MLXGatherOpsTest | — | all handwritten source |
 | `mlx_h.mlx_std` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_std_axis` | downcall | unplanned | — | — | — | — |

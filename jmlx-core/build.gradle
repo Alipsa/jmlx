@@ -71,3 +71,8 @@ publishing {
         }
     }
 }
+
+tasks.withType(Test).configureEach {
+    // Opt-in performance tests: ./gradlew :jmlx-core:test -Djmlx.benchmark=true --tests "*Benchmark*"
+    systemProperty 'jmlx.benchmark', System.getProperty('jmlx.benchmark', 'false')
+}

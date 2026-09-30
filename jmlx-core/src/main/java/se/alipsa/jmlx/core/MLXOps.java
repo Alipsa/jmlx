@@ -1,7 +1,9 @@
 package se.alipsa.jmlx.core;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
+import java.util.Objects;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -78,6 +80,43 @@ public final class MLXOps {
   public static MLXArray matmul(MLXArray a, MLXArray b) {
     requireMatmulCompatible(a, b);
     return NativeOps.binaryOp("matmul", a, b, mlx_h::mlx_matmul);
+  }
+
+  /**
+   * Batched matmul that picks, per batch entry, which matrix of {@code a} and/or {@code b} to use
+   * ({@code mlx_gather_mm}). {@code lhsIndices}/{@code rhsIndices} index {@code a}'s/{@code b}'s
+   * leading batch axes and may be null (meaning "use the natural batch position"). The index arrays
+   * must be integral, and each index must be in range: the pinned native op does NOT bounds-check
+   * index values, so an out-of-range index returns unspecified values instead of failing. {@code
+   * sortedIndices} is a performance hint that the indices are non-decreasing; it never changes the
+   * result on the pinned runtime, so no test can catch a wrong value. Get it right at the call
+   * site. Like {@link #matmul}, at least one of {@code a}/{@code b} must have an inexact dtype; two
+   * integer operands are rejected before reaching native. The result is allocated into the
+   * innermost scope of every non-null operand.
+   */
+  public static MLXArray gatherMatmul(
+      MLXArray a, MLXArray b, MLXArray lhsIndices, MLXArray rhsIndices, boolean sortedIndices) {
+    Objects.requireNonNull(a, "gatherMatmul: a must not be null");
+    Objects.requireNonNull(b, "gatherMatmul: b must not be null");
+    if (!a.dtype().isInexact() && !b.dtype().isInexact()) {
+      throw new IllegalArgumentException(
+          "gatherMatmul: requires at least one inexact dtype, got "
+              + a.dtype()
+              + " and "
+              + b.dtype());
+    }
+    MLXScope scope = NativeOps.scopeOf("gatherMatmul", a, b, lhsIndices, rhsIndices);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment lhs = NativeOps.nullableHandle(lhsIndices, tmp);
+      MemorySegment rhs = NativeOps.nullableHandle(rhsIndices, tmp);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "gatherMatmul",
+          () ->
+              mlx_h.mlx_gather_mm(
+                  res, a.handle(), b.handle(), lhs, rhs, sortedIndices, NativeOps.DEFAULT_STREAM));
+      return new MLXArray(scope, res);
+    }
   }
 
   /**

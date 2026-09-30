@@ -139,6 +139,15 @@ public final class MLXShape {
   }
 
   /**
+   * Swaps two axes, allocating the result into {@code target} instead of {@code a.scope()} -- the
+   * {@code swapaxes} counterpart of {@link #transpose(MLXArray, MLXScope)}, for a weight-derived
+   * view computed inside {@code forward()} that must land in the step scope.
+   */
+  public static MLXArray swapaxes(MLXArray a, MLXScope target, int axis1, int axis2) {
+    return NativeOps.axis2Op("swapaxes", a, target, axis1, axis2, mlx_h::mlx_swapaxes);
+  }
+
+  /**
    * Takes array entries at the given indices, treating the array as flattened regardless of its own
    * shape.
    */
@@ -289,6 +298,19 @@ public final class MLXShape {
       }
     }
     return NativeOps.vectorInOp("concatenate", arrays, axis, mlx_h::mlx_concatenate_axis);
+  }
+
+  /** Stacks equal-shaped {@code arrays} along a new axis inserted at {@code axis}. */
+  public static MLXArray stack(MLXArray[] arrays, int axis) {
+    if (arrays.length == 0) {
+      throw new IllegalArgumentException("stack: requires at least one array");
+    }
+    for (int i = 0; i < arrays.length; i++) {
+      if (arrays[i] == null) {
+        throw new IllegalArgumentException("stack: arrays[" + i + "] must not be null");
+      }
+    }
+    return NativeOps.vectorInOp("stack", arrays, axis, mlx_h::mlx_stack_axis);
   }
 
   /** Splits {@code a} into {@code numSplits} equal-size parts along {@code axis}, in order. */

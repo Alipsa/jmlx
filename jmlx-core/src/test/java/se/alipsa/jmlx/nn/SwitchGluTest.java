@@ -245,4 +245,41 @@ class SwitchGluTest {
       assertTrue(growth <= 2_000_000, "grew " + growth + " B");
     }
   }
+
+  @Test
+  void rejectsIndicesLivingInAnAncestorOfTheInputScope() {
+    try (MLXScope model = new MLXScope();
+        MLXScope step = model.newChild()) {
+      SwitchGlu glu = switchGlu(model, expertWeights(model), Activation.SILU);
+      MLXArray x = MLX.array(step, pattern(2 * H, 5), new int[] {1, 2, H});
+      MLXArray modelIdx = MLX.array(model, indices(1, 2, 2), new int[] {1, 2, 2});
+      assertThrows(IllegalArgumentException.class, () -> glu.forward(x, modelIdx));
+      assertThrows(IllegalArgumentException.class, () -> glu.forward(x, modelIdx, true));
+      // The same indices in the step scope are fine.
+      glu.forward(x, MLX.array(step, indices(1, 2, 2), new int[] {1, 2, 2}));
+    }
+  }
+
+  @Test
+  void rejectsWeightsOfDifferentDtypes() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray gate =
+          MLX.astype(MLX.zeros(scope, new int[] {E, F, H}, DType.FLOAT32), DType.BFLOAT16);
+      MLXArray up = MLX.zeros(scope, new int[] {E, F, H}, DType.FLOAT32);
+      MLXArray down =
+          MLX.astype(MLX.zeros(scope, new int[] {E, H, F}, DType.FLOAT32), DType.BFLOAT16);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> new SwitchGlu(scope, gate, up, down, Activation.SILU));
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              new SwitchGlu(
+                  scope,
+                  gate,
+                  gate,
+                  MLX.zeros(scope, new int[] {E, H, F}, DType.FLOAT32),
+                  Activation.SILU));
+    }
+  }
 }

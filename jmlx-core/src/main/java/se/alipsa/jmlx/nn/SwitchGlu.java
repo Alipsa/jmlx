@@ -41,6 +41,15 @@ public final class SwitchGlu extends Module {
     int[] gate = rank3(gateWeight, "gateWeight");
     int[] up = rank3(upWeight, "upWeight");
     int[] down = rank3(downWeight, "downWeight");
+    if (upWeight.dtype() != gateWeight.dtype() || downWeight.dtype() != gateWeight.dtype()) {
+      throw new IllegalArgumentException(
+          "gate/up/down weights must share one dtype, got "
+              + gateWeight.dtype()
+              + "/"
+              + upWeight.dtype()
+              + "/"
+              + downWeight.dtype());
+    }
     if (!Arrays.equals(gate, up)) {
       throw new IllegalArgumentException(
           "upWeight must have gateWeight's shape "
@@ -81,7 +90,10 @@ public final class SwitchGlu extends Module {
    * Returns the {@code [B, T, K, H]} outputs of the expert chosen for each of a token's {@code K}
    * slots, before routing weights are applied. {@code indices} must be INT32 {@code [B, T, K]} with
    * every value in {@code [0, experts())}: the native gather does not bounds-check, so an
-   * out-of-range index returns unspecified values instead of failing.
+   * out-of-range index returns unspecified values instead of failing. {@code indices} must live in
+   * {@code x}'s scope or a descendant of it: every array derived from them is allocated into their
+   * scope, so indices kept in an ancestor (for example the model scope) would leak those arrays
+   * until it closes.
    */
   public MLXArray forward(MLXArray x, MLXArray indices) {
     Objects.requireNonNull(indices, "indices");
@@ -104,10 +116,15 @@ public final class SwitchGlu extends Module {
               + " "
               + Arrays.toString(is));
     }
+    MLXScope s = x.scope();
+    if (!s.isAncestorOf(indices.scope())) {
+      throw new IllegalArgumentException(
+          "indices must live in x's scope or a descendant of it, not an ancestor or unrelated"
+              + " scope");
+    }
     int b = xs[0];
     int t = xs[1];
     int k = is[2];
-    MLXScope s = x.scope();
     // gather_mm has no VJP with respect to its indices; routing is not differentiable anyway.
     MLXArray idx = MLXOps.stopGradient(indices);
     // Weight views go into the caller's scope, never the model scope (req/phase4-plan.md §2).

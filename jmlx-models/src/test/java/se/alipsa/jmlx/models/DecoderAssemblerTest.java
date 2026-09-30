@@ -79,6 +79,26 @@ class DecoderAssemblerTest {
 
   @Test
   @EnabledIfNativeAvailable
+  void expertKindsWithDifferentDtypesNameTheTensorKey() throws Exception {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors = mixtralTensors(scope);
+      for (int e = 0; e < 4; e++) {
+        tensors.put(
+            "model.layers.0.block_sparse_moe.experts." + e + ".w3.weight",
+            MLX.zeros(scope, new int[] {128, 64}, DType.BFLOAT16));
+      }
+      String message =
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () -> DecoderAssembler.assemble(scope, mixtralDescriptor(), tensors))
+              .getMessage();
+      assertTrue(message.contains("model.layers.0.block_sparse_moe.experts.0.w3.weight"), message);
+      assertTrue(message.contains("BFLOAT16"), message);
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
   void failedAssemblyLeavesEveryExpertSourceOpen() throws Exception {
     String bad = "model.layers.1.block_sparse_moe.experts.2.w2.weight";
     try (MLXScope scope = new MLXScope()) {

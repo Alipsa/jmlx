@@ -24,6 +24,8 @@ class MoeMlpBenchmarkTest {
   private static final int F = 3584;
   private static final int E = 8;
   private static final int K = 2;
+  private static final int ROUNDS = 7;
+  private static final int RUNS_PER_ROUND = 10;
 
   @Test
   void gatheredDecodeIsFasterThanDense(TestReporter reporter) {
@@ -77,16 +79,21 @@ class MoeMlpBenchmarkTest {
     }
   }
 
+  /** Median over {@code ROUNDS} timed rounds, so one throttled or contended round cannot decide. */
   private static double millis(MLXScope model, UnaryLayer moe, int tokens) {
     for (int i = 0; i < 5; i++) {
       run(model, moe, tokens);
     }
-    int n = 30;
-    long start = System.nanoTime();
-    for (int i = 0; i < n; i++) {
-      run(model, moe, tokens);
+    double[] rounds = new double[ROUNDS];
+    for (int r = 0; r < ROUNDS; r++) {
+      long start = System.nanoTime();
+      for (int i = 0; i < RUNS_PER_ROUND; i++) {
+        run(model, moe, tokens);
+      }
+      rounds[r] = (System.nanoTime() - start) / 1e6 / RUNS_PER_ROUND;
     }
-    return (System.nanoTime() - start) / 1e6 / n;
+    java.util.Arrays.sort(rounds);
+    return rounds[ROUNDS / 2];
   }
 
   private static void run(MLXScope model, UnaryLayer moe, int tokens) {

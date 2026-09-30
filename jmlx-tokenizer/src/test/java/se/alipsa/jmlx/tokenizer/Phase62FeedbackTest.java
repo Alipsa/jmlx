@@ -12,6 +12,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class Phase62FeedbackTest {
+  private static final String UNASSIGNED = "\u0378"; // unassigned code point
+  private static final String COMBINING_ENCLOSING = "\u0488"; // combining mark
+  private static final String COMPAT_IDEOGRAPH = "\uf900"; // compatibility ideograph
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -22,7 +25,8 @@ class Phase62FeedbackTest {
         texts(
             PreTokenizerPipeline.apply(
                 json(
-                    "{\"type\":\"Split\",\"pattern\":{\"String\":\"a\"},\"behavior\":\"MergedWithPrevious\"}"),
+                    "{\"type\":\"Split\",\"pattern\":{\"String\":\"a\"},"
+                        + "\"behavior\":\"MergedWithPrevious\"}"),
                 AlignedText.original("baab"))));
   }
 
@@ -33,11 +37,13 @@ class Phase62FeedbackTest {
         texts(
             PreTokenizerPipeline.apply(
                 json(
-                    "{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\",\"split\":false}"),
+                    "{\"type\":\"Metaspace\",\"replacement\":\"▁\","
+                        + "\"prepend_scheme\":\"always\",\"split\":false}"),
                 AlignedText.original("▁abc"))));
     JsonNode metaspace =
         json(
-            "{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\",\"split\":false}");
+            "{\"type\":\"Metaspace\",\"replacement\":\"▁\","
+                + "\"prepend_scheme\":\"always\",\"split\":false}");
     assertEquals(
         List.of("▁a"), texts(PreTokenizerPipeline.apply(metaspace, AlignedText.original(" a"))));
     assertEquals(
@@ -55,7 +61,7 @@ class Phase62FeedbackTest {
   @Test
   void unicodeNormalizationOfLongDecomposedTextStaysBounded() throws Exception {
     JsonNode nfc = json("{\"type\":\"NFC\"}");
-    String input = "Cafe\u0301 ".repeat(10_000);
+    String input = "Cafe\u0301 ".repeat(10_000); // e + combining acute
     assertTimeout(
         Duration.ofSeconds(5),
         () ->
@@ -94,8 +100,8 @@ class Phase62FeedbackTest {
                 json("{\"type\":\"WhitespaceSplit\"}"), AlignedText.original("a\u00a0b"))));
     JsonNode whitespace = json("{\"type\":\"Whitespace\"}");
     assertEquals(
-        List.of("e\u0301cole"),
-        texts(PreTokenizerPipeline.apply(whitespace, AlignedText.original("e\u0301cole"))));
+        List.of("e\u0301cole"), // NFD e-acute
+        texts(PreTokenizerPipeline.apply(whitespace, AlignedText.original("e\u0301cole")))); // NFD
     assertEquals(
         List.of("a", "①", "b"),
         texts(PreTokenizerPipeline.apply(whitespace, AlignedText.original("a①b"))));
@@ -113,21 +119,24 @@ class Phase62FeedbackTest {
         texts(
             PreTokenizerPipeline.apply(
                 json(
-                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\d+\"},\"behavior\":\"Isolated\"}"),
+                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\d+\"},"
+                        + "\"behavior\":\"Isolated\"}"),
                 AlignedText.original("a١٢b"))));
     assertEquals(
         List.of("aéb"),
         texts(
             PreTokenizerPipeline.apply(
                 json(
-                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\w+\"},\"behavior\":\"Isolated\"}"),
+                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\w+\"},"
+                        + "\"behavior\":\"Isolated\"}"),
                 AlignedText.original("aéb"))));
     assertEquals(
         List.of("a", "12", "b"),
         texts(
             PreTokenizerPipeline.apply(
                 json(
-                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"[[:digit:]]+\"},\"behavior\":\"Isolated\"}"),
+                    "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"[[:digit:]]+\"},"
+                        + "\"behavior\":\"Isolated\"}"),
                 AlignedText.original("a12b"))));
     assertEquals(
         "#",
@@ -141,22 +150,27 @@ class Phase62FeedbackTest {
   void bertCleanAndAccentRulesMatchHf() throws Exception {
     JsonNode unclean =
         json(
-            "{\"type\":\"BertNormalizer\",\"clean_text\":false,\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":false}");
+            "{\"type\":\"BertNormalizer\",\"clean_text\":false,"
+                + "\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":false}");
     assertEquals(
         "a\tb\nc\u00a0d",
         NormalizerPipeline.apply(unclean, AlignedText.original("a\tb\nc\u00a0d")).text());
     JsonNode clean =
         json(
-            "{\"type\":\"BertNormalizer\",\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":false}");
+            "{\"type\":\"BertNormalizer\",\"handle_chinese_chars\":false,"
+                + "\"lowercase\":false,\"strip_accents\":false}");
     assertEquals(
-        "\u0378z", NormalizerPipeline.apply(clean, AlignedText.original("\u0378z")).text());
+        UNASSIGNED + "z",
+        NormalizerPipeline.apply(clean, AlignedText.original(UNASSIGNED + "z")).text());
     JsonNode accents =
         json(
-            "{\"type\":\"BertNormalizer\",\"handle_chinese_chars\":false,\"lowercase\":false,\"strip_accents\":true}");
+            "{\"type\":\"BertNormalizer\",\"handle_chinese_chars\":false,"
+                + "\"lowercase\":false,\"strip_accents\":true}");
     assertEquals("कार", NormalizerPipeline.apply(accents, AlignedText.original("कार")).text());
     assertEquals("अः", NormalizerPipeline.apply(accents, AlignedText.original("अः")).text());
     assertEquals(
-        "a\u0488", NormalizerPipeline.apply(accents, AlignedText.original("a\u0488")).text());
+        "a" + COMBINING_ENCLOSING,
+        NormalizerPipeline.apply(accents, AlignedText.original("a" + COMBINING_ENCLOSING)).text());
   }
 
   @Test
@@ -174,7 +188,8 @@ class Phase62FeedbackTest {
     assertEquals(0, byteLevel.units().getFirst().startByte());
     assertEquals(1, byteLevel.units().getFirst().endByte());
     AlignedText composed =
-        NormalizerPipeline.apply(json("{\"type\":\"NFC\"}"), AlignedText.original("e\u0301"));
+        NormalizerPipeline.apply(
+            json("{\"type\":\"NFC\"}"), AlignedText.original("e\u0301")); // NFD e-acute
     assertEquals(composed.offset(), new TokenOffset(0, 1));
     AlignedText replaced =
         NormalizerPipeline.apply(
@@ -230,9 +245,12 @@ class Phase62FeedbackTest {
     JsonNode bert =
         json("{\"type\":\"BertNormalizer\",\"lowercase\":false,\"strip_accents\":false}");
     assertEquals("ab", NormalizerPipeline.apply(bert, AlignedText.original("a\u000bb")).text());
-    assertEquals("ab", NormalizerPipeline.apply(bert, AlignedText.original("a\ue000b")).text());
     assertEquals(
-        "a \uf900 b", NormalizerPipeline.apply(bert, AlignedText.original("a\uf900b")).text());
+        "ab",
+        NormalizerPipeline.apply(bert, AlignedText.original("a\ue000b")).text()); // private use
+    assertEquals(
+        "a " + COMPAT_IDEOGRAPH + " b",
+        NormalizerPipeline.apply(bert, AlignedText.original("a" + COMPAT_IDEOGRAPH + "b")).text());
   }
 
   @Test
@@ -255,15 +273,17 @@ class Phase62FeedbackTest {
     assertEquals("AB", DecoderPipeline.decode(stripFallback, List.of(" <0x41>", " <0x42>")));
     JsonNode byteLevelStrip =
         json(
-            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteLevel\"},{\"type\":\"Strip\",\"content\":\""
+            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteLevel\"},"
+                + "{\"type\":\"Strip\",\"content\":\""
                 + " \",\"start\":1,\"stop\":0}]}");
     assertEquals("a b", DecoderPipeline.decode(byteLevelStrip, List.of("Ġa", "Ġb")));
     JsonNode byteLevelReplace =
         json(
-            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteLevel\"},{\"type\":\"Replace\",\"pattern\":{\"String\":\"ab\"},\"content\":\"X\"}]}");
+            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteLevel\"},"
+                + "{\"type\":\"Replace\",\"pattern\":{\"String\":\"ab\"},\"content\":\"X\"}]}");
     assertEquals("X", DecoderPipeline.decode(byteLevelReplace, List.of("a", "b")));
     assertEquals(
-        "\ufffd\ufffda",
+        "\ufffd\ufffda", // two U+FFFD
         DecoderPipeline.decode(
             json("{\"type\":\"ByteFallback\"}"), List.of("<0xC3>", "<0x28>", "a")));
   }
@@ -279,9 +299,10 @@ class Phase62FeedbackTest {
         incremental(wordPiece, Map.of("##ing", 0, "##s", 1, "hello", 2), List.of(0, 1, 2)));
     JsonNode fallbackMetaspace =
         json(
-            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteFallback\"},{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\"}]}");
+            "{\"type\":\"Sequence\",\"decoders\":[{\"type\":\"ByteFallback\"},"
+                + "{\"type\":\"Metaspace\",\"replacement\":\"▁\",\"prepend_scheme\":\"always\"}]}");
     assertEquals(
-        "\ufffd\ufffda",
+        "\ufffd\ufffda", // two U+FFFD
         incremental(fallbackMetaspace, Map.of("<0xC3>", 0, "<0x28>", 1, "a", 2), List.of(0, 1, 2)));
   }
 

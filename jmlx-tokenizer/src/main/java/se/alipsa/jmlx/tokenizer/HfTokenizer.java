@@ -101,7 +101,7 @@ public final class HfTokenizer {
   public String renderChat(List<Map<String, Object>> messages, ChatTemplateOptions options) {
     Objects.requireNonNull(messages, "HfTokenizer.renderChat: messages");
     Objects.requireNonNull(options, "HfTokenizer.renderChat: options");
-    List<Map<String, Object>> safeMessages =
+    final List<Map<String, Object>> safeMessages =
         messages.stream().map(HfTokenizer::validatedMessage).toList();
     String name = options.templateName();
     if (chatTemplates.isEmpty()) {

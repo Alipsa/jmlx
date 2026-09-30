@@ -164,7 +164,7 @@ final class DecoderPipeline {
           .decode(ByteBuffer.wrap(bytes))
           .toString();
     } catch (CharacterCodingException e) {
-      return "\ufffd".repeat(bytes.length);
+      return "\ufffd".repeat(bytes.length); // U+FFFD
     }
   }
 

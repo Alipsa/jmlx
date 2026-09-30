@@ -50,7 +50,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * replacement of {@code weight} itself is not). {@link #updateScalesAndBiases} remains available as
  * a direct, single-layer alternative when a typed reference is already in hand.
  */
-public final class QuantizedLinear extends Module implements UnaryModule {
+public final class QuantizedLinear extends UnaryLayer {
 
   private static final String MODE = "affine";
 

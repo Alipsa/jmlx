@@ -1,0 +1,88 @@
+{
+  "fixtures": [
+    {
+      "name": "mistral",
+      "tokenizer": "phase6-3-mistral.tokenizer.json",
+      "cases": [
+        {
+          "name": "plain",
+          "text": "hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bos",
+          "text": "hello",
+          "addSpecialTokens": true
+        },
+        {
+          "name": "markers",
+          "text": "<s>[INST] hello[/INST]",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "gemma",
+      "tokenizer": "phase6-3-gemma.tokenizer.json",
+      "cases": [
+        {
+          "name": "plain",
+          "text": "hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bos",
+          "text": "hello",
+          "addSpecialTokens": true
+        },
+        {
+          "name": "markers",
+          "text": "<bos><start_of_turn>user\nhello<end_of_turn>",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "phi3",
+      "tokenizer": "phase6-3-phi3.tokenizer.json",
+      "cases": [
+        {
+          "name": "plain",
+          "text": "hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bos",
+          "text": "hello",
+          "addSpecialTokens": true
+        },
+        {
+          "name": "markers",
+          "text": "<|user|>\nhello<|end|>",
+          "addSpecialTokens": false
+        }
+      ]
+    },
+    {
+      "name": "mixtral",
+      "tokenizer": "phase6-3-mixtral.tokenizer.json",
+      "cases": [
+        {
+          "name": "plain",
+          "text": "hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "bos",
+          "text": "hello",
+          "addSpecialTokens": true
+        },
+        {
+          "name": "markers",
+          "text": "<s>[INST] hello[/INST]",
+          "addSpecialTokens": false
+        }
+      ]
+    }
+  ]
+}

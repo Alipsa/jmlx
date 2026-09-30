@@ -261,13 +261,13 @@ class Phase62TokenizerContractTest {
       AlignedText normalized =
           NormalizerPipeline.apply(
               MAPPER.readTree("{\"type\":\"" + form + "\"}"),
-              AlignedText.original("\u1100\u1161\u11A8"));
+              AlignedText.original("\u1100\u1161\u11A8")); // Hangul jamo
       assertEquals("각", normalized.text());
       assertEquals(new TokenOffset(0, 3), normalized.offset());
     }
     AlignedText decomposed =
         NormalizerPipeline.apply(MAPPER.readTree("{\"type\":\"NFKD\"}"), AlignedText.original("각"));
-    assertEquals("\u1100\u1161\u11A8", decomposed.text());
+    assertEquals("\u1100\u1161\u11A8", decomposed.text()); // Hangul jamo
     assertTrue(
         decomposed.units().stream().allMatch(unit -> unit.startByte() == 0 && unit.endByte() == 3));
   }
@@ -348,7 +348,9 @@ class Phase62TokenizerContractTest {
       root.set(
           "post_processor",
           MAPPER.readTree(
-              "{\"type\":\"TemplateProcessing\",\"single\":[{\"SpecialToken\":{\"id\":\"[CLS]\"}},{\"Sequence\":{}}],\"special_tokens\":{\"[CLS]\":"
+              "{\"type\":\"TemplateProcessing\","
+                  + "\"single\":[{\"SpecialToken\":{\"id\":\"[CLS]\"}},{\"Sequence\":{}}],"
+                  + "\"special_tokens\":{\"[CLS]\":"
                   + malformed
                   + "}}"));
       Path file = temporaryDirectory.resolve("bad-template-" + malformed.hashCode() + ".json");

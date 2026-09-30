@@ -10,16 +10,16 @@ import java.util.Set;
 import java.util.function.Consumer;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.nn.AttentionMask;
 import se.alipsa.jmlx.nn.DecoderBlock;
 import se.alipsa.jmlx.nn.Embedding;
-import se.alipsa.jmlx.nn.GroupedQueryAttention;
 import se.alipsa.jmlx.nn.KVCache;
 import se.alipsa.jmlx.nn.Linear;
 import se.alipsa.jmlx.nn.Module;
 import se.alipsa.jmlx.nn.RMSNorm;
-import se.alipsa.jmlx.nn.SwiGLU;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
 import se.alipsa.jmlx.tokenizer.TokenizerException;
@@ -28,6 +28,7 @@ import se.alipsa.jmlx.tokenizer.TokenizerException;
 public abstract class DecoderModel extends Module implements TextGenerationModel {
   private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
   private final DecoderConfig config;
+  private final ArchitectureDescriptor descriptor;
   private final ModelMetadata metadata;
   private final Embedding embedding;
   private final List<DecoderBlock> layers;
@@ -35,75 +36,24 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   private final Linear lmHead;
   private final boolean tiedOutput;
 
-  /**
-   * Builds every layer from {@code tensors}, keyed by their Hugging Face checkpoint names. {@code
-   * qkvBiasRequired}/{@code outBiasRequired} are constructor arguments, not methods a subclass
-   * overrides: reading them from an overridable hook here would run before the subclass's own field
-   * initializers (the classic Java construction-order hazard) -- see {@link QwenModel}'s and {@link
-   * LlamaModel}'s private constructors for how each architecture derives them. Neither simply reads
-   * {@link DecoderConfig#attentionBias()} directly: Qwen2 never defines that config.json field
-   * (hardcoding q/k/v bias -- but never o_proj bias -- in HF's modeling code instead), so a
-   * hand-edited Qwen2 config that happened to set it would otherwise reject an o_proj-bias-less
-   * checkpoint that is, in fact, perfectly valid.
-   */
+  /** Builds a decoder from checkpoint tensors validated against the architecture's tensor plan. */
   protected DecoderModel(
-      MLXScope scope,
-      DecoderConfig config,
-      Map<String, MLXArray> tensors,
-      boolean qkvBiasRequired,
-      boolean outBiasRequired) {
+      MLXScope scope, ArchitectureDescriptor descriptor, Map<String, MLXArray> tensors) {
     super(scope);
-    this.config = Objects.requireNonNull(config, "config");
+    this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
+    this.config = descriptor.dimensions();
     metadata =
         new DecoderMetadata(config.modelType(), config.vocabSize(), config.numHiddenLayers());
-    embedding =
-        child("embedding", new Embedding(scope, tensor(tensors, "model.embed_tokens.weight")));
-    boolean mlpBiasExpected = config.mlpBias();
+    DecoderAssembler.Assembled assembled = DecoderAssembler.assemble(scope, descriptor, tensors);
+    embedding = child("embedding", assembled.embedding());
     List<DecoderBlock> built = new ArrayList<>();
-    for (int i = 0; i < config.numHiddenLayers(); i++) {
-      String p = "model.layers." + i + ".";
-      RMSNorm inputNorm =
-          new RMSNorm(scope, tensor(tensors, p + "input_layernorm.weight"), config.rmsNormEps());
-      GroupedQueryAttention attention =
-          new GroupedQueryAttention(
-              scope,
-              config.numAttentionHeads(),
-              config.numKeyValueHeads(),
-              config.ropeTheta(),
-              tensor(tensors, p + "self_attn.q_proj.weight"),
-              bias(tensors, p + "self_attn.q_proj.bias", qkvBiasRequired),
-              tensor(tensors, p + "self_attn.k_proj.weight"),
-              bias(tensors, p + "self_attn.k_proj.bias", qkvBiasRequired),
-              tensor(tensors, p + "self_attn.v_proj.weight"),
-              bias(tensors, p + "self_attn.v_proj.bias", qkvBiasRequired),
-              tensor(tensors, p + "self_attn.o_proj.weight"),
-              bias(tensors, p + "self_attn.o_proj.bias", outBiasRequired));
-      RMSNorm postNorm =
-          new RMSNorm(
-              scope, tensor(tensors, p + "post_attention_layernorm.weight"), config.rmsNormEps());
-      SwiGLU mlp =
-          new SwiGLU(
-              scope,
-              tensor(tensors, p + "mlp.gate_proj.weight"),
-              bias(tensors, p + "mlp.gate_proj.bias", mlpBiasExpected),
-              tensor(tensors, p + "mlp.up_proj.weight"),
-              bias(tensors, p + "mlp.up_proj.bias", mlpBiasExpected),
-              tensor(tensors, p + "mlp.down_proj.weight"),
-              bias(tensors, p + "mlp.down_proj.bias", mlpBiasExpected));
-      built.add(child("layer" + i, new DecoderBlock(scope, inputNorm, attention, postNorm, mlp)));
+    for (int i = 0; i < assembled.layers().size(); i++) {
+      built.add(child("layer" + i, assembled.layers().get(i)));
     }
     layers = List.copyOf(built);
-    norm =
-        child(
-            "norm", new RMSNorm(scope, tensor(tensors, "model.norm.weight"), config.rmsNormEps()));
-    MLXArray headWeight = tensors.get("lm_head.weight");
-    // Prefer an explicit output head: some converted fine-tunes leave the source model's
-    // tie_word_embeddings flag set after untying and training lm_head.
-    tiedOutput = headWeight == null && config.tieWordEmbeddings();
-    if (!tiedOutput && headWeight == null) {
-      throw new IllegalArgumentException("checkpoint missing lm_head.weight");
-    }
-    lmHead = tiedOutput ? null : child("lmHead", new Linear(scope, headWeight, null));
+    norm = child("norm", assembled.finalNorm());
+    tiedOutput = assembled.lmHead() == null;
+    lmHead = tiedOutput ? null : child("lmHead", assembled.lmHead());
   }
 
   /**
@@ -138,9 +88,31 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private MLXArray normalizedHiddenStates(MLXArray tokenIds, List<KVCache> caches) {
+    for (int i = 0; i < caches.size(); i++) {
+      Objects.requireNonNull(caches.get(i), "cache " + i);
+    }
     MLXArray x = embedding.forward(tokenIds);
+    if (descriptor.embedding().scaleBySqrtHidden()) {
+      MLXArray scale =
+          MLX.array(x.scope(), new float[] {(float) Math.sqrt(config.hiddenSize())}, new int[] {1});
+      x = MLXOps.multiply(x, MLX.astype(scale, x.dtype()));
+    }
+    Integer window = descriptor.attention().slidingWindow();
+    MLXArray mask =
+        window != null && window < caches.get(0).offset() + tokenIds.shape()[1]
+            ? AttentionMask.slidingWindow(
+                x.scope(),
+                tokenIds.shape()[1],
+                caches.get(0).offset() + tokenIds.shape()[1],
+                window)
+            : null;
+    MLXArray stepFrequencies =
+        descriptor
+            .rope()
+            .stepFrequencies(
+                x.scope(), descriptor.rotaryDims(), caches.get(0).offset() + tokenIds.shape()[1]);
     for (int i = 0; i < layers.size(); i++) {
-      x = layers.get(i).forward(x, Objects.requireNonNull(caches.get(i), "cache " + i));
+      x = layers.get(i).forward(x, caches.get(i), mask, stepFrequencies);
     }
     return norm.forward(x);
   }
@@ -350,26 +322,5 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             GenerationConfig.greedyDefaults(maxNewTokens, eosTokenIds),
             CancellationToken.NONE);
     return generate(request, ignored -> {}).generatedText();
-  }
-
-  private static MLXArray tensor(Map<String, MLXArray> tensors, String name) {
-    MLXArray tensor = tensors.get(name);
-    if (tensor == null) {
-      throw new IllegalArgumentException("checkpoint missing tensor '" + name + "'");
-    }
-    return tensor;
-  }
-
-  /**
-   * Returns the bias tensor {@code name}, or {@code null} if this architecture's config does not
-   * call for one. Throws if {@code expected} is {@code true} but the checkpoint lacks it -- a
-   * silently-null bias here would otherwise compute wrong attention/MLP output with no diagnostic.
-   */
-  private static MLXArray bias(Map<String, MLXArray> tensors, String name, boolean expected) {
-    MLXArray bias = tensors.get(name);
-    if (expected && bias == null) {
-      throw new IllegalArgumentException("checkpoint missing required bias tensor '" + name + "'");
-    }
-    return bias;
   }
 }

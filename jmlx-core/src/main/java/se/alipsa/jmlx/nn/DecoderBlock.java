@@ -13,9 +13,9 @@ import se.alipsa.jmlx.memory.MLXScope;
 public final class DecoderBlock extends Module {
 
   private final RMSNorm inputNorm;
-  private final GroupedQueryAttention attention;
+  private final CachedAttention attention;
   private final RMSNorm postAttentionNorm;
-  private final SwiGLU mlp;
+  private final UnaryLayer mlp;
 
   /** Creates a decoder block from its already-constructed checkpoint-compatible components. */
   public DecoderBlock(
@@ -24,6 +24,16 @@ public final class DecoderBlock extends Module {
       GroupedQueryAttention attention,
       RMSNorm postAttentionNorm,
       SwiGLU mlp) {
+    this(scope, inputNorm, (CachedAttention) attention, postAttentionNorm, (UnaryLayer) mlp);
+  }
+
+  /** Creates a decoder block from interchangeable registered components. */
+  public DecoderBlock(
+      MLXScope scope,
+      RMSNorm inputNorm,
+      CachedAttention attention,
+      RMSNorm postAttentionNorm,
+      UnaryLayer mlp) {
     super(scope);
     this.inputNorm =
         child(
@@ -43,8 +53,21 @@ public final class DecoderBlock extends Module {
 
   /** Applies the block to {@code x}, using {@code cache} for this block's attention state. */
   public MLXArray forward(MLXArray x, KVCache cache) {
+    return forward(x, cache, null);
+  }
+
+  /** Applies the block with a mask shared by decoder layers in this forward step. */
+  public MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask) {
+    return forward(x, cache, attentionMask, null);
+  }
+
+  /** Applies the block with a mask and dynamic rotary frequencies shared across layers. */
+  public MLXArray forward(
+      MLXArray x, KVCache cache, MLXArray attentionMask, MLXArray stepFrequencies) {
     Objects.requireNonNull(x, "DecoderBlock.forward: x must not be null");
-    MLXArray afterAttention = MLXOps.add(x, attention.forward(inputNorm.forward(x), cache));
+    MLXArray afterAttention =
+        MLXOps.add(
+            x, attention.forward(inputNorm.forward(x), cache, attentionMask, stepFrequencies));
     return MLXOps.add(afterAttention, mlp.forward(postAttentionNorm.forward(afterAttention)));
   }
 }

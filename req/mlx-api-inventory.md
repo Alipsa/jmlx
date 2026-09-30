@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=168, planned=9, unplanned=556
+- by status: implemented=169, planned=9, unplanned=555
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -464,7 +464,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_log2` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logaddexp` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logcumsumexp` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_logical_and` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_logical_and` | downcall | implemented | MLXOps.logicalAnd | AttentionMaskTest | — | all handwritten source |
 | `mlx_h.mlx_logical_not` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logical_or` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logsumexp` | downcall | unplanned | — | — | — | — |

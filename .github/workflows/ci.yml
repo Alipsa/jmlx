@@ -20,11 +20,21 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      tier_b:
+        description: Run the pinned public Tier B artifact probe
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  tier_b_probe:
+    if: github.event_name == 'workflow_dispatch' && inputs.tier_b
+    uses: ./.github/workflows/tier-b.yml
+
   java:
     runs-on: ubuntu-latest
     env:
@@ -73,6 +83,7 @@ jobs:
           ./gradlew \
             :jmlx-jinja:check \
             :jmlx-tokenizer:check \
+            :jmlx-core:test \
             :jmlx-models:check \
             verifyTokenizerOracle \
             verifyTokenizerOracleFixtures \
@@ -122,3 +133,29 @@ jobs:
       # that MLX tests executed on this Apple-Silicon runner.
       - name: Run native module checks
         run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check :jmlx-native-macos-arm64:check :jmlx-ffi:assemble :jmlx-core:assemble :jmlx-models:assemble :jmlx-native-macos-arm64:assemble
+
+      - name: Assert Phase 6.3 native suites executed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          suites = {
+              'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest'],
+              'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
+                              'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
+                              'QuantizedCheckpointProbeTest'],
+          }
+          for module, names in suites.items():
+              root = Path(module) / 'build/test-results/test'
+              for name in names:
+                  matches = list(root.glob(f'TEST-*.{name}.xml'))
+                  if len(matches) != 1:
+                      raise SystemExit(f'{module}/{name}: expected one result XML, found {len(matches)}')
+                  result = ElementTree.parse(matches[0]).getroot()
+                  tests = int(result.attrib['tests'])
+                  skipped = int(result.attrib.get('skipped', 0))
+                  if tests == 0 or skipped == tests:
+                      raise SystemExit(f'{module}/{name}: native tests did not execute')
+                  print(f'{module}/{name}: {tests - skipped}/{tests} executed')
+          PY

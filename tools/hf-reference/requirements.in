@@ -1,0 +1,4 @@
+# Generate-only reference environment. Never install this in CI.
+torch==2.6.0
+transformers==4.57.6
+safetensors==0.6.2

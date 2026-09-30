@@ -1,0 +1,301 @@
+{
+  "family": "gemma",
+  "cases": [
+    {
+      "name": "plain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<bos><start_of_turn>user\nhello<end_of_turn>\n",
+      "ids": [
+        21,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "plain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<bos><start_of_turn>user\nhello<end_of_turn>\n<start_of_turn>model\n",
+      "ids": [
+        21,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        5,
+        8,
+        3,
+        4,
+        0
+      ]
+    },
+    {
+      "name": "system_user",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<bos><start_of_turn>user\nhelpful<end_of_turn>\n<start_of_turn>user\nhello<end_of_turn>\n",
+      "ids": [
+        21,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "system_user",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<bos><start_of_turn>user\nhelpful<end_of_turn>\n<start_of_turn>user\nhello<end_of_turn>\n<start_of_turn>model\n",
+      "ids": [
+        21,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        5,
+        8,
+        3,
+        4,
+        0
+      ]
+    },
+    {
+      "name": "multi_turn",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<bos><start_of_turn>user\nhello<end_of_turn>\n<start_of_turn>model\nworld<end_of_turn>\n<start_of_turn>user\nhello<end_of_turn>\n",
+      "ids": [
+        21,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        5,
+        8,
+        3,
+        4,
+        0,
+        17,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "multi_turn",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<bos><start_of_turn>user\nhello<end_of_turn>\n<start_of_turn>model\nworld<end_of_turn>\n<start_of_turn>user\nhello<end_of_turn>\n<start_of_turn>model\n",
+      "ids": [
+        21,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        5,
+        8,
+        3,
+        4,
+        0,
+        17,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24,
+        1,
+        0,
+        23,
+        1,
+        0,
+        5,
+        8,
+        3,
+        4,
+        0
+      ]
+    }
+  ]
+}

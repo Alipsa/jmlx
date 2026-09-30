@@ -13,7 +13,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * heads while keys and values have {@code numKeyValueHeads} heads, each shared by a contiguous
  * group of query heads.
  */
-public final class GroupedQueryAttention extends Module {
+public final class GroupedQueryAttention extends CachedAttention {
 
   private final int numHeads;
   private final int numKeyValueHeads;
@@ -91,7 +91,11 @@ public final class GroupedQueryAttention extends Module {
    * {@code cache} is supplied, it retains the un-repeated key/value heads across calls; expansion
    * to query-head count occurs only for the attention operation.
    */
-  public MLXArray forward(MLXArray x, KVCache cache) {
+  @Override
+  public MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask) {
+    if (attentionMask != null) {
+      throw new IllegalArgumentException("GroupedQueryAttention does not accept attentionMask");
+    }
     Objects.requireNonNull(x, "GroupedQueryAttention.forward: x must not be null");
     int[] shape = x.shape();
     if (shape.length != 3 || shape[2] != numHeads * headDim) {
@@ -104,9 +108,11 @@ public final class GroupedQueryAttention extends Module {
     int batch = shape[0];
     int sequence = shape[1];
     int offset = cache == null ? 0 : cache.offset();
-    MLXArray q = toHeads(queryProj.forward(x), batch, sequence, numHeads);
-    MLXArray k = toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads);
-    MLXArray v = toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads);
+    MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
+    MLXArray k =
+        AttentionHeads.toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
+    MLXArray v =
+        AttentionHeads.toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
     q = MLXFast.rope(q, headDim, false, ropeTheta, 1.0f, offset, null);
     k = MLXFast.rope(k, headDim, false, ropeTheta, 1.0f, offset, null);
     if (cache != null) {
@@ -117,34 +123,16 @@ public final class GroupedQueryAttention extends Module {
     MLXArray attended =
         MLXFast.scaledDotProductAttention(
             q,
-            repeatKeyValueHeads(k, x.scope()),
-            repeatKeyValueHeads(v, x.scope()),
+            AttentionHeads.repeatKeyValueHeads(
+                k, x.scope(), numKeyValueHeads, queriesPerKeyValueHead),
+            AttentionHeads.repeatKeyValueHeads(
+                v, x.scope(), numKeyValueHeads, queriesPerKeyValueHead),
             scale,
             true,
             null,
             null);
     MLXArray merged = MLXShape.flatten(MLXShape.transpose(attended, new int[] {0, 2, 1, 3}), 2, 3);
     return outProj.forward(merged);
-  }
-
-  private MLXArray toHeads(MLXArray projected, int batch, int sequence, int heads) {
-    return MLXShape.transpose(
-        MLXShape.reshape(projected, new int[] {batch, sequence, heads, headDim}),
-        new int[] {0, 2, 1, 3});
-  }
-
-  private MLXArray repeatKeyValueHeads(MLXArray value, MLXScope target) {
-    if (queriesPerKeyValueHead == 1) {
-      return value;
-    }
-    int[] shape = value.shape();
-    MLXArray expanded = MLXShape.expandDims(value, target, 2);
-    MLXArray broadcast =
-        MLXShape.broadcastTo(
-            expanded,
-            target,
-            new int[] {shape[0], numKeyValueHeads, queriesPerKeyValueHead, shape[2], shape[3]});
-    return MLXShape.flatten(broadcast, target, 1, 2);
   }
 
   private static void requireWeight(String name, MLXArray weight, int out, int in) {

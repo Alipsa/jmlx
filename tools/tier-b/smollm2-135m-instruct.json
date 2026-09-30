@@ -1,0 +1,30 @@
+{
+  "repository": "HuggingFaceTB/SmolLM2-135M-Instruct",
+  "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+  "max_total_bytes": 300000000,
+  "recorded_pin": "Apple M1 (Virtual)|macOS=26.6.2|arch=aarch64|mlx-metal=0.31.2|mlx-c=fba4470b89073180056c9ea46c443051375f7399|batch=1",
+  "expected_token_ids": [1, 520, 9531, 198, 19556, 28, 957, 1462, 314, 2, 198, 1, 4093, 198, 57, 5248],
+  "observed_peak_test_jvm_rss_kib": 461424,
+  "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36640308134",
+  "expected_chat_text": "<|im_start|>system\nYou are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>\n<|im_start|>user\nHello, my name is<|im_end|>\n",
+  "expected_chat_ids": [1, 9690, 198, 2683, 359, 253, 5356, 5646, 11173, 3365, 3511, 308, 34519, 28, 7018, 411, 407, 19712, 8182, 2, 198, 1, 4093, 198, 19556, 28, 957, 1462, 314, 2, 198],
+  "expected_prompt_ids": [19556, 28, 957, 1462, 314],
+  "files": {
+    "config.json": {
+      "sha256": "8eb740e8bbe4cff95ea7b4588d17a2432deb16e8075bc5828ff7ba9be94d982a",
+      "max_bytes": 100000
+    },
+    "tokenizer.json": {
+      "sha256": "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c",
+      "max_bytes": 5000000
+    },
+    "tokenizer_config.json": {
+      "sha256": "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df",
+      "max_bytes": 100000
+    },
+    "model.safetensors": {
+      "sha256": "5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c",
+      "max_bytes": 280000000
+    }
+  }
+}

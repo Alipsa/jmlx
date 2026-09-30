@@ -341,6 +341,12 @@ public final class MLXOps {
     return NativeOps.binaryOp("equal", a, b, mlx_h::mlx_equal);
   }
 
+  /** Elementwise logical AND, broadcasting per NumPy's rules. Result dtype is {@code BOOL}. */
+  public static MLXArray logicalAnd(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "logicalAnd");
+    return NativeOps.binaryOp("logicalAnd", a, b, mlx_h::mlx_logical_and);
+  }
+
   /**
    * Elementwise select: {@code x} where {@code condition} is nonzero, {@code y} otherwise. Three
    * array operands, none nullable -- resolves its target via {@link NativeOps#scopeOf} across all

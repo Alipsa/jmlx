@@ -332,6 +332,21 @@ class MlxApiInventoryTest {
   }
 
   @Test
+  void callSiteGuardIgnoresCheckoutsInsideAgentWorktrees() throws Exception {
+    Path root = fixture("{\"records\":[]}");
+    Path generatedCopy =
+        root.resolve(
+            ".claude/worktrees/other/jmlx-ffi/src/main/generated/java/se/alipsa/jmlx/ffi/G.java");
+    Files.createDirectories(generatedCopy.getParent());
+    Files.writeString(generatedCopy, "class G { void use() { mlx_h.mlx_array_free(); } }");
+    Path handwritten = root.resolve(".claude/worktrees/other/jmlx-core/src/main/java/Broken.java");
+    Files.createDirectories(handwritten.getParent());
+    Files.writeString(handwritten, "this is not Java");
+
+    assertDoesNotThrow(() -> MlxApiCallSites.verify(root));
+  }
+
+  @Test
   void callSiteGuardDoesNotParseJavaSourcesInsideToolVirtualEnvironments() throws Exception {
     Path root = fixture("{\"records\":[]}");
     Path virtualEnvironmentSource =

@@ -1,0 +1,159 @@
+{
+  "family": "mixtral",
+  "cases": [
+    {
+      "name": "plain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<s>[INST] hello[/INST]",
+      "ids": [
+        21,
+        23,
+        13,
+        24
+      ]
+    },
+    {
+      "name": "plain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<s>[INST] hello[/INST]",
+      "ids": [
+        21,
+        23,
+        13,
+        24
+      ]
+    },
+    {
+      "name": "system_user",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<s>[INST] helpful\n\nhello[/INST]",
+      "ids": [
+        21,
+        23,
+        11,
+        0,
+        4,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24
+      ]
+    },
+    {
+      "name": "system_user",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<s>[INST] helpful\n\nhello[/INST]",
+      "ids": [
+        21,
+        23,
+        11,
+        0,
+        4,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        24
+      ]
+    },
+    {
+      "name": "multi_turn",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<s>[INST] hello[/INST] world</s>[INST] hello[/INST]",
+      "ids": [
+        21,
+        23,
+        13,
+        24,
+        1,
+        17,
+        22,
+        23,
+        13,
+        24
+      ]
+    },
+    {
+      "name": "multi_turn",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<s>[INST] hello[/INST] world</s>[INST] hello[/INST]",
+      "ids": [
+        21,
+        23,
+        13,
+        24,
+        1,
+        17,
+        22,
+        23,
+        13,
+        24
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "repository": "OuteAI/Lite-Mistral-150M-v2-Instruct",
+  "revision": "6e2f90cbf312921289b3b8c29cb34cbdb6cb708e",
+  "max_total_bytes": 650000000,
+  "recorded_pin": "Apple M1 (Virtual)|macOS=26.6.2|arch=aarch64|mlx-metal=0.31.2|mlx-c=fba4470b89073180056c9ea46c443051375f7399|batch=1",
+  "expected_token_ids": [1, 13892, 13, 16230, 28808, 1602, 541, 315, 6031, 368, 3154, 28804, 2, 28705, 13, 1],
+  "observed_peak_test_jvm_rss_kib": 802064,
+  "observed_run": "https://github.com/Alipsa/jmlx/actions/runs/36640308134",
+  "expected_chat_text": "<s>user\nHello, my name is</s>\n",
+  "expected_chat_ids": [1, 2188, 13, 16230, 28725, 586, 1141, 349, 2, 28705, 13],
+  "expected_prompt_ids": [22557, 28725, 586, 1141, 349],
+  "files": {
+    "config.json": {
+      "sha256": "714f8cf063588022499e8223cc3a487c500ffcd4cfd8a7bd3c2fc8354678c086",
+      "max_bytes": 100000
+    },
+    "tokenizer.json": {
+      "sha256": "bdc45dc7f18a5c55e0dcb36f4f187a7c429d6aaa1693a17d20422b85081642d9",
+      "max_bytes": 3000000
+    },
+    "tokenizer_config.json": {
+      "sha256": "0eafab4ad5551c3078011ff19b5e0c8a48d4d29b9d96c78e2c8d090530b6b655",
+      "max_bytes": 100000
+    },
+    "model.safetensors": {
+      "sha256": "60d47cd37ad9dc1900461c4effdd8762ae740c719f7dac33979dced68a3dfdfd",
+      "max_bytes": 640000000
+    }
+  }
+}

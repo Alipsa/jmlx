@@ -1,0 +1,103 @@
+package se.alipsa.jmlx.models;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import se.alipsa.jmlx.core.DType;
+import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXIO;
+import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
+import se.alipsa.jmlx.memory.MLXScope;
+import tools.jackson.databind.ObjectMapper;
+
+/** Header validation guards decoder assembly before native safetensors loading. */
+class DecoderAssemblerTest {
+
+  @Test
+  @EnabledIfNativeAvailable
+  void explicitOutputHeadWinsOverTieWordEmbeddings(@TempDir Path directory) throws Exception {
+    TinyCheckpoints.randomLlama(directory, 42, 2, false, true);
+    ArchitectureDescriptor descriptor =
+        ArchitectureMappings.parse(
+            new ObjectMapper().readTree(directory.resolve("config.json").toFile()));
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          new java.util.LinkedHashMap<>(
+              MLXIO
+                  .loadSafetensors(scope, directory.resolve("model.safetensors").toString())
+                  .tensors());
+      tensors.put("lm_head.weight", MLX.zeros(scope, new int[] {128, 64}, DType.FLOAT32));
+      assertNotNull(DecoderAssembler.assemble(scope, descriptor, tensors).lmHead());
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
+  void tiedEmbeddingWithoutOutputHeadHasNoLmHead(@TempDir Path directory) throws Exception {
+    TinyCheckpoints.randomLlama(directory, 42, 2, false, true);
+    ArchitectureDescriptor descriptor =
+        ArchitectureMappings.parse(
+            new ObjectMapper().readTree(directory.resolve("config.json").toFile()));
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          MLXIO.loadSafetensors(scope, directory.resolve("model.safetensors").toString()).tensors();
+      assertNull(DecoderAssembler.assemble(scope, descriptor, tensors).lmHead());
+    }
+  }
+
+  @Test
+  void missingMlpTensorStopsBeforeNativeLoad(@TempDir Path directory) throws IOException {
+    TensorPlan plan = ArchitectureMappings.tensorPlan(TestDescriptors.llama(1, false));
+    String missing = "model.layers.0.mlp.down_proj.weight";
+    Set<String> available = new java.util.HashSet<>(plan.required());
+    available.remove(missing);
+    StringBuilder header = new StringBuilder("{");
+    boolean first = true;
+    for (String name : available) {
+      if (!first) {
+        header.append(',');
+      }
+      first = false;
+      header
+          .append('"')
+          .append(name)
+          .append("\":{\"dtype\":\"F32\",\"shape\":[0],\"data_offsets\":[0,0]}");
+    }
+    header.append('}');
+    byte[] bytes = header.toString().getBytes(StandardCharsets.UTF_8);
+    ByteBuffer data = ByteBuffer.allocate(8 + bytes.length).order(ByteOrder.LITTLE_ENDIAN);
+    Files.write(
+        directory.resolve("model.safetensors"), data.putLong(bytes.length).put(bytes).array());
+    AtomicInteger loads = new AtomicInteger();
+    String message =
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    CheckpointLoader.load(
+                        null,
+                        directory,
+                        plan,
+                        (scope, shard) -> {
+                          loads.incrementAndGet();
+                          throw new AssertionError("native load must not run");
+                        }))
+            .getMessage();
+    assertTrue(message.contains(missing), message);
+    assertEquals(0, loads.get());
+  }
+}

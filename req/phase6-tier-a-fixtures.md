@@ -16,6 +16,12 @@ runs on every relevant pull request; no test downloads a model or tokenizer.
 | Tokenizer directory/chat contracts | local tokenizer config and Jinja templates; reserved context and template-only IDs | metadata/template precedence, rendered text, collision failures, incremental split-UTF-8 decode | `Phase62TokenizerContractTest` |
 | Tokenizer-backed tiny decoder | generated tiny Llama checkpoint and local tokenizer; normal and pre-cancelled requests | generated IDs, event deltas/flush, result text, contextual decode abort | `LlamaModelTest.tokenizerBackedRequestsStreamTextAndFlushPreCancelledRequests`; `LlamaModelTest.tokenizerDecodeFailureIsAContextualGenerationAbort` |
 | Tokenizer-backed Qwen2 tiny decoder | generated zero-valued 1-layer GQA safetensors and local tokenizer | generated IDs `[0,0]`; generated text `aa` | `QwenModelTest.loadsCheckpointAndGeneratesWithGroupedQueryCache` |
+| Phase 6.3 checkpoint tensor plan | pure-Java fabricated names and safetensors headers/indexes, including mismatches | named missing, forbidden, extra, and misindexed keys before native loading | `TensorPlanTest`; `CheckpointIndexTest` |
+| Hugging Face RoPE oracle | pinned `transformers==4.57.6`; fixed 16-wide input at offsets 0, 17, 80, 160 | inverse frequencies, attention scaling, rotated values for base, linear, dynamic NTK, Llama 3, YaRN | `verifyHfReferenceGoldens`; `RopeReferenceTest` on macOS CI |
+| Sliding-window mask and attention | generated query/key positions around window boundary | BOOL mask with `p - j < window`; prefill/decode attention equivalence | `AttentionMaskTest`; `DecoderAttentionTest` on macOS CI |
+| Phi-3 fused projection mapping | 2-layer seeded Hugging Face checkpoint with fused QKV and gate/up tensors | prefill logits and two decode logits | `Phi3ModelTest` on macOS CI |
+| Mistral, Gemma v1, Mixtral tiny decoders | committed 2-layer, seeded nonzero Hugging Face safetensors | full prefill logits and two decode logits per family | `MistralModelTest`, `GemmaModelTest`, `MixtralModelTest` on macOS CI |
+| Phase 6.3 family tokenizer bundles | synthetic family-shaped tokenizer/config files and chats | Hugging Face rendered chat text and IDs plus tokenizers encode/decode IDs | `Phase63FamilyTokenizerTest`; `Phase63ModelTokenizerContractTest`; `verifyTokenizerOracleFixtures` |
 
 `verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces every committed
 oracle output. The original array row remains an environment self-check; Phase 6.1 closes the Java

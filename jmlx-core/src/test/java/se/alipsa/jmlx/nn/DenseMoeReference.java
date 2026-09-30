@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.List;
 import java.util.Objects;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
@@ -9,25 +10,29 @@ import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Mixture of gated experts with deterministic top-k routing; only the selected experts are
- * evaluated (see {@link SwitchGlu}).
+ * Test oracle: the Phase 6.3 dense mixture of experts, which runs every expert on every token and
+ * masks unselected outputs with {@code where}. Kept verbatim from the pre-gather {@code MoeMlp} so
+ * the gathered implementation is checked against an independent, simpler algorithm (routing,
+ * tie-breaking and renormalisation must agree exactly).
  */
-public final class MoeMlp extends UnaryLayer {
+final class DenseMoeReference extends UnaryLayer {
 
   private final UnaryLayer router;
-  private final SwitchGlu experts;
+  private final List<GatedMlp> experts;
   private final int topK;
 
-  /**
-   * Registers the router and the stacked experts as children {@code router} and {@code experts}.
-   */
-  public MoeMlp(MLXScope scope, UnaryLayer router, SwitchGlu experts, int topK) {
+  /** Registers the router and experts as children, in checkpoint order. */
+  public DenseMoeReference(MLXScope scope, UnaryLayer router, List<GatedMlp> experts, int topK) {
     super(scope);
     this.router = child("router", Objects.requireNonNull(router, "router"));
-    this.experts = child("experts", Objects.requireNonNull(experts, "experts"));
-    if (topK < 1 || topK > experts.experts()) {
+    List<GatedMlp> copy = List.copyOf(Objects.requireNonNull(experts, "experts"));
+    if (topK < 1 || topK > copy.size()) {
       throw new IllegalArgumentException("topK must be between 1 and the number of experts");
     }
+    for (int i = 0; i < copy.size(); i++) {
+      child("expert" + i, copy.get(i));
+    }
+    this.experts = copy;
     this.topK = topK;
   }
 
@@ -43,14 +48,14 @@ public final class MoeMlp extends UnaryLayer {
     if (logitShape.length != 3
         || logitShape[0] != inputShape[0]
         || logitShape[1] != inputShape[1]
-        || logitShape[2] != experts.experts()) {
+        || logitShape[2] != experts.size()) {
       throw new IllegalArgumentException("MoE router must produce [batch, tokens, experts]");
     }
 
     // Mixtral softmax is evaluated in float32, even with reduced-precision hidden states.
     MLXArray probabilities = MLXOps.softmaxAxis(MLX.astype(logits, DType.FLOAT32), -1, true);
     MLXArray remaining = probabilities;
-    MLXArray expertIds = MLX.arange(x.scope(), 0, experts.experts(), 1, DType.INT32);
+    MLXArray expertIds = MLX.arange(x.scope(), 0, experts.size(), 1, DType.INT32);
     MLXArray[] indices = new MLXArray[topK];
     MLXArray[] selectedProbabilities = new MLXArray[topK];
     MLXArray selectedSum = null;
@@ -67,15 +72,22 @@ public final class MoeMlp extends UnaryLayer {
       remaining = MLXOps.where(MLXOps.equal(expertIds, indices[i]), negativeInfinity, remaining);
     }
 
+    MLXArray result = MLX.zeros(x.scope(), inputShape, x.dtype());
+    MLXArray zero = MLX.zeros(x.scope(), new int[] {1}, x.dtype());
     MLXArray[] weights = new MLXArray[topK];
     for (int i = 0; i < topK; i++) {
       weights[i] = MLX.astype(MLXOps.divide(selectedProbabilities[i], selectedSum), x.dtype());
     }
-    // [B, T, K]: argmaxAxis(keepdims=true) yields INT32 [B, T, 1] per slot.
-    MLXArray selected = MLXShape.concatenate(indices, -1);
-    MLXArray slotWeights = MLXShape.concatenate(weights, -1);
-    MLXArray expertOutputs = experts.forward(x, selected); // [B, T, K, H]
-    return MLXOps.sum(
-        MLXOps.multiply(expertOutputs, MLXShape.expandDims(slotWeights, -1)), new int[] {2}, false);
+    for (int expert = 0; expert < experts.size(); expert++) {
+      MLXArray expertOutput = experts.get(expert).forward(x);
+      MLXArray expertId = MLX.full(x.scope(), new int[] {1}, expert, DType.INT32);
+      for (int i = 0; i < topK; i++) {
+        MLXArray chosen = MLXOps.equal(indices[i], expertId);
+        // where runs before multiplication so an unselected infinite expert cannot poison output.
+        MLXArray masked = MLXOps.where(chosen, expertOutput, zero);
+        result = MLXOps.add(result, MLXOps.multiply(masked, weights[i]));
+      }
+    }
+    return result;
   }
 }

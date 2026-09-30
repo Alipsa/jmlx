@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -15,6 +16,7 @@ import se.alipsa.jmlx.nn.GatedMlp;
 import se.alipsa.jmlx.nn.Linear;
 import se.alipsa.jmlx.nn.MoeMlp;
 import se.alipsa.jmlx.nn.RMSNorm;
+import se.alipsa.jmlx.nn.SwitchGlu;
 import se.alipsa.jmlx.nn.UnaryLayer;
 
 /** Constructs the registered decoder modules from a validated architecture and checkpoint. */
@@ -30,7 +32,11 @@ public final class DecoderAssembler {
     }
   }
 
-  /** Builds a decoder after confirming that loaded tensor keys still satisfy the header plan. */
+  /**
+   * Builds a decoder after confirming that loaded tensor keys still satisfy the header plan. For
+   * mixture-of-experts layers, the per-expert {@code block_sparse_moe.experts.*} arrays in {@code
+   * tensors} are stacked and then closed, so the caller must not use them afterwards.
+   */
   public static Assembled assemble(
       MLXScope scope, ArchitectureDescriptor descriptor, Map<String, MLXArray> tensors) {
     Objects.requireNonNull(scope, "scope");
@@ -117,22 +123,49 @@ public final class DecoderAssembler {
       ArchitectureDescriptor descriptor,
       Map<String, MLXArray> tensors,
       String prefix) {
-    List<GatedMlp> experts = new ArrayList<>();
-    for (int expert = 0; expert < descriptor.moe().experts(); expert++) {
-      String p = prefix + "experts." + expert + ".";
-      experts.add(
-          new GatedMlp(
-              scope,
-              projection(scope, tensors, p + "w1", false),
-              projection(scope, tensors, p + "w3", false),
-              projection(scope, tensors, p + "w2", false),
-              descriptor.mlp().activation()));
+    int experts = descriptor.moe().experts();
+    int hidden = descriptor.dimensions().hiddenSize();
+    int intermediate = descriptor.dimensions().intermediateSize();
+    // Validate all three kinds before stacking any, so a bad tensor fails before a source closes.
+    for (String kind : new String[] {"w1", "w3", "w2"}) {
+      boolean down = kind.equals("w2");
+      for (int e = 0; e < experts; e++) {
+        String key = prefix + "experts." + e + "." + kind + ".weight";
+        requireShape(
+            tensor(tensors, key), key, down ? hidden : intermediate, down ? intermediate : hidden);
+      }
     }
+    SwitchGlu stacked =
+        new SwitchGlu(
+            scope,
+            stackExperts(tensors, prefix, "w1", experts),
+            stackExperts(tensors, prefix, "w3", experts),
+            stackExperts(tensors, prefix, "w2", experts),
+            descriptor.mlp().activation());
     return new MoeMlp(
         scope,
         projection(scope, tensors, prefix + "gate", false),
-        experts,
+        stacked,
         descriptor.moe().topK());
+  }
+
+  /**
+   * Stacks one projection kind of every expert into {@code [E, rows, columns]}, materialises it,
+   * then closes the per-expert sources. Evaluating per layer before closing keeps peak weight
+   * memory near 1x instead of 2x (req/plans/phase6-3-performance.md, Verified facts 6).
+   */
+  private static MLXArray stackExperts(
+      Map<String, MLXArray> tensors, String prefix, String kind, int experts) {
+    MLXArray[] parts = new MLXArray[experts];
+    for (int e = 0; e < experts; e++) {
+      parts[e] = tensor(tensors, prefix + "experts." + e + "." + kind + ".weight");
+    }
+    MLXArray stacked = MLXShape.stack(parts, 0);
+    MLX.eval(stacked);
+    for (MLXArray part : parts) {
+      part.close();
+    }
+    return stacked;
   }
 
   private static Linear[] fusedQkv(

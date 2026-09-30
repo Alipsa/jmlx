@@ -28,6 +28,54 @@ import tools.jackson.databind.ObjectMapper;
 /** Header validation guards decoder assembly before native safetensors loading. */
 class DecoderAssemblerTest {
 
+  private static final Path MIXTRAL =
+      Path.of(
+          System.getProperty("jmlx.repository.root"),
+          "tools",
+          "hf-reference",
+          "goldens",
+          "checkpoints",
+          "mixtral");
+
+  private static Map<String, MLXArray> mixtralTensors(MLXScope scope) {
+    return new java.util.LinkedHashMap<>(
+        MLXIO.loadSafetensors(scope, MIXTRAL.resolve("model.safetensors").toString()).tensors());
+  }
+
+  private static ArchitectureDescriptor mixtralDescriptor() throws IOException {
+    return ArchitectureMappings.parse(
+        new ObjectMapper().readTree(MIXTRAL.resolve("config.json").toFile()));
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
+  void expertSourceTensorsAreClosedAfterStacking() throws Exception {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors = mixtralTensors(scope);
+      MLXArray expert = tensors.get("model.layers.0.block_sparse_moe.experts.0.w1.weight");
+      MLXArray router = tensors.get("model.layers.0.block_sparse_moe.gate.weight");
+      DecoderAssembler.assemble(scope, mixtralDescriptor(), tensors);
+      assertThrows(IllegalStateException.class, expert::shape);
+      router.shape(); // non-expert tensors stay open: they are the live parameters
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
+  void mismatchedExpertShapeNamesTheTensorKey() throws Exception {
+    String key = "model.layers.1.block_sparse_moe.experts.2.w2.weight";
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors = mixtralTensors(scope);
+      tensors.put(key, MLX.zeros(scope, new int[] {3, 3}, DType.FLOAT32));
+      String message =
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () -> DecoderAssembler.assemble(scope, mixtralDescriptor(), tensors))
+              .getMessage();
+      assertTrue(message.contains(key), message);
+    }
+  }
+
   @Test
   @EnabledIfNativeAvailable
   void explicitOutputHeadWinsOverTieWordEmbeddings(@TempDir Path directory) throws Exception {

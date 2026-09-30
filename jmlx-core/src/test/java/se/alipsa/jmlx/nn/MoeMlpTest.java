@@ -210,17 +210,38 @@ class MoeMlpTest {
           MLXScope step = model.newChild()) {
         MLXArray x =
             MLX.array(step, SwitchGluTest.pattern(tokens * H, 6), new int[] {1, tokens, H});
-        MLXArray stacked =
-            gathered.apply(step, new MLXArray[] {x}).grads().get("experts.gateWeight");
+        var gatheredGrads = gathered.apply(step, new MLXArray[] {x}).grads();
         var denseGrads = dense.apply(step, new MLXArray[] {x}).grads();
-        int f = SwitchGluTest.F;
-        for (int e = 0; e < E; e++) {
-          float[] slice =
-              MLXShape.slice(stacked, new int[] {e, 0, 0}, new int[] {e + 1, f, H}).toFloatArray();
+        assertEquals(
+            List.of(
+                "router.weight",
+                "router.bias",
+                "experts.gateWeight",
+                "experts.upWeight",
+                "experts.downWeight"),
+            List.copyOf(gatheredGrads.keySet()));
+        for (String router : List.of("router.weight", "router.bias")) {
           assertArrayEquals(
-              denseGrads.get("expert" + e + ".gateProj.weight").toFloatArray(), slice, EPS);
-          if (e >= 2) {
-            assertArrayEquals(new float[f * H], slice, 0f);
+              denseGrads.get(router).toFloatArray(),
+              gatheredGrads.get(router).toFloatArray(),
+              EPS,
+              router);
+        }
+        for (String kind : List.of("gate", "up", "down")) {
+          MLXArray stacked = gatheredGrads.get("experts." + kind + "Weight");
+          int[] shape = stacked.shape();
+          for (int e = 0; e < E; e++) {
+            float[] slice =
+                MLXShape.slice(stacked, new int[] {e, 0, 0}, new int[] {e + 1, shape[1], shape[2]})
+                    .toFloatArray();
+            assertArrayEquals(
+                denseGrads.get("expert" + e + "." + kind + "Proj.weight").toFloatArray(),
+                slice,
+                EPS,
+                kind + " expert " + e + " tokens=" + tokens);
+            if (e >= 2) {
+              assertArrayEquals(new float[slice.length], slice, 0f, kind + " expert " + e);
+            }
           }
         }
       }

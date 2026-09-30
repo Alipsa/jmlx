@@ -252,8 +252,9 @@ misreading, so the goldens come from Hugging Face's own code, run once offline a
 - [ ] **Step 2:** `python -m venv` + `pip install --require-hashes -r requirements.lock`; run once per
   family; record Python, `torch`, `transformers` and `safetensors` versions, the commit of
   `modeling_rope_utils.py` semantics used, host OS/arch, and file hashes in `provenance.json`.
-- [ ] **Step 3:** Add `verifyHfReferenceGoldens` and a `jmlx-models` test
-  `HfReferenceProvenanceTest` (pure Java, runs on Ubuntu) that fails on any hash drift.
+- [ ] **Step 3:** Add `verifyHfReferenceGoldens` (pure Gradle, runs on Ubuntu via root `check`) that
+  fails on any hash drift, extra or missing file, or path escape. It is the single hash check; a
+  duplicate JUnit test was removed in PR #25 review (item 10) because the two could disagree.
   Document in the README that regenerating is a reviewed,
   manual step and that a repin changes the goldens' expected diff.
 - [ ] **Step 4:** Run `./gradlew verifyHfReferenceGoldens :check`. Expected: PASS.
@@ -534,7 +535,7 @@ class TensorPlanTest {
 
   @Test
   void explicitLmHeadIsAllowedWhenTied() {
-    // A tied head tolerates an explicit lm_head.weight but ignores it (HF ties and replaces it).
+    // A tied head tolerates an explicit lm_head.weight; DecoderAssembler then prefers it over tying.
     Set<String> have = new HashSet<>(llamaPlan(false).required());
     have.add("lm_head.weight");
     llamaPlan(false).validate(have);
@@ -1171,11 +1172,16 @@ git commit -m "Add Mistral sliding-window and Phi-3 fused-projection decoders"
   already satisfy; the Tier-A tiny Gemma must satisfy it too. The relaxation applies only to families whose
   mapping declares an explicit head dimension; a Llama config with a mismatched `head_dim` stays rejected.
   **Activation precedence** follows HF: use a non-null `hidden_activation` when present; when it is
-  null or absent use Gemma v1's `gelu_pytorch_tanh` default, regardless of `hidden_act`. Add a config
-  test for `{"hidden_act":"gelu","hidden_activation":null}` expecting `GELU_TANH`.
+  null or absent fall back to `hidden_act` (default `gelu_pytorch_tanh`), as HF 4.57 and 5.x
+  `GemmaMLP` do (PR #25 review item 3). A config test for `{"hidden_act":"gelu","hidden_activation":null}`
+  expects exact `GELU`. When both keys are present and differ, `hidden_activation` wins; HF reads
+  `hidden_act` only, so that is the one documented divergence.
   An explicit `gelu_pytorch_tanh` or
   `gelu_new` maps to `GELU_TANH`; an explicit `gelu` maps to the **exact** `GELU`; anything else is
   rejected by name. `tie_word_embeddings` defaults **true** for Gemma (unlike Llama's false).
+  **Head selection** (PR #25 review item 1): an explicit `lm_head.weight` always wins over
+  `tie_word_embeddings`, because converted fine-tunes leave the flag set after untying and training
+  the head (commit 60ccd2a). This deliberately differs from HF, which ties and discards the tensor.
   `gemma2`/`gemma3` `model_type` are rejected with "deferred to a later milestone".
 - Behavior (native, seeded non-zero tiny checkpoint): (1) the `RMSNorm` offset form computes
   normalized `x.float()` times `(1 + w.float())` and casts the product to the input dtype; assert
@@ -1433,8 +1439,7 @@ scaling now supported), `req/plans/phase5-m3-retrospective.md` is left as histor
   `@EnabledIfNativeAvailable`. Keep each new native-touching test method gated, while the pure
   Java `RopeSpecTest` and `RopeReferenceTest` frequency cases run on Ubuntu. Run the same
   command again after adding those tests and before merging the CI change.
-  `HfReferenceProvenanceTest` lives in `jmlx-models` and runs under the existing
-  `:jmlx-models:check`.
+  Golden hashes are verified only by root `verifyHfReferenceGoldens` (part of `:check`).
 - [ ] Commit: `git commit -m "Update the compatibility matrix and docs for Phase 6.3"`
 
 ---

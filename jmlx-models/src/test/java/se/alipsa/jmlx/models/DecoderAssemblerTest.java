@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +30,7 @@ class DecoderAssemblerTest {
 
   @Test
   @EnabledIfNativeAvailable
-  void tiedEmbeddingIgnoresOptionalOutputHead(@TempDir Path directory) throws Exception {
+  void explicitOutputHeadWinsOverTieWordEmbeddings(@TempDir Path directory) throws Exception {
     TinyCheckpoints.randomLlama(directory, 42, 2, false, true);
     ArchitectureDescriptor descriptor =
         ArchitectureMappings.parse(
@@ -41,6 +42,20 @@ class DecoderAssemblerTest {
                   .loadSafetensors(scope, directory.resolve("model.safetensors").toString())
                   .tensors());
       tensors.put("lm_head.weight", MLX.zeros(scope, new int[] {128, 64}, DType.FLOAT32));
+      assertNotNull(DecoderAssembler.assemble(scope, descriptor, tensors).lmHead());
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
+  void tiedEmbeddingWithoutOutputHeadHasNoLmHead(@TempDir Path directory) throws Exception {
+    TinyCheckpoints.randomLlama(directory, 42, 2, false, true);
+    ArchitectureDescriptor descriptor =
+        ArchitectureMappings.parse(
+            new ObjectMapper().readTree(directory.resolve("config.json").toFile()));
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          MLXIO.loadSafetensors(scope, directory.resolve("model.safetensors").toString()).tensors();
       assertNull(DecoderAssembler.assemble(scope, descriptor, tensors).lmHead());
     }
   }

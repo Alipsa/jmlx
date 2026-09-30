@@ -4,8 +4,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 import se.alipsa.jmlx.models.ArchitectureDescriptor.Attention;
 import se.alipsa.jmlx.models.ArchitectureDescriptor.Embedding;
@@ -23,8 +23,11 @@ import tools.jackson.databind.JsonNode;
 public final class ArchitectureMappings {
   private static final System.Logger LOGGER =
       System.getLogger(ArchitectureMappings.class.getName());
-  // Gemma v1 checkpoints ship hidden_act "gelu" next to hidden_activation "gelu_pytorch_tanh";
-  // hidden_activation (then the tanh default) selects the activation, hidden_act is only validated.
+  // Gemma v1 checkpoints ship hidden_act "gelu" next to hidden_activation "gelu_pytorch_tanh".
+  // A non-null hidden_activation selects the activation (the variant Gemma was trained with); only
+  // when it is missing or null does hidden_act decide. Hugging Face transformers 4.57 and 5.x
+  // GemmaMLP read hidden_act alone, so a config carrying both keys with different values is the
+  // one case where this loader deliberately differs from it.
   private static final Set<String> GEMMA_ACTIVATIONS =
       Set.of("gelu", "gelu_pytorch_tanh", "gelu_new");
   private static final Set<String> CONSUMED =
@@ -70,20 +73,50 @@ public final class ArchitectureMappings {
           Map.entry("router_aux_loss_coef", "training only"),
           Map.entry("router_jitter_noise", "training only"),
           Map.entry("output_router_logits", "false during inference"));
-  private static final Map<String, Function<JsonNode, ArchitectureDescriptor>> MAPPINGS =
+  private static final Map<String, Family> FAMILIES =
       Map.of(
-          "llama", node -> dense(node, false),
-          "qwen2", node -> dense(node, true),
-          "mistral", node -> dense(node, false),
-          "phi3", node -> dense(node, false),
-          "gemma", node -> dense(node, false),
-          "mixtral", node -> dense(node, false));
+          "llama", new Family(false, false, false, false, true, false, true, WindowPolicy.REJECT),
+          "qwen2", new Family(true, false, false, false, true, true, true, WindowPolicy.IGNORE),
+          "mistral", new Family(false, false, false, false, false, false, false, WindowPolicy.USE),
+          "phi3", new Family(false, false, true, false, true, false, false, WindowPolicy.USE),
+          "gemma", new Family(false, true, false, false, true, false, true, WindowPolicy.REJECT),
+          "mixtral", new Family(false, false, false, true, false, false, true, WindowPolicy.USE));
+
+  /** How a family treats a non-null {@code sliding_window} config field. */
+  private enum WindowPolicy {
+    REJECT,
+    IGNORE,
+    USE
+  }
+
+  /**
+   * Config-level capabilities that differ between decoder families. Adding a family means adding
+   * one entry to {@link #FAMILIES}; {@link #dense} never branches on a model type string.
+   *
+   * @param qwen2Bias qkv projections always carry a bias and the output projection never does
+   * @param gemma explicit head_dim, offset RMSNorm, scaled embeddings, tied head, Gemma activations
+   * @param fusedProjections fused qkv and gate/up projections
+   * @param moe sparse mixture-of-experts MLP
+   * @param honorsAttentionBias whether {@code attention_bias} turns on projection biases
+   * @param acceptsMaxWindowLayers whether {@code max_window_layers} is a recognised field
+   * @param acceptsLayerTypes whether a {@code layer_types} schedule may be present
+   * @param window treatment of {@code sliding_window}
+   */
+  private record Family(
+      boolean qwen2Bias,
+      boolean gemma,
+      boolean fusedProjections,
+      boolean moe,
+      boolean honorsAttentionBias,
+      boolean acceptsMaxWindowLayers,
+      boolean acceptsLayerTypes,
+      WindowPolicy window) {}
 
   private ArchitectureMappings() {}
 
   /** Model types whose numerical configuration this loader understands. */
   public static Set<String> supportedModelTypes() {
-    return MAPPINGS.keySet();
+    return FAMILIES.keySet();
   }
 
   /** Expands a descriptor into its checkpoint tensor names. */
@@ -171,16 +204,16 @@ public final class ArchitectureMappings {
     Objects.requireNonNull(config, "config");
     Objects.requireNonNull(unknownKeySink, "unknownKeySink");
     String type = requiredText(config, "model_type");
-    Function<JsonNode, ArchitectureDescriptor> mapping = MAPPINGS.get(type);
-    if (mapping == null) {
+    Family family = FAMILIES.get(type);
+    if (family == null) {
       if ("gemma2".equals(type) || "gemma3".equals(type)) {
         throw new IllegalArgumentException(
             "config.json model_type '" + type + "' is deferred to a later milestone");
       }
       throw new IllegalArgumentException("config.json model_type '" + type + "' is unsupported");
     }
-    rejectUnsupportedNumerics(config, type);
-    ArchitectureDescriptor descriptor = mapping.apply(config);
+    rejectUnsupportedNumerics(config, type, family.moe());
+    ArchitectureDescriptor descriptor = dense(config, family);
     for (Map.Entry<String, JsonNode> entry : config.properties()) {
       String key = entry.getKey();
       if (!CONSUMED.contains(key) && !IGNORED.containsKey(key) && !key.endsWith("_pdrop")) {
@@ -190,11 +223,12 @@ public final class ArchitectureMappings {
     return descriptor;
   }
 
-  private static ArchitectureDescriptor dense(JsonNode node, boolean qwen2) {
+  private static ArchitectureDescriptor dense(JsonNode node, Family family) {
     int hidden = requiredInt(node, "hidden_size");
     int heads = requiredInt(node, "num_attention_heads");
-    String modelType = requiredText(node, "model_type");
-    boolean gemma = "gemma".equals(modelType);
+    final String modelType = requiredText(node, "model_type");
+    final boolean qwen2 = family.qwen2Bias();
+    boolean gemma = family.gemma();
     if (gemma && !node.hasNonNull("head_dim")) {
       throw new IllegalArgumentException("config.json gemma requires head_dim");
     }
@@ -212,20 +246,18 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException(
           "config.json declares hidden_act '"
               + hiddenAct
-              + "', but this decoder only implements silu");
+              + "', but this decoder only implements "
+              + (gemma ? String.join(", ", new TreeSet<>(GEMMA_ACTIVATIONS)) : "silu"));
     }
     if (node.path("use_sliding_window").asBoolean(false)) {
       throw new IllegalArgumentException(
           "config.json enables use_sliding_window, which this decoder does not implement");
     }
-    if (!("mistral".equals(modelType) || "phi3".equals(modelType) || "mixtral".equals(modelType))
-        && node.hasNonNull("sliding_window")) {
-      if (!qwen2) {
-        throw new IllegalArgumentException(
-            "config.json sliding_window is unsupported for " + modelType);
-      }
+    if (family.window() == WindowPolicy.REJECT && node.hasNonNull("sliding_window")) {
+      throw new IllegalArgumentException(
+          "config.json sliding_window is unsupported for " + modelType);
     }
-    if (!qwen2 && node.hasNonNull("max_window_layers")) {
+    if (!family.acceptsMaxWindowLayers() && node.hasNonNull("max_window_layers")) {
       throw new IllegalArgumentException(
           "config.json max_window_layers is unsupported for " + modelType);
     }
@@ -236,7 +268,7 @@ public final class ArchitectureMappings {
     int layers = requiredInt(node, "num_hidden_layers");
     JsonNode layerTypes = node.get("layer_types");
     if (layerTypes != null && !layerTypes.isNull()) {
-      if ("mistral".equals(modelType) || "phi3".equals(modelType)) {
+      if (!family.acceptsLayerTypes()) {
         throw new IllegalArgumentException(
             "config.json layer_types schedules are unsupported for " + modelType);
       }
@@ -271,19 +303,19 @@ public final class ArchitectureMappings {
     }
     float theta = (float) nestedTheta;
     int headDim = gemma ? requiredInt(node, "head_dim") : hidden / heads;
-    float partial =
-        (float)
-            node.path("partial_rotary_factor")
-                .asDouble(
-                    thetaSource == null
-                        ? 1
-                        : thetaSource.path("partial_rotary_factor").asDouble(1));
+    double partial =
+        node.path("partial_rotary_factor")
+            .asDouble(
+                thetaSource == null ? 1 : thetaSource.path("partial_rotary_factor").asDouble(1));
     final int rotaryDims = (int) (headDim * partial);
     final RopeSpec rope = parseRope(node, theta);
     final float eps = (float) node.path("rms_norm_eps").asDouble(1e-6);
-    boolean qkvBias = qwen2 || node.path("attention_bias").asBoolean(false);
+    // Hugging Face hardcodes bias=False in the Mistral and Mixtral attention projections.
+    boolean attentionBias =
+        family.honorsAttentionBias() && node.path("attention_bias").asBoolean(false);
+    boolean qkvBias = qwen2 || attentionBias;
     boolean mlpBias = node.path("mlp_bias").asBoolean(false);
-    if ("phi3".equals(modelType) && (qkvBias || mlpBias)) {
+    if (family.fusedProjections() && (qkvBias || mlpBias)) {
       throw new IllegalArgumentException(
           "config.json phi3 attention_bias or mlp_bias is unsupported for fused projections");
     }
@@ -291,15 +323,15 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException(
           "config.json gemma attention_bias or mlp_bias is unsupported");
     }
-    if ("mixtral".equals(modelType) && mlpBias) {
+    if (family.moe() && mlpBias) {
       throw new IllegalArgumentException("config.json mixtral mlp_bias=true is unsupported");
     }
     Activation activation = Activation.SILU;
     if (gemma) {
       String gemmaActivation =
-          node.path("hidden_activation").isNull()
-              ? "gelu_pytorch_tanh"
-              : node.path("hidden_activation").asString("gelu_pytorch_tanh");
+          node.hasNonNull("hidden_activation")
+              ? node.get("hidden_activation").asString()
+              : hiddenAct;
       activation =
           switch (gemmaActivation) {
             case "gelu_pytorch_tanh", "gelu_new" -> Activation.GELU_TANH;
@@ -310,8 +342,7 @@ public final class ArchitectureMappings {
           };
     }
     Integer slidingWindow = null;
-    if (("mistral".equals(modelType) || "phi3".equals(modelType) || "mixtral".equals(modelType))
-        && node.hasNonNull("sliding_window")) {
+    if (family.window() == WindowPolicy.USE && node.hasNonNull("sliding_window")) {
       if (!node.get("sliding_window").canConvertToInt()) {
         throw new IllegalArgumentException("config.json sliding_window must be an integer");
       }
@@ -329,10 +360,10 @@ public final class ArchitectureMappings {
             eps,
             theta,
             node.path("tie_word_embeddings").asBoolean(gemma),
-            node.path("attention_bias").asBoolean(false),
+            attentionBias,
             mlpBias);
     Moe moe =
-        "mixtral".equals(modelType)
+        family.moe()
             ? new Moe(
                 requiredInt(node, "num_local_experts"), requiredInt(node, "num_experts_per_tok"))
             : null;
@@ -343,16 +374,16 @@ public final class ArchitectureMappings {
         rope,
         new Norm(NormKind.RMS, eps, gemma),
         new Mlp(
-            "phi3".equals(modelType) ? MlpLayout.FUSED_GATE_UP : MlpLayout.SEPARATE_GATE_UP,
+            family.fusedProjections() ? MlpLayout.FUSED_GATE_UP : MlpLayout.SEPARATE_GATE_UP,
             activation,
             mlpBias),
-        new Attention(qkvBias, !qwen2 && qkvBias, "phi3".equals(modelType), slidingWindow),
+        new Attention(qkvBias, !qwen2 && qkvBias, family.fusedProjections(), slidingWindow),
         new Head(dimensions.tieWordEmbeddings()),
         new Embedding(gemma),
         moe);
   }
 
-  private static void rejectUnsupportedNumerics(JsonNode node, String type) {
+  private static void rejectUnsupportedNumerics(JsonNode node, String type, boolean moe) {
     if (node.hasNonNull("quantization") || node.hasNonNull("quantization_config")) {
       String key = node.hasNonNull("quantization") ? "quantization" : "quantization_config";
       throw new IllegalArgumentException(
@@ -368,8 +399,7 @@ public final class ArchitectureMappings {
             "final_logit_softcapping",
             "query_pre_attn_scalar")) {
       if (node.hasNonNull(key)) {
-        if ("mixtral".equals(type)
-            && ("num_local_experts".equals(key) || "num_experts_per_tok".equals(key))) {
+        if (moe && ("num_local_experts".equals(key) || "num_experts_per_tok".equals(key))) {
           continue;
         }
         throw new IllegalArgumentException("config.json " + key + " is unsupported for " + type);
@@ -447,7 +477,10 @@ public final class ArchitectureMappings {
     if ("default".equals(type)) {
       return new RopeSpec.Base(theta);
     }
-    float factor = requiredFloat(source, "factor", prefix);
+    float factor =
+        "yarn".equals(type) && source.has("factor") && source.get("factor").isNull()
+            ? yarnFactorFromContext(source, config, prefix)
+            : requiredFloat(source, "factor", prefix);
     return switch (type) {
       case "linear" -> new RopeSpec.Linear(theta, factor);
       case "dynamic" ->
@@ -464,8 +497,8 @@ public final class ArchitectureMappings {
               theta,
               factor,
               optionalContext(source, config, prefix),
-              (float) source.path("beta_fast").asDouble(32),
-              (float) source.path("beta_slow").asDouble(1),
+              orDefault(source, "beta_fast", 32, prefix),
+              orDefault(source, "beta_slow", 1, prefix),
               (float) source.path("mscale").asDouble(0),
               (float) source.path("mscale_all_dim").asDouble(0),
               source.hasNonNull("attention_factor")
@@ -474,6 +507,26 @@ public final class ArchitectureMappings {
               source.path("truncate").asBoolean(true));
       default -> throw new AssertionError(type);
     };
+  }
+
+  // Hugging Face writes `get(key) or default`, so null and 0 both select the default.
+  private static float orDefault(JsonNode node, String key, float fallback, String prefix) {
+    JsonNode value = node.get(key);
+    if (value == null || value.isNull() || (value.isNumber() && value.doubleValue() == 0)) {
+      return fallback;
+    }
+    return requiredFloat(node, key, prefix);
+  }
+
+  // Hugging Face derives a null YaRN factor from max_position_embeddings and the original context.
+  private static float yarnFactorFromContext(JsonNode source, JsonNode config, String prefix) {
+    int original = optionalContext(source, config, prefix);
+    JsonNode max = config.get("max_position_embeddings");
+    if (max == null || !max.canConvertToInt() || max.intValue() <= 0) {
+      throw new IllegalArgumentException(
+          "config.json " + prefix + ".factor is null and max_position_embeddings is missing");
+    }
+    return (float) max.intValue() / original;
   }
 
   private static int optionalContext(JsonNode source, JsonNode config, String prefix) {

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -38,7 +37,7 @@ public final class DecoderAssembler {
     Objects.requireNonNull(descriptor, "descriptor");
     Objects.requireNonNull(tensors, "tensors");
     ArchitectureMappings.tensorPlan(descriptor).validate(tensors.keySet());
-    MLXArray staticFreqs = staticRopeFrequencies(scope, descriptor);
+    MLXArray staticFreqs = descriptor.rope().staticFrequencies(scope, descriptor.rotaryDims());
     Embedding embedding = new Embedding(scope, tensor(tensors, "model.embed_tokens.weight"));
     List<DecoderBlock> layers = new ArrayList<>();
     for (int i = 0; i < descriptor.dimensions().numHiddenLayers(); i++) {
@@ -79,7 +78,8 @@ public final class DecoderAssembler {
       layers.add(new DecoderBlock(scope, input, attention, post, mlp));
     }
     RMSNorm finalNorm = norm(scope, descriptor, tensors, "model.norm.weight");
-    MLXArray headWeight = descriptor.head().tied() ? null : tensors.get("lm_head.weight");
+    // An explicit lm_head.weight wins over tie_word_embeddings: fine-tunes may leave the flag set.
+    MLXArray headWeight = tensors.get("lm_head.weight");
     if (headWeight == null && !descriptor.head().tied()) {
       throw new IllegalArgumentException("checkpoint missing lm_head.weight");
     }
@@ -133,19 +133,6 @@ public final class DecoderAssembler {
         projection(scope, tensors, prefix + "gate", false),
         experts,
         descriptor.moe().topK());
-  }
-
-  private static MLXArray staticRopeFrequencies(MLXScope scope, ArchitectureDescriptor d) {
-    if (!(d.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.Llama3)
-        && !(d.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.Yarn)) {
-      return null;
-    }
-    double[] periods = d.rope().frequencies(d.rotaryDims(), 1);
-    float[] data = new float[periods.length];
-    for (int i = 0; i < data.length; i++) {
-      data[i] = (float) periods[i];
-    }
-    return MLX.array(scope, data, new int[] {data.length});
   }
 
   private static Linear[] fusedQkv(

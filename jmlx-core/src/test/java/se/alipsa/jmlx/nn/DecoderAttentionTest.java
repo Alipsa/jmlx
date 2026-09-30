@@ -2,6 +2,7 @@ package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -152,5 +153,61 @@ class DecoderAttentionTest {
       data[i * size + i] = 1;
     }
     return data;
+  }
+
+  private static DecoderAttention identityAttention(MLXScope scope, RopeSpec rope) {
+    return new DecoderAttention(
+        scope,
+        1,
+        1,
+        4,
+        rope,
+        4,
+        null,
+        null,
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null));
+  }
+
+  @Test
+  void callerMaskIsAppliedWithoutASlidingWindow() {
+    try (MLXScope scope = new MLXScope()) {
+      DecoderAttention attention = identityAttention(scope, new RopeSpec.Base(10000f));
+      MLXArray x = MLX.array(scope, new float[] {4, 0, 0, 0, 0, 4, 0, 0}, new int[] {1, 2, 4});
+      // Causal attention lets query 1 prefer its own key, so row 1 is about [0, 4, 0, 0]; a mask
+      // allowing only key 0 forces row 1 to the value of key 0, [4, 0, 0, 0].
+      MLXArray onlyKeyZero =
+          MLX.astype(MLX.array(scope, new float[] {1, 0, 1, 0}, new int[] {2, 2}), DType.BOOL);
+      float[] causal = attention.forward(x, null, null).toFloatArray();
+      float[] masked = attention.forward(x, null, onlyKeyZero).toFloatArray();
+      assertTrue(causal[4] < 0.5f, "causal row 1 col 0 was " + causal[4]);
+      assertEquals(4f, masked[4], 1e-3f);
+    }
+  }
+
+  @Test
+  void malformedMaskIsRejectedWithoutASlidingWindow() {
+    try (MLXScope scope = new MLXScope()) {
+      DecoderAttention attention = identityAttention(scope, new RopeSpec.Base(10000f));
+      MLXArray x = MLX.ones(scope, new int[] {1, 2, 4}, DType.FLOAT32);
+      MLXArray wrongShape = MLX.full(scope, new int[] {3, 3}, 1f, DType.BOOL);
+      assertThrows(IllegalArgumentException.class, () -> attention.forward(x, null, wrongShape));
+    }
+  }
+
+  @Test
+  void staticScalingSpecsShareOneFrequencyUploadAcrossDirectConstruction() {
+    try (MLXScope scope = new MLXScope()) {
+      final RopeSpec llama3 = new RopeSpec.Llama3(10000f, 8f, 1f, 4f, 64);
+      assertNull(new RopeSpec.Base(10000f).staticFrequencies(scope, 4));
+      assertNull(new RopeSpec.Linear(10000f, 2f).staticFrequencies(scope, 4));
+      assertNull(new RopeSpec.DynamicNtk(10000f, 2f, 8).staticFrequencies(scope, 4));
+      assertArrayEquals(new int[] {2}, llama3.staticFrequencies(scope, 4).shape());
+      MLXArray x = MLX.ones(scope, new int[] {1, 2, 4}, DType.FLOAT32);
+      assertArrayEquals(
+          new int[] {1, 2, 4}, identityAttention(scope, llama3).forward(x, null).shape());
+    }
   }
 }

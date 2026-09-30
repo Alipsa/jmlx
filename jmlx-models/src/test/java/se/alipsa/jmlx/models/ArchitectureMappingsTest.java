@@ -214,7 +214,7 @@ class ArchitectureMappingsTest {
   }
 
   @Test
-  void gemmaUsesExplicitHeadAndTanhGeluDefault() {
+  void gemmaFallsBackToHiddenActWhenHiddenActivationIsNull() {
     ArchitectureDescriptor gemma =
         ArchitectureMappings.parse(
             json(
@@ -224,10 +224,60 @@ class ArchitectureMappingsTest {
                  "head_dim":6,"hidden_act":"gelu","hidden_activation":null}
                 """));
     assertEquals(6, gemma.headDim());
-    assertEquals(se.alipsa.jmlx.nn.Activation.GELU_TANH, gemma.mlp().activation());
+    assertEquals(se.alipsa.jmlx.nn.Activation.GELU, gemma.mlp().activation());
     assertTrue(gemma.norm().weightOffset());
     assertTrue(gemma.embedding().scaleBySqrtHidden());
     assertTrue(gemma.head().tied());
+  }
+
+  @Test
+  void gemmaDefaultsToTanhGeluWhenNeitherActivationKeyIsPresent() {
+    ArchitectureDescriptor gemma =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"gemma","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                 "num_hidden_layers":1,"num_attention_heads":2,"head_dim":6}
+                """));
+    assertEquals(se.alipsa.jmlx.nn.Activation.GELU_TANH, gemma.mlp().activation());
+  }
+
+  @Test
+  void gemmaActivationErrorNamesGemmaActivationsNotSilu() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"gemma","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                         "head_dim":6,"hidden_act":"relu"}
+                        """)));
+    assertTrue(error.getMessage().contains("gelu_pytorch_tanh"), error.getMessage());
+    assertFalse(error.getMessage().contains("only implements silu"), error.getMessage());
+  }
+
+  @Test
+  void mistralAndMixtralIgnoreAttentionBiasLikeHuggingFace() {
+    for (String type : List.of("mistral", "mixtral")) {
+      ArchitectureDescriptor d =
+          ArchitectureMappings.parse(
+              json(
+                  """
+                  {"model_type":"%s","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                   "num_hidden_layers":1,"num_attention_heads":2,"attention_bias":true%s}
+                  """
+                      .formatted(
+                          type,
+                          "mixtral".equals(type)
+                              ? ",\"num_local_experts\":2,\"num_experts_per_tok\":1"
+                              : "")));
+      assertFalse(d.attention().qkvBias(), type);
+      assertFalse(d.attention().outBias(), type);
+      assertFalse(d.dimensions().attentionBias(), type);
+    }
   }
 
   @Test

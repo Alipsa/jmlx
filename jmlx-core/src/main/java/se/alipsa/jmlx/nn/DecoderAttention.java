@@ -59,7 +59,8 @@ public final class DecoderAttention extends CachedAttention {
     queriesPerKeyValueHead = numHeads / numKeyValueHeads;
     scale = (float) (1.0 / Math.sqrt(headDim));
     this.rope = Objects.requireNonNull(rope, "rope");
-    this.staticFreqs = staticFreqs;
+    this.staticFreqs =
+        staticFreqs != null ? staticFreqs : rope.staticFrequencies(scope, rotaryDims);
     this.slidingWindow = slidingWindow;
     queryProj = child("queryProj", Objects.requireNonNull(q, "q"));
     keyProj = child("keyProj", Objects.requireNonNull(k, "k"));
@@ -80,24 +81,23 @@ public final class DecoderAttention extends CachedAttention {
     if (shape.length != 3 || shape[1] <= 0) {
       throw new IllegalArgumentException("DecoderAttention: x must be [batch, sequence, hidden]");
     }
-    int batch = shape[0];
+    final int batch = shape[0];
     int sequence = shape[1];
     int offset = cache == null ? 0 : cache.offset();
     int keyLength = offset + sequence;
     boolean windowed = slidingWindow != null && slidingWindow < keyLength;
-    if (windowed) {
-      if (attentionMask == null) {
-        throw new IllegalArgumentException("slidingWindow requires an attentionMask");
-      }
-      if (attentionMask.dtype() != DType.BOOL
-          || !Arrays.equals(attentionMask.shape(), new int[] {sequence, keyLength})) {
-        throw new IllegalArgumentException(
-            "slidingWindow attentionMask must be BOOL [" + sequence + ", " + keyLength + "]");
-      }
+    if (windowed && attentionMask == null) {
+      throw new IllegalArgumentException("slidingWindow requires an attentionMask");
+    }
+    if (attentionMask != null
+        && (attentionMask.dtype() != DType.BOOL
+            || !Arrays.equals(attentionMask.shape(), new int[] {sequence, keyLength}))) {
+      throw new IllegalArgumentException(
+          "attentionMask must be BOOL [" + sequence + ", " + keyLength + "]");
     }
     MLXArray freqs = staticFreqs != null ? staticFreqs : stepFrequencies;
     if (freqs == null) {
-      // Computed once here rather than inside each apply() so q and k share one upload.
+      // Only dynamic specs reach here; computed once so q and k share one upload.
       freqs = rope.stepFrequencies(x.scope(), rotaryDims, keyLength);
     }
     MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
@@ -112,7 +112,7 @@ public final class DecoderAttention extends CachedAttention {
       k = cache.keys();
       v = cache.values();
     }
-    MLXArray attended = attendWithMask(q, k, v, windowed ? attentionMask : null);
+    MLXArray attended = attendWithMask(q, k, v, attentionMask);
     MLXArray merged = MLXShape.flatten(MLXShape.transpose(attended, new int[] {0, 2, 1, 3}), 2, 3);
     return outProj.forward(merged);
   }

@@ -98,6 +98,19 @@ public sealed interface RopeSpec
     return isStatic() ? null : frequencyArray(scope, rotaryDims, sequenceLength);
   }
 
+  /**
+   * Builds the one frequency array every layer and step can share, or returns {@code null} when
+   * this variant needs none ({@link Base}, {@link Linear}) or varies with length ({@link
+   * DynamicNtk}).
+   */
+  default MLXArray staticFrequencies(MLXScope scope, int rotaryDims) {
+    return usesFrequencyArray() && isStatic() ? frequencyArray(scope, rotaryDims, 1) : null;
+  }
+
+  private boolean usesFrequencyArray() {
+    return !(this instanceof Base) && !(this instanceof Linear);
+  }
+
   private MLXArray frequencyArray(MLXScope scope, int rotaryDims, int sequenceLength) {
     double[] periods = frequencies(rotaryDims, sequenceLength);
     float[] data = new float[periods.length];
@@ -124,7 +137,7 @@ public sealed interface RopeSpec
       prefix = MLXShape.slice(x, start, stop);
     }
     MLXArray freqs = staticFreqs;
-    if (freqs == null && !(this instanceof Base) && !(this instanceof Linear)) {
+    if (freqs == null && usesFrequencyArray()) {
       freqs = frequencyArray(x.scope(), rotaryDims, offset + shape[last - 1]);
     }
     MLXArray rotated =

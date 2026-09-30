@@ -3,6 +3,7 @@ package se.alipsa.jmlx.nn;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,7 @@ import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
+import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /** Gathered expert evaluation checked against one dense {@link GatedMlp} per expert. */
@@ -210,6 +212,37 @@ class SwitchGluTest {
       assertThrows(IllegalArgumentException.class, () -> glu.forward(wrongHidden, idx));
       assertThrows(IllegalArgumentException.class, () -> glu.forward(x, floatIdx));
       assertThrows(IllegalArgumentException.class, () -> glu.forward(x, wrongTokens));
+    }
+  }
+
+  /**
+   * Per-step leak guard, following {@code LinearTest}'s structure: each iteration runs in its own
+   * child scope under a long-lived model scope. Limitation (verified on MLX 0.31.2): a retained
+   * {@code swapaxes} view shares its source buffer, so active memory does not detect a view leaked
+   * into the model scope. This only guards against data-owning intermediates (gather outputs,
+   * stacked copies) accumulating; the {@code x.scope()} rule for the views stays a review item.
+   */
+  @Test
+  void activeMemoryDoesNotGrowAcrossPerStepScopes() {
+    try (MLXScope model = new MLXScope()) {
+      SwitchGlu glu = switchGlu(model, expertWeights(model), Activation.SILU);
+      Runnable step =
+          () -> {
+            try (MLXScope s = model.newChild()) {
+              MLXArray x = MLX.array(s, pattern(40 * H, 2), new int[] {1, 40, H});
+              MLXArray idx = MLX.array(s, indices(1, 40, 2), new int[] {1, 40, 2});
+              MLX.eval(glu.forward(x, idx));
+            }
+          };
+      for (int i = 0; i < 50; i++) {
+        step.run();
+      }
+      long baseline = NativeMemoryProbe.activeMemoryBytes();
+      for (int i = 0; i < 200; i++) {
+        step.run();
+      }
+      long growth = NativeMemoryProbe.activeMemoryBytes() - baseline;
+      assertTrue(growth <= 2_000_000, "grew " + growth + " B");
     }
   }
 }

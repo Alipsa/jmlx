@@ -205,7 +205,7 @@ jmlx-examples    HelloMLX                          demo, end-to-end test
        |
 jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLinear,
                                                     RMSNorm/LayerNorm/SiLU/GELU/Embedding,
-                                                    MultiHeadAttention, KVCache, ModuleGrad
+                                                    MultiHeadAttention, KVCache, SwitchGlu, ModuleGrad
                  se.alipsa.jmlx.core                MLX, MLXOps, MLXShape, MLXFast, MLXQuant,
                                                     MLXRandom, MLXGrad, MLXIO, MLXArray, DType,
                                                     MLXException

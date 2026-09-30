@@ -16,4 +16,11 @@ class KVCachePolicyTest {
     assertThrows(IllegalArgumentException.class, () -> KVCachePolicy.full(0));
     assertThrows(IllegalArgumentException.class, () -> KVCachePolicy.slidingWindow(0));
   }
+
+  @Test
+  void quantizedRetentionIsNamedUnsupportedCapability() {
+    UnsupportedOperationException failure =
+        assertThrows(UnsupportedOperationException.class, () -> KVCachePolicy.quantized(4, 32));
+    assertTrue(failure.getMessage().contains("SDPA requires float K/V"));
+  }
 }

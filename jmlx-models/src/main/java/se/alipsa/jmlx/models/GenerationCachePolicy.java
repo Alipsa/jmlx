@@ -44,6 +44,18 @@ public record GenerationCachePolicy(Mode mode, int limit) {
     return new GenerationCachePolicy(Mode.SLIDING_WINDOW_FROM_MODEL, 0);
   }
 
+  /**
+   * Named unsupported capability: the pinned runtime cannot attend directly over packed K/V. This
+   * fails at request construction so generation never silently falls back to a float cache.
+   *
+   * @throws UnsupportedOperationException always
+   */
+  public static GenerationCachePolicy quantized(int bits, int groupSize) {
+    throw new UnsupportedOperationException(
+        "quantized KV retention is unsupported: pinned MLX SDPA requires float K/V; "
+            + "full-cache dequantization raises decode peak memory");
+  }
+
   KVCachePolicy resolve(Integer descriptorWindow) {
     if (mode == Mode.FULL) {
       return limit == 0 ? KVCachePolicy.full() : KVCachePolicy.full(limit);

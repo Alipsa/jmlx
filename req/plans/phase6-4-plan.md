@@ -161,12 +161,12 @@ runtime is Java 25 on macOS Apple Silicon, mlx-c `fba4470` and `mlx-metal==0.31.
   accessible Tier-B checkpoint. Save command lines, raw JSON, environment and interpretation under
   a Phase 6.4 benchmark report; do not set a speedup target before those numbers exist, and land
   no performance optimization before this baseline is committed.
-- [ ] Probe cache quantization separately on the pinned MLX runtime: available primitives and
-  representation (packed values/scales/metadata), supported bits/group sizes and head shapes,
-  quantize/dequantize round trip, attention accuracy, append/slice/reorder behavior, scope ownership,
-  and peak/steady memory. Determine whether SDPA accepts quantized K/V or dequantizes the whole
-  cache each step; measure that transient peak. Record findings, including an unsupported result,
-  before adding an API.
+- [x] Probe cache quantization separately on the pinned MLX runtime: representation, supported
+  bits/group sizes and head shapes, round trip, direct packed SDPA, and the dequantization memory
+  path. The probe found no useful attention-memory path; measurements and the deliberately skipped
+  append/slice/reorder and scope-ownership probes are recorded in `req/phase6-4-benchmark.md`.
+  Those lifecycle probes become required if a future fused packed-KV attention path makes the mode
+  viable.
 
 ### 1. Split prefill and decode without changing results
 
@@ -288,7 +288,7 @@ runtime is Java 25 on macOS Apple Silicon, mlx-c `fba4470` and `mlx-metal==0.31.
   equality is required only for fixtures whose reference margin supports it; otherwise state the
   measured tolerance and any token divergence. The default float path retains its existing greedy
   contract; the opt-in quantized mode gets a separately documented accuracy contract.
-- [ ] If the probe fails, record the reason and keep quantized cache creation as a named unsupported
+- [x] If the probe fails, record the reason and keep quantized cache creation as a named unsupported
   capability. Do not silently accept a request and use float cache.
 
 ### 5. Finish the benchmark and acceptance evidence

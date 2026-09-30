@@ -80,9 +80,11 @@ policy, and seed when reproducibility matters.
 `DecoderModel.forward(tokenIds, caches)` now evaluates logits and cache tensors before returning;
 an exception after a layer advances poisons the whole cache set until every cache is reset.
 `forward(tokenIds, caches, validLengths)` accepts left-padded batched rows and a positive valid
-length per row. Dynamic NTK rejects unequal-position batches. Cache quantization remains
-unsupported pending a native representation and attention-memory probe. The opt-in benchmark and
-its measurement contract are documented in [Phase 6.4 benchmark](../req/phase6-4-benchmark.md).
+length per row. Dynamic NTK rejects unequal-position batches. Cache quantization is a named
+unsupported capability: the pinned runtime rejects packed K/V in SDPA, and full-cache
+dequantization raises decode peak memory. `GenerationCachePolicy.quantized(bits, groupSize)` fails
+immediately, without a float-cache fallback. The native probe and benchmark contract are documented
+in [Phase 6.4 benchmark](../req/phase6-4-benchmark.md).
 
 ## Errors, cancellation, and ownership
 

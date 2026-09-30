@@ -35,6 +35,19 @@ public record KVCachePolicy(Mode mode, int limit) {
     return new KVCachePolicy(Mode.SLIDING_WINDOW, window);
   }
 
+  /**
+   * Named unsupported capability. The pinned runtime's SDPA rejects packed K/V; unpacking the whole
+   * cache before every attention call raises decode peak memory above the float cache. Consequently
+   * no quantized retention policy is constructed.
+   *
+   * @throws UnsupportedOperationException always
+   */
+  public static KVCachePolicy quantized(int bits, int groupSize) {
+    throw new UnsupportedOperationException(
+        "quantized KV retention is unsupported: pinned MLX SDPA requires float K/V; "
+            + "full-cache dequantization raises decode peak memory");
+  }
+
   /** Returns whether this policy may discard previously attended keys. */
   public boolean evicts() {
     return mode == Mode.SLIDING_WINDOW;

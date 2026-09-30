@@ -30,7 +30,36 @@ Consequently no native throughput or memory results are recorded here. The macOS
 smoke step validates output fields without speed thresholds; performance comparisons remain an
 explicit native-run acceptance item.
 
-Quantized KV retention is not exposed as a policy yet. The pinned runtime's quantize/dequantize
-representation, SDPA input requirements, and transient dequantization peak still require a native
-probe before an accuracy or memory contract can be published. A preallocated `slice_update`
-buffer or sliding ring buffer likewise remains a post-baseline optimization candidate.
+## Quantized KV retention probe
+
+The pinned macOS runtime probe ran in [CI run 125](https://github.com/Alipsa/jmlx/actions/runs/36777592834)
+and the padded-head follow-up in [CI run 126](https://github.com/Alipsa/jmlx/actions/runs/36778017501).
+Both native jobs and the required-suite assertions passed. Their `kv-cache-quantization-probe`
+artifacts contain the raw JUnit XML and measurements. All seven tiny HF reference checkpoints use
+16-dimensional K/V heads.
+
+| Cache shape and affine setting | Packed bytes for one 64-token K | Float bytes | Maximum round-trip error | Direct packed SDPA |
+| --- | ---: | ---: | ---: | --- |
+| D=16, group=16, 4 or 8 bits | — | 4,096 | — | Quantize rejected: native groups are 32, 64, 128 |
+| D=16 padded to 32, group=32, 4 bits | 1,536 | 4,096 | 0.00832210 | Not attempted; packed last dimension is 4, not the query's 16 |
+| D=32, group=32, 4 bits | 1,536 | 8,192 | 0.00924163 | Rejected: packed last dimension 4, query dimension 32 |
+| D=64, group=64, 4 bits | 2,560 | 16,384 | 0.0214118 | Rejected: packed last dimension 8, query dimension 64 |
+
+Eight-bit D=32/64 cases also packed successfully, with smaller round-trip error (0.000670463
+for group 32), but direct SDPA rejected their packed dimensions. The padded D=16 probe observed a
+26,128-byte process-wide peak during dequantization; that figure includes the still-live source
+and padding arrays, so it is **not** a controlled float-versus-quantized peak comparison. The
+representation itself proves the limiting transient: a D=16 cache padded to D=32 needs 1,536
+packed bytes plus an 8,192-byte dequantized tensor for each 64-token K, before attention's other
+buffers. A float D=16 K needs 4,096 bytes. For D=32/64, the dequantized tensor alone is the size
+of the original float cache, and packed storage remains live alongside it. Full-cache
+dequantization also adds work to every token.
+
+The probe therefore does not establish a useful decode-memory or throughput path on the pinned
+runtime. `GenerationCachePolicy.quantized(bits, groupSize)` and `KVCachePolicy.quantized(bits,
+groupSize)` fail immediately with a named unsupported-capability exception. No request silently
+uses float retention. Append, reorder, fork, and scope ownership of a quantized cache were not
+probed because the representation fails the attention-memory gate first. A future fused packed-KV
+attention kernel would require a new capability probe and accuracy/ownership tests before enabling
+the policy. A preallocated `slice_update` buffer or sliding ring buffer remains a post-baseline
+float-cache optimization candidate.

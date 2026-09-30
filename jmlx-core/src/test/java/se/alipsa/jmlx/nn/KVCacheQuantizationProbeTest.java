@@ -126,7 +126,8 @@ class KVCacheQuantizationProbeTest {
       MLXArray padded = MLXShape.concatenate(new MLXArray[] {source, zeroPad}, 3);
       MLXArray[] packed = MLXQuant.quantize(padded, 32, 4, "affine", null);
       MLX.eval(packed);
-      long packedBytes = Arrays.stream(packed).mapToLong(KVCacheQuantizationProbeTest::bytes).sum();
+      final long packedBytes =
+          Arrays.stream(packed).mapToLong(KVCacheQuantizationProbeTest::bytes).sum();
       MLXMemory.resetPeak();
       MLXArray unpacked =
           MLXQuant.dequantize(packed[0], packed[1], packed[2], 32, 4, "affine", null, null);

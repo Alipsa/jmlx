@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.nn.KVCachePolicy;
@@ -17,5 +18,13 @@ class GenerationCachePolicyTest {
         () -> GenerationCachePolicy.slidingWindowFromModel().resolve(null));
     assertThrows(
         IllegalArgumentException.class, () -> GenerationCachePolicy.slidingWindow(8).resolve(4));
+  }
+
+  @Test
+  void quantizedRequestFailsWithoutFloatFallback() {
+    UnsupportedOperationException failure =
+        assertThrows(
+            UnsupportedOperationException.class, () -> GenerationCachePolicy.quantized(4, 32));
+    assertTrue(failure.getMessage().contains("SDPA requires float K/V"));
   }
 }

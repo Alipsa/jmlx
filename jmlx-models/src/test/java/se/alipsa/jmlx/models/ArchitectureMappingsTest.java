@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.models.ArchitectureDescriptor.NormKind;
 import se.alipsa.jmlx.nn.RopeSpec;
@@ -197,6 +199,134 @@ class ArchitectureMappingsTest {
                  "num_hidden_layers":1,"num_attention_heads":2,"mlp_bias":true}
                 """));
     assertTrue(d.mlp().bias());
+  }
+
+  private static String familyConfig(String type, String extra) {
+    String specific =
+        switch (type) {
+          case "gemma" -> ",\"head_dim\":4";
+          case "mixtral" -> ",\"num_local_experts\":2,\"num_experts_per_tok\":1";
+          default -> "";
+        };
+    return "{\"model_type\":\""
+        + type
+        + "\",\"vocab_size\":16,\"hidden_size\":8,\"intermediate_size\":16,"
+        + "\"num_hidden_layers\":1,\"num_attention_heads\":2"
+        + specific
+        + extra
+        + "}";
+  }
+
+  /** Pins one capability for every family, so a new or edited FAMILIES entry must update it. */
+  private static void assertPerFamily(
+      String extra, Function<ArchitectureDescriptor, String> describe, Map<String, String> want) {
+    assertEquals(ArchitectureMappings.supportedModelTypes(), want.keySet());
+    for (Map.Entry<String, String> entry : want.entrySet()) {
+      String type = entry.getKey();
+      String got;
+      try {
+        got = describe.apply(ArchitectureMappings.parse(json(familyConfig(type, extra)), k -> {}));
+      } catch (IllegalArgumentException e) {
+        got = "rejected";
+      }
+      assertEquals(entry.getValue(), got, type + " with " + extra);
+    }
+  }
+
+  @Test
+  void layerTypesScheduleIsAcceptedPerFamily() {
+    assertPerFamily(
+        ",\"layer_types\":[\"full_attention\"]",
+        d -> "accepted",
+        Map.of(
+            "llama", "accepted",
+            "qwen2", "accepted",
+            "mistral", "rejected",
+            "phi3", "rejected",
+            "gemma", "accepted",
+            "mixtral", "accepted"));
+  }
+
+  @Test
+  void maxWindowLayersIsAcceptedPerFamily() {
+    assertPerFamily(
+        ",\"max_window_layers\":1",
+        d -> "accepted",
+        Map.of(
+            "llama", "rejected",
+            "qwen2", "accepted",
+            "mistral", "rejected",
+            "phi3", "rejected",
+            "gemma", "rejected",
+            "mixtral", "rejected"));
+  }
+
+  @Test
+  void slidingWindowIsHandledPerFamily() {
+    assertPerFamily(
+        ",\"sliding_window\":4",
+        d -> String.valueOf(d.attention().slidingWindow()),
+        Map.of(
+            "llama", "rejected",
+            "qwen2", "null",
+            "mistral", "4",
+            "phi3", "4",
+            "gemma", "rejected",
+            "mixtral", "4"));
+  }
+
+  @Test
+  void attentionBiasFlagIsHandledPerFamily() {
+    assertPerFamily(
+        ",\"attention_bias\":true",
+        d -> "qkv=" + d.attention().qkvBias() + " out=" + d.attention().outBias(),
+        Map.of(
+            "llama", "qkv=true out=true",
+            "qwen2", "qkv=true out=false",
+            "mistral", "qkv=false out=false",
+            "phi3", "qkv=false out=false",
+            "gemma", "rejected",
+            "mixtral", "qkv=false out=false"));
+  }
+
+  @Test
+  void mlpBiasFlagIsHandledPerFamily() {
+    assertPerFamily(
+        ",\"mlp_bias\":true",
+        d -> String.valueOf(d.mlp().bias()),
+        Map.of(
+            "llama", "true",
+            "qwen2", "false",
+            "mistral", "false",
+            "phi3", "false",
+            "gemma", "false",
+            "mixtral", "false"));
+  }
+
+  @Test
+  void structuralCapabilitiesArePinnedPerFamily() {
+    assertPerFamily(
+        "",
+        d ->
+            "qkv="
+                + d.attention().qkvBias()
+                + " fused="
+                + d.attention().fusedQkv()
+                + " moe="
+                + (d.moe() != null)
+                + " offset="
+                + d.norm().weightOffset()
+                + " scaled="
+                + d.embedding().scaleBySqrtHidden()
+                + " tied="
+                + d.head().tied(),
+        Map.of(
+            "llama", "qkv=false fused=false moe=false offset=false scaled=false tied=false",
+            "qwen2", "qkv=true fused=false moe=false offset=false scaled=false tied=false",
+            "mistral", "qkv=false fused=false moe=false offset=false scaled=false tied=false",
+            "phi3", "qkv=false fused=true moe=false offset=false scaled=false tied=false",
+            "gemma", "qkv=false fused=false moe=false offset=true scaled=true tied=true",
+            "mixtral", "qkv=false fused=false moe=true offset=false scaled=false tied=false"));
   }
 
   @Test

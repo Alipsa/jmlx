@@ -93,7 +93,11 @@ public final class ArchitectureMappings {
           "phi3",
           Family.builder(WindowPolicy.USE).fusedProjections().build(),
           "gemma",
-          Family.builder(WindowPolicy.REJECT).gemma().honorsAttentionBias().build(),
+          Family.builder(WindowPolicy.REJECT)
+              .gemma()
+              .honorsAttentionBias()
+              .acceptsLayerTypes()
+              .build(),
           "mixtral",
           Family.builder(WindowPolicy.USE).moe().acceptsLayerTypes().build());
 

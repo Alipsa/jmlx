@@ -76,17 +76,26 @@ public final class ArchitectureMappings {
   private static final Map<String, Family> FAMILIES =
       Map.of(
           "llama",
-          new Family(false, false, false, false, true, true, false, true, WindowPolicy.REJECT),
+          Family.builder(WindowPolicy.REJECT)
+              .honorsAttentionBias()
+              .honorsMlpBias()
+              .acceptsLayerTypes()
+              .build(),
           "qwen2",
-          new Family(true, false, false, false, true, false, true, true, WindowPolicy.IGNORE),
+          Family.builder(WindowPolicy.IGNORE)
+              .qwen2Bias()
+              .honorsAttentionBias()
+              .acceptsMaxWindowLayers()
+              .acceptsLayerTypes()
+              .build(),
           "mistral",
-          new Family(false, false, false, false, false, false, false, false, WindowPolicy.USE),
+          Family.builder(WindowPolicy.USE).build(),
           "phi3",
-          new Family(false, false, true, false, false, false, false, false, WindowPolicy.USE),
+          Family.builder(WindowPolicy.USE).fusedProjections().build(),
           "gemma",
-          new Family(false, true, false, false, true, false, false, true, WindowPolicy.REJECT),
+          Family.builder(WindowPolicy.REJECT).gemma().honorsAttentionBias().build(),
           "mixtral",
-          new Family(false, false, false, true, false, false, false, true, WindowPolicy.USE));
+          Family.builder(WindowPolicy.USE).moe().acceptsLayerTypes().build());
 
   /** How a family treats a non-null {@code sliding_window} config field. */
   private enum WindowPolicy {
@@ -118,7 +127,93 @@ public final class ArchitectureMappings {
       boolean honorsMlpBias,
       boolean acceptsMaxWindowLayers,
       boolean acceptsLayerTypes,
-      WindowPolicy window) {}
+      WindowPolicy window) {
+
+    /** Rejects capability combinations the tensor plan and assembler cannot express. */
+    Family {
+      Objects.requireNonNull(window, "window");
+      if (fusedProjections && (qwen2Bias || honorsAttentionBias || honorsMlpBias)) {
+        throw new IllegalStateException("fused projections cannot carry biases");
+      }
+      if (moe && honorsMlpBias) {
+        throw new IllegalStateException("mixture-of-experts experts cannot carry biases");
+      }
+    }
+
+    static Builder builder(WindowPolicy window) {
+      return new Builder(window);
+    }
+
+    /** Names each capability at the call site; every flag defaults to off. */
+    private static final class Builder {
+      private final WindowPolicy window;
+      private boolean qwen2Bias;
+      private boolean gemma;
+      private boolean fusedProjections;
+      private boolean moe;
+      private boolean honorsAttentionBias;
+      private boolean honorsMlpBias;
+      private boolean acceptsMaxWindowLayers;
+      private boolean acceptsLayerTypes;
+
+      private Builder(WindowPolicy window) {
+        this.window = window;
+      }
+
+      Builder qwen2Bias() {
+        qwen2Bias = true;
+        return this;
+      }
+
+      Builder gemma() {
+        gemma = true;
+        return this;
+      }
+
+      Builder fusedProjections() {
+        fusedProjections = true;
+        return this;
+      }
+
+      Builder moe() {
+        moe = true;
+        return this;
+      }
+
+      Builder honorsAttentionBias() {
+        honorsAttentionBias = true;
+        return this;
+      }
+
+      Builder honorsMlpBias() {
+        honorsMlpBias = true;
+        return this;
+      }
+
+      Builder acceptsMaxWindowLayers() {
+        acceptsMaxWindowLayers = true;
+        return this;
+      }
+
+      Builder acceptsLayerTypes() {
+        acceptsLayerTypes = true;
+        return this;
+      }
+
+      Family build() {
+        return new Family(
+            qwen2Bias,
+            gemma,
+            fusedProjections,
+            moe,
+            honorsAttentionBias,
+            honorsMlpBias,
+            acceptsMaxWindowLayers,
+            acceptsLayerTypes,
+            window);
+      }
+    }
+  }
 
   private ArchitectureMappings() {}
 
@@ -323,18 +418,10 @@ public final class ArchitectureMappings {
     boolean attentionBias =
         family.honorsAttentionBias() && node.path("attention_bias").asBoolean(false);
     boolean qkvBias = qwen2 || attentionBias;
-    boolean mlpBias = family.honorsMlpBias() && node.path("mlp_bias").asBoolean(false);
-    if (family.fusedProjections() && (qkvBias || mlpBias)) {
-      throw new IllegalArgumentException(
-          "config.json " + modelType + " attention_bias or mlp_bias is unsupported for fused");
-    }
+    final boolean mlpBias = family.honorsMlpBias() && node.path("mlp_bias").asBoolean(false);
     if (gemma && qkvBias) {
       throw new IllegalArgumentException(
           "config.json " + modelType + " attention_bias is unsupported");
-    }
-    if (family.moe() && mlpBias) {
-      throw new IllegalArgumentException(
-          "config.json " + modelType + " mlp_bias=true is unsupported");
     }
     Activation activation = Activation.SILU;
     if (gemma) {

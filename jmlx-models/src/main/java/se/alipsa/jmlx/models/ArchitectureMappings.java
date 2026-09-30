@@ -75,12 +75,18 @@ public final class ArchitectureMappings {
           Map.entry("output_router_logits", "false during inference"));
   private static final Map<String, Family> FAMILIES =
       Map.of(
-          "llama", new Family(false, false, false, false, true, false, true, WindowPolicy.REJECT),
-          "qwen2", new Family(true, false, false, false, true, true, true, WindowPolicy.IGNORE),
-          "mistral", new Family(false, false, false, false, false, false, false, WindowPolicy.USE),
-          "phi3", new Family(false, false, true, false, true, false, false, WindowPolicy.USE),
-          "gemma", new Family(false, true, false, false, true, false, true, WindowPolicy.REJECT),
-          "mixtral", new Family(false, false, false, true, false, false, true, WindowPolicy.USE));
+          "llama",
+          new Family(false, false, false, false, true, true, false, true, WindowPolicy.REJECT),
+          "qwen2",
+          new Family(true, false, false, false, true, false, true, true, WindowPolicy.IGNORE),
+          "mistral",
+          new Family(false, false, false, false, false, false, false, false, WindowPolicy.USE),
+          "phi3",
+          new Family(false, false, true, false, false, false, false, false, WindowPolicy.USE),
+          "gemma",
+          new Family(false, true, false, false, true, false, false, true, WindowPolicy.REJECT),
+          "mixtral",
+          new Family(false, false, false, true, false, false, false, true, WindowPolicy.USE));
 
   /** How a family treats a non-null {@code sliding_window} config field. */
   private enum WindowPolicy {
@@ -98,6 +104,7 @@ public final class ArchitectureMappings {
    * @param fusedProjections fused qkv and gate/up projections
    * @param moe sparse mixture-of-experts MLP
    * @param honorsAttentionBias whether {@code attention_bias} turns on projection biases
+   * @param honorsMlpBias whether {@code mlp_bias} turns on MLP projection biases
    * @param acceptsMaxWindowLayers whether {@code max_window_layers} is a recognised field
    * @param acceptsLayerTypes whether a {@code layer_types} schedule may be present
    * @param window treatment of {@code sliding_window}
@@ -108,6 +115,7 @@ public final class ArchitectureMappings {
       boolean fusedProjections,
       boolean moe,
       boolean honorsAttentionBias,
+      boolean honorsMlpBias,
       boolean acceptsMaxWindowLayers,
       boolean acceptsLayerTypes,
       WindowPolicy window) {}
@@ -310,21 +318,23 @@ public final class ArchitectureMappings {
     final int rotaryDims = (int) (headDim * partial);
     final RopeSpec rope = parseRope(node, theta);
     final float eps = (float) node.path("rms_norm_eps").asDouble(1e-6);
-    // Hugging Face hardcodes bias=False in the Mistral and Mixtral attention projections.
+    // Hugging Face hardcodes bias=False in several families' projections and ignores the flag
+    // there.
     boolean attentionBias =
         family.honorsAttentionBias() && node.path("attention_bias").asBoolean(false);
     boolean qkvBias = qwen2 || attentionBias;
-    boolean mlpBias = node.path("mlp_bias").asBoolean(false);
+    boolean mlpBias = family.honorsMlpBias() && node.path("mlp_bias").asBoolean(false);
     if (family.fusedProjections() && (qkvBias || mlpBias)) {
       throw new IllegalArgumentException(
-          "config.json phi3 attention_bias or mlp_bias is unsupported for fused projections");
+          "config.json " + modelType + " attention_bias or mlp_bias is unsupported for fused");
     }
-    if (gemma && (qkvBias || mlpBias)) {
+    if (gemma && qkvBias) {
       throw new IllegalArgumentException(
-          "config.json gemma attention_bias or mlp_bias is unsupported");
+          "config.json " + modelType + " attention_bias is unsupported");
     }
     if (family.moe() && mlpBias) {
-      throw new IllegalArgumentException("config.json mixtral mlp_bias=true is unsupported");
+      throw new IllegalArgumentException(
+          "config.json " + modelType + " mlp_bias=true is unsupported");
     }
     Activation activation = Activation.SILU;
     if (gemma) {

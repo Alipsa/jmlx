@@ -152,7 +152,11 @@ def fact5():
 def fact6():
     layers, e, f, h = 4, 8, 256, 1024
     total = layers * e * 2 * f * h * 4
-    path = os.path.join(tempfile.mkdtemp(), "moe_layers.safetensors")
+    with tempfile.TemporaryDirectory() as tmp:
+        _fact6(os.path.join(tmp, "moe_layers.safetensors"), layers, e, f, h, total)
+
+
+def _fact6(path, layers, e, f, h, total):
     weights = {f"l{l}.e{j}.{p}": mx.random.normal((f, h))
                for l in range(layers) for j in range(e) for p in ("w1", "w3")}
     mx.eval(weights)

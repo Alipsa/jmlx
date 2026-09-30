@@ -11,7 +11,13 @@ public abstract class CachedAttention extends Module {
     super(scope);
   }
 
-  /** Applies attention, optionally using a cache and an explicit mask. */
+  /**
+   * Applies attention, optionally using a cache and an explicit mask.
+   *
+   * <p>A non-null {@code attentionMask} replaces the causal mask rather than adding to it, so it
+   * must already encode causality (as {@link AttentionMask#slidingWindow} does). It has no batch
+   * dimension and is shaped {@code [sequence, keyLength]}.
+   */
   public abstract MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask);
 
   /**

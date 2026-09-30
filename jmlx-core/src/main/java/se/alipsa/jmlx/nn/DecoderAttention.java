@@ -68,6 +68,13 @@ public final class DecoderAttention extends CachedAttention {
     outProj = child("outProj", Objects.requireNonNull(out, "out"));
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>A non-null mask replaces causal masking, so it must already be causal where that is wanted.
+   * It must be BOOL, shaped {@code [sequence, keyLength]} with no batch dimension, and is required
+   * once the key length exceeds the sliding window.
+   */
   @Override
   public MLXArray forward(MLXArray x, KVCache cache, MLXArray attentionMask) {
     return forward(x, cache, attentionMask, null);

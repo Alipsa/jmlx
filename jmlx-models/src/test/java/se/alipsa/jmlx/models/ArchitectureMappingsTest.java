@@ -153,20 +153,50 @@ class ArchitectureMappingsTest {
   }
 
   @Test
-  void mixtralRejectsUnimplementedExpertBiases() {
-    var error =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ArchitectureMappings.parse(
-                    json(
-                        """
-                        {"model_type":"mixtral","vocab_size":16,"hidden_size":8,
-                         "intermediate_size":16,"num_hidden_layers":1,
-                         "num_attention_heads":2,"num_key_value_heads":1,
-                         "num_local_experts":2,"num_experts_per_tok":1,"mlp_bias":true}
-                        """)));
-    assertTrue(error.getMessage().contains("mlp_bias"));
+  void biasFlagsHuggingFaceHardcodesOffAreIgnored() {
+    for (String type : List.of("qwen2", "mistral", "phi3", "gemma", "mixtral")) {
+      String extra =
+          switch (type) {
+            case "gemma" -> ",\"head_dim\":4";
+            case "mixtral" -> ",\"num_local_experts\":2,\"num_experts_per_tok\":1";
+            default -> "";
+          };
+      ArchitectureDescriptor d =
+          ArchitectureMappings.parse(
+              json(
+                  """
+                  {"model_type":"%s","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                   "num_hidden_layers":1,"num_attention_heads":2,"mlp_bias":true%s}
+                  """
+                      .formatted(type, extra)));
+      assertFalse(d.mlp().bias(), type);
+      assertFalse(d.dimensions().mlpBias(), type);
+    }
+  }
+
+  @Test
+  void phi3IgnoresAttentionBiasLikeHuggingFace() {
+    ArchitectureDescriptor d =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"phi3","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                 "num_hidden_layers":1,"num_attention_heads":2,"attention_bias":true}
+                """));
+    assertFalse(d.attention().qkvBias());
+    assertFalse(d.attention().outBias());
+  }
+
+  @Test
+  void llamaHonorsMlpBias() {
+    ArchitectureDescriptor d =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"llama","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                 "num_hidden_layers":1,"num_attention_heads":2,"mlp_bias":true}
+                """));
+    assertTrue(d.mlp().bias());
   }
 
   @Test

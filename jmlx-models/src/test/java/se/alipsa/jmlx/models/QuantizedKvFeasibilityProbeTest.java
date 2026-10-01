@@ -3,6 +3,7 @@ package se.alipsa.jmlx.models;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import se.alipsa.jmlx.core.MLX;
@@ -82,7 +83,7 @@ class QuantizedKvFeasibilityProbeTest {
         double range = max - min;
         minRange = Math.min(minRange, range);
         double margin = max - second;
-        margins.append(String.format("%.4f/%.4f ", margin, range));
+        margins.append(String.format(Locale.ROOT, "%.4f/%.4f ", margin, range));
         for (int c = 0; c < caps.length; c++) {
           if (margin <= 2 * caps[c] * range) {
             excluded[c]++;
@@ -120,17 +121,19 @@ class QuantizedKvFeasibilityProbeTest {
         wholeMax = Math.max(wholeMax, whole[i]);
         wholeMin = Math.min(wholeMin, whole[i]);
       }
-      System.out.printf(
-          "KV_FEASIBILITY family=%s positions=%d excluded1pct=%d excluded5pct=%d"
-              + " floatChunkNoise=%g floatChunkNoiseOfRangePct=%g chunk=%d margin/range=%s%n",
-          family,
-          positions.size(),
-          excluded[0],
-          excluded[1],
-          noise,
-          100.0 * noise / (wholeMax - wholeMin),
-          NOISE_CHUNK,
-          margins.toString().trim());
+      System.out.print(
+          String.format(
+              Locale.ROOT,
+              "KV_FEASIBILITY family=%s positions=%d excluded1pct=%d excluded5pct=%d"
+                  + " floatChunkNoise=%g floatChunkNoiseOfRangePct=%g chunk=%d margin/range=%s%n",
+              family,
+              positions.size(),
+              excluded[0],
+              excluded[1],
+              noise,
+              100.0 * noise / (wholeMax - wholeMin),
+              NOISE_CHUNK,
+              margins.toString().trim()));
     }
   }
 

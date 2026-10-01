@@ -91,33 +91,26 @@ broadcast), masks applied with `where(mask, scores, lowest)`, and zero-padded qu
 | P4 time <= 2.0 x float | ratios 0.84-2.00 in the committed run: five configurations pass; bf16 8-bit printed 2.00 and FAIL. Across three runs of the same code bf16 8-bit read 1.87, 2.02 and 2.00, so it sits on the limit and P4 is not decisive for it (timing noise). The other five read 0.84-1.78 |
 | P5 host synchronizations | 0 (lazy graph) |
 
-**Why P1 fails, and why B and C cannot fix it.** Candidate B was measured at the only level
-that decides P1: `viaDequant` in the diagnostic below is B with a single block (dequantize K/V,
-then float SDPA). Splitting it into blocks with an online softmax changes only reduction order, so
-its P1 error is that floor (9-17% at 4 bits). B's P2-P5 were not measured, because P1 already
-decides the stop; this is a ruling, not a skipped rule. C was not built, with this reason.
- `quantizerFloorDiagnostic` compares three
+**Why P1 fails, and why B and C cannot fix it.** `quantizerFloorDiagnostic` compares three
 outputs on identical inputs: float SDPA over the original K/V, float SDPA over the
 quantize-then-dequantize K/V, and candidate A. For float32 the attention path adds 0.0000-0.0003%
 over float SDPA on the dequantized K/V, so all of A's error is in the packed K/V. For bfloat16 the
 added share is 0.56-0.90% (precise-softmax and bf16 matmul rounding) on top of a 1.1-13% floor.
-Candidates B (blocked dequantization with online softmax) and C (fused kernel) read the same packed
-K/V, so their output equals attention over dequantized K/V up to reduction order, which is exactly
-the float32 diagnostic. They cannot get below the floor, so neither was built.
-Note that draws differ between tests: the same D16 4-bit S=2048 L=256 causal case reads 21.0% in
-`accuracy` and 9.0% in the floor diagnostic, so the per-case range is noisy; the 4-bit minimum
-(6.1%) is what the decision rests on. The batched cells also include padded query rows, whose
-outputs are raw V values, which enlarges the denominator, so they read lower and flatter the 8-bit
-pass counts. Neither affects the stop.
 
-Under a sharper attention pattern (queries scaled by 6) the 4-bit error reaches 33-68% because
-key rounding moves the softmax; 8-bit stays at 2-4%.
+Candidate B was measured at the only level that decides P1: the diagnostic's `viaDequant` is B with
+a single block (dequantize K/V, then float SDPA). Splitting it into blocks with an online softmax
+changes only reduction order, so B's P1 error is that floor (9-17% at 4 bits). B's P2-P5 were not
+measured, because P1 already decides the stop; this is a ruling, not a skipped rule. C reads the
+same packed K/V and was not built, for the same reason.
 
-The frozen P1 is a worst case in one respect: random-normal values with near-uniform attention
-average to a small output, so a fixed absolute rounding error looks large relative to it. That is
-why 8-bit also misses its 1% limit in places. The plan does not allow loosening P1 after a result,
-so this record stands; model-level G1-G3 (logit error against the float run) remain the measure
-that matters for a future attempt.
+Under a sharper attention pattern (queries scaled by 6) the 4-bit error reaches 33-68% and 8-bit
+reaches 2-4%, because rounding the keys moves which tokens the softmax picks. Sharper, more
+realistic attention therefore makes this worse, not better. Two caveats on the numbers: draws differ
+between tests (the same D16 4-bit S=2048 L=256 causal case reads 21.0% in `accuracy` and 9.0% in
+the floor diagnostic), so the per-case range is noisy and the decision rests on the 4-bit minimum
+(6.1%); and the batched cells include padded query rows whose outputs are raw V values, which
+enlarges the denominator, so they read lower and flatter the 8-bit pass counts. Neither affects the
+stop. The plan does not allow loosening P1 after a result.
 
 **Other facts recorded.**
 
@@ -137,12 +130,17 @@ that matters for a future attempt.
 - Unmeasured because the decision came first: `quantized_matmul` with a genuinely broadcast batch
   axis (not needed by the folded layout), chunked-prefill memory, and every model-level gate.
 
-**What a reopening would have to change.** The error is the 4-bit affine rounding of K/V itself.
-On this probe's inputs (independent normal K/V, near-uniform attention) the output and the
-quantization error both scale with 1/sqrt(S), so the relative error is about the per-element
-4-bit noise (an analytical estimate from the quantization step, not a measurement). That points
-to 4-bit P1 being unreachable on this input for any 4-bit scalar quantizer, with or without
-per-channel or outlier-aware grouping, which would only help real keys that have outlier
-channels. A reopening therefore has to amend P1's inputs or metric (with dated evidence from real
-K/V) or drop 4-bit, not only change the quantizer or kernel. Options are 8-bit only (marginal
-against P1 as written), or quantizing values but keeping keys in float.
+**What a reopening would have to change.** The error is the 4-bit affine rounding of K/V itself,
+and sharper attention makes it worse, so changing P1's inputs is not a path to 4-bit keys. Both
+options below are untested hypotheses, not measurements:
+
+- Keep keys in float and quantize only the values. Value rounding enters the output linearly,
+  whereas key rounding moves which tokens the softmax selects.
+- 8-bit only, which is marginal against P1 as written (15 of 27 cases pass), and under the plan's
+  pass condition cannot pass on its own, because that condition requires the 16-dimension float32
+  4-bit setting.
+
+Any reopening is a dated amendment to the plan that scopes the new design, measures P1 on K/V
+captured from a real Tier-B checkpoint instead of random-normal inputs, and migrates 6.5's
+`keys()`/`values()` consumers. It also needs a real checkpoint for accuracy gates: six of the seven
+synthetic fixtures were too tie-prone for the flip limit in step 0.

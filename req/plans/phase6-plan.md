@@ -243,6 +243,10 @@ correct; reproducible benchmark data exists for every supported family.
 
 ## 6.4.1 — Quantized KV retention and packed attention
 
+**Status (2026-10-01): deferred pending a new attention design.** The step 1 prototype recorded a
+stop (`req/plans/phase6-4-1-plan.md`, `req/phase6-4-benchmark.md`); the text below is the original
+scope and applies only if the item is reopened by a dated amendment.
+
 Implement the opt-in compressed-cache path described in `req/plans/phase6-4-1-plan.md` after 6.4
 is closed. It is time-boxed: only its step 1 prototype decision (proceed or stop, with a binding
 decision date) and, on a proceed, its step 1b accessor refactor (deadline: decision date + 14 days)

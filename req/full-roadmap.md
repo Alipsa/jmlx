@@ -189,6 +189,11 @@ is correct; the benchmark reports tokens/s and peak memory reproducibly for ever
 
 ### 6.4.1 — Quantized KV retention and packed attention
 
+**Status (2026-10-01): deferred pending a new attention design.** The step 1 prototype stopped:
+four-bit packed attention misses its accuracy criterion because of 4-bit affine rounding of K/V, which
+no attention kernel can avoid (`req/phase6-4-benchmark.md`). The unsupported-capability rejection
+stays and 6.5 proceeds.
+
 After closing 6.4, implement an opt-in packed-KV attention path that attends to compressed keys
 and values without materializing the entire float cache per decode step. The pinned runtime's SDPA
 rejects packed K/V, so this requires a separately measured attention implementation (for example,

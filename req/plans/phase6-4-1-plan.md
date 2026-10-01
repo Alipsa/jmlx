@@ -684,6 +684,22 @@ qwen2, mistral, phi3 and mixtral are dropped from the flip limit for G1 and G2 a
 full policy; raw JSON in `req/data/phase6-4-1-baseline/`): llama 1076.9, llama31 1099.6,
 qwen2 1080.0, mistral 1089.1, gemma 830.6, phi3 1097.4, mixtral 762.0. Not the G6 comparison.
 
+## Step 1 record (2026-10-01): decision STOP
+
+Decision made on 2026-10-01, before the 2026-10-08 decision date. Candidate A failed P1 at 4 bits
+in all 27 measured cases, including the mandatory D=16 float32 4-bit group 32 setting (6.4-21.0%
+against the 5% limit). The attention path adds under 0.001% for float32; the error is the packed
+K/V itself, so candidates B and C, which read the same packed K/V, cannot pass either and were not
+built (the written reason the stop rule asks for). P2, P3, P4 and P5 passed. Full numbers, the
+quantizer-floor diagnostic and the other facts are in `req/phase6-4-benchmark.md` ("Phase 6.4.1
+step 1"), raw output in `req/data/phase6-4-1-probe/`.
+
+Consequences, per "Sequence and blocking" and the stop rule: the named rejection stays; step 1b and
+steps 2-7 are not started; 6.4.1 is "deferred pending a new attention design" in the roadmap; 6.5
+proceeds and uses float `keys()`/`values()`. Reopening needs a dated amendment here with new
+evidence, a new decision date, and a deliverable that migrates every 6.5 consumer of
+`keys()`/`values()` to the neutral accessors.
+
 ## Exit gate (enabling the opt-in policy)
 
 Enablement requires **all** of:

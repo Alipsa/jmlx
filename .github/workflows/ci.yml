@@ -143,7 +143,7 @@ jobs:
           suites = {
               'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest',
                             'KVCacheTest', 'KVCacheMemoryPlateauTest',
-                            'KVCacheQuantizationProbeTest', 'AttentionMaskTest',
+                            'KVCacheQuantizationProbeTest', 'PackedAttentionProbeTest', 'AttentionMaskTest',
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
@@ -172,6 +172,14 @@ jobs:
         with:
           name: kv-cache-quantization-probe
           path: jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheQuantizationProbeTest.xml
+          if-no-files-found: warn
+
+      - name: Upload packed attention probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packed-attention-probe
+          path: jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.PackedAttentionProbeTest.xml
           if-no-files-found: warn
 
       - name: Smoke test decode benchmark JSON

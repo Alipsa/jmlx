@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.examples;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -256,13 +257,21 @@ public final class DecodeBenchmark {
    * The checkpoint path as recorded in the report: relative to the repository root when the
    * checkpoint lies inside it, so committed reports carry no machine-specific home directory. The
    * root comes from {@code jmlx.repository.root} (set by the Gradle task) and otherwise the
-   * absolute path is kept.
+   * absolute path is kept. Both paths are compared as real paths, because Gradle reports the
+   * project directory with symlinks resolved while the checkpoint argument may reach it through one
+   * (on macOS, {@code /tmp} is {@code /private/tmp}).
    */
   private static String reportedCheckpoint(Path checkpoint) {
     Path absolute = checkpoint.toAbsolutePath().normalize();
     String root = System.getProperty("jmlx.repository.root");
     if (root != null && !root.isBlank()) {
       Path repository = Path.of(root).toAbsolutePath().normalize();
+      try {
+        absolute = absolute.toRealPath();
+        repository = repository.toRealPath();
+      } catch (IOException unresolvable) {
+        // Keep the normalized paths; at worst the absolute path is reported.
+      }
       if (absolute.startsWith(repository)) {
         return repository.relativize(absolute).toString();
       }
@@ -286,7 +295,10 @@ public final class DecodeBenchmark {
               .start();
       String chip = new String(process.getInputStream().readAllBytes()).trim();
       return process.waitFor() == 0 && !chip.isEmpty() ? chip : "unspecified";
-    } catch (Exception unavailable) {
+    } catch (IOException unavailable) {
+      return "unspecified";
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
       return "unspecified";
     }
   }

@@ -452,7 +452,7 @@ every mask kind (causal, sliding, left-padded batch with unequal positions).
 | P1 | max abs error of the attention output vs float SDPA on identical inputs: 8-bit ≤ 1% and 4-bit ≤ 5% of the float output's max abs value; no NaN/Inf, including padded query rows |
 | P2 | peak active bytes during one decode-step attention including its `append` (retained cache plus transient, same conditions as the float run) strictly below float's at S = 4096 |
 | P3 | the D5 scaling check, applied per attention call between S = 2048 and 4096 (not model-level), with its single failure-pattern bound `s_quant < a × packed + 0.5 × floatKept + scoreKept` (measured append multiplier `a`, counted score intermediates; one layer, so `floatKept = float`), for one kv-head-token |
-| P4 | median time per call over 20 timed calls after warmup ≤ 2.0 × float SDPA's at S = 4096, `L=1` |
+| P4 | median time per call over 20 timed calls after warmup ≤ 2.0 × float SDPA's at S = 4096, `L=1` (**amended 2026-10-01:** the step 1 probe times 60 calls after 30 warmup calls, alternating float and packed calls, to cut noise; the threshold is unchanged. See `req/phase6-4-benchmark.md`, "Phase 6.4.1 step 1") |
 | P5 | host synchronizations inside the attention op: zero for candidate A (lazy graph, caller evals once); counted and reported for B and C |
 
 A candidate **passes** when P1–P5 hold for D=16 float32 4-bit group 32 and for at least one D=64

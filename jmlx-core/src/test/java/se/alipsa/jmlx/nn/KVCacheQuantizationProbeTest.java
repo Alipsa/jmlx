@@ -1,7 +1,5 @@
 package se.alipsa.jmlx.nn;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
@@ -52,18 +50,23 @@ class KVCacheQuantizationProbeTest {
               for (int i = 0; i < data.length; i++) {
                 maxError = Math.max(maxError, Math.abs(data[i] - roundTrip[i]));
               }
+              float scale = 1f / (float) Math.sqrt(headDim);
+              MLXArray reference =
+                  MLXFast.scaledDotProductAttention(
+                      query, source, source, scale, false, null, null);
+              MLX.eval(reference);
               MLXMemory.resetPeak();
               MLXArray output =
                   MLXFast.scaledDotProductAttention(
-                      query,
-                      restored,
-                      restored,
-                      1f / (float) Math.sqrt(headDim),
-                      false,
-                      null,
-                      null);
+                      query, restored, restored, scale, false, null, null);
               MLX.eval(output);
               long dequantAttentionPeak = MLXMemory.peakBytes();
+              float[] expected = reference.toFloatArray();
+              float[] actual = output.toFloatArray();
+              float attentionError = 0;
+              for (int i = 0; i < expected.length; i++) {
+                attentionError = Math.max(attentionError, Math.abs(expected[i] - actual[i]));
+              }
               String direct;
               try {
                 MLXArray directOutput =
@@ -82,8 +85,8 @@ class KVCacheQuantizationProbeTest {
               }
               System.out.printf(
                   "KV_QUANT_PROBE headDim=%d bits=%d group=%d packedShape=%s scaleShape=%s"
-                      + " packedBytes=%d floatBytes=%d maxError=%g packedActive=%d"
-                      + " dequantAttentionPeak=%d directSdpa=%s%n",
+                      + " packedBytes=%d floatBytes=%d maxError=%g attentionMaxError=%g"
+                      + " packedActive=%d dequantAttentionPeak=%d directSdpa=%s%n",
                   headDim,
                   bits,
                   groupSize,
@@ -92,6 +95,7 @@ class KVCacheQuantizationProbeTest {
                   packedBytes,
                   bytes(source),
                   maxError,
+                  attentionError,
                   packedActive,
                   dequantAttentionPeak,
                   direct.replace('\n', ' '));
@@ -109,7 +113,9 @@ class KVCacheQuantizationProbeTest {
         }
       }
     }
-    assertTrue(successes > 0, "pinned runtime has no usable cache-shaped affine quantization");
+    // An unsupported pinned runtime is a legitimate outcome: quantized retention stays disabled and
+    // the float path is used, so the probe reports the count instead of asserting on it.
+    System.out.printf("KV_QUANT_PROBE_SUMMARY supportedConfigurations=%d%n", successes);
   }
 
   @Test

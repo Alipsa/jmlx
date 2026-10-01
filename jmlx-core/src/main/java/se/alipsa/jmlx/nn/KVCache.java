@@ -227,6 +227,9 @@ public final class KVCache {
     if (newLength <= 0) {
       throw new IllegalArgumentException("KVCache.append: sequence length must be positive");
     }
+    if (ks.length == 4 && ks[0] <= 0) {
+      throw new IllegalArgumentException("KVCache.append: batch size must be positive");
+    }
     long ending = (long) offset + newLength;
     if (ending > Integer.MAX_VALUE
         || (policy.mode() == KVCachePolicy.Mode.FULL
@@ -324,6 +327,9 @@ public final class KVCache {
    * longest valid row; a one-token decode with all lengths one uses the uniform concatenate path.
    */
   public void append(MLXArray k, MLXArray v, int[] validLengths) {
+    if (poisoned) {
+      throw new IllegalStateException("KVCache is poisoned; reset before reuse");
+    }
     Objects.requireNonNull(k, "k");
     Objects.requireNonNull(v, "v");
     Objects.requireNonNull(validLengths, "validLengths");
@@ -470,8 +476,17 @@ public final class KVCache {
         positions[i] = length() - count + i;
       }
       MLXArray indices = MLX.array(scope, positions, new int[] {count});
-      trimmedKeys = MLXShape.takeAxis(keys, indices, keys.ndim() - 2);
-      trimmedValues = MLXShape.takeAxis(values, indices, values.ndim() - 2);
+      try {
+        trimmedKeys = MLXShape.takeAxis(keys, indices, keys.ndim() - 2);
+        try {
+          trimmedValues = MLXShape.takeAxis(values, indices, values.ndim() - 2);
+        } catch (RuntimeException | Error failure) {
+          trimmedKeys.close();
+          throw failure;
+        }
+      } finally {
+        indices.close();
+      }
     }
     replaceAccumulated(trimmedKeys, trimmedValues);
     startPosition = offset - count;
@@ -492,6 +507,7 @@ public final class KVCache {
     if (keys == null) {
       return new KVCache(destinationScope, policy);
     }
+    // Axis 0 is a batch axis only for rank-4 caches; lower ranks copy along the sequence axis.
     int axis = keys.ndim() == 4 ? 0 : keys.ndim() - 2;
     int[] identity = new int[keys.shape()[axis]];
     for (int i = 0; i < identity.length; i++) {
@@ -528,7 +544,8 @@ public final class KVCache {
   }
 
   private KVCache copyAlongAxis(int[] indices, int axis, MLXScope destinationScope) {
-    if (axis == 0 && length() == 0) {
+    final boolean batchAxis = keys.ndim() == 4 && axis == 0;
+    if (batchAxis && length() == 0) {
       KVCache empty = new KVCache(destinationScope, policy);
       int[] keyShape = keys.shape();
       int[] valueShape = values.shape();
@@ -562,54 +579,49 @@ public final class KVCache {
       MLX.eval(empty.keys, empty.values);
       return empty;
     }
-    MLXArray indexArray = MLX.array(destinationScope, indices, new int[] {indices.length});
     KVCache result = new KVCache(destinationScope, policy);
+    MLXArray indexArray = MLX.array(destinationScope, indices, new int[] {indices.length});
+    MLXArray sequenceIndices = null;
     MLXArray sourceKeys = keys;
     MLXArray sourceValues = values;
-    if (axis == 0) {
-      int longest = 0;
-      for (int index : indices) {
-        longest = Math.max(longest, rowLength(index));
-      }
-      if (longest < length()) {
-        int[] positions = new int[longest];
-        for (int i = 0; i < longest; i++) {
-          positions[i] = length() - longest + i;
-        }
-        if (longest == 0) {
-          int[] keyShape = keys.shape();
-          int[] valueShape = values.shape();
-          keyShape[2] = 0;
-          valueShape[2] = 0;
-          sourceKeys = MLX.zeros(scope, keyShape, keys.dtype());
-          sourceValues = MLX.zeros(scope, valueShape, values.dtype());
-        } else {
-          MLXArray sequenceIndices = MLX.array(scope, positions, new int[] {longest});
-          sourceKeys = MLXShape.takeAxis(keys, sequenceIndices, 2);
-          sourceValues = MLXShape.takeAxis(values, sequenceIndices, 2);
-        }
-      }
-    }
-    MLXArray copiedKeys = MLXShape.takeAxis(sourceKeys, indexArray, destinationScope, axis);
-    MLXArray copiedValues;
+    MLXArray copiedKeys = null;
+    MLXArray copiedValues = null;
     try {
+      if (batchAxis) {
+        int longest = 0;
+        for (int index : indices) {
+          longest = Math.max(longest, rowLength(index));
+        }
+        if (longest < length()) {
+          if (longest == 0) {
+            int[] keyShape = keys.shape();
+            int[] valueShape = values.shape();
+            keyShape[2] = 0;
+            valueShape[2] = 0;
+            sourceKeys = MLX.zeros(scope, keyShape, keys.dtype());
+            sourceValues = MLX.zeros(scope, valueShape, values.dtype());
+          } else {
+            int[] positions = new int[longest];
+            for (int i = 0; i < longest; i++) {
+              positions[i] = length() - longest + i;
+            }
+            sequenceIndices = MLX.array(scope, positions, new int[] {longest});
+            sourceKeys = MLXShape.takeAxis(keys, sequenceIndices, 2);
+            sourceValues = MLXShape.takeAxis(values, sequenceIndices, 2);
+          }
+        }
+      }
+      copiedKeys = MLXShape.takeAxis(sourceKeys, indexArray, destinationScope, axis);
       copiedValues = MLXShape.takeAxis(sourceValues, indexArray, destinationScope, axis);
-    } catch (RuntimeException | Error failure) {
-      copiedKeys.close();
-      throw failure;
-    }
-    try {
       MLX.eval(copiedKeys, copiedValues);
       result.keys = copiedKeys;
       result.values = copiedValues;
       result.ownsKeys = true;
       result.ownsValues = true;
-      result.offset = offset;
-      result.startPosition = startPosition;
-      result.rowNextPositions = new int[axis == 0 ? indices.length : rowNextPositions.length];
+      result.rowNextPositions = new int[batchAxis ? indices.length : rowNextPositions.length];
       result.rowStartPositions = new int[result.rowNextPositions.length];
       for (int i = 0; i < result.rowNextPositions.length; i++) {
-        int sourceRow = axis == 0 ? indices[i] : i;
+        int sourceRow = batchAxis ? indices[i] : i;
         result.rowNextPositions[i] = rowNextPositions[sourceRow];
         result.rowStartPositions[i] = rowStartPositions[sourceRow];
       }
@@ -617,9 +629,24 @@ public final class KVCache {
       result.startPosition = Arrays.stream(result.rowStartPositions).min().orElse(0);
       return result;
     } catch (RuntimeException | Error failure) {
-      copiedKeys.close();
-      copiedValues.close();
+      if (copiedKeys != null) {
+        copiedKeys.close();
+      }
+      if (copiedValues != null) {
+        copiedValues.close();
+      }
       throw failure;
+    } finally {
+      indexArray.close();
+      if (sequenceIndices != null) {
+        sequenceIndices.close();
+      }
+      if (sourceKeys != keys) {
+        sourceKeys.close();
+      }
+      if (sourceValues != values) {
+        sourceValues.close();
+      }
     }
   }
 

@@ -49,10 +49,15 @@ public final class DecodeBenchmark {
     int tokens = args.length > 3 ? Integer.parseInt(args[3]) : 8;
     int samples = args.length > 4 ? Integer.parseInt(args[4]) : 3;
     int warmups = args.length > 5 ? Integer.parseInt(args[5]) : 1;
+    String policyName = args.length > 6 ? args[6] : "full";
     GenerationCachePolicy policy =
-        args.length > 6 && args[6].equals("sliding-from-model")
-            ? GenerationCachePolicy.slidingWindowFromModel()
-            : GenerationCachePolicy.full();
+        switch (policyName) {
+          case "full" -> GenerationCachePolicy.full();
+          case "sliding-from-model" -> GenerationCachePolicy.slidingWindowFromModel();
+          default ->
+              throw new IllegalArgumentException(
+                  "unknown cache policy '" + policyName + "'; expected full|sliding-from-model");
+        };
     if (tokens < 1 || samples < 1 || warmups < 0) {
       throw new IllegalArgumentException("tokens/samples must be positive and warmups nonnegative");
     }

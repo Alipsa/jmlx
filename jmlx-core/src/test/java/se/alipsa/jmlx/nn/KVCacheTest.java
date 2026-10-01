@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -276,6 +277,45 @@ class KVCacheTest {
       assertTrue(
           NativeMemoryProbe.activeMemoryBytes() - baseline <= oneRowBytes + 1024 * 1024,
           "reordered cache retained the full two-row source backing allocation");
+    }
+  }
+
+  @Test
+  void forkOfRankTwoCacheCopiesAlongSequenceAxis() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope);
+      cache.append(
+          MLX.array(scope, new float[] {1, 2}, new int[] {2, 1}),
+          MLX.array(scope, new float[] {3, 4}, new int[] {2, 1}));
+      cache.append(
+          MLX.array(scope, new float[] {5}, new int[] {1, 1}),
+          MLX.array(scope, new float[] {6}, new int[] {1, 1}));
+      KVCache copy = cache.fork(scope);
+      assertArrayEquals(new float[] {1, 2, 5}, copy.keys().toFloatArray(), EPS);
+      assertArrayEquals(new float[] {3, 4, 6}, copy.values().toFloatArray(), EPS);
+      assertEquals(3, copy.offset());
+    }
+  }
+
+  @Test
+  void appendRejectsZeroRowBatchBeforeInstallingMetadata() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope);
+      MLXArray empty = MLX.zeros(scope, new int[] {0, 1, 1, 1}, DType.FLOAT32);
+      assertThrows(IllegalArgumentException.class, () -> cache.append(empty, empty));
+      assertEquals(0, cache.batchSize());
+      assertEquals(0, cache.offset());
+    }
+  }
+
+  @Test
+  void raggedAppendRejectsPoisonedCache() {
+    try (MLXScope scope = new MLXScope()) {
+      KVCache cache = new KVCache(scope);
+      MLXArray data = MLX.array(scope, new float[] {0, 7, 2, 3}, new int[] {2, 1, 2, 1});
+      cache.append(data, data, new int[] {1, 2});
+      cache.poison();
+      assertThrows(IllegalStateException.class, () -> cache.append(data, data, new int[] {1, 2}));
     }
   }
 }

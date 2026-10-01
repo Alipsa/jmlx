@@ -150,7 +150,7 @@ jobs:
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
                               'QuantizedCheckpointProbeTest', 'DecoderCacheLifecycleTest',
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
-                              'DecoderForwardPoisoningTest'],
+                              'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest'],
           }
           for module, names in suites.items():
               root = Path(module) / 'build/test-results/test'
@@ -180,6 +180,14 @@ jobs:
         with:
           name: packed-attention-probe
           path: jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.PackedAttentionProbeTest.xml
+          if-no-files-found: warn
+
+      - name: Upload quantized KV feasibility probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quantized-kv-feasibility-probe
+          path: jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedKvFeasibilityProbeTest.xml
           if-no-files-found: warn
 
       - name: Smoke test decode benchmark JSON

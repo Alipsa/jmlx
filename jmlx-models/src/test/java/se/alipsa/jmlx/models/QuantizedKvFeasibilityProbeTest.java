@@ -90,9 +90,10 @@ class QuantizedKvFeasibilityProbeTest {
           }
         }
       }
-      // Float chunked-versus-unchunked noise: the whole token stream through one forward versus
-      // sequential forwards of NOISE_CHUNK tokens, last-position logits of each.
-      int total = tokens.size() - 1;
+      // Float chunked-versus-unchunked noise: the whole token stream (prompt plus every generated
+      // token) through one forward versus sequential forwards of NOISE_CHUNK tokens,
+      // last-position logits of each.
+      int total = tokens.size();
       int[] stream = tokens.subList(0, total).stream().mapToInt(Integer::intValue).toArray();
       float[] whole;
       try (MLXScope chunkRoot = modelScope.newChild();
@@ -124,10 +125,13 @@ class QuantizedKvFeasibilityProbeTest {
       System.out.print(
           String.format(
               Locale.ROOT,
-              "KV_FEASIBILITY family=%s positions=%d excluded1pct=%d excluded5pct=%d"
-                  + " floatChunkNoise=%g floatChunkNoiseOfRangePct=%g chunk=%d margin/range=%s%n",
+              "KV_FEASIBILITY family=%s positions=%d streamTokens=%d minRange=%.4f excluded1pct=%d"
+                  + " excluded5pct=%d floatChunkNoise=%g floatChunkNoiseOfRangePct=%g chunk=%d"
+                  + " margin/range=%s%n",
               family,
               positions.size(),
+              total,
+              minRange,
               excluded[0],
               excluded[1],
               noise,

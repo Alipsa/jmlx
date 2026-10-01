@@ -1,12 +1,15 @@
 package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static se.alipsa.jmlx.nn.ArrayBytes.bytes;
+import static se.alipsa.jmlx.nn.ArrayBytes.elementBytes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,17 +55,6 @@ class PackedAttentionProbeTest {
           new Cfg(DType.BFLOAT16, 64, 4, 64),
           new Cfg(DType.BFLOAT16, 64, 8, 64));
 
-  private static int elementBytes(DType dtype) {
-    return switch (dtype) {
-      case FLOAT16, BFLOAT16 -> 2;
-      default -> 4;
-    };
-  }
-
-  private static long bytes(MLXArray a) {
-    return a.size() * elementBytes(a.dtype());
-  }
-
   private static void printf(String format, Object... args) {
     System.out.print(String.format(Locale.ROOT, format, args));
   }
@@ -95,19 +87,22 @@ class PackedAttentionProbeTest {
     return m;
   }
 
+  /**
+   * Packs {@code x} and hoists the packed arrays into {@code target}. The pack intermediates land
+   * in {@code x}'s own scope (an op allocates into its operand's scope), so the caller controls
+   * when they are released by choosing where {@code x} lives; {@code target} must be {@code x}'s
+   * scope or an ancestor of it.
+   */
   private static PackedAttentionPrototype.Packed packInto(
       MLXScope target, MLXArray x, int group, int bits) {
-    try (MLXScope tmp = target.newChild()) {
-      PackedAttentionPrototype.Packed p = PackedAttentionPrototype.pack(x, group, bits);
-      MLX.eval(p.arrays());
-      return new PackedAttentionPrototype.Packed(
-          MLX.hoist(p.w(), target), MLX.hoist(p.scales(), target), MLX.hoist(p.biases(), target));
-    }
+    PackedAttentionPrototype.Packed p = PackedAttentionPrototype.pack(x, group, bits);
+    MLX.eval(p.arrays());
+    return new PackedAttentionPrototype.Packed(
+        MLX.hoist(p.w(), target), MLX.hoist(p.scales(), target), MLX.hoist(p.biases(), target));
   }
 
-  /** Peak bytes of one measured step; the context is built (and evaluated) before the reset. */
-  private static long peakOf(Supplier<Runnable> contextThenStep) {
-    Runnable step = contextThenStep.get();
+  /** Peak bytes of {@code step}; the caller builds and evaluates its context first. */
+  private static long peakOf(Runnable step) {
     MLXMemory.resetPeak();
     step.run();
     return MLXMemory.peakBytes();
@@ -136,21 +131,19 @@ class PackedAttentionProbeTest {
       MLXArray nv = random(root, new int[] {1, KV_HEADS, 1, c.headDim()}, c.dtype());
       MLXArray q = random(root, new int[] {1, HEADS, 1, c.headDim()}, c.dtype());
       MLX.eval(k, v, nk, nv, q);
+      // Every operand lives in root, so every intermediate of the step does too; root is closed
+      // right after the single measured step, which is what releases them.
       return peakOf(
-          () ->
-              () -> {
-                try (MLXScope step = root.newChild()) {
-                  MLXArray k2 = MLXShape.concatenate(new MLXArray[] {k, nk}, 2);
-                  MLXArray v2 = MLXShape.concatenate(new MLXArray[] {v, nv}, 2);
-                  if (attend) {
-                    MLXArray out =
-                        PackedAttentionPrototype.floatAttend(q, k2, v2, null, false, KV_HEADS);
-                    MLX.eval(out, k2, v2);
-                  } else {
-                    MLX.eval(k2, v2);
-                  }
-                }
-              });
+          () -> {
+            MLXArray k2 = MLXShape.concatenate(new MLXArray[] {k, nk}, 2);
+            MLXArray v2 = MLXShape.concatenate(new MLXArray[] {v, nv}, 2);
+            if (attend) {
+              MLXArray out = PackedAttentionPrototype.floatAttend(q, k2, v2, null, false, KV_HEADS);
+              MLX.eval(out, k2, v2);
+            } else {
+              MLX.eval(k2, v2);
+            }
+          });
     }
   }
 
@@ -160,7 +153,8 @@ class PackedAttentionProbeTest {
       PackedAttentionPrototype.Packed pk;
       PackedAttentionPrototype.Packed pv;
       try (MLXScope sources = root.newChild()) {
-        // Float sources are released before the measured step so retained bytes are packed only.
+        // The float sources and their pack intermediates live in sources (packInto allocates into
+        // the source's scope), so closing it leaves only the packed arrays hoisted into root.
         pk = packInto(root, random(sources, kv, c.dtype()), c.group(), c.bits());
         pv = packInto(root, random(sources, kv, c.dtype()), c.group(), c.bits());
       }
@@ -168,24 +162,22 @@ class PackedAttentionProbeTest {
       MLXArray nv = random(root, new int[] {1, KV_HEADS, 1, c.headDim()}, c.dtype());
       MLXArray q = random(root, new int[] {1, HEADS, 1, c.headDim()}, c.dtype());
       MLX.eval(nk, nv, q);
+      // As in floatStep: every operand lives in root, which is closed after the one measured step.
       return peakOf(
-          () ->
-              () -> {
-                try (MLXScope step = root.newChild()) {
-                  PackedAttentionPrototype.Packed k2 =
-                      pk.concat(PackedAttentionPrototype.pack(nk, c.group(), c.bits()));
-                  PackedAttentionPrototype.Packed v2 =
-                      pv.concat(PackedAttentionPrototype.pack(nv, c.group(), c.bits()));
-                  List<MLXArray> all = new ArrayList<>(Arrays.asList(k2.arrays()));
-                  all.addAll(Arrays.asList(v2.arrays()));
-                  if (attend) {
-                    all.add(
-                        PackedAttentionPrototype.attend(
-                            q, k2, v2, null, KV_HEADS, c.headDim(), c.group(), c.bits()));
-                  }
-                  MLX.eval(all.toArray(new MLXArray[0]));
-                }
-              });
+          () -> {
+            PackedAttentionPrototype.Packed k2 =
+                pk.concat(PackedAttentionPrototype.pack(nk, c.group(), c.bits()));
+            PackedAttentionPrototype.Packed v2 =
+                pv.concat(PackedAttentionPrototype.pack(nv, c.group(), c.bits()));
+            List<MLXArray> all = new ArrayList<>(Arrays.asList(k2.arrays()));
+            all.addAll(Arrays.asList(v2.arrays()));
+            if (attend) {
+              all.add(
+                  PackedAttentionPrototype.attend(
+                      q, k2, v2, null, KV_HEADS, c.headDim(), c.group(), c.bits()));
+            }
+            MLX.eval(all.toArray(new MLXArray[0]));
+          });
     }
   }
 
@@ -281,8 +273,7 @@ class PackedAttentionProbeTest {
               MLXArray q = random(scope, new int[] {1, HEADS, length, c.headDim()}, c.dtype());
               MLXArray mask =
                   switch (maskKind) {
-                    case "causal" ->
-                        PackedAttentionPrototype.causal(scope, keys - length, length, keys);
+                    case "causal" -> AttentionMask.slidingWindow(scope, length, keys, keys);
                     case "sliding" ->
                         AttentionMask.slidingWindow(scope, length, keys, Math.min(128, keys));
                     default -> null;
@@ -313,9 +304,7 @@ class PackedAttentionProbeTest {
           MLXArray v = random(scope, new int[] {1, KV_HEADS, keys, c.headDim()}, c.dtype());
           MLXArray q = random(scope, new int[] {1, HEADS, length, c.headDim()}, c.dtype());
           MLXArray mask =
-              length == 1
-                  ? null
-                  : PackedAttentionPrototype.causal(scope, keys - length, length, keys);
+              length == 1 ? null : AttentionMask.slidingWindow(scope, length, keys, keys);
           PackedAttentionPrototype.Packed pk =
               PackedAttentionPrototype.pack(k, c.group(), c.bits());
           PackedAttentionPrototype.Packed pv =
@@ -470,17 +459,19 @@ class PackedAttentionProbeTest {
         int keys = 4096;
         MLXArray k = random(scope, new int[] {1, KV_HEADS, keys, c.headDim()}, c.dtype());
         MLXArray v = random(scope, new int[] {1, KV_HEADS, keys, c.headDim()}, c.dtype());
-        MLXArray q = random(scope, new int[] {1, HEADS, 1, c.headDim()}, c.dtype());
         PackedAttentionPrototype.Packed pk = packInto(scope, k, c.group(), c.bits());
         PackedAttentionPrototype.Packed pv = packInto(scope, v, c.group(), c.bits());
-        MLX.eval(k, v, q);
+        MLX.eval(k, v);
         double floatMs =
             timePerCall(
-                scope, () -> PackedAttentionPrototype.floatAttend(q, k, v, null, false, KV_HEADS));
+                scope,
+                c,
+                q -> PackedAttentionPrototype.floatAttend(q, k, v, null, false, KV_HEADS));
         double packedMs =
             timePerCall(
                 scope,
-                () ->
+                c,
+                q ->
                     PackedAttentionPrototype.attend(
                         q, pk, pv, null, KV_HEADS, c.headDim(), c.group(), c.bits()));
         printf(
@@ -495,17 +486,29 @@ class PackedAttentionProbeTest {
     assertTrue(true);
   }
 
-  private static double timePerCall(MLXScope scope, Supplier<MLXArray> call) {
+  /**
+   * Median milliseconds per decode-step attention call. Each call gets a fresh query in a per-call
+   * child scope: ops allocate into the innermost operand scope, so the call's intermediates (the
+   * repeated-head K/V copies on the float path, scores and weights on the packed path) land in that
+   * child and are released when it closes, instead of accumulating in {@code scope}. The query is
+   * evaluated before the clock starts so lazy random generation is not timed.
+   */
+  private static double timePerCall(MLXScope scope, Cfg c, Function<MLXArray, MLXArray> call) {
+    int[] queryShape = {1, HEADS, 1, c.headDim()};
     for (int i = 0; i < 5; i++) {
       try (MLXScope s = scope.newChild()) {
-        MLX.eval(call.get());
+        MLXArray q = random(s, queryShape, c.dtype());
+        MLX.eval(q);
+        MLX.eval(call.apply(q));
       }
     }
     double[] times = new double[20];
     for (int i = 0; i < times.length; i++) {
       try (MLXScope s = scope.newChild()) {
+        MLXArray q = random(s, queryShape, c.dtype());
+        MLX.eval(q);
         long t = System.nanoTime();
-        MLX.eval(call.get());
+        MLX.eval(call.apply(q));
         times[i] = (System.nanoTime() - t) / 1e6;
       }
     }
@@ -558,7 +561,7 @@ class PackedAttentionProbeTest {
         int ulps = c.dtype() == DType.FLOAT32 ? 4 : 1;
         MLXArray k2 = perturb(scope, k, c.dtype(), ulps, rng);
         MLXArray v2 = perturb(scope, v, c.dtype(), ulps, rng);
-        MLXArray mask = PackedAttentionPrototype.causal(scope, keys - length, length, keys);
+        MLXArray mask = AttentionMask.slidingWindow(scope, length, keys, keys);
         MLXArray attnF = PackedAttentionPrototype.floatAttend(q, k, v, mask, false, KV_HEADS);
         MLXArray attnF2 = PackedAttentionPrototype.floatAttend(q, k2, v2, mask, false, KV_HEADS);
         MLXArray attnQ = quantizedAttend(c, q, k, v, mask);

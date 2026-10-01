@@ -656,8 +656,8 @@ deadline: 2026-10-22.**
 equals K/V dtype) holds for them. The Tier-B checkpoints are checked in step 6.
 
 **Float chunk noise** (last-position logits, 4-token sequential `forward` versus one `forward`
-over 31 tokens; `QuantizedKvFeasibilityProbeTest`): 3e-6 % to 1.5e-5 % of the logit range for every
-fixture, orders of magnitude below half of the smallest tolerance (0.25 %). No per-fixture raise.
+over the whole 37-token stream, 6 prompt + 31 generated; `QuantizedKvFeasibilityProbeTest`):
+0.8e-5 % to 1.7e-5 % of the logit range for every fixture, orders of magnitude below half of the smallest tolerance (0.25 %). No per-fixture raise.
 
 **Float-only margin feasibility** (32 teacher-forced positions; positions excluded when
 `floatMargin ≤ 2 × deltaCap`; the 10% cap allows 3):
@@ -692,7 +692,8 @@ against the 5% limit). The attention path adds under 0.001% for float32; the err
 K/V itself, so candidates B and C, which read the same packed K/V, cannot pass either and were not
 built. B was measured for P1 through its one-block case (dequantize, then float SDPA), whose
 error is the same floor; B's P2-P5 were not measured because P1 decides. This is a ruling, since
-the stop rule says "measure B". P2, P3, P4 and P5 passed. Full numbers, the
+the stop rule says "measure B". P2, P3 and P5 passed; P4 passed for float32 and failed or sat on
+the limit for bfloat16 (2.0-2.4 x float after the timing harness was corrected). Full numbers, the
 quantizer-floor diagnostic and the other facts are in `req/phase6-4-benchmark.md` ("Phase 6.4.1
 step 1"), raw output in `req/data/phase6-4-1-probe/`.
 

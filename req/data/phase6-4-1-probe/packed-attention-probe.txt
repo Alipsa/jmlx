@@ -62,12 +62,12 @@ PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=504 L=4 mask=batched errorPct=6.1209 lim
 PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=504 L=4 mask=batched errorPct=0.3565 limitPct=1.0 finite=true PASS
 PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=504 L=4 mask=batched errorPct=6.1846 limitPct=5.0 finite=true FAIL
 PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=504 L=4 mask=batched errorPct=0.7614 limitPct=1.0 finite=true PASS
-PACKED_ATTN_P4 cfg=FLOAT32-D16-b4-g32 floatMs=0.5595 packedMs=0.8135 ratio=1.45 PASS
-PACKED_ATTN_P4 cfg=FLOAT32-D16-b8-g32 floatMs=0.4429 packedMs=0.7868 ratio=1.78 PASS
-PACKED_ATTN_P4 cfg=FLOAT32-D64-b4-g64 floatMs=0.7913 packedMs=0.6653 ratio=0.84 PASS
-PACKED_ATTN_P4 cfg=FLOAT32-D64-b8-g64 floatMs=0.3843 packedMs=0.6297 ratio=1.64 PASS
-PACKED_ATTN_P4 cfg=BFLOAT16-D64-b4-g64 floatMs=0.5604 packedMs=0.5967 ratio=1.06 PASS
-PACKED_ATTN_P4 cfg=BFLOAT16-D64-b8-g64 floatMs=0.2840 packedMs=0.5687 ratio=2.00 FAIL
+PACKED_ATTN_P4 cfg=FLOAT32-D16-b4-g32 floatMs=0.3747 packedMs=0.6297 ratio=1.68 PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D16-b8-g32 floatMs=0.4017 packedMs=0.7532 ratio=1.88 PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D64-b4-g64 floatMs=0.3754 packedMs=0.6521 ratio=1.74 PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D64-b8-g64 floatMs=0.4017 packedMs=0.6434 ratio=1.60 PASS
+PACKED_ATTN_P4 cfg=BFLOAT16-D64-b4-g64 floatMs=0.3749 packedMs=0.8840 ratio=2.36 FAIL
+PACKED_ATTN_P4 cfg=BFLOAT16-D64-b8-g64 floatMs=0.3967 packedMs=0.8175 ratio=2.06 FAIL
 PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b4-g32 S=2048 L=1 packedVsFloatPct=13.7981 quantizerFloorPct=13.7981 attentionAddedPct=0.0001 outputMaxAbs=0.1212
 PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b4-g32 S=2048 L=256 packedVsFloatPct=9.0230 quantizerFloorPct=9.0230 attentionAddedPct=0.0000 outputMaxAbs=0.4650
 PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b8-g32 S=2048 L=1 packedVsFloatPct=0.6610 quantizerFloorPct=0.6611 attentionAddedPct=0.0001 outputMaxAbs=0.0813

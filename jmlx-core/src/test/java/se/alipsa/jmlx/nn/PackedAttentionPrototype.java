@@ -46,17 +46,6 @@ final class PackedAttentionPrototype {
     return new Packed(parts[0], parts[1], parts[2]);
   }
 
-  /** BOOL {@code [queryLength, keyLength]} causal mask over absolute positions; true = attend. */
-  static MLXArray causal(MLXScope scope, int queryStart, int queryLength, int keyLength) {
-    MLXArray positions =
-        MLXShape.reshape(
-            MLX.arange(scope, queryStart, queryStart + queryLength, 1, DType.INT32),
-            new int[] {queryLength, 1});
-    MLXArray keys =
-        MLXShape.reshape(MLX.arange(scope, 0, keyLength, 1, DType.INT32), new int[] {1, keyLength});
-    return MLXOps.lessEqual(keys, positions);
-  }
-
   static float lowest(DType dtype) {
     return switch (dtype) {
       case FLOAT16 -> -65504f;

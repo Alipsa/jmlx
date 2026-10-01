@@ -10,6 +10,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -72,11 +73,7 @@ public final class DecodeBenchmark {
       // Hash only after the cold-load timer: hashing beforehand would warm the OS page cache.
       final Map<String, String> checkpointHashes = checkpointHashes(checkpoint);
       JsonNode config = new ObjectMapper().readTree(checkpoint.resolve("config.json").toFile());
-      int configuredWindow = config.path("sliding_window").asInt(0);
-      KVCachePolicy resolvedPolicy =
-          policy.mode() == GenerationCachePolicy.Mode.FULL
-              ? KVCachePolicy.full()
-              : KVCachePolicy.slidingWindow(configuredWindow);
+      KVCachePolicy resolvedPolicy = model.resolveCachePolicy(policy);
       List<Long> prefillNanos = new ArrayList<>();
       List<Long> decodeNanos = new ArrayList<>();
       List<Long> generationNanos = new ArrayList<>();
@@ -162,8 +159,9 @@ public final class DecodeBenchmark {
       report.put("os", System.getProperty("os.name"));
       report.put("architecture", System.getProperty("os.arch"));
       report.put("device", System.getenv().getOrDefault("JMLX_BENCH_DEVICE", "unspecified"));
-      report.put("mlx_c_pin", "fba4470");
-      report.put("mlx_metal_pin", "0.31.2");
+      Properties pins = nativePins();
+      report.put("mlx_c_pin", pins.getProperty("mlxcCommit", "unspecified"));
+      report.put("mlx_metal_pin", pins.getProperty("mlxMetalVersion", "unspecified"));
       report.put("model_type", model.config().modelType());
       report.put("model_revision", "local-checkpoint-sha256");
       report.put(
@@ -229,6 +227,24 @@ public final class DecodeBenchmark {
       throw new IllegalArgumentException("prompt must contain token IDs");
     }
     return prompt;
+  }
+
+  /** Reads the staged runtime's pins; empty when the library directory is not a staged one. */
+  private static Properties nativePins() throws Exception {
+    String dir = System.getProperty("jmlx.library.path");
+    if (dir == null || dir.isBlank()) {
+      dir = System.getenv("JMLX_LIBRARY_PATH");
+    }
+    Properties pins = new Properties();
+    if (dir != null && !dir.isBlank()) {
+      Path file = Path.of(dir).resolve("native-pin.properties");
+      if (Files.isRegularFile(file)) {
+        try (InputStream input = Files.newInputStream(file)) {
+          pins.load(input);
+        }
+      }
+    }
+    return pins;
   }
 
   private static String commit() {

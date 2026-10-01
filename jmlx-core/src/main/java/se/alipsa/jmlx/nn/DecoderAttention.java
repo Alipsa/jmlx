@@ -109,8 +109,16 @@ public final class DecoderAttention extends CachedAttention {
     }
     final int batch = shape[0];
     final int sequence = shape[1];
-    if (validLengths != null && validLengths.length != batch) {
-      throw new IllegalArgumentException("one valid length is required per batch row");
+    if (validLengths != null) {
+      if (validLengths.length != batch) {
+        throw new IllegalArgumentException("one valid length is required per batch row");
+      }
+      if (Arrays.stream(validLengths).max().orElse(0) != sequence) {
+        throw new IllegalArgumentException("left-padded sequence must equal the longest valid row");
+      }
+      if (cache != null && cache.batchSize() != 0 && cache.batchSize() != batch) {
+        throw new IllegalArgumentException("cache batch size differs from x batch size");
+      }
     }
     if (cache != null
         && cache.policy().evicts()
@@ -137,15 +145,11 @@ public final class DecoderAttention extends CachedAttention {
           throw new IllegalArgumentException("invalid batch row length");
         }
         if (cache != null
-            && cache.batchSize() > 0
             && (long) cache.nextPosition(row) + validLengths[row] > Integer.MAX_VALUE) {
           throw new IllegalArgumentException("attention batch position overflow");
         }
         keyLength =
-            Math.max(
-                keyLength,
-                (cache == null || cache.batchSize() == 0 ? 0 : cache.rowLength(row))
-                    + validLengths[row]);
+            Math.max(keyLength, (cache == null ? 0 : cache.rowLength(row)) + validLengths[row]);
       }
     }
     boolean windowed = slidingWindow != null && slidingWindow < keyLength;
@@ -170,10 +174,7 @@ public final class DecoderAttention extends CachedAttention {
         ending = 0;
         for (int row = 0; row < batch; row++) {
           ending =
-              Math.max(
-                  ending,
-                  (cache == null || cache.batchSize() == 0 ? 0 : cache.nextPosition(row))
-                      + validLengths[row]);
+              Math.max(ending, (cache == null ? 0 : cache.nextPosition(row)) + validLengths[row]);
         }
       }
       freqs = rope.stepFrequencies(x.scope(), rotaryDims, ending);
@@ -189,7 +190,7 @@ public final class DecoderAttention extends CachedAttention {
     } else {
       int[] positions = new int[batch];
       for (int row = 0; row < batch; row++) {
-        positions[row] = cache == null || cache.batchSize() == 0 ? 0 : cache.nextPosition(row);
+        positions[row] = cache == null ? 0 : cache.nextPosition(row);
       }
       q = rope.apply(q, rotaryDims, positions, validLengths, freqs);
       k = rope.apply(k, rotaryDims, positions, validLengths, freqs);

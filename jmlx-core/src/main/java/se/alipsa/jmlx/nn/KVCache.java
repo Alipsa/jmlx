@@ -40,7 +40,6 @@ public final class KVCache {
   private MLXArray keys;
   private MLXArray values;
   private int offset;
-  private int startPosition;
   private int[] rowNextPositions;
   private int[] rowStartPositions;
   private boolean poisoned;
@@ -69,9 +68,9 @@ public final class KVCache {
     return rowStartPositions == null ? 0 : rowStartPositions[0];
   }
 
-  /** Absolute position of one row's first valid retained key. */
+  /** Absolute position of one row's first valid retained key; zero while the cache is empty. */
   public int startPosition(int row) {
-    return rowStartPositions[row];
+    return rowStartPositions == null ? 0 : rowStartPositions[row];
   }
 
   /** Absolute position of the next key; rejects unequal batch-row positions. */
@@ -80,9 +79,9 @@ public final class KVCache {
     return rowNextPositions == null ? 0 : rowNextPositions[0];
   }
 
-  /** Absolute next position for one row. */
+  /** Absolute next position for one row; zero while the cache is empty. */
   public int nextPosition(int row) {
-    return rowNextPositions[row];
+    return rowNextPositions == null ? 0 : rowNextPositions[row];
   }
 
   /** Physical retained width; for a batch, shorter rows are left padded to this width. */
@@ -95,9 +94,9 @@ public final class KVCache {
     return rowNextPositions == null ? 0 : rowNextPositions.length;
   }
 
-  /** Valid retained keys for one row, excluding left padding. */
+  /** Valid retained keys for one row, excluding left padding; zero while the cache is empty. */
   public int rowLength(int row) {
-    return rowNextPositions[row] - rowStartPositions[row];
+    return rowNextPositions == null ? 0 : rowNextPositions[row] - rowStartPositions[row];
   }
 
   /** Whether all batch rows have the same position range. */
@@ -144,7 +143,6 @@ public final class KVCache {
     keys = null;
     values = null;
     offset = 0;
-    startPosition = 0;
     rowNextPositions = null;
     rowStartPositions = null;
     ownsKeys = false;
@@ -230,13 +228,7 @@ public final class KVCache {
     if (ks.length == 4 && ks[0] <= 0) {
       throw new IllegalArgumentException("KVCache.append: batch size must be positive");
     }
-    long ending = (long) offset + newLength;
-    if (ending > Integer.MAX_VALUE
-        || (policy.mode() == KVCachePolicy.Mode.FULL
-            && policy.limit() > 0
-            && ending > policy.limit())) {
-      throw new IllegalArgumentException("KVCache.append: absolute position exceeds capacity");
-    }
+    policy.requireCapacity((long) offset + newLength, "KVCache.append: absolute position");
     if (vs[seqAxis] != newLength) {
       throw new IllegalArgumentException(
           "KVCache.append: v's sequence length must match k's ("
@@ -383,21 +375,11 @@ public final class KVCache {
     int maxNext = 0;
     for (int row = 0; row < validLengths.length; row++) {
       long next = (long) rowNextPositions[row] + validLengths[row];
-      int width = rowLength(row) + validLengths[row];
-      if (next > Integer.MAX_VALUE
-          || (policy.mode() == KVCachePolicy.Mode.FULL
-              && policy.limit() > 0
-              && next > policy.limit())) {
-        throw new IllegalArgumentException("batched append exceeds absolute position capacity");
-      }
-      nextWidth = Math.max(nextWidth, width);
+      policy.requireCapacity(next, "batched append absolute position");
+      nextWidth = Math.max(nextWidth, rowLength(row) + validLengths[row]);
       maxNext = Math.max(maxNext, (int) next);
     }
-    if (policy.mode() == KVCachePolicy.Mode.FULL
-        && policy.limit() > 0
-        && nextWidth > policy.limit()) {
-      throw new IllegalArgumentException("batched append exceeds padded-width capacity");
-    }
+    policy.requireCapacity(nextWidth, "batched append padded width");
     MLXArray nextKeys = repackRows(keys, k, validLengths, nextWidth);
     MLXArray nextValues = repackRows(values, v, validLengths, nextWidth);
     MLXArray hoistedKeys = MLX.hoist(nextKeys, scope);
@@ -471,28 +453,25 @@ public final class KVCache {
       trimmedKeys = MLX.zeros(scope, keyShape, keys.dtype());
       trimmedValues = MLX.zeros(scope, valueShape, values.dtype());
     } else {
-      int[] positions = new int[count];
-      for (int i = 0; i < count; i++) {
-        positions[i] = length() - count + i;
-      }
-      MLXArray indices = MLX.array(scope, positions, new int[] {count});
+      trimmedKeys = lastAlongSequence(keys, count);
       try {
-        trimmedKeys = MLXShape.takeAxis(keys, indices, keys.ndim() - 2);
-        try {
-          trimmedValues = MLXShape.takeAxis(values, indices, values.ndim() - 2);
-        } catch (RuntimeException | Error failure) {
-          trimmedKeys.close();
-          throw failure;
-        }
-      } finally {
-        indices.close();
+        trimmedValues = lastAlongSequence(values, count);
+      } catch (RuntimeException | Error failure) {
+        trimmedKeys.close();
+        throw failure;
       }
     }
     replaceAccumulated(trimmedKeys, trimmedValues);
-    startPosition = offset - count;
     for (int i = 0; i < rowStartPositions.length; i++) {
       rowStartPositions[i] = Math.max(rowStartPositions[i], rowNextPositions[i] - count);
     }
+  }
+
+  private static MLXArray lastAlongSequence(MLXArray a, int count) {
+    int[] stop = a.shape();
+    int[] start = new int[stop.length];
+    start[stop.length - 2] = stop[stop.length - 2] - count;
+    return MLXShape.slice(a, start, stop);
   }
 
   /**
@@ -562,7 +541,6 @@ public final class KVCache {
         empty.rowStartPositions[i] = rowStartPositions[indices[i]];
       }
       empty.offset = Arrays.stream(empty.rowNextPositions).max().orElse(0);
-      empty.startPosition = Arrays.stream(empty.rowStartPositions).min().orElse(0);
       MLX.eval(empty.keys, empty.values);
       return empty;
     }
@@ -573,7 +551,6 @@ public final class KVCache {
       empty.ownsKeys = true;
       empty.ownsValues = true;
       empty.offset = offset;
-      empty.startPosition = startPosition;
       empty.rowNextPositions = rowNextPositions.clone();
       empty.rowStartPositions = rowStartPositions.clone();
       MLX.eval(empty.keys, empty.values);
@@ -581,7 +558,6 @@ public final class KVCache {
     }
     KVCache result = new KVCache(destinationScope, policy);
     MLXArray indexArray = MLX.array(destinationScope, indices, new int[] {indices.length});
-    MLXArray sequenceIndices = null;
     MLXArray sourceKeys = keys;
     MLXArray sourceValues = values;
     MLXArray copiedKeys = null;
@@ -601,13 +577,8 @@ public final class KVCache {
             sourceKeys = MLX.zeros(scope, keyShape, keys.dtype());
             sourceValues = MLX.zeros(scope, valueShape, values.dtype());
           } else {
-            int[] positions = new int[longest];
-            for (int i = 0; i < longest; i++) {
-              positions[i] = length() - longest + i;
-            }
-            sequenceIndices = MLX.array(scope, positions, new int[] {longest});
-            sourceKeys = MLXShape.takeAxis(keys, sequenceIndices, 2);
-            sourceValues = MLXShape.takeAxis(values, sequenceIndices, 2);
+            sourceKeys = lastAlongSequence(keys, longest);
+            sourceValues = lastAlongSequence(values, longest);
           }
         }
       }
@@ -626,7 +597,6 @@ public final class KVCache {
         result.rowStartPositions[i] = rowStartPositions[sourceRow];
       }
       result.offset = Arrays.stream(result.rowNextPositions).max().orElse(0);
-      result.startPosition = Arrays.stream(result.rowStartPositions).min().orElse(0);
       return result;
     } catch (RuntimeException | Error failure) {
       if (copiedKeys != null) {
@@ -638,9 +608,6 @@ public final class KVCache {
       throw failure;
     } finally {
       indexArray.close();
-      if (sequenceIndices != null) {
-        sequenceIndices.close();
-      }
       if (sourceKeys != keys) {
         sourceKeys.close();
       }

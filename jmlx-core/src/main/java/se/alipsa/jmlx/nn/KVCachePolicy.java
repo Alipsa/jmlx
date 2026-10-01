@@ -48,6 +48,18 @@ public record KVCachePolicy(Mode mode, int limit) {
             + "full-cache dequantization raises decode peak memory");
   }
 
+  /**
+   * Rejects a position or padded width that overflows {@code int} or exceeds a bounded {@link
+   * Mode#FULL} capacity. Sliding policies evict instead of failing, so only the overflow applies.
+   *
+   * @throws IllegalArgumentException naming {@code subject} when {@code count} is not retainable
+   */
+  public void requireCapacity(long count, String subject) {
+    if (count > Integer.MAX_VALUE || (mode == Mode.FULL && limit > 0 && count > limit)) {
+      throw new IllegalArgumentException(subject + " exceeds capacity");
+    }
+  }
+
   /** Returns whether this policy may discard previously attended keys. */
   public boolean evicts() {
     return mode == Mode.SLIDING_WINDOW;

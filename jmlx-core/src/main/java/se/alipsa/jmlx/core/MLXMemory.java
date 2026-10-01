@@ -37,26 +37,14 @@ public final class MLXMemory {
 
   /** Resets the process-wide peak counter; concurrent allocations may immediately raise it. */
   public static void resetPeak() {
-    NativeLoader.clearLastNativeError();
-    int status = mlx_h.mlx_reset_peak_memory();
-    check("mlx_reset_peak_memory", status);
+    NativeOps.checked("mlx_reset_peak_memory", mlx_h::mlx_reset_peak_memory);
   }
 
   private static long read(String operation, Function<MemorySegment, Integer> call) {
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment result = arena.allocate(ValueLayout.JAVA_LONG);
-      NativeLoader.clearLastNativeError();
-      check(operation, call.apply(result));
+      NativeOps.checked(operation, () -> call.apply(result));
       return result.get(ValueLayout.JAVA_LONG, 0);
-    }
-  }
-
-  private static void check(String operation, int status) {
-    if (status != 0) {
-      String message = NativeLoader.lastNativeError();
-      NativeLoader.clearLastNativeError();
-      throw new MLXException(
-          operation + " failed with status " + status + (message == null ? "" : ": " + message));
     }
   }
 }

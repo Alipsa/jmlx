@@ -23,4 +23,19 @@ class KVCachePolicyTest {
         assertThrows(UnsupportedOperationException.class, () -> KVCachePolicy.quantized(4, 32));
     assertTrue(failure.getMessage().contains("SDPA requires float K/V"));
   }
+
+  @Test
+  void requireCapacityBoundsFullButNotSliding() {
+    KVCachePolicy.full(4).requireCapacity(4, "x");
+    KVCachePolicy.full().requireCapacity(Integer.MAX_VALUE, "x");
+    KVCachePolicy.slidingWindow(4).requireCapacity(1000, "x");
+    assertThrows(
+        IllegalArgumentException.class, () -> KVCachePolicy.full(4).requireCapacity(5, "x"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KVCachePolicy.full().requireCapacity(Integer.MAX_VALUE + 1L, "x"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> KVCachePolicy.slidingWindow(4).requireCapacity(Integer.MAX_VALUE + 1L, "x"));
+  }
 }

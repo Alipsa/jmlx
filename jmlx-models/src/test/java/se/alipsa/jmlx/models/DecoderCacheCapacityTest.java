@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -103,6 +104,37 @@ class DecoderCacheCapacityTest {
       for (KVCache cache : caches) {
         assertEquals(2, cache.nextPosition(1));
       }
+    }
+  }
+
+  @Test
+  void raggedCacheOnUnbatchedForwardPointsToValidLengthsOverload(@TempDir Path dir)
+      throws Exception {
+    TinyCheckpoints.randomLlama(dir, 1, 2, false, false);
+    try (MLXScope scope = new MLXScope()) {
+      DecoderModel model = LlamaModel.load(scope, dir);
+      List<KVCache> caches = new ArrayList<>();
+      for (int i = 0; i < model.config().numHiddenLayers(); i++) {
+        caches.add(new KVCache(scope));
+      }
+      model.forward(
+          MLX.array(scope, new int[] {0, 1, 2, 3}, new int[] {2, 2}), caches, new int[] {1, 2});
+      MLXArray decode = MLX.array(scope, new int[] {4, 5}, new int[] {2, 1});
+      IllegalArgumentException failure =
+          assertThrows(IllegalArgumentException.class, () -> model.forward(decode, caches));
+      assertTrue(failure.getMessage().contains("validLengths"), failure.getMessage());
+    }
+  }
+
+  @Test
+  void resolvedPolicyMatchesWhatGenerationUses(@TempDir Path dir) throws Exception {
+    TinyCheckpoints.randomLlama(dir, 1, 2, false, false);
+    try (MLXScope scope = new MLXScope()) {
+      DecoderModel model = LlamaModel.load(scope, dir);
+      assertEquals(KVCachePolicy.full(), model.resolveCachePolicy(GenerationCachePolicy.full()));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> model.resolveCachePolicy(GenerationCachePolicy.slidingWindowFromModel()));
     }
   }
 }

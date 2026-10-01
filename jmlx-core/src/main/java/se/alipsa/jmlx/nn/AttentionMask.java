@@ -79,7 +79,10 @@ public final class AttentionMask {
         || window < 0) {
       throw new IllegalArgumentException("invalid batched attention dimensions");
     }
-    int[] data = new int[Math.multiplyExact(batch, Math.multiplyExact(queryWidth, keyWidth))];
+    int[] queryOffsets = new int[batch];
+    int[] queryPaddings = new int[batch];
+    int[] keyOffsets = new int[batch];
+    int[] keyPaddings = new int[batch];
     for (int row = 0; row < batch; row++) {
       int validQueries = validQueryLengths[row];
       long retainedLong = (long) queryStarts[row] - keyStarts[row] + validQueries;
@@ -92,25 +95,31 @@ public final class AttentionMask {
           || retainedLong > keyWidth) {
         throw new IllegalArgumentException("invalid row positions or left padding");
       }
-      int retained = (int) retainedLong;
-      int keyPadding = keyWidth - retained;
-      int queryPadding = queryWidth - validQueries;
-      for (int q = 0; q < queryWidth; q++) {
-        if (q < queryPadding) {
-          data[(row * queryWidth + q) * keyWidth + keyWidth - 1] = 1;
-          continue;
-        }
-        int absoluteQuery = queryStarts[row] + q - queryPadding;
-        for (int key = keyPadding; key < keyWidth; key++) {
-          int absoluteKey = keyStarts[row] + key - keyPadding;
-          if (absoluteKey <= absoluteQuery
-              && (window == 0 || absoluteQuery - absoluteKey < window)) {
-            data[(row * queryWidth + q) * keyWidth + key] = 1;
-          }
-        }
-      }
+      queryPaddings[row] = queryWidth - validQueries;
+      keyPaddings[row] = keyWidth - (int) retainedLong;
+      queryOffsets[row] = queryStarts[row] - queryPaddings[row];
+      keyOffsets[row] = keyStarts[row] - keyPaddings[row];
     }
-    return MLX.astype(
-        MLX.array(scope, data, new int[] {batch, 1, queryWidth, keyWidth}), DType.BOOL);
+    int[] column = {batch, 1, 1, 1};
+    MLXArray queryIndex =
+        MLXShape.reshape(
+            MLX.arange(scope, 0, queryWidth, 1, DType.INT32), new int[] {1, 1, queryWidth, 1});
+    MLXArray keyIndex =
+        MLXShape.reshape(
+            MLX.arange(scope, 0, keyWidth, 1, DType.INT32), new int[] {1, 1, 1, keyWidth});
+    MLXArray absoluteQuery = MLXOps.add(queryIndex, MLX.array(scope, queryOffsets, column));
+    MLXArray absoluteKey = MLXOps.add(keyIndex, MLX.array(scope, keyOffsets, column));
+    MLXArray validKey = MLXOps.greaterEqual(keyIndex, MLX.array(scope, keyPaddings, column));
+    MLXArray visible = MLXOps.logicalAnd(validKey, MLXOps.lessEqual(absoluteKey, absoluteQuery));
+    if (window > 0) {
+      MLXArray limit = MLX.array(scope, new int[] {window}, new int[] {1});
+      visible =
+          MLXOps.logicalAnd(
+              visible, MLXOps.less(MLXOps.subtract(absoluteQuery, absoluteKey), limit));
+    }
+    MLXArray paddedQuery = MLXOps.less(queryIndex, MLX.array(scope, queryPaddings, column));
+    MLXArray lastKey =
+        MLXOps.equal(keyIndex, MLX.array(scope, new int[] {keyWidth - 1}, new int[] {1}));
+    return MLXOps.where(paddedQuery, lastKey, visible);
   }
 }

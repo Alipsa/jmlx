@@ -80,8 +80,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * Returns logits shaped {@code [batch, sequence, vocab]} and advances one cache per layer. Each
    * cache must be non-null and live in this model scope or a descendant scope that outlives this
    * call; generation creates such caches automatically. This method synchronizes logits and changed
-   * cache arrays before returning. A failure after cache mutation poisons all supplied caches;
-   * reset every cache before reuse.
+   * cache arrays before returning, so a lazy native failure poisons the caches instead of surfacing
+   * after the positions were committed. Logits are computed for <em>every</em> position: {@link
+   * #generate} avoids that cost by projecting only the last hidden state, so timings and peak
+   * memory of this method are not comparable to generation's prefill. A failure after cache
+   * mutation poisons all supplied caches; reset every cache before reuse.
    */
   public final MLXArray forward(MLXArray tokenIds, List<KVCache> caches) {
     int[] before = preflight(tokenIds, caches);
@@ -120,7 +123,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       for (int layer = 0; layer < caches.size(); layer++) {
         KVCache cache = caches.get(layer);
         for (int row = 0; row < validLengths.length; row++) {
-          if (cache.batchSize() > 0 && cache.nextPosition(row) != before[layer][row]) {
+          if (cache.nextPosition(row) != before[layer][row]) {
             caches.forEach(KVCache::poison);
             throw failure;
           }
@@ -167,8 +170,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       validateCacheShape(cache, batch);
       int layerWidth = 0;
       for (int row = 0; row < batch; row++) {
-        int next = cache.batchSize() == 0 ? 0 : cache.nextPosition(row);
-        int start = cache.batchSize() == 0 ? 0 : cache.startPosition(row);
+        int next = cache.nextPosition(row);
+        int start = cache.startPosition(row);
         if (layer > 0 && (positions[row] != next || starts[row] != start)) {
           throw new IllegalArgumentException("decoder layer caches have mismatched row positions");
         }
@@ -176,21 +179,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
           positions[row] = next;
           starts[row] = start;
         }
-        long ending = (long) next + validLengths[row];
-        if (ending > Integer.MAX_VALUE
-            || (cache.policy().mode() == KVCachePolicy.Mode.FULL
-                && cache.policy().limit() > 0
-                && ending > cache.policy().limit())) {
-          throw new IllegalArgumentException("decoder batch cache capacity exceeded");
-        }
+        cache.policy().requireCapacity((long) next + validLengths[row], "decoder batch cache");
         before[layer][row] = next;
         layerWidth = Math.max(layerWidth, next - start + validLengths[row]);
       }
-      if (cache.policy().mode() == KVCachePolicy.Mode.FULL
-          && cache.policy().limit() > 0
-          && layerWidth > cache.policy().limit()) {
-        throw new IllegalArgumentException("decoder padded cache width exceeds capacity");
-      }
+      cache.policy().requireCapacity(layerWidth, "decoder padded cache width");
     }
     if (descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk) {
       int ending = positions[0] + validLengths[0];
@@ -240,8 +233,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     int keyWidth = 0;
     int maxEnding = 0;
     for (int row = 0; row < batch; row++) {
-      queryStarts[row] = first.batchSize() == 0 ? 0 : first.nextPosition(row);
-      keyStarts[row] = first.batchSize() == 0 ? 0 : first.startPosition(row);
+      queryStarts[row] = first.nextPosition(row);
+      keyStarts[row] = first.startPosition(row);
       keyWidth = Math.max(keyWidth, queryStarts[row] - keyStarts[row] + validLengths[row]);
       maxEnding = Math.max(maxEnding, queryStarts[row] + validLengths[row]);
     }
@@ -274,6 +267,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     }
     int[] before = new int[caches.size()];
     KVCache first = Objects.requireNonNull(caches.get(0), "cache 0");
+    requireUnpadded(first);
     int position = first.nextPosition();
     int start = first.startPosition();
     for (int i = 0; i < caches.size(); i++) {
@@ -282,26 +276,24 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       if (cache.isPoisoned()) {
         throw new IllegalStateException("decoder cache set is poisoned; reset every layer");
       }
+      requireUnpadded(cache);
       if (cache.nextPosition() != position || cache.startPosition() != start) {
         throw new IllegalArgumentException("decoder layer caches have mismatched positions");
-      }
-      if (cache.batchSize() > 0 && cache.rowLength(0) != cache.length()) {
-        throw new IllegalArgumentException("left-padded cache requires validLengths overload");
       }
       if (cache.keys() != null && cache.keys().shape()[0] != tokenIds.shape()[0]) {
         throw new IllegalArgumentException("decoder cache batch size differs from tokenIds");
       }
       validateCacheShape(cache, tokenIds.shape()[0]);
-      long end = (long) position + tokenIds.shape()[1];
-      if (end > Integer.MAX_VALUE
-          || (cache.policy().mode() == KVCachePolicy.Mode.FULL
-              && cache.policy().limit() > 0
-              && end > cache.policy().limit())) {
-        throw new IllegalArgumentException("decoder cache capacity exceeded");
-      }
+      cache.policy().requireCapacity((long) position + tokenIds.shape()[1], "decoder cache");
       before[i] = position;
     }
     return before;
+  }
+
+  private static void requireUnpadded(KVCache cache) {
+    if (!cache.isUniform() || cache.rowLength(0) != cache.length()) {
+      throw new IllegalArgumentException("left-padded cache requires validLengths overload");
+    }
   }
 
   private void requireCompatiblePolicy(KVCachePolicy policy, KVCachePolicy expected) {
@@ -386,6 +378,16 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     return norm.forward(x);
   }
 
+  /**
+   * Resolves a request-level cache policy against this checkpoint's effective sliding window -- the
+   * same resolution {@link #generate(GenerationRequest, Consumer)} applies, so callers that build
+   * their own caches for {@link #forward} cannot disagree with it.
+   */
+  public final KVCachePolicy resolveCachePolicy(GenerationCachePolicy requested) {
+    return Objects.requireNonNull(requested, "requested")
+        .resolve(descriptor.attention().slidingWindow());
+  }
+
   /** Greedily generates up to {@code maxNewTokens}; prompt tokens are included in the result. */
   public final List<Integer> generate(int[] prompt, int maxNewTokens, Set<Integer> eosTokenIds) {
     if (prompt == null || prompt.length == 0) {
@@ -413,15 +415,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     GenerationConfig policy = request.config();
     int[] prompt = request.promptTokenIds();
     validateTokenIds(prompt, policy, config.vocabSize());
-    KVCachePolicy cachePolicy =
-        request.cachePolicy().resolve(descriptor.attention().slidingWindow());
+    KVCachePolicy cachePolicy = resolveCachePolicy(request.cachePolicy());
     long required =
         policy.maxNewTokens() == 0 ? 0 : (long) prompt.length + policy.maxNewTokens() - 1;
-    if (cachePolicy.mode() == KVCachePolicy.Mode.FULL
-        && cachePolicy.limit() > 0
-        && required > cachePolicy.limit()) {
-      throw new IllegalArgumentException("generation exceeds FULL cache capacity");
-    }
+    cachePolicy.requireCapacity(required, "generation");
     HfTokenizer tokenizer = request.tokenizer();
     if (tokenizer != null && tokenizer.vocabSize() > config.vocabSize()) {
       throw new IllegalArgumentException(

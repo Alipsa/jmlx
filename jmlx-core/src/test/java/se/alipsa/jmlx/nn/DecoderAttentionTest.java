@@ -210,4 +210,21 @@ class DecoderAttentionTest {
           new int[] {1, 2, 4}, identityAttention(scope, llama3).forward(x, null).shape());
     }
   }
+
+  @Test
+  void batchedForwardRejectsWrongSequenceWidthAndCacheBatchSize() {
+    try (MLXScope scope = new MLXScope()) {
+      DecoderAttention attention = identityAttention(scope, new RopeSpec.Base(10000f));
+      MLXArray x = MLX.ones(scope, new int[] {2, 2, 4}, DType.FLOAT32);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> attention.forward(x, null, null, null, new int[] {1, 1}));
+      KVCache oneRow = new KVCache(scope);
+      MLXArray row = MLX.ones(scope, new int[] {1, 1, 2, 4}, DType.FLOAT32);
+      oneRow.append(row, row);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> attention.forward(x, oneRow, null, null, new int[] {2, 2}));
+    }
+  }
 }

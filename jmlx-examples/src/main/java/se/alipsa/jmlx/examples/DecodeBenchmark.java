@@ -152,13 +152,13 @@ public final class DecodeBenchmark {
       }
       Map<String, Object> report = new LinkedHashMap<>();
       report.put("schema", "jmlx-decode-benchmark-1");
-      report.put("checkpoint", checkpoint.toAbsolutePath().toString());
+      report.put("checkpoint", reportedCheckpoint(checkpoint));
       report.put("checkpoint_sha256", checkpointHashes);
       report.put("commit", commit());
       report.put("java", System.getProperty("java.version"));
       report.put("os", System.getProperty("os.name"));
       report.put("architecture", System.getProperty("os.arch"));
-      report.put("device", System.getenv().getOrDefault("JMLX_BENCH_DEVICE", "unspecified"));
+      report.put("device", device());
       Properties pins = nativePins();
       report.put("mlx_c_pin", pins.getProperty("mlxcCommit", "unspecified"));
       report.put("mlx_metal_pin", pins.getProperty("mlxMetalVersion", "unspecified"));
@@ -250,6 +250,45 @@ public final class DecodeBenchmark {
       }
     }
     return pins;
+  }
+
+  /**
+   * The checkpoint path as recorded in the report: relative to the repository root when the
+   * checkpoint lies inside it, so committed reports carry no machine-specific home directory. The
+   * root comes from {@code jmlx.repository.root} (set by the Gradle task) and otherwise the
+   * absolute path is kept.
+   */
+  private static String reportedCheckpoint(Path checkpoint) {
+    Path absolute = checkpoint.toAbsolutePath().normalize();
+    String root = System.getProperty("jmlx.repository.root");
+    if (root != null && !root.isBlank()) {
+      Path repository = Path.of(root).toAbsolutePath().normalize();
+      if (absolute.startsWith(repository)) {
+        return repository.relativize(absolute).toString();
+      }
+    }
+    return absolute.toString();
+  }
+
+  /**
+   * The device label: {@code JMLX_BENCH_DEVICE} when set, otherwise the macOS chip name from {@code
+   * sysctl}, otherwise "unspecified".
+   */
+  private static String device() {
+    String configured = System.getenv("JMLX_BENCH_DEVICE");
+    if (configured != null && !configured.isBlank()) {
+      return configured;
+    }
+    try {
+      Process process =
+          new ProcessBuilder("sysctl", "-n", "machdep.cpu.brand_string")
+              .redirectErrorStream(true)
+              .start();
+      String chip = new String(process.getInputStream().readAllBytes()).trim();
+      return process.waitFor() == 0 && !chip.isEmpty() ? chip : "unspecified";
+    } catch (Exception unavailable) {
+      return "unspecified";
+    }
   }
 
   private static String commit() {

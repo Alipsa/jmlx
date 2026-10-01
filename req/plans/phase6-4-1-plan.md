@@ -692,8 +692,9 @@ against the 5% limit). The attention path adds under 0.001% for float32; the err
 K/V itself, so candidates B and C, which read the same packed K/V, cannot pass either and were not
 built. B was measured for P1 through its one-block case (dequantize, then float SDPA), whose
 error is the same floor; B's P2-P5 were not measured because P1 decides. This is a ruling, since
-the stop rule says "measure B". P2, P3 and P5 passed; P4 passed for float32 and failed or sat on
-the limit for bfloat16 (2.0-2.4 x float after the timing harness was corrected). Full numbers, the
+the stop rule says "measure B". P2, P3 and P5 passed; P4 passed for float32 and bfloat16 8-bit and was
+inconclusive for bfloat16 4-bit (1.6-2.1 x float, dependent on run mode after the timing harness
+was corrected to alternate float and packed calls). Full numbers, the
 quantizer-floor diagnostic and the other facts are in `req/phase6-4-benchmark.md` ("Phase 6.4.1
 step 1"), raw output in `req/data/phase6-4-1-probe/`.
 

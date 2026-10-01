@@ -44,4 +44,5 @@ tasks.register('benchmarkDecode', JavaExec) {
     jvmArgs '--enable-native-access=ALL-UNNAMED'
     def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
     systemProperty('jmlx.library.path', nativeLibDir)
+    systemProperty('jmlx.repository.root', rootProject.projectDir.absolutePath)
 }

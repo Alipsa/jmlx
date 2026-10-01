@@ -34,6 +34,8 @@ class PackedAttentionProbeTest {
   private static final int PER_KV = 4;
   private static final int HEADS = KV_HEADS * PER_KV;
   private static final int RUNS = 5;
+  private static final int WARMUP_CALLS = 30;
+  private static final int TIMED_CALLS = 60;
 
   @BeforeEach
   void seed() {
@@ -462,24 +464,24 @@ class PackedAttentionProbeTest {
         PackedAttentionPrototype.Packed pk = packInto(scope, k, c.group(), c.bits());
         PackedAttentionPrototype.Packed pv = packInto(scope, v, c.group(), c.bits());
         MLX.eval(k, v);
-        double floatMs =
-            timePerCall(
+        double[] ms =
+            timeInterleaved(
                 scope,
                 c,
-                q -> PackedAttentionPrototype.floatAttend(q, k, v, null, false, KV_HEADS));
-        double packedMs =
-            timePerCall(
-                scope,
-                c,
+                q -> PackedAttentionPrototype.floatAttend(q, k, v, null, false, KV_HEADS),
                 q ->
                     PackedAttentionPrototype.attend(
                         q, pk, pv, null, KV_HEADS, c.headDim(), c.group(), c.bits()));
+        double floatMs = ms[0];
+        double packedMs = ms[1];
         printf(
-            "PACKED_ATTN_P4 cfg=%s floatMs=%.4f packedMs=%.4f ratio=%.2f %s%n",
+            "PACKED_ATTN_P4 cfg=%s floatMs=%.4f packedMs=%.4f ratio=%.2f warmup=%d timed=%d %s%n",
             c.id(),
             floatMs,
             packedMs,
             packedMs / floatMs,
+            WARMUP_CALLS,
+            TIMED_CALLS,
             packedMs <= 2.0 * floatMs ? "PASS" : "FAIL");
       }
     }
@@ -487,32 +489,45 @@ class PackedAttentionProbeTest {
   }
 
   /**
-   * Median milliseconds per decode-step attention call. Each call gets a fresh query in a per-call
-   * child scope: ops allocate into the innermost operand scope, so the call's intermediates (the
-   * repeated-head K/V copies on the float path, scores and weights on the packed path) land in that
-   * child and are released when it closes, instead of accumulating in {@code scope}. The query is
-   * evaluated before the clock starts so lazy random generation is not timed.
+   * Median milliseconds per decode-step attention call for {@code first} and {@code second},
+   * returned as {@code {firstMs, secondMs}}. The two are timed in alternation, and which goes first
+   * flips every iteration, so warm-up, GPU clock state and thermal drift hit both equally; timing
+   * one fully before the other made the verdict depend on run order. Each call gets a fresh query
+   * in a per-call child scope: ops allocate into the innermost operand scope, so the call's
+   * intermediates (the repeated-head K/V copies on the float path, scores and weights on the packed
+   * path) land in that child and are released when it closes, instead of accumulating in {@code
+   * scope}. The query is evaluated before the clock starts so lazy random generation is not timed.
    */
-  private static double timePerCall(MLXScope scope, Cfg c, Function<MLXArray, MLXArray> call) {
+  private static double[] timeInterleaved(
+      MLXScope scope,
+      Cfg c,
+      Function<MLXArray, MLXArray> first,
+      Function<MLXArray, MLXArray> second) {
     int[] queryShape = {1, HEADS, 1, c.headDim()};
-    for (int i = 0; i < 5; i++) {
-      try (MLXScope s = scope.newChild()) {
-        MLXArray q = random(s, queryShape, c.dtype());
-        MLX.eval(q);
-        MLX.eval(call.apply(q));
+    double[] firstTimes = new double[TIMED_CALLS];
+    double[] secondTimes = new double[TIMED_CALLS];
+    for (int i = 0; i < WARMUP_CALLS + TIMED_CALLS; i++) {
+      boolean timed = i >= WARMUP_CALLS;
+      boolean firstLeads = i % 2 == 0;
+      double a = timeOne(scope, queryShape, c, firstLeads ? first : second);
+      double b = timeOne(scope, queryShape, c, firstLeads ? second : first);
+      if (timed) {
+        firstTimes[i - WARMUP_CALLS] = firstLeads ? a : b;
+        secondTimes[i - WARMUP_CALLS] = firstLeads ? b : a;
       }
     }
-    double[] times = new double[20];
-    for (int i = 0; i < times.length; i++) {
-      try (MLXScope s = scope.newChild()) {
-        MLXArray q = random(s, queryShape, c.dtype());
-        MLX.eval(q);
-        long t = System.nanoTime();
-        MLX.eval(call.apply(q));
-        times[i] = (System.nanoTime() - t) / 1e6;
-      }
+    return new double[] {median(firstTimes), median(secondTimes)};
+  }
+
+  private static double timeOne(
+      MLXScope scope, int[] queryShape, Cfg c, Function<MLXArray, MLXArray> call) {
+    try (MLXScope s = scope.newChild()) {
+      MLXArray q = random(s, queryShape, c.dtype());
+      MLX.eval(q);
+      long t = System.nanoTime();
+      MLX.eval(call.apply(q));
+      return (System.nanoTime() - t) / 1e6;
     }
-    return median(times);
   }
 
   // ---- scale dtype and GQA broadcast --------------------------------------------------------

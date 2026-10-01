@@ -94,7 +94,7 @@ class QuantizedKvFeasibilityProbeTest {
       // token) through one forward versus sequential forwards of NOISE_CHUNK tokens,
       // last-position logits of each.
       int total = tokens.size();
-      int[] stream = tokens.subList(0, total).stream().mapToInt(Integer::intValue).toArray();
+      int[] stream = tokens.stream().mapToInt(Integer::intValue).toArray();
       float[] whole;
       try (MLXScope chunkRoot = modelScope.newChild();
           MLXScope step = chunkRoot.newChild()) {

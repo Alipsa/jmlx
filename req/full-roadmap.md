@@ -189,6 +189,11 @@ is correct; the benchmark reports tokens/s and peak memory reproducibly for ever
 
 ### 6.4.1 — Quantized KV retention and packed attention
 
+**Status (2026-10-01): deferred pending a new attention design.** The step 1 prototype stopped:
+four-bit packed attention misses its accuracy criterion because of 4-bit affine rounding of K/V, which
+no attention kernel can avoid (`req/phase6-4-benchmark.md`). The unsupported-capability rejection
+stays and 6.5 proceeds.
+
 After closing 6.4, implement an opt-in packed-KV attention path that attends to compressed keys
 and values without materializing the entire float cache per decode step. The pinned runtime's SDPA
 rejects packed K/V, so this requires a separately measured attention implementation (for example,
@@ -198,7 +203,12 @@ float retention as the default. Follow `req/plans/phase6-4-1-plan.md`.
 
 **Exit gate:** the opt-in mode passes accuracy and cache lifecycle tests across supported families,
 has lower steady and peak native memory than float retention at a documented long context, and
-publishes decode throughput alongside the float baseline. Complete 6.4.1 before starting 6.5.
+publishes decode throughput alongside the float baseline. 6.4.1 is time-boxed: 6.5 may start once
+the plan's step 1 prototype records a proceed/stop decision (or its decision date passes, which
+counts as stop) and, on a proceed, the small float-only cache-accessor refactor (step 1b) has
+merged or its deadline (decision date + 14 days) has passed. The remaining 6.4.1 steps do not block
+6.5 or the first Central release. A stop keeps the explicit unsupported-capability rejection and is
+reopened only by a dated amendment to the plan.
 
 ### 6.5 — Batched serving primitives and release hardening
 

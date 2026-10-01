@@ -1,5 +1,7 @@
 package se.alipsa.jmlx.nn;
 
+import static se.alipsa.jmlx.nn.ArrayBytes.bytes;
+
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
@@ -39,8 +41,7 @@ class KVCacheQuantizationProbeTest {
               MLXArray[] packed = MLXQuant.quantize(source, groupSize, bits, "affine", null);
               MLX.eval(packed);
               final long packedActive = MLXMemory.activeBytes();
-              final long packedBytes =
-                  Arrays.stream(packed).mapToLong(KVCacheQuantizationProbeTest::bytes).sum();
+              final long packedBytes = Arrays.stream(packed).mapToLong(ArrayBytes::bytes).sum();
               MLXArray restored =
                   MLXQuant.dequantize(
                       packed[0], packed[1], packed[2], groupSize, bits, "affine", null, null);
@@ -132,8 +133,7 @@ class KVCacheQuantizationProbeTest {
       MLXArray padded = MLXShape.concatenate(new MLXArray[] {source, zeroPad}, 3);
       MLXArray[] packed = MLXQuant.quantize(padded, 32, 4, "affine", null);
       MLX.eval(packed);
-      final long packedBytes =
-          Arrays.stream(packed).mapToLong(KVCacheQuantizationProbeTest::bytes).sum();
+      final long packedBytes = Arrays.stream(packed).mapToLong(ArrayBytes::bytes).sum();
       MLXMemory.resetPeak();
       MLXArray unpacked =
           MLXQuant.dequantize(packed[0], packed[1], packed[2], 32, 4, "affine", null, null);
@@ -151,13 +151,5 @@ class KVCacheQuantizationProbeTest {
               + " dequantPeak=%d%n",
           packedBytes, bytes(source), maxError, peak);
     }
-  }
-
-  private static long bytes(MLXArray array) {
-    long count = 1;
-    for (int dimension : array.shape()) {
-      count *= dimension;
-    }
-    return count * (array.dtype().name().contains("16") ? 2 : 4);
   }
 }

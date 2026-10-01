@@ -243,14 +243,22 @@ correct; reproducible benchmark data exists for every supported family.
 
 ## 6.4.1 — Quantized KV retention and packed attention
 
+**Status (2026-10-01): deferred pending a new attention design.** The step 1 prototype recorded a
+stop (`req/plans/phase6-4-1-plan.md`, `req/phase6-4-benchmark.md`); the text below is the original
+scope and applies only if the item is reopened by a dated amendment.
+
 Implement the opt-in compressed-cache path described in `req/plans/phase6-4-1-plan.md` after 6.4
-is closed and before 6.5 begins. The 6.4 native probe showed that the pinned SDPA rejects packed
-K/V and full-cache dequantization erases peak-memory savings. Add an attention path that consumes
-packed storage without a full float cache, then prove accuracy, cache ownership, lower steady and
-peak native memory, and measured decode throughput. Keep the default float path unchanged.
+is closed. It is time-boxed: only its step 1 prototype decision (proceed or stop, with a binding
+decision date) and, on a proceed, its step 1b accessor refactor (deadline: decision date + 14 days)
+precede 6.5; later steps may overlap 6.5. The 6.4 native probe showed that the pinned SDPA rejects
+packed K/V and full-cache dequantization erases peak-memory savings. Add an attention path that
+consumes packed storage without a full float cache, then prove accuracy, cache ownership, lower
+steady and peak native memory, and measured decode throughput. Keep the default float path
+unchanged.
 
 **Gate:** the quantized policy is enabled only after the native and benchmark evidence in the 6.4.1
-plan passes. This gate precedes the 6.5 batching scheduler.
+plan passes. That gate governs enabling the policy, not 6.5: a recorded stop or a missed decision
+date leaves the explicit rejection in place and 6.5 proceeds.
 
 ## 6.5 — Batching, release evidence, and first Central release
 

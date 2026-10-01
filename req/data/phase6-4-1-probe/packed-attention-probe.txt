@@ -1,0 +1,100 @@
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=2048 L=1 mask=none errorPct=13.7981 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=2048 L=1 mask=sliding errorPct=11.6712 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=2048 L=256 mask=causal errorPct=21.0380 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=2048 L=256 mask=sliding errorPct=9.3930 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=4096 L=1 mask=none errorPct=9.9760 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=4096 L=1 mask=sliding errorPct=11.9767 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=4096 L=256 mask=causal errorPct=11.8359 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=4096 L=256 mask=sliding errorPct=17.1557 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=2048 L=1 mask=none errorPct=0.5620 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=2048 L=1 mask=sliding errorPct=0.7089 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=2048 L=256 mask=causal errorPct=1.0816 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=2048 L=256 mask=sliding errorPct=1.3009 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=4096 L=1 mask=none errorPct=0.5153 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=4096 L=1 mask=sliding errorPct=0.9246 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=4096 L=256 mask=causal errorPct=1.2537 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=4096 L=256 mask=sliding errorPct=0.6444 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=2048 L=1 mask=none errorPct=13.7223 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=2048 L=1 mask=sliding errorPct=12.1344 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=2048 L=256 mask=causal errorPct=10.5579 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=2048 L=256 mask=sliding errorPct=13.0400 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=4096 L=1 mask=none errorPct=13.5745 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=4096 L=1 mask=sliding errorPct=11.4517 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=4096 L=256 mask=causal errorPct=16.4562 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=4096 L=256 mask=sliding errorPct=10.4924 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=2048 L=1 mask=none errorPct=0.7555 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=2048 L=1 mask=sliding errorPct=0.8324 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=2048 L=256 mask=causal errorPct=1.0108 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=2048 L=256 mask=sliding errorPct=0.8839 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=4096 L=1 mask=none errorPct=0.8165 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=4096 L=1 mask=sliding errorPct=0.7073 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=4096 L=256 mask=causal errorPct=0.7689 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=4096 L=256 mask=sliding errorPct=0.9028 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=2048 L=1 mask=none errorPct=13.5274 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=2048 L=1 mask=sliding errorPct=14.3029 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=2048 L=256 mask=causal errorPct=13.1143 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=2048 L=256 mask=sliding errorPct=23.0594 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=4096 L=1 mask=none errorPct=18.5644 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=4096 L=1 mask=sliding errorPct=13.0127 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=4096 L=256 mask=causal errorPct=17.1435 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=4096 L=256 mask=sliding errorPct=15.2838 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=2048 L=1 mask=none errorPct=1.0502 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=2048 L=1 mask=sliding errorPct=1.4254 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=2048 L=256 mask=causal errorPct=1.5385 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=2048 L=256 mask=sliding errorPct=2.2901 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=4096 L=1 mask=none errorPct=1.2500 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=4096 L=1 mask=sliding errorPct=1.2876 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=4096 L=256 mask=causal errorPct=1.9355 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=4096 L=256 mask=sliding errorPct=2.2422 limitPct=1.0 finite=true FAIL
+PACKED_ATTN_DTYPE input=FLOAT32 packed=UINT32 scales=FLOAT32 biases=FLOAT32
+PACKED_ATTN_DTYPE input=BFLOAT16 packed=UINT32 scales=BFLOAT16 biases=BFLOAT16
+PACKED_ATTN_DTYPE input=FLOAT16 packed=UINT32 scales=FLOAT16 biases=FLOAT16
+PACKED_ATTN_GQA the prototype folds queriesPerKv into the query axis, so quantized_matmul sees [B,kvHeads,perKv*L,Dpad] against [B,kvHeads,S,*] with equal batch dims and needs no head broadcast (exercised by every P1 line above)
+PACKED_ATTN_FLIP cfg=FLOAT32-D64-b4-g64 ulps=4 quantizedDiffPct=0.00010 floatDiffPct=0.00011 flipSharePct=0.00010 warnAbovePct=1.2500 ok
+PACKED_ATTN_FLIP cfg=FLOAT32-D64-b8-g64 ulps=4 quantizedDiffPct=0.00011 floatDiffPct=0.00007 flipSharePct=0.00010 warnAbovePct=0.2500 ok
+PACKED_ATTN_FLIP cfg=BFLOAT16-D64-b4-g64 ulps=1 quantizedDiffPct=9.94898 floatDiffPct=0.51020 flipSharePct=9.94898 warnAbovePct=1.2500 WARN
+PACKED_ATTN_FLIP cfg=BFLOAT16-D64-b8-g64 ulps=1 quantizedDiffPct=1.39840 floatDiffPct=0.57078 flipSharePct=1.45548 warnAbovePct=0.2500 WARN
+PACKED_ATTN_FLIP cfg=FLOAT32-D16-b4-g32 ulps=4 quantizedDiffPct=0.00009 floatDiffPct=0.00004 flipSharePct=0.00006 warnAbovePct=1.2500 ok
+PACKED_ATTN_FLIP cfg=FLOAT32-D16-b8-g32 ulps=4 quantizedDiffPct=0.00009 floatDiffPct=0.00006 flipSharePct=0.00007 warnAbovePct=0.2500 ok
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b4-g32 S=504 L=4 mask=batched errorPct=6.4141 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D16-b8-g32 S=504 L=4 mask=batched errorPct=0.4863 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b4-g64 S=504 L=4 mask=batched errorPct=6.1209 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=FLOAT32-D64-b8-g64 S=504 L=4 mask=batched errorPct=0.3565 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b4-g64 S=504 L=4 mask=batched errorPct=6.1846 limitPct=5.0 finite=true FAIL
+PACKED_ATTN_P1 cfg=BFLOAT16-D64-b8-g64 S=504 L=4 mask=batched errorPct=0.7614 limitPct=1.0 finite=true PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D16-b4-g32 floatMs=0.4589 packedMs=0.7825 ratio=1.71 warmup=30 timed=60 PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D16-b8-g32 floatMs=0.4709 packedMs=0.7885 ratio=1.67 warmup=30 timed=60 PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D64-b4-g64 floatMs=0.4371 packedMs=0.5618 ratio=1.29 warmup=30 timed=60 PASS
+PACKED_ATTN_P4 cfg=FLOAT32-D64-b8-g64 floatMs=0.3922 packedMs=0.4601 ratio=1.17 warmup=30 timed=60 PASS
+PACKED_ATTN_P4 cfg=BFLOAT16-D64-b4-g64 floatMs=0.3318 packedMs=0.5586 ratio=1.68 warmup=30 timed=60 PASS
+PACKED_ATTN_P4 cfg=BFLOAT16-D64-b8-g64 floatMs=0.2994 packedMs=0.4597 ratio=1.54 warmup=30 timed=60 PASS
+PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b4-g32 S=2048 L=1 packedVsFloatPct=13.7981 quantizerFloorPct=13.7981 attentionAddedPct=0.0001 outputMaxAbs=0.1212
+PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b4-g32 S=2048 L=256 packedVsFloatPct=9.0230 quantizerFloorPct=9.0230 attentionAddedPct=0.0000 outputMaxAbs=0.4650
+PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b8-g32 S=2048 L=1 packedVsFloatPct=0.6610 quantizerFloorPct=0.6611 attentionAddedPct=0.0001 outputMaxAbs=0.0813
+PACKED_ATTN_FLOOR cfg=FLOAT32-D16-b8-g32 S=2048 L=256 packedVsFloatPct=0.6899 quantizerFloorPct=0.6899 attentionAddedPct=0.0000 outputMaxAbs=0.2441
+PACKED_ATTN_FLOOR cfg=FLOAT32-D64-b4-g64 S=2048 L=1 packedVsFloatPct=14.5748 quantizerFloorPct=14.5748 attentionAddedPct=0.0001 outputMaxAbs=0.1032
+PACKED_ATTN_FLOOR cfg=FLOAT32-D64-b4-g64 S=2048 L=256 packedVsFloatPct=17.4421 quantizerFloorPct=17.4421 attentionAddedPct=0.0003 outputMaxAbs=0.1837
+PACKED_ATTN_FLOOR cfg=FLOAT32-D64-b8-g64 S=2048 L=1 packedVsFloatPct=0.7863 quantizerFloorPct=0.7863 attentionAddedPct=0.0002 outputMaxAbs=0.1266
+PACKED_ATTN_FLOOR cfg=FLOAT32-D64-b8-g64 S=2048 L=256 packedVsFloatPct=0.6661 quantizerFloorPct=0.6661 attentionAddedPct=0.0002 outputMaxAbs=0.3061
+PACKED_ATTN_FLOOR cfg=BFLOAT16-D64-b4-g64 S=2048 L=1 packedVsFloatPct=11.9718 quantizerFloorPct=11.6197 attentionAddedPct=0.8803 outputMaxAbs=0.1387
+PACKED_ATTN_FLOOR cfg=BFLOAT16-D64-b4-g64 S=2048 L=256 packedVsFloatPct=12.8743 quantizerFloorPct=13.1737 attentionAddedPct=0.8982 outputMaxAbs=0.3262
+PACKED_ATTN_FLOOR cfg=BFLOAT16-D64-b8-g64 S=2048 L=1 packedVsFloatPct=1.2146 quantizerFloorPct=1.2146 attentionAddedPct=0.5567 outputMaxAbs=0.1206
+PACKED_ATTN_FLOOR cfg=BFLOAT16-D64-b8-g64 S=2048 L=256 packedVsFloatPct=1.4286 quantizerFloorPct=1.1429 attentionAddedPct=0.5714 outputMaxAbs=0.3418
+PACKED_ATTN_APPEND cfg=FLOAT32-D16-b4-g32 packedPerKvHeadToken=48.00 floatPerKvHeadToken=128.0 aMedian=2.333 appendSpread=0.000 floatAppendMultiplier=2.000
+PACKED_ATTN_P2P3 cfg=FLOAT32-D16-b4-g32 peakFloat4096=6506260 peakPacked4096=1249924 p2=PASS floatGrowth=784.00 quantGrowth=144.00 quantGrowthSpread=0.00 bound=208.00 (a*packed=112.00 floatHalf=64.00 scoreKept=32.00) uncertainty=0.00 half=64.00 p3=PASS
+PACKED_ATTN_APPEND cfg=FLOAT32-D16-b8-g32 packedPerKvHeadToken=80.00 floatPerKvHeadToken=128.0 aMedian=2.200 appendSpread=0.000 floatAppendMultiplier=2.000
+PACKED_ATTN_P2P3 cfg=FLOAT32-D16-b8-g32 peakFloat4096=6506260 peakPacked4096=1774276 p2=PASS floatGrowth=784.00 quantGrowth=208.00 quantGrowthSpread=0.00 bound=272.00 (a*packed=176.00 floatHalf=64.00 scoreKept=32.00) uncertainty=0.00 half=64.00 p3=PASS
+PACKED_ATTN_APPEND cfg=FLOAT32-D64-b4-g64 packedPerKvHeadToken=80.00 floatPerKvHeadToken=512.0 aMedian=2.200 appendSpread=0.000 floatAppendMultiplier=2.000
+PACKED_ATTN_P2P3 cfg=FLOAT32-D64-b4-g64 peakFloat4096=25371664 peakPacked4096=1776824 p2=PASS floatGrowth=3072.00 quantGrowth=208.00 quantGrowthSpread=0.00 bound=464.00 (a*packed=176.00 floatHalf=256.00 scoreKept=32.00) uncertainty=0.00 half=256.00 p3=PASS
+PACKED_ATTN_APPEND cfg=FLOAT32-D64-b8-g64 packedPerKvHeadToken=144.00 floatPerKvHeadToken=512.0 aMedian=2.111 appendSpread=0.000 floatAppendMultiplier=2.000
+PACKED_ATTN_P2P3 cfg=FLOAT32-D64-b8-g64 peakFloat4096=25371664 peakPacked4096=2825528 p2=PASS floatGrowth=3072.00 quantGrowth=336.00 quantGrowthSpread=0.00 bound=592.00 (a*packed=304.00 floatHalf=256.00 scoreKept=32.00) uncertainty=0.00 half=256.00 p3=PASS
+PACKED_ATTN_APPEND cfg=BFLOAT16-D64-b4-g64 packedPerKvHeadToken=72.00 floatPerKvHeadToken=256.0 aMedian=2.111 appendSpread=0.000 floatAppendMultiplier=4.000
+PACKED_ATTN_P2P3 cfg=BFLOAT16-D64-b4-g64 peakFloat4096=16918032 peakPacked4096=1448616 p2=PASS floatGrowth=2048.00 quantGrowth=160.00 quantGrowthSpread=0.00 bound=296.00 (a*packed=152.00 floatHalf=128.00 scoreKept=16.00) uncertainty=0.00 half=128.00 p3=PASS
+PACKED_ATTN_APPEND cfg=BFLOAT16-D64-b8-g64 packedPerKvHeadToken=136.00 floatPerKvHeadToken=256.0 aMedian=2.059 appendSpread=0.000 floatAppendMultiplier=4.000
+PACKED_ATTN_P2P3 cfg=BFLOAT16-D64-b8-g64 peakFloat4096=16918032 peakPacked4096=2497320 p2=PASS floatGrowth=2048.00 quantGrowth=288.00 quantGrowthSpread=0.00 bound=424.00 (a*packed=280.00 floatHalf=128.00 scoreKept=16.00) uncertainty=0.00 half=128.00 p3=PASS
+PACKED_ATTN_PEAKED cfg=FLOAT32-D16-b4-g32 S=2048 L=1 queryScale=6 errorPct=32.7687 outputMaxAbs=1.8296
+PACKED_ATTN_PEAKED cfg=FLOAT32-D16-b8-g32 S=2048 L=1 queryScale=6 errorPct=1.9540 outputMaxAbs=1.4328
+PACKED_ATTN_PEAKED cfg=FLOAT32-D64-b4-g64 S=2048 L=1 queryScale=6 errorPct=35.3053 outputMaxAbs=2.9422
+PACKED_ATTN_PEAKED cfg=FLOAT32-D64-b8-g64 S=2048 L=1 queryScale=6 errorPct=4.0843 outputMaxAbs=2.8932
+PACKED_ATTN_PEAKED cfg=BFLOAT16-D64-b4-g64 S=2048 L=1 queryScale=6 errorPct=67.8344 outputMaxAbs=2.4531
+PACKED_ATTN_PEAKED cfg=BFLOAT16-D64-b8-g64 S=2048 L=1 queryScale=6 errorPct=2.0725 outputMaxAbs=3.0156

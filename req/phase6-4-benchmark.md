@@ -136,6 +136,9 @@ options below are untested hypotheses, not measurements:
 
 - Keep keys in float and quantize only the values. Value rounding enters the output linearly,
   whereas key rounding moves which tokens the softmax selects.
+  This gives up about half of the saving. Per token per head for D=64 bfloat16 at 4 bits, group 64
+  (D2 formula, not a measurement): float K and V are 128 + 128 = 256 bytes, packed K and V are
+  36 + 36 = 72 (28%), but float keys with packed values are 128 + 36 = 164 (64%).
 - 8-bit only, which is marginal against P1 as written (15 of 27 cases pass), and under the plan's
   pass condition cannot pass on its own, because that condition requires the 16-dimension float32
   4-bit setting.

@@ -267,6 +267,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     }
     int[] before = new int[caches.size()];
     KVCache first = Objects.requireNonNull(caches.get(0), "cache 0");
+    if (first.isPoisoned()) {
+      throw new IllegalStateException("decoder cache set is poisoned; reset every layer");
+    }
     requireUnpadded(first);
     int position = first.nextPosition();
     int start = first.startPosition();
@@ -418,7 +421,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     KVCachePolicy cachePolicy = resolveCachePolicy(request.cachePolicy());
     long required =
         policy.maxNewTokens() == 0 ? 0 : (long) prompt.length + policy.maxNewTokens() - 1;
-    cachePolicy.requireCapacity(required, "generation");
+    // Clamped: an effectively unbounded token budget ("until EOS") is legal on unbounded and
+    // sliding caches; only a bounded FULL capacity can be exceeded up front.
+    cachePolicy.requireCapacity(Math.min(required, Integer.MAX_VALUE), "generation");
     HfTokenizer tokenizer = request.tokenizer();
     if (tokenizer != null && tokenizer.vocabSize() > config.vocabSize()) {
       throw new IllegalArgumentException(

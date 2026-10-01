@@ -137,4 +137,44 @@ class DecoderCacheCapacityTest {
           () -> model.resolveCachePolicy(GenerationCachePolicy.slidingWindowFromModel()));
     }
   }
+
+  @Test
+  void unboundedTokenBudgetIsNotRejectedUpFront(@TempDir Path dir) throws Exception {
+    TinyCheckpoints.randomLlama(dir, 1, 2, false, false);
+    try (MLXScope scope = new MLXScope()) {
+      DecoderModel model = LlamaModel.load(scope, dir);
+      int[] polls = {0};
+      GenerationRequest request =
+          new GenerationRequest(
+              new int[] {1, 2},
+              GenerationConfig.greedyDefaults(Integer.MAX_VALUE, Set.of()),
+              () -> ++polls[0] > 3);
+      GenerationResult result = model.generate(request, ignored -> {});
+      assertEquals(FinishReason.CANCELLED, result.finishReason());
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              model.generate(
+                  request.withCachePolicy(GenerationCachePolicy.full(10)), ignored -> {}));
+    }
+  }
+
+  @Test
+  void poisonedPaddedCacheReportsPoisonNotPadding(@TempDir Path dir) throws Exception {
+    TinyCheckpoints.randomLlama(dir, 1, 2, false, false);
+    try (MLXScope scope = new MLXScope()) {
+      DecoderModel model = LlamaModel.load(scope, dir);
+      List<KVCache> caches = new ArrayList<>();
+      for (int i = 0; i < model.config().numHiddenLayers(); i++) {
+        caches.add(new KVCache(scope));
+      }
+      model.forward(
+          MLX.array(scope, new int[] {0, 1, 2, 3}, new int[] {2, 2}), caches, new int[] {1, 2});
+      caches.forEach(KVCache::poison);
+      MLXArray decode = MLX.array(scope, new int[] {4, 5}, new int[] {2, 1});
+      IllegalStateException failure =
+          assertThrows(IllegalStateException.class, () -> model.forward(decode, caches));
+      assertTrue(failure.getMessage().contains("poisoned"), failure.getMessage());
+    }
+  }
 }

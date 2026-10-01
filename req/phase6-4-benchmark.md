@@ -4,7 +4,10 @@ The opt-in `:jmlx-examples:benchmarkDecode` task measures a local checkpoint. It
 nothing. The first model load in a fresh JVM is timed before any checkpoint hashing; this is a
 first-in-process measurement with the OS page cache in its observed state, not a flushed-cache
 measurement. Public `forward` evaluates its outputs before each prefill and one-token decode
-timer stops. Sustained generation samples active native bytes after every emitted token and reports
+timer stops. That forward computes logits for every prompt position, whereas generation projects
+only the last hidden state, so the reported `prefill_ns` and prefill peak memory overstate real
+prefill cost (the report records this as `"prefill_logits": "all_positions"`); compare them only
+with each other. Sustained generation samples active native bytes after every emitted token and reports
 the allocator's peak active bytes separately from cached bytes.
 
 On a bootstrapped macOS Apple Silicon host, run each synthetic family in a fresh JVM:

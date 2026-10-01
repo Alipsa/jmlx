@@ -168,6 +168,7 @@ public final class DecodeBenchmark {
           "dtype", config.path("dtype").asText(config.path("torch_dtype").asText("unspecified")));
       report.put("checkpoint_sliding_window", config.path("sliding_window").asText("null"));
       report.put("cache_policy", policy.mode().name());
+      report.put("prefill_logits", "all_positions");
       report.put("batch", 1);
       report.put("prompt_length", prompt.length);
       report.put("tokens", tokens);
@@ -229,7 +230,11 @@ public final class DecodeBenchmark {
     return prompt;
   }
 
-  /** Reads the staged runtime's pins; empty when the library directory is not a staged one. */
+  /**
+   * Reads the staged runtime's pins from the configured library directory. Empty when none is
+   * configured -- e.g. when NativeLoader extracted the library from the classpath instead -- in
+   * which case the report says "unspecified"; the Gradle task always sets the path.
+   */
   private static Properties nativePins() throws Exception {
     String dir = System.getProperty("jmlx.library.path");
     if (dir == null || dir.isBlank()) {

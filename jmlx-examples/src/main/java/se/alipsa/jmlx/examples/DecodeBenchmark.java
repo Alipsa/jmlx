@@ -257,20 +257,24 @@ public final class DecodeBenchmark {
    * The checkpoint path as recorded in the report: relative to the repository root when the
    * checkpoint lies inside it, so committed reports carry no machine-specific home directory. The
    * root comes from {@code jmlx.repository.root} (set by the Gradle task) and otherwise the
-   * absolute path is kept. Both paths are compared as real paths, because Gradle reports the
-   * project directory with symlinks resolved while the checkpoint argument may reach it through one
-   * (on macOS, {@code /tmp} is {@code /private/tmp}).
+   * absolute path is kept. The normalized paths are compared first, so a symlink inside the
+   * repository is recorded under its in-repo name rather than its target. Only when that does not
+   * match are both resolved to real paths, because Gradle reports the project directory with
+   * symlinks resolved while the checkpoint argument may reach it through one (on macOS, {@code
+   * /tmp} is {@code /private/tmp}).
    */
   private static String reportedCheckpoint(Path checkpoint) {
     Path absolute = checkpoint.toAbsolutePath().normalize();
     String root = System.getProperty("jmlx.repository.root");
     if (root != null && !root.isBlank()) {
       Path repository = Path.of(root).toAbsolutePath().normalize();
-      try {
-        absolute = absolute.toRealPath();
-        repository = repository.toRealPath();
-      } catch (IOException unresolvable) {
-        // Keep the normalized paths; at worst the absolute path is reported.
+      if (!absolute.startsWith(repository)) {
+        try {
+          absolute = absolute.toRealPath();
+          repository = repository.toRealPath();
+        } catch (IOException unresolvable) {
+          // Keep the normalized paths; at worst the absolute path is reported.
+        }
       }
       if (absolute.startsWith(repository)) {
         return repository.relativize(absolute).toString();

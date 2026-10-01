@@ -70,4 +70,20 @@ public final class DecoderBlock extends Module {
             x, attention.forward(inputNorm.forward(x), cache, attentionMask, stepFrequencies));
     return MLXOps.add(afterAttention, mlp.forward(postAttentionNorm.forward(afterAttention)));
   }
+
+  /** Applies this block to a left-padded batch with one valid length per row. */
+  public MLXArray forward(
+      MLXArray x,
+      KVCache cache,
+      MLXArray attentionMask,
+      MLXArray stepFrequencies,
+      int[] validLengths) {
+    Objects.requireNonNull(x, "DecoderBlock.forward: x must not be null");
+    MLXArray afterAttention =
+        MLXOps.add(
+            x,
+            attention.forward(
+                inputNorm.forward(x), cache, attentionMask, stepFrequencies, validLengths));
+    return MLXOps.add(afterAttention, mlp.forward(postAttentionNorm.forward(afterAttention)));
+  }
 }

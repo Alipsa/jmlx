@@ -2,6 +2,7 @@ package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
@@ -12,6 +13,21 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 @EnabledIfNativeAvailable
 class GroupedQueryAttentionTest {
+
+  @Test
+  void rejectsSlidingAndRaggedCachesBeforeProjection() {
+    try (MLXScope scope = new MLXScope()) {
+      GroupedQueryAttention attention = attention(scope);
+      MLXArray x = MLX.zeros(scope, new int[] {2, 1, 4}, DType.FLOAT32);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> attention.forward(x, new KVCache(scope, KVCachePolicy.slidingWindow(2))));
+      KVCache ragged = new KVCache(scope);
+      MLXArray kv = MLX.zeros(scope, new int[] {2, 1, 2, 2}, DType.FLOAT32);
+      ragged.append(kv, kv, new int[] {1, 2});
+      assertThrows(IllegalArgumentException.class, () -> attention.forward(x, ragged));
+    }
+  }
 
   @Test
   void retainsCompactKeyValueHeadsWhileDecoding() {

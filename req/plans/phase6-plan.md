@@ -241,6 +241,17 @@ unsupported artifacts fail before a partial model is returned.
 **Gate:** no unbounded native memory in repeated generation; sliding-window outputs/masks are
 correct; reproducible benchmark data exists for every supported family.
 
+## 6.4.1 — Quantized KV retention and packed attention
+
+Implement the opt-in compressed-cache path described in `req/plans/phase6-4-1-plan.md` after 6.4
+is closed and before 6.5 begins. The 6.4 native probe showed that the pinned SDPA rejects packed
+K/V and full-cache dequantization erases peak-memory savings. Add an attention path that consumes
+packed storage without a full float cache, then prove accuracy, cache ownership, lower steady and
+peak native memory, and measured decode throughput. Keep the default float path unchanged.
+
+**Gate:** the quantized policy is enabled only after the native and benchmark evidence in the 6.4.1
+plan passes. This gate precedes the 6.5 batching scheduler.
+
 ## 6.5 — Batching, release evidence, and first Central release
 
 1. Add a bounded in-process batch scheduler, not an HTTP server. It accepts prompt requests, limits

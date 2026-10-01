@@ -168,6 +168,44 @@ def generate_family(family, out):
     (out / f"{family}.json").write_text(json.dumps(data, indent=2) + "\n")
 
 
+def generate_mistral_windows(out):
+    """Generate extra window-boundary references from the existing pinned tiny checkpoint."""
+    checkpoint = out / "checkpoints" / "mistral"
+    model = AutoModelForCausalLM.from_pretrained(
+        checkpoint, attn_implementation="eager", dtype=torch.float32,
+        local_files_only=True).eval()
+    prompts = {
+        "shorter_than_window": [1, 7, 42],
+        "equal_to_window": [1, 7, 42, 3],
+        "longer_than_window": [1, 7, 42, 3, 19, 5],
+        "chunked_prefill": [1, 7, 42, 3, 19, 5],
+        "older_token_a": [1, 7, 42, 3, 19, 5, 6, 8, 10, 11, 12, 13],
+        "older_token_b": [2, 7, 42, 3, 19, 5, 6, 8, 10, 11, 12, 13],
+    }
+    cases = []
+    with torch.inference_mode():
+        for name, ids in prompts.items():
+            logits = model(input_ids=torch.tensor([ids]), use_cache=False).logits[0, -1]
+            cases.append({
+                "name": name,
+                "prompt_ids": ids,
+                "chunk_lengths": [3, len(ids) - 3] if name == "chunked_prefill" else [len(ids)],
+                "last_logits": rounded(logits.float()),
+            })
+        ids = list(prompts["longer_than_window"])
+        decode = []
+        for _ in range(16):
+            logits = model(input_ids=torch.tensor([ids]), use_cache=False).logits[0, -1]
+            next_id = int(logits.argmax())
+            ids.append(next_id)
+            decode.append({"token_id": next_id, "logits": rounded(
+                model(input_ids=torch.tensor([ids]), use_cache=False).logits[0, -1].float())})
+    (out / "mistral-window.json").write_text(json.dumps({
+        "family": "mistral", "window": 4, "max_position_embeddings": 128,
+        "cases": cases, "long_decode": decode,
+    }, indent=2) + "\n")
+
+
 def generate_rope(out):
     base = LlamaConfig(hidden_size=64, intermediate_size=128, num_hidden_layers=2,
                        num_attention_heads=4, num_key_value_heads=2,
@@ -286,10 +324,18 @@ def main():
     parser.add_argument("--family", choices=(*FAMILIES, "rope", "all"), required=True)
     parser.add_argument("--out", type=Path, required=True, help="goldens directory")
     parser.add_argument("--chat", action="store_true", help="generate chat goldens only")
+    parser.add_argument("--window-cases", action="store_true",
+                        help="generate extra Mistral window cases from the existing checkpoint")
     parser.add_argument("--tokenizer-root", type=Path,
                         default=Path("jmlx-tokenizer/src/test/resources/families"))
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.window_cases:
+        if args.family != "mistral" or args.chat:
+            parser.error("--window-cases requires --family mistral without --chat")
+        generate_mistral_windows(args.out)
+        update_provenance(args.out)
+        return
     if args.chat:
         if args.family not in CHAT_FAMILIES and args.family != "all":
             parser.error("--chat requires a chat family or --family all")

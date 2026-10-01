@@ -107,6 +107,14 @@ public final class GroupedQueryAttention extends CachedAttention {
     }
     int batch = shape[0];
     int sequence = shape[1];
+    if (cache != null
+        && (cache.policy().mode() != KVCachePolicy.Mode.FULL
+            || !cache.isUniform()
+            || (cache.batchSize() > 0 && cache.rowLength(0) != cache.length())
+            || cache.startPosition() != 0)) {
+      throw new IllegalArgumentException(
+          "GroupedQueryAttention requires a uniform FULL cache starting at zero");
+    }
     int offset = cache == null ? 0 : cache.offset();
     MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
     MLXArray k =

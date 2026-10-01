@@ -17,6 +17,7 @@ import se.alipsa.jmlx.nn.AttentionMask;
 import se.alipsa.jmlx.nn.DecoderBlock;
 import se.alipsa.jmlx.nn.Embedding;
 import se.alipsa.jmlx.nn.KVCache;
+import se.alipsa.jmlx.nn.KVCachePolicy;
 import se.alipsa.jmlx.nn.Linear;
 import se.alipsa.jmlx.nn.Module;
 import se.alipsa.jmlx.nn.RMSNorm;
@@ -35,6 +36,12 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   private final RMSNorm norm;
   private final Linear lmHead;
   private final boolean tiedOutput;
+  private StepBoundaryEvaluator stepBoundaryEvaluator = StepBoundaryEvaluator.NATIVE;
+
+  /** Replaces the evaluation boundary for package tests without affecting other model instances. */
+  final void setStepBoundaryEvaluatorForTest(StepBoundaryEvaluator evaluator) {
+    stepBoundaryEvaluator = Objects.requireNonNull(evaluator, "evaluator");
+  }
 
   /** Builds a decoder from checkpoint tensors validated against the architecture's tensor plan. */
   protected DecoderModel(
@@ -72,19 +79,271 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   /**
    * Returns logits shaped {@code [batch, sequence, vocab]} and advances one cache per layer. Each
    * cache must be non-null and live in this model scope or a descendant scope that outlives this
-   * call; generation creates such caches automatically.
+   * call; generation creates such caches automatically. This method synchronizes logits and changed
+   * cache arrays before returning, so a lazy native failure poisons the caches instead of surfacing
+   * after the positions were committed. Logits are computed for <em>every</em> position: {@link
+   * #generate} avoids that cost by projecting only the last hidden state, so timings and peak
+   * memory of this method are not comparable to generation's prefill. A failure after cache
+   * mutation poisons all supplied caches; reset every cache before reuse.
    */
   public final MLXArray forward(MLXArray tokenIds, List<KVCache> caches) {
+    int[] before = preflight(tokenIds, caches);
+    try {
+      MLXArray normalized = normalizedHiddenStates(tokenIds, caches);
+      requirePostflight(caches);
+      MLXArray logits = tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
+      MLXArray[] arrays = new MLXArray[1 + 2 * caches.size()];
+      arrays[0] = logits;
+      System.arraycopy(cacheArrays(caches), 0, arrays, 1, 2 * caches.size());
+      stepBoundaryEvaluator.evaluate(arrays);
+      return logits;
+    } catch (RuntimeException | Error failure) {
+      poisonIfMutated(caches, before);
+      throw failure;
+    }
+  }
+
+  /**
+   * Evaluates a left-padded {@code [B,T]} batch with one positive valid length per row. Each row's
+   * valid tokens occupy its rightmost positions. The resulting cache set must be reset after a
+   * failure that occurs after any layer advances.
+   */
+  public final MLXArray forward(MLXArray tokenIds, List<KVCache> caches, int[] validLengths) {
+    int[][] before = preflightBatch(tokenIds, caches, validLengths);
+    try {
+      MLXArray normalized = normalizedHiddenStatesBatch(tokenIds, caches, validLengths);
+      requirePostflightBatch(caches, validLengths.length);
+      MLXArray logits = tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
+      MLXArray[] arrays = new MLXArray[1 + 2 * caches.size()];
+      arrays[0] = logits;
+      System.arraycopy(cacheArrays(caches), 0, arrays, 1, 2 * caches.size());
+      stepBoundaryEvaluator.evaluate(arrays);
+      return logits;
+    } catch (RuntimeException | Error failure) {
+      for (int layer = 0; layer < caches.size(); layer++) {
+        KVCache cache = caches.get(layer);
+        for (int row = 0; row < validLengths.length; row++) {
+          if (cache.nextPosition(row) != before[layer][row]) {
+            caches.forEach(KVCache::poison);
+            throw failure;
+          }
+        }
+      }
+      throw failure;
+    }
+  }
+
+  private int[][] preflightBatch(MLXArray tokenIds, List<KVCache> caches, int[] validLengths) {
     Objects.requireNonNull(tokenIds, "tokenIds");
-    if (tokenIds.ndim() != 2) {
-      throw new IllegalArgumentException("tokenIds must have shape [batch, sequence]");
+    Objects.requireNonNull(validLengths, "validLengths");
+    Objects.requireNonNull(caches, "caches");
+    if (tokenIds.ndim() != 2
+        || tokenIds.shape()[0] <= 0
+        || tokenIds.shape()[1] <= 0
+        || caches.size() != layers.size()
+        || validLengths.length != tokenIds.shape()[0]) {
+      throw new IllegalArgumentException(
+          "batched forward requires nonempty [B,T], B lengths and one cache per layer");
+    }
+    int batch = tokenIds.shape()[0];
+    int width = tokenIds.shape()[1];
+    int maxValid = 0;
+    for (int valid : validLengths) {
+      if (valid <= 0 || valid > width) {
+        throw new IllegalArgumentException("each batch row needs 1..T valid tokens");
+      }
+      maxValid = Math.max(maxValid, valid);
+    }
+    if (maxValid != width) {
+      throw new IllegalArgumentException("left-padded width must equal longest valid row");
+    }
+    int[][] before = new int[caches.size()][batch];
+    int[] starts = new int[batch];
+    int[] positions = new int[batch];
+    KVCachePolicy expectedPolicy = Objects.requireNonNull(caches.getFirst(), "cache 0").policy();
+    for (int layer = 0; layer < caches.size(); layer++) {
+      KVCache cache = Objects.requireNonNull(caches.get(layer), "cache " + layer);
+      requireCompatiblePolicy(cache.policy(), expectedPolicy);
+      if (cache.isPoisoned() || (cache.batchSize() != 0 && cache.batchSize() != batch)) {
+        throw new IllegalStateException("decoder batch cache is poisoned or has wrong batch size");
+      }
+      validateCacheShape(cache, batch);
+      int layerWidth = 0;
+      for (int row = 0; row < batch; row++) {
+        int next = cache.nextPosition(row);
+        int start = cache.startPosition(row);
+        if (layer > 0 && (positions[row] != next || starts[row] != start)) {
+          throw new IllegalArgumentException("decoder layer caches have mismatched row positions");
+        }
+        if (layer == 0) {
+          positions[row] = next;
+          starts[row] = start;
+        }
+        cache.policy().requireCapacity((long) next + validLengths[row], "decoder batch cache");
+        before[layer][row] = next;
+        layerWidth = Math.max(layerWidth, next - start + validLengths[row]);
+      }
+      cache.policy().requireCapacity(layerWidth, "decoder padded cache width");
+    }
+    if (descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk) {
+      int ending = positions[0] + validLengths[0];
+      for (int row = 1; row < batch; row++) {
+        if (positions[row] != positions[0] || positions[row] + validLengths[row] != ending) {
+          throw new IllegalArgumentException("DynamicNtk does not support unequal batch positions");
+        }
+      }
+    }
+    return before;
+  }
+
+  private static void requirePostflight(List<KVCache> caches) {
+    int next = caches.getFirst().nextPosition();
+    int start = caches.getFirst().startPosition();
+    for (KVCache cache : caches) {
+      if (cache.nextPosition() != next || cache.startPosition() != start) {
+        throw new IllegalStateException("decoder layers diverged after forward");
+      }
+    }
+  }
+
+  private static void requirePostflightBatch(List<KVCache> caches, int batch) {
+    KVCache first = caches.getFirst();
+    for (KVCache cache : caches) {
+      for (int row = 0; row < batch; row++) {
+        if (cache.nextPosition(row) != first.nextPosition(row)
+            || cache.startPosition(row) != first.startPosition(row)) {
+          throw new IllegalStateException("decoder batch layers diverged after forward");
+        }
+      }
+    }
+  }
+
+  private MLXArray normalizedHiddenStatesBatch(
+      MLXArray tokenIds, List<KVCache> caches, int[] validLengths) {
+    MLXArray x = embedding.forward(tokenIds);
+    if (descriptor.embedding().scaleBySqrtHidden()) {
+      MLXArray scale =
+          MLX.array(x.scope(), new float[] {(float) Math.sqrt(config.hiddenSize())}, new int[] {1});
+      x = MLXOps.multiply(x, MLX.astype(scale, x.dtype()));
+    }
+    KVCache first = caches.getFirst();
+    int batch = validLengths.length;
+    int[] queryStarts = new int[batch];
+    int[] keyStarts = new int[batch];
+    int keyWidth = 0;
+    int maxEnding = 0;
+    for (int row = 0; row < batch; row++) {
+      queryStarts[row] = first.nextPosition(row);
+      keyStarts[row] = first.startPosition(row);
+      keyWidth = Math.max(keyWidth, queryStarts[row] - keyStarts[row] + validLengths[row]);
+      maxEnding = Math.max(maxEnding, queryStarts[row] + validLengths[row]);
+    }
+    Integer window = descriptor.attention().slidingWindow();
+    MLXArray mask =
+        AttentionMask.batched(
+            x.scope(),
+            queryStarts,
+            keyStarts,
+            validLengths,
+            tokenIds.shape()[1],
+            keyWidth,
+            window == null ? 0 : window);
+    MLXArray frequencies =
+        descriptor.rope().stepFrequencies(x.scope(), descriptor.rotaryDims(), maxEnding);
+    for (int i = 0; i < layers.size(); i++) {
+      x = layers.get(i).forward(x, caches.get(i), mask, frequencies, validLengths);
+    }
+    return norm.forward(x);
+  }
+
+  private int[] preflight(MLXArray tokenIds, List<KVCache> caches) {
+    Objects.requireNonNull(tokenIds, "tokenIds");
+    if (tokenIds.ndim() != 2 || tokenIds.shape()[0] <= 0 || tokenIds.shape()[1] <= 0) {
+      throw new IllegalArgumentException("tokenIds must have nonempty shape [batch, sequence]");
     }
     Objects.requireNonNull(caches, "caches");
     if (caches.size() != layers.size()) {
       throw new IllegalArgumentException("one KVCache is required per decoder layer");
     }
-    MLXArray normalized = normalizedHiddenStates(tokenIds, caches);
-    return tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
+    int[] before = new int[caches.size()];
+    KVCache first = Objects.requireNonNull(caches.get(0), "cache 0");
+    if (first.isPoisoned()) {
+      throw new IllegalStateException("decoder cache set is poisoned; reset every layer");
+    }
+    requireUnpadded(first);
+    int position = first.nextPosition();
+    int start = first.startPosition();
+    for (int i = 0; i < caches.size(); i++) {
+      KVCache cache = Objects.requireNonNull(caches.get(i), "cache " + i);
+      requireCompatiblePolicy(cache.policy(), first.policy());
+      if (cache.isPoisoned()) {
+        throw new IllegalStateException("decoder cache set is poisoned; reset every layer");
+      }
+      requireUnpadded(cache);
+      if (cache.nextPosition() != position || cache.startPosition() != start) {
+        throw new IllegalArgumentException("decoder layer caches have mismatched positions");
+      }
+      if (cache.keys() != null && cache.keys().shape()[0] != tokenIds.shape()[0]) {
+        throw new IllegalArgumentException("decoder cache batch size differs from tokenIds");
+      }
+      validateCacheShape(cache, tokenIds.shape()[0]);
+      cache.policy().requireCapacity((long) position + tokenIds.shape()[1], "decoder cache");
+      before[i] = position;
+    }
+    return before;
+  }
+
+  private static void requireUnpadded(KVCache cache) {
+    if (!cache.isUniform() || cache.rowLength(0) != cache.length()) {
+      throw new IllegalArgumentException("left-padded cache requires validLengths overload");
+    }
+  }
+
+  private void requireCompatiblePolicy(KVCachePolicy policy, KVCachePolicy expected) {
+    if (!policy.equals(expected)) {
+      throw new IllegalArgumentException("decoder layer caches have mismatched policies");
+    }
+    if (policy.evicts()
+        && !Objects.equals(descriptor.attention().slidingWindow(), policy.limit())) {
+      throw new IllegalArgumentException("SLIDING_WINDOW cache must match checkpoint window");
+    }
+  }
+
+  private void validateCacheShape(KVCache cache, int batch) {
+    if (cache.keys() == null) {
+      return;
+    }
+    int[] keyShape = cache.keys().shape();
+    int[] valueShape = cache.values().shape();
+    if (keyShape.length != 4
+        || valueShape.length != 4
+        || keyShape[0] != batch
+        || valueShape[0] != batch
+        || keyShape[1] != config.numKeyValueHeads()
+        || valueShape[1] != config.numKeyValueHeads()
+        || keyShape[3] != descriptor.headDim()
+        || valueShape[3] != descriptor.headDim()
+        || keyShape[2] != valueShape[2]) {
+      throw new IllegalArgumentException("decoder cache key/value shape differs from architecture");
+    }
+  }
+
+  private static void poisonIfMutated(List<KVCache> caches, int[] before) {
+    for (int i = 0; i < caches.size(); i++) {
+      if (caches.get(i).nextPosition() != before[i]) {
+        caches.forEach(KVCache::poison);
+        return;
+      }
+    }
+  }
+
+  private static MLXArray[] cacheArrays(List<KVCache> caches) {
+    MLXArray[] arrays = new MLXArray[2 * caches.size()];
+    for (int i = 0; i < caches.size(); i++) {
+      arrays[2 * i] = caches.get(i).keys();
+      arrays[2 * i + 1] = caches.get(i).values();
+    }
+    return arrays;
   }
 
   private MLXArray normalizedHiddenStates(MLXArray tokenIds, List<KVCache> caches) {
@@ -98,23 +357,38 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       x = MLXOps.multiply(x, MLX.astype(scale, x.dtype()));
     }
     Integer window = descriptor.attention().slidingWindow();
+    int keyLength = caches.get(0).length() + tokenIds.shape()[1];
     MLXArray mask =
-        window != null && window < caches.get(0).offset() + tokenIds.shape()[1]
+        window != null && (window < keyLength || caches.get(0).startPosition() > 0)
             ? AttentionMask.slidingWindow(
                 x.scope(),
+                caches.get(0).nextPosition(),
+                caches.get(0).startPosition(),
                 tokenIds.shape()[1],
-                caches.get(0).offset() + tokenIds.shape()[1],
+                keyLength,
                 window)
             : null;
     MLXArray stepFrequencies =
         descriptor
             .rope()
             .stepFrequencies(
-                x.scope(), descriptor.rotaryDims(), caches.get(0).offset() + tokenIds.shape()[1]);
+                x.scope(),
+                descriptor.rotaryDims(),
+                caches.get(0).nextPosition() + tokenIds.shape()[1]);
     for (int i = 0; i < layers.size(); i++) {
       x = layers.get(i).forward(x, caches.get(i), mask, stepFrequencies);
     }
     return norm.forward(x);
+  }
+
+  /**
+   * Resolves a request-level cache policy against this checkpoint's effective sliding window -- the
+   * same resolution {@link #generate(GenerationRequest, Consumer)} applies, so callers that build
+   * their own caches for {@link #forward} cannot disagree with it.
+   */
+  public final KVCachePolicy resolveCachePolicy(GenerationCachePolicy requested) {
+    return Objects.requireNonNull(requested, "requested")
+        .resolve(descriptor.attention().slidingWindow());
   }
 
   /** Greedily generates up to {@code maxNewTokens}; prompt tokens are included in the result. */
@@ -144,6 +418,12 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     GenerationConfig policy = request.config();
     int[] prompt = request.promptTokenIds();
     validateTokenIds(prompt, policy, config.vocabSize());
+    KVCachePolicy cachePolicy = resolveCachePolicy(request.cachePolicy());
+    long required =
+        policy.maxNewTokens() == 0 ? 0 : (long) prompt.length + policy.maxNewTokens() - 1;
+    // Clamped: an effectively unbounded token budget ("until EOS") is legal on unbounded and
+    // sliding caches; only a bounded FULL capacity can be exceeded up front.
+    cachePolicy.requireCapacity(Math.min(required, Integer.MAX_VALUE), "generation");
     HfTokenizer tokenizer = request.tokenizer();
     if (tokenizer != null && tokenizer.vocabSize() > config.vocabSize()) {
       throw new IllegalArgumentException(
@@ -161,10 +441,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     if (!request.cancellationToken().isCancelled()) {
       decoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
       try (MLXScope generation = scope().newChild();
-          SamplingPipeline sampler = new SamplingPipeline(generation, policy, config.vocabSize())) {
+          SamplingPipeline sampler =
+              new SamplingPipeline(generation, policy, config.vocabSize(), stepBoundaryEvaluator)) {
         List<KVCache> caches = new ArrayList<>();
         for (int i = 0; i < layers.size(); i++) {
-          caches.add(new KVCache(generation));
+          caches.add(new KVCache(generation, cachePolicy));
         }
         int[] input = prompt;
         for (int step = 0; step < policy.maxNewTokens(); step++) {
@@ -174,18 +455,20 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
           }
           try (MLXScope activation = generation.newChild()) {
             MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
-            MLXArray normalized = normalizedHiddenStates(ids, caches);
-            int[] shape = normalized.shape();
-            MLXArray lastHiddenState =
-                MLXShape.slice(
-                    normalized,
-                    new int[] {0, shape[1] - 1, 0},
-                    new int[] {shape[0], shape[1], shape[2]});
-            MLXArray lastLogits =
-                tiedOutput ? embedding.project(lastHiddenState) : lmHead.forward(lastHiddenState);
-            SamplingPipeline.Selection selection =
-                sampler.select(
-                    lastLogits, PenaltyInputs.from(frequencies, config.vocabSize()), step);
+            int[] before = preflight(ids, caches);
+            SamplingPipeline.Selection selection;
+            try {
+              MLXArray lastLogits = step == 0 ? prefill(ids, caches) : decode(ids, caches);
+              selection =
+                  sampler.select(
+                      lastLogits,
+                      PenaltyInputs.from(frequencies, config.vocabSize()),
+                      step,
+                      cacheArrays(caches));
+            } catch (RuntimeException | Error failure) {
+              poisonIfMutated(caches, before);
+              throw failure;
+            }
             int next = selection.tokenId();
             boolean eos = policy.eosTokenIds().contains(next);
             if (!eos && policy.stopTokenIds().contains(next)) {
@@ -252,6 +535,25 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       LOGGER.log(System.Logger.Level.WARNING, "generation terminal listener failed", e);
     }
     return result;
+  }
+
+  private MLXArray prefill(MLXArray ids, List<KVCache> caches) {
+    MLXArray normalized = normalizedHiddenStates(ids, caches);
+    requirePostflight(caches);
+    int[] shape = normalized.shape();
+    MLXArray last =
+        MLXShape.slice(
+            normalized, new int[] {0, shape[1] - 1, 0}, new int[] {shape[0], shape[1], shape[2]});
+    return tiedOutput ? embedding.project(last) : lmHead.forward(last);
+  }
+
+  private MLXArray decode(MLXArray ids, List<KVCache> caches) {
+    if (ids.shape()[1] != 1 || caches.get(0).nextPosition() == 0) {
+      throw new IllegalArgumentException("decode requires one token and a populated cache");
+    }
+    MLXArray normalized = normalizedHiddenStates(ids, caches);
+    requirePostflight(caches);
+    return tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
   }
 
   private static GenerationEvent tokenEvent(int tokenId, String textDelta, Double logProbability) {

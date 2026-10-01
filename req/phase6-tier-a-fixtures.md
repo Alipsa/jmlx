@@ -22,6 +22,7 @@ runs on every relevant pull request; no test downloads a model or tokenizer.
 | Phi-3 fused projection mapping | 2-layer seeded Hugging Face checkpoint with fused QKV and gate/up tensors | prefill logits and two decode logits | `Phi3ModelTest` on macOS CI |
 | Mistral, Gemma v1, Mixtral tiny decoders | committed 2-layer, seeded nonzero Hugging Face safetensors | full prefill logits and two decode logits per family | `MistralModelTest`, `GemmaModelTest`, `MixtralModelTest` on macOS CI |
 | Phase 6.3 family tokenizer bundles | synthetic family-shaped tokenizer/config files and chats | Hugging Face rendered chat text and IDs plus tokenizers encode/decode IDs | `Phase63FamilyTokenizerTest`; `Phase63ModelTokenizerContractTest`; `verifyTokenizerOracleFixtures` |
+| Phase 6.4 Mistral window boundaries | committed window-4 tiny checkpoint; prompts of lengths 3, 4, 6 and 12; chunked prefill and 16 decode steps | independent eager Hugging Face last logits and greedy IDs in `mistral-window.json`; existing `mistral.json` unchanged | `verifyHfReferenceGoldens`; `DecoderSlidingWindowTest` on macOS CI |
 
 `verifyMlxOracleFixtures` verifies that the pinned Python environment reproduces every committed
 oracle output. The original array row remains an environment self-check; Phase 6.1 closes the Java

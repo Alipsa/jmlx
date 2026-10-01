@@ -158,6 +158,58 @@ public sealed interface RopeSpec
     return MLXShape.concatenate(new MLXArray[] {rotated, MLXShape.slice(x, start, stop)}, last);
   }
 
+  /**
+   * Applies RoPE to the valid suffix of each left-padded {@code [B,H,T,D]} row at its absolute next
+   * position. Padded prefixes are copied through and must be excluded by attention masks.
+   */
+  default MLXArray apply(
+      MLXArray x, int rotaryDims, int[] nextPositions, int[] validLengths, MLXArray frequencies) {
+    Objects.requireNonNull(x, "x");
+    Objects.requireNonNull(nextPositions, "nextPositions");
+    Objects.requireNonNull(validLengths, "validLengths");
+    int[] shape = x.shape();
+    if (shape.length != 4
+        || shape[0] == 0
+        || nextPositions.length != shape[0]
+        || validLengths.length != shape[0]) {
+      throw new IllegalArgumentException("batch RoPE requires [B,H,T,D] and B positions/lengths");
+    }
+    boolean scalar = true;
+    for (int row = 0; row < shape[0]; row++) {
+      if (nextPositions[row] < 0 || validLengths[row] <= 0 || validLengths[row] > shape[2]) {
+        throw new IllegalArgumentException("invalid batch RoPE position or valid length");
+      }
+      scalar &= nextPositions[row] == nextPositions[0] && validLengths[row] == shape[2];
+    }
+    if (scalar) {
+      return apply(x, rotaryDims, nextPositions[0], frequencies);
+    }
+    if (this instanceof DynamicNtk) {
+      throw new IllegalArgumentException("DynamicNtk does not support unequal batch positions");
+    }
+    MLXArray[] rows = new MLXArray[shape[0]];
+    for (int row = 0; row < shape[0]; row++) {
+      int padding = shape[2] - validLengths[row];
+      MLXArray valid =
+          MLXShape.slice(
+              x, new int[] {row, 0, padding, 0}, new int[] {row + 1, shape[1], shape[2], shape[3]});
+      MLXArray rotated = apply(valid, rotaryDims, nextPositions[row], frequencies);
+      rows[row] =
+          padding == 0
+              ? rotated
+              : MLXShape.concatenate(
+                  new MLXArray[] {
+                    MLXShape.slice(
+                        x,
+                        new int[] {row, 0, 0, 0},
+                        new int[] {row + 1, shape[1], padding, shape[3]}),
+                    rotated
+                  },
+                  2);
+    }
+    return MLXShape.concatenate(rows, 0);
+  }
+
   private static double[] basePeriods(double theta, int dims) {
     double[] periods = new double[dims / 2];
     for (int i = 0; i < periods.length; i++) {

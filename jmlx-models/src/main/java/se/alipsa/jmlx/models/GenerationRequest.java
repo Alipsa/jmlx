@@ -14,10 +14,27 @@ public final class GenerationRequest {
   private final CancellationToken cancellationToken;
   private final PromptSpecialTokens promptSpecialTokens;
   private final HfTokenizer tokenizer;
+  private final GenerationCachePolicy cachePolicy;
 
   /** Creates a request from already-rendered prompt token IDs. */
   public GenerationRequest(
       int[] promptTokenIds, GenerationConfig config, CancellationToken cancellationToken) {
+    this(
+        promptTokenIds,
+        config,
+        cancellationToken,
+        PromptSpecialTokens.PRETOKENIZED,
+        null,
+        GenerationCachePolicy.full());
+  }
+
+  private GenerationRequest(
+      int[] promptTokenIds,
+      GenerationConfig config,
+      CancellationToken cancellationToken,
+      PromptSpecialTokens promptSpecialTokens,
+      HfTokenizer tokenizer,
+      GenerationCachePolicy cachePolicy) {
     this.promptTokenIds =
         Arrays.copyOf(
             Objects.requireNonNull(promptTokenIds, "promptTokenIds"), promptTokenIds.length);
@@ -26,24 +43,9 @@ public final class GenerationRequest {
     }
     this.config = Objects.requireNonNull(config, "config");
     this.cancellationToken = Objects.requireNonNull(cancellationToken, "cancellationToken");
-    this.promptSpecialTokens = PromptSpecialTokens.PRETOKENIZED;
-    this.tokenizer = null;
-  }
-
-  private GenerationRequest(
-      int[] promptTokenIds,
-      GenerationConfig config,
-      CancellationToken cancellationToken,
-      PromptSpecialTokens promptSpecialTokens,
-      HfTokenizer tokenizer) {
-    this.promptTokenIds = Arrays.copyOf(promptTokenIds, promptTokenIds.length);
-    if (this.promptTokenIds.length == 0) {
-      throw new IllegalArgumentException("promptTokenIds must not be empty");
-    }
-    this.config = Objects.requireNonNull(config, "config");
-    this.cancellationToken = Objects.requireNonNull(cancellationToken, "cancellationToken");
     this.promptSpecialTokens = Objects.requireNonNull(promptSpecialTokens, "promptSpecialTokens");
-    this.tokenizer = Objects.requireNonNull(tokenizer, "tokenizer");
+    this.tokenizer = tokenizer;
+    this.cachePolicy = Objects.requireNonNull(cachePolicy, "cachePolicy");
   }
 
   /**
@@ -106,7 +108,24 @@ public final class GenerationRequest {
         config,
         cancellationToken,
         specialTokens,
-        tokenizer);
+        tokenizer,
+        GenerationCachePolicy.full());
+  }
+
+  /** Returns a copy of this request with an explicit cache policy. */
+  public GenerationRequest withCachePolicy(GenerationCachePolicy policy) {
+    return new GenerationRequest(
+        promptTokenIds,
+        config,
+        cancellationToken,
+        promptSpecialTokens,
+        tokenizer,
+        Objects.requireNonNull(policy, "policy"));
+  }
+
+  /** Returns this request's cache retention policy. */
+  public GenerationCachePolicy cachePolicy() {
+    return cachePolicy;
   }
 
   /** Returns a defensive copy of the prompt IDs. */

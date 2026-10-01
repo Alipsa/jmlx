@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     implementation project(':jmlx-core')
+    implementation project(':jmlx-models')
+    implementation libs.jackson.databind
 
     testImplementation testFixtures(project(':jmlx-ffi'))
 }
@@ -30,6 +32,16 @@ application {
 // JMLX_LIBRARY_PATH instead (NativeLoader already supports it) to wherever
 // they ran bootstrap-native.sh.
 tasks.named('run', JavaExec).configure {
+    def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
+    systemProperty('jmlx.library.path', nativeLibDir)
+}
+
+tasks.register('benchmarkDecode', JavaExec) {
+    group = 'verification'
+    description = 'Runs the opt-in Phase 6.4 decoder benchmark against a local checkpoint.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.examples.DecodeBenchmark'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
     def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
     systemProperty('jmlx.library.path', nativeLibDir)
 }

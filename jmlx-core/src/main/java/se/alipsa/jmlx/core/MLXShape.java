@@ -170,6 +170,22 @@ public final class MLXShape {
   }
 
   /**
+   * Takes slices into an explicit destination scope. Callers that need storage independent of
+   * {@code a}'s scope must evaluate the result before releasing the source scope.
+   */
+  public static MLXArray takeAxis(MLXArray a, MLXArray indices, MLXScope destination, int axis) {
+    if (destination == null) {
+      throw new IllegalArgumentException("takeAxis destination must not be null");
+    }
+    MemorySegment res = mlx_h.mlx_array_new(destination);
+    NativeOps.checked(
+        "takeAxis",
+        () ->
+            mlx_h.mlx_take_axis(res, a.handle(), indices.handle(), axis, NativeOps.DEFAULT_STREAM));
+    return new MLXArray(destination, res);
+  }
+
+  /**
    * Takes values elementwise along {@code axis}. Unlike {@link #takeAxis}, this does not insert the
    * full indices shape: {@code indices} must be broadcast-compatible with {@code a} outside the
    * selected axis.

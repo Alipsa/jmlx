@@ -37,6 +37,7 @@
     "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
     "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
     "llama31.json": "51c231ec47bfa9461ca7b1b85cfc9899b21ab0691e218510d5f0f49cd706b5a4",
+    "mistral-window.json": "66925477007852aaeddd4f0571c0ae410045b1359c8802caaf09a9a5431269e4",
     "mistral.json": "c9c7b6fae983a8ec1f36fa0b9acb25c804bd8e46df7af1b0f73b2779bd144554",
     "mixtral.json": "a918494a8f61a882393772b6d1fbaa0deab33b32c84cccb5c0d995f685fee8aa",
     "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06",

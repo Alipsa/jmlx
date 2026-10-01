@@ -645,6 +645,45 @@ the same commit as this plan so no document contradicts it.
    hashes, runtime pins), `req/mlx-api-inventory*.md` if a binding was added, and the README and
    CLAUDE.md summaries.
 
+## Step 0 record (2026-10-01, host Apple M2 Max, 64 GB, macOS 26.7, base `54f031f`)
+
+Ratified unchanged: D1–D5, P1–P5, G1–G7, the 0.5 slack, `deltaCap` 1% (8-bit) and 5% (4-bit),
+N = 4096, C = 256, the step 5 tolerance `0.25 × deltaCap`, and the probe parameters (k = 4 float32,
+k = 1 bfloat16/float16, 10%, seed 12345, 25% warning level). **Decision date: 2026-10-08. 1b
+deadline: 2026-10-22.**
+
+**Embedding dtype.** All seven fixtures are float32 weights, so the early D2 check (embedding dtype
+equals K/V dtype) holds for them. The Tier-B checkpoints are checked in step 6.
+
+**Float chunk noise** (last-position logits, 4-token sequential `forward` versus one `forward`
+over 31 tokens; `QuantizedKvFeasibilityProbeTest`): 3e-6 % to 1.5e-5 % of the logit range for every
+fixture, orders of magnitude below half of the smallest tolerance (0.25 %). No per-fixture raise.
+
+**Float-only margin feasibility** (32 teacher-forced positions; positions excluded when
+`floatMargin ≤ 2 × deltaCap`; the 10% cap allows 3):
+
+| Fixture | Excluded at 1% | Excluded at 5% | Flip limit |
+| --- | ---: | ---: | --- |
+| llama | 11 | 27 | dropped |
+| llama31 | 6 | 20 | dropped |
+| qwen2 | 5 | 28 | dropped |
+| mistral (window 4) | 4 | 26 | dropped |
+| gemma | 0 | 0 | kept (0 excluded: any flip fails) |
+| phi3 | 8 | 27 | dropped |
+| mixtral | 10 | 31 | dropped |
+
+The random-weight fixtures have top-1/top-2 margins around 0.01–0.1 against a logit range near
+0.8. The exclusion threshold is a fraction of the range, so more positions or a different prompt
+change the count of excluded positions in proportion, not the fraction, so more positions would
+not bring six of the seven under 10% (reasoned from the distribution above, not re-measured with
+other prompts). **Last resort applied (recorded before any quantized run):** llama, llama31,
+qwen2, mistral, phi3 and mixtral are dropped from the flip limit for G1 and G2 and gated by the
+Δ cap alone. gemma keeps both. G3 (real checkpoint) keeps its flip limit and the 10% cap.
+
+**Informational float baseline** (tokens/s median of 5 samples, 32 tokens, prompt 1,7,42,3,19,5,
+full policy; raw JSON in `req/data/phase6-4-1-baseline/`): llama 1076.9, llama31 1099.6,
+qwen2 1080.0, mistral 1089.1, gemma 830.6, phi3 1097.4, mixtral 762.0. Not the G6 comparison.
+
 ## Exit gate (enabling the opt-in policy)
 
 Enablement requires **all** of:

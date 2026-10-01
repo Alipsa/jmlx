@@ -14,7 +14,7 @@ On a bootstrapped macOS Apple Silicon host, run each synthetic family in a fresh
 
 ```sh
 ./scripts/bootstrap-native.sh
-for family in llama qwen2 mistral gemma phi3 mixtral; do
+for family in llama llama31 qwen2 mistral gemma phi3 mixtral; do
   ./gradlew :jmlx-examples:benchmarkDecode \
     --args="${PWD}/tools/hf-reference/goldens/checkpoints/${family} ${PWD}/build/phase6-4-${family} 1,7,42,3,19,5 32 5 2 full"
 done

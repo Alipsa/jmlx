@@ -690,7 +690,9 @@ Decision made on 2026-10-01, before the 2026-10-08 decision date. Candidate A fa
 in all 27 measured cases, including the mandatory D=16 float32 4-bit group 32 setting (6.4-21.0%
 against the 5% limit). The attention path adds under 0.001% for float32; the error is the packed
 K/V itself, so candidates B and C, which read the same packed K/V, cannot pass either and were not
-built (the written reason the stop rule asks for). P2, P3, P4 and P5 passed. Full numbers, the
+built. B was measured for P1 through its one-block case (dequantize, then float SDPA), whose
+error is the same floor; B's P2-P5 were not measured because P1 decides. This is a ruling, since
+the stop rule says "measure B". P2, P3, P4 and P5 passed. Full numbers, the
 quantizer-floor diagnostic and the other facts are in `req/phase6-4-benchmark.md` ("Phase 6.4.1
 step 1"), raw output in `req/data/phase6-4-1-probe/`.
 

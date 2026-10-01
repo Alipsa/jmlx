@@ -76,8 +76,8 @@ amendment that changes what is being quantized). The explicit rejection in
 skipped, so 6.5 code uses `keys()`/`values()` and a future reopening must migrate those consumers
 (plan, "Sequence and blocking").
 
-Host Apple M2 Max, macOS 26.7, pinned mlx-metal 0.31.2 / mlx-c `fba4470`, commit `54f031f` plus
-the uncommitted probe. Probe: `PackedAttentionProbeTest` (random normal K/V/Q seeded 20261001,
+Host Apple M2 Max, macOS 26.7, pinned mlx-metal 0.31.2 / mlx-c `fba4470`, commit `6e4cb43`
+plus the probe. Probe: `PackedAttentionProbeTest` (random normal K/V/Q seeded 20261001,
 B=1, 2 kv heads x 4 query heads, S = 2048/4096, L = 1 and 256, causal/sliding/left-padded batch
 masks). Raw output: `req/data/phase6-4-1-probe/packed-attention-probe.txt`. Candidate A is packed
 `quantized_matmul` attention with GQA folded into the query axis (so the packed K/V need no head
@@ -88,17 +88,28 @@ broadcast), masks applied with `where(mask, scores, lowest)`, and zero-padded qu
 | P1 accuracy (max error as % of float output max abs; limit 1% for 8-bit, 5% for 4-bit) | **4-bit fails everywhere**: D16 f32 6.4-21.0%, D64 f32 6.1-16.5%, D64 bf16 6.2-23.1% (0 of 27 cases pass). 8-bit: D16 f32 0.5-1.3% (6/9 pass), D64 f32 0.4-1.0% (8/9), D64 bf16 0.8-2.3% (1/9) |
 | P2 peak below float at S=4096 | pass for all six configurations (for example D64 f32 4-bit: 1.78 MB packed against 25.4 MB float) |
 | P3 scaling bound | pass for all six; peak growth per token was identical across the 5 runs (spread 0), so no configuration was inconclusive |
-| P4 time <= 2.0 x float | pass for all six in the final run (ratios 0.86-1.87); bf16 8-bit read 2.02 in an earlier run, so it sits on the limit |
+| P4 time <= 2.0 x float | ratios 0.84-2.00 in the committed run: five configurations pass; bf16 8-bit printed 2.00 and FAIL. Across three runs of the same code bf16 8-bit read 1.87, 2.02 and 2.00, so it sits on the limit and P4 is not decisive for it (timing noise). The other five read 0.84-1.78 |
 | P5 host synchronizations | 0 (lazy graph) |
 
-**Why P1 fails, and why B and C cannot fix it.** `quantizerFloorDiagnostic` compares three
+**Why P1 fails, and why B and C cannot fix it.** Candidate B was measured at the only level
+that decides P1: `viaDequant` in the diagnostic below is B with a single block (dequantize K/V,
+then float SDPA). Splitting it into blocks with an online softmax changes only reduction order, so
+its P1 error is that floor (9-17% at 4 bits). B's P2-P5 were not measured, because P1 already
+decides the stop; this is a ruling, not a skipped rule. C was not built, with this reason.
+ `quantizerFloorDiagnostic` compares three
 outputs on identical inputs: float SDPA over the original K/V, float SDPA over the
 quantize-then-dequantize K/V, and candidate A. For float32 the attention path adds 0.0000-0.0003%
 over float SDPA on the dequantized K/V, so all of A's error is in the packed K/V. For bfloat16 the
-added share is 0.4-0.9% (precise-softmax and bf16 matmul rounding) on top of a 1.1-13% floor.
+added share is 0.56-0.90% (precise-softmax and bf16 matmul rounding) on top of a 1.1-13% floor.
 Candidates B (blocked dequantization with online softmax) and C (fused kernel) read the same packed
 K/V, so their output equals attention over dequantized K/V up to reduction order, which is exactly
 the float32 diagnostic. They cannot get below the floor, so neither was built.
+Note that draws differ between tests: the same D16 4-bit S=2048 L=256 causal case reads 21.0% in
+`accuracy` and 9.0% in the floor diagnostic, so the per-case range is noisy; the 4-bit minimum
+(6.1%) is what the decision rests on. The batched cells also include padded query rows, whose
+outputs are raw V values, which enlarges the denominator, so they read lower and flatter the 8-bit
+pass counts. Neither affects the stop.
+
 Under a sharper attention pattern (queries scaled by 6) the 4-bit error reaches 33-68% because
 key rounding moves the softmax; 8-bit stays at 2-4%.
 
@@ -126,7 +137,12 @@ that matters for a future attempt.
 - Unmeasured because the decision came first: `quantized_matmul` with a genuinely broadcast batch
   axis (not needed by the folded layout), chunked-prefill memory, and every model-level gate.
 
-**What a new design would have to change.** The error is set by 4-bit affine rounding of K/V
-within 32-64 element groups, so a reopening needs a different quantizer rather than a different
-attention kernel: for example 8-bit only (still marginal against P1 as written), per-channel or
-outlier-aware key grouping, or quantizing values but keeping keys in float.
+**What a reopening would have to change.** The error is the 4-bit affine rounding of K/V itself.
+On this probe's inputs (independent normal K/V, near-uniform attention) the output and the
+quantization error both scale with 1/sqrt(S), so the relative error is about the per-element
+4-bit noise (an analytical estimate from the quantization step, not a measurement). That points
+to 4-bit P1 being unreachable on this input for any 4-bit scalar quantizer, with or without
+per-channel or outlier-aware grouping, which would only help real keys that have outlier
+channels. A reopening therefore has to amend P1's inputs or metric (with dated evidence from real
+K/V) or drop 4-bit, not only change the quantizer or kernel. Options are 8-bit only (marginal
+against P1 as written), or quantizing values but keeping keys in float.

@@ -637,7 +637,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     return tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
   }
 
-  private static GenerationEvent tokenEvent(int tokenId, String textDelta, Double logProbability) {
+  static GenerationEvent tokenEvent(int tokenId, String textDelta, Double logProbability) {
     if (textDelta == null) {
       return logProbability == null
           ? GenerationEvent.token(tokenId)
@@ -652,7 +652,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     return Arrays.stream(ids).boxed().toList();
   }
 
-  private static void validateTokenIds(int[] prompt, GenerationConfig policy, int vocabularySize) {
+  static void validateTokenIds(int[] prompt, GenerationConfig policy, int vocabularySize) {
     for (int token : prompt) {
       requireTokenId("prompt", token, vocabularySize);
     }

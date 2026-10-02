@@ -1,15 +1,29 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import se.alipsa.jmlx.jinja.JinjaException;
+import se.alipsa.jmlx.jinja.RenderOptions;
 import se.alipsa.jmlx.jinja.Template;
 
 /** Renders a Hugging Face {@code chat_template} Jinja string via {@code jmlx-jinja}. */
 public final class ChatTemplateRenderer {
+  /**
+   * Templates such as Llama 3.x's call {@code strftime_now} to date their system prompt. Hugging
+   * Face resolves it against the current time in the local zone, and {@code jmlx-jinja} refuses to
+   * guess a clock, so this supplies the same one. The rendered prompt therefore depends on the date
+   * for those templates, exactly as it does in Hugging Face.
+   */
+  private static final RenderOptions RENDER_OPTIONS =
+      RenderOptions.builder()
+          .clock(Clock.systemDefaultZone())
+          .zoneId(ZoneId.systemDefault())
+          .build();
 
   private ChatTemplateRenderer() {}
 
@@ -68,7 +82,7 @@ public final class ChatTemplateRenderer {
     context.put("bos_token", bosToken);
     context.put("eos_token", eosToken);
     try {
-      return chatTemplate.render(context);
+      return chatTemplate.render(context, RENDER_OPTIONS);
     } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);
@@ -98,7 +112,8 @@ public final class ChatTemplateRenderer {
         chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
     Objects.requireNonNull(context, "ChatTemplateRenderer.render: context must not be null");
     try {
-      return chatTemplate.render(Collections.unmodifiableMap(new HashMap<>(context)));
+      return chatTemplate.render(
+          Collections.unmodifiableMap(new HashMap<>(context)), RENDER_OPTIONS);
     } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);

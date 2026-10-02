@@ -68,4 +68,24 @@ class ChatTemplateRendererTest {
             + "<|im_start|>assistant\n",
         result);
   }
+
+  @Test
+  void templatesThatDateThemselvesWithStrftimeNowRender() {
+    // Llama 3.x chat templates call strftime_now("%d %b %Y"); the renderer supplies a clock.
+    String template = "{{ strftime_now('%Y') }}|{{ messages[0]['content'] }}";
+    List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "hi"));
+    String rendered =
+        ChatTemplateRenderer.render(
+            template, java.util.Map.of("messages", messages, "add_generation_prompt", false));
+    assertEquals(java.time.Year.now().toString() + "|hi", rendered);
+    assertEquals(
+        rendered,
+        ChatTemplateRenderer.render(
+            ChatTemplateRenderer.parse(template),
+            messages,
+            false,
+            "<s>",
+            "</s>",
+            java.util.Map.of()));
+  }
 }

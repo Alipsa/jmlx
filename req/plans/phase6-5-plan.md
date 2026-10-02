@@ -62,8 +62,9 @@ native object. Document these behaviors in Javadoc before implementing the worke
   return type. Do not accept a caller-loaded model or scope: `MLXScope.newChild()` and every
   weight access check the owning thread. The worker alone closes the model and root when the
   scheduler closes. Submission and cancellation never touch MLX arrays or caches.
-- Complete request stages on a dedicated, bounded completion dispatcher so synchronous
-  `CompletionStage` dependents never execute on the MLX worker. Reserve one completion
+- Complete request stages on a dedicated, bounded completion dispatcher so the MLX worker
+  never runs a request's completion itself. This guarantees where completion is dispatched,
+  not where every observer runs (see the registering-thread limit below). Reserve one completion
   slot for every accepted request at submission; retain it through queued and active
   states and release it only after the dispatcher has run that request's completion.
   The dispatcher queue plus running completions is therefore bounded by the total
@@ -73,14 +74,15 @@ native object. Document these behaviors in Javadoc before implementing the worke
   `toCompletableFuture()` returns a new future, so no hand-written facade is needed. The
   handle's `cancel()` atomically ORs its signal with `GenerationRequest.cancellationToken()`.
   Stage cancellation is not a request cancellation API; a caller must use the handle.
-  Document that completion observers must return promptly and must not block on another
-  request's stage; doing so can deadlock a bounded dispatcher. Document the remaining limit
-  on "dependents never run on the worker": a non-async dependent attached to an **already
-  completed** stage runs on the attaching thread, so a token listener or event callback
-  (which runs on the worker) that calls `otherHandle.stage().thenRun(...)` on a finished
-  request runs that code on the MLX worker. Callbacks must use the `*Async` forms or avoid
-  attaching dependents. Reject `close()` from the worker or completion dispatcher with
-  `IllegalStateException` to prevent self-join.
+  Document that completion observers must return promptly and must not block on another request's
+  stage; doing so can deadlock a bounded dispatcher. Document the registering-thread limit: a
+  non-async dependent (`thenAccept`, `thenApply`, `thenRun`, ...) attached to an **already
+  completed** stage runs immediately on the attaching thread, and a read-only
+  `minimalCompletionStage()` does not change that. A token listener or event callback (which runs
+  on the worker) that calls `otherHandle.stage().thenAccept(...)` on a finished request therefore
+  runs that observer on the MLX worker, so such an observer must not block or use MLX. Callbacks
+  must use the `*Async` forms or avoid attaching dependents. Reject `close()` from the worker or
+  completion dispatcher with `IllegalStateException` to prevent self-join.
 - Configure positive `maxBatchSize`, `maxQueuedRequests`, and a bounded prompt-token budget
   for a batch. Count prefill work as `rows × maximum padded prompt width`, including left
   padding, rather than summing valid prompt lengths. Reject a prompt exceeding the budget
@@ -378,23 +380,25 @@ and reuses an existing extraction after only a file-size check, so on a machine 
 ran jmlx at the same pin the smoke would never extract from the published jar. Run the
 consumer with `-Djmlx.native.cache.path=<disposable empty dir>` and assert that the pinned
 files were freshly extracted there (directory empty before, expected files present after).
-Use the committed synthetic Mistral checkpoint at
-`tools/hf-reference/goldens/checkpoints/mistral/` and its paired chat tokenizer at
-`jmlx-tokenizer/src/test/resources/families/mistral/`. The checkpoint's `vocab_size` is 128
-but the tokenizer fixture only defines ids 0–24, and `TokenizerRuntime.decodableToken`
-returns null (decoded as `""`) for ids above the largest known id, so sampling over 128
-logits mostly streams empty deltas. No option restricts selection by id (`GenerationConfig`
-has no logit mask and its shape is frozen), and `topK`/low temperature limit by rank, so ids
-above 24 can still win. Ids 21–24 are special tokens that the decoder skips, so they also
-decode to `""`; ids 18–20 are byte-fallback pieces that may buffer partial UTF-8; the usable
-text-producing range is therefore about 0–17. The checkpoint's `eos_token_id` is 2 (`h` in
-this vocabulary, not the tokenizer's `</s>`, id 22), so generating id 2 ends the run with
-EOS unless the golden's `eosTokenIds` says otherwise; record `eosTokenIds` in the golden.
-Pick the prompt and seed **by experiment** so that at least one generated id lies in the
-text-producing range and the committed golden contains **at least one non-empty decoded
-delta**; assert this in the smoke. A smoke setup task copies `config.json`,
-`generation_config.json`, and `model.safetensors` from the checkpoint, plus `tokenizer.json`
-and `tokenizer_config.json` from the tokenizer fixture, into one disposable model directory.
+Use the committed synthetic Mistral checkpoint at `tools/hf-reference/goldens/checkpoints/mistral/`,
+but **not** its chat tokenizer at `jmlx-tokenizer/src/test/resources/families/mistral/`: the two are
+not a pair. The checkpoint has `vocab_size` 128 and `bos_token_id`/`eos_token_id` 1/2, while that
+tokenizer defines only ids 0-24 with BOS/EOS 21/22. The generation size check accepts the smaller
+tokenizer, and `TokenizerRuntime.decodableToken` returns null (decoded as `""`) for ids above the
+largest known id, so sampling over 128 logits would silently drop ids 25-127 and stream empty
+deltas; an exact golden would then pass while text is missing. Nothing can restrict selection by id
+(`GenerationConfig` has no logit mask and its shape is frozen; `topK`/low temperature limit by rank
+only). Commit a dedicated smoke tokenizer under `tools/release-smoke/fixtures/` that defines every
+id 0-127, with special-token ids matching the checkpoint (BOS 1, EOS 2) and a chat template the
+renderer accepts, so every id the model can emit decodes to something. Give it a provenance note
+stating how it was built (hand-written, not Hugging Face-generated). The smoke asserts that the
+tokenizer's id range equals the checkpoint's `vocab_size`, that the golden's `eosTokenIds` match the
+checkpoint's, and, over the golden's generated ids, that every non-special id yields non-empty text.
+Ids that are special or byte-fallback pieces (partial UTF-8 buffers) may stream empty deltas, so
+choose the prompt and seed **by experiment** so the committed golden contains at least one non-empty
+decoded delta, and assert that. A smoke setup task copies `config.json`, `generation_config.json`,
+and `model.safetensors` from the checkpoint, plus `tokenizer.json` and `tokenizer_config.json` from
+the dedicated smoke tokenizer fixture, into one disposable model directory.
 The consumer reads that directory from a filesystem path; neither fixture is supplied
 through the consumer classpath. Commit a seeded smoke golden under
 `tools/release-smoke/goldens/` containing the chat prompt IDs, generated IDs, decoded

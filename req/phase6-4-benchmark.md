@@ -190,3 +190,28 @@ return to the baseline in every run), not that it is faster at this size, and sa
 Tier-B run on real weights. The batched peak is the whole run's peak, including the cohort's
 cache compaction, and is higher than the direct peak because the cohort holds three rows' caches at
 once; it is not broken out per phase. No speed threshold is enforced anywhere in CI.
+
+### One real-size run (unpinned local checkpoint)
+
+The same benchmark on a locally fine-tuned, fused Llama 3.2 1B checkpoint (bfloat16 float
+safetensors, 16 layers, hidden size 2048, vocab 128,256), 3 requests with prompt lengths 4/7/5 and
+new tokens 24/8/16, 5 samples after 2 warm-ups, max batch 4, Apple M2 Max, commit `c5899f8`. **This
+is not Tier-B evidence**: the checkpoint is unpinned and its hashes are not recorded, and the prompt
+IDs are arbitrary Llama-3 token IDs, not a chat prompt.
+
+| | Direct | Batched |
+| --- | ---: | ---: |
+| Median tokens/s (48 tokens) | 90.2 | 92.3 (1.02x) |
+| Wall ms, per sample | 544, 554, 523, 531, 532 | 520, 563, 555, 475, 487 |
+| First-token ms, requests 1/2/3 | 101 / 324 / 400 | 106 / 106 / 123 |
+| Total ms, requests 1/2/3 | 307 / 384 / 532 | 475 / 249 / 440 |
+| Peak active bytes | 2,497,646,844 | 2,544,668,488 |
+| Active bytes left after a run | 0 | 0 |
+
+Aggregate throughput did not improve, but latency did: batching starts every request's first token
+at about the first request's latency instead of waiting behind the others, and the shortest request
+finishes sooner (249 ms versus 384 ms). The long request finishes later (475 ms versus 307 ms)
+because it shares its steps with the others. Peak memory is about 2% higher. The wall-time
+samples overlap, so the throughput difference is within noise. I have not investigated why batching
+a 1B model at this size yields no aggregate gain, so treat that as unexplained, not as a property of
+batching.

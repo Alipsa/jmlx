@@ -168,24 +168,25 @@ for family in llama llama31 qwen2 mistral gemma phi3 mixtral; do
 done
 ```
 
-Run on Apple M2 Max, Java 25.0.3, `mlx-metal==0.31.2`, mlx-c `fba4470`, commit `1a98704` (the
-working tree also held the uncommitted benchmark class). Median tokens/s over the 48 generated
-tokens:
+Run on Apple M2 Max, Java 25.0.3, `mlx-metal==0.31.2`, mlx-c `fba4470`, commit `c5899f8`. The
+direct and batched runs alternate which goes first on each iteration (an earlier recording that
+always ran direct first overstated some speedups and is superseded). Median tokens/s over the 48
+generated tokens:
 
 | Family | Direct | Batched | Speedup | Peak active bytes (direct / batched) | Leaked after run |
 | --- | ---: | ---: | ---: | --- | ---: |
-| llama | 1149 | 1128 | 0.98 | 454,648 / 739,043 | 0 |
-| llama31 | 1155 | 1331 | 1.15 | 454,680 / 753,414 | 0 |
-| qwen2 | 1120 | 1047 | 0.94 | 461,816 / 780,006 | 0 |
-| mistral | 1102 | 1365 | 1.24 | 454,784 / 754,177 | 0 |
-| gemma | 883 | 1169 | 1.32 | 483,592 / 933,579 | 0 |
-| phi3 | 1168 | 1238 | 1.06 | 454,648 / 753,382 | 0 |
-| mixtral | 817 | 918 | 1.12 | 1,179,648 / 1,557,003 | 0 |
+| llama | 1105 | 1344 | 1.22 | 454,648 / 753,382 | 0 |
+| llama31 | 1148 | 1265 | 1.10 | 454,680 / 739,203 | 0 |
+| qwen2 | 1062 | 931 | 0.88 | 461,816 / 765,667 | 0 |
+| mistral | 1073 | 1091 | 1.02 | 454,784 / 739,819 | 0 |
+| gemma | 834 | 843 | 1.01 | 483,592 / 912,075 | 0 |
+| phi3 | 1139 | 1083 | 0.95 | 454,648 / 753,382 | 0 |
+| mixtral | 805 | 900 | 1.12 | 1,179,648 / 1,557,003 | 0 |
 
 How to read this: these are the tiny synthetic fixtures, so each step is dominated by fixed
-per-call overhead, not arithmetic, and the speedups (0.94-1.32) are within run-to-run noise for
-some families. They show that batching is correct, leak-free (active bytes return to the baseline in
-every run) and not slower in aggregate, **not** what it buys on a production-size model; that needs
-a Tier-B run on real weights. The batched peak is the whole run's peak, including the cohort's
+per-call overhead, not arithmetic, and the speedups (0.88-1.22) are within run-to-run noise for
+most families, and two are below 1. They show that batching is correct and leak-free (active bytes
+return to the baseline in every run), not that it is faster at this size, and say nothing about a production-size model; that needs a
+Tier-B run on real weights. The batched peak is the whole run's peak, including the cohort's
 cache compaction, and is higher than the direct peak because the cohort holds three rows' caches at
 once; it is not broken out per phase. No speed threshold is enforced anywhere in CI.

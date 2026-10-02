@@ -34,8 +34,8 @@ real Tier-B artifact; its equivalence tests use the synthetic checkpoints.
 
 Method, command and results are in the
 [Phase 6.5 section of the benchmark report](phase6-4-benchmark.md#phase-65-direct-versus-batched-decode),
-recorded on an Apple M2 Max with the pins below. Batched throughput was between 0.94x and 1.32x the
-direct path over the seven synthetic families. Those checkpoints are tiny, so the numbers show
+recorded on an Apple M2 Max with the pins below. Batched throughput was between 0.88x and 1.22x the
+direct path over the seven synthetic families (two below 1). Those checkpoints are tiny, so the numbers show
 correctness and the absence of leaks (active bytes return to baseline), not production-size gains. A
 Tier-B-size run is outstanding. No speed threshold is enforced in CI.
 

@@ -154,7 +154,8 @@ synthetic fixtures were too tie-prone for the flip limit in step 0.
 through the direct path and once through a `BatchGenerationScheduler`, each in the same JVM with the
 two runs alternating (model load is outside both clocks). It downloads nothing and writes
 `<prefix>.json` (per-sample wall times, per-request first-token and total latency, peak and
-leaked active bytes) and `<prefix>.md`. Memory counters are read only while no other thread uses
+leaked active bytes, and the per-sample cohort sizes the batched run actually ran) and
+`<prefix>.md`. Memory counters are read only while no other thread uses
 MLX: the direct scope and the scheduler are both closed first.
 
 Command, per family, each in a fresh JVM (3 requests, prompt lengths 6/3/5, new tokens 24/8/16,
@@ -190,6 +191,12 @@ return to the baseline in every run), not that it is faster at this size, and sa
 Tier-B run on real weights. The batched peak is the whole run's peak, including the cohort's
 cache compaction, and is higher than the direct peak because the cohort holds three rows' caches at
 once; it is not broken out per phase. No speed threshold is enforced anywhere in CI.
+
+The JSON report also records the cohort sizes that actually ran in each sample
+(`batched_cohort_sizes`): the worker may form a cohort of one before the rest of the queue arrives,
+so a speedup can only be attributed to a batch shape by reading that field. The tables in this
+section predate the field and were recorded without forcing cohort formation, so they do not
+guarantee that a B>1 forward ran in every sample.
 
 ### One real-size run (unpinned local checkpoint)
 

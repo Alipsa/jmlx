@@ -21,10 +21,24 @@ class BatchSchedulerMemoryTest {
   private static final int[][] PROMPTS = {{1, 7, 42, 3, 19, 5}, {1, 9, 4}, {1, 2, 3, 4, 5}};
   private static final long SLACK = 8L * 1024 * 1024;
 
-  private static void cohort(BatchGenerationScheduler scheduler, int newTokens) throws Exception {
+  /**
+   * Runs one gated cohort of all three prompts and appends {@code MLXMemory.activeBytes()} read
+   * from the worker (the only thread allowed to read it while the scheduler runs) on every token of
+   * the first row.
+   */
+  private static void cohort(BatchGenerationScheduler scheduler, int newTokens, List<Long> samples)
+      throws Exception {
     List<BatchRequestHandle> handles = new ArrayList<>();
-    for (int[] prompt : PROMPTS) {
-      handles.add(scheduler.submit(greedy(prompt, newTokens), e -> {}));
+    for (int i = 0; i < PROMPTS.length; i++) {
+      boolean sampler = i == 0;
+      handles.add(
+          scheduler.submit(
+              greedy(PROMPTS[i], newTokens),
+              e -> {
+                if (sampler && e.tokenId() != null) {
+                  samples.add(MLXMemory.activeBytes());
+                }
+              }));
     }
     for (BatchRequestHandle handle : handles) {
       await(handle);
@@ -33,15 +47,16 @@ class BatchSchedulerMemoryTest {
 
   @Test
   void repeatedCohortsDoNotGrowActiveMemory() throws Exception {
+    // The gate is one-shot; later cohorts run ungated. Every cohort has the same shape, so the
+    // last sample of the first and of the last cohort are at the same point in the lifecycle.
+    List<Long> samples = new ArrayList<>();
     try (BatchGenerationScheduler scheduler = start("llama", config(4, 8), gated(3))) {
-      cohort(scheduler, 6);
-      long afterFirst = MLXMemory.activeBytes();
+      cohort(scheduler, 6, samples);
+      long afterFirst = samples.getLast();
       for (int i = 0; i < 12; i++) {
-        BatchGenerationScheduler fresh =
-            scheduler; // the gate is one-shot; later cohorts run ungated
-        cohort(fresh, 6);
+        cohort(scheduler, 6, samples);
       }
-      long growth = MLXMemory.activeBytes() - afterFirst;
+      long growth = samples.getLast() - afterFirst;
       assertTrue(
           growth <= SLACK,
           "12 further cohorts retained " + growth + " native bytes after their scopes closed");

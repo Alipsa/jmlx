@@ -49,6 +49,22 @@ class MLXScopeTest {
   }
 
   @Test
+  void aRootScopeIsRejectedOnAVirtualThread() throws Exception {
+    // MLX's per-stream state is bound to the OS thread (a C++ thread_local), which a virtual
+    // thread migrates between; every check in MLXScope compares thread objects and would keep
+    // passing, so the rejection is up front. It precedes the thread's first stream, so no native
+    // stream is created and the test may share the suite's JVM.
+    AtomicReference<Throwable> caught = new AtomicReference<>();
+    Thread virtual =
+        Thread.ofVirtual()
+            .name("virtual-scope-probe")
+            .start(() -> caught.set(catchThrowable(MLXScope::new)));
+    virtual.join();
+    IllegalStateException e = assertInstanceOf(IllegalStateException.class, caught.get());
+    assertTrue(e.getMessage().contains("virtual"), e.getMessage());
+  }
+
+  @Test
   void eachThreadRunsOpsOnItsOwnStreamEvenWhenAnotherThreadUsedMlxFirst() throws Exception {
     // MLX streams are thread-bound ("There is no Stream(gpu, N) in current thread"), and the
     // process-wide default stream only worked for the first thread to touch it. Run real ops

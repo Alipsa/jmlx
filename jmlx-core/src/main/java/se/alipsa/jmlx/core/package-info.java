@@ -18,6 +18,24 @@
  * scheduler rejects a second running scheduler), and the direct {@code generate} API cannot be
  * blocked, so mixing the direct path with a running scheduler is a documentation-only rule.
  *
+ * <p><b>Per-thread cost.</b> Every thread that uses MLX directly carries its own scheduler stream:
+ * the first root {@code MLXScope} a thread builds creates it (about 60 KB measured per stream), and
+ * it is never freed -- mlx-c has no call that removes a stream from MLX's scheduler, and freeing
+ * the handle would reclaim nothing but a few bytes. A process that churns MLX-using threads
+ * therefore accumulates one stream per thread for its whole life: a thread-per-request server that
+ * calls the direct {@code generate} API one request at a time keeps growing one stream per request
+ * thread with no upper bound, and a scheduler that is closed and restarted adds one per worker
+ * thread. Prefer one long-lived MLX thread (the scheduler's worker is the built-in shape) over many
+ * short-lived ones.
+ *
+ * <p><b>Virtual threads.</b> Virtual threads cannot be MLX threads. The stream binding is to the OS
+ * thread -- in the pinned mlx-metal 0.31.2, each stream's Metal command state is a {@code static
+ * thread_local} in {@code mlx/backend/metal/device.cpp} -- while a Java virtual thread migrates
+ * between carrier OS threads between calls. The Java-side confinement checks compare thread objects
+ * and would keep passing after a migration, so the failure would surface, if at all, at a random
+ * native call; creating a root {@code MLXScope} on a virtual thread is therefore rejected with
+ * {@link IllegalStateException} up front.
+ *
  * <p><b>Known exception.</b> The {@link java.lang.ref.Cleaner} backstops free native handles from
  * the JVM Cleaner thread when a scope or function was never closed: {@code MLXScope} calls {@code
  * mlx_array_free}, and {@code MLXGrad.Fn} calls {@code mlx_closure_free} and {@code

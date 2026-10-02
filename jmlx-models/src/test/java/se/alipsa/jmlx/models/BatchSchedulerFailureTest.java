@@ -124,6 +124,36 @@ class BatchSchedulerFailureTest {
   }
 
   @Test
+  void cohortSetupFailureFailsTheCohortButTheWorkerKeepsServing() throws Exception {
+    AtomicBoolean faulted = new AtomicBoolean();
+    try (BatchGenerationScheduler scheduler =
+        start(
+            "llama",
+            config(4, 4),
+            gated(2)
+                .withSetupFault(
+                    () -> {
+                      if (faulted.compareAndSet(false, true)) {
+                        throw new IllegalStateException("injected cohort setup failure");
+                      }
+                    }))) {
+      BatchRequestHandle a = scheduler.submit(greedy(PROMPTS[0], 6), e -> {});
+      BatchRequestHandle b = scheduler.submit(greedy(PROMPTS[1], 6), e -> {});
+      for (BatchRequestHandle handle : List.of(a, b)) {
+        GenerationAbortedException aborted =
+            assertInstanceOf(GenerationAbortedException.class, failureOf(handle));
+        assertEquals("cohort setup", aborted.stage());
+        assertEquals("injected cohort setup failure", aborted.getCause().getMessage());
+        assertEquals(0, aborted.generatedTokenIds().size(), "failed before any token");
+      }
+      assertEquals(BatchGenerationScheduler.State.RUNNING, scheduler.state());
+      // The model is still valid: a later cohort starts with fresh caches and succeeds.
+      assertEquals(
+          4, await(scheduler.submit(greedy(PROMPTS[0], 4), e -> {})).generatedTokenIds().size());
+    }
+  }
+
+  @Test
   void jointEvaluationFailureIsAttributedToTheSharedCohort() throws Exception {
     AtomicInteger evaluations = new AtomicInteger();
     AtomicReference<DecoderModel> model = new AtomicReference<>();

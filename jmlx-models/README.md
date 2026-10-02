@@ -121,6 +121,11 @@ run on the worker and must return promptly. See the `BatchGenerationScheduler` J
 semantics, and the `se.alipsa.jmlx.core` package Javadoc for the threading rule and its one known
 exception (the `Cleaner` backstops).
 
+Each scheduler worker carries its own scheduler stream (about 60 KB) for the process's life --
+mlx-c cannot free streams -- so close-then-restart accumulates one stream per worker thread.
+Keep one scheduler running rather than churning them; that is also what the per-thread stream
+cost makes the long-lived worker the recommended shape for any direct-`generate` server.
+
 ## Models, downloads, and caching
 
 `jmlx-models` loads **local directories only**; it never downloads anything, and neither do the

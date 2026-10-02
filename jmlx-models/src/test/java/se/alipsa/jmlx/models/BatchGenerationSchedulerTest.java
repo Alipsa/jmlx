@@ -103,6 +103,24 @@ class BatchGenerationSchedulerTest {
   }
 
   @Test
+  void aPublicCohortGateHoldsTheFirstRequestUntilTheSecondArrives() throws Exception {
+    // The public gate overload (not the test-seam Hooks) pins the batch shape, the way the
+    // release smoke needs: whatever the worker's wake-up timing, both requests share one cohort.
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            waiting -> waiting >= 2)) {
+      BatchRequestHandle a = scheduler.submit(greedy(PROMPTS[0], 4), e -> {});
+      BatchRequestHandle b = scheduler.submit(greedy(PROMPTS[1], 4), e -> {});
+      assertEquals(4, await(a).generatedTokenIds().size());
+      assertEquals(4, await(b).generatedTokenIds().size());
+      assertEquals(
+          List.of(2), scheduler.cohortSizes(), "the gated requests share one cohort of two");
+    }
+  }
+
+  @Test
   void listenerFailureAbortsOnlyItsOwnRow() throws Exception {
     try (BatchGenerationScheduler scheduler = start("llama", config(2, 4))) {
       List<GenerationEvent> healthyEvents = new CopyOnWriteArrayList<>();

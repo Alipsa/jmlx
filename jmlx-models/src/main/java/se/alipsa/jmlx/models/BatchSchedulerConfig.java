@@ -12,13 +12,25 @@ package se.alipsa.jmlx.models;
 public record BatchSchedulerConfig(
     int maxBatchSize, int maxQueuedRequests, int maxPromptTokenBudget, int maxNewTokensPerRequest) {
 
-  /** Validates that every limit is positive and that the total admission permits fit an int. */
+  /**
+   * Validates that every limit is positive and that the total admission permits fit an int.
+   *
+   * @throws IllegalArgumentException if a limit is not positive or the permits overflow
+   */
   public BatchSchedulerConfig {
     requirePositive("maxBatchSize", maxBatchSize);
     requirePositive("maxQueuedRequests", maxQueuedRequests);
     requirePositive("maxPromptTokenBudget", maxPromptTokenBudget);
     requirePositive("maxNewTokensPerRequest", maxNewTokensPerRequest);
-    Math.addExact(maxBatchSize, maxQueuedRequests);
+    if ((long) maxBatchSize + maxQueuedRequests > Integer.MAX_VALUE) {
+      // The documented contract is IllegalArgumentException (not Math.addExact's
+      // ArithmeticException) when the total permits do not fit an int.
+      throw new IllegalArgumentException(
+          "maxBatchSize + maxQueuedRequests overflows an int: "
+              + maxBatchSize
+              + " + "
+              + maxQueuedRequests);
+    }
   }
 
   /** Modest limits suitable for a local demo: 4 rows, 16 waiting, 8192 prefill tokens. */

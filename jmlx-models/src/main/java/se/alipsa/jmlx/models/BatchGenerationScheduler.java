@@ -7,8 +7,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -60,11 +61,14 @@ import se.alipsa.jmlx.tokenizer.TokenizerException;
  *
  * <p><b>Failure.</b> A row-level failure (token listener, output decoder, cancellation token, a
  * non-finite row) completes only that row's stage with {@link GenerationAbortedException} and no
- * terminal event. A failure of the shared forward, selection graph, joint evaluation or cache
- * compaction poisons the cohort and fails each of its rows the same way, while the worker keeps
+ * terminal event. A failure of cohort setup (an output decoder, the cohort scope, the caches, the
+ * rank indices, or a sampler), of the shared forward, selection graph, joint evaluation, or of
+ * cache compaction poisons the cohort and fails each of its rows the same way -- stage {@code
+ * "cohort setup"}, {@code "batch step"}, or {@code "cache compaction"} -- while the worker keeps
  * serving later cohorts. A failure that leaves the worker unusable moves the scheduler to {@link
  * State#FAILED}: every accepted stage completes with a {@link GenerationAbortedException} whose
- * cause is a {@link SchedulerFailedException}, and later {@link #submit} calls throw it.
+ * cause is a {@link SchedulerFailedException}, and later {@link #submit} calls throw a fresh {@link
+ * SchedulerFailedException} with the same cause.
  */
 public final class BatchGenerationScheduler implements AutoCloseable {
   private static final System.Logger LOGGER =
@@ -95,30 +99,37 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   /**
    * Test seams; {@link #NONE} in production. {@code cleanupFault} runs inside the exit sequence's
    * best-effort close, so a test can make cleanup throw (the model and root classes are final).
-   * {@code cohortGate} receives the number of waiting requests and the worker forms no cohort until
-   * it returns true (or the scheduler stops), so a test can pin exactly which requests batch.
+   * {@code setupFault} runs at the start of a cohort's setup (cache, rank-index, and sampler
+   * construction), so a test can fail cohort setup without touching the model. {@code cohortGate}
+   * receives the number of waiting requests and the worker forms no cohort until it returns true
+   * (or the scheduler stops), so a test can pin exactly which requests batch.
    */
   record Hooks(
       DecoderModel.EmbeddingHook embeddingHook,
       CacheReorderer reorderer,
       Runnable cleanupFault,
+      Runnable setupFault,
       java.util.function.IntPredicate cohortGate) {
-    static final Hooks NONE = new Hooks(null, CacheReorderer.NATIVE, null, null);
+    static final Hooks NONE = new Hooks(null, CacheReorderer.NATIVE, null, null, null);
 
     Hooks withEmbeddingHook(DecoderModel.EmbeddingHook hook) {
-      return new Hooks(hook, reorderer, cleanupFault, cohortGate);
+      return new Hooks(hook, reorderer, cleanupFault, setupFault, cohortGate);
     }
 
     Hooks withReorderer(CacheReorderer replacement) {
-      return new Hooks(embeddingHook, replacement, cleanupFault, cohortGate);
+      return new Hooks(embeddingHook, replacement, cleanupFault, setupFault, cohortGate);
     }
 
     Hooks withCleanupFault(Runnable fault) {
-      return new Hooks(embeddingHook, reorderer, fault, cohortGate);
+      return new Hooks(embeddingHook, reorderer, fault, setupFault, cohortGate);
+    }
+
+    Hooks withSetupFault(Runnable fault) {
+      return new Hooks(embeddingHook, reorderer, cleanupFault, fault, cohortGate);
     }
 
     Hooks withCohortGate(java.util.function.IntPredicate gate) {
-      return new Hooks(embeddingHook, reorderer, cleanupFault, gate);
+      return new Hooks(embeddingHook, reorderer, cleanupFault, setupFault, gate);
     }
   }
 
@@ -152,7 +163,10 @@ public final class BatchGenerationScheduler implements AutoCloseable {
           1,
           0,
           TimeUnit.MILLISECONDS,
-          new ArrayBlockingQueue<>(capacity),
+          // Linked, not Array: ArrayBlockingQueue eagerly allocates Object[capacity], so a
+          // validated-but-huge admissionPermits() would throw OutOfMemoryError from start().
+          // LinkedBlockingQueue is bounded the same way without the pre-allocation.
+          new LinkedBlockingQueue<>(capacity),
           r -> new SchedulerThread(BatchGenerationScheduler.this, r, "jmlx-batch-completion"));
     }
 
@@ -213,6 +227,9 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
   private final CountDownLatch ready = new CountDownLatch(1);
   private final AtomicLong forwardCalls = new AtomicLong();
+  // CopyOnWrite: written once per cohort on the worker and read by callers from any thread;
+  // cohorts are rare, so the write cost is irrelevant.
+  private final CopyOnWriteArrayList<Integer> cohortSizes = new CopyOnWriteArrayList<>();
   private volatile Throwable startupFailure;
   private volatile SchedulerFailedException schedulerFailure;
   private volatile DecoderModel.BatchFacts facts;
@@ -242,6 +259,27 @@ public final class BatchGenerationScheduler implements AutoCloseable {
    */
   public static BatchGenerationScheduler start(BatchSchedulerConfig config, ModelFactory factory) {
     return start(config, factory, Hooks.NONE);
+  }
+
+  /**
+   * Starts a scheduler like {@link #start(BatchSchedulerConfig, ModelFactory)}, whose worker forms
+   * no cohort until {@code cohortGate} accepts the number of waiting requests. This pins the batch
+   * shape: for example, {@code waiting -> waiting >= 2} holds the first request until the second
+   * arrives, so the two are guaranteed to share one cohort. The gate is consulted every time the
+   * worker wakes, against the total number of queued requests, not the size of one compatibility
+   * group (see {@code CohortKey}); if the requests already waiting cannot cohort together, a
+   * request the gate is holding waits until the scheduler stops.
+   *
+   * @throws SchedulerAlreadyRunningException if another scheduler's worker has not exited
+   * @throws SchedulerStartException if the factory throws a checked exception or returns something
+   *     that is not a usable {@code DecoderModel}; unchecked factory failures propagate unchanged
+   */
+  public static BatchGenerationScheduler start(
+      BatchSchedulerConfig config,
+      ModelFactory factory,
+      java.util.function.IntPredicate cohortGate) {
+    Objects.requireNonNull(cohortGate, "cohortGate");
+    return start(config, factory, Hooks.NONE.withCohortGate(cohortGate));
   }
 
   static BatchGenerationScheduler start(
@@ -345,10 +383,22 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     return forwardCalls.get();
   }
 
+  /**
+   * The size in rows of every cohort the worker has started, in start order. A cohort reports the
+   * size it started with even if rows finish earlier, and a request cancelled or rejected before
+   * its cohort starts is not counted.
+   */
+  public List<Integer> cohortSizes() {
+    return List.copyOf(cohortSizes);
+  }
+
   private void requireAcceptingState() {
     State current = state.get();
     if (current == State.FAILED) {
-      throw schedulerFailure;
+      // A fresh instance per call: the shared one carries the worker's stack trace, and callers
+      // on different threads could modify it concurrently (addSuppressed from
+      // try-with-resources, initCause).
+      throw new SchedulerFailedException(schedulerFailure.getCause());
     }
     if (current != State.RUNNING) {
       throw new SchedulerClosedException("scheduler is " + current.name().toLowerCase());
@@ -643,57 +693,77 @@ public final class BatchGenerationScheduler implements AutoCloseable {
 
   private void runCohort(List<Req> cohort) {
     activeRows = cohort;
+    cohortSizes.add(cohort.size());
     List<Req> live = new ArrayList<>();
-    for (Req r : cohort) {
-      Poll poll = poll(r);
-      if (poll == Poll.CANCELLED) {
-        finishRow(r, FinishReason.CANCELLED);
-      } else if (poll == Poll.TOKEN_FAILED) {
-        abort(r, "cancellation token", null, r.tokenFailure);
-      } else {
-        r.decoder = r.tokenizer == null ? null : r.tokenizer.newIncrementalDecoder(true);
-        if (r.policy.maxNewTokens() == 0) {
-          finishRow(r, FinishReason.MAX_TOKENS);
+    RuntimeException setupFailure = null;
+    MLXScope cohortScope = null;
+    try {
+      for (Req r : cohort) {
+        Poll poll = poll(r);
+        if (poll == Poll.CANCELLED) {
+          finishRow(r, FinishReason.CANCELLED);
+        } else if (poll == Poll.TOKEN_FAILED) {
+          abort(r, "cancellation token", null, r.tokenFailure);
         } else {
-          live.add(r);
+          r.decoder = r.tokenizer == null ? null : r.tokenizer.newIncrementalDecoder(true);
+          if (r.policy.maxNewTokens() == 0) {
+            finishRow(r, FinishReason.MAX_TOKENS);
+          } else {
+            live.add(r);
+          }
         }
       }
+      if (!live.isEmpty()) {
+        if (hooks.setupFault() != null) {
+          hooks.setupFault().run();
+        }
+        int vocab = facts.vocabSize();
+        cohortScope = decoder.modelScope().newChild();
+        // Samplers hold keys in the cohort scope, so they must close before it does -- exactly the
+        // order the direct path's try-with-resources gives (sampler first, then its scope).
+        try {
+          List<KVCache> caches = new ArrayList<>();
+          for (int layer = 0; layer < facts.layerCount(); layer++) {
+            caches.add(new KVCache(cohortScope, live.getFirst().cachePolicy));
+          }
+          boolean needsRank =
+              live.stream().anyMatch(r -> SamplingPipeline.needsRankIndices(r.policy));
+          MLXArray rank = needsRank ? SamplingPipeline.newRankIndices(cohortScope, vocab) : null;
+          for (Req r : live) {
+            r.sampler =
+                new SamplingPipeline(
+                    cohortScope,
+                    r.policy,
+                    vocab,
+                    decoder.stepBoundaryEvaluator(),
+                    SamplingPipeline.needsRankIndices(r.policy) ? rank : null);
+          }
+          decodeLoop(cohortScope, live, caches);
+        } finally {
+          for (Req r : cohort) {
+            closeSampler(r);
+          }
+        }
+      }
+    } catch (RuntimeException e) {
+      // Cohort setup failed (an output decoder, the cohort scope, the caches, the rank indices,
+      // or a sampler): a cohort-level failure, not a worker failure -- the cohort's rows get it
+      // and the worker keeps serving later cohorts. Only an Error escapes to failWorker.
+      // (decodeLoop handles its own step and compaction failures with their own stages.)
+      setupFailure = e;
+    } finally {
+      if (cohortScope != null) {
+        cohortScope.close();
+      }
     }
-    if (live.isEmpty()) {
-      activeRows = List.of();
-      return;
+    if (setupFailure != null) {
+      // abort() and finishRow() skip completed rows, so the whole cohort can be passed: a row
+      // that never got set up is failed like one that was, and rows the first loop already
+      // finished with CANCELLED/MAX_TOKENS keep their outcomes.
+      failCohort(cohort, "cohort setup", setupFailure);
     }
-    // activeRows is cleared only on a normal return: if an Error escapes, failWorker still has to
+    // activeRows is cleared only on a normal return: if an Error escaped, failWorker still has to
     // see this cohort so it can complete every one of its stages.
-
-    int vocab = facts.vocabSize();
-    try (MLXScope cohortScope = decoder.modelScope().newChild()) {
-      // Samplers hold keys in the cohort scope, so they must close before it does -- exactly the
-      // order the direct path's try-with-resources gives (sampler first, then its scope).
-      try {
-        List<KVCache> caches = new ArrayList<>();
-        for (int layer = 0; layer < facts.layerCount(); layer++) {
-          caches.add(new KVCache(cohortScope, live.getFirst().cachePolicy));
-        }
-        boolean needsRank =
-            live.stream().anyMatch(r -> SamplingPipeline.needsRankIndices(r.policy));
-        MLXArray rank = needsRank ? SamplingPipeline.newRankIndices(cohortScope, vocab) : null;
-        for (Req r : live) {
-          r.sampler =
-              new SamplingPipeline(
-                  cohortScope,
-                  r.policy,
-                  vocab,
-                  decoder.stepBoundaryEvaluator(),
-                  SamplingPipeline.needsRankIndices(r.policy) ? rank : null);
-        }
-        decodeLoop(cohortScope, live, caches);
-      } finally {
-        for (Req r : cohort) {
-          closeSampler(r);
-        }
-      }
-    }
     activeRows = List.of();
   }
 

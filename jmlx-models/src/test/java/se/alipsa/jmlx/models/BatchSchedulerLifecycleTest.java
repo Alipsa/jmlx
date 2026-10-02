@@ -3,6 +3,8 @@ package se.alipsa.jmlx.models;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -228,8 +230,11 @@ class BatchSchedulerLifecycleTest {
     starter.start();
     assertTrue(inFactory.await(60, TimeUnit.SECONDS));
     starter.interrupt();
-    Thread.sleep(300);
-    assertTrue(starter.isAlive(), "start() keeps waiting through the interrupt");
+    // start() cannot have returned yet: the ready latch is only released once the factory
+    // returns, and the factory is still blocked below. Deterministic, so no sleep and no
+    // thread-liveness check are needed; the "uninterruptible" part of the contract is proven
+    // by the flag being restored and the scheduler being usable after the join below.
+    assertNull(started.get(), "start() must keep waiting through the interrupt");
     finishFactory.countDown();
     starter.join(TimeUnit.SECONDS.toMillis(60));
     assertEquals(null, thrown.get());
@@ -293,6 +298,17 @@ class BatchSchedulerLifecycleTest {
     assertEquals(BatchGenerationScheduler.State.FAILED, scheduler.state());
     assertTrue(scheduler.failure().isPresent());
     assertSame(IllegalStateException.class, scheduler.failure().get().getClass());
+    // Every submit after the failure throws its own SchedulerFailedException: the shared
+    // instance carries the worker's stack trace and callers on different threads could modify
+    // it concurrently (addSuppressed from try-with-resources, initCause).
+    SchedulerFailedException first =
+        assertThrows(
+            SchedulerFailedException.class, () -> scheduler.submit(greedy(PROMPT, 2), e -> {}));
+    SchedulerFailedException second =
+        assertThrows(
+            SchedulerFailedException.class, () -> scheduler.submit(greedy(PROMPT, 2), e -> {}));
+    assertNotSame(first, second);
+    assertSame(first.getCause(), second.getCause());
     scheduler.close(); // returns normally after a failure, state stays FAILED
     assertEquals(BatchGenerationScheduler.State.FAILED, scheduler.state());
     // The worker has exited, so it is not a concurrent MLX thread: a restart is accepted.

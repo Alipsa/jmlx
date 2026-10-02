@@ -70,13 +70,13 @@ public final class BatchDecodeBenchmark {
     final long totalTokens = Arrays.stream(newTokens).asLongStream().sum();
 
     List<Run> direct = new ArrayList<>();
-    List<Run> batched = new ArrayList<>();
+    List<BatchedRun> batched = new ArrayList<>();
     for (int run = -warmups; run < samples; run++) {
       // Alternate which side goes first so warm-up, thermal and allocator-order effects are not
       // always charged to the same one.
       boolean directFirst = (run & 1) == 0;
       Run d = directFirst ? runDirect(checkpoint, requests) : null;
-      Run b = runBatched(checkpoint, requests, maxBatch);
+      BatchedRun b = runBatched(checkpoint, requests, maxBatch);
       if (d == null) {
         d = runDirect(checkpoint, requests);
       }
@@ -100,11 +100,14 @@ public final class BatchDecodeBenchmark {
     report.put("warmups", warmups);
     report.put("samples", samples);
     report.put("direct", summary(direct, totalTokens));
-    report.put("batched", summary(batched, totalTokens));
+    report.put("batched", summary(batched.stream().map(BatchedRun::metrics).toList(), totalTokens));
+    // The cohorts that actually ran, per sample: the worker may form a cohort of one before the
+    // rest of the queue arrives, so without this a speedup cannot be attributed to a batch shape.
+    report.put("batched_cohort_sizes", batched.stream().map(BatchedRun::cohortSizes).toList());
     report.put(
         "speedup_median",
         median(direct.stream().map(Run::wallNanos).toList())
-            / (double) median(batched.stream().map(Run::wallNanos).toList()));
+            / (double) median(batched.stream().map(r -> r.metrics().wallNanos()).toList()));
     Files.createDirectories(output.toAbsolutePath().getParent());
     new ObjectMapper()
         .writeValue(output.resolveSibling(output.getFileName() + ".json").toFile(), report);
@@ -130,6 +133,9 @@ public final class BatchDecodeBenchmark {
       long[] totalNanos,
       long peakBytes,
       long activeAfterBytes) {}
+
+  /** A batched run plus the cohort sizes it actually ran, for attribution in the report. */
+  private record BatchedRun(Run metrics, List<Integer> cohortSizes) {}
 
   private static Run runDirect(Path checkpoint, List<GenerationRequest> requests) throws Exception {
     long before = MLXMemory.activeBytes();
@@ -157,8 +163,8 @@ public final class BatchDecodeBenchmark {
     return new Run(wall, first, total, MLXMemory.peakBytes(), MLXMemory.activeBytes() - before);
   }
 
-  private static Run runBatched(Path checkpoint, List<GenerationRequest> requests, int maxBatch)
-      throws Exception {
+  private static BatchedRun runBatched(
+      Path checkpoint, List<GenerationRequest> requests, int maxBatch) throws Exception {
     long before = MLXMemory.activeBytes();
     MLXMemory.resetPeak();
     int n = requests.size();
@@ -168,9 +174,12 @@ public final class BatchDecodeBenchmark {
     BatchSchedulerConfig config = new BatchSchedulerConfig(maxBatch, Math.max(n, 1), 8192, 4096);
     // start() returns once the worker has loaded the model, so load time is outside the clock.
     // Requests are submitted back to back; how they group into cohorts is the scheduler's call,
-    // and the first one may start alone before the rest are queued.
+    // and the first one may start alone before the rest are queued. The cohorts that actually ran
+    // are returned with the run (recorded as batched_cohort_sizes in the report) so a speedup can
+    // be attributed to a batch shape.
     BatchGenerationScheduler.ModelFactory factory =
         scope -> TextGenerationModels.load(scope, checkpoint);
+    List<Integer> cohortSizes;
     try (BatchGenerationScheduler scheduler = BatchGenerationScheduler.start(config, factory)) {
       List<CompletableFuture<?>> done = new ArrayList<>();
       begin.set(System.nanoTime());
@@ -191,10 +200,13 @@ public final class BatchDecodeBenchmark {
                 .toCompletableFuture());
       }
       CompletableFuture.allOf(done.toArray(CompletableFuture[]::new)).join();
+      cohortSizes = scheduler.cohortSizes();
     }
     // The scheduler is closed: its worker has exited, so reading the counters is single-threaded.
     long wall = Arrays.stream(total).max().orElse(0);
-    return new Run(wall, first, total, MLXMemory.peakBytes(), MLXMemory.activeBytes() - before);
+    return new BatchedRun(
+        new Run(wall, first, total, MLXMemory.peakBytes(), MLXMemory.activeBytes() - before),
+        cohortSizes);
   }
 
   private static Map<String, Object> summary(List<Run> runs, long totalTokens) {

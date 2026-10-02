@@ -25,7 +25,17 @@ modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jm
 # with that binary under a throwaway home. `--version` makes the wrapper download it if needed.
 "$root/gradlew" --version >/dev/null
 wrapper_version="$(sed -n 's|.*gradle-\([0-9.]*\)-bin.zip.*|\1|p' "$root/gradle/wrapper/gradle-wrapper.properties")"
-gradle_bin="$(ls -d "${GRADLE_USER_HOME:-$HOME/.gradle}"/wrapper/dists/gradle-"$wrapper_version"-bin/*/gradle-"$wrapper_version"/bin/gradle | head -1)"
+dists_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper/dists"
+# || true: under `set -euo pipefail` a bare `ls ... | head -1` assignment exits the script on a
+# missing distribution (the original failure mode), before the check below can report it.
+gradle_bin="$(ls -d "$dists_dir"/gradle-"$wrapper_version"-bin/*/gradle-"$wrapper_version"/bin/gradle 2>/dev/null | head -1 || true)"
+if [ -z "$gradle_bin" ] || [ ! -x "$gradle_bin" ]; then
+  echo "error: no usable Gradle $wrapper_version distribution under $dists_dir" >&2
+  echo "hint: the consumer must run with the checkout's wrapper distribution; run" >&2
+  echo "      '$root/gradlew --version' once from this checkout (with its default" >&2
+  echo "      GRADLE_USER_HOME) so the wrapper downloads it" >&2
+  exit 2
+fi
 
 args=()
 case "$mode" in
@@ -45,6 +55,10 @@ case "$mode" in
     exit 2
     ;;
 esac
+if [ "$record" = true ] && [ "$mode" != "ci" ]; then
+  echo "error: --record is ci only: it would overwrite the committed golden with whatever '$mode' serves" >&2
+  exit 2
+fi
 $record && args+=("-PsmokeRecord=true")
 
 home="$(mktemp -d)"

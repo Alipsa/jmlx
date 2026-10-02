@@ -25,14 +25,24 @@ import se.alipsa.jmlx.ffi.mlx_stream_;
  * NativeOps.scopeOf} in {@code se.alipsa.jmlx.core}) is an ownership-comprehensibility invariant,
  * not a confinement guard.
  *
- * <p>Streams: MLX streams are thread-bound -- a stream created on one thread cannot run ops from
- * another ("There is no Stream(gpu, N) in current thread", verified on the pinned mlx-metal
- * 0.31.2), and MLX's process-wide default stream is only usable by the first thread that touches
- * it. So every scope carries the {@linkplain #stream() stream} of its owner thread: a root scope
- * takes the calling thread's own stream (created once per thread, on first use), and a child
- * inherits its parent's, which is the same thread by construction. Ops read the stream from the
- * result scope, so a worker thread that creates its own root scope runs entirely on its own stream
- * regardless of which thread used MLX first.
+ * <p>Streams: MLX streams are bound to the operating-system thread that created them -- a stream
+ * created on one thread cannot run ops from another ("There is no Stream(gpu, N) in current
+ * thread", verified in the pinned mlx-metal 0.31.2 source: each stream's Metal command state lives
+ * in a {@code static thread_local} map in {@code mlx/backend/metal/device.cpp}, and each device's
+ * default stream in a {@code static thread_local} in {@code mlx/stream.cpp}) -- and MLX's
+ * process-wide default stream is only usable by the first thread that touches it. So every scope
+ * carries the {@linkplain #stream() stream} of its owner thread: a root scope takes the calling
+ * thread's own stream (created once per thread, on first use, and never freed -- see the {@code
+ * se.alipsa.jmlx.core} package Javadoc for the per-thread cost), and a child inherits its parent's,
+ * which is the same thread by construction. Ops read the stream from the result scope, so a worker
+ * thread that creates its own root scope runs entirely on its own stream regardless of which thread
+ * used MLX first.
+ *
+ * <p>Because the binding is to the OS thread, a Java virtual thread is not a usable MLX thread: it
+ * migrates between carrier OS threads between calls, so the stream it created on one carrier is not
+ * visible after it moves, while every check in this class compares thread <em>objects</em> and
+ * would still pass. Creating a root scope on a virtual thread is therefore rejected up front with
+ * {@link IllegalStateException} instead of failing at a random native call; use a platform thread.
  *
  * <p>Implements {@link SegmentAllocator} so it can be passed directly to mlx-c's struct-returning
  * constructors (e.g. {@code mlx_array_new}, {@code mlx_array_new_data}), which allocate their
@@ -224,6 +234,18 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
 
   private MLXScope(MLXScope parent) {
     this.parent = parent;
+    if (parent == null && Thread.currentThread().isVirtual()) {
+      // MLX's per-stream state is a C++ thread_local bound to the OS thread (see the class
+      // javadoc), which a virtual thread migrates between, while every check in this class
+      // compares Java thread objects and would keep passing across the migration. Reject up
+      // front instead of failing at a random native call with "no Stream(gpu, N) in current
+      // thread". Children are exempt by construction: they share a parent whose owner thread
+      // already passed this check.
+      throw new IllegalStateException(
+          "MLXScope: the current thread is a virtual thread, whose stream would be bound to "
+              + "whichever OS thread it runs on at the time; use a platform thread (see the "
+              + "se.alipsa.jmlx.core package Javadoc)");
+    }
     // A child shares its parent's owner thread (newChild() checks access first), so it shares the
     // parent's stream; only a root consults the per-thread cache.
     this.stream = parent != null ? parent.stream : THREAD_STREAM.get();

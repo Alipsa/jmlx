@@ -87,12 +87,15 @@ public final class ReleaseSmoke {
     GenerationRequest second = request(tokenizer, SECOND_MESSAGES, greedy(eosIds));
     List<String> deltas = new CopyOnWriteArrayList<>();
     BatchGenerationResult run;
-    // maxBatch 2: the two requests are a bounded batch. close() stops admission and the worker
-    // closes the model and its scope.
+    // maxBatch 2, and the cohort gate holds the worker until both requests are waiting, so the run
+    // below is provably one B=2 cohort rather than two B=1 cohorts that happened to overlap; the
+    // cohortSizes assertion after the join re-proves it from the scheduler itself. close() stops
+    // admission and the worker closes the model and its scope.
     try (BatchGenerationScheduler scheduler =
         BatchGenerationScheduler.start(
             new BatchSchedulerConfig(2, 4, 4096, 64),
-            scope -> TextGenerationModels.load(scope, modelDir))) {
+            scope -> TextGenerationModels.load(scope, modelDir),
+            waiting -> waiting >= 2)) {
       BatchRequestHandle a =
           scheduler.submit(
               first,
@@ -105,6 +108,9 @@ public final class ReleaseSmoke {
       run =
           new BatchGenerationResult(
               a.stage().toCompletableFuture().join(), b.stage().toCompletableFuture().join());
+      check(
+          scheduler.cohortSizes().equals(List.of(2)),
+          "the two requests must share one cohort of two, got " + scheduler.cohortSizes());
     }
 
     verifyExtraction(cache);

@@ -111,7 +111,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   public final MLXArray forward(MLXArray tokenIds, List<KVCache> caches, int[] validLengths) {
     int[][] before = preflightBatch(tokenIds, caches, validLengths);
     try {
-      MLXArray normalized = normalizedHiddenStatesBatch(tokenIds, caches, validLengths);
+      MLXArray normalized = normalizedHiddenStatesBatch(tokenIds, caches, validLengths, null);
       requirePostflightBatch(caches, validLengths.length);
       MLXArray logits = tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
       MLXArray[] arrays = new MLXArray[1 + 2 * caches.size()];
@@ -120,16 +120,94 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       stepBoundaryEvaluator.evaluate(arrays);
       return logits;
     } catch (RuntimeException | Error failure) {
-      for (int layer = 0; layer < caches.size(); layer++) {
-        KVCache cache = caches.get(layer);
-        for (int row = 0; row < validLengths.length; row++) {
-          if (cache.nextPosition(row) != before[layer][row]) {
-            caches.forEach(KVCache::poison);
-            throw failure;
-          }
+      poisonBatchIfMutated(caches, before, validLengths.length);
+      throw failure;
+    }
+  }
+
+  /**
+   * Worker-thread-only access to this model's weight scope, which the inherited {@code
+   * Module.scope()} (protected in another package) hides from the scheduler. The scheduler checks
+   * {@code root.isAncestorOf(modelScope())} before accepting a factory result.
+   */
+  final MLXScope modelScope() {
+    return scope();
+  }
+
+  /**
+   * The model facts a scheduler snapshots on its worker so {@code submit} can validate without it.
+   */
+  record BatchFacts(
+      int vocabSize,
+      Integer slidingWindow,
+      boolean dynamicNtk,
+      int layerCount,
+      boolean tiedOutput) {}
+
+  final BatchFacts batchFacts() {
+    return new BatchFacts(
+        config.vocabSize(),
+        descriptor.attention().slidingWindow(),
+        descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk,
+        layers.size(),
+        tiedOutput);
+  }
+
+  /** Test seam: perturbs the embedded activations of selected rows right after the lookup. */
+  @FunctionalInterface
+  interface EmbeddingHook {
+    MLXArray apply(MLXArray embedded);
+  }
+
+  /**
+   * Lazy batched step shared with the scheduler: runs one forward over a left-padded {@code [B,T]}
+   * batch and returns the {@code [B,1,V]} logits of every row's last valid column, with <em>no</em>
+   * evaluation and no cache poisoning bookkeeping beyond {@link #poisonBatchIfMutated}. Because
+   * preflight requires the padded width to equal the longest valid row, every row's last valid
+   * column is column {@code T-1}, so one slice (taken before the output projection, like the
+   * single-row prefill) suffices -- no per-row gather. A one-column decode batch is the same call.
+   *
+   * <p>Unlike the public {@link #forward(MLXArray, List, int[])}, this neither evaluates the logits
+   * and cache arrays (which would cost a second synchronization per step once the scheduler's joint
+   * selection evaluate runs) nor projects all {@code T} positions.
+   */
+  final MLXArray stepLogits(
+      MLXArray tokenIds, List<KVCache> caches, int[] validLengths, EmbeddingHook hook) {
+    int[][] before = preflightBatch(tokenIds, caches, validLengths);
+    try {
+      MLXArray normalized = normalizedHiddenStatesBatch(tokenIds, caches, validLengths, hook);
+      requirePostflightBatch(caches, validLengths.length);
+      int[] shape = normalized.shape();
+      MLXArray last =
+          MLXShape.slice(
+              normalized, new int[] {0, shape[1] - 1, 0}, new int[] {shape[0], shape[1], shape[2]});
+      return tiedOutput ? embedding.project(last) : lmHead.forward(last);
+    } catch (RuntimeException | Error failure) {
+      poisonBatchIfMutated(caches, before, validLengths.length);
+      throw failure;
+    }
+  }
+
+  /** The cache arrays a joint step evaluation must include, in layer order (keys, values). */
+  static MLXArray[] stepCacheArrays(List<KVCache> caches) {
+    return cacheArrays(caches);
+  }
+
+  /** The evaluation boundary a scheduler must route its joint evaluation through. */
+  final StepBoundaryEvaluator stepBoundaryEvaluator() {
+    return stepBoundaryEvaluator;
+  }
+
+  /** Poisons every cache if any row of any layer advanced since {@code before} was recorded. */
+  static void poisonBatchIfMutated(List<KVCache> caches, int[][] before, int batch) {
+    for (int layer = 0; layer < caches.size(); layer++) {
+      KVCache cache = caches.get(layer);
+      for (int row = 0; row < batch; row++) {
+        if (cache.nextPosition(row) != before[layer][row]) {
+          caches.forEach(KVCache::poison);
+          return;
         }
       }
-      throw failure;
     }
   }
 
@@ -219,8 +297,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private MLXArray normalizedHiddenStatesBatch(
-      MLXArray tokenIds, List<KVCache> caches, int[] validLengths) {
+      MLXArray tokenIds, List<KVCache> caches, int[] validLengths, EmbeddingHook hook) {
     MLXArray x = embedding.forward(tokenIds);
+    if (hook != null) {
+      x = hook.apply(x);
+    }
     if (descriptor.embedding().scaleBySqrtHidden()) {
       MLXArray scale =
           MLX.array(x.scope(), new float[] {(float) Math.sqrt(config.hiddenSize())}, new int[] {1});

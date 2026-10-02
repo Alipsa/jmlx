@@ -33,11 +33,32 @@ final class SamplingPipeline implements AutoCloseable {
     this(generationScope, policy, vocabularySize, StepBoundaryEvaluator.NATIVE);
   }
 
+  /** Direct-path constructor: builds its own {@code rankIndices} in {@code generationScope}. */
   SamplingPipeline(
       MLXScope generationScope,
       GenerationConfig policy,
       int vocabularySize,
       StepBoundaryEvaluator evaluator) {
+    this(
+        generationScope,
+        policy,
+        vocabularySize,
+        evaluator,
+        needsRankIndices(policy) ? newRankIndices(generationScope, vocabularySize) : null);
+  }
+
+  /**
+   * Batch constructor: every row of a cohort shares the model's vocabulary size, so the cohort
+   * builds <em>one</em> {@code rankIndices} array (see {@link #newRankIndices}) and shares it.
+   * {@code sharedRankIndices} must be {@code null} exactly when {@link #needsRankIndices} is false
+   * for {@code policy}; its owner closes it, never {@link #close()}.
+   */
+  SamplingPipeline(
+      MLXScope generationScope,
+      GenerationConfig policy,
+      int vocabularySize,
+      StepBoundaryEvaluator evaluator,
+      MLXArray sharedRankIndices) {
     this.generationScope = Objects.requireNonNull(generationScope, "generationScope");
     this.policy = Objects.requireNonNull(policy, "policy");
     this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
@@ -50,16 +71,26 @@ final class SamplingPipeline implements AutoCloseable {
     }
     this.vocabularySize = vocabularySize;
     filtering = policy.topK() != 0 || policy.topP() != 1 || policy.minP() != 0;
-    rankIndices =
-        filtering && (policy.topK() != 0 || policy.topP() == 0)
-            ? MLXShape.reshape(
-                MLX.arange(generationScope, 0, vocabularySize, 1, DType.INT32),
-                new int[] {1, 1, vocabularySize})
-            : null;
+    if (needsRankIndices(policy) && sharedRankIndices == null) {
+      throw new IllegalArgumentException("policy needs rankIndices but none was supplied");
+    }
+    rankIndices = needsRankIndices(policy) ? sharedRankIndices : null;
     currentKey =
         policy.temperature() > 0
             ? MLXRandom.key(generationScope, policy.seed().orElseThrow())
             : null;
+  }
+
+  /** Whether {@code policy}'s filters index tokens by rank (top-k, or top-p of zero). */
+  static boolean needsRankIndices(GenerationConfig policy) {
+    boolean filtering = policy.topK() != 0 || policy.topP() != 1 || policy.minP() != 0;
+    return filtering && (policy.topK() != 0 || policy.topP() == 0);
+  }
+
+  /** The {@code [1,1,V]} rank array every rank-based filter compares against. */
+  static MLXArray newRankIndices(MLXScope scope, int vocabularySize) {
+    return MLXShape.reshape(
+        MLX.arange(scope, 0, vocabularySize, 1, DType.INT32), new int[] {1, 1, vocabularySize});
   }
 
   Selection select(MLXArray modelLogits, PenaltyInputs penaltyInputs, int decodeStep) {
@@ -68,6 +99,27 @@ final class SamplingPipeline implements AutoCloseable {
 
   Selection select(
       MLXArray modelLogits, PenaltyInputs penaltyInputs, int decodeStep, MLXArray... cacheArrays) {
+    Built built = build(modelLogits, penaltyInputs);
+    evaluate(built, cacheArrays);
+    return readBack(built, decodeStep);
+  }
+
+  /**
+   * One row's lazy selection graph, all of it in the scope of the logits it was built from. Nothing
+   * has been evaluated: {@code selected} is the chosen ID, {@code finite} and {@code
+   * temperedFinite} are 0/1 INT32 scalars ({@code temperedFinite} is null in greedy mode, which has
+   * no tempering step), and {@code logProbability} is non-null only for a sampled row that asked
+   * for it (a greedy row's log probability is the constant 0).
+   */
+  record Built(
+      MLXArray selected,
+      MLXArray finite,
+      MLXArray temperedFinite,
+      MLXArray logProbability,
+      MLXArray vocabularyLogits) {}
+
+  /** Builds the lazy selection graph for one {@code [1,1,V]} logits row; advances the RNG key. */
+  Built build(MLXArray modelLogits, PenaltyInputs penaltyInputs) {
     requireLogits(modelLogits);
     MLXArray logits =
         modelLogits.dtype() == DType.FLOAT32 ? modelLogits : MLX.astype(modelLogits, DType.FLOAT32);
@@ -76,10 +128,7 @@ final class SamplingPipeline implements AutoCloseable {
 
     if (policy.temperature() == 0) {
       MLXArray selected = MLXOps.argmaxAxis(adjusted, VOCABULARY_AXIS, false);
-      evalWithCaches(cacheArrays, finite, selected);
-      requireFinite(finite, decodeStep);
-      return new Selection(
-          selected.toIntArray()[0], policy.logProbabilities() ? 0.0 : null, adjusted);
+      return new Built(selected, finite, null, null, adjusted);
     }
 
     MLXArray temperature = scalar(logits.scope(), policy.temperature());
@@ -93,18 +142,139 @@ final class SamplingPipeline implements AutoCloseable {
         policy.logProbabilities()
             ? selectedLogProbability(vocabularyOrdered, selected, logNormalizer)
             : null;
+    return new Built(selected, finite, temperedFinite, selectedLogProbability, vocabularyOrdered);
+  }
 
-    if (selectedLogProbability == null) {
-      evalWithCaches(cacheArrays, finite, temperedFinite, selected);
+  /**
+   * Evaluates {@code built} together with {@code cacheArrays} in one call through the injected
+   * boundary evaluator, so selection and the cache update cost a single synchronization.
+   */
+  void evaluate(Built built, MLXArray... cacheArrays) {
+    if (built.temperedFinite() == null) {
+      evalWithCaches(cacheArrays, built.finite(), built.selected());
+    } else if (built.logProbability() == null) {
+      evalWithCaches(cacheArrays, built.finite(), built.temperedFinite(), built.selected());
     } else {
-      evalWithCaches(cacheArrays, finite, temperedFinite, selected, selectedLogProbability);
+      evalWithCaches(
+          cacheArrays,
+          built.finite(),
+          built.temperedFinite(),
+          built.selected(),
+          built.logProbability());
     }
-    requireFinite(finite, decodeStep);
-    requireTemperedFinite(temperedFinite, decodeStep);
-    int token = selected.toIntArray()[0];
+  }
+
+  /** Reads an already-evaluated {@code built} back, enforcing the finite-logit policy. */
+  Selection readBack(Built built, int decodeStep) {
+    requireFinite(built.finite(), decodeStep);
+    if (built.temperedFinite() == null) {
+      return new Selection(
+          built.selected().toIntArray()[0],
+          policy.logProbabilities() ? 0.0 : null,
+          built.vocabularyLogits());
+    }
+    requireTemperedFinite(built.temperedFinite(), decodeStep);
+    int token = built.selected().toIntArray()[0];
     Double logProbability =
-        selectedLogProbability == null ? null : (double) selectedLogProbability.toFloatArray()[0];
-    return new Selection(token, logProbability, vocabularyOrdered);
+        built.logProbability() == null ? null : (double) built.logProbability().toFloatArray()[0];
+    return new Selection(token, logProbability, built.vocabularyLogits());
+  }
+
+  /**
+   * A cohort's per-row {@link Built} results stacked into two lazy arrays so that reading them back
+   * does not trigger a second synchronization: {@code ints} is INT32 {@code [B,3]} of selected ID,
+   * finite flag and tempered-finite flag (a constant 1 for greedy rows, which have no tempered
+   * check); {@code logProbabilities} is FLOAT32 {@code [B]} of post-filter log probabilities, null
+   * unless some row has one (rows without one contribute 0).
+   */
+  record Batched(MLXArray ints, MLXArray logProbabilities) {}
+
+  /** Stacks {@code rows} (in row order) into the two readback arrays, in {@code scope}. */
+  static Batched stack(MLXScope scope, java.util.List<Built> rows) {
+    MLXArray[] perRow = new MLXArray[rows.size()];
+    boolean anyLogProbability = false;
+    for (int row = 0; row < perRow.length; row++) {
+      Built built = rows.get(row);
+      MLXArray tempered =
+          built.temperedFinite() == null
+              ? MLX.full(scope, new int[] {1, 1}, 1, DType.INT32)
+              : MLXShape.reshape(built.temperedFinite(), new int[] {1, 1});
+      perRow[row] =
+          MLXShape.concatenate(
+              new MLXArray[] {
+                MLXShape.reshape(built.selected(), new int[] {1, 1}),
+                MLXShape.reshape(built.finite(), new int[] {1, 1}),
+                tempered
+              },
+              1);
+      anyLogProbability |= built.logProbability() != null;
+    }
+    MLXArray ints = MLXShape.concatenate(perRow, 0);
+    if (!anyLogProbability) {
+      return new Batched(ints, null);
+    }
+    MLXArray[] logProbabilities = new MLXArray[rows.size()];
+    for (int row = 0; row < logProbabilities.length; row++) {
+      MLXArray logProbability = rows.get(row).logProbability();
+      logProbabilities[row] =
+          logProbability == null
+              ? MLX.full(scope, new int[] {1}, 0f, DType.FLOAT32)
+              : MLXShape.reshape(logProbability, new int[] {1});
+    }
+    return new Batched(ints, MLXShape.concatenate(logProbabilities, 0));
+  }
+
+  /** Evaluates the stacked readback arrays and {@code cacheArrays} in one boundary call. */
+  static void evaluate(StepBoundaryEvaluator evaluator, Batched batched, MLXArray... cacheArrays) {
+    int leading = batched.logProbabilities() == null ? 1 : 2;
+    MLXArray[] all = new MLXArray[leading + cacheArrays.length];
+    all[0] = batched.ints();
+    if (leading == 2) {
+      all[1] = batched.logProbabilities();
+    }
+    System.arraycopy(cacheArrays, 0, all, leading, cacheArrays.length);
+    evaluator.evaluate(all);
+  }
+
+  /** One row's readback; the flags are only meaningful before {@code tokenId} is trusted. */
+  record RowReadBack(int tokenId, boolean finite, boolean temperedFinite, Double logProbability) {}
+
+  /**
+   * Reads an evaluated {@link Batched} back with one native call per array. {@code
+   * logProbabilityRows[row]} says whether that row's policy reports a log probability (the greedy
+   * constant 0 included), so rows that did not ask for one get {@code null}.
+   */
+  static RowReadBack[] readBack(Batched batched, boolean[] logProbabilityRows) {
+    int[] ints = batched.ints().toIntArray();
+    float[] logProbabilities =
+        batched.logProbabilities() == null ? null : batched.logProbabilities().toFloatArray();
+    RowReadBack[] rows = new RowReadBack[logProbabilityRows.length];
+    for (int row = 0; row < rows.length; row++) {
+      Double logProbability =
+          !logProbabilityRows[row]
+              ? null
+              : (logProbabilities == null ? Double.valueOf(0.0) : (double) logProbabilities[row]);
+      rows[row] =
+          new RowReadBack(
+              ints[3 * row], ints[3 * row + 1] != 0, ints[3 * row + 2] != 0, logProbability);
+    }
+    return rows;
+  }
+
+  /** The direct path's finite-logit failure, reused so batched rows report identical text. */
+  static IllegalStateException nonFiniteLogits(int decodeStep) {
+    return new IllegalStateException(
+        "sampling stage finite-logit validation failed at decode step "
+            + decodeStep
+            + ": logits must be finite");
+  }
+
+  /** The direct path's tempering failure, reused so batched rows report identical text. */
+  static IllegalStateException nonFiniteTempered(int decodeStep) {
+    return new IllegalStateException(
+        "sampling stage temperature scaling failed at decode step "
+            + decodeStep
+            + ": tempered logits must be finite");
   }
 
   private void evalWithCaches(MLXArray[] cacheArrays, MLXArray... selectionArrays) {
@@ -239,19 +409,13 @@ final class SamplingPipeline implements AutoCloseable {
 
   private static void requireFinite(MLXArray finite, int decodeStep) {
     if (finite.toIntArray()[0] == 0) {
-      throw new IllegalStateException(
-          "sampling stage finite-logit validation failed at decode step "
-              + decodeStep
-              + ": logits must be finite");
+      throw nonFiniteLogits(decodeStep);
     }
   }
 
   private static void requireTemperedFinite(MLXArray finite, int decodeStep) {
     if (finite.toIntArray()[0] == 0) {
-      throw new IllegalStateException(
-          "sampling stage temperature scaling failed at decode step "
-              + decodeStep
-              + ": tempered logits must be finite");
+      throw nonFiniteTempered(decodeStep);
     }
   }
 

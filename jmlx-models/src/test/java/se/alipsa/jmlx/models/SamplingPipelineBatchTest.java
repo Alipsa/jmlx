@@ -71,7 +71,7 @@ class SamplingPipelineBatchTest {
   }
 
   @Test
-  void aSharedRankIndicesArrayGivesTheSameSelectionAsAPrivateOne() {
+  void sharedRankIndicesGiveTheSameSelectionAsPrivateOnes() {
     GenerationConfig policy = sampled(3, 0.9f, true);
     assertTrue(SamplingPipeline.needsRankIndices(policy));
     assertFalse(SamplingPipeline.needsRankIndices(sampled(0, 1, true)));
@@ -171,7 +171,7 @@ class SamplingPipelineBatchTest {
   }
 
   @Test
-  void aNonFiniteRowIsFlaggedWithoutDisturbingItsNeighbours() {
+  void nonFiniteRowIsFlaggedWithoutDisturbingItsNeighbours() {
     GenerationConfig policy = greedy();
     try (MLXScope cohort = new MLXScope();
         SamplingPipeline a = new SamplingPipeline(cohort, policy, V);

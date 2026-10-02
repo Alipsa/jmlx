@@ -90,7 +90,7 @@ class BatchStepEquivalenceTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"llama", "mistral"})
-  void aBatchedStepEvaluatesNothingUntilTheCallerDoes(String family) throws Exception {
+  void batchedStepEvaluatesNothingUntilTheCallerDoes(String family) throws Exception {
     // The lazy contract: stepLogits must not call the model's StepBoundaryEvaluator, so the
     // scheduler's joint selection evaluate is the step's only synchronization.
     Path directory =

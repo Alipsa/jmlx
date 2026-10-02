@@ -164,6 +164,21 @@ final class SamplingPipeline implements AutoCloseable {
     }
   }
 
+  /** Evaluates the stacked readback arrays and {@code cacheArrays} in one boundary call. */
+  static void evaluate(StepBoundaryEvaluator evaluator, Batched batched, MLXArray... cacheArrays) {
+    int leading = batched.logProbabilities() == null ? 1 : 2;
+    MLXArray[] all = new MLXArray[leading + cacheArrays.length];
+    all[0] = batched.ints();
+    if (leading == 2) {
+      all[1] = batched.logProbabilities();
+    }
+    System.arraycopy(cacheArrays, 0, all, leading, cacheArrays.length);
+    evaluator.evaluate(all);
+  }
+
+  /** One row's readback; the flags are only meaningful before {@code tokenId} is trusted. */
+  record RowReadBack(int tokenId, boolean finite, boolean temperedFinite, Double logProbability) {}
+
   /** Reads an already-evaluated {@code built} back, enforcing the finite-logit policy. */
   Selection readBack(Built built, int decodeStep) {
     requireFinite(built.finite(), decodeStep);
@@ -178,6 +193,28 @@ final class SamplingPipeline implements AutoCloseable {
     Double logProbability =
         built.logProbability() == null ? null : (double) built.logProbability().toFloatArray()[0];
     return new Selection(token, logProbability, built.vocabularyLogits());
+  }
+
+  /**
+   * Reads an evaluated {@link Batched} back with one native call per array. {@code
+   * logProbabilityRows[row]} says whether that row's policy reports a log probability (the greedy
+   * constant 0 included), so rows that did not ask for one get {@code null}.
+   */
+  static RowReadBack[] readBack(Batched batched, boolean[] logProbabilityRows) {
+    int[] ints = batched.ints().toIntArray();
+    float[] logProbabilities =
+        batched.logProbabilities() == null ? null : batched.logProbabilities().toFloatArray();
+    RowReadBack[] rows = new RowReadBack[logProbabilityRows.length];
+    for (int row = 0; row < rows.length; row++) {
+      Double logProbability =
+          !logProbabilityRows[row]
+              ? null
+              : (logProbabilities == null ? Double.valueOf(0.0) : (double) logProbabilities[row]);
+      rows[row] =
+          new RowReadBack(
+              ints[3 * row], ints[3 * row + 1] != 0, ints[3 * row + 2] != 0, logProbability);
+    }
+    return rows;
   }
 
   /**
@@ -222,43 +259,6 @@ final class SamplingPipeline implements AutoCloseable {
               : MLXShape.reshape(logProbability, new int[] {1});
     }
     return new Batched(ints, MLXShape.concatenate(logProbabilities, 0));
-  }
-
-  /** Evaluates the stacked readback arrays and {@code cacheArrays} in one boundary call. */
-  static void evaluate(StepBoundaryEvaluator evaluator, Batched batched, MLXArray... cacheArrays) {
-    int leading = batched.logProbabilities() == null ? 1 : 2;
-    MLXArray[] all = new MLXArray[leading + cacheArrays.length];
-    all[0] = batched.ints();
-    if (leading == 2) {
-      all[1] = batched.logProbabilities();
-    }
-    System.arraycopy(cacheArrays, 0, all, leading, cacheArrays.length);
-    evaluator.evaluate(all);
-  }
-
-  /** One row's readback; the flags are only meaningful before {@code tokenId} is trusted. */
-  record RowReadBack(int tokenId, boolean finite, boolean temperedFinite, Double logProbability) {}
-
-  /**
-   * Reads an evaluated {@link Batched} back with one native call per array. {@code
-   * logProbabilityRows[row]} says whether that row's policy reports a log probability (the greedy
-   * constant 0 included), so rows that did not ask for one get {@code null}.
-   */
-  static RowReadBack[] readBack(Batched batched, boolean[] logProbabilityRows) {
-    int[] ints = batched.ints().toIntArray();
-    float[] logProbabilities =
-        batched.logProbabilities() == null ? null : batched.logProbabilities().toFloatArray();
-    RowReadBack[] rows = new RowReadBack[logProbabilityRows.length];
-    for (int row = 0; row < rows.length; row++) {
-      Double logProbability =
-          !logProbabilityRows[row]
-              ? null
-              : (logProbabilities == null ? Double.valueOf(0.0) : (double) logProbabilities[row]);
-      rows[row] =
-          new RowReadBack(
-              ints[3 * row], ints[3 * row + 1] != 0, ints[3 * row + 2] != 0, logProbability);
-    }
-    return rows;
   }
 
   /** The direct path's finite-logit failure, reused so batched rows report identical text. */

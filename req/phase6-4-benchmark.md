@@ -147,3 +147,45 @@ Any reopening is a dated amendment to the plan that scopes the new design, measu
 captured from a real Tier-B checkpoint instead of random-normal inputs, and migrates 6.5's
 `keys()`/`values()` consumers. It also needs a real checkpoint for accuracy gates: six of the seven
 synthetic fixtures were too tie-prone for the flip limit in step 0.
+
+## Phase 6.5 direct versus batched decode
+
+`:jmlx-examples:benchmarkBatchDecode` runs the same heterogeneous requests once sequentially
+through the direct path and once through a `BatchGenerationScheduler`, each in the same JVM with the
+two runs alternating (model load is outside both clocks). It downloads nothing and writes
+`<prefix>.json` (per-sample wall times, per-request first-token and total latency, peak and
+leaked active bytes) and `<prefix>.md`. Memory counters are read only while no other thread uses
+MLX: the direct scope and the scheduler are both closed first.
+
+Command, per family, each in a fresh JVM (3 requests, prompt lengths 6/3/5, new tokens 24/8/16,
+7 samples after 2 warm-ups, max batch 4, all submitted back to back so queue depth is 3):
+
+```sh
+export JMLX_BENCH_DEVICE="$(sysctl -n machdep.cpu.brand_string)"
+for family in llama llama31 qwen2 mistral gemma phi3 mixtral; do
+  ./gradlew -q :jmlx-examples:benchmarkBatchDecode \
+    --args="${PWD}/tools/hf-reference/goldens/checkpoints/${family} ${PWD}/build/p65/${family} 1,7,42,3,19,5;1,9,4;1,2,3,4,5 24,8,16 7 2 4"
+done
+```
+
+Run on Apple M2 Max, Java 25.0.3, `mlx-metal==0.31.2`, mlx-c `fba4470`, commit `1a98704` (the
+working tree also held the uncommitted benchmark class). Median tokens/s over the 48 generated
+tokens:
+
+| Family | Direct | Batched | Speedup | Peak active bytes (direct / batched) | Leaked after run |
+| --- | ---: | ---: | ---: | --- | ---: |
+| llama | 1149 | 1128 | 0.98 | 454,648 / 739,043 | 0 |
+| llama31 | 1155 | 1331 | 1.15 | 454,680 / 753,414 | 0 |
+| qwen2 | 1120 | 1047 | 0.94 | 461,816 / 780,006 | 0 |
+| mistral | 1102 | 1365 | 1.24 | 454,784 / 754,177 | 0 |
+| gemma | 883 | 1169 | 1.32 | 483,592 / 933,579 | 0 |
+| phi3 | 1168 | 1238 | 1.06 | 454,648 / 753,382 | 0 |
+| mixtral | 817 | 918 | 1.12 | 1,179,648 / 1,557,003 | 0 |
+
+How to read this: these are the tiny synthetic fixtures, so each step is dominated by fixed
+per-call overhead, not arithmetic, and the speedups (0.94-1.32) are within run-to-run noise for
+some families. They show that batching is correct, leak-free (active bytes return to the baseline in
+every run) and not slower in aggregate, **not** what it buys on a production-size model; that needs
+a Tier-B run on real weights. The batched peak is the whole run's peak, including the cohort's
+cache compaction, and is higher than the direct peak because the cohort holds three rows' caches at
+once; it is not broken out per phase. No speed threshold is enforced anywhere in CI.

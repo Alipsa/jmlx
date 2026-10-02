@@ -56,3 +56,13 @@ tasks.register('runSchedulerExample', JavaExec) {
     def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
     systemProperty('jmlx.library.path', nativeLibDir)
 }
+
+tasks.register('benchmarkBatchDecode', JavaExec) {
+    group = 'verification'
+    description = 'Runs the opt-in direct-versus-batched decode benchmark against a local checkpoint.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.examples.BatchDecodeBenchmark'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    def nativeLibDir = rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath
+    systemProperty('jmlx.library.path', nativeLibDir)
+}

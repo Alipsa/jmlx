@@ -176,6 +176,20 @@ dependency-update review) — that is not part of `check` and stays a separate, 
 `jmlx-jinja/req/release-checklist.md` is jinja's full release procedure; follow it, not just
 `release.sh`, before an actual jinja release.
 
+## Release smoke
+
+`tools/release-smoke/` is an independent Gradle consumer (no `project(...)` deps) that proves the
+published shape: `./tools/release-smoke/run.sh ci` publishes the six modules to a disposable
+`build/smoke-repo` (each module's opt-in `smoke` Maven repository,
+`publishMavenPublicationToSmokeRepository`), then resolves `jmlx-models` plus the runtime-only native
+jar from it under a fresh `GRADLE_USER_HOME` with `exclusiveContent` for `se.alipsa`, a disposable
+`jmlx.native.cache.path`, and no native path override. It also checks the POM-only runtime classpath
+matches the Gradle-metadata one, every jar's license, the native jar's payload, and a seeded
+two-request batch against `goldens/mistral-sampled.properties`; `--record` rewrites the golden.
+`run.sh candidate` is the same with SNAPSHOT suffixes stripped (release versions set first), and
+`run.sh central` resolves from Maven Central after all six are published. The smoke tokenizer in
+`fixtures/` is hand-written to pair with the synthetic Mistral checkpoint (see its `PROVENANCE.md`).
+
 ## Code style
 
 Hand-written sources are Google Java Style, 2-space indent, 100-column width. Formatting is

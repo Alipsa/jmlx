@@ -1,0 +1,36 @@
+plugins { id 'java' }
+
+// Resolves the same graph through the POMs only (see repositories.gradle) so a Maven consumer's view
+// is exercised too. The jmlx-core POM puts jmlx-ffi in runtime scope (it is an `implementation`
+// dependency), so only the RUNTIME classpath is comparable, never the compile classpath.
+ext.pomOnlyResolution = true
+apply from: '../repositories.gradle'
+
+dependencies {
+    implementation "se.alipsa:jmlx-models:${jmlxVersions['jmlx-models']}"
+    runtimeOnly "se.alipsa:jmlx-native-macos-arm64:${jmlxVersions['jmlx-native-macos-arm64']}"
+}
+
+tasks.register('writeRuntimeCoordinates') {
+    def output = layout.buildDirectory.file('runtime-coordinates.txt')
+    outputs.file(output)
+    def resolved = configurations.runtimeClasspath.incoming.resolutionResult.rootComponent
+    doLast {
+        def coordinates = new TreeSet<String>()
+        def queue = [resolved.get()]
+        def seen = new HashSet()
+        while (queue) {
+            def component = queue.remove(0)
+            if (!seen.add(component.id)) continue
+            component.dependencies.each { dep ->
+                if (dep instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult) {
+                    queue << dep.selected
+                }
+            }
+            if (component.id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                coordinates << "${component.moduleVersion.group}:${component.moduleVersion.name}:${component.moduleVersion.version}".toString()
+            }
+        }
+        output.get().asFile.text = coordinates.join('\n') + '\n'
+    }
+}

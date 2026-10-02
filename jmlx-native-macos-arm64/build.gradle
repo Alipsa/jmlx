@@ -106,10 +106,7 @@ tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
     dependsOn tasks.named('stageNativeResources')
     from(generatedResourcesDir)
-    // MLX/mlx-c are MIT; libmlx.dylib also embeds Apache-2.0-licensed metal-cpp. Keep the module's
-    // license and third-party attribution in the actual runtime jar, not only in the source checkout.
-    from('LICENSE') { into 'META-INF' }
-    from('NOTICE') { into 'META-INF' }
+    // LICENSE/NOTICE are added to every published jar by the root build.gradle convention.
 }
 
 // Task 2's doLast only checks immediately after copying; this re-verifies the actual published

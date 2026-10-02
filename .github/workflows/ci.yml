@@ -134,6 +134,12 @@ jobs:
       - name: Run native module checks
         run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check :jmlx-native-macos-arm64:check :jmlx-ffi:assemble :jmlx-core:assemble :jmlx-models:assemble :jmlx-native-macos-arm64:assemble
 
+      # Publishes the six SNAPSHOT modules to a disposable repository and resolves them from a clean
+      # consumer (fresh GRADLE_USER_HOME, exclusive repository content, no checkout classpath, no
+      # native path override). CI mode only: the release-mode and Central runs are manual.
+      - name: Release smoke (CI mode)
+        run: ./tools/release-smoke/run.sh ci
+
       - name: Assert required native suites executed
         run: |
           python3 - <<'PY'

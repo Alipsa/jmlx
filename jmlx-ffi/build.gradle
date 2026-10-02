@@ -42,9 +42,7 @@ tasks.named('javadoc', Javadoc) {
 
 tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.ffi')
-    // jmlx-ffi redistributes generated bindings derived from mlx-c; ship its attribution with the
-    // artifact rather than leaving it only in a source checkout.
-    from('NOTICE') { into 'META-INF' }
+    // LICENSE/NOTICE are added to every published jar by the root build.gradle convention.
 }
 
 dependencies {

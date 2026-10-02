@@ -1,0 +1,155 @@
+plugins { id 'application' }
+
+apply from: '../repositories.gradle'
+
+// Compile against models only; core, tokenizer and jinja arrive transitively, and ffi is runtime-only
+// (jmlx-core's `implementation` dependency). The native jar is a runtime-only opt-in.
+dependencies {
+    implementation "se.alipsa:jmlx-models:${jmlxVersions['jmlx-models']}"
+    runtimeOnly "se.alipsa:jmlx-native-macos-arm64:${jmlxVersions['jmlx-native-macos-arm64']}"
+}
+
+application { mainClass = 'smoke.ReleaseSmoke' }
+
+// Javadoc and sources jars for all six, resolved by variant attributes.
+configurations {
+    docs {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+def docsAttributes = { String docsType ->
+    return { attrs ->
+        attrs.attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.DOCUMENTATION))
+        attrs.attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+        attrs.attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType, docsType))
+        attrs.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+    }
+}
+configurations {
+    javadocJars { canBeConsumed = false; canBeResolved = true; attributes(docsAttributes(DocsType.JAVADOC)) }
+    sourcesJars { canBeConsumed = false; canBeResolved = true; attributes(docsAttributes(DocsType.SOURCES)) }
+}
+jmlxVersions.each { name, version ->
+    dependencies.add('javadocJars', "se.alipsa:${name}:${version}")
+    dependencies.add('sourcesJars', "se.alipsa:${name}:${version}")
+}
+
+def modelDir = layout.buildDirectory.dir('model')
+def nativeCache = layout.buildDirectory.dir('native-cache')
+
+// One disposable model directory: the committed synthetic Mistral checkpoint plus the dedicated smoke
+// tokenizer. NOT jmlx-tokenizer's test tokenizer, which is not a pair for this checkpoint (it defines
+// ids 0-24, the checkpoint emits 0-127); see fixtures/PROVENANCE.md.
+tasks.register('assembleModelDirectory', Sync) {
+    into modelDir
+    from('../../hf-reference/goldens/checkpoints/mistral') {
+        include 'config.json', 'generation_config.json', 'model.safetensors'
+    }
+    from('../fixtures') { include 'tokenizer.json', 'tokenizer_config.json' }
+}
+
+// Every resolved se.alipsa artifact must be a module component (never a project or a file), come at
+// the expected version, and, in release mode, nothing in the graph may be a SNAPSHOT.
+tasks.register('verifyResolution') {
+    def runtime = configurations.runtimeClasspath
+    def root = runtime.incoming.resolutionResult.rootComponent
+    def expectedVersions = jmlxVersions
+    def mode = jmlxMode
+    doLast {
+        def found = [:]
+        def all = new TreeSet<String>()
+        def queue = [root.get()]
+        def seen = new HashSet()
+        while (queue) {
+            def component = queue.remove(0)
+            if (!seen.add(component.id)) continue
+            component.dependencies.each { if (it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult) queue << it.selected }
+            def id = component.id
+            if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+                if (component.id != root.get().id) throw new GradleException("A project dependency leaked in: ${id}")
+            } else if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                all << "${id.group}:${id.module}:${id.version}".toString()
+                if (id.group == 'se.alipsa') found[id.module] = id.version
+            } else {
+                throw new GradleException("Unexpected component (not a published module): ${id}")
+            }
+        }
+        if (found != expectedVersions) {
+            throw new GradleException("Resolved se.alipsa modules ${found} != expected ${expectedVersions}")
+        }
+        if (mode == 'release') {
+            def snapshots = all.findAll { it.endsWith('-SNAPSHOT') }
+            if (snapshots) throw new GradleException("Release mode forbids SNAPSHOTs: ${snapshots}")
+        }
+        layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.text = all.join('\n') + '\n'
+        println "Resolved ${all.size()} runtime components, se.alipsa: ${found}"
+    }
+}
+
+// The Gradle-metadata resolution (above) and the POM-only resolution (:pom-check) must agree.
+tasks.register('verifyPomMatchesModuleMetadata') {
+    dependsOn 'verifyResolution', ':pom-check:writeRuntimeCoordinates'
+    doLast {
+        def gradleMetadata = layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.readLines()
+        def pom = project(':pom-check').layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.readLines()
+        if (gradleMetadata != pom) {
+            throw new GradleException("Module-metadata and POM-only runtime classpaths differ:\n" +
+                    "module metadata: ${gradleMetadata}\nPOM only:        ${pom}")
+        }
+        println "POM-only and module-metadata runtime classpaths agree (${pom.size()} components)"
+    }
+}
+
+// Javadoc and sources jars exist for every module; every runtime jar carries a license; the native
+// jar carries the required binaries.
+tasks.register('verifyPublishedArtifacts') {
+    def runtime = configurations.runtimeClasspath
+    def javadocs = configurations.javadocJars
+    def sources = configurations.sourcesJars
+    doLast {
+        def jmlxJars = runtime.files.findAll { it.name.startsWith('jmlx-') }
+        if (jmlxJars.size() != 6) throw new GradleException("Expected 6 jmlx jars, got ${jmlxJars*.name}")
+        def entries = { File jar -> new java.util.zip.ZipFile(jar).withCloseable { z -> z.entries().collect { it.name } } }
+        jmlxJars.each { jar ->
+            def names = entries(jar)
+            if (!names.contains('META-INF/LICENSE')) throw new GradleException("${jar.name}: no META-INF/LICENSE")
+        }
+        def nativeJar = jmlxJars.find { it.name.startsWith('jmlx-native-macos-arm64') }
+        def required = ['libmlxc.dylib', 'libmlx.dylib', 'libjaccl.dylib', 'mlx.metallib', 'native-pin.properties']
+        def names = entries(nativeJar)
+        required.each {
+            if (!names.contains("se/alipsa/jmlx/native/macos-aarch64/${it}".toString())) {
+                throw new GradleException("${nativeJar.name} lacks ${it}")
+            }
+        }
+        if (!names.contains('META-INF/NOTICE')) throw new GradleException("${nativeJar.name}: no META-INF/NOTICE")
+        if (javadocs.files.size() != 6) throw new GradleException("javadoc jars: ${javadocs.files*.name}")
+        if (sources.files.size() != 6) throw new GradleException("sources jars: ${sources.files*.name}")
+        println "License, native payload, ${javadocs.files.size()} javadoc and ${sources.files.size()} sources jars verified"
+    }
+}
+
+tasks.register('smoke', JavaExec) {
+    group = 'verification'
+    description = 'Runs the release smoke against the resolved jmlx jars.'
+    dependsOn 'assembleModelDirectory', 'verifyPomMatchesModuleMetadata', 'verifyPublishedArtifacts'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'smoke.ReleaseSmoke'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    // The loader must come from the packaged jar: neither override may be set, and the extraction
+    // cache is a disposable directory so the extraction cannot be satisfied by an earlier run.
+    environment.remove('JMLX_LIBRARY_PATH')
+    systemProperty 'jmlx.native.cache.path', nativeCache.get().asFile.absolutePath
+    systemProperty 'smoke.model.dir', modelDir.get().asFile.absolutePath
+    systemProperty 'smoke.golden', file('../goldens/mistral-sampled.properties').absolutePath
+    systemProperty 'smoke.checkout.root', rootProject.projectDir.parentFile.parentFile.absolutePath
+    systemProperty 'smoke.mode', jmlxMode
+    systemProperty 'smoke.record', providers.gradleProperty('smokeRecord').getOrElse('false')
+    systemProperty 'smoke.expected.versions', jmlxVersions.collect { k, v -> "${k}=${v}" }.join(',')
+    doFirst {
+        def cache = nativeCache.get().asFile
+        project.delete(cache)
+        cache.mkdirs()
+    }
+}

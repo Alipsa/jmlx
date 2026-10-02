@@ -62,47 +62,57 @@ native object. Document these behaviors in Javadoc before implementing the worke
   return type. Do not accept a caller-loaded model or scope: `MLXScope.newChild()` and every
   weight access check the owning thread. The worker alone closes the model and root when the
   scheduler closes. Submission and cancellation never touch MLX arrays or caches.
-- Complete request stages on a dedicated, bounded completion dispatcher so the MLX worker
-  never runs a request's completion itself. This guarantees where completion is dispatched,
-  not where every observer runs (see the registering-thread limit below). Reserve one completion
-  slot for every accepted request at submission; retain it through queued and active
-  states and release it only after the dispatcher has run that request's completion.
-  The dispatcher queue plus running completions is therefore bounded by the total
-  admission permits (`maxQueuedRequests + maxBatchSize`), and worker handoff never
-  waits for queue space. Exhausted permits reject new submissions immediately. Expose
-  the handle's stage as `internalFuture.minimalCompletionStage()`: it is read-only and its
-  `toCompletableFuture()` returns a new future, so no hand-written facade is needed. The
-  handle's `cancel()` atomically ORs its signal with `GenerationRequest.cancellationToken()`.
-  Stage cancellation is not a request cancellation API; a caller must use the handle.
-  Document that completion observers must return promptly and must not block on another request's
-  stage; doing so can deadlock a bounded dispatcher. Document the registering-thread limit: a
-  non-async dependent (`thenAccept`, `thenApply`, `thenRun`, ...) attached to an **already
-  completed** stage runs immediately on the attaching thread, and a read-only
-  `minimalCompletionStage()` does not change that. A token listener or event callback (which runs
-  on the worker) that calls `otherHandle.stage().thenAccept(...)` on a finished request therefore
-  runs that observer on the MLX worker, so such an observer must not block or use MLX. Callbacks
-  must use the `*Async` forms or avoid attaching dependents. Reject `close()` from the worker or
-  completion dispatcher with `IllegalStateException` to prevent self-join.
-- Configure positive `maxBatchSize`, `maxQueuedRequests`, and a bounded prompt-token budget
-  for a batch. Count prefill work as `rows × maximum padded prompt width`, including left
-  padding, rather than summing valid prompt lengths. Reject a prompt exceeding the budget
-  even alone. Exhausted admission capacity causes immediate, named rejection with no request
-  side effects; it never grows implicitly. Name that exception
-  `BatchAdmissionRejectedException`, not "queue full": cancelled requests and requests
-  awaiting completion dispatch free their queue slot but keep their admission permit, so a
-  slow dispatcher can reject a submission while the waiting queue is empty. Document this.
-  An active batch holds at most `maxBatchSize` requests; waiting requests count against
-  `maxQueuedRequests` and every accepted request also holds one total admission permit
-  through completion dispatch. The oldest waiting request determines the next cohort's
-  compatibility group; scan later requests only to fill that cohort without exceeding either
-  bound. Add a scheduler `maxNewTokensPerRequest` cap and reject larger requests before
-  enqueue. With no mid-decode joins, the next cohort waits at most that many active decode
-  steps plus callback time; document this step-count bound and verify that the oldest
-  waiting request runs next. There is no wall-clock bound while callbacks may block.
+- Complete request stages on a dedicated, bounded completion dispatcher so the MLX worker never runs
+  a request's completion itself. This guarantees where completion is dispatched, not where every
+  observer runs (see the registering-thread limit below). Reserve one completion slot for every
+  accepted request at submission; retain it through queued and active states and release it only
+  after the dispatcher has run that request's completion. The dispatcher queue plus running
+  completions is therefore bounded by the total admission permits (`maxQueuedRequests +
+  maxBatchSize`), and worker handoff never waits for queue space. Exhausted permits reject new
+  submissions immediately. Expose the handle's stage as `internalFuture.minimalCompletionStage()`:
+  it is read-only and its `toCompletableFuture()` returns a new future, so no hand-written facade is
+  needed. Dependents attached to that stage see a failed request as a `CompletionException` whose
+  **cause** is the real exception (checked in jshell:
+  `minimalCompletionStage().handle`/`exceptionally` receive the wrapper, while handlers on the
+  internal future get the raw exception). Every "completes exceptionally with X" statement in this
+  plan therefore means X is the cause of what a stage dependent receives. The Javadoc tells callers
+  to unwrap `CompletionException` (`join()` throws it; `get()` throws `ExecutionException`), and one
+  test pins this behavior. The handle's `cancel()` atomically ORs its signal with
+  `GenerationRequest.cancellationToken()`. Stage cancellation is not a request cancellation API; a
+  caller must use the handle. Document that completion observers must return promptly and must not
+  block on another request's stage; doing so can deadlock a bounded dispatcher. Document the
+  registering-thread limit: a non-async dependent (`thenAccept`, `thenApply`, `thenRun`, ...)
+  attached to an **already completed** stage runs immediately on the attaching thread, and a
+  read-only `minimalCompletionStage()` does not change that. A token listener or event callback
+  (which runs on the worker) that calls `otherHandle.stage().thenAccept(...)` on a finished request
+  therefore runs that observer on the MLX worker, so such an observer must not block or use MLX.
+  Callbacks must use the `*Async` forms or avoid attaching dependents. A `close()` from the worker
+  or completion dispatcher cannot join itself, and throwing there would be swallowed by a dependent
+  stage (`handle.stage().thenRun(scheduler::close)` would silently never close). Such a call instead
+  stops admission and returns immediately without waiting; the normal drain performs the `CLOSING →
+  CLOSED` transition. Document that it does not wait, and test the pattern.
+- Configure positive `maxBatchSize`, `maxQueuedRequests`, and a bounded prompt-token budget for a
+  batch. Count prefill work as `rows × maximum padded prompt width`, including left padding, rather
+  than summing valid prompt lengths. Reject a prompt exceeding the budget even alone, and a
+  `maxNewTokens` above `maxNewTokensPerRequest`, with `IllegalArgumentException` at `submit` (they
+  can never succeed on retry); `BatchAdmissionRejectedException` is reserved for transient capacity
+  ("retry later"). Exhausted admission capacity causes immediate, named rejection with no request
+  side effects; it never grows implicitly. Name that exception `BatchAdmissionRejectedException`,
+  not "queue full": cancelled requests and requests awaiting completion dispatch free their queue
+  slot but keep their admission permit, so a slow dispatcher can reject a submission while the
+  waiting queue is empty. Document this. An active batch holds at most `maxBatchSize` requests;
+  waiting requests count against `maxQueuedRequests` and every accepted request also holds one total
+  admission permit through completion dispatch. The oldest waiting request determines the next
+  cohort's compatibility group; scan later requests only to fill that cohort without exceeding
+  either bound. Add a scheduler `maxNewTokensPerRequest` cap and reject larger requests before
+  enqueue. With no mid-decode joins, the next cohort waits at most that many active decode steps
+  plus callback time; document this step-count bound and verify that the oldest waiting request runs
+  next. There is no wall-clock bound while callbacks may block.
 - A callback runs synchronously on the worker, receives only immutable Java events,
-  and must return promptly. It must not call a blocking scheduler operation or close the
-  scheduler from that worker. `submit` remains nonblocking even when invoked by a
-  callback; `close()` from that worker throws. No unbounded output event queue is added.
+  and must return promptly. It must not call a blocking scheduler operation. `submit` remains
+  nonblocking even when invoked by a callback; `close()` from that worker only stops admission
+  and returns without waiting (see the dispatcher rule above). No unbounded output event queue
+  is added.
   A slow callback delays the worker; document that operational limit and measure it
   in the benchmark. Never wait for request completion on the worker.
 - Cancellation before admission completes with `CANCELLED` and one terminal event;
@@ -133,12 +143,17 @@ native object. Document these behaviors in Javadoc before implementing the worke
   never abandons an accepted stage. Document that a callback that never returns can stall
   worker shutdown and an observer that never returns can stall dispatcher drain and
   `close()`; there is no forced timeout.
+  The worker and the dispatcher are named **non-daemon** threads: a daemon worker could be
+  killed mid-native call at JVM exit, which is worse than a forgotten `close()` keeping the JVM
+  alive. Document that `close()` is required (use try-with-resources).
 - **Failed-worker state.** A failure that leaves the model or worker unusable moves the
   scheduler to `FAILED`: a thrown `Error`, an exception outside the §2 step-failure
   classification, a failed model, or a cleanup step (closing a cache, scope, or the model)
   that itself throws. Cohort-wide failures with a named cause (forward, selection-graph,
   joint-evaluation, compaction) poison that cohort's caches and fail its rows, but keep the
-  worker `RUNNING` because the model is still valid. On entering `FAILED` the worker
+  worker `RUNNING` because the model is still valid. Each such row's stage completes with
+  `GenerationAbortedException` carrying that cause and the row's partial IDs, and no
+  listener gets a terminal event, as in the other failure rules. On entering `FAILED` the worker
   atomically stops admission, completes **every** queued and active stage exceptionally
   with the existing `GenerationAbortedException` (partial generated IDs, empty for queued
   requests) whose cause is a named `SchedulerFailedException`, so consumers handle one
@@ -178,13 +193,28 @@ scheduler. A bad request is rejected by `submit` itself with an `IllegalArgument
 it takes no admission permit and returns no handle, so it cannot poison the queue. All
 request validation happens at submit; none is deferred to the step boundary.
 
+**Tokenizer thread safety.** Under the scheduler one `HfTokenizer` (carried in each
+`GenerationRequest`) is used concurrently: submitting threads encode and size-check with it
+while the worker creates and drives incremental decoders, where the direct API only ever
+used it from one thread. Thread safety of `HfTokenizer`, `AddedTokenMatcher` (which has a
+`HashMap` field), `ChatTemplateRenderer` and the Jinja `Template` after construction is
+unverified. Before the scheduler ships, require either a stated Javadoc guarantee of
+concurrent use after construction or a concurrency test (several threads encode, render, and
+decode against single-threaded reference output), and fix any shared mutable state found.
+
 **Gate 0 — native thread probes (before any scheduler code).** (a) Exercise a worker
 thread after `NativeOps.DEFAULT_STREAM` was initialized on a different thread, then load
 and generate entirely on that worker. (b) Run two threads that each load and generate
 concurrently on the shared default stream, which is what a user calling the public direct
-`generate` while a scheduler runs, or starting two schedulers, would do. These are the
-required pinned-runtime probes, not an assumption about Metal command-encoder or MLX
-stream thread safety (MLX 0.31.2's behavior here is unverified). If (a) fails, the native
+`generate` while a scheduler runs, or starting two schedulers, would do. These are
+pinned-runtime probes, not an assumption about Metal command-encoder or MLX stream thread
+safety (MLX 0.31.2's behavior here is unverified). Run both in a separate forked
+`threadProbeTest` task in `jmlx-models`, wired into `check` and excluded from `test`, the same
+pattern as `loaderGuardTest`: (a) needs a fresh JVM anyway, because `DEFAULT_STREAM` is
+initialized once per JVM, and (b) races two MLX threads on a stream this plan treats as
+unsafe, so a crash must not take down the `:jmlx-models:test` JVM. (a) is a required test; (b)
+is an **evidence probe**: record its outcome (pass, failure, or crash) but never gate on it,
+since a pass proves nothing. If (a) fails, the native
 stream ownership or initialization design changes and §1–§2's worker design must be
 revisited. A passing (b) is **not** permission: a race test can pass on CI and still crash
 later. "At most one MLX-using thread at a time per process" is therefore the documented
@@ -205,12 +235,17 @@ static, so it enforces the rule only within one jmlx classloader; the rule itsel
 because MLX's native state (the default stream and the Metal device) is process-wide. Say both in
 the Javadoc. (Whether the JDK already refuses to load the native library into a second classloader
 on the `System.load` path is unverified; the documented rule says "per process" either way.) The
-guard is released only after the worker has closed the model and root, and on **every
-startup-failure path** (a throwing factory, a failed scope check, a worker that never becomes
-ready), so one failed `start()` cannot block later ones until the JVM exits; test the failure paths.
+guard is released when the worker thread exits, in a `finally`, whatever happened: after an
+orderly close, after a runtime `FAILED` (including one whose best-effort close of the model
+or root threw), and on **every startup-failure path** (a throwing factory, a failed scope
+check, a worker that never becomes ready). It is never released while the worker is alive.
+The rule bounds concurrent MLX threads and an exited worker is not one, so a failed native
+cleanup (leaked handles; state `FAILED`, recorded by `failure()`) does not block a restart,
+and one failed `start()` cannot block later ones until the JVM exits; test the failure paths,
+including a throwing root close.
 Close-then-restart (common in tests and the example) works. The public direct `generate` API cannot
 be blocked, so for that path the rule is documentation only. Run the probes before writing the
-scheduler, and keep them as required native CI tests afterwards.
+scheduler, and keep (a) as a required native CI test and (b) as an evidence probe afterwards.
 
 **Scope layout:** On the worker, create one model root; create each active cohort's scope
 `C` as a child of the validated `DecoderModel.modelScope()`, so weight scopes remain
@@ -294,7 +329,8 @@ scheduler. No change to `MLXShape.takeAxis` or its Javadoc is required.
    expert routing, so it is tested rather than assumed (see the native tests); if a family
    fails that test, its non-finite rows fail the whole cohort instead. Forward construction,
    selection-graph/native errors, or joint evaluation failure poison the whole cohort cache
-   set and fail every active row with a named cause. Do not infer a row-only native failure
+   set and fail every active row as in §1 (`GenerationAbortedException` with the named cause,
+   partial IDs, no terminal event). Do not infer a row-only native failure
    from the order in which arrays were passed to `MLX.eval`. Queued requests may start with
    fresh caches only while the worker is `RUNNING`; otherwise the failed-worker rule in §1
    applies.
@@ -332,14 +368,16 @@ vocabulary column and prove nothing about isolation. Injecting NaN only into log
 enough, since it exercises only code after the forward pass. The plateau assertion must
 sample active bytes **within one long cohort** across many decode steps, as well as after
 repeated cohorts, so a per-step activation leak cannot hide behind end-of-cohort cleanup.
-The Gate 0 probes (a) and (b) stay required native tests here. Assert required native test
-XML in `.github/workflows/ci.yml` so an unbootstrapped run cannot appear green through
-skipped tests. After cancelling a row, assert the other row's RNG key sequence and
-decode-step count are unchanged; compare its events exactly with a reference run using the
-**same cancellation schedule and batch shapes**. Compare its logits with an uncancelled run
-only within a documented numerical tolerance, since compaction changes batch shape. Retain
-the roadmap's no-cross-batch-shape token identity rule. Include a measurable proof that a
-multi-row cohort uses fewer model forward calls than one forward per request.
+Gate 0 probe (a) stays a required native test; it runs in `threadProbeTest`, so extend the
+required-suite check in `.github/workflows/ci.yml`, which only reads `build/test-results/test/`, to
+read that task's results directory too. Probe (b) is not asserted. Assert required native test XML
+in `.github/workflows/ci.yml` so an unbootstrapped run cannot appear green through skipped tests.
+After cancelling a row, assert the other row's RNG key sequence and decode-step count are unchanged;
+compare its events exactly with a reference run using the **same cancellation schedule and batch
+shapes**. Compare its logits with an uncancelled run only within a documented numerical tolerance,
+since compaction changes batch shape. Retain the roadmap's no-cross-batch-shape token identity rule.
+Include a measurable proof that a multi-row cohort uses fewer model forward calls than one forward
+per request.
 
 ## 3. Consumer example, benchmark, and support report
 

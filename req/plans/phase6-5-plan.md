@@ -48,18 +48,18 @@ Add `BatchGenerationScheduler` and a small immutable `BatchSchedulerConfig` in
 a read-only completion stage and a thread-safe `cancel()` signal. The handle owns no
 native object. Document these behaviors in Javadoc before implementing the worker:
 
-- Make a worker-owned factory the only constructor path:
-  `BatchGenerationScheduler.start(config, modelFactory)`, where the checked factory receives
-  the root `MLXScope` and returns `TextGenerationModel`. The worker creates that root,
-  invokes the factory there, verifies the result is a `DecoderModel` whose model scope is
-  the root or its descendant, then publishes a ready scheduler. Add a package-private,
-  worker-thread-only scope accessor on `DecoderModel` because its inherited `Module.scope()`
-  is protected in `se.alipsa.jmlx.nn`; check `root.isAncestorOf(model.modelScope())` before
-  accepting the factory result. A factory that returns a model from an unrelated scope fails
-  startup with a named error. Startup failures close the factory result where possible and
-  the root, then propagate to the caller. `TextGenerationModels.load(scope, path)` already
-  returns the interface, so this accepts the existing loader without changing its public
-  return type. Do not accept a caller-loaded model or scope: `MLXScope.newChild()` and every
+- Make a worker-owned factory the only constructor path: `BatchGenerationScheduler.start(config,
+  modelFactory)`, where the checked factory receives the root `MLXScope` and returns
+  `TextGenerationModel`. The worker creates that root, invokes the factory there, verifies the
+  result is a `DecoderModel` whose model scope is the root or its descendant, then publishes a ready
+  scheduler. Add a package-private, worker-thread-only scope accessor on `DecoderModel` because its
+  inherited `Module.scope()` is protected in `se.alipsa.jmlx.nn`; check
+  `root.isAncestorOf(model.modelScope())` before accepting the factory result. A factory that
+  returns a model from an unrelated scope fails startup with a named error. Startup failures close
+  the factory result where possible and the root, and `start()` then joins the worker thread (see
+  the exit sequence) before propagating the error to the caller. `TextGenerationModels.load(scope,
+  path)` already returns the interface, so this accepts the existing loader without changing its
+  public return type. Do not accept a caller-loaded model or scope: `MLXScope.newChild()` and every
   weight access check the owning thread. The worker alone closes the model and root when the
   scheduler closes. Submission and cancellation never touch MLX arrays or caches.
 - Complete request stages on a dedicated, bounded completion dispatcher so the MLX worker never runs
@@ -116,52 +116,57 @@ native object. Document these behaviors in Javadoc before implementing the worke
   is added.
   A slow callback delays the worker; document that operational limit and measure it
   in the benchmark. Never wait for request completion on the worker.
-- Cancellation before admission completes with `CANCELLED` and one terminal event;
-  cancellation in flight is observed before prefill or between decode steps, never in the
-  middle of a native call. At **every** active step boundary, the worker also re-checks all
-  waiting requests' own cancellation tokens and handle signals. It removes cancelled
-  requests from the queue immediately, emits their one `CANCELLED` terminal event on the
-  worker, and hands completion to the dispatcher; their queue slots are then free, while
-  admission permits remain held until completion dispatch finishes. Removing one request
-  never cancels or changes another. Document the cost: this is up to `maxQueuedRequests`
-  user `isCancelled()` calls per decode step on the MLX worker, and a token that blocks
-  stalls the worker like a slow callback. A token whose `isCancelled()` throws fails only
-  its own request: it is removed like a cancelled request, with no terminal event, and its
-  stage completes exceptionally with `GenerationAbortedException` carrying the cause and its
-  partial generated IDs (empty if it never started), matching the token-listener failure
-  rule below. It never affects another row or the worker. After a token-listener exception,
-  close that request's state and complete its future exceptionally with the existing
-  `GenerationAbortedException` partial result; emit no terminal event for it. A
-  terminal-listener exception follows the direct API's logged, successful-result rule.
-  `close()` atomically stops admission; a racing or later `submit` gets a named
-  `SchedulerClosedException`, distinct from the named `BatchAdmissionRejectedException` for
-  capacity rejection. The worker treats every remaining queued and active request as
-  cancelled at its next safe boundary: each gets a `GenerationResult` with
-  `FinishReason.CANCELLED`, its partial generated IDs, and exactly one terminal event
-  delivered on the worker, including tokenizer flush if applicable. Then the worker closes
-  all row state, cohort scopes, model, and root. `close()` joins the worker and waits for
-  the completion dispatcher to deliver every accepted request's stage before returning; it
-  never abandons an accepted stage. Document that a callback that never returns can stall
-  worker shutdown and an observer that never returns can stall dispatcher drain and
-  `close()`; there is no forced timeout.
-  **Exit sequence.** The dispatcher is a `ThreadPoolExecutor` subclass whose bounded queue holds
-  exactly the admission-permit count; the exit sequence submits **no** task, so it needs no extra
-  slot and cannot be rejected or block the worker. Every worker exit path (orderly close,
-  `FAILED`, and every startup failure after the dispatcher exists) ends with the worker calling
-  the executor's `shutdown()`, which still runs every already-queued completion. `CLOSED` is set
-  (unless the state is `FAILED`) from the executor's `terminated()` hook, which runs only after
-  every queued and running completion has finished, so it holds for a dispatcher of any size and
-  never precedes the drain. Shutting the dispatcher down is the worker's job, so a `close()` made
-  from the worker or dispatcher leaves no live non-daemon thread and no state stuck at `CLOSING`.
-  If `Thread.start()` for the worker itself throws (for example `OutOfMemoryError`: unable to
-  create native thread), no worker `finally` will ever run, so `start()` releases the guard and
-  shuts the dispatcher down itself before rethrowing; test this with an injected thread factory.
-  An outside `close()` joins the worker, then calls `awaitTermination` on the dispatcher (no
-  timeout, like the drain above) and returns. **Combining calls:** every `close()` from an outside
-  thread waits for the drain, including one made after a non-waiting `close()` from the worker or
-  dispatcher; repeated `close()` calls are safe; the non-waiting rule above is the only exception
-  to "`close()` joins".
-  The worker and the dispatcher are named **non-daemon** threads: a daemon worker could be
+- Cancellation before admission completes with `CANCELLED` and one terminal event; cancellation in
+  flight is observed before prefill or between decode steps, never in the middle of a native call.
+  At **every** active step boundary, the worker also re-checks all waiting requests' own
+  cancellation tokens and handle signals. It removes cancelled requests from the queue immediately,
+  emits their one `CANCELLED` terminal event on the worker, and hands completion to the dispatcher;
+  their queue slots are then free, while admission permits remain held until completion dispatch
+  finishes. Removing one request never cancels or changes another. Document the cost: this is up to
+  `maxQueuedRequests` user `isCancelled()` calls per decode step on the MLX worker, and a token that
+  blocks stalls the worker like a slow callback. A token whose `isCancelled()` throws fails only its
+  own request: it is removed like a cancelled request, with no terminal event, and its stage
+  completes exceptionally with `GenerationAbortedException` carrying the cause and its partial
+  generated IDs (empty if it never started), matching the token-listener failure rule below. It
+  never affects another row or the worker. After a token-listener exception, close that request's
+  state and complete its future exceptionally with the existing `GenerationAbortedException` partial
+  result; emit no terminal event for it. A terminal-listener exception follows the direct API's
+  logged, successful-result rule. `close()` atomically stops admission; a racing or later `submit`
+  gets a named `SchedulerClosedException`, distinct from the named `BatchAdmissionRejectedException`
+  for capacity rejection. The worker treats every remaining queued and active request as cancelled
+  at its next safe boundary: each gets a `GenerationResult` with `FinishReason.CANCELLED`, its
+  partial generated IDs, and exactly one terminal event delivered on the worker, including tokenizer
+  flush if applicable. Then the worker closes all row state, cohort scopes, model, and root.
+  `close()` joins the worker and waits for the completion dispatcher to deliver every accepted
+  request's stage before returning; it never abandons an accepted stage. Document that a callback
+  that never returns can stall worker shutdown and an observer that never returns can stall
+  dispatcher drain and `close()`; there is no forced timeout. **Exit sequence.** The dispatcher is a
+  `ThreadPoolExecutor` subclass whose bounded queue holds exactly the admission-permit count; the
+  exit sequence submits **no** task, so it needs no extra slot and cannot be rejected or block the
+  worker. Every worker exit path (orderly close, `FAILED`, and every startup failure after the
+  dispatcher exists) runs the same three steps **in this order**: (1) close the model and root (best
+  effort), (2) release the one-scheduler guard, (3) call the executor's `shutdown()` last, which
+  still runs every already-queued completion. The order matters: with an idle dispatcher
+  `shutdown()` runs `terminated()` immediately on the worker thread, so `CLOSED` can never be
+  visible while the guard is still held, and a caller who sees `CLOSED` and calls `start()` is not
+  rejected. Releasing the guard before the thread literally ends is safe because the worker makes no
+  MLX calls after step (1). `CLOSED` is set (unless the state is `FAILED`) from the executor's
+  `terminated()` hook, which runs only after every queued and running completion has finished, so it
+  holds for a dispatcher of any size and never precedes the drain. Shutting the dispatcher down is
+  the worker's job, so a `close()` made from the worker or dispatcher leaves no live non-daemon
+  thread and no state stuck at `CLOSING`. If `Thread.start()` for the worker itself throws (for
+  example `OutOfMemoryError`: unable to create native thread), no worker `finally` will ever run, so
+  `start()` releases the guard and shuts the dispatcher down itself before rethrowing; test this
+  with an injected thread factory. An outside `close()` joins the worker, then calls
+  `awaitTermination` on the dispatcher (no timeout, like the drain above) and returns.
+  **Interruption:** these waits are uninterruptible: `close()` keeps waiting if interrupted,
+  restores the thread's interrupt flag before returning, and never throws `InterruptedException`, so
+  a try-with-resources close stays quiet; test it. **Startup failure:** `start()` joins the worker
+  thread (same uninterruptible wait) before rethrowing, so the guard is already released and an
+  immediate retry is accepted. **Combining calls:** every `close()` from an outside thread waits for
+  the drain, including one made after a non-waiting `close()` from the worker or dispatcher;
+  repeated `close()` calls are safe; the non-waiting rule above is the only exception to "`close()`
+  joins". The worker and the dispatcher are named **non-daemon** threads: a daemon worker could be
   killed mid-native call at JVM exit, which is worse than a forgotten `close()` keeping the JVM
   alive. Document that `close()` is required (use try-with-resources).
 - **Failed-worker state.** A failure that leaves the model or worker unusable moves the scheduler to
@@ -184,12 +189,12 @@ native object. Document these behaviors in Javadoc before implementing the worke
   no requests in flight would otherwise only see the failure by calling `submit`, so add a
   non-blocking `state()` accessor (`RUNNING`, `CLOSING`, `FAILED`, `CLOSED`) and
   `Optional<Throwable> failure()`. Transitions: `RUNNING → CLOSING` when `close()` stops admission,
-  and `CLOSING → CLOSED` only after the worker has exited and the dispatcher has drained (set by the
-  executor's `terminated()` hook, see the exit sequence); `RUNNING → FAILED` when the worker fails.
-  `FAILED` is terminal and sticky: a later `close()` still drains and returns but leaves the state
-  `FAILED`, so `failure()` stays meaningful. A failure during `CLOSING` (for example a throwing
-  cleanup) also ends in `FAILED`. An `Error` is recorded as the cause, not swallowed, and may be
-  rethrown from the worker thread after stages complete.
+  and `CLOSING → CLOSED` only after the worker has finished its cleanup and released the guard and
+  the dispatcher has drained (set by the executor's `terminated()` hook, see the exit sequence);
+  `RUNNING → FAILED` when the worker fails. `FAILED` is terminal and sticky: a later `close()` still
+  drains and returns but leaves the state `FAILED`, so `failure()` stays meaningful. A failure
+  during `CLOSING` (for example a throwing cleanup) also ends in `FAILED`. An `Error` is recorded as
+  the cause, not swallowed, and may be rethrown from the worker thread after stages complete.
 - Match direct `GenerationResult` and `GenerationEvent` semantics: EOS token included,
   explicit stop token excluded, one terminal event for normal completion, tokenizer
   flush delta, optional post-filter log probability, and `maxNewTokens == 0` without
@@ -254,11 +259,13 @@ another scheduler's worker has not exited. The guard is static, so it enforces t
 one jmlx classloader; the rule itself stays per process, because MLX's native state (the default
 stream and the Metal device) is process-wide. Say both in the Javadoc. (Whether the JDK already
 refuses to load the native library into a second classloader on the `System.load` path is
-unverified; the documented rule says "per process" either way.) The guard is released when the
-worker thread exits, in a `finally`, whatever happened: after an orderly close, after a runtime
+unverified; the documented rule says "per process" either way.) The guard is released by the
+worker's exit sequence, in a `finally`, whatever happened: after an orderly close, after a runtime
 `FAILED` (including one whose best-effort close of the model or root threw), and on every
 startup-failure path in which the worker exits (a throwing factory, a failed scope check). It is
-never released while the worker is alive. If the worker thread cannot be started, `start()` itself
+never released while the worker can still make MLX calls; it is released after the model and root
+are closed and before the dispatcher is shut down, so `start()` after a failed `start()` or after
+`state() == CLOSED` is not rejected. If the worker thread cannot be started, `start()` itself
 releases it (see the exit sequence). `start()` has no startup timeout: a factory that never returns
 makes `start()` block, and that is documented rather than reported as a failure, because a timeout
 would throw while a live worker still holds the guard and the model. The rule bounds concurrent MLX

@@ -68,11 +68,11 @@ native object. Document these behaviors in Javadoc before implementing the worke
   accepted request at submission; retain it through queued and active states and release it only
   after the dispatcher has run that request's completion. The dispatcher queue plus running
   completions is therefore bounded by the total admission permits (`maxQueuedRequests +
-  maxBatchSize`), and worker handoff never waits for queue space. Exhausted permits reject new
-  submissions immediately. Expose the handle's stage as `internalFuture.minimalCompletionStage()`:
-  it is read-only and its `toCompletableFuture()` returns a new future, so no hand-written facade is
-  needed. Dependents attached to that stage see a failed request as a `CompletionException` whose
-  **cause** is the real exception (checked in jshell:
+  maxBatchSize`), and worker handoff never waits for queue space (the exit sequence adds no queued
+  task). Exhausted permits reject new submissions immediately. Expose the handle's stage as
+  `internalFuture.minimalCompletionStage()`: it is read-only and its `toCompletableFuture()` returns
+  a new future, so no hand-written facade is needed. Dependents attached to that stage see a failed
+  request as a `CompletionException` whose **cause** is the real exception (checked in jshell:
   `minimalCompletionStage().handle`/`exceptionally` receive the wrapper, while handlers on the
   internal future get the raw exception). Every "completes exceptionally with X" statement in this
   plan therefore means X is the cause of what a stage dependent receives. The Javadoc tells callers
@@ -144,17 +144,23 @@ native object. Document these behaviors in Javadoc before implementing the worke
   never abandons an accepted stage. Document that a callback that never returns can stall
   worker shutdown and an observer that never returns can stall dispatcher drain and
   `close()`; there is no forced timeout.
-  **Exit sequence.** Every worker exit path (orderly close, `FAILED`, and every startup
-  failure) ends with the worker queuing one final task on the dispatcher that sets `CLOSED`
-  (unless the state is `FAILED`) and then calls the dispatcher executor's `shutdown()`; if the
-  dispatcher was created before `start()` failed, a startup failure shuts it down the same way.
-  Shutting the dispatcher down is therefore the worker's job, not the caller's, so a
-  `close()` made from the worker or dispatcher leaves no live non-daemon thread and no state
-  stuck at `CLOSING`. An outside `close()` joins the worker and then only waits for that final
-  task. **Combining calls:** every `close()` from an outside thread waits for the drain,
-  including one made after a non-waiting `close()` from the worker or dispatcher; repeated
-  `close()` calls are safe; the non-waiting rule above is the only exception to "`close()`
-  joins".
+  **Exit sequence.** The dispatcher is a `ThreadPoolExecutor` subclass whose bounded queue holds
+  exactly the admission-permit count; the exit sequence submits **no** task, so it needs no extra
+  slot and cannot be rejected or block the worker. Every worker exit path (orderly close,
+  `FAILED`, and every startup failure after the dispatcher exists) ends with the worker calling
+  the executor's `shutdown()`, which still runs every already-queued completion. `CLOSED` is set
+  (unless the state is `FAILED`) from the executor's `terminated()` hook, which runs only after
+  every queued and running completion has finished, so it holds for a dispatcher of any size and
+  never precedes the drain. Shutting the dispatcher down is the worker's job, so a `close()` made
+  from the worker or dispatcher leaves no live non-daemon thread and no state stuck at `CLOSING`.
+  If `Thread.start()` for the worker itself throws (for example `OutOfMemoryError`: unable to
+  create native thread), no worker `finally` will ever run, so `start()` releases the guard and
+  shuts the dispatcher down itself before rethrowing; test this with an injected thread factory.
+  An outside `close()` joins the worker, then calls `awaitTermination` on the dispatcher (no
+  timeout, like the drain above) and returns. **Combining calls:** every `close()` from an outside
+  thread waits for the drain, including one made after a non-waiting `close()` from the worker or
+  dispatcher; repeated `close()` calls are safe; the non-waiting rule above is the only exception
+  to "`close()` joins".
   The worker and the dispatcher are named **non-daemon** threads: a daemon worker could be
   killed mid-native call at JVM exit, which is worse than a forgotten `close()` keeping the JVM
   alive. Document that `close()` is required (use try-with-resources).
@@ -179,7 +185,7 @@ native object. Document these behaviors in Javadoc before implementing the worke
   non-blocking `state()` accessor (`RUNNING`, `CLOSING`, `FAILED`, `CLOSED`) and
   `Optional<Throwable> failure()`. Transitions: `RUNNING → CLOSING` when `close()` stops admission,
   and `CLOSING → CLOSED` only after the worker has exited and the dispatcher has drained (set by the
-  worker's final dispatcher task, see the exit sequence); `RUNNING → FAILED` when the worker fails.
+  executor's `terminated()` hook, see the exit sequence); `RUNNING → FAILED` when the worker fails.
   `FAILED` is terminal and sticky: a later `close()` still drains and returns but leaves the state
   `FAILED`, so `failure()` stays meaningful. A failure during `CLOSING` (for example a throwing
   cleanup) also ends in `FAILED`. An `Error` is recorded as the cause, not swallowed, and may be
@@ -225,41 +231,43 @@ threads on a stream this plan treats as unsafe, so it can crash its JVM and must
 '**/WorkerStreamProbeTest.class'`) for (a) only, excluded from `test` and wired into `check`: (a) is
 a required test. Register `concurrentStreamProbe` (`include '**/ConcurrentStreamProbeTest.class'`)
 for (b), excluded from `test` and **not** wired into `check`; run it as its own CI step with
-`continue-on-error: true` that records the outcome (pass, failure, or crash) and uploads its result
-XML. Do not rely on `ignoreFailures` for (b): it covers failing tests, and whether it covers a
-crashed test process is unverified. (b) is an evidence probe and never gates, since a pass proves
-nothing. If (a) fails, the native stream ownership or initialization design changes and §1–§2's
-worker design must be revisited. A passing (b) is **not** permission: a race test can pass on CI and
-still crash later. "At most one MLX-using thread at a time per process" is therefore the documented
-default and stays so unless upstream MLX documents that sharing a stream across threads is safe.
-Because the constraint covers all of `jmlx-core`, not just the scheduler, it is a public-contract
-change to `jmlx-core` and goes in its package Javadoc and README. State one **known exception**: the
-`Cleaner` backstops in `MLXScope` (`mlx_array_free`) and `MLXGrad.Fn`
-(`mlx_closure_free`/`mlx_closure_value_and_grad_free`, plus its upcall arena) run on the JVM Cleaner
-thread when a scope or function is never closed. The array free is the unresolved cross-thread-free
-question in `req/initial-plan.md` (Open questions); the closure frees are a related but separate
-case that question does not cover. The Javadoc and README name both paths and link the question
-rather than claim the rule holds absolutely; callers avoid them by always closing scopes and
-functions, which the scheduler's worker does. If probe (b) shows any instability, add probe (c),
-freeing arrays (and closures) from a second thread while the worker generates, which also resolves
-that open question. Enforce the rule where possible by rejecting a second `start()` while another
-scheduler's worker has not exited. The guard is static, so it enforces the rule only within one jmlx
-classloader; the rule itself stays per process, because MLX's native state (the default stream and
-the Metal device) is process-wide. Say both in the Javadoc. (Whether the JDK already refuses to load
-the native library into a second classloader on the `System.load` path is unverified; the documented
-rule says "per process" either way.) The guard is released when the worker thread exits, in a
-`finally`, whatever happened: after an orderly close, after a runtime `FAILED` (including one whose
-best-effort close of the model or root threw), and on every startup-failure path in which the worker
-exits (a throwing factory, a failed scope check). It is never released while the worker is alive.
-`start()` has no startup timeout: a factory that never returns makes `start()` block, and that is
-documented rather than reported as a failure, because a timeout would throw while a live worker
-still holds the guard and the model. The rule bounds concurrent MLX threads and an exited worker is
-not one, so a failed native cleanup (leaked handles; state `FAILED`, recorded by `failure()`) does
-not block a restart, and one failed `start()` cannot block later ones until the JVM exits; test the
-failure paths, including a throwing root close. Close-then-restart (common in tests and the example)
-works. The public direct `generate` API cannot be blocked, so for that path the rule is
-documentation only. Run the probes before writing the scheduler, and keep (a) as a required native
-CI test and (b) as an evidence probe afterwards.
+`continue-on-error: true`, give the step an `id`, and record `steps.<id>.outcome` in the job summary
+so a crash is captured even when no XML exists. Upload the result XML with `if-no-files-found:
+warn`, because a crashed JVM may write none. Do not rely on `ignoreFailures` for (b): it covers
+failing tests, and whether it covers a crashed test process is unverified. (b) is an evidence probe
+and never gates, since a pass proves nothing. If (a) fails, the native stream ownership or
+initialization design changes and §1–§2's worker design must be revisited. A passing (b) is **not**
+permission: a race test can pass on CI and still crash later. "At most one MLX-using thread at a
+time per process" is therefore the documented default and stays so unless upstream MLX documents
+that sharing a stream across threads is safe. Because the constraint covers all of `jmlx-core`, not
+just the scheduler, it is a public-contract change to `jmlx-core` and goes in its package Javadoc
+and README. State one **known exception**: the `Cleaner` backstops in `MLXScope` (`mlx_array_free`)
+and `MLXGrad.Fn` (`mlx_closure_free`/`mlx_closure_value_and_grad_free`, plus its upcall arena) run
+on the JVM Cleaner thread when a scope or function is never closed. The array free is the unresolved
+cross-thread-free question in `req/initial-plan.md` (Open questions); the closure frees are a
+related but separate case that question does not cover. The Javadoc and README name both paths and
+link the question rather than claim the rule holds absolutely; callers avoid them by always closing
+scopes and functions, which the scheduler's worker does. If probe (b) shows any instability, add
+probe (c), freeing arrays (and closures) from a second thread while the worker generates, which also
+resolves that open question. Enforce the rule where possible by rejecting a second `start()` while
+another scheduler's worker has not exited. The guard is static, so it enforces the rule only within
+one jmlx classloader; the rule itself stays per process, because MLX's native state (the default
+stream and the Metal device) is process-wide. Say both in the Javadoc. (Whether the JDK already
+refuses to load the native library into a second classloader on the `System.load` path is
+unverified; the documented rule says "per process" either way.) The guard is released when the
+worker thread exits, in a `finally`, whatever happened: after an orderly close, after a runtime
+`FAILED` (including one whose best-effort close of the model or root threw), and on every
+startup-failure path in which the worker exits (a throwing factory, a failed scope check). It is
+never released while the worker is alive. If the worker thread cannot be started, `start()` itself
+releases it (see the exit sequence). `start()` has no startup timeout: a factory that never returns
+makes `start()` block, and that is documented rather than reported as a failure, because a timeout
+would throw while a live worker still holds the guard and the model. The rule bounds concurrent MLX
+threads and an exited worker is not one, so a failed native cleanup (leaked handles; state `FAILED`,
+recorded by `failure()`) does not block a restart, and one failed `start()` cannot block later ones
+until the JVM exits; test the failure paths, including a throwing root close. Close-then-restart
+(common in tests and the example) works. The public direct `generate` API cannot be blocked, so for
+that path the rule is documentation only. Run the probes before writing the scheduler, and keep (a)
+as a required native CI test and (b) as an evidence probe afterwards.
 
 **Scope layout:** On the worker, create one model root; create each active cohort's scope
 `C` as a child of the validated `DecoderModel.modelScope()`, so weight scopes remain

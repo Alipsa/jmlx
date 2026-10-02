@@ -30,3 +30,12 @@ the workflow checks their JUnit XML to prevent a silent native skip. The
 [Mistral](https://github.com/Alipsa/jmlx/actions/runs/36640308134) pinned real-artifact jobs
 asserted 16 greedy IDs on the recorded runner pin; the other rows retain
 synthetic-fixture status.
+
+MLX affine quantization (`quantization: {group_size, bits}`, tensors as `.weight`/`.scales`/`.biases`)
+loads for Llama, Qwen2, Mistral, Gemma v1 and Phi-3, with the packed embedding table also serving as
+the tied output head. Verification is **synthetic plus one local real artifact**: `QuantizedDecoderTest`
+compares each family's quantized logits against the same weights dequantized to float, and
+`mlx-community/Llama-3.2-1B-Instruct-4bit` (not a pinned Tier-B artifact) produced the same greedy
+token IDs as an independent MLX-Python reference on three prompts (24, 8 and 16 tokens). Mixtral
+quantization, per-layer overrides, non-affine modes, GPTQ/AWQ and GGUF are rejected with the key
+named. Quantized KV cache remains unsupported.

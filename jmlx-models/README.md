@@ -8,8 +8,16 @@ numeric tests still require a macOS run before compatibility is verified.
 
 The API supports greedy generation and explicitly seeded sampling, synchronous token/text events,
 raw-text and configured-chat requests, penalties, and top-k/top-p/min-p filtering. Additional model
-quantization and serving infrastructure remain later Phase 6 work; see
+serving infrastructure remains later Phase 6 work; see
 the [compatibility matrix](../req/phase6-compatibility.md).
+
+MLX-community affine-quantized checkpoints (`quantization: {group_size, bits}` in `config.json`,
+tensors stored as `.weight`/`.scales`/`.biases`) load for Llama, Qwen2, Mistral, Gemma v1 and Phi-3.
+The projections and the embedding table stay packed and run through the fused quantized matmul; a
+quantized embedding table also serves as the tied output head. Norm weights and projection biases
+stay float. The packing parameters are read from the config and cannot be verified against the
+tensors (see `QuantizedLinear`), so a wrong `group_size` or `bits` in a config produces wrong
+output, not an error.
 
 The descriptor validates supported `config.json` capabilities and checkpoint tensor names before
 constructing decoder layers. RoPE supports base, linear, dynamic NTK, Llama 3, and YaRN scaling.
@@ -26,7 +34,8 @@ at load time).
 
 | Unsupported input | Load-time result |
 | --- | --- |
-| Quantized safetensors or GGUF | `quantization` / `quantization_config` or checkpoint format is rejected; float safetensors only |
+| GGUF, GPTQ/AWQ and other non-MLX quantization | The checkpoint format or `quant_method` is rejected; only float safetensors and MLX affine quantization are loaded |
+| MLX quantization with per-layer overrides, a non-affine `mode`, or on Mixtral | The offending `quantization` key is named |
 | `gemma2`, `gemma3`, Phi-2 `phi` | Unsupported `model_type` named |
 | Phi-3 `longrope` | Unsupported `rope_scaling.rope_type` named |
 | Unknown checkpoint tensor or forbidden projection bias | Tensor key named by the preflight validator |
@@ -207,7 +216,7 @@ required PR checks. You manage the artifacts:
   resulting file SHA-256s so a re-download can be verified.
 - **Licenses.** Many checkpoints are gated or carry use restrictions; accept the license on the
   model's hub page before downloading, and follow it when redistributing. jmlx ships no weights.
-- **Size and eviction.** Weights are loaded fully into unified memory (float only; quantized and GGUF
+- **Size and eviction.** Weights are loaded fully into unified memory (float or MLX affine-quantized; GGUF
   checkpoints are rejected), so budget roughly the safetensors size plus KV cache. Keep downloads in a
   directory you own and delete old revisions yourself; jmlx has no cache manager.
 - **Native library cache.** Separately, the packaged native binaries are extracted to a per-pin cache

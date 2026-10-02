@@ -10,7 +10,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * index, via {@link MLXShape#takeAxis(MLXArray, MLXArray, int)} along axis 0. {@code weight} has
  * shape {@code [numEmbeddings, dim]}.
  */
-public final class Embedding extends Module implements UnaryModule {
+public final class Embedding extends EmbeddingLayer {
 
   /**
    * Creates an {@code Embedding} layer with the given {@code weight} (shape {@code [numEmbeddings,
@@ -36,6 +36,7 @@ public final class Embedding extends Module implements UnaryModule {
    * model that ties input embeddings and output logits, without registering the same parameter in
    * two module subtrees.
    */
+  @Override
   public MLXArray project(MLXArray hiddenStates) {
     return MLXOps.matmul(hiddenStates, MLXShape.transpose(param("weight"), hiddenStates.scope()));
   }

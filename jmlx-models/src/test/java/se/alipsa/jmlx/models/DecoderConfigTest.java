@@ -69,7 +69,7 @@ class DecoderConfigTest {
   }
 
   @Test
-  void rejectsQuantizedWeightConfigurations(@TempDir Path dir) throws Exception {
+  void acceptsMlxAffineQuantizationUnderEitherKey(@TempDir Path dir) throws Exception {
     Path config = dir.resolve("config.json");
     for (String field : java.util.List.of("quantization", "quantization_config")) {
       Files.writeString(
@@ -80,9 +80,7 @@ class DecoderConfigTest {
           """
               .formatted(field));
 
-      IllegalArgumentException error =
-          assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
-      assertTrue(error.getMessage().contains("quantized weights"), error.getMessage());
+      assertEquals(4, DecoderConfig.fromFile(config).hiddenSize());
     }
   }
 

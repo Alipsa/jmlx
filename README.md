@@ -46,6 +46,17 @@ a matmul b = [2, 2] [19.0, 22.0, 43.0, 50.0]
 
 Every module's tests are skipped automatically (not failed) if `native/install/lib/mlx.metallib` isn't present — see `@EnabledIfNativeAvailable` in `jmlx-ffi`.
 
+## Threading
+
+Use MLX from **at most one thread at a time per process**. MLX's native state (default stream, Metal
+device) is process-wide and its streams are bound to the thread that created them, so each
+`MLXScope` carries its owner thread's stream and an `MLXScope` plus its arrays are confined to that
+thread. To serve concurrent callers, funnel them through one MLX-owning worker
+(`BatchGenerationScheduler` in `jmlx-models`). The only known exception is the JVM `Cleaner` backstop,
+which frees native handles from its own thread if a scope or autograd function was never closed;
+whether that is safe is still an open question (`req/initial-plan.md`, Open questions), so always
+close scopes. See the `se.alipsa.jmlx.core` package Javadoc for the full contract.
+
 ## Code style
 
 Hand-written sources are Google Java Style with 2-space indentation and a 100-column width, enforced by running `google-java-format` directly via Spotless (see `build.gradle`'s `spotless` block and `config/checkstyle/checkstyle.xml`, which derives from Google's own upstream artifact; see its comments for the one remaining documented deviation). The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from both, since they must stay byte-identical to `scripts/regen-bindings.sh`'s output.

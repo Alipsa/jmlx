@@ -147,36 +147,35 @@ native object. Document these behaviors in Javadoc before implementing the worke
   dispatcher exists) runs the same three steps **in this order**: (1) close the model and root (best
   effort), (2) release the one-scheduler guard, (3) call the executor's `shutdown()` last, which
   still runs every already-queued completion. The order matters: `terminated()` may run on the
-  worker (only if the dispatcher never started a thread; checked in jshell) or on a dispatcher
-  thread after `shutdown()` has returned, so the plan relies on neither. Because the guard is
-  released before `shutdown()` is even called, `CLOSED` can never be visible while the guard is
-  still held, wherever `terminated()` runs, and a caller who sees `CLOSED` and calls `start()` is
-  not rejected. Releasing the guard before the thread literally ends is safe because the worker
-  makes no MLX calls after step (1). `CLOSED` is set (unless the state is `FAILED`) from the
-  executor's `terminated()` hook, which runs only after every queued and running completion has
-  finished, so it holds for a dispatcher of any size and never precedes the drain. Shutting the
-  dispatcher down is the worker's job, so a `close()` made from the worker or dispatcher leaves no
-  live non-daemon thread and no state stuck at `CLOSING`. If `Thread.start()` for the worker itself
-  throws (for example `OutOfMemoryError`: unable to create native thread), no worker `finally` will
-  ever run, so `start()` releases the guard and shuts the dispatcher down itself before rethrowing;
-  test this with an injected thread factory. An outside `close()` joins the worker, then calls
-  `awaitTermination` on the dispatcher (no timeout, like the drain above) and returns.
-  **Interruption:** these waits are uninterruptible: `close()` keeps waiting if interrupted,
-  restores the thread's interrupt flag before returning, and never throws `InterruptedException`, so
-  a try-with-resources close stays quiet; test it. **Startup wait:** `start()`'s wait for the worker
-  to report ready is uninterruptible too: if the calling thread is interrupted while a slow factory
-  is loading, `start()` keeps waiting, restores the interrupt flag before returning (or before
-  rethrowing a startup failure), and never throws `InterruptedException`. Otherwise it could return
-  while the worker still loads, leaving a live non-daemon worker that holds the guard and the model
-  and that no caller references; test this by interrupting the thread that calls `start()` during a
-  slow factory. **Startup failure:** `start()` joins the worker thread (same uninterruptible wait)
-  before rethrowing, so the guard is already released and an immediate retry is accepted.
-  **Combining calls:** every `close()` from an outside thread waits for the drain, including one
-  made after a non-waiting `close()` from the worker or dispatcher; repeated `close()` calls are
-  safe; the non-waiting rule above is the only exception to "`close()` joins". The worker and the
-  dispatcher are named **non-daemon** threads: a daemon worker could be killed mid-native call at
-  JVM exit, which is worse than a forgotten `close()` keeping the JVM alive. Document that `close()`
-  is required (use try-with-resources).
+  worker or on a dispatcher thread after `shutdown()` has returned, so the plan relies on neither.
+  Because the guard is released before `shutdown()` is even called, `CLOSED` can never be visible
+  while the guard is still held, wherever `terminated()` runs, and a caller who sees `CLOSED` and
+  calls `start()` is not rejected. Releasing the guard before the thread literally ends is safe
+  because the worker makes no MLX calls after step (1). `CLOSED` is set (unless the state is
+  `FAILED`) from the executor's `terminated()` hook, which runs only after every queued and running
+  completion has finished, so it holds for a dispatcher of any size and never precedes the drain.
+  Shutting the dispatcher down is the worker's job, so a `close()` made from the worker or
+  dispatcher leaves no live non-daemon thread and no state stuck at `CLOSING`. If `Thread.start()`
+  for the worker itself throws (for example `OutOfMemoryError`: unable to create native thread), no
+  worker `finally` will ever run, so `start()` releases the guard and shuts the dispatcher down
+  itself before rethrowing; test this with an injected thread factory. An outside `close()` joins
+  the worker, then calls `awaitTermination` on the dispatcher (no timeout, like the drain above) and
+  returns. **Interruption:** these waits are uninterruptible: `close()` keeps waiting if
+  interrupted, restores the thread's interrupt flag before returning, and never throws
+  `InterruptedException`, so a try-with-resources close stays quiet; test it. **Startup wait:**
+  `start()`'s wait for the worker to report ready is uninterruptible too: if the calling thread is
+  interrupted while a slow factory is loading, `start()` keeps waiting, restores the interrupt flag
+  before returning (or before rethrowing a startup failure), and never throws
+  `InterruptedException`. Otherwise it could return while the worker still loads, leaving a live
+  non-daemon worker that holds the guard and the model and that no caller references; test this by
+  interrupting the thread that calls `start()` during a slow factory. **Startup failure:** `start()`
+  joins the worker thread (same uninterruptible wait) before rethrowing, so the guard is already
+  released and an immediate retry is accepted. **Combining calls:** every `close()` from an outside
+  thread waits for the drain, including one made after a non-waiting `close()` from the worker or
+  dispatcher; repeated `close()` calls are safe; the non-waiting rule above is the only exception to
+  "`close()` joins". The worker and the dispatcher are named **non-daemon** threads: a daemon worker
+  could be killed mid-native call at JVM exit, which is worse than a forgotten `close()` keeping the
+  JVM alive. Document that `close()` is required (use try-with-resources).
 - **Failed-worker state.** A failure that leaves the model or worker unusable moves the scheduler to
   `FAILED`: a thrown `Error`, an exception outside the §2 step-failure classification, a failed
   model, or a cleanup step (closing a cache, scope, or the model) that itself throws. Cohort-wide

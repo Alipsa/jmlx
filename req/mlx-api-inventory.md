@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=175, planned=9, unplanned=549
+- by status: implemented=174, planned=9, unplanned=550
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -385,7 +385,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_get_active_memory` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_get_cache_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_get_default_device` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_get_default_stream` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
+| `mlx_h.mlx_get_default_stream` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_memory_limit` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_peak_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_greater` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
@@ -621,8 +621,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_stream_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_get_device` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_get_index` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_stream_new` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_stream_new_device` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stream_new` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stream_new_device` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_stream_set` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_tostring` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_string_data` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |

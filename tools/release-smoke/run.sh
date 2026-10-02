@@ -25,7 +25,7 @@ modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jm
 # with that binary under a throwaway home. `--version` makes the wrapper download it if needed.
 "$root/gradlew" --version >/dev/null
 wrapper_version="$(sed -n 's|.*gradle-\([0-9.]*\)-bin.zip.*|\1|p' "$root/gradle/wrapper/gradle-wrapper.properties")"
-gradle_bin="$(ls -d "$HOME"/.gradle/wrapper/dists/gradle-"$wrapper_version"-bin/*/gradle-"$wrapper_version"/bin/gradle | head -1)"
+gradle_bin="$(ls -d "${GRADLE_USER_HOME:-$HOME/.gradle}"/wrapper/dists/gradle-"$wrapper_version"-bin/*/gradle-"$wrapper_version"/bin/gradle | head -1)"
 
 args=()
 case "$mode" in

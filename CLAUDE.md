@@ -343,8 +343,14 @@ that step would return plausible-looking values in the wrong order instead of cr
 
 Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` covers `FLOAT32`, `INT32`,
 `BOOL`, `UINT32` (the packed-weight dtype `QuantizedLinear` validates against), `FLOAT16` and
-`BFLOAT16`. `defaultDevice()`/`defaultStream()` are resolved once from mlx-c's own defaults and cached
-for the process lifetime — this slice doesn't expose device switching.
+`BFLOAT16`. `defaultDevice()` is resolved once from mlx-c's own default and cached for the process
+lifetime — this slice doesn't expose device switching. Streams are **not** process-wide: MLX streams
+are thread-bound ("There is no Stream(gpu, N) in current thread"; MLX's default GPU stream only
+worked on the first thread to use it), so each `MLXScope` carries its owner thread's own stream
+(`MLXScope.stream()`, created once per thread by the first root scope, inherited by children), and
+every op runs on its result scope's stream. Arrays must therefore be evaluated on the thread that
+built them. The default CPU stream (`NativeOps.DEFAULT_CPU_STREAM`, used by `MLXIO`) works from any
+thread.
 
 ## Native version pinning
 

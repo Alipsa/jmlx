@@ -114,7 +114,7 @@ public final class MLXOps {
           "gatherMatmul",
           () ->
               mlx_h.mlx_gather_mm(
-                  res, a.handle(), b.handle(), lhs, rhs, sortedIndices, NativeOps.DEFAULT_STREAM));
+                  res, a.handle(), b.handle(), lhs, rhs, sortedIndices, scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -278,7 +278,7 @@ public final class MLXOps {
     // own body rather than forcing it through a shape unaryOp doesn't have.
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    NativeOps.checked("sum", () -> mlx_h.mlx_sum(res, a.handle(), false, NativeOps.DEFAULT_STREAM));
+    NativeOps.checked("sum", () -> mlx_h.mlx_sum(res, a.handle(), false, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -301,8 +301,7 @@ public final class MLXOps {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "argmaxAxis",
-        () -> mlx_h.mlx_argmax_axis(res, a.handle(), axis, keepdims, NativeOps.DEFAULT_STREAM));
+        "argmaxAxis", () -> mlx_h.mlx_argmax_axis(res, a.handle(), axis, keepdims, scope.stream()));
     // MLX's native argmax produces UINT32 indices. jmlx's index-consuming APIs use INT32, and
     // this conversion is safe because an MLX array's dimensions are Java ints.
     return MLX.astype(new MLXArray(scope, res), DType.INT32);
@@ -399,9 +398,7 @@ public final class MLXOps {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "where",
-        () ->
-            mlx_h.mlx_where(
-                res, condition.handle(), x.handle(), y.handle(), NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_where(res, condition.handle(), x.handle(), y.handle(), scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -417,7 +414,7 @@ public final class MLXOps {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "softmaxAxis",
-        () -> mlx_h.mlx_softmax_axis(res, a.handle(), axis, precise, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_softmax_axis(res, a.handle(), axis, precise, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -426,8 +423,7 @@ public final class MLXOps {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "argsortAxis",
-        () -> mlx_h.mlx_argsort_axis(res, a.handle(), axis, NativeOps.DEFAULT_STREAM));
+        "argsortAxis", () -> mlx_h.mlx_argsort_axis(res, a.handle(), axis, scope.stream()));
     return MLX.astype(new MLXArray(scope, res), DType.INT32);
   }
 
@@ -438,8 +434,7 @@ public final class MLXOps {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "cumulativeSumAxis",
-        () ->
-            mlx_h.mlx_cumsum(res, a.handle(), axis, reverse, inclusive, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_cumsum(res, a.handle(), axis, reverse, inclusive, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -452,7 +447,7 @@ public final class MLXOps {
   public static MLXArray all(MLXArray a) {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    NativeOps.checked("all", () -> mlx_h.mlx_all(res, a.handle(), false, NativeOps.DEFAULT_STREAM));
+    NativeOps.checked("all", () -> mlx_h.mlx_all(res, a.handle(), false, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -462,7 +457,7 @@ public final class MLXOps {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "logSumExpAxis",
-        () -> mlx_h.mlx_logsumexp_axis(res, a.handle(), axis, keepdims, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_logsumexp_axis(res, a.handle(), axis, keepdims, scope.stream()));
     return new MLXArray(scope, res);
   }
 }

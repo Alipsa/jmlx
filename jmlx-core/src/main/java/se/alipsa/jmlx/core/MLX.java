@@ -53,12 +53,15 @@ import se.alipsa.jmlx.memory.MLXScope;
  *       req/plans/phase4-m4-plan.md's Amendment).
  * </ul>
  *
- * <p>{@link #defaultDevice()}/{@link #defaultStream()} are resolved once, lazily, from whatever
- * mlx-c's own default device is at first use, and cached for the process lifetime -- this slice
- * does not expose device switching, so there is no stale-cache hazard in practice. The resolved
- * values live in {@link NativeOps}, which every op class (including this one, for {@code eval})
- * needs direct access to; these methods are the public read of that shared state, not a delegated
- * op body.
+ * <p>{@link #defaultDevice()} is resolved once, lazily, from whatever mlx-c's own default device is
+ * at first use, and cached for the process lifetime -- this slice does not expose device switching,
+ * so there is no stale-cache hazard in practice. It lives in {@link NativeOps}, which every op
+ * class (including this one, for {@code eval}) needs direct access to; this method is the public
+ * read of that shared state, not a delegated op body.
+ *
+ * <p>Streams are <em>not</em> process-wide: MLX streams are thread-bound, so every op runs on the
+ * stream of the {@link MLXScope} its result is allocated in, which is its owner thread's own stream
+ * (see {@link MLXScope#stream()}).
  */
 public final class MLX {
 
@@ -77,11 +80,6 @@ public final class MLX {
   /** Opaque {@code mlx_device} handle; valid for the process lifetime. */
   public static MemorySegment defaultDevice() {
     return NativeOps.defaultDevice();
-  }
-
-  /** Opaque {@code mlx_stream} handle; valid for the process lifetime. */
-  public static MemorySegment defaultStream() {
-    return NativeOps.DEFAULT_STREAM;
   }
 
   /**
@@ -160,8 +158,7 @@ public final class MLX {
       NativeOps.checked(
           "zeros",
           () ->
-              mlx_h.mlx_zeros(
-                  res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+              mlx_h.mlx_zeros(res, nativeShape, shape.length, dtype.nativeValue(), scope.stream()));
     }
     return new MLXArray(scope, res);
   }
@@ -174,8 +171,7 @@ public final class MLX {
       NativeOps.checked(
           "ones",
           () ->
-              mlx_h.mlx_ones(
-                  res, nativeShape, shape.length, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+              mlx_h.mlx_ones(res, nativeShape, shape.length, dtype.nativeValue(), scope.stream()));
     }
     return new MLXArray(scope, res);
   }
@@ -222,12 +218,7 @@ public final class MLX {
             "full",
             () ->
                 mlx_h.mlx_full(
-                    res,
-                    nativeShape,
-                    shape.length,
-                    scalar,
-                    dtype.nativeValue(),
-                    NativeOps.DEFAULT_STREAM));
+                    res, nativeShape, shape.length, scalar, dtype.nativeValue(), scope.stream()));
         return new MLXArray(scope, res);
       } finally {
         mlx_h.mlx_array_free(scalar);
@@ -257,9 +248,7 @@ public final class MLX {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "arange",
-        () ->
-            mlx_h.mlx_arange(
-                res, start, stop, step, dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_arange(res, start, stop, step, dtype.nativeValue(), scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -305,8 +294,7 @@ public final class MLX {
     MLXScope scope = a.scope();
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "astype",
-        () -> mlx_h.mlx_astype(res, a.handle(), dtype.nativeValue(), NativeOps.DEFAULT_STREAM));
+        "astype", () -> mlx_h.mlx_astype(res, a.handle(), dtype.nativeValue(), scope.stream()));
     return new MLXArray(scope, res);
   }
 

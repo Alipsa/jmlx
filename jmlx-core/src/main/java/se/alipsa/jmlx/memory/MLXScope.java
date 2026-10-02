@@ -7,6 +7,7 @@ import java.lang.ref.Cleaner;
 import java.util.LinkedHashSet;
 import se.alipsa.jmlx.ffi.NativeLoader;
 import se.alipsa.jmlx.ffi.mlx_h;
+import se.alipsa.jmlx.ffi.mlx_stream_;
 
 /**
  * Owns the {@code mlx_array} native handles allocated on it and frees them in reverse insertion
@@ -23,6 +24,15 @@ import se.alipsa.jmlx.ffi.mlx_h;
  * same-thread automatically, which is why the ancestor rule used by op helpers (see {@code
  * NativeOps.scopeOf} in {@code se.alipsa.jmlx.core}) is an ownership-comprehensibility invariant,
  * not a confinement guard.
+ *
+ * <p>Streams: MLX streams are thread-bound -- a stream created on one thread cannot run ops from
+ * another ("There is no Stream(gpu, N) in current thread", verified on the pinned mlx-metal
+ * 0.31.2), and MLX's process-wide default stream is only usable by the first thread that touches
+ * it. So every scope carries the {@linkplain #stream() stream} of its owner thread: a root scope
+ * takes the calling thread's own stream (created once per thread, on first use), and a child
+ * inherits its parent's, which is the same thread by construction. Ops read the stream from the
+ * result scope, so a worker thread that creates its own root scope runs entirely on its own stream
+ * regardless of which thread used MLX first.
  *
  * <p>Implements {@link SegmentAllocator} so it can be passed directly to mlx-c's struct-returning
  * constructors (e.g. {@code mlx_array_new}, {@code mlx_array_new_data}), which allocate their
@@ -43,6 +53,36 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   }
 
   private static final Cleaner CLEANER = Cleaner.create();
+
+  /**
+   * One native stream per thread, created lazily by the first root scope that thread builds and
+   * never freed: mlx-c has no call that removes a stream from MLX's scheduler, so freeing the
+   * handle would reclaim nothing but a few bytes. The cost per thread is therefore one scheduler
+   * stream (about 60 KB measured), paid once however many scopes the thread creates.
+   */
+  private static final ThreadLocal<MemorySegment> THREAD_STREAM =
+      ThreadLocal.withInitial(MLXScope::newThreadStream);
+
+  private static MemorySegment newThreadStream() {
+    NativeLoader.clearLastNativeError();
+    MemorySegment device = mlx_h.mlx_device_new(Arena.global());
+    requireOk("mlx_get_default_device", mlx_h.mlx_get_default_device(device));
+    MemorySegment stream = mlx_h.mlx_stream_new_device(Arena.global(), device);
+    // mlx_stream_new_device has no status return: failure fires the error handler and hands back a
+    // null-ctx struct, so it is detected by the null ctx rather than by checked().
+    if (mlx_stream_.ctx(stream).address() == 0) {
+      throw new IllegalStateException(
+          "mlx_stream_new_device failed: " + NativeLoader.lastNativeError());
+    }
+    return stream;
+  }
+
+  private static void requireOk(String call, int status) {
+    if (status != 0) {
+      throw new IllegalStateException(
+          call + " failed with status " + status + ": " + NativeLoader.lastNativeError());
+    }
+  }
 
   /**
    * Capture rule: the failure mode of this whole pattern is the cleanup action holding a reference
@@ -167,6 +207,7 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   private final Cleaner.Cleanable cleanable = CLEANER.register(this, holder::closeAll);
   private final Thread owner = Thread.currentThread();
   private final MLXScope parent;
+  private final MemorySegment stream;
   private volatile boolean closed = false;
 
   /** Creates a root scope: {@link #parent()} is {@code null}. */
@@ -176,6 +217,9 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
 
   private MLXScope(MLXScope parent) {
     this.parent = parent;
+    // A child shares its parent's owner thread (newChild() checks access first), so it shares the
+    // parent's stream; only a root consults the per-thread cache.
+    this.stream = parent != null ? parent.stream : THREAD_STREAM.get();
     if (parent != null) {
       parent.holder.addChild(holder);
     }
@@ -192,6 +236,18 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   public MLXScope newChild() {
     checkAccess();
     return new MLXScope(this);
+  }
+
+  /**
+   * The opaque {@code mlx_stream} handle ops allocated in this scope run on: the stream of this
+   * scope's owner thread, shared by the whole scope tree. Never share it across threads -- MLX
+   * rejects it there, which is exactly what {@link #checkAccess()} guards.
+   *
+   * @throws IllegalStateException if called from another thread, or after this scope closed
+   */
+  public MemorySegment stream() {
+    checkAccess();
+    return stream;
   }
 
   /** This scope's parent, or {@code null} if it is a root. */

@@ -308,38 +308,35 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe argmax",
-        () -> mlx_h.mlx_argmax_axis(result, array.handle(), axis, false, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_argmax_axis(result, array.handle(), axis, false, scope.stream()));
     return new MLXArray(scope, result);
   }
 
   private static MLXArray rawTopkAxis(MLXScope scope, MLXArray array, int k, int axis) {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "probe topk",
-        () -> mlx_h.mlx_topk_axis(result, array.handle(), k, axis, NativeOps.DEFAULT_STREAM));
+        "probe topk", () -> mlx_h.mlx_topk_axis(result, array.handle(), k, axis, scope.stream()));
     return new MLXArray(scope, result);
   }
 
   private static MLXArray rawTopk(MLXScope scope, MLXArray array, int k) {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "probe flat topk",
-        () -> mlx_h.mlx_topk(result, array.handle(), k, NativeOps.DEFAULT_STREAM));
+        "probe flat topk", () -> mlx_h.mlx_topk(result, array.handle(), k, scope.stream()));
     return new MLXArray(scope, result);
   }
 
   private static MLXArray rawSortAxis(MLXScope scope, MLXArray array, int axis) {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "probe sort",
-        () -> mlx_h.mlx_sort_axis(result, array.handle(), axis, NativeOps.DEFAULT_STREAM));
+        "probe sort", () -> mlx_h.mlx_sort_axis(result, array.handle(), axis, scope.stream()));
     return new MLXArray(scope, result);
   }
 
   private static MLXArray rawSort(MLXScope scope, MLXArray array) {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "probe flat sort", () -> mlx_h.mlx_sort(result, array.handle(), NativeOps.DEFAULT_STREAM));
+        "probe flat sort", () -> mlx_h.mlx_sort(result, array.handle(), scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -347,15 +344,14 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe argsort",
-        () -> mlx_h.mlx_argsort_axis(result, array.handle(), axis, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_argsort_axis(result, array.handle(), axis, scope.stream()));
     return new MLXArray(scope, result);
   }
 
   private static MLXArray rawArgsort(MLXScope scope, MLXArray array) {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "probe flat argsort",
-        () -> mlx_h.mlx_argsort(result, array.handle(), NativeOps.DEFAULT_STREAM));
+        "probe flat argsort", () -> mlx_h.mlx_argsort(result, array.handle(), scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -363,8 +359,7 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe partition",
-        () ->
-            mlx_h.mlx_partition_axis(result, array.handle(), kth, axis, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_partition_axis(result, array.handle(), kth, axis, scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -372,7 +367,7 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe flat partition",
-        () -> mlx_h.mlx_partition(result, array.handle(), kth, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_partition(result, array.handle(), kth, scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -380,9 +375,7 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe argpartition",
-        () ->
-            mlx_h.mlx_argpartition_axis(
-                result, array.handle(), kth, axis, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_argpartition_axis(result, array.handle(), kth, axis, scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -390,7 +383,7 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe flat argpartition",
-        () -> mlx_h.mlx_argpartition(result, array.handle(), kth, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_argpartition(result, array.handle(), kth, scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -404,7 +397,7 @@ class SelectionAndRandomProbeTest {
     MemorySegment result = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "probe split_num",
-        () -> mlx_h.mlx_random_split_num(result, key.handle(), count, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_random_split_num(result, key.handle(), count, scope.stream()));
     return new MLXArray(scope, result);
   }
 
@@ -412,8 +405,7 @@ class SelectionAndRandomProbeTest {
     MemorySegment first = mlx_h.mlx_array_new(scope);
     MemorySegment second = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
-        "probe split",
-        () -> mlx_h.mlx_random_split(first, second, key.handle(), NativeOps.DEFAULT_STREAM));
+        "probe split", () -> mlx_h.mlx_random_split(first, second, key.handle(), scope.stream()));
     return new MLXArray[] {new MLXArray(scope, first), new MLXArray(scope, second)};
   }
 
@@ -423,7 +415,7 @@ class SelectionAndRandomProbeTest {
         "probe categorical",
         () ->
             mlx_h.mlx_random_categorical(
-                result, logits.handle(), axis, key.handle(), NativeOps.DEFAULT_STREAM));
+                result, logits.handle(), axis, key.handle(), scope.stream()));
     return new MLXArray(scope, result);
   }
 }

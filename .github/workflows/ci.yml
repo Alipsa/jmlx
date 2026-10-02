@@ -152,9 +152,14 @@ jobs:
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
                               'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest'],
           }
+          # Gate 0 probe (a) runs alone in its own forked JVM (threadProbeTest), so its XML is not
+          # under build/test-results/test. Probe (b) is evidence only and is deliberately absent.
+          results_dirs = {'jmlx-models': {'WorkerStreamProbeTest': 'threadProbeTest'}}
+          suites['jmlx-models'].append('WorkerStreamProbeTest')
           for module, names in suites.items():
-              root = Path(module) / 'build/test-results/test'
               for name in names:
+                  task = results_dirs.get(module, {}).get(name, 'test')
+                  root = Path(module) / 'build/test-results' / task
                   matches = list(root.glob(f'TEST-*.{name}.xml'))
                   if len(matches) != 1:
                       raise SystemExit(f'{module}/{name}: expected one result XML, found {len(matches)}')
@@ -165,6 +170,28 @@ jobs:
                       raise SystemExit(f'{module}/{name}: native tests did not execute')
                   print(f'{module}/{name}: {tests - skipped}/{tests} executed')
           PY
+
+      # Gate 0 probe (b): two threads use MLX concurrently. Evidence only -- a pass proves nothing
+      # and it can crash its JVM, so it never gates. The step has an id so its outcome is recorded
+      # even when a crash leaves no result XML.
+      - name: Gate 0 probe (b) - concurrent MLX threads (evidence only)
+        id: concurrent_stream_probe
+        continue-on-error: true
+        run: ./gradlew --no-build-cache :jmlx-models:concurrentStreamProbe
+
+      - name: Record probe (b) outcome
+        if: always()
+        run: |
+          echo "### Gate 0 probe (b): concurrent MLX threads" >> "$GITHUB_STEP_SUMMARY"
+          echo "outcome: \`${{ steps.concurrent_stream_probe.outcome }}\` (evidence only, never gates)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload probe (b) result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: concurrent-stream-probe
+          path: jmlx-models/build/test-results/concurrentStreamProbe/
+          if-no-files-found: warn
 
       - name: Upload native quantization probe
         if: always()

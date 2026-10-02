@@ -14,10 +14,10 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * Gate 0 probe (b), an <em>evidence</em> probe that never gates: two threads each load a model and
- * generate concurrently on the shared default stream. A pass proves nothing, since a race can pass
- * here and crash later, so "at most one MLX-using thread at a time per process" stays the
- * documented rule. It can crash its JVM, so it runs in its own forked task ({@code
- * concurrentStreamProbe}) outside {@code check}.
+ * generate concurrently, each on its own thread-owned stream (every root {@code MLXScope} takes its
+ * creating thread's stream). A pass proves nothing, since a race can pass here and crash later, so
+ * "at most one MLX-using thread at a time per process" stays the documented rule. It can crash its
+ * JVM, so it runs in its own forked task ({@code concurrentStreamProbe}) outside {@code check}.
  */
 @EnabledIfNativeAvailable
 class ConcurrentStreamProbeTest {

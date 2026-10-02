@@ -65,16 +65,23 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
 
   private static MemorySegment newThreadStream() {
     NativeLoader.clearLastNativeError();
+    // The device is a temporary: the Arena only reclaims the Java-side struct, so the native object
+    // behind it needs mlx_device_free (req/plans/phase5-m1-plan.md's device/stream distinction).
+    // Freed once the stream exists, since the stream retains whatever it needs of the device.
     MemorySegment device = mlx_h.mlx_device_new(Arena.global());
-    requireOk("mlx_get_default_device", mlx_h.mlx_get_default_device(device));
-    MemorySegment stream = mlx_h.mlx_stream_new_device(Arena.global(), device);
-    // mlx_stream_new_device has no status return: failure fires the error handler and hands back a
-    // null-ctx struct, so it is detected by the null ctx rather than by checked().
-    if (mlx_stream_.ctx(stream).address() == 0) {
-      throw new IllegalStateException(
-          "mlx_stream_new_device failed: " + NativeLoader.lastNativeError());
+    try {
+      requireOk("mlx_get_default_device", mlx_h.mlx_get_default_device(device));
+      MemorySegment stream = mlx_h.mlx_stream_new_device(Arena.global(), device);
+      // mlx_stream_new_device has no status return: failure fires the error handler and hands back
+      // a null-ctx struct, so it is detected by the null ctx rather than by checked().
+      if (mlx_stream_.ctx(stream).address() == 0) {
+        throw new IllegalStateException(
+            "mlx_stream_new_device failed: " + NativeLoader.lastNativeError());
+      }
+      return stream;
+    } finally {
+      mlx_h.mlx_device_free(device);
     }
-    return stream;
   }
 
   private static void requireOk(String call, int status) {

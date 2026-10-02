@@ -28,7 +28,8 @@ class WorkerStreamProbeTest {
   void workerThreadLoadsAndGeneratesAfterStreamInitializedElsewhere(@TempDir Path dir)
       throws Exception {
     TinyCheckpoints.randomLlama(dir, 1, 2, false, false);
-    // Initialize the default stream on this (the "main") thread, and nothing else.
+    // Initialize this (the "main") thread's own scope stream and nothing else, so the worker below
+    // is not the first thread to use MLX in this JVM.
     try (MLXScope scope = new MLXScope()) {
       MLXArray probe = MLX.array(scope, new float[] {1f, 2f}, new int[] {2});
       MLX.eval(probe);

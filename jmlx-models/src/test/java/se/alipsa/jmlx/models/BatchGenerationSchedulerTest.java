@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.alipsa.jmlx.models.SchedulerFixtures.await;
 import static se.alipsa.jmlx.models.SchedulerFixtures.config;
+import static se.alipsa.jmlx.models.SchedulerFixtures.gated;
 import static se.alipsa.jmlx.models.SchedulerFixtures.greedy;
 import static se.alipsa.jmlx.models.SchedulerFixtures.sampled;
 import static se.alipsa.jmlx.models.SchedulerFixtures.start;
@@ -61,7 +62,8 @@ class BatchGenerationSchedulerTest {
       requests.add(request);
       expected.add(direct("llama", request));
     }
-    try (BatchGenerationScheduler scheduler = start("llama", config(4, 8))) {
+    // Gated: all three requests must share one cohort whatever the worker's wake-up timing.
+    try (BatchGenerationScheduler scheduler = start("llama", config(4, 8), gated(3))) {
       List<BatchRequestHandle> handles = new ArrayList<>();
       for (GenerationRequest request : requests) {
         handles.add(scheduler.submit(request, e -> {}));
@@ -86,12 +88,13 @@ class BatchGenerationSchedulerTest {
     GenerationRequest a = sampled(PROMPTS[0], 6, 11);
     List<Integer> withB;
     List<Integer> withC;
-    try (BatchGenerationScheduler scheduler = start("llama", config(2, 4))) {
+    // Gated so A really decodes in a cohort with its companion, not alone.
+    try (BatchGenerationScheduler scheduler = start("llama", config(2, 4), gated(2))) {
       BatchRequestHandle ha = scheduler.submit(a, e -> {});
       scheduler.submit(sampled(PROMPTS[1], 6, 12), e -> {});
       withB = tokens(await(ha));
     }
-    try (BatchGenerationScheduler scheduler = start("llama", config(2, 4))) {
+    try (BatchGenerationScheduler scheduler = start("llama", config(2, 4), gated(2))) {
       BatchRequestHandle ha = scheduler.submit(a, e -> {});
       scheduler.submit(sampled(PROMPTS[1], 6, 99), e -> {});
       withC = tokens(await(ha));

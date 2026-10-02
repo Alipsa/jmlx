@@ -245,10 +245,9 @@ stream; `NativeOps.DEFAULT_STREAM` and `MLX.defaultStream()` are gone. Probe (a)
 worker thread loads and generates after another thread has already used MLX, and two successive
 workers each work (the close-then-restart shape). The consequence for the scheduler is that arrays
 must be evaluated on the thread that built them, which the worker-owned design already guarantees.
-(b) Run two threads that each load and generate concurrently, which is what a user calling the
-public direct `generate` while a scheduler runs, or starting two schedulers, would do. (b) Run two
-threads that each load and generate concurrently on the shared default stream, which is what a user
-calling the public direct `generate` while a scheduler runs, or starting two schedulers, would do.
+(b) Run two threads that each load and generate concurrently, each on its own thread-bound stream,
+which is what a user calling the public direct `generate` while a scheduler runs, or starting two
+schedulers, would do.
 These are pinned-runtime probes, not an assumption about Metal command-encoder or MLX stream thread
 safety (MLX 0.31.2's behavior here is unverified). Give each probe its own forked JVM, the same
 pattern as `loaderGuardTest`: (a) needs a fresh JVM so that "another thread used MLX first" is

@@ -114,9 +114,10 @@ tasks.withType(Test).configureEach {
 }
 
 // Gate 0 thread probes (req/plans/phase6-5-plan.md). Each runs in its own forked JVM, like
-// jmlx-ffi's loaderGuardTest: DEFAULT_STREAM is resolved once per JVM, so probe (a) needs a JVM
-// nothing else has touched, and probe (b) races two MLX threads and may crash its JVM, so it must
-// not share one with (a), with `test`, or with `check`.
+// jmlx-ffi's loaderGuardTest: probe (a) needs a JVM in which no other test has used MLX on a
+// thread first, so "another thread used MLX before the worker" is really first, and probe (b)
+// races two threads on their own thread-owned streams and may crash its JVM, so it must not share
+// one with (a), with `test`, or with `check`.
 def threadProbeClasses = ['**/WorkerStreamProbeTest.class', '**/ConcurrentStreamProbeTest.class']
 
 tasks.named('test', Test) {

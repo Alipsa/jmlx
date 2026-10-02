@@ -72,8 +72,14 @@ public final class BatchDecodeBenchmark {
     List<Run> direct = new ArrayList<>();
     List<Run> batched = new ArrayList<>();
     for (int run = -warmups; run < samples; run++) {
-      Run d = runDirect(checkpoint, requests);
+      // Alternate which side goes first so warm-up, thermal and allocator-order effects are not
+      // always charged to the same one.
+      boolean directFirst = (run & 1) == 0;
+      Run d = directFirst ? runDirect(checkpoint, requests) : null;
       Run b = runBatched(checkpoint, requests, maxBatch);
+      if (d == null) {
+        d = runDirect(checkpoint, requests);
+      }
       if (run >= 0) {
         direct.add(d);
         batched.add(b);

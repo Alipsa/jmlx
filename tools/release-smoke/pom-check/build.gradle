@@ -14,6 +14,11 @@ dependencies {
 tasks.register('writeRuntimeCoordinates') {
     def output = layout.buildDirectory.file('runtime-coordinates.txt')
     outputs.file(output)
+    // Declared so a change of mode, versions or repository URL reruns the task instead of reusing a
+    // stale file from an earlier ci/candidate/central run.
+    inputs.property('mode', jmlxMode)
+    inputs.property('versions', jmlxVersions.toString())
+    inputs.property('repo', providers.gradleProperty('jmlxRepoUrl').orElse('central'))
     def resolved = configurations.runtimeClasspath.incoming.resolutionResult.rootComponent
     doLast {
         def coordinates = new TreeSet<String>()

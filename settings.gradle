@@ -19,4 +19,5 @@ include(
     'jmlx-jinja',
     'jmlx-models',
     'jmlx-examples',
+    'jmlx-benchmarks',
     'jmlx-native-macos-arm64')

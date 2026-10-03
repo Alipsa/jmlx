@@ -120,8 +120,28 @@ tasks.withType(Test).configureEach {
 // one with (a), with `test`, or with `check`.
 def threadProbeClasses = ['**/WorkerStreamProbeTest.class', '**/ConcurrentStreamProbeTest.class']
 
+// CPU float32 references need full native precision. Keep them in a separate JVM so the
+// ordinary suite still covers MLX's default reduced-precision inference paths. Batch-step
+// equivalence runs in both tasks, exercising its strict and default-mode bounds separately.
 tasks.named('test', Test) {
     exclude threadProbeClasses
+    useJUnitPlatform { excludeTags 'full-float32' }
+    environment 'MLX_ENABLE_TF32', '1'
+    inputs.property('mlxEnableTf32', '1')
+}
+
+tasks.register('float32GoldenTest', Test) {
+    group = 'verification'
+    description = 'Verifies CPU float32 model goldens and strict batch equivalence in a full-precision JVM.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'full-float32', 'batch-equivalence' }
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+    // MLX supports one active thread per process. Run the two precision tasks sequentially
+    // to avoid GPU contention, while allowing this task to be invoked independently.
+    mustRunAfter tasks.named('test')
 }
 
 tasks.register('threadProbeTest', Test) {
@@ -147,4 +167,6 @@ tasks.register('concurrentStreamProbe', Test) {
     include '**/ConcurrentStreamProbeTest.class'
 }
 
-tasks.named('check') { dependsOn tasks.named('threadProbeTest') }
+tasks.named('check') {
+    dependsOn tasks.named('threadProbeTest'), tasks.named('float32GoldenTest')
+}

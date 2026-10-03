@@ -32,7 +32,7 @@ Re-run this only if you change the pinned mlx-c commit; `git diff --exit-code jm
 ## Build, test, run
 
 ```sh
-./gradlew build          # compiles jmlx-ffi, jmlx-core, jmlx-examples
+./gradlew build          # compiles and verifies all modules
 ./gradlew :jmlx-core:test  # memory lifecycle, numeric correctness, layers/autograd/attention -- against real hardware
 ./gradlew :jmlx-examples:run  # runs HelloMLX
 ```
@@ -85,3 +85,17 @@ Hand-written sources are Google Java Style with 2-space indentation and a 100-co
 ```sh
 JMLX_LIBRARY_PATH=/path/to/native/install/lib ./bin/jmlx-examples
 ```
+
+## Performance benchmarks
+
+[`jmlx-benchmarks`](jmlx-benchmarks/README.md) hosts opt-in performance experiments.
+Its first benchmark compares float32 matrix multiplication, prefill and cached
+decode with TF32 enabled and disabled in separate JVMs:
+
+```sh
+./gradlew :jmlx-benchmarks:benchmarkTf32 --args='tools/hf-reference/goldens/checkpoints/llama build/benchmarks/tf32-llama'
+```
+
+For external Java/Groovy applications, choose precision at process startup; see
+[model precision guidance](jmlx-models/README.md#precision-in-java-and-groovy-applications).
+Gradle verification enforces the golden tests' precision independently of application defaults.

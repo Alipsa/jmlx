@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
@@ -109,6 +110,7 @@ class MultiHeadAttentionTest {
   }
 
   @Test
+  @Tag("full-float32")
   void forwardWithoutCacheMatchesPerHeadComposedReferenceWithCausalMasking() {
     try (MLXScope scope = new MLXScope()) {
       MultiHeadAttention mha =

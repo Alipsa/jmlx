@@ -124,13 +124,30 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples, jmlx-native-macos-arm64
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples, jmlx-benchmarks, jmlx-native-macos-arm64
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
 ./gradlew :jmlx-tokenizer:test  # pure-Java tokenizer tests (no native bootstrap needed)
 ./gradlew :jmlx-jinja:test      # pure-Java Jinja tests (no native bootstrap needed)
 ```
+
+**Gradle enforces numerical-reference precision.** Tests tagged `full-float32` run in
+`:jmlx-core:float32GoldenTest` or `:jmlx-models:float32GoldenTest`
+(part of `check`/`build`) in separate JVMs with `MLX_ENABLE_TF32=0`. This covers CPU Hugging
+Face references, Mixtral sorted-prefill comparison, and strict core attention/MoE oracles.
+Preserve their existing assertions; do not regenerate goldens to accommodate native reduced
+precision. Tag new strict float32 references `full-float32` to select the enforced mode
+automatically. The ordinary `test` tasks in both modules force `MLX_ENABLE_TF32=1` and exclude
+that tag, retaining default-mode inference coverage.
+`BatchStepEquivalenceTest` runs in both tasks, with its mode-specific tolerance. Both modes
+are explicit task inputs, so the developer's shell cannot accidentally select the wrong mode.
+Run `./gradlew :jmlx-models:check` for both, or target `float32GoldenTest --tests ...` for a
+reference suite. The native CI execution assertion checks the corresponding result directories;
+update its required-suite list when adding a native reference suite.
+`jmlx-benchmarks:benchmarkTf32` controls its own workers' precision modes independently.
+See `req/phase6-golden-precision.md` and `req/phase6-batch-equivalence.md` for the evidence,
+and `jmlx-models/README.md` for precision selection in external applications.
 
 Every module's native-dependent tests are **skipped, not failed**, when `native/install/lib/mlx.metallib`
 is absent — see `@EnabledIfNativeAvailable` (a `jmlx-ffi` test fixture, shared via `testFixtures`,
@@ -164,6 +181,7 @@ Opt-in tasks that are not part of `check`:
 python3 tools/tier-b/download.py tools/tier-b/<manifest>.json <model-dir>
 JMLX_TIER_B_MODEL_DIR=<model-dir> JMLX_TIER_B_MANIFEST=tools/tier-b/<manifest>.json \
   ./gradlew :jmlx-models:tierBTest   # optional: JMLX_TIER_B_MODEL_TYPE=<model_type> to assert it
+./gradlew :jmlx-benchmarks:benchmarkTf32 --args='...'       # TF32 enabled vs disabled (fresh JVMs)
 ./gradlew :jmlx-examples:benchmarkDecode --args='...'       # DecodeBenchmark (direct path)
 ./gradlew :jmlx-examples:benchmarkBatchDecode --args='...'  # BatchDecodeBenchmark (direct vs batched)
 ./gradlew :jmlx-examples:runSchedulerExample --args='...'   # SchedulerExample
@@ -182,8 +200,8 @@ to that list. Otherwise a native skip passes CI unnoticed.
 Six modules publish to Maven Central independently of each other and of the root project's
 version: `jmlx-jinja`, `jmlx-tokenizer`, `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`, and
 `jmlx-models`. Each has its own `release.sh` (all six byte-identical, enforced by
-`verifyReleaseScriptsMatch`). `jmlx-examples` remains the sole unpublished module (an `application`
-demo, not a library).
+`verifyReleaseScriptsMatch`). `jmlx-examples` (an application demo) and `jmlx-benchmarks`
+(opt-in performance experiments) are unpublished.
 
 ```sh
 ./jmlx-jinja/release.sh              # publishes se.alipsa:jmlx-jinja
@@ -264,6 +282,8 @@ it explicitly: `./gradlew -p buildSrc check`.
 ## Architecture
 
 ```
+jmlx-benchmarks  Tf32Benchmark, Tf32Worker       opt-in performance experiments
+
 jmlx-examples    HelloMLX, SchedulerExample,       demos and opt-in benchmarks
                  DecodeBenchmark, BatchDecodeBenchmark
        |
@@ -347,7 +367,7 @@ module needs it, so targeting 21 keeps their published artifacts usable by Java 
 `verifyBytecodeLevel` task enforces this.
 
 **Six modules are published**, each carrying its own version independent of the root's
-`0.5.0-SNAPSHOT` (`jmlx-examples` is the sole exception, an `application` demo): `jmlx-jinja` is
+`0.5.0-SNAPSHOT` (`jmlx-examples` and `jmlx-benchmarks` are unpublished applications): `jmlx-jinja` is
 `0.6.0-SNAPSHOT` (continuing the archived hfjinja project's line), `jmlx-tokenizer` and
 `jmlx-native-macos-arm64` are both `0.1.0-SNAPSHOT` (neither has ever been published), `jmlx-ffi`
 and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward the number they

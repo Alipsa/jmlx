@@ -86,6 +86,67 @@ dequantization raises decode peak memory. `GenerationCachePolicy.quantized(bits,
 immediately, without a float-cache fallback. The native probe and benchmark contract are documented
 in [Phase 6.4 benchmark](../req/phase6-4-benchmark.md).
 
+## Precision in Java and Groovy applications
+
+Choose the precision mode when launching the application's process. MLX's
+`MLX_ENABLE_TF32` setting controls reduced-precision paths for float32 matrix
+operations on supported hardware; arrays still have the `FLOAT32` dtype.
+The pinned MLX runtime defaults to `1` and caches this setting on first use.
+See the [MLX precision guide](https://ml-explore.github.io/mlx/build/html/usage/precision.html)
+and the [pinned environment implementation](https://github.com/ml-explore/mlx/blob/v0.31.2/mlx/utils.h).
+
+For normal inference, start with the default performance mode and validate it
+against representative prompts and your quality requirements. For comparisons
+with full-float32 reference logits, or applications that need tighter numerical
+agreement, launch with `MLX_ENABLE_TF32=0`:
+
+```sh
+MLX_ENABLE_TF32=0 java --enable-native-access=ALL-UNNAMED -jar application.jar
+MLX_ENABLE_TF32=0 JAVA_OPTS='--enable-native-access=ALL-UNNAMED' groovy inference.groovy
+```
+
+These examples assume the application's dependencies and native runtime are
+configured. An IDE, service launcher or deployment environment should set the
+same environment variable for the application process. A Java or Groovy parent
+process can select the mode for a new JVM with `ProcessBuilder`:
+
+```java
+ProcessBuilder launcher = new ProcessBuilder(
+    "java", "--enable-native-access=ALL-UNNAMED", "-jar", "application.jar");
+launcher.environment().put("MLX_ENABLE_TF32", "0");
+launcher.inheritIO().start().waitFor();
+```
+
+This is a native process setting, not a jmlx per-model option. A JVM `-D` flag
+or `System.setProperty("MLX_ENABLE_TF32", "0")` does not change it. Choose the
+mode before starting Java/Groovy; use separate processes to compare modes or
+serve workloads that need different settings.
+
+Full float32 can cost GPU throughput. The TF32 benchmark measured a 2.73x cost
+for a 2048-square float32 matmul on M5 Max, while tiny-Llama timings were similar;
+that does not predict the cost for a particular production model. Use
+[`jmlx-benchmarks`](../jmlx-benchmarks/README.md) with your checkpoint and workload
+to evaluate the tradeoff. Record the precision setting alongside hardware,
+native pin, checkpoint, prompt IDs, generation policy, batch shape and seed when
+reproducibility matters. Full float32 reduces numerical discrepancies but does
+not promise identical logits or generated tokens across hardware or batch shapes.
+
+## Model test precision
+
+`./gradlew :jmlx-models:check` automatically runs the ordinary tests with
+`MLX_ENABLE_TF32=1` and the CPU reference suites in a separate JVM with
+`MLX_ENABLE_TF32=0`. To run a reference suite alone, use for example:
+
+```sh
+./gradlew :jmlx-models:float32GoldenTest --tests '*GemmaModelTest'
+```
+
+New strict float32 reference tests use the JUnit tag `full-float32`; Gradle
+selects their precision mode automatically. Core attention/MoE reference tests
+use the same policy in `:jmlx-core:float32GoldenTest`. Batch-step equivalence
+runs in both model tasks. These build settings apply to test
+JVMs only; external applications choose their own launch environment.
+
 ## Errors, cancellation, and ownership
 
 Prompt tokenization happens before native generation begins. A generated-ID decode failure is

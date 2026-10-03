@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import se.alipsa.jmlx.core.MLX;
@@ -29,6 +30,7 @@ import se.alipsa.jmlx.nn.KVCache;
  * measurements and reproduction. Greedy token identity is asserted separately on these fixtures.
  */
 @EnabledIfNativeAvailable
+@Tag("batch-equivalence")
 class BatchStepEquivalenceTest {
   static final float TOLERANCE = "0".equals(System.getenv("MLX_ENABLE_TF32")) ? 1e-4f : 2e-3f;
   private static final int[][] PROMPTS = {{1, 7, 42, 3, 19, 5}, {1, 9, 4}, {1, 2, 3, 4, 5}};

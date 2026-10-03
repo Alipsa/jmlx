@@ -32,9 +32,11 @@ when TF32 is explicitly disabled. It also checks greedy token identity for each
 row and step. These bounds apply to these small committed float32 checkpoints;
 they are not a general accuracy guarantee for arbitrary models or hardware.
 
-Reproduce both modes in separate test JVMs:
+Gradle now enforces both modes in separate test JVMs. The ordinary `test` task
+sets `MLX_ENABLE_TF32=1`; `float32GoldenTest` sets it to `0`. Both run this suite
+and are included in `check`/`build`:
 
 ```sh
-./gradlew :jmlx-models:test --tests '*BatchStepEquivalenceTest' --rerun-tasks
-MLX_ENABLE_TF32=0 ./gradlew :jmlx-models:test --tests '*BatchStepEquivalenceTest' --rerun-tasks
+./gradlew :jmlx-models:test --tests '*BatchStepEquivalenceTest'
+./gradlew :jmlx-models:float32GoldenTest --tests '*BatchStepEquivalenceTest'
 ```

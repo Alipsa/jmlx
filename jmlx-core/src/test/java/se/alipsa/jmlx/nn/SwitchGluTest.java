@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
@@ -118,6 +119,7 @@ class SwitchGluTest {
   }
 
   @Test
+  @Tag("full-float32")
   void unsortedPathMatchesDenseExperts() {
     assertMatchesDense(2, 3, 2, false, Activation.SILU);
   }
@@ -128,17 +130,20 @@ class SwitchGluTest {
   }
 
   @Test
+  @Tag("full-float32")
   void topKEqualToExpertCountMatchesDenseExperts() {
     assertMatchesDense(1, 5, E, false, Activation.SILU);
     assertMatchesDense(1, 5, E, true, Activation.SILU);
   }
 
   @Test
+  @Tag("full-float32")
   void geluTanhActivationMatchesDenseExperts() {
     assertMatchesDense(1, 4, 2, false, Activation.GELU_TANH);
   }
 
   @Test
+  @Tag("full-float32")
   void sortedAndUnsortedPathsAgreeAboveThreshold() {
     // 1 * 40 * 2 = 80 >= SORT_THRESHOLD: the public overload takes the sorted path.
     try (MLXScope model = new MLXScope();

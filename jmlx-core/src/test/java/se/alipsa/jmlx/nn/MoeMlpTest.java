@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
@@ -79,12 +80,14 @@ class MoeMlpTest {
   }
 
   @Test
+  @Tag("full-float32")
   void selectingEveryExpertMatchesDenseOracle() {
     assertMatchesOracle(5, E);
     assertMatchesOracle(40, E);
   }
 
   @Test
+  @Tag("full-float32")
   void exactTiesChooseFirstExpertAcrossTokensAndRuns() {
     try (MLXScope model = new MLXScope();
         MLXScope step = model.newChild()) {
@@ -105,6 +108,7 @@ class MoeMlpTest {
   }
 
   @Test
+  @Tag("full-float32")
   void unselectedInfiniteExpertNeverAffectsOutput() {
     try (MLXScope model = new MLXScope();
         MLXScope step = model.newChild()) {
@@ -182,6 +186,7 @@ class MoeMlpTest {
    * every realistic training step takes the sorted one.
    */
   @Test
+  @Tag("full-float32")
   void gradientsFlowOnlyToSelectedExperts() {
     assertGradientsMatchOracle(3);
     assertGradientsMatchOracle(40);
@@ -330,6 +335,7 @@ class MoeMlpTest {
 
   /** Replaces the dropped Phase 6.3 closed-form tests; float32, both paths, top-k 2 and 3. */
   @Test
+  @Tag("full-float32")
   void float32MatchesClosedFormOnBothPaths() {
     for (int tokens : new int[] {2, 40}) {
       for (int topK : new int[] {2, 3}) {

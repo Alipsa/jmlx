@@ -1,9 +1,11 @@
 package se.alipsa.jmlx.models;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 
 /** Llama 3.1 RoPE scaling against the committed Hugging Face checkpoint and logits. */
+@Tag("full-float32")
 class Llama31ModelTest {
   @Test
   @EnabledIfNativeAvailable

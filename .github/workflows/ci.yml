@@ -147,7 +147,7 @@ jobs:
           from xml.etree import ElementTree
 
           suites = {
-              'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest',
+              'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'SwitchGluTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest',
                             'KVCacheTest', 'KVCacheMemoryPlateauTest',
                             'KVCacheQuantizationProbeTest', 'PackedAttentionProbeTest', 'AttentionMaskTest',
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
@@ -161,23 +161,31 @@ jobs:
                               'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
                               'BatchStepEquivalenceTest'],
           }
-          # Gate 0 probe (a) runs alone in its own forked JVM (threadProbeTest), so its XML is not
-          # under build/test-results/test. Probe (b) is evidence only and is deliberately absent.
-          results_dirs = {'jmlx-models': {'WorkerStreamProbeTest': 'threadProbeTest'}}
+          # Golden references run in their own full-float32 JVM. Batch equivalence must
+          # execute in both precision modes. Probe (b) remains evidence only.
+          float32_suites = ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
+                            'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
+                            'DecoderSlidingWindowTest']
+          model_results = {name: ['float32GoldenTest'] for name in float32_suites}
+          model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
+          model_results['WorkerStreamProbeTest'] = ['threadProbeTest']
+          core_results = {name: ['test', 'float32GoldenTest'] for name in
+                          ['DecoderAttentionTest', 'MultiHeadAttentionTest', 'MoeMlpTest', 'SwitchGluTest']}
+          results_dirs = {'jmlx-models': model_results, 'jmlx-core': core_results}
           suites['jmlx-models'].append('WorkerStreamProbeTest')
           for module, names in suites.items():
               for name in names:
-                  task = results_dirs.get(module, {}).get(name, 'test')
-                  root = Path(module) / 'build/test-results' / task
-                  matches = list(root.glob(f'TEST-*.{name}.xml'))
-                  if len(matches) != 1:
-                      raise SystemExit(f'{module}/{name}: expected one result XML, found {len(matches)}')
-                  result = ElementTree.parse(matches[0]).getroot()
-                  tests = int(result.attrib['tests'])
-                  skipped = int(result.attrib.get('skipped', 0))
-                  if tests == 0 or skipped == tests:
-                      raise SystemExit(f'{module}/{name}: native tests did not execute')
-                  print(f'{module}/{name}: {tests - skipped}/{tests} executed')
+                  for task in results_dirs.get(module, {}).get(name, ['test']):
+                      root = Path(module) / 'build/test-results' / task
+                      matches = list(root.glob(f'TEST-*.{name}.xml'))
+                      if len(matches) != 1:
+                          raise SystemExit(f'{module}/{task}/{name}: expected one result XML, found {len(matches)}')
+                      result = ElementTree.parse(matches[0]).getroot()
+                      tests = int(result.attrib['tests'])
+                      skipped = int(result.attrib.get('skipped', 0))
+                      if tests == 0 or skipped == tests:
+                          raise SystemExit(f'{module}/{task}/{name}: native tests did not execute')
+                      print(f'{module}/{task}/{name}: {tests - skipped}/{tests} executed')
           PY
 
       # Gate 0 probe (b): two threads use MLX concurrently. Evidence only -- a pass proves nothing

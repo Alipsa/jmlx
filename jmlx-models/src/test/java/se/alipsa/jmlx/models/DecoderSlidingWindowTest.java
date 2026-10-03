@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.MLX;
@@ -21,6 +22,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @EnabledIfNativeAvailable
+@Tag("full-float32")
 class DecoderSlidingWindowTest {
   @Test
   void matchesIndependentWindowBoundaryAndLongDecodeGoldens() throws Exception {

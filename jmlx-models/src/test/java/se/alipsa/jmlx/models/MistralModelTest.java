@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.MLX;
@@ -19,6 +20,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.KVCache;
 import tools.jackson.databind.ObjectMapper;
 
+@Tag("full-float32")
 class MistralModelTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 

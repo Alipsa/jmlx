@@ -76,3 +76,25 @@ tasks.withType(Test).configureEach {
     // Opt-in performance tests: ./gradlew :jmlx-core:test -Djmlx.benchmark=true --tests "*Benchmark*"
     systemProperty 'jmlx.benchmark', System.getProperty('jmlx.benchmark', 'false')
 }
+
+// Exact float32 reference comparisons run separately from default-precision inference tests.
+// Tag new strict references with full-float32 so the mode is enforced before MLX initializes.
+tasks.named('test', Test) {
+    useJUnitPlatform { excludeTags 'full-float32' }
+    environment 'MLX_ENABLE_TF32', '1'
+    inputs.property('mlxEnableTf32', '1')
+}
+
+tasks.register('float32GoldenTest', Test) {
+    group = 'verification'
+    description = 'Verifies tagged attention and MoE float32 references in a full-precision JVM.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'full-float32' }
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+    mustRunAfter tasks.named('test')
+}
+
+tasks.named('check') { dependsOn tasks.named('float32GoldenTest') }

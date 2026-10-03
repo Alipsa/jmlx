@@ -16,12 +16,28 @@ byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered
 migrated former `hfjinja` project) is a dependency-free Java 21+ Hugging Face Jinja subset for
 chat-template rendering. `req/project-outline.md` describes the full multi-phase vision (autograd,
 `se.alipsa.jmlx.nn`, safetensors/tokenizers, and model loading). Phase 5 M3 is implemented as
-`jmlx-models`, with local Hugging Face Llama/Qwen safetensors loading and greedy generation.
-Phase 6.3 adds descriptor-driven Llama, Qwen2, Mistral, Gemma v1, Phi-3, and Mixtral decoders,
-including linear, dynamic NTK, Llama 3, and YaRN RoPE scaling. The new families' native golden
-tests still need a macOS run before compatibility is marked verified.
+`jmlx-models` (local Hugging Face safetensors loading and generation).
 
-Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain.
+Phase 6 (`req/plans/phase6-plan.md`, complete local text-LLM inference and the first Maven Central
+release) is built in milestones, each with its own plan under `req/plans/`:
+
+- 6.0b: MLX API inventory, Python MLX oracle, and Tier-A fixtures.
+- 6.1: seeded sampling, penalties, and top-k/top-p/min-p filtering.
+- 6.2: component-based tokenizers (Metaspace BPE, Unigram, WordPiece) and prompt compatibility.
+- 6.3: descriptor-driven Llama, Qwen2, Mistral, Gemma v1, Phi-3, and Mixtral decoders, with linear,
+  dynamic NTK, Llama 3, and YaRN RoPE scaling.
+- 6.4: explicit prefill/decode, `KVCachePolicy` (full, capacity-bounded, sliding), and benchmarks.
+- 6.4.1: quantized KV retention, prototyped and stopped.
+- 6.5: `BatchGenerationScheduler`, per-thread MLX streams, and release hardening.
+
+`req/phase6-compatibility.md` is the source of truth for which families are verified and how
+(real Tier-B artifact versus synthetic Tier-A fixture). `req/phase6-inference-report.md` summarizes
+the Phase 6 state and lists the remaining release steps. Nothing has been published to Maven
+Central yet.
+
+Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain. The native bootstrap also needs
+the Xcode Command Line Tools (`git`, `cc`, `otool`) and `cmake` (`brew install cmake`); see
+`README.md`.
 
 ## One-time native bootstrap
 
@@ -93,6 +109,12 @@ review that diff whenever a fixture input or tokenizer JSON changes. Every `*.to
 by `runner.py` before use -- a tampered or stale fixture source fails the build rather than silently
 comparing against drifted input.
 
+`tools/hf-reference/` is a generate-only Python tool (Hugging Face `transformers`, CPU, float32)
+that produced the tiny synthetic checkpoints and logits goldens under `tools/hf-reference/goldens/`
+that the decoder-family tests compare against. Gradle never runs Torch: `verifyHfReferenceGoldens`
+(part of root `check`) only verifies the committed files' SHA-256 against `provenance.json`.
+Regeneration is a manual, reviewed step; see `tools/hf-reference/README.md`.
+
 `scripts/checkDependencies.zsh` is a read-only report of available updates (Gradle plugins/deps, the
 wrapper, the pinned `mlx-metal` version, and — since mlx-c versions independently of MLX — the mlx-c
 tag that pairs with a newer wheel). `scripts/updateMlx.zsh <mlx-c-commit-sha>` repins `MLX_C_COMMIT` in
@@ -129,6 +151,31 @@ every other native test over the real staging directory if run in the same JVM. 
 `jmlx.library.path`, `JMLX_LIBRARY_PATH` removed, the real `jmlx-native-macos-arm64` jar on its
 classpath) to prove extraction works against the real, published-shape artifact — see
 `ClasspathNativeExtractorTest` for the same mechanics exercised against tiny fake fixtures instead.
+
+`jmlx-models` uses the same forked-JVM pattern for its thread probes, which `test` excludes:
+`threadProbeTest` (`WorkerStreamProbeTest`, wired into `check`) needs a JVM where no other test has
+used MLX first, and `concurrentStreamProbe` (`ConcurrentStreamProbeTest`) is evidence only. It races
+two MLX threads and may crash its JVM, so it is never part of `check`.
+
+Opt-in tasks that are not part of `check`:
+
+```sh
+# Real-artifact (Tier-B) smoke: download a pinned checkpoint, then run against it.
+python3 tools/tier-b/download.py tools/tier-b/<manifest>.json <model-dir>
+JMLX_TIER_B_MODEL_DIR=<model-dir> JMLX_TIER_B_MANIFEST=tools/tier-b/<manifest>.json \
+  ./gradlew :jmlx-models:tierBTest   # optional: JMLX_TIER_B_MODEL_TYPE=<model_type> to assert it
+./gradlew :jmlx-examples:benchmarkDecode --args='...'       # DecodeBenchmark (direct path)
+./gradlew :jmlx-examples:benchmarkBatchDecode --args='...'  # BatchDecodeBenchmark (direct vs batched)
+./gradlew :jmlx-examples:runSchedulerExample --args='...'   # SchedulerExample
+```
+
+`.github/workflows/tier-b.yml` runs `tierBTest` weekly and on demand, for the pinned artifacts in
+`req/phase6-tier-b-artifacts.md`.
+
+**CI checks that native tests actually ran.** The macOS native job in `.github/workflows/ci.yml`
+reads the JUnit XML for a hard-coded list of suites, the "Assert required native suites executed"
+step, and fails if any of them was skipped. When you add a native test class that must run, add it
+to that list. Otherwise a native skip passes CI unnoticed.
 
 ## Releasing a module
 
@@ -185,7 +232,9 @@ published shape: `./tools/release-smoke/run.sh ci` publishes the six modules to 
 jar from it under a fresh `GRADLE_USER_HOME` with `exclusiveContent` for `se.alipsa`, a disposable
 `jmlx.native.cache.path`, and no native path override. It also checks the POM-only runtime classpath
 matches the Gradle-metadata one, every jar's license, the native jar's payload, and a seeded
-two-request batch against `goldens/mistral-sampled.properties`; `--record` rewrites the golden.
+two-request batch against `goldens/mistral-sampled.properties`. The smoke gates the scheduler so
+both requests share one cohort, then asserts `cohortSizes() == [2]`. `--record` rewrites the golden
+and is accepted in `ci` mode only. The native CI job runs `run.sh ci`.
 `run.sh candidate` is the same with SNAPSHOT suffixes stripped (release versions set first), and
 `run.sh central` resolves from Maven Central after all six are published. The smoke tokenizer in
 `fixtures/` is hand-written to pair with the synthetic Mistral checkpoint (see its `PROVENANCE.md`).
@@ -215,14 +264,18 @@ it explicitly: `./gradlew -p buildSrc check`.
 ## Architecture
 
 ```
-jmlx-examples    HelloMLX                          demo, end-to-end test
+jmlx-examples    HelloMLX, SchedulerExample,       demos and opt-in benchmarks
+                 DecodeBenchmark, BatchDecodeBenchmark
        |
 jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLinear,
                                                     RMSNorm/LayerNorm/SiLU/GELU/Embedding,
-                                                    MultiHeadAttention, KVCache, SwitchGlu, ModuleGrad
+                                                    MultiHeadAttention, GroupedQueryAttention,
+                                                    DecoderAttention, DecoderBlock, AttentionMask,
+                                                    RopeSpec, KVCache, KVCachePolicy, GatedMlp,
+                                                    SwiGLU, MoeMlp, SwitchGlu, ModuleGrad
                  se.alipsa.jmlx.core                MLX, MLXOps, MLXShape, MLXFast, MLXQuant,
-                                                    MLXRandom, MLXGrad, MLXIO, MLXArray, DType,
-                                                    MLXException
+                                                    MLXRandom, MLXGrad, MLXIO, MLXMemory, MLXArray,
+                                                    DType, MLXException
                  se.alipsa.jmlx.memory              MLXScope
        |
 jmlx-ffi         se.alipsa.jmlx.ffi.*              committed jextract output
@@ -239,20 +292,32 @@ jmlx-native-macos-arm64  se/alipsa/jmlx/native/macos-aarch64/  the same 4 binari
                                                     packaged as classpath resources -- optional
                                                     runtime dependency, not a build-time one
 
-jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, ChatTemplateRenderer,
-                                                    TokenizerJson/TokenizerJsonLoader, Vocabulary,
-                                                    BpeMerger, ByteLevelCoding,
-                                                    ByteLevelPreTokenizer, ByteLevelDecoder,
+jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, IncrementalTokenDecoder,
+                                                    TokenizerEncoding/EncodingOptions/Padding/
+                                                    Truncation, ChatTemplateRenderer/
+                                                    ChatTemplateOptions, TokenizerJson/
+                                                    TokenizerJsonLoader, TokenizerMetadata,
+                                                    Vocabulary, BpeMerger, ByteLevel* components,
                                                     AddedTokenSplitter, TextNormalizer,
                                                     PostProcessorApplier, TokenizerException
+                                                    (byte-level BPE, Metaspace BPE, Unigram,
+                                                    WordPiece)
        |
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
                  pure Java; no dependency on jmlx-ffi or native/install/lib
 
 jmlx-models      se.alipsa.jmlx.models             TextGenerationModel, TextGenerationModels,
                                                     GenerationConfig/Request/Result/Event,
-                                                    CancellationToken, FinishReason, ModelMetadata,
-                                                    LlamaModel, QwenModel, DecoderModel
+                                                    GenerationCachePolicy, CancellationToken,
+                                                    FinishReason, GenerationAbortedException,
+                                                    ModelMetadata, DecoderModel, LlamaModel,
+                                                    QwenModel, MistralModel, GemmaModel, Phi3Model,
+                                                    MixtralModel, ArchitectureDescriptor/
+                                                    ArchitectureMappings, DecoderAssembler,
+                                                    DecoderConfig, TensorPlan,
+                                                    BatchGenerationScheduler (+ BatchSchedulerConfig,
+                                                    BatchRequestHandle, Scheduler*/BatchAdmission*
+                                                    exceptions)
                  depends on jmlx-core + jmlx-tokenizer; native inference and generation
 ```
 
@@ -270,7 +335,7 @@ are not independent of each other, though: `jmlx-tokenizer` declares `api projec
 byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-jinja`, the migrated
 former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
 Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
-below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO`).
+below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, `MLXIO`, and `MLXMemory`).
 
 **`jmlx-models` is in the native chain.** It depends on `jmlx-core` for MLX inference and on
 `jmlx-tokenizer` for prompt encoding/decoding, so model loading and generation require the native
@@ -297,9 +362,10 @@ module" above.
 
 **Loading order matters.** jextract binds each downcall's method handle lazily, in a private
 per-function holder class, the first time that function is called — and that first call fails unless
-the dylib is already loaded by then. `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, and `MLXIO` each have a
-static initializer that calls `NativeLoader.ensureLoaded()` for exactly this reason; any of the five can
-be the first one touched, so each guards independently rather than relying on load order. `NativeOps`'s
+the dylib is already loaded by then. `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, `MLXIO`, and
+`MLXMemory` each have a static initializer that calls `NativeLoader.ensureLoaded()` for exactly this
+reason; any of the six can be the first one touched, so each guards independently rather than
+relying on load order. `NativeOps`'s
 guard covers `MLXOps`/`MLXShape`/`MLXFast`/`MLXQuant`/`MLXRandom` transitively, since every op in those
 classes reaches native only through `NativeOps`'s own `checked`/`binaryOp`/`unaryOp`/`shapeOp`-family
 helpers — none of those classes needs (or has) its own guard. `MLXGrad` and `MLXIO` both need their own
@@ -366,6 +432,22 @@ every op runs on its result scope's stream. Arrays must therefore be evaluated o
 built them. The default CPU stream (`NativeOps.DEFAULT_CPU_STREAM`, used by `MLXIO`) works from any
 thread.
 
+**Threading rule:** use MLX from at most one thread at a time per process. The full contract is in
+the `se.alipsa.jmlx.core` package Javadoc (`package-info.java`).
+
+- Each thread's stream is created once and never freed (about 60 KB per thread), so many short-lived
+  MLX threads leak streams. Prefer one long-lived MLX thread.
+- MLX binds streams to the OS thread through a C++ `thread_local`, and a virtual thread can move
+  between OS threads. `MLXScope` therefore rejects a root scope created on a virtual thread with
+  `IllegalStateException`.
+- To serve concurrent callers, use `BatchGenerationScheduler` in `jmlx-models`. Its single
+  platform-thread worker owns the model and decodes compatible requests together as one cohort.
+  Callers submit and cancel from any thread. Its Javadoc defines the lifecycle, the per-row versus
+  per-cohort failure rules, and the optional cohort gate with its `maxBatchWait`.
+- The scheduler can only block a second scheduler within one classloader. It cannot stop direct
+  `generate` calls from other threads, so the one-thread rule there is enforced by documentation
+  only.
+
 ## Native version pinning
 
 mlx-c is versioned independently of MLX itself (mlx-c's own `CMakeLists.txt` pins an exact MLX tag via
@@ -402,3 +484,19 @@ broader multi-phase vision; where it conflicts with `req/initial-plan.md` on sco
 latter is authoritative for what's actually being built now. `req/full-roadmap.md` extends that
 outline after Phase 5: use it to select future phase/milestone scope and exit gates, then write the
 corresponding detailed plan under `req/plans/` before implementation.
+
+Phase 5 and 6 documents:
+
+- `req/phase5-plan.md` and `req/plans/phase5-m3-retrospective.md`.
+- `req/plans/phase6-plan.md`, with one plan per milestone (`phase6-0b-plan.md` through
+  `phase6-5-plan.md`) plus their probe findings, all under `req/plans/`.
+- Living reports:
+  - `req/phase6-compatibility.md`: the supported-family matrix. Update it whenever verification
+    status changes.
+  - `req/phase6-inference-report.md`: Phase 6 status and the remaining release steps.
+  - `req/phase6-4-benchmark.md`: decode benchmarks.
+  - `req/phase6-tier-a-fixtures.md` and `req/phase6-tier-b-artifacts.md`: fixtures and pinned
+    artifacts.
+  - `req/phase6-2-tokenizer-components.md`: tokenizer component coverage.
+  - `req/mlx-api-inventory.md` and `req/mlx-api-header-coverage.md`: binding coverage, generated by
+    the `*MlxApi*` Gradle tasks.

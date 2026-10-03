@@ -33,9 +33,7 @@ public final class MLXFast {
       MemorySegment res = mlx_h.mlx_array_new(scope);
       NativeOps.checked(
           "rmsNorm",
-          () ->
-              mlx_h.mlx_fast_rms_norm(
-                  res, x.handle(), weightHandle, eps, NativeOps.DEFAULT_STREAM));
+          () -> mlx_h.mlx_fast_rms_norm(res, x.handle(), weightHandle, eps, scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -56,7 +54,7 @@ public final class MLXFast {
           "layerNorm",
           () ->
               mlx_h.mlx_fast_layer_norm(
-                  res, x.handle(), weightHandle, biasHandle, eps, NativeOps.DEFAULT_STREAM));
+                  res, x.handle(), weightHandle, biasHandle, eps, scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -102,7 +100,7 @@ public final class MLXFast {
                   scale,
                   offset,
                   freqsHandle,
-                  NativeOps.DEFAULT_STREAM));
+                  scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -140,7 +138,7 @@ public final class MLXFast {
                   scale,
                   offset.handle(),
                   freqsHandle,
-                  NativeOps.DEFAULT_STREAM));
+                  scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -207,7 +205,7 @@ public final class MLXFast {
                   maskMode,
                   maskHandle,
                   sinksHandle,
-                  NativeOps.DEFAULT_STREAM));
+                  scope.stream()));
       return new MLXArray(scope, res);
     }
   }

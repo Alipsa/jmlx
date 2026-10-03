@@ -110,9 +110,7 @@ public final class MLXArray implements AutoCloseable {
           MemorySegment target = mlx_h.mlx_array_new(tmp);
           NativeOps.checked(
               "toFloatArray",
-              () ->
-                  mlx_h.mlx_astype(
-                      target, handle, DType.FLOAT32.nativeValue(), MLX.defaultStream()));
+              () -> mlx_h.mlx_astype(target, handle, DType.FLOAT32.nativeValue(), scope.stream()));
           astyped = target;
           source = target;
         }
@@ -138,8 +136,7 @@ public final class MLXArray implements AutoCloseable {
       MemorySegment contiguous = mlx_h.mlx_array_new(tmp);
       try {
         NativeOps.checked(
-            "toIntArray",
-            () -> mlx_h.mlx_contiguous(contiguous, handle, false, MLX.defaultStream()));
+            "toIntArray", () -> mlx_h.mlx_contiguous(contiguous, handle, false, scope.stream()));
         NativeOps.checked("toIntArray", () -> mlx_h.mlx_array_eval(contiguous));
         long n = mlx_h.mlx_array_size(contiguous);
         if (n > Integer.MAX_VALUE) {
@@ -172,8 +169,7 @@ public final class MLXArray implements AutoCloseable {
     MemorySegment contiguous = mlx_h.mlx_array_new(allocator);
     try {
       NativeOps.checked(
-          "toFloatArray",
-          () -> mlx_h.mlx_contiguous(contiguous, source, false, MLX.defaultStream()));
+          "toFloatArray", () -> mlx_h.mlx_contiguous(contiguous, source, false, scope.stream()));
       NativeOps.checked("toFloatArray", () -> mlx_h.mlx_array_eval(contiguous));
       long n = mlx_h.mlx_array_size(contiguous);
       if (n > Integer.MAX_VALUE) {

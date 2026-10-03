@@ -7,7 +7,9 @@ The core (`req/initial-plan.md`) is a v0.1 vertical slice — native bootstrap, 
 
 - macOS on Apple Silicon, macOS 26 or later.
 - Java 25 (JDK 25 toolchain; Gradle's toolchain support will provision it if you don't already have one).
-- `cmake`, `git`, `curl`, `unzip`, `otool`, `codesign`, `shasum`, `cc` on `PATH` (all standard on a normal macOS + Homebrew + Xcode Command Line Tools dev setup; `cc` is already implied by `cmake` building mlx-c's C++ source).
+- Xcode Command Line Tools (`xcode-select --install`), which provide `git`, `cc` (clang) and `otool`.
+- `cmake`: `brew install cmake` (or the cmake.org installer).
+- `curl`, `unzip`, `shasum` and `codesign` ship with macOS; nothing to install.
 
 ## One-time native bootstrap
 
@@ -45,6 +47,26 @@ a matmul b = [2, 2] [19.0, 22.0, 43.0, 50.0]
 ```
 
 Every module's tests are skipped automatically (not failed) if `native/install/lib/mlx.metallib` isn't present — see `@EnabledIfNativeAvailable` in `jmlx-ffi`.
+
+## Threading
+
+Use MLX from **at most one thread at a time per process**. MLX's native state (default stream, Metal
+device) is process-wide and its streams are bound to the OS thread that created them, so each
+`MLXScope` carries its owner thread's stream and an `MLXScope` plus its arrays are confined to that
+thread. To serve concurrent callers, funnel them through one MLX-owning worker
+(`BatchGenerationScheduler` in `jmlx-models`). The only known exception is the JVM `Cleaner` backstop,
+which frees native handles from its own thread if a scope or autograd function was never closed;
+whether that is safe is still an open question (`req/initial-plan.md`, Open questions), so always
+close scopes. See the `se.alipsa.jmlx.core` package Javadoc for the full contract.
+
+Every MLX-using thread carries one scheduler stream (about 60 KB measured), created by its first
+root `MLXScope` and never freed: mlx-c has no call that removes a stream from the scheduler.
+Thread-per-request servers that call direct `generate`, and scheduler close-then-restart,
+therefore accumulate one stream per thread for the process's life — prefer one long-lived
+MLX-owning thread (the scheduler's worker) over many short-lived ones. Virtual threads cannot be
+MLX threads: the stream binding is to the OS thread (a C++ `thread_local` in the pinned
+mlx-metal 0.31.2) while a virtual thread migrates between carriers, so a root `MLXScope` created
+on a virtual thread is rejected.
 
 ## Code style
 

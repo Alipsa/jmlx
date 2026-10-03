@@ -147,3 +147,78 @@ Any reopening is a dated amendment to the plan that scopes the new design, measu
 captured from a real Tier-B checkpoint instead of random-normal inputs, and migrates 6.5's
 `keys()`/`values()` consumers. It also needs a real checkpoint for accuracy gates: six of the seven
 synthetic fixtures were too tie-prone for the flip limit in step 0.
+
+## Phase 6.5 direct versus batched decode
+
+`:jmlx-examples:benchmarkBatchDecode` runs the same heterogeneous requests once sequentially
+through the direct path and once through a `BatchGenerationScheduler`, each in the same JVM with the
+two runs alternating (model load is outside both clocks). It downloads nothing and writes
+`<prefix>.json` (per-sample wall times, per-request first-token and total latency, peak and
+leaked active bytes, and the per-sample cohort sizes the batched run actually ran) and
+`<prefix>.md`. Memory counters are read only while no other thread uses
+MLX: the direct scope and the scheduler are both closed first.
+
+Command, per family, each in a fresh JVM (3 requests, prompt lengths 6/3/5, new tokens 24/8/16,
+7 samples after 2 warm-ups, max batch 4, all submitted back to back so queue depth is 3):
+
+```sh
+export JMLX_BENCH_DEVICE="$(sysctl -n machdep.cpu.brand_string)"
+for family in llama llama31 qwen2 mistral gemma phi3 mixtral; do
+  ./gradlew -q :jmlx-examples:benchmarkBatchDecode \
+    --args="${PWD}/tools/hf-reference/goldens/checkpoints/${family} ${PWD}/build/p65/${family} 1,7,42,3,19,5;1,9,4;1,2,3,4,5 24,8,16 7 2 4"
+done
+```
+
+Run on Apple M2 Max, Java 25.0.3, `mlx-metal==0.31.2`, mlx-c `fba4470`, commit `c5899f8`. The
+direct and batched runs alternate which goes first on each iteration (an earlier recording that
+always ran direct first overstated some speedups and is superseded). Median tokens/s over the 48
+generated tokens:
+
+| Family | Direct | Batched | Speedup | Peak active bytes (direct / batched) | Leaked after run |
+| --- | ---: | ---: | ---: | --- | ---: |
+| llama | 1105 | 1344 | 1.22 | 454,648 / 753,382 | 0 |
+| llama31 | 1148 | 1265 | 1.10 | 454,680 / 739,203 | 0 |
+| qwen2 | 1062 | 931 | 0.88 | 461,816 / 765,667 | 0 |
+| mistral | 1073 | 1091 | 1.02 | 454,784 / 739,819 | 0 |
+| gemma | 834 | 843 | 1.01 | 483,592 / 912,075 | 0 |
+| phi3 | 1139 | 1083 | 0.95 | 454,648 / 753,382 | 0 |
+| mixtral | 805 | 900 | 1.12 | 1,179,648 / 1,557,003 | 0 |
+
+How to read this: these are the tiny synthetic fixtures, so each step is dominated by fixed
+per-call overhead, not arithmetic, and the speedups (0.88-1.22) are within run-to-run noise for
+most families, and two are below 1. They show that batching is correct and leak-free (active bytes
+return to the baseline in every run), not that it is faster at this size, and say nothing about a production-size model; that needs a
+Tier-B run on real weights. The batched peak is the whole run's peak, including the cohort's
+cache compaction, and is higher than the direct peak because the cohort holds three rows' caches at
+once; it is not broken out per phase. No speed threshold is enforced anywhere in CI.
+
+The JSON report also records the cohort sizes that actually ran in each sample
+(`batched_cohort_sizes`): the worker may form a cohort of one before the rest of the queue arrives,
+so a speedup can only be attributed to a batch shape by reading that field. The tables in this
+section predate the field and were recorded without forcing cohort formation, so they do not
+guarantee that a B>1 forward ran in every sample.
+
+### One real-size run (unpinned local checkpoint)
+
+The same benchmark on a locally fine-tuned, fused Llama 3.2 1B checkpoint (bfloat16 float
+safetensors, 16 layers, hidden size 2048, vocab 128,256), 3 requests with prompt lengths 4/7/5 and
+new tokens 24/8/16, 5 samples after 2 warm-ups, max batch 4, Apple M2 Max, commit `c5899f8`. **This
+is not Tier-B evidence**: the checkpoint is unpinned and its hashes are not recorded, and the prompt
+IDs are arbitrary Llama-3 token IDs, not a chat prompt.
+
+| | Direct | Batched |
+| --- | ---: | ---: |
+| Median tokens/s (48 tokens) | 90.2 | 92.3 (1.02x) |
+| Wall ms, per sample | 544, 554, 523, 531, 532 | 520, 563, 555, 475, 487 |
+| First-token ms, requests 1/2/3 | 101 / 324 / 400 | 106 / 106 / 123 |
+| Total ms, requests 1/2/3 | 307 / 384 / 532 | 475 / 249 / 440 |
+| Peak active bytes | 2,497,646,844 | 2,544,668,488 |
+| Active bytes left after a run | 0 | 0 |
+
+Aggregate throughput did not improve, but latency did: batching starts every request's first token
+at about the first request's latency instead of waiting behind the others, and the shortest request
+finishes sooner (249 ms versus 384 ms). The long request finishes later (475 ms versus 307 ms)
+because it shares its steps with the others. Peak memory is about 2% higher. The wall-time
+samples overlap, so the throughput difference is within noise. I have not investigated why batching
+a 1B model at this size yields no aggregate gain, so treat that as unexplained, not as a property of
+batching.

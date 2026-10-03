@@ -112,3 +112,39 @@ tasks.named('check') { dependsOn tasks.named('verifyPublishedDependencies') }
 tasks.withType(Test).configureEach {
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
 }
+
+// Gate 0 thread probes (req/plans/phase6-5-plan.md). Each runs in its own forked JVM, like
+// jmlx-ffi's loaderGuardTest: probe (a) needs a JVM in which no other test has used MLX on a
+// thread first, so "another thread used MLX before the worker" is really first, and probe (b)
+// races two threads on their own thread-owned streams and may crash its JVM, so it must not share
+// one with (a), with `test`, or with `check`.
+def threadProbeClasses = ['**/WorkerStreamProbeTest.class', '**/ConcurrentStreamProbeTest.class']
+
+tasks.named('test', Test) {
+    exclude threadProbeClasses
+}
+
+tasks.register('threadProbeTest', Test) {
+    group = 'verification'
+    description = 'Gate 0 probe (a): a worker thread uses MLX after the stream was initialized ' +
+            'elsewhere. Required; runs in its own JVM.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    include '**/WorkerStreamProbeTest.class'
+}
+
+// Evidence only: a pass proves nothing and it can crash its JVM, so it is deliberately not wired
+// into `check`. CI runs it as its own continue-on-error step and records the outcome.
+tasks.register('concurrentStreamProbe', Test) {
+    group = 'verification'
+    description = 'Gate 0 probe (b): two threads use MLX concurrently. Evidence only, never gates.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    include '**/ConcurrentStreamProbeTest.class'
+}
+
+tasks.named('check') { dependsOn tasks.named('threadProbeTest') }

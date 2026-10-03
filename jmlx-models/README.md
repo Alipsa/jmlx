@@ -96,3 +96,60 @@ Cancellation is observed before prefill and between decode steps.
 Models own checkpoint tensors in their supplied `MLXScope`. Generation owns and closes child scopes,
 caches, sampler state, and incremental decoder state; callers do not manage those intermediates.
 Only the cancellation token may be changed from another thread.
+
+## Serving many requests: the batch scheduler
+
+`BatchGenerationScheduler` is the opt-in way to serve concurrent callers. One worker thread owns
+MLX, builds the model through your factory (so the weights live in a worker-owned scope), and
+decodes compatible requests together as a cohort. Any thread may `submit` and `cancel`:
+
+```java
+BatchSchedulerConfig config = BatchSchedulerConfig.defaults(); // 4 rows, 16 queued
+try (BatchGenerationScheduler scheduler =
+    BatchGenerationScheduler.start(config, scope -> TextGenerationModels.load(scope, modelDirectory))) {
+  BatchRequestHandle a = scheduler.submit(requestA, eventA -> {});
+  BatchRequestHandle b = scheduler.submit(requestB, eventB -> {});
+  b.cancel();
+  GenerationResult result = a.stage().toCompletableFuture().join();
+}
+```
+
+MLX is used from **at most one thread at a time per process**, so while a scheduler runs, do not call
+the direct `generate` API or any other MLX code on another thread; `start` rejects a second running
+scheduler in the same classloader. Always close the scheduler (its threads are non-daemon). Callbacks
+run on the worker and must return promptly. See the `BatchGenerationScheduler` Javadoc for failure
+semantics, and the `se.alipsa.jmlx.core` package Javadoc for the threading rule and its one known
+exception (the `Cleaner` backstops).
+
+Each scheduler worker carries its own scheduler stream (about 60 KB) for the process's life --
+mlx-c cannot free streams -- so close-then-restart accumulates one stream per worker thread.
+Keep one scheduler running rather than churning them: the per-thread stream cost also makes the
+long-lived worker the recommended shape for any direct-`generate` server.
+
+When you need a guaranteed batch shape, start with a cohort gate: `start(config, factory,
+waiting -> waiting >= 2, Duration.ofSeconds(30))` holds the worker until two requests are queued
+or 30 s elapse, whichever first, so both share one cohort. The gate runs on the worker under the
+admission lock: keep it fast and side-effect free. See the `BatchGenerationScheduler` Javadoc for
+the full contract.
+
+## Models, downloads, and caching
+
+`jmlx-models` loads **local directories only**; it never downloads anything, and neither do the
+required PR checks. You manage the artifacts:
+
+- **Layout.** A model directory holds `config.json`, the float `*.safetensors` shards (and their
+  index), and the tokenizer files (`tokenizer.json`, optionally `tokenizer_config.json` and
+  `chat_template.jinja`). Pair the checkpoint with *its own* tokenizer from the same revision; a
+  mismatched tokenizer fails at the first out-of-range id or produces wrong text.
+- **Fetching.** Use any tool you like (for example `huggingface-cli download <repo> --revision <sha>
+  --local-dir <dir>`). Pin an exact commit `--revision`, not a branch name, and record the
+  resulting file SHA-256s so a re-download can be verified.
+- **Licenses.** Many checkpoints are gated or carry use restrictions; accept the license on the
+  model's hub page before downloading, and follow it when redistributing. jmlx ships no weights.
+- **Size and eviction.** Weights are loaded fully into unified memory (float only; quantized and GGUF
+  checkpoints are rejected), so budget roughly the safetensors size plus KV cache. Keep downloads in a
+  directory you own and delete old revisions yourself; jmlx has no cache manager.
+- **Native library cache.** Separately, the packaged native binaries are extracted to a per-pin cache
+  directory; override it with `-Djmlx.native.cache.path=<dir>` on slow or shared storage.
+- **Real-artifact tests.** The opt-in Tier-B checks that run against real downloaded models are
+  listed in [`req/phase6-tier-b-artifacts.md`](../req/phase6-tier-b-artifacts.md).

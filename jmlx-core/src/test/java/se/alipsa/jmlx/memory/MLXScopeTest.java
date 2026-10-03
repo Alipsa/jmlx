@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.foreign.MemorySegment;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,6 +28,111 @@ import se.alipsa.jmlx.ffi.NativeMemoryProbe;
  */
 @EnabledIfNativeAvailable
 class MLXScopeTest {
+
+  @Test
+  void childScopesShareTheirParentsStream() {
+    try (MLXScope root = new MLXScope();
+        MLXScope child = root.newChild();
+        MLXScope grandchild = child.newChild()) {
+      assertSame(root.stream(), child.stream());
+      assertSame(root.stream(), grandchild.stream());
+    }
+  }
+
+  @Test
+  void rootScopesOnOneThreadShareOneStream() {
+    // One scheduler stream per thread, not per scope: every root scope a thread builds reuses it.
+    try (MLXScope first = new MLXScope();
+        MLXScope second = new MLXScope()) {
+      assertEquals(first.stream().address(), second.stream().address());
+    }
+  }
+
+  @Test
+  void aRootScopeIsRejectedOnAVirtualThread() throws Exception {
+    // MLX's per-stream state is bound to the OS thread (a C++ thread_local), which a virtual
+    // thread migrates between; every check in MLXScope compares thread objects and would keep
+    // passing, so the rejection is up front. It precedes the thread's first stream, so no native
+    // stream is created and the test may share the suite's JVM.
+    AtomicReference<Throwable> caught = new AtomicReference<>();
+    Thread virtual =
+        Thread.ofVirtual()
+            .name("virtual-scope-probe")
+            .start(() -> caught.set(catchThrowable(MLXScope::new)));
+    virtual.join();
+    IllegalStateException e = assertInstanceOf(IllegalStateException.class, caught.get());
+    assertTrue(e.getMessage().contains("virtual"), e.getMessage());
+  }
+
+  @Test
+  void eachThreadRunsOpsOnItsOwnStreamEvenWhenAnotherThreadUsedMlxFirst() throws Exception {
+    // MLX streams are thread-bound ("There is no Stream(gpu, N) in current thread"), and the
+    // process-wide default stream only worked for the first thread to touch it. Run real ops
+    // (eval + readback) on this thread, then on two later threads, and require distinct streams.
+    long mainStream;
+    try (MLXScope scope = new MLXScope()) {
+      assertArrayEquals(new float[] {2f, 4f}, doubled(scope), 0f);
+      mainStream = scope.stream().address();
+    }
+    long[] first = onNewThread();
+    long[] second = onNewThread();
+    assertNotEquals(mainStream, first[0], "a worker must not reuse another thread's stream");
+    assertNotEquals(mainStream, second[0]);
+    assertNotEquals(first[0], second[0], "each thread owns a distinct stream");
+  }
+
+  @Test
+  void streamIsConfinedToTheOwnerThread() throws InterruptedException {
+    try (MLXScope scope = new MLXScope()) {
+      AtomicReference<Throwable> caught = new AtomicReference<>();
+      Thread other = new Thread(() -> caught.set(catchThrowable(scope::stream)));
+      other.start();
+      other.join();
+      assertInstanceOf(IllegalStateException.class, caught.get());
+    }
+  }
+
+  @Test
+  void streamOfAClosedScopeIsRejected() {
+    MLXScope scope = new MLXScope();
+    scope.close();
+    assertThrows(IllegalStateException.class, scope::stream);
+  }
+
+  private static float[] doubled(MLXScope scope) {
+    MLXArray a = MLX.array(scope, new float[] {1f, 2f}, new int[] {2});
+    return MLXOps.add(a, a).toFloatArray();
+  }
+
+  /** Runs real ops on a fresh thread and returns {its stream address}. */
+  private static long[] onNewThread() throws Exception {
+    long[] out = new long[1];
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread t =
+        new Thread(
+            () -> {
+              try (MLXScope scope = new MLXScope()) {
+                assertArrayEquals(new float[] {2f, 4f}, doubled(scope), 0f);
+                MemorySegment stream = scope.stream();
+                out[0] = stream.address();
+              } catch (Throwable x) {
+                failure.set(x);
+              }
+            });
+    t.start();
+    t.join();
+    assertNull(failure.get(), () -> "worker thread failed: " + failure.get());
+    return out;
+  }
+
+  private static Throwable catchThrowable(Runnable r) {
+    try {
+      r.run();
+      return null;
+    } catch (Throwable t) {
+      return t;
+    }
+  }
 
   @Test
   void closeIsIdempotent() {

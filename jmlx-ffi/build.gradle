@@ -42,9 +42,7 @@ tasks.named('javadoc', Javadoc) {
 
 tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.ffi')
-    // jmlx-ffi redistributes generated bindings derived from mlx-c; ship its attribution with the
-    // artifact rather than leaving it only in a source checkout.
-    from('NOTICE') { into 'META-INF' }
+    // LICENSE/NOTICE are added to every published jar by the root build.gradle convention.
 }
 
 dependencies {
@@ -115,7 +113,7 @@ tasks.register('extractionFallbackTest', Test) {
     // Mirrors jmlx-native-macos-arm64's own stageNativeResources gate: without
     // scripts/bootstrap-native.sh having run, that module's jar is empty and this test would
     // genuinely fail (not just skip) -- but every other native-dependent test in this repo is
-    // SKIPPED, not failed, in that situation (see @EnabledIfNativeAvailable, CLAUDE.md). Gate on
+    // SKIPPED, not failed, in that situation (see @EnabledIfNativeAvailable, AGENTS.md). Gate on
     // the same underlying signal so ./gradlew build keeps succeeding for a contributor who hasn't
     // bootstrapped and doesn't need native functionality.
     onlyIf {

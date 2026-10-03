@@ -43,17 +43,18 @@ final class NativeOps {
 
   private static final Arena FACADE_ARENA = Arena.ofShared();
   private static final MemorySegment DEFAULT_DEVICE = resolveDefaultDevice();
-  static final MemorySegment DEFAULT_STREAM = resolveDefaultStream();
 
   /**
-   * The process-wide default CPU stream, resolved once and never freed, exactly like {@link
-   * #DEFAULT_STREAM}. {@code mlx_default_cpu_stream_new} returns MLX's *existing* default CPU
-   * stream (a stable scheduler index across every call) rather than minting a new one -- {@code
+   * The process-wide default CPU stream, resolved once and never freed. Unlike a GPU stream (see
+   * {@link MLXScope#stream()}), MLX lets every thread use it, verified on the pinned runtime.
+   * {@code mlx_default_cpu_stream_new} returns MLX's *existing* default CPU stream (a stable
+   * scheduler index across every call) rather than minting a new one -- {@code
    * mlx_stream_new_device} would instead register a fresh scheduler stream on every call, leaking
    * one per invocation since nothing would ever free it. {@link MLXIO#loadSafetensors}/ {@link
-   * MLXIO#loadGguf} need this instead of {@link #DEFAULT_STREAM} specifically because both loaders'
-   * arrays are backed by a lazy {@code Load} primitive whose {@code eval_gpu} is unimplemented in
-   * the pinned {@code mlx-metal==0.31.2} wheel (req/plans/phase5-m1-plan.md's amendment).
+   * MLXIO#loadGguf} need this instead of the owner thread's GPU stream specifically because both
+   * loaders' arrays are backed by a lazy {@code Load} primitive whose {@code eval_gpu} is
+   * unimplemented in the pinned {@code mlx-metal==0.31.2} wheel (req/plans/phase5-m1-plan.md's
+   * amendment).
    */
   static final MemorySegment DEFAULT_CPU_STREAM = resolveDefaultCpuStream();
 
@@ -61,12 +62,6 @@ final class NativeOps {
     MemorySegment dev = mlx_h.mlx_device_new(FACADE_ARENA);
     checked(() -> mlx_h.mlx_get_default_device(dev));
     return dev;
-  }
-
-  private static MemorySegment resolveDefaultStream() {
-    MemorySegment stream = mlx_h.mlx_stream_new(FACADE_ARENA);
-    checked(() -> mlx_h.mlx_get_default_stream(stream, DEFAULT_DEVICE));
-    return stream;
   }
 
   /**
@@ -96,7 +91,7 @@ final class NativeOps {
   static MLXArray binaryOp(String opName, MLXArray a, MLXArray b, BinaryOp op) {
     MLXScope scope = scopeOf(opName, a, b);
     MemorySegment res = mlx_h.mlx_array_new(scope);
-    checked(opName, () -> op.apply(res, a.handle(), b.handle(), DEFAULT_STREAM));
+    checked(opName, () -> op.apply(res, a.handle(), b.handle(), scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -152,7 +147,7 @@ final class NativeOps {
     // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
-    checked(opName, () -> op.apply(res, a.handle(), DEFAULT_STREAM));
+    checked(opName, () -> op.apply(res, a.handle(), target.stream()));
     return new MLXArray(target, res);
   }
 
@@ -182,7 +177,7 @@ final class NativeOps {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment nativeParam = tmp.allocateFrom(ValueLayout.JAVA_INT, param);
       MemorySegment res = mlx_h.mlx_array_new(target);
-      checked(opName, () -> op.apply(res, a.handle(), nativeParam, param.length, DEFAULT_STREAM));
+      checked(opName, () -> op.apply(res, a.handle(), nativeParam, param.length, target.stream()));
       return new MLXArray(target, res);
     }
   }
@@ -209,7 +204,7 @@ final class NativeOps {
       MemorySegment res = mlx_h.mlx_array_new(scope);
       checked(
           opName,
-          () -> op.apply(res, a.handle(), nativeAxes, axes.length, keepdims, DEFAULT_STREAM));
+          () -> op.apply(res, a.handle(), nativeAxes, axes.length, keepdims, scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -239,7 +234,7 @@ final class NativeOps {
     // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
-    checked(opName, () -> op.apply(res, a.handle(), axis1, axis2, DEFAULT_STREAM));
+    checked(opName, () -> op.apply(res, a.handle(), axis1, axis2, target.stream()));
     return new MLXArray(target, res);
   }
 
@@ -264,7 +259,7 @@ final class NativeOps {
     // descendant of a.scope()) is intentionally discarded -- it's not where this op allocates.
     MLXScope.innermost(a.scope(), target);
     MemorySegment res = mlx_h.mlx_array_new(target);
-    checked(opName, () -> op.apply(res, a.handle(), param, DEFAULT_STREAM));
+    checked(opName, () -> op.apply(res, a.handle(), param, target.stream()));
     return new MLXArray(target, res);
   }
 
@@ -348,10 +343,10 @@ final class NativeOps {
    * once per distinct literal -- for the closed-set {@code const char*} parameters this facade's
    * mlx-c surface uses (SDPA's {@code mask_mode}), which never need per-call allocation
    * (req/phase4-plan.md §7's Native surface table). Callers store the result in a {@code private
-   * static final MemorySegment} field per distinct literal, exactly like {@link #DEFAULT_STREAM}.
-   * Backed by an intern cache keyed on {@code s} so that even an accidental per-call use never
-   * grows {@link #FACADE_ARENA} beyond one segment per distinct literal ever seen -- the intended
-   * static-initializer-only discipline is structural, not just documented.
+   * static final MemorySegment} field per distinct literal, exactly like {@link
+   * #DEFAULT_CPU_STREAM}. Backed by an intern cache keyed on {@code s} so that even an accidental
+   * per-call use never grows {@link #FACADE_ARENA} beyond one segment per distinct literal ever
+   * seen -- the intended static-initializer-only discipline is structural, not just documented.
    */
   static MemorySegment cstr(String s) {
     return CSTR_CACHE.computeIfAbsent(s, FACADE_ARENA::allocateFrom);
@@ -410,7 +405,7 @@ final class NativeOps {
       }
       try {
         MemorySegment res = mlx_h.mlx_array_new(scope);
-        checked(opName, () -> op.apply(res, vec, axis, DEFAULT_STREAM));
+        checked(opName, () -> op.apply(res, vec, axis, scope.stream()));
         return new MLXArray(scope, res);
       } finally {
         mlx_h.mlx_vector_array_free(vec);
@@ -439,7 +434,7 @@ final class NativeOps {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment vec = mlx_h.mlx_vector_array_new(tmp); // tmp -- NOT target
       try {
-        checked(opName, () -> op.apply(vec, DEFAULT_STREAM));
+        checked(opName, () -> op.apply(vec, target.stream()));
         long n = mlx_h.mlx_vector_array_size(vec);
         MLXArray[] out = new MLXArray[(int) n];
         for (int i = 0; i < n; i++) {

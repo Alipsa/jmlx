@@ -21,7 +21,16 @@ public record TokenizerEncoding(
     List<TokenOffset> offsets,
     List<String> tokens) {
 
-  /** Compatibility constructor for callers that do not supply token strings. */
+  /**
+   * Compatibility constructor for callers that do not supply token strings; each token string is
+   * empty.
+   *
+   * @param ids token IDs
+   * @param typeIds sequence/type IDs
+   * @param attentionMask one for attended tokens and zero for padding
+   * @param specialTokensMask one for special tokens and zero otherwise
+   * @param offsets original-input UTF-8 byte ranges
+   */
   public TokenizerEncoding(
       List<Integer> ids,
       List<Integer> typeIds,

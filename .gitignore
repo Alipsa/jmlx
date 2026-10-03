@@ -47,3 +47,6 @@ __pycache__/
 
 # Subagent-driven-development scratch workspace
 /.superpowers/
+/tools/release-smoke/build/
+/tools/release-smoke/.gradle/
+/tools/release-smoke/*/build/

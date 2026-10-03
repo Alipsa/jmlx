@@ -230,59 +230,72 @@ unverified. Before the scheduler ships, require either a stated Javadoc guarante
 concurrent use after construction or a concurrency test (several threads encode, render, and
 decode against single-threaded reference output), and fix any shared mutable state found.
 
-**Gate 0 — native thread probes (before any scheduler code).** (a) Exercise a worker thread after
-`NativeOps.DEFAULT_STREAM` was initialized on a different thread, then load and generate entirely on
-that worker. (b) Run two threads that each load and generate concurrently on the shared default
-stream, which is what a user calling the public direct `generate` while a scheduler runs, or
-starting two schedulers, would do. These are pinned-runtime probes, not an assumption about Metal
-command-encoder or MLX stream thread safety (MLX 0.31.2's behavior here is unverified). Give each
-probe its own forked JVM, the same pattern as `loaderGuardTest`: (a) needs a fresh JVM in which
-nothing else has touched `DEFAULT_STREAM`, which is initialized once per JVM, and (b) races two MLX
-threads on a stream this plan treats as unsafe, so it can crash its JVM and must not share one with
-(a), with `:jmlx-models:test`, or with `check`. Register `threadProbeTest` (`include
-'**/WorkerStreamProbeTest.class'`) for (a) only, excluded from `test` and wired into `check`: (a) is
-a required test. Register `concurrentStreamProbe` (`include '**/ConcurrentStreamProbeTest.class'`)
-for (b), excluded from `test` and **not** wired into `check`; run it as its own CI step with
-`continue-on-error: true`, give the step an `id`, and record `steps.<id>.outcome` in the job summary
-so a crash is captured even when no XML exists. Upload the result XML with `if-no-files-found:
-warn`, because a crashed JVM may write none. Do not rely on `ignoreFailures` for (b): it covers
-failing tests, and whether it covers a crashed test process is unverified. (b) is an evidence probe
-and never gates, since a pass proves nothing. If (a) fails, the native stream ownership or
-initialization design changes and §1–§2's worker design must be revisited. A passing (b) is **not**
-permission: a race test can pass on CI and still crash later. "At most one MLX-using thread at a
-time per process" is therefore the documented default and stays so unless upstream MLX documents
-that sharing a stream across threads is safe. Because the constraint covers all of `jmlx-core`, not
-just the scheduler, it is a public-contract change to `jmlx-core` and goes in its package Javadoc
-and README. State one **known exception**: the `Cleaner` backstops in `MLXScope` (`mlx_array_free`)
-and `MLXGrad.Fn` (`mlx_closure_free`/`mlx_closure_value_and_grad_free`, plus its upcall arena) run
-on the JVM Cleaner thread when a scope or function is never closed. The array free is the unresolved
-cross-thread-free question in `req/initial-plan.md` (Open questions); the closure frees are a
-related but separate case that question does not cover. The Javadoc and README name both paths and
-link the question rather than claim the rule holds absolutely; callers avoid them by always closing
-scopes and functions, which the scheduler's worker does. If probe (b) shows any instability, add
-probe (c), freeing arrays (and closures) from a second thread while the worker generates, which also
-resolves that open question. Enforce the rule where possible by rejecting a second `start()` while
-another scheduler's worker has not exited. The guard is static, so it enforces the rule only within
-one jmlx classloader; the rule itself stays per process, because MLX's native state (the default
-stream and the Metal device) is process-wide. Say both in the Javadoc. (Whether the JDK already
-refuses to load the native library into a second classloader on the `System.load` path is
-unverified; the documented rule says "per process" either way.) The guard is released by the
-worker's exit sequence, in a `finally`, whatever happened: after an orderly close, after a runtime
-`FAILED` (including one whose best-effort close of the model or root threw), and on every
-startup-failure path in which the worker exits (a throwing factory, a failed scope check). It is
-never released while the worker can still make MLX calls; it is released after the model and root
-are closed and before the dispatcher is shut down, so `start()` after a failed `start()` or after
-`state() == CLOSED` is not rejected. If the worker thread cannot be started, `start()` itself
-releases it (see the exit sequence). `start()` has no startup timeout: a factory that never returns
-makes `start()` block, even if its caller is interrupted, and that is documented rather than
-reported as a failure, because a timeout would throw while a live worker still holds the guard and
-the model. The rule bounds concurrent MLX threads and an exited worker is not one, so a failed
-native cleanup (leaked handles; state `FAILED`, recorded by `failure()`) does not block a restart,
-and one failed `start()` cannot block later ones until the JVM exits; test the failure paths,
-including a throwing root close. Close-then-restart (common in tests and the example) works. The
-public direct `generate` API cannot be blocked, so for that path the rule is documentation only. Run
-the probes before writing the scheduler, and keep (a) as a required native CI test and (b) as an
-evidence probe afterwards.
+**Gate 0 — native thread probes (before any scheduler code).** **Recorded result (2026-10-02, pinned
+`mlx-metal==0.31.2`):** probe (a) as first written failed, and the failure was not "stream
+initialized on a different thread". MLX streams are thread-bound ("There is no Stream(gpu, 0) in
+current thread"), and the process-wide default GPU stream works only on the first thread that
+touches it, so a worker that was not first failed, close-then-restart failed, and a direct
+`generate` on `main` followed by a scheduler failed. A spike confirmed that a thread creating its
+own stream (`mlx_stream_new_device`) runs ops fine, that a stream cannot be used from another thread
+(also after its creator exits), that evaluating another thread's lazy array fails, that the default
+CPU stream works from any thread, and that a stream costs about 60 KB per thread. The fix (done):
+every `MLXScope` carries its owner thread's stream (`MLXScope.stream()`, one per thread, created
+lazily by the first root scope), children inherit it, and every op runs on its result scope's
+stream; `NativeOps.DEFAULT_STREAM` and `MLX.defaultStream()` are gone. Probe (a) is now: (a) a
+worker thread loads and generates after another thread has already used MLX, and two successive
+workers each work (the close-then-restart shape). The consequence for the scheduler is that arrays
+must be evaluated on the thread that built them, which the worker-owned design already guarantees.
+(b) Run two threads that each load and generate concurrently, each on its own thread-bound stream,
+which is what a user calling the public direct `generate` while a scheduler runs, or starting two
+schedulers, would do.
+These are pinned-runtime probes, not an assumption about Metal command-encoder or MLX stream thread
+safety (MLX 0.31.2's behavior here is unverified). Give each probe its own forked JVM, the same
+pattern as `loaderGuardTest`: (a) needs a fresh JVM so that "another thread used MLX first" is
+really first, and (b) races two MLX threads on a stream this plan treats as unsafe, so it can crash
+its JVM and must not share one with (a), with `:jmlx-models:test`, or with `check`. Register
+`threadProbeTest` (`include '**/WorkerStreamProbeTest.class'`) for (a) only, excluded from `test`
+and wired into `check`: (a) is a required test. Register `concurrentStreamProbe` (`include
+'**/ConcurrentStreamProbeTest.class'`) for (b), excluded from `test` and **not** wired into `check`;
+run it as its own CI step with `continue-on-error: true`, give the step an `id`, and record
+`steps.<id>.outcome` in the job summary so a crash is captured even when no XML exists. Upload the
+result XML with `if-no-files-found: warn`, because a crashed JVM may write none. Do not rely on
+`ignoreFailures` for (b): it covers failing tests, and whether it covers a crashed test process is
+unverified. (b) is an evidence probe and never gates, since a pass proves nothing. If (a) fails, the
+native stream ownership or initialization design changes and §1–§2's worker design must be
+revisited. A passing (b) is **not** permission: a race test can pass on CI and still crash later.
+"At most one MLX-using thread at a time per process" is therefore the documented default and stays
+so unless upstream MLX documents that sharing a stream across threads is safe. Because the
+constraint covers all of `jmlx-core`, not just the scheduler, it is a public-contract change to
+`jmlx-core` and goes in its package Javadoc and README. State one **known exception**: the `Cleaner`
+backstops in `MLXScope` (`mlx_array_free`) and `MLXGrad.Fn`
+(`mlx_closure_free`/`mlx_closure_value_and_grad_free`, plus its upcall arena) run on the JVM Cleaner
+thread when a scope or function is never closed. The array free is the unresolved cross-thread-free
+question in `req/initial-plan.md` (Open questions); the closure frees are a related but separate
+case that question does not cover. The Javadoc and README name both paths and link the question
+rather than claim the rule holds absolutely; callers avoid them by always closing scopes and
+functions, which the scheduler's worker does. If probe (b) shows any instability, add probe (c),
+freeing arrays (and closures) from a second thread while the worker generates, which also resolves
+that open question. Enforce the rule where possible by rejecting a second `start()` while another
+scheduler's worker has not exited. The guard is static, so it enforces the rule only within one jmlx
+classloader; the rule itself stays per process, because MLX's native state (the default stream and
+the Metal device) is process-wide. Say both in the Javadoc. (Whether the JDK already refuses to load
+the native library into a second classloader on the `System.load` path is unverified; the documented
+rule says "per process" either way.) The guard is released by the worker's exit sequence, in a
+`finally`, whatever happened: after an orderly close, after a runtime `FAILED` (including one whose
+best-effort close of the model or root threw), and on every startup-failure path in which the worker
+exits (a throwing factory, a failed scope check). It is never released while the worker can still
+make MLX calls; it is released after the model and root are closed and before the dispatcher is shut
+down, so `start()` after a failed `start()` or after `state() == CLOSED` is not rejected. If the
+worker thread cannot be started, `start()` itself releases it (see the exit sequence). `start()` has
+no startup timeout: a factory that never returns makes `start()` block, even if its caller is
+interrupted, and that is documented rather than reported as a failure, because a timeout would throw
+while a live worker still holds the guard and the model. The rule bounds concurrent MLX threads and
+an exited worker is not one, so a failed native cleanup (leaked handles; state `FAILED`, recorded by
+`failure()`) does not block a restart, and one failed `start()` cannot block later ones until the
+JVM exits; test the failure paths, including a throwing root close. Close-then-restart (common in
+tests and the example) works. The public direct `generate` API cannot be blocked, so for that path
+the rule is documentation only. Run the probes before writing the scheduler, and keep (a) as a
+required native CI test and (b) as an evidence probe afterwards.
 
 **Scope layout:** On the worker, create one model root; create each active cohort's scope
 `C` as a child of the validated `DecoderModel.modelScope()`, so weight scopes remain

@@ -54,8 +54,14 @@ METALLIB_MIN_BYTES=100000000
 log() { printf '>>> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-for tool in cmake git curl unzip otool codesign shasum cc; do
-  command -v "$tool" >/dev/null 2>&1 || die "required tool '$tool' not found on PATH -- install it (e.g. 'brew install $tool') and re-run"
+# git, cc and otool exist as /usr/bin stubs even without the Command Line Tools, so command -v alone
+# cannot detect a missing install; xcode-select -p can.
+xcode-select -p >/dev/null 2>&1 \
+  || die "Xcode Command Line Tools not installed -- run 'xcode-select --install' and re-run"
+command -v cmake >/dev/null 2>&1 \
+  || die "cmake not found on PATH -- install it with 'brew install cmake' and re-run"
+for tool in git curl unzip otool codesign shasum cc; do
+  command -v "$tool" >/dev/null 2>&1 || die "required tool '$tool' not found on PATH"
 done
 
 mkdir -p "$SCRATCH_DIR"

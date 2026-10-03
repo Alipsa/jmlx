@@ -37,9 +37,7 @@ public final class MLXShape {
       MemorySegment res = mlx_h.mlx_array_new(scope);
       NativeOps.checked(
           "reshape",
-          () ->
-              mlx_h.mlx_reshape(
-                  res, a.handle(), nativeShape, shape.length, NativeOps.DEFAULT_STREAM));
+          () -> mlx_h.mlx_reshape(res, a.handle(), nativeShape, shape.length, scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -164,8 +162,7 @@ public final class MLXShape {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "takeAxis",
-        () ->
-            mlx_h.mlx_take_axis(res, a.handle(), indices.handle(), axis, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_take_axis(res, a.handle(), indices.handle(), axis, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -180,8 +177,7 @@ public final class MLXShape {
     MemorySegment res = mlx_h.mlx_array_new(destination);
     NativeOps.checked(
         "takeAxis",
-        () ->
-            mlx_h.mlx_take_axis(res, a.handle(), indices.handle(), axis, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_take_axis(res, a.handle(), indices.handle(), axis, destination.stream()));
     return new MLXArray(destination, res);
   }
 
@@ -195,9 +191,7 @@ public final class MLXShape {
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "takeAlongAxis",
-        () ->
-            mlx_h.mlx_take_along_axis(
-                res, a.handle(), indices.handle(), axis, NativeOps.DEFAULT_STREAM));
+        () -> mlx_h.mlx_take_along_axis(res, a.handle(), indices.handle(), axis, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -214,12 +208,7 @@ public final class MLXShape {
         "putAlongAxis",
         () ->
             mlx_h.mlx_put_along_axis(
-                res,
-                a.handle(),
-                indices.handle(),
-                values.handle(),
-                axis,
-                NativeOps.DEFAULT_STREAM));
+                res, a.handle(), indices.handle(), values.handle(), axis, scope.stream()));
     return new MLXArray(scope, res);
   }
 
@@ -298,7 +287,7 @@ public final class MLXShape {
                   stop.length,
                   nativeStrides,
                   strides.length,
-                  NativeOps.DEFAULT_STREAM));
+                  scope.stream()));
       return new MLXArray(scope, res);
     }
   }

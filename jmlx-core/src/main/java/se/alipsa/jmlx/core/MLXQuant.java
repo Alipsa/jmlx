@@ -150,7 +150,7 @@ public final class MLXQuant {
                   modeStr,
                   globalScaleHandle,
                   dt,
-                  NativeOps.DEFAULT_STREAM));
+                  target.stream()));
       return new MLXArray(target, res);
     }
   }
@@ -258,7 +258,7 @@ public final class MLXQuant {
                   gs,
                   b,
                   modeStr,
-                  NativeOps.DEFAULT_STREAM));
+                  target.stream()));
       return new MLXArray(target, res);
     }
   }

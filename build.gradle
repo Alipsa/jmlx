@@ -476,6 +476,30 @@ subprojects {
         apply plugin: 'signing'
         apply plugin: 'se.alipsa.nexus-release-plugin'
 
+        // Every published jar carries its license and third-party attribution, not only the source
+        // checkout: the module's own LICENSE/NOTICE when it has one, else the root LICENSE (the
+        // same MIT text). jmlx-jinja's NOTICE in particular is the @huggingface/jinja attribution.
+        tasks.named('jar', Jar) {
+            def moduleLicense = project.file('LICENSE').isFile() ? project.file('LICENSE') : rootProject.file('LICENSE')
+            from(moduleLicense) { into 'META-INF' }
+            if (project.file('NOTICE').isFile()) {
+                from(project.file('NOTICE')) { into 'META-INF' }
+            }
+        }
+
+        // Opt-in local repository for tools/release-smoke: `publishMavenPublicationToSmokeRepository`
+        // writes jars, POMs and Gradle module metadata under a disposable build directory, with no
+        // Central credentials, no `release`, and no publishToMavenLocal. tools/release-smoke/run.sh
+        // deletes the directory before publishing, so a stale SNAPSHOT never leaks between runs.
+        publishing {
+            repositories {
+                maven {
+                    name = 'smoke'
+                    url = uri(rootProject.layout.buildDirectory.dir('smoke-repo'))
+                }
+            }
+        }
+
         // Published Javadoc is consumer-facing API documentation; fail its build on warnings for
         // every publishable module, rather than requiring each module to duplicate this policy.
         tasks.withType(Javadoc).configureEach {
@@ -533,7 +557,7 @@ subprojects {
         // project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate carrying jinja's
         // current version, so this fails the tokenizer release while jinja is still a SNAPSHOT.
         // Consequently, release tokenizer after jinja is released but before jinja is bumped to
-        // its next SNAPSHOT; CLAUDE.md documents that release window.
+        // its next SNAPSHOT; AGENTS.md documents that release window.
         // The own-version check exists because nothing on the Gradle side otherwise catches it:
         // the nexus-release-plugin's ReleaseTask just logs and returns 0 for a SNAPSHOT version,
         // so a bare `./gradlew :module:release` would report BUILD SUCCESSFUL having published

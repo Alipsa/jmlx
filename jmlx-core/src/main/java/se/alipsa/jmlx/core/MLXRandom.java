@@ -52,8 +52,7 @@ public final class MLXRandom {
     }
     MemorySegment res = mlx_h.mlx_array_new(target);
     NativeOps.checked(
-        "split",
-        () -> mlx_h.mlx_random_split_num(res, key.handle(), count, NativeOps.DEFAULT_STREAM));
+        "split", () -> mlx_h.mlx_random_split_num(res, key.handle(), count, target.stream()));
     return new MLXArray(target, res);
   }
 
@@ -74,7 +73,7 @@ public final class MLXRandom {
         "categorical",
         () ->
             mlx_h.mlx_random_categorical(
-                res, logits.handle(), normalizedAxis, key.handle(), NativeOps.DEFAULT_STREAM));
+                res, logits.handle(), normalizedAxis, key.handle(), scope.stream()));
     return MLX.astype(new MLXArray(scope, res), DType.INT32);
   }
 
@@ -109,7 +108,7 @@ public final class MLXRandom {
                   loc,
                   scale,
                   key,
-                  NativeOps.DEFAULT_STREAM));
+                  scope.stream()));
       return new MLXArray(scope, res);
     }
   }
@@ -167,7 +166,7 @@ public final class MLXRandom {
                       shape.length,
                       dtype.nativeValue(),
                       key,
-                      NativeOps.DEFAULT_STREAM));
+                      scope.stream()));
           return new MLXArray(scope, res);
         } finally {
           mlx_h.mlx_array_free(highScalar);

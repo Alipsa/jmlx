@@ -134,6 +134,12 @@ jobs:
       - name: Run native module checks
         run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check :jmlx-native-macos-arm64:check :jmlx-ffi:assemble :jmlx-core:assemble :jmlx-models:assemble :jmlx-native-macos-arm64:assemble
 
+      # Publishes the six SNAPSHOT modules to a disposable repository and resolves them from a clean
+      # consumer (fresh GRADLE_USER_HOME, exclusive repository content, no checkout classpath, no
+      # native path override). CI mode only: the release-mode and Central runs are manual.
+      - name: Release smoke (CI mode)
+        run: ./tools/release-smoke/run.sh ci
+
       - name: Assert required native suites executed
         run: |
           python3 - <<'PY'
@@ -150,11 +156,19 @@ jobs:
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
                               'QuantizedCheckpointProbeTest', 'DecoderCacheLifecycleTest',
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
-                              'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest'],
+                              'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest',
+                              'BatchGenerationSchedulerTest', 'BatchSchedulerFailureTest',
+                              'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
+                              'BatchStepEquivalenceTest'],
           }
+          # Gate 0 probe (a) runs alone in its own forked JVM (threadProbeTest), so its XML is not
+          # under build/test-results/test. Probe (b) is evidence only and is deliberately absent.
+          results_dirs = {'jmlx-models': {'WorkerStreamProbeTest': 'threadProbeTest'}}
+          suites['jmlx-models'].append('WorkerStreamProbeTest')
           for module, names in suites.items():
-              root = Path(module) / 'build/test-results/test'
               for name in names:
+                  task = results_dirs.get(module, {}).get(name, 'test')
+                  root = Path(module) / 'build/test-results' / task
                   matches = list(root.glob(f'TEST-*.{name}.xml'))
                   if len(matches) != 1:
                       raise SystemExit(f'{module}/{name}: expected one result XML, found {len(matches)}')
@@ -165,6 +179,28 @@ jobs:
                       raise SystemExit(f'{module}/{name}: native tests did not execute')
                   print(f'{module}/{name}: {tests - skipped}/{tests} executed')
           PY
+
+      # Gate 0 probe (b): two threads use MLX concurrently. Evidence only -- a pass proves nothing
+      # and it can crash its JVM, so it never gates. The step has an id so its outcome is recorded
+      # even when a crash leaves no result XML.
+      - name: Gate 0 probe (b) - concurrent MLX threads (evidence only)
+        id: concurrent_stream_probe
+        continue-on-error: true
+        run: ./gradlew --no-build-cache :jmlx-models:concurrentStreamProbe
+
+      - name: Record probe (b) outcome
+        if: always()
+        run: |
+          echo "### Gate 0 probe (b): concurrent MLX threads" >> "$GITHUB_STEP_SUMMARY"
+          echo "outcome: \`${{ steps.concurrent_stream_probe.outcome }}\` (evidence only, never gates)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload probe (b) result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: concurrent-stream-probe
+          path: jmlx-models/build/test-results/concurrentStreamProbe/
+          if-no-files-found: warn
 
       - name: Upload native quantization probe
         if: always()

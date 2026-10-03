@@ -1,0 +1,43 @@
+// Shared by app and pom-check. The jmlx source is a parameter (-PjmlxRepoUrl): the disposable smoke
+// repository in CI / release-candidate mode, Maven Central for the final release-mode run.
+// exclusiveContent makes `se.alipsa` resolve ONLY from that source, and everything else (Jackson,
+// the only external runtime dependency) ONLY from Central. No mavenLocal(), no substitution rules.
+def jmlxRepoUrl = providers.gradleProperty('jmlxRepoUrl').orElse('https://repo.maven.apache.org/maven2/').get()
+def pomOnly = project.hasProperty('pomOnlyResolution')
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'jmlx'
+                url = uri(jmlxRepoUrl)
+                if (pomOnly) {
+                    // Resolve through the POM, as a Maven consumer would, instead of the .module file.
+                    metadataSources {
+                        mavenPom()
+                        ignoreGradleMetadataRedirection()
+                    }
+                }
+            }
+        }
+        filter { includeGroup 'se.alipsa' }
+    }
+    mavenCentral { content { excludeGroup 'se.alipsa' } }
+}
+
+ext.jmlxMode = providers.gradleProperty('jmlxMode').orElse('ci').get()
+if (!(jmlxMode in ['ci', 'release'])) {
+    throw new GradleException("jmlxMode must be 'ci' or 'release', not '${jmlxMode}'")
+}
+def versionOf = { String property ->
+    def configured = providers.gradleProperty(property).get()
+    jmlxMode == 'release' ? configured.replace('-SNAPSHOT', '') : configured
+}
+ext.jmlxVersions = [
+    'jmlx-models'            : versionOf('jmlxModelsVersion'),
+    'jmlx-native-macos-arm64': versionOf('jmlxNativeVersion'),
+    'jmlx-core'              : versionOf('jmlxCoreVersion'),
+    'jmlx-ffi'               : versionOf('jmlxFfiVersion'),
+    'jmlx-tokenizer'         : versionOf('jmlxTokenizerVersion'),
+    'jmlx-jinja'             : versionOf('jmlxJinjaVersion'),
+]

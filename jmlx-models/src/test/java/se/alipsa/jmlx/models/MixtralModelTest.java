@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -14,6 +15,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.KVCache;
 
 /** Mixtral checkpoint coverage over a committed Hugging Face reference. */
+@Tag("full-float32")
 class MixtralModelTest {
   @Test
   @EnabledIfNativeAvailable

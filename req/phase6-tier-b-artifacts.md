@@ -41,3 +41,8 @@ Adding a row requires an immutable repository revision and hashes for every cons
 tokenizer, index, and weight file. Record whether authentication or license acceptance is required,
 the exact model metadata and prompt/token output asserted, the maximum download/cache size, and who
 owns manual/scheduled execution. A passing Tier-A synthetic fixture is not Tier-B evidence.
+
+`tierBTest` explicitly sets `MLX_ENABLE_TF32=0` and declares that mode as a task input.
+Exact greedy-ID comparisons therefore use full float32 independently of the launching shell.
+The recorded artifacts were verified on the documented device; this does not establish
+identical greedy IDs across GPU generations.

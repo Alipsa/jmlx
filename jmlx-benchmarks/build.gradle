@@ -1,0 +1,35 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':jmlx-core')
+    implementation project(':jmlx-models')
+    implementation libs.jackson.databind
+}
+
+application {
+    mainClass = 'se.alipsa.jmlx.benchmarks.Tf32Benchmark'
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+}
+
+tasks.named('run', JavaExec).configure {
+    workingDir rootProject.projectDir
+    systemProperty('jmlx.library.path',
+            rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath)
+}
+
+tasks.register('benchmarkTf32', JavaExec) {
+    group = 'benchmark'
+    description = 'Compares TF32 enabled and disabled in alternating fresh JVMs (pass --args).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    workingDir rootProject.projectDir
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    systemProperty('jmlx.library.path',
+            rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath)
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('spotlessCheck')
+}

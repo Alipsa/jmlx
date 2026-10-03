@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import se.alipsa.jmlx.core.MLX;
@@ -18,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Compares Llama and Qwen2 decoder logits with independent Hugging Face float32 references. */
 @EnabledIfNativeAvailable
+@Tag("full-float32")
 class DecoderRefactorGoldenTest {
 
   @ParameterizedTest

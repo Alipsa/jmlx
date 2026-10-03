@@ -1,5 +1,7 @@
 plugins { id 'application' }
 
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+
 apply from: '../repositories.gradle'
 
 // Compile against models only; core, tokenizer and jinja arrive transitively, and ffi is runtime-only

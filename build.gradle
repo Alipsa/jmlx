@@ -1,6 +1,6 @@
 /*
  * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer,
- * jmlx-jinja, jmlx-models and jmlx-examples lives here; each module's own build.gradle only
+ * jmlx-jinja, jmlx-models, jmlx-examples and jmlx-benchmarks lives here; each module's build.gradle
  * declares its plugin and dependencies. See req/initial-plan.md §4 for the
  * rationale behind the native-access flags and the native-directory system
  * property below.
@@ -469,7 +469,7 @@ subprojects {
 
 // Release wiring for publishable modules only. A module opts in by applying 'maven-publish'; today
 // that includes jmlx-jinja, jmlx-tokenizer, jmlx-ffi, jmlx-core, jmlx-models and
-// jmlx-native-macos-arm64 (jmlx-examples does not). Kept here rather than duplicated per module so
+// jmlx-native-macos-arm64 (jmlx-examples and jmlx-benchmarks do not). Kept here rather than duplicated per module so
 // there is one copy to keep correct -- the same reason Spotless is applied above.
 subprojects {
     plugins.withId('maven-publish') {

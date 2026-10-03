@@ -1,5 +1,7 @@
 plugins { id 'java' }
 
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+
 // Resolves the same graph through the POMs only (see repositories.gradle) so a Maven consumer's view
 // is exercised too. The jmlx-core POM puts jmlx-ffi in runtime scope (it is an `implementation`
 // dependency), so only the RUNTIME classpath is comparable, never the compile classpath.

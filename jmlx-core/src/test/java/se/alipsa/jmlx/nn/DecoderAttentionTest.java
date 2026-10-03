@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
@@ -102,6 +103,7 @@ class DecoderAttentionTest {
   }
 
   @Test
+  @Tag("full-float32")
   void windowedLastRowMatchesDirectAttentionAtPrefillAndDecodeOffsets() {
     try (MLXScope scope = new MLXScope()) {
       DecoderAttention attention =

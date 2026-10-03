@@ -5,10 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import tools.jackson.databind.ObjectMapper;
 
+@Tag("full-float32")
 class Phi3ModelTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 

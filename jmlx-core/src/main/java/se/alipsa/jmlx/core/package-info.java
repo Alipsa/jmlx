@@ -2,6 +2,16 @@
  * Tensor operations over Apple's MLX: {@link se.alipsa.jmlx.core.MLX} and its op facades, {@link
  * se.alipsa.jmlx.core.MLXArray}, autograd and checkpoint I/O.
  *
+ * <h2>Numerical precision</h2>
+ *
+ * <p>MLX may use reduced-precision matrix kernels for {@code FLOAT32} operations on supported
+ * hardware, while keeping input and output arrays in {@code FLOAT32}. For comparisons with full
+ * float32 references, set the native environment variable {@code MLX_ENABLE_TF32=0} when launching
+ * the Java or Groovy process. The pinned runtime defaults to {@code 1} and caches the setting on
+ * first use; a Java system property does not select native precision. Choose the mode at process
+ * startup and benchmark its performance on the application's actual model and shapes. Full float32
+ * does not guarantee identical results across hardware or batch shapes.
+ *
  * <h2>Threading rule</h2>
  *
  * <p>Use MLX from <b>at most one thread at a time per process</b>. MLX's native state -- the

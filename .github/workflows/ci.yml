@@ -156,7 +156,10 @@ jobs:
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
                               'QuantizedCheckpointProbeTest', 'DecoderCacheLifecycleTest',
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
-                              'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest'],
+                              'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest',
+                              'BatchGenerationSchedulerTest', 'BatchSchedulerFailureTest',
+                              'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
+                              'BatchStepEquivalenceTest'],
           }
           # Gate 0 probe (a) runs alone in its own forked JVM (threadProbeTest), so its XML is not
           # under build/test-results/test. Probe (b) is evidence only and is deliberately absent.

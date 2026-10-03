@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.models;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.IntPredicate;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXShape;
@@ -64,11 +65,12 @@ import se.alipsa.jmlx.tokenizer.TokenizerException;
  * terminal event. A failure of cohort setup (an output decoder, the cohort scope, the caches, the
  * rank indices, or a sampler), of the shared forward, selection graph, joint evaluation, or of
  * cache compaction poisons the cohort and fails each of its rows the same way -- stage {@code
- * "cohort setup"}, {@code "batch step"}, or {@code "cache compaction"} -- while the worker keeps
- * serving later cohorts. A failure that leaves the worker unusable moves the scheduler to {@link
- * State#FAILED}: every accepted stage completes with a {@link GenerationAbortedException} whose
- * cause is a {@link SchedulerFailedException}, and later {@link #submit} calls throw a fresh {@link
- * SchedulerFailedException} with the same cause.
+ * "cohort setup"}, {@code "batch step"}, or {@code "cache compaction"} -- and a failure that
+ * escapes the decode loop after setup finished is attributed to stage {@code "cohort"}; all of them
+ * leave the worker serving later cohorts. A failure that leaves the worker unusable moves the
+ * scheduler to {@link State#FAILED}: every accepted stage completes with a {@link
+ * GenerationAbortedException} whose cause is a {@link SchedulerFailedException}, and later {@link
+ * #submit} calls throw a fresh {@link SchedulerFailedException} with the same cause.
  */
 public final class BatchGenerationScheduler implements AutoCloseable {
   private static final System.Logger LOGGER =
@@ -100,36 +102,66 @@ public final class BatchGenerationScheduler implements AutoCloseable {
    * Test seams; {@link #NONE} in production. {@code cleanupFault} runs inside the exit sequence's
    * best-effort close, so a test can make cleanup throw (the model and root classes are final).
    * {@code setupFault} runs at the start of a cohort's setup (cache, rank-index, and sampler
-   * construction), so a test can fail cohort setup without touching the model. {@code cohortGate}
-   * receives the number of waiting requests and the worker forms no cohort until it returns true
-   * (or the scheduler stops), so a test can pin exactly which requests batch.
+   * construction), so a test can fail cohort setup without touching the model. {@code decodeFault}
+   * runs between steps of the decode loop, so a test can make a failure escape the loop (stage
+   * {@code "cohort"}) without touching the model. {@code cohortGate} receives the number of waiting
+   * requests and the worker forms no cohort until it returns true, the gate wait ({@code
+   * cohortGateMaxWait}) elapses, or the scheduler stops, so a test can pin exactly which requests
+   * batch; it runs on the worker under the admission lock, so it must be fast and side-effect free
+   * (a throw is treated as "release now", see {@link #gateAdmits}).
    */
   record Hooks(
       DecoderModel.EmbeddingHook embeddingHook,
       CacheReorderer reorderer,
       Runnable cleanupFault,
       Runnable setupFault,
-      java.util.function.IntPredicate cohortGate) {
-    static final Hooks NONE = new Hooks(null, CacheReorderer.NATIVE, null, null, null);
+      Runnable decodeFault,
+      IntPredicate cohortGate,
+      Duration cohortGateMaxWait) {
+    static final Hooks NONE = new Hooks(null, CacheReorderer.NATIVE, null, null, null, null, null);
 
     Hooks withEmbeddingHook(DecoderModel.EmbeddingHook hook) {
-      return new Hooks(hook, reorderer, cleanupFault, setupFault, cohortGate);
+      return new Hooks(
+          hook, reorderer, cleanupFault, setupFault, decodeFault, cohortGate, cohortGateMaxWait);
     }
 
     Hooks withReorderer(CacheReorderer replacement) {
-      return new Hooks(embeddingHook, replacement, cleanupFault, setupFault, cohortGate);
+      return new Hooks(
+          embeddingHook,
+          replacement,
+          cleanupFault,
+          setupFault,
+          decodeFault,
+          cohortGate,
+          cohortGateMaxWait);
     }
 
     Hooks withCleanupFault(Runnable fault) {
-      return new Hooks(embeddingHook, reorderer, fault, setupFault, cohortGate);
+      return new Hooks(
+          embeddingHook, reorderer, fault, setupFault, decodeFault, cohortGate, cohortGateMaxWait);
     }
 
     Hooks withSetupFault(Runnable fault) {
-      return new Hooks(embeddingHook, reorderer, cleanupFault, fault, cohortGate);
+      return new Hooks(
+          embeddingHook,
+          reorderer,
+          cleanupFault,
+          fault,
+          decodeFault,
+          cohortGate,
+          cohortGateMaxWait);
     }
 
-    Hooks withCohortGate(java.util.function.IntPredicate gate) {
-      return new Hooks(embeddingHook, reorderer, cleanupFault, setupFault, gate);
+    Hooks withDecodeFault(Runnable fault) {
+      return new Hooks(
+          embeddingHook, reorderer, cleanupFault, setupFault, fault, cohortGate, cohortGateMaxWait);
+    }
+
+    Hooks withCohortGate(IntPredicate gate, Duration maxWait) {
+      Objects.requireNonNull(gate, "gate");
+      Objects.requireNonNull(maxWait, "maxWait");
+      return new Hooks(
+          embeddingHook, reorderer, cleanupFault, setupFault, decodeFault, gate, maxWait);
     }
   }
 
@@ -145,6 +177,62 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   }
 
   private record CohortKey(KVCachePolicy cachePolicy, int equalLength) {}
+
+  /**
+   * The cohort sizes the worker has started, bounded to the last {@link #CAPACITY} of them plus
+   * lifetime totals: under light load every request is its own cohort, so an unbounded list would
+   * grow for the process's life and a per-cohort copy would cost more with every cohort. Written on
+   * the worker, read from any thread under the monitor.
+   */
+  static final class CohortSizeWindow {
+    /** Most recent cohort sizes kept; older ones survive only in the lifetime counts. */
+    static final int CAPACITY = 1024;
+
+    private final int[] sizes = new int[CAPACITY];
+    private int nextSlot;
+    private long cohorts;
+    private long rows;
+
+    /** Records one started cohort; worker only. */
+    void record(int size) {
+      synchronized (this) {
+        sizes[nextSlot] = size;
+        nextSlot = (nextSlot + 1) % CAPACITY;
+        cohorts++;
+        rows += size;
+      }
+    }
+
+    /** The most recent cohort sizes, in start order, at most the last {@link #CAPACITY}. */
+    List<Integer> recent() {
+      synchronized (this) {
+        if (cohorts == 0) {
+          return List.of();
+        }
+        int kept = (int) Math.min(cohorts, CAPACITY);
+        int start = (nextSlot - kept + CAPACITY) % CAPACITY;
+        List<Integer> out = new ArrayList<>(kept);
+        for (int i = 0; i < kept; i++) {
+          out.add(sizes[(start + i) % CAPACITY]);
+        }
+        return out;
+      }
+    }
+
+    /** Total cohorts started, including any beyond the window. */
+    long cohorts() {
+      synchronized (this) {
+        return cohorts;
+      }
+    }
+
+    /** Total rows started across all cohorts (the sum of their sizes). */
+    long rows() {
+      synchronized (this) {
+        return rows;
+      }
+    }
+  }
 
   private static final class SchedulerThread extends Thread {
     private final BatchGenerationScheduler owner;
@@ -227,9 +315,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
   private final CountDownLatch ready = new CountDownLatch(1);
   private final AtomicLong forwardCalls = new AtomicLong();
-  // CopyOnWrite: written once per cohort on the worker and read by callers from any thread;
-  // cohorts are rare, so the write cost is irrelevant.
-  private final CopyOnWriteArrayList<Integer> cohortSizes = new CopyOnWriteArrayList<>();
+  private final CohortSizeWindow cohortSizes = new CohortSizeWindow();
   private volatile Throwable startupFailure;
   private volatile SchedulerFailedException schedulerFailure;
   private volatile DecoderModel.BatchFacts facts;
@@ -265,11 +351,28 @@ public final class BatchGenerationScheduler implements AutoCloseable {
    * Starts a scheduler like {@link #start(BatchSchedulerConfig, ModelFactory)}, whose worker forms
    * no cohort until {@code cohortGate} accepts the number of waiting requests. This pins the batch
    * shape: for example, {@code waiting -> waiting >= 2} holds the first request until the second
-   * arrives, so the two are guaranteed to share one cohort. The gate is consulted every time the
-   * worker wakes, against the total number of queued requests, not the size of one compatibility
-   * group (see {@code CohortKey}); if the requests already waiting cannot cohort together, a
-   * request the gate is holding waits until the scheduler stops.
+   * arrives, so the two are guaranteed to share one cohort.
    *
+   * <p>The gate is consulted every time the worker wakes, against the total number of queued
+   * requests, not the size of one compatibility group (see {@code CohortKey}); requests already
+   * waiting that cannot cohort together are released when {@code maxBatchWait} elapses, so a
+   * request the gate is holding never waits longer than that (and a {@link BatchRequestHandle
+   * #cancel()} wakes the worker at once, so a cancelled waiting request completes without waiting
+   * for the next request or {@link #close()}).
+   *
+   * <p>The predicate runs on the worker while it holds the admission lock, the same lock {@link
+   * #submit} takes: it must be fast and side-effect free, and a slow one blocks {@code submit}
+   * while it runs. A predicate that throws is treated as {@code true} (release now) and logged; it
+   * never fails the scheduler or strands the queue.
+   *
+   * @param cohortGate consulted with the number of waiting requests; {@code true} releases the
+   *     queue as a cohort
+   * @param maxBatchWait how long the worker may hold a queue the gate rejects, measured from when
+   *     it first holds one (the clock is not restarted by wakes); after it elapses the waiting
+   *     requests form a cohort anyway. For {@code waiting -> waiting >= n} pick a fraction of the
+   *     latency the batch is meant to save
+   * @throws IllegalArgumentException if {@code maxBatchWait} is zero, negative, or does not fit a
+   *     nanoseconds count
    * @throws SchedulerAlreadyRunningException if another scheduler's worker has not exited
    * @throws SchedulerStartException if the factory throws a checked exception or returns something
    *     that is not a usable {@code DecoderModel}; unchecked factory failures propagate unchanged
@@ -277,9 +380,20 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   public static BatchGenerationScheduler start(
       BatchSchedulerConfig config,
       ModelFactory factory,
-      java.util.function.IntPredicate cohortGate) {
+      IntPredicate cohortGate,
+      Duration maxBatchWait) {
     Objects.requireNonNull(cohortGate, "cohortGate");
-    return start(config, factory, Hooks.NONE.withCohortGate(cohortGate));
+    Objects.requireNonNull(maxBatchWait, "maxBatchWait");
+    if (maxBatchWait.isNegative() || maxBatchWait.isZero()) {
+      throw new IllegalArgumentException("maxBatchWait must be positive: " + maxBatchWait);
+    }
+    try {
+      maxBatchWait.toNanos();
+    } catch (ArithmeticException e) {
+      throw new IllegalArgumentException(
+          "maxBatchWait does not fit a nanoseconds count: " + maxBatchWait, e);
+    }
+    return start(config, factory, Hooks.NONE.withCohortGate(cohortGate, maxBatchWait));
   }
 
   static BatchGenerationScheduler start(
@@ -343,7 +457,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
       throw new BatchAdmissionRejectedException(
           "admission permits exhausted (" + config.admissionPermits() + " in flight)");
     }
-    BatchRequestHandle handle = new BatchRequestHandle();
+    BatchRequestHandle handle = new BatchRequestHandle(this::wakeWorker);
     lock.lock();
     try {
       requireAcceptingState();
@@ -384,12 +498,27 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   }
 
   /**
-   * The size in rows of every cohort the worker has started, in start order. A cohort reports the
-   * size it started with even if rows finish earlier, and a request cancelled or rejected before
-   * its cohort starts is not counted.
+   * The size in rows of the most recent cohorts the worker has started, in start order, at most the
+   * last {@value CohortSizeWindow#CAPACITY}. A cohort reports the size it started with even if rows
+   * finish earlier, and a request cancelled or rejected before its cohort starts is not counted.
+   * The window is bounded so a long-lived scheduler does not grow per cohort; for lifetime totals
+   * use {@link #cohortCount()} and {@link #rowsBatched()}.
    */
   public List<Integer> cohortSizes() {
-    return List.copyOf(cohortSizes);
+    return cohortSizes.recent();
+  }
+
+  /**
+   * The total number of cohorts the worker has started, including any beyond {@link
+   * #cohortSizes()}.
+   */
+  public long cohortCount() {
+    return cohortSizes.cohorts();
+  }
+
+  /** The total rows started across all cohorts (the sum of their sizes). */
+  public long rowsBatched() {
+    return cohortSizes.rows();
   }
 
   private void requireAcceptingState() {
@@ -467,6 +596,20 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     lock.lock();
     try {
       state.compareAndSet(State.RUNNING, State.CLOSING);
+      notEmpty.signalAll();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Wakes the worker so it re-polls the waiting queue. Cancellation installs this as the handle's
+   * waker: without it, a cancelled request held by the cohort gate would sit pending (and holding
+   * its admission permit) until the next submit, the gate wait, or {@link #close()}.
+   */
+  private void wakeWorker() {
+    lock.lock();
+    try {
       notEmpty.signalAll();
     } finally {
       lock.unlock();
@@ -573,6 +716,10 @@ public final class BatchGenerationScheduler implements AutoCloseable {
 
   /** Blocks for the next cohort, or returns null once admission stopped and the queue is empty. */
   private List<Req> nextCohort() {
+    // The wall-clock deadline of the current gate wait, or -1 while the worker is not gate-blocked.
+    // It is set once per hold and not restarted by wakes, so a queue trickling requests below the
+    // gate's threshold cannot hold a cohort past maxBatchWait.
+    long gateDeadline = -1;
     while (true) {
       drainWaiting();
       lock.lock();
@@ -581,18 +728,89 @@ public final class BatchGenerationScheduler implements AutoCloseable {
           if (state.get() != State.RUNNING) {
             return null;
           }
+          gateDeadline = -1;
           notEmpty.awaitUninterruptibly();
           continue;
         }
-        if (hooks.cohortGate() != null
-            && state.get() == State.RUNNING
-            && !hooks.cohortGate().test(waiting.size())) {
-          notEmpty.awaitUninterruptibly();
+        IntPredicate gate = hooks.cohortGate();
+        if (gate != null && state.get() == State.RUNNING && !gateAdmits(gate, waiting.size())) {
+          if (anyWaitingCancelled()) {
+            // A cancel landed after drainWaiting() ran (it runs before the lock), so its signal
+            // would be lost if we parked. Loop back and drain it now instead of holding the queue
+            // until the gate wait expires. close()/failWorker() need no equivalent: their state
+            // change is read in this same lock section.
+            continue;
+          }
+          if (gateDeadline < 0) {
+            gateDeadline = System.nanoTime() + hooks.cohortGateMaxWait().toNanos();
+          }
+          long remaining = gateDeadline - System.nanoTime();
+          if (remaining <= 0) {
+            // The wait expired: release what is waiting rather than strand it until close().
+            return formCohort();
+          }
+          boolean interrupted = awaitGate(gateDeadline);
+          restoreInterrupt(interrupted);
           continue;
         }
+        gateDeadline = -1;
         return formCohort();
       } finally {
         lock.unlock();
+      }
+    }
+  }
+
+  /**
+   * Called with the lock held: whether any waiting request would be drained by the next {@link
+   * #drainWaiting()}. Checked under the lock right before the gate wait parks, so no cancellation
+   * loses its wake-up: a flag set before the check is seen here, and one set after it cannot miss
+   * the park, because this check and the park run in one lock section while the waker takes that
+   * same lock to signal.
+   */
+  private boolean anyWaitingCancelled() {
+    for (Req r : waiting) {
+      if (poll(r) != Poll.LIVE) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Asks the cohort gate whether to release the queue now. A gate that throws is treated as {@code
+   * true} (release now) and logged: user code must not be able to fail the worker or strand the
+   * queue it runs on.
+   */
+  private boolean gateAdmits(IntPredicate gate, int waitingRequests) {
+    try {
+      return gate.test(waitingRequests);
+    } catch (RuntimeException e) {
+      LOGGER.log(
+          System.Logger.Level.WARNING, "the cohort gate threw; releasing the waiting requests", e);
+      return true;
+    }
+  }
+
+  /**
+   * Waits on the gate condition until its deadline or a wake, uninterruptibly: the worker keeps
+   * waiting through an interrupt and reports it for restoration.
+   */
+  private boolean awaitGate(long deadline) {
+    boolean interrupted = false;
+    while (true) {
+      long remaining = deadline - System.nanoTime();
+      if (remaining <= 0) {
+        return interrupted;
+      }
+      try {
+        notEmpty.awaitNanos(remaining);
+        return interrupted;
+      } catch (InterruptedException e) {
+        interrupted = true;
+        // Clear the flag so the next awaitNanos parks instead of rethrowing immediately; the
+        // caller restores it once the gate wait ends.
+        Thread.interrupted();
       }
     }
   }
@@ -693,9 +911,13 @@ public final class BatchGenerationScheduler implements AutoCloseable {
 
   private void runCohort(List<Req> cohort) {
     activeRows = cohort;
-    cohortSizes.add(cohort.size());
+    cohortSizes.record(cohort.size());
     List<Req> live = new ArrayList<>();
     RuntimeException setupFailure = null;
+    // Set once the samplers exist and the decode loop starts: a failure after that point (for
+    // example one escaping decodeLoop) is attributed to stage "cohort", not "cohort setup", even
+    // though both fail the cohort the same way.
+    boolean setupDone = false;
     MLXScope cohortScope = null;
     try {
       for (Req r : cohort) {
@@ -738,6 +960,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
                     decoder.stepBoundaryEvaluator(),
                     SamplingPipeline.needsRankIndices(r.policy) ? rank : null);
           }
+          setupDone = true;
           decodeLoop(cohortScope, live, caches);
         } finally {
           for (Req r : cohort) {
@@ -746,10 +969,10 @@ public final class BatchGenerationScheduler implements AutoCloseable {
         }
       }
     } catch (RuntimeException e) {
-      // Cohort setup failed (an output decoder, the cohort scope, the caches, the rank indices,
-      // or a sampler): a cohort-level failure, not a worker failure -- the cohort's rows get it
-      // and the worker keeps serving later cohorts. Only an Error escapes to failWorker.
-      // (decodeLoop handles its own step and compaction failures with their own stages.)
+      // A cohort-level failure, not a worker failure -- the cohort's rows get it and the worker
+      // keeps serving later cohorts. Only an Error escapes to failWorker. (decodeLoop handles its
+      // own step and compaction failures with their own stages; a RuntimeException that still
+      // escapes it happens mid-decode, after setup finished.)
       setupFailure = e;
     } finally {
       if (cohortScope != null) {
@@ -759,8 +982,9 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     if (setupFailure != null) {
       // abort() and finishRow() skip completed rows, so the whole cohort can be passed: a row
       // that never got set up is failed like one that was, and rows the first loop already
-      // finished with CANCELLED/MAX_TOKENS keep their outcomes.
-      failCohort(cohort, "cohort setup", setupFailure);
+      // finished with CANCELLED/MAX_TOKENS keep their outcomes. The stage names when the failure
+      // happened: before the decode loop started, or somewhere inside it.
+      failCohort(cohort, setupDone ? "cohort" : "cohort setup", setupFailure);
     }
     // activeRows is cleared only on a normal return: if an Error escaped, failWorker still has to
     // see this cohort so it can complete every one of its stages.
@@ -801,6 +1025,11 @@ public final class BatchGenerationScheduler implements AutoCloseable {
       live.clear();
       live.addAll(survivors);
       drainWaiting();
+      // Outside runStep's own catch, so a fault injected here escapes the loop and is attributed
+      // to stage "cohort" (setup had finished), not "cohort setup".
+      if (hooks.decodeFault() != null) {
+        hooks.decodeFault().run();
+      }
       step++;
     }
   }

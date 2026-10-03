@@ -7,6 +7,7 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.CodeSource;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -89,13 +90,15 @@ public final class ReleaseSmoke {
     BatchGenerationResult run;
     // maxBatch 2, and the cohort gate holds the worker until both requests are waiting, so the run
     // below is provably one B=2 cohort rather than two B=1 cohorts that happened to overlap; the
-    // cohortSizes assertion after the join re-proves it from the scheduler itself. close() stops
-    // admission and the worker closes the model and its scope.
+    // cohortSizes assertion after the join re-proves it from the scheduler itself. The gate wait
+    // is long (far longer than the gap between the two submits) so it only bounds the hold, it
+    // never releases it. close() stops admission and the worker closes the model and its scope.
     try (BatchGenerationScheduler scheduler =
         BatchGenerationScheduler.start(
             new BatchSchedulerConfig(2, 4, 4096, 64),
             scope -> TextGenerationModels.load(scope, modelDir),
-            waiting -> waiting >= 2)) {
+            waiting -> waiting >= 2,
+            Duration.ofSeconds(30))) {
       BatchRequestHandle a =
           scheduler.submit(
               first,

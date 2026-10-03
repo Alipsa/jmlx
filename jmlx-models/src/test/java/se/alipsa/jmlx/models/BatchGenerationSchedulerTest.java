@@ -13,11 +13,13 @@ import static se.alipsa.jmlx.models.SchedulerFixtures.sampled;
 import static se.alipsa.jmlx.models.SchedulerFixtures.start;
 import static se.alipsa.jmlx.models.SchedulerFixtures.tokens;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -110,13 +112,109 @@ class BatchGenerationSchedulerTest {
         BatchGenerationScheduler.start(
             config(2, 4),
             root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
-            waiting -> waiting >= 2)) {
+            waiting -> waiting >= 2,
+            Duration.ofSeconds(30))) {
       BatchRequestHandle a = scheduler.submit(greedy(PROMPTS[0], 4), e -> {});
       BatchRequestHandle b = scheduler.submit(greedy(PROMPTS[1], 4), e -> {});
       assertEquals(4, await(a).generatedTokenIds().size());
       assertEquals(4, await(b).generatedTokenIds().size());
       assertEquals(
           List.of(2), scheduler.cohortSizes(), "the gated requests share one cohort of two");
+    }
+  }
+
+  @Test
+  void cancellingARequestHeldByTheGateCompletesItWithoutAnotherRequest() throws Exception {
+    // The gate holds single requests for far longer than the await timeout, so the only thing
+    // that can complete the first request is its cancellation waking the worker: before the fix
+    // the stage stayed pending (and held its permit) until the next submit or close(). The gate
+    // then opens, proving the worker kept serving.
+    AtomicBoolean hold = new AtomicBoolean(true);
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            // While holding, admit only cohorts of two; once released, admit whatever waits.
+            waiting -> !hold.get() || waiting >= 2,
+            Duration.ofMinutes(10))) {
+      BatchRequestHandle a = scheduler.submit(greedy(PROMPTS[0], 4), e -> {});
+      a.cancel();
+      GenerationResult result = await(a);
+      assertEquals(FinishReason.CANCELLED, result.finishReason());
+      hold.set(false);
+      // The worker kept serving afterwards.
+      assertEquals(
+          4, await(scheduler.submit(greedy(PROMPTS[1], 4), e -> {})).generatedTokenIds().size());
+    }
+  }
+
+  @Test
+  void aCancellationTokenCancellationIsNoticedWithinTheGateWait() throws Exception {
+    // No handle.cancel() and no second request: the worker may only learn of the token
+    // cancellation when the gate wait wakes it, so completion within the wait proves it is
+    // noticed there.
+    AtomicBoolean token = new AtomicBoolean();
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            waiting -> waiting >= 2,
+            Duration.ofMillis(500))) {
+      BatchRequestHandle a =
+          scheduler.submit(
+              new GenerationRequest(
+                  PROMPTS[0], GenerationConfig.greedyDefaults(4, Set.of()), token::get),
+              e -> {});
+      token.set(true);
+      GenerationResult result = await(a);
+      assertEquals(FinishReason.CANCELLED, result.finishReason());
+    }
+  }
+
+  @Test
+  void aGateRejectedQueueIsReleasedWhenTheWaitExpires() throws Exception {
+    // waiting >= 2 never passes for a single request; the wait must release it instead of holding
+    // it until close().
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            waiting -> waiting >= 2,
+            Duration.ofMillis(500))) {
+      long began = System.nanoTime();
+      GenerationResult result = await(scheduler.submit(greedy(PROMPTS[0], 4), e -> {}));
+      long heldMillis = (System.nanoTime() - began) / 1_000_000;
+      assertEquals(4, result.generatedTokenIds().size());
+      assertTrue(
+          heldMillis >= 400,
+          "the request must be held until the wait expires: " + heldMillis + " ms");
+      assertEquals(List.of(1), scheduler.cohortSizes(), "it ran alone once the wait expired");
+    }
+  }
+
+  @Test
+  void aGateThatThrowsReleasesTheCohortInsteadOfFailingTheScheduler() throws Exception {
+    // A throwing predicate must not fail the worker or strand the queue: it is treated as
+    // "release now".
+    AtomicBoolean threw = new AtomicBoolean();
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            waiting -> {
+              if (threw.compareAndSet(false, true)) {
+                throw new IllegalStateException("gate boom");
+              }
+              return true;
+            },
+            Duration.ofSeconds(30))) {
+      BatchRequestHandle a = scheduler.submit(greedy(PROMPTS[0], 4), e -> {});
+      assertEquals(4, await(a).generatedTokenIds().size());
+      assertTrue(threw.get(), "the gate actually threw");
+      assertEquals(BatchGenerationScheduler.State.RUNNING, scheduler.state());
+      assertEquals(1, scheduler.cohortCount());
+      assertEquals(
+          4, await(scheduler.submit(greedy(PROMPTS[1], 4), e -> {})).generatedTokenIds().size());
     }
   }
 

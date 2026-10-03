@@ -231,10 +231,10 @@ class BatchSchedulerLifecycleTest {
     assertTrue(inFactory.await(60, TimeUnit.SECONDS));
     starter.interrupt();
     // start() cannot have returned yet: the ready latch is only released once the factory
-    // returns, and the factory is still blocked below. Deterministic, so no sleep and no
-    // thread-liveness check are needed; the "uninterruptible" part of the contract is proven
-    // by the flag being restored and the scheduler being usable after the join below.
-    assertNull(started.get(), "start() must keep waiting through the interrupt");
+    // returns, and the factory is still blocked below, so this is a sanity check that can never
+    // fail -- the "uninterruptible" part of the contract is proven by the flag being restored
+    // and the scheduler being usable after the join below.
+    assertNull(started.get(), "sanity check only: start() must keep waiting through the interrupt");
     finishFactory.countDown();
     starter.join(TimeUnit.SECONDS.toMillis(60));
     assertEquals(null, thrown.get());

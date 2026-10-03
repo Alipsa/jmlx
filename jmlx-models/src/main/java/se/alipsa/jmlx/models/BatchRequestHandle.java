@@ -24,8 +24,13 @@ public final class BatchRequestHandle {
   private final CompletableFuture<GenerationResult> future = new CompletableFuture<>();
   private final CompletionStage<GenerationResult> stage = future.minimalCompletionStage();
   private final AtomicBoolean cancelRequested = new AtomicBoolean();
+  // The owning scheduler's wake; the flag alone would not reach a worker blocked on the cohort
+  // gate, which nothing else signals.
+  private final Runnable cancelWaker;
 
-  BatchRequestHandle() {}
+  BatchRequestHandle(Runnable cancelWaker) {
+    this.cancelWaker = cancelWaker;
+  }
 
   /**
    * The request's completion. Cancelling this stage is not a request cancellation; use {@link
@@ -38,10 +43,14 @@ public final class BatchRequestHandle {
   /**
    * Requests cancellation. Safe from any thread and idempotent. The worker observes it before
    * prefill and between decode steps, never in the middle of a native call, so the request still
-   * completes normally with {@link FinishReason#CANCELLED} and its partial result.
+   * completes normally with {@link FinishReason#CANCELLED} and its partial result. Cancellation
+   * also wakes a worker that is waiting, so a request that is still queued (for example held by the
+   * cohort gate) completes at once, not when the next request arrives or the scheduler closes.
    */
   public void cancel() {
-    cancelRequested.set(true);
+    if (cancelRequested.compareAndSet(false, true)) {
+      cancelWaker.run();
+    }
   }
 
   /** Whether {@link #cancel()} has been called. */

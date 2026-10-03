@@ -123,8 +123,14 @@ exception (the `Cleaner` backstops).
 
 Each scheduler worker carries its own scheduler stream (about 60 KB) for the process's life --
 mlx-c cannot free streams -- so close-then-restart accumulates one stream per worker thread.
-Keep one scheduler running rather than churning them; that is also what the per-thread stream
-cost makes the long-lived worker the recommended shape for any direct-`generate` server.
+Keep one scheduler running rather than churning them: the per-thread stream cost also makes the
+long-lived worker the recommended shape for any direct-`generate` server.
+
+When you need a guaranteed batch shape, start with a cohort gate: `start(config, factory,
+waiting -> waiting >= 2, Duration.ofSeconds(30))` holds the worker until two requests are queued
+or 30 s elapse, whichever first, so both share one cohort. The gate runs on the worker under the
+admission lock: keep it fast and side-effect free. See the `BatchGenerationScheduler` Javadoc for
+the full contract.
 
 ## Models, downloads, and caching
 

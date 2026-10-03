@@ -15,6 +15,12 @@ mode="${1:-ci}"
 shift || true
 record=false
 [ "${1:-}" = "--record" ] && record=true
+# Rejected before any work: the ci/candidate block deletes the smoke repo and publishes all six
+# modules, so a later check would not undo that.
+if [ "$record" = true ] && [ "$mode" != "ci" ]; then
+  echo "error: --record is ci only: it would overwrite the committed golden with whatever '$mode' serves" >&2
+  exit 2
+fi
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 smoke="$root/tools/release-smoke"
@@ -55,10 +61,6 @@ case "$mode" in
     exit 2
     ;;
 esac
-if [ "$record" = true ] && [ "$mode" != "ci" ]; then
-  echo "error: --record is ci only: it would overwrite the committed golden with whatever '$mode' serves" >&2
-  exit 2
-fi
 $record && args+=("-PsmokeRecord=true")
 
 home="$(mktemp -d)"

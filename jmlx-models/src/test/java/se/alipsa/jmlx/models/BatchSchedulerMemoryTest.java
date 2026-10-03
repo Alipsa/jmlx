@@ -10,6 +10,7 @@ import static se.alipsa.jmlx.models.SchedulerFixtures.start;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLXMemory;
@@ -22,41 +23,45 @@ class BatchSchedulerMemoryTest {
   private static final long SLACK = 8L * 1024 * 1024;
 
   /**
-   * Runs one gated cohort of all three prompts and appends {@code MLXMemory.activeBytes()} read
-   * from the worker (the only thread allowed to read it while the scheduler runs) on every token of
-   * the first row.
+   * Runs one cohort of all three prompts, then one single-row probe whose first token (sampled on
+   * the worker, the only thread allowed to read {@code MLXMemory} while the scheduler runs) is the
+   * fixed measurement point: the cohort's scope, caches, and activations are closed, and only the
+   * probe's own single-row state is alive at every sample.
    */
-  private static void cohort(BatchGenerationScheduler scheduler, int newTokens, List<Long> samples)
-      throws Exception {
-    List<BatchRequestHandle> handles = new ArrayList<>();
-    for (int i = 0; i < PROMPTS.length; i++) {
-      boolean sampler = i == 0;
-      handles.add(
-          scheduler.submit(
-              greedy(PROMPTS[i], newTokens),
-              e -> {
-                if (sampler && e.tokenId() != null) {
-                  samples.add(MLXMemory.activeBytes());
-                }
-              }));
+  private static void cohortAndProbe(
+      BatchGenerationScheduler scheduler, int newTokens, List<Long> samples) throws Exception {
+    List<BatchRequestHandle> cohort = new ArrayList<>();
+    for (int[] prompt : PROMPTS) {
+      cohort.add(scheduler.submit(greedy(prompt, newTokens), e -> {}));
     }
-    for (BatchRequestHandle handle : handles) {
+    for (BatchRequestHandle handle : cohort) {
       await(handle);
     }
+    AtomicBoolean sampled = new AtomicBoolean();
+    BatchRequestHandle probe =
+        scheduler.submit(
+            greedy(PROMPTS[0], newTokens),
+            e -> {
+              if (e.tokenId() != null && sampled.compareAndSet(false, true)) {
+                samples.add(MLXMemory.activeBytes());
+              }
+            });
+    await(probe);
   }
 
   @Test
   void repeatedCohortsDoNotGrowActiveMemory() throws Exception {
-    // The gate is one-shot; later cohorts run ungated. Every cohort has the same shape, so the
-    // last sample of the first and of the last cohort are at the same point in the lifecycle.
+    // The gate is persistent (every cohort needs three rows) with the fixture's short wait, so
+    // every cohort is exactly three rows whatever the worker's wake-up timing (a one-shot gate
+    // would leave the later cohorts to run as 1+2 or 1+1+1, so row 0's last sample would include
+    // a different amount of live KV cache in each cohort), and the one-row probe after each
+    // cohort is released by the wait instead of being held until close().
     List<Long> samples = new ArrayList<>();
     try (BatchGenerationScheduler scheduler = start("llama", config(4, 8), gated(3))) {
-      cohort(scheduler, 6, samples);
-      long afterFirst = samples.getLast();
-      for (int i = 0; i < 12; i++) {
-        cohort(scheduler, 6, samples);
+      for (int i = 0; i < 13; i++) {
+        cohortAndProbe(scheduler, 6, samples);
       }
-      long growth = samples.getLast() - afterFirst;
+      long growth = samples.getLast() - samples.getFirst();
       assertTrue(
           growth <= SLACK,
           "12 further cohorts retained " + growth + " native bytes after their scopes closed");

@@ -154,6 +154,38 @@ class BatchSchedulerFailureTest {
   }
 
   @Test
+  void aFailureEscapingTheDecodeLoopIsLabelledCohortNotSetup() throws Exception {
+    // The fault fires between steps, after setup finished: it must be attributed to stage
+    // "cohort", not "cohort setup", even though it fails the cohort the same way.
+    AtomicInteger faults = new AtomicInteger();
+    try (BatchGenerationScheduler scheduler =
+        start(
+            "llama",
+            config(4, 4),
+            gated(2)
+                .withDecodeFault(
+                    () -> {
+                      if (faults.incrementAndGet() == 2) { // the second decode step
+                        throw new IllegalStateException("injected decode loop failure");
+                      }
+                    }))) {
+      BatchRequestHandle a = scheduler.submit(greedy(PROMPTS[0], 6), e -> {});
+      BatchRequestHandle b = scheduler.submit(greedy(PROMPTS[1], 6), e -> {});
+      for (BatchRequestHandle handle : List.of(a, b)) {
+        GenerationAbortedException aborted =
+            assertInstanceOf(GenerationAbortedException.class, failureOf(handle));
+        assertEquals("cohort", aborted.stage());
+        assertEquals("injected decode loop failure", aborted.getCause().getMessage());
+        assertEquals(2, aborted.generatedTokenIds().size(), "failed after the second token");
+      }
+      assertEquals(BatchGenerationScheduler.State.RUNNING, scheduler.state());
+      // The model is still valid: a later cohort starts with fresh caches and succeeds.
+      assertEquals(
+          4, await(scheduler.submit(greedy(PROMPTS[0], 4), e -> {})).generatedTokenIds().size());
+    }
+  }
+
+  @Test
   void jointEvaluationFailureIsAttributedToTheSharedCohort() throws Exception {
     AtomicInteger evaluations = new AtomicInteger();
     AtomicReference<DecoderModel> model = new AtomicReference<>();
@@ -278,7 +310,8 @@ class BatchSchedulerFailureTest {
   @Test
   void distinctRejectionTypesRaceCorrectly() throws Exception {
     BatchSchedulerConfig tiny = new BatchSchedulerConfig(1, 1, 4096, 256);
-    BatchGenerationScheduler scheduler = start("llama", tiny, gated(1000)); // worker never starts
+    // The gate (waiting >= 1000) holds the queue; close() in the finally reaches the worker first.
+    BatchGenerationScheduler scheduler = start("llama", tiny, gated(1000));
     try {
       scheduler.submit(greedy(PROMPTS[1], 2), e -> {});
       assertThrows(

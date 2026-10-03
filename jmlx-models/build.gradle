@@ -49,6 +49,8 @@ tasks.register('tierBTest', Test) {
     testClassesDirs = sourceSets.tierB.output.classesDirs
     classpath = sourceSets.tierB.runtimeClasspath
     useJUnitPlatform()
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
     systemProperty 'jmlx.tier.b.model.dir', System.getenv('JMLX_TIER_B_MODEL_DIR') ?: ''
     systemProperty 'jmlx.tier.b.expected.model.type', System.getenv('JMLX_TIER_B_MODEL_TYPE') ?: ''
     def tierBManifest = System.getenv('JMLX_TIER_B_MANIFEST')

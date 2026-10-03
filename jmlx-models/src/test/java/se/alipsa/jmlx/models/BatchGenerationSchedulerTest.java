@@ -19,6 +19,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -149,30 +151,82 @@ class BatchGenerationSchedulerTest {
   }
 
   @Test
-  void aCancellationTokenCancellationIsNoticedWithinTheGateWait() throws Exception {
-    // No handle.cancel() and no second request: the worker may only learn of the token
-    // cancellation when the gate wait wakes it, so completion within the wait proves it is
-    // noticed there.
+  void tokenCancellationIsDrainedAfterTheGateWait() throws Exception {
+    // Tokens have no waker. Set cancellation after the gate is reached, then verify the
+    // deadline wakes drainWaiting() and removes the request before it forms a cohort.
+    CountDownLatch gated = new CountDownLatch(1);
     AtomicBoolean token = new AtomicBoolean();
     try (BatchGenerationScheduler scheduler =
         BatchGenerationScheduler.start(
             config(2, 4),
             root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
-            waiting -> waiting >= 2,
+            waiting -> {
+              gated.countDown();
+              return waiting >= 2;
+            },
             Duration.ofMillis(500))) {
       BatchRequestHandle a =
           scheduler.submit(
               new GenerationRequest(
                   PROMPTS[0], GenerationConfig.greedyDefaults(4, Set.of()), token::get),
               e -> {});
+      assertTrue(gated.await(5, TimeUnit.SECONDS));
       token.set(true);
       GenerationResult result = await(a);
       assertEquals(FinishReason.CANCELLED, result.finishReason());
+      assertEquals(
+          0, scheduler.cohortCount(), "cancelled request is drained before cohort formation");
     }
   }
 
   @Test
-  void tokenThatThrowsOnceDuringTheGateCheckAbortsTheRequest() throws Exception {
+  void tokenPollingAfterTheGateDoesNotBlockAdmission() throws Exception {
+    AtomicBoolean inGate = new AtomicBoolean();
+    CountDownLatch polling = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            waiting -> {
+              inGate.set(true);
+              return false;
+            },
+            Duration.ofMillis(500))) {
+      BatchRequestHandle first =
+          scheduler.submit(
+              new GenerationRequest(
+                  PROMPTS[0],
+                  GenerationConfig.greedyDefaults(4, Set.of()),
+                  () -> {
+                    if (inGate.get()) {
+                      polling.countDown();
+                      try {
+                        release.await();
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(e);
+                      }
+                      return true;
+                    }
+                    return false;
+                  }),
+              e -> {});
+      try {
+        assertTrue(polling.await(5, TimeUnit.SECONDS));
+        var admission =
+            java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> scheduler.submit(greedy(PROMPTS[1], 4), e -> {}));
+        admission.get(5, TimeUnit.SECONDS).cancel();
+      } finally {
+        release.countDown();
+      }
+      assertEquals(FinishReason.CANCELLED, await(first).finishReason());
+    }
+  }
+
+  @Test
+  void tokenThatThrowsOnceAfterTheGateWaitAbortsTheRequest() throws Exception {
     AtomicBoolean inGate = new AtomicBoolean();
     AtomicBoolean threw = new AtomicBoolean();
     IllegalStateException cause = new IllegalStateException("token boom");

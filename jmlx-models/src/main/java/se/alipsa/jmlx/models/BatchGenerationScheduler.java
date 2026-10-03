@@ -734,7 +734,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
         }
         IntPredicate gate = hooks.cohortGate();
         if (gate != null && state.get() == State.RUNNING && !gateAdmits(gate, waiting.size())) {
-          if (anyWaitingCancelled()) {
+          if (anyWaitingHandleCancelled()) {
             // A cancel landed after drainWaiting() ran (it runs before the lock), so its signal
             // would be lost if we parked. Loop back and drain it now instead of holding the queue
             // until the gate wait expires. close()/failWorker() need no equivalent: their state
@@ -762,15 +762,15 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   }
 
   /**
-   * Called with the lock held: whether any waiting request would be drained by the next {@link
-   * #drainWaiting()}. Checked under the lock right before the gate wait parks, so no cancellation
-   * loses its wake-up: a flag set before the check is seen here, and one set after it cannot miss
-   * the park, because this check and the park run in one lock section while the waker takes that
-   * same lock to signal.
+   * Called with the lock held: whether any waiting handle has requested cancellation. Caller
+   * cancellation tokens are polled outside the lock by {@link #drainWaiting()}. Checked under the
+   * lock right before the gate wait parks, so no cancellation loses its wake-up: a flag set before
+   * the check is seen here, and one set after it cannot miss the park, because this check and the
+   * park run in one lock section while the waker takes that same lock to signal.
    */
-  private boolean anyWaitingCancelled() {
+  private boolean anyWaitingHandleCancelled() {
     for (Req r : waiting) {
-      if (poll(r) != Poll.LIVE) {
+      if (r.handle.isCancellationRequested()) {
         return true;
       }
     }

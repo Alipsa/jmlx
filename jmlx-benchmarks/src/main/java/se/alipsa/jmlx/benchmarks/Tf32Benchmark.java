@@ -22,8 +22,8 @@ public final class Tf32Benchmark {
   private Tf32Benchmark() {}
 
   /**
-   * Runs {@code checkpoint output-directory [prompt-length decode-steps samples warmups forks
-   * batch]}.
+   * Runs {@code checkpoint output-directory [prompt-length decode-steps samples warmups forks batch
+   * matmul-size]}.
    *
    * @param args checkpoint, report directory and optional workload dimensions
    * @throws Exception if a worker, native runtime or report operation fails
@@ -274,8 +274,12 @@ public final class Tf32Benchmark {
           throw new IllegalArgumentException("dimensions must be positive; warmups may be zero");
         }
       }
-      Math.multiplyExact(dimensions[0], dimensions[5]);
-      Math.multiplyExact(dimensions[6], dimensions[6]);
+      try {
+        Math.multiplyExact(dimensions[0], dimensions[5]);
+        Math.multiplyExact(dimensions[6], dimensions[6]);
+      } catch (ArithmeticException e) {
+        throw new IllegalArgumentException("workload array dimensions exceed the integer limit", e);
+      }
       return new Options(
           Path.of(args[0]).toAbsolutePath().normalize(),
           Path.of(args[1]).toAbsolutePath().normalize(),

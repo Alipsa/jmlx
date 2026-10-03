@@ -83,6 +83,7 @@ jobs:
           ./gradlew \
             :jmlx-jinja:check \
             :jmlx-tokenizer:check \
+            :jmlx-benchmarks:check \
             :jmlx-core:test \
             :jmlx-models:check \
             verifyTokenizerOracle \

@@ -35,6 +35,16 @@ class Tf32BenchmarkTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> Tf32Benchmark.Options.parse(new String[] {"model", "out", "1", "1", "1", "-1"}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            Tf32Benchmark.Options.parse(
+                new String[] {"model", "out", "2147483647", "1", "1", "0", "1", "2"}));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            Tf32Benchmark.Options.parse(
+                new String[] {"model", "out", "1", "1", "1", "0", "1", "1", "46341"}));
     assertEquals(
         0,
         Tf32Benchmark.Options.parse(new String[] {"model", "out", "1", "1", "1", "0"}).warmups());

@@ -22,14 +22,15 @@ import se.alipsa.jmlx.nn.KVCache;
  * supported family's committed checkpoint. Covers per-row masks and RoPE positions, Gemma embedding
  * scaling, Phi-3's fused projections, Mixtral's expert routing, and Mistral's sliding window.
  *
- * <p>Tolerance: batching changes the matmul shapes the GPU sees, so logits agree to float
- * accumulation noise, not bit for bit (req/plans/phase6-plan.md rules out cross-batch-shape
- * identity). {@link #TOLERANCE} is that documented bound; token identity is asserted separately
- * where the margin allows it.
+ * <p>Tolerance: MLX's default reduced-precision float32 matmul on M5 changes with batch shape. The
+ * pinned runtime measured at most 1.10e-3 absolute logit error (Gemma decode); disabling TF32
+ * reduced every family's error below 2.39e-7. Use a 2e-3 bound in the default mode and retain 1e-4
+ * with {@code MLX_ENABLE_TF32=0}. See {@code req/phase6-batch-equivalence.md} for the hardware,
+ * measurements and reproduction. Greedy token identity is asserted separately on these fixtures.
  */
 @EnabledIfNativeAvailable
 class BatchStepEquivalenceTest {
-  static final float TOLERANCE = 1e-4f;
+  static final float TOLERANCE = "0".equals(System.getenv("MLX_ENABLE_TF32")) ? 1e-4f : 2e-3f;
   private static final int[][] PROMPTS = {{1, 7, 42, 3, 19, 5}, {1, 9, 4}, {1, 2, 3, 4, 5}};
   private static final int[] NEXT = {95, 12, 77};
 
@@ -71,6 +72,7 @@ class BatchStepEquivalenceTest {
         }
         float[] prefill = stepFlat(model, run, caches, padded, PROMPTS.length, width, valid);
         for (int row = 0; row < PROMPTS.length; row++) {
+          assertEquals(argmax(soloPrefill[row]), argmax(slice(prefill, row, vocab)));
           assertArrayEquals(
               soloPrefill[row],
               slice(prefill, row, vocab),
@@ -81,6 +83,7 @@ class BatchStepEquivalenceTest {
         java.util.Arrays.fill(ones, 1);
         float[] decode = stepFlat(model, run, caches, NEXT, PROMPTS.length, 1, ones);
         for (int row = 0; row < PROMPTS.length; row++) {
+          assertEquals(argmax(soloDecode[row]), argmax(slice(decode, row, vocab)));
           assertArrayEquals(
               soloDecode[row], slice(decode, row, vocab), TOLERANCE, family + " decode row " + row);
         }
@@ -157,6 +160,16 @@ class BatchStepEquivalenceTest {
       model.stepBoundaryEvaluator().evaluate(arrays);
       return logits.toFloatArray();
     }
+  }
+
+  private static int argmax(float[] logits) {
+    int best = 0;
+    for (int i = 1; i < logits.length; i++) {
+      if (logits[i] > logits[best]) {
+        best = i;
+      }
+    }
+    return best;
   }
 
   private static float[] slice(float[] flat, int row, int vocab) {

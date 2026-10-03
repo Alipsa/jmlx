@@ -172,6 +172,44 @@ class BatchGenerationSchedulerTest {
   }
 
   @Test
+  void tokenThatThrowsOnceDuringTheGateCheckAbortsTheRequest() throws Exception {
+    AtomicBoolean inGate = new AtomicBoolean();
+    AtomicBoolean threw = new AtomicBoolean();
+    IllegalStateException cause = new IllegalStateException("token boom");
+    try (BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            config(2, 4),
+            root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama")),
+            waiting -> {
+              inGate.set(true);
+              return false;
+            },
+            Duration.ofMillis(500))) {
+      BatchRequestHandle bad =
+          scheduler.submit(
+              new GenerationRequest(
+                  PROMPTS[0],
+                  GenerationConfig.greedyDefaults(4, Set.of()),
+                  () -> {
+                    if (inGate.get() && threw.compareAndSet(false, true)) {
+                      throw cause;
+                    }
+                    return false;
+                  }),
+              e -> {});
+      GenerationAbortedException aborted =
+          assertInstanceOf(GenerationAbortedException.class, SchedulerFixtures.failureOf(bad));
+      assertEquals(cause, aborted.getCause());
+      assertEquals("cancellation token", aborted.stage());
+      assertTrue(aborted.generatedTokenIds().isEmpty());
+      assertTrue(threw.get());
+      assertEquals(0, scheduler.cohortCount(), "the failed request never runs");
+      assertEquals(
+          4, await(scheduler.submit(greedy(PROMPTS[1], 4), e -> {})).generatedTokenIds().size());
+    }
+  }
+
+  @Test
   void aGateRejectedQueueIsReleasedWhenTheWaitExpires() throws Exception {
     // waiting >= 2 never passes for a single request; the wait must release it instead of holding
     // it until close().

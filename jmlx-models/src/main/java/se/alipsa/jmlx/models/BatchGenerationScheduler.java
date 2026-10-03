@@ -844,6 +844,10 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   }
 
   private Poll poll(Req r) {
+    // A token failure is terminal, even if a later token poll would succeed or cancellation lands.
+    if (r.tokenFailure != null) {
+      return Poll.TOKEN_FAILED;
+    }
     if (state.get() != State.RUNNING || r.handle.isCancellationRequested()) {
       return Poll.CANCELLED;
     }

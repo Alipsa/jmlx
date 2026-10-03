@@ -557,7 +557,7 @@ subprojects {
         // project(':jmlx-jinja'), which Gradle publishes as a concrete coordinate carrying jinja's
         // current version, so this fails the tokenizer release while jinja is still a SNAPSHOT.
         // Consequently, release tokenizer after jinja is released but before jinja is bumped to
-        // its next SNAPSHOT; CLAUDE.md documents that release window.
+        // its next SNAPSHOT; AGENTS.md documents that release window.
         // The own-version check exists because nothing on the Gradle side otherwise catches it:
         // the nexus-release-plugin's ReleaseTask just logs and returns 0 for a SNAPSHOT version,
         // so a bare `./gradlew :module:release` would report BUILD SUCCESSFUL having published

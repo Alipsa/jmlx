@@ -7,7 +7,7 @@ plugins {
 // req/plans/native-artifact-packaging-plan.md. The real upstream pin (mlx-metal wheel version +
 // mlx-c commit) travels inside the jar as native-pin.properties instead of in this version string,
 // so this module's own SemVer stays independent of mlx-c's own independent versioning (already a
-// distinct axis per CLAUDE.md).
+// distinct axis per AGENTS.md).
 version = '0.1.0-SNAPSHOT'
 
 // This module has a small Java metadata API alongside its native payload. Native resources are added
@@ -37,7 +37,7 @@ def generatedResourcesDir = layout.buildDirectory.dir('generated/nativeResources
 def fileSystemOperations = project.services.get(org.gradle.api.file.FileSystemOperations)
 
 // Every other module's native-dependent tests are SKIPPED, not failed, when native/install/lib
-// isn't staged (see @EnabledIfNativeAvailable and CLAUDE.md) so that ./gradlew build succeeds for
+// isn't staged (see @EnabledIfNativeAvailable and AGENTS.md) so that ./gradlew build succeeds for
 // a contributor who hasn't run bootstrap-native.sh and doesn't need native functionality. This
 // module's own build must honor that same repo-wide invariant: gate staging on the same signal
 // NativeLoader itself checks first (mlx.metallib's presence), so a totally unstaged checkout

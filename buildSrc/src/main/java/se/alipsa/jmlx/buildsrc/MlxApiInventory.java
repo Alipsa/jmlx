@@ -36,7 +36,7 @@ public final class MlxApiInventory {
   private static final Pattern CONSTANT =
       Pattern.compile("(?m)^    public static [A-Za-z]+ (MLX_[A-Z0-9_]+)\\(\\)");
 
-  // CLAUDE.md documents that an unfiltered jextract run silently drops exactly these four
+  // AGENTS.md documents that an unfiltered jextract run silently drops exactly these four
   // mlx_array constructor/destructor symbols with no warning. The variadic classes also have a
   // different generated shape from ordinary holders. Check all six by name so either shape change
   // cannot silently remove them from the inventory.

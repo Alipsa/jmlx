@@ -13,12 +13,13 @@ the [compatibility matrix](../req/phase6-compatibility.md).
 
 MLX-community affine-quantized checkpoints (`quantization: {group_size, bits}` in `config.json`,
 tensors stored as `.weight`/`.scales`/`.biases`) load for Llama, Qwen2, Mistral, Gemma v1 and Phi-3.
-The projections and the embedding table stay packed and run through the fused quantized matmul; a
-quantized embedding table also serves as the tied output head. Norm weights and projection biases
-stay float. Layers without `.scales` remain float, including layers whose input width is not
-compatible with the group size. Packing parameters are checked against the model's configured
-input dimensions, packed weight columns and scales columns at load time; inconsistent
-`group_size` or `bits` values fail with the offending tensor named.
+The projections stay packed and run through the fused quantized matmul. The input-embedding lookup
+stays packed too, but gathers and dequantizes only the selected rows, never expanding the full
+table; the same table serves as the tied output head through the fused quantized matmul. Norm
+weights and projection biases stay float. Layers without `.scales` remain float, including layers
+whose input width is not compatible with the group size. Packing parameters are checked against the
+model's configured input dimensions, packed weight columns and scales columns at load time;
+inconsistent `group_size` or `bits` values fail with the offending tensor named.
 
 The descriptor validates supported `config.json` capabilities and checkpoint tensor names before
 constructing decoder layers. RoPE supports base, linear, dynamic NTK, Llama 3, and YaRN scaling.

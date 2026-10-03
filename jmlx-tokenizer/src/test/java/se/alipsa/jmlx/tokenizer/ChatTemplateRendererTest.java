@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -97,16 +98,27 @@ class ChatTemplateRendererTest {
     java.util.TimeZone original = java.util.TimeZone.getDefault();
     try {
       String template = "{{ strftime_now('%Y-%m-%d %H') }}";
-      java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("GMT+09:00"));
-      assertEquals(
-          java.time.ZonedDateTime.now()
-              .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH")),
-          ChatTemplateRenderer.render(template, Map.of()));
-      java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("GMT-08:00"));
-      assertEquals(
-          java.time.ZonedDateTime.now()
-              .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH")),
-          ChatTemplateRenderer.render(template, Map.of()));
+      var formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH");
+      for (String zone : java.util.List.of("GMT+09:00", "GMT-08:00")) {
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(zone));
+        // before/after bracket the render's own clock read, and the whole sequence spans far
+        // less than an hour, so at most one hour boundary can fall in it: the render must equal
+        // one of the two reads, exactly as it must in the steady state.
+        String before = java.time.ZonedDateTime.now().format(formatter);
+        String rendered = ChatTemplateRenderer.render(template, Map.of());
+        String after = java.time.ZonedDateTime.now().format(formatter);
+        assertTrue(
+            rendered.equals(before) || rendered.equals(after),
+            "zone "
+                + zone
+                + " rendered '"
+                + rendered
+                + "', expected '"
+                + before
+                + "' or '"
+                + after
+                + "'");
+      }
     } finally {
       java.util.TimeZone.setDefault(original);
     }
@@ -117,18 +129,22 @@ class ChatTemplateRendererTest {
     // Llama 3.x chat templates call strftime_now("%d %b %Y"); the renderer supplies a clock.
     String template = "{{ strftime_now('%Y') }}|{{ messages[0]['content'] }}";
     List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "hi"));
+    // Format-only assertions: reading Year.now() separately from the render (or comparing the two
+    // renders against each other) would desync if a year boundary falls between the reads.
     String rendered =
         ChatTemplateRenderer.render(
             template, java.util.Map.of("messages", messages, "add_generation_prompt", false));
-    assertEquals(java.time.Year.now().toString() + "|hi", rendered);
-    assertEquals(
-        rendered,
+    assertTrue(rendered.matches("\\d{4}\\|hi"), "unexpected rendered year: " + rendered);
+    String renderedFromParsed =
         ChatTemplateRenderer.render(
             ChatTemplateRenderer.parse(template),
             messages,
             false,
             "<s>",
             "</s>",
-            java.util.Map.of()));
+            java.util.Map.of());
+    assertTrue(
+        renderedFromParsed.matches("\\d{4}\\|hi"),
+        "unexpected rendered year: " + renderedFromParsed);
   }
 }

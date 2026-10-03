@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.Year;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -49,11 +48,10 @@ class ChatTemplateRenderOptionsTest {
     String rendered =
         tokenizer.renderChat(
             List.of(Map.of("role", "user", "content", "hi")), ChatTemplateOptions.defaults(true));
-    // Year granularity, as in ChatTemplateRendererTest: only a year boundary could desync the
-    // assertion from the render.
+    // Format-only assertion: comparing against a separately read Year.now() would desync at a
+    // year boundary; the pinned-clock test above covers the exact-value path.
     assertTrue(
-        rendered.startsWith(Year.now().toString() + "-") && rendered.endsWith(" hi"),
-        "unexpected rendered prompt: " + rendered);
+        rendered.matches("\\d{4}-\\d{2}-\\d{2} hi"), "unexpected rendered date: " + rendered);
   }
 
   @Test

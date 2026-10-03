@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -82,6 +83,31 @@ class DecoderConfigTest {
 
       assertEquals(4, DecoderConfig.fromFile(config).hiddenSize());
     }
+  }
+
+  @Test
+  void unsupportedQuantizationDeclarationsAreRejected(@TempDir Path dir) throws Exception {
+    Path config = dir.resolve("config.json");
+    String base =
+        "{\"model_type\":\"llama\",\"vocab_size\":8,\"hidden_size\":64,\"intermediate_size\":128,"
+            + "\"num_hidden_layers\":1,\"num_attention_heads\":4,\"quantization\":%s}";
+    Map<String, String> cases =
+        Map.of(
+            "{\"group_size\":64,\"bits\":4,\"model.layers.0.mlp\":{\"bits\":8}}", "per-layer",
+            "{\"group_size\":48,\"bits\":4}", "group_size",
+            "{\"group_size\":64,\"bits\":7}", "bits",
+            "{\"quant_method\":\"gptq\",\"group_size\":64,\"bits\":4}", "gptq",
+            "{\"group_size\":64,\"bits\":4,\"mode\":\"mxfp4\"}", "mxfp4",
+            "{\"group_size\":64.5,\"bits\":4}", "group_size",
+            "{\"group_size\":64,\"bits\":4.5}", "bits");
+    for (var entry : cases.entrySet()) {
+      Files.writeString(config, base.formatted(entry.getKey()));
+      IllegalArgumentException error =
+          assertThrows(IllegalArgumentException.class, () -> DecoderConfig.fromFile(config));
+      assertTrue(error.getMessage().contains(entry.getValue()), error.getMessage());
+    }
+    Files.writeString(config, base.formatted("{\"group_size\":64,\"bits\":4}"));
+    assertEquals(64, DecoderConfig.fromFile(config).hiddenSize());
   }
 
   @Test

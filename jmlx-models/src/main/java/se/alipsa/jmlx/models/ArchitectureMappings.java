@@ -535,7 +535,9 @@ public final class ArchitectureMappings {
    * Reads an MLX-style {@code quantization} block ({@code group_size}, {@code bits}). Only the
    * default affine mode is supported, and not for mixture-of-experts, whose stacked expert tensors
    * have no quantized path yet. A per-layer override in the block is rejected rather than ignored:
-   * every layer would silently be read with the global setting.
+   * every layer would silently be read with the global setting. Both values must be integral JSON
+   * numbers: a fractional value such as {@code 64.5} is rejected rather than truncated, so a
+   * malformed config cannot select different packing parameters than it declares.
    */
   private static Quantization parseQuantization(JsonNode node, boolean moe) {
     JsonNode block = node.hasNonNull("quantization") ? node.get("quantization") : null;
@@ -580,11 +582,15 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException(
           "config.json " + key + " is unsupported for mixture-of-experts models");
     }
-    if (!q.path("group_size").canConvertToInt() || !q.path("bits").canConvertToInt()) {
-      throw new IllegalArgumentException(
-          "config.json " + key + " needs integer group_size and bits");
+    JsonNode groupSize = q.path("group_size");
+    JsonNode bits = q.path("bits");
+    if (!groupSize.isIntegralNumber() || !groupSize.canConvertToInt()) {
+      throw new IllegalArgumentException("config.json " + key + ".group_size must be an integer");
     }
-    return new Quantization(q.get("group_size").intValue(), q.get("bits").intValue());
+    if (!bits.isIntegralNumber() || !bits.canConvertToInt()) {
+      throw new IllegalArgumentException("config.json " + key + ".bits must be an integer");
+    }
+    return new Quantization(groupSize.intValue(), bits.intValue());
   }
 
   private static RopeSpec parseRope(JsonNode config, float theta) {

@@ -88,4 +88,69 @@ class BpeMergerTest {
     BpeMerger merger = new BpeMerger(new BpeModelConfig(Map.of("a", 0, word, 1), ranks, false));
     assertEquals(List.of(word), merger.merge(word));
   }
+
+  @Test
+  void bpeMergeDropsContinuingSubwordPrefixOfRightSymbol() {
+    TokenizerDefinition.Bpe model =
+        new TokenizerDefinition.Bpe(
+            Map.of("[UNK]", 0, "a", 1, "##b", 2, "ab", 3, "##c", 4, "abc", 5),
+            Map.of("a ##b", 0, "ab ##c", 1),
+            "[UNK]",
+            false,
+            false,
+            "##",
+            "",
+            false);
+    assertEquals(List.of("abc"), bpe(model, "abc"));
+    assertEquals(List.of("ab"), bpe(model, "ab"));
+  }
+
+  @Test
+  void bpeByteFallbackKeepsSubwordPrefixLikeHuggingFace() {
+    TokenizerDefinition.Bpe model =
+        new TokenizerDefinition.Bpe(
+            Map.of("[UNK]", 0, "a", 1, "<0x62>", 2, "<0x23>", 3),
+            Map.of(),
+            "[UNK]",
+            false,
+            true,
+            "##",
+            "",
+            false);
+    assertEquals(List.of("a", "<0x23>", "<0x23>", "<0x62>"), bpe(model, "ab"));
+  }
+
+  @Test
+  void bpeDropsUnknownWithoutUnkAndClampsFallbackOffsets() {
+    TokenizerDefinition.Bpe noUnknown =
+        new TokenizerDefinition.Bpe(
+            Map.of("a", 0, "b", 1), Map.of(), null, false, false, "", "", false);
+    List<TokenPiece> pieces = TokenizerModels.encode(noUnknown, AlignedText.original("azb"));
+    assertEquals(List.of("a", "b"), pieces.stream().map(TokenPiece::text).toList());
+    assertEquals(
+        List.of(new TokenOffset(0, 1), new TokenOffset(2, 3)),
+        pieces.stream().map(TokenPiece::offset).toList());
+
+    TokenizerDefinition.Bpe fallback =
+        new TokenizerDefinition.Bpe(
+            Map.of("a", 0, "<0x58>", 1, "<0x62>", 2, "<0x59>", 3),
+            Map.of(),
+            null,
+            false,
+            true,
+            "X",
+            "Y",
+            false);
+    List<TokenPiece> encoded = TokenizerModels.encode(fallback, AlignedText.original("ab"));
+    assertEquals(
+        List.of("a", "<0x58>", "<0x62>", "<0x59>"),
+        encoded.stream().map(TokenPiece::text).toList());
+    assertEquals(4, encoded.size());
+  }
+
+  private static List<String> bpe(TokenizerDefinition.Bpe model, String text) {
+    return TokenizerModels.encode(model, AlignedText.original(text)).stream()
+        .map(TokenPiece::text)
+        .toList();
+  }
 }

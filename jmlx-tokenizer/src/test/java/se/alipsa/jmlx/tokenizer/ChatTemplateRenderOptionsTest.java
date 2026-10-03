@@ -17,8 +17,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.jinja.RenderOptions;
 
-/** PR #31 feedback: the high-level renderChat path must accept render options (pinned clock). */
-class Pr31FeedbackTest {
+/**
+ * The high-level {@code HfTokenizer.renderChat} path honors {@link ChatTemplateOptions}' explicit
+ * render options: a pinned clock and zone for reproducible prompts, and the system clock when none
+ * are supplied.
+ */
+class ChatTemplateRenderOptionsTest {
 
   @TempDir Path temporaryDirectory;
 

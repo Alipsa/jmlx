@@ -15,12 +15,12 @@ import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.AttentionMask;
 import se.alipsa.jmlx.nn.DecoderBlock;
-import se.alipsa.jmlx.nn.Embedding;
+import se.alipsa.jmlx.nn.EmbeddingLayer;
 import se.alipsa.jmlx.nn.KVCache;
 import se.alipsa.jmlx.nn.KVCachePolicy;
-import se.alipsa.jmlx.nn.Linear;
 import se.alipsa.jmlx.nn.Module;
 import se.alipsa.jmlx.nn.RMSNorm;
+import se.alipsa.jmlx.nn.UnaryLayer;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
 import se.alipsa.jmlx.tokenizer.TokenizerException;
@@ -31,10 +31,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   private final DecoderConfig config;
   private final ArchitectureDescriptor descriptor;
   private final ModelMetadata metadata;
-  private final Embedding embedding;
+  private final EmbeddingLayer embedding;
   private final List<DecoderBlock> layers;
   private final RMSNorm norm;
-  private final Linear lmHead;
+  private final UnaryLayer lmHead;
   private final boolean tiedOutput;
   private StepBoundaryEvaluator stepBoundaryEvaluator = StepBoundaryEvaluator.NATIVE;
 

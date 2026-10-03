@@ -222,3 +222,24 @@ because it shares its steps with the others. Peak memory is about 2% higher. The
 samples overlap, so the throughput difference is within noise. I have not investigated why batching
 a 1B model at this size yields no aggregate gain, so treat that as unexplained, not as a property of
 batching.
+
+### The same run on a 4-bit checkpoint
+
+`mlx-community/Llama-3.2-1B-Instruct-4bit` (MLX affine, group size 64, 4 bits; unpinned local
+download, hashes not recorded), same prompts, tokens, samples and machine as the bf16 run above,
+commit `700207b` plus the chat-template clock fix. Greedy output was checked token for token against
+an independent MLX-Python implementation on all three prompts.
+
+| | Direct | Batched |
+| --- | ---: | ---: |
+| Median tokens/s (48 tokens) | 193.5 | 203.1 (1.05x) |
+| Wall ms, per sample | 251, 251, 229, 237, 248 | 245, 240, 192, 236, 181 |
+| First-token ms, requests 1/2/3 | 28 / 145 / 185 | 36 / 36 / 170 |
+| Total ms, requests 1/2/3 | 130 / 176 / 248 | 168 / 91 / 236 |
+| Peak active bytes | 723,432,756 | 824,759,358 |
+| Active bytes left after a run | 0 | 0 |
+
+The 4-bit model is about 2.1x faster than bf16 direct (193.5 versus 90.2 tokens/s) and its peak
+active memory is about 29% of bf16's. Batching again gains little in aggregate and improves the
+shorter requests' latency; as before, the wall-time samples overlap, so the throughput difference
+is within noise.

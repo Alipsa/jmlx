@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Unit coverage for {@link TokenizerJsonLoader}'s own field-level validations -- {@code
@@ -21,6 +23,8 @@ import org.junit.jupiter.api.io.TempDir;
 class TokenizerJsonLoaderTest {
 
   @TempDir Path tempDir;
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private static final String VALID_DECODER =
       "{\"type\": \"ByteLevel\", \"add_prefix_space\": true, \"trim_offsets\": true, \"use_regex\":"
@@ -153,6 +157,20 @@ class TokenizerJsonLoaderTest {
             + " \"use_regex\": false}]}";
     Path path = writeTokenizerJson(VALID_DECODER, preTokenizer, VALID_MODEL, "[]");
     assertThrows(TokenizerException.class, () -> TokenizerJsonLoader.load(path));
+  }
+
+  @Test
+  void splitInvertTrueIsRejectedAtLoad() throws Exception {
+    ObjectNode root = (ObjectNode) MAPPER.readTree(wordPieceFixture().toFile());
+    root.set(
+        "pre_tokenizer",
+        MAPPER.readTree(
+            "{\"type\":\"Split\",\"pattern\":{\"Regex\":\"\\\\w+\"},"
+                + "\"behavior\":\"Isolated\",\"invert\":true}"));
+    Path path = tempDir.resolve("invert.tokenizer.json");
+    MAPPER.writeValue(path.toFile(), root);
+    TokenizerException e = assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(path));
+    assertTrue(e.getMessage().contains("invert"), e.getMessage());
   }
 
   @Test
@@ -575,5 +593,10 @@ class TokenizerJsonLoaderTest {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  private static Path wordPieceFixture() {
+    return Path.of(System.getProperty("jmlx.repository.root"))
+        .resolve("tools/tokenizer-oracle/fixtures/wordpiece.tokenizer.json");
   }
 }

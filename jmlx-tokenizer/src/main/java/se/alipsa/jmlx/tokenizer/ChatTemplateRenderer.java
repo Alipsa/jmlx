@@ -1,15 +1,23 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import se.alipsa.jmlx.jinja.JinjaException;
+import se.alipsa.jmlx.jinja.RenderOptions;
 import se.alipsa.jmlx.jinja.Template;
 
 /** Renders a Hugging Face {@code chat_template} Jinja string via {@code jmlx-jinja}. */
 public final class ChatTemplateRenderer {
+  /** Resolves the current default zone for each render, including changes to TimeZone defaults. */
+  private static RenderOptions defaultRenderOptions() {
+    ZoneId zone = ZoneId.systemDefault();
+    return RenderOptions.builder().clock(Clock.system(zone)).zoneId(zone).build();
+  }
 
   private ChatTemplateRenderer() {}
 
@@ -36,7 +44,43 @@ public final class ChatTemplateRenderer {
       String eosToken,
       Map<String, Object> extraContext) {
     return render(
-        parse(chatTemplate), messages, addGenerationPrompt, bosToken, eosToken, extraContext);
+        chatTemplate,
+        messages,
+        addGenerationPrompt,
+        bosToken,
+        eosToken,
+        extraContext,
+        defaultRenderOptions());
+  }
+
+  /**
+   * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
+   *
+   * @param chatTemplate template source
+   * @param messages chat messages
+   * @param addGenerationPrompt whether to add the generation prompt
+   * @param bosToken beginning-of-sequence token
+   * @param eosToken end-of-sequence token
+   * @param extraContext additional template values
+   * @param renderOptions explicit clock, zone and other render settings
+   * @return rendered prompt
+   */
+  public static String render(
+      String chatTemplate,
+      List<Map<String, Object>> messages,
+      boolean addGenerationPrompt,
+      String bosToken,
+      String eosToken,
+      Map<String, Object> extraContext,
+      RenderOptions renderOptions) {
+    return render(
+        parse(chatTemplate),
+        messages,
+        addGenerationPrompt,
+        bosToken,
+        eosToken,
+        extraContext,
+        renderOptions);
   }
 
   /**
@@ -57,6 +101,36 @@ public final class ChatTemplateRenderer {
       String bosToken,
       String eosToken,
       Map<String, Object> extraContext) {
+    return render(
+        chatTemplate,
+        messages,
+        addGenerationPrompt,
+        bosToken,
+        eosToken,
+        extraContext,
+        defaultRenderOptions());
+  }
+
+  /**
+   * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
+   *
+   * @param chatTemplate parsed template
+   * @param messages chat messages
+   * @param addGenerationPrompt whether to add the generation prompt
+   * @param bosToken beginning-of-sequence token
+   * @param eosToken end-of-sequence token
+   * @param extraContext additional template values
+   * @param renderOptions explicit clock, zone and other render settings
+   * @return rendered prompt
+   */
+  public static String render(
+      Template chatTemplate,
+      List<Map<String, Object>> messages,
+      boolean addGenerationPrompt,
+      String bosToken,
+      String eosToken,
+      Map<String, Object> extraContext,
+      RenderOptions renderOptions) {
     Objects.requireNonNull(
         chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
     Objects.requireNonNull(messages, "ChatTemplateRenderer.render: messages must not be null");
@@ -68,7 +142,7 @@ public final class ChatTemplateRenderer {
     context.put("bos_token", bosToken);
     context.put("eos_token", eosToken);
     try {
-      return chatTemplate.render(context);
+      return chatTemplate.render(context, Objects.requireNonNull(renderOptions, "renderOptions"));
     } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);
@@ -83,7 +157,20 @@ public final class ChatTemplateRenderer {
    * @return rendered prompt
    */
   public static String render(String chatTemplate, Map<String, Object> context) {
-    return render(parse(chatTemplate), context);
+    return render(chatTemplate, context, defaultRenderOptions());
+  }
+
+  /**
+   * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
+   *
+   * @param chatTemplate template source
+   * @param context complete render context
+   * @param renderOptions explicit clock, zone and other render settings
+   * @return rendered prompt
+   */
+  public static String render(
+      String chatTemplate, Map<String, Object> context, RenderOptions renderOptions) {
+    return render(parse(chatTemplate), context, renderOptions);
   }
 
   /**
@@ -94,11 +181,26 @@ public final class ChatTemplateRenderer {
    * @return rendered prompt
    */
   public static String render(Template chatTemplate, Map<String, Object> context) {
+    return render(chatTemplate, context, defaultRenderOptions());
+  }
+
+  /**
+   * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
+   *
+   * @param chatTemplate parsed template
+   * @param context complete render context
+   * @param renderOptions explicit clock, zone and other render settings
+   * @return rendered prompt
+   */
+  public static String render(
+      Template chatTemplate, Map<String, Object> context, RenderOptions renderOptions) {
     Objects.requireNonNull(
         chatTemplate, "ChatTemplateRenderer.render: chatTemplate must not be null");
     Objects.requireNonNull(context, "ChatTemplateRenderer.render: context must not be null");
     try {
-      return chatTemplate.render(Collections.unmodifiableMap(new HashMap<>(context)));
+      return chatTemplate.render(
+          Collections.unmodifiableMap(new HashMap<>(context)),
+          Objects.requireNonNull(renderOptions, "renderOptions"));
     } catch (JinjaException e) {
       throw new TokenizerException(
           "ChatTemplateRenderer.render: failed to render chat template", e);

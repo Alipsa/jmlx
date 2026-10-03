@@ -15,6 +15,7 @@ import se.alipsa.jmlx.models.ArchitectureDescriptor.MlpLayout;
 import se.alipsa.jmlx.models.ArchitectureDescriptor.Moe;
 import se.alipsa.jmlx.models.ArchitectureDescriptor.Norm;
 import se.alipsa.jmlx.models.ArchitectureDescriptor.NormKind;
+import se.alipsa.jmlx.models.ArchitectureDescriptor.Quantization;
 import se.alipsa.jmlx.nn.Activation;
 import se.alipsa.jmlx.nn.RopeSpec;
 import tools.jackson.databind.JsonNode;
@@ -56,7 +57,9 @@ public final class ArchitectureMappings {
           "sliding_window",
           "max_window_layers",
           "max_position_embeddings",
-          "partial_rotary_factor");
+          "partial_rotary_factor",
+          "quantization",
+          "quantization_config");
   private static final Map<String, String> IGNORED =
       Map.ofEntries(
           Map.entry("architectures", "metadata only"),
@@ -296,8 +299,31 @@ public final class ArchitectureMappings {
         (descriptor.mlp().bias() ? required : forbidden).add(key + ".bias");
       }
     }
+    if (descriptor.quantization() != null) {
+      addQuantizedCompanions(required, optional);
+      addQuantizedCompanions(optional, optional);
+    }
     return new TensorPlan(
         required, optional, forbidden, Set.of(Pattern.compile(".*\\.rotary_emb\\.inv_freq$")));
+  }
+
+  /**
+   * Every eligible weight ({@code *_proj.weight}, the embedding table, {@code lm_head.weight}) may
+   * travel with {@code .scales} and {@code .biases}; norm weights stay float. The linear bias of a
+   * projection is {@code .bias}, distinct from the quantization offsets {@code .biases}.
+   */
+  private static void addQuantizedCompanions(Set<String> keys, Set<String> optional) {
+    for (String key : Set.copyOf(keys)) {
+      boolean quantized =
+          key.endsWith("_proj.weight")
+              || key.equals("model.embed_tokens.weight")
+              || key.equals("lm_head.weight");
+      if (quantized) {
+        String stem = key.substring(0, key.length() - ".weight".length());
+        optional.add(stem + ".scales");
+        optional.add(stem + ".biases");
+      }
+    }
   }
 
   /** Parses a configuration and warns about unrecognized keys. */
@@ -481,17 +507,11 @@ public final class ArchitectureMappings {
         new Attention(qkvBias, !qwen2 && qkvBias, family.fusedProjections(), slidingWindow),
         new Head(dimensions.tieWordEmbeddings()),
         new Embedding(gemma),
-        moe);
+        moe,
+        parseQuantization(node, family.moe()));
   }
 
   private static void rejectUnsupportedNumerics(JsonNode node, String type, boolean moe) {
-    if (node.hasNonNull("quantization") || node.hasNonNull("quantization_config")) {
-      String key = node.hasNonNull("quantization") ? "quantization" : "quantization_config";
-      throw new IllegalArgumentException(
-          "config.json "
-              + key
-              + " declares quantized weights, which this decoder does not yet implement");
-    }
     for (String key :
         Set.of(
             "num_local_experts",
@@ -509,6 +529,62 @@ public final class ArchitectureMappings {
     if (node.path("output_router_logits").asBoolean(false)) {
       throw new IllegalArgumentException("config.json output_router_logits=true is unsupported");
     }
+  }
+
+  /**
+   * Reads an MLX-style {@code quantization} block ({@code group_size}, {@code bits}). Only the
+   * default affine mode is supported, and not for mixture-of-experts, whose stacked expert tensors
+   * have no quantized path yet. A per-layer override in the block is rejected rather than ignored:
+   * every layer would silently be read with the global setting.
+   */
+  private static Quantization parseQuantization(JsonNode node, boolean moe) {
+    JsonNode block = node.hasNonNull("quantization") ? node.get("quantization") : null;
+    JsonNode alias =
+        node.hasNonNull("quantization_config") ? node.get("quantization_config") : null;
+    if (block == null && alias == null) {
+      return null;
+    }
+    String key = block != null ? "quantization" : "quantization_config";
+    JsonNode q = block != null ? block : alias;
+    if (!q.isObject()) {
+      throw new IllegalArgumentException("config.json " + key + " must be an object");
+    }
+    if (block != null && alias != null && !block.equals(alias)) {
+      throw new IllegalArgumentException(
+          "config.json quantization and quantization_config disagree");
+    }
+    if (q.hasNonNull("quant_method")) {
+      throw new IllegalArgumentException(
+          "config.json "
+              + key
+              + ".quant_method '"
+              + q.get("quant_method").asString()
+              + "' is unsupported; only MLX affine quantization is implemented");
+    }
+    if (q.hasNonNull("mode") && !"affine".equals(q.get("mode").asString())) {
+      throw new IllegalArgumentException(
+          "config.json " + key + ".mode '" + q.get("mode").asString() + "' is unsupported");
+    }
+    for (var entry : q.properties()) {
+      String name = entry.getKey();
+      if (!name.equals("group_size") && !name.equals("bits") && !name.equals("mode")) {
+        throw new IllegalArgumentException(
+            "config.json "
+                + key
+                + "."
+                + name
+                + " is unsupported (per-layer quantization overrides are not implemented)");
+      }
+    }
+    if (moe) {
+      throw new IllegalArgumentException(
+          "config.json " + key + " is unsupported for mixture-of-experts models");
+    }
+    if (!q.path("group_size").canConvertToInt() || !q.path("bits").canConvertToInt()) {
+      throw new IllegalArgumentException(
+          "config.json " + key + " needs integer group_size and bits");
+    }
+    return new Quantization(q.get("group_size").intValue(), q.get("bits").intValue());
   }
 
   private static RopeSpec parseRope(JsonNode config, float theta) {

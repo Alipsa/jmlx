@@ -34,6 +34,7 @@ final class TestDescriptors {
         new ArchitectureDescriptor.Attention(qkvBias, outBias, false, null),
         new ArchitectureDescriptor.Head(tiedHead),
         new ArchitectureDescriptor.Embedding(false),
+        null,
         null);
   }
 }

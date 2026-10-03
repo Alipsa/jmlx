@@ -66,7 +66,7 @@ Each is rejected with a named error at config parsing or load time, not silently
 
 | Feature | Behaviour |
 | --- | --- |
-| Quantized safetensors and GGUF checkpoints | Rejected at load; float safetensors only |
+| GGUF, GPTQ/AWQ and per-layer or non-affine MLX quantization; any quantization on Mixtral | Rejected at load with the offending key named; float and uniform MLX affine safetensors load |
 | Packed (quantized) KV cache | Not supported: the pinned runtime rejects packed K/V in SDPA (see the [quantized KV probe](phase6-4-benchmark.md#quantized-kv-retention-probe)) |
 | Gemma 2/3, Phi-2, Phi-3 `longrope`, shared-expert MoE | `planned`; the unsupported `model_type` or `rope_type` is named |
 | Qwen2 `use_sliding_window=true` | Config key named |

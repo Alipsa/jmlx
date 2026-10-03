@@ -15,7 +15,8 @@ public record ArchitectureDescriptor(
     Attention attention,
     Head head,
     Embedding embedding,
-    Moe moe) {
+    Moe moe,
+    Quantization quantization) {
 
   /** Validates dimensions and required component specifications. */
   public ArchitectureDescriptor {
@@ -86,6 +87,25 @@ public record ArchitectureDescriptor(
 
   /** Whether embeddings are scaled by the square root of hidden size. */
   public record Embedding(boolean scaleBySqrtHidden) {}
+
+  /**
+   * Affine weight quantization declared by an MLX-style {@code quantization} config block: every
+   * linear projection and the embedding table are stored as {@code .weight}/{@code .scales}/{@code
+   * .biases}. Null on the descriptor means float weights.
+   */
+  public record Quantization(int groupSize, int bits) {
+    /** Validates the group size and bit width against the sets the native runtime supports. */
+    public Quantization {
+      if (groupSize != 32 && groupSize != 64 && groupSize != 128) {
+        throw new IllegalArgumentException(
+            "quantization group_size must be one of {32, 64, 128}, got " + groupSize);
+      }
+      if (bits != 2 && bits != 3 && bits != 4 && bits != 5 && bits != 6 && bits != 8) {
+        throw new IllegalArgumentException(
+            "quantization bits must be one of {2, 3, 4, 5, 6, 8}, got " + bits);
+      }
+    }
+  }
 
   /** Expert count and number selected per token. */
   public record Moe(int experts, int topK) {

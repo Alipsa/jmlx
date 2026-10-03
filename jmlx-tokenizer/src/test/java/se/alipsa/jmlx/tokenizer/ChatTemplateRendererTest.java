@@ -70,6 +70,49 @@ class ChatTemplateRendererTest {
   }
 
   @Test
+  void explicitClockPinsAllRenderOverloads() {
+    String source = "{{ strftime_now('%Y-%m-%d') }}|{{ messages[0]['content'] }}";
+    Template parsed = ChatTemplateRenderer.parse(source);
+    var options =
+        se.alipsa.jmlx.jinja.RenderOptions.builder()
+            .clock(
+                java.time.Clock.fixed(
+                    java.time.Instant.parse("2024-01-01T00:30:00Z"), java.time.ZoneOffset.UTC))
+            .zoneId(java.time.ZoneId.of("America/Los_Angeles"))
+            .build();
+    List<Map<String, Object>> messages = List.of(Map.of("content", "hi"));
+    Map<String, Object> context = Map.of("messages", messages);
+    assertEquals("2023-12-31|hi", ChatTemplateRenderer.render(source, context, options));
+    assertEquals("2023-12-31|hi", ChatTemplateRenderer.render(parsed, context, options));
+    assertEquals(
+        "2023-12-31|hi",
+        ChatTemplateRenderer.render(source, messages, false, null, null, Map.of(), options));
+    assertEquals(
+        "2023-12-31|hi",
+        ChatTemplateRenderer.render(parsed, messages, false, null, null, Map.of(), options));
+  }
+
+  @Test
+  void defaultOptionsFollowChangedSystemZone() {
+    java.util.TimeZone original = java.util.TimeZone.getDefault();
+    try {
+      String template = "{{ strftime_now('%Y-%m-%d %H') }}";
+      java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("GMT+09:00"));
+      assertEquals(
+          java.time.ZonedDateTime.now()
+              .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH")),
+          ChatTemplateRenderer.render(template, Map.of()));
+      java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("GMT-08:00"));
+      assertEquals(
+          java.time.ZonedDateTime.now()
+              .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH")),
+          ChatTemplateRenderer.render(template, Map.of()));
+    } finally {
+      java.util.TimeZone.setDefault(original);
+    }
+  }
+
+  @Test
   void templatesThatDateThemselvesWithStrftimeNowRender() {
     // Llama 3.x chat templates call strftime_now("%d %b %Y"); the renderer supplies a clock.
     String template = "{{ strftime_now('%Y') }}|{{ messages[0]['content'] }}";

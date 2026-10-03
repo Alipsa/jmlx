@@ -56,6 +56,20 @@ disabled. The reserved context includes `messages`, `add_generation_prompt`, and
 `bos_token`, `eos_token`, `pad_token`, `unk_token`, `sep_token`, `cls_token`, and `mask_token`.
 `extraContext` can supply values such as `tools`, but reserved-key collisions are rejected.
 
+Templates using `strftime_now` use the current system clock and default zone on each render.
+For reproducible prompts, all `ChatTemplateRenderer.render` overloads accept a final
+`RenderOptions` argument, for example:
+
+```java
+var renderOptions = RenderOptions.builder()
+    .clock(Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC))
+    .zoneId(ZoneOffset.UTC)
+    .build();
+String prompt = ChatTemplateRenderer.render(template, context, renderOptions);
+```
+
+`RenderOptions` comes from `se.alipsa.jmlx.jinja`; the time types come from `java.time`.
+
 ## Incremental output
 
 Create a decoder per generated request; never decode individual ByteLevel tokens independently,

@@ -47,6 +47,17 @@ class QuantizedDecoderTest {
 
   /** Builds {@code quantized/} and {@code reference/} under {@code root} from {@code source}. */
   private static void quantize(Path root, Path source) throws Exception {
+    quantize(root, source, key -> true);
+  }
+
+  private static void quantize(Path root, Path source, java.util.function.Predicate<String> select)
+      throws Exception {
+    quantize(root, source, select, GROUP);
+  }
+
+  private static void quantize(
+      Path root, Path source, java.util.function.Predicate<String> select, int group)
+      throws Exception {
     Path quantized = Files.createDirectories(root.resolve("quantized"));
     Path reference = Files.createDirectories(root.resolve("reference"));
     String config = Files.readString(source.resolve("config.json"));
@@ -55,7 +66,7 @@ class QuantizedDecoderTest {
         quantized.resolve("config.json"),
         config.substring(0, config.lastIndexOf('}'))
             + ",\"quantization\":{\"group_size\":"
-            + GROUP
+            + group
             + ",\"bits\":"
             + BITS
             + "}}");
@@ -70,18 +81,18 @@ class QuantizedDecoderTest {
             key.endsWith("_proj.weight")
                 || key.equals("model.embed_tokens.weight")
                 || key.equals("lm_head.weight");
-        if (!quantize) {
+        if (!quantize || !select.test(key)) {
           packed.put(key, entry.getValue());
           dequantized.put(key, entry.getValue());
           continue;
         }
         String stem = key.substring(0, key.length() - ".weight".length());
-        MLXArray[] q = MLXQuant.quantize(entry.getValue(), GROUP, BITS, "affine", null);
+        MLXArray[] q = MLXQuant.quantize(entry.getValue(), group, BITS, "affine", null);
         packed.put(key, q[0]);
         packed.put(stem + ".scales", q[1]);
         packed.put(stem + ".biases", q[2]);
         dequantized.put(
-            key, MLXQuant.dequantize(q[0], q[1], q[2], GROUP, BITS, "affine", null, DType.FLOAT32));
+            key, MLXQuant.dequantize(q[0], q[1], q[2], group, BITS, "affine", null, DType.FLOAT32));
       }
       MLXIO.saveSafetensors(quantized.resolve("model.safetensors").toString(), packed, Map.of());
       MLXIO.saveSafetensors(
@@ -205,6 +216,119 @@ class QuantizedDecoderTest {
     // Phi-3 stores qkv_proj and gate_up_proj fused; each is split by rows, which for a packed
     // weight must slice scales and biases by the same rows.
     assertMatchesDequantizedReference(dir, "phi3");
+  }
+
+  @Test
+  void mixedFloatAndQuantizedLayersMatchReference(@TempDir Path dir) throws Exception {
+    for (String family : List.of("llama", "phi3")) {
+      Path root = Files.createDirectories(dir.resolve(family));
+      Path source = Files.createDirectories(root.resolve("source"));
+      Path checkpoint =
+          Path.of(System.getProperty("jmlx.repository.root"))
+              .resolve("tools/hf-reference/goldens/checkpoints")
+              .resolve(family);
+      Files.copy(checkpoint.resolve("config.json"), source.resolve("config.json"));
+      Files.copy(checkpoint.resolve("model.safetensors"), source.resolve("model.safetensors"));
+      // Float embedding, head and attention/fused projections coexist with packed down_proj.
+      quantize(root, source, key -> key.endsWith("down_proj.weight"));
+      try (MLXScope scope = new MLXScope()) {
+        assertClose(
+            logits(scope, root.resolve("reference"), new int[] {1, 5, 9}),
+            logits(scope, root.resolve("quantized"), new int[] {1, 5, 9}),
+            1e-3f);
+      }
+    }
+  }
+
+  @Test
+  void groupSizeIncompatibleWithHiddenWidthLeavesLayersFloat(@TempDir Path dir) throws Exception {
+    Path source = dir.resolve("source");
+    TinyCheckpoints.randomLlama(source, 11L, 2, false, true);
+    // Hidden width 64 is not divisible by 128; down_proj input width 128 is.
+    quantize(dir, source, key -> key.endsWith("down_proj.weight"), 128);
+    try (MLXScope scope = new MLXScope()) {
+      assertClose(
+          logits(scope, dir.resolve("reference"), new int[] {1, 5, 9}),
+          logits(scope, dir.resolve("quantized"), new int[] {1, 5, 9}),
+          1e-3f);
+    }
+  }
+
+  @Test
+  void packingChecksCoverEmbeddingHeadDownAndFusedProjections(@TempDir Path dir) throws Exception {
+    for (String stem :
+        List.of(
+            "model.embed_tokens",
+            "lm_head",
+            "model.layers.0.mlp.down_proj",
+            "model.layers.0.self_attn.qkv_proj",
+            "model.layers.0.mlp.gate_up_proj")) {
+      Path root = Files.createDirectories(dir.resolve(stem));
+      Path source = Files.createDirectories(root.resolve("source"));
+      boolean fused = stem.endsWith("qkv_proj") || stem.endsWith("gate_up_proj");
+      if (fused) {
+        Path checkpoint =
+            Path.of(System.getProperty("jmlx.repository.root"))
+                .resolve("tools/hf-reference/goldens/checkpoints/phi3");
+        Files.copy(checkpoint.resolve("config.json"), source.resolve("config.json"));
+        Files.copy(checkpoint.resolve("model.safetensors"), source.resolve("model.safetensors"));
+      } else {
+        TinyCheckpoints.randomLlama(source, 11L, 2, false, false);
+      }
+      quantize(root, source, key -> key.equals(stem + ".weight"));
+      Path config = root.resolve("quantized/config.json");
+      String original = Files.readString(config);
+      for (String replacement :
+          List.of("\"group_size\":64,\"bits\":8", "\"group_size\":32,\"bits\":8")) {
+        Files.writeString(config, original.replace("\"group_size\":32,\"bits\":4", replacement));
+        try (MLXScope scope = new MLXScope()) {
+          IllegalArgumentException error =
+              assertThrows(
+                  IllegalArgumentException.class,
+                  () -> TextGenerationModels.load(scope, root.resolve("quantized")));
+          assertTrue(error.getMessage().contains(stem), error.getMessage());
+          assertTrue(error.getMessage().contains("input size"), error.getMessage());
+        }
+      }
+    }
+  }
+
+  @Test
+  void wrongPackingParametersFailAtLoadTime(@TempDir Path dir) throws Exception {
+    build(dir, "llama", false);
+    Path quantized = dir.resolve("quantized");
+    Path config = quantized.resolve("config.json");
+    String original = Files.readString(config);
+    for (String replacement :
+        List.of("\"group_size\":64,\"bits\":8", "\"group_size\":32,\"bits\":8")) {
+      Files.writeString(config, original.replace("\"group_size\":32,\"bits\":4", replacement));
+      try (MLXScope scope = new MLXScope()) {
+        IllegalArgumentException error =
+            assertThrows(
+                IllegalArgumentException.class, () -> TextGenerationModels.load(scope, quantized));
+        assertTrue(error.getMessage().contains("checkpoint tensor"), error.getMessage());
+        assertTrue(error.getMessage().contains("input size"), error.getMessage());
+      }
+    }
+  }
+
+  @Test
+  void missingQuantizationOffsetsAreNamed(@TempDir Path dir) throws Exception {
+    build(dir, "llama", false);
+    Path quantized = dir.resolve("quantized");
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          new LinkedHashMap<>(
+              MLXIO
+                  .loadSafetensors(scope, quantized.resolve("model.safetensors").toString())
+                  .tensors());
+      tensors.remove("model.layers.0.mlp.up_proj.biases");
+      MLXIO.saveSafetensors(quantized.resolve("model.safetensors").toString(), tensors, Map.of());
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class, () -> TextGenerationModels.load(scope, quantized));
+      assertTrue(error.getMessage().contains("up_proj.biases"), error.getMessage());
+    }
   }
 
   @Test

@@ -300,19 +300,19 @@ public final class ArchitectureMappings {
       }
     }
     if (descriptor.quantization() != null) {
-      addQuantizedCompanions(required);
-      addQuantizedCompanions(optional);
+      addQuantizedCompanions(required, optional);
+      addQuantizedCompanions(optional, optional);
     }
     return new TensorPlan(
         required, optional, forbidden, Set.of(Pattern.compile(".*\\.rotary_emb\\.inv_freq$")));
   }
 
   /**
-   * Every quantized weight ({@code *_proj.weight}, the embedding table, {@code lm_head.weight})
-   * travels with {@code .scales} and {@code .biases}; norm weights stay float. The linear bias of a
+   * Every eligible weight ({@code *_proj.weight}, the embedding table, {@code lm_head.weight}) may
+   * travel with {@code .scales} and {@code .biases}; norm weights stay float. The linear bias of a
    * projection is {@code .bias}, distinct from the quantization offsets {@code .biases}.
    */
-  private static void addQuantizedCompanions(Set<String> keys) {
+  private static void addQuantizedCompanions(Set<String> keys, Set<String> optional) {
     for (String key : Set.copyOf(keys)) {
       boolean quantized =
           key.endsWith("_proj.weight")
@@ -320,8 +320,8 @@ public final class ArchitectureMappings {
               || key.equals("lm_head.weight");
       if (quantized) {
         String stem = key.substring(0, key.length() - ".weight".length());
-        keys.add(stem + ".scales");
-        keys.add(stem + ".biases");
+        optional.add(stem + ".scales");
+        optional.add(stem + ".biases");
       }
     }
   }

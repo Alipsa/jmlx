@@ -58,10 +58,11 @@ public final class DecoderAssembler {
         validateExperts(descriptor, tensors, "model.layers." + i + ".block_sparse_moe.");
       }
     }
+    validatePackedTensors(descriptor, tensors);
     MLXArray staticFreqs = descriptor.rope().staticFrequencies(scope, descriptor.rotaryDims());
     ArchitectureDescriptor.Quantization quantization = descriptor.quantization();
     EmbeddingLayer embedding =
-        quantization == null
+        !tensors.containsKey("model.embed_tokens.scales")
             ? new Embedding(scope, tensor(tensors, "model.embed_tokens.weight"))
             : new QuantizedEmbedding(
                 scope,
@@ -235,7 +236,7 @@ public final class DecoderAssembler {
     int hidden = d.dimensions().hiddenSize();
     int queryRows = d.dimensions().numAttentionHeads() * d.headDim();
     int kvRows = d.dimensions().numKeyValueHeads() * d.headDim();
-    checkFusedShape(d, tensors, prefix, queryRows + 2 * kvRows, hidden);
+    checkFusedShape(tensors, prefix, queryRows + 2 * kvRows, hidden);
     return new UnaryLayer[] {
       rowSlice(scope, d, tensors, prefix, 0, queryRows),
       rowSlice(scope, d, tensors, prefix, queryRows, queryRows + kvRows),
@@ -246,7 +247,7 @@ public final class DecoderAssembler {
   private static UnaryLayer[] fusedGateUp(
       MLXScope scope, ArchitectureDescriptor d, Map<String, MLXArray> tensors, String prefix) {
     int intermediate = d.dimensions().intermediateSize();
-    checkFusedShape(d, tensors, prefix, 2 * intermediate, d.dimensions().hiddenSize());
+    checkFusedShape(tensors, prefix, 2 * intermediate, d.dimensions().hiddenSize());
     return new UnaryLayer[] {
       rowSlice(scope, d, tensors, prefix, 0, intermediate),
       rowSlice(scope, d, tensors, prefix, intermediate, 2 * intermediate)
@@ -255,13 +256,9 @@ public final class DecoderAssembler {
 
   /** Float weights are {@code [rows, hidden]}; quantized ones are packed along the columns. */
   private static void checkFusedShape(
-      ArchitectureDescriptor d,
-      Map<String, MLXArray> tensors,
-      String prefix,
-      int rows,
-      int hidden) {
+      Map<String, MLXArray> tensors, String prefix, int rows, int hidden) {
     MLXArray weight = tensor(tensors, prefix + ".weight");
-    if (d.quantization() == null) {
+    if (!tensors.containsKey(prefix + ".scales")) {
       requireShape(weight, prefix + ".weight", rows, hidden);
     } else if (weight.ndim() != 2 || weight.shape()[0] != rows) {
       throw new IllegalArgumentException(
@@ -279,7 +276,7 @@ public final class DecoderAssembler {
       int to) {
     MLXArray weight = rows(tensor(tensors, prefix + ".weight"), from, to);
     ArchitectureDescriptor.Quantization q = d.quantization();
-    if (q == null) {
+    if (!tensors.containsKey(prefix + ".scales")) {
       return new Linear(scope, weight, null);
     }
     return new QuantizedLinear(
@@ -315,7 +312,7 @@ public final class DecoderAssembler {
           "checkpoint missing required bias tensor '" + prefix + ".bias'");
     }
     ArchitectureDescriptor.Quantization q = d.quantization();
-    if (q == null) {
+    if (!tensors.containsKey(prefix + ".scales")) {
       return new Linear(scope, tensor(tensors, prefix + ".weight"), bias);
     }
     return new QuantizedLinear(
@@ -326,6 +323,57 @@ public final class DecoderAssembler {
         bias,
         q.groupSize(),
         q.bits());
+  }
+
+  /** Validates dimensions before slicing packed arrays or constructing any decoder layers. */
+  private static void validatePackedTensors(
+      ArchitectureDescriptor d, Map<String, MLXArray> tensors) {
+    for (String key : tensors.keySet()) {
+      if (!key.endsWith(".weight")) {
+        continue;
+      }
+      String prefix = key.substring(0, key.length() - ".weight".length());
+      MLXArray scales = tensors.get(prefix + ".scales");
+      MLXArray offsets = tensors.get(prefix + ".biases");
+      if (scales == null) {
+        if (offsets != null || tensors.get(key).dtype() == DType.UINT32) {
+          throw new IllegalArgumentException("checkpoint missing tensor '" + prefix + ".scales'");
+        }
+        continue;
+      }
+      ArchitectureDescriptor.Quantization q = Objects.requireNonNull(d.quantization());
+      int input =
+          prefix.endsWith(".down_proj")
+              ? d.dimensions().intermediateSize()
+              : prefix.endsWith(".o_proj")
+                  ? d.dimensions().numAttentionHeads() * d.headDim()
+                  : d.dimensions().hiddenSize();
+      MLXArray weight = tensors.get(key);
+      if (scales.ndim() != 2 || (long) scales.shape()[1] * q.groupSize() != input) {
+        throw new IllegalArgumentException(
+            "checkpoint tensor '"
+                + prefix
+                + ".scales' is incompatible with group_size "
+                + q.groupSize()
+                + " and input size "
+                + input);
+      }
+      if (weight.ndim() != 2 || (long) weight.shape()[1] * 32 != (long) input * q.bits()) {
+        throw new IllegalArgumentException(
+            "checkpoint tensor '"
+                + key
+                + "' is incompatible with bits "
+                + q.bits()
+                + " and input size "
+                + input);
+      }
+      requireShape(scales, prefix + ".scales", weight.shape()[0], input / q.groupSize());
+      requireShape(
+          tensor(tensors, prefix + ".biases"),
+          prefix + ".biases",
+          weight.shape()[0],
+          input / q.groupSize());
+    }
   }
 
   private static MLXArray tensor(Map<String, MLXArray> tensors, String name) {

@@ -57,18 +57,22 @@ disabled. The reserved context includes `messages`, `add_generation_prompt`, and
 `extraContext` can supply values such as `tools`, but reserved-key collisions are rejected.
 
 Templates using `strftime_now` use the current system clock and default zone on each render.
-For reproducible prompts, all `ChatTemplateRenderer.render` overloads accept a final
-`RenderOptions` argument, for example:
+For reproducible prompts, supply a `RenderOptions` (from `se.alipsa.jmlx.jinja`):
+`ChatTemplateOptions` takes one as its fourth component, so the high-level `renderChat` path
+pins it too; a null component (or the three-argument constructor) keeps the system clock:
 
 ```java
 var renderOptions = RenderOptions.builder()
     .clock(Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC))
     .zoneId(ZoneOffset.UTC)
     .build();
-String prompt = ChatTemplateRenderer.render(template, context, renderOptions);
+var options = new ChatTemplateOptions("", true, Map.of(), renderOptions);
+List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "Hello"));
+String prompt = tokenizer.renderChat(messages, options);
 ```
 
-`RenderOptions` comes from `se.alipsa.jmlx.jinja`; the time types come from `java.time`.
+All `ChatTemplateRenderer.render` overloads accept the same `RenderOptions` as a final argument
+for lower-level callers. The time types come from `java.time`.
 
 ## Incremental output
 

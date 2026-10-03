@@ -56,7 +56,7 @@ public final class ChatTemplateRenderer {
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
    *
-   * @param chatTemplate template source or parsed template
+   * @param chatTemplate template source
    * @param messages chat messages
    * @param addGenerationPrompt whether to add the generation prompt
    * @param bosToken beginning-of-sequence token
@@ -114,7 +114,7 @@ public final class ChatTemplateRenderer {
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
    *
-   * @param chatTemplate template source or parsed template
+   * @param chatTemplate parsed template
    * @param messages chat messages
    * @param addGenerationPrompt whether to add the generation prompt
    * @param bosToken beginning-of-sequence token
@@ -163,7 +163,7 @@ public final class ChatTemplateRenderer {
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
    *
-   * @param chatTemplate template source or parsed template
+   * @param chatTemplate template source
    * @param context complete render context
    * @param renderOptions explicit clock, zone and other render settings
    * @return rendered prompt
@@ -187,7 +187,7 @@ public final class ChatTemplateRenderer {
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts.
    *
-   * @param chatTemplate template source or parsed template
+   * @param chatTemplate parsed template
    * @param context complete render context
    * @param renderOptions explicit clock, zone and other render settings
    * @return rendered prompt

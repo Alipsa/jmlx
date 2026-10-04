@@ -162,6 +162,55 @@ class DecoderAssemblerTest {
   }
 
   @Test
+  @EnabledIfNativeAvailable
+  void strayScalesWithoutDeclaredQuantizationAreRejected() {
+    // assemble's tensor plan rejects a .scales tensor before this branch runs on every public
+    // path (see QuantizedDecoderTest's stray-tensor test), so the branch is exercised directly.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors = new java.util.LinkedHashMap<>();
+      tensors.put(
+          "model.layers.0.self_attn.q_proj.weight",
+          MLX.zeros(scope, new int[] {4, 4}, DType.FLOAT32));
+      tensors.put(
+          "model.layers.0.self_attn.q_proj.scales",
+          MLX.zeros(scope, new int[] {4, 1}, DType.FLOAT32));
+      String message =
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () ->
+                      DecoderAssembler.validatePackedTensors(
+                          TestDescriptors.llama(1, false), tensors))
+              .getMessage();
+      assertTrue(message.contains("q_proj.scales"), message);
+      assertTrue(message.contains("declares no quantization"), message);
+    }
+  }
+
+  @Test
+  @EnabledIfNativeAvailable
+  void unknownPackedProjectionNameIsRejected() {
+    // Same reason as the test above: the plan only admits weight names this architecture
+    // declares, so a .scales-bearing prefix matching no known projection is unreachable through
+    // assemble.
+    try (MLXScope scope = new MLXScope()) {
+      String stem = "model.layers.0.self_attn.mystery_proj";
+      Map<String, MLXArray> tensors = new java.util.LinkedHashMap<>();
+      tensors.put(stem + ".weight", MLX.zeros(scope, new int[] {4, 4}, DType.FLOAT32));
+      tensors.put(stem + ".scales", MLX.zeros(scope, new int[] {4, 1}, DType.FLOAT32));
+      tensors.put(stem + ".biases", MLX.zeros(scope, new int[] {4, 1}, DType.FLOAT32));
+      String message =
+          assertThrows(
+                  IllegalArgumentException.class,
+                  () ->
+                      DecoderAssembler.validatePackedTensors(
+                          TestDescriptors.llamaWithQuantization(32, 4), tensors))
+              .getMessage();
+      assertTrue(message.contains(stem + ".scales"), message);
+      assertTrue(message.contains("known input width"), message);
+    }
+  }
+
+  @Test
   void missingMlpTensorStopsBeforeNativeLoad(@TempDir Path directory) throws IOException {
     TensorPlan plan = ArchitectureMappings.tensorPlan(TestDescriptors.llama(1, false));
     String missing = "model.layers.0.mlp.down_proj.weight";

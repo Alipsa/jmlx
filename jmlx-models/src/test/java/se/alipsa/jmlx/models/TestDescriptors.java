@@ -12,15 +12,26 @@ final class TestDescriptors {
   }
 
   static ArchitectureDescriptor llama(int layers, boolean attentionBias, boolean tiedHead) {
-    return dense("llama", layers, attentionBias, attentionBias, tiedHead);
+    return dense("llama", layers, attentionBias, attentionBias, tiedHead, null);
   }
 
   static ArchitectureDescriptor qwen2(int layers) {
-    return dense("qwen2", layers, true, false, false);
+    return dense("qwen2", layers, true, false, false, null);
+  }
+
+  /** One llama layer declaring an MLX-style quantization block. */
+  static ArchitectureDescriptor llamaWithQuantization(int groupSize, int bits) {
+    return dense(
+        "llama", 1, false, false, false, new ArchitectureDescriptor.Quantization(groupSize, bits));
   }
 
   private static ArchitectureDescriptor dense(
-      String type, int layers, boolean qkvBias, boolean outBias, boolean tiedHead) {
+      String type,
+      int layers,
+      boolean qkvBias,
+      boolean outBias,
+      boolean tiedHead,
+      ArchitectureDescriptor.Quantization quantization) {
     DecoderConfig dimensions =
         new DecoderConfig(type, 4, 4, 8, layers, 2, 1, 1e-6f, 10000, tiedHead, outBias, false);
     return new ArchitectureDescriptor(
@@ -35,6 +46,6 @@ final class TestDescriptors {
         new ArchitectureDescriptor.Head(tiedHead),
         new ArchitectureDescriptor.Embedding(false),
         null,
-        null);
+        quantization);
   }
 }

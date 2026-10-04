@@ -71,6 +71,11 @@ List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "
 String prompt = tokenizer.renderChat(messages, options);
 ```
 
+A `RenderOptions` that leaves the clock and/or zone unset gets the missing pieces topped up: a
+missing zone next to a supplied clock uses the clock's own zone (a fixed clock then renders
+identically on every host), and the system clock and default zone fill in only what is still
+missing — so options that change only another setting keep the no-options behavior.
+
 All `ChatTemplateRenderer.render` overloads accept the same `RenderOptions` as a final argument
 for lower-level callers. The time types come from `java.time`.
 

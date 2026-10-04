@@ -327,9 +327,14 @@ public final class DecoderAssembler {
         q.bits());
   }
 
-  /** Validates dimensions before slicing packed arrays or constructing any decoder layers. */
-  private static void validatePackedTensors(
-      ArchitectureDescriptor d, Map<String, MLXArray> tensors) {
+  /**
+   * Validates dimensions before slicing packed arrays or constructing any decoder layers. Package
+   * visible rather than private so tests can reach the defensive branches every public path
+   * preempts: {@link #assemble} runs the tensor plan validation first, which already rejects a
+   * {@code .scales} tensor on a descriptor that declares no quantization and any weight name the
+   * architecture does not know.
+   */
+  static void validatePackedTensors(ArchitectureDescriptor d, Map<String, MLXArray> tensors) {
     boolean sawPackedTensor = false;
     for (String key : tensors.keySet()) {
       if (!key.endsWith(".weight")) {

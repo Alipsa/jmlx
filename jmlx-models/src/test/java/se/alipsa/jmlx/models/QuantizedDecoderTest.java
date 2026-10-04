@@ -7,11 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.DType;
@@ -367,5 +370,63 @@ class QuantizedDecoderTest {
               IllegalArgumentException.class, () -> TextGenerationModels.load(scope, reference));
       assertTrue(error.getMessage().contains("unexpected tensor"), error.getMessage());
     }
+  }
+
+  @Test
+  void staleQuantizationBlockOnFloatCheckpointLoadsAsFloat(@TempDir Path dir) throws Exception {
+    // A float checkpoint whose config keeps a stale quantization block hits the warning branch:
+    // every layer loads as float (a hard error would break legitimately mixed float checkpoints)
+    // and the mismatch is reported instead of ignored silently.
+    Path source = dir.resolve("source");
+    TinyCheckpoints.randomLlama(source, 11L, 2, false, false);
+    Path stale = Files.createDirectories(dir.resolve("stale-quant"));
+    String config = Files.readString(source.resolve("config.json"));
+    Files.writeString(
+        stale.resolve("config.json"),
+        config.substring(0, config.lastIndexOf('}'))
+            + ",\"quantization\":{\"group_size\":32,\"bits\":4}}");
+    Files.copy(source.resolve("model.safetensors"), stale.resolve("model.safetensors"));
+    RecordingHandler warnings = new RecordingHandler();
+    // The default System.Logger delegates to the java.util.logging logger of the same name, so
+    // the warning is captured there.
+    java.util.logging.Logger jul =
+        java.util.logging.Logger.getLogger(DecoderAssembler.class.getName());
+    jul.addHandler(warnings);
+    try (MLXScope scope = new MLXScope()) {
+      assertClose(
+          logits(scope, source, new int[] {1, 5, 9}),
+          logits(scope, stale, new int[] {1, 5, 9}),
+          1e-3f);
+    } finally {
+      jul.removeHandler(warnings);
+    }
+    assertTrue(
+        warnings.messages().stream().anyMatch(m -> m.contains("no packed .scales tensors")),
+        String.join(" | ", warnings.messages()));
+  }
+
+  /** Captures WARNING-and-above messages published to a java.util.logging logger. */
+  private static final class RecordingHandler extends java.util.logging.Handler {
+    private final List<String> messages = new ArrayList<>();
+
+    List<String> messages() {
+      return messages;
+    }
+
+    @Override
+    public void publish(LogRecord record) {
+      if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
+        messages.add(
+            record.getParameters() == null
+                ? record.getMessage()
+                : MessageFormat.format(record.getMessage(), record.getParameters()));
+      }
+    }
+
+    @Override
+    public void flush() {}
+
+    @Override
+    public void close() {}
   }
 }

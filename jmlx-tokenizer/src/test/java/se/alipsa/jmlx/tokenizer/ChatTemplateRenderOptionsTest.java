@@ -70,19 +70,24 @@ class ChatTemplateRenderOptionsTest {
   }
 
   @Test
-  void clockOnlyRenderOptionsKeepTheirPinnedClockAcrossTheZoneTopUp() {
-    // A supplied clock with no zone keeps the clock's instant; the zone is topped up with the
-    // system default, which is exactly what the renderer documents.
-    Clock fixed = Clock.fixed(Instant.parse("2024-01-01T00:30:00Z"), ZoneOffset.UTC);
-    String rendered =
+  void clockOnlyRenderOptionsKeepTheirPinnedClockZone() {
+    // A supplied clock with no zone keeps the clock's own zone, not the host's default, so a
+    // pinned clock renders the same prompt on every host: the same instant reads a different date
+    // under a different pinned zone.
+    Instant instant = Instant.parse("2024-01-01T00:30:00Z");
+    String utc =
         ChatTemplateRenderer.render(
             "{{ strftime_now('%Y-%m-%d') }}",
-            Map.of(), RenderOptions.builder().clock(fixed).build());
-    assertEquals(
-        java.time.ZonedDateTime.ofInstant(
-                Instant.parse("2024-01-01T00:30:00Z"), ZoneId.systemDefault())
-            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")),
-        rendered);
+            Map.of(), RenderOptions.builder().clock(Clock.fixed(instant, ZoneOffset.UTC)).build());
+    String losAngeles =
+        ChatTemplateRenderer.render(
+            "{{ strftime_now('%Y-%m-%d') }}",
+            Map.of(),
+            RenderOptions.builder()
+                .clock(Clock.fixed(instant, ZoneId.of("America/Los_Angeles")))
+                .build());
+    assertEquals("2024-01-01", utc);
+    assertEquals("2023-12-31", losAngeles);
   }
 
   @Test

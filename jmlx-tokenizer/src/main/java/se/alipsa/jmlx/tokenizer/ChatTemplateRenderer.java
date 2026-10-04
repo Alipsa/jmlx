@@ -15,33 +15,35 @@ import se.alipsa.jmlx.jinja.Template;
 public final class ChatTemplateRenderer {
   /** Resolves the current default zone for each render, including changes to TimeZone defaults. */
   private static RenderOptions defaultRenderOptions() {
-    ZoneId zone = ZoneId.systemDefault();
-    return RenderOptions.builder().clock(Clock.system(zone)).zoneId(zone).build();
+    return withSystemClock(RenderOptions.DEFAULT);
   }
 
   /**
-   * Fills in only the missing pieces of {@code renderOptions} with the system clock and zone, so an
-   * options object that changes only another setting (e.g. {@code maxSteps}) keeps the no-options
-   * overloads' {@code strftime_now} behavior instead of failing at its first use — jinja's {@code
-   * strftime_now} requires both a clock and a zone at first use, and jinja's own option defaults
-   * carry neither. Options that already supply both pass through unchanged; a supplied zone with a
-   * missing clock derives the clock from that zone, so an explicit zone is still honored.
+   * Fills in only the missing pieces of {@code renderOptions} — the clock, the zone, or both — so
+   * an options object that changes only another setting (e.g. {@code maxSteps}) keeps the
+   * no-options overloads' {@code strftime_now} behavior instead of failing at its first use:
+   * jinja's {@code strftime_now} requires both a clock and a zone at first use, and jinja's own
+   * option defaults carry neither. Options that already supply both pass through unchanged; a
+   * supplied zone with a missing clock derives the clock from that zone, so an explicit zone is
+   * still honored; a supplied clock with a missing zone keeps the clock's own zone, so a pinned
+   * clock renders the same prompt on every host regardless of the default zone; and the system
+   * clock and zone apply only when both are missing. The top-up copies through {@link
+   * RenderOptions#toBuilder()} so a field added to that class later is carried over here
+   * automatically.
    */
   private static RenderOptions withSystemClock(RenderOptions renderOptions) {
     if (renderOptions.clock().isPresent() && renderOptions.zoneId().isPresent()) {
       return renderOptions;
     }
-    ZoneId zone = renderOptions.zoneId().orElseGet(ZoneId::systemDefault);
-    RenderOptions.Builder builder =
-        RenderOptions.builder()
-            .clock(renderOptions.clock().orElseGet(() -> Clock.system(zone)))
-            .zoneId(zone)
-            .maxSteps(renderOptions.maxSteps())
-            .maxLoopIterations(renderOptions.maxLoopIterations())
-            .maxOutputLength(renderOptions.maxOutputLength())
-            .maxMacroDepth(renderOptions.maxMacroDepth());
-    renderOptions.hostFunctions().forEach(builder::hostFunction);
-    return builder.build();
+    ZoneId zone =
+        renderOptions
+            .zoneId()
+            .orElseGet(
+                () -> renderOptions.clock().map(Clock::getZone).orElseGet(ZoneId::systemDefault));
+    return renderOptions.toBuilder()
+        .clock(renderOptions.clock().orElseGet(() -> Clock.system(zone)))
+        .zoneId(zone)
+        .build();
   }
 
   private ChatTemplateRenderer() {}
@@ -80,9 +82,11 @@ public final class ChatTemplateRenderer {
 
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts. A
-   * render options object that leaves the clock and zone unset gets the system clock and zone, so
-   * options that change only another setting keep the no-options overloads' {@code strftime_now}
-   * behavior.
+   * render options object that leaves the clock and/or zone unset gets a top-up, so options that
+   * change only another setting keep the no-options overloads' {@code strftime_now} behavior: the
+   * system clock and zone apply when both are missing, a supplied zone with a missing clock derives
+   * the clock from that zone, and a supplied clock without a zone keeps the clock's own zone, so a
+   * pinned clock renders the same prompt on every host.
    *
    * @param chatTemplate template source
    * @param messages chat messages
@@ -90,8 +94,9 @@ public final class ChatTemplateRenderer {
    * @param bosToken beginning-of-sequence token
    * @param eosToken end-of-sequence token
    * @param extraContext additional template values
-   * @param renderOptions explicit render settings; an unset clock and zone default to the system
-   *     clock and zone
+   * @param renderOptions explicit render settings; a missing clock or zone is topped up with the
+   *     system clock and zone, except that a missing zone next to a supplied clock uses that
+   *     clock's own zone
    * @return rendered prompt
    */
   public static String render(
@@ -142,9 +147,11 @@ public final class ChatTemplateRenderer {
 
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts. A
-   * render options object that leaves the clock and zone unset gets the system clock and zone, so
-   * options that change only another setting keep the no-options overloads' {@code strftime_now}
-   * behavior.
+   * render options object that leaves the clock and/or zone unset gets a top-up, so options that
+   * change only another setting keep the no-options overloads' {@code strftime_now} behavior: the
+   * system clock and zone apply when both are missing, a supplied zone with a missing clock derives
+   * the clock from that zone, and a supplied clock without a zone keeps the clock's own zone, so a
+   * pinned clock renders the same prompt on every host.
    *
    * @param chatTemplate parsed template
    * @param messages chat messages
@@ -152,8 +159,9 @@ public final class ChatTemplateRenderer {
    * @param bosToken beginning-of-sequence token
    * @param eosToken end-of-sequence token
    * @param extraContext additional template values
-   * @param renderOptions explicit render settings; an unset clock and zone default to the system
-   *     clock and zone
+   * @param renderOptions explicit render settings; a missing clock or zone is topped up with the
+   *     system clock and zone, except that a missing zone next to a supplied clock uses that
+   *     clock's own zone
    * @return rendered prompt
    */
   public static String render(
@@ -196,14 +204,17 @@ public final class ChatTemplateRenderer {
 
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts. A
-   * render options object that leaves the clock and zone unset gets the system clock and zone, so
-   * options that change only another setting keep the no-options overloads' {@code strftime_now}
-   * behavior.
+   * render options object that leaves the clock and/or zone unset gets a top-up, so options that
+   * change only another setting keep the no-options overloads' {@code strftime_now} behavior: the
+   * system clock and zone apply when both are missing, a supplied zone with a missing clock derives
+   * the clock from that zone, and a supplied clock without a zone keeps the clock's own zone, so a
+   * pinned clock renders the same prompt on every host.
    *
    * @param chatTemplate template source
    * @param context complete render context
-   * @param renderOptions explicit render settings; an unset clock and zone default to the system
-   *     clock and zone
+   * @param renderOptions explicit render settings; a missing clock or zone is topped up with the
+   *     system clock and zone, except that a missing zone next to a supplied clock uses that
+   *     clock's own zone
    * @return rendered prompt
    */
   public static String render(
@@ -224,14 +235,17 @@ public final class ChatTemplateRenderer {
 
   /**
    * Renders with explicit options, allowing a fixed clock and zone for reproducible prompts. A
-   * render options object that leaves the clock and zone unset gets the system clock and zone, so
-   * options that change only another setting keep the no-options overloads' {@code strftime_now}
-   * behavior.
+   * render options object that leaves the clock and/or zone unset gets a top-up, so options that
+   * change only another setting keep the no-options overloads' {@code strftime_now} behavior: the
+   * system clock and zone apply when both are missing, a supplied zone with a missing clock derives
+   * the clock from that zone, and a supplied clock without a zone keeps the clock's own zone, so a
+   * pinned clock renders the same prompt on every host.
    *
    * @param chatTemplate parsed template
    * @param context complete render context
-   * @param renderOptions explicit render settings; an unset clock and zone default to the system
-   *     clock and zone
+   * @param renderOptions explicit render settings; a missing clock or zone is topped up with the
+   *     system clock and zone, except that a missing zone next to a supplied clock uses that
+   *     clock's own zone
    * @return rendered prompt
    */
   public static String render(

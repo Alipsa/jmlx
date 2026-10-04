@@ -69,6 +69,26 @@ public final class RenderOptions {
   }
 
   /**
+   * Returns a builder pre-populated with this options object's current values, so a caller can
+   * change individual settings without copying the rest by hand. A field added to this class later
+   * is carried over by this method automatically, which a hand-rolled field-by-field copy at each
+   * call site is not.
+   *
+   * @return a new builder initialized from this options object
+   */
+  public Builder toBuilder() {
+    Builder builder = new Builder();
+    builder.clock = clock;
+    builder.zoneId = zoneId;
+    builder.maxSteps = maxSteps;
+    builder.maxLoopIterations = maxLoopIterations;
+    builder.maxOutputLength = maxOutputLength;
+    builder.maxMacroDepth = maxMacroDepth;
+    hostFunctions.forEach(builder::hostFunction);
+    return builder;
+  }
+
+  /**
    * Returns the optional caller-supplied clock.
    *
    * @return the clock, or empty; {@code strftime_now} requires an explicit clock at first use

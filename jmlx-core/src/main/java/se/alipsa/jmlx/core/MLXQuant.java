@@ -39,26 +39,6 @@ public final class MLXQuant {
   private MLXQuant() {}
 
   /**
-   * The group sizes accepted by {@link #quantize}, {@link #dequantize} and {@link #quantizedMatmul}
-   * under {@code mode="affine"}, in ascending order.
-   *
-   * @return an immutable list of the supported group sizes
-   */
-  public static List<Integer> supportedGroupSizes() {
-    return GROUP_SIZES;
-  }
-
-  /**
-   * The bit widths accepted by {@link #quantize}, {@link #dequantize} and {@link #quantizedMatmul}
-   * under {@code mode="affine"}, in ascending order.
-   *
-   * @return an immutable list of the supported bit widths
-   */
-  public static List<Integer> supportedBits() {
-    return BITS;
-  }
-
-  /**
    * Rejects a {@code groupSize} the native runtime does not support, naming the value and the
    * accepted set. {@code label} prefixes the message so each caller keeps its own context ("{@code
    * QuantizedLinear: groupSize}", "{@code quantization group_size}", ...); the accepted-set text is

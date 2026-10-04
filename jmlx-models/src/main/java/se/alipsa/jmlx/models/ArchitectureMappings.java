@@ -91,6 +91,14 @@ public final class ArchitectureMappings {
               .acceptsMaxWindowLayers()
               .acceptsLayerTypes()
               .build(),
+          "qwen3",
+          Family.builder(WindowPolicy.IGNORE)
+              .honorsAttentionBias()
+              .honorsExplicitHeadDim()
+              .acceptsMaxWindowLayers()
+              .acceptsLayerTypes()
+              .qkNorm()
+              .build(),
           "mistral",
           Family.builder(WindowPolicy.USE).build(),
           "phi3",
@@ -123,6 +131,11 @@ public final class ArchitectureMappings {
    * @param honorsMlpBias whether {@code mlp_bias} turns on MLP projection biases
    * @param acceptsMaxWindowLayers whether {@code max_window_layers} is a recognised field
    * @param acceptsLayerTypes whether a {@code layer_types} schedule may be present
+   * @param honorsExplicitHeadDim whether an explicit {@code head_dim} is honored when it
+   *     differs from {@code hidden_size / num_attention_heads} (Qwen3; Gemma is stricter and
+   *     requires the field outright)
+   * @param qkNorm per-head QK normalization: {@code self_attn.q_norm.weight}/{@code
+   *     k_norm.weight} over {@code head_dim} are required, after projection and before RoPE
    * @param window treatment of {@code sliding_window}
    */
   private record Family(
@@ -134,6 +147,8 @@ public final class ArchitectureMappings {
       boolean honorsMlpBias,
       boolean acceptsMaxWindowLayers,
       boolean acceptsLayerTypes,
+      boolean honorsExplicitHeadDim,
+      boolean qkNorm,
       WindowPolicy window) {
 
     /** Rejects capability combinations the tensor plan and assembler cannot express. */
@@ -162,6 +177,8 @@ public final class ArchitectureMappings {
       private boolean honorsMlpBias;
       private boolean acceptsMaxWindowLayers;
       private boolean acceptsLayerTypes;
+      private boolean honorsExplicitHeadDim;
+      private boolean qkNorm;
 
       private Builder(WindowPolicy window) {
         this.window = window;
@@ -207,6 +224,16 @@ public final class ArchitectureMappings {
         return this;
       }
 
+      Builder honorsExplicitHeadDim() {
+        honorsExplicitHeadDim = true;
+        return this;
+      }
+
+      Builder qkNorm() {
+        qkNorm = true;
+        return this;
+      }
+
       Family build() {
         return new Family(
             qwen2Bias,
@@ -217,6 +244,8 @@ public final class ArchitectureMappings {
             honorsMlpBias,
             acceptsMaxWindowLayers,
             acceptsLayerTypes,
+            honorsExplicitHeadDim,
+            qkNorm,
             window);
       }
     }
@@ -265,6 +294,12 @@ public final class ArchitectureMappings {
                 ? descriptor.attention().outBias()
                 : descriptor.attention().qkvBias();
         (bias ? required : forbidden).add(key + ".bias");
+      }
+      // QK normalization (Qwen3) is float-only: the names do not match the affine allow-list, so
+      // a quantized companion for them is rejected as an unexpected tensor.
+      for (String norm : Set.of("q_norm", "k_norm")) {
+        String key = layer + "self_attn." + norm;
+        (descriptor.attention().qkNorm() ? required : forbidden).add(key + ".weight");
       }
       if (descriptor.moe() != null) {
         required.add(layer + "block_sparse_moe.gate.weight");
@@ -339,7 +374,7 @@ public final class ArchitectureMappings {
     String type = requiredText(config, "model_type");
     Family family = FAMILIES.get(type);
     if (family == null) {
-      if ("gemma2".equals(type) || "gemma3".equals(type)) {
+      if ("gemma2".equals(type) || "gemma3".equals(type) || "qwen3_moe".equals(type)) {
         throw new IllegalArgumentException(
             "config.json model_type '" + type + "' is deferred to a later milestone");
       }
@@ -366,6 +401,7 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException("config.json gemma requires head_dim");
     }
     if (!gemma
+        && !family.honorsExplicitHeadDim()
         && node.hasNonNull("head_dim")
         && (!node.get("head_dim").canConvertToInt()
             || node.get("head_dim").intValue() * heads != hidden)) {
@@ -435,7 +471,18 @@ public final class ArchitectureMappings {
               + ".rope_theta");
     }
     float theta = (float) nestedTheta;
-    int headDim = gemma ? requiredInt(node, "head_dim") : hidden / heads;
+    int headDim;
+    if (node.hasNonNull("head_dim")) {
+      // Gemma requires the field outright; honorsExplicitHeadDim families (Qwen3) accept a
+      // value that differs from hidden_size / num_attention_heads; all other families must
+      // satisfy the product check above.
+      if (!node.get("head_dim").canConvertToInt()) {
+        throw new IllegalArgumentException("config.json head_dim must be an integer");
+      }
+      headDim = node.get("head_dim").intValue();
+    } else {
+      headDim = hidden / heads;
+    }
     double partial =
         node.path("partial_rotary_factor")
             .asDouble(
@@ -504,7 +551,8 @@ public final class ArchitectureMappings {
             family.fusedProjections() ? MlpLayout.FUSED_GATE_UP : MlpLayout.SEPARATE_GATE_UP,
             activation,
             mlpBias),
-        new Attention(qkvBias, !qwen2 && qkvBias, family.fusedProjections(), slidingWindow),
+        new Attention(qkvBias, !qwen2 && qkvBias, family.fusedProjections(), slidingWindow,
+            family.qkNorm()),
         new Head(dimensions.tieWordEmbeddings()),
         new Embedding(gemma),
         moe,

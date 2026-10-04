@@ -42,6 +42,7 @@ public final class TextGenerationModels {
     return switch (descriptor.modelType()) {
       case "llama" -> LlamaModel.create(scope, descriptor, directory);
       case "qwen2" -> QwenModel.create(scope, descriptor, directory);
+      case "qwen3" -> QwenModel.create(scope, descriptor, directory);
       case "mistral" -> MistralModel.create(scope, descriptor, directory);
       case "phi3" -> Phi3Model.create(scope, descriptor, directory);
       case "gemma" -> GemmaModel.create(scope, descriptor, directory);

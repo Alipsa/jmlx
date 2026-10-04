@@ -149,6 +149,107 @@ class DecoderAttentionTest {
     }
   }
 
+  private static DecoderAttention qkNormAttention(MLXScope scope, float qScale, float kScale) {
+    float[] qWeight = new float[] {qScale, qScale, qScale, qScale};
+    float[] kWeight = new float[] {kScale, kScale, kScale, kScale};
+    return new DecoderAttention(
+        scope,
+        1,
+        1,
+        4,
+        new RopeSpec.Base(10000f),
+        4,
+        null,
+        null,
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+        new RMSNorm(scope, MLX.array(scope, qWeight, new int[] {4}), 1e-6f),
+        new RMSNorm(scope, MLX.array(scope, kWeight, new int[] {4}), 1e-6f));
+  }
+
+  private static float rmsRms(float[] v, float eps) {
+    double sum = 0;
+    for (float e : v) {
+      sum += (double) e * e;
+    }
+    return (float) Math.sqrt(sum / v.length + eps);
+  }
+
+  @Test
+  @Tag("full-float32")
+  void qkNormNormalizesProjectionOutputBeforeRope() {
+    try (MLXScope scope = new MLXScope()) {
+      DecoderAttention attention = qkNormAttention(scope, 2f, 4f);
+      assertTrue(attention.parameters().containsKey("queryNorm.weight"));
+      assertTrue(attention.parameters().containsKey("keyNorm.weight"));
+      // Identity projections: each head equals the input row before normalization.
+      MLXArray x = MLX.array(scope, new float[] {1, 2, 3, 4, 2, 1, 4, 3}, new int[] {1, 2, 4});
+      float[][] rows = {{1, 2, 3, 4}, {2, 1, 4, 3}};
+      float[] qn = new float[8];
+      float[] kn = new float[8];
+      for (int t = 0; t < 2; t++) {
+        float rms = rmsRms(rows[t], 1e-6f);
+        for (int d = 0; d < 4; d++) {
+          qn[t * 4 + d] = 2f * rows[t][d] / rms;
+          kn[t * 4 + d] = 4f * rows[t][d] / rms;
+        }
+      }
+      RopeSpec rope = new RopeSpec.Base(10000f);
+      MLXArray q = rope.apply(MLX.array(scope, qn, new int[] {1, 1, 2, 4}), 4, 0, null);
+      MLXArray k = rope.apply(MLX.array(scope, kn, new int[] {1, 1, 2, 4}), 4, 0, null);
+      MLXArray v = MLXShape.reshape(x, new int[] {1, 1, 2, 4});
+      MLXArray expected =
+          MLXFast.scaledDotProductAttention(q, k, v, 0.5f, true, null, null);
+      assertArrayEquals(expected.toFloatArray(), attention.forward(x, null).toFloatArray(), 1e-5f);
+    }
+  }
+
+  @Test
+  @Tag("full-float32")
+  void qkNormNormalizedKeysEnterTheCache() {
+    try (MLXScope scope = new MLXScope()) {
+      // Decoding from the cache must equal a full prefill: keys are normalized once, at creation,
+      // so a second normalization on later steps would change the numbers.
+      DecoderAttention attention = qkNormAttention(scope, 2f, 4f);
+      MLXArray prompt = MLX.array(scope, new float[] {1, 2, 3, 4, 2, 1, 4, 3}, new int[] {1, 2, 4});
+      float[] full = attention.forward(prompt, null).toFloatArray();
+      KVCache cache = new KVCache(scope);
+      MLXArray row0 = MLXShape.slice(prompt, new int[] {0, 0, 0}, new int[] {1, 1, 4});
+      attention.forward(row0, cache);
+      MLXArray row1 = MLXShape.slice(prompt, new int[] {0, 1, 0}, new int[] {1, 2, 4});
+      float[] decoded = attention.forward(row1, cache).toFloatArray();
+      assertArrayEquals(
+          new float[] {full[4], full[5], full[6], full[7]}, decoded, 1e-5f);
+    }
+  }
+
+  @Test
+  void qkNormRejectsWrongWeightDimension() {
+    try (MLXScope scope = new MLXScope()) {
+      RMSNorm wrongDim = new RMSNorm(scope, MLX.array(scope, new float[] {1, 1, 1}, new int[] {3}), 1e-6f);
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              new DecoderAttention(
+                  scope,
+                  1,
+                  1,
+                  4,
+                  new RopeSpec.Base(10000f),
+                  4,
+                  null,
+                  null,
+                  new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+                  new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+                  new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+                  new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
+                  wrongDim,
+                  wrongDim));
+    }
+  }
+
   private static float[] identity(int size) {
     float[] data = new float[size * size];
     for (int i = 0; i < size; i++) {

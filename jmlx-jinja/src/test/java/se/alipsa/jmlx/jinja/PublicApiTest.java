@@ -9,9 +9,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Modifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -138,6 +140,17 @@ class PublicApiTest {
             .maxOutputLength(333)
             .maxMacroDepth(444)
             .build();
+
+    // Guard for toBuilder(): it copies fields by hand, so a field added to RenderOptions later
+    // is only carried over if someone adds a copy line AND updates this test. Counting the
+    // declared instance fields makes that forgotten copy fail here rather than silently
+    // round-tripping at its default value.
+    assertEquals(
+        7,
+        Arrays.stream(RenderOptions.class.getDeclaredFields())
+            .filter(f -> !Modifier.isStatic(f.getModifiers()))
+            .count(),
+        "RenderOptions gained a field: copy it in toBuilder() and assert it here");
 
     var rebuilt = options.toBuilder().build();
 

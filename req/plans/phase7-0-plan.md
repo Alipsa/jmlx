@@ -283,3 +283,69 @@ It stays a manual, evidence-only run recorded in `req/phase6-4-benchmark.md`.
    (`JMLX_TIER_B_MODEL_DIR`, `JMLX_TIER_B_MANIFEST=tools/tier-b/qwen3-0.6b.json`).
 4. 8B 4-bit manual run recorded in `req/phase6-4-benchmark.md`.
 5. `git diff --check`; diff review of every golden/provenance change.
+## 12. Status (2026-10-05, mid-milestone pause)
+
+Done and green on branch `phase7-0-qwen3`:
+
+- Step 0 roadmap amendment (its own commit, per the master plan).
+- This sub-plan, with all live-artifact verifications (fact 8's inverted
+  `enable_thinking` included).
+- `DecoderAttention` qk-norm (jmlx-core) + strict/cache/dimension tests
+  (default and `float32GoldenTest` green).
+- `ArchitectureDescriptor.Attention.qkNorm`, the `qwen3` family in
+  `ArchitectureMappings` (explicit head_dim, honored `attention_bias`,
+  `qwen3_moe` named deferral, tensor plan), `DecoderAssembler` wiring,
+  `TextGenerationModels` dispatch, `QwenModel` javadoc.
+- Mapping tests (live 0.6B/8B configs, per-family pins), `TinyCheckpoints
+  .randomQwen3`, `Qwen3ModelTest` (8 tests), `QuantizedDecoderTest` qwen3
+  cases. `:jmlx-models:test` (228), `:jmlx-models:float32GoldenTest` (22),
+  `:jmlx-core:test` (389) and `:jmlx-core:float32GoldenTest` (13) all green.
+- `tools/hf-reference/generate.py`: `qwen3` appended to `FAMILIES`/
+  `CHAT_FAMILIES`, `Qwen3Config(head_dim=32)` fixture config, tensor-name
+  manifest with float-only `q_norm`/`k_norm`.
+
+Remaining, in order:
+
+1. `generate.py --chat qwen3`: per-family extra kwargs to
+   `apply_chat_template` (`enable_thinking` true/false), tool-call and
+   multi-turn-with-assistant conversation cases, plus the committed bundle
+   it renders (see 2).
+2. `jmlx-tokenizer/src/test/resources/families/qwen3/` bundle: small
+   byte-level BPE `tokenizer.json` (per the existing synthetic-bundle
+   convention) with the real Qwen3 chat template (SHA-256 in §2 fact 8)
+   embedded in `tokenizer_config.json`; the same template committed to
+   `jmlx-jinja/src/test/resources/model-templates/` with `InterpreterTest`
+   cases (enable_thinking true/false, system/no-system, multi-turn,
+   tool call).
+3. `tools/tokenizer-oracle` encode/decode fixtures for the bundle
+   (`install.sh`, `generateTokenizerOracleFixtures`).
+4. Tier-A goldens: temporary `workflow_dispatch` job on `ubuntu-24.04`
+   (pinned `requirements.lock`, CPython 3.12) running
+   `generate.py --family qwen3 --out goldens` and `--chat --family qwen3`;
+   commit `qwen3.json`, `checkpoints/qwen3/*`, `chat-qwen3.json` and the
+   rewritten `provenance.json` (all other file hashes must stay
+   byte-identical); delete the temporary workflow.
+5. Add the `qwen3` `@ValueSource` entry to `DecoderRefactorGoldenTest`
+   and `BatchStepEquivalenceTest`, the scheduler family lists where they
+   enumerate all families, and the
+   `qwen3SyntheticCheckpointMatchesTheDequantizedWeights` quantized case
+   that reads the committed HF checkpoint.
+6. CI: `Qwen3ModelTest` on the required-suite list in
+   `.github/workflows/ci.yml` (and the core float32 list if the new
+   strict test class were added there — it is not; `DecoderAttentionTest`
+   already runs).
+7. Tier-B: `tools/tier-b/qwen3-0.6b.json` (revision `c1899de...`, file
+   hashes from the artifact), `.github/workflows/tier-b.yml` entry, local
+   run recording the exact greedy IDs, peak test-JVM RSS and the
+   observed-run link.
+8. 8B 4-bit manual run: `mlx-community/Qwen3-8B-4bit` (revision
+   `545dc42...`), load + short greedy decode, peak native memory and
+   download size recorded against the CI runner budget in
+   `req/phase6-tier-b-artifacts.md`; benchmark into
+   `req/phase6-4-benchmark.md`; default-mode measured error into
+   `req/phase6-golden-precision.md`.
+9. Docs: `req/phase6-compatibility.md` Qwen3 row + Quantization-column
+   reconciliation with the PR #31 affine support; `jmlx-models`
+   published-POM description and `DecoderModel` javadoc mention the
+   family.
+10. Final gate: `./gradlew build` plus the verification checklist in §11.

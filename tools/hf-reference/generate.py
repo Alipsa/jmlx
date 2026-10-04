@@ -21,6 +21,7 @@ from transformers import (
     MixtralConfig,
     Phi3Config,
     Qwen2Config,
+    Qwen3Config,
 )
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS
 from transformers.models.llama.modeling_llama import (
@@ -29,8 +30,10 @@ from transformers.models.llama.modeling_llama import (
 )
 
 
-FAMILIES = ("llama", "qwen2", "llama31", "mistral", "phi3", "gemma", "mixtral")
-CHAT_FAMILIES = ("mistral", "gemma", "phi3", "mixtral")
+# qwen3 is appended last: the per-family seed is SEED + FAMILIES.index(family), so existing
+# families keep their seeds (and goldens) byte-identical.
+FAMILIES = ("llama", "qwen2", "llama31", "mistral", "phi3", "gemma", "mixtral", "qwen3")
+CHAT_FAMILIES = ("mistral", "gemma", "phi3", "mixtral", "qwen3")
 SEED = 6302026
 PROMPT_IDS = [1, 7, 42, 3, 19, 5]
 # Peeled commit of the exact v4.57.6 release tag (not the annotated tag object).
@@ -86,6 +89,11 @@ def config_for(family):
         return config
     if family == "qwen2":
         return Qwen2Config(**common, use_sliding_window=False)
+    if family == "qwen3":
+        # head_dim differs from hidden_size // num_attention_heads (16) on purpose, so the
+        # golden exercises the explicit-head-dim path end to end; Qwen3 also always ships
+        # q_norm/k_norm and no projection biases (attention_bias=False).
+        return Qwen3Config(**common, head_dim=32)
     if family == "mistral":
         return MistralConfig(**common, sliding_window=4)
     if family == "phi3":
@@ -115,6 +123,10 @@ def expected_tensor_names(family):
             if family == "qwen2":
                 names.update(prefix + "self_attn." + name for name in (
                     "q_proj.bias", "k_proj.bias", "v_proj.bias"))
+            if family == "qwen3":
+                # Float-only per-head QK normalization; Qwen3 has no projection biases.
+                names.update(prefix + "self_attn." + name for name in (
+                    "q_norm.weight", "k_norm.weight"))
             if family == "mixtral":
                 names.add(prefix + "block_sparse_moe.gate.weight")
                 for expert in range(4):

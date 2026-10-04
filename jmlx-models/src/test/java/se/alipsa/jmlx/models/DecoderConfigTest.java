@@ -99,7 +99,9 @@ class DecoderConfigTest {
             "{\"quant_method\":\"gptq\",\"group_size\":64,\"bits\":4}", "gptq",
             "{\"group_size\":64,\"bits\":4,\"mode\":\"mxfp4\"}", "mxfp4",
             "{\"group_size\":64.5,\"bits\":4}", "group_size",
-            "{\"group_size\":64,\"bits\":4.5}", "bits");
+            "{\"group_size\":64,\"bits\":4.5}", "bits",
+            "{\"bits\":4}", "group_size",
+            "{\"group_size\":64}", "bits");
     for (var entry : cases.entrySet()) {
       Files.writeString(config, base.formatted(entry.getKey()));
       IllegalArgumentException error =

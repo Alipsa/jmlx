@@ -55,6 +55,50 @@ class ChatTemplateRenderOptionsTest {
   }
 
   @Test
+  void explicitRenderOptionsWithoutClockOrZoneStillRenderStrftimeNow() throws Exception {
+    HfTokenizer tokenizer = tokenizerWithDateTemplate();
+    // The reported regression: passing RenderOptions only to raise a limit used to leave
+    // strftime_now without a clock (jinja requires both clock and zone at first use) and fail a
+    // template that renders fine by default.
+    String rendered =
+        tokenizer.renderChat(
+            List.of(Map.of("role", "user", "content", "hi")),
+            new ChatTemplateOptions(
+                "", true, Map.of(), RenderOptions.builder().maxSteps(500_000).build()));
+    assertTrue(
+        rendered.matches("\\d{4}-\\d{2}-\\d{2} hi"), "unexpected rendered date: " + rendered);
+  }
+
+  @Test
+  void clockOnlyRenderOptionsKeepTheirPinnedClockAcrossTheZoneTopUp() {
+    // A supplied clock with no zone keeps the clock's instant; the zone is topped up with the
+    // system default, which is exactly what the renderer documents.
+    Clock fixed = Clock.fixed(Instant.parse("2024-01-01T00:30:00Z"), ZoneOffset.UTC);
+    String rendered =
+        ChatTemplateRenderer.render(
+            "{{ strftime_now('%Y-%m-%d') }}",
+            Map.of(), RenderOptions.builder().clock(fixed).build());
+    assertEquals(
+        java.time.ZonedDateTime.ofInstant(
+                Instant.parse("2024-01-01T00:30:00Z"), ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+        rendered);
+  }
+
+  @Test
+  void topUpPreservesLimitsAndHostFunctionsOfPartialRenderOptions() {
+    String rendered =
+        ChatTemplateRenderer.render(
+            "{{ shout('hi') }} {{ strftime_now('%Y') }}",
+            Map.of(),
+            RenderOptions.builder()
+                .maxSteps(500_000)
+                .hostFunction("shout", arguments -> String.valueOf(arguments.get(0)).toUpperCase())
+                .build());
+    assertTrue(rendered.matches("HI \\d{4}"), "unexpected rendered prompt: " + rendered);
+  }
+
+  @Test
   void legacyOptionsShapesLeaveRenderOptionsNull() {
     assertNull(new ChatTemplateOptions("", false, Map.of()).renderOptions());
     assertNull(new ChatTemplateOptions("", false, Map.of(), null).renderOptions());

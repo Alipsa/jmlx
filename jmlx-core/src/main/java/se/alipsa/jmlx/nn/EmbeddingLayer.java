@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.nn;
 
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * A token embedding table that can also act as a tied output head: {@link #forward} looks up rows
@@ -9,7 +10,7 @@ import se.alipsa.jmlx.core.MLXArray;
 public abstract class EmbeddingLayer extends Module implements UnaryModule {
 
   /** Creates an embedding layer owned by {@code scope}. */
-  protected EmbeddingLayer(se.alipsa.jmlx.memory.MLXScope scope) {
+  protected EmbeddingLayer(MLXScope scope) {
     super(scope);
   }
 

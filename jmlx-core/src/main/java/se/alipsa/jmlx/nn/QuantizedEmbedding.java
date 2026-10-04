@@ -152,14 +152,8 @@ public final class QuantizedEmbedding extends EmbeddingLayer {
               + " "
               + Arrays.toString(weight.shape()));
     }
-    if (groupSize != 32 && groupSize != 64 && groupSize != 128) {
-      throw new IllegalArgumentException(
-          "QuantizedEmbedding: groupSize must be one of {32, 64, 128}, got " + groupSize);
-    }
-    if (bits != 2 && bits != 3 && bits != 4 && bits != 5 && bits != 6 && bits != 8) {
-      throw new IllegalArgumentException(
-          "QuantizedEmbedding: bits must be one of {2, 3, 4, 5, 6, 8}, got " + bits);
-    }
+    MLXQuant.checkGroupSize("QuantizedEmbedding: groupSize", groupSize);
+    MLXQuant.checkBits("QuantizedEmbedding: bits", bits);
     validateScalesAndBiasesAgainstWeight(weight, scales, biases, groupSize, bits);
   }
 

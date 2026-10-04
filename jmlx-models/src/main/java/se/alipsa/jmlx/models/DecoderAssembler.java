@@ -25,6 +25,8 @@ import se.alipsa.jmlx.nn.UnaryLayer;
 
 /** Constructs the registered decoder modules from a validated architecture and checkpoint. */
 public final class DecoderAssembler {
+  private static final System.Logger LOGGER = System.getLogger(DecoderAssembler.class.getName());
+
   private DecoderAssembler() {}
 
   /** Components to register under the decoder's stable child names. */
@@ -328,6 +330,7 @@ public final class DecoderAssembler {
   /** Validates dimensions before slicing packed arrays or constructing any decoder layers. */
   private static void validatePackedTensors(
       ArchitectureDescriptor d, Map<String, MLXArray> tensors) {
+    boolean sawPackedTensor = false;
     for (String key : tensors.keySet()) {
       if (!key.endsWith(".weight")) {
         continue;
@@ -341,13 +344,15 @@ public final class DecoderAssembler {
         }
         continue;
       }
-      ArchitectureDescriptor.Quantization q = Objects.requireNonNull(d.quantization());
-      int input =
-          prefix.endsWith(".down_proj")
-              ? d.dimensions().intermediateSize()
-              : prefix.endsWith(".o_proj")
-                  ? d.dimensions().numAttentionHeads() * d.headDim()
-                  : d.dimensions().hiddenSize();
+      sawPackedTensor = true;
+      ArchitectureDescriptor.Quantization q = d.quantization();
+      if (q == null) {
+        throw new IllegalArgumentException(
+            "checkpoint tensor '"
+                + prefix
+                + ".scales' present but config declares no quantization");
+      }
+      int input = packedInputWidth(d, prefix);
       MLXArray weight = tensors.get(key);
       if (scales.ndim() != 2 || (long) scales.shape()[1] * q.groupSize() != input) {
         throw new IllegalArgumentException(
@@ -374,6 +379,49 @@ public final class DecoderAssembler {
           weight.shape()[0],
           input / q.groupSize());
     }
+    if (d.quantization() != null && !sawPackedTensor) {
+      // Every .scales-less weight above fell back to a float layer, so a checkpoint that was
+      // never actually quantized loads silently as float. The reverse mismatches (packed data
+      // without a declared block, missing .scales for packed data) are hard errors; this one
+      // is only silently wrong in the sense that the declared packing is ignored -- hence a
+      // warning rather than a rejection, which would break legitimately mixed float checkpoints.
+      LOGGER.log(
+          System.Logger.Level.WARNING,
+          "config declares quantization (group_size {0}, bits {1}) but the checkpoint has no"
+              + " packed .scales tensors; every layer loads as float",
+          d.quantization().groupSize(),
+          d.quantization().bits());
+    }
+  }
+
+  /**
+   * The input width a packed projection's group count must match, keyed by the projection name. An
+   * unrecognized {@code .scales}-bearing name fails loudly here rather than defaulting to {@code
+   * hiddenSize}, so a future family with differently named projections cannot be silently validated
+   * against the wrong width.
+   */
+  private static int packedInputWidth(ArchitectureDescriptor d, String prefix) {
+    if (prefix.endsWith(".down_proj")) {
+      return d.dimensions().intermediateSize();
+    }
+    if (prefix.endsWith(".o_proj")) {
+      return d.dimensions().numAttentionHeads() * d.headDim();
+    }
+    if (prefix.endsWith(".q_proj")
+        || prefix.endsWith(".k_proj")
+        || prefix.endsWith(".v_proj")
+        || prefix.endsWith(".qkv_proj")
+        || prefix.endsWith(".gate_proj")
+        || prefix.endsWith(".up_proj")
+        || prefix.endsWith(".gate_up_proj")
+        || prefix.endsWith(".embed_tokens")
+        || prefix.equals("lm_head")) {
+      return d.dimensions().hiddenSize();
+    }
+    throw new IllegalArgumentException(
+        "checkpoint tensor '"
+            + prefix
+            + ".scales' names no projection with a known input width for this architecture");
   }
 
   private static MLXArray tensor(Map<String, MLXArray> tensors, String name) {

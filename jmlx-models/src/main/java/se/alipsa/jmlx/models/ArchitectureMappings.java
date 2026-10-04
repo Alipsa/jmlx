@@ -535,9 +535,10 @@ public final class ArchitectureMappings {
    * Reads an MLX-style {@code quantization} block ({@code group_size}, {@code bits}). Only the
    * default affine mode is supported, and not for mixture-of-experts, whose stacked expert tensors
    * have no quantized path yet. A per-layer override in the block is rejected rather than ignored:
-   * every layer would silently be read with the global setting. Both values must be integral JSON
-   * numbers: a fractional value such as {@code 64.5} is rejected rather than truncated, so a
-   * malformed config cannot select different packing parameters than it declares.
+   * every layer would silently be read with the global setting. Both values must be present
+   * integral JSON numbers: a fractional value such as {@code 64.5} is rejected rather than
+   * truncated, and a missing one is rejected rather than defaulted, so a malformed config cannot
+   * select different packing parameters than it declares.
    */
   private static Quantization parseQuantization(JsonNode node, boolean moe) {
     JsonNode block = node.hasNonNull("quantization") ? node.get("quantization") : null;
@@ -584,11 +585,14 @@ public final class ArchitectureMappings {
     }
     JsonNode groupSize = q.path("group_size");
     JsonNode bits = q.path("bits");
+    // isIntegralNumber covers "missing" (a MissingNode is not a number) as well as fractional,
+    // so both failure shapes are described by the message below.
     if (!groupSize.isIntegralNumber() || !groupSize.canConvertToInt()) {
-      throw new IllegalArgumentException("config.json " + key + ".group_size must be an integer");
+      throw new IllegalArgumentException(
+          "config.json " + key + ".group_size is missing or non-integer");
     }
     if (!bits.isIntegralNumber() || !bits.canConvertToInt()) {
-      throw new IllegalArgumentException("config.json " + key + ".bits must be an integer");
+      throw new IllegalArgumentException("config.json " + key + ".bits is missing or non-integer");
     }
     return new Quantization(groupSize.intValue(), bits.intValue());
   }

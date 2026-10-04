@@ -56,6 +56,29 @@ disabled. The reserved context includes `messages`, `add_generation_prompt`, and
 `bos_token`, `eos_token`, `pad_token`, `unk_token`, `sep_token`, `cls_token`, and `mask_token`.
 `extraContext` can supply values such as `tools`, but reserved-key collisions are rejected.
 
+Templates using `strftime_now` use the current system clock and default zone on each render.
+For reproducible prompts, supply a `RenderOptions` (from `se.alipsa.jmlx.jinja`):
+`ChatTemplateOptions` takes one as its fourth component, so the high-level `renderChat` path
+pins it too; a null component (or the three-argument constructor) keeps the system clock:
+
+```java
+var renderOptions = RenderOptions.builder()
+    .clock(Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC))
+    .zoneId(ZoneOffset.UTC)
+    .build();
+var options = new ChatTemplateOptions("", true, Map.of(), renderOptions);
+List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "Hello"));
+String prompt = tokenizer.renderChat(messages, options);
+```
+
+A `RenderOptions` that leaves the clock and/or zone unset gets the missing pieces topped up: a
+missing zone next to a supplied clock uses the clock's own zone (a fixed clock then renders
+identically on every host), and the system clock and default zone fill in only what is still
+missing — so options that change only another setting keep the no-options behavior.
+
+All `ChatTemplateRenderer.render` overloads accept the same `RenderOptions` as a final argument
+for lower-level callers. The time types come from `java.time`.
+
 ## Incremental output
 
 Create a decoder per generated request; never decode individual ByteLevel tokens independently,

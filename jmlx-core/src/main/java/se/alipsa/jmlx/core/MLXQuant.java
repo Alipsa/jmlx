@@ -1,7 +1,10 @@
 package se.alipsa.jmlx.core;
 
+import static java.util.stream.Collectors.joining;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import se.alipsa.jmlx.ffi.mlx_h;
@@ -19,7 +22,59 @@ public final class MLXQuant {
 
   private static final Set<String> MODES = Set.of("affine", "mxfp4", "mxfp8", "nvfp4");
 
+  /**
+   * The group sizes the pinned native runtime accepts for affine quantization. Single source of
+   * truth for {@link #checkGroupSize} -- {@code QuantizedLinear}, {@code QuantizedEmbedding} and
+   * the model descriptor's {@code quantization} block all validate against this list, so their
+   * accepted values cannot drift apart.
+   */
+  private static final List<Integer> GROUP_SIZES = List.of(32, 64, 128);
+
+  /**
+   * The bit widths the pinned native runtime accepts for affine quantization. Single source of
+   * truth for {@link #checkBits}; see {@link #GROUP_SIZES} for why this list exists.
+   */
+  private static final List<Integer> BITS = List.of(2, 3, 4, 5, 6, 8);
+
   private MLXQuant() {}
+
+  /**
+   * Rejects a {@code groupSize} the native runtime does not support, naming the value and the
+   * accepted set. {@code label} prefixes the message so each caller keeps its own context ("{@code
+   * QuantizedLinear: groupSize}", "{@code quantization group_size}", ...); the accepted-set text is
+   * rendered from {@link #GROUP_SIZES} so it cannot drift from what is actually checked.
+   *
+   * @param label the parameter's name in the caller's own message style, without the {@code must
+   *     be} clause
+   * @param groupSize the value to validate
+   * @throws IllegalArgumentException if {@code groupSize} is not supported
+   */
+  public static void checkGroupSize(String label, int groupSize) {
+    if (!GROUP_SIZES.contains(groupSize)) {
+      throw new IllegalArgumentException(
+          label + " must be one of " + brace(GROUP_SIZES) + ", got " + groupSize);
+    }
+  }
+
+  /**
+   * Rejects a {@code bits} width the native runtime does not support; same contract and {@code
+   * label} convention as {@link #checkGroupSize}.
+   *
+   * @param label the parameter's name in the caller's own message style, without the {@code must
+   *     be} clause
+   * @param bits the value to validate
+   * @throws IllegalArgumentException if {@code bits} is not supported
+   */
+  public static void checkBits(String label, int bits) {
+    if (!BITS.contains(bits)) {
+      throw new IllegalArgumentException(
+          label + " must be one of " + brace(BITS) + ", got " + bits);
+    }
+  }
+
+  private static String brace(List<Integer> values) {
+    return values.stream().map(String::valueOf).collect(joining(", ", "{", "}"));
+  }
 
   /**
    * Validates {@code mode} against the four upstream {@code QuantizationMode} values (Findings

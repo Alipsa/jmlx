@@ -322,14 +322,8 @@ public final class QuantizedLinear extends UnaryLayer {
               + Arrays.toString(weight.shape()));
     }
     validateBiasAgainstWeight(weight, bias);
-    if (bits != 2 && bits != 3 && bits != 4 && bits != 5 && bits != 6 && bits != 8) {
-      throw new IllegalArgumentException(
-          "QuantizedLinear: bits must be one of {2, 3, 4, 5, 6, 8}, got " + bits);
-    }
-    if (groupSize != 32 && groupSize != 64 && groupSize != 128) {
-      throw new IllegalArgumentException(
-          "QuantizedLinear: groupSize must be one of {32, 64, 128}, got " + groupSize);
-    }
+    MLXQuant.checkBits("QuantizedLinear: bits", bits);
+    MLXQuant.checkGroupSize("QuantizedLinear: groupSize", groupSize);
     validateScalesAndBiasesAgainstWeight(weight, scales, biases, groupSize, bits);
   }
 

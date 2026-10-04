@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import se.alipsa.jmlx.jinja.RenderOptions;
 import se.alipsa.jmlx.jinja.Template;
 
 /**
@@ -95,7 +96,7 @@ public final class HfTokenizer {
    * Renders one configured chat template.
    *
    * @param messages ordered textual role/content messages
-   * @param options template name, generation-prompt flag, and extra context
+   * @param options template name, generation-prompt flag, extra context, and render options
    * @return rendered prompt text
    */
   public String renderChat(List<Map<String, Object>> messages, ChatTemplateOptions options) {
@@ -131,7 +132,10 @@ public final class HfTokenizer {
     putToken(context, "sep_token", metadata.separatorToken());
     putToken(context, "cls_token", metadata.classificationToken());
     putToken(context, "mask_token", metadata.maskToken());
-    return ChatTemplateRenderer.render(template, context);
+    RenderOptions renderOptions = options.renderOptions();
+    return renderOptions == null
+        ? ChatTemplateRenderer.render(template, context)
+        : ChatTemplateRenderer.render(template, context, renderOptions);
   }
 
   private static Map<String, Object> validatedMessage(Map<String, Object> message) {

@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import java.util.Objects;
+import se.alipsa.jmlx.core.MLXQuant;
 import se.alipsa.jmlx.nn.Activation;
 import se.alipsa.jmlx.nn.RopeSpec;
 
@@ -15,7 +16,8 @@ public record ArchitectureDescriptor(
     Attention attention,
     Head head,
     Embedding embedding,
-    Moe moe) {
+    Moe moe,
+    Quantization quantization) {
 
   /** Validates dimensions and required component specifications. */
   public ArchitectureDescriptor {
@@ -86,6 +88,22 @@ public record ArchitectureDescriptor(
 
   /** Whether embeddings are scaled by the square root of hidden size. */
   public record Embedding(boolean scaleBySqrtHidden) {}
+
+  /**
+   * Affine weight quantization declared by an MLX-style {@code quantization} config block. Packing
+   * is decided per layer by the checkpoint itself: a layer whose tensors include {@code .scales}
+   * (and {@code .biases}) alongside {@code .weight} loads packed, and every other layer — norm
+   * weights, biases, and projections whose width is not group-size compatible — stays float, so one
+   * checkpoint can mix packed and float layers. A null {@code quantization} on the descriptor means
+   * the config declares none; packed tensors in that case are rejected by {@code DecoderAssembler}.
+   */
+  public record Quantization(int groupSize, int bits) {
+    /** Validates the group size and bit width against the sets the native runtime supports. */
+    public Quantization {
+      MLXQuant.checkGroupSize("quantization group_size", groupSize);
+      MLXQuant.checkBits("quantization bits", bits);
+    }
+  }
 
   /** Expert count and number selected per token. */
   public record Moe(int experts, int topK) {

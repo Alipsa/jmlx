@@ -4,13 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class HfTokenizerTest {
+
+  @TempDir Path temporaryDirectory;
 
   @Test
   void qwen25GoldenVectorsMatchHuggingFaceTokenizers() {
@@ -249,5 +256,73 @@ class HfTokenizerTest {
     // different id" -- and missed exactly this case (PR #14 review round 4, finding 2).
     Path path = fixture("llama3-style-template-id-mirrors-a-different-id.tokenizer.json");
     assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(path));
+  }
+
+  @Test
+  void additionalTemplatesMayBeSymlinksIntoTheHubBlobCache() throws Exception {
+    Path snapshot = Files.createDirectory(temporaryDirectory.resolve("snapshot"));
+    Path blobs = Files.createDirectory(temporaryDirectory.resolve("blobs"));
+    Files.copy(wordPieceFixture(), snapshot.resolve("tokenizer.json"));
+    Path blob = Files.writeString(blobs.resolve("abc123"), "TOOLS {{ messages[0].content }}");
+    Path additional = Files.createDirectory(snapshot.resolve("additional_chat_templates"));
+    Files.createSymbolicLink(additional.resolve("tool_use.jinja"), blob);
+    HfTokenizer tokenizer = HfTokenizer.fromDirectory(snapshot);
+    assertEquals(
+        "TOOLS hi",
+        tokenizer.renderChat(
+            List.of(Map.of("role", "user", "content", "hi")),
+            new ChatTemplateOptions("tool_use", false, Map.of())));
+  }
+
+  @Test
+  void nullValuesInMessagesAndContextDoNotThrowRawNullPointerException() throws Exception {
+    Path directory = Files.createDirectory(temporaryDirectory.resolve("nulls"));
+    Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));
+    Files.writeString(directory.resolve("chat_template.jinja"), "{{ messages[0].content }}");
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("role", "assistant");
+    message.put("content", "hello");
+    message.put("tool_calls", null);
+    Map<String, Object> context = new HashMap<>();
+    context.put("tools", null);
+    HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+    assertEquals(
+        "hello",
+        tokenizer.renderChat(List.of(message), new ChatTemplateOptions("", false, context)));
+  }
+
+  @Test
+  void inputAddedTokensAreNotMarkedAsPostProcessorSpecialTokens() {
+    TokenizerDefinition definition =
+        new TokenizerDefinition(
+            null,
+            null,
+            List.of(),
+            new TokenizerDefinition.WordPiece(Map.of("x", 0, "[UNK]", 1), "[UNK]", "##", 100),
+            null,
+            List.of(new AddedToken(2, "<A>", true)),
+            EncodingOptions.unbounded(false),
+            false,
+            false);
+    TokenizerEncoding encoding =
+        new TokenizerRuntime(definition).encode("x<A>x", EncodingOptions.unbounded(false));
+    assertEquals(List.of(0, 2, 0), encoding.ids());
+    assertEquals(List.of(0, 0, 0), encoding.specialTokensMask());
+  }
+
+  @Test
+  void fixedPaddingCanBeShorterThanTruncationLimit() {
+    EncodingOptions options =
+        new EncodingOptions(
+            true,
+            new Truncation(8, Direction.RIGHT),
+            new Padding(4, Direction.RIGHT, 0, "[PAD]", 0));
+    assertEquals(8, options.truncation().maxLength());
+    assertEquals(4, options.padding().length());
+  }
+
+  private static Path wordPieceFixture() {
+    return Path.of(System.getProperty("jmlx.repository.root"))
+        .resolve("tools/tokenizer-oracle/fixtures/wordpiece.tokenizer.json");
   }
 }

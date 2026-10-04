@@ -9,9 +9,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Modifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -120,6 +122,46 @@ class PublicApiTest {
     assertThrows(
         NullPointerException.class,
         () -> RenderOptions.builder().hostFunction("format_tool", null));
+  }
+
+  @Test
+  void toBuilderCarriesEveryFieldOfTheSourceOptions() {
+    var clock = Clock.fixed(Instant.parse("2025-01-02T03:04:05Z"), ZoneOffset.UTC);
+    HostFunction first = arguments -> "first";
+    HostFunction second = arguments -> "second";
+    var options =
+        RenderOptions.builder()
+            .clock(clock)
+            .zoneId(ZoneOffset.UTC)
+            .hostFunction("first", first)
+            .hostFunction("second", second)
+            .maxSteps(111)
+            .maxLoopIterations(222)
+            .maxOutputLength(333)
+            .maxMacroDepth(444)
+            .build();
+
+    // Guard for toBuilder(): it copies fields by hand, so a field added to RenderOptions later
+    // is only carried over if someone adds a copy line AND updates this test. Counting the
+    // declared instance fields makes that forgotten copy fail here rather than silently
+    // round-tripping at its default value.
+    assertEquals(
+        7,
+        Arrays.stream(RenderOptions.class.getDeclaredFields())
+            .filter(f -> !Modifier.isStatic(f.getModifiers()))
+            .count(),
+        "RenderOptions gained a field: copy it in toBuilder() and assert it here");
+
+    var rebuilt = options.toBuilder().build();
+
+    assertEquals(clock, rebuilt.clock().orElseThrow());
+    assertEquals(ZoneOffset.UTC, rebuilt.zoneId().orElseThrow());
+    assertEquals(Map.of("first", first, "second", second), rebuilt.hostFunctions());
+    assertEquals(111, rebuilt.maxSteps());
+    assertEquals(222, rebuilt.maxLoopIterations());
+    assertEquals(333, rebuilt.maxOutputLength());
+    assertEquals(444, rebuilt.maxMacroDepth());
+    assertEquals(123, options.toBuilder().maxSteps(123).build().maxSteps());
   }
 
   @Test

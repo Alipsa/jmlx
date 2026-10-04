@@ -70,9 +70,10 @@ public final class RenderOptions {
 
   /**
    * Returns a builder pre-populated with this options object's current values, so a caller can
-   * change individual settings without copying the rest by hand. A field added to this class later
-   * is carried over by this method automatically, which a hand-rolled field-by-field copy at each
-   * call site is not.
+   * change individual settings without copying the rest by hand.
+   *
+   * <p>Keeps the copy next to the fields it copies: a field added to this class must also be copied
+   * here.
    *
    * @return a new builder initialized from this options object
    */

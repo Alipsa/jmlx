@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `RenderOptions.toBuilder()`, which returns a builder pre-populated with an existing options
+  object's current values so callers can derive new options while overriding individual settings.
+
 ### Changed
 
 - **Breaking:** renamed the project from `hfjinja` to `jmlx-jinja` as part of its migration into

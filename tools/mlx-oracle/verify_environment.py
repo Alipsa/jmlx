@@ -59,6 +59,7 @@ def main() -> None:
     parser.add_argument("--mlx-metal-sha256", required=True)
     parser.add_argument("--mlx-c-commit", required=True)
     parser.add_argument("--family", choices=["phase6", "phase7-1"])
+    parser.add_argument("--require-all-profiles", action="store_true")
     args = parser.parse_args()
 
     provenance = json.loads(args.provenance.read_text())
@@ -95,7 +96,7 @@ def main() -> None:
     if set(provenance.get("profiles", {})) != {"phase6", "phase7-1"}:
         raise SystemExit("provenance must declare phase6 and phase7-1 profiles")
     profiles = provenance["profiles"]
-    selected = select_profiles(profiles, args.family)
+    selected = select_profiles(profiles, args.family, args.require_all_profiles)
     for family in selected:
         profile = profiles[family]
         if profile["device"] not in {"cpu", "gpu"}:

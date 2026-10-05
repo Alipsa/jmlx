@@ -150,6 +150,8 @@ tasks.register('verifyMlxOracle', Exec) {
     inputs.file(mlxOracleDir.file('profile_policy.py'))
     inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
     def family = providers.gradleProperty('mlxOracleFamily')
+    def requireAll = providers.gradleProperty('mlxOracleRequireAllProfiles').map { it.toBoolean() }.orElse(false)
+    inputs.property('requireAllProfiles', requireAll)
     inputs.property('oracleFamily', family.orElse('all'))
     // A FileCollection may contain an absent optional marker; inputs.file(...).optional() still
     // validates a configured path and rejects it before the task's friendly environment check.
@@ -159,6 +161,7 @@ tasks.register('verifyMlxOracle', Exec) {
             '--provenance', mlxOracleDir.file('provenance.json').asFile,
             '--staged-pins', stagedNativePins.asFile
     doFirst {
+        if (requireAll.get()) { args '--require-all-profiles' }
         if (family.isPresent()) { args '--family', family.get() }
         def pins = mlxPins.get()
         args '--mlx-metal-version', pins.required('MLX_METAL_VERSION'),
@@ -177,8 +180,13 @@ tasks.register('generateMlxOracleFixtures', Exec) {
     inputs.file(mlxOracleDir.file('profile_policy.py'))
     inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
     def family = providers.gradleProperty('mlxOracleFamily')
+    def requireAll = providers.gradleProperty('mlxOracleRequireAllProfiles').map { it.toBoolean() }.orElse(false)
+    inputs.property('requireAllProfiles', requireAll)
     inputs.property('fixtureFamily', family.orElse('all'))
-    doFirst { if (family.isPresent()) { args '--family', family.get() } }
+    doFirst {
+        if (requireAll.get()) { args '--require-all-profiles' }
+        if (family.isPresent()) { args '--family', family.get() }
+    }
     def fixtureInputs = fileTree(mlxOracleDir.dir('fixtures')) {
         include family.isPresent() ? "${family.get()}*.input.json" : '*.input.json'
     }
@@ -204,8 +212,13 @@ tasks.register('verifyMlxOracleFixtures', Exec) {
     dependsOn tasks.named('verifyMlxOracle')
     mustRunAfter tasks.named('generateMlxOracleFixtures')
     def family = providers.gradleProperty('mlxOracleFamily')
+    def requireAll = providers.gradleProperty('mlxOracleRequireAllProfiles').map { it.toBoolean() }.orElse(false)
+    inputs.property('requireAllProfiles', requireAll)
     inputs.property('fixtureFamily', family.orElse('all'))
-    doFirst { if (family.isPresent()) { args '--family', family.get() } }
+    doFirst {
+        if (requireAll.get()) { args '--require-all-profiles' }
+        if (family.isPresent()) { args '--family', family.get() }
+    }
     inputs.file(mlxOracleDir.file('runner.py'))
     inputs.file(mlxOracleDir.file('profile_policy.py'))
     inputs.property('oracleHostOsVersion', System.getProperty('os.version'))

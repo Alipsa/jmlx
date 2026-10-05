@@ -38,6 +38,10 @@ Phase 7.1 CPU fixtures without flags and leave Phase 6 GPU goldens unchanged. `-
 optionally selects a specific family; explicitly requesting Phase 6 on an incompatible host fails.
 Direct single-fixture runner invocations also enforce the profile policy.
 
+CI sets `-PmlxOracleRequireAllProfiles=true`: every recorded profile must be compatible, so an OS
+image change fails instead of skipping Phase 6. This option cannot be combined with a family
+selection. Direct Python tools expose the equivalent `--require-all-profiles` option.
+
 Nonfinite float serialization uses `NaN`, `Infinity` and `-Infinity` strings with `allow_nan=False`.
 The shared core test-fixture reader decodes them; comparisons classify NaNs/infinity signs exactly.
 QuickGELU's formula case follows HF's definition `x*sigmoid(1.702*x)` (the `quick_gelu` configuration

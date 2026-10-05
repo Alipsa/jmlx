@@ -227,12 +227,15 @@ def main() -> None:
     source.add_argument("--fixtures-dir", type=Path)
     parser.add_argument("--provenance", type=Path, required=True)
     parser.add_argument("--family", choices=["phase6", "phase7-1"])
+    parser.add_argument("--require-all-profiles", action="store_true")
     output = parser.add_mutually_exclusive_group(required=True)
     output.add_argument("--output", type=Path)
     output.add_argument("--verify", type=Path)
     output.add_argument("--generate-all", action="store_true")
     output.add_argument("--verify-all", action="store_true")
     args = parser.parse_args()
+    if args.require_all_profiles and not args.fixtures_dir:
+        parser.error("--require-all-profiles requires --fixtures-dir")
 
     if args.fixtures_dir:
         if not (args.generate_all or args.verify_all):
@@ -246,7 +249,7 @@ def main() -> None:
         if args.verify_all and missing_expected:
             raise SystemExit(f"oracle inputs missing expected fixtures: {', '.join(missing_expected)}")
         provenance = json.loads(args.provenance.read_text())
-        selected = select_profiles(provenance["profiles"], args.family)
+        selected = select_profiles(provenance["profiles"], args.family, args.require_all_profiles)
         for name, input_path in sorted(inputs.items()):
             expected_path = args.fixtures_dir / f"{name}.expected.json"
             specification = json.loads(input_path.read_text())

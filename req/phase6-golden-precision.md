@@ -16,6 +16,7 @@ All outputs were finite. The diagnostics were removed after measurement.
 | Suite | Arrays compared | Default maximum absolute error | Full float32 maximum absolute error |
 | --- | ---: | ---: | ---: |
 | DecoderRefactorGoldenTest (Llama, Qwen2) | 6 | 1.1740e-3 | 1.6391e-7 |
+| DecoderRefactorGoldenTest (Qwen3) | 3 | 7.7340e-4 | 2.3097e-7 |
 | MistralModelTest | 3 | 9.1095e-4 | 1.6391e-7 |
 | GemmaModelTest | 3 | 8.9169e-4 | 3.5763e-7 |
 | Phi3ModelTest | 3 | 9.9596e-4 | 1.7881e-7 |
@@ -29,6 +30,13 @@ window-boundary cases, long cached decode, and full-cache versus sliding-cache
 comparisons. No element exceeds the original `1e-4` bound in full-float32 mode.
 The HF fixtures were generated on CPU using float32 eager attention, as recorded
 in `tools/hf-reference/README.md`.
+
+Phase 7.0 (Qwen3, measured 2026-10-05 on the same staged mlx-c fba4470 / MLX
+0.31.2 runtime and Apple M5 Max) added the qwen3 row above with the same
+temporary-diagnostic method: prefill and the two decode steps of the committed
+qwen3 golden, removed after measurement. The default-mode maximum (7.7340e-4)
+is below the `2e-3` bound `BatchStepEquivalenceTest` uses in default mode, and
+the full-float32 maximum is below the original `1e-4` golden bound.
 
 ## Native mechanism
 

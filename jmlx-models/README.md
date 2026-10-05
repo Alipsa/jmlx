@@ -1,10 +1,10 @@
 # jmlx-models
 
 Reference local decoder-model implementations built on jmlx. The module loads Hugging Face
-safetensors checkpoints and provides inference-only Llama, Qwen2, Mistral, Gemma v1, Phi-3, and
-Mixtral decoders with a pure-Java Hugging Face tokenizer. The native runtime supports macOS on Apple
-Silicon. The four new families have committed Hugging Face tiny-checkpoint references; their native
-numeric tests still require a macOS run before compatibility is verified.
+safetensors checkpoints and provides inference-only Llama, Qwen2, Qwen3, Mistral, Gemma v1, Phi-3,
+and Mixtral decoders with a pure-Java Hugging Face tokenizer. The native runtime supports macOS on
+Apple Silicon. Every supported family has committed Hugging Face tiny-checkpoint references; Qwen3
+adds per-head query/key normalization, an explicit head dimension, and tied or untied output heads.
 
 The API supports greedy generation and explicitly seeded sampling, synchronous token/text events,
 raw-text and configured-chat requests, penalties, and top-k/top-p/min-p filtering. Additional model
@@ -12,7 +12,8 @@ serving infrastructure remains later Phase 6 work; see
 the [compatibility matrix](../req/phase6-compatibility.md).
 
 MLX-community affine-quantized checkpoints (`quantization: {group_size, bits}` in `config.json`,
-tensors stored as `.weight`/`.scales`/`.biases`) load for Llama, Qwen2, Mistral, Gemma v1 and Phi-3.
+tensors stored as `.weight`/`.scales`/`.biases`) load for Llama, Qwen2, Qwen3, Mistral, Gemma v1
+and Phi-3.
 The projections stay packed and run through the fused quantized matmul. The input-embedding lookup
 stays packed too, but gathers and dequantizes only the selected rows, never expanding the full
 table; the same table serves as the tied output head through the fused quantized matmul. Norm
@@ -38,10 +39,10 @@ at load time).
 | --- | --- |
 | GGUF, GPTQ/AWQ and other non-MLX quantization | The checkpoint format or `quant_method` is rejected; only float safetensors and MLX affine quantization are loaded |
 | MLX quantization with per-layer overrides, a non-affine `mode`, or on Mixtral | The offending `quantization` key is named |
-| `gemma2`, `gemma3`, Phi-2 `phi` | Unsupported `model_type` named |
+| `gemma2`, `gemma3`, `qwen3_moe`, Phi-2 `phi` | Unsupported `model_type` named |
 | Phi-3 `longrope` | Unsupported `rope_scaling.rope_type` named |
 | Unknown checkpoint tensor or forbidden projection bias | Tensor key named by the preflight validator |
-| Qwen2 `use_sliding_window=true` | Config key named |
+| `use_sliding_window=true` (any family) | Config key named |
 
 ## Load and generate text
 

@@ -243,3 +243,50 @@ The 4-bit model is about 2.1x faster than bf16 direct (193.5 versus 90.2 tokens/
 active memory is about 29% of bf16's. Batching again gains little in aggregate and improves the
 shorter requests' latency; as before, the wall-time samples overlap, so the throughput difference
 is within noise.
+
+## Phase 7.0 Qwen3-8B 4-bit local run (2026-10-05)
+
+`mlx-community/Qwen3-8B-4bit` (revision `545dc4251c05440727734bcd94334791f6ab0192`, repo HEAD at
+download time), MLX affine 4-bit, group size 64, 36 layers, hidden 4096, 32 query / 8 KV heads,
+explicit `head_dim` 128, untied embeddings. Loaded through `TextGenerationModels.load` and
+benchmarked with `:jmlx-examples:benchmarkDecode` in fresh JVMs: prompt is the Tier-B chat prompt
+(the rendered IDs `151644,872,198,9707,11,847,829,374,151645,198`; the `tokenizer.json` is
+byte-identical, SHA-256 `aeb13307...dae4`, to the Qwen3-0.6B Tier-B artifact's), 32 tokens, 3
+samples after 1 warm-up, FULL cache policy, Apple M5 Max, Java 25.0.4.1, `mlx-metal==0.31.2`,
+mlx-c `fba4470`, commit `41ea666`. **This is a manual, evidence-only run, not Tier-B
+evidence**: the download is local and the greedy output was not cross-checked against an
+independent implementation. Qwen3 numerical correctness is covered by the strict float32 HF
+reference (measured in `req/phase6-golden-precision.md`) and by `QuantizedDecoderTest`'s
+quantized-versus-dequantized qwen3 case.
+
+Consumed files and SHA-256 (also recorded in the benchmark's JSON report):
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `model.safetensors` | 4,607,835,174 | `f2d29621aab300336ad645567ff38c42aac755513006ef4e8a579cf7ef5256d8` |
+| `tokenizer.json` | 11,422,654 | `aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4` |
+| `tokenizer_config.json` | 9,706 | `253153d0738ceb4c668d2eff957714dd2bea0b56de772a9fdccd96cbf517e6a0` |
+| `config.json` | 939 | `e5485285fd7e289e76e9cffa112f6dc2e3426519082f7db9b69041589f81a218` |
+| **Total downloaded** | **4,619,268,473** | |
+
+| Metric | Value |
+| --- | ---: |
+| Cold load (warm OS page cache) | 139.4 ms |
+| Median prefill (10 tokens) | 39.9 ms |
+| Median one-token decode | 10.3 ms |
+| Median sustained throughput | 86.92 tokens/s |
+| Peak active native bytes | 4,699,272,000 |
+| Active native bytes after each run (weights only) | 4,607,731,712 |
+| Allocator-cached bytes retained | 316,855,508 |
+
+The peak is stable to under 0.1% across all three samples, and active bytes return to the
+weights-only baseline after every run, so the KV cache and activation scratch are fully
+released. Fit against the recorded CI runner budget (`req/phase6-tier-b-artifacts.md`:
+`macos-26` arm64, M1 virtual, **7 GB RAM and 14 GB SSD**): the 4.62 GB download fits the 14 GB
+SSD with about two-thirds margin. For RAM, the measured peak active native bytes are 4.70 GB;
+the 0.6B Tier-B run measured test-JVM RSS 1,910,976 KiB against 1.50 GB of weights, i.e. about
+0.45 GB of JVM/RSS overhead above the weights. Extrapolating that overhead gives an estimated
+M1-virtual test-JVM RSS of about 5.1-5.2 GB: the model **fits the 7 GB budget, but with only
+about a 25% RAM margin**, and that figure is an extrapolation from this machine, not a hosted
+measurement. A Qwen3-8B 4-bit Tier-B row would need a hosted run to establish that margin for
+real.

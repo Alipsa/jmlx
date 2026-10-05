@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXConv;
@@ -33,6 +34,13 @@ class Phase71OracleTest {
       try (MLXScope scope = new MLXScope()) {
         MLXArray result = apply(scope, c);
         assertArrayEquals(ints(reference.get("shape")), result.shape(), name);
+        if (c.get("op").asString().equals("alibi")) {
+          assertEquals(
+              DType.valueOf(
+                  c.get("x").path("dtype").asString("float32").toUpperCase(java.util.Locale.ROOT)),
+              result.dtype(),
+              name);
+        }
         float[] actual = result.toFloatArray();
         float[] wanted = OracleFixtureReader.floats(reference.get("values"));
         assertEquals(wanted.length, actual.length, name);
@@ -45,7 +53,12 @@ class Phase71OracleTest {
             assertEquals(wanted[j], actual[j], name + "[" + j + "]");
           } else {
             assertEquals(
-                wanted[j], actual[j], 1e-4f + 1e-5f * Math.abs(wanted[j]), name + "[" + j + "]");
+                wanted[j],
+                actual[j],
+                c.get("x").path("dtype").asString().equals("float16")
+                    ? 0
+                    : 1e-4f + 1e-5f * Math.abs(wanted[j]),
+                name + "[" + j + "]");
           }
         }
         System.out.println(name + " maxAbsoluteError=" + maximumError);
@@ -71,7 +84,9 @@ class Phase71OracleTest {
     if ("int32".equals(value.path("dtype").asString())) {
       return MLX.array(scope, ints(value.get("values")), shape);
     }
-    return MLX.array(scope, OracleFixtureReader.floats(value.get("values")), shape);
+    return MLX.astype(
+        MLX.array(scope, OracleFixtureReader.floats(value.get("values")), shape),
+        DType.valueOf(value.path("dtype").asString("float32").toUpperCase(java.util.Locale.ROOT)));
   }
 
   private static int[] spatial(JsonNode p, String key, int rank, int fallback) {

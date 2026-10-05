@@ -8,7 +8,7 @@ def fixture(spec, rounded):
         def arr(key):
             value=case.get(key)
             if value is None: return None
-            dtype=mx.int32 if value.get('dtype')=='int32' else mx.float32
+            dtype=getattr(mx,value.get('dtype','float32'))
             return mx.array([{'-Infinity':float('-inf'),'Infinity':float('inf'),'NaN':float('nan')}.get(v,v) if isinstance(v,str) else v for v in value['values']],dtype=dtype).reshape(value['shape'])
         x=arr('x'); y=arr('y'); w=arr('w'); b=arr('b'); p=case.get('options',{})
         op=case['op']

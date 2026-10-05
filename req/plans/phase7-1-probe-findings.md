@@ -154,3 +154,8 @@ with groups=2 found maximum absolute differences of 13.66 for dilation=(2,2), 14
 and 7.63 for (2,1) with flip. Java rejects all grouped 2-D non-unit input dilation. Grouped
 1-D dilation and ungrouped 2-D dilation matched; the restriction remains specific to 2-D groups.
 ALiBi now constructs distance and broadcast slopes on-device and casts bias to the scores' dtype.
+
+ALiBi casts both slopes and distances to the scores' dtype before multiplication, matching pinned
+MLX's reduced-precision rounding order. The float16 oracle regression uses 12 heads, query
+offset 4032, and shape [1,12,2,16]; Java matches the reference exactly. Running this case against
+the previous float32-multiply-then-cast implementation fails the exact comparison.

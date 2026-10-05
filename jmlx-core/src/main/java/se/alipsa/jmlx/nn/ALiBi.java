@@ -48,8 +48,8 @@ public final class ALiBi extends Module {
                 MLXOps.subtract(MLXShape.expandDims(queries, 1), MLXShape.expandDims(keys, 0))));
     MLXArray bias =
         MLXOps.multiply(
-            MLX.array(target, slopes, new int[] {1, heads, 1, 1}),
-            MLXShape.reshape(distance, new int[] {1, 1, q, k}));
-    return MLXOps.add(scores, MLX.astype(bias, scores.dtype()));
+            MLX.astype(MLX.array(target, slopes, new int[] {1, heads, 1, 1}), scores.dtype()),
+            MLX.astype(MLXShape.reshape(distance, new int[] {1, 1, q, k}), scores.dtype()));
+    return MLXOps.add(scores, bias);
   }
 }

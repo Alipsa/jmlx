@@ -16,9 +16,7 @@ def verify_host(family, profile):
         raise SystemExit(f"GPU profile {family} must use an exact macOS policy")
     if (policy == "exact" and actual != recorded) or (policy == "minimum" and actual < recorded):
         raise IncompatibleHost(
-            f"{family} oracle requires macOS major {recorded} ({policy}); found {actual}. "
-            "Phase 6 GPU fixtures must be generated and verified on macOS 26; "
-            "omit -PmlxOracleFamily to verify only the compatible profiles."
+            f"{family} oracle requires macOS major {recorded} ({policy}); found {actual}."
         )
 
 
@@ -27,11 +25,22 @@ def select_profiles(profiles, requested=None, require_all=False):
         if requested:
             raise SystemExit("require-all-profiles cannot be combined with a family selection")
         for family, profile in profiles.items():
-            verify_host(family, profile)
+            try:
+                verify_host(family, profile)
+            except IncompatibleHost as error:
+                raise IncompatibleHost(
+                    f"{error} All profiles are required; the runner must satisfy every profile's "
+                    f"OS requirement (use macOS {profile['macOSMajor']} for {family})."
+                ) from error
     if requested:
         if requested not in profiles:
             raise SystemExit(f"missing {requested} provenance profile")
-        verify_host(requested, profiles[requested])
+        try:
+            verify_host(requested, profiles[requested])
+        except IncompatibleHost as error:
+            raise IncompatibleHost(
+                f"{error} Omit -PmlxOracleFamily (or --family) to verify only compatible profiles."
+            ) from error
         return [requested]
     selected = []
     for family, profile in profiles.items():

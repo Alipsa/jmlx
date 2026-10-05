@@ -365,4 +365,143 @@ public final class MLXShape {
   public static MLXArray triu(MLXArray a, int k) {
     return NativeOps.axisOp("triu", a, k, mlx_h::mlx_triu);
   }
+
+  /** Confirmed native padding modes. Symmetric widths are independent of the mode. */
+  public enum PadMode {
+    CONSTANT,
+    EDGE
+  }
+
+  /** Pads selected axes with scalar value, using constant or edge padding. */
+  public static MLXArray pad(
+      MLXArray a, int[] axes, int[] low, int[] high, MLXArray value, PadMode mode) {
+    if (axes.length != low.length || axes.length != high.length) {
+      throw new IllegalArgumentException("pad: axes and widths must have equal lengths");
+    }
+    if (value.size() != 1) {
+      throw new IllegalArgumentException("pad: value must be scalar");
+    }
+    MLXScope scope = NativeOps.scopeOf("pad", a, value);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment na = tmp.allocateFrom(ValueLayout.JAVA_INT, axes);
+      MemorySegment nl = tmp.allocateFrom(ValueLayout.JAVA_INT, low);
+      MemorySegment nh = tmp.allocateFrom(ValueLayout.JAVA_INT, high);
+      MemorySegment nm = tmp.allocateFrom(mode.name().toLowerCase(java.util.Locale.ROOT));
+      MemorySegment result = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "pad",
+          () ->
+              mlx_h.mlx_pad(
+                  result,
+                  a.handle(),
+                  na,
+                  axes.length,
+                  nl,
+                  low.length,
+                  nh,
+                  high.length,
+                  value.handle(),
+                  nm,
+                  scope.stream()));
+      return new MLXArray(scope, result);
+    }
+  }
+
+  /** Equal padding widths on every axis; this does not mean reflection padding. */
+  public static MLXArray padSymmetric(MLXArray a, int width, MLXArray value, PadMode mode) {
+    MLXScope scope = NativeOps.scopeOf("padSymmetric", a, value);
+    if (value.size() != 1) {
+      throw new IllegalArgumentException("pad: value must be scalar");
+    }
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment nm = tmp.allocateFrom(mode.name().toLowerCase(java.util.Locale.ROOT));
+      MemorySegment result = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "padSymmetric",
+          () ->
+              mlx_h.mlx_pad_symmetric(
+                  result, a.handle(), width, value.handle(), nm, scope.stream()));
+      return new MLXArray(scope, result);
+    }
+  }
+
+  /** Tiles with leading-axis alignment and optional rank extension; zero repetitions are legal. */
+  public static MLXArray tile(MLXArray a, int[] repetitions) {
+    for (int n : repetitions) {
+      if (n < 0) {
+        throw new IllegalArgumentException("tile: negative repetition");
+      }
+    }
+    return NativeOps.shapeOp("tile", a, repetitions, mlx_h::mlx_tile);
+  }
+
+  /** Repeats along an axis; zero repeats produces an empty axis. */
+  public static MLXArray repeatAxis(MLXArray a, int repeats, int axis) {
+    if (repeats < 0) {
+      throw new IllegalArgumentException("repeatAxis: negative repeats");
+    }
+    int normalized = axis < 0 ? axis + a.ndim() : axis;
+    if (normalized < 0 || normalized >= a.ndim()) {
+      throw new IllegalArgumentException("repeatAxis: axis out of range: " + axis);
+    }
+    return NativeOps.axis2Op("repeatAxis", a, repeats, normalized, mlx_h::mlx_repeat_axis);
+  }
+
+  /**
+   * Checked view in element strides of a row-contiguous normalization of the input. Offset zero
+   * addresses the logical start, including sliced inputs. Negative and zero strides are supported.
+   * No reachable address may lie outside the normalized input; arithmetic overflow is rejected.
+   */
+  public static MLXArray asStrided(MLXArray a, int[] shape, long[] strides, long offset) {
+    if (shape.length != strides.length || offset < 0) {
+      throw new IllegalArgumentException("asStrided: rank mismatch or negative offset");
+    }
+    boolean empty = false;
+    for (int n : shape) {
+      if (n < 0) {
+        throw new IllegalArgumentException("asStrided: negative extent");
+      }
+      empty |= n == 0;
+    }
+    try {
+      long low = offset;
+      long high = offset;
+      if (!empty) {
+        for (int i = 0; i < shape.length; i++) {
+          long reach = Math.multiplyExact(shape[i] - 1L, strides[i]);
+          low = Math.addExact(low, Math.min(0, reach));
+          high = Math.addExact(high, Math.max(0, reach));
+        }
+        if (low < 0 || high >= a.size()) {
+          throw new IllegalArgumentException("asStrided: reachable addresses outside input");
+        }
+      }
+    } catch (ArithmeticException error) {
+      throw new IllegalArgumentException("asStrided: address arithmetic overflow", error);
+    }
+    MLXScope scope = a.scope();
+    MLXArray normalized =
+        NativeOps.unaryOp(
+            "contiguous",
+            a,
+            (res, input, stream) -> mlx_h.mlx_contiguous(res, input, false, stream));
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment ns = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
+      MemorySegment nt = tmp.allocateFrom(ValueLayout.JAVA_LONG, strides);
+      MemorySegment result = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "asStrided",
+          () ->
+              mlx_h.mlx_as_strided(
+                  result,
+                  normalized.handle(),
+                  ns,
+                  shape.length,
+                  nt,
+                  strides.length,
+                  offset,
+                  scope.stream()));
+      return new MLXArray(scope, result);
+    }
+  }
 }

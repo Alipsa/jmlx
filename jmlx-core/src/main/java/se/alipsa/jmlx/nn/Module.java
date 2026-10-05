@@ -33,6 +33,7 @@ public abstract class Module {
   private final LinkedHashMap<String, MLXArray> params = new LinkedHashMap<>();
   private final LinkedHashMap<String, Module> children = new LinkedHashMap<>();
   private boolean frozen;
+  private boolean training;
 
   /** Creates a module whose parameters and submodules will be allocated into {@code scope}. */
   protected Module(MLXScope scope) {
@@ -99,6 +100,7 @@ public abstract class Module {
     if (children.containsKey(name)) {
       throw new IllegalStateException("child \"" + name + "\" is already registered");
     }
+    module.train(training);
     children.put(name, module);
     return module;
   }
@@ -234,6 +236,23 @@ public abstract class Module {
     for (Module child : children.values()) {
       child.notifyDepthFirst(touchedNames);
     }
+  }
+
+  /**
+   * Sets inference/training mode recursively, independently of parameter freezing. Defaults to
+   * eval. Cycles and shared parents inherit child registration's undefined behavior; cycles may
+   * overflow the stack. Training support is defined by each layer.
+   */
+  public final void train(boolean value) {
+    training = value;
+    for (Module child : children.values()) {
+      child.train(value);
+    }
+  }
+
+  /** Whether training mode is selected. */
+  public final boolean isTraining() {
+    return training;
   }
 
   /**

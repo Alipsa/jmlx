@@ -62,7 +62,7 @@
     },
     {
       "bindings": [
-        "mlx_h.mlx_reshape", "mlx_h.mlx_slice", "mlx_h.mlx_softmax_axis", "mlx_h.mlx_split",
+        "mlx_h.mlx_reshape", "mlx_h.mlx_slice", "mlx_h.mlx_split",
         "mlx_h.mlx_take_axis"
       ],
       "category": "downcall",
@@ -254,6 +254,60 @@
       "status": "implemented",
       "facadeOrReason": "NativeLoader error-handler installation",
       "tests": "MLXNativeErrorTest"
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_abs",
+        "mlx_h.mlx_minimum",
+        "mlx_h.mlx_clip",
+        "mlx_h.mlx_floor",
+        "mlx_h.mlx_log1p",
+        "mlx_h.mlx_max_axes",
+        "mlx_h.mlx_var_axes",
+        "mlx_h.mlx_softmax_axes",
+        "mlx_h.mlx_softmax_axis"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXOps",
+      "tests": "Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest",
+      "sources": [
+        "jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java"
+      ]
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_pad",
+        "mlx_h.mlx_pad_symmetric",
+        "mlx_h.mlx_as_strided",
+        "mlx_h.mlx_tile",
+        "mlx_h.mlx_repeat_axis"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXShape",
+      "tests": "Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest",
+      "sources": [
+        "jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java"
+      ]
+    },
+    {
+      "bindings": [
+        "mlx_h.mlx_conv1d",
+        "mlx_h.mlx_conv2d",
+        "mlx_h.mlx_conv3d",
+        "mlx_h.mlx_conv_transpose1d",
+        "mlx_h.mlx_conv_transpose2d",
+        "mlx_h.mlx_conv_transpose3d",
+        "mlx_h.mlx_conv_general"
+      ],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXConv",
+      "tests": "Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest",
+      "sources": [
+        "jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java"
+      ]
     }
   ]
 }

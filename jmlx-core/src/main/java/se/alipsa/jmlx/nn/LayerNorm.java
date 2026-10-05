@@ -10,7 +10,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * {@link RMSNorm}. A caller needing {@code affine=false} calls {@code MLXFast.layerNorm(x, null,
  * null, eps)} directly -- that is what the bare op is for.
  */
-public final class LayerNorm extends Module implements UnaryModule {
+public final class LayerNorm extends UnaryLayer {
 
   private final float eps;
 

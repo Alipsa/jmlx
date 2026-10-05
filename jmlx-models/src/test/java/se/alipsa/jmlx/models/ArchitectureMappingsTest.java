@@ -659,4 +659,53 @@ class ArchitectureMappingsTest {
       assertTrue(error.getMessage().contains(field), error.getMessage());
     }
   }
+
+  @Test
+  void sharedResolverPreservesFamilyAllowLists() {
+    assertEquals(
+        se.alipsa.jmlx.nn.Activation.RELU,
+        ArchitectureMappings.resolveActivation("relu", "dense_act_fn"));
+    assertEquals(
+        se.alipsa.jmlx.nn.Activation.QUICK_GELU,
+        ArchitectureMappings.resolveActivation("quick_gelu", "hidden_act"));
+    assertEquals(
+        se.alipsa.jmlx.nn.Activation.GELU_TANH,
+        ArchitectureMappings.resolveActivation("gelu_new", "dense_act_fn"));
+    for (String name : List.of("silu", "swish")) {
+      assertEquals(
+          se.alipsa.jmlx.nn.Activation.SILU,
+          ArchitectureMappings.resolveActivation(name, "hidden_act"));
+    }
+    assertEquals(
+        se.alipsa.jmlx.nn.Activation.GELU,
+        ArchitectureMappings.resolveActivation("gelu", "hidden_act"));
+    assertEquals(
+        se.alipsa.jmlx.nn.Activation.GELU_TANH,
+        ArchitectureMappings.resolveActivation("gelu_pytorch_tanh", "hidden_act"));
+    assertTrue(
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ArchitectureMappings.resolveActivation("unknown", "dense_act_fn"))
+            .getMessage()
+            .contains("dense_act_fn"));
+    String base =
+        "\"vocab_size\":4,\"hidden_size\":4,\"intermediate_size\":8,"
+            + "\"num_hidden_layers\":1,\"num_attention_heads\":2";
+    for (String field :
+        List.of("\"hidden_act\":\"relu\"", "\"hidden_activation\":\"quick_gelu\"")) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ArchitectureMappings.parse(
+                  json("{\"model_type\":\"llama\"," + base + "," + field + "}")));
+    }
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ArchitectureMappings.parse(
+                json(
+                    "{\"model_type\":\"gemma\",\"head_dim\":2,"
+                        + base
+                        + ",\"hidden_activation\":\"relu\"}")));
+  }
 }

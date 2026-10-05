@@ -127,7 +127,7 @@ jobs:
 
       - name: Run root verification
         # Runs the repository-wide source guards after native bootstrap and oracle setup.
-        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures
+        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures -PmlxOracleRequireAllProfiles=true
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use
       # Gradle's build cache here: a cached test result would not demonstrate
@@ -152,7 +152,8 @@ jobs:
                             'KVCacheTest', 'KVCacheMemoryPlateauTest',
                             'KVCacheQuantizationProbeTest', 'PackedAttentionProbeTest', 'AttentionMaskTest',
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
-                            'BatchAttentionMaskTest', 'BatchRopeProbeTest'],
+                            'BatchAttentionMaskTest', 'BatchRopeProbeTest', 'StridedViewSafetyTest',
+                            'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
@@ -172,6 +173,7 @@ jobs:
           model_results['WorkerStreamProbeTest'] = ['threadProbeTest']
           core_results = {name: ['test', 'float32GoldenTest'] for name in
                           ['DecoderAttentionTest', 'MultiHeadAttentionTest', 'MoeMlpTest', 'SwitchGluTest']}
+          core_results['Phase71OracleTest'] = ['float32GoldenTest']
           results_dirs = {'jmlx-models': model_results, 'jmlx-core': core_results}
           suites['jmlx-models'].append('WorkerStreamProbeTest')
           for module, names in suites.items():

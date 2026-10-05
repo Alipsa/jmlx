@@ -506,14 +506,11 @@ public final class ArchitectureMappings {
           node.hasNonNull("hidden_activation")
               ? node.get("hidden_activation").asString()
               : hiddenAct;
-      activation =
-          switch (gemmaActivation) {
-            case "gelu_pytorch_tanh", "gelu_new" -> Activation.GELU_TANH;
-            case "gelu" -> Activation.GELU;
-            default ->
-                throw new IllegalArgumentException(
-                    "config.json hidden_activation '" + gemmaActivation + "' is unsupported");
-          };
+      if (!GEMMA_ACTIVATIONS.contains(gemmaActivation)) {
+        throw new IllegalArgumentException(
+            "config.json hidden_activation '" + gemmaActivation + "' is unsupported");
+      }
+      activation = resolveActivation(gemmaActivation, "hidden_activation");
     }
     Integer slidingWindow = null;
     if (family.window() == WindowPolicy.USE && node.hasNonNull("sliding_window")) {
@@ -799,5 +796,19 @@ public final class ArchitectureMappings {
       throw new IllegalArgumentException("config.json is missing string field '" + name + "'");
     }
     return node.get(name).asString();
+  }
+
+  /** Resolves an HF activation name; callers enforce their family-specific allowlists. */
+  static Activation resolveActivation(String name, String configKey) {
+    return switch (name) {
+      case "silu", "swish" -> Activation.SILU;
+      case "gelu" -> Activation.GELU;
+      case "gelu_new", "gelu_pytorch_tanh" -> Activation.GELU_TANH;
+      case "relu" -> Activation.RELU;
+      case "quick_gelu" -> Activation.QUICK_GELU;
+      default ->
+          throw new IllegalArgumentException(
+              "config.json " + configKey + " '" + name + "' is unsupported");
+    };
   }
 }

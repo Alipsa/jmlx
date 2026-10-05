@@ -87,6 +87,9 @@ verify the recorded environment and canonical fixtures:
 ./gradlew verifyMlxOracle verifyMlxOracleFixtures
 ```
 
+Oracle commands automatically select compatible profiles: macOS 26 runs all families; newer hosts
+run Phase 7.1 CPU fixtures and report Phase 6 GPU fixtures as skipped. Phase 6 requires macOS 26.
+
 Only `./gradlew generateMlxOracleFixtures` rewrites the committed oracle JSON. Review that diff and
 the recorded provenance whenever native pins change. Tier-A inputs and Java goldens are documented
 in `req/phase6-tier-a-fixtures.md`; `req/phase6-tier-b-artifacts.md` is the opt-in real-artifact

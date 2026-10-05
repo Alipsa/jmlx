@@ -3,15 +3,33 @@ import argparse
 import difflib
 import json
 import math
+import os
 from pathlib import Path
+from profile_policy import select_profiles, verify_host
 
 import mlx.core as mx
+
+
+FIXTURE_FAMILIES = {
+    "phase6-tier-a-array": "phase6",
+    "phase6-1-sampling": "phase6",
+    "phase7-1-core": "phase7-1",
+}
+
+
+def fixture_family(specification: dict) -> str:
+    fixture = specification.get("fixture")
+    if fixture not in FIXTURE_FAMILIES:
+        raise SystemExit(f"unknown fixture: {fixture}")
+    return FIXTURE_FAMILIES[fixture]
 
 
 def rounded(values):
     if isinstance(values, list):
         return [rounded(value) for value in values]
     if isinstance(values, float):
+        if math.isnan(values):
+            return "NaN"
         if math.isinf(values):
             return "Infinity" if values > 0 else "-Infinity"
         return round(values, 7)
@@ -151,7 +169,14 @@ def sampling_fixture(specification: dict) -> dict:
 
 def run(specification: dict, provenance: dict) -> dict:
     device = specification.get("device")
-    recorded_device = provenance["device"]["type"]
+    family = fixture_family(specification)
+    profile = provenance.get("profiles", {}).get(family)
+    if profile is None:
+        raise ValueError(f"missing {family} provenance profile")
+    verify_host(family, profile)
+    recorded_device = profile["device"]
+    if os.environ.get("MLX_ENABLE_TF32") != profile["MLX_ENABLE_TF32"]:
+        raise ValueError("oracle precision does not match recorded profile")
     if device != recorded_device:
         raise ValueError(
             f"oracle fixture device {device} does not match recorded device {recorded_device}"
@@ -165,6 +190,9 @@ def run(specification: dict, provenance: dict) -> dict:
         result = array_fixture(specification)
     elif fixture == "phase6-1-sampling":
         result = sampling_fixture(specification)
+    elif fixture == "phase7-1-core":
+        from phase71 import fixture as phase71_fixture
+        result = phase71_fixture(specification, rounded)
     else:
         raise ValueError(f"unknown fixture: {fixture}")
     return {
@@ -212,12 +240,16 @@ def main() -> None:
     source.add_argument("--input", type=Path)
     source.add_argument("--fixtures-dir", type=Path)
     parser.add_argument("--provenance", type=Path, required=True)
+    parser.add_argument("--family", choices=["phase6", "phase7-1"])
+    parser.add_argument("--require-all-profiles", action="store_true")
     output = parser.add_mutually_exclusive_group(required=True)
     output.add_argument("--output", type=Path)
     output.add_argument("--verify", type=Path)
     output.add_argument("--generate-all", action="store_true")
     output.add_argument("--verify-all", action="store_true")
     args = parser.parse_args()
+    if args.require_all_profiles and not args.fixtures_dir:
+        parser.error("--require-all-profiles requires --fixtures-dir")
 
     if args.fixtures_dir:
         if not (args.generate_all or args.verify_all):
@@ -231,9 +263,14 @@ def main() -> None:
         if args.verify_all and missing_expected:
             raise SystemExit(f"oracle inputs missing expected fixtures: {', '.join(missing_expected)}")
         provenance = json.loads(args.provenance.read_text())
+        selected = select_profiles(provenance["profiles"], args.family, args.require_all_profiles)
         for name, input_path in sorted(inputs.items()):
             expected_path = args.fixtures_dir / f"{name}.expected.json"
-            actual = canonical(run(json.loads(input_path.read_text()), provenance))
+            specification = json.loads(input_path.read_text())
+            family = fixture_family(specification)
+            if family not in selected:
+                continue
+            actual = canonical(run(specification, provenance))
             if args.generate_all:
                 expected_path.write_text(actual)
             else:
@@ -248,9 +285,14 @@ def main() -> None:
     if not (args.output or args.verify):
         parser.error("--input requires --output or --verify")
 
-    actual = canonical(
-        run(json.loads(args.input.read_text()), json.loads(args.provenance.read_text()))
-    )
+    specification = json.loads(args.input.read_text())
+    family = fixture_family(specification)
+    if args.family and args.family != family:
+        parser.error(f"--family {args.family} does not match input fixture family {family}")
+    provenance = json.loads(args.provenance.read_text())
+    if args.family:
+        select_profiles(provenance["profiles"], args.family)
+    actual = canonical(run(specification, provenance))
     if args.output:
         args.output.write_text(actual)
         return

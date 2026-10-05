@@ -117,7 +117,7 @@ for every new op.
      check support before building a request.
 5. **Train/eval state.** `Module` gains `train(boolean)`/`isTraining()`, applied recursively.
    jmlx's default is **eval**, a deliberate deviation from MLX's `training=True` default because
-   jmlx is inference-first. Record this in javadoc and the inventory notes. `Dropout` is the
+   jmlx is inference-first. Record this in javadoc and the core README. `Dropout` is the
    identity in eval. In training mode it throws `UnsupportedOperationException` naming Phase 11,
    rather than silently skipping dropout.
 6. **Layout.** jmlx `nn` follows MLX: channels-last (`NHWC`) activations, with conv weights shaped
@@ -253,6 +253,13 @@ reconciled with the MLX affine support recorded below the matrix, which landed i
 
 ## 7.1 — Core inference modules (`jmlx-core`)
 
+Implementation evidence (2026-10-05) is in `phase7-1-probe-findings.md`. Pinned limitations:
+constant/edge padding only; native 3-D grouped convolution unsupported; grouped transpose2d with
+non-unit stride explicitly rejected for a CPU/GPU correctness defect; sinusoidal dims<4 rejected
+instead of returning NaNs. KL takes log-probability targets, and empty max-pool outputs preserve
+the native reduction error. Acceptance remains pending legacy Phase 6 byte-exact oracle drift and
+cross-host CPU fixture verification; implementation is not marked milestone-complete.
+
 Focused Phase 8 slices land here under the permission step 0 adds, each recorded in the inventory.
 
 1. **Probe first** (`req/plans/phase7-1-probe-findings.md`):
@@ -274,7 +281,9 @@ Focused Phase 8 slices land here under the permission step 0 adds, each recorded
        `log1p` (`mlx_log1p`);
      - `maxAxes` (`mlx_max_axes`) and `varAxes` (`mlx_var_axes`, with `ddof`);
      - `softmaxAxes` (`mlx_softmax_axes`);
-     - `logSoftmax`, recorded as `derived-java-api` (`x - logSumExpAxis`).
+     - `logSoftmax` (`x - logSumExpAxis`), documented as a composition in javadoc and the
+       core README. Leave shared inventory records unchanged: do not add a binding-less derived
+       record or remap `mlx_logsumexp_axis` from `implemented`.
    - `MLXShape`:
      - `pad` (`mlx_pad`, a mode parameter limited to what the probe confirms) and `padSymmetric`
        (`mlx_pad_symmetric`);
@@ -291,9 +300,12 @@ Focused Phase 8 slices land here under the permission step 0 adds, each recorded
        element at `offset`.
      - Negative and zero strides are accepted only if the probe shows MLX supports them; otherwise
        they are rejected with a named message.
-     - A transposed, sliced or broadcast input is either made contiguous first or rejected,
-       matching the probe's finding on what strides address. Pooling over such inputs is tested
-       either way.
+     - Every input passes through `mlx_contiguous(a, false)` before striding. The probe confirms
+       offset zero addresses the normalized view's start, including row-contiguous slices sharing
+       a larger buffer. Enforce this with ordinary `StridedViewSafetyTest` in `check` and CI's
+       required native-suite list, including on native pin changes. If this cannot be established,
+       materialize a proven independent copy or reject before native striding. Pooling over
+       transposed and sliced inputs is tested.
 
      Tests: bounds at exactly the first and last element, one past each, overflowing
      stride×extent, negative and zero strides, zero-extent shapes, scalar (rank-zero) offsets at

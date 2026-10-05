@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'java-test-fixtures'
     id 'maven-publish'
 }
 
@@ -40,6 +41,8 @@ dependencies {
     implementation project(':jmlx-ffi')
 
     testImplementation testFixtures(project(':jmlx-ffi'))
+    testImplementation libs.jackson.databind
+    testFixturesImplementation libs.jackson.databind
 }
 
 publishing {
@@ -73,6 +76,9 @@ publishing {
 }
 
 tasks.withType(Test).configureEach {
+    mustRunAfter rootProject.tasks.named('generateMlxOracleFixtures')
+    systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
+    inputs.files(rootProject.fileTree('tools/mlx-oracle/fixtures') { include '*.json' })
     // Opt-in performance tests: ./gradlew :jmlx-core:test -Djmlx.benchmark=true --tests "*Benchmark*"
     systemProperty 'jmlx.benchmark', System.getProperty('jmlx.benchmark', 'false')
 }
@@ -98,3 +104,46 @@ tasks.register('float32GoldenTest', Test) {
 }
 
 tasks.named('check') { dependsOn tasks.named('float32GoldenTest') }
+
+// Internal reader variants must never appear in published POM/module metadata.
+components.java.withVariantsFromConfiguration(configurations.testFixturesApiElements) { skip() }
+components.java.withVariantsFromConfiguration(configurations.testFixturesRuntimeElements) { skip() }
+tasks.register('verifyPublishedDependencies') {
+    group = 'verification'
+    dependsOn 'generatePomFileForMavenPublication', 'generateMetadataFileForMavenPublication'
+    def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+    def metadataFile = layout.buildDirectory.file('publications/maven/module.json')
+    inputs.files(pomFile, metadataFile)
+    doLast {
+        def expected = ["se.alipsa:jmlx-ffi:${project(':jmlx-ffi').version}"]
+        def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                .collect { it.coordinates() }
+        if (actual != expected) { throw new GradleException("Core POM dependencies changed: ${actual}") }
+        def metadata = new groovy.json.JsonSlurper().parse(metadataFile.get().asFile)
+        if (metadataFile.get().asFile.text.contains('test-fixtures') ||
+                metadataFile.get().asFile.text.contains('testFixtures')) {
+            throw new GradleException('Core publication leaked test fixtures')
+        }
+        metadata.variants.each { variant ->
+            def deps = (variant.dependencies ?: []).collect { "${it.group}:${it.module}:${it.version.requires}" }
+            def wanted = variant.name == 'runtimeElements' ? expected : []
+            if (deps != wanted) { throw new GradleException("Core metadata dependencies changed: ${variant.name}: ${deps}") }
+        }
+    }
+}
+tasks.named('check') { dependsOn tasks.named('verifyPublishedDependencies') }
+
+// One selected class per launcher invocation; potentially fatal native paths never share test JVMs.
+tasks.named('test', Test) { exclude '**/Phase71*Probe.class' }
+tasks.named('float32GoldenTest', Test) { exclude '**/Phase71*Probe.class' }
+tasks.register('phase71NativeProbe', Test) {
+    group = 'verification'
+    description = 'Internal evidence task; invoke scripts/run-phase71-native-probes.sh.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/Phase71*Probe.class'
+    useJUnitPlatform()
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+}

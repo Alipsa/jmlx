@@ -34,6 +34,7 @@ sourceSets {
 }
 
 dependencies {
+    testImplementation testFixtures(project(':jmlx-core'))
     api project(':jmlx-core')
     api project(':jmlx-tokenizer')
     implementation libs.jackson.databind
@@ -112,7 +113,9 @@ tasks.register('verifyPublishedDependencies') {
 tasks.named('check') { dependsOn tasks.named('verifyPublishedDependencies') }
 
 tasks.withType(Test).configureEach {
+    mustRunAfter rootProject.tasks.named('generateMlxOracleFixtures')
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
+    inputs.files(rootProject.fileTree('tools/mlx-oracle/fixtures') { include '*.json' })
 }
 
 // Gate 0 thread probes (req/plans/phase6-5-plan.md). Each runs in its own forked JVM, like

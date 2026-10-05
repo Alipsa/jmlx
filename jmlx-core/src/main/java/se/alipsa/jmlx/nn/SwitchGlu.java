@@ -73,12 +73,7 @@ public final class SwitchGlu extends Module {
     param("downWeight", downWeight);
     experts = gate[0];
     hidden = gate[2];
-    activationLayer =
-        switch (Objects.requireNonNull(activation, "activation")) {
-          case SILU -> new SiLU(scope);
-          case GELU -> new GELU(scope);
-          case GELU_TANH -> new GELU(scope, true);
-        };
+    activationLayer = Objects.requireNonNull(activation, "activation").layer(scope);
   }
 
   /** Number of stacked experts, {@code E}. */

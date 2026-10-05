@@ -119,13 +119,23 @@ tasks.named('verifyMlxApiHeaderCoverage') {
 }
 
 def mlxPins = providers.provider { MlxPins.read(projectDir.toPath()) }
+def requireAllProfiles = providers.gradleProperty('mlxOracleRequireAllProfiles').map {
+    if (!(it in ['true', 'false'])) {
+        throw new GradleException("mlxOracleRequireAllProfiles must be true or false, got '${it}'")
+    }
+    it == 'true'
+}.orElse(false)
+
 def mlxOracleDir = layout.projectDirectory.dir('tools/mlx-oracle')
 def mlxOraclePython = mlxOracleDir.file('.venv/bin/python').asFile
 def stagedNativePins = layout.projectDirectory.file('native/install/lib/native-pin.properties')
 def configureMlxOracle = { Exec task ->
+    task.environment 'MLX_ENABLE_TF32', '0'
+    task.inputs.property('mlxEnableTf32', '0')
     task.inputs.file(layout.projectDirectory.file('scripts/bootstrap-native.sh'))
     task.inputs.file(mlxOracleDir.file('requirements.lock'))
     task.inputs.file(mlxOracleDir.file('provenance.json'))
+    task.inputs.file(mlxOracleDir.file('phase71.py'))
     task.inputs.property('mlxMetalVersion', mlxPins.map { it.required('MLX_METAL_VERSION') })
     task.inputs.property('mlxMetalWheelUrl', mlxPins.map { it.required('MLX_METAL_WHEEL_URL') })
     task.inputs.property('mlxMetalWheelSha256', mlxPins.map { it.required('MLX_METAL_WHEEL_SHA256') })
@@ -144,6 +154,11 @@ tasks.register('verifyMlxOracle', Exec) {
     description = 'Verifies the pinned Python MLX oracle environment and provenance.'
     configureMlxOracle(delegate)
     inputs.file(mlxOracleDir.file('verify_environment.py'))
+    inputs.file(mlxOracleDir.file('profile_policy.py'))
+    inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
+    def family = providers.gradleProperty('mlxOracleFamily')
+    inputs.property('requireAllProfiles', requireAllProfiles)
+    inputs.property('oracleFamily', family.orElse('all'))
     // A FileCollection may contain an absent optional marker; inputs.file(...).optional() still
     // validates a configured path and rejects it before the task's friendly environment check.
     inputs.files(stagedNativePins)
@@ -152,6 +167,8 @@ tasks.register('verifyMlxOracle', Exec) {
             '--provenance', mlxOracleDir.file('provenance.json').asFile,
             '--staged-pins', stagedNativePins.asFile
     doFirst {
+        if (requireAllProfiles.get()) { args '--require-all-profiles' }
+        if (family.isPresent()) { args '--family', family.get() }
         def pins = mlxPins.get()
         args '--mlx-metal-version', pins.required('MLX_METAL_VERSION'),
                 '--mlx-metal-url', pins.required('MLX_METAL_WHEEL_URL'),
@@ -166,7 +183,18 @@ tasks.register('generateMlxOracleFixtures', Exec) {
     configureMlxOracle(delegate)
     dependsOn tasks.named('verifyMlxOracle')
     inputs.file(mlxOracleDir.file('runner.py'))
-    def fixtureInputs = fileTree(mlxOracleDir.dir('fixtures')) { include '*.input.json' }
+    inputs.file(mlxOracleDir.file('profile_policy.py'))
+    inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
+    def family = providers.gradleProperty('mlxOracleFamily')
+    inputs.property('requireAllProfiles', requireAllProfiles)
+    inputs.property('fixtureFamily', family.orElse('all'))
+    doFirst {
+        if (requireAllProfiles.get()) { args '--require-all-profiles' }
+        if (family.isPresent()) { args '--family', family.get() }
+    }
+    def fixtureInputs = fileTree(mlxOracleDir.dir('fixtures')) {
+        include family.isPresent() ? "${family.get()}*.input.json" : '*.input.json'
+    }
     def fixtureOutputs = providers.provider {
         fixtureInputs.files.collect { new File(it.parentFile, it.name.replace('.input.json', '.expected.json')) }
     }
@@ -188,7 +216,16 @@ tasks.register('verifyMlxOracleFixtures', Exec) {
     configureMlxOracle(delegate)
     dependsOn tasks.named('verifyMlxOracle')
     mustRunAfter tasks.named('generateMlxOracleFixtures')
+    def family = providers.gradleProperty('mlxOracleFamily')
+    inputs.property('requireAllProfiles', requireAllProfiles)
+    inputs.property('fixtureFamily', family.orElse('all'))
+    doFirst {
+        if (requireAllProfiles.get()) { args '--require-all-profiles' }
+        if (family.isPresent()) { args '--family', family.get() }
+    }
     inputs.file(mlxOracleDir.file('runner.py'))
+    inputs.file(mlxOracleDir.file('profile_policy.py'))
+    inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
     inputs.files(fileTree(mlxOracleDir.dir('fixtures')) { include '*.input.json', '*.expected.json' })
     args mlxOracleDir.file('runner.py').asFile,
             '--fixtures-dir', mlxOracleDir.file('fixtures').asFile,

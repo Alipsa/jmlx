@@ -12,7 +12,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * half precision. No parameters -- {@code scope} is accepted only to satisfy {@link Module}'s
  * constructor contract; nothing is registered.
  */
-public final class GELU extends Module implements UnaryModule {
+public final class GELU extends UnaryLayer {
 
   private static final float SQRT2 = 1.4142135f;
   private static final float SQRT_2_OVER_PI = (float) Math.sqrt(2.0 / Math.PI);

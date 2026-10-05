@@ -64,10 +64,10 @@ verifyMlxOracleFixtures gate therefore remains failing on this host. This is a s
 Phase 6 reproducibility issue, not permission to rewrite legacy goldens. The drift also occurs
 with TF32=1, so selecting default precision does not resolve it.
 
-The environment verifier now interprets recorded macOSMajor=26 as a minimum supported version,
-consistent with the repository's macOS 26+ requirement. This allows the development host's macOS 27
-without changing the legacy reference provenance. Per-family CPU/GPU profiles and precision are
-validated independently. Cross-host byte-exact verification remains a CI acceptance gate; no second
+The environment verifier and runner enforce per-profile OS policies: Phase 6 GPU generation and
+verification require exactly macOS 26; Phase 7.1 CPU fixtures allow macOS 26+. Unfiltered commands
+on macOS 27 fail before rewriting any fixture. Selecting `-PmlxOracleFamily=phase7-1` verifies
+only the compatible CPU profile. Per-family CPU/GPU profiles and precision are validated independently. Cross-host byte-exact verification remains a CI acceptance gate; no second
 host result is claimed here.
 
 The isolated launcher ran Phase71ConvolutionProbe: exit 0, executed 1, skipped 0, failures 0,
@@ -159,3 +159,8 @@ ALiBi casts both slopes and distances to the scores' dtype before multiplication
 MLX's reduced-precision rounding order. The float16 oracle regression uses 12 heads, query
 offset 4032, and shape [1,12,2,16]; Java matches the reference exactly. Running this case against
 the previous float32-multiply-then-cast implementation fails the exact comparison.
+
+Exact oracle comparison is now explicitly selected with `exact: true` per case. The bfloat16 twin
+of the 12-head, offset-4032 ALiBi fixture also matches exactly. Host-policy checks covered macOS
+26/27 acceptance and macOS 25 rejection; both unfiltered Gradle generation and verification refused
+macOS 27, with all expected fixture hashes unchanged.

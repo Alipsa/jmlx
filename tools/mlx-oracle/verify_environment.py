@@ -7,6 +7,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from profile_policy import verify_host
 
 
 def require_equal(label: str, actual: str, expected: str) -> None:
@@ -57,6 +58,7 @@ def main() -> None:
     parser.add_argument("--mlx-metal-url", required=True)
     parser.add_argument("--mlx-metal-sha256", required=True)
     parser.add_argument("--mlx-c-commit", required=True)
+    parser.add_argument("--family", choices=["phase6", "phase7-1"])
     args = parser.parse_args()
 
     provenance = json.loads(args.provenance.read_text())
@@ -64,10 +66,6 @@ def main() -> None:
     require_equal("platform machine", platform.machine(), "arm64")
     require_equal("recorded system", provenance["platform"]["system"], "Darwin")
     require_equal("recorded machine", provenance["platform"]["machine"], "arm64")
-    require_equal("macOS major policy", provenance["platform"]["macOSMajorPolicy"], "minimum")
-    macos_major = platform.mac_ver()[0].split(".")[0]
-    if int(macos_major) < int(provenance["platform"]["macOSMajor"]):
-        raise SystemExit("macOS is below the recorded minimum supported version")
     require_equal(
         "Python",
         f"{sys.version_info.major}.{sys.version_info.minor}",
@@ -94,10 +92,14 @@ def main() -> None:
     device = provenance["device"]["type"]
     if device not in {"cpu", "gpu"}:
         raise SystemExit(f"unsupported oracle device: {device}")
-    verify_runtime(device)
     if set(provenance.get("profiles", {})) != {"phase6", "phase7-1"}:
         raise SystemExit("provenance must declare phase6 and phase7-1 profiles")
-    for family, profile in provenance["profiles"].items():
+    profiles = provenance["profiles"]
+    selected = [args.family] if args.family else list(profiles)
+    for family in selected:
+        verify_host(family, profiles[family])
+    for family in selected:
+        profile = profiles[family]
         if profile["device"] not in {"cpu", "gpu"}:
             raise SystemExit(f"unsupported device profile: {family}")
         require_equal(f"{family} precision", os.environ.get("MLX_ENABLE_TF32", "<missing>"),

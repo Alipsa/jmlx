@@ -55,9 +55,7 @@ class Phase71OracleTest {
             assertEquals(
                 wanted[j],
                 actual[j],
-                c.get("x").path("dtype").asString().equals("float16")
-                    ? 0
-                    : 1e-4f + 1e-5f * Math.abs(wanted[j]),
+                c.path("exact").asBoolean(false) ? 0 : 1e-4f + 1e-5f * Math.abs(wanted[j]),
                 name + "[" + j + "]");
           }
         }

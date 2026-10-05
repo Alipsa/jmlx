@@ -1,9 +1,7 @@
 {
   "platform": {
     "system": "Darwin",
-    "machine": "arm64",
-    "macOSMajor": "26",
-    "macOSMajorPolicy": "minimum"
+    "machine": "arm64"
   },
   "device": {
     "type": "gpu"
@@ -25,11 +23,15 @@
   "profiles": {
     "phase6": {
       "device": "gpu",
-      "MLX_ENABLE_TF32": "0"
+      "MLX_ENABLE_TF32": "0",
+      "macOSMajor": "26",
+      "macOSMajorPolicy": "exact"
     },
     "phase7-1": {
       "device": "cpu",
-      "MLX_ENABLE_TF32": "0"
+      "MLX_ENABLE_TF32": "0",
+      "macOSMajor": "26",
+      "macOSMajorPolicy": "minimum"
     }
   }
 }

@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+from profile_policy import verify_host
 
 import mlx.core as mx
 
@@ -158,6 +159,7 @@ def run(specification: dict, provenance: dict) -> dict:
     profile = provenance.get("profiles", {}).get(family)
     if family == "phase7-1" and profile is None:
         raise ValueError("missing phase7-1 provenance profile")
+    verify_host(family, profile)
     recorded_device = profile["device"] if profile else provenance["device"]["type"]
     if profile and os.environ.get("MLX_ENABLE_TF32") != profile["MLX_ENABLE_TF32"]:
         raise ValueError("oracle precision does not match recorded profile")
@@ -244,6 +246,9 @@ def main() -> None:
         if args.verify_all and missing_expected:
             raise SystemExit(f"oracle inputs missing expected fixtures: {', '.join(missing_expected)}")
         provenance = json.loads(args.provenance.read_text())
+        for family, profile in provenance["profiles"].items():
+            if not args.family or args.family == family:
+                verify_host(family, profile)
         for name, input_path in sorted(inputs.items()):
             expected_path = args.fixtures_dir / f"{name}.expected.json"
             specification = json.loads(input_path.read_text())

@@ -66,9 +66,10 @@ with TF32=1, so selecting default precision does not resolve it.
 
 The environment verifier and runner enforce per-profile OS policies: Phase 6 GPU generation and
 verification require exactly macOS 26; Phase 7.1 CPU fixtures allow macOS 26+. Unfiltered commands
-on macOS 27 fail before rewriting any fixture. Selecting `-PmlxOracleFamily=phase7-1` verifies
-only the compatible CPU profile. Per-family CPU/GPU profiles and precision are validated independently. Cross-host byte-exact verification remains a CI acceptance gate; no second
-host result is claimed here.
+on macOS 27 fail before rewriting any fixture. Selecting `-PmlxOracleFamily=phase7-1` verifies only
+the compatible CPU profile. Per-family CPU/GPU profiles and precision are validated independently.
+Cross-host byte-exact verification remains a CI acceptance gate; no second host result is claimed
+here.
 
 The isolated launcher ran Phase71ConvolutionProbe: exit 0, executed 1, skipped 0, failures 0,
 executed-success. It asserted the native grouped-3D error in a disposable JVM. XML/log/summary are

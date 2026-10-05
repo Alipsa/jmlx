@@ -157,11 +157,11 @@ def run(specification: dict, provenance: dict) -> dict:
     device = specification.get("device")
     family = "phase7-1" if specification.get("fixture") == "phase7-1-core" else "phase6"
     profile = provenance.get("profiles", {}).get(family)
-    if family == "phase7-1" and profile is None:
-        raise ValueError("missing phase7-1 provenance profile")
+    if profile is None:
+        raise ValueError(f"missing {family} provenance profile")
     verify_host(family, profile)
-    recorded_device = profile["device"] if profile else provenance["device"]["type"]
-    if profile and os.environ.get("MLX_ENABLE_TF32") != profile["MLX_ENABLE_TF32"]:
+    recorded_device = profile["device"]
+    if os.environ.get("MLX_ENABLE_TF32") != profile["MLX_ENABLE_TF32"]:
         raise ValueError("oracle precision does not match recorded profile")
     if device != recorded_device:
         raise ValueError(

@@ -87,6 +87,9 @@ verify the recorded environment and canonical fixtures:
 ./gradlew verifyMlxOracle verifyMlxOracleFixtures
 ```
 
+Phase 6 GPU fixtures require exactly macOS 26; newer hosts should add
+`-PmlxOracleFamily=phase7-1` to verify the CPU fixtures.
+
 Only `./gradlew generateMlxOracleFixtures` rewrites the committed oracle JSON. Review that diff and
 the recorded provenance whenever native pins change. Tier-A inputs and Java goldens are documented
 in `req/phase6-tier-a-fixtures.md`; `req/phase6-tier-b-artifacts.md` is the opt-in real-artifact

@@ -29,6 +29,7 @@ class Phase71OracleTest {
       JsonNode c = inputs.get(i);
       JsonNode reference = expected.get(i);
       String name = c.get("name").asString();
+      assertEquals(name, reference.get("name").asString());
       try (MLXScope scope = new MLXScope()) {
         MLXArray result = apply(scope, c);
         assertArrayEquals(ints(reference.get("shape")), result.shape(), name);
@@ -233,20 +234,19 @@ class Phase71OracleTest {
                   s,
                   p.get("width").asInt(),
                   (float) p.get("value").asDouble(),
-                  MLXShape.PadMode.CONSTANT)
+                  MLXShape.PadMode.valueOf(
+                      p.get("mode").asString().toUpperCase(java.util.Locale.ROOT)))
               .forward(x);
       case "pad" ->
           new Pad(
                   s,
-                  new int[] {0, 1},
-                  new int[] {
-                    p.get("pad_width").get(0).get(0).asInt(),
-                    p.get("pad_width").get(1).get(0).asInt()
-                  },
-                  new int[] {
-                    p.get("pad_width").get(0).get(1).asInt(),
-                    p.get("pad_width").get(1).get(1).asInt()
-                  },
+                  IntStream.range(0, x.ndim()).toArray(),
+                  IntStream.range(0, x.ndim())
+                      .map(i -> p.get("pad_width").get(i).get(0).asInt())
+                      .toArray(),
+                  IntStream.range(0, x.ndim())
+                      .map(i -> p.get("pad_width").get(i).get(1).asInt())
+                      .toArray(),
                   (float) p.path("constant_values").asDouble(0),
                   MLXShape.PadMode.valueOf(
                       p.get("mode").asString().toUpperCase(java.util.Locale.ROOT)))
@@ -262,12 +262,12 @@ class Phase71OracleTest {
               x,
               w,
               ints(p.get("stride")),
-              new int[] {1, 0},
-              new int[] {0, 1},
+              ints(p.get("padding").get(0)),
+              ints(p.get("padding").get(1)),
               ints(p.get("kernel_dilation")),
               ints(p.get("input_dilation")),
-              1,
-              true);
+              p.get("groups").asInt(),
+              p.get("flip").asBoolean());
       default -> throw new AssertionError(op);
     };
   }

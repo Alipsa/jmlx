@@ -275,6 +275,11 @@ public final class MLXConv {
         throw new IllegalArgumentException("convGeneral: dilation and stride must be positive");
       }
     }
+    if (rank == 2 && groups > 1 && (inputDilation[0] != 1 || inputDilation[1] != 1)) {
+      throw new UnsupportedOperationException(
+          "convGeneral: pinned MLX GPU grouped 2-D input dilation is incorrect;"
+              + " see Phase 7.1 findings");
+    }
     try {
       for (int i = 0; i < rank; i++) {
         if (weightShape[i + 1] <= 0) {

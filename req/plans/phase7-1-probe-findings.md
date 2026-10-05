@@ -148,3 +148,9 @@ Maximum absolute errors per operation (float32 values read back from Java):
 | tile | 0 | 0 |
 | upsample | 2.3841858e-07 | 2.3841858e-07 |
 | var | 0 | 0 |
+
+Grouped 2-D `convGeneral` also exposes the input-dilation defect: reviewer CPU/GPU comparisons
+with groups=2 found maximum absolute differences of 13.66 for dilation=(2,2), 14.06 for (1,2),
+and 7.63 for (2,1) with flip. Java rejects all grouped 2-D non-unit input dilation. Grouped
+1-D dilation and ungrouped 2-D dilation matched; the restriction remains specific to 2-D groups.
+ALiBi now constructs distance and broadcast slopes on-device and casts bias to the scores' dtype.

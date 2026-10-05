@@ -2,7 +2,8 @@
   "platform": {
     "system": "Darwin",
     "machine": "arm64",
-    "macOSMajor": "26"
+    "macOSMajor": "26",
+    "macOSMajorPolicy": "minimum"
   },
   "device": {
     "type": "gpu"

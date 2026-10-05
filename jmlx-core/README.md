@@ -7,7 +7,8 @@ convolution, are `[out, kernel..., in/groups]`; constructors copy spatial option
 weights fresh on every forward. `MLXConv` exposes strides, padding, dilation, groups and transpose
 output padding; `convGeneral` uses low/high padding and input/kernel dilation. Pinned MLX does not
 support grouped 3-D convolution, and grouped transpose2d with non-unit stride is rejected because
-its GPU results disagree with CPU. See [probe findings](../req/plans/phase7-1-probe-findings.md).
+its GPU results disagree with CPU. Grouped 2-D `convGeneral` with non-unit input dilation
+is rejected for the same defect. See [probe findings](../req/plans/phase7-1-probe-findings.md).
 
 `Sequential` applies fixed unary children; `ModuleList` stores arbitrary fixed modules. Both use
 ordered decimal parameter paths. Modules default to eval. `train(boolean)` propagates recursively
@@ -45,7 +46,8 @@ ReLU, LeakyReLU, ELU, SELU, Tanh, Sigmoid, Softplus, Mish, HardSwish and QuickGE
 Softplus is stable at large magnitudes; QuickGELU is HF's `x * sigmoid(1.702*x)`.
 `logSoftmax` is composed from log-sum-exp and subtraction. SinusoidalPositionalEncoding returns
 features rather than adding to embeddings; dims<4 is deliberately rejected to avoid pinned NaNs.
-ALiBi adds MLX's symmetric negative absolute-distance bias, with a query offset for cached scores.
+ALiBi builds its bias with device operations, preserves the scores' dtype, and adds MLX's symmetric
+negative absolute-distance bias, with a query offset for cached scores.
 Position-sized temporaries are allocated in the input scope.
 
 `Losses` provides CE, BCE, NLL, MSE, L1, smooth-L1, KL and cosine similarity for evaluation.

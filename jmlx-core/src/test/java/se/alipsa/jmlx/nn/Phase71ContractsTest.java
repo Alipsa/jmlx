@@ -27,6 +27,77 @@ import se.alipsa.jmlx.memory.MLXScope;
 @EnabledIfNativeAvailable
 class Phase71ContractsTest {
   @Test
+  void groupedGeneralInputDilationRejectsThePinnedGpuDefect() {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray x = MLX.ones(scope, new int[] {1, 3, 3, 2}, DType.FLOAT32);
+      MLXArray w = MLX.ones(scope, new int[] {2, 2, 2, 1}, DType.FLOAT32);
+      for (int[] dilation : new int[][] {{2, 2}, {1, 2}, {2, 1}}) {
+        for (boolean flip : new boolean[] {false, true}) {
+          UnsupportedOperationException error =
+              assertThrows(
+                  UnsupportedOperationException.class,
+                  () ->
+                      MLXConv.convGeneral(
+                          x,
+                          w,
+                          new int[] {1, 1},
+                          new int[] {0, 0},
+                          new int[] {0, 0},
+                          new int[] {1, 1},
+                          dilation,
+                          2,
+                          flip));
+          assertTrue(error.getMessage().contains("grouped 2-D input dilation"));
+        }
+      }
+      assertArrayEquals(
+          new float[] {4, 4, 4, 4, 4, 4, 4, 4},
+          MLXConv.convGeneral(
+                  x,
+                  w,
+                  new int[] {1, 1},
+                  new int[] {0, 0},
+                  new int[] {0, 0},
+                  new int[] {1, 1},
+                  new int[] {1, 1},
+                  2,
+                  false)
+              .toFloatArray());
+      MLXArray oneDimensional = MLX.ones(scope, new int[] {1, 3, 2}, DType.FLOAT32);
+      MLXArray kernel = MLX.ones(scope, new int[] {2, 2, 1}, DType.FLOAT32);
+      assertArrayEquals(
+          new float[] {1, 1, 1, 1, 1, 1, 1, 1},
+          MLXConv.convGeneral(
+                  oneDimensional,
+                  kernel,
+                  new int[] {1},
+                  new int[] {0},
+                  new int[] {0},
+                  new int[] {1},
+                  new int[] {2},
+                  2,
+                  false)
+              .toFloatArray());
+    }
+  }
+
+  @Test
+  void alibiPreservesReducedPrecisionAndBroadcastsOffsets() {
+    try (MLXScope scope = new MLXScope()) {
+      for (DType dtype : new DType[] {DType.FLOAT16, DType.BFLOAT16}) {
+        MLXArray scores = MLX.ones(scope, new int[] {2, 1, 2, 3}, dtype);
+        MLXArray result = new ALiBi(scope).forward(scores, 1);
+        assertEquals(dtype, result.dtype());
+        float[] row = {1 - 1f / 256, 1, 1 - 1f / 256, 1 - 2f / 256, 1 - 1f / 256, 1};
+        float[] expected = new float[12];
+        System.arraycopy(row, 0, expected, 0, 6);
+        System.arraycopy(row, 0, expected, 6, 6);
+        assertArrayEquals(expected, result.toFloatArray());
+      }
+    }
+  }
+
+  @Test
   void modeContainersAndTrainingRejection() {
     try (MLXScope s = new MLXScope()) {
       Dropout dropout = new Dropout(s, 0);

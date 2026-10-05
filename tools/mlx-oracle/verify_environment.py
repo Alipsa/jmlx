@@ -64,6 +64,7 @@ def main() -> None:
     require_equal("platform machine", platform.machine(), "arm64")
     require_equal("recorded system", provenance["platform"]["system"], "Darwin")
     require_equal("recorded machine", provenance["platform"]["machine"], "arm64")
+    require_equal("macOS major policy", provenance["platform"]["macOSMajorPolicy"], "minimum")
     macos_major = platform.mac_ver()[0].split(".")[0]
     if int(macos_major) < int(provenance["platform"]["macOSMajor"]):
         raise SystemExit("macOS is below the recorded minimum supported version")

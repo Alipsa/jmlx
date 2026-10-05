@@ -30,7 +30,8 @@ running `generateMlxOracleFixtures`, because generation first verifies provenanc
 Phase 7.1 uses the `phase7-1-core` dispatcher in `phase71.py` and the `phase7-1` provenance profile:
 CPU and `MLX_ENABLE_TF32=0`. Legacy Phase 6 retains its GPU profile. All Gradle oracle tasks pin
 precision as an environment variable and task input; the verifier evaluates a runtime operation on
-every declared device. The recorded macOS major is the minimum supported OS (26+).
+every declared device. `platform.macOSMajorPolicy` is explicitly `minimum`: `macOSMajor` records
+the minimum supported OS (26+), rather than the generating host version.
 
 Nonfinite float serialization uses `NaN`, `Infinity` and `-Infinity` strings with `allow_nan=False`.
 The shared core test-fixture reader decodes them; comparisons classify NaNs/infinity signs exactly.

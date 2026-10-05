@@ -7,6 +7,7 @@ mkdir -p "$OUTPUT"
 RESULT=0
 for CASE in se.alipsa.jmlx.core.Phase71ConvolutionProbe; do
   CASE_DIR="$OUTPUT/${CASE##*.}"
+  rm -rf "$CASE_DIR"
   mkdir -p "$CASE_DIR"
   rm -rf jmlx-core/build/test-results/phase71NativeProbe
   ./gradlew :jmlx-core:phase71NativeProbe --tests "$CASE" --rerun > "$CASE_DIR/gradle.log" 2>&1

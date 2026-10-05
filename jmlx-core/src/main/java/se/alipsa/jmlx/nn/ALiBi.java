@@ -1,8 +1,10 @@
 package se.alipsa.jmlx.nn;
 
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
+import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /** Pinned MLX symmetric -abs(query-key) bias added to rank-four attention scores. */
@@ -29,19 +31,25 @@ public final class ALiBi extends Module {
     if (heads < 1) {
       throw new IllegalArgumentException("ALiBi: at least one head required");
     }
-    float[] values = new float[Math.multiplyExact(heads, Math.multiplyExact(q, k))];
+    float[] slopes = new float[heads];
     int power = Integer.highestOneBit(heads);
     for (int h = 0; h < heads; h++) {
       int n = h < power ? power : 2 * power;
       int index = h < power ? h : 2 * (h - power);
       double start = Math.pow(2, -Math.pow(2, -(Math.log(n) / Math.log(2) - 3)));
-      float slope = (float) Math.pow(start, index + 1);
-      for (int i = 0; i < q; i++) {
-        for (int j = 0; j < k; j++) {
-          values[(h * q + i) * k + j] = -Math.abs((long) offset + i - j) * slope;
-        }
-      }
+      slopes[h] = (float) Math.pow(start, index + 1);
     }
-    return MLXOps.add(scores, MLX.array(scores.scope(), values, new int[] {1, heads, q, k}));
+    MLXScope target = scores.scope();
+    MLXArray queries = MLX.arange(target, offset, (double) offset + q, 1, DType.FLOAT32);
+    MLXArray keys = MLX.arange(target, 0, k, 1, DType.FLOAT32);
+    MLXArray distance =
+        MLXOps.negative(
+            MLXOps.abs(
+                MLXOps.subtract(MLXShape.expandDims(queries, 1), MLXShape.expandDims(keys, 0))));
+    MLXArray bias =
+        MLXOps.multiply(
+            MLX.array(target, slopes, new int[] {1, heads, 1, 1}),
+            MLXShape.reshape(distance, new int[] {1, 1, q, k}));
+    return MLXOps.add(scores, MLX.astype(bias, scores.dtype()));
   }
 }

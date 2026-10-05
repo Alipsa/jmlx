@@ -2,7 +2,7 @@ package se.alipsa.jmlx.nn;
 
 import se.alipsa.jmlx.memory.MLXScope;
 
-/** Channels-last MaxPool1d; padded averages include zeros in their denominator. */
+/** Channels-last MaxPool1d; padding uses negative infinity. */
 public final class MaxPool1d extends Pooling {
   /** Kernel-sized stride and zero padding. */
   public MaxPool1d(MLXScope scope, int kernel) {

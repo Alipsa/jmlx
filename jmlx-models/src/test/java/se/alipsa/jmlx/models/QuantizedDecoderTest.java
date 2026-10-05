@@ -42,6 +42,8 @@ class QuantizedDecoderTest {
     Path source = root.resolve("source");
     if (family.equals("llama")) {
       TinyCheckpoints.randomLlama(source, 11L, 2, false, tied);
+    } else if (family.equals("qwen3")) {
+      TinyCheckpoints.randomQwen3(source, 11L, 2, false, tied);
     } else {
       TinyCheckpoints.randomQwen2(source, 11L);
     }
@@ -193,6 +195,45 @@ class QuantizedDecoderTest {
   @Test
   void qwen2SyntheticCheckpointMatchesTheDequantizedWeights(@TempDir Path dir) throws Exception {
     assertMatchesDequantizedReference(dir, "qwen2");
+  }
+
+  @Test
+  void qwen3SyntheticCheckpointMatchesTheDequantizedWeights(@TempDir Path dir) throws Exception {
+    // The committed HF qwen3 checkpoint's float-only q_norm/k_norm stay float through
+    // quantization; only the projections, embedding, and head are packed.
+    assertMatchesDequantizedReference(dir, "qwen3");
+  }
+
+  @Test
+  void qwen3MatchesTheDequantizedWeightsAndKeepsQkNormFloat(@TempDir Path dir) throws Exception {
+    build(dir, "qwen3", false);
+    int[] prompt = {1, 2, 3};
+    try (MLXScope scope = new MLXScope()) {
+      assertClose(
+          logits(scope, dir.resolve("reference"), prompt),
+          logits(scope, dir.resolve("quantized"), prompt),
+          1e-3f);
+    }
+  }
+
+  @Test
+  void qwen3RejectsScalesOnItsQkNormWeights(@TempDir Path dir) throws Exception {
+    build(dir, "qwen3", false);
+    Path quantized = dir.resolve("quantized");
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          new LinkedHashMap<>(
+              MLXIO
+                  .loadSafetensors(scope, quantized.resolve("model.safetensors").toString())
+                  .tensors());
+      tensors.put("model.layers.0.self_attn.q_norm.scales", tensors.get("model.norm.weight"));
+      MLXIO.saveSafetensors(quantized.resolve("model.safetensors").toString(), tensors, Map.of());
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class, () -> TextGenerationModels.load(scope, quantized));
+      assertTrue(error.getMessage().contains("unexpected tensor"), error.getMessage());
+      assertTrue(error.getMessage().contains("q_norm.scales"), error.getMessage());
+    }
   }
 
   private static void assertMatchesDequantizedReference(Path dir, String family) throws Exception {

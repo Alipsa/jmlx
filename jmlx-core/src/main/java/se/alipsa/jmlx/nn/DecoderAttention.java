@@ -10,6 +10,10 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * Decoder self-attention with configurable head width, rotary frequencies, and attention window.
+ *
+ * <p>The optional per-head QK-normalization constructors add an {@link RMSNorm} over {@code
+ * headDim} applied to the query and key heads after projection and before RoPE, matching
+ * transformers' Qwen3 {@code q_norm}/{@code k_norm} ordering.
  */
 public final class DecoderAttention extends CachedAttention {
 
@@ -26,8 +30,10 @@ public final class DecoderAttention extends CachedAttention {
   private final UnaryLayer keyProj;
   private final UnaryLayer valueProj;
   private final UnaryLayer outProj;
+  private final RMSNorm queryNorm;
+  private final RMSNorm keyNorm;
 
-  /** Creates attention from registered projection modules. */
+  /** Creates attention from registered projection modules, without per-head QK normalization. */
   public DecoderAttention(
       MLXScope scope,
       int numHeads,
@@ -41,6 +47,43 @@ public final class DecoderAttention extends CachedAttention {
       UnaryLayer k,
       UnaryLayer v,
       UnaryLayer out) {
+    this(
+        scope,
+        numHeads,
+        numKeyValueHeads,
+        headDim,
+        rope,
+        rotaryDims,
+        staticFreqs,
+        slidingWindow,
+        q,
+        k,
+        v,
+        out,
+        null,
+        null);
+  }
+
+  /**
+   * Creates attention from registered projection modules with optional per-head QK normalization:
+   * each non-null norm is an {@link RMSNorm} over {@code headDim} applied to the query or key heads
+   * after projection and before RoPE (transformers' Qwen3 ordering).
+   */
+  public DecoderAttention(
+      MLXScope scope,
+      int numHeads,
+      int numKeyValueHeads,
+      int headDim,
+      RopeSpec rope,
+      int rotaryDims,
+      MLXArray staticFreqs,
+      Integer slidingWindow,
+      UnaryLayer q,
+      UnaryLayer k,
+      UnaryLayer v,
+      UnaryLayer out,
+      RMSNorm queryNorm,
+      RMSNorm keyNorm) {
     super(scope);
     if (numHeads <= 0 || numKeyValueHeads <= 0 || numHeads % numKeyValueHeads != 0) {
       throw new IllegalArgumentException(
@@ -66,6 +109,24 @@ public final class DecoderAttention extends CachedAttention {
     keyProj = child("keyProj", Objects.requireNonNull(k, "k"));
     valueProj = child("valueProj", Objects.requireNonNull(v, "v"));
     outProj = child("outProj", Objects.requireNonNull(out, "out"));
+    if (queryNorm != null) {
+      checkNormDimension(queryNorm, "queryNorm");
+      queryNorm = child("queryNorm", queryNorm);
+    }
+    if (keyNorm != null) {
+      checkNormDimension(keyNorm, "keyNorm");
+      keyNorm = child("keyNorm", keyNorm);
+    }
+    this.queryNorm = queryNorm;
+    this.keyNorm = keyNorm;
+  }
+
+  private void checkNormDimension(RMSNorm norm, String name) {
+    int[] weight = norm.parameters().get("weight").shape();
+    if (weight.length != 1 || weight[0] != headDim) {
+      throw new IllegalArgumentException(
+          name + " weight must be [headDim] == [" + headDim + "], got " + Arrays.toString(weight));
+    }
   }
 
   /**
@@ -184,6 +245,14 @@ public final class DecoderAttention extends CachedAttention {
         AttentionHeads.toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
     MLXArray v =
         AttentionHeads.toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
+    // QK normalization (Qwen3 q_norm/k_norm) sits between projection and RoPE; normalized keys
+    // enter the cache, so cached rows are never re-normalized.
+    if (queryNorm != null) {
+      q = queryNorm.forward(q);
+    }
+    if (keyNorm != null) {
+      k = keyNorm.forward(k);
+    }
     if (validLengths == null) {
       q = rope.apply(q, rotaryDims, offset, freqs);
       k = rope.apply(k, rotaryDims, offset, freqs);

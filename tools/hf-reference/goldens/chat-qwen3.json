@@ -1,0 +1,878 @@
+{
+  "family": "qwen3",
+  "cases": [
+    {
+      "name": "plain_thinking_off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "plain_thinking_off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        23,
+        1,
+        0,
+        24,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "plain_thinking_on",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": true
+      }
+    },
+    {
+      "name": "plain_thinking_on",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": true
+      }
+    },
+    {
+      "name": "system_user_thinking_off",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>system\nhelpful<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "system_user_thinking_off",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>system\nhelpful<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        23,
+        1,
+        0,
+        24,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "system_user_thinking_on",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>system\nhelpful<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": true
+      }
+    },
+    {
+      "name": "system_user_thinking_on",
+      "messages": [
+        {
+          "role": "system",
+          "content": "helpful"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>system\nhelpful<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        0,
+        2,
+        3,
+        4,
+        0,
+        4,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": true
+      }
+    },
+    {
+      "name": "multi_turn_thinking_off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\nworld<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        17,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "multi_turn_thinking_off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\nworld<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        17,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        23,
+        1,
+        0,
+        24,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "multi_turn_thinking_on",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\nworld<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        17,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": true
+      }
+    },
+    {
+      "name": "multi_turn_thinking_on",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hello"
+        },
+        {
+          "role": "assistant",
+          "content": "world"
+        },
+        {
+          "role": "user",
+          "content": "hello"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\nworld<|im_end|>\n<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        17,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        3,
+        4,
+        4,
+        5,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": true
+      }
+    },
+    {
+      "name": "tool_call_thinking_off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the weather?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "sunny"
+        },
+        {
+          "role": "user",
+          "content": "What is the weather in Tokyo?"
+        }
+      ],
+      "add_generation_prompt": false,
+      "rendered": "<|im_start|>user\nWhat is the weather?<|im_end|>\n<|im_start|>assistant\n<tool_call>\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"Paris\"}}\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\nsunny\n</tool_response><|im_end|>\n<|im_start|>user\nWhat is the weather in Tokyo?<|im_end|>\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        0,
+        1,
+        0,
+        1,
+        0,
+        2,
+        3,
+        1,
+        6,
+        3,
+        0,
+        2,
+        3,
+        7,
+        0,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        25,
+        1,
+        0,
+        3,
+        0,
+        1,
+        0,
+        3,
+        0,
+        6,
+        3,
+        0,
+        2,
+        3,
+        7,
+        0,
+        1,
+        0,
+        7,
+        0,
+        3,
+        0,
+        1,
+        0,
+        1,
+        0,
+        7,
+        0,
+        26,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        27,
+        1,
+        0,
+        28,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        0,
+        1,
+        0,
+        1,
+        0,
+        2,
+        3,
+        1,
+        6,
+        3,
+        0,
+        2,
+        3,
+        7,
+        1,
+        0,
+        1,
+        0,
+        5,
+        0,
+        5,
+        0,
+        22,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    },
+    {
+      "name": "tool_call_thinking_off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the weather?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "sunny"
+        },
+        {
+          "role": "user",
+          "content": "What is the weather in Tokyo?"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>user\nWhat is the weather?<|im_end|>\n<|im_start|>assistant\n<tool_call>\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"Paris\"}}\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\nsunny\n</tool_response><|im_end|>\n<|im_start|>user\nWhat is the weather in Tokyo?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "ids": [
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        0,
+        1,
+        0,
+        1,
+        0,
+        2,
+        3,
+        1,
+        6,
+        3,
+        0,
+        2,
+        3,
+        7,
+        0,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        25,
+        1,
+        0,
+        3,
+        0,
+        1,
+        0,
+        3,
+        0,
+        6,
+        3,
+        0,
+        2,
+        3,
+        7,
+        0,
+        1,
+        0,
+        7,
+        0,
+        3,
+        0,
+        1,
+        0,
+        1,
+        0,
+        7,
+        0,
+        26,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        27,
+        1,
+        0,
+        28,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        3,
+        7,
+        0,
+        2,
+        0,
+        1,
+        0,
+        1,
+        0,
+        2,
+        3,
+        1,
+        6,
+        3,
+        0,
+        2,
+        3,
+        7,
+        1,
+        0,
+        1,
+        0,
+        5,
+        0,
+        5,
+        0,
+        22,
+        1,
+        0,
+        21,
+        1,
+        0,
+        23,
+        1,
+        0,
+        24,
+        1,
+        0
+      ],
+      "extra": {
+        "enable_thinking": false
+      }
+    }
+  ]
+}

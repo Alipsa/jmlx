@@ -8,8 +8,18 @@ The Mistral and Mixtral chat template is copied from the existing
 The Gemma and Phi-3 templates are small family-shaped templates: Gemma uses
 `<start_of_turn>` and the `assistant` → `model` role mapping; Phi-3 uses its role and end markers.
 These two templates are synthetic and do not claim byte-for-byte production-template compatibility.
+The Qwen3 bundle embeds the **real** Qwen3 chat template from
+`Qwen/Qwen3-0.6B` at `c1899de289a04d12100db370d81485cdf75e47ca` (SHA-256
+`a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8`, also committed to the
+`jmlx-jinja` model-template corpus as `qwen3-0.6b.jinja`); its added tokens cover the template's
+special markers, and the `tokenizer_config.json` keeps every live scalar field except the
+vocabulary-keyed `added_tokens_decoder`/`additional_special_tokens` (the live empty-string
+`pad_token` is nulled, since it is not in the synthetic vocabulary).
 
 `tools/hf-reference/generate.py --chat` loads each committed bundle with pinned Transformers,
-renders six conversation cases through `AutoTokenizer.apply_chat_template`, and tokenizes the
-rendered text without adding special tokens. `tools/tokenizer-oracle` separately pins plain encode
-behavior for the same tokenizer JSON files. Production artifact compatibility remains a Tier-B task.
+renders the family's conversation cases (three standard conversations for the earlier families;
+the enable_thinking-on/off matrix plus a tool-call conversation for Qwen3, each recorded with the
+per-case template variables it was rendered with) through `AutoTokenizer.apply_chat_template`, and
+tokenizes the rendered text without adding special tokens. `tools/tokenizer-oracle` separately pins
+plain encode behavior for the same tokenizer JSON files. Production artifact compatibility remains
+a Tier-B task.

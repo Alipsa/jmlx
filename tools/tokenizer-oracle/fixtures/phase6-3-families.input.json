@@ -83,6 +83,22 @@
           "addSpecialTokens": false
         }
       ]
+    },
+    {
+      "name": "qwen3",
+      "tokenizer": "phase6-3-qwen3.tokenizer.json",
+      "cases": [
+        {
+          "name": "plain",
+          "text": "hello world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "markers",
+          "text": "<|im_start|>system\nhelpful\n<|im_end|>\n<think></think><tool_call></tool_call><tool_response></tool_response>",
+          "addSpecialTokens": false
+        }
+      ]
     }
   ]
 }

@@ -25,7 +25,10 @@ import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
 import se.alipsa.jmlx.tokenizer.TokenizerException;
 
-/** Inference-only pre-norm decoder shared by Llama and Qwen2 checkpoints. */
+/**
+ * Inference-only pre-norm decoder shared by the Llama, Qwen2, Qwen3, Mistral, Gemma, Phi-3 and
+ * Mixtral checkpoints.
+ */
 public abstract class DecoderModel extends Module implements TextGenerationModel {
   private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
   private final DecoderConfig config;

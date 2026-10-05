@@ -1,0 +1,17 @@
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+<tool_call>
+{"name": "get_weather", "arguments": {"city": "Paris"}}
+</tool_call><|im_end|>
+<|im_start|>user
+<tool_response>
+sunny
+</tool_response><|im_end|>
+<|im_start|>user
+What is the weather in Tokyo?<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+

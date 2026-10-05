@@ -16,9 +16,15 @@ row, for both prefill and decode (not just the first failing element).
 | Gemma | 9.063e-4 | 1.0965e-3 |
 | Phi-3 | 3.539e-4 | 5.025e-4 |
 | Mixtral | 3.536e-4 | 4.919e-4 |
+| Qwen3 | 4.7004e-4 | 4.7503e-4 |
 
 With `MLX_ENABLE_TF32=0`, the maximum across every family, row and step fell to
-`2.3842e-7`. This controlled comparison attributes the discrepancy to native
+`2.3842e-7`. Phase 7.0 added the Qwen3 row above, measured 2026-10-05 on the
+same staged mlx-c fba4470 / MLX 0.31.2 runtime and Apple M5 Max with the same
+temporary-diagnostic method (removed after measurement): default-mode maxima
+4.7004e-4 (prefill) and 4.7503e-4 (decode), and at most 1.4901e-7 with
+`MLX_ENABLE_TF32=0`. Both stay inside the existing bounds, so the Qwen3 case
+needed no bound change. This controlled comparison attributes the discrepancy to native
 reduced precision: the Java graph, weights, masks, positions and cache logic
 were unchanged. MLX documents reduced-precision float32 matrix operations on
 supported hardware and the full-float32 opt-out in its

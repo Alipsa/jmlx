@@ -21,7 +21,7 @@ class Phase63ModelTokenizerContractTest {
   @Test
   void eachFamilyChatRequestUsesTemplateIdsWithoutDuplicateBos() throws Exception {
     Path root = Path.of(System.getProperty("jmlx.repository.root"));
-    for (String family : List.of("mistral", "gemma", "phi3", "mixtral")) {
+    for (String family : List.of("mistral", "gemma", "phi3", "mixtral", "qwen3")) {
       HfTokenizer tokenizer =
           HfTokenizer.fromDirectory(
               root.resolve("jmlx-tokenizer/src/test/resources/families").resolve(family));

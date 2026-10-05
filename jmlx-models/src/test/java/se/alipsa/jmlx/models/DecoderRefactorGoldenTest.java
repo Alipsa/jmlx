@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 class DecoderRefactorGoldenTest {
 
   @ParameterizedTest
-  @ValueSource(strings = {"llama", "qwen2"})
+  @ValueSource(strings = {"llama", "qwen2", "qwen3"})
   void prefillAndDecodeMatchHuggingFace(String family) throws Exception {
     Path root =
         Path.of(System.getProperty("jmlx.repository.root"), "tools", "hf-reference", "goldens");

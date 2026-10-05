@@ -19,7 +19,8 @@ import tools.jackson.databind.ObjectMapper;
 class Phase63FamilyTokenizerTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final List<String> FAMILIES = List.of("mistral", "gemma", "phi3", "mixtral");
+  private static final List<String> FAMILIES =
+      List.of("mistral", "gemma", "phi3", "mixtral", "qwen3");
 
   @Test
   void chatInputBundlesMatchRecordedProvenance() throws Exception {
@@ -90,18 +91,29 @@ class Phase63FamilyTokenizerTest {
         String label = family + ":" + testCase.required("name").asString();
         boolean addGenerationPrompt = testCase.required("add_generation_prompt").booleanValue();
         List<Map<String, Object>> messages = messages(testCase.required("messages"));
+        Map<String, Object> extra = extra(testCase.path("extra"));
         String rendered =
-            tokenizer.renderChat(messages, ChatTemplateOptions.defaults(addGenerationPrompt));
+            tokenizer.renderChat(
+                messages,
+                extra.isEmpty()
+                    ? ChatTemplateOptions.defaults(addGenerationPrompt)
+                    : new ChatTemplateOptions("", addGenerationPrompt, extra));
         assertEquals(testCase.required("rendered").asString(), rendered, label);
         List<Integer> expectedIds = integers(testCase.required("ids"));
         assertEquals(expectedIds, tokenizer.encode(rendered, false), label);
         // A chat request uses OMIT: the template already owns BOS.
-        int bosId = tokenizer.bosTokenId(tokenizer.metadata().bosToken().orElseThrow()).getAsInt();
-        if (rendered.startsWith(tokenizer.metadata().bosToken().orElseThrow())) {
-          assertEquals(bosId, expectedIds.getFirst(), label);
-          assertEquals(1, expectedIds.stream().filter(id -> id == bosId).count(), label);
+        var bosToken = tokenizer.metadata().bosToken();
+        if (bosToken.isPresent()) {
+          int bosId = tokenizer.bosTokenId(bosToken.get()).getAsInt();
+          if (rendered.startsWith(bosToken.get())) {
+            assertEquals(bosId, expectedIds.getFirst(), label);
+            assertEquals(1, expectedIds.stream().filter(id -> id == bosId).count(), label);
+          }
+          assertEquals(expectedIds.size() + 1, tokenizer.encode(rendered, true).size(), label);
+        } else {
+          // qwen3: no BOS and no post-processor, so special tokens are a no-op.
+          assertEquals(expectedIds, tokenizer.encode(rendered, true), label);
         }
-        assertEquals(expectedIds.size() + 1, tokenizer.encode(rendered, true).size(), label);
         if (family.equals("mistral") || family.equals("mixtral")) {
           String corpusSource =
               Files.readString(
@@ -124,15 +136,49 @@ class Phase63FamilyTokenizerTest {
     }
   }
 
+  /**
+   * Rebuilds a golden message as a render context value, preserving tool-call structure so the
+   * template sees the same object shape the reference render did.
+   */
   private static List<Map<String, Object>> messages(JsonNode nodes) {
     List<Map<String, Object>> result = new ArrayList<>();
     for (JsonNode node : nodes) {
-      result.add(
-          Map.of(
-              "role", node.required("role").asString(),
-              "content", node.required("content").asString()));
+      result.add((Map<String, Object>) value(node));
     }
     return List.copyOf(result);
+  }
+
+  /** Per-case template variables recorded next to the golden case, e.g. enable_thinking. */
+  private static Map<String, Object> extra(JsonNode node) {
+    Map<String, Object> result = new java.util.LinkedHashMap<>();
+    if (node.isObject()) {
+      for (Map.Entry<String, JsonNode> entry : node.properties()) {
+        result.put(entry.getKey(), value(entry.getValue()));
+      }
+    }
+    return Map.copyOf(result);
+  }
+
+  private static Object value(JsonNode node) {
+    if (node.isObject()) {
+      Map<String, Object> result = new java.util.LinkedHashMap<>();
+      for (Map.Entry<String, JsonNode> entry : node.properties()) {
+        result.put(entry.getKey(), value(entry.getValue()));
+      }
+      return result;
+    }
+    if (node.isArray()) {
+      List<Object> result = new ArrayList<>();
+      node.forEach(child -> result.add(value(child)));
+      return result;
+    }
+    if (node.isBoolean()) {
+      return node.booleanValue();
+    }
+    if (node.isIntegralNumber()) {
+      return node.intValue();
+    }
+    return node.asString();
   }
 
   private static List<Integer> integers(JsonNode nodes) {

@@ -71,6 +71,45 @@ class ChatTemplateRendererTest {
   }
 
   @Test
+  void qwen3TemplateInsertsEmptyThinkingBlockOnlyWhenThinkingDisabled() throws Exception {
+    // The real Qwen3 template (families/qwen3 bundle): enable_thinking is inverted -- false
+    // appends an empty thinking block after the assistant role-open token, true leaves the turn
+    // open-ended. Marker literals are spelled with unicode escapes in this source.
+    var config =
+        new tools.jackson.databind.ObjectMapper()
+            .readTree(
+                Path.of(getClass().getResource("/families/qwen3/tokenizer_config.json").toURI())
+                    .toFile());
+    String template = config.path("chat_template").asString();
+    List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "hello"));
+    var imStart = "\u003c|im_start|\u003e";
+    var imEnd = "\u003c|im_end|\u003e";
+    var thinkOpen = "\u003cthink\u003e";
+    var thinkClose = "\u003c/think\u003e";
+    assertEquals(
+        imStart
+            + "user\nhello"
+            + imEnd
+            + "\n"
+            + imStart
+            + "assistant\n"
+            + thinkOpen
+            + "\n\n"
+            + thinkClose
+            + "\n\n",
+        ChatTemplateRenderer.render(
+            template, messages, true, null, null, Map.of("enable_thinking", false)));
+    assertEquals(
+        imStart + "user\nhello" + imEnd + "\n" + imStart + "assistant\n",
+        ChatTemplateRenderer.render(
+            template, messages, true, null, null, Map.of("enable_thinking", true)));
+    // Absent enable_thinking behaves like true: the turn stays open-ended.
+    assertEquals(
+        imStart + "user\nhello" + imEnd + "\n" + imStart + "assistant\n",
+        ChatTemplateRenderer.render(template, messages, true, null, null, Map.of()));
+  }
+
+  @Test
   void explicitClockPinsAllRenderOverloads() {
     String source = "{{ strftime_now('%Y-%m-%d') }}|{{ messages[0]['content'] }}";
     Template parsed = ChatTemplateRenderer.parse(source);

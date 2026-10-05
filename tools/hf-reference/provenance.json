@@ -13,6 +13,7 @@
     "chat-mistral.json": "49d714abc84c5f83474eaaebf845d144ba4bd8e9417c7b169a80eb3533baeaf8",
     "chat-mixtral.json": "d2fe353cff35cef9e2004a4f719d0254470da14405c0622c2ef9af2719b18384",
     "chat-phi3.json": "b7977c8940e958c803a862f929cf753f07cf8abf4ad02d0cb60bf98ace2d432a",
+    "chat-qwen3.json": "b3a6a2749ea5c024cd433d7611909a5bf0dd6206cadd3ff2977720bb15be0f07",
     "checkpoints/gemma/config.json": "699e044edc882eb6c13bc5f0409139fecc906c8ebd46ef8ea99c3f8b82cee830",
     "checkpoints/gemma/generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
     "checkpoints/gemma/model.safetensors": "9dd35c0ae0dcfa41863dd62507d2c01564794871b01db3edd4b620394bb689c5",
@@ -34,6 +35,9 @@
     "checkpoints/qwen2/config.json": "b9fce8ff7244a8001ad1ca40cdb66c32dbf2193e70f1f63b7244e8f7259a4a4c",
     "checkpoints/qwen2/generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
     "checkpoints/qwen2/model.safetensors": "a4032dcfb112f07e57c5b3c3ceb0974a3177491363e8170e40c4ffdc817b28ef",
+    "checkpoints/qwen3/config.json": "87685f246c8fbcc0ea600681a726e9f99ee698cdbf0e550c9a2ea0983a81f57d",
+    "checkpoints/qwen3/generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+    "checkpoints/qwen3/model.safetensors": "9b287aa3ed5343da031ad48e600ff8a9a2784c7efac5606fea957043e0a8d642",
     "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
     "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
     "llama31.json": "51c231ec47bfa9461ca7b1b85cfc9899b21ab0691e218510d5f0f49cd706b5a4",
@@ -42,6 +46,7 @@
     "mixtral.json": "a918494a8f61a882393772b6d1fbaa0deab33b32c84cccb5c0d995f685fee8aa",
     "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06",
     "qwen2.json": "a98b86fcffbcc3528543f90f0d960e9302a0524ad672e00d466e2a7d2868b24e",
+    "qwen3.json": "21c7aa6f2123ab61129e09d39eab2c99cc3c91bf50613c1fb96795d07149c012",
     "rope.json": "46bd5212bb0f0e5153ce8a0ec7934174d38b107d25e2ba5e26f5518430303105"
   },
   "chat_sources": {
@@ -52,6 +57,8 @@
     "phi3/tokenizer.json": "e66be4592820e5d63d09e2f209d9b4ffe81a034d468d5589e77b2ccbe7cdb9b6",
     "phi3/tokenizer_config.json": "f5f68e8b82cced8bf20e6dfe70aef0dfc99be2b9c8649a4e3bfb593f0a7d0497",
     "mixtral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
-    "mixtral/tokenizer_config.json": "baa2d57cbea616a76ee79323bebe4aac6be802caf433cc9572d2c523f365652b"
+    "mixtral/tokenizer_config.json": "baa2d57cbea616a76ee79323bebe4aac6be802caf433cc9572d2c523f365652b",
+    "qwen3/tokenizer.json": "274b06a0f99baa3a58407f9c416a2e9dda7b0c0f6abd5b172c0371946a6a257a",
+    "qwen3/tokenizer_config.json": "ee8bc348c897da92268e5978855088a03fe939ee318057691eafb591d520a7b2"
   }
 }

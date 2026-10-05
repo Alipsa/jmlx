@@ -56,6 +56,127 @@ class ArchitectureMappingsTest {
   }
 
   @Test
+  void qwen3ParsesExplicitHeadDimAndQkNorm() {
+    ArchitectureDescriptor d =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"qwen3","vocab_size":151936,"hidden_size":1024,
+                 "intermediate_size":3072,"num_hidden_layers":28,"num_attention_heads":16,
+                 "num_key_value_heads":8,"max_position_embeddings":40960,"rms_norm_eps":1e-06,
+                 "rope_theta":1000000,"head_dim":128,"tie_word_embeddings":true,
+                 "attention_bias":false,"hidden_act":"silu"}\
+                """));
+    // head_dim differs from hidden_size / num_attention_heads on purpose: the Qwen3 product check
+    // must not reject the family.
+    assertEquals(128, d.headDim());
+    assertEquals(128, d.rotaryDims());
+    assertTrue(d.attention().qkNorm());
+    assertFalse(d.attention().qkvBias());
+    assertFalse(d.attention().outBias());
+    assertFalse(d.attention().fusedQkv());
+    assertNull(d.attention().slidingWindow());
+    assertTrue(d.head().tied());
+    assertEquals(1_000_000f, ((RopeSpec.Base) d.rope()).theta());
+  }
+
+  @Test
+  void qwen3LiveConfigKeysAreAllConsumedWithoutWarnings() {
+    List<String> unknown = new ArrayList<>();
+    ArchitectureMappings.parse(
+        json(
+            """
+            {"architectures":["Qwen3ForCausalLM"],"attention_bias":false,
+             "attention_dropout":0.0,"bos_token_id":151643,"eos_token_id":151645,
+             "head_dim":128,"hidden_act":"silu","hidden_size":1024,
+             "initializer_range":0.02,"intermediate_size":3072,
+             "max_position_embeddings":40960,"max_window_layers":28,"model_type":"qwen3",
+             "num_attention_heads":16,"num_hidden_layers":28,"num_key_value_heads":8,
+             "rms_norm_eps":1e-06,"rope_scaling":null,"rope_theta":1000000,
+             "sliding_window":null,"tie_word_embeddings":true,"torch_dtype":"bfloat16",
+             "transformers_version":"4.51.0","use_cache":true,"use_sliding_window":false,
+             "vocab_size":151936}\
+            """),
+        unknown::add);
+    assertEquals(List.of(), unknown);
+  }
+
+  @Test
+  void qwen3HonorsAttentionBiasWhenSet() {
+    ArchitectureDescriptor d =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"qwen3","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                 "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":1,
+                 "attention_bias":true}\
+                """));
+    assertTrue(d.attention().qkvBias());
+    assertTrue(d.attention().outBias());
+  }
+
+  @Test
+  void qwen3WithoutExplicitHeadDimFallsBackToHiddenPerHead() {
+    ArchitectureDescriptor d =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"qwen3","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+                 "num_hidden_layers":1,"num_attention_heads":2,"num_key_value_heads":1}\
+                """));
+    assertEquals(4, d.headDim());
+    assertEquals(4, d.rotaryDims());
+    assertTrue(d.attention().qkNorm());
+  }
+
+  @Test
+  void qwen3TensorPlanRequiresAndForbidsQkNormWeights() {
+    TensorPlan qwen3 = ArchitectureMappings.tensorPlan(TestDescriptors.qwen3(2));
+    assertTrue(qwen3.required().contains("model.layers.0.self_attn.q_norm.weight"));
+    assertTrue(qwen3.required().contains("model.layers.1.self_attn.k_norm.weight"));
+    assertFalse(qwen3.forbidden().contains("model.layers.0.self_attn.q_norm.weight"));
+    TensorPlan qwen2 = ArchitectureMappings.tensorPlan(TestDescriptors.qwen2(2));
+    assertTrue(qwen2.forbidden().contains("model.layers.0.self_attn.q_norm.weight"));
+    assertTrue(qwen2.forbidden().contains("model.layers.0.self_attn.k_norm.weight"));
+    // Norm weights never enter the affine companion allow-list, even when quantization is set.
+    TensorPlan quantized =
+        ArchitectureMappings.tensorPlan(TestDescriptors.llamaWithQuantization(32, 4));
+    assertFalse(quantized.optional().contains("model.layers.0.self_attn.q_norm.scales"));
+  }
+
+  @Test
+  void qwen3MoEIsRejectedByNamedDeferral() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"qwen3_moe","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2}\
+                        """)));
+    assertTrue(error.getMessage().contains("qwen3_moe"));
+    assertTrue(error.getMessage().contains("deferred"));
+  }
+
+  @Test
+  void qwen3RejectsEnabledSlidingWindow() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"qwen3","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                         "use_sliding_window":true}\
+                        """)));
+    assertTrue(error.getMessage().contains("use_sliding_window"));
+  }
+
+  @Test
   void freshlySavedConfigWithHarmlessKeysLoads() {
     List<String> unknown = new ArrayList<>();
     ArchitectureDescriptor d =
@@ -241,6 +362,7 @@ class ArchitectureMappingsTest {
         Map.of(
             "llama", "accepted",
             "qwen2", "accepted",
+            "qwen3", "accepted",
             "mistral", "rejected",
             "phi3", "rejected",
             "gemma", "accepted",
@@ -255,6 +377,7 @@ class ArchitectureMappingsTest {
         Map.of(
             "llama", "rejected",
             "qwen2", "accepted",
+            "qwen3", "accepted",
             "mistral", "rejected",
             "phi3", "rejected",
             "gemma", "rejected",
@@ -269,6 +392,7 @@ class ArchitectureMappingsTest {
         Map.of(
             "llama", "rejected",
             "qwen2", "null",
+            "qwen3", "null",
             "mistral", "4",
             "phi3", "4",
             "gemma", "rejected",
@@ -283,6 +407,7 @@ class ArchitectureMappingsTest {
         Map.of(
             "llama", "qkv=true out=true",
             "qwen2", "qkv=true out=false",
+            "qwen3", "qkv=true out=true",
             "mistral", "qkv=false out=false",
             "phi3", "qkv=false out=false",
             "gemma", "rejected",
@@ -297,6 +422,7 @@ class ArchitectureMappingsTest {
         Map.of(
             "llama", "true",
             "qwen2", "false",
+            "qwen3", "false",
             "mistral", "false",
             "phi3", "false",
             "gemma", "false",
@@ -314,6 +440,8 @@ class ArchitectureMappingsTest {
                 + d.attention().fusedQkv()
                 + " moe="
                 + (d.moe() != null)
+                + " qk="
+                + d.attention().qkNorm()
                 + " offset="
                 + d.norm().weightOffset()
                 + " scaled="
@@ -321,12 +449,20 @@ class ArchitectureMappingsTest {
                 + " tied="
                 + d.head().tied(),
         Map.of(
-            "llama", "qkv=false fused=false moe=false offset=false scaled=false tied=false",
-            "qwen2", "qkv=true fused=false moe=false offset=false scaled=false tied=false",
-            "mistral", "qkv=false fused=false moe=false offset=false scaled=false tied=false",
-            "phi3", "qkv=false fused=true moe=false offset=false scaled=false tied=false",
-            "gemma", "qkv=false fused=false moe=false offset=true scaled=true tied=true",
-            "mixtral", "qkv=false fused=false moe=true offset=false scaled=false tied=false"));
+            "llama",
+            "qkv=false fused=false moe=false qk=false offset=false scaled=false tied=false",
+            "qwen2",
+            "qkv=true fused=false moe=false qk=false offset=false scaled=false tied=false",
+            "qwen3",
+            "qkv=false fused=false moe=false qk=true offset=false scaled=false tied=false",
+            "mistral",
+            "qkv=false fused=false moe=false qk=false offset=false scaled=false tied=false",
+            "phi3",
+            "qkv=false fused=true moe=false qk=false offset=false scaled=false tied=false",
+            "gemma",
+            "qkv=false fused=false moe=false qk=false offset=true scaled=true tied=true",
+            "mixtral",
+            "qkv=false fused=false moe=true qk=false offset=false scaled=false tied=false"));
   }
 
   @Test

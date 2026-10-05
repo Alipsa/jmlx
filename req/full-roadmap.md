@@ -16,6 +16,16 @@ This ordering is priority, not a strict ban on dependencies: Phase 6 may impleme
 array, indexing, sort/selection, and random-key slices it needs from later groups. The inventory
 records those decisions, and later phases extend the established contract rather than re-deriving it.
 
+**Amended 2026-10-04 (Phase 7):** this permission is extended to Phase 7 for the focused Phase 8
+array slices its milestones need, as enumerated in `req/plans/phase7-plan.md`: `abs`, `minimum`,
+`clip`, `floor` and `log1p` (Phase 8 milestone 2); `max_axes` and `var_axes` (milestone 3);
+`pad`, `as_strided`, `tile` and `repeat_axis` (milestone 4). The Phase 7 milestone 1 layer families
+themselves (convolution, pooling, padding, upsampling, normalization variants, containers, dropout,
+activations) need no permission because §Phase 7 milestone 1 already names them. Each pulled-forward
+slice is entered in `req/mlx-api-inventory.md` where it lands, and Phase 8 and Phase 11 milestone 2
+("Complete standard layers required by the pinned MLX `nn` scope") extend this work rather than
+re-deriving it.
+
 "Full parity" means that, for the version of MLX pinned by `scripts/bootstrap-native.sh`, a
 Java caller can use every supported public mlx-c capability through a safe, idiomatic Java API
 with MLX-equivalent observable semantics.  Parity is not a literal one-class-per-C-function
@@ -226,7 +236,22 @@ resources safely.  No claim is made yet for multimodal or diffusion models.
 **Objective:** cover inference workloads outside decoder-only text generation and add the missing
 neural modules they require.
 
+**Amended 2026-10-04:** milestone 7.0 is inserted ahead of the listed order for product priority.
+The primary product target of Phase 7 is the Qwen family — Qwen3 text decoders first, then
+Qwen3-VL — and Qwen3 support is a decoder-only capability of the kind Phase 6.3 established, so it
+unblocks the flagship use case (running Qwen3 locally through the existing `TextGenerationModel`
+contract) without waiting on the layer work the other milestones require. It also verifies the
+per-head QK-normalization capability the later milestones' model families reuse. The existing
+milestone numbering below is unchanged; 7.0 slots in before it. See `req/plans/phase7-plan.md` §7.0.
+
 Milestones, to plan in dependency order:
+
+0. **Qwen3 text decoders** *(added 2026-10-04, first for product priority):* map `model_type`
+   `qwen3` in `ArchitectureMappings`, add the per-head QK-normalization capability
+   (`q_norm`/`k_norm` over `head_dim`, after projection and before RoPE) to `DecoderAttention`,
+   honor explicit `head_dim`, extend affine-quantized loading to the family, and land the full
+   fixture tier (synthetic logits goldens, tokenizer/chat-template goldens through the real Qwen3
+   template, a pinned Qwen3-0.6B Tier-B artifact, and a recorded manual Qwen3-8B 4-bit run).
 
 1. **Core inference modules:** `Sequential`/containers, dropout evaluation semantics, softmax and
    common losses/activations, convolution and transpose convolution, pooling, padding, upsampling,

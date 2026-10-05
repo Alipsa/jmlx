@@ -101,6 +101,14 @@ public final class DecoderAssembler {
                     attentionPrefix + "v_proj",
                     descriptor.attention().qkvBias())
               };
+      RMSNorm qNorm =
+          descriptor.attention().qkNorm()
+              ? norm(scope, descriptor, tensors, attentionPrefix + "q_norm.weight")
+              : null;
+      RMSNorm kNorm =
+          descriptor.attention().qkNorm()
+              ? norm(scope, descriptor, tensors, attentionPrefix + "k_norm.weight")
+              : null;
       CachedAttention attention =
           new DecoderAttention(
               scope,
@@ -119,7 +127,9 @@ public final class DecoderAssembler {
                   descriptor,
                   tensors,
                   attentionPrefix + "o_proj",
-                  descriptor.attention().outBias()));
+                  descriptor.attention().outBias()),
+              qNorm,
+              kNorm);
       RMSNorm post = norm(scope, descriptor, tensors, prefix + "post_attention_layernorm.weight");
       UnaryLayer mlp =
           descriptor.moe() == null

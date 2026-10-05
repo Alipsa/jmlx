@@ -52,7 +52,7 @@ class BatchSchedulerFailureTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"llama", "qwen2", "mistral", "gemma", "phi3", "mixtral"})
+  @ValueSource(strings = {"llama", "qwen2", "mistral", "gemma", "phi3", "mixtral", "qwen3"})
   void nonFiniteRowFailsAloneAndNeverTouchesTheOthers(String family) throws Exception {
     // Reference: the same 3-row cohort with the same schedule (row 1 leaves after its first token,
     // compacting 3 -> 2 rows at step 0), but cancelled instead of poisoned.

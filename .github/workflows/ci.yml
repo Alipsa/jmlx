@@ -154,7 +154,7 @@ jobs:
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
-                              'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
+                              'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
                               'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest',

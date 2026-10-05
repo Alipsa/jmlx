@@ -44,7 +44,7 @@ class BatchGenerationSchedulerTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"llama", "qwen2", "mistral", "gemma", "phi3", "mixtral"})
+  @ValueSource(strings = {"llama", "qwen2", "mistral", "gemma", "phi3", "mixtral", "qwen3"})
   void singleRequestMatchesTheDirectPath(String family) throws Exception {
     GenerationRequest request = greedy(PROMPTS[0], 6);
     GenerationResult expected = direct(family, request);

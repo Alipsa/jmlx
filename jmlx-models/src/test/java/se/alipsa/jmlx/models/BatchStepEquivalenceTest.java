@@ -37,7 +37,7 @@ class BatchStepEquivalenceTest {
   private static final int[] NEXT = {95, 12, 77};
 
   @ParameterizedTest
-  @ValueSource(strings = {"llama", "qwen2", "mistral", "gemma", "phi3", "mixtral"})
+  @ValueSource(strings = {"llama", "qwen2", "mistral", "gemma", "phi3", "mixtral", "qwen3"})
   void batchedPrefillAndDecodeMatchIndependentRows(String family) throws Exception {
     Path directory =
         Path.of(System.getProperty("jmlx.repository.root"), "tools", "hf-reference", "goldens")

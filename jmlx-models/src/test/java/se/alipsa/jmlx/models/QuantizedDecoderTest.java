@@ -198,6 +198,13 @@ class QuantizedDecoderTest {
   }
 
   @Test
+  void qwen3SyntheticCheckpointMatchesTheDequantizedWeights(@TempDir Path dir) throws Exception {
+    // The committed HF qwen3 checkpoint's float-only q_norm/k_norm stay float through
+    // quantization; only the projections, embedding, and head are packed.
+    assertMatchesDequantizedReference(dir, "qwen3");
+  }
+
+  @Test
   void qwen3MatchesTheDequantizedWeightsAndKeepsQkNormFloat(@TempDir Path dir) throws Exception {
     build(dir, "qwen3", false);
     int[] prompt = {1, 2, 3};

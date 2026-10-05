@@ -148,9 +148,11 @@ for every new op.
      - within one request, growth across decode steps is bounded by KV retention. This reuses
        the existing test's slope method, which compares the late per-token slope with the early
        one. That test bounds total growth with a hard-coded constant (`4L * 1024 * 1024`,
-       "generous for 2 layers x 3 rows of a tiny model"). New work replaces the constant with a
+       "generous for 2 layers x 3 rows of a tiny model"). New request-state tests use a
        per-token budget derived from layers, KV heads, head size and dtype, plus a stated
-       margin. Request-specific static tensors (cross-attention K/V, image and DeepStack
+       margin. **2026-10-05 amendment:** replacing the existing scheduler test's constant is
+       separate follow-up work, not a 7.2 dependency. Request-specific static tensors
+       (cross-attention K/V, image and DeepStack
        features) add no per-step growth;
      - a capacity-bounded FULL cache (`KVCachePolicy.full(capacity)`) never evicts. It rejects a
        position beyond capacity, and generation validates the whole token budget up front. So it
@@ -167,7 +169,7 @@ for every new op.
 | Step 0 Roadmap amendment | docs | — | amended roadmap merged |
 | 7.0 Qwen3 text decoders | `jmlx-core`, `jmlx-models`, `jmlx-jinja` | step 0 | Qwen3 Tier-A logits; Qwen3-0.6B Tier-B; Qwen3-8B 4-bit run recorded |
 | 7.1 Core inference modules | `jmlx-core`, `tools/mlx-oracle` | step 0 | every layer oracle-tested; inventory updated |
-| 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models` | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens |
+| 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models`, `jmlx-tokenizer`, reference/Tier-B tools | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens |
 | 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B |
 | 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output |
 | 7.3c LLaVA-style (optional) | `jmlx-models` | 7.3a | Tier-B artifact, or a dated deferral |
@@ -352,6 +354,20 @@ native suites go on CI's required-suite list.
 inventory with tests; `verifyMlxApiCallSites` is green.
 
 ## 7.2 — Encoders and encoder-decoder generation
+
+**Implementation update, 2026-10-05:** local BERT/T5, tokenizer and Tier-B checks pass; see
+`req/phase7-2-implementation-report.md`. New macOS 26 CI acceptance remains pending. The inspected
+Intel MRPC revision has no safetensors; the licensed single-sequence SST-2 fallback is selected.
+Pair encoding remains implemented and oracle-verified.
+
+**Scope amendment, 2026-10-05:** include additive tokenizer pair encoding for the selected
+BERT classifier candidates and SentencePiece Precompiled normalization if required by the
+pinned Flan-T5 tokenizer. These changes require tokenizer oracle fixtures, Java 21 checks,
+CHANGELOG/API documentation and inclusion in jmlx-tokenizer's independent release process.
+Also include safe nested artifact downloads, task-specific Tier-B manifests/tests/CI rows and
+an actual pinned sentence-transformers reference dependency. The implementation sub-plan is
+`req/plans/phase7-2-plan.md`; outstanding artifact inspection is a prerequisite, not evidence
+that current tokenizer or Tier-B infrastructure already supports these checkpoints.
 
 1. **Shared modules:** a bidirectional padding mask in `AttentionMask`; a `CrossAttention` module
    whose encoder keys/values are computed once and held in a static (non-appending) cache variant,

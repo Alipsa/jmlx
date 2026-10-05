@@ -71,7 +71,9 @@ public final class TokenizerJsonLoader {
           addedTokens,
           parseConfiguredDefaults(root, configuredVocabulary(model.vocab(), addedTokens)),
           byteLevelStep != null,
-          byteLevelStep != null && byteLevelStep.path("add_prefix_space").asBoolean(false));
+          byteLevelStep != null && byteLevelStep.path("add_prefix_space").asBoolean(false),
+          nullableComponent(root, "post_processor"),
+          configuredStrategy(root));
     } catch (IOException | JacksonException e) {
       throw new TokenizerException("TokenizerJsonLoader: failed to parse " + path, e);
     }
@@ -96,8 +98,8 @@ public final class TokenizerJsonLoader {
     }
     String type = componentType(node, path);
     if ("Precompiled".equals(type)) {
-      throw new TokenizerException(
-          "TokenizerJsonLoader: unsupported " + path + ".type 'Precompiled'");
+      new PrecompiledNormalizer(node.path("precompiled_charsmap").asString());
+      return;
     }
     if ("Sequence".equals(type)) {
       if (!node.path("normalizers").isArray()) {
@@ -608,13 +610,23 @@ public final class TokenizerJsonLoader {
     return new TemplateProcessingStep(single, specialTokens);
   }
 
+  private static PairTruncationStrategy configuredStrategy(JsonNode root) {
+    return switch (root.path("truncation").path("strategy").asString("LongestFirst")) {
+      case "OnlyFirst" -> PairTruncationStrategy.ONLY_FIRST;
+      case "OnlySecond" -> PairTruncationStrategy.ONLY_SECOND;
+      default -> PairTruncationStrategy.LONGEST_FIRST;
+    };
+  }
+
   private static EncodingOptions parseConfiguredDefaults(
       JsonNode root, Map<String, Integer> vocabulary) {
     Truncation truncation = Truncation.disabled();
     JsonNode truncationNode = root.path("truncation");
     if (!truncationNode.isMissingNode() && !truncationNode.isNull()) {
       String strategy = optionalString(truncationNode, "strategy", "LongestFirst", "truncation");
-      if (!"LongestFirst".equals(strategy) && !"OnlyFirst".equals(strategy)) {
+      if (!"LongestFirst".equals(strategy)
+          && !"OnlyFirst".equals(strategy)
+          && !"OnlySecond".equals(strategy)) {
         throw new TokenizerException(
             "TokenizerJsonLoader: truncation.strategy is pair-only or unsupported: " + strategy);
       }

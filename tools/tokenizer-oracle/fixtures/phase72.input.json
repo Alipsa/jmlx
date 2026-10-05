@@ -1,0 +1,261 @@
+{
+  "fixtures": [
+    {
+      "name": "bert-pairs",
+      "tokenizer": "phase72-wordpiece.tokenizer.json",
+      "cases": [
+        {
+          "name": "longest_first-left",
+          "text": "hello world this is nice",
+          "textPair": "café naïve déjà vu",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "longest_first",
+            "direction": "left"
+          }
+        },
+        {
+          "name": "longest_first-right",
+          "text": "hello world this is nice",
+          "textPair": "café naïve déjà vu",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "longest_first",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "only_first-left",
+          "text": "hello world this is nice",
+          "textPair": "café naïve déjà vu",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "only_first",
+            "direction": "left"
+          }
+        },
+        {
+          "name": "only_first-right",
+          "text": "hello world this is nice",
+          "textPair": "café naïve déjà vu",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "only_first",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "only_second-left",
+          "text": "hello world this is nice",
+          "textPair": "café naïve déjà vu",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "only_second",
+            "direction": "left"
+          }
+        },
+        {
+          "name": "only_second-right",
+          "text": "hello world this is nice",
+          "textPair": "café naïve déjà vu",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "only_second",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "unicode-pair",
+          "text": "café",
+          "textPair": "漢字 déjà",
+          "addSpecialTokens": true
+        },
+        {
+          "name": "no-special",
+          "text": "hello",
+          "textPair": "world",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "left-padding",
+          "text": "hello",
+          "textPair": "world",
+          "addSpecialTokens": true,
+          "padding": {
+            "length": 9,
+            "direction": "left",
+            "pad_id": 0,
+            "pad_token": "[PAD]",
+            "pad_type_id": 0
+          }
+        },
+        {
+          "name": "only_first-entire-removal",
+          "text": "one two",
+          "textPair": "three four",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 5,
+            "strategy": "only_first",
+            "direction": "right"
+          },
+          "expectedError": true
+        },
+        {
+          "name": "only_second-entire-removal",
+          "text": "one two",
+          "textPair": "three four",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 5,
+            "strategy": "only_second",
+            "direction": "right"
+          },
+          "expectedError": true
+        },
+        {
+          "name": "equal-longest",
+          "text": "one two",
+          "textPair": "three four",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 6,
+            "strategy": "longest_first",
+            "direction": "right"
+          }
+        }
+      ]
+    },
+    {
+      "name": "only-second-single",
+      "tokenizer": "phase72-only-second.tokenizer.json",
+      "cases": [
+        {
+          "name": "only-second-under",
+          "text": "one two",
+          "addSpecialTokens": true,
+          "sequenceIds": true,
+          "truncation": {
+            "max_length": 5,
+            "strategy": "only_second",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "only-second-over",
+          "text": "one two",
+          "addSpecialTokens": true,
+          "sequenceIds": true,
+          "truncation": {
+            "max_length": 3,
+            "strategy": "only_second",
+            "direction": "right"
+          },
+          "expectedError": true
+        }
+      ]
+    },
+    {
+      "name": "precompiled",
+      "tokenizer": "phase72-precompiled.tokenizer.json",
+      "cases": [
+        {
+          "name": "normalization-0",
+          "text": "café é ＡＢＣ ① ﬁ ™",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-1",
+          "text": "hello\u001eworld",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-2",
+          "text": "™\u001eg",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-3",
+          "text": "你好 日本語",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-4",
+          "text": "a   b\t c",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-5",
+          "text": "́é",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-6",
+          "text": "​word",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "normalization-7",
+          "text": "ﬃ café 😀",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "leading-deletion",
+          "text": "\u001ehello",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "leading-multiple-deletion",
+          "text": "\u001e\u001ehello",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "trailing-deletion",
+          "text": "hello\u001e",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "only-deletions",
+          "text": "\u001e\u001e",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        },
+        {
+          "name": "long-combining-cluster",
+          "text": "á̂̃",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        }
+      ]
+    },
+    {
+      "name": "zero-width-replace",
+      "tokenizer": "phase72-replace.tokenizer.json",
+      "cases": [
+        {
+          "name": "word-boundary",
+          "text": "ab cd",
+          "addSpecialTokens": false,
+          "sequenceIds": true
+        }
+      ]
+    }
+  ]
+}

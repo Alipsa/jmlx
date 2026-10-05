@@ -1,5 +1,11 @@
 # Phase 6.2 tokenizer component evidence
 
+**2026-10-05 Phase 7.2 amendment:** historical exclusions below describe Phase 6.2.
+Precompiled charsmap normalization and BERT pair encoding now have locked `phase72` Rust-oracle
+fixtures. Pair truncation supports LongestFirst, OnlyFirst and OnlySecond. Overflow stride,
+arbitrary pair templates and a general sequence-ID API remain outside scope. Source derivation,
+sizes, hashes and Apache-2.0 attribution accompany those fixtures.
+
 This matrix records the exact offline evidence behind Phase 6.2. The reference is `tokenizers`
 0.23.2's Python binding over the Hugging Face Rust runtime; hashes and supported oracle platforms
 are pinned in `tools/tokenizer-oracle/provenance.json`. Fixture generation opens only committed local

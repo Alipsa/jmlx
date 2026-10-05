@@ -15,9 +15,37 @@ record TokenizerDefinition(
     List<AddedToken> addedTokens,
     EncodingOptions configuredDefaults,
     boolean trimByteLevelOffsets,
-    boolean byteLevelAddPrefixSpace) {
+    boolean byteLevelAddPrefixSpace,
+    JsonNode pairPostProcessor,
+    PairTruncationStrategy configuredStrategy) {
+
+  TokenizerDefinition(
+      JsonNode normalizer,
+      JsonNode preTokenizer,
+      List<PostProcessorStep> postProcessor,
+      Model model,
+      JsonNode decoder,
+      List<AddedToken> addedTokens,
+      EncodingOptions configuredDefaults,
+      boolean trimByteLevelOffsets,
+      boolean byteLevelAddPrefixSpace) {
+    this(
+        normalizer,
+        preTokenizer,
+        postProcessor,
+        model,
+        decoder,
+        addedTokens,
+        configuredDefaults,
+        trimByteLevelOffsets,
+        byteLevelAddPrefixSpace,
+        null,
+        PairTruncationStrategy.LONGEST_FIRST);
+  }
 
   TokenizerDefinition {
+    pairPostProcessor = pairPostProcessor == null ? null : pairPostProcessor.deepCopy();
+    configuredStrategy = Objects.requireNonNull(configuredStrategy);
     normalizer = normalizer == null ? null : normalizer.deepCopy();
     preTokenizer = preTokenizer == null ? null : preTokenizer.deepCopy();
     postProcessor = List.copyOf(postProcessor);

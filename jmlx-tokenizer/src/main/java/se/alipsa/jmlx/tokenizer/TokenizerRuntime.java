@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import tools.jackson.databind.JsonNode;
 
 /** Immutable component runtime shared by all calls to one tokenizer. */
 final class TokenizerRuntime {
 
   private final TokenizerDefinition definition;
   private final TokenizerModels.Encoder modelEncoder;
+  private final java.util.function.UnaryOperator<AlignedText> normalizer;
   private final AddedTokenMatcher rawMatcher;
   private final AddedTokenMatcher normalizedMatcher;
   private final Vocabulary vocabulary;
@@ -18,6 +20,7 @@ final class TokenizerRuntime {
   TokenizerRuntime(TokenizerDefinition definition) {
     this.definition = Objects.requireNonNull(definition, "definition");
     this.modelEncoder = TokenizerModels.prepare(definition.model());
+    this.normalizer = NormalizerPipeline.prepare(definition.normalizer());
     this.rawMatcher =
         new AddedTokenMatcher(definition.addedTokens(), false, definition.normalizer());
     this.normalizedMatcher =
@@ -84,6 +87,15 @@ final class TokenizerRuntime {
         throw new TokenizerException(
             "TokenizerRuntime: truncation maxLength cannot contain required special tokens");
       }
+      if (pieces.size() > available
+          && definition.configuredStrategy() == PairTruncationStrategy.ONLY_SECOND) {
+        throw new TokenizerException("Truncation error: Second sequence not provided");
+      }
+      if (pieces.size() > available
+          && available == 0
+          && definition.configuredStrategy() == PairTruncationStrategy.ONLY_FIRST) {
+        throw new TokenizerException("Truncation error: Sequence to truncate too short");
+      }
       pieces = truncate(pieces, available, options.truncation().direction());
     }
     pieces = applyPostProcessor(pieces, options.addSpecialTokens());
@@ -91,6 +103,168 @@ final class TokenizerRuntime {
       pieces = pad(pieces, options.padding());
     }
     return columns(pieces);
+  }
+
+  TokenizerEncoding encodePair(String text, String textPair, PairEncodingOptions pairOptions) {
+    Objects.requireNonNull(text, "text");
+    Objects.requireNonNull(textPair, "textPair");
+    Objects.requireNonNull(pairOptions, "options");
+    EncodingOptions options = pairOptions.options();
+    if (options.padding().enabled()) {
+      validatePadding(options.padding());
+    }
+    List<TokenPiece> first = encodeInput(text);
+    List<TokenPiece> second = encodeInput(textPair);
+    int budget = pairProcess(List.of(), List.of(), options.addSpecialTokens()).size();
+    if (options.truncation().enabled()) {
+      int available = options.truncation().maxLength() - budget;
+      if (available < 0) {
+        throw new TokenizerException("truncation maxLength cannot contain pair special tokens");
+      }
+      int remove = Math.max(0, first.size() + second.size() - available);
+      int firstLength = first.size();
+      int secondLength = second.size();
+      if (remove > 0) {
+        switch (pairOptions.strategy()) {
+          case ONLY_FIRST -> {
+            if (firstLength <= remove) {
+              throw new TokenizerException("Truncation error: Sequence to truncate too short");
+            }
+            firstLength -= remove;
+          }
+          case ONLY_SECOND -> {
+            if (secondLength <= remove) {
+              throw new TokenizerException("Truncation error: Sequence to truncate too short");
+            }
+            secondLength -= remove;
+          }
+          case LONGEST_FIRST -> {
+            while (remove-- > 0) {
+              if (firstLength >= secondLength) {
+                firstLength--;
+              } else {
+                secondLength--;
+              }
+            }
+          }
+          default -> throw new TokenizerException("unsupported pair truncation strategy");
+        }
+      }
+      first = truncate(first, firstLength, options.truncation().direction());
+      second = truncate(second, secondLength, options.truncation().direction());
+    }
+    List<TokenPiece> output = pairProcess(first, second, options.addSpecialTokens());
+    if (options.padding().enabled()) {
+      output = pad(output, options.padding());
+    }
+    return columns(output);
+  }
+
+  private List<TokenPiece> pairProcess(
+      List<TokenPiece> first, List<TokenPiece> second, boolean special) {
+    JsonNode processor = definition.pairPostProcessor();
+    if (processor == null) {
+      throw new TokenizerException("pair encoding requires a BERT pair post-processor");
+    }
+    if ("Sequence".equals(processor.path("type").asString())) {
+      JsonNode template = null;
+      for (JsonNode step : processor.path("processors")) {
+        if ("BertProcessing".equals(step.path("type").asString())
+            || "TemplateProcessing".equals(step.path("type").asString())) {
+          if (template != null) {
+            throw new TokenizerException("multiple pair templates are unsupported");
+          }
+          template = step;
+        } else {
+          throw new TokenizerException("unsupported pair post-processor sequence");
+        }
+      }
+      processor = template;
+    }
+    if (processor == null) {
+      throw new TokenizerException("missing pair template");
+    }
+    List<TokenPiece> output = new ArrayList<>();
+    if ("BertProcessing".equals(processor.path("type").asString())) {
+      if (special) {
+        pairSpecial(
+            output,
+            processor.path("cls").get(0).asString(),
+            processor.path("cls").get(1).intValue(),
+            0);
+      }
+      typed(output, first, 0);
+      if (special) {
+        pairSpecial(
+            output,
+            processor.path("sep").get(0).asString(),
+            processor.path("sep").get(1).intValue(),
+            0);
+      }
+      typed(output, second, 1);
+      if (special) {
+        pairSpecial(
+            output,
+            processor.path("sep").get(0).asString(),
+            processor.path("sep").get(1).intValue(),
+            1);
+      }
+    } else if ("TemplateProcessing".equals(processor.path("type").asString())) {
+      boolean seenFirst = false;
+      boolean seenSecond = false;
+      for (JsonNode item : processor.path("pair")) {
+        JsonNode sequence = item.get("Sequence");
+        if (sequence != null) {
+          String id = sequence.path("id").asString();
+          int type = sequence.path("type_id").asInt(0);
+          if ("A".equals(id) && type == 0 && !seenFirst) {
+            typed(output, first, 0);
+            seenFirst = true;
+          } else if ("B".equals(id) && type == 1 && !seenSecond) {
+            typed(output, second, 1);
+            seenSecond = true;
+          } else {
+            throw new TokenizerException("pair template must distinguish A:0 and B:1 exactly once");
+          }
+        } else if (item.has("SpecialToken")) {
+          JsonNode token = item.path("SpecialToken");
+          int type = token.path("type_id").asInt(0);
+          JsonNode info = processor.path("special_tokens").path(token.path("id").asString());
+          if (!info.path("ids").isArray()
+              || info.path("ids").isEmpty()
+              || info.path("ids").size() != info.path("tokens").size()) {
+            throw new TokenizerException("invalid pair special token definition");
+          }
+          if (special) {
+            for (int i = 0; i < info.path("ids").size(); i++) {
+              pairSpecial(
+                  output,
+                  info.path("tokens").get(i).asString(),
+                  info.path("ids").get(i).intValue(),
+                  type);
+            }
+          }
+        } else {
+          throw new TokenizerException("unsupported pair template item");
+        }
+      }
+      if (!seenFirst || !seenSecond) {
+        throw new TokenizerException("pair template must contain A:0 and B:1");
+      }
+    } else {
+      throw new TokenizerException("unsupported pair post-processor");
+    }
+    return output;
+  }
+
+  private static void pairSpecial(List<TokenPiece> output, String text, int id, int type) {
+    output.add(new TokenPiece(text, TokenOffset.NONE, id, type, true));
+  }
+
+  private static void typed(List<TokenPiece> output, List<TokenPiece> input, int type) {
+    for (TokenPiece piece : input) {
+      output.add(new TokenPiece(piece.text(), piece.offset(), piece.id(), type, piece.special()));
+    }
   }
 
   private List<TokenPiece> encodeInput(String text) {
@@ -101,7 +275,7 @@ final class TokenizerRuntime {
         result.add(added(raw));
         continue;
       }
-      AlignedText normalized = NormalizerPipeline.apply(definition.normalizer(), raw.text());
+      AlignedText normalized = normalizer.apply(raw.text());
       for (AddedTokenMatcher.Segment segment : normalizedMatcher.split(normalized)) {
         if (segment.token() != null) {
           result.add(added(segment));

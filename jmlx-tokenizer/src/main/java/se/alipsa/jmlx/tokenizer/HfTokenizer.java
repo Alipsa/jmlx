@@ -261,6 +261,19 @@ public final class HfTokenizer {
   }
 
   /**
+   * Encodes a BERT-template pair with offsets local to each input. Type IDs 0 and 1 identify first
+   * and second input tokens; special and padding tokens have no source offset.
+   *
+   * @param text first input
+   * @param textPair second input
+   * @param options special-token, padding and pair truncation policies
+   * @return immutable encoding with input-local offsets
+   */
+  public TokenizerEncoding encode(String text, String textPair, PairEncodingOptions options) {
+    return runtime.encodePair(text, textPair, options);
+  }
+
+  /**
    * Encodes text with explicit truncation, padding, and special-token options.
    *
    * @param text input text

@@ -22,13 +22,14 @@ final class AddedTokenMatcher {
    * first code point and ordered longest-first so a lookup only scans tokens that can match there.
    */
   AddedTokenMatcher(List<AddedToken> tokens, boolean normalized, JsonNode normalizer) {
+    var prepared = NormalizerPipeline.prepare(normalizer);
     for (AddedToken token : tokens) {
       if (token.normalized() != normalized) {
         continue;
       }
       String content =
           token.normalized()
-              ? NormalizerPipeline.apply(normalizer, AlignedText.original(token.content())).text()
+              ? prepared.apply(AlignedText.original(token.content())).text()
               : token.content();
       if (!content.isEmpty()) {
         byFirstCodePoint

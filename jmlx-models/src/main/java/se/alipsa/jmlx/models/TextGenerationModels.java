@@ -17,7 +17,30 @@ public final class TextGenerationModels {
   public static TextGenerationModel load(MLXScope scope, Path directory) throws IOException {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(directory, "directory");
+    if ("t5"
+        .equals(
+            MAPPER
+                .readTree(directory.resolve("config.json").toFile())
+                .path("model_type")
+                .asString())) {
+      return T5Model.load(scope, directory);
+    }
     return loadDecoder(scope, directory, readConfig(directory));
+  }
+
+  /** Loads T5 with an explicit source limit; other architectures reject these options. */
+  public static TextGenerationModel load(MLXScope scope, Path directory, T5LoadOptions options)
+      throws IOException {
+    Objects.requireNonNull(options);
+    if (!"t5"
+        .equals(
+            MAPPER
+                .readTree(directory.resolve("config.json").toFile())
+                .path("model_type")
+                .asString())) {
+      throw new IllegalArgumentException("T5LoadOptions applies only to model_type=t5");
+    }
+    return T5Model.load(scope, directory, options);
   }
 
   static <T extends DecoderModel> T loadDecoder(

@@ -47,14 +47,30 @@ dependencies {
 tasks.register('tierBTest', Test) {
     group = 'verification'
     description = 'Runs opt-in real-checkpoint smoke tests when JMLX_TIER_B_MODEL_DIR is set.'
+    doNotTrackState('verifies external pinned checkpoints and measures inference on this host')
     testClassesDirs = sourceSets.tierB.output.classesDirs
     classpath = sourceSets.tierB.runtimeClasspath
     useJUnitPlatform()
     environment 'MLX_ENABLE_TF32', '0'
     inputs.property('mlxEnableTf32', '0')
-    systemProperty 'jmlx.tier.b.model.dir', System.getenv('JMLX_TIER_B_MODEL_DIR') ?: ''
+    def tierBDirectory = System.getenv('JMLX_TIER_B_MODEL_DIR')
+    systemProperty 'jmlx.tier.b.model.dir', tierBDirectory ? rootProject.file(tierBDirectory).absolutePath : ''
     systemProperty 'jmlx.tier.b.expected.model.type', System.getenv('JMLX_TIER_B_MODEL_TYPE') ?: ''
     def tierBManifest = System.getenv('JMLX_TIER_B_MANIFEST')
+    def taskName = tierBManifest && rootProject.file(tierBManifest).isFile()
+        ? new groovy.json.JsonSlurper().parse(rootProject.file(tierBManifest)).task ?: 'generation'
+        : 'generation'
+    def suites = [generation: 'TierBSmokeTest', embedding: 'TierBEmbeddingTest',
+                  classification: 'TierBClassificationTest', seq2seq: 'TierBSeq2SeqTest']
+    if (!suites.containsKey(taskName)) { throw new GradleException("Unsupported Tier-B task: ${taskName}") }
+    def assertedTask = System.getenv('JMLX_TIER_B_TASK')
+    if (assertedTask && assertedTask != taskName) {
+        throw new GradleException("Expected Tier-B task ${assertedTask}, got ${taskName}")
+    }
+    include "**/${suites[taskName]}.class"
+    inputs.property('tierBTask', taskName)
+    if (tierBManifest) { inputs.file(rootProject.file(tierBManifest)) }
+    systemProperty 'jmlx.tier.b.expected.task', System.getenv('JMLX_TIER_B_TASK') ?: ''
     systemProperty 'jmlx.tier.b.manifest', tierBManifest ? rootProject.file(tierBManifest).absolutePath : ''
 }
 
@@ -116,6 +132,7 @@ tasks.withType(Test).configureEach {
     mustRunAfter rootProject.tasks.named('generateMlxOracleFixtures')
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
     inputs.files(rootProject.fileTree('tools/mlx-oracle/fixtures') { include '*.json' })
+    inputs.files(rootProject.fileTree('tools/hf-reference/goldens'))
 }
 
 // Gate 0 thread probes (req/plans/phase6-5-plan.md). Each runs in its own forked JVM, like

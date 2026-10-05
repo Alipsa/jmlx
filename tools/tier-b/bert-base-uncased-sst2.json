@@ -1,0 +1,98 @@
+{
+  "repository": "yoshitomo-matsubara/bert-base-uncased-sst2",
+  "revision": "ce4cfd087e0c988beae0699f77a610bf7916742c",
+  "task": "classification",
+  "license": "Apache-2.0",
+  "license_evidence": "https://huggingface.co/yoshitomo-matsubara/bert-base-uncased-sst2/blob/ce4cfd087e0c988beae0699f77a610bf7916742c/README.md",
+  "max_total_bytes": 438431729,
+  "reference_status": "locally verified; macOS 26 CI acceptance pending",
+  "files": {
+    "README.md": {
+      "sha256": "ba9a350e55a33efa85979e16d22cae8ae7468da4e5d59ecfd2971e66197e65ac",
+      "max_bytes": 1653
+    },
+    "config.json": {
+      "sha256": "4a7926b8bd7439789bc5fe4f71bb24ff9cf96cbe1b7e8e9171bd997d181b8c2e",
+      "max_bytes": 697
+    },
+    "model.safetensors": {
+      "sha256": "e8924f8a3ab0f8fa92637e3d6de97fd1f35050d8d9ecf895a6b7c2a9b2d2816c",
+      "max_bytes": 437962832
+    },
+    "special_tokens_map.json": {
+      "sha256": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+      "max_bytes": 112
+    },
+    "tokenizer.json": {
+      "sha256": "9720ec9f57683b9b2abe85ef7958a4d90c1769df357d0f44516a4919f476db08",
+      "max_bytes": 466132
+    },
+    "tokenizer_config.json": {
+      "sha256": "d6a7893d4d005a3d19a14ba0e57ce05f0be25adc8b89135116e0f7cfbe9c050c",
+      "max_bytes": 303
+    }
+  },
+  "reference": {
+    "status": "eligible after measured real-checkpoint error; local run passed",
+    "epsilon": 0.0001,
+    "margin": 0.0001,
+    "prompt_special_tokens": "ADD",
+    "precision": "CPU float32 eager; Java TF32 off",
+    "versions": {
+      "python": "3.12.15",
+      "torch": "2.6.0",
+      "transformers": "4.57.6",
+      "sentence_transformers": "5.1.2"
+    },
+    "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b",
+    "generator_sha256": "9f406f8fe79e29cace93bca2d986a4d990bd59a01f3e9c1aea4c07ae9ecb8098",
+    "source_sha256": {
+      "BertForSequenceClassification": "89e5e5098b98a206c8835c6c00b52b40d6d078a5994c40f300f98173969137c2",
+      "T5ForConditionalGeneration": "ee1a043f5c03c684a2bbb0213ea3b3f8be272a03ab884bdca57c31e7315e7b7e",
+      "Transformer": "71ddf3be1a57e2543271aaadeb407e93fb595ef9c6ad055f11b74dbacff23fc3",
+      "Pooling": "8d743fcecdb4fb9cfd0a3a0f1429b35621d450f505805dad83e916ce19a8eeb4",
+      "Normalize": "b99812bcc69cd8bd42e42d63fb55bef5b52c723be2a82838fccca2f5d246aeb5"
+    },
+    "cases": [
+      {
+        "text": "This movie was delightful, beautifully acted and wonderfully entertaining.",
+        "source_ids": [
+          101,
+          2023,
+          3185,
+          2001,
+          26380,
+          1010,
+          17950,
+          6051,
+          1998,
+          6919,
+          2135,
+          14036,
+          1012,
+          102
+        ],
+        "logits": [
+          -7.5859479904174805,
+          7.120089530944824
+        ],
+        "class_id": 1,
+        "top_two_ids": [
+          1,
+          0
+        ],
+        "gap": 14.706037521362305
+      }
+    ],
+    "measurement": {
+      "date": "2026-10-05",
+      "host": "Apple M5 Max / macOS 27.0.1 / aarch64",
+      "tf32": false,
+      "maximum_absolute_error": 4.76837158203125e-07,
+      "jvm_rss_kib_after_comparison": 643216,
+      "native_peak_bytes": 470252210,
+      "gap_eligibility": "all recorded decisions exceed 2*epsilon+margin",
+      "minimum_gap": 14.706037521362305
+    }
+  }
+}

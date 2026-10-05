@@ -82,7 +82,7 @@ class NormalizerPipelineTest {
             AlignedText.original("ab cd"));
     AlignedText.Unit inserted =
         replaced.units().stream().filter(u -> u.value().equals("|")).toList().get(2);
-    assertEquals(new TokenOffset(3, 3), new TokenOffset(inserted.startByte(), inserted.endByte()));
+    assertEquals(new TokenOffset(2, 3), new TokenOffset(inserted.startByte(), inserted.endByte()));
   }
 
   @Test

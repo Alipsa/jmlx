@@ -22,6 +22,31 @@ cd ../..
 ```
 
 `--family` also accepts one family name or `rope` for a targeted regeneration.
+Phase 7.2 has a separate seed-preserving entry point:
+
+```sh
+tools/hf-reference/.venv/bin/python tools/hf-reference/generate.py \
+  --family phase72 --out tools/hf-reference/goldens
+```
+
+It produces BERT encoder/sequence/token heads and tied-ReLU/untied-gated T5 checkpoints,
+full/cached logits, encoder states, buckets and greedy outputs. Source hashes and executable
+semantic probes are recorded in `phase72-semantics.json` and provenance. The universal hash
+lock retains Linux Torch `2.6.0+cpu`, uses Torch `2.6.0` on Darwin, and adds the actual
+`sentence-transformers==5.1.2` pipeline. Existing decoder goldens are unchanged.
+
+Generate reviewed candidates for locally downloaded real artifacts with:
+
+```sh
+tools/hf-reference/.venv/bin/python tools/hf-reference/tier_b.py \
+  --directory .tier-b/minilm-l6-v2 --manifest tools/tier-b/minilm-l6-v2.json
+```
+
+The command also accepts classification and seq2seq manifests. It verifies artifact hashes,
+checks installed versions, and records CPU float32 eager vectors/logits, source hashes and
+top-two gaps. Regeneration resets acceptance. Rerun Java Tier-B, measure the real error and
+verify `gap > 2 * epsilon + margin` before recording final eligibility. A multi-label
+threshold would require `abs(logit) > epsilon + margin`. Python execution stays opt-in.
 To regenerate only the additional Mistral window-boundary references from the committed
 checkpoint without changing `mistral.json`, run
 `tools/hf-reference/.venv/bin/python tools/hf-reference/generate.py --family mistral --window-cases --out tools/hf-reference/goldens`

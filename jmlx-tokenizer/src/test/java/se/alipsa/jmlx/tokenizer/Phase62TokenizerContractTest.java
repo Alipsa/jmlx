@@ -241,7 +241,7 @@ class Phase62TokenizerContractTest {
     MAPPER.writeValue(precompiled.toFile(), wordPiece);
     TokenizerException unsupported =
         assertThrows(TokenizerException.class, () -> HfTokenizer.fromFile(precompiled));
-    assertTrue(unsupported.getMessage().contains("normalizer.type 'Precompiled'"));
+    assertTrue(unsupported.getMessage().contains("Precompiled: malformed"));
 
     String malformed =
         Files.readString(

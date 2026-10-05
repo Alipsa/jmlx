@@ -1,5 +1,11 @@
 # Phase 6.2 implementation plan — tokenizer and prompt compatibility
 
+**2026-10-05 Phase 7.2 amendment:** historical exclusions below describe Phase 6.2.
+Precompiled charsmap normalization and BERT pair encoding now have locked `phase72` Rust-oracle
+fixtures. Pair truncation supports LongestFirst, OnlyFirst and OnlySecond. Overflow stride,
+arbitrary pair templates and a general sequence-ID API remain outside scope. Source derivation,
+sizes, hashes and Apache-2.0 attribution accompany those fixtures.
+
 **Roadmap:** `req/full-roadmap.md` §Phase 6.2
 
 **Prerequisite:** Phase 6.1, merged in PR #23 (`92fa802`)

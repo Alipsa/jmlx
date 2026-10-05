@@ -51,3 +51,23 @@ owns manual/scheduled execution. A passing Tier-A synthetic fixture is not Tier-
 Exact greedy-ID comparisons therefore use full float32 independently of the launching shell.
 The recorded artifacts were verified on the documented device; this does not establish
 identical greedy IDs across GPU generations.
+
+## Phase 7.2 task manifests (2026-10-05)
+
+| Task | Manifest | Immutable revision | Consumed bytes | License |
+| --- | --- | --- | ---: | --- |
+| embedding | tools/tier-b/minilm-l6-v2.json | 1110a243fdf4706b3f48f1d95db1a4f5529b4d41 | 91346791 | Apache-2.0 |
+| classification | tools/tier-b/bert-base-uncased-sst2.json | ce4cfd087e0c988beae0699f77a610bf7916742c | 438431729 | Apache-2.0 |
+| seq2seq | tools/tier-b/flan-t5-small.json | 0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab | 310308220 | Apache-2.0 |
+
+The Intel MRPC candidate at `844e804944328e45c3f3bf69b35467e0ce0b26af` has no safetensors payload;
+the planned licensed fallback is SST-2. Pair tokenization remains independently covered.
+Use `./gradlew downloadTierBArtifact -PtierBManifest=<manifest> -PtierBTarget=<directory>`, then
+set JMLX_TIER_B_MODEL_DIR and JMLX_TIER_B_MANIFEST for `:jmlx-models:tierBTest`.
+The manifest task selects a separate suite; both BERT artifacts can therefore use model_type=bert.
+Optional JMLX_TIER_B_TASK asserts the task. Legacy decoder manifests retain generation behavior.
+Every file is SHA-pinned, including nested pooling metadata. The downloader is Java buildSrc;
+its tests run in the existing `./gradlew -p buildSrc check` CI step. Python download.py was removed.
+Actual sentence-transformers and HF CPU references, source hashes, full logits, gaps, final local
+measurements and host are recorded in manifests. Numerical comparisons always run; exact IDs
+require stable margin eligibility. Initial macOS 26 workflow acceptance remains pending.

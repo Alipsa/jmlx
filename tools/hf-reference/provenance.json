@@ -47,7 +47,25 @@
     "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06",
     "qwen2.json": "a98b86fcffbcc3528543f90f0d960e9302a0524ad672e00d466e2a7d2868b24e",
     "qwen3.json": "21c7aa6f2123ab61129e09d39eab2c99cc3c91bf50613c1fb96795d07149c012",
-    "rope.json": "46bd5212bb0f0e5153ce8a0ec7934174d38b107d25e2ba5e26f5518430303105"
+    "rope.json": "46bd5212bb0f0e5153ce8a0ec7934174d38b107d25e2ba5e26f5518430303105",
+    "bert-sequence.json": "478712f5c276474796934bccb2bf599d28a0de07a60f4ab4d5847f6219507ade",
+    "bert-token.json": "0fef60969ee3a47fda96a9642d070fd0e8d7f213627b311d684702b61d14624c",
+    "bert.json": "3ab831f87d7ef3e5c419d80cb1dc989838851f4435ed093357323e766fdec316",
+    "checkpoints/bert/config.json": "74f2b4ad55ec0374e1867a64c7af8a3044f501d7ba41dffa7f74611c057c4716",
+    "checkpoints/bert/model.safetensors": "6dbe1cf5b3846a4053828af2730aeae1e75599652ff037cea08d17a53468b93c",
+    "checkpoints/bert-sequence/config.json": "f7c85d2b918c445addc9bc1063c2191a28f4655ee7754168cddaac5aa95c6824",
+    "checkpoints/bert-sequence/model.safetensors": "3521f1de388f107b68c493ede15d3c93423e46314823198c4add1517963e73d4",
+    "checkpoints/bert-token/config.json": "b307d7401fa4bf3082657b9a64391266adcf15febaeafc64461d75b5f22791af",
+    "checkpoints/bert-token/model.safetensors": "dda29356289a247e02c497caecdf351b7db5a7e0960e86f6d5dc6684691b70b4",
+    "checkpoints/t5-gated/config.json": "4fc10be5b898bddcbb05d5699078e9af37eacb8f84422b77d91d6a4269b0659b",
+    "checkpoints/t5-gated/generation_config.json": "8145d7eecabff8e16a9876617a6d52728e9b8fbe24c426e6bf9ebbd6bfb87737",
+    "checkpoints/t5-gated/model.safetensors": "0c482fb40c29b8006b9b1cba6572ea53af5717de055b4fcc042a42235f2d703d",
+    "checkpoints/t5-relu/config.json": "bc3a229ea896a8cf8815f5bfa5dbb381c0617f4c86588bed021a5cd6c2710aaa",
+    "checkpoints/t5-relu/generation_config.json": "8145d7eecabff8e16a9876617a6d52728e9b8fbe24c426e6bf9ebbd6bfb87737",
+    "checkpoints/t5-relu/model.safetensors": "4d6000053da2a947e9e86cc310d88df83111f384eda4782a2a0fdd2b74062ab0",
+    "phase72-semantics.json": "9ac909d01e650680a8a19b8bd18b44fd5b42bbaf9ce759a2797ca4c7bf02c800",
+    "t5-gated.json": "f0a8b2c8efdafa34fc4f55a130da75f13fc72dddfffda47c9d6464c255202d56",
+    "t5-relu.json": "8f94a656a6c3f5d27f4bdaf9fb356d7cce440677e0977d1106d0c05100ee2433"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -60,5 +78,26 @@
     "mixtral/tokenizer_config.json": "baa2d57cbea616a76ee79323bebe4aac6be802caf433cc9572d2c523f365652b",
     "qwen3/tokenizer.json": "274b06a0f99baa3a58407f9c416a2e9dda7b0c0f6abd5b172c0371946a6a257a",
     "qwen3/tokenizer_config.json": "ee8bc348c897da92268e5978855088a03fe939ee318057691eafb591d520a7b2"
+  },
+  "phase72": {
+    "versions": {
+      "torch": "2.6.0",
+      "transformers": "4.57.6",
+      "sentence_transformers": "5.1.2"
+    },
+    "host": {
+      "os": "Darwin",
+      "arch": "arm64"
+    },
+    "sources": {
+      "bert": "89e5e5098b98a206c8835c6c00b52b40d6d078a5994c40f300f98173969137c2",
+      "t5": "ee1a043f5c03c684a2bbb0213ea3b3f8be272a03ab884bdca57c31e7315e7b7e"
+    },
+    "contracts": {
+      "bert": "absolute input-index positions; embedding LN; post-LN residuals; pooler tanh at index 0; sequence head reads pooler; token head reads hidden states; key-only mask",
+      "t5": "q/k/v width heads*d_kv; float32 RMS accumulation without mean subtraction or bias; unscaled attention; pre-norm residuals; gated-gelu uses gelu_new; tied head scales hidden states by d_model**-0.5",
+      "pooling": "attended special tokens included; CLS index 0; Mean/Max exclude padding; Normalize follows Pooling; artifact maximum sequence length enforced by tokenizer truncation upstream"
+    },
+    "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b"
   }
 }

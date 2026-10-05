@@ -43,3 +43,16 @@ token IDs as an independent MLX-Python reference on three prompts (24, 8 and 16 
 `req/phase6-4-benchmark.md`. Mixtral
 quantization, per-layer overrides, non-affine modes, GPTQ/AWQ and GGUF are rejected with the key
 named. Quantized KV cache remains unsupported.
+
+## Phase 7.2 text tasks (2026-10-05)
+
+| Task/family | Tier-A | Tier-B | Limits |
+| --- | --- | --- | --- |
+| Text encoder, BERT | Tiny HF encoder hidden states including padded rows; CLS/mean/max/L2 | all-MiniLM-L6-v2, actual sentence-transformers CPU vector | Absolute positions, GELU, unquantized; one supported Pooling plus optional Normalize |
+| Sequence classification, BERT | Tiny HF sequence logits and labels | Licensed bert-base-uncased-sst2 fallback; stable-margin exact class | Regression rejected; pair API separately oracle-verified |
+| Token classification, BERT | Tiny HF token logits for every row | No real task-head claim | Softmax/sigmoid selected by problem_type; no CRF |
+| Seq2seq text, T5/Flan-T5 | Tied ReLU/untied gated-GELU; encoder, full/cached logits, buckets, generation | flan-t5-small complete greedy IDs, EOS and every CPU logit history | FULL cache only; no scheduler, beam search, decoder prefixes or quantized weights |
+
+All three new real-artifact checks passed locally on M5 Max/macOS 27.0.1 with TF32 disabled.
+Their first supported macOS 26 CI executions remain pending. See `phase7-2-implementation-report.md`
+for pins, margins and measured resource use; synthetic head checks do not imply other model families.

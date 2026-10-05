@@ -84,6 +84,41 @@ public final class DecoderAttention extends CachedAttention {
       UnaryLayer out,
       RMSNorm queryNorm,
       RMSNorm keyNorm) {
+    this(
+        scope,
+        numHeads,
+        numKeyValueHeads,
+        headDim,
+        rope,
+        rotaryDims,
+        staticFreqs,
+        slidingWindow,
+        q,
+        k,
+        v,
+        out,
+        queryNorm,
+        keyNorm,
+        (float) (1.0 / Math.sqrt(headDim)));
+  }
+
+  /** Creates decoder attention with explicit scale and optional QK norms. */
+  public DecoderAttention(
+      MLXScope scope,
+      int numHeads,
+      int numKeyValueHeads,
+      int headDim,
+      RopeSpec rope,
+      int rotaryDims,
+      MLXArray staticFreqs,
+      Integer slidingWindow,
+      UnaryLayer q,
+      UnaryLayer k,
+      UnaryLayer v,
+      UnaryLayer out,
+      RMSNorm queryNorm,
+      RMSNorm keyNorm,
+      float scale) {
     super(scope);
     if (numHeads <= 0 || numKeyValueHeads <= 0 || numHeads % numKeyValueHeads != 0) {
       throw new IllegalArgumentException(
@@ -100,7 +135,10 @@ public final class DecoderAttention extends CachedAttention {
     this.headDim = headDim;
     this.rotaryDims = rotaryDims;
     queriesPerKeyValueHead = numHeads / numKeyValueHeads;
-    scale = (float) (1.0 / Math.sqrt(headDim));
+    if (!Float.isFinite(scale) || scale <= 0) {
+      throw new IllegalArgumentException("attention scale must be finite and positive");
+    }
+    this.scale = scale;
     this.rope = Objects.requireNonNull(rope, "rope");
     this.staticFreqs =
         staticFreqs != null ? staticFreqs : rope.staticFrequencies(scope, rotaryDims);

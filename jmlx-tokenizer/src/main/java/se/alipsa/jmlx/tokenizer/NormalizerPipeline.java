@@ -14,6 +14,30 @@ final class NormalizerPipeline {
 
   private NormalizerPipeline() {}
 
+  static java.util.function.UnaryOperator<AlignedText> prepare(JsonNode config) {
+    if (config == null || config.isNull()) {
+      return input -> input;
+    }
+    if ("Precompiled".equals(config.path("type").asString())) {
+      PrecompiledNormalizer normalizer =
+          new PrecompiledNormalizer(config.path("precompiled_charsmap").asString());
+      return normalizer::apply;
+    }
+    if ("Sequence".equals(config.path("type").asString())) {
+      java.util.List<java.util.function.UnaryOperator<AlignedText>> steps =
+          new java.util.ArrayList<>();
+      config.path("normalizers").forEach(step -> steps.add(prepare(step)));
+      return input -> {
+        AlignedText result = input;
+        for (var step : steps) {
+          result = step.apply(result);
+        }
+        return result;
+      };
+    }
+    return input -> apply(config, input);
+  }
+
   static AlignedText apply(JsonNode config, AlignedText input) {
     if (config == null || config.isNull() || config.isMissingNode()) {
       return input;
@@ -21,6 +45,8 @@ final class NormalizerPipeline {
     String type = config.path("type").asString();
     return switch (type) {
       case "Sequence" -> applySequence(config.path("normalizers"), input);
+      case "Precompiled" ->
+          new PrecompiledNormalizer(config.path("precompiled_charsmap").asString()).apply(input);
       case "NFC" -> unicode(input, Normalizer.Form.NFC);
       case "NFD" -> unicode(input, Normalizer.Form.NFD);
       case "NFKC" -> unicode(input, Normalizer.Form.NFKC);
@@ -198,7 +224,16 @@ final class NormalizerPipeline {
     int last = 0;
     while (matcher.find()) {
       appendRange(input, unitAtChar, last, matcher.start(), output);
-      TokenOffset range = range(input, unitAtChar, matcher.start(), matcher.end());
+      TokenOffset range;
+      if (matcher.end() > matcher.start()) {
+        AlignedText.Unit lastMatched = input.units().get(unitAtChar[matcher.end()] - 1);
+        range = new TokenOffset(lastMatched.startByte(), lastMatched.endByte());
+      } else if (matcher.end() > 0) {
+        AlignedText.Unit previous = input.units().get(unitAtChar[matcher.end()] - 1);
+        range = new TokenOffset(previous.startByte(), previous.endByte());
+      } else {
+        range = new TokenOffset(0, 0);
+      }
       // HF's Replace treats `content` as a literal replacement string, never a `$1`/backreference
       // template -- Matcher.replaceFirst/replaceAll would otherwise throw on a literal `$` in
       // content, or misinterpret it as a group reference (PR #24 review round 2, finding 7).

@@ -649,8 +649,11 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private static DecoderModel acceptModel(MLXScope root, TextGenerationModel model) {
     if (!(model instanceof DecoderModel decoderModel)) {
       throw new SchedulerStartException(
-          "the model factory must return a DecoderModel, got "
-              + (model == null ? "null" : model.getClass().getName()));
+          model == null
+              ? "the model factory returned null"
+              : "model_type "
+                  + model.metadata().modelType()
+                  + " is not supported by the batch scheduler");
     }
     if (!root.isAncestorOf(decoderModel.modelScope())) {
       throw new SchedulerStartException(

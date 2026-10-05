@@ -96,3 +96,21 @@ includes the `batch-equivalence` tag. Both modules wire the golden task into
 `check`/`build`, and CI requires the relevant native suites in both result
 directories. New strict numerical references should use `full-float32` to select
 the full-precision JVM automatically.
+
+## Phase 7.2 precision evidence (2026-10-05)
+
+BertGoldenTest, T5GoldenTest and EncoderAttentionTest run only in the strict float32 result
+directory, with the existing absolute `1e-4` bound. CPU goldens were not rewritten to fit Metal.
+EncoderDefaultPrecisionTest runs in ordinary TF32 mode with an independent `0.03` bound. On
+Apple M5 Max / macOS 27.0.1 / aarch64 the measured maximum over BERT hidden states/task heads and tied-ReLU
+and untied-gated T5 encoder/logit fixtures was `0.020420074462890625`. This is a default-mode
+bound, not a replacement for strict reference assertions or an all-checkpoint precision claim.
+Real-artifact Tier-B uses TF32 off: maximum errors were MiniLM `1.9371509552001953e-7`, SST-2
+`4.76837158203125e-7`, Flan-T5 `3.814697265625e-5`, all below the separate recorded `1e-4`
+real-checkpoint bound. Class/greedy IDs additionally require recorded top-two gaps above
+`2 * epsilon + margin` (`margin=1e-4`); host mismatch never downgrades numerical comparison.
+The new suites still need their first macOS 26 CI execution; local evidence is explicitly dated.
+
+Per-family maxima including cached T5 histories: BERT `1.4835596084594727e-4`, T5 ReLU
+`0.006804823875427246`, T5 gated `0.020420074462890625`. Each remains below the independent
+default-mode bound; strict suites keep their original bound.

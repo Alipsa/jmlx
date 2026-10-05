@@ -4,13 +4,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
 import se.alipsa.jmlx.memory.MLXScope;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /** Common loader for the currently supported decoder checkpoint architectures. */
 public final class TextGenerationModels {
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private TextGenerationModels() {}
 
@@ -76,11 +73,6 @@ public final class TextGenerationModels {
    * in the checked {@link IOException} this package's loaders contract on.
    */
   private static JsonNode readConfigTree(Path directory) throws IOException {
-    Path file = directory.resolve("config.json");
-    try {
-      return MAPPER.readTree(file.toFile());
-    } catch (JacksonException e) {
-      throw new IOException("failed to read " + file.toAbsolutePath().normalize(), e);
-    }
+    return JsonFiles.read(directory.resolve("config.json"));
   }
 }

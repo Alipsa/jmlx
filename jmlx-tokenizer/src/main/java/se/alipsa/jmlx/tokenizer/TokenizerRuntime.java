@@ -87,14 +87,12 @@ final class TokenizerRuntime {
         throw new TokenizerException(
             "TokenizerRuntime: truncation maxLength cannot contain required special tokens");
       }
-      if (pieces.size() > available
+      // A zero remaining budget is a successful truncation to empty under every strategy:
+      // the encoding keeps only the post-processor special tokens (HF does not fail here).
+      if (available > 0
+          && pieces.size() > available
           && definition.configuredStrategy() == PairTruncationStrategy.ONLY_SECOND) {
         throw new TokenizerException("Truncation error: Second sequence not provided");
-      }
-      if (pieces.size() > available
-          && available == 0
-          && definition.configuredStrategy() == PairTruncationStrategy.ONLY_FIRST) {
-        throw new TokenizerException("Truncation error: Sequence to truncate too short");
       }
       pieces = truncate(pieces, available, options.truncation().direction());
     }
@@ -124,7 +122,12 @@ final class TokenizerRuntime {
       int remove = Math.max(0, first.size() + second.size() - available);
       int firstLength = first.size();
       int secondLength = second.size();
-      if (remove > 0) {
+      // A zero remaining budget is a successful truncation to empty under every strategy:
+      // the encoding keeps only the pair post-processor special tokens (HF does not fail here).
+      if (available == 0) {
+        firstLength = 0;
+        secondLength = 0;
+      } else if (remove > 0) {
         switch (pairOptions.strategy()) {
           case ONLY_FIRST -> {
             if (firstLength <= remove) {

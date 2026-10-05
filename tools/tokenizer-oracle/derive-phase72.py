@@ -45,6 +45,14 @@ if __name__ == "__main__":
     sources[path.name] = {**sources["phase72-wordpiece.tokenizer.json"],
                           "derived_bytes": path.stat().st_size,
                           "modification": "OnlySecond / max_length=5 / Right / stride=0"}
+    first = json.loads((FIXTURES / "phase72-wordpiece.tokenizer.json").read_text())
+    first["truncation"] = {"strategy": "OnlyFirst", "max_length": 5,
+                           "direction": "Right", "stride": 0}
+    path = FIXTURES / "phase72-only-first.tokenizer.json"
+    path.write_text(json.dumps(first, separators=(",", ":")) + "\n")
+    sources[path.name] = {**sources["phase72-wordpiece.tokenizer.json"],
+                          "derived_bytes": path.stat().st_size,
+                          "modification": "OnlyFirst / max_length=5 / Right / stride=0"}
     replacement = json.loads((FIXTURES / "wordpiece.tokenizer.json").read_text())
     replacement["normalizer"] = {"type": "Replace", "pattern": {"Regex": r"\b"},
                                   "content": "|"}

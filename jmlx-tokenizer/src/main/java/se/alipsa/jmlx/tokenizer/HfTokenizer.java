@@ -279,10 +279,11 @@ public final class HfTokenizer {
    * <p>The {@code options} truncation supplies the max length and direction. The truncation
    * strategy is deliberately not part of the single-sequence options: it is inherited from the
    * {@code tokenizer.json} configuration, mirroring Hugging Face tokenizers' configured-truncation
-   * semantics. With a configured {@code OnlySecond} strategy, a single sequence that needs
-   * truncating fails with "Second sequence not provided"; with a configured {@code OnlyFirst}
-   * strategy it fails when the remaining budget is zero; otherwise (the default {@code
-   * LongestFirst}) the sequence is truncated alone.
+   * semantics. A zero remaining budget (the max length leaves no room beyond the special tokens) is
+   * a successful truncation to empty under every configured strategy: only the special tokens
+   * remain. With a non-zero budget and a configured {@code OnlySecond} strategy, a single sequence
+   * that needs truncating fails with "Second sequence not provided"; otherwise the sequence is
+   * truncated alone.
    *
    * @param text input text
    * @param options explicit encoding options

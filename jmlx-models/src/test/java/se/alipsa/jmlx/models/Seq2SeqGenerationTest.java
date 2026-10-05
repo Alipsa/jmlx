@@ -188,6 +188,18 @@ class Seq2SeqGenerationTest {
   }
 
   @Test
+  void malformedGenerationConfigFailsWithIOException(@TempDir Path directory) throws Exception {
+    // generation_config.json is optional, but a present, unreadable one is a checked IOException,
+    // not an unchecked Jackson 3 exception.
+    Files.copy(checkpoint().resolve("config.json"), directory.resolve("config.json"));
+    Files.writeString(directory.resolve("generation_config.json"), "{\"max_new_tokens\": ");
+    try (MLXScope scope = new MLXScope()) {
+      IOException exception = assertThrows(IOException.class, () -> T5Model.load(scope, directory));
+      assertTrue(exception.getMessage().contains("failed to read"));
+    }
+  }
+
+  @Test
   void schedulerNamesUnsupportedModelAndReleasesGuard() throws Exception {
     SchedulerStartException exception =
         assertThrows(

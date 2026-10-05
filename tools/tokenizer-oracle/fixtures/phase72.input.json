@@ -151,6 +151,39 @@
             "strategy": "longest_first",
             "direction": "right"
           }
+        },
+        {
+          "name": "zero-budget-only-first",
+          "text": "hello hello",
+          "textPair": "world",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 3,
+            "strategy": "only_first",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "zero-budget-only-second",
+          "text": "hello hello",
+          "textPair": "world",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 3,
+            "strategy": "only_second",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "zero-budget-longest-first",
+          "text": "hello hello",
+          "textPair": "world",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 3,
+            "strategy": "longest_first",
+            "direction": "right"
+          }
         }
       ]
     },
@@ -180,6 +213,34 @@
             "direction": "right"
           },
           "expectedError": true
+        },
+        {
+          "name": "only-second-zero-budget",
+          "text": "one two",
+          "addSpecialTokens": true,
+          "sequenceIds": true,
+          "truncation": {
+            "max_length": 2,
+            "strategy": "only_second",
+            "direction": "right"
+          }
+        }
+      ]
+    },
+    {
+      "name": "only-first-single",
+      "tokenizer": "phase72-only-first.tokenizer.json",
+      "cases": [
+        {
+          "name": "only-first-zero-budget",
+          "text": "one two",
+          "addSpecialTokens": true,
+          "sequenceIds": true,
+          "truncation": {
+            "max_length": 2,
+            "strategy": "only_first",
+            "direction": "right"
+          }
         }
       ]
     },

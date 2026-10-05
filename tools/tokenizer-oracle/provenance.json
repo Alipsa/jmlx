@@ -23,8 +23,9 @@
     "phase6-3-qwen3.tokenizer.json": "274b06a0f99baa3a58407f9c416a2e9dda7b0c0f6abd5b172c0371946a6a257a",
     "phase72-wordpiece.tokenizer.json": "4a04f93e37e7dc74b7d62ec37daa8b3534573002bd26a57f7f77d1a63b5a53b2",
     "phase72-precompiled.tokenizer.json": "bf7bdea15a326b3ba67efd388ed872933d3dec3e0ece1f252f01f327b2fb40c0",
-    "phase72.input.json": "9a316881bb4e25561a95c3949dbfeb3dbca2d9f1164bd73e67d031e126b8b91e",
+    "phase72.input.json": "5b0e5a07bdb49c32b7aa800bb88aba88572bbecc3e49940ba77b21d9d49c4e7d",
     "phase72-only-second.tokenizer.json": "747f700b875120b13d161029dc22519c5951f2955a87740747f422d15d32ac7b",
+    "phase72-only-first.tokenizer.json": "5a63ef061222fc20ed97be6b01124cda59c1d1291c298ad8384cf4a76ab8a72d",
     "phase72-replace.tokenizer.json": "6fe0a2f6764508becab79319db724a4ea0446fc82f4c66d230ac109d6c9f3e57"
   },
   "networkPolicy": "Fixtures load committed local tokenizer files only; no Hub calls are permitted.",
@@ -72,6 +73,16 @@
       "license": "Apache-2.0",
       "derivation": "tools/tokenizer-oracle/derive-phase72.py",
       "modification": "OnlySecond / max_length=5 / Right / stride=0"
+    },
+    "phase72-only-first.tokenizer.json": {
+      "repository": "yoshitomo-matsubara/bert-base-uncased-sst2",
+      "revision": "ce4cfd087e0c988beae0699f77a610bf7916742c",
+      "source_sha256": "9720ec9f57683b9b2abe85ef7958a4d90c1769df357d0f44516a4919f476db08",
+      "source_bytes": 466132,
+      "derived_bytes": 472459,
+      "license": "Apache-2.0",
+      "derivation": "tools/tokenizer-oracle/derive-phase72.py",
+      "modification": "OnlyFirst / max_length=5 / Right / stride=0"
     }
   }
 }

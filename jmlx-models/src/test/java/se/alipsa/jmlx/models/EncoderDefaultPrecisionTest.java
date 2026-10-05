@@ -1,10 +1,14 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -13,6 +17,23 @@ import tools.jackson.databind.ObjectMapper;
 /** Measures the ordinary inference mode independently of the strict float32 reference suite. */
 @EnabledIfNativeAvailable
 class EncoderDefaultPrecisionTest {
+
+  @Test
+  void unreadableConfigJsonFailsWithIOException(@TempDir Path directory) throws Exception {
+    // A malformed or missing config.json is a checked IOException on every BERT task, not an
+    // unchecked Jackson 3 exception leaking from the loader internals.
+    Files.writeString(directory.resolve("config.json"), "{\"model_type\": ");
+    try (MLXScope scope = new MLXScope()) {
+      IOException encoder =
+          assertThrows(IOException.class, () -> TextEncoderModels.load(scope, directory));
+      assertTrue(encoder.getMessage().contains("failed to read"));
+      assertThrows(IOException.class, () -> SequenceClassifiers.load(scope, directory));
+      assertThrows(IOException.class, () -> TokenClassifiers.load(scope, directory));
+      Files.delete(directory.resolve("config.json"));
+      assertThrows(IOException.class, () -> TextEncoderModels.load(scope, directory));
+    }
+  }
+
   @Test
   void defaultModePreservesEncoderAndSeq2SeqReferenceBounds() throws Exception {
     Path goldens = BertGoldenTest.root().resolve("tools/hf-reference/goldens");

@@ -25,7 +25,6 @@ import se.alipsa.jmlx.nn.Module;
 import se.alipsa.jmlx.nn.Sequential;
 import se.alipsa.jmlx.tokenizer.TokenizerEncoding;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /** Task-selected BERT backbone with explicit key-only masking and float32 execution. */
 final class BertModels extends Module {
@@ -35,7 +34,6 @@ final class BertModels extends Module {
     TOKEN
   }
 
-  private static final ObjectMapper JSON = new ObjectMapper();
   private final Task task;
   private final int vocab;
   private final int hidden;
@@ -55,7 +53,7 @@ final class BertModels extends Module {
   private final Linear classifier;
 
   static BertModels load(MLXScope scope, Path directory, Task task) throws IOException {
-    JsonNode config = JSON.readTree(directory.resolve("config.json").toFile());
+    JsonNode config = JsonFiles.read(directory.resolve("config.json"));
     validateConfig(config, task);
     int hidden = positive(config, "hidden_size");
     final int layers = positive(config, "num_hidden_layers");
@@ -427,7 +425,7 @@ final class BertModels extends Module {
     if (!Files.exists(directory.resolve("modules.json"))) {
       return new Pipeline(new Pooling(Pooling.Mode.CLS, false), positions);
     }
-    JsonNode modules = JSON.readTree(directory.resolve("modules.json").toFile());
+    JsonNode modules = JsonFiles.read(directory.resolve("modules.json"));
     if (!modules.isArray() || modules.size() < 2 || modules.size() > 3) {
       throw new IllegalArgumentException("unsupported sentence-transformers pipeline");
     }
@@ -448,15 +446,14 @@ final class BertModels extends Module {
       }
     }
     JsonNode config =
-        JSON.readTree(
+        JsonFiles.read(
             modulePath(
-                    directory,
-                    directory
-                        .toRealPath()
-                        .relativize(poolingPath.toAbsolutePath().normalize())
-                        .toString(),
-                    false)
-                .toFile());
+                directory,
+                directory
+                    .toRealPath()
+                    .relativize(poolingPath.toAbsolutePath().normalize())
+                    .toString(),
+                false));
     if (positive(config, "word_embedding_dimension") != hidden
         || !config.path("include_prompt").asBoolean(true)) {
       throw new IllegalArgumentException("pooling dimension or prompt exclusion is unsupported");
@@ -484,7 +481,7 @@ final class BertModels extends Module {
     if (enabled.size() != 1) {
       throw new IllegalArgumentException("pooling concatenation is unsupported");
     }
-    JsonNode sentence = JSON.readTree(directory.resolve("sentence_bert_config.json").toFile());
+    JsonNode sentence = JsonFiles.read(directory.resolve("sentence_bert_config.json"));
     return new Pipeline(
         new Pooling(enabled.getFirst(), modules.size() == 3),
         Math.min(positions, positive(sentence, "max_seq_length")));

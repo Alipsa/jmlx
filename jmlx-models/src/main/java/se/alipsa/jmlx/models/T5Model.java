@@ -35,13 +35,10 @@ import se.alipsa.jmlx.nn.UnaryLayer;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
 import se.alipsa.jmlx.tokenizer.TokenizerException;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /** Float32 T5/Flan-T5 encoder-decoder inference with request-owned static encoder projections. */
 public final class T5Model extends Module implements TextGenerationModel {
-  private static final ObjectMapper JSON = new ObjectMapper();
   private static final System.Logger LOGGER = System.getLogger(T5Model.class.getName());
   private final Config config;
   private final T5LoadOptions options;
@@ -95,18 +92,10 @@ public final class T5Model extends Module implements TextGenerationModel {
   public static T5Model load(MLXScope scope, Path directory, T5LoadOptions options)
       throws IOException {
     Objects.requireNonNull(options);
-    Path configFile = directory.resolve("config.json");
-    JsonNode root;
-    try {
-      root = JSON.readTree(configFile.toFile());
-    } catch (JacksonException e) {
-      throw new IOException("failed to read " + configFile.toAbsolutePath().normalize(), e);
-    }
+    JsonNode root = JsonFiles.read(directory.resolve("config.json"));
     Config config = parse(root);
-    JsonNode generation =
-        Files.exists(directory.resolve("generation_config.json"))
-            ? JSON.readTree(directory.resolve("generation_config.json").toFile())
-            : null;
+    Path generationFile = directory.resolve("generation_config.json");
+    JsonNode generation = Files.exists(generationFile) ? JsonFiles.read(generationFile) : null;
     JsonNode start = generation == null ? null : generation.get("decoder_start_token_id");
     if (start == null || start.isNull()) {
       start = root.get("decoder_start_token_id");

@@ -139,13 +139,21 @@ final class TokenizerRuntime {
             secondLength -= remove;
           }
           case LONGEST_FIRST -> {
-            while (remove-- > 0) {
-              if (firstLength >= secondLength) {
-                firstLength--;
-              } else {
-                secondLength--;
-              }
+            // Mirrors tokenizers/src/utils/truncation.rs: each sequence is first truncated to
+            // the raw max_length during model tokenization, then the remaining budget
+            // (available, i.e. max_length minus the special tokens) is split, giving the extra
+            // token to the originally longer input.
+            firstLength = Math.min(firstLength, options.truncation().maxLength());
+            secondLength = Math.min(secondLength, options.truncation().maxLength());
+            int shorter = Math.min(firstLength, secondLength);
+            int longer = shorter > available ? shorter : Math.max(shorter, available - shorter);
+            if (shorter + longer > available) {
+              shorter = available / 2;
+              longer = shorter + available % 2;
             }
+            boolean firstLonger = firstLength > secondLength;
+            firstLength = firstLonger ? longer : shorter;
+            secondLength = firstLonger ? shorter : longer;
           }
           default -> throw new TokenizerException("unsupported pair truncation strategy");
         }

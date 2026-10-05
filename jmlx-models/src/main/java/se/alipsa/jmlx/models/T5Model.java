@@ -35,6 +35,7 @@ import se.alipsa.jmlx.nn.UnaryLayer;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
 import se.alipsa.jmlx.tokenizer.TokenizerException;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -53,7 +54,8 @@ public final class T5Model extends Module implements TextGenerationModel {
   private final RMSNorm encoderNorm;
   private final RMSNorm decoderNorm;
   private final Linear head;
-  private Consumer<Map<Integer, Integer>> penaltyObserver = ignored -> {};
+  // Null unless a test installs one, so the per-step frequency copy only happens when observed.
+  private Consumer<Map<Integer, Integer>> penaltyObserver;
 
   void penaltyObserver(Consumer<Map<Integer, Integer>> observer) {
     penaltyObserver = Objects.requireNonNull(observer);
@@ -93,7 +95,13 @@ public final class T5Model extends Module implements TextGenerationModel {
   public static T5Model load(MLXScope scope, Path directory, T5LoadOptions options)
       throws IOException {
     Objects.requireNonNull(options);
-    JsonNode root = JSON.readTree(directory.resolve("config.json").toFile());
+    Path configFile = directory.resolve("config.json");
+    JsonNode root;
+    try {
+      root = JSON.readTree(configFile.toFile());
+    } catch (JacksonException e) {
+      throw new IOException("failed to read " + configFile.toAbsolutePath().normalize(), e);
+    }
     Config config = parse(root);
     JsonNode generation =
         Files.exists(directory.resolve("generation_config.json"))
@@ -125,12 +133,19 @@ public final class T5Model extends Module implements TextGenerationModel {
         }
       }
       for (String alias : aliases) {
-        if (weights.containsKey(alias)
-            && (!Arrays.equals(
-                    weights.get(alias).shape(), new int[] {config.vocab(), config.model()})
-                || !Arrays.equals(
-                    weights.get(alias).toFloatArray(),
-                    weights.get("shared.weight").toFloatArray()))) {
+        if (!weights.containsKey(alias)) {
+          continue;
+        }
+        MLXArray aliasWeight = weights.get(alias);
+        if (!Arrays.equals(aliasWeight.shape(), new int[] {config.vocab(), config.model()})) {
+          throw new IllegalArgumentException("t5 tied alias differs from shared.weight: " + alias);
+        }
+        // Compared on device so a tied-embedding copy never pulls the whole matrices to the host.
+        MLXArray equal =
+            MLX.astype(
+                MLXOps.all(MLXOps.equal(aliasWeight, weights.get("shared.weight"))), DType.INT32);
+        MLX.eval(equal);
+        if (equal.toIntArray()[0] != 1) {
           throw new IllegalArgumentException("t5 tied alias differs from shared.weight: " + alias);
         }
       }
@@ -218,6 +233,17 @@ public final class T5Model extends Module implements TextGenerationModel {
     String projection = root.path("feed_forward_proj").asString("relu");
     if (!List.of("relu", "gated-gelu").contains(projection)) {
       throw new IllegalArgumentException("unsupported t5 feed_forward_proj: " + projection);
+    }
+    // HF derives dense_act_fn and is_gated_act from feed_forward_proj, then lets explicit
+    // config values override them. This loader only implements the derived pair (gated-gelu is
+    // tanh-GELU), so reject configs whose explicit keys disagree instead of silently applying a
+    // different activation than HF would.
+    String act = projection.equals("gated-gelu") ? "gelu_new" : "relu";
+    if (root.has("dense_act_fn") && !act.equals(root.path("dense_act_fn").asString())
+        || root.has("is_gated_act")
+            && root.path("is_gated_act").asBoolean() != projection.startsWith("gated")) {
+      throw new IllegalArgumentException(
+          "t5 dense_act_fn/is_gated_act conflict with feed_forward_proj");
     }
     int layers = positive(root, "num_layers", -1);
     int buckets = positive(root, "relative_attention_num_buckets", 32);
@@ -504,7 +530,9 @@ public final class T5Model extends Module implements TextGenerationModel {
           }
           try (MLXScope activation = generation.newChild()) {
             MLXArray logits = forward(activation, input, prompt.length, sourceMask, cross, caches);
-            penaltyObserver.accept(Map.copyOf(frequencies));
+            if (penaltyObserver != null) {
+              penaltyObserver.accept(Map.copyOf(frequencies));
+            }
             SamplingPipeline.Selection selection =
                 sampler.select(
                     logits,

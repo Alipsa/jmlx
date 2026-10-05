@@ -276,6 +276,14 @@ public final class HfTokenizer {
   /**
    * Encodes text with explicit truncation, padding, and special-token options.
    *
+   * <p>The {@code options} truncation supplies the max length and direction. The truncation
+   * strategy is deliberately not part of the single-sequence options: it is inherited from the
+   * {@code tokenizer.json} configuration, mirroring Hugging Face tokenizers' configured-truncation
+   * semantics. With a configured {@code OnlySecond} strategy, a single sequence that needs
+   * truncating fails with "Second sequence not provided"; with a configured {@code OnlyFirst}
+   * strategy it fails when the remaining budget is zero; otherwise (the default {@code
+   * LongestFirst}) the sequence is truncated alone.
+   *
    * @param text input text
    * @param options explicit encoding options
    * @return aligned encoding columns

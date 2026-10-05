@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +13,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -162,6 +165,25 @@ class Seq2SeqGenerationTest {
         expected.merge(result.generatedTokenIds().get(i), 1, Integer::sum);
       }
       assertEquals(3, histories.size());
+    }
+  }
+
+  @Test
+  void unreadableConfigJsonFailsWithIOException(@TempDir Path directory) throws Exception {
+    // A malformed or missing config.json is a checked IOException on every architecture, not an
+    // unchecked Jackson 3 exception leaking from the loader internals.
+    Files.writeString(directory.resolve("config.json"), "{\"model_type\": ");
+    try (MLXScope scope = new MLXScope()) {
+      IOException malformed =
+          assertThrows(IOException.class, () -> TextGenerationModels.load(scope, directory));
+      assertTrue(malformed.getMessage().contains("failed to read"));
+      Files.delete(directory.resolve("config.json"));
+      assertThrows(IOException.class, () -> TextGenerationModels.load(scope, directory));
+      Files.writeString(directory.resolve("config.json"), "{\"model_type\": ");
+      assertThrows(
+          IOException.class,
+          () -> TextGenerationModels.load(scope, directory, T5LoadOptions.defaults()));
+      assertThrows(IOException.class, () -> T5Model.load(scope, directory));
     }
   }
 

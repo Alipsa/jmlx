@@ -129,6 +129,28 @@
             "strategy": "longest_first",
             "direction": "right"
           }
+        },
+        {
+          "name": "longest-first-odd-budget",
+          "text": "hello hello hello hello hello hello",
+          "textPair": "world world world world world",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "longest_first",
+            "direction": "right"
+          }
+        },
+        {
+          "name": "longest-first-exceeds-max-length",
+          "text": "hello hello hello hello hello hello hello hello hello hello hello hello",
+          "textPair": "world world",
+          "addSpecialTokens": true,
+          "truncation": {
+            "max_length": 10,
+            "strategy": "longest_first",
+            "direction": "right"
+          }
         }
       ]
     },

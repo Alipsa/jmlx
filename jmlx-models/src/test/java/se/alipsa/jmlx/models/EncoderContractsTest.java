@@ -73,6 +73,37 @@ class EncoderContractsTest {
   }
 
   @Test
+  void denseActFnAndGatedFlagsConflictingWithProjectionAreRejected(@TempDir Path directory)
+      throws Exception {
+    // HF lets explicit dense_act_fn/is_gated_act override what feed_forward_proj derives; this
+    // loader only implements the derived pair, so configs carrying disagreeing keys must fail
+    // before any weight loading. Consistent keys (as in both committed T5 checkpoints) pass.
+    ObjectNode gated =
+        (ObjectNode)
+            JSON.readTree(Seq2SeqGenerationTest.checkpoint().resolve("config.json").toFile());
+    gated.put("dense_act_fn", "gelu");
+    Files.writeString(directory.resolve("config.json"), JSON.writeValueAsString(gated));
+    assertThrows(IllegalArgumentException.class, () -> T5Model.load(null, directory));
+    gated.put("dense_act_fn", "gelu_new");
+    gated.put("is_gated_act", false);
+    Files.writeString(directory.resolve("config.json"), JSON.writeValueAsString(gated));
+    assertThrows(IllegalArgumentException.class, () -> T5Model.load(null, directory));
+    ObjectNode relu =
+        (ObjectNode)
+            JSON.readTree(
+                BertGoldenTest.root()
+                    .resolve("tools/hf-reference/goldens/checkpoints/t5-relu/config.json")
+                    .toFile());
+    ObjectNode reluGatedAct = (ObjectNode) relu.deepCopy();
+    reluGatedAct.put("is_gated_act", true);
+    Files.writeString(directory.resolve("config.json"), JSON.writeValueAsString(reluGatedAct));
+    assertThrows(IllegalArgumentException.class, () -> T5Model.load(null, directory));
+    relu.put("dense_act_fn", "gelu_new");
+    Files.writeString(directory.resolve("config.json"), JSON.writeValueAsString(relu));
+    assertThrows(IllegalArgumentException.class, () -> T5Model.load(null, directory));
+  }
+
+  @Test
   void inputIdsTypesMasksAndCapacityAreCheckedWithoutNativeWork() {
     for (int[] values :
         List.of(

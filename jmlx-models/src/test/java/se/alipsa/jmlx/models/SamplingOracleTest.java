@@ -14,6 +14,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.OracleFixtureReader;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import tools.jackson.databind.JsonNode;
@@ -65,7 +66,7 @@ class SamplingOracleTest {
         if (policy.temperature() != 0) {
           JsonNode expectedVocabularyLogits = required(expectedCase, "vocabularyLogits");
           assertArrayEquals(
-              floatsWithInfinity(expectedVocabularyLogits),
+              OracleFixtureReader.floats(expectedVocabularyLogits),
               actual.vocabularyLogits().toFloatArray(),
               1e-6f,
               name);
@@ -110,23 +111,6 @@ class SamplingOracleTest {
     float[] result = new float[node.size()];
     for (int i = 0; i < result.length; i++) {
       result[i] = (float) node.get(i).doubleValue();
-    }
-    return result;
-  }
-
-  private static float[] floatsWithInfinity(JsonNode node) {
-    float[] result = new float[node.size()];
-    for (int i = 0; i < result.length; i++) {
-      JsonNode value = node.get(i);
-      if (!value.isTextual()) {
-        result[i] = (float) value.doubleValue();
-      } else if ("Infinity".equals(value.textValue())) {
-        result[i] = Float.POSITIVE_INFINITY;
-      } else if ("-Infinity".equals(value.textValue())) {
-        result[i] = Float.NEGATIVE_INFINITY;
-      } else {
-        throw new IllegalArgumentException("unexpected oracle float value: " + value.textValue());
-      }
     }
     return result;
   }

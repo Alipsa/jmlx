@@ -20,12 +20,7 @@ public class GatedMlp extends UnaryLayer {
     gateProj = child("gateProj", Objects.requireNonNull(gate, "gate"));
     upProj = child("upProj", Objects.requireNonNull(up, "up"));
     downProj = child("downProj", Objects.requireNonNull(down, "down"));
-    activationLayer =
-        switch (Objects.requireNonNull(activation, "activation")) {
-          case SILU -> new SiLU(scope);
-          case GELU -> new GELU(scope);
-          case GELU_TANH -> new GELU(scope, true);
-        };
+    activationLayer = Objects.requireNonNull(activation, "activation").layer(scope);
   }
 
   @Override

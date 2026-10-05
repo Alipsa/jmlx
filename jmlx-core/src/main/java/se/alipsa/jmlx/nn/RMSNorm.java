@@ -13,7 +13,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * RMSNorm} usage trains one. {@link MLXFast#rmsNorm} itself still accepts a {@code null} {@code
  * weight}, unused by this layer, for a caller that wants the bare op.
  */
-public final class RMSNorm extends Module implements UnaryModule {
+public final class RMSNorm extends UnaryLayer {
 
   private final float eps;
   private final boolean weightOffset;

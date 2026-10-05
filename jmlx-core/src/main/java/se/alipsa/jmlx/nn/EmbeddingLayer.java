@@ -7,7 +7,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * A token embedding table that can also act as a tied output head: {@link #forward} looks up rows
  * and {@link #project} multiplies by the table's transpose.
  */
-public abstract class EmbeddingLayer extends Module implements UnaryModule {
+public abstract class EmbeddingLayer extends UnaryLayer {
 
   /** Creates an embedding layer owned by {@code scope}. */
   protected EmbeddingLayer(MLXScope scope) {

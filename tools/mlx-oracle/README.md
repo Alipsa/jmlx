@@ -26,3 +26,28 @@ After `scripts/updateMlx.zsh` changes the mlx-c pin, update `provenance.json`'s 
 running `generateMlxOracleFixtures`, because generation first verifies provenance. If the paired
 `mlx` or `mlx-metal` distribution changes too, update its version, URL, and hash in both
 `provenance.json` and `requirements.lock`, then rerun `install.sh` before fixture generation.
+
+Phase 7.1 uses the `phase7-1-core` dispatcher in `phase71.py` and the `phase7-1` provenance profile:
+CPU and `MLX_ENABLE_TF32=0`. Legacy Phase 6 retains its GPU profile. All Gradle oracle tasks pin
+precision as an environment variable and task input; the verifier evaluates a runtime operation on
+every declared device. The recorded macOS major is the minimum supported OS (26+).
+
+Nonfinite float serialization uses `NaN`, `Infinity` and `-Infinity` strings with `allow_nan=False`.
+The shared core test-fixture reader decodes them; comparisons classify NaNs/infinity signs exactly.
+QuickGELU's formula case follows HF's definition `x*sigmoid(1.702*x)` (the `quick_gelu` configuration
+contract); it is not substituted with MLX's fast GELU approximation. Reference sources for every
+other case are the installed pinned MLX core and nn implementations. Explicit input weights,
+biases, statistics and options are committed beside expected values.
+
+Only `./gradlew generateMlxOracleFixtures` rewrites canonical references. Review legacy outputs:
+seven-decimal Phase 6 GPU regeneration currently drifts on the development macOS 27 host, so those
+files remain unchanged and global verification fails rather than silently accepting drift. The
+family selector leaves unrelated expected files untouched:
+
+```sh
+./gradlew generateMlxOracleFixtures -PmlxOracleFamily=phase7-1
+./gradlew verifyMlxOracleFixtures -PmlxOracleFamily=phase7-1
+```
+
+The CPU family still requires byte-exact verification on CI before milestone acceptance. See
+`req/plans/phase7-1-probe-findings.md` for contracts, pinned limitations and command results.

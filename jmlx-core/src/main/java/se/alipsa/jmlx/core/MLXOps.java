@@ -460,4 +460,87 @@ public final class MLXOps {
         () -> mlx_h.mlx_logsumexp_axis(res, a.handle(), axis, keepdims, scope.stream()));
     return new MLXArray(scope, res);
   }
+
+  /** Elementwise abs. */
+  public static MLXArray abs(MLXArray a) {
+    return NativeOps.unaryOp("abs", a, mlx_h::mlx_abs);
+  }
+
+  /** Elementwise floor. */
+  public static MLXArray floor(MLXArray a) {
+    return NativeOps.unaryOp("floor", a, mlx_h::mlx_floor);
+  }
+
+  /** Elementwise log1p. */
+  public static MLXArray log1p(MLXArray a) {
+    return NativeOps.unaryOp("log1p", a, mlx_h::mlx_log1p);
+  }
+
+  /** Elementwise minimum with broadcasting. */
+  public static MLXArray minimum(MLXArray a, MLXArray b) {
+    requireBroadcastCompatible(a, b, "minimum");
+    return NativeOps.binaryOp("minimum", a, b, mlx_h::mlx_minimum);
+  }
+
+  /**
+   * Clips with broadcast array bounds; both bounds are required. Inverted bounds yield the upper.
+   */
+  public static MLXArray clip(MLXArray a, MLXArray lower, MLXArray upper) {
+    MLXScope scope = NativeOps.scopeOf("clip", a, lower, upper);
+    MemorySegment result = mlx_h.mlx_array_new(scope);
+    NativeOps.checked(
+        "clip",
+        () -> mlx_h.mlx_clip(result, a.handle(), lower.handle(), upper.handle(), scope.stream()));
+    return new MLXArray(scope, result);
+  }
+
+  /** Stable log-softmax composed from log-sum-exp and subtraction. */
+  public static MLXArray logSoftmax(MLXArray a, int axis) {
+    return subtract(a, logSumExpAxis(a, axis, true));
+  }
+
+  /** Native maxAxes; negative axes are normalized by MLX. */
+  public static MLXArray maxAxes(MLXArray a, int[] axes, boolean keepdims) {
+    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment indices = tmp.allocateFrom(java.lang.foreign.ValueLayout.JAVA_INT, axes);
+      MemorySegment result = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "maxAxes",
+          () ->
+              mlx_h.mlx_max_axes(
+                  result, a.handle(), indices, axes.length, keepdims, scope.stream()));
+      return new MLXArray(scope, result);
+    }
+  }
+
+  /** Native varAxes; negative axes are normalized by MLX. */
+  public static MLXArray varAxes(MLXArray a, int[] axes, boolean keepdims, int ddof) {
+    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment indices = tmp.allocateFrom(java.lang.foreign.ValueLayout.JAVA_INT, axes);
+      MemorySegment result = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "varAxes",
+          () ->
+              mlx_h.mlx_var_axes(
+                  result, a.handle(), indices, axes.length, keepdims, ddof, scope.stream()));
+      return new MLXArray(scope, result);
+    }
+  }
+
+  /** Native softmaxAxes; negative axes are normalized by MLX. */
+  public static MLXArray softmaxAxes(MLXArray a, int[] axes, boolean precise) {
+    MLXScope scope = a.scope();
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment indices = tmp.allocateFrom(java.lang.foreign.ValueLayout.JAVA_INT, axes);
+      MemorySegment result = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "softmaxAxes",
+          () ->
+              mlx_h.mlx_softmax_axes(
+                  result, a.handle(), indices, axes.length, precise, scope.stream()));
+      return new MLXArray(scope, result);
+    }
+  }
 }

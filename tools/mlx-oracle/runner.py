@@ -3,6 +3,7 @@ import argparse
 import difflib
 import json
 import math
+import os
 from pathlib import Path
 
 import mlx.core as mx
@@ -12,6 +13,8 @@ def rounded(values):
     if isinstance(values, list):
         return [rounded(value) for value in values]
     if isinstance(values, float):
+        if math.isnan(values):
+            return "NaN"
         if math.isinf(values):
             return "Infinity" if values > 0 else "-Infinity"
         return round(values, 7)
@@ -151,7 +154,13 @@ def sampling_fixture(specification: dict) -> dict:
 
 def run(specification: dict, provenance: dict) -> dict:
     device = specification.get("device")
-    recorded_device = provenance["device"]["type"]
+    family = "phase7-1" if specification.get("fixture") == "phase7-1-core" else "phase6"
+    profile = provenance.get("profiles", {}).get(family)
+    if family == "phase7-1" and profile is None:
+        raise ValueError("missing phase7-1 provenance profile")
+    recorded_device = profile["device"] if profile else provenance["device"]["type"]
+    if profile and os.environ.get("MLX_ENABLE_TF32") != profile["MLX_ENABLE_TF32"]:
+        raise ValueError("oracle precision does not match recorded profile")
     if device != recorded_device:
         raise ValueError(
             f"oracle fixture device {device} does not match recorded device {recorded_device}"
@@ -165,6 +174,9 @@ def run(specification: dict, provenance: dict) -> dict:
         result = array_fixture(specification)
     elif fixture == "phase6-1-sampling":
         result = sampling_fixture(specification)
+    elif fixture == "phase7-1-core":
+        from phase71 import fixture as phase71_fixture
+        result = phase71_fixture(specification, rounded)
     else:
         raise ValueError(f"unknown fixture: {fixture}")
     return {
@@ -212,6 +224,7 @@ def main() -> None:
     source.add_argument("--input", type=Path)
     source.add_argument("--fixtures-dir", type=Path)
     parser.add_argument("--provenance", type=Path, required=True)
+    parser.add_argument("--family", choices=["phase6", "phase7-1"])
     output = parser.add_mutually_exclusive_group(required=True)
     output.add_argument("--output", type=Path)
     output.add_argument("--verify", type=Path)
@@ -233,7 +246,10 @@ def main() -> None:
         provenance = json.loads(args.provenance.read_text())
         for name, input_path in sorted(inputs.items()):
             expected_path = args.fixtures_dir / f"{name}.expected.json"
-            actual = canonical(run(json.loads(input_path.read_text()), provenance))
+            specification = json.loads(input_path.read_text())
+            if args.family and not specification["fixture"].startswith(args.family):
+                continue
+            actual = canonical(run(specification, provenance))
             if args.generate_all:
                 expected_path.write_text(actual)
             else:

@@ -3,6 +3,7 @@ import argparse
 import importlib.metadata
 import json
 import platform
+import os
 import re
 import sys
 from pathlib import Path
@@ -64,7 +65,8 @@ def main() -> None:
     require_equal("recorded system", provenance["platform"]["system"], "Darwin")
     require_equal("recorded machine", provenance["platform"]["machine"], "arm64")
     macos_major = platform.mac_ver()[0].split(".")[0]
-    require_equal("macOS major version", macos_major, provenance["platform"]["macOSMajor"])
+    if int(macos_major) < int(provenance["platform"]["macOSMajor"]):
+        raise SystemExit("macOS is below the recorded minimum supported version")
     require_equal(
         "Python",
         f"{sys.version_info.major}.{sys.version_info.minor}",
@@ -92,6 +94,14 @@ def main() -> None:
     if device not in {"cpu", "gpu"}:
         raise SystemExit(f"unsupported oracle device: {device}")
     verify_runtime(device)
+    if set(provenance.get("profiles", {})) != {"phase6", "phase7-1"}:
+        raise SystemExit("provenance must declare phase6 and phase7-1 profiles")
+    for family, profile in provenance["profiles"].items():
+        if profile["device"] not in {"cpu", "gpu"}:
+            raise SystemExit(f"unsupported device profile: {family}")
+        require_equal(f"{family} precision", os.environ.get("MLX_ENABLE_TF32", "<missing>"),
+                      profile["MLX_ENABLE_TF32"])
+        verify_runtime(profile["device"])
 
     if args.staged_pins.is_file():
         staged = read_properties(args.staged_pins)

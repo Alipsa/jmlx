@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=174, planned=9, unplanned=550
+- by status: implemented=194, planned=9, unplanned=530
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -96,7 +96,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h._mlx_array_is_row_contiguous` | downcall | unplanned | — | — | — | — |
 | `mlx_h._mlx_array_wait` | downcall | unplanned | — | — | — | — |
 | `mlx_h._mlx_error` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_abs` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_abs` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_add` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_addmm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_all` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
@@ -180,7 +180,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_array_size` | downcall | implemented | MLXArray | MLXArrayTest; MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_array_strides` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_array_tostring` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_as_strided` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_as_strided` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
 | `mlx_h.mlx_astype` | downcall | implemented | MLXArray | MLXArrayTest; MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_async_eval` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_atleast_1d` | downcall | unplanned | — | — | — | — |
@@ -198,7 +198,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_ceil` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_checkpoint` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_clear_cache` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_clip` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_clip` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_closure_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_closure_custom_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_closure_custom_free` | downcall | unplanned | — | — | — | — |
@@ -241,13 +241,13 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_concatenate_axis` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_conjugate` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_contiguous` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_conv1d` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_conv2d` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_conv3d` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_conv_general` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_conv_transpose1d` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_conv_transpose2d` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_conv_transpose3d` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_conv1d` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
+| `mlx_h.mlx_conv2d` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
+| `mlx_h.mlx_conv3d` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
+| `mlx_h.mlx_conv_general` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
+| `mlx_h.mlx_conv_transpose1d` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
+| `mlx_h.mlx_conv_transpose2d` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
+| `mlx_h.mlx_conv_transpose3d` | downcall | implemented | MLXConv | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXConv.java |
 | `mlx_h.mlx_copy` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cos` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_cosh` | downcall | unplanned | — | — | — | — |
@@ -369,7 +369,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fft_rfftfreq` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fft_rfftn` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_flatten` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
-| `mlx_h.mlx_floor` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_floor` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_floor_divide` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_from_fp8` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_full` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
@@ -460,7 +460,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_load_safetensors_reader` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_log` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_log10` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_log1p` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_log1p` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_log2` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logaddexp` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logcumsumexp` | downcall | unplanned | — | — | — | — |
@@ -489,7 +489,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_masked_scatter` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_matmul` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_max` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_max_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_max_axes` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_max_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_maximum` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_mean` | downcall | unplanned | — | — | — | — |
@@ -503,7 +503,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_min` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_min_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_min_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_minimum` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_minimum` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_moveaxis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_multiply` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_nan_to_num` | downcall | unplanned | — | — | — | — |
@@ -517,8 +517,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_ones` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_ones_like` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_outer` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
-| `mlx_h.mlx_pad` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_pad_symmetric` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_pad` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
+| `mlx_h.mlx_pad_symmetric` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
 | `mlx_h.mlx_partition` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_partition_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_power` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
@@ -554,7 +554,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_reciprocal` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_remainder` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_repeat` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_repeat_axis` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_repeat_axis` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
 | `mlx_h.mlx_reset_peak_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_reshape` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
 | `mlx_h.mlx_right_shift` | downcall | unplanned | — | — | — | — |
@@ -600,8 +600,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_slice_update_min` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_slice_update_prod` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_softmax` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_softmax_axes` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_softmax_axis` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
+| `mlx_h.mlx_softmax_axes` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
+| `mlx_h.mlx_softmax_axis` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_sort` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_sort_axis` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_split` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
@@ -643,7 +643,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_tanh` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_tensordot` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_tensordot_axis` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_tile` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_tile` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
 | `mlx_h.mlx_to_fp8` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_topk` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_topk_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
@@ -656,7 +656,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_unflatten` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_value_and_grad` | downcall | implemented | MLXGrad | MLXGradTest | — | all handwritten source |
 | `mlx_h.mlx_var` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_var_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_var_axes` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_var_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_array_append_data` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_array_append_value` | downcall | unplanned | — | — | — | — |

@@ -10,6 +10,20 @@ from profile_policy import select_profiles, verify_host
 import mlx.core as mx
 
 
+FIXTURE_FAMILIES = {
+    "phase6-tier-a-array": "phase6",
+    "phase6-1-sampling": "phase6",
+    "phase7-1-core": "phase7-1",
+}
+
+
+def fixture_family(specification: dict) -> str:
+    fixture = specification.get("fixture")
+    if fixture not in FIXTURE_FAMILIES:
+        raise SystemExit(f"unknown fixture: {fixture}")
+    return FIXTURE_FAMILIES[fixture]
+
+
 def rounded(values):
     if isinstance(values, list):
         return [rounded(value) for value in values]
@@ -155,7 +169,7 @@ def sampling_fixture(specification: dict) -> dict:
 
 def run(specification: dict, provenance: dict) -> dict:
     device = specification.get("device")
-    family = "phase7-1" if specification.get("fixture") == "phase7-1-core" else "phase6"
+    family = fixture_family(specification)
     profile = provenance.get("profiles", {}).get(family)
     if profile is None:
         raise ValueError(f"missing {family} provenance profile")
@@ -253,7 +267,7 @@ def main() -> None:
         for name, input_path in sorted(inputs.items()):
             expected_path = args.fixtures_dir / f"{name}.expected.json"
             specification = json.loads(input_path.read_text())
-            family = "phase7-1" if specification["fixture"] == "phase7-1-core" else "phase6"
+            family = fixture_family(specification)
             if family not in selected:
                 continue
             actual = canonical(run(specification, provenance))
@@ -272,7 +286,7 @@ def main() -> None:
         parser.error("--input requires --output or --verify")
 
     specification = json.loads(args.input.read_text())
-    family = "phase7-1" if specification.get("fixture") == "phase7-1-core" else "phase6"
+    family = fixture_family(specification)
     if args.family and args.family != family:
         parser.error(f"--family {args.family} does not match input fixture family {family}")
     provenance = json.loads(args.provenance.read_text())

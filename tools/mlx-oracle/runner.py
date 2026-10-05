@@ -271,9 +271,14 @@ def main() -> None:
     if not (args.output or args.verify):
         parser.error("--input requires --output or --verify")
 
-    actual = canonical(
-        run(json.loads(args.input.read_text()), json.loads(args.provenance.read_text()))
-    )
+    specification = json.loads(args.input.read_text())
+    family = "phase7-1" if specification.get("fixture") == "phase7-1-core" else "phase6"
+    if args.family and args.family != family:
+        parser.error(f"--family {args.family} does not match input fixture family {family}")
+    provenance = json.loads(args.provenance.read_text())
+    if args.family:
+        select_profiles(provenance["profiles"], args.family)
+    actual = canonical(run(specification, provenance))
     if args.output:
         args.output.write_text(actual)
         return

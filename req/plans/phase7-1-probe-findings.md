@@ -56,13 +56,14 @@ dispatcher.
 
 `Phase71OracleTest` compares committed CPU JSON shape/value references against Java GPU execution
 with combined atol=1e-4, rtol=1e-5; nonfinite classifications are exact. Development-host strict
-comparison passed after the grouped transpose2d limitation was isolated. Phase 6 fixture outputs
-show drift at seven decimals on this host: array softmax 0.665241 -> 0.6652409 and sampling
-log-probability -0.4076059 -> -0.4076061. Generation initially exposed this difference; the legacy
-files were restored byte-for-byte and are intentionally not updated. The global
-verifyMlxOracleFixtures gate therefore remains failing on this host. This is a separately reviewed
-Phase 6 reproducibility issue, not permission to rewrite legacy goldens. The drift also occurs
-with TF32=1, so selecting default precision does not resolve it.
+comparison passed after the grouped transpose2d limitation was isolated. Before the per-profile host
+policy was introduced, Phase 6 fixture outputs showed drift at seven decimals on this host: array
+softmax 0.665241 -> 0.6652409 and sampling log-probability -0.4076059 -> -0.4076061. Generation
+initially exposed this difference; the legacy files were restored byte-for-byte and are
+intentionally not updated. That historical global verification failed on this host; current
+unfiltered verification passes with Phase 6 skipped. This is a separately reviewed Phase 6
+reproducibility issue, not permission to rewrite legacy goldens. The drift also occurs with TF32=1,
+so selecting default precision does not resolve it.
 
 The environment verifier and runner enforce per-profile OS policies: Phase 6 GPU generation and
 verification require exactly macOS 26; Phase 7.1 CPU fixtures allow macOS 26+. Unfiltered commands
@@ -82,14 +83,15 @@ errors. No expected process termination is declared for current cases.
 - `./gradlew :jmlx-core:check :jmlx-models:check`: passed; new native correctness suites executed
   without skips. Existing unrelated Checkstyle warnings remain; new sources have no warnings.
 - Inventory generation, call-site guard and staged header coverage: passed; bindings unchanged.
-- `verifyMlxOracleFixtures -PmlxOracleFamily=phase7-1`: passed byte-exact regeneration of 125 cases.
+- `verifyMlxOracleFixtures -PmlxOracleFamily=phase7-1`: passed byte-exact regeneration of 127 cases.
 - Core publication POM/module metadata guard: passed; no fixture variant/artifact or Jackson/JUnit
   dependency was published. Production dependency remains jmlx-ffi only.
 - Fixture input invalidation: same filtered core/models ordinary/float32 command ran once, then all
   four tasks were UP-TO-DATE; appending a temporary newline to the 7.1 input made all four execute,
   each reporting that input changed. The fixture was restored exactly afterward.
 - Isolated launcher: executed 1, skipped 0, failures 0, aggregate passed=true.
-- Global legacy oracle verification: fails with the recorded Phase 6 drift; originals preserved.
+- Current unfiltered oracle verification: passes for CPU fixtures, reports Phase 6 as skipped.
+- Require-all verification: rejects macOS 27 before fixture execution; CI requires macOS 26.
 - CPU byte-exact verification on a second CI host: pending, no result claimed.
 
 ## Measured reference errors

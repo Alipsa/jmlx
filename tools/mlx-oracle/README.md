@@ -49,10 +49,11 @@ contract); it is not substituted with MLX's fast GELU approximation. Reference s
 other case are the installed pinned MLX core and nn implementations. Explicit input weights,
 biases, statistics and options are committed beside expected values.
 
-Only `./gradlew generateMlxOracleFixtures` rewrites canonical references. Review legacy outputs:
-seven-decimal Phase 6 GPU regeneration currently drifts on the development macOS 27 host, so those
-files remain unchanged and global verification fails rather than silently accepting drift. The
-family selector leaves unrelated expected files untouched:
+Only `./gradlew generateMlxOracleFixtures` rewrites canonical references. Before host policies were
+introduced, Phase 6 GPU outputs drifted at seven decimals on macOS 27. Legacy goldens were preserved.
+Current unfiltered verification passes for CPU fixtures and reports Phase 6 as skipped; require-all
+verification rejects this host before execution. The optional family selector leaves unrelated
+expected files untouched:
 
 ```sh
 ./gradlew generateMlxOracleFixtures -PmlxOracleFamily=phase7-1

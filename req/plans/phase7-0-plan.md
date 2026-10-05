@@ -269,9 +269,10 @@ It stays a manual, evidence-only run recorded in `req/phase6-4-benchmark.md`.
 - Inventory: no new bindings, so `req/mlx-api-inventory.md` is unchanged; this is recorded here
   to satisfy Rule 1. `verifyMlxApiCallSites` stays green.
 - `jmlx-models` published-POM description and `DecoderModel`/`QwenModel` javadocs gain the family.
-- Deferred (from the master plan): `qwen3_moe`, video input, parsing of generated thinking
-  output, and batched scheduling of qwen3 requests (the scheduler's decoder-only contract is
-  unchanged by this milestone).
+- Deferred (from the master plan): `qwen3_moe`, video input, and parsing of generated
+  thinking output. Batched scheduling of qwen3 requests is not deferred: the scheduler
+  dispatches qwen3 as the same `DecoderModel`, and `BatchGenerationSchedulerTest`/
+  `BatchSchedulerFailureTest` cover it.
 
 ## 11. Verification checklist
 

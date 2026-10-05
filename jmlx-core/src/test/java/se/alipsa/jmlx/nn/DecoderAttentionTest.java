@@ -200,8 +200,7 @@ class DecoderAttentionTest {
       MLXArray q = rope.apply(MLX.array(scope, qn, new int[] {1, 1, 2, 4}), 4, 0, null);
       MLXArray k = rope.apply(MLX.array(scope, kn, new int[] {1, 1, 2, 4}), 4, 0, null);
       MLXArray v = MLXShape.reshape(x, new int[] {1, 1, 2, 4});
-      MLXArray expected =
-          MLXFast.scaledDotProductAttention(q, k, v, 0.5f, true, null, null);
+      MLXArray expected = MLXFast.scaledDotProductAttention(q, k, v, 0.5f, true, null, null);
       assertArrayEquals(expected.toFloatArray(), attention.forward(x, null).toFloatArray(), 1e-5f);
     }
   }
@@ -220,15 +219,15 @@ class DecoderAttentionTest {
       attention.forward(row0, cache);
       MLXArray row1 = MLXShape.slice(prompt, new int[] {0, 1, 0}, new int[] {1, 2, 4});
       float[] decoded = attention.forward(row1, cache).toFloatArray();
-      assertArrayEquals(
-          new float[] {full[4], full[5], full[6], full[7]}, decoded, 1e-5f);
+      assertArrayEquals(new float[] {full[4], full[5], full[6], full[7]}, decoded, 1e-5f);
     }
   }
 
   @Test
   void qkNormRejectsWrongWeightDimension() {
     try (MLXScope scope = new MLXScope()) {
-      RMSNorm wrongDim = new RMSNorm(scope, MLX.array(scope, new float[] {1, 1, 1}, new int[] {3}), 1e-6f);
+      RMSNorm wrongDim =
+          new RMSNorm(scope, MLX.array(scope, new float[] {1, 1, 1}, new int[] {3}), 1e-6f);
       assertThrows(
           IllegalArgumentException.class,
           () ->

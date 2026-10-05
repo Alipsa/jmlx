@@ -216,11 +216,11 @@ class QuantizedDecoderTest {
     try (MLXScope scope = new MLXScope()) {
       Map<String, MLXArray> tensors =
           new LinkedHashMap<>(
-              MLXIO.loadSafetensors(scope, quantized.resolve("model.safetensors").toString())
+              MLXIO
+                  .loadSafetensors(scope, quantized.resolve("model.safetensors").toString())
                   .tensors());
       tensors.put("model.layers.0.self_attn.q_norm.scales", tensors.get("model.norm.weight"));
-      MLXIO.saveSafetensors(
-          quantized.resolve("model.safetensors").toString(), tensors, Map.of());
+      MLXIO.saveSafetensors(quantized.resolve("model.safetensors").toString(), tensors, Map.of());
       IllegalArgumentException error =
           assertThrows(
               IllegalArgumentException.class, () -> TextGenerationModels.load(scope, quantized));

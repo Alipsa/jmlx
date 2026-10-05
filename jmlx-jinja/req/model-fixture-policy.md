@@ -12,6 +12,7 @@ exact model repository, immutable revision, template path, and applicable licens
 | `mlx-community/Qwen3.8-27B-4bit` at `3e6447f082e89cc7f0bc6e5441afd38dfce760ff` | Apache-2.0 MLX conversion of `Qwen/Qwen3.8-27B` | Template text may be retained after recording the `chat_template.jinja` path, Apache-2.0 notice, upstream-base relationship, and model-card attribution. This is the primary retained Qwen fixture. |
 | `mistralai/Mistral-7B-Instruct-v0.3` at `c170c708c41dac9275d15a8fff4eca08d52bab71` | Apache-2.0 | Template text may be retained after recording the template path, Apache-2.0 notice, and model-card attribution. |
 | `stepfun-ai/step3` at `7bf55112c8b477c47f91ed7c5872a5a80015b099` | Apache-2.0 | Template text and self-authored rendered output may be retained after recording the `chat_template.json` path, Apache-2.0 notice, and model-card attribution. |
+| `Qwen/Qwen3-0.6B` at `c1899de289a04d12100db370d81485cdf75e47ca` | Apache-2.0 | Template text and self-authored rendered output may be retained after recording the `tokenizer_config.json` `chat_template` path, Apache-2.0 notice, and model-card attribution. |
 | All other Qwen models, including Qwen2.5 3B and 72B variants | Not preapproved | Do not retain template text or rendered output. A hash-only case is permitted; text or output requires a fixture-specific review. |
 | All Llama models | Model-version-specific Llama Community License | Do not retain template text or rendered output by default. A hash-only case may retain reviewed source revision/path, the template SHA-256, either the successful-output SHA-256 or an error category, and self-authored test context. Text or output may be added only after a separate review confirms the applicable license, attribution, redistribution, naming, and acceptable-use terms. |
 | Any repository-and-revision pair not listed above | Not preapproved | Do not retain template text or rendered output. A hash-only case following the Llama form is permitted; text or output requires a fixture-specific review that adds an exact repository-and-revision row here and records its notice requirements. |
@@ -61,3 +62,14 @@ Reviewed 2026-08-26:
   — Apache-2.0 and attribution source.
 - [mlx-community/Qwen3.8-27B-4bit chat template at `3e6447f`](https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/blob/3e6447f082e89cc7f0bc6e5441afd38dfce760ff/chat_template.jinja)
   — immutable retained source.
+
+Reviewed 2026-10-05:
+
+- [Qwen/Qwen3-0.6B at `c1899de`](https://huggingface.co/Qwen/Qwen3-0.6B/tree/c1899de289a04d12100db370d81485cdf75e47ca)
+  — immutable verified revision; the `LICENSE` file at that revision is the 11,343-byte Apache-2.0
+  license text (SHA-256 `832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e`).
+- [Qwen/Qwen3-0.6B model card at `c1899de`](https://huggingface.co/Qwen/Qwen3-0.6B/blob/c1899de289a04d12100db370d81485cdf75e47ca/README.md)
+  — attribution source.
+- [Qwen/Qwen3-0.6B chat template at `c1899de`](https://huggingface.co/Qwen/Qwen3-0.6B/blob/c1899de289a04d12100db370d81485cdf75e47ca/tokenizer_config.json)
+  — immutable retained source; the decoded `chat_template` field was reviewed for fixture intake
+  (SHA-256 `a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8`).

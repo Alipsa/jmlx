@@ -1955,6 +1955,91 @@ class InterpreterTest {
   }
 
   @Test
+  void rendersQwen3ChatTemplateWithPinnedGoldens() throws Exception {
+    var template = resource("qwen3-0.6b.jinja");
+    assertEquals(
+        "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8", sha256(template));
+    // The enable_thinking switch is inverted: false inserts an empty thinking block
+    // before the generation prompt; true (or absent) leaves the turn open-ended.
+    assertEquals(
+        resource("qwen3-0.6b-plain-no-thinking.expected.txt"),
+        Template.parse(template)
+            .render(
+                Map.of(
+                    "add_generation_prompt",
+                    true,
+                    "enable_thinking",
+                    false,
+                    "messages",
+                    java.util.List.of(Map.of("role", "user", "content", "hello")))));
+    assertEquals(
+        resource("qwen3-0.6b-plain-thinking.expected.txt"),
+        Template.parse(template)
+            .render(
+                Map.of(
+                    "add_generation_prompt",
+                    true,
+                    "enable_thinking",
+                    true,
+                    "messages",
+                    java.util.List.of(Map.of("role", "user", "content", "hello")))));
+    assertEquals(
+        resource("qwen3-0.6b-system-no-thinking.expected.txt"),
+        Template.parse(template)
+            .render(
+                Map.of(
+                    "add_generation_prompt",
+                    false,
+                    "enable_thinking",
+                    false,
+                    "messages",
+                    java.util.List.of(
+                        Map.of("role", "system", "content", "helpful"),
+                        Map.of("role", "user", "content", "hello")))));
+    assertEquals(
+        resource("qwen3-0.6b-multi-turn-thinking.expected.txt"),
+        Template.parse(template)
+            .render(
+                Map.of(
+                    "add_generation_prompt",
+                    true,
+                    "enable_thinking",
+                    true,
+                    "messages",
+                    java.util.List.of(
+                        Map.of("role", "user", "content", "hello"),
+                        Map.of("role", "assistant", "content", "world"),
+                        Map.of("role", "user", "content", "hello")))));
+    var toolCall =
+        orderedMap(
+            "type",
+            "function",
+            "function",
+            orderedMap("name", "get_weather", "arguments", "{\"city\": \"Paris\"}"));
+    assertEquals(
+        resource("qwen3-0.6b-toolcall.expected.txt"),
+        Template.parse(template)
+            .render(
+                orderedMap(
+                    "add_generation_prompt",
+                    true,
+                    "enable_thinking",
+                    false,
+                    "messages",
+                    java.util.List.of(
+                        Map.of("role", "user", "content", "What is the weather?"),
+                        orderedMap(
+                            "role",
+                            "assistant",
+                            "content",
+                            "",
+                            "tool_calls",
+                            java.util.List.of(toolCall)),
+                        Map.of("role", "tool", "content", "sunny"),
+                        Map.of("role", "user", "content", "What is the weather in Tokyo?")))));
+  }
+
+  @Test
   void rendersStep3MacroHeavyTemplate() throws Exception {
     var tool =
         orderedMap(

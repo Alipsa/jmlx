@@ -140,8 +140,7 @@ class ArchitectureMappingsTest {
     assertTrue(qwen2.forbidden().contains("model.layers.0.self_attn.k_norm.weight"));
     // Norm weights never enter the affine companion allow-list, even when quantization is set.
     TensorPlan quantized =
-        ArchitectureMappings.tensorPlan(
-            TestDescriptors.llamaWithQuantization(32, 4));
+        ArchitectureMappings.tensorPlan(TestDescriptors.llamaWithQuantization(32, 4));
     assertFalse(quantized.optional().contains("model.layers.0.self_attn.q_norm.scales"));
   }
 
@@ -452,12 +451,16 @@ class ArchitectureMappingsTest {
         Map.of(
             "llama",
             "qkv=false fused=false moe=false qk=false offset=false scaled=false tied=false",
-            "qwen2", "qkv=true fused=false moe=false qk=false offset=false scaled=false tied=false",
-            "qwen3", "qkv=false fused=false moe=false qk=true offset=false scaled=false tied=false",
+            "qwen2",
+            "qkv=true fused=false moe=false qk=false offset=false scaled=false tied=false",
+            "qwen3",
+            "qkv=false fused=false moe=false qk=true offset=false scaled=false tied=false",
             "mistral",
             "qkv=false fused=false moe=false qk=false offset=false scaled=false tied=false",
-            "phi3", "qkv=false fused=true moe=false qk=false offset=false scaled=false tied=false",
-            "gemma", "qkv=false fused=false moe=false qk=false offset=true scaled=true tied=true",
+            "phi3",
+            "qkv=false fused=true moe=false qk=false offset=false scaled=false tied=false",
+            "gemma",
+            "qkv=false fused=false moe=false qk=false offset=true scaled=true tied=true",
             "mixtral",
             "qkv=false fused=false moe=true qk=false offset=false scaled=false tied=false"));
   }

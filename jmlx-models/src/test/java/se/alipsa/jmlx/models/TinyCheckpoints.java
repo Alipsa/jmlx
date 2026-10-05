@@ -34,9 +34,9 @@ final class TinyCheckpoints {
   }
 
   /**
-   * A tiny qwen3 checkpoint: explicit {@code head_dim} (32, deliberately different from
-   * {@code hidden_size / num_attention_heads == 16}), no projection biases unless requested, and
-   * the float-only {@code q_norm}/{@code k_norm} weights.
+   * A tiny qwen3 checkpoint: explicit {@code head_dim} (32, deliberately different from {@code
+   * hidden_size / num_attention_heads == 16}), no projection biases unless requested, and the
+   * float-only {@code q_norm}/{@code k_norm} weights.
    */
   static void randomQwen3(
       Path directory, long seed, int kvHeads, boolean attentionBias, boolean tiedHead)

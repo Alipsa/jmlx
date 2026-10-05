@@ -253,38 +253,87 @@ def generate_rope(out):
     (out / "rope.json").write_text(json.dumps({"samples": samples}, indent=2) + "\n")
 
 
+def qwen3_conversations():
+    """The qwen3 chat case matrix: enable_thinking true/false over the standard
+    conversations, plus one tool-call conversation. The Qwen3 template's
+    enable_thinking semantics are inverted (false inserts an empty thinking block
+    before the generation prompt), so each conversation pins its value explicitly
+    and the golden records it so the Java render can reproduce the context."""
+    plain = [{"role": "user", "content": "hello"}]
+    system_user = [
+        {"role": "system", "content": "helpful"},
+        {"role": "user", "content": "hello"},
+    ]
+    multi_turn = [
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "world"},
+        {"role": "user", "content": "hello"},
+    ]
+    tool_call = [
+        {"role": "user", "content": "What is the weather?"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {"name": "get_weather", "arguments": '{"city": "Paris"}'},
+                }
+            ],
+        },
+        {"role": "tool", "content": "sunny"},
+        {"role": "user", "content": "What is the weather in Tokyo?"},
+    ]
+    return [
+        ("plain_thinking_off", plain, {"enable_thinking": False}),
+        ("plain_thinking_on", plain, {"enable_thinking": True}),
+        ("system_user_thinking_off", system_user, {"enable_thinking": False}),
+        ("system_user_thinking_on", system_user, {"enable_thinking": True}),
+        ("multi_turn_thinking_off", multi_turn, {"enable_thinking": False}),
+        ("multi_turn_thinking_on", multi_turn, {"enable_thinking": True}),
+        ("tool_call_thinking_off", tool_call, {"enable_thinking": False}),
+    ]
+
+
 def generate_chat(family, out, tokenizer_root):
     """Render and encode committed local tokenizer bundles through Transformers."""
     directory = tokenizer_root / family
     if not (directory / "tokenizer.json").is_file() or not (directory / "tokenizer_config.json").is_file():
         raise ValueError(f"missing committed tokenizer bundle for {family}: {directory}")
     tokenizer = AutoTokenizer.from_pretrained(directory, local_files_only=True, use_fast=True)
-    conversations = {
-        "plain": [{"role": "user", "content": "hello"}],
-        "system_user": [
-            {"role": "system", "content": "helpful"},
-            {"role": "user", "content": "hello"},
-        ],
-        "multi_turn": [
-            {"role": "user", "content": "hello"},
-            {"role": "assistant", "content": "world"},
-            {"role": "user", "content": "hello"},
-        ],
-    }
+    if family == "qwen3":
+        conversations = qwen3_conversations()
+    else:
+        conversations = [
+            ("plain", [{"role": "user", "content": "hello"}], {}),
+            ("system_user", [
+                {"role": "system", "content": "helpful"},
+                {"role": "user", "content": "hello"},
+            ], {}),
+            ("multi_turn", [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "world"},
+                {"role": "user", "content": "hello"},
+            ], {}),
+        ]
     cases = []
-    for name, messages in conversations.items():
+    for name, messages, extra in conversations:
         for add_generation_prompt in (False, True):
             rendered = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=add_generation_prompt
+                messages, tokenize=False, add_generation_prompt=add_generation_prompt,
+                **extra
             )
             ids = tokenizer(rendered, add_special_tokens=False).input_ids
-            cases.append({
+            case = {
                 "name": name,
                 "messages": messages,
                 "add_generation_prompt": add_generation_prompt,
                 "rendered": rendered,
                 "ids": ids,
-            })
+            }
+            if extra:
+                case["extra"] = extra
+            cases.append(case)
     (out / f"chat-{family}.json").write_text(
         json.dumps({"family": family, "cases": cases}, ensure_ascii=False, indent=2) + "\n"
     )

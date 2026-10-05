@@ -73,10 +73,10 @@ public record ArchitectureDescriptor(
   }
 
   /**
-   * Attention projection layout, bias policy, optional sliding window, and optional per-head
-   * QK normalization: {@code qkNorm} requires float {@code self_attn.q_norm.weight} and
-   * {@code self_attn.k_norm.weight} tensors shaped {@code [head_dim]} and applies them over the
-   * head dimension after projection and before RoPE (transformers' Qwen3 ordering).
+   * Attention projection layout, bias policy, optional sliding window, and optional per-head QK
+   * normalization: {@code qkNorm} requires float {@code self_attn.q_norm.weight} and {@code
+   * self_attn.k_norm.weight} tensors shaped {@code [head_dim]} and applies them over the head
+   * dimension after projection and before RoPE (transformers' Qwen3 ordering).
    */
   public record Attention(
       boolean qkvBias, boolean outBias, boolean fusedQkv, Integer slidingWindow, boolean qkNorm) {

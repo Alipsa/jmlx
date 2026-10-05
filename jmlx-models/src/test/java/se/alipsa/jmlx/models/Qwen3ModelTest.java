@@ -39,7 +39,8 @@ class Qwen3ModelTest {
           model
               .generate(
                   new GenerationRequest(
-                      new int[] {1, 5, 9}, GenerationConfig.greedyDefaults(4, Set.of()),
+                      new int[] {1, 5, 9},
+                      GenerationConfig.greedyDefaults(4, Set.of()),
                       CancellationToken.NONE),
                   ignored -> {})
               .generatedTokenIds());
@@ -76,8 +77,12 @@ class Qwen3ModelTest {
       for (int t = 0; t < prompt.length - 1; t++) {
         model.forward(MLX.array(modelScope, new int[] {prompt[t]}, new int[] {1, 1}), caches);
       }
-      float[] stepped = lastRowLogits(model, modelScope,
-          MLX.array(modelScope, new int[] {prompt[prompt.length - 1]}, new int[] {1, 1}), caches);
+      float[] stepped =
+          lastRowLogits(
+              model,
+              modelScope,
+              MLX.array(modelScope, new int[] {prompt[prompt.length - 1]}, new int[] {1, 1}),
+              caches);
       assertEquals(full.length, stepped.length);
       float worst = 0;
       for (int i = 0; i < full.length; i++) {
@@ -97,8 +102,7 @@ class Qwen3ModelTest {
       tensors.remove("model.layers.0.self_attn.q_norm.weight");
       MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
       IllegalArgumentException error =
-          assertThrows(
-              IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
+          assertThrows(IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
       assertTrue(error.getMessage().contains("q_norm.weight"), error.getMessage());
     }
   }
@@ -116,8 +120,7 @@ class Qwen3ModelTest {
           MLX.astype(MLX.zeros(scope, new int[] {32}, DType.FLOAT32), DType.UINT32));
       MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
       IllegalArgumentException error =
-          assertThrows(
-              IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
+          assertThrows(IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
       assertTrue(error.getMessage().contains("q_norm"), error.getMessage());
     }
   }
@@ -129,12 +132,10 @@ class Qwen3ModelTest {
       Map<String, MLXArray> tensors =
           new LinkedHashMap<>(
               MLXIO.loadSafetensors(scope, dir.resolve("model.safetensors").toString()).tensors());
-      tensors.put(
-          "model.layers.0.self_attn.q_norm.scales", tensors.get("model.norm.weight"));
+      tensors.put("model.layers.0.self_attn.q_norm.scales", tensors.get("model.norm.weight"));
       MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), tensors, Map.of());
       IllegalArgumentException error =
-          assertThrows(
-              IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
+          assertThrows(IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
       assertTrue(error.getMessage().contains("unexpected tensor"), error.getMessage());
       assertTrue(error.getMessage().contains("q_norm.scales"), error.getMessage());
     }
@@ -163,6 +164,8 @@ class Qwen3ModelTest {
     float[] logits = model.forward(ids, caches).toFloatArray();
     int vocab = logits.length / (ids.shape()[0] * ids.shape()[1]);
     return java.util.Arrays.copyOfRange(
-        logits, (ids.shape()[0] * ids.shape()[1] - 1) * vocab, ids.shape()[0] * ids.shape()[1] * vocab);
+        logits,
+        (ids.shape()[0] * ids.shape()[1] - 1) * vocab,
+        ids.shape()[0] * ids.shape()[1] * vocab);
   }
 }

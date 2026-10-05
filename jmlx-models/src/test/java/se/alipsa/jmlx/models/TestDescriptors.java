@@ -19,8 +19,10 @@ final class TestDescriptors {
     return dense("qwen2", layers, true, false, false, null, false);
   }
 
-  /** Qwen3: no projection biases, per-head QK normalization, explicit head_dim path exercised
-   * by the checkpoint-level tests. */
+  /**
+   * Qwen3: no projection biases, per-head QK normalization, explicit head_dim path exercised by the
+   * checkpoint-level tests.
+   */
   static ArchitectureDescriptor qwen3(int layers) {
     return dense("qwen3", layers, false, false, false, null, true);
   }

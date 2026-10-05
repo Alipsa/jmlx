@@ -47,14 +47,27 @@ public final class DecoderAttention extends CachedAttention {
       UnaryLayer k,
       UnaryLayer v,
       UnaryLayer out) {
-    this(scope, numHeads, numKeyValueHeads, headDim, rope, rotaryDims, staticFreqs,
-        slidingWindow, q, k, v, out, null, null);
+    this(
+        scope,
+        numHeads,
+        numKeyValueHeads,
+        headDim,
+        rope,
+        rotaryDims,
+        staticFreqs,
+        slidingWindow,
+        q,
+        k,
+        v,
+        out,
+        null,
+        null);
   }
 
   /**
    * Creates attention from registered projection modules with optional per-head QK normalization:
-   * each non-null norm is an {@link RMSNorm} over {@code headDim} applied to the query or key
-   * heads after projection and before RoPE (transformers' Qwen3 ordering).
+   * each non-null norm is an {@link RMSNorm} over {@code headDim} applied to the query or key heads
+   * after projection and before RoPE (transformers' Qwen3 ordering).
    */
   public DecoderAttention(
       MLXScope scope,

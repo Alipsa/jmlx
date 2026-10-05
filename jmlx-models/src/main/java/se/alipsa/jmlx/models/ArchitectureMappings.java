@@ -131,11 +131,11 @@ public final class ArchitectureMappings {
    * @param honorsMlpBias whether {@code mlp_bias} turns on MLP projection biases
    * @param acceptsMaxWindowLayers whether {@code max_window_layers} is a recognised field
    * @param acceptsLayerTypes whether a {@code layer_types} schedule may be present
-   * @param honorsExplicitHeadDim whether an explicit {@code head_dim} is honored when it
-   *     differs from {@code hidden_size / num_attention_heads} (Qwen3; Gemma is stricter and
-   *     requires the field outright)
-   * @param qkNorm per-head QK normalization: {@code self_attn.q_norm.weight}/{@code
-   *     k_norm.weight} over {@code head_dim} are required, after projection and before RoPE
+   * @param honorsExplicitHeadDim whether an explicit {@code head_dim} is honored when it differs
+   *     from {@code hidden_size / num_attention_heads} (Qwen3; Gemma is stricter and requires the
+   *     field outright)
+   * @param qkNorm per-head QK normalization: {@code self_attn.q_norm.weight}/{@code k_norm.weight}
+   *     over {@code head_dim} are required, after projection and before RoPE
    * @param window treatment of {@code sliding_window}
    */
   private record Family(
@@ -551,8 +551,8 @@ public final class ArchitectureMappings {
             family.fusedProjections() ? MlpLayout.FUSED_GATE_UP : MlpLayout.SEPARATE_GATE_UP,
             activation,
             mlpBias),
-        new Attention(qkvBias, !qwen2 && qkvBias, family.fusedProjections(), slidingWindow,
-            family.qkNorm()),
+        new Attention(
+            qkvBias, !qwen2 && qkvBias, family.fusedProjections(), slidingWindow, family.qkNorm()),
         new Head(dimensions.tieWordEmbeddings()),
         new Embedding(gemma),
         moe,

@@ -5,10 +5,10 @@ import java.nio.file.Path;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Loads Hugging Face safetensors checkpoints whose {@code model_type} is {@code qwen2} or
- * {@code qwen3}. Both families share the dense decoder stack; {@code qwen3} adds per-head QK
- * normalization and honors an explicit {@code head_dim}, expressed through the
- * {@link ArchitectureDescriptor} rather than this class.
+ * Loads Hugging Face safetensors checkpoints whose {@code model_type} is {@code qwen2} or {@code
+ * qwen3}. Both families share the dense decoder stack; {@code qwen3} adds per-head QK normalization
+ * and honors an explicit {@code head_dim}, expressed through the {@link ArchitectureDescriptor}
+ * rather than this class.
  */
 public final class QwenModel extends DecoderModel {
   private QwenModel(MLXScope scope, ArchitectureDescriptor descriptor, Path directory)

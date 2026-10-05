@@ -32,9 +32,11 @@ CPU and `MLX_ENABLE_TF32=0`. Legacy Phase 6 retains its GPU profile. All Gradle 
 precision as an environment variable and task input; the verifier evaluates a runtime operation on
 every selected device. Each profile declares `macOSMajor` and `macOSMajorPolicy`. Phase 6 GPU
 fixtures require exactly macOS 26 for generation and verification; newer OS versions change their
-rounded results. Phase 7.1 CPU fixtures allow macOS 26+ with a `minimum` policy. On newer macOS,
-select `-PmlxOracleFamily=phase7-1`. Unfiltered commands refuse incompatible profiles before
-rewriting any fixtures; direct runner invocations enforce the same policy.
+rounded results. Phase 7.1 CPU fixtures allow macOS 26+ with a `minimum` policy. Unfiltered commands
+automatically select compatible profiles and print which families were skipped. Newer hosts run
+Phase 7.1 CPU fixtures without flags and leave Phase 6 GPU goldens unchanged. `-PmlxOracleFamily`
+optionally selects a specific family; explicitly requesting Phase 6 on an incompatible host fails.
+Direct single-fixture runner invocations also enforce the profile policy.
 
 Nonfinite float serialization uses `NaN`, `Infinity` and `-Infinity` strings with `allow_nan=False`.
 The shared core test-fixture reader decodes them; comparisons classify NaNs/infinity signs exactly.

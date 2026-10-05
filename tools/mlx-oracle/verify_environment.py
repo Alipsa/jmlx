@@ -7,7 +7,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from profile_policy import verify_host
+from profile_policy import select_profiles
 
 
 def require_equal(label: str, actual: str, expected: str) -> None:
@@ -95,9 +95,7 @@ def main() -> None:
     if set(provenance.get("profiles", {})) != {"phase6", "phase7-1"}:
         raise SystemExit("provenance must declare phase6 and phase7-1 profiles")
     profiles = provenance["profiles"]
-    selected = [args.family] if args.family else list(profiles)
-    for family in selected:
-        verify_host(family, profiles[family])
+    selected = select_profiles(profiles, args.family)
     for family in selected:
         profile = profiles[family]
         if profile["device"] not in {"cpu", "gpu"}:

@@ -148,6 +148,7 @@ tasks.register('verifyMlxOracle', Exec) {
     configureMlxOracle(delegate)
     inputs.file(mlxOracleDir.file('verify_environment.py'))
     inputs.file(mlxOracleDir.file('profile_policy.py'))
+    inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
     def family = providers.gradleProperty('mlxOracleFamily')
     inputs.property('oracleFamily', family.orElse('all'))
     // A FileCollection may contain an absent optional marker; inputs.file(...).optional() still
@@ -174,6 +175,7 @@ tasks.register('generateMlxOracleFixtures', Exec) {
     dependsOn tasks.named('verifyMlxOracle')
     inputs.file(mlxOracleDir.file('runner.py'))
     inputs.file(mlxOracleDir.file('profile_policy.py'))
+    inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
     def family = providers.gradleProperty('mlxOracleFamily')
     inputs.property('fixtureFamily', family.orElse('all'))
     doFirst { if (family.isPresent()) { args '--family', family.get() } }
@@ -206,6 +208,7 @@ tasks.register('verifyMlxOracleFixtures', Exec) {
     doFirst { if (family.isPresent()) { args '--family', family.get() } }
     inputs.file(mlxOracleDir.file('runner.py'))
     inputs.file(mlxOracleDir.file('profile_policy.py'))
+    inputs.property('oracleHostOsVersion', System.getProperty('os.version'))
     inputs.files(fileTree(mlxOracleDir.dir('fixtures')) { include '*.input.json', '*.expected.json' })
     args mlxOracleDir.file('runner.py').asFile,
             '--fixtures-dir', mlxOracleDir.file('fixtures').asFile,

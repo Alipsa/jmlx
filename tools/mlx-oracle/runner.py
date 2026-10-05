@@ -5,7 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
-from profile_policy import verify_host
+from profile_policy import select_profiles, verify_host
 
 import mlx.core as mx
 
@@ -246,13 +246,12 @@ def main() -> None:
         if args.verify_all and missing_expected:
             raise SystemExit(f"oracle inputs missing expected fixtures: {', '.join(missing_expected)}")
         provenance = json.loads(args.provenance.read_text())
-        for family, profile in provenance["profiles"].items():
-            if not args.family or args.family == family:
-                verify_host(family, profile)
+        selected = select_profiles(provenance["profiles"], args.family)
         for name, input_path in sorted(inputs.items()):
             expected_path = args.fixtures_dir / f"{name}.expected.json"
             specification = json.loads(input_path.read_text())
-            if args.family and not specification["fixture"].startswith(args.family):
+            family = "phase7-1" if specification["fixture"] == "phase7-1-core" else "phase6"
+            if family not in selected:
                 continue
             actual = canonical(run(specification, provenance))
             if args.generate_all:

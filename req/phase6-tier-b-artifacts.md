@@ -8,7 +8,7 @@ must record every field below before an artifact is accepted as compatibility ev
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Llama | [HuggingFaceTB/SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) | `12fd25f77366fa6b3b4b768ec3050bf629380bac` | all consumed files in [`tools/tier-b/smollm2-135m-instruct.json`](../tools/tier-b/smollm2-135m-instruct.json) | Apache-2.0; public | `model_type=llama`; exact 16 chat-generated IDs, chat text/IDs, and runtime pin in machine manifest | 271,169,733 bytes consumed; 300,000,000-byte cap; highest sampled test-JVM RSS 461,424 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/36640308134) |
 | Qwen2 | [Qwen/Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) | `7ae557604adf67be50417f59c2c2f167def9a775` | all consumed files in [`tools/tier-b/qwen2.5-0.5b-instruct.json`](../tools/tier-b/qwen2.5-0.5b-instruct.json) | Apache-2.0; public | `model_type=qwen2`; exact 16 chat-generated IDs, chat text/IDs, and runtime pin in machine manifest | 995,137,433 bytes consumed; 1,100,000,000-byte cap; highest sampled test-JVM RSS 1,018,112 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/36640308134) |
-| Qwen3 | [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) | `c1899de289a04d12100db370d81485cdf75e47ca` | all consumed files in [`tools/tier-b/qwen3-0.6b.json`](../tools/tier-b/qwen3-0.6b.json) | Apache-2.0; public | `model_type=qwen3`; exact 16 chat-generated IDs, chat text/IDs, and runtime pin in machine manifest | 1,514,733,440 bytes consumed; 1,520,000,000-byte cap; highest sampled test-JVM RSS 1,910,976 KiB (local M5 Max) | project maintainer | verified-with-local-run; hosted-runner exact-token run follows the Qwen3 decoder merge |
+| Qwen3 | [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) | `c1899de289a04d12100db370d81485cdf75e47ca` | all consumed files in [`tools/tier-b/qwen3-0.6b.json`](../tools/tier-b/qwen3-0.6b.json) | Apache-2.0; public | `model_type=qwen3`; exact 16 chat-generated IDs, chat text/IDs, and runtime pin in machine manifest | 1,514,733,440 bytes consumed; 1,520,000,000-byte cap; highest sampled test-JVM RSS 867,520 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/37301827462) |
 | Mistral | [OuteAI/Lite-Mistral-150M-v2-Instruct](https://huggingface.co/OuteAI/Lite-Mistral-150M-v2-Instruct) | `6e2f90cbf312921289b3b8c29cb34cbdb6cb708e` | all consumed files in [`tools/tier-b/lite-mistral-150m-v2-instruct.json`](../tools/tier-b/lite-mistral-150m-v2-instruct.json) | Apache-2.0; public | `model_type=mistral`; exact 16 chat-generated IDs, chat text/IDs, and runtime pin in machine manifest | 627,886,087 bytes consumed; 650,000,000-byte cap; highest sampled test-JVM RSS 802,064 KiB | project maintainer | verified-with-real-artifact; [exact-token run](https://github.com/Alipsa/jmlx/actions/runs/36640308134) |
 | Gemma v1 | [google/gemma-2b](https://huggingface.co/google/gemma-2b) | — | — | Gemma terms acceptance and token required | — | about 5.02 GB weights plus runtime; peak unmeasured | project maintainer | candidate pending |
 | Phi-3 | [microsoft/Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct) | — | — | MIT; public | — | index reports 7,642,159,104 bytes of weights, exceeding hosted runner RAM before runtime overhead | self-hosted runner owner pending | candidate pending |
@@ -28,12 +28,10 @@ measurement does not include separate Gradle processes or all unified GPU alloca
 successful hosted-runner load is the practical fit evidence. Llama's exact-token run used the
 same recorded Apple M1/macOS/MLX pin; the highest sampled test-JVM RSS across its recorded runs
 was 461,424 KiB. Mistral's exact-token run used the same runner pin, asserted the 16 IDs in
-its machine manifest, and sampled a peak test-JVM RSS of 802,064 KiB. Qwen3's exact-token run so
-far is local: Apple M5 Max, macOS 27.0.1, aarch64, mlx-metal 0.31.2, and mlx-c
-`fba4470b89073180056c9ea46c443051375f7399`, asserting the 16 IDs in its machine manifest on the
-recorded local pin, with a peak sampled test-JVM RSS of 1,910,976 KiB. The scheduled
-hosted-runner run starts with the Qwen3 decoder code on the default branch; the manifest's
-recorded pin and observed-run link get the hosted values when it lands. The Tier-B generation
+its machine manifest, and sampled a peak test-JVM RSS of 802,064 KiB. Qwen3's exact-token run used the same recorded Apple M1/macOS/MLX runner pin,
+asserting the 16 IDs in its machine manifest, with a peak sampled test-JVM RSS of
+867,520 KiB; a local Apple M5 Max run on the same checkpoint produced the identical
+16 IDs. The Tier-B generation
 requests use the same rendered chat IDs checked before model loading. The remaining rows are
 candidate evaluations, not Tier-B evidence.
 

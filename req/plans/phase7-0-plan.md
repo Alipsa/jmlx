@@ -331,6 +331,9 @@ Items 1-10 of the final checklist:
    dispatch the Tier-B workflow, then set the manifest's `recorded_pin`,
    `observed_peak_test_jvm_rss_kib` and `observed_run` from the qwen3 arm
    (and update the `req/phase6-tier-b-artifacts.md` row's status and link).
+   Done post-merge: dispatch run `37301827462`, the hosted qwen3 arm passed
+   and produced the identical 16 IDs (peak test-JVM RSS 867,520 KiB on the
+   M1 virtual pin); manifest and doc row updated with the hosted values.
 8. Done: `mlx-community/Qwen3-8B-4bit` (revision
    `545dc4251c05440727734bcd94334791f6ab0192`) local run recorded in
    `req/phase6-4-benchmark.md` (86.92 tokens/s median, 4,699,272,000 peak

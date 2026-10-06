@@ -2,5 +2,8 @@
 torch==2.6.0+cpu ; sys_platform != "darwin"
 torch==2.6.0 ; sys_platform == "darwin"
 transformers==4.57.6
+# Direct pin: the slow PIL image processor is the reference image pipeline.
+# Matches the already-locked transitive version; the reviewed lock is preserved.
+Pillow==12.3.0
 safetensors==0.6.2
 sentence-transformers==5.1.2

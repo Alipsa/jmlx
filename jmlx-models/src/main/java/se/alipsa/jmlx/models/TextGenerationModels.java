@@ -17,7 +17,9 @@ public final class TextGenerationModels {
     Objects.requireNonNull(directory, "directory");
     JsonNode root = readConfigTree(directory);
     if ("t5".equals(root.path("model_type").asString())) {
-      return T5Model.load(scope, directory);
+      // Reuse the tree we just read to dispatch, so config.json is parsed once (PR #39 review,
+      // finding 7c).
+      return T5Model.load(scope, directory, T5LoadOptions.defaults(), root);
     }
     return loadDecoder(scope, directory, ArchitectureMappings.parse(root));
   }
@@ -25,11 +27,14 @@ public final class TextGenerationModels {
   /** Loads T5 with an explicit source limit; other architectures reject these options. */
   public static TextGenerationModel load(MLXScope scope, Path directory, T5LoadOptions options)
       throws IOException {
+    Objects.requireNonNull(scope, "scope");
+    Objects.requireNonNull(directory, "directory");
     Objects.requireNonNull(options);
-    if (!"t5".equals(readConfigTree(directory).path("model_type").asString())) {
+    JsonNode root = readConfigTree(directory);
+    if (!"t5".equals(root.path("model_type").asString())) {
       throw new IllegalArgumentException("T5LoadOptions applies only to model_type=t5");
     }
-    return T5Model.load(scope, directory, options);
+    return T5Model.load(scope, directory, options, root);
   }
 
   static <T extends DecoderModel> T loadDecoder(

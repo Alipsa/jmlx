@@ -1,11 +1,14 @@
 package se.alipsa.jmlx.nn;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -92,6 +95,55 @@ class EncoderAttentionTest {
             new float[] {expected, 2 * expected},
             attention.forward(input, cache, mask, bias).toFloatArray(),
             1e-4f);
+      }
+    }
+  }
+
+  @Test
+  void halfPrecisionInputsStayHalfPrecision() {
+    try (MLXScope model = new MLXScope();
+        MLXScope request = model.newChild()) {
+      for (DType dtype : List.of(DType.FLOAT16, DType.BFLOAT16)) {
+        Linear query =
+            new Linear(
+                model,
+                MLX.astype(MLX.array(model, new float[] {1, 0}, new int[] {1, 2}), dtype),
+                null);
+        Linear key =
+            new Linear(
+                model,
+                MLX.astype(MLX.array(model, new float[] {0, 1}, new int[] {1, 2}), dtype),
+                null);
+        Linear value =
+            new Linear(
+                model,
+                MLX.astype(MLX.array(model, new float[] {1, 0}, new int[] {1, 2}), dtype),
+                null);
+        Linear out =
+            new Linear(
+                model,
+                MLX.astype(MLX.array(model, new float[] {1, 2}, new int[] {2, 1}), dtype),
+                null);
+        BidirectionalAttention attention =
+            new BidirectionalAttention(model, 1, 1, 1f, query, key, value, out);
+        StaticKVCache cache = new StaticKVCache(request);
+        try (MLXScope stage = request.newChild()) {
+          MLXArray source =
+              MLX.astype(
+                  MLX.array(stage, new float[] {3, 1, 7, 2, 99, 3}, new int[] {1, 3, 2}), dtype);
+          attention.initialize(source, cache);
+        }
+        cache.validate(1, 1, 3, 1);
+        try (MLXScope step = request.newChild()) {
+          MLXArray input =
+              MLX.astype(MLX.array(step, new float[] {1, 0}, new int[] {1, 1, 2}), dtype);
+          MLXArray mask = AttentionMask.bidirectional(step, new int[][] {{1, 1, 0}}, 1);
+          MLXArray output = attention.forward(input, cache, mask);
+          assertEquals(dtype, output.dtype());
+          float probability = (float) (Math.E / (1 + Math.E));
+          float expected = 3 * (1 - probability) + 7 * probability;
+          assertArrayEquals(new float[] {expected, 2 * expected}, output.toFloatArray(), 0.05f);
+        }
       }
     }
   }

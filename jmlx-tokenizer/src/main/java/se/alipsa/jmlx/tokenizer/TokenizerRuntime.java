@@ -16,15 +16,16 @@ final class TokenizerRuntime {
   private final AddedTokenMatcher normalizedMatcher;
   private final Vocabulary vocabulary;
   private final int baseVocabularyMaxKnownId;
+  private final PairTemplate pairTemplate;
 
   TokenizerRuntime(TokenizerDefinition definition) {
     this.definition = Objects.requireNonNull(definition, "definition");
     this.modelEncoder = TokenizerModels.prepare(definition.model());
     this.normalizer = NormalizerPipeline.prepare(definition.normalizer());
-    this.rawMatcher =
-        new AddedTokenMatcher(definition.addedTokens(), false, definition.normalizer());
-    this.normalizedMatcher =
-        new AddedTokenMatcher(definition.addedTokens(), true, definition.normalizer());
+    // Share the runtime's own prepared normalizer with both matchers so a Precompiled charsmap is
+    // parsed once, not once per matcher (PR #39 review, finding 7a).
+    this.rawMatcher = new AddedTokenMatcher(definition.addedTokens(), false, this.normalizer);
+    this.normalizedMatcher = new AddedTokenMatcher(definition.addedTokens(), true, this.normalizer);
     List<AddedToken> templateTokens = collectTemplateTokens(definition.postProcessor());
     Vocabulary base = new Vocabulary(definition.model().vocab(), definition.addedTokens());
     requireCompatible(templateTokens, base);
@@ -36,6 +37,12 @@ final class TokenizerRuntime {
     }
     this.vocabulary = new Vocabulary(definition.model().vocab(), merged);
     this.baseVocabularyMaxKnownId = base.maxKnownId();
+    // Parse a cacheable pair template once at load time so repeated encodePair calls (BERT
+    // prefill/decode) do not re-walk the JSON (PR #39 review, finding 7b). A null template means
+    // the post-processor is not a clean direct Bert/Template pair template (e.g. ByteLevel or a
+    // Sequence), in which case the original lazy pairProcess keeps full ownership of the behavior
+    // and error timing.
+    this.pairTemplate = tryParsePairTemplate(definition.pairPostProcessor());
   }
 
   int vocabSize() {
@@ -113,7 +120,7 @@ final class TokenizerRuntime {
     }
     List<TokenPiece> first = encodeInput(text);
     List<TokenPiece> second = encodeInput(textPair);
-    int budget = pairProcess(List.of(), List.of(), options.addSpecialTokens()).size();
+    int budget = pairSpecialBudget(options.addSpecialTokens());
     if (options.truncation().enabled()) {
       int available = options.truncation().maxLength() - budget;
       if (available < 0) {
@@ -144,8 +151,9 @@ final class TokenizerRuntime {
           case LONGEST_FIRST -> {
             // Mirrors tokenizers/src/utils/truncation.rs: each sequence is first truncated to
             // the raw max_length during model tokenization, then the remaining budget
-            // (available, i.e. max_length minus the special tokens) is split, giving the extra
-            // token to the originally longer input.
+            // (available, i.e. max_length minus the special tokens) is split between the
+            // capped lengths, giving the extra token to the longer capped input (the second
+            // one when both cap to the same length).
             firstLength = Math.min(firstLength, options.truncation().maxLength());
             secondLength = Math.min(secondLength, options.truncation().maxLength());
             int shorter = Math.min(firstLength, secondLength);
@@ -164,11 +172,172 @@ final class TokenizerRuntime {
       first = truncate(first, firstLength, options.truncation().direction());
       second = truncate(second, secondLength, options.truncation().direction());
     }
-    List<TokenPiece> output = pairProcess(first, second, options.addSpecialTokens());
+    List<TokenPiece> output = pairApply(first, second, options.addSpecialTokens());
     if (options.padding().enabled()) {
       output = pad(output, options.padding());
     }
     return columns(output);
+  }
+
+  /**
+   * The pair special-token budget: the number of pieces a pair post-processor contributes when both
+   * sequences are empty. Uses the cached template when one was parsed at load time, otherwise falls
+   * back to the original lazy {@link #pairProcess} (which also reproduces its load-independent
+   * errors, e.g. a ByteLevel or Sequence post-processor that has no pair template).
+   */
+  private int pairSpecialBudget(boolean addSpecialTokens) {
+    if (pairTemplate == null) {
+      return pairProcess(List.of(), List.of(), addSpecialTokens).size();
+    }
+    // The lazy budget call above used to run the template's A:0/B:1 checks before any truncation
+    // error could fire; keep that error precedence on the cached path as well.
+    pairTemplate.validate();
+    return pairTemplate.budget(addSpecialTokens);
+  }
+
+  /**
+   * Applies the pair post-processor. Uses the cached template when one was parsed at load time,
+   * otherwise falls back to the original lazy {@link #pairProcess} so every non-cached shape keeps
+   * its exact historical behavior and error timing.
+   */
+  private List<TokenPiece> pairApply(
+      List<TokenPiece> first, List<TokenPiece> second, boolean special) {
+    return pairTemplate == null
+        ? pairProcess(first, second, special)
+        : applyPairTemplate(first, second, special);
+  }
+
+  /**
+   * Walks a cached {@link PairTemplate}. The structural shape was validated at load time; the two
+   * semantic invariants -- that the template references {@code A:0} and {@code B:1} exactly once
+   * each -- are still enforced here, because a structurally-valid template can violate them (e.g. a
+   * {@code B:0} item) and HF only surfaces that at pair-encode time, not at load time.
+   */
+  private List<TokenPiece> applyPairTemplate(
+      List<TokenPiece> first, List<TokenPiece> second, boolean special) {
+    List<TokenPiece> output = new ArrayList<>();
+    boolean seenFirst = false;
+    boolean seenSecond = false;
+    for (PairStep step : pairTemplate.steps()) {
+      if (step instanceof SequenceStep sequence) {
+        if ("A".equals(sequence.id()) && sequence.typeId() == 0 && !seenFirst) {
+          typed(output, first, 0);
+          seenFirst = true;
+        } else if ("B".equals(sequence.id()) && sequence.typeId() == 1 && !seenSecond) {
+          typed(output, second, 1);
+          seenSecond = true;
+        } else {
+          throw new TokenizerException("pair template must distinguish A:0 and B:1 exactly once");
+        }
+      } else if (step instanceof SpecialStep sp && special) {
+        for (SpecialRef ref : sp.refs()) {
+          pairSpecial(output, ref.text(), ref.id(), sp.typeId());
+        }
+      }
+    }
+    if (!seenFirst || !seenSecond) {
+      throw new TokenizerException("pair template must contain A:0 and B:1");
+    }
+    return output;
+  }
+
+  /**
+   * Parses a pair template at load time for caching. Returns a cacheable {@link PairTemplate} for a
+   * clean Bert or Template pair template -- either directly present or the sole template step of a
+   * Sequence wrapper (both real HF BERT shapes). Returns {@code null} for every other shape (a
+   * missing post-processor, a ByteLevel or other non-template step, a Sequence with zero or
+   * multiple template steps, or a template whose items/special-token references are not
+   * structurally well-formed) so that the original lazy {@link #pairProcess} remains the authority
+   * for their behavior and error timing. Deliberately does not perform the {@code A:0}/{@code B:1}
+   * semantic checks, which stay at encode time.
+   */
+  private static PairTemplate tryParsePairTemplate(JsonNode processor) {
+    if (processor == null) {
+      return null;
+    }
+    JsonNode template = processor;
+    if ("Sequence".equals(template.path("type").asString())) {
+      template = null;
+      for (JsonNode step : processor.path("processors")) {
+        if ("BertProcessing".equals(step.path("type").asString())
+            || "TemplateProcessing".equals(step.path("type").asString())) {
+          if (template != null) {
+            return null;
+          }
+          template = step;
+        } else {
+          return null;
+        }
+      }
+    }
+    if (template == null) {
+      return null;
+    }
+    if ("BertProcessing".equals(template.path("type").asString())) {
+      return bertPairTemplate(template);
+    }
+    return "TemplateProcessing".equals(template.path("type").asString())
+        ? templatePairTemplate(template)
+        : null;
+  }
+
+  /**
+   * Builds the fixed Bert pair template. {@code cls}/{@code sep} are already validated as {@code
+   * [token, id]} pairs by the loader ({@link TokenizerJsonLoader}), so they are read here without
+   * re-validation.
+   */
+  private static PairTemplate bertPairTemplate(JsonNode processor) {
+    List<PairStep> steps = new ArrayList<>();
+    steps.add(new SpecialStep(0, List.of(pairRef(processor, "cls"))));
+    steps.add(new SequenceStep("A", 0));
+    steps.add(new SpecialStep(0, List.of(pairRef(processor, "sep"))));
+    steps.add(new SequenceStep("B", 1));
+    steps.add(new SpecialStep(1, List.of(pairRef(processor, "sep"))));
+    return new PairTemplate(List.copyOf(steps), 3);
+  }
+
+  /**
+   * Builds a Template pair template from its {@code pair} items. Returns {@code null} (deferring to
+   * the lazy {@link #pairProcess}) when there is no {@code pair} array or any item is not a
+   * well-formed {@code Sequence}/{@code SpecialToken} reference, so the original error timing is
+   * preserved for those.
+   */
+  private static PairTemplate templatePairTemplate(JsonNode processor) {
+    JsonNode pair = processor.path("pair");
+    if (!pair.isArray()) {
+      return null;
+    }
+    List<PairStep> steps = new ArrayList<>();
+    int specialCount = 0;
+    for (JsonNode item : pair) {
+      JsonNode sequence = item.get("Sequence");
+      if (sequence != null) {
+        steps.add(
+            new SequenceStep(sequence.path("id").asString(), sequence.path("type_id").asInt(0)));
+      } else if (item.has("SpecialToken")) {
+        JsonNode token = item.path("SpecialToken");
+        JsonNode info = processor.path("special_tokens").path(token.path("id").asString());
+        JsonNode ids = info.path("ids");
+        JsonNode tokens = info.path("tokens");
+        if (!ids.isArray() || ids.isEmpty() || ids.size() != tokens.size()) {
+          return null;
+        }
+        List<SpecialRef> refs = new ArrayList<>(ids.size());
+        for (int i = 0; i < ids.size(); i++) {
+          refs.add(new SpecialRef(tokens.get(i).asString(), ids.get(i).intValue()));
+        }
+        steps.add(new SpecialStep(token.path("type_id").asInt(0), refs));
+        specialCount += refs.size();
+      } else {
+        return null;
+      }
+    }
+    return new PairTemplate(List.copyOf(steps), specialCount);
+  }
+
+  private static SpecialRef pairRef(JsonNode processor, String field) {
+    JsonNode pair = processor.path(field);
+    return new SpecialRef(pair.get(0).asString(), pair.get(1).intValue());
   }
 
   private List<TokenPiece> pairProcess(
@@ -497,4 +666,51 @@ final class TokenizerRuntime {
       }
     }
   }
+
+  /** A cached pair template: its ordered steps plus the count of special-token pieces it emits. */
+  private record PairTemplate(List<PairStep> steps, int specialCount) {
+    int budget(boolean addSpecialTokens) {
+      return addSpecialTokens ? specialCount : 0;
+    }
+
+    /**
+     * The A:0/B:1 invariants, mirroring {@link #applyPairTemplate}'s checks and message selection,
+     * so a template that violates them fails at budget time exactly as the historical lazy budget
+     * call did (before any truncation error).
+     */
+    void validate() {
+      int first = 0;
+      int second = 0;
+      for (PairStep step : steps) {
+        if (step instanceof SequenceStep sequence) {
+          if ("A".equals(sequence.id()) && sequence.typeId() == 0) {
+            if (first++ != 0) {
+              throw new TokenizerException(
+                  "pair template must distinguish A:0 and B:1 exactly once");
+            }
+          } else if ("B".equals(sequence.id()) && sequence.typeId() == 1) {
+            if (second++ != 0) {
+              throw new TokenizerException(
+                  "pair template must distinguish A:0 and B:1 exactly once");
+            }
+          } else {
+            throw new TokenizerException("pair template must distinguish A:0 and B:1 exactly once");
+          }
+        }
+      }
+      if (first != 1 || second != 1) {
+        throw new TokenizerException("pair template must contain A:0 and B:1");
+      }
+    }
+  }
+
+  private sealed interface PairStep permits SequenceStep, SpecialStep {}
+
+  /** A reference to one of the two sequences to splice into the pair output. */
+  private record SequenceStep(String id, int typeId) implements PairStep {}
+
+  /** One or more special tokens emitted (only when special tokens are requested). */
+  private record SpecialStep(int typeId, List<SpecialRef> refs) implements PairStep {}
+
+  private record SpecialRef(String text, int id) {}
 }

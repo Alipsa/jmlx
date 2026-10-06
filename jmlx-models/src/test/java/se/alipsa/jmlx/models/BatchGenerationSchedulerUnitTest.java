@@ -16,7 +16,7 @@ class BatchGenerationSchedulerUnitTest {
   private static final int CAPACITY = BatchGenerationScheduler.CohortSizeWindow.CAPACITY;
 
   @Test
-  void aNonPositiveGateWaitIsRejectedAtStart() {
+  void nonPositiveGateWaitIsRejectedAtStart() {
     // Rejected before any worker starts, so it is safe to call twice back to back.
     BatchGenerationScheduler.ModelFactory factory =
         root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama"));
@@ -33,7 +33,7 @@ class BatchGenerationSchedulerUnitTest {
   }
 
   @Test
-  void aGateWaitThatDoesNotFitInNanosIsRejectedAtStart() {
+  void gateWaitThatDoesNotFitInNanosIsRejectedAtStart() {
     BatchGenerationScheduler.ModelFactory factory =
         root -> TextGenerationModels.load(root, SchedulerFixtures.checkpoint("llama"));
     assertThrows(

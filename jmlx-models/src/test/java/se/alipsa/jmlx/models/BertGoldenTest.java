@@ -4,11 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.tokenizer.TokenOffset;
@@ -20,6 +27,8 @@ import tools.jackson.databind.ObjectMapper;
 @Tag("full-float32")
 class BertGoldenTest {
   private static final ObjectMapper JSON = new ObjectMapper();
+
+  @TempDir Path temporaryDirectory;
 
   static Path root() {
     return Path.of(System.getProperty("jmlx.repository.root"));
@@ -129,6 +138,35 @@ class BertGoldenTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> TextEncoderModels.load(scope, goldens.resolve("checkpoints/bert-sequence")));
+    }
+  }
+
+  @Test
+  void tokenClassificationIgnoresPoolerWeightsFromBaseCheckpoint() throws Exception {
+    Path goldens = root().resolve("tools/hf-reference/goldens");
+    Path base = goldens.resolve("checkpoints/bert-token");
+    JsonNode token = JSON.readTree(goldens.resolve("bert-token.json").toFile());
+    int hidden = JSON.readTree(base.resolve("config.json").toFile()).get("hidden_size").intValue();
+    Path withPooler = Files.createDirectory(temporaryDirectory.resolve("with-pooler"));
+    try (MLXScope scope = new MLXScope()) {
+      MLXIO.SafetensorsResult tensors =
+          MLXIO.loadSafetensors(scope, base.resolve("model.safetensors").toString());
+      Map<String, MLXArray> withPoolerTensors = new LinkedHashMap<>(tensors.tensors());
+      withPoolerTensors.put(
+          "bert.pooler.dense.weight",
+          MLX.array(scope, new float[hidden * hidden], new int[] {hidden, hidden}));
+      withPoolerTensors.put(
+          "bert.pooler.dense.bias", MLX.array(scope, new float[hidden], new int[] {hidden}));
+      Files.copy(base.resolve("config.json"), withPooler.resolve("config.json"));
+      MLXIO.saveSafetensors(
+          withPooler.resolve("model.safetensors").toString(), withPoolerTensors, Map.of());
+      TokenClassifier baseModel = TokenClassifiers.load(scope, base);
+      TokenClassifier poolerModel = TokenClassifiers.load(scope, withPooler);
+      float[][] expected = baseModel.classify(input(token)).logits();
+      float[][] actual = poolerModel.classify(input(token)).logits();
+      for (int i = 0; i < expected.length; i++) {
+        assertArrayEquals(expected[i], actual[i]);
+      }
     }
   }
 }

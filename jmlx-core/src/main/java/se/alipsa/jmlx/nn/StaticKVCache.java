@@ -18,7 +18,10 @@ public final class StaticKVCache {
     scope.checkAccess();
   }
 
-  /** Copies evaluated [B,H,S,D] projections into the owner; may be called only once. */
+  /**
+   * Adopts already-evaluated [B,H,S,D] projections, moving them into the owner scope via {@link
+   * MLX#hoist}; may be called only once.
+   */
   public void initialize(MLXArray keys, MLXArray values) {
     scope.checkAccess();
     if (initialized()) {

@@ -62,9 +62,12 @@ final class BertModels extends Module {
     int positions = positive(config, "max_position_embeddings");
     final int types = positive(config, "type_vocab_size");
     int labels = labelCount(config);
-    if (task == Task.ENCODER) {
-      pipeline(directory, positions, hidden);
-    } else {
+    // Computed here, not in the constructor, so the pipeline files are read exactly once.
+    final Pipeline pipeline =
+        task == Task.ENCODER
+            ? pipeline(directory, positions, hidden)
+            : new Pipeline(new Pooling(Pooling.Mode.CLS, false), positions);
+    if (task != Task.ENCODER) {
       labels(config, labels);
     }
     if (task != Task.ENCODER && labels <= 0) {
@@ -94,6 +97,12 @@ final class BertModels extends Module {
       optional.add("pooler.dense.weight");
       optional.add("pooler.dense.bias");
     }
+    if (task == Task.TOKEN) {
+      // Checkpoints converted from a base model may still contain the pooler, which HF ignores
+      // for token classification; accept it and leave it unloaded (see the promotion loop below).
+      optional.add(prefix + "pooler.dense.weight");
+      optional.add(prefix + "pooler.dense.bias");
+    }
     if (task == Task.SEQUENCE) {
       linearShapes(shapes, "bert.pooler.dense", hidden, hidden);
     }
@@ -118,13 +127,19 @@ final class BertModels extends Module {
           }
         }
       }
-      if (tensors.containsKey(prefix + "pooler.dense.weight")
-          != tensors.containsKey(prefix + "pooler.dense.bias")) {
+      if (task != Task.TOKEN
+          && tensors.containsKey(prefix + "pooler.dense.weight")
+              != tensors.containsKey(prefix + "pooler.dense.bias")) {
         throw new IllegalArgumentException("BERT pooler requires both weight and bias");
       }
       Map<String, MLXArray> promoted = new LinkedHashMap<>();
       for (var entry : tensors.entrySet()) {
         if (entry.getKey().endsWith("position_ids") || entry.getKey().endsWith("token_type_ids")) {
+          continue;
+        }
+        if (task == Task.TOKEN && entry.getKey().startsWith(prefix + "pooler.")) {
+          // Ignored by token classification (HF loads it the same way); keeping it in the staging
+          // scope lets it be freed with the staging instead of being hoisted into the model.
           continue;
         }
         DType dtype = entry.getValue().dtype();
@@ -133,18 +148,17 @@ final class BertModels extends Module {
         }
         promoted.put(entry.getKey(), MLX.hoist(MLX.astype(entry.getValue(), DType.FLOAT32), scope));
       }
-      return new BertModels(scope, config, directory, task, prefix, promoted);
+      return new BertModels(scope, config, task, prefix, pipeline, promoted);
     }
   }
 
   private BertModels(
       MLXScope scope,
       JsonNode config,
-      Path directory,
       Task task,
       String prefix,
-      Map<String, MLXArray> tensors)
-      throws IOException {
+      Pipeline pipeline,
+      Map<String, MLXArray> tensors) {
     super(scope);
     this.task = task;
     vocab = positive(config, "vocab_size");
@@ -154,10 +168,6 @@ final class BertModels extends Module {
     final int layers = positive(config, "num_hidden_layers");
     final int heads = positive(config, "num_attention_heads");
     final float epsilon = (float) config.path("layer_norm_eps").asDouble(1e-12);
-    Pipeline pipeline =
-        task == Task.ENCODER
-            ? pipeline(directory, positions, hidden)
-            : new Pipeline(new Pooling(Pooling.Mode.CLS, false), positions);
     limit = pipeline.limit();
     pooling = pipeline.pooling();
     metadata = new EncoderMetadata("bert", vocab, layers);
@@ -209,7 +219,7 @@ final class BertModels extends Module {
     }
     String poolerName = prefix + "pooler.dense";
     pooler =
-        tensors.containsKey(poolerName + ".weight")
+        task != Task.TOKEN && tensors.containsKey(poolerName + ".weight")
             ? child("pooler", linear(scope, tensors, poolerName))
             : null;
     classifier =

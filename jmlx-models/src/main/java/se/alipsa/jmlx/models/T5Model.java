@@ -91,8 +91,22 @@ public final class T5Model extends Module implements TextGenerationModel {
   /** Loads supported dense T5 weights into the caller-owned scope. */
   public static T5Model load(MLXScope scope, Path directory, T5LoadOptions options)
       throws IOException {
+    // Deliberately no null checks here: config validation must fail before any native call, and
+    // constructing a scope is itself native (see EncoderContractsTest's null-scope loads). The
+    // dispatching TextGenerationModels entry points check their arguments.
+    return load(scope, directory, options, JsonFiles.read(directory.resolve("config.json")));
+  }
+
+  /**
+   * Loads supported dense T5 weights, reusing a config tree the caller has already read -- avoiding
+   * a second parse of {@code config.json} when the dispatching loader (e.g. {@link
+   * TextGenerationModels}) has already read it to select on {@code model_type} (PR #39 review,
+   * finding 7c).
+   */
+  static T5Model load(MLXScope scope, Path directory, T5LoadOptions options, JsonNode root)
+      throws IOException {
     Objects.requireNonNull(options);
-    JsonNode root = JsonFiles.read(directory.resolve("config.json"));
+    Objects.requireNonNull(root, "root");
     Config config = parse(root);
     Path generationFile = directory.resolve("generation_config.json");
     JsonNode generation = Files.exists(generationFile) ? JsonFiles.read(generationFile) : null;
@@ -472,9 +486,8 @@ public final class T5Model extends Module implements TextGenerationModel {
       throw new IllegalArgumentException("t5 does not support " + request.cachePolicy().mode());
     }
     KVCachePolicy cachePolicy = request.cachePolicy().resolve(null);
-    long required = policy.maxNewTokens() == 0 ? 0 : (long) policy.maxNewTokens();
     // A bounded FULL capacity must cover the target budget before any source encoding.
-    cachePolicy.requireCapacity(Math.min(required, Integer.MAX_VALUE), "generation");
+    cachePolicy.requireCapacity(policy.maxNewTokens(), "generation");
     HfTokenizer tokenizer = request.tokenizer();
     if (tokenizer != null && tokenizer.vocabSize() > config.vocab()) {
       throw new IllegalArgumentException(
@@ -486,11 +499,11 @@ public final class T5Model extends Module implements TextGenerationModel {
     List<Integer> generated = new ArrayList<>();
     List<Double> logProbabilities = new ArrayList<>();
     StringBuilder generatedText = tokenizer == null ? null : new StringBuilder();
-    IncrementalTokenDecoder decoder = null;
+    IncrementalTokenDecoder textDecoder = null;
     LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(new int[] {startToken});
     FinishReason reason = FinishReason.MAX_TOKENS;
     if (!request.cancellationToken().isCancelled() && policy.maxNewTokens() > 0) {
-      decoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
+      textDecoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
       try (MLXScope generation = scope().newChild();
           SamplingPipeline sampler =
               new SamplingPipeline(
@@ -540,9 +553,9 @@ public final class T5Model extends Module implements TextGenerationModel {
               logProbabilities.add(selection.logProbability());
             }
             String textDelta = null;
-            if (decoder != null) {
+            if (textDecoder != null) {
               try {
-                textDelta = decoder.append(next);
+                textDelta = textDecoder.append(next);
                 generatedText.append(textDelta);
               } catch (TokenizerException e) {
                 throw new GenerationAbortedException(
@@ -568,9 +581,9 @@ public final class T5Model extends Module implements TextGenerationModel {
     String terminalDelta = null;
     if (tokenizer != null) {
       terminalDelta = "";
-      if (decoder != null) {
+      if (textDecoder != null) {
         try {
-          terminalDelta = decoder.finish();
+          terminalDelta = textDecoder.finish();
         } catch (TokenizerException e) {
           throw new GenerationAbortedException(
               toList(prompt), generated, "output decoder finish", null, e);

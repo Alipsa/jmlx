@@ -86,19 +86,33 @@ public final class BidirectionalAttention extends Module {
         new int[] {0, 2, 1, 3});
   }
 
+  /**
+   * The largest negative finite value the scores' dtype can hold: {@code -Float.MAX_VALUE}
+   * overflows float16 (max finite 65504) and even rounds to -inf in bfloat16, where softmax would
+   * then see NaN on an all-masked row instead of the intended uniform 1/n degenerate result.
+   */
+  private static float maskFill(DType dtype) {
+    return switch (dtype) {
+      case FLOAT16 -> -65504f;
+      case BFLOAT16 -> -3.3895313892515355e38f;
+      default -> -Float.MAX_VALUE;
+    };
+  }
+
   private MLXArray attend(MLXArray q, MLXArray k, MLXArray v, MLXArray mask, MLXArray bias) {
     if (mask == null || mask.dtype() != DType.BOOL) {
       throw new IllegalArgumentException("attention requires an explicit BOOL mask");
     }
+    // Constants take the scores' dtype (float32 only for non-inexact inputs, as before) so
+    // half-precision q/k/v stay half precision through scores, softmax and output.
+    DType dtype = q.dtype().isInexact() ? q.dtype() : DType.FLOAT32;
     // Explicit composition preserves both padding and relative bias on every native path.
     MLXArray scores = MLXOps.matmul(q, MLXShape.transpose(k, new int[] {0, 1, 3, 2}));
-    scores = MLXOps.multiply(scores, MLX.full(q.scope(), new int[] {1}, scale, DType.FLOAT32));
+    scores = MLXOps.multiply(scores, MLX.full(q.scope(), new int[] {1}, scale, dtype));
     if (bias != null) {
       scores = MLXOps.add(scores, bias);
     }
-    scores =
-        MLXOps.where(
-            mask, scores, MLX.full(q.scope(), new int[] {1}, -Float.MAX_VALUE, DType.FLOAT32));
+    scores = MLXOps.where(mask, scores, MLX.full(q.scope(), new int[] {1}, maskFill(dtype), dtype));
     MLXArray attended = MLXOps.matmul(MLXOps.softmaxAxis(scores, -1, true), v);
     MLXArray merged = MLXShape.flatten(MLXShape.transpose(attended, new int[] {0, 2, 1, 3}), 2, 3);
     return output.forward(merged);

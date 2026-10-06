@@ -107,7 +107,7 @@ class BatchGenerationSchedulerTest {
   }
 
   @Test
-  void aPublicCohortGateHoldsTheFirstRequestUntilTheSecondArrives() throws Exception {
+  void publicCohortGateHoldsTheFirstRequestUntilTheSecondArrives() throws Exception {
     // The public gate overload (not the test-seam Hooks) pins the batch shape, the way the
     // release smoke needs: whatever the worker's wake-up timing, both requests share one cohort.
     try (BatchGenerationScheduler scheduler =
@@ -264,7 +264,7 @@ class BatchGenerationSchedulerTest {
   }
 
   @Test
-  void aGateRejectedQueueIsReleasedWhenTheWaitExpires() throws Exception {
+  void gateRejectedQueueIsReleasedWhenTheWaitExpires() throws Exception {
     // waiting >= 2 never passes for a single request; the wait must release it instead of holding
     // it until close().
     try (BatchGenerationScheduler scheduler =
@@ -285,7 +285,7 @@ class BatchGenerationSchedulerTest {
   }
 
   @Test
-  void aGateThatThrowsReleasesTheCohortInsteadOfFailingTheScheduler() throws Exception {
+  void gateThatThrowsReleasesTheCohortInsteadOfFailingTheScheduler() throws Exception {
     // A throwing predicate must not fail the worker or strand the queue: it is treated as
     // "release now".
     AtomicBoolean threw = new AtomicBoolean();

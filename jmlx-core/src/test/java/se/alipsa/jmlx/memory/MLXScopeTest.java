@@ -49,7 +49,7 @@ class MLXScopeTest {
   }
 
   @Test
-  void aRootScopeIsRejectedOnAVirtualThread() throws Exception {
+  void rootScopeIsRejectedOnVirtualThread() throws Exception {
     // MLX's per-stream state is bound to the OS thread (a C++ thread_local), which a virtual
     // thread migrates between; every check in MLXScope compares thread objects and would keep
     // passing, so the rejection is up front. It precedes the thread's first stream, so no native

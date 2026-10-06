@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import tools.jackson.databind.JsonNode;
 
 /** Longest-first added-token matching with stripping and word-boundary behavior. */
 final class AddedTokenMatcher {
@@ -20,9 +19,16 @@ final class AddedTokenMatcher {
   /**
    * Prepares the candidates whose {@code normalized} flag equals {@code normalized}, bucketed by
    * first code point and ordered longest-first so a lookup only scans tokens that can match there.
+   * The caller supplies the already-prepared normalizer (shared with the runtime's own normalizer
+   * so a {@code Precompiled} charsmap is parsed once, not once per matcher); a {@code null}
+   * normalizer behaves as the identity.
    */
-  AddedTokenMatcher(List<AddedToken> tokens, boolean normalized, JsonNode normalizer) {
-    var prepared = NormalizerPipeline.prepare(normalizer);
+  AddedTokenMatcher(
+      List<AddedToken> tokens,
+      boolean normalized,
+      java.util.function.UnaryOperator<AlignedText> normalizer) {
+    java.util.function.UnaryOperator<AlignedText> prepared =
+        normalizer == null ? (input -> input) : normalizer;
     for (AddedToken token : tokens) {
       if (token.normalized() != normalized) {
         continue;

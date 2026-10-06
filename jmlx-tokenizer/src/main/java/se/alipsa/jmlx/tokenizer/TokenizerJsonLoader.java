@@ -98,7 +98,18 @@ public final class TokenizerJsonLoader {
     }
     String type = componentType(node, path);
     if ("Precompiled".equals(type)) {
-      new PrecompiledNormalizer(node.path("precompiled_charsmap").asString());
+      // Only check the field is present and a string here. The charsmap itself is parsed lazily by
+      // the runtime's normalizer (built inside HfTokenizer.fromFile, the same call), so a malformed
+      // charsmap still surfaces as a "Precompiled: malformed ..." TokenizerException at load time
+      // --
+      // but we no longer parse it eagerly at validation time, letting the runtime's prepared
+      // normalizer be the single place the (potentially large) charsmap is decoded (PR #39 review,
+      // finding 7a).
+      JsonNode charsmap = node.path("precompiled_charsmap");
+      if (charsmap.isMissingNode() || charsmap.isNull() || !charsmap.isString()) {
+        throw new TokenizerException(
+            "TokenizerJsonLoader: " + path + ".precompiled_charsmap must be a string");
+      }
       return;
     }
     if ("Sequence".equals(type)) {

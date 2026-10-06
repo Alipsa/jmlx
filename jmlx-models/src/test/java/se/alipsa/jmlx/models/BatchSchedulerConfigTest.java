@@ -30,7 +30,7 @@ class BatchSchedulerConfigTest {
   }
 
   @Test
-  void aHugeButFittingPermitTotalIsAccepted() {
+  void hugeButFittingPermitTotalIsAccepted() {
     // The admission queue is bounded without pre-allocation, so this must not throw here or in
     // start(): previously an ArrayBlockingQueue of this size OOMed with "Requested array size
     // exceeds VM limit".

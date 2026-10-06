@@ -281,8 +281,6 @@ public final class DecoderAttention extends CachedAttention {
     MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
     MLXArray k =
         AttentionHeads.toHeads(keyProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
-    MLXArray v =
-        AttentionHeads.toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
     // QK normalization (Qwen3 q_norm/k_norm) sits between projection and RoPE; normalized keys
     // enter the cache, so cached rows are never re-normalized.
     if (queryNorm != null) {
@@ -302,6 +300,8 @@ public final class DecoderAttention extends CachedAttention {
       q = rope.apply(q, rotaryDims, positions, validLengths, freqs);
       k = rope.apply(k, rotaryDims, positions, validLengths, freqs);
     }
+    MLXArray v =
+        AttentionHeads.toHeads(valueProj.forward(x), batch, sequence, numKeyValueHeads, headDim);
     if (cache != null) {
       if (validLengths == null) {
         cache.append(k, v);

@@ -59,7 +59,7 @@ class JsonParserTest {
   }
 
   @Test
-  void preservesInventoryStrictMode() {
+  void preservesLegacyInventoryMode() {
     assertEquals(
         Map.of("x", List.of("value")), new JsonParser("{\"x\":[\"value\"]}", true).parse());
     for (String source : List.of("1", "1.5", "true", "null", "\"\\n\"", "\"\\u0041\"")) {

@@ -149,9 +149,10 @@ class DecoderAttentionTest {
     }
   }
 
-  private static DecoderAttention qkNormAttention(MLXScope scope, float qScale, float kScale) {
-    float[] qWeight = new float[] {qScale, qScale, qScale, qScale};
-    float[] kWeight = new float[] {kScale, kScale, kScale, kScale};
+  private static DecoderAttention qkNormAttention(
+      MLXScope scope, float queryScale, float keyScale) {
+    float[] queryWeight = new float[] {queryScale, queryScale, queryScale, queryScale};
+    float[] keyWeight = new float[] {keyScale, keyScale, keyScale, keyScale};
     return new DecoderAttention(
         scope,
         1,
@@ -165,8 +166,8 @@ class DecoderAttentionTest {
         new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
         new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
         new Linear(scope, MLX.array(scope, identity(4), new int[] {4, 4}), null),
-        new RMSNorm(scope, MLX.array(scope, qWeight, new int[] {4}), 1e-6f),
-        new RMSNorm(scope, MLX.array(scope, kWeight, new int[] {4}), 1e-6f));
+        new RMSNorm(scope, MLX.array(scope, queryWeight, new int[] {4}), 1e-6f),
+        new RMSNorm(scope, MLX.array(scope, keyWeight, new int[] {4}), 1e-6f));
   }
 
   private static float rmsRms(float[] v, float eps) {

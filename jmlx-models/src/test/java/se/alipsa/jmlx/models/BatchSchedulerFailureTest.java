@@ -154,7 +154,7 @@ class BatchSchedulerFailureTest {
   }
 
   @Test
-  void aFailureEscapingTheDecodeLoopIsLabelledCohortNotSetup() throws Exception {
+  void failureEscapingTheDecodeLoopIsLabelledCohortNotSetup() throws Exception {
     // The fault fires between steps, after setup finished: it must be attributed to stage
     // "cohort", not "cohort setup", even though it fails the cohort the same way.
     AtomicInteger faults = new AtomicInteger();

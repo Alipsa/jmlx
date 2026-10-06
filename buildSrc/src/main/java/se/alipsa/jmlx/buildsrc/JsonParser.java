@@ -9,15 +9,19 @@ import java.util.Map;
 final class JsonParser {
   private final String source;
   private int index;
-  private final boolean strict;
+  private final boolean legacyInventoryMode;
 
   JsonParser(String source) {
     this(source, false);
   }
 
-  JsonParser(String source, boolean strict) {
+  /**
+   * Creates a parser; legacy inventory mode preserves the exact (mixed, stricter-and-looser)
+   * acceptance rules of the pre-refactor inventory mapping parser, where this parser used to live.
+   */
+  JsonParser(String source, boolean legacyInventoryMode) {
     this.source = source;
-    this.strict = strict;
+    this.legacyInventoryMode = legacyInventoryMode;
   }
 
   Object parse() {
@@ -39,7 +43,7 @@ final class JsonParser {
       case '[' -> array();
       case '"' -> string();
       default -> {
-        if (strict) {
+        if (legacyInventoryMode) {
           throw error("Expected JSON object, array, or string");
         }
         yield scalar();
@@ -94,7 +98,7 @@ final class JsonParser {
           throw error("Unterminated escape");
         }
         character = source.charAt(index++);
-        if (strict && character != '"' && character != '\\' && character != '/') {
+        if (legacyInventoryMode && character != '"' && character != '\\' && character != '/') {
           throw error("Only JSON quote, slash, and backslash escapes are supported");
         }
         character =
@@ -108,14 +112,14 @@ final class JsonParser {
               case 'u' -> unicode();
               default -> throw error("Invalid escape");
             };
-      } else if (character < 0x20 && !strict) {
+      } else if (character < 0x20 && !legacyInventoryMode) {
         throw error("Unescaped control character");
       }
       result.append(character);
     }
     expect('"');
     String text = result.toString();
-    if (!strict) {
+    if (!legacyInventoryMode) {
       for (int i = 0; i < text.length(); i++) {
         char c = text.charAt(i);
         if (Character.isHighSurrogate(c)) {
@@ -203,7 +207,7 @@ final class JsonParser {
 
   private void whitespace() {
     while (index < source.length()
-        && (strict
+        && (legacyInventoryMode
             ? Character.isWhitespace(source.charAt(index))
             : " \t\r\n".indexOf(source.charAt(index)) >= 0)) {
       index++;

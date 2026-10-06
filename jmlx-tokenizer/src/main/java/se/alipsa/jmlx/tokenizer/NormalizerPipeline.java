@@ -232,7 +232,10 @@ final class NormalizerPipeline {
         AlignedText.Unit previous = input.units().get(unitAtChar[matcher.end()] - 1);
         range = new TokenOffset(previous.startByte(), previous.endByte());
       } else {
-        range = new TokenOffset(0, 0);
+        // An empty match at char 0 of a segment that does not start at byte 0 (e.g. any segment
+        // after an added token) must point at the segment's own start boundary, not absolute 0.
+        int boundary = input.units().isEmpty() ? 0 : input.units().getFirst().startByte();
+        range = new TokenOffset(boundary, boundary);
       }
       // HF's Replace treats `content` as a literal replacement string, never a `$1`/backreference
       // template -- Matcher.replaceFirst/replaceAll would otherwise throw on a literal `$` in
@@ -314,22 +317,6 @@ final class NormalizerPipeline {
     int first = unitAtChar[start];
     int last = unitAtChar[end - 1];
     output.addAll(input.units().subList(first, last + 1));
-  }
-
-  private static TokenOffset range(AlignedText input, int[] unitAtChar, int start, int end) {
-    if (input.units().isEmpty()) {
-      return TokenOffset.NONE;
-    }
-    if (start == end) {
-      int boundary =
-          start < input.text().length()
-              ? input.units().get(unitAtChar[start]).startByte()
-              : input.units().getLast().endByte();
-      return new TokenOffset(boundary, boundary);
-    }
-    AlignedText.Unit first = input.units().get(unitAtChar[start]);
-    AlignedText.Unit last = input.units().get(unitAtChar[end - 1]);
-    return new TokenOffset(first.startByte(), last.endByte());
   }
 
   private static void addMapped(

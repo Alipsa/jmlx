@@ -6,10 +6,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class SafetensorsHeadersTest {
+  @TempDir Path temporaryDirectory;
+
+  @Test
+  void malformedHeaderJsonFailsWithIoExceptionNotUncheckedJackson() throws IOException {
+    byte[] body = "{not json".getBytes(StandardCharsets.UTF_8);
+    ByteBuffer file = ByteBuffer.allocate(Long.BYTES + body.length).order(ByteOrder.LITTLE_ENDIAN);
+    file.putLong(body.length);
+    file.put(body);
+    Path corrupt = temporaryDirectory.resolve("corrupt.safetensors");
+    Files.write(corrupt, file.array());
+    IOException error =
+        assertThrows(IOException.class, () -> SafetensorsHeaders.tensorNames(List.of(corrupt)));
+    assertTrue(error.getMessage().contains("corrupt.safetensors"));
+    assertTrue(error.getCause() instanceof tools.jackson.core.JacksonException);
+  }
+
   @Test
   void readFullyAcceptsPartialChannelReads() throws IOException {
     ByteBuffer target = ByteBuffer.allocate(Long.BYTES);

@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,7 +36,12 @@ final class SafetensorsHeaders {
         }
         ByteBuffer bytes = ByteBuffer.allocate((int) count);
         readFully(channel, bytes, "truncated safetensors header in " + file);
-        JsonNode root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
+        JsonNode root;
+        try {
+          root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
+        } catch (JacksonException e) {
+          throw new IOException("invalid safetensors header JSON in " + file, e);
+        }
         if (root == null || !root.isObject()) {
           throw new IllegalArgumentException("invalid safetensors header JSON in " + file);
         }
@@ -64,7 +70,12 @@ final class SafetensorsHeaders {
         }
         ByteBuffer bytes = ByteBuffer.allocate((int) headerSize);
         readFully(channel, bytes, "truncated safetensors header");
-        JsonNode root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
+        JsonNode root;
+        try {
+          root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
+        } catch (JacksonException e) {
+          throw new IOException("invalid safetensors header JSON", e);
+        }
         for (String name : List.of("position_ids", "token_type_ids")) {
           JsonNode buffer = root.get(prefix + "embeddings." + name);
           if (buffer == null) {

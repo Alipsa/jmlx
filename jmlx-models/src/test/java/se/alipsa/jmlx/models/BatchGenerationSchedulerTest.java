@@ -22,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -453,6 +454,48 @@ class BatchGenerationSchedulerTest {
       BatchRequestHandle b = scheduler.submit(greedy(PROMPTS[1], 2), e -> {});
       assertNotNull(await(a));
       assertNotNull(await(b));
+    }
+  }
+
+  @Test
+  void nonDecoderModelWhoseMetadataIsBrokenIsRejectedWithSchedulerStartException() {
+    // TextGenerationModel is a public, unsealed interface: a custom model's metadata() may throw
+    // or return null. Either way startup must fail with the SchedulerStartException, never with
+    // the model's own exception or an NPE from building the message.
+    for (int metadataMode = 0; metadataMode <= 1; metadataMode++) {
+      final int mode = metadataMode;
+      BatchGenerationScheduler.ModelFactory factory = root -> new UnusableModel(mode);
+      SchedulerStartException error =
+          assertThrows(
+              SchedulerStartException.class,
+              () -> BatchGenerationScheduler.start(config(2, 4), factory));
+      assertTrue(
+          error.getMessage().contains("UnusableModel")
+              && error.getMessage().contains("is not supported by the batch scheduler"),
+          "mode " + metadataMode + ": " + error.getMessage());
+    }
+  }
+
+  /** A non-decoder model whose metadata() is broken in one of two ways. */
+  private static final class UnusableModel implements TextGenerationModel {
+    private final int metadataMode;
+
+    private UnusableModel(int metadataMode) {
+      this.metadataMode = metadataMode;
+    }
+
+    @Override
+    public ModelMetadata metadata() {
+      if (metadataMode == 0) {
+        throw new IllegalStateException("metadata unavailable");
+      }
+      return null;
+    }
+
+    @Override
+    public GenerationResult generate(
+        GenerationRequest request, Consumer<GenerationEvent> listener) {
+      throw new UnsupportedOperationException("no generation");
     }
   }
 }

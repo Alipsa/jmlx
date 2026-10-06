@@ -32,10 +32,14 @@ public final class StaticKVCache {
         || Arrays.stream(keys.shape()).anyMatch(d -> d <= 0)) {
       throw new IllegalArgumentException("static K/V requires equal positive [B,H,S,D] dimensions");
     }
+    // Hoist both projections before publishing either: a values hoist that throws (unrelated
+    // scope) must not leave the cache half-initialized and unable to retry.
     MLX.eval(keys, values);
-    this.keys = MLX.hoist(keys, scope);
-    this.values = MLX.hoist(values, scope);
-    MLX.eval(this.keys, this.values);
+    MLXArray k = MLX.hoist(keys, scope);
+    MLXArray v = MLX.hoist(values, scope);
+    MLX.eval(k, v);
+    this.keys = k;
+    this.values = v;
   }
 
   /** Whether projections have been initialized. */

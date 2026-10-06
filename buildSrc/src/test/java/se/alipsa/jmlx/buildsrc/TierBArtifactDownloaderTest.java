@@ -13,7 +13,10 @@ import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -67,6 +70,24 @@ class TierBArtifactDownloaderTest {
     Files.writeString(target.resolve("1_Pooling/config.json"), "changed");
     TierBArtifactDownloader.download(manifest, target, transport);
     assertEquals(2, gets.get());
+  }
+
+  @Test
+  void fullyCachedRunSendsNoNetworkRequests() throws Exception {
+    Path manifest = manifest("config.json", 10, 10, hash());
+    Path target = temporary.resolve("model");
+    List<String> calls = Collections.synchronizedList(new ArrayList<>());
+    TierBArtifactDownloader.Transport transport =
+        (path, method) -> {
+          calls.add(method);
+          return response(200, "7", CONTENT);
+        };
+    TierBArtifactDownloader.download(manifest, target, transport);
+    assertEquals(List.of("HEAD", "GET"), List.copyOf(calls));
+    calls.clear();
+    TierBArtifactDownloader.download(manifest, target, transport);
+    // A warm cache hit verifies the local SHA before any request: a Hub outage cannot fail it.
+    assertEquals(List.of(), List.copyOf(calls));
   }
 
   @Test

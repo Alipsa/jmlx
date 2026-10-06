@@ -142,6 +142,38 @@ class BertGoldenTest {
   }
 
   @Test
+  void encoderTaskLeavesUnusedPoolerWeightsUnloaded() throws Exception {
+    Path goldens = root().resolve("tools/hf-reference/goldens");
+    Path base = goldens.resolve("checkpoints/bert");
+    JsonNode data = JSON.readTree(goldens.resolve("bert.json").toFile());
+    int hidden = JSON.readTree(base.resolve("config.json").toFile()).get("hidden_size").intValue();
+    Path withPooler = Files.createDirectory(temporaryDirectory.resolve("with-pooler"));
+    try (MLXScope scope = new MLXScope()) {
+      MLXIO.SafetensorsResult tensors =
+          MLXIO.loadSafetensors(scope, base.resolve("model.safetensors").toString());
+      Map<String, MLXArray> withPoolerTensors = new LinkedHashMap<>(tensors.tensors());
+      // A base-model checkpoint carries the top-level (unprefixed) pooler; encode() never uses it.
+      withPoolerTensors.put(
+          "pooler.dense.weight",
+          MLX.array(scope, new float[hidden * hidden], new int[] {hidden, hidden}));
+      withPoolerTensors.put(
+          "pooler.dense.bias", MLX.array(scope, new float[hidden], new int[] {hidden}));
+      Files.copy(base.resolve("config.json"), withPooler.resolve("config.json"));
+      MLXIO.saveSafetensors(
+          withPooler.resolve("model.safetensors").toString(), withPoolerTensors, Map.of());
+      TextEncoderModel baseModel = TextEncoderModels.load(scope, base);
+      TextEncoderModel poolerModel = TextEncoderModels.load(scope, withPooler);
+      assertArrayEquals(
+          baseModel.encode(input(data)).embedding(), poolerModel.encode(input(data)).embedding());
+      // The pooler stays in the staging scope: it is not registered on the loaded model.
+      BertModels loaded = ((BertModels.Encoder) poolerModel).model;
+      assertEquals(
+          false,
+          loaded.parameters().keySet().stream().anyMatch(name -> name.startsWith("pooler.")));
+    }
+  }
+
+  @Test
   void tokenClassificationIgnoresPoolerWeightsFromBaseCheckpoint() throws Exception {
     Path goldens = root().resolve("tools/hf-reference/goldens");
     Path base = goldens.resolve("checkpoints/bert-token");

@@ -47,6 +47,26 @@ class EncoderAttentionTest {
   }
 
   @Test
+  void initializeStaysRetryableWhenTheSecondHoistFails() {
+    try (MLXScope model = new MLXScope()) {
+      MLXScope request = model.newChild();
+      MLXScope foreign = model.newChild();
+      StaticKVCache cache = new StaticKVCache(request);
+      MLXArray keys = MLX.array(request, new float[] {1, 1, 1, 1}, new int[] {1, 1, 2, 2});
+      MLXArray values = MLX.array(foreign, new float[] {2, 2, 2, 2}, new int[] {1, 1, 2, 2});
+      assertThrows(IllegalArgumentException.class, () -> cache.initialize(keys, values));
+      // The failed initialize must not consume the cache: nothing was published, and a retry
+      // with a valid pair succeeds (PR #39 review round 2, finding 2).
+      assertEquals(false, cache.initialized());
+      assertThrows(IllegalStateException.class, cache::keys);
+      MLXArray replaced = MLX.array(request, new float[] {3, 3, 3, 3}, new int[] {1, 1, 2, 2});
+      cache.initialize(keys, replaced);
+      assertArrayEquals(keys.toFloatArray(), cache.keys().toFloatArray());
+      assertArrayEquals(replaced.toFloatArray(), cache.values().toFloatArray());
+    }
+  }
+
+  @Test
   void paddedQueriesUseEveryValidKey() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray mask = AttentionMask.bidirectional(scope, new int[][] {{1, 1, 0}}, 3);

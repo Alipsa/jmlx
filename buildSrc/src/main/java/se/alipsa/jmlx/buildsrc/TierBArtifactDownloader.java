@@ -104,16 +104,18 @@ public final class TierBArtifactDownloader {
       Path destination = contained(realRoot, name);
       Path partial = contained(realRoot, name + ".part");
       String relative = repository + "/resolve/" + revision + "/" + name;
-      long expected;
-      try (Response response = transport.request(relative, "HEAD")) {
-        expected = length(response, fileCap, totalCap - total);
-      }
+      // Verify the local copy before touching the network: a fully cached run (e.g. CI with a
+      // warm target directory) must not depend on the Hub being reachable.
       if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) {
         long size = Files.size(destination);
         if (size <= fileCap && size <= totalCap - total && hash.equals(sha256(destination))) {
           total += size;
           continue;
         }
+      }
+      long expected;
+      try (Response response = transport.request(relative, "HEAD")) {
+        expected = length(response, fileCap, totalCap - total);
       }
       long count = 0;
       MessageDigest digest = digest();

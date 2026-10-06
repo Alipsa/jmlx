@@ -137,9 +137,10 @@ final class BertModels extends Module {
         if (entry.getKey().endsWith("position_ids") || entry.getKey().endsWith("token_type_ids")) {
           continue;
         }
-        if (task == Task.TOKEN && entry.getKey().startsWith(prefix + "pooler.")) {
-          // Ignored by token classification (HF loads it the same way); keeping it in the staging
-          // scope lets it be freed with the staging instead of being hoisted into the model.
+        if (task != Task.SEQUENCE && entry.getKey().startsWith(prefix + "pooler.")) {
+          // Only sequence classification uses the pooler: encode() has no head on it and HF
+          // ignores it for token classification. Keeping it in the staging scope lets it be freed
+          // with the staging instead of being hoisted into the model.
           continue;
         }
         DType dtype = entry.getValue().dtype();
@@ -218,10 +219,7 @@ final class BertModels extends Module {
                   false)));
     }
     String poolerName = prefix + "pooler.dense";
-    pooler =
-        task != Task.TOKEN && tensors.containsKey(poolerName + ".weight")
-            ? child("pooler", linear(scope, tensors, poolerName))
-            : null;
+    pooler = task == Task.SEQUENCE ? child("pooler", linear(scope, tensors, poolerName)) : null;
     classifier =
         task != Task.ENCODER ? child("classifier", linear(scope, tensors, "classifier")) : null;
     train(false);
@@ -600,7 +598,9 @@ final class BertModels extends Module {
   }
 
   static final class Encoder implements TextEncoderModel {
-    private final BertModels model;
+    // Package-private so the same-package tests can inspect the wrapped model's registered
+    // parameters (e.g. to prove an unused pooler was never loaded).
+    final BertModels model;
 
     Encoder(BertModels model) {
       this.model = model;

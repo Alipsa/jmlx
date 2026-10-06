@@ -29,7 +29,9 @@ dependencies {
 }
 
 tasks.withType(Test).configureEach {
+    mustRunAfter rootProject.tasks.named('generateTokenizerOracleFixtures')
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
+    inputs.files(rootProject.fileTree('tools/tokenizer-oracle/fixtures'))
 }
 
 publishing {

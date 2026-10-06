@@ -8,6 +8,7 @@
 
 import se.alipsa.jmlx.buildsrc.MlxApiHeaderCoverage
 import se.alipsa.jmlx.buildsrc.MlxApiInventory
+import se.alipsa.jmlx.buildsrc.TierBArtifactDownloader
 import se.alipsa.jmlx.buildsrc.MlxPins
 import groovy.json.JsonSlurper
 import java.security.MessageDigest
@@ -20,6 +21,21 @@ plugins {
 }
 
 def projectJavaVersion = 25
+
+// The downloader verifies its own hashes; never fingerprint/cache multi-gigabyte model outputs.
+tasks.register('downloadTierBArtifact') {
+    group = 'verification'
+    description = 'Downloads a SHA-pinned public Tier-B artifact (opt-in).'
+    doNotTrackState('downloads pinned external artifacts with their own SHA-256 verification')
+    def manifest = providers.gradleProperty('tierBManifest')
+    def target = providers.gradleProperty('tierBTarget')
+    doLast {
+        if (!manifest.isPresent() || !target.isPresent()) {
+            throw new GradleException('Provide -PtierBManifest=<manifest.json> -PtierBTarget=<model-dir>')
+        }
+        TierBArtifactDownloader.download(file(manifest.get()).toPath(), file(target.get()).toPath())
+    }
+}
 
 tasks.register('generateMlxApiInventory') {
     group = 'documentation'

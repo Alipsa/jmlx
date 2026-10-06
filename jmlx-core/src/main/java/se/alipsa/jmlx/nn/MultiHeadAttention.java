@@ -39,6 +39,19 @@ public final class MultiHeadAttention extends Module {
       MLXArray qkvBias,
       MLXArray outWeight,
       MLXArray outBias) {
+    this(
+        scope, numHeads, qkvWeight, qkvBias, outWeight, outBias, defaultScale(numHeads, outWeight));
+  }
+
+  /** Creates attention with an explicit finite positive score scale. */
+  public MultiHeadAttention(
+      MLXScope scope,
+      int numHeads,
+      MLXArray qkvWeight,
+      MLXArray qkvBias,
+      MLXArray outWeight,
+      MLXArray outBias,
+      float scale) {
     super(scope);
     if (outWeight.ndim() != 2 || outWeight.shape()[0] != outWeight.shape()[1]) {
       throw new IllegalArgumentException(
@@ -67,9 +80,19 @@ public final class MultiHeadAttention extends Module {
     }
     this.numHeads = numHeads;
     this.headDim = embedDim / numHeads;
-    this.scale = (float) (1.0 / Math.sqrt(headDim));
+    if (!Float.isFinite(scale) || scale <= 0) {
+      throw new IllegalArgumentException("attention scale must be finite and positive");
+    }
+    this.scale = scale;
     qkvProj = child("qkvProj", new Linear(scope, qkvWeight, qkvBias));
     outProj = child("outProj", new Linear(scope, outWeight, outBias));
+  }
+
+  private static float defaultScale(int heads, MLXArray output) {
+    // Let the shared constructor report invalid dimensions before calculating a scale.
+    return heads > 0 && output.ndim() == 2
+        ? (float) (1.0 / Math.sqrt((double) output.shape()[0] / heads))
+        : 1f;
   }
 
   /**

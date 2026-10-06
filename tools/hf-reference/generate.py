@@ -372,7 +372,7 @@ def update_provenance(out, tokenizer_root=None):
 
 def main():
     expected_versions = {
-        "torch": (torch.__version__, "2.6.0+cpu"),
+        "torch": (torch.__version__, ("2.6.0" if platform.system() == "Darwin" else "2.6.0+cpu")),
         "transformers": (transformers.__version__, "4.57.6"),
         "safetensors": (safetensors.__version__, "0.6.2"),
     }
@@ -382,7 +382,7 @@ def main():
     if sys.version_info[:2] != (3, 12):
         raise RuntimeError("Python 3.12 is required")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--family", choices=(*FAMILIES, "rope", "all"), required=True)
+    parser.add_argument("--family", choices=(*FAMILIES, "rope", "phase72", "all"), required=True)
     parser.add_argument("--out", type=Path, required=True, help="goldens directory")
     parser.add_argument("--chat", action="store_true", help="generate chat goldens only")
     parser.add_argument("--window-cases", action="store_true",
@@ -391,6 +391,10 @@ def main():
                         default=Path("jmlx-tokenizer/src/test/resources/families"))
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.family == "phase72":
+        from phase72 import generate
+        generate(args.out)
+        return
     if args.window_cases:
         if args.family != "mistral" or args.chat:
             parser.error("--window-cases requires --family mistral without --chat")

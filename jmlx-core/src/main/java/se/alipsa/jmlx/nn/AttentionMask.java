@@ -18,6 +18,36 @@ public final class AttentionMask {
 
   private AttentionMask() {}
 
+  /** Expands a binary key-padding mask to BOOL [B,1,T,S], including padded queries. */
+  public static MLXArray bidirectional(MLXScope scope, int[][] padding, int queryLength) {
+    Objects.requireNonNull(padding, "padding");
+    if (padding.length == 0 || padding[0] == null || padding[0].length == 0 || queryLength <= 0) {
+      throw new IllegalArgumentException("bidirectional mask requires positive dimensions");
+    }
+    int width = padding[0].length;
+    int[] flat = new int[Math.multiplyExact(padding.length, width)];
+    for (int row = 0; row < padding.length; row++) {
+      if (padding[row] == null || padding[row].length != width) {
+        throw new IllegalArgumentException("padding rows must have equal lengths");
+      }
+      int valid = 0;
+      for (int col = 0; col < width; col++) {
+        int value = padding[row][col];
+        if (value != 0 && value != 1) {
+          throw new IllegalArgumentException("padding must be binary");
+        }
+        valid += value;
+        flat[row * width + col] = value;
+      }
+      if (valid == 0) {
+        throw new IllegalArgumentException("bidirectional input has no valid key");
+      }
+    }
+    MLXArray keys =
+        MLX.astype(MLX.array(scope, flat, new int[] {padding.length, 1, 1, width}), DType.BOOL);
+    return MLXShape.broadcastTo(keys, new int[] {padding.length, 1, queryLength, width});
+  }
+
   /** Returns a BOOL {@code [queryLength, keyLength]} mask; true means attend. */
   public static MLXArray slidingWindow(MLXScope scope, int queryLength, int keyLength, int window) {
     return slidingWindow(scope, keyLength - queryLength, 0, queryLength, keyLength, window);

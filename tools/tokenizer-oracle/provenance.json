@@ -20,7 +20,13 @@
     "phase6-3-phi3.tokenizer.json": "e66be4592820e5d63d09e2f209d9b4ffe81a034d468d5589e77b2ccbe7cdb9b6",
     "phase6-3-mixtral.tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
     "phase6-3-families.input.json": "d125d241a1b37153717bd37e26c4c92b33fcc016b4a42ea298955f03e0178508",
-    "phase6-3-qwen3.tokenizer.json": "274b06a0f99baa3a58407f9c416a2e9dda7b0c0f6abd5b172c0371946a6a257a"
+    "phase6-3-qwen3.tokenizer.json": "274b06a0f99baa3a58407f9c416a2e9dda7b0c0f6abd5b172c0371946a6a257a",
+    "phase72-wordpiece.tokenizer.json": "4a04f93e37e7dc74b7d62ec37daa8b3534573002bd26a57f7f77d1a63b5a53b2",
+    "phase72-precompiled.tokenizer.json": "bf7bdea15a326b3ba67efd388ed872933d3dec3e0ece1f252f01f327b2fb40c0",
+    "phase72.input.json": "5b0e5a07bdb49c32b7aa800bb88aba88572bbecc3e49940ba77b21d9d49c4e7d",
+    "phase72-only-second.tokenizer.json": "747f700b875120b13d161029dc22519c5951f2955a87740747f422d15d32ac7b",
+    "phase72-only-first.tokenizer.json": "5a63ef061222fc20ed97be6b01124cda59c1d1291c298ad8384cf4a76ab8a72d",
+    "phase72-replace.tokenizer.json": "6fe0a2f6764508becab79319db724a4ea0446fc82f4c66d230ac109d6c9f3e57"
   },
   "networkPolicy": "Fixtures load committed local tokenizer files only; no Hub calls are permitted.",
   "platforms": [
@@ -37,5 +43,46 @@
     3,
     12
   ],
-  "tokenizers": "0.23.2"
+  "tokenizers": "0.23.2",
+  "phase72Derivation": {
+    "phase72-wordpiece.tokenizer.json": {
+      "repository": "yoshitomo-matsubara/bert-base-uncased-sst2",
+      "revision": "ce4cfd087e0c988beae0699f77a610bf7916742c",
+      "source_sha256": "9720ec9f57683b9b2abe85ef7958a4d90c1769df357d0f44516a4919f476db08",
+      "source_bytes": 466132,
+      "derived_bytes": 466133,
+      "license": "Apache-2.0",
+      "derivation": "tools/tokenizer-oracle/derive-phase72.py"
+    },
+    "phase72-precompiled.tokenizer.json": {
+      "repository": "google/flan-t5-small",
+      "revision": "0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab",
+      "source_sha256": "fe2ebbbbde2985be723e0ce18217853e4020c5e9d35bd07be2c27ab9d3ead57a",
+      "source_bytes": 2424064,
+      "derived_bytes": 1376750,
+      "license": "Apache-2.0",
+      "derivation": "tools/tokenizer-oracle/derive-phase72.py",
+      "charsmap_base64_sha256": "ce10d747170c5e102c99b841d1cdea976d54405ebc44791f9c3636741a894d8f"
+    },
+    "phase72-only-second.tokenizer.json": {
+      "repository": "yoshitomo-matsubara/bert-base-uncased-sst2",
+      "revision": "ce4cfd087e0c988beae0699f77a610bf7916742c",
+      "source_sha256": "9720ec9f57683b9b2abe85ef7958a4d90c1769df357d0f44516a4919f476db08",
+      "source_bytes": 466132,
+      "derived_bytes": 472460,
+      "license": "Apache-2.0",
+      "derivation": "tools/tokenizer-oracle/derive-phase72.py",
+      "modification": "OnlySecond / max_length=5 / Right / stride=0"
+    },
+    "phase72-only-first.tokenizer.json": {
+      "repository": "yoshitomo-matsubara/bert-base-uncased-sst2",
+      "revision": "ce4cfd087e0c988beae0699f77a610bf7916742c",
+      "source_sha256": "9720ec9f57683b9b2abe85ef7958a4d90c1769df357d0f44516a4919f476db08",
+      "source_bytes": 466132,
+      "derived_bytes": 472459,
+      "license": "Apache-2.0",
+      "derivation": "tools/tokenizer-oracle/derive-phase72.py",
+      "modification": "OnlyFirst / max_length=5 / Right / stride=0"
+    }
+  }
 }

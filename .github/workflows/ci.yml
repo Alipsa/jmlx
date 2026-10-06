@@ -153,7 +153,7 @@ jobs:
                             'KVCacheQuantizationProbeTest', 'PackedAttentionProbeTest', 'AttentionMaskTest',
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest', 'StridedViewSafetyTest',
-                            'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest'],
+                            'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest', 'EncoderAttentionTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
@@ -161,19 +161,20 @@ jobs:
                               'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest',
                               'BatchGenerationSchedulerTest', 'BatchSchedulerFailureTest',
                               'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
-                              'BatchStepEquivalenceTest'],
+                              'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
           float32_suites = ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                             'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
-                            'DecoderSlidingWindowTest']
+                            'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['WorkerStreamProbeTest'] = ['threadProbeTest']
           core_results = {name: ['test', 'float32GoldenTest'] for name in
                           ['DecoderAttentionTest', 'MultiHeadAttentionTest', 'MoeMlpTest', 'SwitchGluTest']}
           core_results['Phase71OracleTest'] = ['float32GoldenTest']
+          core_results['EncoderAttentionTest'] = ['float32GoldenTest']
           results_dirs = {'jmlx-models': model_results, 'jmlx-core': core_results}
           suites['jmlx-models'].append('WorkerStreamProbeTest')
           for module, names in suites.items():

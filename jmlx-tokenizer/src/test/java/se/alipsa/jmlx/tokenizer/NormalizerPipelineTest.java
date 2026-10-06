@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -82,7 +83,29 @@ class NormalizerPipelineTest {
             AlignedText.original("ab cd"));
     AlignedText.Unit inserted =
         replaced.units().stream().filter(u -> u.value().equals("|")).toList().get(2);
-    assertEquals(new TokenOffset(3, 3), new TokenOffset(inserted.startByte(), inserted.endByte()));
+    assertEquals(new TokenOffset(2, 3), new TokenOffset(inserted.startByte(), inserted.endByte()));
+  }
+
+  @Test
+  void emptyReplaceMatchAtSegmentStartKeepsTheSegmentBoundary() throws Exception {
+    // The "abc" segment of an original "[T]abc" where an added token owns bytes 0-3: the units
+    // carry absolute byte offsets, so an empty match at the segment's char 0 must map to the
+    // segment's start boundary, not absolute byte 0 (PR #39 review round 2, finding 1).
+    AlignedText segment =
+        new AlignedText(
+            List.of(
+                new AlignedText.Unit("a", 3, 4),
+                new AlignedText.Unit("b", 4, 5),
+                new AlignedText.Unit("c", 5, 6)));
+    AlignedText replaced =
+        NormalizerPipeline.apply(
+            json("{\"type\":\"Replace\",\"pattern\":{\"Regex\":\"^\"},\"content\":\"X\"}"),
+            segment);
+    AlignedText.Unit inserted = replaced.units().getFirst();
+    assertEquals("X", inserted.value());
+    assertEquals(3, inserted.startByte());
+    assertEquals(3, inserted.endByte());
+    assertEquals("Xabc", replaced.text());
   }
 
   @Test

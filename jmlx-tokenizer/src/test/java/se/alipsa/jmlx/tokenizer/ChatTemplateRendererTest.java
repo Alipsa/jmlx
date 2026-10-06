@@ -74,7 +74,7 @@ class ChatTemplateRendererTest {
   void qwen3TemplateInsertsEmptyThinkingBlockOnlyWhenThinkingDisabled() throws Exception {
     // The real Qwen3 template (families/qwen3 bundle): enable_thinking is inverted -- false
     // appends an empty thinking block after the assistant role-open token, true leaves the turn
-    // open-ended. Marker literals are spelled with unicode escapes in this source.
+    // open-ended.
     var config =
         new tools.jackson.databind.ObjectMapper()
             .readTree(
@@ -82,10 +82,10 @@ class ChatTemplateRendererTest {
                     .toFile());
     String template = config.path("chat_template").asString();
     List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "hello"));
-    var imStart = "\u003c|im_start|\u003e";
-    var imEnd = "\u003c|im_end|\u003e";
-    var thinkOpen = "\u003cthink\u003e";
-    var thinkClose = "\u003c/think\u003e";
+    var imStart = "<|im_start|>";
+    var imEnd = "<|im_end|>";
+    var thinkOpen = "<think>";
+    var thinkClose = "</think>";
     assertEquals(
         imStart
             + "user\nhello"

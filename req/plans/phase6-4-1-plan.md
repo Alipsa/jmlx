@@ -610,6 +610,10 @@ the same commit as this plan so no document contradicts it.
      remote `files`, and a separate local-file check there would add nothing). The test tokenizes
      the prompt with the checkpoint's own tokenizer and takes exactly N = 4096 tokens (failing if
      shorter), so the input is reproducible.
+
+     2026-10-05 migration note: Phase 7.2 replaces the Python downloader with the Java buildSrc
+     `TierBArtifactDownloader`, invoked by `downloadTierBArtifact`; pinned hashes remain unchanged.
+
    - *Test.* A new `TierBQuantizedKvTest` beside `TierBSmokeTest` in the Tier-B source set
      (`jmlx-models/src/tierB/java/se/alipsa/jmlx/models/`, run by `:jmlx-models:tierBTest`): chunked
      prefill of the 4096-token prompt, 64 teacher-forced positions, the G3 comparison with the

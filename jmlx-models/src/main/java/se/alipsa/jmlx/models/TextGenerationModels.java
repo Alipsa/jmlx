@@ -4,12 +4,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
 import se.alipsa.jmlx.memory.MLXScope;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
 
 /** Common loader for the currently supported decoder checkpoint architectures. */
 public final class TextGenerationModels {
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private TextGenerationModels() {}
 
@@ -17,7 +15,26 @@ public final class TextGenerationModels {
   public static TextGenerationModel load(MLXScope scope, Path directory) throws IOException {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(directory, "directory");
-    return loadDecoder(scope, directory, readConfig(directory));
+    JsonNode root = readConfigTree(directory);
+    if ("t5".equals(root.path("model_type").asString())) {
+      // Reuse the tree we just read to dispatch, so config.json is parsed once (PR #39 review,
+      // finding 7c).
+      return T5Model.load(scope, directory, T5LoadOptions.defaults(), root);
+    }
+    return loadDecoder(scope, directory, ArchitectureMappings.parse(root));
+  }
+
+  /** Loads T5 with an explicit source limit; other architectures reject these options. */
+  public static TextGenerationModel load(MLXScope scope, Path directory, T5LoadOptions options)
+      throws IOException {
+    Objects.requireNonNull(scope, "scope");
+    Objects.requireNonNull(directory, "directory");
+    Objects.requireNonNull(options);
+    JsonNode root = readConfigTree(directory);
+    if (!"t5".equals(root.path("model_type").asString())) {
+      throw new IllegalArgumentException("T5LoadOptions applies only to model_type=t5");
+    }
+    return T5Model.load(scope, directory, options, root);
   }
 
   static <T extends DecoderModel> T loadDecoder(
@@ -53,11 +70,14 @@ public final class TextGenerationModels {
   }
 
   private static ArchitectureDescriptor readConfig(Path directory) throws IOException {
-    Path file = directory.resolve("config.json");
-    try {
-      return ArchitectureMappings.parse(MAPPER.readTree(file.toFile()));
-    } catch (JacksonException e) {
-      throw new IOException("failed to read " + file.toAbsolutePath().normalize(), e);
-    }
+    return ArchitectureMappings.parse(readConfigTree(directory));
+  }
+
+  /**
+   * Reads {@code config.json} exactly once, wrapping Jackson 3's unchecked parse and I/O failures
+   * in the checked {@link IOException} this package's loaders contract on.
+   */
+  private static JsonNode readConfigTree(Path directory) throws IOException {
+    return JsonFiles.read(directory.resolve("config.json"));
   }
 }

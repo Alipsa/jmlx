@@ -649,14 +649,33 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private static DecoderModel acceptModel(MLXScope root, TextGenerationModel model) {
     if (!(model instanceof DecoderModel decoderModel)) {
       throw new SchedulerStartException(
-          "the model factory must return a DecoderModel, got "
-              + (model == null ? "null" : model.getClass().getName()));
+          model == null
+              ? "the model factory returned null"
+              : "model_type " + describeModel(model) + " is not supported by the batch scheduler");
     }
     if (!root.isAncestorOf(decoderModel.modelScope())) {
       throw new SchedulerStartException(
           "the model's scope is not the worker's root scope or a descendant of it");
     }
     return decoderModel;
+  }
+
+  /**
+   * Describes a non-decoder model for the rejection message without trusting its metadata: {@link
+   * TextGenerationModel} is a public, unsealed interface, so a custom model's {@code metadata()}
+   * may throw or return null; either way the worker must still fail with the intended {@link
+   * SchedulerStartException}, never with the model's own exception.
+   */
+  private static String describeModel(TextGenerationModel model) {
+    try {
+      ModelMetadata metadata = model.metadata();
+      if (metadata != null && metadata.modelType() != null) {
+        return metadata.modelType();
+      }
+    } catch (RuntimeException ignored) {
+      // A non-conforming metadata() must not replace the intended SchedulerStartException.
+    }
+    return model.getClass().getName();
   }
 
   /**

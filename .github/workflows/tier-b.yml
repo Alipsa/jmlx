@@ -18,23 +18,51 @@ jobs:
       matrix:
         include:
           - name: qwen2
+            task: generation
+            suite: TierBSmokeTest
             model_type: qwen2
             revision: 7ae557604adf67be50417f59c2c2f167def9a775
             manifest: tools/tier-b/qwen2.5-0.5b-instruct.json
           - name: llama
+            task: generation
+            suite: TierBSmokeTest
             model_type: llama
             revision: 12fd25f77366fa6b3b4b768ec3050bf629380bac
             manifest: tools/tier-b/smollm2-135m-instruct.json
           - name: mistral
+            task: generation
+            suite: TierBSmokeTest
             model_type: mistral
             revision: 6e2f90cbf312921289b3b8c29cb34cbdb6cb708e
             manifest: tools/tier-b/lite-mistral-150m-v2-instruct.json
           - name: qwen3
+            task: generation
+            suite: TierBSmokeTest
             model_type: qwen3
             revision: c1899de289a04d12100db370d81485cdf75e47ca
             manifest: tools/tier-b/qwen3-0.6b.json
+          - name: minilm
+            model_type: bert
+            task: embedding
+            suite: TierBEmbeddingTest
+            revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+            manifest: tools/tier-b/minilm-l6-v2.json
+          - name: bert-sst2
+            model_type: bert
+            task: classification
+            suite: TierBClassificationTest
+            revision: ce4cfd087e0c988beae0699f77a610bf7916742c
+            manifest: tools/tier-b/bert-base-uncased-sst2.json
+          - name: flan-t5
+            model_type: t5
+            task: seq2seq
+            suite: TierBSeq2SeqTest
+            revision: 0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab
+            manifest: tools/tier-b/flan-t5-small.json
     env:
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
+      JMLX_TIER_B_TASK: ${{ matrix.task }}
+      JMLX_TIER_B_SUITE: ${{ matrix.suite }}
       JMLX_TIER_B_MODEL_TYPE: ${{ matrix.model_type }}
       JMLX_TIER_B_MANIFEST: ${{ matrix.manifest }}
     steps:
@@ -53,7 +81,7 @@ jobs:
           path: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
           key: tier-b-${{ matrix.name }}-${{ matrix.revision }}
       - name: Download pinned public artifact with hard size cap
-        run: python3 tools/tier-b/download.py "$JMLX_TIER_B_MANIFEST" "$JMLX_TIER_B_MODEL_DIR"
+        run: ./gradlew downloadTierBArtifact -PtierBManifest="$JMLX_TIER_B_MANIFEST" -PtierBTarget="$JMLX_TIER_B_MODEL_DIR"
       - name: Bootstrap pinned native runtime
         run: ./scripts/bootstrap-native.sh
       - name: Run pinned smoke test
@@ -61,12 +89,13 @@ jobs:
       - name: Report observed output and assert test executed
         run: |
           python3 - <<'PY'
+          import os
           from pathlib import Path
           from xml.etree import ElementTree
 
-          result = Path('jmlx-models/build/test-results/tierBTest/TEST-se.alipsa.jmlx.models.TierBSmokeTest.xml')
+          result = Path('jmlx-models/build/test-results/tierBTest') / f"TEST-se.alipsa.jmlx.models.{os.environ['JMLX_TIER_B_SUITE']}.xml"
           suite = ElementTree.parse(result).getroot()
-          if int(suite.attrib['tests']) != 1 or int(suite.attrib.get('skipped', 0)) != 0:
+          if int(suite.attrib['tests']) == 0 or int(suite.attrib.get('skipped', 0)) != 0:
               raise SystemExit('Tier B smoke test did not execute')
           if int(suite.attrib.get('failures', 0)) or int(suite.attrib.get('errors', 0)):
               raise SystemExit('Tier B smoke test failed')

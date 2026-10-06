@@ -50,3 +50,7 @@ __pycache__/
 /tools/release-smoke/build/
 /tools/release-smoke/.gradle/
 /tools/release-smoke/*/build/
+
+# Opt-in real checkpoint downloads
+/.tier-b/
+/tools/hf-reference/.venv/

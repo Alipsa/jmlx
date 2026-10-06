@@ -105,3 +105,18 @@ for one that doesn't, `append()` always returns `""` and the full text is only a
 
 The pinned Python/Rust-backed oracle reads only committed local fixtures. The module targets Java 21
 bytecode; publication and dependency checks are part of `check`.
+
+## BERT pairs and SentencePiece charsmap normalization
+
+`HfTokenizer.encode(text, textPair, new PairEncodingOptions(options, strategy))` supports BERT
+pair templates with all three `PairTruncationStrategy` values: LONGEST_FIRST, ONLY_FIRST and
+ONLY_SECOND. Special tokens reserve space before truncation; padding preserves type IDs and
+special masks. Truncation failures follow the locked Rust oracle, including exact removal of an
+entire selected sequence and missing second sequences only when removal is actually required.
+
+Pair offsets are original UTF-8 byte ranges local to each input. For these BERT templates, type
+IDs plus special/padding masks recover sequence identity. Arbitrary pair templates, overflow
+encodings and a general sequence-ID accessor are outside scope. SentencePiece Precompiled
+normalizers now decode the real Darts charsmap and compose with the other normalizers. Malformed
+binary tables fail safely. The derived Flan-T5 fixtures retain the pinned real charsmap and have
+source hashes, sizes and Apache-2.0 attribution under `tools/tokenizer-oracle/fixtures/`.

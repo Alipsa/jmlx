@@ -226,3 +226,56 @@ required PR checks. You manage the artifacts:
   directory; override it with `-Djmlx.native.cache.path=<dir>` on slow or shared storage.
 - **Real-artifact tests.** The opt-in Tier-B checks that run against real downloaded models are
   listed in [`req/phase6-tier-b-artifacts.md`](../req/phase6-tier-b-artifacts.md).
+
+## BERT encoders and classifiers
+
+```java
+try (MLXScope scope = new MLXScope()) {
+  HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+  TokenizerEncoding input = tokenizer.encode(text, EncodingOptions.unbounded(true));
+  TextEncoderModel encoder = TextEncoderModels.load(scope, directory);
+  EncoderResult result = encoder.encode(input); // artifact pooling and Normalize defaults
+  float[] embedding = result.embedding();
+  // Override explicitly: encoder.encode(input, new Pooling(Pooling.Mode.MEAN, true)).
+}
+```
+
+`SequenceClassifiers.load(scope, directory)` and `TokenClassifiers.load(scope, directory)` select
+BertForSequenceClassification and BertForTokenClassification respectively; call `classify(input)`.
+Results copy every array on construction/access. Single-label scores use softmax; explicitly
+multi-label heads use sigmoid. Regression, decoder/cross-attention BERT variants, non-absolute
+positions, pruned heads and quantized checkpoints are rejected. BERT input IDs, type IDs, masks,
+column lengths and capacities are checked before native array creation.
+
+Pooling supports CLS (attended index 0), MEAN and MAX plus optional L2 normalization. Mean/max
+include attended special tokens and omit padding. Padded hidden-state rows are retained and use
+HF's key-only mask. Supported sentence-transformers modules are Transformer, one Pooling mode,
+and optional Normalize; unsafe module paths and unsupported modules fail. Without module metadata,
+CLS without normalization is the default. Unlike sentence-transformers, over-limit inputs fail
+rather than silently truncating: apply explicit tokenizer truncation first.
+
+## T5 and Flan-T5
+
+```java
+try (MLXScope scope = new MLXScope()) {
+  HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+  TextGenerationModel model = TextGenerationModels.load(scope, directory, new T5LoadOptions(512));
+  GenerationRequest request = GenerationRequest.text(tokenizer, "translate English to German: Hello",
+      PromptSpecialTokens.ADD, GenerationConfig.greedyDefaults(16, Set.of(1)), CancellationToken.NONE);
+  GenerationResult result = model.generate(request, event -> {});
+}
+```
+
+Use ADD for HF-compatible source EOS insertion. OMIT is allowed as an explicit caller deviation.
+The source limit defaults to 512; T5 has no absolute-position capacity. Source IDs are attended;
+pretokenized requests do not infer padding. Cache capacity counts target decoding positions,
+including the decoder start; the source is separately limited. The start token is absent from
+results/events. Penalties count decoder start and emitted targets, never source tokens. EOS is
+included; explicit non-EOS stop tokens are excluded. Sampling, log probabilities, cancellation
+and listeners follow the existing generation API.
+
+Only FULL cache retention is supported; both sliding modes and the batch scheduler reject T5
+explicitly. Encoder output and per-layer cross K/V are request-owned, evaluated once, and released
+at request completion/failure. Supported FFNs are ReLU and gated-GELU; tied heads rescale hidden
+states, untied Flan-T5 heads do not. Beam search, training, quantized weights and decoder prefixes
+are outside this release.

@@ -2,6 +2,7 @@ package se.alipsa.jmlx.tokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -17,14 +18,18 @@ class TokenizerOracleTest {
 
   @Test
   void componentFamiliesMatchPinnedOracle() throws Exception {
+    verifyFixture("phase6-2-components");
+    verifyFixture("phase72");
+  }
+
+  private void verifyFixture(String fixtureName) throws Exception {
     String rootProperty =
         java.util.Objects.requireNonNull(
             System.getProperty("jmlx.repository.root"),
             "jmlx.repository.root must be set by build.gradle");
     Path fixtures = Path.of(rootProperty, "tools", "tokenizer-oracle", "fixtures");
-    JsonNode input = MAPPER.readTree(fixtures.resolve("phase6-2-components.input.json").toFile());
-    JsonNode expected =
-        MAPPER.readTree(fixtures.resolve("phase6-2-components.expected.json").toFile());
+    JsonNode input = MAPPER.readTree(fixtures.resolve(fixtureName + ".input.json").toFile());
+    JsonNode expected = MAPPER.readTree(fixtures.resolve(fixtureName + ".expected.json").toFile());
     assertFalse(input.required("fixtures").isEmpty());
     assertEquals(input.required("fixtures").size(), expected.required("fixtures").size());
     for (int fixtureIndex = 0; fixtureIndex < input.required("fixtures").size(); fixtureIndex++) {
@@ -39,8 +44,21 @@ class TokenizerOracleTest {
         JsonNode testCase = fixture.required("cases").get(caseIndex);
         JsonNode expectedCase = expectedFixture.required("cases").get(caseIndex);
         String name = testCase.required("name").asString();
-        TokenizerEncoding encoding =
-            tokenizer.encode(testCase.required("text").asString(), options(testCase));
+        if (expectedCase.has("error")) {
+          assertThrows(TokenizerException.class, () -> encode(tokenizer, testCase), name);
+          continue;
+        }
+        TokenizerEncoding encoding = encode(tokenizer, testCase);
+        if (expectedCase.has("sequenceIds")) {
+          for (int i = 0; i < encoding.ids().size(); i++) {
+            JsonNode sequence = expectedCase.path("sequenceIds").get(i);
+            if (sequence.isNull()) {
+              assertEquals(TokenOffset.NONE, encoding.offsets().get(i), name);
+            } else {
+              assertEquals(sequence.intValue(), encoding.typeIds().get(i), name);
+            }
+          }
+        }
         assertEquals(ints(expectedCase.required("ids")), encoding.ids(), name);
         assertEquals(strings(expectedCase.required("tokens")), encoding.tokens(), name);
         assertEquals(ints(expectedCase.required("typeIds")), encoding.typeIds(), name);
@@ -61,25 +79,32 @@ class TokenizerOracleTest {
     }
   }
 
+  private static TokenizerEncoding encode(HfTokenizer tokenizer, JsonNode testCase) {
+    String text = testCase.required("text").asString();
+    EncodingOptions options = options(testCase);
+    if (testCase.has("textPair")) {
+      PairTruncationStrategy strategy =
+          PairTruncationStrategy.valueOf(
+              testCase
+                  .path("truncation")
+                  .path("strategy")
+                  .asString("longest_first")
+                  .toUpperCase(Locale.ROOT));
+      return tokenizer.encode(
+          text,
+          testCase.required("textPair").asString(),
+          new PairEncodingOptions(options, strategy));
+    }
+    return tokenizer.encode(text, options);
+  }
+
   private static EncodingOptions options(JsonNode testCase) {
     boolean special = testCase.required("addSpecialTokens").booleanValue();
     Truncation truncation = Truncation.disabled();
     if (testCase.has("truncation")) {
       JsonNode value = testCase.required("truncation");
-      // This port only implements HF's "longest_first" strategy with stride 0 (no pair-sequence
-      // truncation, no overflow-encoding output) -- a fixture asking for anything else would
-      // silently compare against oracle output this port cannot actually reproduce, rather than
-      // failing loudly on the untested gap (PR #24 review round 2, suggestion: stride/strategy/
-      // overflowing are read by runner.py but dropped here).
-      String strategy = value.path("strategy").asString("longest_first");
-      int stride = value.path("stride").asInt(0);
-      if (!"longest_first".equals(strategy) || stride != 0) {
-        throw new TokenizerException(
-            "TokenizerOracleTest: truncation.strategy='"
-                + strategy
-                + "', stride="
-                + stride
-                + " is unsupported by this port's Truncation");
+      if (value.path("stride").asInt(0) != 0) {
+        throw new TokenizerException("oracle fixture stride must be zero");
       }
       truncation =
           new Truncation(
@@ -115,7 +140,11 @@ class TokenizerOracleTest {
   private static List<TokenOffset> offsets(JsonNode values) {
     List<TokenOffset> result = new ArrayList<>();
     values.forEach(
-        value -> result.add(new TokenOffset(value.get(0).intValue(), value.get(1).intValue())));
+        value ->
+            result.add(
+                value.isNull()
+                    ? TokenOffset.NONE
+                    : new TokenOffset(value.get(0).intValue(), value.get(1).intValue())));
     return result;
   }
 }

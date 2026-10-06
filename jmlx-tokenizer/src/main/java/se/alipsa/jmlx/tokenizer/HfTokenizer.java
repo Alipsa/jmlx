@@ -261,7 +261,29 @@ public final class HfTokenizer {
   }
 
   /**
+   * Encodes a BERT-template pair with offsets local to each input. Type IDs 0 and 1 identify first
+   * and second input tokens; special and padding tokens have no source offset.
+   *
+   * @param text first input
+   * @param textPair second input
+   * @param options special-token, padding and pair truncation policies
+   * @return immutable encoding with input-local offsets
+   */
+  public TokenizerEncoding encode(String text, String textPair, PairEncodingOptions options) {
+    return runtime.encodePair(text, textPair, options);
+  }
+
+  /**
    * Encodes text with explicit truncation, padding, and special-token options.
+   *
+   * <p>The {@code options} truncation supplies the max length and direction. The truncation
+   * strategy is deliberately not part of the single-sequence options: it is inherited from the
+   * {@code tokenizer.json} configuration, mirroring Hugging Face tokenizers' configured-truncation
+   * semantics. A zero remaining budget (the max length leaves no room beyond the special tokens) is
+   * a successful truncation to empty under every configured strategy: only the special tokens
+   * remain. With a non-zero budget and a configured {@code OnlySecond} strategy, a single sequence
+   * that needs truncating fails with "Second sequence not provided"; otherwise the sequence is
+   * truncated alone.
    *
    * @param text input text
    * @param options explicit encoding options

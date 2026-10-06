@@ -1,0 +1,20 @@
+{
+  "versions": {
+    "torch": "2.6.0",
+    "transformers": "4.57.6",
+    "sentence_transformers": "5.1.2"
+  },
+  "host": {
+    "os": "Darwin",
+    "arch": "arm64"
+  },
+  "sources": {
+    "bert": "89e5e5098b98a206c8835c6c00b52b40d6d078a5994c40f300f98173969137c2",
+    "t5": "ee1a043f5c03c684a2bbb0213ea3b3f8be272a03ab884bdca57c31e7315e7b7e"
+  },
+  "contracts": {
+    "bert": "absolute input-index positions; embedding LN; post-LN residuals; pooler tanh at index 0; sequence head reads pooler; token head reads hidden states; key-only mask",
+    "t5": "q/k/v width heads*d_kv; float32 RMS accumulation without mean subtraction or bias; unscaled attention; pre-norm residuals; gated-gelu uses gelu_new; tied head scales hidden states by d_model**-0.5",
+    "pooling": "attended special tokens included; CLS index 0; Mean/Max exclude padding; Normalize follows Pooling; artifact maximum sequence length enforced by tokenizer truncation upstream"
+  }
+}

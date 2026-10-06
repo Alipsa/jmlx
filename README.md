@@ -99,3 +99,21 @@ decode with TF32 enabled and disabled in separate JVMs:
 For external Java/Groovy applications, choose precision at process startup; see
 [model precision guidance](jmlx-models/README.md#precision-in-java-and-groovy-applications).
 Gradle verification enforces the golden tests' precision independently of application defaults.
+
+Pinned real-artifact downloads are opt-in and use Java:
+
+```sh
+./gradlew downloadTierBArtifact \
+  -PtierBManifest=tools/tier-b/qwen3-0.6b.json -PtierBTarget=.tier-b/qwen3
+```
+
+See [Tier-B tooling](tools/tier-b/README.md) for hash/size verification and test commands.
+
+
+## BERT and T5 text tasks
+
+Phase 7.2 adds `TextEncoderModels`, `SequenceClassifiers` and `TokenClassifiers` for BERT,
+including MiniLM pooling/Normalize, and T5/Flan-T5 through `TextGenerationModels.load`.
+See [model API examples](jmlx-models/README.md) and [implementation evidence](req/phase7-2-implementation-report.md).
+Pair tokenization and SentencePiece charsmap normalization are pure Java; model execution retains
+its existing native runtime requirements. Python reference/oracle execution remains opt-in.

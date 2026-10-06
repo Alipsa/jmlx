@@ -62,3 +62,18 @@ of norms by epsilon. These compositions have no Phase 11 gradient guarantee.
 Strict CPU oracle references run against Java GPU in `float32GoldenTest`, with separate default-mode
 coverage. The reader is an internal Gradle test fixture; both fixture publication variants are
 skipped and POM/module metadata dependencies are checked by `verifyPublishedDependencies`.
+
+
+## Encoder and cross attention
+
+`AttentionMask.bidirectional(scope, paddingMask, queryLength)` expands a binary key mask to
+`[batch,1,queryLength,sourceLength]`. Padded queries retain valid-key attention; all-masked sources
+fail. `BidirectionalAttention` accepts explicit heads, headDim, scale and registered projections,
+with BOOL masks and optional additive score bias. Rectangular projections do not require RoPE.
+`EncoderBlock` selects BERT post-norm or T5 pre-norm residual ordering.
+
+`CrossAttention.initialize(encoderOutput, staticCache)` projects and evaluates source K/V once.
+`StaticKVCache` belongs to a caller-selected request scope, rejects reinitialization and enforces
+thread/lifetime guards. Validate batch/head/source/headDim before decoder use; it never appends.
+Existing MultiHeadAttention/DecoderAttention constructors retain default scale; their additive
+explicit-scale overloads remain independent of T5's no-RoPE attention implementation.

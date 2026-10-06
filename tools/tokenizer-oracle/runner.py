@@ -54,23 +54,36 @@ def run_fixture(input_path: Path, provenance: dict) -> dict:
             if "padding" in case:
                 tokenizer.enable_padding(**case["padding"])
             text = case["text"]
-            encoding = tokenizer.encode(
-                text, add_special_tokens=case["addSpecialTokens"]
-            )
-            cases.append(
-                {
-                    "attentionMask": encoding.attention_mask,
-                    "decoded": tokenizer.decode(
-                        encoding.ids, skip_special_tokens=True
-                    ),
-                    "ids": encoding.ids,
-                    "name": case["name"],
-                    "offsets": byte_offsets(text, encoding.offsets),
-                    "specialTokensMask": encoding.special_tokens_mask,
-                    "tokens": encoding.tokens,
-                    "typeIds": encoding.type_ids,
-                }
-            )
+            enhanced = case.get("sequenceIds", False) or "textPair" in case
+            try:
+                encoding = tokenizer.encode(
+                    text, case.get("textPair"), add_special_tokens=case["addSpecialTokens"]
+                )
+            except Exception as error:
+                if not case.get("expectedError"):
+                    raise
+                cases.append({"name": case["name"], "error": str(error)})
+                continue
+            if case.get("expectedError"):
+                raise RuntimeError(f"expected encoding error: {case['name']}")
+            result = {
+                "attentionMask": encoding.attention_mask,
+                "decoded": tokenizer.decode(encoding.ids, skip_special_tokens=True),
+                "ids": encoding.ids,
+                "name": case["name"],
+                "offsets": byte_offsets(text, encoding.offsets),
+                "specialTokensMask": encoding.special_tokens_mask,
+                "tokens": encoding.tokens,
+                "typeIds": encoding.type_ids,
+            }
+            if enhanced:
+                sources = [text, case.get("textPair")]
+                result["sequenceIds"] = encoding.sequence_ids
+                result["offsets"] = [
+                    None if sequence is None else byte_offsets(sources[sequence], [offset])[0]
+                    for sequence, offset in zip(encoding.sequence_ids, encoding.offsets)
+                ]
+            cases.append(result)
         fixtures.append({"cases": cases, "name": fixture["name"]})
     return {"fixtures": fixtures}
 

@@ -219,7 +219,8 @@ public final class MlxApiInventory {
       throw new IllegalArgumentException("Missing required inventory mapping file: " + mappingFile);
     }
     try {
-      Object root = new JsonParser(Files.readString(mappingFile, StandardCharsets.UTF_8)).parse();
+      Object root =
+          new JsonParser(Files.readString(mappingFile, StandardCharsets.UTF_8), true).parse();
       if (!(root instanceof Map<?, ?> rootObject) || rootObject.size() != 1) {
         throw new IllegalArgumentException(
             "Inventory mapping must be a JSON object containing only 'records'");
@@ -529,118 +530,6 @@ public final class MlxApiInventory {
         return "Inventory mapping record at index " + index + " for bindings " + shown;
       }
       return "Inventory mapping record at index " + index;
-    }
-  }
-
-  /** Small strict JSON reader; buildSrc deliberately has no runtime JSON dependency. */
-  private static final class JsonParser {
-    private final String source;
-    private int index;
-
-    JsonParser(String source) {
-      this.source = source;
-    }
-
-    Object parse() {
-      Object value = value();
-      whitespace();
-      if (index != source.length()) {
-        throw error("Unexpected trailing input");
-      }
-      return value;
-    }
-
-    private Object value() {
-      whitespace();
-      if (index == source.length()) {
-        throw error("Expected JSON value");
-      }
-      return switch (source.charAt(index)) {
-        case '{' -> object();
-        case '[' -> array();
-        case '"' -> string();
-        default -> throw error("Expected JSON object, array, or string");
-      };
-    }
-
-    private Map<String, Object> object() {
-      expect('{');
-      Map<String, Object> result = new HashMap<>();
-      whitespace();
-      if (consume('}')) {
-        return result;
-      }
-      do {
-        whitespace();
-        String key = string();
-        whitespace();
-        expect(':');
-        if (result.put(key, value()) != null) {
-          throw error("Duplicate JSON object key: " + key);
-        }
-        whitespace();
-      } while (consume(','));
-      expect('}');
-      return result;
-    }
-
-    private List<Object> array() {
-      expect('[');
-      List<Object> result = new ArrayList<>();
-      whitespace();
-      if (consume(']')) {
-        return result;
-      }
-      do {
-        result.add(value());
-        whitespace();
-      } while (consume(','));
-      expect(']');
-      return result;
-    }
-
-    private String string() {
-      expect('"');
-      StringBuilder result = new StringBuilder();
-      while (index < source.length() && source.charAt(index) != '"') {
-        char character = source.charAt(index++);
-        if (character == '\\') {
-          if (index == source.length()) {
-            throw error("Unterminated escape");
-          }
-          character = source.charAt(index++);
-          if (character != '"' && character != '\\' && character != '/') {
-            throw error("Only JSON quote, slash, and backslash escapes are supported");
-          }
-        }
-        result.append(character);
-      }
-      expect('"');
-      return result.toString();
-    }
-
-    private void whitespace() {
-      while (index < source.length() && Character.isWhitespace(source.charAt(index))) {
-        index++;
-      }
-    }
-
-    private boolean consume(char expected) {
-      if (index < source.length() && source.charAt(index) == expected) {
-        index++;
-        return true;
-      }
-      return false;
-    }
-
-    private void expect(char expected) {
-      if (!consume(expected)) {
-        throw error("Expected '" + expected + "'");
-      }
-    }
-
-    private IllegalArgumentException error(String message) {
-      return new IllegalArgumentException(message + " at character " + index);
     }
   }
 }

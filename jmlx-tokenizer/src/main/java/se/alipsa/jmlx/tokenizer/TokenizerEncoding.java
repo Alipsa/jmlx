@@ -4,13 +4,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable columns produced by single-sequence tokenization.
+ * Immutable columns produced by single-sequence or supported BERT pair tokenization.
  *
  * @param ids token IDs
  * @param typeIds sequence/type IDs
  * @param attentionMask one for attended tokens and zero for padding
  * @param specialTokensMask one for special tokens and zero otherwise
- * @param offsets original-input UTF-8 byte ranges
+ * @param offsets input-local original UTF-8 byte ranges; pair identity follows BERT type IDs/masks
  * @param tokens emitted token strings
  */
 public record TokenizerEncoding(

@@ -127,7 +127,11 @@ final class BertModels extends Module {
           }
         }
       }
-      if (task != Task.TOKEN
+      // Only sequence classification consumes the pooler, so only it may reject a half-present
+      // pair: the encoder and token tasks discard it, and a checkpoint with just one of the two
+      // tensors is loadable for them (for the sequence task both are required by the plan above,
+      // so preflight already rejects a missing one).
+      if (task == Task.SEQUENCE
           && tensors.containsKey(prefix + "pooler.dense.weight")
               != tensors.containsKey(prefix + "pooler.dense.bias")) {
         throw new IllegalArgumentException("BERT pooler requires both weight and bias");

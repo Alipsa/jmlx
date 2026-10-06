@@ -30,6 +30,12 @@ class SafetensorsHeadersTest {
         assertThrows(IOException.class, () -> SafetensorsHeaders.tensorNames(List.of(corrupt)));
     assertTrue(error.getMessage().contains("corrupt.safetensors"));
     assertTrue(error.getCause() instanceof tools.jackson.core.JacksonException);
+    // The buffer validator names the offending shard the same way.
+    IOException bufferError =
+        assertThrows(
+            IOException.class,
+            () -> SafetensorsHeaders.validateBertBuffers(List.of(corrupt), "bert.", 4));
+    assertTrue(bufferError.getMessage().contains("corrupt.safetensors"));
   }
 
   @Test

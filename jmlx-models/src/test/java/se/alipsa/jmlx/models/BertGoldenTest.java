@@ -170,6 +170,17 @@ class BertGoldenTest {
       assertEquals(
           false,
           loaded.parameters().keySet().stream().anyMatch(name -> name.startsWith("pooler.")));
+      // A half-present pooler (weight without bias) is discarded for the encoder, so it loads.
+      // The base checkpoint carries both pooler tensors, so drop the bias explicitly.
+      Map<String, MLXArray> halfPoolerTensors = new LinkedHashMap<>(tensors.tensors());
+      halfPoolerTensors.remove("pooler.dense.bias");
+      Path halfPooler = Files.createDirectory(temporaryDirectory.resolve("half-pooler"));
+      Files.copy(base.resolve("config.json"), halfPooler.resolve("config.json"));
+      MLXIO.saveSafetensors(
+          halfPooler.resolve("model.safetensors").toString(), halfPoolerTensors, Map.of());
+      assertArrayEquals(
+          baseModel.encode(input(data)).embedding(),
+          TextEncoderModels.load(scope, halfPooler).encode(input(data)).embedding());
     }
   }
 

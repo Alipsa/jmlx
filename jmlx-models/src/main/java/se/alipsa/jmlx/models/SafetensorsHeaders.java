@@ -74,7 +74,7 @@ final class SafetensorsHeaders {
         try {
           root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
         } catch (JacksonException e) {
-          throw new IOException("invalid safetensors header JSON", e);
+          throw new IOException("invalid safetensors header JSON in " + file, e);
         }
         for (String name : List.of("position_ids", "token_type_ids")) {
           JsonNode buffer = root.get(prefix + "embeddings." + name);

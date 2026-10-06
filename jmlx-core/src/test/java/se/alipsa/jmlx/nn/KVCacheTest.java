@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -257,8 +259,15 @@ class KVCacheTest {
     }
   }
 
+  /**
+   * Polls rather than sampling once: MLX can release the freed source buffer slightly after {@code
+   * eval} returns, so under full-suite load a single sample occasionally still counted the two-row
+   * source (observed: 6,553,604 bytes, settling to 3,276,800 within milliseconds). A cache that
+   * really retains the source never settles, so the bounded poll still fails it.
+   */
   @Test
-  void reorderedSubsetDoesNotRetainFullSourceBuffer() {
+  @Timeout(value = 30, unit = TimeUnit.SECONDS)
+  void reorderedSubsetDoesNotRetainFullSourceBuffer() throws InterruptedException {
     int width = 8192;
     int positions = 50;
     try (MLXScope parent = new MLXScope();
@@ -274,9 +283,21 @@ class KVCacheTest {
       }
       MLX.eval(selected.keys(), selected.values());
       long oneRowBytes = 2L * positions * width * Float.BYTES;
+      long limit = oneRowBytes + 1024 * 1024;
+      // Bounded below the @Timeout so a real retention fails with the measured numbers.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      long growth = NativeMemoryProbe.activeMemoryBytes() - baseline;
+      while (growth > limit && System.nanoTime() < deadline) {
+        Thread.sleep(10);
+        growth = NativeMemoryProbe.activeMemoryBytes() - baseline;
+      }
       assertTrue(
-          NativeMemoryProbe.activeMemoryBytes() - baseline <= oneRowBytes + 1024 * 1024,
-          "reordered cache retained the full two-row source backing allocation");
+          growth <= limit,
+          "reordered cache retained the full two-row source backing allocation (growth="
+              + growth
+              + ", limit="
+              + limit
+              + ")");
     }
   }
 

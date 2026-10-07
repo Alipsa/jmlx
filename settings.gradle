@@ -18,6 +18,7 @@ include(
     'jmlx-tokenizer',
     'jmlx-jinja',
     'jmlx-models',
+    'jmlx-vision',
     'jmlx-examples',
     'jmlx-benchmarks',
     'jmlx-native-macos-arm64')

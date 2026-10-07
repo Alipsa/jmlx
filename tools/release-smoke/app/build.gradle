@@ -4,8 +4,9 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 apply from: '../repositories.gradle'
 
-// Compile against models only; core, tokenizer and jinja arrive transitively, and ffi is runtime-only
-// (jmlx-core's `implementation` dependency). The native jar is a runtime-only opt-in.
+// Compile against models only; core, tokenizer, vision and jinja arrive transitively (vision via
+// models' `api` dependency), and ffi is runtime-only (jmlx-core's `implementation` dependency).
+// The native jar is a runtime-only opt-in.
 dependencies {
     implementation "se.alipsa:jmlx-models:${jmlxVersions['jmlx-models']}"
     runtimeOnly "se.alipsa:jmlx-native-macos-arm64:${jmlxVersions['jmlx-native-macos-arm64']}"
@@ -13,7 +14,7 @@ dependencies {
 
 application { mainClass = 'smoke.ReleaseSmoke' }
 
-// Javadoc and sources jars for all six, resolved by variant attributes.
+// Javadoc and sources jars for all seven, resolved by variant attributes.
 configurations {
     docs {
         canBeConsumed = false
@@ -104,18 +105,51 @@ tasks.register('verifyPomMatchesModuleMetadata') {
 }
 
 // Javadoc and sources jars exist for every module; every runtime jar carries a license; the native
-// jar carries the required binaries.
+// jar carries the required binaries; the three vision jars (main, sources, javadoc) each carry the
+// module NOTICE with the required Pillow provenance references and license text.
 tasks.register('verifyPublishedArtifacts') {
     def runtime = configurations.runtimeClasspath
     def javadocs = configurations.javadocJars
     def sources = configurations.sourcesJars
     doLast {
         def jmlxJars = runtime.files.findAll { it.name.startsWith('jmlx-') }
-        if (jmlxJars.size() != 6) throw new GradleException("Expected 6 jmlx jars, got ${jmlxJars*.name}")
+        if (jmlxJars.size() != 7) throw new GradleException("Expected 7 jmlx jars, got ${jmlxJars*.name}")
         def entries = { File jar -> new java.util.zip.ZipFile(jar).withCloseable { z -> z.entries().collect { it.name } } }
+        def entryText = { File jar, String entryName ->
+            new java.util.zip.ZipFile(jar).withCloseable { z ->
+                def entry = z.getEntry(entryName)
+                entry == null ? null
+                        : new String(z.getInputStream(entry).bytes, java.nio.charset.StandardCharsets.UTF_8)
+            }
+        }
         jmlxJars.each { jar ->
             def names = entries(jar)
             if (!names.contains('META-INF/LICENSE')) throw new GradleException("${jar.name}: no META-INF/LICENSE")
+        }
+        // The vision jars port Pillow's C resampling and alpha-composite code, so their NOTICE must
+        // pin both source files by SHA-256 and carry the Pillow MIT-CMU license text -- in the main
+        // jar and in the sources and javadoc jars a consumer downloads to read that provenance.
+        def requiredNotice = [
+                'src/libImaging/Resample.c',
+                '808c212d03289b9ab70fad67168da1b14ed8dd74f1607c7a7278c50cbc1ae0ab',
+                'src/libImaging/AlphaComposite.c',
+                '0063c136b8bb2be51e2fb76fac222a7ae96b438f3c09706834862d9c1ac62c93',
+                'MIT-CMU License',
+                'Secret Labs AB']
+        def visionJars = [
+                jmlxJars.find { it.name.startsWith('jmlx-vision-') },
+                javadocs.files.find { it.name.startsWith('jmlx-vision-') },
+                sources.files.find { it.name.startsWith('jmlx-vision-') }]
+        visionJars.eachWithIndex { jar, index ->
+            def kind = ['main', 'javadoc', 'sources'][index]
+            if (jar == null) throw new GradleException("jmlx-vision ${kind} jar not resolved")
+            if (!entries(jar).contains('META-INF/NOTICE')) throw new GradleException("${jar.name}: no META-INF/NOTICE")
+            def notice = entryText(jar, 'META-INF/NOTICE')
+            requiredNotice.each { required ->
+                if (!notice.contains(required)) {
+                    throw new GradleException("${jar.name}: META-INF/NOTICE missing required content: ${required}")
+                }
+            }
         }
         def nativeJar = jmlxJars.find { it.name.startsWith('jmlx-native-macos-arm64') }
         def required = ['libmlxc.dylib', 'libmlx.dylib', 'libjaccl.dylib', 'mlx.metallib', 'native-pin.properties']
@@ -126,8 +160,8 @@ tasks.register('verifyPublishedArtifacts') {
             }
         }
         if (!names.contains('META-INF/NOTICE')) throw new GradleException("${nativeJar.name}: no META-INF/NOTICE")
-        if (javadocs.files.size() != 6) throw new GradleException("javadoc jars: ${javadocs.files*.name}")
-        if (sources.files.size() != 6) throw new GradleException("sources jars: ${sources.files*.name}")
+        if (javadocs.files.size() != 7) throw new GradleException("javadoc jars: ${javadocs.files*.name}")
+        if (sources.files.size() != 7) throw new GradleException("sources jars: ${sources.files*.name}")
         println "License, native payload, ${javadocs.files.size()} javadoc and ${sources.files.size()} sources jars verified"
     }
 }

@@ -1,0 +1,110 @@
+{
+  "configOverrides": {
+    "size": 96,
+    "maxImageSize": 32
+  },
+  "cases": [
+    {
+      "name": "gradient-100x80-lanczos",
+      "image": "resize/gradient-100x80.png",
+      "resample": 1,
+      "doImageSplitting": true
+    },
+    {
+      "name": "gradient-100x80-bilinear",
+      "image": "resize/gradient-100x80.png",
+      "resample": 2,
+      "doImageSplitting": true
+    },
+    {
+      "name": "gradient-100x80-bicubic",
+      "image": "resize/gradient-100x80.png",
+      "resample": 3,
+      "doImageSplitting": true
+    },
+    {
+      "name": "gradient-80x100-lanczos",
+      "image": "resize/gradient-80x100.png",
+      "resample": 1,
+      "doImageSplitting": true
+    },
+    {
+      "name": "gradient-80x100-bilinear",
+      "image": "resize/gradient-80x100.png",
+      "resample": 2,
+      "doImageSplitting": true
+    },
+    {
+      "name": "gradient-80x100-bicubic",
+      "image": "resize/gradient-80x100.png",
+      "resample": 3,
+      "doImageSplitting": true
+    },
+    {
+      "name": "wide-200x40-lanczos",
+      "image": "resize/wide-200x40.png",
+      "resample": 1,
+      "doImageSplitting": true
+    },
+    {
+      "name": "wide-200x40-bilinear",
+      "image": "resize/wide-200x40.png",
+      "resample": 2,
+      "doImageSplitting": true
+    },
+    {
+      "name": "wide-200x40-bicubic",
+      "image": "resize/wide-200x40.png",
+      "resample": 3,
+      "doImageSplitting": true
+    },
+    {
+      "name": "square-96x96-lanczos",
+      "image": "resize/square-96x96.png",
+      "resample": 1,
+      "doImageSplitting": true
+    },
+    {
+      "name": "square-96x96-bilinear",
+      "image": "resize/square-96x96.png",
+      "resample": 2,
+      "doImageSplitting": true
+    },
+    {
+      "name": "square-96x96-bicubic",
+      "image": "resize/square-96x96.png",
+      "resample": 3,
+      "doImageSplitting": true
+    },
+    {
+      "name": "checker-120x80-lanczos",
+      "image": "resize/checker-120x80.png",
+      "resample": 1,
+      "doImageSplitting": true
+    },
+    {
+      "name": "checker-120x80-bilinear",
+      "image": "resize/checker-120x80.png",
+      "resample": 2,
+      "doImageSplitting": true
+    },
+    {
+      "name": "checker-120x80-bicubic",
+      "image": "resize/checker-120x80.png",
+      "resample": 3,
+      "doImageSplitting": true
+    },
+    {
+      "name": "gradient-100x80-nosplit-lanczos",
+      "image": "resize/gradient-100x80.png",
+      "resample": 1,
+      "doImageSplitting": false
+    },
+    {
+      "name": "square-96x96-nosplit-lanczos",
+      "image": "resize/square-96x96.png",
+      "resample": 1,
+      "doImageSplitting": false
+    }
+  ]
+}

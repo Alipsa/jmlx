@@ -40,4 +40,5 @@ ext.jmlxVersions = [
     'jmlx-ffi'               : versionOf('jmlxFfiVersion'),
     'jmlx-tokenizer'         : versionOf('jmlxTokenizerVersion'),
     'jmlx-jinja'             : versionOf('jmlxJinjaVersion'),
+    'jmlx-vision'            : versionOf('jmlxVisionVersion'),
 ]

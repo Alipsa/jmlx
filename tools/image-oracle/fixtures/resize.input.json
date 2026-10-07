@@ -1,0 +1,137 @@
+{
+  "cases": [
+    {
+      "name": "small-96x64-up-256x192-lanczos",
+      "image": "resize/small-96x64.png",
+      "width": 256,
+      "height": 192,
+      "resample": 1
+    },
+    {
+      "name": "small-96x64-up-256x192-bilinear",
+      "image": "resize/small-96x64.png",
+      "width": 256,
+      "height": 192,
+      "resample": 2
+    },
+    {
+      "name": "small-96x64-up-256x192-bicubic",
+      "image": "resize/small-96x64.png",
+      "width": 256,
+      "height": 192,
+      "resample": 3
+    },
+    {
+      "name": "odd-321x199-down-161x95-lanczos",
+      "image": "resize/odd-321x199.png",
+      "width": 161,
+      "height": 95,
+      "resample": 1
+    },
+    {
+      "name": "odd-321x199-down-161x95-bilinear",
+      "image": "resize/odd-321x199.png",
+      "width": 161,
+      "height": 95,
+      "resample": 2
+    },
+    {
+      "name": "odd-321x199-down-161x95-bicubic",
+      "image": "resize/odd-321x199.png",
+      "width": 161,
+      "height": 95,
+      "resample": 3
+    },
+    {
+      "name": "small-96x64-oddup-101x73-lanczos",
+      "image": "resize/small-96x64.png",
+      "width": 101,
+      "height": 73,
+      "resample": 1
+    },
+    {
+      "name": "small-96x64-oddup-101x73-bilinear",
+      "image": "resize/small-96x64.png",
+      "width": 101,
+      "height": 73,
+      "resample": 2
+    },
+    {
+      "name": "small-96x64-oddup-101x73-bicubic",
+      "image": "resize/small-96x64.png",
+      "width": 101,
+      "height": 73,
+      "resample": 3
+    },
+    {
+      "name": "identity-48x48-lanczos",
+      "image": "resize/identity-48x48.png",
+      "width": 48,
+      "height": 48,
+      "resample": 1
+    },
+    {
+      "name": "identity-48x48-bilinear",
+      "image": "resize/identity-48x48.png",
+      "width": 48,
+      "height": 48,
+      "resample": 2
+    },
+    {
+      "name": "identity-48x48-bicubic",
+      "image": "resize/identity-48x48.png",
+      "width": 48,
+      "height": 48,
+      "resample": 3
+    },
+    {
+      "name": "solid-64x64-to-40x60-lanczos",
+      "image": "resize/solid-64x64.png",
+      "width": 40,
+      "height": 60,
+      "resample": 1
+    },
+    {
+      "name": "impulse-64x64-up-192x192-lanczos",
+      "image": "resize/impulse-64x64.png",
+      "width": 192,
+      "height": 192,
+      "resample": 1
+    },
+    {
+      "name": "impulse-64x64-up-192x192-bilinear",
+      "image": "resize/impulse-64x64.png",
+      "width": 192,
+      "height": 192,
+      "resample": 2
+    },
+    {
+      "name": "impulse-64x64-up-192x192-bicubic",
+      "image": "resize/impulse-64x64.png",
+      "width": 192,
+      "height": 192,
+      "resample": 3
+    },
+    {
+      "name": "noisy-96x96-nonuniform-100x72-lanczos",
+      "image": "resize/noisy-96x96.png",
+      "width": 100,
+      "height": 72,
+      "resample": 1
+    },
+    {
+      "name": "noisy-96x96-nonuniform-100x72-bilinear",
+      "image": "resize/noisy-96x96.png",
+      "width": 100,
+      "height": 72,
+      "resample": 2
+    },
+    {
+      "name": "noisy-96x96-nonuniform-100x72-bicubic",
+      "image": "resize/noisy-96x96.png",
+      "width": 100,
+      "height": 72,
+      "resample": 3
+    }
+  ]
+}

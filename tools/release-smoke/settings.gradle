@@ -1,5 +1,5 @@
 // Independent of the jmlx checkout: no project(...) dependencies, no includeBuild, no buildSrc.
-// Run via run.sh, which publishes the six modules to a disposable repository first.
+// Run via run.sh, which publishes the seven modules to a disposable repository first.
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }

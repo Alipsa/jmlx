@@ -1,7 +1,8 @@
 # One workflow coordinates the non-native and native checks. The pure-Java job
-# covers jmlx-jinja/jmlx-tokenizer and their Node-oracle verification; the
-# macOS job covers the MLX-dependent modules. Keeping them separate jobs avoids
-# repeating the Jinja suite on the expensive macOS ARM64 runner.
+# covers jmlx-jinja/jmlx-tokenizer/jmlx-vision and their oracle verification
+# (Node for jinja, hash-locked Python for the tokenizer and image oracles);
+# the macOS job covers the MLX-dependent modules. Keeping them separate jobs
+# avoids repeating the pure-Java suites on the expensive macOS ARM64 runner.
 #
 # The Node-dependent tasks (see jmlx-jinja/build.gradle's nodeDependentTasks list) require the
 # exact Node version pinned in jmlx-jinja/upstream/upstream-lock.json and are not wired into
@@ -67,6 +68,9 @@ jobs:
       - name: Install hash-locked tokenizer oracle
         run: ./tools/tokenizer-oracle/install.sh
 
+      - name: Install hash-locked image oracle
+        run: ./tools/image-oracle/install.sh
+
       - name: Check shared build logic
         run: ./gradlew -p buildSrc check
 
@@ -83,11 +87,14 @@ jobs:
           ./gradlew \
             :jmlx-jinja:check \
             :jmlx-tokenizer:check \
+            :jmlx-vision:check \
             :jmlx-benchmarks:check \
             :jmlx-core:test \
             :jmlx-models:check \
             verifyTokenizerOracle \
             verifyTokenizerOracleFixtures \
+            verifyImageOracle \
+            verifyImageOracleFixtures \
             :jmlx-jinja:nodeCorpusTest \
             :jmlx-jinja:nodeOracleVersion \
             :jmlx-jinja:nodeCorpusVerify \
@@ -135,7 +142,7 @@ jobs:
       - name: Run native module checks
         run: ./gradlew --no-build-cache :jmlx-ffi:check :jmlx-core:check :jmlx-models:check :jmlx-examples:check :jmlx-native-macos-arm64:check :jmlx-ffi:assemble :jmlx-core:assemble :jmlx-models:assemble :jmlx-native-macos-arm64:assemble
 
-      # Publishes the six SNAPSHOT modules to a disposable repository and resolves them from a clean
+      # Publishes the seven SNAPSHOT modules to a disposable repository and resolves them from a clean
       # consumer (fresh GRADLE_USER_HOME, exclusive repository content, no checkout classpath, no
       # native path override). CI mode only: the release-mode and Central runs are manual.
       - name: Release smoke (CI mode)

@@ -1,0 +1,6 @@
+# Generate-only reference environment for the image oracle. Never install this in CI.
+# The versions match tools/hf-reference's reviewed lock (verifyImageOracleDependencyPins
+# fails a build if the two locks ever disagree on these three packages).
+Pillow==12.3.0
+numpy==2.5.3
+transformers==4.57.6

@@ -406,3 +406,74 @@ Verified end-to-end on the pinned checkpoint (float32, eager):
 Image-feature reuse across a batch: features are returned shaped `(num_real_images_total, 64, 576)` and scattered
 into the `<image>` positions of each sample in order; per-sample tile counts drive how many 64-blocks each sample
 consumes.
+
+## 8. WP2 Java implementation findings (JDK image decoding)
+
+Findings from implementing `jmlx-vision`'s `ImageDecoder`/resampling against the pinned Pillow 12.3.0 oracle.
+All 51 module tests are byte-exact against the committed fixtures (decode/resize/chain) with no loosened
+tolerances; the normalized-tile comparison in the chain test uses the documented `1e-6` float32 tolerance.
+
+### Raster byte layout is NOT channel order (root cause of red/blue swaps)
+
+The JDK's built-in PNG/JPEG readers store the raster byte buffer as **B,G,R** (`TYPE_3BYTE_BGR`, 3-band) and
+**A,B,G,R** (`TYPE_4BYTE_ABGR`, 4-band) — the Raster's *bands* are always in channel order R,G,B,(A), and the
+`SampleModel`'s `getBandOffsets()` carries the permutation (`[2,1,0]`, `[3,2,1,0]`). 2-band gray+alpha
+(`TYPE_CUSTOM`) has offsets `[0,1]` (band 0 = gray, band 1 = alpha). Addressing bytes by band index silently
+swaps red and blue on every pixel. The implementation therefore addresses bytes through the
+`PixelInterleavedSampleModel` (`getBandOffsets`/`getPixelStride`/`getScanlineStride`) plus
+`DataBuffer.getOffset()` (no-arg; `DataBufferByte` has no `getOffset(int)`), and probes the band→channel
+mapping **once through the decoded `ColorModel`**, never assuming it: per band, build a 1×1 synthetic raster
+with the *real* `bandOffsets`/`pixelStride` via `Raster.createInterleavedRaster(new DataBufferByte(pixelStride),
+1, 1, scanlineStride, pixelStride, bandOffsets, null)` (the 4th arg is `scanlineStride`, not a band count),
+`setSample(0,0,band,255)`, read back with `(byte[]) raster.getDataElements(0,0,null)` and `cm.getRGB(comps)` —
+the exact path `BufferedImage.getRGB(x,y)` uses.
+
+JDK API traps verified against the Java 21 sources (probe scripts kept with the work session):
+`ComponentColorModel` has no `getRedOffset`/`getGreenOffset`/`getBlueOffset`/`getAlphaOffset` getters;
+`cm.getRGB(byte[])`/`getRed(Object)` index by *component* (R,G,B,A), not raster band, so unit-vector probes
+through them test component indexing (always identity) rather than the band permutation; `getRGB(float[])`
+throws `ClassCastException` on byte-transfer models; `Raster.createInterleavedRaster` needs 7 args and a
+non-null `bandOffsets` with `pixelStride ≥ max(offset)+1`.
+
+### Sub-8-bit palettes are 4-bit by default and packed, not expanded
+
+Pillow's own default for a small palette is a **4-bit** palette PNG, so the decoder accepts palette bit depths
+1/2/4/8 (sub-8-bit is rejected only for grayscale/truecolor). The JDK reader decodes sub-8-bit palettes into a
+`MultiPixelPackedSampleModel` (several indices per byte, MSB-first) rather than expanding them. Do **not**
+decode indices from the raw buffer with the sample model's `getBitOffset(x)`/`getOffset(x,y)`: `getBitOffset(0)`
+is 0 (the low nibble) but the first sample occupies the high nibble of byte 0 (measured: `getSample(0,0)` = 0
+while `(data[0] >>> 0) & 0xF` = 1). The packed branch uses `raster.getSample(x, y, 0)` per pixel — the same
+path `getRGB` uses and correct for all packed depths. 8-bit palettes arrive interleaved (`PixelInterleavedSampleModel`).
+
+### JPEG truncation
+
+The JDK's built-in JPEG decoder is lenient about truncated scan data (it silently produces an image padded with
+wrong pixels at the declared size). Truncation is detected by walking the full marker structure in the header
+pre-scan, including the compressed scan as raw bytes (an `FF` followed by a byte that is neither `FF` (fill) nor
+`00` (lenient data) terminates it), and requiring the well-formed `EOI` marker the decoder never checks for.
+
+### Alpha compositing
+
+`tRNS`/RGBA/LA alpha is composited over white with Pillow's exact integer formula ported from the pinned
+`src/libImaging/AlphaComposite.c` (`SHIFTFORDIV255(x) = (((x >> 8) + x) >> 8)`, 32-bit integer math); the
+opaque case (`a == 255`) reduces to the identity for all 256 channel values and passes through unchanged.
+
+### Oracle error bounds (measured)
+
+- **Decode, all accepted fixtures**: byte-exact against the pinned Pillow output — maximum channel error
+  `0`, including the color and grayscale JPEG fixtures (no JPEG-vs-libjpeg-turbo drift on the committed
+  corpus; the JDK reader's own output is what the reference's non-JPEG path would also read, and the
+  JPEG fixtures confirm the channel order is RGB for 3-component frames).
+- **Resize/split/normalize chain**: uint8 pixels byte-exact at every stage; normalized float32 tiles within
+  `1e-6` (the bound covers the reference's float64-rescale→float32 parse path, e.g. the
+  `(float)(1/255)` double-parse difference ~`6e-11` relative).
+- **LANCZOS**: no measured bound needed — the port is byte-exact on the committed corpus, so the plan's
+  fallback (record a non-zero sin bound) never triggered.
+
+### Documented ordering divergences
+
+The reference resizes **and splits before** `convert_to_rgb` (its `_preprocess` order); the port decodes
+straight to RGB (composite over white, palette expansion) and resizes in RGB space. Identical for opaque
+RGB/grayscale input (all strict fixtures); divergent for semi-transparent RGBA (reference resizes alpha in
+its native space) and palette PNG (reference resizes palette indices). The decode path is byte-exact for
+both families; the byte-exact full-chain fixtures exclude them (documented in `jmlx-vision/README.md`).

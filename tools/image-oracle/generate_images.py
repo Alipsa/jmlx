@@ -168,6 +168,23 @@ def main() -> None:
             p8.info["transparency"] = trns
         save(p8, rel)
 
+    # 8-bit palette with a tRNS chunk longer than the palette (technically malformed per
+    # RFC 2083, but PIL and libpng treat it as benign: the per-entry samples past the
+    # palette are ignored, never an error). The samples are the non-simple form, so the
+    # fixture pins the truncation itself - dropping the chunk entirely, or raising, would
+    # change the decoded pixels.
+    write_png(
+        "decode/palette8-trns-overflow-8x8.png",
+        8,
+        8,
+        8,
+        3,
+        1,
+        [bytes((x + y) % 4 for x in range(8)) for y in range(8)],
+        plte=bytes([255, 0, 0, 0, 255, 0, 0, 0, 255, 128, 64, 32]),
+        trns=bytes([0, 128, 255, 0, 7]),  # 5 entries for a 4-entry palette; entry 5 ignored
+    )
+
     # Truecolor with a tRNS chunk: the reference keeps mode RGB and its RGB conversion
     # drops the transparency, so the decode must be the opaque pixels.
     save(gradient_rgb(64, 48), "decode/rgb-trns-64x48.png", transparency=(128, 200, 64))
@@ -185,8 +202,8 @@ def main() -> None:
     gray_j.putdata([(x * 4 + y * 5) % 256 for y in range(48) for x in range(64)])
     save(gray_j, "decode/jpeg-gray-64x48.jpg", quality=JPEG_QUALITY)
 
-    # JPEG with restart markers (RSTn markers inside the scan; PIL writes them without a DRI
-    # segment, and the Java header walk handles both): camera and phone encoders commonly
+    # JPEG with restart markers: PIL emits a DRI segment (FF DD, length 4) together with the
+    # RSTn markers inside the scan. Camera and phone encoders commonly
     # write restart intervals, so the pre-scan must treat RST markers as scan data, not
     # corruption.
     save(gradient_rgb(96, 64), "decode/jpeg-rst-96x64.jpg", quality=JPEG_QUALITY,
@@ -251,20 +268,6 @@ def main() -> None:
     onebit = Image.new("1", (16, 16))
     onebit.putdata([((x + y * 3) % 4 == 0) * 255 for y in range(16) for x in range(16)])
     save(onebit, "reject/png-1bit-gray.png")
-
-    # reject: palette tRNS with more entries than the palette has (malformed per RFC 2083;
-    # must surface as an IOException, never an out-of-bounds access)
-    write_png(
-        "reject/png-trns-overflow.png",
-        8,
-        8,
-        8,
-        3,
-        1,
-        [bytes((x + y) % 4 for x in range(8)) for y in range(8)],
-        plte=bytes([255, 0, 0, 0, 255, 0, 0, 0, 255, 128, 64, 32]),
-        trns=bytes([255, 255, 255, 255, 0]),  # 5 entries for a 4-entry palette
-    )
 
     # reject: CMYK/YCCK JPEGs (byte surgery on a valid RGB JPEG; the Java decoder
     # rejects from the header pre-scan before any pixel decode).

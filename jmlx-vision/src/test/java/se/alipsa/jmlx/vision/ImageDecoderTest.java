@@ -29,8 +29,6 @@ class ImageDecoderTest {
           Map.entry("reject-png-4bit-gray", "4-bit grayscale PNG is not supported (only 8-bit)"),
           Map.entry("reject-png-16bit-gray", "16-bit PNG is not supported"),
           Map.entry("reject-png-16bit-rgb", "16-bit PNG is not supported"),
-          Map.entry(
-              "reject-png-trns-overflow", "corrupt PNG: tRNS has 5 entries for a 4-entry palette"),
           Map.entry("reject-png-truncated", "corrupt PNG: truncated chunk at offset 33"),
           Map.entry(
               "reject-jpeg-cmyk-4comp", "CMYK/YCCK JPEG is not supported (four-component frame)"),
@@ -164,39 +162,58 @@ class ImageDecoderTest {
   }
 
   @Test
-  void jpegWithDriSegmentDecodesIdentically() throws Exception {
-    // A DRI (restart interval) segment is FF FF followed by a length of 4; the marker walk must
-    // consume it as a whole rather than treating it as fill bytes. Insert it directly before the
-    // SOF0 frame header: it is pixel-neutral, so the decode must be unchanged. (The oracle
-    // fixture jpeg-rst-96x64 covers RST markers inside the scan; PIL emits no DRI segment, so
-    // this one is injected by hand.)
-    byte[] bytes =
-        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
-    int sof0 = -1;
-    for (int i = 0; i + 5 < bytes.length; i++) {
-      if ((bytes[i] & 0xFF) == 0xFF
-          && (bytes[i + 1] & 0xFF) == 0xC0
-          && (bytes[i + 2] & 0xFF) == 0x00
-          && (bytes[i + 3] & 0xFF) == 0x11
-          && (bytes[i + 4] & 0xFF)
-              == 0x08) { // SOF0, baseline, length 17 (3 components), precision 8
-        sof0 = i;
+  void jpegRstFixtureCarriesRealDriAndRestartMarkers() throws Exception {
+    // DRI coverage comes from the oracle fixture jpeg-rst-96x64, whose decode is byte-compared
+    // against Pillow in decodeMatchesThePinnedOracleForEveryFixture - but only while the
+    // fixture really carries the structures under test. Guard that here: a DRI segment
+    // (FF DD with a length of 4; the marker PIL's writer emits together with the RST markers)
+    // before the SOS scan, and RST0-RST7 markers inside the scan. (No injected-segment test
+    // is possible: a DRI spliced into a scan that has no RST markers is not pixel-neutral,
+    // because the decoder resets the DC predictor at every restart interval.)
+    byte[] b = Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-rst-96x64.jpg"));
+    int dri = -1;
+    for (int i = 0; i + 5 < b.length; i++) {
+      if ((b[i] & 0xFF) == 0xFF
+          && (b[i + 1] & 0xFF) == 0xDD
+          && (b[i + 2] & 0xFF) == 0x00
+          && (b[i + 3] & 0xFF) == 0x04) { // DRI segment, length 4
+        dri = i;
         break;
       }
     }
-    assertTrue(sof0 > 0, "SOF0 frame header not found in the fixture");
-    byte[] withDri = new byte[bytes.length + 6];
-    System.arraycopy(bytes, 0, withDri, 0, sof0);
-    withDri[sof0] = (byte) 0xFF;
-    withDri[sof0 + 1] = (byte) 0xFF; // DRI marker
-    withDri[sof0 + 2] = 0x00;
-    withDri[sof0 + 3] = 0x04; // segment length (itself included)
-    withDri[sof0 + 4] = 0x00;
-    withDri[sof0 + 5] = 0x01; // restart interval: one MCU
-    System.arraycopy(bytes, sof0, withDri, sof0 + 6, bytes.length - sof0);
-    RgbImage plain = ImageDecoder.decode(new ByteArrayInputStream(bytes));
-    RgbImage withDriImage = ImageDecoder.decode(new ByteArrayInputStream(withDri));
-    assertEquals(plain, withDriImage);
+    assertTrue(dri >= 0, "DRI segment (FF DD, length 4) not found in the fixture");
+    int sos = -1;
+    for (int i = 0; i + 1 < b.length; i++) {
+      if ((b[i] & 0xFF) == 0xFF && (b[i + 1] & 0xFF) == 0xDA) {
+        sos = i;
+        break;
+      }
+    }
+    assertTrue(sos > dri, "the SOS scan must follow the DRI segment");
+    // Walk the entropy-coded scan: FF FF is fill, FF 00 a stuffed data byte, FF D0-D7 a
+    // restart marker; any other FF xx ends the walk (a real marker, e.g. the terminating EOI).
+    int pos = sos + 2;
+    int length = ((b[pos] & 0xFF) << 8) | (b[pos + 1] & 0xFF);
+    pos += 2 + length;
+    int rst = 0;
+    while (pos + 1 < b.length) {
+      if ((b[pos] & 0xFF) != 0xFF) {
+        pos++;
+        continue;
+      }
+      int m = b[pos + 1] & 0xFF;
+      if (m == 0xFF || m == 0x00) {
+        pos += 2;
+        continue;
+      }
+      if (m >= 0xD0 && m <= 0xD7) {
+        rst++;
+        pos += 2;
+        continue;
+      }
+      break;
+    }
+    assertTrue(rst > 0, "no RST markers found in the scan");
   }
 
   @Test

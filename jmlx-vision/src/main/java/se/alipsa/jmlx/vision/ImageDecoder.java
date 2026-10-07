@@ -419,11 +419,12 @@ public final class ImageDecoder {
    * Walks the complete marker structure from SOI to EOI. The JDK's built-in JPEG decoder is lenient
    * about truncated scan data (it silently produces an image padded with wrong pixels), so
    * truncation can only be detected by requiring the well-formed EOI the decoder never checks for.
-   * A {@code FF FF} pair whose length field is 4 is the optional DRI (restart interval) segment and
-   * is consumed as a whole; every other {@code FF FF} is a fill byte. The scan itself is walked as
-   * raw bytes: an {@code FF} followed by a byte that is neither another {@code FF} (fill), {@code
-   * 00} (treated leniently as data), nor one of the {@code RST0}–{@code RST7} restart markers
-   * (valid inside a scan written with a restart interval) terminates it.
+   * Every {@code FF FF} pair outside the scan is a fill byte — the optional DRI (restart interval)
+   * segment is a plain {@code FF DD} length-prefixed segment, handled by the general marker path
+   * below. The scan itself is walked as raw bytes: an {@code FF} followed by a byte that is neither
+   * another {@code FF} (fill), {@code 00} (treated leniently as data), nor one of the {@code
+   * RST0}–{@code RST7} restart markers (valid inside a scan written with a restart interval)
+   * terminates it.
    */
   private static JpegInfo parseJpegHeader(byte[] b) throws IOException {
     JpegInfo info = new JpegInfo();
@@ -432,10 +433,6 @@ public final class ImageDecoder {
     boolean eoiSeen = false;
     while (!eoiSeen) {
       while (pos + 1 < n && (b[pos] & 0xFF) == 0xFF && (b[pos + 1] & 0xFF) == 0xFF) {
-        if (pos + 5 < n && u16(b, pos + 2) == 4) {
-          pos += 6; // DRI segment: marker(2) + length(2) + restart interval(2)
-          continue;
-        }
         pos++; // fill byte
       }
       if (pos + 1 >= n) {
@@ -556,7 +553,7 @@ public final class ImageDecoder {
     final int paletteCount;
     final int[] paletteAlpha;
 
-    DecodePlan(Object header) throws IOException {
+    DecodePlan(Object header) {
       if (header instanceof PngInfo png) {
         switch (png.colorType) {
           case 0 -> expectedBands = 1;
@@ -578,24 +575,24 @@ public final class ImageDecoder {
     }
 
     // PIL semantics for palette + tRNS (PngImagePlugin.chunk_tRNS): a tRNS body of 0xFFs with
-    // exactly one 0x00 marks a single transparent palette index; otherwise each byte is the
-    // alpha of the palette entry at that index (entries past the end stay fully opaque).
-    private static int[] paletteAlpha(int count, byte[] trns) throws IOException {
+    // exactly one 0x00 marks a single transparent palette index (an index past the palette is out
+    // of range and leaves every entry opaque); otherwise each byte is the alpha of the palette
+    // entry at that index. An oversized chunk (more samples than palette entries, technically
+    // malformed per RFC 2083) is benign for PIL and libpng: the samples past the palette are
+    // ignored, never an error.
+    private static int[] paletteAlpha(int count, byte[] trns) {
       if (count == 0 || trns == null) {
         return null;
-      }
-      if (trns.length > count) {
-        // RFC 2083: the tRNS samples must not exceed the palette size; such input is corrupt
-        // and must surface as an IOException, never an out-of-bounds access.
-        throw new IOException(
-            "corrupt PNG: tRNS has " + trns.length + " entries for a " + count + "-entry palette");
       }
       int[] alpha = new int[count];
       Arrays.fill(alpha, 255);
       if (isSimpleTrns(trns)) {
-        alpha[trnsIndex(trns)] = 0;
+        int idx = trnsIndex(trns);
+        if (idx < count) {
+          alpha[idx] = 0;
+        }
       } else {
-        for (int i = 0; i < trns.length; i++) {
+        for (int i = 0; i < Math.min(trns.length, count); i++) {
           alpha[i] = trns[i] & 0xFF;
         }
       }

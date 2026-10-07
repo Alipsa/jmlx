@@ -197,12 +197,21 @@ extra alpha band, so the Java `ImageDecoder` strips the `tRNS` chunk from the by
 own writer emits the tRNS sample 16-bit even for 8-bit files; the decoder strips the whole chunk, so the
 sample layout is irrelevant to it.)
 
+**Oversized palette `tRNS` (more samples than palette entries):** technically malformed per RFC 2083, but
+PIL (`PngImagePlugin.chunk_tRNS`) and libpng treat it as benign. PIL records the transparency as-is: the
+"simple" pattern (all `0xFF` with exactly one `0x00`) becomes a single palette index — one past the palette
+leaves every entry opaque — and the per-entry form keeps the whole byte string, whose samples past the
+palette are ignored at lookup time. The Java `ImageDecoder` matches both: an out-of-range simple index and
+the extra per-entry samples are ignored, never an error. Fixture: `palette8-trns-overflow-8x8` (per-entry
+form: five samples for four entries, the fifth ignored).
+
 **JPEG restart markers:** a scan written with a restart interval contains `RST0`–`RST7` markers inside the
-entropy-coded data, and encoders such as libjpeg additionally emit an optional `DRI` segment (`FF FF` +
-length 4) before the frame. Both are well-formed JPEG (camera and phone encoders write restart intervals
-routinely) and the reference decodes them fine; the header walk must treat in-scan `RSTn` as scan data and
-consume a `DRI` segment as a whole (an `FF FF` pair whose length field is 4 is DRI, every other `FF FF` is
-a fill byte). Fixture: `jpeg-rst-96x64`.
+entropy-coded data, and the writer (PIL's `restart_marker_blocks`, libjpeg, camera and phone encoders)
+additionally emits an optional `DRI` segment (`FF DD`, length 4, restart interval) before the scan. Both are
+well-formed JPEG and the reference decodes them fine; the header walk must treat in-scan `RSTn` as scan data
+(not a scan terminator). The `DRI` segment needs no special case — it is a plain length-prefixed segment the
+general marker path skips, and every `FF FF` outside the scan is simply a fill byte. Fixture: `jpeg-rst-96x64`
+(carries both the `DRI` segment and the in-scan restart markers).
 
 ### Resize (two-stage, exact)
 
@@ -466,9 +475,9 @@ The JDK's built-in JPEG decoder is lenient about truncated scan data (it silentl
 wrong pixels at the declared size). Truncation is detected by walking the full marker structure in the header
 pre-scan, including the compressed scan as raw bytes (an `FF` followed by a byte that is neither `FF` (fill),
 `00` (lenient data), nor one of the `RST0`–`RST7` restart markers — valid inside a scan written with a restart
-interval — terminates it; outside the scan, a `FF FF` pair whose length field is 4 is an optional `DRI` segment,
-consumed as a whole rather than as fill bytes — see §3), and requiring the well-formed `EOI` marker the decoder
-never checks for.
+interval — terminates it; outside the scan, every `FF FF` pair is a fill byte — the `DRI` (restart interval)
+segment is a plain `FF DD` length-prefixed segment the general marker path skips — see §3), and requiring the
+well-formed `EOI` marker the decoder never checks for.
 
 ### Alpha compositing
 

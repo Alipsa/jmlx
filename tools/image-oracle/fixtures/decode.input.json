@@ -45,6 +45,10 @@
       "image": "decode/palette8-trns-perentry-32x32.png"
     },
     {
+      "name": "palette8-trns-overflow-8x8",
+      "image": "decode/palette8-trns-overflow-8x8.png"
+    },
+    {
       "name": "rgb-trns-64x48",
       "image": "decode/rgb-trns-64x48.png"
     },
@@ -111,11 +115,6 @@
     {
       "name": "reject-png-4bit-gray",
       "image": "reject/png-4bit-gray.png",
-      "expectedRejected": true
-    },
-    {
-      "name": "reject-png-trns-overflow",
-      "image": "reject/png-trns-overflow.png",
       "expectedRejected": true
     },
     {

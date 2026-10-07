@@ -1,7 +1,7 @@
 {
   "fixtureSources": {
     "chain.input.json": "16c2c757b95bf55535950430d8ab96cc86a0835b25755f292403d5b80d7fb791",
-    "decode.input.json": "041bd32642aa3267d8f717f1feef8e975fc436017291e41b916e1fe29808849f",
+    "decode.input.json": "efd1abfd0ea0770b9d4121d512207331ad4a8c7a59b8665cec4a04facc01bf6e",
     "decode/exif-orient6-100x60.jpg": "c2fe3e60cc504bc3a66a8237d3c1dcec918dd28f91fc6ebc340023863a615e37",
     "decode/gama-32x32.png": "d0c1c6adf768d684730cc1915269c9aa7f85dd59de3f80586eafb922fd4f9ba8",
     "decode/gray-60x40.png": "99653387ca3553dfec23df709bdf2341e5adeda1929a7539d17e25c7132a6303",
@@ -20,6 +20,7 @@
     "decode/palette-trns-short-32x32.png": "0ebe2596a325bcc75d472fa071a2ce3bb40759bb120bf88c4c43fca77091aeda",
     "decode/palette-trns-single-32x32.png": "ece0e0373ccd876094e4c950db4bb6a05e9e9a490ced46ed462e5a1883217fea",
     "decode/palette8-32x32.png": "4f38d276dea3948c70ae969c658b1baad723ead040a09889acbf9717dbc0cff6",
+    "decode/palette8-trns-overflow-8x8.png": "375dfb2e56454cf17f134ff7eae916a17b924311dec840427d818167d7aa2382",
     "decode/palette8-trns-perentry-32x32.png": "d3a115b8266b14eebfe6577ec8fd16f18e55994232ed2a1b5babcd2cd987f864",
     "decode/palette8-trns-single-32x32.png": "20a0259d60dde4db3f2d89f1169ebd350ea52829cb3c366898a3c8c41e938be4",
     "decode/rgb-64x48.png": "a27db7d9d8e45248dc8ea57c5452d1f01b075e8f384b3663c90163023ad14cfa",
@@ -34,7 +35,6 @@
     "reject/png-16bit-rgb.png": "955f4c0f01736024d831638fa169be0bf7bcf1d4122f4193bf26928148d9b89d",
     "reject/png-1bit-gray.png": "d3a03348bbabc02f89f9e266d920568d38c7a767f3677470373fcd1a4f4fa83d",
     "reject/png-4bit-gray.png": "08e0f4dea21946dbc9d7db2754ab626591dc5d8ee79f14e31f8d87be89f39e59",
-    "reject/png-trns-overflow.png": "d462fa02d915a675e89ea24b216b63e339bc2068d6f6ecd98a3b795d39143479",
     "reject/png-truncated.png": "ae221890fe83ff16c27dde98c775935ac69ad028fe7a95c30451139cea53ab59",
     "resize.input.json": "239db3b3c3a936b3494e21402c04b7edf944a06d2278e41a690125cdb8870ab6",
     "resize/checker-120x80.png": "5b8cfb3fb2ad6d70b199eeb1e5404a7ac31e9d6dd72eb61134c5deea76213472",

@@ -189,6 +189,21 @@ no `load_image`, no pre-`convert("RGB")`. Alpha/palette handling is therefore de
 determine the exact tRNS result rather than assuming white compositing. The Java `ImageDecoder` must match the
 observed processor RGB conversion **before** resize.
 
+**tRNS on truecolor/grayscale PNG (color types 0/2):** Pillow keeps the image in mode `RGB`/`L` and records
+the transparency only in `info["transparency"]`; the processor's RGB conversion drops it, so the reference
+decodes such files as **opaque** — a tRNS twin decodes byte-identical to its opaque original (fixtures
+`rgb-trns-64x48`, `gray-trns-60x40`). The JDK's built-in PNG reader would instead turn the chunk into an
+extra alpha band, so the Java `ImageDecoder` strips the `tRNS` chunk from the bytes before decoding. (PIL's
+own writer emits the tRNS sample 16-bit even for 8-bit files; the decoder strips the whole chunk, so the
+sample layout is irrelevant to it.)
+
+**JPEG restart markers:** a scan written with a restart interval contains `RST0`–`RST7` markers inside the
+entropy-coded data, and encoders such as libjpeg additionally emit an optional `DRI` segment (`FF FF` +
+length 4) before the frame. Both are well-formed JPEG (camera and phone encoders write restart intervals
+routinely) and the reference decodes them fine; the header walk must treat in-scan `RSTn` as scan data and
+consume a `DRI` segment as a whole (an `FF FF` pair whose length field is 4 is DRI, every other `FF FF` is
+a fill byte). Fixture: `jpeg-rst-96x64`.
+
 ### Resize (two-stage, exact)
 
 1. **Stage 1** — `resize(size={"longest_edge": 2048})`: `_resize_output_size_rescale_to_max_len` rescales the
@@ -449,8 +464,11 @@ path `getRGB` uses and correct for all packed depths. 8-bit palettes arrive inte
 
 The JDK's built-in JPEG decoder is lenient about truncated scan data (it silently produces an image padded with
 wrong pixels at the declared size). Truncation is detected by walking the full marker structure in the header
-pre-scan, including the compressed scan as raw bytes (an `FF` followed by a byte that is neither `FF` (fill) nor
-`00` (lenient data) terminates it), and requiring the well-formed `EOI` marker the decoder never checks for.
+pre-scan, including the compressed scan as raw bytes (an `FF` followed by a byte that is neither `FF` (fill),
+`00` (lenient data), nor one of the `RST0`–`RST7` restart markers — valid inside a scan written with a restart
+interval — terminates it; outside the scan, a `FF FF` pair whose length field is 4 is an optional `DRI` segment,
+consumed as a whole rather than as fill bytes — see §3), and requiring the well-formed `EOI` marker the decoder
+never checks for.
 
 ### Alpha compositing
 

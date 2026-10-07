@@ -30,11 +30,15 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * <p><b>Supported:</b> 8-bit RGB, grayscale, RGBA and grayscale-with-alpha PNG, 1-, 2-, 4- and
  * 8-bit palette PNG (the built-in reader expands packed palette indices to 8 bits, and Pillow's own
  * default for a small palette is 4-bit) with optional {@code tRNS}, and 8-bit RGB and grayscale
- * JPEG. Decoded samples are extracted directly from the {@link Raster}'s byte buffer without
- * per-pixel {@code ColorModel}/{@code getRGB} conversion; the expected band count is validated
- * against a byte-level pre-scan of the file header, and the band-to-channel mapping is probed once
- * through the decoded {@link ColorModel} — the built-in readers produce {@code B,G,R} and {@code
- * A,B,G,R} raster layouts, never {@code R,G,B}, so the band order is never assumed.
+ * JPEG, including scans with restart markers ({@code RST0}–{@code RST7}). A {@code tRNS} chunk on a
+ * truecolor or grayscale PNG is ignored — Pillow keeps those images in mode RGB/L and the
+ * reference's RGB conversion drops the transparency — and is stripped from the bytes before the
+ * built-in reader would turn it into an alpha band. Decoded samples are extracted directly from the
+ * {@link Raster}'s byte buffer without per-pixel {@code ColorModel}/{@code getRGB} conversion; the
+ * expected band count is validated against a byte-level pre-scan of the file header, and the
+ * band-to-channel mapping is probed once through the decoded {@link ColorModel} — the built-in
+ * readers produce {@code B,G,R} and {@code A,B,G,R} raster layouts, never {@code R,G,B}, so the
+ * band order is never assumed.
  *
  * <p><b>Rejected before conversion, with format-specific {@link IOException}s:</b> 16-bit PNG,
  * sub-8-bit and 16-bit grayscale/truecolor PNG, CMYK/YCCK JPEG (four-component frames and Adobe
@@ -156,6 +160,16 @@ public final class ImageDecoder {
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
+      if (info.trns != null && (info.colorType == 0 || info.colorType == 2)) {
+        // The reference keeps truecolor/grayscale PNGs in mode RGB/L and its RGB conversion
+        // drops the tRNS, so the chunk is ignored; the built-in reader would turn it into an
+        // alpha band instead, so strip it before decode.
+        int end = info.trnsOffset + 12 + info.trns.length;
+        bytes =
+            concat(
+                Arrays.copyOfRange(bytes, 0, info.trnsOffset),
+                Arrays.copyOfRange(bytes, end, bytes.length));
+      }
     } else if (isJpeg(bytes)) {
       JpegInfo info = parseJpegHeader(bytes);
       format = "jpeg";
@@ -263,6 +277,13 @@ public final class ImageDecoder {
     return len == out.length ? out : Arrays.copyOf(out, len);
   }
 
+  private static byte[] concat(byte[] a, byte[] b) {
+    byte[] out = new byte[a.length + b.length];
+    System.arraycopy(a, 0, out, 0, a.length);
+    System.arraycopy(b, 0, out, a.length, b.length);
+    return out;
+  }
+
   // ----------------------------------------------------------------------------- header scan
 
   private static boolean isPng(byte[] b) {
@@ -304,6 +325,7 @@ public final class ImageDecoder {
     byte[] palette; // RGB triples, paletteCount * 3 bytes
     int paletteCount;
     byte[] trns; // raw tRNS bytes, or null
+    int trnsOffset = -1; // offset of the tRNS chunk's length field, or -1 when absent
   }
 
   private static PngInfo parsePngHeader(byte[] b) throws IOException {
@@ -344,7 +366,7 @@ public final class ImageDecoder {
         // Palette PNGs may be 1-, 2-, 4- or 8-bit (Pillow's own default for a small palette is
         // 4-bit); the built-in reader expands packed indices to 8 bits, so the band count is 1
         // either way and no other depth is valid for this color type.
-        if (info.bitDepth != 1 && info.bitDepth != 2 && info.bitDepth != 4) {
+        if (info.bitDepth != 1 && info.bitDepth != 2 && info.bitDepth != 4 && info.bitDepth != 8) {
           throw new IOException(
               info.bitDepth + "-bit palette PNG is not supported (only 1-, 2-, 4- and 8-bit)");
         }
@@ -373,6 +395,7 @@ public final class ImageDecoder {
         info.paletteCount = (int) (length / 3);
       } else if (cid == 0x74524E53) { // "tRNS"
         info.trns = Arrays.copyOfRange(b, pos + 8, pos + 8 + (int) length);
+        info.trnsOffset = pos;
       } else if (cid == 0x49444154) { // "IDAT"
         haveIdat = true;
       }
@@ -396,8 +419,11 @@ public final class ImageDecoder {
    * Walks the complete marker structure from SOI to EOI. The JDK's built-in JPEG decoder is lenient
    * about truncated scan data (it silently produces an image padded with wrong pixels), so
    * truncation can only be detected by requiring the well-formed EOI the decoder never checks for.
-   * The scan itself is walked as raw bytes: an {@code FF} followed by a byte that is neither
-   * another {@code FF} (fill) nor {@code 00} (treated leniently as data) terminates it.
+   * A {@code FF FF} pair whose length field is 4 is the optional DRI (restart interval) segment and
+   * is consumed as a whole; every other {@code FF FF} is a fill byte. The scan itself is walked as
+   * raw bytes: an {@code FF} followed by a byte that is neither another {@code FF} (fill), {@code
+   * 00} (treated leniently as data), nor one of the {@code RST0}–{@code RST7} restart markers
+   * (valid inside a scan written with a restart interval) terminates it.
    */
   private static JpegInfo parseJpegHeader(byte[] b) throws IOException {
     JpegInfo info = new JpegInfo();
@@ -406,7 +432,11 @@ public final class ImageDecoder {
     boolean eoiSeen = false;
     while (!eoiSeen) {
       while (pos + 1 < n && (b[pos] & 0xFF) == 0xFF && (b[pos + 1] & 0xFF) == 0xFF) {
-        pos++; // fill bytes
+        if (pos + 5 < n && u16(b, pos + 2) == 4) {
+          pos += 6; // DRI segment: marker(2) + length(2) + restart interval(2)
+          continue;
+        }
+        pos++; // fill byte
       }
       if (pos + 1 >= n) {
         throw new IOException("corrupt JPEG: truncated marker at offset " + pos);
@@ -448,8 +478,8 @@ public final class ImageDecoder {
             throw new IOException("corrupt JPEG: truncated scan data");
           }
           int m = b[pos + 1] & 0xFF;
-          if (m == 0xFF || m == 0x00) {
-            pos += 2; // fill byte, or a lenient FF 00 in the data
+          if (m == 0xFF || m == 0x00 || (m >= 0xD0 && m <= 0xD7)) {
+            pos += 2; // fill byte, a stuffed 00, or a restart marker inside the scan
             continue;
           }
           // A real marker: leave pos on it for the outer loop to classify.
@@ -462,13 +492,13 @@ public final class ImageDecoder {
         continue;
       }
       if (marker == 0xEE
-          && length >= 16) { // APP14: "Adobe" + version(2) + flags(2) + transform(1) + YCCK(4)
+          && length >= 14) { // APP14: "Adobe" + version(2) + flags0(2) + flags1(2) + transform(1)
         if ((b[pos + 4] & 0xFF) == 0x41
             && (b[pos + 5] & 0xFF) == 0x64
             && (b[pos + 6] & 0xFF) == 0x6F
             && (b[pos + 7] & 0xFF) == 0x62
             && (b[pos + 8] & 0xFF) == 0x65) { // "Adobe"
-          info.adobeTransform = b[pos + 13] & 0xFF;
+          info.adobeTransform = b[pos + 15] & 0xFF;
         }
       } else if ((marker >= 0xC0 && marker <= 0xC3)
           || (marker >= 0xC5 && marker <= 0xC7)
@@ -526,7 +556,7 @@ public final class ImageDecoder {
     final int paletteCount;
     final int[] paletteAlpha;
 
-    DecodePlan(Object header) {
+    DecodePlan(Object header) throws IOException {
       if (header instanceof PngInfo png) {
         switch (png.colorType) {
           case 0 -> expectedBands = 1;
@@ -550,16 +580,22 @@ public final class ImageDecoder {
     // PIL semantics for palette + tRNS (PngImagePlugin.chunk_tRNS): a tRNS body of 0xFFs with
     // exactly one 0x00 marks a single transparent palette index; otherwise each byte is the
     // alpha of the palette entry at that index (entries past the end stay fully opaque).
-    private static int[] paletteAlpha(int count, byte[] trns) {
+    private static int[] paletteAlpha(int count, byte[] trns) throws IOException {
       if (count == 0 || trns == null) {
         return null;
+      }
+      if (trns.length > count) {
+        // RFC 2083: the tRNS samples must not exceed the palette size; such input is corrupt
+        // and must surface as an IOException, never an out-of-bounds access.
+        throw new IOException(
+            "corrupt PNG: tRNS has " + trns.length + " entries for a " + count + "-entry palette");
       }
       int[] alpha = new int[count];
       Arrays.fill(alpha, 255);
       if (isSimpleTrns(trns)) {
         alpha[trnsIndex(trns)] = 0;
       } else {
-        for (int i = 0; i < trns.length && i < count; i++) {
+        for (int i = 0; i < trns.length; i++) {
           alpha[i] = trns[i] & 0xFF;
         }
       }

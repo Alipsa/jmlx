@@ -33,6 +33,26 @@
       "image": "decode/palette-trns-short-32x32.png"
     },
     {
+      "name": "palette8-32x32",
+      "image": "decode/palette8-32x32.png"
+    },
+    {
+      "name": "palette8-trns-single-32x32",
+      "image": "decode/palette8-trns-single-32x32.png"
+    },
+    {
+      "name": "palette8-trns-perentry-32x32",
+      "image": "decode/palette8-trns-perentry-32x32.png"
+    },
+    {
+      "name": "rgb-trns-64x48",
+      "image": "decode/rgb-trns-64x48.png"
+    },
+    {
+      "name": "gray-trns-60x40",
+      "image": "decode/gray-trns-60x40.png"
+    },
+    {
       "name": "gama-32x32",
       "image": "decode/gama-32x32.png"
     },
@@ -51,6 +71,10 @@
     {
       "name": "jpeg-gray-64x48",
       "image": "decode/jpeg-gray-64x48.jpg"
+    },
+    {
+      "name": "jpeg-rst-96x64",
+      "image": "decode/jpeg-rst-96x64.jpg"
     },
     {
       "name": "exif-orient6-100x60",
@@ -80,13 +104,18 @@
       "expectedRejected": true
     },
     {
-      "name": "reject-png-1bit-palette",
-      "image": "reject/png-1bit-palette.png",
+      "name": "reject-png-1bit-gray",
+      "image": "reject/png-1bit-gray.png",
       "expectedRejected": true
     },
     {
       "name": "reject-png-4bit-gray",
       "image": "reject/png-4bit-gray.png",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-png-trns-overflow",
+      "image": "reject/png-trns-overflow.png",
       "expectedRejected": true
     },
     {

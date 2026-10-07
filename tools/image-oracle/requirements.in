@@ -1,4 +1,5 @@
-# Generate-only reference environment for the image oracle. Never install this in CI.
+# Hash-locked reference environment for the image oracle. Install it explicitly with
+# install.sh (the Ubuntu CI job does); Gradle never installs or imports it.
 # The versions match tools/hf-reference's reviewed lock (verifyImageOracleDependencyPins
 # fails a build if the two locks ever disagree on these three packages).
 Pillow==12.3.0

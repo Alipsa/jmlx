@@ -25,10 +25,12 @@ class ImageDecoderTest {
               "reject-bmp-32x32",
               "unsupported image input: expected a PNG or JPEG file, "
                   + "found input starting with 0x42 0x4d 0x36 0x0c"),
-          Map.entry("reject-png-1bit-palette", "1-bit grayscale PNG is not supported (only 8-bit)"),
+          Map.entry("reject-png-1bit-gray", "1-bit grayscale PNG is not supported (only 8-bit)"),
           Map.entry("reject-png-4bit-gray", "4-bit grayscale PNG is not supported (only 8-bit)"),
           Map.entry("reject-png-16bit-gray", "16-bit PNG is not supported"),
           Map.entry("reject-png-16bit-rgb", "16-bit PNG is not supported"),
+          Map.entry(
+              "reject-png-trns-overflow", "corrupt PNG: tRNS has 5 entries for a 4-entry palette"),
           Map.entry("reject-png-truncated", "corrupt PNG: truncated chunk at offset 33"),
           Map.entry(
               "reject-jpeg-cmyk-4comp", "CMYK/YCCK JPEG is not supported (four-component frame)"),
@@ -144,6 +146,57 @@ class ImageDecoderTest {
         ImageDecoder.decode(OracleFixtures.fixtures().resolve("decode/exif-orient6-100x60.jpg"));
     assertEquals(100, exif.width());
     assertEquals(60, exif.height());
+  }
+
+  @Test
+  void tRnsOnTruecolorAndGrayscaleDecodesAsOpaque() throws Exception {
+    // A tRNS chunk on truecolor/grayscale is ignored (the reference keeps mode RGB/L and its
+    // RGB conversion drops the transparency): each twin decodes byte-identical to its opaque
+    // counterpart.
+    RgbImage rgb = ImageDecoder.decode(OracleFixtures.fixtures().resolve("decode/rgb-64x48.png"));
+    RgbImage rgbTrns =
+        ImageDecoder.decode(OracleFixtures.fixtures().resolve("decode/rgb-trns-64x48.png"));
+    assertEquals(rgb, rgbTrns);
+    RgbImage gray = ImageDecoder.decode(OracleFixtures.fixtures().resolve("decode/gray-60x40.png"));
+    RgbImage grayTrns =
+        ImageDecoder.decode(OracleFixtures.fixtures().resolve("decode/gray-trns-60x40.png"));
+    assertEquals(gray, grayTrns);
+  }
+
+  @Test
+  void jpegWithDriSegmentDecodesIdentically() throws Exception {
+    // A DRI (restart interval) segment is FF FF followed by a length of 4; the marker walk must
+    // consume it as a whole rather than treating it as fill bytes. Insert it directly before the
+    // SOF0 frame header: it is pixel-neutral, so the decode must be unchanged. (The oracle
+    // fixture jpeg-rst-96x64 covers RST markers inside the scan; PIL emits no DRI segment, so
+    // this one is injected by hand.)
+    byte[] bytes =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    int sof0 = -1;
+    for (int i = 0; i + 5 < bytes.length; i++) {
+      if ((bytes[i] & 0xFF) == 0xFF
+          && (bytes[i + 1] & 0xFF) == 0xC0
+          && (bytes[i + 2] & 0xFF) == 0x00
+          && (bytes[i + 3] & 0xFF) == 0x11
+          && (bytes[i + 4] & 0xFF)
+              == 0x08) { // SOF0, baseline, length 17 (3 components), precision 8
+        sof0 = i;
+        break;
+      }
+    }
+    assertTrue(sof0 > 0, "SOF0 frame header not found in the fixture");
+    byte[] withDri = new byte[bytes.length + 6];
+    System.arraycopy(bytes, 0, withDri, 0, sof0);
+    withDri[sof0] = (byte) 0xFF;
+    withDri[sof0 + 1] = (byte) 0xFF; // DRI marker
+    withDri[sof0 + 2] = 0x00;
+    withDri[sof0 + 3] = 0x04; // segment length (itself included)
+    withDri[sof0 + 4] = 0x00;
+    withDri[sof0 + 5] = 0x01; // restart interval: one MCU
+    System.arraycopy(bytes, sof0, withDri, sof0 + 6, bytes.length - sof0);
+    RgbImage plain = ImageDecoder.decode(new ByteArrayInputStream(bytes));
+    RgbImage withDriImage = ImageDecoder.decode(new ByteArrayInputStream(withDri));
+    assertEquals(plain, withDriImage);
   }
 
   @Test

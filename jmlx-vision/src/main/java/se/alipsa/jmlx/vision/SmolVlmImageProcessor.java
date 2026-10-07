@@ -58,7 +58,7 @@ public final class SmolVlmImageProcessor {
     }
     ChainIntermediates chain = intermediates(image);
 
-    float scale = config.doRescale() ? (float) config.rescaleFactor() : 1.0f;
+    double scale = config.doRescale() ? config.rescaleFactor() : 1.0;
     float[] mean = config.doNormalize() ? config.imageMean() : new float[] {0.0f, 0.0f, 0.0f};
     float[] std = config.doNormalize() ? config.imageStd() : new float[] {1.0f, 1.0f, 1.0f};
 
@@ -245,8 +245,11 @@ public final class SmolVlmImageProcessor {
     int w = x1 - x0;
     int h = y1 - y0;
     byte[] out = new byte[w * h * 3];
+    // One defensive copy of the source for the whole crop: pixels() clones, so calling it
+    // per row would re-copy the full image on every row.
+    byte[] src = in.pixels();
     for (int y = 0; y < h; y++) {
-      System.arraycopy(in.pixels(), (y0 + y) * in.width() * 3 + x0 * 3, out, y * w * 3, w * 3);
+      System.arraycopy(src, (y0 + y) * in.width() * 3 + x0 * 3, out, y * w * 3, w * 3);
     }
     return new RgbImage(w, h, out);
   }

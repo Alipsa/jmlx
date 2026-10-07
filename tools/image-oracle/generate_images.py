@@ -90,14 +90,20 @@ def png_chunk(kind: bytes, data: bytes) -> bytes:
 
 
 def write_png(rel: str, width: int, height: int, bit_depth: int, color_type: int,
-              samples_per_pixel: int, row_bytes: list[bytes]) -> None:
-    """Minimal valid PNG writer for the bit depths PIL cannot emit (4-bit gray,
-    16-bit truecolor). Filter type 0 on every row."""
+              samples_per_pixel: int, row_bytes: list[bytes],
+              plte: bytes | None = None, trns: bytes | None = None) -> None:
+    """Minimal valid PNG writer for the inputs PIL cannot emit bit-exactly (4-bit gray,
+    16-bit truecolor, spec-layout tRNS chunks, palette tRNS longer than the palette).
+    Filter type 0 on every row."""
     raw = b"".join(b"\x00" + row for row in row_bytes)
     data = b"\x89PNG\r\n\x1a\n"
     data += png_chunk(
         b"IHDR", struct.pack(">IIBBBBB", width, height, bit_depth, color_type, 0, 0, 0)
     )
+    if plte is not None:
+        data += png_chunk(b"PLTE", plte)
+    if trns is not None:
+        data += png_chunk(b"tRNS", trns)
     data += png_chunk(b"IDAT", zlib.compress(raw, 9))
     data += png_chunk(b"IEND", b"")
     path = ROOT / rel
@@ -144,11 +150,47 @@ def main() -> None:
             p.info["transparency"] = trns
         save(p, rel)
 
+    # 8-bit palettes (256 entries: PIL writes the minimum bit depth, so 256 entries gives
+    # 8-bit). Exercises the interleaved palette decode branch the 4-bit fixtures cannot,
+    # with and without tRNS.
+    palette256 = [(i, 255 - i, (i * 2) % 256) for i in range(256)]
+    for rel, trns in (
+        ("decode/palette8-32x32.png", None),
+        ("decode/palette8-trns-single-32x32.png",
+         bytes([255] * 200 + [0] + [255] * 55)),  # single transparent index 200
+        ("decode/palette8-trns-perentry-32x32.png",
+         bytes([0 if i % 7 == 0 else (i * 17) % 256 for i in range(256)])),
+    ):
+        p8 = Image.new("P", (32, 32))
+        p8.putpalette([c for rgb in palette256 for c in rgb])
+        p8.putdata([(x * 3 + y * 7) % 256 for y in range(32) for x in range(32)])
+        if trns is not None:
+            p8.info["transparency"] = trns
+        save(p8, rel)
+
+    # Truecolor with a tRNS chunk: the reference keeps mode RGB and its RGB conversion
+    # drops the transparency, so the decode must be the opaque pixels.
+    save(gradient_rgb(64, 48), "decode/rgb-trns-64x48.png", transparency=(128, 200, 64))
+
+    # Grayscale with a tRNS chunk (PIL writes the sample as 16 bits, the layout its own
+    # reader accepts): the reference keeps mode L and its RGB conversion drops the
+    # transparency, so the decode must be the opaque pixels — the twin of gray-60x40.
+    gray_t = Image.new("L", (60, 40))
+    gray_t.putdata([(x * 4 + y * 5) % 256 for y in range(40) for x in range(60)])
+    save(gray_t, "decode/gray-trns-60x40.png", transparency=100)
+
     save(gradient_rgb(96, 64), "decode/jpeg-color-96x64.jpg", quality=JPEG_QUALITY)
 
     gray_j = Image.new("L", (64, 48))
     gray_j.putdata([(x * 4 + y * 5) % 256 for y in range(48) for x in range(64)])
     save(gray_j, "decode/jpeg-gray-64x48.jpg", quality=JPEG_QUALITY)
+
+    # JPEG with restart markers (RSTn markers inside the scan; PIL writes them without a DRI
+    # segment, and the Java header walk handles both): camera and phone encoders commonly
+    # write restart intervals, so the pre-scan must treat RST markers as scan data, not
+    # corruption.
+    save(gradient_rgb(96, 64), "decode/jpeg-rst-96x64.jpg", quality=JPEG_QUALITY,
+         restart_marker_blocks=4)
 
     # EXIF orientation 6 (stored 100x60 landscape; viewers would rotate to 60x100).
     # The Java decoder must return the stored, unrotated 100x60 pixels.
@@ -199,14 +241,30 @@ def main() -> None:
     rows4 = []
     for y in range(8):
         row = bytearray()
-        for x in range(8):
-            row.append(((x * 7 + y * 3) % 16) << 4 | ((x + y) % 16))
+        for x in range(0, 8, 2):
+            # Two 4-bit pixels per byte, MSB first (8 pixels per row = 4 bytes).
+            row.append(((x * 7 + y * 3) % 16) << 4 | (((x + 1) * 7 + y * 3) % 16))
         rows4.append(bytes(row))
     write_png("reject/png-4bit-gray.png", 8, 8, 4, 0, 1, rows4)
 
+    # (mode "1" saves as 1-bit grayscale, color type 0 — not a palette image)
     onebit = Image.new("1", (16, 16))
     onebit.putdata([((x + y * 3) % 4 == 0) * 255 for y in range(16) for x in range(16)])
-    save(onebit, "reject/png-1bit-palette.png")
+    save(onebit, "reject/png-1bit-gray.png")
+
+    # reject: palette tRNS with more entries than the palette has (malformed per RFC 2083;
+    # must surface as an IOException, never an out-of-bounds access)
+    write_png(
+        "reject/png-trns-overflow.png",
+        8,
+        8,
+        8,
+        3,
+        1,
+        [bytes((x + y) % 4 for x in range(8)) for y in range(8)],
+        plte=bytes([255, 0, 0, 0, 255, 0, 0, 0, 255, 128, 64, 32]),
+        trns=bytes([255, 255, 255, 255, 0]),  # 5 entries for a 4-entry palette
+    )
 
     # reject: CMYK/YCCK JPEGs (byte surgery on a valid RGB JPEG; the Java decoder
     # rejects from the header pre-scan before any pixel decode).
@@ -222,13 +280,17 @@ def main() -> None:
     path.write_bytes(bytes(cmyk))
     print(f"wrote {path.relative_to(ROOT)} ({path.stat().st_size} bytes)")
 
-    # (b) Adobe APP14 transform code 2 (the CMYK marker used by Adobe encoders).
+    # (b) Adobe APP14 transform code 2 (the CMYK marker used by Adobe encoders), in the
+    # standard layout libjpeg reads: "Adobe" + version(2) + flags0(2) + flags1(2) +
+    # transform(1) = 12 data bytes, so the segment length field (which counts itself) is 14.
     app14 = (
         b"\xff\xee"
-        + struct.pack(">H", 2 + 5 + 2 + 2 + 1 + 4)
+        + struct.pack(">H", 2 + 5 + 2 + 2 + 2 + 1)
         + b"Adobe"
-        + bytes([1, 0, 0, 0, 2])
-        + b"\x00\x00\x00\x00"
+        + bytes([1, 0])  # version
+        + bytes([0, 0])  # flags0
+        + bytes([0, 0])  # flags1
+        + bytes([2])  # transform
     )
     adobe = base[:2] + app14 + base[2:]
     path = ROOT / "reject/jpeg-adobe-transform2.jpg"

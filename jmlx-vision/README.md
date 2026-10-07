@@ -22,9 +22,10 @@ splitting, padding masks, grid/order metadata). No native dependency; Java 21+.
 - **Supported:** 8-bit RGB, grayscale, RGBA and grayscale-with-alpha PNG, 1-, 2-, 4- and
   8-bit palette PNG (Pillow's own default for a small palette is 4-bit) with optional `tRNS`,
   and 8-bit RGB and grayscale JPEG, including scans with restart markers (`RST0`–`RST7`) and an
-  optional DRI segment. A `tRNS` chunk on a truecolor or grayscale PNG is ignored — Pillow keeps
-  those images in mode RGB/L and the reference's RGB conversion drops the transparency — so such
-  files decode identically to their opaque twins. Decoding uses the JDK's built-in
+  optional DRI segment. A `tRNS` chunk is ignored for every color type and stripped from the bytes
+  before decode: the pinned processor never applies it (a palette image is rebuilt from
+  `getpalette()`, RGB only, and the RGB/L conversion drops the chunk), so tRNS files decode
+  identically to their opaque twins. Decoding uses the JDK's built-in
   `javax.imageio` PNG/JPEG readers; decoded bytes are addressed through the raster's
   `SampleModel` (the readers store `B,G,R`/`A,B,G,R`, not channel order) and the band-to-channel
   mapping is probed once through the decoded `ColorModel`, so the band order is never assumed.

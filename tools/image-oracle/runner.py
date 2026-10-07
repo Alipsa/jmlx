@@ -55,17 +55,22 @@ def float32_be_base64(arr) -> str:
 
 def reference_decode(path: Path):
     """The pinned raw-PIL reference decode: open -> load(), keep original mode, then the
-    processor's do_convert_rgb math: RGBA/LA or P-with-tRNS composite over white, every
-    other mode a plain convert("RGB"). No exif_transpose, no ICC/gAMA management."""
+    processor's convert_to_rgb math: RGBA/LA composite over white via its alpha_composite step,
+    every other mode a plain convert("RGB"). A palette tRNS chunk is dropped before the convert:
+    the pinned processor rebuilds the palette from getpalette() (RGB only), so its
+    info["transparency"] never survives - and raw PIL's PngImageFile.convert would apply the
+    tRNS, so the key must be removed first. No exif_transpose, no ICC/gAMA management."""
     from PIL import Image
 
     image = Image.open(path)
     image.load()
-    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+    if image.mode in ("RGBA", "LA"):
         rgba = image.convert("RGBA")
         background = Image.new("RGBA", rgba.size, (255, 255, 255))
         rgb = Image.alpha_composite(background, rgba).convert("RGB")
     else:
+        if image.mode == "P" and "transparency" in image.info:
+            del image.info["transparency"]
         rgb = image.convert("RGB")
     import numpy as np
 

@@ -30,25 +30,28 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * <p><b>Supported:</b> 8-bit RGB, grayscale, RGBA and grayscale-with-alpha PNG, 1-, 2-, 4- and
  * 8-bit palette PNG (the built-in reader expands packed palette indices to 8 bits, and Pillow's own
  * default for a small palette is 4-bit) with optional {@code tRNS}, and 8-bit RGB and grayscale
- * JPEG, including scans with restart markers ({@code RST0}–{@code RST7}). A {@code tRNS} chunk on a
- * truecolor or grayscale PNG is ignored — Pillow keeps those images in mode RGB/L and the
- * reference's RGB conversion drops the transparency — and is stripped from the bytes before the
- * built-in reader would turn it into an alpha band. Decoded samples are extracted directly from the
- * {@link Raster}'s byte buffer without per-pixel {@code ColorModel}/{@code getRGB} conversion; the
- * expected band count is validated against a byte-level pre-scan of the file header, and the
- * band-to-channel mapping is probed once through the decoded {@link ColorModel} — the built-in
- * readers produce {@code B,G,R} and {@code A,B,G,R} raster layouts, never {@code R,G,B}, so the
- * band order is never assumed.
+ * JPEG, including scans with restart markers ({@code RST0}–{@code RST7}). A {@code tRNS} chunk is
+ * stripped from the bytes for every color type before the built-in reader would turn it into an
+ * alpha band or a transparent palette entry — the pinned processor never applies it (see <b>Alpha
+ * policy</b>). Decoded samples are extracted directly from the {@link Raster}'s byte buffer without
+ * per-pixel {@code ColorModel}/{@code getRGB} conversion; the expected band count is validated
+ * against a byte-level pre-scan of the file header, and the band-to-channel mapping is probed once
+ * through the decoded {@link ColorModel} — the built-in readers produce {@code B,G,R} and {@code
+ * A,B,G,R} raster layouts, never {@code R,G,B}, so the band order is never assumed.
  *
  * <p><b>Rejected before conversion, with format-specific {@link IOException}s:</b> 16-bit PNG,
  * sub-8-bit and 16-bit grayscale/truecolor PNG, CMYK/YCCK JPEG (four-component frames and Adobe
  * {@code APP14} transform codes other than RGB/unspecified), inputs above the configured {@link
  * ImageDecodeLimits}, and non-PNG/non-JPEG or corrupt input.
  *
- * <p><b>Alpha policy:</b> alpha (RGBA, LA and palette {@code tRNS}) is composited over a white
- * background using Pillow's exact integer compositing formula (ported from the pinned Pillow 12.3.0
- * {@code src/libImaging/AlphaComposite.c}), matching the reference processor's {@code
- * convert_to_rgb} step. Opaque input passes through unchanged.
+ * <p><b>Alpha policy:</b> alpha (RGBA and LA) is composited over a white background using Pillow's
+ * exact integer compositing formula (ported from the pinned Pillow 12.3.0 {@code
+ * src/libImaging/AlphaComposite.c}), matching the reference processor's {@code convert_to_rgb}
+ * step. Palette {@code tRNS} is <em>not</em> applied: the pinned processor rebuilds a palette image
+ * from {@code getpalette()} (RGB only) before that step, so its transparency never survives and
+ * transparent entries decode to their opaque palette color — the same outcome as a truecolor or
+ * grayscale {@code tRNS}, which the processor's RGB conversion drops. Opaque input passes through
+ * unchanged.
  *
  * <p><b>EXIF orientation is ignored:</b> an EXIF-rotated JPEG decodes to its stored, unrotated
  * pixels, matching the pinned reference path ({@code PIL.Image.open} → {@code load()} with no
@@ -160,10 +163,12 @@ public final class ImageDecoder {
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
-      if (info.trns != null && (info.colorType == 0 || info.colorType == 2)) {
-        // The reference keeps truecolor/grayscale PNGs in mode RGB/L and its RGB conversion
-        // drops the tRNS, so the chunk is ignored; the built-in reader would turn it into an
-        // alpha band instead, so strip it before decode.
+      if (info.trns != null) {
+        // The pinned processor never applies tRNS: truecolor/grayscale PNGs stay in mode RGB/L
+        // and the RGB conversion drops the chunk, and a palette image is rebuilt from
+        // getpalette() (RGB only), so its tRNS never survives. The built-in reader would turn
+        // the chunk into an alpha band (RGB/L) or a transparent palette entry (P), so strip it
+        // before decode for every color type.
         int end = info.trnsOffset + 12 + info.trns.length;
         bytes =
             concat(
@@ -551,7 +556,6 @@ public final class ImageDecoder {
     final int expectedBands;
     final byte[] palette;
     final int paletteCount;
-    final int[] paletteAlpha;
 
     DecodePlan(Object header) {
       if (header instanceof PngInfo png) {
@@ -564,63 +568,12 @@ public final class ImageDecoder {
         }
         palette = png.palette;
         paletteCount = png.paletteCount;
-        paletteAlpha = paletteAlpha(png.paletteCount, png.trns);
       } else {
         JpegInfo jpeg = (JpegInfo) header;
         expectedBands = jpeg.components == 1 ? 1 : 3;
         palette = null;
         paletteCount = 0;
-        paletteAlpha = null;
       }
-    }
-
-    // PIL semantics for palette + tRNS (PngImagePlugin.chunk_tRNS): a tRNS body of 0xFFs with
-    // exactly one 0x00 marks a single transparent palette index (an index past the palette is out
-    // of range and leaves every entry opaque); otherwise each byte is the alpha of the palette
-    // entry at that index. An oversized chunk (more samples than palette entries, technically
-    // malformed per RFC 2083) is benign for PIL and libpng: the samples past the palette are
-    // ignored, never an error.
-    private static int[] paletteAlpha(int count, byte[] trns) {
-      if (count == 0 || trns == null) {
-        return null;
-      }
-      int[] alpha = new int[count];
-      Arrays.fill(alpha, 255);
-      if (isSimpleTrns(trns)) {
-        int idx = trnsIndex(trns);
-        if (idx < count) {
-          alpha[idx] = 0;
-        }
-      } else {
-        for (int i = 0; i < Math.min(trns.length, count); i++) {
-          alpha[i] = trns[i] & 0xFF;
-        }
-      }
-      return alpha;
-    }
-
-    private static boolean isSimpleTrns(byte[] t) {
-      int zeroPos = -1;
-      for (int i = 0; i < t.length; i++) {
-        if ((t[i] & 0xFF) == 0x00) {
-          if (zeroPos >= 0) {
-            return false; // more than one transparent entry
-          }
-          zeroPos = i;
-        } else if ((t[i] & 0xFF) != 0xFF) {
-          return false; // partial alpha value: general per-entry table
-        }
-      }
-      return zeroPos >= 0;
-    }
-
-    private static int trnsIndex(byte[] t) {
-      for (int i = 0; i < t.length; i++) {
-        if ((t[i] & 0xFF) == 0x00) {
-          return i;
-        }
-      }
-      return -1;
     }
   }
 
@@ -705,8 +658,9 @@ public final class ImageDecoder {
         }
       }
     } else if (plan.expectedBands == 1) {
-      // Palette: expand indices, composite tRNS entries over white. Sub-8-bit palettes arrive
-      // packed (several indices per byte); 8-bit palettes are interleaved, one byte per index.
+      // Palette: expand indices (palette tRNS was stripped before decode — see the class
+      // javadoc). Sub-8-bit palettes arrive packed (several indices per byte); 8-bit palettes are
+      // interleaved, one byte per index.
       int p = 0;
       if (sampleModel instanceof MultiPixelPackedSampleModel) {
         // Several indices are packed per byte, MSB-first per the PNG spec; the raster's own
@@ -715,7 +669,7 @@ public final class ImageDecoder {
         for (int y = 0; y < h; y++) {
           for (int x = 0; x < w; x++) {
             int idx = raster.getSample(x, y, 0);
-            p = compositePaletteIndex(idx, plan, out, p);
+            p = expandPaletteIndex(idx, plan, out, p);
           }
         }
       } else if (sampleModel instanceof PixelInterleavedSampleModel interleaved) {
@@ -727,7 +681,7 @@ public final class ImageDecoder {
           int rowBase = bankOffset + y * lineStride;
           for (int x = 0; x < w; x++) {
             int idx = data[rowBase + x * pixStride + offsets[0]] & 0xFF;
-            p = compositePaletteIndex(idx, plan, out, p);
+            p = expandPaletteIndex(idx, plan, out, p);
           }
         }
       } else {
@@ -889,10 +843,11 @@ public final class ImageDecoder {
   }
 
   /**
-   * Expands one palette index to three output bytes, compositing the entry's {@code tRNS} alpha
-   * over white. Writes at {@code out[p..p+2]} and returns the next free output position.
+   * Expands one palette index to three output bytes. Palette {@code tRNS} was stripped before
+   * decode (the pinned processor never applies it), so the palette color is written as-is. Writes
+   * at {@code out[p..p+2]} and returns the next free output position.
    */
-  private static int compositePaletteIndex(int idx, DecodePlan plan, byte[] out, int p)
+  private static int expandPaletteIndex(int idx, DecodePlan plan, byte[] out, int p)
       throws IOException {
     if (idx >= plan.paletteCount) {
       throw new IOException(
@@ -903,10 +858,9 @@ public final class ImageDecoder {
               + " entries)");
     }
     int base = idx * 3;
-    int a = plan.paletteAlpha == null ? 255 : plan.paletteAlpha[idx];
-    out[p] = (byte) compositeOverWhite(plan.palette[base] & 0xFF, a);
-    out[p + 1] = (byte) compositeOverWhite(plan.palette[base + 1] & 0xFF, a);
-    out[p + 2] = (byte) compositeOverWhite(plan.palette[base + 2] & 0xFF, a);
+    out[p] = plan.palette[base];
+    out[p + 1] = plan.palette[base + 1];
+    out[p + 2] = plan.palette[base + 2];
     return p + 3;
   }
 

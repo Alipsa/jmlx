@@ -162,6 +162,25 @@ class ImageDecoderTest {
   }
 
   @Test
+  void tRnsOnPalettedPngDecodesAsOpaqueTwin() throws Exception {
+    // Palette tRNS is dropped to match the pinned processor (its palette is rebuilt from
+    // getpalette(), RGB only): each tRNS twin decodes byte-identical to its opaque counterpart.
+    Path fixtures = OracleFixtures.fixtures();
+    RgbImage palette = ImageDecoder.decode(fixtures.resolve("decode/palette-32x32.png"));
+    assertEquals(
+        palette, ImageDecoder.decode(fixtures.resolve("decode/palette-trns-single-32x32.png")));
+    assertEquals(
+        palette, ImageDecoder.decode(fixtures.resolve("decode/palette-trns-perentry-32x32.png")));
+    assertEquals(
+        palette, ImageDecoder.decode(fixtures.resolve("decode/palette-trns-short-32x32.png")));
+    RgbImage palette8 = ImageDecoder.decode(fixtures.resolve("decode/palette8-32x32.png"));
+    assertEquals(
+        palette8, ImageDecoder.decode(fixtures.resolve("decode/palette8-trns-single-32x32.png")));
+    assertEquals(
+        palette8, ImageDecoder.decode(fixtures.resolve("decode/palette8-trns-perentry-32x32.png")));
+  }
+
+  @Test
   void jpegRstFixtureCarriesRealDriAndRestartMarkers() throws Exception {
     // DRI coverage comes from the oracle fixture jpeg-rst-96x64, whose decode is byte-compared
     // against Pillow in decodeMatchesThePinnedOracleForEveryFixture - but only while the

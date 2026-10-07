@@ -169,10 +169,9 @@ def main() -> None:
         save(p8, rel)
 
     # 8-bit palette with a tRNS chunk longer than the palette (technically malformed per
-    # RFC 2083, but PIL and libpng treat it as benign: the per-entry samples past the
-    # palette are ignored, never an error). The samples are the non-simple form, so the
-    # fixture pins the truncation itself - dropping the chunk entirely, or raising, would
-    # change the decoded pixels.
+    # RFC 2083; PIL and libpng treat it as benign and open the file). The pinned processor
+    # drops all palette tRNS, so the fixture pins that the oversized chunk is not rejected
+    # and decodes to the opaque palette pixels, like any palette tRNS.
     write_png(
         "decode/palette8-trns-overflow-8x8.png",
         8,

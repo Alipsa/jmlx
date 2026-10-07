@@ -183,11 +183,16 @@ accept a `text_config` value that disagrees with a required tensor shape (e.g. `
 ### Decode path (raw `PIL.Image.open → load()`)
 
 The reference loads bytes with `PIL.Image.open(bytes).load()`, keeping the original `mode`, palette and
-info until the slow processor's `do_convert_rgb`. No `exif_transpose` (EXIF orientation is **unapplied**),
-no `load_image`, no pre-`convert("RGB")`. Alpha/palette handling is therefore defined by the processor's
-`do_convert_rgb`, which composites via the palette/tRNS path and then drops alpha. Fixtures (WP2 image oracle)
-determine the exact tRNS result rather than assuming white compositing. The Java `ImageDecoder` must match the
-observed processor RGB conversion **before** resize.
+info until the slow processor's `convert_to_rgb`. No `exif_transpose` (EXIF orientation is **unapplied**),
+no `load_image`, no pre-`convert("RGB")`. Alpha handling is defined by that step: it composites `RGBA`
+and `LA` input over a white background with `Image.alpha_composite`, but a palette image is first
+rebuilt from a numpy index array plus `im.getpalette()` (RGB only), so a `tRNS` chunk **never
+survives** and transparent entries keep their opaque palette color (raw PIL's `PngImageFile.convert`
+would apply the tRNS; the processor's numpy round-trip is what avoids that). The Java `ImageDecoder`
+matches it: RGBA/LA composite over white, and `tRNS` — on palettes as well as on truecolor/grayscale —
+is stripped from the bytes before decode. Fixtures (WP2 image oracle) determine the exact result
+rather than assuming any particular compositing; the Java `ImageDecoder` must match the observed
+processor RGB conversion **before** resize.
 
 **tRNS on truecolor/grayscale PNG (color types 0/2):** Pillow keeps the image in mode `RGB`/`L` and records
 the transparency only in `info["transparency"]`; the processor's RGB conversion drops it, so the reference
@@ -198,12 +203,10 @@ own writer emits the tRNS sample 16-bit even for 8-bit files; the decoder strips
 sample layout is irrelevant to it.)
 
 **Oversized palette `tRNS` (more samples than palette entries):** technically malformed per RFC 2083, but
-PIL (`PngImagePlugin.chunk_tRNS`) and libpng treat it as benign. PIL records the transparency as-is: the
-"simple" pattern (all `0xFF` with exactly one `0x00`) becomes a single palette index — one past the palette
-leaves every entry opaque — and the per-entry form keeps the whole byte string, whose samples past the
-palette are ignored at lookup time. The Java `ImageDecoder` matches both: an out-of-range simple index and
-the extra per-entry samples are ignored, never an error. Fixture: `palette8-trns-overflow-8x8` (per-entry
-form: five samples for four entries, the fifth ignored).
+PIL (`PngImagePlugin.chunk_tRNS`) and libpng treat it as benign and open the file. The pinned processor
+drops palette `tRNS` entirely (the palette is rebuilt RGB-only), so an oversized chunk decodes to the
+opaque palette pixels like any palette `tRNS`; the Java `ImageDecoder` likewise strips the whole chunk
+rather than rejecting the file. Fixture: `palette8-trns-overflow-8x8` (five samples for four entries).
 
 **JPEG restart markers:** a scan written with a restart interval contains `RST0`–`RST7` markers inside the
 entropy-coded data, and the writer (PIL's `restart_marker_blocks`, libjpeg, camera and phone encoders)
@@ -481,9 +484,11 @@ well-formed `EOI` marker the decoder never checks for.
 
 ### Alpha compositing
 
-`tRNS`/RGBA/LA alpha is composited over white with Pillow's exact integer formula ported from the pinned
+`RGBA`/`LA` alpha is composited over white with Pillow's exact integer formula ported from the pinned
 `src/libImaging/AlphaComposite.c` (`SHIFTFORDIV255(x) = (((x >> 8) + x) >> 8)`, 32-bit integer math); the
 opaque case (`a == 255`) reduces to the identity for all 256 channel values and passes through unchanged.
+Palette, truecolor and grayscale `tRNS` is never composited: it is stripped from the bytes before decode
+(the pinned processor never applies it — see the Decode path section above).
 
 ### Oracle error bounds (measured)
 

@@ -27,6 +27,9 @@ replay_pid*
 # Ignore Gradle project-specific cache directory
 .gradle
 
+# macOS Finder metadata
+.DS_Store
+
 # Ignore Gradle build output directory
 build
 

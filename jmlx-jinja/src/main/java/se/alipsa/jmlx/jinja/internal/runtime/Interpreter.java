@@ -2258,59 +2258,76 @@ public final class Interpreter {
         n.iterable() instanceof Expression.SelectExpression s ? s.lhs() : n.iterable();
     var scope = new Environment(e);
     var iterable = evaluateExpression(iterableExpression, scope, b);
-    List<Value> items;
-    if (iterable instanceof Value.ArrayValue a) {
-      items = a.values();
+    var filtered = new ArrayList<Value>();
+    if (iterable instanceof Value.StringValue s && !s.undefinedBacked()) {
+      // Upstream Jinja iterates strings by code point; chat templates rely on this when a
+      // message's content is plain text rather than a list of structured parts. Each code point
+      // is one charged loop iteration, materialized as it is walked, so the render's loop
+      // budget bounds both the iteration and the allocation of a long string.
+      String text = s.value();
+      for (int i = 0; i < text.length(); ) {
+        int codePoint = text.codePointAt(i);
+        i += Character.charCount(codePoint);
+        filterLoopItem(
+            filtered,
+            n,
+            e,
+            b,
+            test,
+            new Value.StringValue(new String(Character.toChars(codePoint))));
+      }
     } else {
-      if (iterable instanceof Value.TupleValue a) {
+      List<Value> items;
+      if (iterable instanceof Value.ArrayValue a) {
         items = a.values();
       } else {
-        if (iterable instanceof Value.ObjectValue o) {
-          items = new ArrayList<>();
-          for (var k : o.values().keySet()) {
-            items.add(
-                k instanceof Value.StringValue string ? string : new Value.StringValue((String) k));
-          }
+        if (iterable instanceof Value.TupleValue a) {
+          items = a.values();
         } else {
-          if (iterable instanceof Value.KeywordArgumentsValue o) {
+          if (iterable instanceof Value.ObjectValue o) {
             items = new ArrayList<>();
             for (var k : o.values().keySet()) {
-              items.add(new Value.StringValue(k));
+              items.add(
+                  k instanceof Value.StringValue string
+                      ? string
+                      : new Value.StringValue((String) k));
             }
           } else {
-            throw new TemplateRenderException(
-                "Expected iterable or object type in for loop: got " + type(iterable),
-                ErrorCategory.TYPE,
-                n.location());
+            if (iterable instanceof Value.KeywordArgumentsValue o) {
+              items = new ArrayList<>();
+              for (var k : o.values().keySet()) {
+                items.add(new Value.StringValue(k));
+              }
+            } else {
+              throw new TemplateRenderException(
+                  "Expected iterable or object type in for loop: got " + type(iterable),
+                  ErrorCategory.TYPE,
+                  n.location());
+            }
           }
         }
       }
-    }
-    var filtered = new ArrayList<Value>();
-    for (var item : items) {
-      b.chargeLoopIteration(n.location());
-      var filterScope = new Environment(e);
-      bind(n.loopVariable(), item, filterScope, n.location());
-      if (test == null || truthy(evaluateExpression(test, filterScope, b), test.location())) {
-        filtered.add(item);
+      for (var item : items) {
+        filterLoopItem(filtered, n, e, b, test, item);
       }
     }
-    items = filtered;
     var out = new StringBuilder();
     boolean none = true;
-    for (int i = 0; i < items.size(); i++) {
+    for (int i = 0; i < filtered.size(); i++) {
       var loop = new LinkedHashMap<String, Value>();
       loop.put("index", new Value.IntegerValue(i + 1));
       loop.put("index0", new Value.IntegerValue(i));
-      loop.put("revindex", new Value.IntegerValue(items.size() - i));
-      loop.put("revindex0", new Value.IntegerValue(items.size() - i - 1));
+      loop.put("revindex", new Value.IntegerValue(filtered.size() - i));
+      loop.put("revindex0", new Value.IntegerValue(filtered.size() - i - 1));
       loop.put("first", new Value.BooleanValue(i == 0));
-      loop.put("last", new Value.BooleanValue(i == items.size() - 1));
-      loop.put("length", new Value.IntegerValue(items.size()));
-      loop.put("previtem", i > 0 ? items.get(i - 1) : Value.UndefinedValue.INSTANCE);
-      loop.put("nextitem", i + 1 < items.size() ? items.get(i + 1) : Value.UndefinedValue.INSTANCE);
+      loop.put("last", new Value.BooleanValue(i == filtered.size() - 1));
+      loop.put("length", new Value.IntegerValue(filtered.size()));
+      loop.put("previtem", i > 0 ? filtered.get(i - 1) : Value.UndefinedValue.INSTANCE);
+      loop.put(
+          "nextitem",
+          i + 1 < filtered.size() ? filtered.get(i + 1) : Value.UndefinedValue.INSTANCE);
       scope.setVariable("loop", new Value.ObjectValue(loop));
-      bind(n.loopVariable(), items.get(i), scope, n.location());
+      bind(n.loopVariable(), filtered.get(i), scope, n.location());
       ExecResult r;
       try {
         r = evaluateBlock(n.body(), scope, b);
@@ -2327,6 +2344,25 @@ public final class Interpreter {
       out.append(((ExecResult.Normal) r).output());
     }
     return none ? evaluateBlock(n.defaultBlock(), scope, b) : new ExecResult.Normal(out.toString());
+  }
+
+  /**
+   * Charges one loop iteration for a for-loop item and keeps it for the body when the loop's
+   * optional test expression passes.
+   */
+  private static void filterLoopItem(
+      List<Value> filtered,
+      Statement.For n,
+      Environment e,
+      RenderBudget b,
+      Expression test,
+      Value item) {
+    b.chargeLoopIteration(n.location());
+    var filterScope = new Environment(e);
+    bind(n.loopVariable(), item, filterScope, n.location());
+    if (test == null || truthy(evaluateExpression(test, filterScope, b), test.location())) {
+      filtered.add(item);
+    }
   }
 
   private static void bind(Expression target, Value item, Environment e, SourceLocation l) {

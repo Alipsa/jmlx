@@ -41,7 +41,10 @@ padding multiples are rejected.
 
 `fromDirectory` reads `tokenizer.json`, optional `tokenizer_config.json`, root
 `chat_template.jinja`, and `additional_chat_templates/*.jinja`. Root templates override a configured
-`default`; a name is required when several templates exist and none is named `default`.
+`default`; a name is required when several templates exist and none is named `default`. A legacy
+processor file `chat_template.json` (`{"chat_template": "..."}`) fills the `default` slot only when
+no other default source exists, so bundles like SmolVLM-256M — which carry the template in both the
+config and the processor file — still resolve it without a global fallback.
 
 ```java
 var tokenizer = HfTokenizer.fromDirectory(modelDirectory);
@@ -55,6 +58,15 @@ Chat templates own their BOS/EOS markers, so rendered chat is encoded with speci
 disabled. The reserved context includes `messages`, `add_generation_prompt`, and configured
 `bos_token`, `eos_token`, `pad_token`, `unk_token`, `sep_token`, `cls_token`, and `mask_token`.
 `extraContext` can supply values such as `tools`, but reserved-key collisions are rejected.
+
+Message `content` is plain text or a structured list of parts, in order:
+`{"type": "text", "text": "..."}` and `{"type": "image"}`. Any other part shape (unknown `type`,
+unknown keys, a non-text `text` value, a non-map part, or an empty list) is rejected. Image parts
+are placeholders only — the renderer emits the template's image marker without fetching anything;
+pixel data is a concern of the generation API, not of the tokenizer. Plain-string content keeps
+its exact existing behavior: `{% for %}` iterates it by code point, as upstream Jinja does, and a
+template that only prints structured text parts (such as SmolVLM's) therefore renders plain
+string content as nothing — use text parts when the text must appear in the prompt.
 
 Templates using `strftime_now` use the current system clock and default zone on each render.
 For reproducible prompts, supply a `RenderOptions` (from `se.alipsa.jmlx.jinja`):

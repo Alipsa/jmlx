@@ -14,6 +14,7 @@ import transformers
 from safetensors import safe_open
 from transformers import (
     AutoModelForCausalLM,
+    AutoProcessor,
     AutoTokenizer,
     GemmaConfig,
     LlamaConfig,
@@ -33,7 +34,7 @@ from transformers.models.llama.modeling_llama import (
 # qwen3 is appended last: the per-family seed is SEED + FAMILIES.index(family), so existing
 # families keep their seeds (and goldens) byte-identical.
 FAMILIES = ("llama", "qwen2", "llama31", "mistral", "phi3", "gemma", "mixtral", "qwen3")
-CHAT_FAMILIES = ("mistral", "gemma", "phi3", "mixtral", "qwen3")
+CHAT_FAMILIES = ("mistral", "gemma", "phi3", "mixtral", "qwen3", "smolvlm")
 SEED = 6302026
 PROMPT_IDS = [1, 7, 42, 3, 19, 5]
 # Peeled commit of the exact v4.57.6 release tag (not the annotated tag object).
@@ -339,10 +340,119 @@ def generate_chat(family, out, tokenizer_root):
     )
 
 
+# smolvlm is the Phase 7.3a vision family: its "rendered" text and "ids" are the unexpanded
+# chat-template output (the Java renderChat + encode target), and "expanded_ids" is the pinned
+# Idefics3Processor expansion (the WP4 expander's target). The case matrix: one image, two
+# images, adjacent images, system/multi-turn content, interleaved text, and text-only. Text
+# turns use {"type": "text", "text": ...} parts, which is what callers must send: the template
+# iterates content, so a plain string renders as nothing (recorded, and pinned, by
+# string_content_dropped_by_template).
+SMOLVLM_CONVERSATIONS = (
+    ("text_only", [{"role": "user", "content": [
+        {"type": "text", "text": "What color is the sky?"}]}], ()),
+    ("single_image_4x4", [{"role": "user", "content": [
+        {"type": "text", "text": "What is in "},
+        {"type": "image"},
+        {"type": "text", "text": " this image?"}]}], ("tile-4x4-100x80",)),
+    ("single_image_1x4", [{"role": "user", "content": [
+        {"type": "image"},
+        {"type": "text", "text": " Describe this panorama."}]}], ("tile-1x4-2048x512",)),
+    ("single_image_4x1", [{"role": "user", "content": [
+        {"type": "image"},
+        {"type": "text", "text": " Describe this panorama."}]}], ("tile-4x1-512x2048",)),
+    ("two_images_interleaved", [{"role": "user", "content": [
+        {"type": "image"},
+        {"type": "text", "text": " first"},
+        {"type": "image"},
+        {"type": "text", "text": " second"}]}], ("tile-4x4-100x80", "tile-1x4-2048x512")),
+    ("two_images_adjacent", [{"role": "user", "content": [
+        {"type": "image"},
+        {"type": "image"},
+        {"type": "text", "text": " compare"}]}], ("tile-4x4-100x80", "tile-4x1-512x2048")),
+    ("system_multi_turn_image", [
+        {"role": "system", "content": [
+            {"type": "text", "text": "You are a helpful assistant."}]},
+        {"role": "user", "content": [
+            {"type": "image"},
+            {"type": "text", "text": " what is this?"}]},
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "A picture."}]},
+        {"role": "user", "content": [
+            {"type": "text", "text": "thanks"}]}], ("tile-4x4-100x80",)),
+    ("text_only_multi_turn", [
+        {"role": "system", "content": [
+            {"type": "text", "text": "You are a helpful assistant."}]},
+        {"role": "user", "content": [
+            {"type": "text", "text": "hello"}]},
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "world"}]},
+        {"role": "user", "content": [
+            {"type": "text", "text": "hello"}]}], ()),
+    ("string_content_dropped_by_template", [
+        {"role": "user", "content": "What color is the sky?"}], ()),
+)
+
+
+def smolvlm_images():
+    """Deterministic in-memory RGB images; only the post-resize tile geometry drives expansion."""
+    import numpy as np
+    from PIL import Image
+
+    def make(w, h):
+        arr = ((np.arange(w * h * 3, dtype=np.uint32) * 7 + 3) % 256).astype(
+            "uint8").reshape(h, w, 3)
+        return Image.fromarray(arr, "RGB")
+
+    return {
+        "tile-4x4-100x80": make(100, 80),
+        "tile-1x4-2048x512": make(2048, 512),
+        "tile-4x1-512x2048": make(512, 2048),
+    }
+
+
+def generate_chat_smolvlm(out, tokenizer_root):
+    """Render and expand the committed SmolVLM bundle through the pinned Idefics3Processor."""
+    directory = tokenizer_root / "smolvlm"
+    missing = [name for name in
+               ("tokenizer.json", "tokenizer_config.json", "preprocessor_config.json",
+                "processor_config.json")
+               if not (directory / name).is_file()]
+    if missing:
+        raise ValueError(f"missing committed SmolVLM bundle files: {missing}")
+    processor = AutoProcessor.from_pretrained(directory, local_files_only=True)
+    tokenizer = processor.tokenizer
+    images = smolvlm_images()
+    cases = []
+    for name, messages, image_names in SMOLVLM_CONVERSATIONS:
+        rendered = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True)
+        ids = tokenizer(rendered, add_special_tokens=False).input_ids
+        case = {
+            "name": name,
+            "messages": messages,
+            "add_generation_prompt": True,
+            "rendered": rendered,
+            "ids": ids,
+        }
+        if image_names:
+            case["images"] = [
+                {"name": image_name, "width": images[image_name].width,
+                 "height": images[image_name].height}
+                for image_name in image_names
+            ]
+            expanded = processor(text=[rendered], images=[images[i] for i in image_names])
+            case["expanded_ids"] = expanded["input_ids"][0]
+        cases.append(case)
+    (out / "chat-smolvlm.json").write_text(
+        json.dumps({"family": "smolvlm", "cases": cases}, ensure_ascii=False, indent=2) + "\n"
+    )
+
+
 def update_provenance(out, tokenizer_root=None):
     source = Path(transformers.__file__).parent / "modeling_rope_utils.py"
     files = {str(path.relative_to(out)): hashlib.sha256(path.read_bytes()).hexdigest()
-             for path in sorted(out.rglob("*")) if path.is_file()}
+             for path in sorted(out.rglob("*"))
+             if path.is_file() and not path.name.startswith(".")}
     metadata = {
         "python": platform.python_version(),
         "torch": torch.__version__,
@@ -356,13 +466,16 @@ def update_provenance(out, tokenizer_root=None):
         "files": files,
     }
     if tokenizer_root is not None:
-        metadata["chat_sources"] = {
-            f"{family}/{filename}": hashlib.sha256(
-                (tokenizer_root / family / filename).read_bytes()
-            ).hexdigest()
-            for family in CHAT_FAMILIES
-            for filename in ("tokenizer.json", "tokenizer_config.json")
-        }
+        # Every committed file of each chat bundle is a source: the text families carry the
+        # tokenizer pair, smolvlm also commits its chat_template.json, special tokens and the
+        # Idefics3 processor configs the golden is rendered from.
+        sources = {}
+        for family in CHAT_FAMILIES:
+            for path in sorted((tokenizer_root / family).iterdir()):
+                if path.is_file() and not path.name.startswith("."):
+                    sources[f"{family}/{path.name}"] = hashlib.sha256(
+                        path.read_bytes()).hexdigest()
+        metadata["chat_sources"] = sources
     else:
         previous = out.parent / "provenance.json"
         if previous.is_file():
@@ -382,7 +495,8 @@ def main():
     if sys.version_info[:2] != (3, 12):
         raise RuntimeError("Python 3.12 is required")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--family", choices=(*FAMILIES, "rope", "phase72", "all"), required=True)
+    parser.add_argument("--family", choices=(*FAMILIES, "smolvlm", "rope", "phase72", "all"),
+                        required=True)
     parser.add_argument("--out", type=Path, required=True, help="goldens directory")
     parser.add_argument("--chat", action="store_true", help="generate chat goldens only")
     parser.add_argument("--window-cases", action="store_true",
@@ -405,7 +519,10 @@ def main():
         if args.family not in CHAT_FAMILIES and args.family != "all":
             parser.error("--chat requires a chat family or --family all")
         for family in CHAT_FAMILIES if args.family == "all" else (args.family,):
-            generate_chat(family, args.out, args.tokenizer_root)
+            if family == "smolvlm":
+                generate_chat_smolvlm(args.out, args.tokenizer_root)
+            else:
+                generate_chat(family, args.out, args.tokenizer_root)
         update_provenance(args.out, args.tokenizer_root)
         return
     if args.family in ("rope", "all"):

@@ -275,6 +275,103 @@ class HfTokenizerTest {
   }
 
   @Test
+  void legacyProcessorChatTemplateFileFillsTheDefaultWhenNoOtherSourceExists() throws Exception {
+    Path directory = Files.createDirectory(temporaryDirectory.resolve("legacy-template"));
+    Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));
+    writeLegacyTemplate(directory, "LEGACY {{ messages[0].content }}");
+    HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+    assertEquals(List.of("default"), tokenizer.metadata().chatTemplateNames());
+    assertEquals(
+        "LEGACY hi",
+        tokenizer.renderChat(
+            List.of(Map.of("role", "user", "content", "hi")),
+            new ChatTemplateOptions("", false, Map.of())));
+  }
+
+  @Test
+  void configAndStandaloneTemplatesBeatsTheLegacyProcessorChatTemplateFile() throws Exception {
+    Path configWins = Files.createDirectory(temporaryDirectory.resolve("config-beats-legacy"));
+    Files.copy(wordPieceFixture(), configWins.resolve("tokenizer.json"));
+    Files.writeString(
+        configWins.resolve("tokenizer_config.json"),
+        "{\"chat_template\": \"CONFIG {{ messages[0].content }}\"}");
+    writeLegacyTemplate(configWins, "LEGACY {{ messages[0].content }}");
+    assertEquals(
+        "CONFIG hi",
+        HfTokenizer.fromDirectory(configWins)
+            .renderChat(
+                List.of(Map.of("role", "user", "content", "hi")),
+                new ChatTemplateOptions("", false, Map.of())));
+
+    Path jinjaWins = Files.createDirectory(temporaryDirectory.resolve("jinja-beats-legacy"));
+    Files.copy(wordPieceFixture(), jinjaWins.resolve("tokenizer.json"));
+    Files.writeString(jinjaWins.resolve("chat_template.jinja"), "JINJA {{ messages[0].content }}");
+    writeLegacyTemplate(jinjaWins, "LEGACY {{ messages[0].content }}");
+    assertEquals(
+        "JINJA hi",
+        HfTokenizer.fromDirectory(jinjaWins)
+            .renderChat(
+                List.of(Map.of("role", "user", "content", "hi")),
+                new ChatTemplateOptions("", false, Map.of())));
+  }
+
+  @Test
+  void additionalDefaultTemplateBeatsTheLegacyProcessorChatTemplateFile() throws Exception {
+    // A bundle with both an additional_chat_templates/default.jinja and a legacy
+    // chat_template.json loaded before the legacy fallback existed; it must still load,
+    // with the additional template winning.
+    Path directory =
+        Files.createDirectory(temporaryDirectory.resolve("additional-default-beats-legacy"));
+    Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));
+    Files.createDirectory(directory.resolve("additional_chat_templates"));
+    Files.writeString(
+        directory.resolve("additional_chat_templates/default.jinja"),
+        "ADDITIONAL {{ messages[0].content }}");
+    writeLegacyTemplate(directory, "LEGACY {{ messages[0].content }}");
+    HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+    assertEquals(List.of("default"), tokenizer.metadata().chatTemplateNames());
+    assertEquals(
+        "ADDITIONAL hi",
+        tokenizer.renderChat(
+            List.of(Map.of("role", "user", "content", "hi")),
+            new ChatTemplateOptions("", false, Map.of())));
+  }
+
+  @Test
+  void aBundleWithoutAnyTemplateSourceStillHasNoTemplates() throws Exception {
+    Path directory = Files.createDirectory(temporaryDirectory.resolve("no-templates"));
+    Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));
+    HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+    assertThrows(
+        TokenizerException.class,
+        () ->
+            tokenizer.renderChat(
+                List.of(Map.of("role", "user", "content", "hi")),
+                new ChatTemplateOptions("", false, Map.of())));
+  }
+
+  @Test
+  void aMalformedLegacyChatTemplateFileIsRejected() throws Exception {
+    Path missingKey = Files.createDirectory(temporaryDirectory.resolve("legacy-missing-key"));
+    Files.copy(wordPieceFixture(), missingKey.resolve("tokenizer.json"));
+    Files.writeString(missingKey.resolve("chat_template.json"), "{\"other\": \"nope\"}");
+    assertEquals(
+        "TokenizerDirectoryLoader: chat_template.json must contain a 'chat_template' string",
+        assertThrows(TokenizerException.class, () -> HfTokenizer.fromDirectory(missingKey))
+            .getMessage());
+
+    Path notAString = Files.createDirectory(temporaryDirectory.resolve("legacy-not-a-string"));
+    Files.copy(wordPieceFixture(), notAString.resolve("tokenizer.json"));
+    Files.writeString(notAString.resolve("chat_template.json"), "{\"chat_template\": 7}");
+    assertThrows(TokenizerException.class, () -> HfTokenizer.fromDirectory(notAString));
+  }
+
+  private static void writeLegacyTemplate(Path directory, String template) throws Exception {
+    Files.writeString(
+        directory.resolve("chat_template.json"), "{\"chat_template\": \"" + template + "\"}");
+  }
+
+  @Test
   void nullValuesInMessagesAndContextDoNotThrowRawNullPointerException() throws Exception {
     Path directory = Files.createDirectory(temporaryDirectory.resolve("nulls"));
     Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));

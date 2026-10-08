@@ -108,33 +108,80 @@ public final class SmolVlmImageProcessor {
   record ChainIntermediates(
       RgbImage stage1, RgbImage stage2, List<RgbImage> frames, int rows, int cols) {}
 
-  ChainIntermediates intermediates(RgbImage image) {
-    RgbImage current = image;
-    if (config.doResize()) {
-      int[] size = stage1Size(image.height(), image.width(), config.sizeLongestEdge());
-      current = ImageTransforms.resize(current, size[1], size[0], config.resample());
+  /**
+   * The pure geometry of the preprocessing chain for an input of the given dimensions: the stage-1
+   * and stage-2 resize targets and the split grid, without touching any pixels. The pixel chain
+   * ({@code intermediates}) uses this plan for its resize targets and split grid, so a caller that
+   * plans geometry from dimensions alone (for example to lay out the prompt-side tile markers)
+   * cannot drift from what the processor actually produces.
+   *
+   * @param height input image height in pixels
+   * @param width input image width in pixels
+   * @return the geometry plan
+   * @throws IllegalArgumentException if the dimensions are not positive
+   */
+  public SmolVlmGeometryPlan geometry(int height, int width) {
+    if (height <= 0 || width <= 0) {
+      throw new IllegalArgumentException(
+          "image dimensions must be positive: " + width + "x" + height);
     }
-    RgbImage stage1 = current;
-    RgbImage stage2;
-    List<RgbImage> frames;
-    int rows;
-    int cols;
+    int s1h = height;
+    int s1w = width;
+    if (config.doResize()) {
+      int[] size = stage1Size(height, width, config.sizeLongestEdge());
+      s1h = size[0];
+      s1w = size[1];
+    }
+    int s2h = 0;
+    int s2w = 0;
+    int rows = 0;
+    int cols = 0;
     if (config.doImageSplitting()) {
       int m = config.maxImageSizeLongestEdge();
-      int[] size = stage2Size(current.height(), current.width(), m);
-      stage2 = ImageTransforms.resize(current, size[1], size[0], config.resample());
-      SplitResult split = split(stage2, m);
-      frames = split.frames;
-      rows = split.rows;
-      cols = split.cols;
-    } else {
-      int m = config.maxImageSizeLongestEdge();
-      stage2 = null;
-      frames = List.of(ImageTransforms.resize(current, m, m, config.resample()));
-      rows = 0;
-      cols = 0;
+      int[] size = stage2Size(s1h, s1w, m);
+      s2h = size[0];
+      s2w = size[1];
+      if (s2h > m || s2w > m) {
+        rows = (int) Math.ceil((double) s2h / m);
+        cols = (int) Math.ceil((double) s2w / m);
+      }
     }
-    return new ChainIntermediates(stage1, stage2, frames, rows, cols);
+    return new SmolVlmGeometryPlan(s1h, s1w, s2h, s2w, rows, cols);
+  }
+
+  ChainIntermediates intermediates(RgbImage image) {
+    SmolVlmGeometryPlan plan = geometry(image.height(), image.width());
+    RgbImage current = image;
+    if (config.doResize()) {
+      current =
+          ImageTransforms.resize(
+              current, plan.stage1Width(), plan.stage1Height(), config.resample());
+    }
+    RgbImage stage1 = current;
+    if (config.doImageSplitting()) {
+      RgbImage stage2 =
+          ImageTransforms.resize(
+              stage1, plan.stage2Width(), plan.stage2Height(), config.resample());
+      SplitResult split = split(stage2, config.maxImageSizeLongestEdge());
+      if (split.rows != plan.rows() || split.cols != plan.cols()) {
+        // Unreachable: both compute the same ceil(size / tile) from the same stage-2 size. The
+        // guard makes any future divergence between the pure plan and the pixel chain a crash,
+        // not a prompt/pixel mismatch.
+        throw new IllegalStateException(
+            "split grid drifted from the geometry plan: planned "
+                + plan.rows()
+                + "x"
+                + plan.cols()
+                + ", produced "
+                + split.rows
+                + "x"
+                + split.cols);
+      }
+      return new ChainIntermediates(stage1, stage2, split.frames, plan.rows(), plan.cols());
+    }
+    int m = config.maxImageSizeLongestEdge();
+    return new ChainIntermediates(
+        stage1, null, List.of(ImageTransforms.resize(stage1, m, m, config.resample())), 0, 0);
   }
 
   /**

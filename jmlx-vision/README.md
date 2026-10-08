@@ -16,6 +16,12 @@ splitting, padding masks, grid/order metadata). No native dependency; Java 21+.
 | `Resampling` | `BILINEAR`, `BICUBIC`, `LANCZOS` — ports of the pinned Pillow kernels. |
 | `SmolVlmProcessorConfig` | Parsed, validated `preprocessor_config.json`. |
 | `SmolVlmImageProcessor` | Full processor: two-stage resize chain, tile splitting, global thumbnail, masks, per-tile normalized tensors. |
+| `SmolVlmGeometryPlan` | Pure per-image geometry (stage-1/stage-2 sizes, split grid, tile count) computed from dimensions alone, with no pixel work. |
+
+`SmolVlmImageProcessor.geometry(height, width)` returns the `SmolVlmGeometryPlan` for an image's
+dimensions; the processor's pixel chain uses that same plan for its resize targets and split
+grid, so prompt-side tile layout computed from dimensions cannot drift from the tiles actually
+produced.
 
 ## Decode policy
 

@@ -78,16 +78,21 @@ class SmolVlmPromptExpanderTest {
     int image = idOf(added, "<image>");
     int fake = idOf(added, "<fake_token_around_image>");
     int global = idOf(added, "<global-img>");
-    int row1col1 = idOf(added, "<row_1_col_1>");
-    int row6col6 = idOf(added, "<row_6_col_6>");
     int video = idOf(added, "<video>");
-    assertTrue(image > 0 && fake > 0 && global > 0 && row1col1 > 0 && row6col6 > 0);
+    assertTrue(image > 0 && fake > 0 && global > 0);
     assertEquals(-1, video, "the pinned SmolVLM-256M tokenizer declares no video token");
-    int base = row1col1 - 1;
-    assertEquals(
-        base + SmolVlmPromptTokens.ROW_COL_MARKER_COUNT,
-        row6col6,
-        "the <row_r_col_c> markers must be one contiguous 36-block");
+    // Verify every marker of the block, not just its ends: a contiguous block ordered
+    // differently would defeat the expander's base-offset arithmetic.
+    int base = idOf(added, "<row_1_col_1>") - 1;
+    assertTrue(base > 0);
+    for (int row = 1; row <= SmolVlmPromptTokens.MARKER_GRID_SIDE; row++) {
+      for (int col = 1; col <= SmolVlmPromptTokens.MARKER_GRID_SIDE; col++) {
+        assertEquals(
+            base + (row - 1) * SmolVlmPromptTokens.MARKER_GRID_SIDE + col,
+            idOf(added, "<row_" + row + "_col_" + col + ">"),
+            "<row_" + row + "_col_" + col + ">");
+      }
+    }
     int tokensPerTile =
         MAPPER
             .readTree(family().resolve("processor_config.json").toFile())
@@ -439,5 +444,87 @@ class SmolVlmPromptExpanderTest {
     assertThrows(IllegalArgumentException.class, () -> new SmolVlmImagePlacement(new int[] {5, 5}));
     assertThrows(IllegalArgumentException.class, () -> new SmolVlmImagePlacement(new int[] {9, 4}));
     assertDoesNotThrow(() -> new SmolVlmImagePlacement(new int[] {1, 4, 9}));
+  }
+
+  @Test
+  void newlineRunsCollidingWithSpecialTokensAreRejected() {
+    int[] rowNewline = new int[] {ROW_NL};
+    String imageCollision =
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    new SmolVlmPromptTokens(
+                        IMAGE, -1, FAKE, GLOBAL, BASE, new int[] {IMAGE}, rowNewline))
+            .getMessage();
+    assertTrue(imageCollision.contains("rowNewlineTokenIds"));
+    assertTrue(imageCollision.contains("the image token"));
+    assertTrue(imageCollision.contains(String.valueOf(IMAGE)));
+    String markerCollision =
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    new SmolVlmPromptTokens(
+                        IMAGE, -1, FAKE, GLOBAL, BASE, rowNewline, new int[] {BASE + 12}))
+            .getMessage();
+    assertTrue(markerCollision.contains("globalBlockNewlineTokenIds"));
+    assertTrue(markerCollision.contains("a row/column marker"));
+    // A declared video token collides; without one, the same ID is an ordinary token.
+    String videoCollision =
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    new SmolVlmPromptTokens(
+                        IMAGE, 99, FAKE, GLOBAL, BASE, new int[] {99}, rowNewline))
+            .getMessage();
+    assertTrue(videoCollision.contains("the video token"));
+    assertDoesNotThrow(
+        () -> new SmolVlmPromptTokens(IMAGE, -1, FAKE, GLOBAL, BASE, new int[] {99}, rowNewline));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new SmolVlmPromptTokens(IMAGE, -1, FAKE, GLOBAL, BASE, new int[] {FAKE}, rowNewline));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new SmolVlmPromptTokens(IMAGE, -1, FAKE, GLOBAL, BASE, rowNewline, new int[] {GLOBAL}));
+  }
+
+  @Test
+  void recordAccessorsReturnDefensiveCopies() {
+    int[] prompt = new int[] {1, 2, IMAGE, 3};
+    SmolVlmPromptPlan plan =
+        SmolVlmPromptExpander.expand(
+            prompt, synthetic(-1), List.of(new SmolVlmImageGrid(2, 3)), TPP);
+    prompt[0] = 999;
+    assertEquals(1, plan.unexpandedIds()[0], "the plan must own a copy of the prompt");
+
+    int[] expanded = plan.expandedIds();
+    expanded[0] = 999;
+    assertEquals(1, plan.expandedIds()[0], "an expandedIds() mutation must not stick");
+    int[] unexpanded = plan.unexpandedIds();
+    unexpanded[0] = 999;
+    assertEquals(1, plan.unexpandedIds()[0], "an unexpandedIds() mutation must not stick");
+    int[] tileStarts = plan.images().getFirst().tileStarts();
+    tileStarts[0] = 999;
+    assertNotEquals(999, plan.images().getFirst().tileStarts()[0]);
+    int[] rowNewline = synthetic(-1).rowNewlineTokenIds();
+    rowNewline[0] = 999;
+    assertEquals(ROW_NL, synthetic(-1).rowNewlineTokenIds()[0]);
+    int[] globalNewline = synthetic(-1).globalBlockNewlineTokenIds();
+    globalNewline[0] = 999;
+    assertEquals(DOUBLE_NL, synthetic(-1).globalBlockNewlineTokenIds()[0]);
+  }
+
+  @Test
+  void planMinimumLengthCheckUsesLongArithmetic() {
+    // tokensPerTile + 3 must not wrap in int arithmetic: the wrap would make the minimum
+    // check pass where it must reject.
+    SmolVlmImagePlacement placement = new SmolVlmImagePlacement(new int[] {1});
+    IllegalArgumentException over =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new SmolVlmPromptPlan(
+                    new int[0], new int[] {1}, Integer.MAX_VALUE, List.of(placement)));
+    assertTrue(over.getMessage().contains("2147483650"));
   }
 }

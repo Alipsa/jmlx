@@ -146,6 +146,8 @@ final class SmolVlmPromptExpander {
     } else {
       int rows = grid.rows();
       int cols = grid.cols();
+      int[] rowNewlineRun = tokens.rowNewlineTokenIds();
+      int[] globalNewlineRun = tokens.globalBlockNewlineTokenIds();
       int[] starts = new int[grid.tileCount()];
       int tile = 0;
       for (int row = 0; row < rows; row++) {
@@ -156,11 +158,7 @@ final class SmolVlmPromptExpander {
           Arrays.fill(out, position, position + tokensPerTile, tokens.imageTokenId());
           position += tokensPerTile;
         }
-        position =
-            writeRun(
-                out,
-                position,
-                row + 1 < rows ? tokens.rowNewlineTokenIds() : tokens.globalBlockNewlineTokenIds());
+        position = writeRun(out, position, row + 1 < rows ? rowNewlineRun : globalNewlineRun);
       }
       out[position++] = tokens.fakeTokenId();
       out[position++] = tokens.globalTokenId();
@@ -213,14 +211,12 @@ final class SmolVlmPromptExpander {
     // fake + global + image run + fake.
     long length = (long) tokensPerTile + 3;
     if (grid.rows() > 0) {
+      int rowNewlineLength = tokens.rowNewlineTokenIds().length;
+      int globalNewlineLength = tokens.globalBlockNewlineTokenIds().length;
       for (int row = 0; row < grid.rows(); row++) {
         length = Math.addExact(length, (long) grid.cols() * (2L + tokensPerTile));
         length =
-            Math.addExact(
-                length,
-                row + 1 < grid.rows()
-                    ? tokens.rowNewlineTokenIds().length
-                    : tokens.globalBlockNewlineTokenIds().length);
+            Math.addExact(length, row + 1 < grid.rows() ? rowNewlineLength : globalNewlineLength);
       }
     }
     return length;
@@ -239,6 +235,7 @@ final class SmolVlmPromptExpander {
               + " != feature row count "
               + plan.totalFeatureRows());
     }
+    int[] expanded = plan.expandedIds();
     int previous = -1;
     for (int destination : destinations) {
       if (destination <= previous) {
@@ -249,7 +246,7 @@ final class SmolVlmPromptExpander {
                 + previous);
       }
       previous = destination;
-      if (plan.expandedIds()[destination] != imageTokenId) {
+      if (expanded[destination] != imageTokenId) {
         throw new IllegalStateException(
             "feature destination " + destination + " does not hold the image token");
       }

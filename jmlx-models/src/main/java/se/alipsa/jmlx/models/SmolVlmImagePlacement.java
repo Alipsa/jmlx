@@ -30,6 +30,11 @@ record SmolVlmImagePlacement(int[] tileStarts) {
     }
   }
 
+  /** One start position per tile, strictly increasing; defensive copy. */
+  public int[] tileStarts() {
+    return tileStarts.clone();
+  }
+
   /** Number of tiles this image expands to. */
   public int tileCount() {
     return tileStarts.length;

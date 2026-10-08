@@ -13,7 +13,10 @@ import java.util.Objects;
  * globalBlockNewlineTokenIds} is the encoding of the doubled {@code \n\n} run after the last row
  * (the row's newline plus the global block's leading newline re-tokenize together — to the single
  * piece 1116 in the pinned SmolLM2 tokenizer, to the lone-newline encoding twice in a tokenizer
- * without that merge).
+ * without that merge). A newline ID that collides with the image, fake, global or video token or
+ * the row/column marker block is rejected at construction: a run is a plain-text encoding and can
+ * never contain a special token, and a colliding ID would insert a token that no feature
+ * destination owns.
  *
  * <p>{@code rowColTokenBase} anchors the contiguous {@code <row_r_col_c>} marker block: the marker
  * for 1-based row {@code r} and column {@code c} is {@code rowColTokenBase + (r - 1) * 6 + c}, so
@@ -86,6 +89,34 @@ record SmolVlmPromptTokens(
     rowNewlineTokenIds = nonEmptyIds(rowNewlineTokenIds, "rowNewlineTokenIds");
     globalBlockNewlineTokenIds =
         nonEmptyIds(globalBlockNewlineTokenIds, "globalBlockNewlineTokenIds");
+    // The compact-constructor body runs before the final fields are assigned, so the checks
+    // below take the component values as parameters and must not read them back through `this`.
+    rejectNewlineCollisions(
+        "rowNewlineTokenIds",
+        rowNewlineTokenIds,
+        imageTokenId,
+        fakeTokenId,
+        globalTokenId,
+        videoTokenId,
+        rowColTokenIdBase);
+    rejectNewlineCollisions(
+        "globalBlockNewlineTokenIds",
+        globalBlockNewlineTokenIds,
+        imageTokenId,
+        fakeTokenId,
+        globalTokenId,
+        videoTokenId,
+        rowColTokenIdBase);
+  }
+
+  /** The tokenizer's lone-newline encoding; defensive copy. */
+  public int[] rowNewlineTokenIds() {
+    return rowNewlineTokenIds.clone();
+  }
+
+  /** The tokenizer's doubled-newline encoding; defensive copy. */
+  public int[] globalBlockNewlineTokenIds() {
+    return globalBlockNewlineTokenIds.clone();
   }
 
   /** The {@code <row_row_col_col>} marker ID for 1-based row and column. */
@@ -95,6 +126,41 @@ record SmolVlmPromptTokens(
           "row/column markers are 1.." + MARKER_GRID_SIDE + ": " + row + "x" + col);
     }
     return rowColTokenIdBase + (row - 1) * MARKER_GRID_SIDE + col;
+  }
+
+  private static void rejectNewlineCollisions(
+      String name,
+      int[] ids,
+      int imageTokenId,
+      int fakeTokenId,
+      int globalTokenId,
+      int videoTokenId,
+      int rowColTokenIdBase) {
+    int blockHigh = rowColTokenIdBase + ROW_COL_MARKER_COUNT;
+    for (int id : ids) {
+      String collidesWith =
+          id == imageTokenId
+              ? "the image token"
+              : id == fakeTokenId
+                  ? "the fake token"
+                  : id == globalTokenId
+                      ? "the global token"
+                      : videoTokenId >= 0 && id == videoTokenId
+                          ? "the video token"
+                          : id > rowColTokenIdBase && id <= blockHigh
+                              ? "a row/column marker"
+                              : null;
+      if (collidesWith != null) {
+        throw new IllegalArgumentException(
+            name
+                + " contains "
+                + collidesWith
+                + " (ID "
+                + id
+                + "); newline runs are plain-text encodings and must not collide with special "
+                + "tokens");
+      }
+    }
   }
 
   private static int[] nonEmptyIds(int[] ids, String name) {

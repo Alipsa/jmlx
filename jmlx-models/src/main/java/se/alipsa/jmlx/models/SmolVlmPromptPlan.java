@@ -29,15 +29,26 @@ record SmolVlmPromptPlan(
     }
     images = List.copyOf(Objects.requireNonNull(images, "images"));
     // Each image occupies at least one unsplit tile: tokensPerTile + 3 marker tokens.
-    if ((long) images.size() * (tokensPerTile + 3) > expandedIds.length) {
+    long minimum = (long) images.size() * ((long) tokensPerTile + 3);
+    if (minimum > expandedIds.length) {
       throw new IllegalArgumentException(
           "expanded IDs hold "
               + expandedIds.length
               + " tokens but "
               + images.size()
               + " image(s) need at least "
-              + (long) images.size() * (tokensPerTile + 3));
+              + minimum);
     }
+  }
+
+  /** The original (unexpanded) prompt IDs; defensive copy. */
+  public int[] unexpandedIds() {
+    return unexpandedIds.clone();
+  }
+
+  /** The expanded prompt IDs; defensive copy. */
+  public int[] expandedIds() {
+    return expandedIds.clone();
   }
 
   /** Length of the expanded prompt in tokens. */

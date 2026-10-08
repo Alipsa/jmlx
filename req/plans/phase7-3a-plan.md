@@ -304,7 +304,10 @@ the newline-run encodings: the reference expands at the string level and re-toke
 (reference findings §6), and the only non-special characters it inserts are the row newlines — a
 lone `\n` after every row except the last and the merged `\n\n` run before the global block, both
 ordinary BPE tokens resolved from the tokenizer at model load (`[198]` and `[1116]` for the pinned
-SmolVLM-256M tokenizer).
+SmolVLM-256M tokenizer). Reject newline IDs that collide with the image, fake, global or video
+token or the row/column marker block: a run is a plain-text encoding and a colliding ID would
+insert a token that no feature destination owns. The plan/placement/token records own their
+arrays; accessors return defensive copies and internal paths read the fields directly.
 
 Count each `<image>` as one unit. `<image><image>` is valid for two supplied images. Reject
 count mismatches, any processor-only fake/row-column/global marker and unsupported video with
@@ -314,7 +317,10 @@ content-part rejection is the effective gate there. Freeze exact markers and til
 in WP1 (amended in place with the re-tokenization counts, per the committed golden); feature
 positions must exclude wrapper/row/column text. Expand after preprocessing, before native
 allocation; use checked token length arithmetic. Validate every projected-feature row has exactly
-one destination, in order.
+one destination, in order. The expander anchors the marker block at its base and cannot detect a
+block that is contiguous but ordered differently, so WP6 must verify all 36 `<row_r_col_c>` IDs
+against the row-major formula when it resolves them from the tokenizer (or store the 36 IDs in an
+explicit table).
 
 Use expanded IDs for penalties, positions, context limits and cache budget `expandedLength +
 maxNewTokens - 1` when maxNewTokens is positive. Include both unexpanded and expanded lengths in
@@ -367,7 +373,12 @@ prompt ID count; the floor `promptPositions >= promptTokenIds().size()` is enfor
 coverage: `LlamaModelTest` zero/one/many/EOS/stop/abort, `Seq2SeqGenerationTest` T5
 source-length equality and aborted prompt IDs, `BatchGenerationSchedulerTest` per-row scheduler
 lengths against the direct path. The model-level `maxNewTokens == 0` path (pixel-work skip,
-zero tower calls, the cancellation points) remains in WP6's `SmolVlmModel.generate`.
+zero tower calls, the cancellation points) remains in WP6's `SmolVlmModel.generate`. Post-review
+amendments: the plan's minimum-length check computes the per-image marker minimum in long
+arithmetic (an int wrap of `tokensPerTile + 3` would pass the check at extreme values); the
+record array accessors return defensive copies; `SmolVlmPromptTokens` rejects newline IDs
+colliding with the special tokens or the marker block; the pinned-fixture test verifies all 36
+`<row_r_col_c>` IDs against the row-major formula, not just the block's ends.
 
 ## 7. Decoder refactor and model assembly (WP5–WP6)
 

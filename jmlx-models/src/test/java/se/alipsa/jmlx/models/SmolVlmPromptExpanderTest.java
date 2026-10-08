@@ -3,6 +3,7 @@ package se.alipsa.jmlx.models;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -171,15 +172,16 @@ class SmolVlmPromptExpanderTest {
     int[] destinations = plan.featureDestinations();
     assertEquals(17 * 64, destinations.length);
     int imageToken = fixtures.tokens().imageTokenId();
+    int[] expanded = plan.expandedIds();
     int expected = 0;
     for (int destination : destinations) {
       assertTrue(destination > expected, "destinations must be strictly increasing");
       expected = destination;
-      assertEquals(imageToken, plan.expandedIds()[destination]);
+      assertEquals(imageToken, expanded[destination]);
     }
     // Every image token in the expanded prompt is a destination, no more and no less.
     int imageTokens = 0;
-    for (int id : plan.expandedIds()) {
+    for (int id : expanded) {
       if (id == imageToken) {
         imageTokens++;
       }
@@ -526,5 +528,41 @@ class SmolVlmPromptExpanderTest {
                 new SmolVlmPromptPlan(
                     new int[0], new int[] {1}, Integer.MAX_VALUE, List.of(placement)));
     assertTrue(over.getMessage().contains("2147483650"));
+  }
+
+  @Test
+  void recordsUseValueEqualityAndReadableToString() {
+    SmolVlmPromptPlan plan =
+        SmolVlmPromptExpander.expand(
+            new int[] {1, 2, IMAGE, 3}, synthetic(-1), List.of(new SmolVlmImageGrid(2, 3)), TPP);
+    SmolVlmPromptPlan same =
+        SmolVlmPromptExpander.expand(
+            new int[] {1, 2, IMAGE, 3}, synthetic(-1), List.of(new SmolVlmImageGrid(2, 3)), TPP);
+    assertEquals(plan, same);
+    assertEquals(plan.hashCode(), same.hashCode());
+    assertNotEquals(
+        plan,
+        SmolVlmPromptExpander.expand(
+            new int[] {1, 2, IMAGE, 3},
+            synthetic(-1),
+            List.of(new SmolVlmImageGrid(2, 3)),
+            TPP + 1));
+
+    SmolVlmImagePlacement placement = new SmolVlmImagePlacement(new int[] {2, 9});
+    assertEquals(placement, new SmolVlmImagePlacement(new int[] {2, 9}));
+    assertEquals(placement.hashCode(), new SmolVlmImagePlacement(new int[] {2, 9}).hashCode());
+    assertNotEquals(placement, new SmolVlmImagePlacement(new int[] {2, 10}));
+
+    assertEquals(synthetic(-1), synthetic(-1));
+    assertEquals(synthetic(-1).hashCode(), synthetic(-1).hashCode());
+    assertNotEquals(
+        synthetic(-1),
+        new SmolVlmPromptTokens(
+            IMAGE, -1, FAKE, GLOBAL, BASE, new int[] {ROW_NL + 1}, new int[] {DOUBLE_NL}));
+
+    // toString renders the array contents, not their identities.
+    String rendered = plan.toString();
+    assertTrue(rendered.contains("expandedIds=["));
+    assertFalse(rendered.contains("[I@"));
   }
 }

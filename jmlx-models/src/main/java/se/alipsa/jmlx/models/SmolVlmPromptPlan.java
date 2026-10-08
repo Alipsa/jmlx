@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.models;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import se.alipsa.jmlx.nn.KVCachePolicy;
@@ -11,7 +12,7 @@ import se.alipsa.jmlx.nn.KVCachePolicy;
  *
  * <p>{@code promptPositions} for the finished result is {@link #expandedLength()}; the {@link
  * #unexpandedIds()} are retained (owned copy) so results and capacity errors can report both
- * lengths.
+ * lengths. Equality is by value: the ID arrays elementwise and the placements listwise.
  *
  * @param unexpandedIds the original prompt IDs, owned copy
  * @param expandedIds the expanded prompt IDs, owned copy
@@ -121,12 +122,43 @@ record SmolVlmPromptPlan(
     int[] destinations = new int[totalFeatureRows()];
     int i = 0;
     for (SmolVlmImagePlacement image : images) {
-      for (int start : image.tileStarts()) {
+      for (int start : image.tileStartsArray()) {
         for (int row = 0; row < tokensPerTile; row++) {
           destinations[i++] = Math.addExact(start, row);
         }
       }
     }
     return destinations;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof SmolVlmPromptPlan that)) {
+      return false;
+    }
+    return tokensPerTile == that.tokensPerTile
+        && Arrays.equals(unexpandedIds, that.unexpandedIds)
+        && Arrays.equals(expandedIds, that.expandedIds)
+        && images.equals(that.images);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        Arrays.hashCode(unexpandedIds), Arrays.hashCode(expandedIds), tokensPerTile, images);
+  }
+
+  @Override
+  public String toString() {
+    return "SmolVlmPromptPlan["
+        + "unexpandedIds="
+        + Arrays.toString(unexpandedIds)
+        + ", expandedIds="
+        + Arrays.toString(expandedIds)
+        + ", tokensPerTile="
+        + tokensPerTile
+        + ", images="
+        + images
+        + "]";
   }
 }

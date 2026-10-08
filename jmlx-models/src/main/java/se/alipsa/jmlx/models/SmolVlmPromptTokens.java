@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.models;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -21,7 +22,7 @@ import java.util.Objects;
  * <p>{@code rowColTokenBase} anchors the contiguous {@code <row_r_col_c>} marker block: the marker
  * for 1-based row {@code r} and column {@code c} is {@code rowColTokenBase + (r - 1) * 6 + c}, so
  * the used IDs are {@code rowColTokenBase + 1 .. rowColTokenBase + 36} (the base itself is not a
- * row/column marker).
+ * row/column marker). Equality is by value: the newline arrays elementwise.
  *
  * @param imageTokenId the {@code <image>} expansion marker
  * @param videoTokenId the tokenizer's {@code <video>} token, or -1 when the tokenizer declares no
@@ -174,5 +175,51 @@ record SmolVlmPromptTokens(
       }
     }
     return copy;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof SmolVlmPromptTokens that)) {
+      return false;
+    }
+    return imageTokenId == that.imageTokenId
+        && videoTokenId == that.videoTokenId
+        && fakeTokenId == that.fakeTokenId
+        && globalTokenId == that.globalTokenId
+        && rowColTokenIdBase == that.rowColTokenIdBase
+        && Arrays.equals(rowNewlineTokenIds, that.rowNewlineTokenIds)
+        && Arrays.equals(globalBlockNewlineTokenIds, that.globalBlockNewlineTokenIds);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        imageTokenId,
+        videoTokenId,
+        fakeTokenId,
+        globalTokenId,
+        rowColTokenIdBase,
+        Arrays.hashCode(rowNewlineTokenIds),
+        Arrays.hashCode(globalBlockNewlineTokenIds));
+  }
+
+  @Override
+  public String toString() {
+    return "SmolVlmPromptTokens["
+        + "imageTokenId="
+        + imageTokenId
+        + ", videoTokenId="
+        + videoTokenId
+        + ", fakeTokenId="
+        + fakeTokenId
+        + ", globalTokenId="
+        + globalTokenId
+        + ", rowColTokenIdBase="
+        + rowColTokenIdBase
+        + ", rowNewlineTokenIds="
+        + Arrays.toString(rowNewlineTokenIds)
+        + ", globalBlockNewlineTokenIds="
+        + Arrays.toString(globalBlockNewlineTokenIds)
+        + "]";
   }
 }

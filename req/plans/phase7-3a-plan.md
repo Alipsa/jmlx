@@ -307,7 +307,8 @@ ordinary BPE tokens resolved from the tokenizer at model load (`[198]` and `[111
 SmolVLM-256M tokenizer). Reject newline IDs that collide with the image, fake, global or video
 token or the row/column marker block: a run is a plain-text encoding and a colliding ID would
 insert a token that no feature destination owns. The plan/placement/token records own their
-arrays; accessors return defensive copies and internal paths read the fields directly.
+arrays; accessors return defensive copies and internal paths read the fields directly. The
+records compare by value (arrays elementwise) and render the arrays in toString.
 
 Count each `<image>` as one unit. `<image><image>` is valid for two supplied images. Reject
 count mismatches, any processor-only fake/row-column/global marker and unsupported video with
@@ -378,7 +379,11 @@ amendments: the plan's minimum-length check computes the per-image marker minimu
 arithmetic (an int wrap of `tokensPerTile + 3` would pass the check at extreme values); the
 record array accessors return defensive copies; `SmolVlmPromptTokens` rejects newline IDs
 colliding with the special tokens or the marker block; the pinned-fixture test verifies all 36
-`<row_r_col_c>` IDs against the row-major formula, not just the block's ends.
+`<row_r_col_c>` IDs against the row-major formula, not just the block's ends. Second review
+round: the array-holding records override equals/hashCode/toString with elementwise array
+semantics (the generated versions compared and printed the arrays by reference), and
+`featureDestinations` reads the placements' internal start arrays through a package-private
+raw accessor so the same-package path pays no copy.
 
 ## 7. Decoder refactor and model assembly (WP5–WP6)
 

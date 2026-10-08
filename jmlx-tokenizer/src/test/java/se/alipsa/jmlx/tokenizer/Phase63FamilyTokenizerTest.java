@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -11,8 +12,11 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.jinja.Template;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -48,9 +52,9 @@ class Phase63FamilyTokenizerTest {
    * The SmolVLM bundle commits more than the tokenizer pair (chat template, special tokens,
    * processor configs), so every {@code smolvlm/*} provenance entry is checked: each pinned entry
    * must exist on disk with the recorded digest, and every committed file must be pinned, so an
-   * edited, added, or removed bundle file fails the build. Dotfiles are not bundle files: the
-   * bundle directory is a Finder-visible test resource, so a .DS_Store (created whenever someone
-   * opens it) must not fail the check.
+   * edited, added, or removed bundle file fails the build. The source folder is read to, never
+   * written by, this check: a .DS_Store a Finder user may have left in it is simply not a bundle
+   * file (see bundleFileListingIgnoresDotfiles).
    */
   @Test
   void smolvlmBundleFilesMatchRecordedProvenance() throws Exception {
@@ -60,31 +64,37 @@ class Phase63FamilyTokenizerTest {
             .readTree(root.resolve("tools/hf-reference/provenance.json").toFile())
             .required("chat_sources");
     Path directory = root.resolve("jmlx-tokenizer/src/test/resources/families/smolvlm");
-    Path dsStore = directory.resolve(".DS_Store");
-    Files.createFile(dsStore);
-    try {
-      var pinned = new TreeSet<String>();
-      for (var entry : sources.properties()) {
-        if (entry.getKey().startsWith("smolvlm/")) {
-          pinned.add(entry.getKey().substring("smolvlm/".length()));
-        }
+    var pinned = new TreeSet<String>();
+    for (var entry : sources.properties()) {
+      if (entry.getKey().startsWith("smolvlm/")) {
+        pinned.add(entry.getKey().substring("smolvlm/".length()));
       }
-      var committed = new TreeSet<String>();
-      try (var files = Files.list(directory)) {
-        files
-            .filter(Files::isRegularFile)
-            .filter(path -> !path.getFileName().toString().startsWith("."))
-            .forEach(path -> committed.add(path.getFileName().toString()));
-      }
-      assertEquals(pinned, committed);
-      for (String filename : committed) {
-        byte[] bytes = Files.readAllBytes(directory.resolve(filename));
-        String actual =
-            HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-        assertEquals(sources.required("smolvlm/" + filename).asString(), actual, filename);
-      }
-    } finally {
-      Files.deleteIfExists(dsStore);
+    }
+    var committed = bundleFiles(directory);
+    assertEquals(pinned, committed);
+    for (String filename : committed) {
+      byte[] bytes = Files.readAllBytes(directory.resolve(filename));
+      String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+      assertEquals(sources.required("smolvlm/" + filename).asString(), actual, filename);
+    }
+  }
+
+  /** A .DS_Store left in a bundle folder by Finder is not a bundle file. */
+  @Test
+  void bundleFileListingIgnoresDotfiles(@TempDir Path directory) throws IOException {
+    Files.writeString(directory.resolve("tokenizer.json"), "{}");
+    Files.createFile(directory.resolve(".DS_Store"));
+    assertEquals(Set.of("tokenizer.json"), bundleFiles(directory));
+  }
+
+  /** The regular, non-dot files of a bundle directory, as a sorted set of names. */
+  private static Set<String> bundleFiles(Path directory) throws IOException {
+    try (var files = Files.list(directory)) {
+      return files
+          .filter(Files::isRegularFile)
+          .map(path -> path.getFileName().toString())
+          .filter(name -> !name.startsWith("."))
+          .collect(Collectors.toCollection(TreeSet::new));
     }
   }
 

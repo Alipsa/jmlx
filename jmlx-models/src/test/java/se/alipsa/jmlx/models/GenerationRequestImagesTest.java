@@ -51,18 +51,20 @@ class GenerationRequestImagesTest {
     for (int i = 0; i < backing.length; i++) {
       backing[i] = (byte) i;
     }
+    final byte[] original = backing.clone();
     RgbImage first = new RgbImage(2, 3, backing);
     List<RgbImage> callerList = new ArrayList<>(List.of(first, image(1, 1, 9)));
 
-    GenerationRequest request = base().withImages(callerList);
+    final GenerationRequest request = base().withImages(callerList);
 
-    backing[0] = 0; // the image constructor already copied the buffer
+    // Mutate everything the caller still holds: the pixel buffer and the list.
+    backing[0] = 99;
     callerList.add(image(4, 4, 7));
     callerList.remove(0);
 
     assertEquals(2, request.images().size());
-    assertEquals(first, request.images().get(0));
-    assertEquals(List.of(first, image(1, 1, 9)), request.images());
+    assertEquals(new RgbImage(2, 3, original), request.images().get(0));
+    assertEquals(List.of(new RgbImage(2, 3, original), image(1, 1, 9)), request.images());
     assertThrows(UnsupportedOperationException.class, () -> request.images().add(image(1, 1, 1)));
   }
 

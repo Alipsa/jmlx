@@ -1,7 +1,7 @@
 # Phase 7.3a — Vision foundation and SmolVLM-256M
 
-- **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`), both on
-  `main` as of 2026-10-08; WP4 is the current work package.
+- **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`), WP4
+  via PR #43 (pending merge as of 2026-10-08); WP5 is the next work package.
 - **Parent:** `req/plans/phase7-plan.md` §7.3a, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Prerequisite:** 7.1 layer/oracle/inventory acceptance. 7.2 cross-attention and 7.0 are
@@ -351,6 +351,23 @@ Tests cover exact HF expansion, different tile counts, images between text, malf
 count mismatch, exact/one-over capacity, zero/one/many generated tokens, EOS/stop and abort IDs.
 Generated image-special tokens are ordinary decoder history, not an instruction to re-run
 vision.
+
+Delivered via PR #43 (branch `phase7-3a-wp4`, 2026-10-08): the package-private
+`SmolVlmPromptExpander` and the `SmolVlmPromptTokens`/`SmolVlmImageGrid`/`SmolVlmImagePlacement`/
+`SmolVlmPromptPlan` records in `se.alipsa.jmlx.models`; the shared
+`SmolVlmImageProcessor.geometry`/`SmolVlmGeometryPlan` landed in jmlx-vision in the same PR.
+`SmolVlmPromptExpanderTest` matches all six golden `expanded_ids` byte-for-byte against the
+pinned transformers 4.57.6 reference (grids derived from the shared geometry plan, not the
+golden's names) and covers the synthetic unsplit/split sequences, prompt-order placements, every
+distinct rejection (count mismatch, fake, row/column, global, video, the 6x6 bound, length
+overflow) and the cache budget at exact/one-over/zero. `GenerationResult` is now a six-component
+record with `promptPositions` (the four-/five-argument compatibility constructors default to the
+prompt ID count; the floor `promptPositions >= promptTokenIds().size()` is enforced;
+`DecoderModel`, `T5Model` and `BatchGenerationScheduler` pass the explicit length). Runtime
+coverage: `LlamaModelTest` zero/one/many/EOS/stop/abort, `Seq2SeqGenerationTest` T5
+source-length equality and aborted prompt IDs, `BatchGenerationSchedulerTest` per-row scheduler
+lengths against the direct path. The model-level `maxNewTokens == 0` path (pixel-work skip,
+zero tower calls, the cancellation points) remains in WP6's `SmolVlmModel.generate`.
 
 ## 7. Decoder refactor and model assembly (WP5–WP6)
 

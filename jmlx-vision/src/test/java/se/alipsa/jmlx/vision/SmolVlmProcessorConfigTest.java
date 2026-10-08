@@ -139,6 +139,63 @@ class SmolVlmProcessorConfigTest {
   }
 
   @Test
+  void valuesThatDoNotFitInAnIntAreRejected() {
+    // A literal outside the int range: asInt() must not be called (it throws a
+    // JsonNodeException out of range), so the range check must come first.
+    String base = textOrThrow();
+    expectRejection(
+        base.replace("\"resample\": 1", "\"resample\": 4294967297"),
+        "resample must fit in a signed 32-bit integer: 4294967297");
+    expectRejection(
+        base.replace("\"longest_edge\": 2048", "\"longest_edge\": 4294967297"),
+        "size.longest_edge must fit in a signed 32-bit integer: 4294967297");
+    expectRejection(
+        base.replace("\"longest_edge\": 512", "\"longest_edge\": 4294967297"),
+        "max_image_size.longest_edge must fit in a signed 32-bit integer: 4294967297");
+  }
+
+  @Test
+  void tileSizeIsCappedAtTheReferenceMaximum() throws Exception {
+    String base = text();
+    // The tile size drives the stage-2 allocation directly, so it is capped at the reference's
+    // own MAX_IMAGE_SIZE.
+    expectRejection(
+        base.replace("\"longest_edge\": 512", "\"longest_edge\": 4097"),
+        "max_image_size.longest_edge must be at most 4096: 4097");
+    expectRejection(
+        base.replace("\"longest_edge\": 512", "\"longest_edge\": 100000"),
+        "max_image_size.longest_edge must be at most 4096: 100000");
+    assertEquals(
+        4096,
+        parse(base.replace("\"longest_edge\": 512", "\"longest_edge\": 4096"))
+            .maxImageSizeLongestEdge());
+    // size.longest_edge is deliberately uncapped: the chain caps the stage-1 output at 4096
+    // exactly as the reference does (see SmolVlmImageProcessorTest.stage1IsCappedAt4096).
+    assertEquals(
+        5000,
+        parse(base.replace("\"longest_edge\": 2048", "\"longest_edge\": 5000")).sizeLongestEdge());
+  }
+
+  @Test
+  void doConvertRgbFalseIsRejected() {
+    // The ported decoder always converts to RGB, so a config that skips the conversion cannot
+    // be honored and is rejected at parse time rather than silently ignored.
+    expectRejection(
+        textOrThrow().replace("\"do_convert_rgb\": true", "\"do_convert_rgb\": false"),
+        "do_convert_rgb must be true: the ported decoder always converts decoded input to "
+            + "RGB (alpha composited over white, palettes expanded), so a config that skips "
+            + "the conversion would be silently ignored");
+  }
+
+  @Test
+  void processorClassMustBeAString() {
+    expectRejection(
+        textOrThrow()
+            .replace("\"processor_class\": \"Idefics3Processor\"", "\"processor_class\": 5"),
+        "processor_class must be a JSON string");
+  }
+
+  @Test
   void rescaleFactorIsStrict() {
     String base = textOrThrow();
     String factor = "\"rescale_factor\": 0.00392156862745098";

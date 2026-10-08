@@ -207,13 +207,16 @@ public final class SmolVlmImageProcessor {
       cols = (int) Math.ceil((double) w / max);
       int optimalH = (int) Math.ceil((double) h / rows);
       int optimalW = (int) Math.ceil((double) w / cols);
+      // One exposure of the stage-2 buffer for the whole crop set: pixelsRaw() does not copy,
+      // so the cost is one buffer reference, not one full-image clone per tile.
+      byte[] src = image.pixelsRaw();
       for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
           int startX = c * optimalW;
           int startY = r * optimalH;
           int endX = Math.min(startX + optimalW, w);
           int endY = Math.min(startY + optimalH, h);
-          frames.add(crop(image, startX, startY, endX, endY));
+          frames.add(crop(src, w, startX, startY, endX, endY));
         }
       }
       if (h != max || w != max) {
@@ -241,17 +244,19 @@ public final class SmolVlmImageProcessor {
     }
   }
 
-  private static RgbImage crop(RgbImage in, int x0, int y0, int x1, int y1) {
+  /**
+   * Copies the {@code (x0, y0) x (x1, y1)} rectangle out of the source buffer into a fresh tile.
+   * The source buffer is read-only here and is adopted into the result without copying (the caller
+   * exposes it once for the whole crop set — see {@link #split}).
+   */
+  private static RgbImage crop(byte[] src, int srcWidth, int x0, int y0, int x1, int y1) {
     int w = x1 - x0;
     int h = y1 - y0;
     byte[] out = new byte[w * h * 3];
-    // One defensive copy of the source for the whole crop: pixels() clones, so calling it
-    // per row would re-copy the full image on every row.
-    byte[] src = in.pixels();
     for (int y = 0; y < h; y++) {
-      System.arraycopy(src, (y0 + y) * in.width() * 3 + x0 * 3, out, y * w * 3, w * 3);
+      System.arraycopy(src, (y0 + y) * srcWidth * 3 + x0 * 3, out, y * w * 3, w * 3);
     }
-    return new RgbImage(w, h, out);
+    return RgbImage.ofUnchecked(w, h, out);
   }
 
   /** Pads an NHWC tensor to (maxH, maxW) at bottom/right with constant 0.0f, as the reference. */
@@ -259,7 +264,9 @@ public final class SmolVlmImageProcessor {
     int[] shape = tensor.shape();
     int h = shape[1];
     int w = shape[2];
-    float[] source = tensor.values();
+    // valuesRaw(): the (multi-megabyte) source buffer is only read here; the padded buffer is
+    // fresh and is copied exactly once, by the ImageTensor constructor.
+    float[] source = tensor.valuesRaw();
     float[] padded = new float[maxH * maxW * 3];
     for (int y = 0; y < h; y++) {
       System.arraycopy(source, y * w * 3, padded, y * maxW * 3, w * 3);

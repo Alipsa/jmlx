@@ -34,6 +34,30 @@ class ImageTransformsTest {
   }
 
   @Test
+  void resizeRejectsOversizedTargets() {
+    // width*height must stay within Integer.MAX_VALUE / 3, so the 3-bytes-per-pixel output
+    // buffer allocation cannot wrap to a negative size; 50000x50000 also overflows the int
+    // product itself, which must be computed in long.
+    RgbImage image = new RgbImage(2, 2, new byte[12]);
+    IllegalArgumentException beyondIntProduct =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ImageTransforms.resize(image, 50000, 50000, Resampling.BILINEAR));
+    assertEquals(
+        "resize target 50000x50000 overflows an int pixel buffer: width*height is 2500000000 "
+            + "but must be at most 715827882",
+        beyondIntProduct.getMessage());
+    IllegalArgumentException withinIntProduct =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ImageTransforms.resize(image, 40000, 40000, Resampling.BILINEAR));
+    assertEquals(
+        "resize target 40000x40000 overflows an int pixel buffer: width*height is 1600000000 "
+            + "but must be at most 715827882",
+        withinIntProduct.getMessage());
+  }
+
+  @Test
   void identityResizeIsExactForEveryKernel() {
     byte[] pixels = new byte[3 * 3 * 3];
     for (int i = 0; i < pixels.length; i++) {

@@ -208,6 +208,12 @@ drops palette `tRNS` entirely (the palette is rebuilt RGB-only), so an oversized
 opaque palette pixels like any palette `tRNS`; the Java `ImageDecoder` likewise strips the whole chunk
 rather than rejecting the file. Fixture: `palette8-trns-overflow-8x8` (five samples for four entries).
 
+**Suggested `PLTE` on truecolor/RGBA:** a `PLTE` chunk on a truecolor or RGBA image is only a *suggested*
+palette (RFC 2083 §11.2); PIL keeps the image in mode `RGB`/`RGBA` and never maps it through the palette, so
+the reference's output for such files is independent of the chunk. The Java `ImageDecoder` matches: the
+`DecodePlan` carries the palette only for color type 3, so a `PLTE` on a truecolor/RGBA image is ignored
+(test: a `PLTE` injected after `IHDR` decodes byte-identical to the opaque original).
+
 **JPEG restart markers:** a scan written with a restart interval contains `RST0`–`RST7` markers inside the
 entropy-coded data, and the writer (PIL's `restart_marker_blocks`, libjpeg, camera and phone encoders)
 additionally emits an optional `DRI` segment (`FF DD`, length 4, restart interval) before the scan. Both are
@@ -437,7 +443,7 @@ consumes.
 ## 8. WP2 Java implementation findings (JDK image decoding)
 
 Findings from implementing `jmlx-vision`'s `ImageDecoder`/resampling against the pinned Pillow 12.3.0 oracle.
-All 51 module tests are byte-exact against the committed fixtures (decode/resize/chain) with no loosened
+All 65 module tests are byte-exact against the committed fixtures (decode/resize/chain) with no loosened
 tolerances; the normalized-tile comparison in the chain test uses the documented `1e-6` float32 tolerance.
 
 ### Raster byte layout is NOT channel order (root cause of red/blue swaps)
@@ -476,9 +482,11 @@ path `getRGB` uses and correct for all packed depths. 8-bit palettes arrive inte
 
 The JDK's built-in JPEG decoder is lenient about truncated scan data (it silently produces an image padded with
 wrong pixels at the declared size). Truncation is detected by walking the full marker structure in the header
-pre-scan, including the compressed scan as raw bytes (an `FF` followed by a byte that is neither `FF` (fill),
-`00` (lenient data), nor one of the `RST0`–`RST7` restart markers — valid inside a scan written with a restart
-interval — terminates it; outside the scan, every `FF FF` pair is a fill byte — the `DRI` (restart interval)
+pre-scan, including the compressed scan as raw bytes (an `FF` followed by another `FF` is a fill byte and
+advances *one* byte, so the second `FF` is re-examined as a marker candidate — a fill byte directly before the
+`EOI` must not swallow it; an `FF` followed by `00` (a stuffed data byte) or one of the `RST0`–`RST7` restart
+markers — valid inside a scan written with a restart interval — advances two; any other following byte
+terminates the scan; outside the scan, every `FF FF` pair is a fill byte — the `DRI` (restart interval)
 segment is a plain `FF DD` length-prefixed segment the general marker path skips — see §3), and requiring the
 well-formed `EOI` marker the decoder never checks for.
 
@@ -504,8 +512,23 @@ Palette, truecolor and grayscale `tRNS` is never composited: it is stripped from
 
 ### Documented ordering divergences
 
-The reference resizes **and splits before** `convert_to_rgb` (its `_preprocess` order); the port decodes
-straight to RGB (composite over white, palette expansion) and resizes in RGB space. Identical for opaque
-RGB/grayscale input (all strict fixtures); divergent for semi-transparent RGBA (reference resizes alpha in
-its native space) and palette PNG (reference resizes palette indices). The decode path is byte-exact for
-both families; the byte-exact full-chain fixtures exclude them (documented in `jmlx-vision/README.md`).
+The reference resizes **and splits before** `convert_to_rgb` (its `preprocess` order); the port decodes
+straight to RGB (composite over white, palette expansion) and resizes in RGB space. Decoding to RGB first is
+a *deliberate extension* of the reference, and the two orderings agree only for fully opaque **RGB** input
+(verified on the committed fixtures against the pinned venv):
+
+- The reference's default `preprocess` (channels-first output) accepts only opaque RGB: `L` and `P` inputs
+  raise `ValueError: Unsupported number of image dimensions: 2`, and `LA` inputs raise
+  `ValueError: Unable to infer channel dimension format` (in both input-data formats). The port accepts all
+  of them.
+- With `input_data_format="channels_last"`, the reference accepts `L` and `P`, but its `resize` converts a
+  single-channel array to a PIL image in mode `P` (`image.ndim == 2 or image.shape[-1] == 1 →
+  image_mode = "P"`), and the pinned Pillow 12.3.0 `Image.resize` forces `Resampling.NEAREST` for modes
+  `1`/`P` regardless of the configured kernel (`if self.mode in ("1", "P"): resample = Resampling.NEAREST`) —
+  so even there the reference does not run the configured kernel on the single channel, while the port
+  resizes the expanded/composited RGB with it. Measured max absolute difference on the normalized float32
+  `pixel_values` (pinned SmolVLM-256M config): `1.6313726` on `gray-60x40.png` and `1.5843138` on
+  `palette8-32x32.png`, exactly `0.0` on the opaque RGB fixture, where the two orderings agree.
+
+The decode path is byte-exact for every accepted family; the byte-exact full-chain fixtures use opaque RGB
+only (the oracle runner enforces `image.mode == "RGB"`) — documented in `jmlx-vision/README.md`.

@@ -16,7 +16,8 @@ public final class ImageTransforms {
    * @param width positive target width
    * @param height positive target height
    * @param method resampling kernel
-   * @throws IllegalArgumentException if an argument is null or a target dimension is not positive
+   * @throws IllegalArgumentException if an argument is null, a target dimension is not positive, or
+   *     {@code width * height * 3} overflows an int
    */
   public static RgbImage resize(RgbImage image, int width, int height, Resampling method) {
     if (image == null) {
@@ -31,10 +32,24 @@ public final class ImageTransforms {
     if (method == null) {
       throw new IllegalArgumentException("method must not be null");
     }
-    byte[] source = image.pixels();
+    if ((long) width * height > Integer.MAX_VALUE / 3) {
+      throw new IllegalArgumentException(
+          "resize target "
+              + width
+              + "x"
+              + height
+              + " overflows an int pixel buffer: width*height is "
+              + (long) width * height
+              + " but must be at most "
+              + (Integer.MAX_VALUE / 3));
+    }
+    // pixelsRaw() and ofUnchecked() keep the no-copy internal path: the resampler allocates its
+    // own output (a copy only in the identity case, mirroring the reference's ImagingCopy), and
+    // the result is adopted without the public constructor's clone.
+    byte[] source = image.pixelsRaw();
     byte[] resized =
         PillowResample.resize(source, image.width(), image.height(), width, height, method);
-    return new RgbImage(width, height, resized);
+    return RgbImage.ofUnchecked(width, height, resized);
   }
 
   /**
@@ -78,7 +93,9 @@ public final class ImageTransforms {
     int width = image.width();
     int height = image.height();
     float[] values = new float[width * height * 3];
-    byte[] pixels = image.pixels();
+    // pixelsRaw(): the source buffer is only read here; the values buffer is fresh and is copied
+    // exactly once, by the ImageTensor constructor.
+    byte[] pixels = image.pixelsRaw();
     int i = 0;
     for (int p = 0; p < pixels.length; p += 3) {
       // float32(float64(pixel) * scale), then (x - mean[c]) / std[c] in float32.

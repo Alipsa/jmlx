@@ -61,6 +61,15 @@ public record ImageTensor(float[] values, int[] shape, Layout layout) {
     return values.clone();
   }
 
+  /**
+   * The backing values buffer without copying. Package-private escape hatch for the module's own
+   * call chain, which reads it while building a fresh output buffer; public code must use {@link
+   * #values()} or {@link #copyValuesTo(float[], int)}.
+   */
+  float[] valuesRaw() {
+    return values;
+  }
+
   /** Returns a copy of the shape vector. */
   @Override
   public int[] shape() {

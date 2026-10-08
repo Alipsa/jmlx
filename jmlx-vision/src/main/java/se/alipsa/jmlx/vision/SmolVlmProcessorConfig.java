@@ -13,11 +13,18 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Parsing is strict: the root must be a JSON object, every key must be a recognized
  * SmolVLM/Idefics3 processor option, all operational options must be present and have the expected
- * type, the {@code image_processor_type} must be {@code Idefics3ImageProcessor}, and {@code
+ * type, {@code do_convert_rgb} must be {@code true} (the ported decoder always converts to RGB —
+ * alpha composited over white, palettes expanded — so a config that skips the conversion cannot be
+ * honored), the {@code image_processor_type} must be {@code Idefics3ImageProcessor}, and {@code
  * size}/{@code max_image_size} must be objects with a single positive-integer {@code longest_edge}
- * entry. Unrecognized keys, missing operational options, malformed values and unsupported {@code
- * resample} numbers are rejected with a descriptive {@link IllegalArgumentException} that names the
- * offending key; unsupported resample values are never mapped to a nearby filter.
+ * entry that fits in a signed 32-bit integer. {@code max_image_size.longest_edge} is additionally
+ * capped at 4096, the reference's own absolute tile maximum ({@code MAX_IMAGE_SIZE}): the tile size
+ * drives the stage-2 allocation directly, so an untrusted config must not be able to request an
+ * arbitrarily large one. {@code size.longest_edge} needs no such cap — the chain caps the stage-1
+ * output at 4096, exactly as the reference does. Unrecognized keys, missing operational options,
+ * malformed values and unsupported {@code resample} numbers are rejected with a descriptive {@link
+ * IllegalArgumentException} that names the offending key; unsupported resample values are never
+ * mapped to a nearby filter.
  *
  * <p>The pinned SmolVLM-256M configuration (the reference for this milestone) parses to: resize
  * longest edge to 2048, LANCZOS, image splitting on, tile size 512, rescale {@code
@@ -25,6 +32,10 @@ import tools.jackson.databind.ObjectMapper;
  */
 public final class SmolVlmProcessorConfig {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  // Absolute maximum tile size, mirroring the reference's MAX_IMAGE_SIZE = 4096 (see the class
+  // javadoc for why only the tile size is capped).
+  private static final int MAX_TILE_LONGEST_EDGE = 4096;
 
   private static final Set<String> KNOWN_KEYS =
       Set.of(
@@ -158,6 +169,21 @@ public final class SmolVlmProcessorConfig {
       throw new IllegalArgumentException(
           "rescale_factor must be finite and positive: " + rescaleFactor);
     }
+    boolean doConvertRgb = bool(root, "do_convert_rgb");
+    if (!doConvertRgb) {
+      throw new IllegalArgumentException(
+          "do_convert_rgb must be true: the ported decoder always converts decoded input to "
+              + "RGB (alpha composited over white, palettes expanded), so a config that skips "
+              + "the conversion would be silently ignored");
+    }
+    String processorClass = null;
+    if (root.has("processor_class")) {
+      JsonNode processorClassNode = root.path("processor_class");
+      if (!processorClassNode.isString()) {
+        throw new IllegalArgumentException("processor_class must be a JSON string");
+      }
+      processorClass = processorClassNode.asString();
+    }
     boolean doNormalize = bool(root, "do_normalize");
     float[] imageMean = floatVector(root, "image_mean");
     float[] imageStd = floatVector(root, "image_std");
@@ -167,16 +193,14 @@ public final class SmolVlmProcessorConfig {
       }
     }
     boolean doPad = bool(root, "do_pad");
-    String processorClass =
-        root.has("processor_class") ? root.path("processor_class").asString() : null;
 
     return new SmolVlmProcessorConfig(
-        bool(root, "do_convert_rgb"),
+        doConvertRgb,
         bool(root, "do_resize"),
-        longestEdge(root, "size"),
+        longestEdge(root, "size", Integer.MAX_VALUE),
         parseResample(root.path("resample")),
         bool(root, "do_image_splitting"),
-        longestEdge(root, "max_image_size"),
+        longestEdge(root, "max_image_size", MAX_TILE_LONGEST_EDGE),
         bool(root, "do_rescale"),
         rescaleFactor,
         doNormalize,
@@ -194,8 +218,11 @@ public final class SmolVlmProcessorConfig {
     return node.asBoolean();
   }
 
-  /** Accepts exactly {"longest_edge": positiveInt}; rejects height/width variants. */
-  private static int longestEdge(JsonNode root, String key) {
+  /**
+   * Accepts exactly {"longest_edge": positiveInt} with {@code value <= max}; rejects height/width
+   * variants.
+   */
+  private static int longestEdge(JsonNode root, String key, int max) {
     JsonNode node = root.path(key);
     if (!node.isObject()) {
       throw new IllegalArgumentException(key + " must be a JSON object");
@@ -214,9 +241,19 @@ public final class SmolVlmProcessorConfig {
     if (!edge.isIntegralNumber()) {
       throw new IllegalArgumentException(key + ".longest_edge must be an integer");
     }
+    // canConvertToInt() first: asInt() throws a JsonNodeException (not the documented
+    // IllegalArgumentException) for values outside the int range.
+    if (!edge.canConvertToInt()) {
+      throw new IllegalArgumentException(
+          key + ".longest_edge must fit in a signed 32-bit integer: " + edge.asString());
+    }
     int value = edge.asInt();
     if (value <= 0) {
       throw new IllegalArgumentException(key + ".longest_edge must be positive: " + value);
+    }
+    if (value > max) {
+      throw new IllegalArgumentException(
+          key + ".longest_edge must be at most " + max + ": " + value);
     }
     return value;
   }
@@ -225,6 +262,10 @@ public final class SmolVlmProcessorConfig {
   private static Resampling parseResample(JsonNode node) {
     if (!node.isIntegralNumber()) {
       throw new IllegalArgumentException("resample must be an integer");
+    }
+    if (!node.canConvertToInt()) {
+      throw new IllegalArgumentException(
+          "resample must fit in a signed 32-bit integer: " + node.asString());
     }
     int value = node.asInt();
     return switch (value) {

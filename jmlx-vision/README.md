@@ -25,7 +25,10 @@ splitting, padding masks, grid/order metadata). No native dependency; Java 21+.
   optional DRI segment. A `tRNS` chunk is ignored for every color type and stripped from the bytes
   before decode: the pinned processor never applies it (a palette image is rebuilt from
   `getpalette()`, RGB only, and the RGB/L conversion drops the chunk), so tRNS files decode
-  identically to their opaque twins. Decoding uses the JDK's built-in
+  identically to their opaque twins. A `PLTE` chunk on a truecolor or RGBA image is only a
+   *suggested* palette (RFC 2083 §11.2) and is ignored — as it is by the built-in reader and
+   by the reference; only palette images decode through the palette. Decoding uses the JDK's
+   built-in
   `javax.imageio` PNG/JPEG readers; decoded bytes are addressed through the raster's
   `SampleModel` (the readers store `B,G,R`/`A,B,G,R`, not channel order) and the band-to-channel
   mapping is probed once through the decoded `ColorModel`, so the band order is never assumed.
@@ -58,16 +61,30 @@ byte-exactness (raster band order, packed sub-8-bit palettes, JPEG truncation de
 
 ## Divergences from the reference's operation order
 
-The reference pipeline (`transformers` `BaseImageProcessor._preprocess`, pinned 4.57.6)
+The reference pipeline (the pinned `transformers` 4.57.6 `Idefics3ImageProcessor.preprocess`)
 resizes **and splits before** `convert_to_rgb`; this port decodes straight to RGB (compositing
-alpha over white, expanding palettes) and resizes in RGB space. The two are identical for
-fully opaque RGB/grayscale input, which is what all strict fixtures use, but for
-semi-transparent RGBA or palette images the reference resizes alpha/index values in their
-native space while the port resizes the already-composited/expanded RGB, so such inputs can
-differ pixel-for-pixel. Decode itself is verified byte-exactly for both families (decode
-fixtures); the byte-exact full-chain fixtures deliberately exclude them. The reference
-pipeline also keeps EXIF orientation unapplied and ignores ICC/gAMA, which the port matches
-(see "Decode policy" above).
+alpha over white, expanding palettes) and resizes in RGB space. Decoding to RGB first is a
+*deliberate extension* of the reference, and the two orderings agree only for fully opaque
+**RGB** input:
+
+- The reference's default `preprocess` (channels-first output) accepts only opaque RGB:
+  grayscale (`L`) and palette (`P`) inputs raise
+  `ValueError: Unsupported number of image dimensions: 2`, and `LA` input raises
+  `ValueError: Unable to infer channel dimension format` (verified on the committed decode
+  fixtures against the pinned venv). The port accepts all of them.
+- With `input_data_format="channels_last"`, the reference accepts `L` and `P`, but it resizes
+  the single channel as a PIL image in mode `P`, and the pinned Pillow 12.3.0 `Image.resize`
+  forces `Resampling.NEAREST` for modes `1`/`P` regardless of the configured kernel — so even
+  there the reference does not run the configured kernel on the single channel, while the port
+  resizes the expanded/composited RGB with it. Measured max absolute difference on the
+  normalized float32 `pixel_values` (pinned SmolVLM-256M config): `1.6313726` on
+  `gray-60x40.png` and `1.5843138` on `palette8-32x32.png`, exactly `0.0` on the opaque RGB
+  fixture, where the two orderings agree.
+
+The byte-exact full-chain fixtures therefore use opaque RGB only (the oracle runner enforces
+`image.mode == "RGB"`); decode itself is verified byte-exactly for every accepted family
+(decode fixtures). The reference pipeline also keeps EXIF orientation unapplied and ignores
+ICC/gAMA, which the port matches (see "Decode policy" above).
 
 ## License
 

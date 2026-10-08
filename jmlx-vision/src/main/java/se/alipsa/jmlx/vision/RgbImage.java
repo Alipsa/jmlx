@@ -23,6 +23,10 @@ public final class RgbImage {
    *     {@code pixels} is null or the wrong length
    */
   public RgbImage(int width, int height, byte[] pixels) {
+    this(width, height, pixels, false);
+  }
+
+  private RgbImage(int width, int height, byte[] pixels, boolean owned) {
     if (width <= 0) {
       throw new IllegalArgumentException("width must be positive: " + width);
     }
@@ -43,7 +47,21 @@ public final class RgbImage {
     }
     this.width = width;
     this.height = height;
-    this.pixels = pixels.clone();
+    this.pixels = owned ? pixels : pixels.clone();
+  }
+
+  /**
+   * Creates a new image from a buffer the caller owns and will no longer touch, adopting it without
+   * the defensive copy. Package-private: for the module's own call chain, which passes freshly
+   * allocated buffers it never retains or mutates.
+   *
+   * @param width positive image width in pixels
+   * @param height positive image height in pixels
+   * @param pixels exactly {@code width * height * 3} bytes, not shared with the caller
+   * @throws IllegalArgumentException on invalid dimensions or a wrong buffer length
+   */
+  static RgbImage ofUnchecked(int width, int height, byte[] pixels) {
+    return new RgbImage(width, height, pixels, true);
   }
 
   /** The image width in pixels. */
@@ -59,6 +77,15 @@ public final class RgbImage {
   /** A copy of the interleaved RGB pixel buffer ({@code width * height * 3} bytes). */
   public byte[] pixels() {
     return pixels.clone();
+  }
+
+  /**
+   * The backing pixel buffer without copying. Package-private escape hatch for the module's own
+   * call chain, which hands the buffer to transforms that read it and never mutate it; public code
+   * must use {@link #pixels()} or {@link #copyPixelsTo(byte[], int)}.
+   */
+  byte[] pixelsRaw() {
+    return pixels;
   }
 
   /**

@@ -181,6 +181,119 @@ class ImageDecoderTest {
   }
 
   @Test
+  void truecolorPngWithSuggestedPlteDecodesAsOpaqueTwin() throws Exception {
+    // A PLTE chunk on a truecolor image is only a *suggested* palette (RFC 2083 s11.2); the
+    // decoder must ignore it, exactly as Pillow does.
+    Path rgb = OracleFixtures.fixtures().resolve("decode/rgb-64x48.png");
+    byte[] bytes = Files.readAllBytes(rgb);
+    byte[] plte = new byte[12]; // four entries; the content is irrelevant
+    for (int i = 0; i < plte.length; i++) {
+      plte[i] = (byte) (i * 21);
+    }
+    RgbImage expected = ImageDecoder.decode(rgb);
+    RgbImage decoded =
+        ImageDecoder.decode(new ByteArrayInputStream(insertPngChunkAfterIhdr(bytes, "PLTE", plte)));
+    assertEquals(expected, decoded);
+  }
+
+  @Test
+  void duplicateTrnsChunksAreAllStripped() throws Exception {
+    // Malformed input may carry more than one tRNS chunk, and the built-in reader would honor
+    // each of them (a surviving truecolor tRNS adds an alpha band, which the band-count check
+    // rejects). Every one must be stripped.
+    Path rgb = OracleFixtures.fixtures().resolve("decode/rgb-64x48.png");
+    byte[] bytes = Files.readAllBytes(rgb);
+    byte[] twoTrns =
+        insertPngChunkAfterIhdr(
+            insertPngChunkAfterIhdr(bytes, "tRNS", new byte[] {10, 20, 30}),
+            "tRNS",
+            new byte[] {40, 50, 60});
+    RgbImage expected = ImageDecoder.decode(rgb);
+    assertEquals(expected, ImageDecoder.decode(new ByteArrayInputStream(twoTrns)));
+    // The same for a palette image: a surviving tRNS would mark palette entries transparent.
+    Path palette = OracleFixtures.fixtures().resolve("decode/palette8-32x32.png");
+    byte[] paletteBytes = Files.readAllBytes(palette);
+    byte[] paletteTwoTrns =
+        insertPngChunkAfterIhdr(
+            insertPngChunkAfterIhdr(paletteBytes, "tRNS", new byte[] {1, (byte) 0xFF}),
+            "tRNS",
+            new byte[] {2, (byte) 0xFF});
+    RgbImage paletteExpected = ImageDecoder.decode(palette);
+    assertEquals(paletteExpected, ImageDecoder.decode(new ByteArrayInputStream(paletteTwoTrns)));
+  }
+
+  @Test
+  void fillByteBeforeTheEoiMarkerIsAccepted() throws Exception {
+    // A fill byte directly before a marker must advance one byte, not two: FF FF D9 (a legal
+    // fill byte before the EOI) used to be consumed as scan data and the file rejected.
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    assertEquals(0xFF, jpeg[jpeg.length - 2] & 0xFF, "fixture must end with the EOI marker");
+    assertEquals(0xD9, jpeg[jpeg.length - 1] & 0xFF, "fixture must end with the EOI marker");
+    RgbImage expected = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    for (int fills = 1; fills <= 2; fills++) {
+      byte[] variant = new byte[jpeg.length + fills];
+      System.arraycopy(jpeg, 0, variant, 0, jpeg.length - 2);
+      Arrays.fill(variant, jpeg.length - 2, variant.length - 2, (byte) 0xFF);
+      variant[variant.length - 2] = (byte) 0xFF;
+      variant[variant.length - 1] = (byte) 0xD9;
+      assertEquals(
+          expected, ImageDecoder.decode(new ByteArrayInputStream(variant)), "fill count " + fills);
+    }
+  }
+
+  @Test
+  void shortSofSegmentIsRejectedWithIOException() {
+    // The component count sits at segment offset 9, so a SOF declared with a length of 7
+    // cannot be read; before the fix, a length-7 segment at end of file threw
+    // ArrayIndexOutOfBoundsException instead of this IOException.
+    IOException truncated =
+        assertThrows(
+            IOException.class,
+            () -> ImageDecoder.decode(new ByteArrayInputStream(hex("FFD8FFC000070800100010"))));
+    assertEquals("corrupt JPEG: truncated SOF segment", truncated.getMessage());
+    // A declared length of 8 covers the count byte, so the walk continues past the segment and
+    // the rest of the file (none of it present) is rejected as a truncated marker.
+    IOException shortComponents =
+        assertThrows(
+            IOException.class,
+            () -> ImageDecoder.decode(new ByteArrayInputStream(hex("FFD8FFC00008080010001003"))));
+    assertEquals("corrupt JPEG: truncated marker at offset 12", shortComponents.getMessage());
+  }
+
+  /** Inserts a chunk with a valid CRC after the IHDR (offset 33) of a PNG byte sequence. */
+  private static byte[] insertPngChunkAfterIhdr(byte[] png, String type, byte[] data) {
+    byte[] chunk = new byte[12 + data.length];
+    chunk[0] = (byte) (data.length >>> 24);
+    chunk[1] = (byte) (data.length >>> 16);
+    chunk[2] = (byte) (data.length >>> 8);
+    chunk[3] = (byte) data.length;
+    byte[] t = type.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    System.arraycopy(t, 0, chunk, 4, 4);
+    System.arraycopy(data, 0, chunk, 8, data.length);
+    java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+    crc.update(chunk, 4, 4 + data.length);
+    long c = crc.getValue();
+    chunk[8 + data.length] = (byte) (c >>> 24);
+    chunk[9 + data.length] = (byte) (c >>> 16);
+    chunk[10 + data.length] = (byte) (c >>> 8);
+    chunk[11 + data.length] = (byte) c;
+    byte[] out = new byte[png.length + chunk.length];
+    System.arraycopy(png, 0, out, 0, 33);
+    System.arraycopy(chunk, 0, out, 33, chunk.length);
+    System.arraycopy(png, 33, out, 33 + chunk.length, png.length - 33);
+    return out;
+  }
+
+  private static byte[] hex(String s) {
+    byte[] out = new byte[s.length() / 2];
+    for (int i = 0; i < out.length; i++) {
+      out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+  }
+
+  @Test
   void jpegRstFixtureCarriesRealDriAndRestartMarkers() throws Exception {
     // DRI coverage comes from the oracle fixture jpeg-rst-96x64, whose decode is byte-compared
     // against Pillow in decodeMatchesThePinnedOracleForEveryFixture - but only while the
@@ -209,8 +322,11 @@ class ImageDecoderTest {
       }
     }
     assertTrue(sos > dri, "the SOS scan must follow the DRI segment");
-    // Walk the entropy-coded scan: FF FF is fill, FF 00 a stuffed data byte, FF D0-D7 a
-    // restart marker; any other FF xx ends the walk (a real marker, e.g. the terminating EOI).
+    // Walk the entropy-coded scan, with the same semantics as the decoder's own scan: an FF
+    // followed by another FF is a fill byte and advances one byte (the second FF is re-examined
+    // as a marker candidate, so a fill directly before the EOI is not swallowed); FF 00 a stuffed
+    // data byte and FF D0-D7 a restart marker each advance two; any other FF xx ends the walk (a
+    // real marker, e.g. the terminating EOI).
     int pos = sos + 2;
     int length = ((b[pos] & 0xFF) << 8) | (b[pos + 1] & 0xFF);
     pos += 2 + length;
@@ -221,7 +337,11 @@ class ImageDecoderTest {
         continue;
       }
       int m = b[pos + 1] & 0xFF;
-      if (m == 0xFF || m == 0x00) {
+      if (m == 0xFF) {
+        pos++;
+        continue;
+      }
+      if (m == 0x00) {
         pos += 2;
         continue;
       }
@@ -280,9 +400,9 @@ class ImageDecoderTest {
   }
 
   @Test
-  void oversizedInputIsRejectedByTheDecodeBufferLimit() throws Exception {
+  void nonImageInputIsRejectedFromTheMagicBeforeBuffering() {
     // A byte-by-byte zero stream reporting 512 MiB + 1 bytes: the bounded reader must refuse
-    // before buffering that much.
+    // from the format check on the first read, not after buffering to the cap.
     final long total = 512L * 1024 * 1024 + 1;
     InputStream stream =
         new InputStream() {
@@ -309,6 +429,54 @@ class ImageDecoderTest {
           }
         };
     IOException e = assertThrows(IOException.class, () -> ImageDecoder.decode(stream));
-    assertEquals("image input exceeds the 536870912-byte decode buffer limit", e.getMessage());
+    assertEquals(
+        "unsupported image input: expected a PNG or JPEG file, "
+            + "found input starting with 0x00 0x00 0x00 0x00",
+        e.getMessage());
+  }
+
+  @Test
+  void oversizedStreamInputIsRejectedByTheDecodeBufferLimit() {
+    // The cap follows the limits (8 * maxPixels + 1 MiB); with the smallest limits it is
+    // 1048584 bytes, so a stream carrying valid PNG magic but one byte more than the cap is
+    // refused.
+    IOException e =
+        assertThrows(
+            IOException.class,
+            () ->
+                ImageDecoder.decode(
+                    new ByteArrayInputStream(pngMagicWithZeros(1048585)),
+                    new ImageDecodeLimits(1, 1)));
+    assertEquals("image input exceeds the 1048584-byte decode buffer limit", e.getMessage());
+  }
+
+  @Test
+  void oversizedFileInputIsRejectedBeforeAnyByteIsRead() throws Exception {
+    // The Path overload sizes the file first: a file over the cap is refused from its size,
+    // before a single byte is read.
+    Path file = Files.createTempFile("jmlx-vision-decode-test", ".bin");
+    try {
+      Files.write(file, pngMagicWithZeros(1048585));
+      IOException e =
+          assertThrows(
+              IOException.class, () -> ImageDecoder.decode(file, new ImageDecodeLimits(1, 1)));
+      assertEquals("image input exceeds the 1048584-byte decode buffer limit", e.getMessage());
+    } finally {
+      Files.deleteIfExists(file);
+    }
+  }
+
+  /** A PNG signature followed by zero bytes, to the given total length. */
+  private static byte[] pngMagicWithZeros(int totalLength) {
+    byte[] out = new byte[totalLength];
+    out[0] = (byte) 0x89;
+    out[1] = 'P';
+    out[2] = 'N';
+    out[3] = 'G';
+    out[4] = 0x0D;
+    out[5] = 0x0A;
+    out[6] = 0x1A;
+    out[7] = 0x0A;
+    return out;
   }
 }

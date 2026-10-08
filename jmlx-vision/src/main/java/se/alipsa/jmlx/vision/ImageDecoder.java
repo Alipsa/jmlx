@@ -15,8 +15,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.spi.IIORegistry;
@@ -33,11 +35,14 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * JPEG, including scans with restart markers ({@code RST0}–{@code RST7}). A {@code tRNS} chunk is
  * stripped from the bytes for every color type before the built-in reader would turn it into an
  * alpha band or a transparent palette entry — the pinned processor never applies it (see <b>Alpha
- * policy</b>). Decoded samples are extracted directly from the {@link Raster}'s byte buffer without
- * per-pixel {@code ColorModel}/{@code getRGB} conversion; the expected band count is validated
- * against a byte-level pre-scan of the file header, and the band-to-channel mapping is probed once
- * through the decoded {@link ColorModel} — the built-in readers produce {@code B,G,R} and {@code
- * A,B,G,R} raster layouts, never {@code R,G,B}, so the band order is never assumed.
+ * policy</b>). A {@code PLTE} chunk on a truecolor or RGBA image is only a <em>suggested</em>
+ * palette (RFC 2083 s11.2) and is ignored, as it is by the built-in reader and by the reference
+ * pipeline: only palette images decode through the palette. Decoded samples are extracted directly
+ * from the {@link Raster}'s byte buffer without per-pixel {@code ColorModel}/{@code getRGB}
+ * conversion; the expected band count is validated against a byte-level pre-scan of the file
+ * header, and the band-to-channel mapping is probed once through the decoded {@link ColorModel} —
+ * the built-in readers produce {@code B,G,R} and {@code A,B,G,R} raster layouts, never {@code
+ * R,G,B}, so the band order is never assumed.
  *
  * <p><b>Rejected before conversion, with format-specific {@link IOException}s:</b> 16-bit PNG,
  * sub-8-bit and 16-bit grayscale/truecolor PNG, CMYK/YCCK JPEG (four-component frames and Adobe
@@ -75,10 +80,6 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 public final class ImageDecoder {
   private static final ImageDecodeLimits DEFAULT_LIMITS =
       new ImageDecodeLimits(16_777_216L, 16_384);
-
-  // Safety valve against unbounded buffering: the dimension limits above already bound the
-  // decoded pixel buffer to ~50 MB, and any input within them buffers far below this cap.
-  private static final long MAX_INPUT_BYTES = 512L * 1024 * 1024;
 
   private ImageDecoder() {}
 
@@ -124,9 +125,14 @@ public final class ImageDecoder {
     if (limits == null) {
       throw new IllegalArgumentException("limits must not be null");
     }
+    long cap = maxInputBytes(limits);
+    // Reject an oversized file from its size before a single byte is read.
+    if (Files.size(path) > cap) {
+      throw new IOException("image input exceeds the " + cap + "-byte decode buffer limit");
+    }
     byte[] bytes;
     try (InputStream in = Files.newInputStream(path)) {
-      bytes = readAllBounded(in);
+      bytes = readAllBounded(in, cap);
     }
     return decode(bytes, limits);
   }
@@ -148,7 +154,7 @@ public final class ImageDecoder {
     if (limits == null) {
       throw new IllegalArgumentException("limits must not be null");
     }
-    byte[] bytes = readAllBounded(input);
+    byte[] bytes = readAllBounded(input, maxInputBytes(limits));
     return decode(bytes, limits);
   }
 
@@ -168,12 +174,10 @@ public final class ImageDecoder {
         // and the RGB conversion drops the chunk, and a palette image is rebuilt from
         // getpalette() (RGB only), so its tRNS never survives. The built-in reader would turn
         // the chunk into an alpha band (RGB/L) or a transparent palette entry (P), so strip it
-        // before decode for every color type.
-        int end = info.trnsOffset + 12 + info.trns.length;
-        bytes =
-            concat(
-                Arrays.copyOfRange(bytes, 0, info.trnsOffset),
-                Arrays.copyOfRange(bytes, end, bytes.length));
+        // before decode for every color type. Malformed input may carry more than one tRNS
+        // chunk, and every one of them would take effect in the built-in reader, so every one
+        // is stripped — in a single pass, copying the input exactly once.
+        bytes = stripPngChunks(bytes, info.trns);
       }
     } else if (isJpeg(bytes)) {
       JpegInfo info = parseJpegHeader(bytes);
@@ -260,32 +264,80 @@ public final class ImageDecoder {
     throw new IOException("no built-in " + formatName + " image reader is available in this JDK");
   }
 
-  private static byte[] readAllBounded(InputStream in) throws IOException {
+  /**
+   * The cap on buffered input bytes for the given limits. An image within the limits carries at
+   * most about four bytes of raw 8-bit sample data per pixel (four bands plus one PNG filter byte
+   * per scanline; JPEG entropy data is comparable) plus per-segment overhead, so eight times the
+   * pixel budget with a fixed margin is a generous ceiling for any valid input within the limits
+   * while still bounding the transient buffer of an oversized untrusted input.
+   */
+  private static long maxInputBytes(ImageDecodeLimits limits) {
+    return 8L * limits.maxPixels() + 1024L * 1024L;
+  }
+
+  /**
+   * Reads the whole stream, refusing to buffer more than {@code cap} bytes. The PNG/JPEG magic is
+   * checked on the first read, so input in another format is rejected after a few bytes instead of
+   * being buffered to the cap first.
+   */
+  private static byte[] readAllBounded(InputStream in, long cap) throws IOException {
     byte[] chunk = new byte[8192];
-    byte[] out = new byte[64 * 1024];
+    int first = in.read(chunk);
+    if (first == -1) {
+      first = 0;
+    }
+    if (first < 2) {
+      throw new IOException(
+          "unsupported image input: expected a PNG or JPEG file, found input of "
+              + first
+              + " byte(s)");
+    }
+    if (!isPng(chunk) && !isJpeg(chunk)) {
+      throw new IOException(
+          "unsupported image input: expected a PNG or JPEG file, found "
+              + describeMagic(Arrays.copyOf(chunk, first)));
+    }
+    byte[] out = new byte[(int) Math.min(cap, 64L * 1024)];
     int len = 0;
     long total = 0;
-    int r;
-    while ((r = in.read(chunk)) != -1) {
+    int r = first;
+    while (r != -1) {
       total += r;
-      if (total > MAX_INPUT_BYTES) {
-        throw new IOException(
-            "image input exceeds the " + MAX_INPUT_BYTES + "-byte decode buffer limit");
+      if (total > cap) {
+        throw new IOException("image input exceeds the " + cap + "-byte decode buffer limit");
       }
       if (len + r > out.length) {
-        int newLength = (int) Math.min(MAX_INPUT_BYTES, Math.max((long) out.length * 2, total));
+        int newLength = (int) Math.min(cap, Math.max((long) out.length * 2, total));
         out = Arrays.copyOf(out, newLength);
       }
       System.arraycopy(chunk, 0, out, len, r);
       len += r;
+      r = in.read(chunk);
     }
     return len == out.length ? out : Arrays.copyOf(out, len);
   }
 
-  private static byte[] concat(byte[] a, byte[] b) {
-    byte[] out = new byte[a.length + b.length];
-    System.arraycopy(a, 0, out, 0, a.length);
-    System.arraycopy(b, 0, out, a.length, b.length);
+  /**
+   * Removes the chunks at {@code {offset of length field, data length}} (in file order) from the
+   * PNG bytes in a single pass: one output allocation and two {@code System.arraycopy} calls per
+   * kept gap, no intermediate copies.
+   */
+  private static byte[] stripPngChunks(byte[] bytes, List<int[]> chunks) {
+    int stripped = 0;
+    for (int[] chunk : chunks) {
+      stripped += 12 + chunk[1];
+    }
+    byte[] out = new byte[bytes.length - stripped];
+    int src = 0;
+    int dst = 0;
+    for (int[] chunk : chunks) {
+      int start = chunk[0];
+      int end = start + 12 + chunk[1];
+      System.arraycopy(bytes, src, out, dst, start - src);
+      dst += start - src;
+      src = end;
+    }
+    System.arraycopy(bytes, src, out, dst, bytes.length - src);
     return out;
   }
 
@@ -329,8 +381,10 @@ public final class ImageDecoder {
     int colorType;
     byte[] palette; // RGB triples, paletteCount * 3 bytes
     int paletteCount;
-    byte[] trns; // raw tRNS bytes, or null
-    int trnsOffset = -1; // offset of the tRNS chunk's length field, or -1 when absent
+    // {offset of the length field, data length} for every tRNS chunk in file order, or null
+    // when the file carries none. Malformed input may carry more than one; the built-in reader
+    // would honor each of them, so all must be stripped.
+    List<int[]> trns;
   }
 
   private static PngInfo parsePngHeader(byte[] b) throws IOException {
@@ -399,8 +453,10 @@ public final class ImageDecoder {
         info.palette = Arrays.copyOfRange(b, pos + 8, pos + 8 + (int) length);
         info.paletteCount = (int) (length / 3);
       } else if (cid == 0x74524E53) { // "tRNS"
-        info.trns = Arrays.copyOfRange(b, pos + 8, pos + 8 + (int) length);
-        info.trnsOffset = pos;
+        if (info.trns == null) {
+          info.trns = new ArrayList<>();
+        }
+        info.trns.add(new int[] {pos, (int) length});
       } else if (cid == 0x49444154) { // "IDAT"
         haveIdat = true;
       }
@@ -426,10 +482,12 @@ public final class ImageDecoder {
    * truncation can only be detected by requiring the well-formed EOI the decoder never checks for.
    * Every {@code FF FF} pair outside the scan is a fill byte — the optional DRI (restart interval)
    * segment is a plain {@code FF DD} length-prefixed segment, handled by the general marker path
-   * below. The scan itself is walked as raw bytes: an {@code FF} followed by a byte that is neither
-   * another {@code FF} (fill), {@code 00} (treated leniently as data), nor one of the {@code
-   * RST0}–{@code RST7} restart markers (valid inside a scan written with a restart interval)
-   * terminates it.
+   * below. The scan itself is walked as raw bytes: an {@code FF} followed by another {@code FF} is
+   * a fill byte and advances <em>one</em> byte, so the second {@code FF} is re-examined as a marker
+   * candidate (a fill byte directly before the EOI must not swallow it); an {@code FF} followed by
+   * {@code 00} (a stuffed data byte) or one of the {@code RST0}–{@code RST7} restart markers (valid
+   * inside a scan written with a restart interval) advances two; any other following byte
+   * terminates the scan and is the marker the outer loop classifies.
    */
   private static JpegInfo parseJpegHeader(byte[] b) throws IOException {
     JpegInfo info = new JpegInfo();
@@ -480,8 +538,12 @@ public final class ImageDecoder {
             throw new IOException("corrupt JPEG: truncated scan data");
           }
           int m = b[pos + 1] & 0xFF;
-          if (m == 0xFF || m == 0x00 || (m >= 0xD0 && m <= 0xD7)) {
-            pos += 2; // fill byte, a stuffed 00, or a restart marker inside the scan
+          if (m == 0xFF) {
+            pos++; // fill byte: the following FF itself starts the marker to be classified
+            continue;
+          }
+          if (m == 0x00 || (m >= 0xD0 && m <= 0xD7)) {
+            pos += 2; // a stuffed 00 data byte, or a restart marker inside the scan
             continue;
           }
           // A real marker: leave pos on it for the outer loop to classify.
@@ -506,7 +568,14 @@ public final class ImageDecoder {
           || (marker >= 0xC5 && marker <= 0xC7)
           || (marker >= 0xC9 && marker <= 0xCB)
           || (marker >= 0xCD && marker <= 0xCF)) {
-        if (length < 7) {
+        // The component count sits at pos + 9; the segment-length check above guarantees the
+        // declared segment is fully present, so length >= 8 is the only guard the read below
+        // needs. The declared length is deliberately not cross-checked against 8 + 3 *
+        // components: a file whose length covers fewer specifiers than the count claims (the
+        // pinned reject-jpeg-cmyk-4comp fixture is exactly that — a 3-component frame with its
+        // count byte set to 4) must still be classified by its count, and anything this walk
+        // lets through reaches the JDK reader, the final gate.
+        if (length < 8) {
           throw new IOException("corrupt JPEG: truncated SOF segment");
         }
         int precision = b[pos + 4] & 0xFF;
@@ -566,8 +635,12 @@ public final class ImageDecoder {
           case 4 -> expectedBands = 2;
           default -> expectedBands = 4;
         }
-        palette = png.palette;
-        paletteCount = png.paletteCount;
+        // A PLTE chunk on a truecolor or RGBA image is only a *suggested* palette (RFC 2083
+        // s11.2); the built-in reader ignores it, so the palette is carried only for palette
+        // images. Carrying it for other color types would send toRgbImage down the palette path
+        // with bandOffsets still null (an NPE), since no sample-model setup was performed.
+        palette = png.colorType == 3 ? png.palette : null;
+        paletteCount = png.colorType == 3 ? png.paletteCount : 0;
       } else {
         JpegInfo jpeg = (JpegInfo) header;
         expectedBands = jpeg.components == 1 ? 1 : 3;
@@ -735,7 +808,9 @@ public final class ImageDecoder {
         }
       }
     }
-    return new RgbImage(w, h, out);
+    // out was allocated and filled here and is never shared, so it is adopted without the
+    // public constructor's defensive copy.
+    return RgbImage.ofUnchecked(w, h, out);
   }
 
   /** Rejects band offsets that fall outside the pixel stride or collide with each other. */

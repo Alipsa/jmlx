@@ -269,33 +269,41 @@ public final class ImageDecoder {
    * most about four bytes of raw 8-bit sample data per pixel (four bands plus one PNG filter byte
    * per scanline; JPEG entropy data is comparable) plus per-segment overhead, so eight times the
    * pixel budget with a fixed margin is a generous ceiling for any valid input within the limits
-   * while still bounding the transient buffer of an oversized untrusted input.
+   * while still bounding the transient buffer of an oversized untrusted input. The computation
+   * saturates instead of overflowing: a huge {@code maxPixels} — including {@code Long.MAX_VALUE},
+   * a natural way to say "no limit" — would otherwise wrap the 8x product to a small or negative
+   * cap that rejects valid input; it clamps to the largest addressable {@code byte[]} instead.
    */
   private static long maxInputBytes(ImageDecodeLimits limits) {
-    return 8L * limits.maxPixels() + 1024L * 1024L;
+    long maxPixels = limits.maxPixels();
+    long unsaturated =
+        maxPixels > (Long.MAX_VALUE - (1L << 20)) / 8
+            ? Long.MAX_VALUE
+            : 8L * maxPixels + (1L << 20);
+    return Math.min(unsaturated, (long) Integer.MAX_VALUE - 8);
   }
 
   /**
    * Reads the whole stream, refusing to buffer more than {@code cap} bytes. The PNG/JPEG magic is
-   * checked on the first read, so input in another format is rejected after a few bytes instead of
-   * being buffered to the cap first.
+   * checked after accumulating up to eight bytes — {@link InputStream#read(byte[], int, int)} may
+   * return fewer bytes than are available (network, {@code SequenceInputStream} and decompressing
+   * streams commonly do), so one short read checked against a zero-filled buffer would reject valid
+   * input — and the magic is compared only against the bytes actually read, so input in another
+   * format is rejected after a few bytes instead of being buffered to the cap first.
    */
   private static byte[] readAllBounded(InputStream in, long cap) throws IOException {
     byte[] chunk = new byte[8192];
-    int first = in.read(chunk);
-    if (first == -1) {
-      first = 0;
-    }
+    int first = in.readNBytes(chunk, 0, 8);
     if (first < 2) {
       throw new IOException(
           "unsupported image input: expected a PNG or JPEG file, found input of "
               + first
               + " byte(s)");
     }
-    if (!isPng(chunk) && !isJpeg(chunk)) {
+    byte[] magic = Arrays.copyOf(chunk, first);
+    if (!isPng(magic) && !isJpeg(magic)) {
       throw new IOException(
-          "unsupported image input: expected a PNG or JPEG file, found "
-              + describeMagic(Arrays.copyOf(chunk, first)));
+          "unsupported image input: expected a PNG or JPEG file, found " + describeMagic(magic));
     }
     byte[] out = new byte[(int) Math.min(cap, 64L * 1024)];
     int len = 0;

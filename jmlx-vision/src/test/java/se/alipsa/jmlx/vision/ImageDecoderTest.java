@@ -6,13 +6,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
@@ -463,6 +470,95 @@ class ImageDecoderTest {
       assertEquals("image input exceeds the 1048584-byte decode buffer limit", e.getMessage());
     } finally {
       Files.deleteIfExists(file);
+    }
+  }
+
+  @Test
+  void drippingStreamOfValidPngAndJpegDecodes() throws Exception {
+    // InputStream.read may return fewer bytes than are available (network, SequenceInputStream and
+    // decompressing streams commonly do): the magic check must accumulate a full header before
+    // deciding, so a stream that dribbles one or four bytes per read still decodes to the same
+    // pixels as the eager stream.
+    for (String name : List.of("decode/rgb-64x48.png", "decode/jpeg-gray-64x48.jpg")) {
+      byte[] bytes = Files.readAllBytes(OracleFixtures.fixtures().resolve(name));
+      RgbImage eager = ImageDecoder.decode(new ByteArrayInputStream(bytes));
+      for (int perRead : List.of(1, 4)) {
+        RgbImage decoded = ImageDecoder.decode(new DripStream(bytes, perRead));
+        assertEquals(eager.width(), decoded.width(), name);
+        assertEquals(eager.height(), decoded.height(), name);
+        assertArrayEquals(eager.pixels(), decoded.pixels(), name);
+      }
+    }
+  }
+
+  @Test
+  void hugeMaxPixelsSaturatesTheDecodeBufferCapInsteadOfOverflowing() throws Exception {
+    // 8 * maxPixels + 1 MiB must not wrap for large maxPixels: Long.MAX_VALUE ("no limit") and
+    // 1 << 60 used to shrink the cap to about 1 MiB (or make it negative), rejecting valid input
+    // over ~1 MiB.
+    byte[] png = noisePng(1000, 1000);
+    assertTrue(png.length > 1024 * 1024, "noise PNG must exceed 1 MiB: " + png.length);
+    for (long maxPixels : List.of(Long.MAX_VALUE, 1L << 60)) {
+      RgbImage decoded =
+          ImageDecoder.decode(
+              new ByteArrayInputStream(png), new ImageDecodeLimits(maxPixels, 16384));
+      assertEquals(1000, decoded.width());
+      assertEquals(1000, decoded.height());
+    }
+  }
+
+  @Test
+  void saturatedCapRejectsAFileOverTheLargestAddressableBuffer() throws Exception {
+    // The cap saturates at Integer.MAX_VALUE - 8; a sparse file just over that is rejected from
+    // its size (before a single byte is read) with the saturated cap in the message.
+    Path file = Files.createTempFile("jmlx-vision-decode-test", ".bin");
+    try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "rw")) {
+      raf.setLength((long) Integer.MAX_VALUE - 8 + 1);
+      IOException e =
+          assertThrows(
+              IOException.class,
+              () -> ImageDecoder.decode(file, new ImageDecodeLimits(Long.MAX_VALUE, 16384)));
+      assertEquals("image input exceeds the 2147483639-byte decode buffer limit", e.getMessage());
+    } finally {
+      Files.deleteIfExists(file);
+    }
+  }
+
+  /** A deterministic 1000x1000-style RGB noise PNG: incompressible, so it exceeds 1 MiB. */
+  private static byte[] noisePng(int width, int height) throws IOException {
+    BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+    byte[] raster = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+    new Random(1L).nextBytes(raster);
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    assertTrue(ImageIO.write(image, "png", out));
+    return out.toByteArray();
+  }
+
+  /** A stream that returns at most {@code maxPerRead} bytes per read, like a slow socket. */
+  private static final class DripStream extends InputStream {
+    private final byte[] bytes;
+    private final int maxPerRead;
+    private int pos;
+
+    DripStream(byte[] bytes, int maxPerRead) {
+      this.bytes = bytes;
+      this.maxPerRead = maxPerRead;
+    }
+
+    @Override
+    public int read() {
+      return pos < bytes.length ? (bytes[pos++] & 0xFF) : -1;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) {
+      if (pos >= bytes.length) {
+        return -1;
+      }
+      int n = (int) Math.min(Math.min(len, maxPerRead), bytes.length - pos);
+      System.arraycopy(bytes, pos, b, off, n);
+      pos += n;
+      return n;
     }
   }
 

@@ -155,10 +155,11 @@ class SmolVlmProcessorConfigTest {
   }
 
   @Test
-  void tileSizeIsCappedAtTheReferenceMaximum() throws Exception {
+  void tileSizeIsCappedAtTheJmlxMaximum() throws Exception {
     String base = text();
-    // The tile size drives the stage-2 allocation directly, so it is capped at the reference's
-    // own MAX_IMAGE_SIZE.
+    // The tile size drives the stage-2 allocation directly, so it is capped at 4096: a jmlx
+    // safety limit (the reference's MAX_IMAGE_SIZE bounds its stage-1 output, not
+    // max_image_size).
     expectRejection(
         base.replace("\"longest_edge\": 512", "\"longest_edge\": 4097"),
         "max_image_size.longest_edge must be at most 4096: 4097");

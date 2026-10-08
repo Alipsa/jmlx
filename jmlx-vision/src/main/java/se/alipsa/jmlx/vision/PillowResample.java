@@ -61,7 +61,9 @@ final class PillowResample {
    * Resizes the interleaved RGB source to {@code outWidth x outHeight} with the pinned Pillow
    * kernel, returning a fresh row-major byte array that never aliases {@code in}.
    *
-   * @throws IllegalArgumentException if {@code outWidth * outHeight * 3} overflows an int
+   * @throws IllegalArgumentException if {@code outWidth * outHeight * 3}, or the two-pass
+   *     intermediate buffer ({@code outWidth} times the spanned source rows, times 3), overflows an
+   *     int
    */
   static byte[] resize(
       byte[] in, int inWidth, int inHeight, int outWidth, int outHeight, Resampling method) {
@@ -97,6 +99,20 @@ final class PillowResample {
         vert.bounds[i * 2] -= yboxFirst;
       }
       int intermediateHeight = yboxLast - yboxFirst;
+      if ((long) outWidth * intermediateHeight > Integer.MAX_VALUE / 3) {
+        // The output check above covers outWidth * outHeight only; the horizontal pass allocates
+        // outWidth * intermediateHeight * 3, and intermediateHeight spans source rows, so a tall
+        // narrow source resized to a wide short target overflows it even when the target fits.
+        throw new IllegalArgumentException(
+            "resize target "
+                + outWidth
+                + "x"
+                + outHeight
+                + " overflows an int intermediate pixel buffer: outWidth*intermediateHeight is "
+                + (long) outWidth * intermediateHeight
+                + " but must be at most "
+                + (Integer.MAX_VALUE / 3));
+      }
       byte[] intermediate =
           horizontalPass(in, inWidth, yboxFirst, intermediateHeight, outWidth, horiz);
       out =

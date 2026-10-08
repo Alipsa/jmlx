@@ -54,9 +54,6 @@ dependencies {
 
 tasks.withType(Test).configureEach {
     mustRunAfter rootProject.tasks.named('generateImageOracleFixtures')
-    // ImageDecoderTest exercises the 512 MiB decode-buffer limit, which buffers that many bytes:
-    // the default 512 MB test heap cannot hold it.
-    maxHeapSize = '1g'
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
     inputs.files(rootProject.fileTree('tools/image-oracle/fixtures'))
 }

@@ -246,8 +246,9 @@ public final class SmolVlmImageProcessor {
 
   /**
    * Copies the {@code (x0, y0) x (x1, y1)} rectangle out of the source buffer into a fresh tile.
-   * The source buffer is read-only here and is adopted into the result without copying (the caller
-   * exposes it once for the whole crop set — see {@link #split}).
+   * The source buffer is only read; the freshly allocated tile is adopted into the result without a
+   * further copy — {@link RgbImage#ofUnchecked} does not clone, and the caller exposes each tile
+   * once for the whole crop set (see {@link #split}).
    */
   private static RgbImage crop(byte[] src, int srcWidth, int x0, int y0, int x1, int y1) {
     int w = x1 - x0;

@@ -17,7 +17,8 @@ public final class ImageTransforms {
    * @param height positive target height
    * @param method resampling kernel
    * @throws IllegalArgumentException if an argument is null, a target dimension is not positive, or
-   *     {@code width * height * 3} overflows an int
+   *     {@code width * height * 3} (or the two-pass intermediate buffer, for wide-short targets
+   *     from tall sources) overflows an int
    */
   public static RgbImage resize(RgbImage image, int width, int height, Resampling method) {
     if (image == null) {

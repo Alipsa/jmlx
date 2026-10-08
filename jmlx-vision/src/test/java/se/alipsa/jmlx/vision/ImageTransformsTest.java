@@ -58,6 +58,23 @@ class ImageTransformsTest {
   }
 
   @Test
+  void resizeRejectsAnOversizedIntermediateBuffer() {
+    // The output-size guard covers width*height only; the horizontal pass allocates
+    // outWidth * intermediateHeight * 3, where intermediateHeight spans source rows. A tall narrow
+    // source resized to a wide short target passes the output check and must be rejected before
+    // that allocation wraps (it used to surface as an ArrayIndexOutOfBoundsException).
+    RgbImage source = new RgbImage(10, 50000, new byte[10 * 50000 * 3]);
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ImageTransforms.resize(source, 40000, 10, Resampling.BILINEAR));
+    assertEquals(
+        "resize target 40000x10 overflows an int intermediate pixel buffer: "
+            + "outWidth*intermediateHeight is 2000000000 but must be at most 715827882",
+        e.getMessage());
+  }
+
+  @Test
   void identityResizeIsExactForEveryKernel() {
     byte[] pixels = new byte[3 * 3 * 3];
     for (int i = 0; i < pixels.length; i++) {

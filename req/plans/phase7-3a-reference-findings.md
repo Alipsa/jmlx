@@ -443,7 +443,7 @@ consumes.
 ## 8. WP2 Java implementation findings (JDK image decoding)
 
 Findings from implementing `jmlx-vision`'s `ImageDecoder`/resampling against the pinned Pillow 12.3.0 oracle.
-All 65 module tests are byte-exact against the committed fixtures (decode/resize/chain) with no loosened
+All 69 module tests are byte-exact against the committed fixtures (decode/resize/chain) with no loosened
 tolerances; the normalized-tile comparison in the chain test uses the documented `1e-6` float32 tolerance.
 
 ### Raster byte layout is NOT channel order (root cause of red/blue swaps)

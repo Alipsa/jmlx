@@ -18,13 +18,14 @@ import tools.jackson.databind.ObjectMapper;
  * honored), the {@code image_processor_type} must be {@code Idefics3ImageProcessor}, and {@code
  * size}/{@code max_image_size} must be objects with a single positive-integer {@code longest_edge}
  * entry that fits in a signed 32-bit integer. {@code max_image_size.longest_edge} is additionally
- * capped at 4096, the reference's own absolute tile maximum ({@code MAX_IMAGE_SIZE}): the tile size
- * drives the stage-2 allocation directly, so an untrusted config must not be able to request an
- * arbitrarily large one. {@code size.longest_edge} needs no such cap — the chain caps the stage-1
- * output at 4096, exactly as the reference does. Unrecognized keys, missing operational options,
- * malformed values and unsupported {@code resample} numbers are rejected with a descriptive {@link
- * IllegalArgumentException} that names the offending key; unsupported resample values are never
- * mapped to a nearby filter.
+ * capped at 4096: a jmlx safety limit that rejects some configs the pinned reference accepts (its
+ * {@code MAX_IMAGE_SIZE} = 4096 bounds only the stage-1 resize output, never {@code max_image_size}
+ * itself): the tile size drives the stage-2 allocation directly, so an untrusted config must not be
+ * able to request an arbitrarily large one. {@code size.longest_edge} needs no such cap — the chain
+ * caps the stage-1 output at 4096, exactly as the reference does. Unrecognized keys, missing
+ * operational options, malformed values and unsupported {@code resample} numbers are rejected with
+ * a descriptive {@link IllegalArgumentException} that names the offending key; unsupported resample
+ * values are never mapped to a nearby filter.
  *
  * <p>The pinned SmolVLM-256M configuration (the reference for this milestone) parses to: resize
  * longest edge to 2048, LANCZOS, image splitting on, tile size 512, rescale {@code
@@ -33,7 +34,9 @@ import tools.jackson.databind.ObjectMapper;
 public final class SmolVlmProcessorConfig {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  // Absolute maximum tile size, mirroring the reference's MAX_IMAGE_SIZE = 4096 (see the class
+  // Maximum tile size accepted from an untrusted config. The value matches the pinned reference's
+  // MAX_IMAGE_SIZE = 4096, but the reference applies that constant to its stage-1 resize output,
+  // never to max_image_size: this cap is jmlx policy, not reference behavior (see the class
   // javadoc for why only the tile size is capped).
   private static final int MAX_TILE_LONGEST_EDGE = 4096;
 

@@ -451,7 +451,8 @@ def generate_chat_smolvlm(out, tokenizer_root):
 def update_provenance(out, tokenizer_root=None):
     source = Path(transformers.__file__).parent / "modeling_rope_utils.py"
     files = {str(path.relative_to(out)): hashlib.sha256(path.read_bytes()).hexdigest()
-             for path in sorted(out.rglob("*")) if path.is_file()}
+             for path in sorted(out.rglob("*"))
+             if path.is_file() and not path.name.startswith(".")}
     metadata = {
         "python": platform.python_version(),
         "torch": torch.__version__,
@@ -471,7 +472,7 @@ def update_provenance(out, tokenizer_root=None):
         sources = {}
         for family in CHAT_FAMILIES:
             for path in sorted((tokenizer_root / family).iterdir()):
-                if path.is_file():
+                if path.is_file() and not path.name.startswith("."):
                     sources[f"{family}/{path.name}"] = hashlib.sha256(
                         path.read_bytes()).hexdigest()
         metadata["chat_sources"] = sources

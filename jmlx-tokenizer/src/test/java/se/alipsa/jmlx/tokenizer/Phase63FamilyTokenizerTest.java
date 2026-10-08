@@ -48,7 +48,9 @@ class Phase63FamilyTokenizerTest {
    * The SmolVLM bundle commits more than the tokenizer pair (chat template, special tokens,
    * processor configs), so every {@code smolvlm/*} provenance entry is checked: each pinned entry
    * must exist on disk with the recorded digest, and every committed file must be pinned, so an
-   * edited, added, or removed bundle file fails the build.
+   * edited, added, or removed bundle file fails the build. Dotfiles are not bundle files: the
+   * bundle directory is a Finder-visible test resource, so a .DS_Store (created whenever someone
+   * opens it) must not fail the check.
    */
   @Test
   void smolvlmBundleFilesMatchRecordedProvenance() throws Exception {
@@ -58,23 +60,31 @@ class Phase63FamilyTokenizerTest {
             .readTree(root.resolve("tools/hf-reference/provenance.json").toFile())
             .required("chat_sources");
     Path directory = root.resolve("jmlx-tokenizer/src/test/resources/families/smolvlm");
-    var pinned = new TreeSet<String>();
-    for (var entry : sources.properties()) {
-      if (entry.getKey().startsWith("smolvlm/")) {
-        pinned.add(entry.getKey().substring("smolvlm/".length()));
+    Path dsStore = directory.resolve(".DS_Store");
+    Files.createFile(dsStore);
+    try {
+      var pinned = new TreeSet<String>();
+      for (var entry : sources.properties()) {
+        if (entry.getKey().startsWith("smolvlm/")) {
+          pinned.add(entry.getKey().substring("smolvlm/".length()));
+        }
       }
-    }
-    var committed = new TreeSet<String>();
-    try (var files = Files.list(directory)) {
-      files
-          .filter(Files::isRegularFile)
-          .forEach(path -> committed.add(path.getFileName().toString()));
-    }
-    assertEquals(pinned, committed);
-    for (String filename : committed) {
-      byte[] bytes = Files.readAllBytes(directory.resolve(filename));
-      String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-      assertEquals(sources.required("smolvlm/" + filename).asString(), actual, filename);
+      var committed = new TreeSet<String>();
+      try (var files = Files.list(directory)) {
+        files
+            .filter(Files::isRegularFile)
+            .filter(path -> !path.getFileName().toString().startsWith("."))
+            .forEach(path -> committed.add(path.getFileName().toString()));
+      }
+      assertEquals(pinned, committed);
+      for (String filename : committed) {
+        byte[] bytes = Files.readAllBytes(directory.resolve(filename));
+        String actual =
+            HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        assertEquals(sources.required("smolvlm/" + filename).asString(), actual, filename);
+      }
+    } finally {
+      Files.deleteIfExists(dsStore);
     }
   }
 

@@ -483,8 +483,7 @@ class InterpreterTest {
             TemplateRenderException.class,
             () ->
                 loop.render(
-                    Map.of("s", "\uD83D\uDC4D\uD83D\uDC4D\uD83D\uDC4D"),
-                    RenderOptions.builder().maxLoopIterations(2).build()));
+                    Map.of("s", "👍👍👍"), RenderOptions.builder().maxLoopIterations(2).build()));
     assertEquals(ErrorCategory.RESOURCE_LIMIT, error.category());
     // A string's iterations share the render's budget with other loops.
     error =
@@ -495,7 +494,7 @@ class InterpreterTest {
                     .render(
                         Map.of("s", "ab"), RenderOptions.builder().maxLoopIterations(4).build()));
     assertEquals(ErrorCategory.RESOURCE_LIMIT, error.category());
-    // Within the budget, loop metadata (index, previtem) works on the lazy string items.
+    // Within the budget, loop metadata (index, previtem) works when iterating a string.
     assertEquals(
         "12a3b4c",
         Template.parse("{% for x in s %}{{ loop.index }}{{ loop.previtem }}{% endfor %}")

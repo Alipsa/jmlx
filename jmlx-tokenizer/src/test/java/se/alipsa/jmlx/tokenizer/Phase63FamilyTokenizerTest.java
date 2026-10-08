@@ -52,7 +52,7 @@ class Phase63FamilyTokenizerTest {
    * The SmolVLM bundle commits more than the tokenizer pair (chat template, special tokens,
    * processor configs), so every {@code smolvlm/*} provenance entry is checked: each pinned entry
    * must exist on disk with the recorded digest, and every committed file must be pinned, so an
-   * edited, added, or removed bundle file fails the build. The source folder is read to, never
+   * edited, added, or removed bundle file fails the build. The source folder is read from, never
    * written by, this check: a .DS_Store a Finder user may have left in it is simply not a bundle
    * file (see bundleFileListingIgnoresDotfiles).
    */

@@ -538,6 +538,12 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     DecoderModel.BatchFacts model = facts;
     GenerationConfig policy = request.config();
     int[] prompt = request.promptTokenIds();
+    if (!request.images().isEmpty()) {
+      // The scheduler only admits text-only decoders, so images can never be served here;
+      // reject on the caller thread before any native work, naming the model type.
+      throw new IllegalArgumentException(
+          "model_type " + model.modelType() + " does not accept images");
+    }
     DecoderModel.validateTokenIds(prompt, policy, model.vocabSize());
     KVCachePolicy cachePolicy = request.cachePolicy().resolve(model.slidingWindow());
     if (policy.maxNewTokens() > config.maxNewTokensPerRequest()) {

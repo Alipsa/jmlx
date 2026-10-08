@@ -141,6 +141,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * The model facts a scheduler snapshots on its worker so {@code submit} can validate without it.
    */
   record BatchFacts(
+      String modelType,
       int vocabSize,
       Integer slidingWindow,
       boolean dynamicNtk,
@@ -149,6 +150,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
 
   final BatchFacts batchFacts() {
     return new BatchFacts(
+        config.modelType(),
         config.vocabSize(),
         descriptor.attention().slidingWindow(),
         descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk,
@@ -499,6 +501,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       GenerationRequest request, Consumer<GenerationEvent> listener) {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(listener, "listener");
+    if (!request.images().isEmpty()) {
+      throw new IllegalArgumentException(
+          "model_type " + config.modelType() + " does not accept images");
+    }
     GenerationConfig policy = request.config();
     int[] prompt = request.promptTokenIds();
     validateTokenIds(prompt, policy, config.vocabSize());

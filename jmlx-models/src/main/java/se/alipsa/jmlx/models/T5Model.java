@@ -475,6 +475,9 @@ public final class T5Model extends Module implements TextGenerationModel {
   public GenerationResult generate(GenerationRequest request, Consumer<GenerationEvent> listener) {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(listener, "listener");
+    if (!request.images().isEmpty()) {
+      throw new IllegalArgumentException("model_type t5 does not accept images");
+    }
     GenerationConfig policy = request.config();
     int[] prompt = request.promptTokenIds();
     scope().checkAccess();

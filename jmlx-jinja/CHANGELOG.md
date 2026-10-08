@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `RenderOptions.toBuilder()`, which returns a builder pre-populated with an existing options
   object's current values so callers can derive new options while overriding individual settings.
+- `{% for %}` now iterates strings by Unicode code point, matching upstream Jinja. Structured
+  chat templates that loop over a message's plain-text content (where each iteration yields a
+  character with no members) render their text branches as no-ops instead of failing the loop.
 
 ### Changed
 

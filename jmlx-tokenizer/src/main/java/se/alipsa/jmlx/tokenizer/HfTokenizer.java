@@ -95,7 +95,14 @@ public final class HfTokenizer {
   /**
    * Renders one configured chat template.
    *
-   * @param messages ordered textual role/content messages
+   * <p>Each message's {@code content} is plain text or a structured list of content parts: a text
+   * part is {@code {"type": "text", "text": <String>}} and an image part is {@code {"type":
+   * "image"}} with an optional, ignored {@code image} value. Parts keep their order in the template
+   * context. Image parts are placeholders only — no URL or path is ever fetched; pixel payloads
+   * belong on the generation request ({@code GenerationRequest.withImages}), paired with the image
+   * parts in order of appearance.
+   *
+   * @param messages ordered role/content messages; content is text or structured content parts
    * @param options template name, generation-prompt flag, extra context, and render options
    * @return rendered prompt text
    */
@@ -145,10 +152,61 @@ public final class HfTokenizer {
     if (!(role instanceof String roleText) || roleText.isBlank()) {
       throw new TokenizerException("HfTokenizer.renderChat: message role must be non-empty text");
     }
-    if (!(content instanceof String)) {
-      throw new TokenizerException("HfTokenizer.renderChat: message content must be text");
+    Object safeContent;
+    if (content instanceof String) {
+      safeContent = content;
+    } else if (content instanceof List<?> parts) {
+      List<Map<String, Object>> normalized = new ArrayList<>(parts.size());
+      for (Object part : parts) {
+        normalized.add(validatedContentPart(part));
+      }
+      if (normalized.isEmpty()) {
+        throw new TokenizerException("HfTokenizer.renderChat: content list must not be empty");
+      }
+      safeContent = List.copyOf(normalized);
+    } else {
+      throw new TokenizerException(
+          "HfTokenizer.renderChat: message content must be text or a list of text/image parts");
     }
-    return Collections.unmodifiableMap(new LinkedHashMap<>(message));
+    Map<String, Object> copy = new LinkedHashMap<>(message);
+    copy.put("content", safeContent);
+    return Collections.unmodifiableMap(copy);
+  }
+
+  /**
+   * Normalizes one structured content part to the immutable map shape chat templates read: {@code
+   * {"type": "text", "text": ...}} or {@code {"type": "image"}}. Image parts are placeholders — the
+   * optional {@code image} value is not inspected or fetched, and pixels come from the request, not
+   * the template context.
+   */
+  private static Map<String, Object> validatedContentPart(Object part) {
+    if (!(part instanceof Map<?, ?> raw)) {
+      throw new TokenizerException("HfTokenizer.renderChat: content parts must be objects");
+    }
+    Object type = raw.get("type");
+    if (!"text".equals(type) && !"image".equals(type)) {
+      throw new TokenizerException(
+          "HfTokenizer.renderChat: unsupported content part type "
+              + String.valueOf(type)
+              + " (only text and image)");
+    }
+    for (Object key : raw.keySet()) {
+      if (!"type".equals(key)
+          && !("text".equals(type) && "text".equals(key))
+          && !("image".equals(type) && "image".equals(key))) {
+        throw new TokenizerException(
+            "HfTokenizer.renderChat: content part contains unsupported key '" + key + "'");
+      }
+    }
+    if ("image".equals(type)) {
+      return Map.of("type", "image");
+    }
+    Object text = raw.get("text");
+    if (!(text instanceof String)) {
+      throw new TokenizerException(
+          "HfTokenizer.renderChat: text content parts require a 'text' string value");
+    }
+    return Map.of("type", "text", "text", text);
   }
 
   private static void putToken(

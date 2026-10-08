@@ -448,6 +448,23 @@ class InterpreterTest {
   }
 
   @Test
+  void forLoopsIterateStringsByCodePointLikeUpstream() {
+    var template = "{% for x in s %}{{ x }};{% endfor %}";
+    assertEquals("a;b;", Template.parse(template).render(Map.of("s", "ab")));
+    // Non-BMP characters stay one iteration, never split across surrogate halves.
+    assertEquals("👍;", Template.parse(template).render(Map.of("s", "👍")));
+    // Characters carry no members: the structured-chat pattern renders nothing for string content.
+    assertEquals(
+        "",
+        Template.parse(
+                "{% for x in s %}{% if x['type'] == 'text' %}{{ x['text'] }}{% endif %}{% endfor"
+                    + " %}")
+            .render(Map.of("s", "ab")));
+    // An empty string loops zero times.
+    assertEquals("", Template.parse(template).render(Map.of("s", "")));
+  }
+
+  @Test
   void repeatedHostMapsDoNotAliasAfterTemplateMutation() {
     var shared = Map.of("k", 1);
     assertEquals(

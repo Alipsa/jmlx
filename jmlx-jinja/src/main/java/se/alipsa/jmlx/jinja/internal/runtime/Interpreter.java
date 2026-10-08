@@ -2259,7 +2259,11 @@ public final class Interpreter {
     var scope = new Environment(e);
     var iterable = evaluateExpression(iterableExpression, scope, b);
     List<Value> items;
-    if (iterable instanceof Value.ArrayValue a) {
+    if (iterable instanceof Value.StringValue s && !s.undefinedBacked()) {
+      // Upstream Jinja iterates strings by code point; chat templates rely on this when a
+      // message's content is plain text rather than a list of structured parts.
+      items = stringCodePoints(s.value());
+    } else if (iterable instanceof Value.ArrayValue a) {
       items = a.values();
     } else {
       if (iterable instanceof Value.TupleValue a) {
@@ -2327,6 +2331,17 @@ public final class Interpreter {
       out.append(((ExecResult.Normal) r).output());
     }
     return none ? evaluateBlock(n.defaultBlock(), scope, b) : new ExecResult.Normal(out.toString());
+  }
+
+  /** Splits a string into its Unicode code points, each as its own one-point string value. */
+  private static List<Value> stringCodePoints(String text) {
+    var items = new ArrayList<Value>();
+    for (int i = 0; i < text.length(); ) {
+      int codePoint = text.codePointAt(i);
+      items.add(new Value.StringValue(new String(Character.toChars(codePoint))));
+      i += Character.charCount(codePoint);
+    }
+    return items;
   }
 
   private static void bind(Expression target, Value item, Environment e, SourceLocation l) {

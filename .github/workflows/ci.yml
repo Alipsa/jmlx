@@ -168,7 +168,8 @@ jobs:
                               'DecoderForwardPoisoningTest', 'QuantizedKvFeasibilityProbeTest',
                               'BatchGenerationSchedulerTest', 'BatchSchedulerFailureTest',
                               'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
-                              'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest'],
+                              'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest',
+                              'ModalityRejectionTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.

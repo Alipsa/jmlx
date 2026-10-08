@@ -79,6 +79,23 @@ GenerationRequest request = GenerationRequest.chat(
     CancellationToken.NONE);
 ```
 
+Chat message content may also be a structured list of `{"type": "text", "text": ...}` and
+`{"type": "image"}` parts (validated by `jmlx-tokenizer`; see its README). Image parts render the
+template's image marker only; pixels are attached to the request separately, in order of
+appearance:
+
+```java
+GenerationRequest request =
+    GenerationRequest.chat(tokenizer, messages, ChatTemplateOptions.defaults(true), config,
+        CancellationToken.NONE)
+        .withImages(List.of(image)); // RgbImage values, one per image part, in order
+```
+
+Requests start image-free; `withImages` copies the caller's list (each `RgbImage` copies its pixel
+buffer), so later mutation cannot affect the request. Every delivered model is text-only today —
+`ModelMetadata.inputModalities()` defaults to `{TEXT}`, and generation (decoder and T5) as well as
+batch-scheduler admission reject non-empty images before any native work, naming the model type.
+
 Use the existing `GenerationRequest(int[], ...)` constructor for pretokenized input. Its event
 `textDelta` and result `generatedText` remain null. Tokenizer-backed requests produce non-null,
 possibly empty deltas; the terminal event can carry the decoder's final UTF-8 flush. Concatenating

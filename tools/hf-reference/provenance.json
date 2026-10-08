@@ -65,7 +65,8 @@
     "checkpoints/t5-relu/model.safetensors": "4d6000053da2a947e9e86cc310d88df83111f384eda4782a2a0fdd2b74062ab0",
     "phase72-semantics.json": "9ac909d01e650680a8a19b8bd18b44fd5b42bbaf9ce759a2797ca4c7bf02c800",
     "t5-gated.json": "f0a8b2c8efdafa34fc4f55a130da75f13fc72dddfffda47c9d6464c255202d56",
-    "t5-relu.json": "8f94a656a6c3f5d27f4bdaf9fb356d7cce440677e0977d1106d0c05100ee2433"
+    "t5-relu.json": "8f94a656a6c3f5d27f4bdaf9fb356d7cce440677e0977d1106d0c05100ee2433",
+    "chat-smolvlm.json": "178a36902787a85b35a54ba851f116fd75b1973e7cac05984c421c26bc75182b"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -77,7 +78,14 @@
     "mixtral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
     "mixtral/tokenizer_config.json": "baa2d57cbea616a76ee79323bebe4aac6be802caf433cc9572d2c523f365652b",
     "qwen3/tokenizer.json": "274b06a0f99baa3a58407f9c416a2e9dda7b0c0f6abd5b172c0371946a6a257a",
-    "qwen3/tokenizer_config.json": "ee8bc348c897da92268e5978855088a03fe939ee318057691eafb591d520a7b2"
+    "qwen3/tokenizer_config.json": "ee8bc348c897da92268e5978855088a03fe939ee318057691eafb591d520a7b2",
+    "smolvlm/added_tokens.json": "74135b8664b56088c0006f1c8e848d79a8eba003411f72ebf1dc2ee96227be3a",
+    "smolvlm/chat_template.json": "a68ad1a42681ae44eacd109ff8dd56a840f761c03d72f4ff4c515d092f882168",
+    "smolvlm/preprocessor_config.json": "6cb6e36d6fcb88ca1502c4a26750715dc3e7dedddc9a8f17b27d8d167d1457e7",
+    "smolvlm/processor_config.json": "e7bff42da73ae9eec9042ef20e066e11f1ee20f025358ff79131e3c0fb549b46",
+    "smolvlm/special_tokens_map.json": "aa0ff906077086dfa9734a7f97f68c825877a48f9468807be65504495cdeef09",
+    "smolvlm/tokenizer.json": "5ece781dc8d2b2f3e2f289ca0ae50b17cfc27dd27bfe7971bb8241e0b964331a",
+    "smolvlm/tokenizer_config.json": "36c6fd44d07d10fd8180ee6b46dcccf69fb7c06753968ff0d7e17b8bfe17b777"
   },
   "phase72": {
     "versions": {

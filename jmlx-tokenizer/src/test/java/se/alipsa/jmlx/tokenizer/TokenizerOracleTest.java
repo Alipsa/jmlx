@@ -22,6 +22,13 @@ class TokenizerOracleTest {
     verifyFixture("phase72");
   }
 
+  @Test
+  void smolvlmChatRenderingsMatchPinnedOracle() throws Exception {
+    // The SmolVLM-256M chat renderings (including the template's <image> and <end_of_utterance>
+    // markers) are the WP3 encoding reference for structured content prompts.
+    verifyFixture("smolvlm");
+  }
+
   private void verifyFixture(String fixtureName) throws Exception {
     String rootProperty =
         java.util.Objects.requireNonNull(

@@ -16,6 +16,18 @@ special markers, and the `tokenizer_config.json` keeps every live scalar field e
 vocabulary-keyed `added_tokens_decoder`/`additional_special_tokens` (the live empty-string
 `pad_token` is nulled, since it is not in the synthetic vocabulary).
 
+The `smolvlm` bundle is different: it is the **real**, unmodified tokenizer bundle of
+`HuggingFaceTB/SmolVLM-256M-Instruct` pinned at revision
+`7e3e67edbbed1bf9888184d9df282b700a323964` (SHA-256 per file in
+`req/plans/phase7-3a-reference-findings.md`; the model weights themselves are not committed). It
+exists for the Phase 7.3a vision work: its chat template iterates structured content parts and
+renders image parts to an `<image>` placeholder, and the bundle's legacy processor file
+`chat_template.json` carries the same template string that `tokenizer_config.json` already holds
+(the loader prefers the config). `tools/hf-reference/generate.py --chat` renders its eight
+conversation cases (text-only, single/two/adjacent images, system and multi-turn) through
+`AutoProcessor.apply_chat_template`, and `tools/tokenizer-oracle` pins the encoding of the exact
+rendered texts in the `smolvlm.*` fixtures.
+
 `tools/hf-reference/generate.py --chat` loads each committed bundle with pinned Transformers,
 renders the family's conversation cases (three standard conversations for the earlier families;
 the enable_thinking-on/off matrix plus a tool-call conversation for Qwen3, each recorded with the

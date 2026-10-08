@@ -465,6 +465,44 @@ class InterpreterTest {
   }
 
   @Test
+  void forLoopsOverStringsChargeTheSharedLoopBudgetPerCodePoint() {
+    var loop = Template.parse("{% for x in s %}{% endfor %}");
+    // Each code point is one charged iteration, so a string over the budget fails even when the
+    // body renders nothing.
+    var error =
+        assertThrows(
+            TemplateRenderException.class,
+            () ->
+                loop.render(
+                    Map.of("s", "abc"), RenderOptions.builder().maxLoopIterations(2).build()));
+    assertEquals(ErrorCategory.RESOURCE_LIMIT, error.category());
+    assertEquals("Maximum loop iterations exceeded", error.getMessage());
+    // Non-BMP characters charge as one code point each, not two UTF-16 units.
+    error =
+        assertThrows(
+            TemplateRenderException.class,
+            () ->
+                loop.render(
+                    Map.of("s", "\uD83D\uDC4D\uD83D\uDC4D\uD83D\uDC4D"),
+                    RenderOptions.builder().maxLoopIterations(2).build()));
+    assertEquals(ErrorCategory.RESOURCE_LIMIT, error.category());
+    // A string's iterations share the render's budget with other loops.
+    error =
+        assertThrows(
+            TemplateRenderException.class,
+            () ->
+                Template.parse("{% for x in range(3) %}{% endfor %}{% for x in s %}{% endfor %}")
+                    .render(
+                        Map.of("s", "ab"), RenderOptions.builder().maxLoopIterations(4).build()));
+    assertEquals(ErrorCategory.RESOURCE_LIMIT, error.category());
+    // Within the budget, loop metadata (index, previtem) works on the lazy string items.
+    assertEquals(
+        "12a3b4c",
+        Template.parse("{% for x in s %}{{ loop.index }}{{ loop.previtem }}{% endfor %}")
+            .render(Map.of("s", "abcd"), RenderOptions.builder().maxLoopIterations(10).build()));
+  }
+
+  @Test
   void repeatedHostMapsDoNotAliasAfterTemplateMutation() {
     var shared = Map.of("k", 1);
     assertEquals(

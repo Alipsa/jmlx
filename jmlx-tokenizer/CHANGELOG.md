@@ -5,7 +5,9 @@
 - `renderChat` accepts structured message content: an ordered list of `{"type": "text",
   "text": ...}` and `{"type": "image"}` parts. Parts keep their order, image parts render the
   template's image marker as a placeholder (pixels never come from the messages), and any other
-  part shape is rejected. Plain-string content keeps its existing behavior.
+  part shape is rejected. Plain-string content keeps its existing behavior: `{% for %}` iterates it
+by code point, so a template that only prints structured text parts (such as SmolVLM's) renders a
+plain string as nothing — text parts carry text to the prompt.
 - A legacy processor file `chat_template.json` (`{"chat_template": "..."}`) now fills the
   `default` template slot when `tokenizer_config.json`, a root `chat_template.jinja`, and the
   additional-templates directory all leave it unset. Existing default sources still take

@@ -78,20 +78,6 @@ final class TokenizerDirectoryLoader {
       // Hugging Face gives the standalone template priority over the config's default.
       sources.put("default", readTemplate(rootTemplate));
     }
-    if (!sources.containsKey("default")) {
-      // The legacy processor template file ({"chat_template": "..."}) carries the pinned
-      // processor's template when tokenizer_config.json has none. It is per-bundle: a tokenizer
-      // without any template source keeps having none.
-      Path legacy = directory.resolve("chat_template.json");
-      if (Files.isRegularFile(legacy)) {
-        JsonNode template = readOptionalJson(legacy).path("chat_template");
-        if (!template.isString()) {
-          throw new TokenizerException(
-              "TokenizerDirectoryLoader: chat_template.json must contain a 'chat_template' string");
-        }
-        sources.put("default", template.asString());
-      }
-    }
     Path additional = directory.resolve("additional_chat_templates");
     if (Files.isDirectory(additional)) {
       try (Stream<Path> files = Files.list(additional)) {
@@ -114,6 +100,22 @@ final class TokenizerDirectoryLoader {
                 });
       } catch (IOException e) {
         throw new TokenizerException("TokenizerDirectoryLoader: failed to list " + additional, e);
+      }
+    }
+    if (!sources.containsKey("default")) {
+      // The legacy processor template file ({"chat_template": "..."}) carries the pinned
+      // processor's template when nothing else set the default. It is the lowest-priority
+      // default source — config, a root chat_template.jinja, and an
+      // additional_chat_templates/default.jinja all beat it — and it is per-bundle: a tokenizer
+      // without any template source keeps having none.
+      Path legacy = directory.resolve("chat_template.json");
+      if (Files.isRegularFile(legacy)) {
+        JsonNode template = readOptionalJson(legacy).path("chat_template");
+        if (!template.isString()) {
+          throw new TokenizerException(
+              "TokenizerDirectoryLoader: chat_template.json must contain a 'chat_template' string");
+        }
+        sources.put("default", template.asString());
       }
     }
     Map<String, Template> result = new LinkedHashMap<>();

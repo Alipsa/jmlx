@@ -2,12 +2,15 @@ package se.alipsa.jmlx.jinja.internal.runtime;
 
 import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
 import se.alipsa.jmlx.jinja.ErrorCategory;
 import se.alipsa.jmlx.jinja.RenderOptions;
@@ -43,6 +46,77 @@ public final class Interpreter {
 
     SourceLocation location() {
       return location;
+    }
+  }
+
+  /**
+   * For-loop items for a string iterable: the string's code points, each as its own string value.
+   * Materialization is lazy — {@code size()} counts code points without allocating, and {@code
+   * get}/{@code iterator} extend the materialized prefix one code point at a time — so a long
+   * string cannot allocate its whole materialization before the loop budget stops the loop.
+   * Inherits {@link AbstractList}'s read-only conventions: every mutating operation throws.
+   */
+  private static final class StringCodePoints extends AbstractList<Value> {
+    private final String text;
+    private final List<Value> materialized = new ArrayList<>();
+    private int offset;
+    private int size = -1;
+
+    private StringCodePoints(String text) {
+      this.text = text;
+    }
+
+    @Override
+    public int size() {
+      if (size < 0) {
+        size = text.codePointCount(0, text.length());
+      }
+      return size;
+    }
+
+    @Override
+    public Value get(int index) {
+      if (index < 0 || index >= size()) {
+        throw new IndexOutOfBoundsException(String.valueOf(index));
+      }
+      while (materialized.size() <= index) {
+        int codePoint = text.codePointAt(offset);
+        materialized.add(new Value.StringValue(new String(Character.toChars(codePoint))));
+        offset += Character.charCount(codePoint);
+      }
+      return materialized.get(index);
+    }
+
+    @Override
+    public Iterator<Value> iterator() {
+      return new Iterator<>() {
+        private int next;
+
+        @Override
+        public boolean hasNext() {
+          return next < size();
+        }
+
+        @Override
+        public Value next() {
+          if (!hasNext()) {
+            throw new NoSuchElementException();
+          }
+          return get(next++);
+        }
+      };
+    }
+
+    @Override
+    public List<Value> subList(int fromIndex, int toIndex) {
+      if (fromIndex < 0 || toIndex > size() || fromIndex > toIndex) {
+        throw new IndexOutOfBoundsException("from " + fromIndex + " to " + toIndex);
+      }
+      var result = new ArrayList<Value>(toIndex - fromIndex);
+      for (int i = fromIndex; i < toIndex; i++) {
+        result.add(get(i));
+      }
+      return List.copyOf(result);
     }
   }
 
@@ -2261,8 +2335,10 @@ public final class Interpreter {
     List<Value> items;
     if (iterable instanceof Value.StringValue s && !s.undefinedBacked()) {
       // Upstream Jinja iterates strings by code point; chat templates rely on this when a
-      // message's content is plain text rather than a list of structured parts.
-      items = stringCodePoints(s.value());
+      // message's content is plain text rather than a list of structured parts. Code points
+      // materialize one per loop iteration, so the render's loop budget bounds both the
+      // iteration and the allocation.
+      items = new StringCodePoints(s.value());
     } else if (iterable instanceof Value.ArrayValue a) {
       items = a.values();
     } else {
@@ -2331,17 +2407,6 @@ public final class Interpreter {
       out.append(((ExecResult.Normal) r).output());
     }
     return none ? evaluateBlock(n.defaultBlock(), scope, b) : new ExecResult.Normal(out.toString());
-  }
-
-  /** Splits a string into its Unicode code points, each as its own one-point string value. */
-  private static List<Value> stringCodePoints(String text) {
-    var items = new ArrayList<Value>();
-    for (int i = 0; i < text.length(); ) {
-      int codePoint = text.codePointAt(i);
-      items.add(new Value.StringValue(new String(Character.toChars(codePoint))));
-      i += Character.charCount(codePoint);
-    }
-    return items;
   }
 
   private static void bind(Expression target, Value item, Environment e, SourceLocation l) {

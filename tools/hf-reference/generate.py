@@ -343,9 +343,13 @@ def generate_chat(family, out, tokenizer_root):
 # smolvlm is the Phase 7.3a vision family: its "rendered" text and "ids" are the unexpanded
 # chat-template output (the Java renderChat + encode target), and "expanded_ids" is the pinned
 # Idefics3Processor expansion (the WP4 expander's target). The case matrix: one image, two
-# images, adjacent images, system/multi-turn content, interleaved text, and text-only.
+# images, adjacent images, system/multi-turn content, interleaved text, and text-only. Text
+# turns use {"type": "text", "text": ...} parts, which is what callers must send: the template
+# iterates content, so a plain string renders as nothing (recorded, and pinned, by
+# string_content_dropped_by_template).
 SMOLVLM_CONVERSATIONS = (
-    ("text_only", [{"role": "user", "content": "What color is the sky?"}], ()),
+    ("text_only", [{"role": "user", "content": [
+        {"type": "text", "text": "What color is the sky?"}]}], ()),
     ("single_image_4x4", [{"role": "user", "content": [
         {"type": "text", "text": "What is in "},
         {"type": "image"},
@@ -366,17 +370,26 @@ SMOLVLM_CONVERSATIONS = (
         {"type": "image"},
         {"type": "text", "text": " compare"}]}], ("tile-4x4-100x80", "tile-4x1-512x2048")),
     ("system_multi_turn_image", [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": [
+            {"type": "text", "text": "You are a helpful assistant."}]},
         {"role": "user", "content": [
             {"type": "image"},
             {"type": "text", "text": " what is this?"}]},
-        {"role": "assistant", "content": "A picture."},
-        {"role": "user", "content": "thanks"}], ("tile-4x4-100x80",)),
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "A picture."}]},
+        {"role": "user", "content": [
+            {"type": "text", "text": "thanks"}]}], ("tile-4x4-100x80",)),
     ("text_only_multi_turn", [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": "world"},
-        {"role": "user", "content": "hello"}], ()),
+        {"role": "system", "content": [
+            {"type": "text", "text": "You are a helpful assistant."}]},
+        {"role": "user", "content": [
+            {"type": "text", "text": "hello"}]},
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "world"}]},
+        {"role": "user", "content": [
+            {"type": "text", "text": "hello"}]}], ()),
+    ("string_content_dropped_by_template", [
+        {"role": "user", "content": "What color is the sky?"}], ()),
 )
 
 

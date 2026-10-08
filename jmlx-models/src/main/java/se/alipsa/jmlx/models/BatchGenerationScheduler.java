@@ -440,10 +440,10 @@ public final class BatchGenerationScheduler implements AutoCloseable {
    * Submits a request. Never blocks and never touches MLX. Validation happens here, on the caller
    * thread, against model facts the worker snapshotted at startup.
    *
-   * @throws IllegalArgumentException if the request can never be served (bad token IDs, a prompt
-   *     over the prompt-token budget even alone, {@code maxNewTokens} above the scheduler's cap, a
-   *     cache policy the checkpoint cannot honor, or bounded-FULL capacity); it takes no admission
-   *     permit
+   * @throws IllegalArgumentException if the request can never be served (bad token IDs, images on a
+   *     text-only model, a prompt over the prompt-token budget even alone, {@code maxNewTokens}
+   *     above the scheduler's cap, a cache policy the checkpoint cannot honor, or bounded-FULL
+   *     capacity); it takes no admission permit
    * @throws BatchAdmissionRejectedException if the scheduler is at capacity right now
    * @throws SchedulerClosedException if the scheduler is closing or closed
    * @throws SchedulerFailedException if the worker failed

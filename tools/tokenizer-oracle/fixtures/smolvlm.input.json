@@ -6,7 +6,7 @@
       "cases": [
         {
           "name": "text_only",
-          "text": "<|im_start|>User: <end_of_utterance>\nAssistant:",
+          "text": "<|im_start|>User: What color is the sky?<end_of_utterance>\nAssistant:",
           "addSpecialTokens": false
         },
         {
@@ -36,12 +36,17 @@
         },
         {
           "name": "system_multi_turn_image",
-          "text": "<|im_start|>System: <end_of_utterance>\nUser:<image> what is this?<end_of_utterance>\nAssistant: <end_of_utterance>\nUser: <end_of_utterance>\nAssistant:",
+          "text": "<|im_start|>System: You are a helpful assistant.<end_of_utterance>\nUser:<image> what is this?<end_of_utterance>\nAssistant: A picture.<end_of_utterance>\nUser: thanks<end_of_utterance>\nAssistant:",
           "addSpecialTokens": false
         },
         {
           "name": "text_only_multi_turn",
-          "text": "<|im_start|>System: <end_of_utterance>\nUser: <end_of_utterance>\nAssistant: <end_of_utterance>\nUser: <end_of_utterance>\nAssistant:",
+          "text": "<|im_start|>System: You are a helpful assistant.<end_of_utterance>\nUser: hello<end_of_utterance>\nAssistant: world<end_of_utterance>\nUser: hello<end_of_utterance>\nAssistant:",
+          "addSpecialTokens": false
+        },
+        {
+          "name": "string_content_dropped_by_template",
+          "text": "<|im_start|>User: <end_of_utterance>\nAssistant:",
           "addSpecialTokens": false
         }
       ]

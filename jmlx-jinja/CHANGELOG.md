@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `{% for %}` now iterates strings by Unicode code point, matching upstream Jinja. Structured
   chat templates that loop over a message's plain-text content (where each iteration yields a
   character with no members) render their text branches as no-ops instead of failing the loop.
+  Each code point is one charged loop iteration, and code points materialize lazily, so the
+  render's loop budget bounds both iteration and allocation for long strings.
 
 ### Changed
 

@@ -8,8 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.jinja.Template;
 import tools.jackson.databind.JsonNode;
@@ -39,6 +41,40 @@ class Phase63FamilyTokenizerTest {
             java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         assertEquals(sources.required(key).asString(), actual, key);
       }
+    }
+  }
+
+  /**
+   * The SmolVLM bundle commits more than the tokenizer pair (chat template, special tokens,
+   * processor configs), so every {@code smolvlm/*} provenance entry is checked: each pinned entry
+   * must exist on disk with the recorded digest, and every committed file must be pinned, so an
+   * edited, added, or removed bundle file fails the build.
+   */
+  @Test
+  void smolvlmBundleFilesMatchRecordedProvenance() throws Exception {
+    Path root = Path.of(System.getProperty("jmlx.repository.root"));
+    JsonNode sources =
+        MAPPER
+            .readTree(root.resolve("tools/hf-reference/provenance.json").toFile())
+            .required("chat_sources");
+    Path directory = root.resolve("jmlx-tokenizer/src/test/resources/families/smolvlm");
+    var pinned = new TreeSet<String>();
+    for (var entry : sources.properties()) {
+      if (entry.getKey().startsWith("smolvlm/")) {
+        pinned.add(entry.getKey().substring("smolvlm/".length()));
+      }
+    }
+    var committed = new TreeSet<String>();
+    try (var files = Files.list(directory)) {
+      files
+          .filter(Files::isRegularFile)
+          .forEach(path -> committed.add(path.getFileName().toString()));
+    }
+    assertEquals(pinned, committed);
+    for (String filename : committed) {
+      byte[] bytes = Files.readAllBytes(directory.resolve(filename));
+      String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+      assertEquals(sources.required("smolvlm/" + filename).asString(), actual, filename);
     }
   }
 

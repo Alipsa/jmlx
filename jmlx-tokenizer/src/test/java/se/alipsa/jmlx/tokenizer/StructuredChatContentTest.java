@@ -17,8 +17,10 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Structured chat content ({@code {"type": "text", "text": ...}} and {@code {"type": "image"}}
  * parts) rendered through the committed SmolVLM-256M bundle, verified against the pinned Hugging
- * Face golden. String content keeps its existing behavior, including the template's
- * character-by-character iteration of plain text.
+ * Face golden. String content keeps its existing behavior: the template iterates the content, and
+ * under a template like SmolVLM's that only prints structured text parts, a plain string renders as
+ * nothing. The golden's {@code string_content_dropped_by_template} case pins that, so callers must
+ * send text parts for text.
  */
 class StructuredChatContentTest {
 

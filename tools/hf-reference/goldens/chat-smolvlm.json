@@ -6,16 +6,26 @@
       "messages": [
         {
           "role": "user",
-          "content": "What color is the sky?"
+          "content": [
+            {
+              "type": "text",
+              "text": "What color is the sky?"
+            }
+          ]
         }
       ],
       "add_generation_prompt": true,
-      "rendered": "<|im_start|>User: <end_of_utterance>\nAssistant:",
+      "rendered": "<|im_start|>User: What color is the sky?<end_of_utterance>\nAssistant:",
       "ids": [
         1,
         11126,
         42,
-        216,
+        1812,
+        2380,
+        314,
+        260,
+        6376,
+        47,
         49279,
         198,
         9519,
@@ -5044,7 +5054,12 @@
       "messages": [
         {
           "role": "system",
-          "content": "You are a helpful assistant."
+          "content": [
+            {
+              "type": "text",
+              "text": "You are a helpful assistant."
+            }
+          ]
         },
         {
           "role": "user",
@@ -5060,20 +5075,35 @@
         },
         {
           "role": "assistant",
-          "content": "A picture."
+          "content": [
+            {
+              "type": "text",
+              "text": "A picture."
+            }
+          ]
         },
         {
           "role": "user",
-          "content": "thanks"
+          "content": [
+            {
+              "type": "text",
+              "text": "thanks"
+            }
+          ]
         }
       ],
       "add_generation_prompt": true,
-      "rendered": "<|im_start|>System: <end_of_utterance>\nUser:<image> what is this?<end_of_utterance>\nAssistant: <end_of_utterance>\nUser: <end_of_utterance>\nAssistant:",
+      "rendered": "<|im_start|>System: You are a helpful assistant.<end_of_utterance>\nUser:<image> what is this?<end_of_utterance>\nAssistant: A picture.<end_of_utterance>\nUser: thanks<end_of_utterance>\nAssistant:",
       "ids": [
         1,
         18403,
         42,
-        216,
+        1206,
+        359,
+        253,
+        5356,
+        11173,
+        30,
         49279,
         198,
         11126,
@@ -5088,12 +5118,14 @@
         9519,
         9531,
         42,
-        216,
+        330,
+        4177,
+        30,
         49279,
         198,
         11126,
         42,
-        216,
+        6954,
         49279,
         198,
         9519,
@@ -5111,7 +5143,12 @@
         1,
         18403,
         42,
-        216,
+        1206,
+        359,
+        253,
+        5356,
+        11173,
+        30,
         49279,
         198,
         11126,
@@ -6252,12 +6289,14 @@
         9519,
         9531,
         42,
-        216,
+        330,
+        4177,
+        30,
         49279,
         198,
         11126,
         42,
-        216,
+        6954,
         49279,
         198,
         9519,
@@ -6270,41 +6309,88 @@
       "messages": [
         {
           "role": "system",
-          "content": "You are a helpful assistant."
+          "content": [
+            {
+              "type": "text",
+              "text": "You are a helpful assistant."
+            }
+          ]
         },
         {
           "role": "user",
-          "content": "hello"
+          "content": [
+            {
+              "type": "text",
+              "text": "hello"
+            }
+          ]
         },
         {
           "role": "assistant",
-          "content": "world"
+          "content": [
+            {
+              "type": "text",
+              "text": "world"
+            }
+          ]
         },
         {
           "role": "user",
-          "content": "hello"
+          "content": [
+            {
+              "type": "text",
+              "text": "hello"
+            }
+          ]
         }
       ],
       "add_generation_prompt": true,
-      "rendered": "<|im_start|>System: <end_of_utterance>\nUser: <end_of_utterance>\nAssistant: <end_of_utterance>\nUser: <end_of_utterance>\nAssistant:",
+      "rendered": "<|im_start|>System: You are a helpful assistant.<end_of_utterance>\nUser: hello<end_of_utterance>\nAssistant: world<end_of_utterance>\nUser: hello<end_of_utterance>\nAssistant:",
       "ids": [
         1,
         18403,
         42,
-        216,
+        1206,
+        359,
+        253,
+        5356,
+        11173,
+        30,
         49279,
         198,
         11126,
         42,
-        216,
+        33662,
         49279,
         198,
         9519,
         9531,
         42,
-        216,
+        905,
         49279,
         198,
+        11126,
+        42,
+        33662,
+        49279,
+        198,
+        9519,
+        9531,
+        42
+      ]
+    },
+    {
+      "name": "string_content_dropped_by_template",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What color is the sky?"
+        }
+      ],
+      "add_generation_prompt": true,
+      "rendered": "<|im_start|>User: <end_of_utterance>\nAssistant:",
+      "ids": [
+        1,
         11126,
         42,
         216,

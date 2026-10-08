@@ -66,7 +66,7 @@
     "phase72-semantics.json": "9ac909d01e650680a8a19b8bd18b44fd5b42bbaf9ce759a2797ca4c7bf02c800",
     "t5-gated.json": "f0a8b2c8efdafa34fc4f55a130da75f13fc72dddfffda47c9d6464c255202d56",
     "t5-relu.json": "8f94a656a6c3f5d27f4bdaf9fb356d7cce440677e0977d1106d0c05100ee2433",
-    "chat-smolvlm.json": "178a36902787a85b35a54ba851f116fd75b1973e7cac05984c421c26bc75182b"
+    "chat-smolvlm.json": "775aaf27cf4138182165fbfd8d57512ae9e2256560df11ab5e6e935a1d029c6f"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",

@@ -316,6 +316,28 @@ class HfTokenizerTest {
   }
 
   @Test
+  void additionalDefaultTemplateBeatsTheLegacyProcessorChatTemplateFile() throws Exception {
+    // A bundle with both an additional_chat_templates/default.jinja and a legacy
+    // chat_template.json loaded before the legacy fallback existed; it must still load,
+    // with the additional template winning.
+    Path directory =
+        Files.createDirectory(temporaryDirectory.resolve("additional-default-beats-legacy"));
+    Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));
+    Files.createDirectory(directory.resolve("additional_chat_templates"));
+    Files.writeString(
+        directory.resolve("additional_chat_templates/default.jinja"),
+        "ADDITIONAL {{ messages[0].content }}");
+    writeLegacyTemplate(directory, "LEGACY {{ messages[0].content }}");
+    HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
+    assertEquals(List.of("default"), tokenizer.metadata().chatTemplateNames());
+    assertEquals(
+        "ADDITIONAL hi",
+        tokenizer.renderChat(
+            List.of(Map.of("role", "user", "content", "hi")),
+            new ChatTemplateOptions("", false, Map.of())));
+  }
+
+  @Test
   void aBundleWithoutAnyTemplateSourceStillHasNoTemplates() throws Exception {
     Path directory = Files.createDirectory(temporaryDirectory.resolve("no-templates"));
     Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));

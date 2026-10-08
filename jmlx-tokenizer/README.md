@@ -64,8 +64,9 @@ Message `content` is plain text or a structured list of parts, in order:
 unknown keys, a non-text `text` value, a non-map part, or an empty list) is rejected. Image parts
 are placeholders only — the renderer emits the template's image marker without fetching anything;
 pixel data is a concern of the generation API, not of the tokenizer. Plain-string content keeps
-its exact existing behavior (templates may iterate it character by character, as upstream Jinja
-does).
+its exact existing behavior: `{% for %}` iterates it by code point, as upstream Jinja does, and a
+template that only prints structured text parts (such as SmolVLM's) therefore renders plain
+string content as nothing — use text parts when the text must appear in the prompt.
 
 Templates using `strftime_now` use the current system clock and default zone on each render.
 For reproducible prompts, supply a `RenderOptions` (from `se.alipsa.jmlx.jinja`):

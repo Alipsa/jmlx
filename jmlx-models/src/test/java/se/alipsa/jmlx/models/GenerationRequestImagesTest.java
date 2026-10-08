@@ -102,6 +102,22 @@ class GenerationRequestImagesTest {
     assertEquals(GenerationCachePolicy.full(), chat.cachePolicy());
   }
 
+  @Test
+  void textOnlyMetadataDefaultsToText() {
+    // Pure metadata: no native library involved, so this runs (and must run) on bootstrapped and
+    // unbootstrapped checkouts alike.
+    assertEquals(
+        Set.of(InputModality.TEXT), new DecoderMetadata("llama", 32_000, 32).inputModalities());
+    assertEquals(
+        Set.of(InputModality.TEXT), new EncoderMetadata("bert", 30_522, 6).inputModalities());
+    assertEquals(
+        Set.of(InputModality.TEXT), new Seq2SeqMetadata("t5", 32_128, 8, 8).inputModalities());
+    // The set is immutable.
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> new DecoderMetadata("llama", 32_000, 32).inputModalities().add(InputModality.IMAGE));
+  }
+
   private static HfTokenizer mistralTokenizer() {
     Path root = Path.of(System.getProperty("jmlx.repository.root"));
     return HfTokenizer.fromDirectory(

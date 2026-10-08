@@ -28,7 +28,7 @@
     "phase72-only-first.tokenizer.json": "5a63ef061222fc20ed97be6b01124cda59c1d1291c298ad8384cf4a76ab8a72d",
     "phase72-replace.tokenizer.json": "6fe0a2f6764508becab79319db724a4ea0446fc82f4c66d230ac109d6c9f3e57",
     "smolvlm.tokenizer.json": "5ece781dc8d2b2f3e2f289ca0ae50b17cfc27dd27bfe7971bb8241e0b964331a",
-    "smolvlm.input.json": "6cf3581a5eda7d44d9870bf4f599a13334a1bf0f84fddc7f635b2c9d5f099d47"
+    "smolvlm.input.json": "2c67b8e09f086ceab6b0941367dad807fadbbf7c7fd4410103b14aae33063d3f"
   },
   "networkPolicy": "Fixtures load committed local tokenizer files only; no Hub calls are permitted.",
   "platforms": [

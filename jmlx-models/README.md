@@ -82,7 +82,10 @@ GenerationRequest request = GenerationRequest.chat(
 Chat message content may also be a structured list of `{"type": "text", "text": ...}` and
 `{"type": "image"}` parts (validated by `jmlx-tokenizer`; see its README). Image parts render the
 template's image marker only; pixels are attached to the request separately, in order of
-appearance:
+appearance. Templates may loop over a message's content and print only structured text parts —
+SmolVLM's does — so send text parts, not plain strings, when the text must reach the model:
+under such a template, `Map.of("role", "user", "content", "How are you?")` renders an empty user
+turn without an error.
 
 ```java
 GenerationRequest request =

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Runs the release smoke consumer against the six jmlx modules.
+# Runs the release smoke consumer against the seven jmlx modules.
 #
 #   run.sh ci                 publish the current SNAPSHOTs to a disposable repo, then smoke them
 #   run.sh candidate          same, with SNAPSHOT suffixes stripped from the consumer's versions
 #                             (set the modules to their release versions first; rejects SNAPSHOTs)
-#   run.sh central            resolve everything from Maven Central, after all six are published
+#   run.sh central            resolve everything from Maven Central, after all seven are published
 #   run.sh ... --record       (ci only) rewrite goldens/mistral-sampled.properties
 #
 # Every run uses a fresh GRADLE_USER_HOME, so no cached or mavenLocal jmlx artifact can be reused.
@@ -15,7 +15,7 @@ mode="${1:-ci}"
 shift || true
 record=false
 [ "${1:-}" = "--record" ] && record=true
-# Rejected before any work: the ci/candidate block deletes the smoke repo and publishes all six
+# Rejected before any work: the ci/candidate block deletes the smoke repo and publishes all seven
 # modules, so a later check would not undo that.
 if [ "$record" = true ] && [ "$mode" != "ci" ]; then
   echo "error: --record is ci only: it would overwrite the committed golden with whatever '$mode' serves" >&2
@@ -25,7 +25,7 @@ fi
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 smoke="$root/tools/release-smoke"
 repo="$root/build/smoke-repo"
-modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jmlx-models"
+modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jmlx-vision jmlx-models"
 
 # Locate a Gradle distribution through the checkout's wrapper (default home), then run the consumer
 # with that binary under a throwaway home. `--version` makes the wrapper download it if needed.
@@ -68,7 +68,8 @@ trap 'rm -rf "$home"' EXIT
 # Forward any version overrides (e.g. JMLX_MODELS_VERSION) as -P properties.
 for pair in JMLX_MODELS_VERSION:jmlxModelsVersion JMLX_NATIVE_VERSION:jmlxNativeVersion \
   JMLX_CORE_VERSION:jmlxCoreVersion JMLX_FFI_VERSION:jmlxFfiVersion \
-  JMLX_TOKENIZER_VERSION:jmlxTokenizerVersion JMLX_JINJA_VERSION:jmlxJinjaVersion; do
+  JMLX_TOKENIZER_VERSION:jmlxTokenizerVersion JMLX_JINJA_VERSION:jmlxJinjaVersion \
+  JMLX_VISION_VERSION:jmlxVisionVersion; do
   var="${pair%%:*}"
   [ -n "${!var:-}" ] && args+=("-P${pair#*:}=${!var}")
 done

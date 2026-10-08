@@ -1,0 +1,71 @@
+{
+  "fixtureSources": {
+    "chain.input.json": "16c2c757b95bf55535950430d8ab96cc86a0835b25755f292403d5b80d7fb791",
+    "decode.input.json": "efd1abfd0ea0770b9d4121d512207331ad4a8c7a59b8665cec4a04facc01bf6e",
+    "decode/exif-orient6-100x60.jpg": "c2fe3e60cc504bc3a66a8237d3c1dcec918dd28f91fc6ebc340023863a615e37",
+    "decode/gama-32x32.png": "d0c1c6adf768d684730cc1915269c9aa7f85dd59de3f80586eafb922fd4f9ba8",
+    "decode/gray-60x40.png": "99653387ca3553dfec23df709bdf2341e5adeda1929a7539d17e25c7132a6303",
+    "decode/gray-trns-60x40.png": "1696535aeb4b641fa7e52806670106600bf8e96d0a2c7241c1f25bdbcbb1005d",
+    "decode/icc-p3-32x32.png": "398a2ccde46fc7340321e99f8c163d8d9fde9c4df7e711f633802b7d55d47e8c",
+    "decode/icc-p3-twin-32x32.png": "d0c1c6adf768d684730cc1915269c9aa7f85dd59de3f80586eafb922fd4f9ba8",
+    "decode/jpeg-color-96x64.jpg": "c0b85711afc462177e9b19967e16317297c6010cc764233f953630b6e51095a7",
+    "decode/jpeg-gray-64x48.jpg": "2e474fd67057499af51b2b4038e14262f261494656241046c7d9d8fa0bf4eee9",
+    "decode/jpeg-rst-96x64.jpg": "b1196a73e9b97c6061fce70c6c404bbb57d028a33e5f4cc042684a9d6f979f3c",
+    "decode/la-32x24.png": "bdac5e6cf5f9103bf8543fb321eeb3ab8b685394ee33e7feeaf88c0a025fef9e",
+    "decode/limits-5760x4200.png": "e2f2b0b37957316e2f0c736b6a2050e8e2039b1c1015f413deb806c770425ec3",
+    "decode/limits-8192x5760.png": "b7e345d4cfacdd4c06c2230a3c431cb0ef2e08f7e155dd0365e8d42e21bda40a",
+    "decode/limits-wide-20000x300.png": "240d86fc7d03a71f00895f3bdf84fb63e4a0903700c5a91144a1fd6c8c2ee4d1",
+    "decode/palette-32x32.png": "2f65dd7a66b3272c81e79401cef678ffa5bae6f855969a697cf3be278dc07bdf",
+    "decode/palette-trns-perentry-32x32.png": "85f762b56fe472f502e8073de6af03bef83045f5ae5d5823f919df8a00cdcc66",
+    "decode/palette-trns-short-32x32.png": "0ebe2596a325bcc75d472fa071a2ce3bb40759bb120bf88c4c43fca77091aeda",
+    "decode/palette-trns-single-32x32.png": "ece0e0373ccd876094e4c950db4bb6a05e9e9a490ced46ed462e5a1883217fea",
+    "decode/palette8-32x32.png": "4f38d276dea3948c70ae969c658b1baad723ead040a09889acbf9717dbc0cff6",
+    "decode/palette8-trns-overflow-8x8.png": "375dfb2e56454cf17f134ff7eae916a17b924311dec840427d818167d7aa2382",
+    "decode/palette8-trns-perentry-32x32.png": "d3a115b8266b14eebfe6577ec8fd16f18e55994232ed2a1b5babcd2cd987f864",
+    "decode/palette8-trns-single-32x32.png": "20a0259d60dde4db3f2d89f1169ebd350ea52829cb3c366898a3c8c41e938be4",
+    "decode/rgb-64x48.png": "a27db7d9d8e45248dc8ea57c5452d1f01b075e8f384b3663c90163023ad14cfa",
+    "decode/rgb-trns-64x48.png": "d39b593e5e69d6baaf567b0e766bf03b6cdddd59f529178bb024e9e057a12376",
+    "decode/rgba-32x32.png": "d121f9b0aa5574980de2e131ee58045850fd10478d3aa94896b15d35e0b6807c",
+    "preprocessor_config.json": "6cb6e36d6fcb88ca1502c4a26750715dc3e7dedddc9a8f17b27d8d167d1457e7",
+    "reject/bmp-32x32.bmp": "c191003cc652a29ffdafe4ff405ba3fac005a3489546998b8d5e1fec438a4798",
+    "reject/jpeg-adobe-transform2.jpg": "6a6f5ea15a658c78528ffa2b9e9bb59e935b207d36261af1f0478c69d54b79ea",
+    "reject/jpeg-cmyk-4comp.jpg": "10992d448864f073ef1e7919c498ce92f58fdee3f590d8fb74087ae31b92e3e4",
+    "reject/jpeg-truncated.jpg": "65c1be10830910d4d4dc025ecf0fad282ae5718ec5f385ce625b0e13c609886e",
+    "reject/png-16bit-gray.png": "6132d0c53a6bf051377e945e595b891297daba80f5605e77b91c275e7862ddcf",
+    "reject/png-16bit-rgb.png": "955f4c0f01736024d831638fa169be0bf7bcf1d4122f4193bf26928148d9b89d",
+    "reject/png-1bit-gray.png": "d3a03348bbabc02f89f9e266d920568d38c7a767f3677470373fcd1a4f4fa83d",
+    "reject/png-4bit-gray.png": "08e0f4dea21946dbc9d7db2754ab626591dc5d8ee79f14e31f8d87be89f39e59",
+    "reject/png-truncated.png": "ae221890fe83ff16c27dde98c775935ac69ad028fe7a95c30451139cea53ab59",
+    "resize.input.json": "239db3b3c3a936b3494e21402c04b7edf944a06d2278e41a690125cdb8870ab6",
+    "resize/checker-120x80.png": "5b8cfb3fb2ad6d70b199eeb1e5404a7ac31e9d6dd72eb61134c5deea76213472",
+    "resize/gradient-100x80.png": "5c2d78f6d836fc59f9ee22242d0ee025f710a65810615a28eeffbe9eede369db",
+    "resize/gradient-80x100.png": "72936064fd7e51ef1e4a3b50b6a0ec64657798e3c8bb7f69bb1deaae1389cd29",
+    "resize/identity-48x48.png": "683cf904237c84772714f22d7cd47e6619cfe31b463bf88fbfb4dbb94624f957",
+    "resize/impulse-64x64.png": "cff19c5414297e8c6808c1bcbd5aaa86646418444fd9ba80fb677fd5f83cba9e",
+    "resize/noisy-96x96.png": "94cd0aea44df941f59d5d4788f5c075a06a31fa56a610c5e49edeade60a5c324",
+    "resize/odd-321x199.png": "11346c3af26326d0fe8c61d2e20f6f30d7a7c189810f02bf89074a6b291aff46",
+    "resize/small-96x64.png": "71bcf8f79e3f08afa3c1ce67ec974866170211b6849673d26faf36c92f54989c",
+    "resize/solid-64x64.png": "842ff904e3479cc848e16a1d83fa325ba32e54f42f53d65f6a894095f6fc2eb1",
+    "resize/square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741",
+    "resize/wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7"
+  },
+  "networkPolicy": "Fixtures load committed local image files and the hash-pinned preprocessor config only; no Hub calls are permitted.",
+  "numpy": "2.5.3",
+  "pillow": "12.3.0",
+  "platforms": [
+    {
+      "machine": "x86_64",
+      "system": "Linux"
+    },
+    {
+      "machine": "arm64",
+      "system": "Darwin"
+    }
+  ],
+  "python": [
+    3,
+    12
+  ],
+  "referencePath": "PIL.Image.open(path) -> load() keeping the original mode/palette/info (no exif_transpose, no ICC/gAMA color management); decode-level RGB conversion is the processor's do_convert_rgb math (RGBA/LA or P-with-tRNS composited over white, every other mode convert('RGB')); chain and resize run through Idefics3ImageProcessor built from the hash-pinned preprocessor_config.json with size.longest_edge=96 and max_image_size.longest_edge=32 and the per-case resample/do_image_splitting overrides, return_tensors=None.",
+  "transformers": "4.57.6"
+}

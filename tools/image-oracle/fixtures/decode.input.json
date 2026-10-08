@@ -1,0 +1,151 @@
+{
+  "cases": [
+    {
+      "name": "rgb-64x48",
+      "image": "decode/rgb-64x48.png"
+    },
+    {
+      "name": "gray-60x40",
+      "image": "decode/gray-60x40.png"
+    },
+    {
+      "name": "rgba-32x32",
+      "image": "decode/rgba-32x32.png"
+    },
+    {
+      "name": "la-32x24",
+      "image": "decode/la-32x24.png"
+    },
+    {
+      "name": "palette-32x32",
+      "image": "decode/palette-32x32.png"
+    },
+    {
+      "name": "palette-trns-single-32x32",
+      "image": "decode/palette-trns-single-32x32.png"
+    },
+    {
+      "name": "palette-trns-perentry-32x32",
+      "image": "decode/palette-trns-perentry-32x32.png"
+    },
+    {
+      "name": "palette-trns-short-32x32",
+      "image": "decode/palette-trns-short-32x32.png"
+    },
+    {
+      "name": "palette8-32x32",
+      "image": "decode/palette8-32x32.png"
+    },
+    {
+      "name": "palette8-trns-single-32x32",
+      "image": "decode/palette8-trns-single-32x32.png"
+    },
+    {
+      "name": "palette8-trns-perentry-32x32",
+      "image": "decode/palette8-trns-perentry-32x32.png"
+    },
+    {
+      "name": "palette8-trns-overflow-8x8",
+      "image": "decode/palette8-trns-overflow-8x8.png"
+    },
+    {
+      "name": "rgb-trns-64x48",
+      "image": "decode/rgb-trns-64x48.png"
+    },
+    {
+      "name": "gray-trns-60x40",
+      "image": "decode/gray-trns-60x40.png"
+    },
+    {
+      "name": "gama-32x32",
+      "image": "decode/gama-32x32.png"
+    },
+    {
+      "name": "icc-p3-32x32",
+      "image": "decode/icc-p3-32x32.png"
+    },
+    {
+      "name": "icc-p3-twin-32x32",
+      "image": "decode/icc-p3-twin-32x32.png"
+    },
+    {
+      "name": "jpeg-color-96x64",
+      "image": "decode/jpeg-color-96x64.jpg"
+    },
+    {
+      "name": "jpeg-gray-64x48",
+      "image": "decode/jpeg-gray-64x48.jpg"
+    },
+    {
+      "name": "jpeg-rst-96x64",
+      "image": "decode/jpeg-rst-96x64.jpg"
+    },
+    {
+      "name": "exif-orient6-100x60",
+      "image": "decode/exif-orient6-100x60.jpg"
+    },
+    {
+      "name": "limits-5760x4200",
+      "image": "decode/limits-5760x4200.png",
+      "shaOnly": true,
+      "defaultLimitsRejected": true
+    },
+    {
+      "name": "limits-8192x5760",
+      "image": "decode/limits-8192x5760.png",
+      "shaOnly": true,
+      "defaultLimitsRejected": true
+    },
+    {
+      "name": "limits-wide-20000x300",
+      "image": "decode/limits-wide-20000x300.png",
+      "shaOnly": true,
+      "defaultLimitsRejected": true
+    },
+    {
+      "name": "reject-bmp-32x32",
+      "image": "reject/bmp-32x32.bmp",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-png-1bit-gray",
+      "image": "reject/png-1bit-gray.png",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-png-4bit-gray",
+      "image": "reject/png-4bit-gray.png",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-png-16bit-gray",
+      "image": "reject/png-16bit-gray.png",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-png-16bit-rgb",
+      "image": "reject/png-16bit-rgb.png",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-png-truncated",
+      "image": "reject/png-truncated.png",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-jpeg-cmyk-4comp",
+      "image": "reject/jpeg-cmyk-4comp.jpg",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-jpeg-adobe-transform2",
+      "image": "reject/jpeg-adobe-transform2.jpg",
+      "expectedRejected": true
+    },
+    {
+      "name": "reject-jpeg-truncated",
+      "image": "reject/jpeg-truncated.jpg",
+      "expectedRejected": true
+    }
+  ]
+}

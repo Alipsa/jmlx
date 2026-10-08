@@ -1,0 +1,156 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+// Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: jmlx-vision has
+// never been published, so it starts a fresh 0.1.0 line -- same reasoning jmlx-tokenizer used for
+// its own first version.
+version = '0.1.0-SNAPSHOT'
+
+// Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain (which
+// exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and
+// jmlx-tokenizer and keeps the published artifact consumable from Java 21 onward.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.vision')
+}
+
+// Same reasoning as jmlx-core/jmlx-models (Decision 8 in req/plans/native-artifact-packaging-plan.md):
+// the root javadoc -Werror convention's "missing" doclint category only ever flags absent
+// @param/@return tags on already-prose-documented, self-explanatory members -- not a real content
+// problem worth a wave of filler tags. -Werror still gates genuine problems (broken @link,
+// malformed HTML) through the remaining doclint categories.
+tasks.named('javadoc', Javadoc) {
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
+// The root convention (build.gradle's maven-publish block) adds LICENSE/NOTICE to the main jar
+// only. The sources and javadoc jars are what a consumer downloads to read this code and its
+// provenance, so they must carry the same legal files: the root MIT LICENSE and this module's
+// NOTICE (the full Pillow MIT-CMU text). Vision-only by design: the root convention is not
+// extended and the six existing modules' ancillary artifacts are left untouched.
+tasks.named('sourcesJar', Jar) {
+    from(rootProject.file('LICENSE')) { into 'META-INF' }
+    from(project.file('NOTICE')) { into 'META-INF' }
+}
+tasks.named('javadocJar', Jar) {
+    from(rootProject.file('LICENSE')) { into 'META-INF' }
+    from(project.file('NOTICE')) { into 'META-INF' }
+}
+
+dependencies {
+    // jackson-databind parses preprocessor_config.json (SmolVlmProcessorConfig). Matching
+    // jmlx-tokenizer's choice: Jackson 3 (tools.jackson.core) as the only external dependency.
+    implementation libs.jackson.databind
+}
+
+tasks.withType(Test).configureEach {
+    mustRunAfter rootProject.tasks.named('generateImageOracleFixtures')
+    systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
+    inputs.files(rootProject.fileTree('tools/image-oracle/fixtures'))
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-vision'
+                description = 'Pure-Java image decoding, Pillow-exact resampling, normalization and the SmolVLM/Idefics3 image processor for jmlx-models.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}
+
+// jmlx-jinja's verifyPublicationMetadata asserts *zero* published dependencies; jmlx-vision
+// legitimately has one (Jackson 3, matching jmlx-tokenizer), so it asserts that exact identity
+// instead.
+tasks.register('verifyPublishedDependencies') {
+    group = 'verification'
+    description = 'Verifies the published POM declares exactly the expected dependencies.'
+    dependsOn tasks.named('generatePomFileForMavenPublication')
+    def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
+    def expected = ['tools.jackson.core:jackson-databind']
+    inputs.file(pomFile)
+    inputs.property('expected', expected)
+    doLast {
+        def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
+                .collect { it.groupArtifact() }
+        if (actual.toSorted() != expected.toSorted()) {
+            throw new GradleException(
+                    "Published dependencies changed. Expected ${expected.toSorted()}, " +
+                    "found ${actual.toSorted()}.")
+        }
+    }
+}
+
+// The Java 21 override is only worth anything if it cannot silently regress: if it is ever
+// removed, the module falls back to the root's Java 25 and the published artifact stops working
+// for Java 21 consumers. There is no module-info.java, so assert the bytecode level directly
+// (same guard jmlx-tokenizer carries).
+tasks.register('verifyBytecodeLevel') {
+    group = 'verification'
+    description = 'Verifies compiled classes are Java 21 (bytecode major 65).'
+    dependsOn tasks.named('compileJava')
+    def classesDir = layout.buildDirectory.dir('classes/java/main')
+    inputs.dir(classesDir)
+    doLast {
+        def offenders = []
+        def classFileCount = 0
+        classesDir.get().asFile.eachFileRecurse { file ->
+            if (file.name.endsWith('.class')) {
+                classFileCount++
+                file.withDataInputStream { input ->
+                    input.readInt()            // 0xCAFEBABE
+                    input.readUnsignedShort()  // minor
+                    int major = input.readUnsignedShort()
+                    if (major != 65) {
+                        offenders << "${file.name}: major ${major}".toString()
+                    }
+                }
+            }
+        }
+        // eachFileRecurse iterates zero times over a directory that exists but is empty --
+        // without this check a misconfigured source set or a relocated output directory would
+        // leave offenders empty and this task would report BUILD SUCCESSFUL having verified
+        // nothing, the exact silent-guard failure this task exists to prevent.
+        if (classFileCount == 0) {
+            throw new GradleException(
+                    "Expected to find compiled .class files under ${classesDir.get().asFile} but found none.")
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException(
+                    "Expected Java 21 bytecode (major 65) but found: ${offenders.join(', ')}")
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyPublishedDependencies'), tasks.named('verifyBytecodeLevel')
+}

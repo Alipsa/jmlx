@@ -112,6 +112,25 @@ review that diff whenever a fixture input or tokenizer JSON changes. Every `*.to
 by `runner.py` before use -- a tampered or stale fixture source fails the build rather than silently
 comparing against drifted input.
 
+The Python Pillow/Transformers image-preprocessing oracle (`tools/image-oracle/`) is the equivalent
+fixture tool for `jmlx-vision`: a hash-locked CPython 3.12 venv pinning Pillow 12.3.0, NumPy 2.5.3
+and Transformers 4.57.6, used to generate and verify the decode/resize/normalize/full-processor
+fixtures under `tools/image-oracle/fixtures/` (`*.input.json` specs, `*.expected.json` canonical
+oracle output, the fixture images and `preprocessor_config.json`). Install and verify with:
+
+```sh
+./tools/image-oracle/install.sh
+./gradlew verifyImageOracle verifyImageOracleFixtures
+```
+
+Only `./gradlew generateImageOracleFixtures` rewrites a fixture's committed `*.expected.json`;
+review that diff whenever a fixture input image or spec changes. Every fixture source is
+SHA-256-pinned in `tools/image-oracle/provenance.json`, re-verified by the pure-Java
+`verifyImageOracleFixtureDigests` (part of root `check`) and by `runner.py` before use.
+`verifyImageOracleDependencyPins` (also part of root `check`) keeps the image and HF reference locks
+in agreement on the shared Pillow/NumPy/Transformers pins. Python execution stays an explicit,
+venv-dependent step -- ordinary builds gain no Python prerequisite.
+
 `tools/hf-reference/` is a generate-only Python tool (Hugging Face `transformers`, CPU, float32)
 that produced the tiny synthetic checkpoints and logits goldens under `tools/hf-reference/goldens/`
 that the decoder-family tests compare against. Gradle never runs Torch: `verifyHfReferenceGoldens`
@@ -127,12 +146,13 @@ one.
 ## Build, test, run
 
 ```sh
-./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-models, jmlx-examples, jmlx-benchmarks, jmlx-native-macos-arm64
+./gradlew build                # compiles jmlx-ffi, jmlx-core, jmlx-tokenizer, jmlx-jinja, jmlx-vision, jmlx-models, jmlx-examples, jmlx-benchmarks, jmlx-native-macos-arm64
 ./gradlew :jmlx-core:test       # memory lifecycle, numeric correctness, native error path
 ./gradlew test --tests "se.alipsa.jmlx.core.MLXArrayTest"   # a single test class
 ./gradlew :jmlx-examples:run    # runs HelloMLX end-to-end on real GPU hardware
 ./gradlew :jmlx-tokenizer:test  # pure-Java tokenizer tests (no native bootstrap needed)
 ./gradlew :jmlx-jinja:test      # pure-Java Jinja tests (no native bootstrap needed)
+./gradlew :jmlx-vision:test     # pure-Java image decode/resample/processor tests (no native bootstrap needed)
 ```
 
 **Gradle enforces numerical-reference precision.** Tests tagged `full-float32` run in
@@ -200,15 +220,16 @@ to that list. Otherwise a native skip passes CI unnoticed.
 
 ## Releasing a module
 
-Six modules publish to Maven Central independently of each other and of the root project's
-version: `jmlx-jinja`, `jmlx-tokenizer`, `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`, and
-`jmlx-models`. Each has its own `release.sh` (all six byte-identical, enforced by
-`verifyReleaseScriptsMatch`). `jmlx-examples` (an application demo) and `jmlx-benchmarks`
+Seven modules publish to Maven Central independently of each other and of the root project's
+version: `jmlx-jinja`, `jmlx-tokenizer`, `jmlx-vision`, `jmlx-native-macos-arm64`, `jmlx-ffi`,
+`jmlx-core`, and `jmlx-models`. Each has its own `release.sh` (all seven byte-identical, enforced
+by `verifyReleaseScriptsMatch`). `jmlx-examples` (an application demo) and `jmlx-benchmarks`
 (opt-in performance experiments) are unpublished.
 
 ```sh
 ./jmlx-jinja/release.sh              # publishes se.alipsa:jmlx-jinja
 ./jmlx-tokenizer/release.sh          # publishes se.alipsa:jmlx-tokenizer
+./jmlx-vision/release.sh             # publishes se.alipsa:jmlx-vision
 ./jmlx-native-macos-arm64/release.sh # publishes se.alipsa:jmlx-native-macos-arm64
 ./jmlx-ffi/release.sh                # publishes se.alipsa:jmlx-ffi
 ./jmlx-core/release.sh               # publishes se.alipsa:jmlx-core
@@ -222,11 +243,13 @@ bumping is deliberately manual.
 
 **Release order matters, along two independent chains.** `jmlx-tokenizer` depends on `jmlx-jinja`
 via `api project(...)`; `jmlx-core` depends on `jmlx-ffi` via `implementation project(...)`;
-`jmlx-models` depends on both `jmlx-core` and `jmlx-tokenizer` via `api project(...)`. Gradle
-publishes every one of these as a concrete coordinate, and `verifyNoSnapshotDependencies` fails a
-release while any of them is still a SNAPSHOT. Release jinja before tokenizer, and ffi before core
-before models. `jmlx-native-macos-arm64` has no published-POM dependency relationship to either
-chain, and jmlx-core deliberately does not depend on it (see Decision 5 in
+`jmlx-models` depends on `jmlx-core`, `jmlx-tokenizer` and `jmlx-vision` via `api project(...)`.
+Gradle publishes every one of these as a concrete coordinate, and `verifyNoSnapshotDependencies`
+fails a release while any of them is still a SNAPSHOT. Release jinja before tokenizer, and ffi
+before core before models. `jmlx-vision` itself has no published project dependency, but models
+needs it, so release vision before models too. `jmlx-native-macos-arm64` has no published-POM
+dependency relationship to either chain, and jmlx-core deliberately does not depend on it (see
+Decision 5 in
 `req/plans/native-artifact-packaging-plan.md`); it can therefore be released independently. Its
 artifact is nevertheless a test-fixture build dependency of `jmlx-ffi`'s `extractionFallbackTest`,
 so `jmlx-ffi:check` and any ffi release build the native jar. Release each chain's modules while the
@@ -247,17 +270,18 @@ dependency-update review) — that is not part of `check` and stays a separate, 
 ## Release smoke
 
 `tools/release-smoke/` is an independent Gradle consumer (no `project(...)` deps) that proves the
-published shape: `./tools/release-smoke/run.sh ci` publishes the six modules to a disposable
+published shape: `./tools/release-smoke/run.sh ci` publishes the seven modules to a disposable
 `build/smoke-repo` (each module's opt-in `smoke` Maven repository,
 `publishMavenPublicationToSmokeRepository`), then resolves `jmlx-models` plus the runtime-only native
 jar from it under a fresh `GRADLE_USER_HOME` with `exclusiveContent` for `se.alipsa`, a disposable
 `jmlx.native.cache.path`, and no native path override. It also checks the POM-only runtime classpath
-matches the Gradle-metadata one, every jar's license, the native jar's payload, and a seeded
-two-request batch against `goldens/mistral-sampled.properties`. The smoke gates the scheduler so
-both requests share one cohort, then asserts `cohortSizes() == [2]`. `--record` rewrites the golden
-and is accepted in `ci` mode only. The native CI job runs `run.sh ci`.
+matches the Gradle-metadata one, every jar's license, the three vision jars' `META-INF/NOTICE`
+content (the pinned Pillow source references, SHA-256s and MIT-CMU license text), the native jar's
+payload, and a seeded two-request batch against `goldens/mistral-sampled.properties`. The smoke
+gates the scheduler so both requests share one cohort, then asserts `cohortSizes() == [2]`.
+`--record` rewrites the golden and is accepted in `ci` mode only. The native CI job runs `run.sh ci`.
 `run.sh candidate` is the same with SNAPSHOT suffixes stripped (release versions set first), and
-`run.sh central` resolves from Maven Central after all six are published. The smoke tokenizer in
+`run.sh central` resolves from Maven Central after all seven are published. The smoke tokenizer in
 `fixtures/` is hand-written to pair with the synthetic Mistral checkpoint (see its `PROVENANCE.md`).
 
 ## Code style
@@ -329,6 +353,15 @@ jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, IncrementalToke
 jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja rendering
                  pure Java; no dependency on jmlx-ffi or native/install/lib
 
+jmlx-vision      se.alipsa.jmlx.vision             ImageDecoder, RgbImage, ImageTensor, Layout,
+                                                    PillowResample, ImageTransforms, Resampling,
+                                                    ImageDecodeLimits, SmolVlmImageProcessor/
+                                                    SmolVlmProcessorConfig/
+                                                    SmolVlmImageProcessorResult
+                                                    pure Java; Pillow-exact bilinear/bicubic/
+                                                    LANCZOS resampling; no dependency on
+                                                    jmlx-ffi or native/install/lib
+
 jmlx-models      se.alipsa.jmlx.models             TextGenerationModel, TextGenerationModels,
                                                     GenerationConfig/Request/Result/Event,
                                                     GenerationCachePolicy, CancellationToken,
@@ -341,7 +374,8 @@ jmlx-models      se.alipsa.jmlx.models             TextGenerationModel, TextGene
                                                     BatchGenerationScheduler (+ BatchSchedulerConfig,
                                                     BatchRequestHandle, Scheduler*/BatchAdmission*
                                                     exceptions)
-                 depends on jmlx-core + jmlx-tokenizer; native inference and generation
+                 depends on jmlx-core + jmlx-tokenizer + jmlx-vision;
+                 native inference and generation
 ```
 
 Three native modules, deliberately: the jextract output for `mlx/c/mlx.h` is a large generated blob. Isolating
@@ -350,35 +384,42 @@ keeping incremental builds fast and generated code out of review diffs. `jmlx-co
 `jmlx-ffi` as `implementation`, not `api` — `MLXArray`/`MLX` wrap raw `MemorySegment` handles behind
 plain Java types and never expose `jmlx-ffi` on their own public surface.
 
-**`jmlx-tokenizer` and `jmlx-jinja` sit outside the native chain entirely.** Neither depends on
-`jmlx-ffi`; they never touch `native/install/lib` and do not call `NativeLoader.ensureLoaded()`. They
-are not independent of each other, though: `jmlx-tokenizer` declares `api project(':jmlx-jinja')` and
-`ChatTemplateRenderer` returns `jmlx-jinja`'s own `Template` type on its public API, since
-`jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`) is a from-scratch Java port of the
-byte-level-BPE pipeline that renders HF `chat_template` strings through `jmlx-jinja`, the migrated
-former `hfjinja` project. See `jmlx-jinja/README.md` for usage and its own `upstreamVerify` /
-Node-oracle verification tasks. Neither is part of the "Loading order matters" native-guard discussion
-below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`, `MLXIO`, and `MLXMemory`).
+**`jmlx-tokenizer`, `jmlx-jinja` and `jmlx-vision` sit outside the native chain entirely.** None of
+them depends on `jmlx-ffi`; they never touch `native/install/lib` and do not call
+`NativeLoader.ensureLoaded()`. They are not all independent of each other, though: `jmlx-tokenizer`
+declares `api project(':jmlx-jinja')` and `ChatTemplateRenderer` returns `jmlx-jinja`'s own `Template`
+type on its public API, since `jmlx-tokenizer` (Phase 5 M2, `req/plans/phase5-m2-plan.md`) is a
+from-scratch Java port of the byte-level-BPE pipeline that renders HF `chat_template` strings through
+`jmlx-jinja`, the migrated former `hfjinja` project. `jmlx-vision` (Phase 7.3a,
+`req/plans/phase7-3a-plan.md`) is a pure-Java image decode/resample/normalize library plus the
+SmolVLM/Idefics3 image processor, whose only external dependency is Jackson (matching
+`jmlx-tokenizer`) and which has no project dependencies at all; its resampling kernels are a
+Pillow-ported implementation pinned by SHA-256 in `jmlx-vision/NOTICE`. See `jmlx-jinja/README.md`
+for usage and its own `upstreamVerify` / Node-oracle verification tasks, and `jmlx-vision/README.md`
+for the image oracle's fixture and precision story. None is part of the "Loading order matters"
+native-guard discussion below (which is specific to `MLX`, `MLXScope`, `NativeOps`, `MLXGrad`,
+`MLXIO`, and `MLXMemory`).
 
-**`jmlx-models` is in the native chain.** It depends on `jmlx-core` for MLX inference and on
-`jmlx-tokenizer` for prompt encoding/decoding, so model loading and generation require the native
-bootstrap and participate in the same loading-order guarantees as `jmlx-core`.
+**`jmlx-models` is in the native chain.** It depends on `jmlx-core` for MLX inference, on
+`jmlx-tokenizer` for prompt encoding/decoding, and on `jmlx-vision` (as `api`) for image
+preprocessing, so model loading and generation require the native bootstrap and participate in the
+same loading-order guarantees as `jmlx-core`.
 
-`jmlx-tokenizer` and `jmlx-jinja` override the toolchain to **Java 21** rather than inheriting the
-root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s Panama FFM, and neither pure-Java
-module needs it, so targeting 21 keeps their published artifacts usable by Java 21 consumers. `jmlx-tokenizer`'s
-`verifyBytecodeLevel` task enforces this.
+`jmlx-tokenizer`, `jmlx-jinja` and `jmlx-vision` override the toolchain to **Java 21** rather than
+inheriting the root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s Panama FFM, and none of
+those pure-Java modules needs it, so targeting 21 keeps their published artifacts usable by Java 21
+consumers. `jmlx-tokenizer`'s and `jmlx-vision`'s `verifyBytecodeLevel` tasks enforce this.
 
-**Six modules are published**, each carrying its own version independent of the root's
+**Seven modules are published**, each carrying its own version independent of the root's
 `0.5.0-SNAPSHOT` (`jmlx-examples` and `jmlx-benchmarks` are unpublished applications): `jmlx-jinja` is
-`0.6.0-SNAPSHOT` (continuing the archived hfjinja project's line), `jmlx-tokenizer` and
-`jmlx-native-macos-arm64` are both `0.1.0-SNAPSHOT` (neither has ever been published), `jmlx-ffi`
-and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward the number they
-already had via the root's default), and `jmlx-models` is `0.1.0-SNAPSHOT` (also never published).
-`jmlx-core`/`jmlx-models` disable Javadoc's `missing` doclint category (`-Xdoclint:all,-missing`)
-rather than retrofitting `@param`/`@return`/`@throws` tags onto an already prose-documented,
-pre-existing public surface — the root's reactive `maven-publish` wiring's `-Werror` still gates
-every other Javadoc problem. `jmlx-ffi` instead restricts Javadoc's (and `checkstyleMain`'s) source
+`0.6.0-SNAPSHOT` (continuing the archived hfjinja project's line), `jmlx-tokenizer`,
+`jmlx-native-macos-arm64` and `jmlx-vision` are all `0.1.0-SNAPSHOT` (none has ever been
+published), `jmlx-ffi` and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward
+the number they already had via the root's default), and `jmlx-models` is `0.1.0-SNAPSHOT` (also
+never published). `jmlx-core`/`jmlx-models`/`jmlx-vision` disable Javadoc's `missing` doclint
+category (`-Xdoclint:all,-missing`) rather than retrofitting `@param`/`@return`/`@throws` tags onto
+an already prose-documented public surface — the root's reactive `maven-publish` wiring's `-Werror`
+still gates every other Javadoc problem. `jmlx-ffi` instead restricts Javadoc's (and `checkstyleMain`'s) source
 to its hand-written tree, excluding the committed jextract bindings entirely, for the same reason
 those bindings are exempt from Spotless/checkstyle (see "Code style" above). See "Releasing a
 module" above.
@@ -523,6 +564,8 @@ Phase 5 and 6 documents:
   - `req/phase6-2-tokenizer-components.md`: tokenizer component coverage.
   - `req/mlx-api-inventory.md` and `req/mlx-api-header-coverage.md`: binding coverage, generated by
     the `*MlxApi*` Gradle tasks.
+- `req/plans/phase7-3a-plan.md` (the vision/multimodal plan, WP1-WP8) and
+  `req/plans/phase7-3a-reference-findings.md` (the pinned reference findings it builds on).
 
 
 ## Phase 7.2 additions
@@ -537,3 +580,19 @@ Java downloadTierBArtifact owns SHA verification and does not declare Gradle out
 tests remain explicitly separate from root check. Python execution remains opt-in for reference
 and oracle tools; ordinary builds gain no Python prerequisite. See the Phase 7.2 implementation
 report for local evidence and the pending new macOS 26 CI gate. Versions and publication are unchanged.
+
+## Phase 7.3a additions
+
+`jmlx-vision` is a new pure-Java 21 module (no native dependency, Jackson only): image decoding
+(PNG/JPEG, including palette PNGs), Pillow-exact bilinear/bicubic/LANCZOS resampling, normalization,
+and the SmolVLM/Idefics3 image processor, with its byte-exactness evidence coming from the
+`tools/image-oracle/` fixtures. `jmlx-models` now `api`-depends on it, so seven modules are
+published (jmlx-vision starts a fresh `0.1.0-SNAPSHOT` line; its `release.sh` is byte-identical to
+the others and covered by `verifyReleaseScriptsMatch`). CI: the Ubuntu job runs
+`:jmlx-vision:check` plus the executable image-oracle verification; root `check` carries the
+pure-Java pin/digest guards; the release smoke asserts the three vision jars' Pillow NOTICE
+content. The Pillow port provenance lives in `jmlx-vision/NOTICE` (pinned source SHA-256s plus the
+full MIT-CMU license text) and is carried in all three vision jars. Vision's documented
+operation-order divergences from the reference (decode-then-resize in RGB space vs the reference's
+resize/split before `convert_to_rgb`) are recorded in `jmlx-vision/README.md` and the reference
+findings; strict full-chain fixtures use opaque RGB inputs where the two orders agree.

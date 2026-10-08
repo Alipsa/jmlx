@@ -37,6 +37,9 @@ dependencies {
     testImplementation testFixtures(project(':jmlx-core'))
     api project(':jmlx-core')
     api project(':jmlx-tokenizer')
+    // Phase 7.3a: image inputs (SmolVLM/Idefics3) ride on jmlx-vision's processor; models
+    // exposes it, so consumers of a future withImages API get it transitively.
+    api project(':jmlx-vision')
     implementation libs.jackson.databind
 
     testImplementation testFixtures(project(':jmlx-ffi'))
@@ -112,7 +115,12 @@ tasks.register('verifyPublishedDependencies') {
     description = 'Verifies the published POM declares exactly the expected dependencies.'
     dependsOn tasks.named('generatePomFileForMavenPublication')
     def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
-    def expected = ['se.alipsa:jmlx-core', 'se.alipsa:jmlx-tokenizer', 'tools.jackson.core:jackson-databind']
+    def expected = [
+            'se.alipsa:jmlx-core',
+            'se.alipsa:jmlx-tokenizer',
+            'se.alipsa:jmlx-vision',
+            'tools.jackson.core:jackson-databind',
+    ]
     inputs.file(pomFile)
     inputs.property('expected', expected)
     doLast {

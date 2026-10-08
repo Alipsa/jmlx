@@ -1,6 +1,6 @@
 /*
  * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer,
- * jmlx-jinja, jmlx-models, jmlx-examples and jmlx-benchmarks lives here; each module's build.gradle
+ * jmlx-jinja, jmlx-vision, jmlx-models, jmlx-examples and jmlx-benchmarks lives here; each module's build.gradle
  * declares its plugin and dependencies. See req/initial-plan.md §4 for the
  * rationale behind the native-access flags and the native-directory system
  * property below.
@@ -315,6 +315,157 @@ tasks.register('verifyTokenizerOracleFixtures', Exec) {
             '--verify-all'
 }
 
+def imageOracleDir = layout.projectDirectory.dir('tools/image-oracle')
+def imageOraclePython = imageOracleDir.file('.venv/bin/python').asFile
+def configureImageOracle = { Exec task ->
+    task.inputs.file(imageOracleDir.file('requirements.in'))
+    task.inputs.file(imageOracleDir.file('requirements.lock'))
+    task.inputs.file(imageOracleDir.file('provenance.json'))
+    task.executable = imageOraclePython
+    task.doFirst {
+        if (!imageOraclePython.isFile()) {
+            throw new GradleException(
+                    'Image oracle environment is missing; run ./tools/image-oracle/install.sh')
+        }
+    }
+}
+
+tasks.register('verifyImageOracle', Exec) {
+    group = 'verification'
+    description = 'Verifies the pinned image preprocessing oracle environment.'
+    configureImageOracle(delegate)
+    inputs.file(imageOracleDir.file('verify_environment.py'))
+    args imageOracleDir.file('verify_environment.py').asFile,
+            imageOracleDir.file('provenance.json').asFile
+}
+
+tasks.register('generateImageOracleFixtures', Exec) {
+    group = 'documentation'
+    description = 'Regenerates canonical image fixtures with the pinned reference runtime.'
+    configureImageOracle(delegate)
+    dependsOn tasks.named('verifyImageOracle')
+    inputs.file(imageOracleDir.file('runner.py'))
+    def fixtureInputs = fileTree(imageOracleDir.dir('fixtures')) { include '*.input.json' }
+    def fixtureOutputs = providers.provider {
+        fileTree(imageOracleDir.dir('fixtures')) { include '*.input.json' }.files.collect {
+            new File(it.parentFile, it.name.replace('.input.json', '.expected.json'))
+        }
+    }
+    inputs.files(fixtureInputs)
+    inputs.property('existingExpectedFixtureNames', providers.provider {
+        fileTree(imageOracleDir.dir('fixtures')) { include '*.expected.json' }
+                .files.collect { it.name }.sort()
+    })
+    outputs.files(fixtureOutputs)
+    args imageOracleDir.file('runner.py').asFile,
+            '--fixtures-dir', imageOracleDir.file('fixtures').asFile,
+            '--provenance', imageOracleDir.file('provenance.json').asFile,
+            '--generate-all'
+}
+
+tasks.register('verifyImageOracleFixtures', Exec) {
+    group = 'verification'
+    description = 'Verifies committed image fixtures with the pinned reference runtime.'
+    configureImageOracle(delegate)
+    dependsOn tasks.named('verifyImageOracle')
+    mustRunAfter tasks.named('generateImageOracleFixtures')
+    inputs.file(imageOracleDir.file('runner.py'))
+    inputs.files(fileTree(imageOracleDir.dir('fixtures')) {
+        include '*.input.json', '*.expected.json'
+    })
+    args imageOracleDir.file('runner.py').asFile,
+            '--fixtures-dir', imageOracleDir.file('fixtures').asFile,
+            '--provenance', imageOracleDir.file('provenance.json').asFile,
+            '--verify-all'
+}
+
+// The Python-executing tasks above stay explicit (they need the pinned venv). What CI runs in
+// ordinary check without Python: the image and HF reference lock files must agree on the three
+// shared reference pins (Pillow/NumPy/Transformers), and every committed image fixture source
+// must still carry its provenance SHA-256. The runner re-verifies both under the venv, so a
+// local drift is caught before any fixture is used and again in check.
+tasks.register('verifyImageOracleDependencyPins') {
+    group = 'verification'
+    description = 'Verifies the image and HF reference locks agree on Pillow, NumPy and Transformers.'
+    def imageLock = imageOracleDir.file('requirements.lock')
+    def referenceLock = layout.projectDirectory.file('tools/hf-reference/requirements.lock')
+    inputs.file(imageLock)
+    inputs.file(referenceLock)
+    doLast {
+        def parseLock = { File lock ->
+            def pins = [:]
+            lock.readLines().each { line ->
+                def match = (line =~ '^([A-Za-z0-9._-]+)==([^ ;\\\\]+)( ;.+?)?\\s*\\\\?\\s*$')
+                if (match.matches()) {
+                    pins[match.group(1).toLowerCase().replace('_', '-')] =
+                            [version: match.group(2), marker: (match.group(3) ?: '').trim()]
+                }
+            }
+            pins
+        }
+        def imagePins = parseLock(imageLock.asFile)
+        def referencePins = parseLock(referenceLock.asFile)
+        ['pillow', 'numpy', 'transformers'].each { packageName ->
+            if (!imagePins.containsKey(packageName)) {
+                throw new GradleException("image-oracle lock is missing a pinned ${packageName} dependency")
+            }
+            if (!referencePins.containsKey(packageName)) {
+                throw new GradleException("hf-reference lock is missing a pinned ${packageName} dependency")
+            }
+            if (imagePins[packageName].version != referencePins[packageName].version) {
+                throw new GradleException("${packageName} pin disagrees: image-oracle " +
+                        "${imagePins[packageName].version} vs hf-reference ${referencePins[packageName].version}")
+            }
+            if (imagePins[packageName].marker != referencePins[packageName].marker) {
+                throw new GradleException("${packageName} environment marker disagrees: image-oracle " +
+                        "'${imagePins[packageName].marker}' vs hf-reference '${referencePins[packageName].marker}'")
+            }
+        }
+    }
+}
+
+tasks.register('verifyImageOracleFixtureDigests') {
+    group = 'verification'
+    description = 'Verifies every committed image oracle fixture source against its provenance SHA-256.'
+    def fixtures = imageOracleDir.dir('fixtures')
+    def provenance = imageOracleDir.file('provenance.json')
+    inputs.file(provenance)
+    inputs.files(fileTree(fixtures))
+    doLast {
+        def metadata = new JsonSlurper().parse(provenance.asFile)
+        def expected = metadata.fixtureSources
+        if (!(expected instanceof Map) || expected.isEmpty()) {
+            throw new GradleException('Image oracle provenance has no fixture hashes')
+        }
+        def root = fixtures.asFile.toPath().toRealPath()
+        def actualPaths = fileTree(fixtures) { exclude '*.expected.json' }.files.collect {
+            root.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
+        }.toSet()
+        if (actualPaths != expected.keySet().toSet()) {
+            throw new GradleException("Image oracle fixture source set differs: " +
+                    "missing ${expected.keySet() - actualPaths}; extra ${actualPaths - expected.keySet()}")
+        }
+        expected.each { relativePath, expectedHash ->
+            def path = root.resolve(relativePath.toString()).normalize()
+            if (!path.startsWith(root) || !java.nio.file.Files.isRegularFile(path)) {
+                throw new GradleException("Invalid image oracle fixture path: ${relativePath}")
+            }
+            def digest = MessageDigest.getInstance('SHA-256')
+            java.nio.file.Files.newInputStream(path).withCloseable { stream ->
+                byte[] bytes = new byte[8192]
+                int count
+                while ((count = stream.read(bytes)) != -1) {
+                    digest.update(bytes, 0, count)
+                }
+            }
+            def actualHash = digest.digest().encodeHex().toString()
+            if (actualHash != expectedHash) {
+                throw new GradleException("Image oracle fixture SHA-256 differs: ${relativePath}")
+            }
+        }
+    }
+}
+
 // This source-only guard runs under the project's Java toolchain, so parsing coverage cannot
 // silently lag the source language level or constrain the Gradle daemon's Java version.
 tasks.register('verifyMlxApiCallSites', JavaExec) {
@@ -333,7 +484,9 @@ tasks.named('check') {
     // so repository-wide verifications can run once from CI without pretending that a module-local
     // check covers handwritten source in every module.
     dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites'),
-            tasks.named('verifyHfReferenceGoldens')
+            tasks.named('verifyHfReferenceGoldens'),
+            tasks.named('verifyImageOracleDependencyPins'),
+            tasks.named('verifyImageOracleFixtureDigests')
 }
 
 tasks.register('verifyHfReferenceGoldens') {

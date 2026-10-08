@@ -431,11 +431,47 @@ modality rows.
 
 ## 7.3a — Vision foundation and SmolVLM-256M
 
+Implementation sub-plan: [phase7-3a-plan.md](phase7-3a-plan.md) (proposed, 2026-10-06).
+
+**Review amendments, 2026-10-06:**
+
+- Include Pillow-compatible three-lobe LANCZOS (`resample=1`) for the target Idefics3 processor.
+  Select the slow PIL processor explicitly in both Python tools. Target exact uint8 resampling
+  and complete chained preprocessing; if exactness is not achieved, record separately measured
+  single-stage, full-chain and JPEG decode/full-chain bounds before acceptance. A single-resize
+  tolerance does not establish a bound for the three uint8 resize stages. Verify Pillow, NumPy
+  and Transformers pins agree across the image and HF oracle locks.
+- Pin raw `PIL.Image.open` → slow processor as the reference loading path, with no preliminary
+  RGB conversion or EXIF transpose. ImageDecoder deliberately ignores EXIF orientation and
+  ICC/gAMA color management and extracts decoded samples without ColorModel conversion.
+  Javadoc and README tell callers to rotate images themselves. Palette/tRNS behavior follows
+  the oracle fixture, not an assumed compositing outcome.
+- Preserve Pillow notices in every ported source header and in vision's binary, sources and
+  Javadoc jars. Add vision-only ancillary-jar packaging and smoke content checks in the module
+  PR; the existing six modules' sources/Javadoc packaging is unchanged.
+- Replace masked-scatter-first with a single `take` gather over concatenated text embeddings and
+  image features, indexed by the validated pure expansion map. This uses existing core facades;
+  masked_scatter remains deferred unless measurements justify a separately probed wrapper.
+- Ship release-smoke module/version/POM checks, release-script coverage, Ubuntu vision check and
+  AGENTS.md module/architecture/release updates in the PR adding jmlx-vision and its models
+  dependency, rather than postponing them to final acceptance.
+- ImageTensor remains a defensively copied record with explicit content equality/hashCode,
+  bounded toString and public bulk-copy access. Decoder APIs gain explicit decode limits.
+- A zero-token VLM request validates syntax and expands using pure geometry, reports the expanded
+  prompt length, and skips pixel preprocessing and native work; cache capacity charged is zero.
+- `promptPositions` means effective input length: decoder/scheduler prompt, expanded VLM prompt,
+  or T5 encoder source. It is at least the unexpanded prompt count. Adding this record component
+  is an intentional pre-publication compatibility exception to decision 4's additive wording:
+  constructors remain, but record patterns/equality change. Recheck publication before proceeding;
+  if published, amend to compatible metadata instead. Preserve unexpanded result/abort IDs.
+- Include T5 raw logits and greedy IDs in both precision-mode exact comparisons if its generation
+  loop is changed by shared-code extraction.
+
 1. **`jmlx-vision` module** (Java 21, published, release script, `verifyBytecodeLevel`,
    Ubuntu pure-Java CI job):
    - decode PNG/JPEG via `javax.imageio` into `RgbImage`, the decoded-pixel record that
      `GenerationRequest.withImages` carries (WebP is unsupported and documented);
-   - convert to RGB; resize (bilinear/bicubic); rescale; normalize (mean/std);
+   - convert to RGB; resize (bilinear/bicubic/LANCZOS); rescale; normalize (mean/std);
    - HF-style image tiling/splitting;
    - parse `preprocessor_config.json`;
    - output `ImageTensor` records (`float[]` plus shape and layout).
@@ -448,10 +484,10 @@ modality rows.
    internal forward can start from a caller-built embedding tensor. Production then uses the same
    post-embedding point the hook uses today. `EmbeddingHook` stays a test seam, re-expressed on the
    new entry point, and `BatchGenerationScheduler.Hooks` keeps working unchanged. Merge image
-   features at image-token positions (`mlx_masked_scatter`, or `where`/`concatenate` if the probe
-   rejects it). The token-ID path must stay bit-identical. The committed goldens use tolerances, so
-   they cannot prove this. Prove it with the exact before/after comparison defined under
-   Cross-cutting verification.
+   features at image-token positions using a validated destination map and `take` over
+   concatenated text/image rows (2026-10-06 amendment above). The token-ID path must stay
+   bit-identical. The committed goldens use tolerances, so they cannot prove this. Prove it with
+   the exact before/after comparison defined under Cross-cutting verification.
 3. **Vision encoder and connector:** a SigLIP-style ViT (patch embedding via `Conv2d` or
    linear-on-patches, learned positions, LayerNorm/GELU blocks) and the Idefics3 connector (pixel
    shuffle + linear). Architecture facts are verified against `transformers` in the sub-plan.
@@ -498,7 +534,8 @@ modality rows.
      `promptPositions()` count or as metadata on the result, not by changing the meaning of
      `promptTokenIds()`.
    - Penalty seeding, context-length limits and `GenerationCachePolicy` capacity
-     (`expanded.length + maxNewTokens - 1`) use the **expanded** sequence, as HF does with its
+     (`expanded.length + maxNewTokens - 1` for positive maxNewTokens; zero otherwise) use the
+     **expanded** sequence, as HF does with its
      processor-expanded `input_ids`. The sub-plan verifies the penalty-seeding point against
      `transformers`' logits processors rather than assuming it. Capacity is validated after
      expansion, before native work, and the error names both lengths.

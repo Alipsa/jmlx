@@ -380,14 +380,30 @@ a template literal, not a `{{ bos_token }}` variable). Key behaviors:
 
 `image_seq_len = 64` (per tile). `fake = 49189`, `global = 49152`, `img = 49190`.
 
+The processor expands at the **string** level and then **re-tokenizes the whole expanded text**
+(`SmolVLMProcessor.expand_text_with_image_tokens` substitutes, `__call__` tokenizes the result).
+The substitution strings are:
+
 - **Single image** (`rows = cols = 0`): `fake + global + img*64 + fake`.
 - **Tiled image** (`gh×gw`): for each row `r` (0-based), each col `c`: `fake + <row_{r+1}_col_{c+1}> + img*64`,
   then a literal `\n` after each row; after all rows: `\n + fake + global + img*64 + fake`.
 
-So a tile contributes `66` tokens (`1 fake + 1 row/col + 64 img`) and a row of `gw` tiles contributes `66*gw + 1`
-(newline); the global block contributes `1 (\n) + 1 (fake) + 1 (global) + 64 (img) + 1 (fake) = 68`. Total
-expanded length for a `gh×gw` image = `gh*(66*gw + 1) + 68`. For the verified `4×4` example: `4*(66*4+1)+68 =
-4*265+68 = 1128`; plus the surrounding prompt tokens.
+Every inserted character other than the newlines is an added token, which re-encodes to its single
+ID; tokens outside the substitution regions re-encode unchanged. The newlines are **ordinary BPE
+pieces**, not special tokens, and their IDs depend on the tokenizer:
+
+- A lone `\n` (after each row except the last, where it is followed by the next row's `fake` token)
+  encodes to ID **198** (`Ċ`) in the pinned SmolLM2 tokenizer.
+- The doubled `\n\n` between the last row and the global block (the last row's newline plus the
+  block's leading newline, re-tokenized together) merges to the single ID **1116** (`ĊĊ`).
+
+So a tile contributes `66` tokens (`1 fake + 1 row/col + 64 img`) and a row of `gw` tiles
+contributes `66*gw + 1` (one newline token); the global block contributes `1 (fake) + 1 (global) +
+64 (img) + 1 (fake) = 67` tokens — its leading newline is the merged `\n\n` already counted in the
+last row. Total expanded **token** length for a `gh×gw` image = `gh*(66*gw + 1) + 67`; for the
+verified `4×4` example: `4*(66*4+1)+67 = 4*265+67 = 1127` (this section originally wrote `+68` /
+`1128`, counting the global block's leading newline twice; the committed golden is authoritative).
+An unsplit image expands to `64 + 3 = 67` tokens.
 
 Verified full-prompt `input_ids` (100×80 image, single user message "What is in [image] this image?",
 `add_generation_prompt=True`), head and structure:
@@ -402,7 +418,11 @@ Verified full-prompt `input_ids` (100×80 image, single user message "What is in
 ```
 
 Counts for that prompt: `<image>` (49190) = 1088, `fake` (49189) = 18, `global` (49152) = 1, `START` (1) = 1.
-Total prompt length = 1141.
+Total prompt length = 1142 (16 unexpanded tokens, 1 of them `<image>`, replaced by the 1127-token
+region). The committed golden
+`tools/hf-reference/goldens/chat-smolvlm.json` (`single_image_4x4.expanded_ids`, 1142 entries) is
+the source of truth; WP4's expander reproduces it byte-for-byte, including the `198`/`1116`
+newline tokens.
 
 ### Text-only / adjacent / multiple images
 

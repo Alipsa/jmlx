@@ -1,6 +1,7 @@
 # Phase 7.3a — Vision foundation and SmolVLM-256M
 
-- **Status:** proposed, 2026-10-06; implementation and reference probes have not run.
+- **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`), both on
+  `main` as of 2026-10-08; WP4 is the current work package.
 - **Parent:** `req/plans/phase7-plan.md` §7.3a, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Prerequisite:** 7.1 layer/oracle/inventory acceptance. 7.2 cross-attention and 7.0 are
@@ -289,18 +290,31 @@ rendering/expansion references belong in HF/image tools. Add any required Jinja 
 own regression and CHANGELOG entry. Qwen3-VL execution tests wait for 7.3b; generic structured
 content must preserve its wrapper-shaped template output without assuming SmolVLM syntax.
 
+Delivered via PR #42 (merge `0dac174`, 2026-10-08): `GenerationRequest.withImages`/`images()`,
+`InputModality`, model and scheduler image rejection, structured `renderChat` content, the pinned
+chat template in metadata loading, and the HF `--chat` golden (`tools/hf-reference/goldens/
+chat-smolvlm.json`) with unexpanded and expanded IDs committed separately.
+
 ## 6. Pure expansion and generation accounting (WP4)
 
 Implement a package-private pure `SmolVlmPromptExpander` in models. Inputs are unexpanded IDs,
 validated special IDs and per-image processor grids. Output owns expanded IDs and ordered image
-feature positions/ranges. It never receives native tensors.
+feature positions/ranges. It never receives native tensors. The validated special IDs also carry
+the newline-run encodings: the reference expands at the string level and re-tokenizes the result
+(reference findings §6), and the only non-special characters it inserts are the row newlines — a
+lone `\n` after every row except the last and the merged `\n\n` run before the global block, both
+ordinary BPE tokens resolved from the tokenizer at model load (`[198]` and `[1116]` for the pinned
+SmolVLM-256M tokenizer).
 
 Count each `<image>` as one unit. `<image><image>` is valid for two supplied images. Reject
 count mismatches, any processor-only fake/row-column/global marker and unsupported video with
-distinct messages. Freeze exact markers and tile/global sequence in WP1; feature positions must
-exclude wrapper/row/column text. Expand after preprocessing, before native allocation; use
-checked token length arithmetic. Validate every projected-feature row has exactly one
-destination, in order.
+distinct messages. Unsupported video means the tokenizer's `<video>` token when the tokenizer
+declares one; the pinned SmolVLM-256M tokenizer has no `<video>` added token, so WP3's
+content-part rejection is the effective gate there. Freeze exact markers and tile/global sequence
+in WP1 (amended in place with the re-tokenization counts, per the committed golden); feature
+positions must exclude wrapper/row/column text. Expand after preprocessing, before native
+allocation; use checked token length arithmetic. Validate every projected-feature row has exactly
+one destination, in order.
 
 Use expanded IDs for penalties, positions, context limits and cache budget `expandedLength +
 maxNewTokens - 1` when maxNewTokens is positive. Include both unexpanded and expanded lengths in
@@ -312,8 +326,12 @@ For `maxNewTokens == 0`, still validate placeholder counts and processor-only/vi
 pure geometry planning and expansion, and report the expanded promptPositions. Skip pixel
 resize/rescale/normalize, vision tower, embedding/native work and KV allocation; required cache
 capacity is zero. Geometry planning must share the processor's rounding/splitting code so counts
-cannot drift. Validate context length and image/geometry limits even in this path. Test
-rejection, position reporting and zero native/tower calls explicitly.
+cannot drift; it is delivered as pure `SmolVlmImageProcessor.geometry(height, width)` /
+`SmolVlmGeometryPlan` in jmlx-vision, which `intermediates()` itself uses. Validate context
+length and image/geometry limits even in this path. Test rejection, position reporting and zero
+native/tower calls explicitly; the model-level parts of this paragraph (pixel-work skip, zero
+tower calls, the cancellation points) are realized in WP6's `SmolVlmModel.generate`, which
+composes these pure components, while WP4's acceptance covers their pure side.
 
 Add `int promptPositions` as a GenerationResult component: define it as the effective input
 prompt length, expanded VLM length, ordinary decoder/scheduler prompt length, and **encoder

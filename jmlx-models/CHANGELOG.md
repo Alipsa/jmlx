@@ -18,5 +18,12 @@
 - Add defensive result records and encoder-depth metadata.
 - Reject T5 in the batch scheduler and both sliding policies before resolving cache defaults.
 - Add task-specific MiniLM, BERT SST-2 and Flan-T5 Tier-B checks.
+- `GenerationResult` gains `promptPositions`: the effective input prompt length the model
+  consumed. It equals `promptTokenIds().size()` for the decoder models, the batch scheduler, and
+  T5 (the encoder source length); for vision models it is the expanded prompt length, where each
+  `<image>` placeholder stands for a block of marker-delimited image tokens. `promptTokenIds()`
+  always retains the unexpanded prompt IDs (as do `tokenIds()` and `GenerationAbortedException`
+  partials), so `promptPositions >= promptTokenIds().size()`. The four- and five-argument
+  compatibility constructors default `promptPositions` to the prompt ID count.
 
 Versions are unchanged; implementation does not publish artifacts.

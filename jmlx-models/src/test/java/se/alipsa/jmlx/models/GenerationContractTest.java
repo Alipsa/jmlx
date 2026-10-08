@@ -77,11 +77,37 @@ class GenerationContractTest {
     assertEquals(List.of(1, 2), result.promptTokenIds());
     assertEquals(List.of(3), result.generatedTokenIds());
     assertEquals(List.of(1, 2, 3), result.tokenIds());
+    assertEquals(
+        2, result.promptPositions(), "the compat constructors default to the prompt count");
     assertThrows(
         IllegalArgumentException.class,
         () ->
             new GenerationResult(
                 List.of(1), List.of(2, 3), FinishReason.MAX_TOKENS, List.of(-0.5)));
+  }
+
+  @Test
+  void promptPositionsValidatesAgainstTheUnexpandedPromptCount() {
+    // A vision result reports the expanded length while retaining the unexpanded prompt IDs.
+    GenerationResult vision =
+        new GenerationResult(
+            List.of(1, 2), List.of(3), FinishReason.MAX_TOKENS, List.of(), "text", 9);
+    assertEquals(9, vision.promptPositions());
+    assertEquals(List.of(1, 2), vision.promptTokenIds());
+
+    final IllegalArgumentException positions =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new GenerationResult(
+                    List.of(1, 2), List.of(3), FinishReason.MAX_TOKENS, List.of(), "text", 1));
+    assertTrue(positions.getMessage().contains("promptPositions"));
+    final NullPointerException nullPrompt =
+        assertThrows(
+            NullPointerException.class,
+            () ->
+                new GenerationResult(null, List.of(3), FinishReason.MAX_TOKENS, List.of(), "text"));
+    assertEquals("promptTokenIds", nullPrompt.getMessage());
   }
 
   @Test

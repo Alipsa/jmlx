@@ -600,7 +600,8 @@ public final class T5Model extends Module implements TextGenerationModel {
             generated,
             reason,
             logProbabilities,
-            generatedText == null ? null : generatedText.toString());
+            generatedText == null ? null : generatedText.toString(),
+            prompt.length);
     try {
       listener.accept(
           terminalDelta == null

@@ -38,7 +38,10 @@ public final class GenerationAbortedException extends IllegalStateException {
     this.failingTokenId = failingTokenId;
   }
 
-  /** Prompt token IDs for the aborted generation. */
+  /**
+   * Prompt token IDs for the aborted generation — always the original, unexpanded prompt IDs (see
+   * {@link GenerationResult#promptTokenIds()}), never a vision model's expanded marker sequence.
+   */
   public List<Integer> promptTokenIds() {
     return promptTokenIds;
   }

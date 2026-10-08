@@ -615,7 +615,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             generated,
             reason,
             logProbabilities,
-            generatedText == null ? null : generatedText.toString());
+            generatedText == null ? null : generatedText.toString(),
+            prompt.length);
     try {
       listener.accept(
           terminalDelta == null

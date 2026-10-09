@@ -41,16 +41,20 @@ import tools.jackson.databind.ObjectMapper;
  *   <li>{@code tf32-<0|1>/derived/<family>-q4/} -- the quantized checkpoints derived at record
  *       time; verify mode re-derives into a separate {@code tf32-<0|1>/derived-verify/} directory
  *       (same layout) so the recorded tree is never overwritten.
- *   <li>{@code tf32-<0|1>/manifest.json} -- host metadata plus every variant's applicability, input
- *       SHA-256 hashes, derived quantized checkpoint SHA-256 hashes and capture list.
+ *   <li>{@code tf32-<0|1>/manifest.json} -- host metadata (including the provenance-only,
+ *       never-compared {@code gitDirty} tree-dirtiness flag and {@code decoderModelSha256} source
+ *       hash), plus every variant's applicability, input SHA-256 hashes, derived quantized
+ *       checkpoint SHA-256 hashes and capture list.
  * </ul>
  *
  * <p>Verify mode checks the recorded manifest cheaply first -- existence, format version, globally
- * comparable metadata (everything except the git commit) and the variant set -- so an absent or
- * non-comparable recording fails fast before any capture runs. Only then does it recompute
- * everything and require bit-exact agreement of every float and ID, and metadata equality in every
- * field except the git commit (the comparison crosses the refactor's own commits); anything else
- * that differs means the recordings are not comparable on this host.
+ * comparable metadata (every field except the git commit and the provenance-only
+ * gitDirty/decoderModelSha256) and the variant set -- so an absent or non-comparable recording
+ * fails fast before any capture runs. Only then does it recompute everything and require bit-exact
+ * agreement of every float and ID, and metadata equality in every field except the git commit (the
+ * comparison crosses the refactor's own commits) and the two provenance-only fields (absent from
+ * recordings made before they existed); anything else that differs means the recordings are not
+ * comparable on this host.
  */
 class ExactBitsRecorderTest {
 
@@ -140,8 +144,19 @@ class ExactBitsRecorderTest {
     return variants;
   }
 
-  private static ExactBitsMetadata metadata(Path repoRoot) throws Exception {
+  // Package-private so the candidate-metadata builder is exerciseable without the full
+  // record/verify run.
+  static ExactBitsMetadata metadata(Path repoRoot) throws Exception {
     String commit = gitRevParse(repoRoot);
+    // Provenance only, never compared: which actual source state was recorded (a dirty tree
+    // means uncommitted work is part of it), and the SHA-256 of the DecoderModel source -- the
+    // very class the guarded refactor changes -- so the evidence says which decoder stack.
+    boolean dirty = gitStatusDirty(repoRoot);
+    String decoderModelSha256 =
+        ExactBitsSpec.sha256(
+            Files.readAllBytes(
+                repoRoot.resolve(
+                    "jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderModel.java")));
     Properties pins = new Properties();
     try (InputStream in =
         Files.newInputStream(repoRoot.resolve("native/install/lib/native-pin.properties"))) {
@@ -157,7 +172,9 @@ class ExactBitsRecorderTest {
         System.getenv("MLX_ENABLE_TF32"),
         ExactBitsSpec.sha256(),
         Map.of(),
-        Map.of());
+        Map.of(),
+        dirty,
+        decoderModelSha256);
   }
 
   /** Fails (rather than skips) with the actionable bootstrap step when the runtime is absent. */
@@ -201,6 +218,23 @@ class ExactBitsRecorderTest {
     return out;
   }
 
+  /**
+   * Whether the tree at {@code repoRoot} is dirty: {@code git status --porcelain} prints anything
+   * at all (even a blank line). Provenance only, never compared.
+   */
+  private static boolean gitStatusDirty(Path repoRoot) throws Exception {
+    Process process =
+        new ProcessBuilder("git", "status", "--porcelain")
+            .directory(repoRoot.toFile())
+            .redirectErrorStream(true)
+            .start();
+    String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    if (process.waitFor() != 0) {
+      throw new AssertionError("git status --porcelain failed in " + repoRoot + ": " + out);
+    }
+    return !out.isEmpty();
+  }
+
   private static void record(
       ExactBitsMetadata global, List<ExactBitsCapture.Variant> variants, Path modeDir)
       throws IOException {
@@ -232,8 +266,9 @@ class ExactBitsRecorderTest {
 
   /**
    * The cheap half of verification, run before {@link #captureAll}: the recording must exist, use
-   * the supported format version, carry globally comparable metadata (everything except the git
-   * commit, which is allowed to differ across the refactor's own commits), and name exactly the
+   * the supported format version, carry globally comparable metadata (every field except the git
+   * commit, which is allowed to differ across the refactor's own commits, and the provenance-only
+   * gitDirty/decoderModelSha256, which are recorded but never compared), and name exactly the
    * candidate variants. An absent or non-comparable recording therefore fails fast, before any
    * capture is spent; the comparison messages are shared with the per-capture checks below. Returns
    * the parsed manifest for {@link #verifyPostCapture}. Package-private so the fast-fail contract
@@ -620,7 +655,9 @@ class ExactBitsRecorderTest {
         global.mlxEnableTf32,
         global.specHash,
         variant.inputHashes,
-        variant.derivedHashes);
+        variant.derivedHashes,
+        global.gitDirty,
+        global.decoderModelSha256);
   }
 
   /** Capture names in the recorded order: float captures, then greedy, then scheduler. */

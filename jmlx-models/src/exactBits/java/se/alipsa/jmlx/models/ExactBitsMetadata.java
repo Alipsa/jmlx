@@ -12,7 +12,11 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>Every field except {@code gitCommit} must match exactly between a recording and a candidate
  * run, or the recordings are not comparable on that host: the commit is the only field allowed to
- * differ, because the point of the comparison is to cross the refactor's own commits.
+ * differ, because the point of the comparison is to cross the refactor's own commits. {@code
+ * gitDirty} and {@code decoderModelSha256} are provenance only, like the commit: whether the tree
+ * was dirty when the recording was made, and the SHA-256 of the DecoderModel source it was recorded
+ * against. They are recorded but never compared, and recordings made before they existed omit them
+ * (absent reads as {@code false} / {@code ""}).
  */
 final class ExactBitsMetadata {
 
@@ -26,6 +30,8 @@ final class ExactBitsMetadata {
   final String specHash;
   final Map<String, String> inputHashes;
   final Map<String, String> derivedHashes;
+  final boolean gitDirty;
+  final String decoderModelSha256;
 
   ExactBitsMetadata(
       String gitCommit,
@@ -37,7 +43,9 @@ final class ExactBitsMetadata {
       String mlxEnableTf32,
       String specHash,
       Map<String, String> inputHashes,
-      Map<String, String> derivedHashes) {
+      Map<String, String> derivedHashes,
+      boolean gitDirty,
+      String decoderModelSha256) {
     this.gitCommit = gitCommit;
     this.mlxMetalVersion = mlxMetalVersion;
     this.mlxcCommit = mlxcCommit;
@@ -48,6 +56,8 @@ final class ExactBitsMetadata {
     this.specHash = specHash;
     this.inputHashes = Map.copyOf(new TreeMap<>(inputHashes));
     this.derivedHashes = Map.copyOf(new TreeMap<>(derivedHashes));
+    this.gitDirty = gitDirty;
+    this.decoderModelSha256 = decoderModelSha256;
   }
 
   /** Renders the metadata object in fixed key order, escaping every string value for JSON. */
@@ -62,7 +72,9 @@ final class ExactBitsMetadata {
     out.append("\"mlxEnableTf32\":\"").append(escapeJson(mlxEnableTf32)).append("\",");
     out.append("\"specHash\":\"").append(escapeJson(specHash)).append("\",");
     out.append("\"inputHashes\":").append(mapToJson(inputHashes)).append(',');
-    out.append("\"derivedHashes\":").append(mapToJson(derivedHashes));
+    out.append("\"derivedHashes\":").append(mapToJson(derivedHashes)).append(',');
+    out.append("\"gitDirty\":").append(gitDirty).append(',');
+    out.append("\"decoderModelSha256\":\"").append(escapeJson(decoderModelSha256)).append('"');
     out.append('}');
     return out.toString();
   }
@@ -70,6 +82,11 @@ final class ExactBitsMetadata {
   static ExactBitsMetadata fromJson(JsonNode node) {
     Map<String, String> inputs = strings(node.path("inputHashes"));
     Map<String, String> derived = strings(node.path("derivedHashes"));
+    // Provenance-only fields: recordings made before they existed omit them, so an absent value
+    // reads as the documented default (false / ""). They are never compared, so the default can
+    // never flip a comparison result.
+    JsonNode gitDirty = node.path("gitDirty");
+    JsonNode decoderModelSha256 = node.path("decoderModelSha256");
     return new ExactBitsMetadata(
         node.path("gitCommit").asString(),
         node.path("mlxMetalVersion").asString(),
@@ -80,13 +97,17 @@ final class ExactBitsMetadata {
         node.path("mlxEnableTf32").asString(),
         node.path("specHash").asString(),
         inputs,
-        derived);
+        derived,
+        gitDirty.isBoolean() && gitDirty.asBoolean(false),
+        decoderModelSha256.isTextual() ? decoderModelSha256.asString() : "");
   }
 
   /**
-   * Names every field on which this metadata disagrees with {@code recorded}. The git commit is
-   * never compared; the input/derived hash maps are compared only when {@code includeHashMaps} is
-   * set, because the per-mode manifest stores them per variant instead.
+   * Names every compared field on which this metadata disagrees with {@code recorded}. The git
+   * commit is never compared, and neither are {@code gitDirty} and {@code decoderModelSha256}
+   * (provenance only; recordings made before they existed omit them); the input/derived hash maps
+   * are compared only when {@code includeHashMaps} is set, because the per-mode manifest stores
+   * them per variant instead.
    */
   List<String> mismatches(ExactBitsMetadata recorded, boolean includeHashMaps) {
     List<String> out = new ArrayList<>();

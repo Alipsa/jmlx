@@ -86,15 +86,25 @@ final class ExactBitsCapture {
   /**
    * Deterministically derives the quantized checkpoint of a committed float checkpoint with the
    * same group, bits and key set as QuantizedDecoderTest.quantize, writing it to {@code outDir} and
-   * recording the SHA-256 of the derived files in {@code derivedHashes}.
+   * recording the SHA-256 of the derived files in {@code derivedHashes}. Refuses with {@link
+   * IllegalStateException} a checkpoint whose config.json already carries a top-level {@code
+   * quantization} key, since the derivation would splice a duplicate key into it.
    */
   static Path deriveQuantized(Path floatCheckpoint, Path outDir, Map<String, String> derivedHashes)
       throws Exception {
+    JsonNode config = JsonFiles.read(floatCheckpoint.resolve("config.json"));
+    if (config.isObject() && config.has("quantization")) {
+      throw new IllegalStateException(
+          "cannot derive a quantized checkpoint from "
+              + floatCheckpoint
+              + ": its config.json already declares a top-level \"quantization\" key that the "
+              + "derivation would duplicate");
+    }
     Path out = Files.createDirectories(outDir);
-    String config = Files.readString(floatCheckpoint.resolve("config.json"));
+    String configText = Files.readString(floatCheckpoint.resolve("config.json"));
     Files.writeString(
         out.resolve("config.json"),
-        config.substring(0, config.lastIndexOf('}'))
+        configText.substring(0, configText.lastIndexOf('}'))
             + ",\"quantization\":{\"group_size\":"
             + ExactBitsSpec.QUANT_GROUP
             + ",\"bits\":"
@@ -271,7 +281,6 @@ final class ExactBitsCapture {
   private static MLXArray hook(MLXArray embedded) {
     int[] shape = embedded.shape();
     float[] addend = new float[shape[0]];
-    Arrays.fill(addend, 0f);
     addend[ExactBitsSpec.HOOK_ROW] = ExactBitsSpec.HOOK_CONSTANT;
     return MLXOps.add(embedded, MLX.array(embedded.scope(), addend, new int[] {shape[0], 1, 1}));
   }

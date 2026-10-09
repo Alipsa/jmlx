@@ -327,12 +327,38 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * that the token-ID entry derived, preserves the graph operation order, dtypes and
    * lazy-evaluation boundaries of the stack it was factored from, and it neither evaluates nor
    * poisons: the caller keeps the preflight, postflight, evaluation and cache-poisoning
-   * responsibilities. The upcoming SmolVLM work (WP6, this package) feeds its merged text and image
-   * embeddings through this entry; production token-ID callers keep the identical stack via {@link
+   * responsibilities, while this entry itself validates the batch shape of {@code embeddings}
+   * against {@code validLengths}, {@code sequenceWidth} and {@code caches} (shape {@code [B,
+   * sequenceWidth, hiddenSize]} with one cache per layer) before building any graph node. The
+   * upcoming SmolVLM work (WP6, this package) feeds its merged text and image embeddings through
+   * this entry; production token-ID callers keep the identical stack via {@link
    * #normalizedHiddenStatesBatch}.
    */
   final MLXArray decoderStack(
       MLXArray embeddings, List<KVCache> caches, int[] validLengths, int sequenceWidth) {
+    int[] shape = embeddings.shape();
+    if (shape.length != 3
+        || shape[0] != validLengths.length
+        || shape[1] != sequenceWidth
+        || shape[2] != config.hiddenSize()) {
+      throw new IllegalArgumentException(
+          "decoderStack requires embeddings shaped ["
+              + validLengths.length
+              + ", "
+              + sequenceWidth
+              + ", "
+              + config.hiddenSize()
+              + "]: got "
+              + Arrays.toString(shape));
+    }
+    if (caches.size() != layers.size()) {
+      throw new IllegalArgumentException(
+          "one KVCache is required per decoder layer: got "
+              + caches.size()
+              + " caches for "
+              + layers.size()
+              + " layers");
+    }
     MLXArray x = embeddings;
     KVCache first = caches.getFirst();
     int batch = validLengths.length;

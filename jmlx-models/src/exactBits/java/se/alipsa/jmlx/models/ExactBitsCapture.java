@@ -208,7 +208,12 @@ final class ExactBitsCapture {
     }
   }
 
-  /** End-to-end scheduler: two greedy requests of different lengths sharing one gated cohort. */
+  /**
+   * End-to-end scheduler: two greedy requests of different lengths sharing one gated cohort;
+   * asserts they actually formed one 2-row cohort before the scheduler is closed, so a split into
+   * two 1-row cohorts (e.g. a GC pause past the gate window) fails the capture instead of silently
+   * recording an unbatched run.
+   */
   private static List<SchedulerRow> schedulerCapture(Path checkpoint, int[] prompt)
       throws Exception {
     BatchSchedulerConfig config =
@@ -231,6 +236,10 @@ final class ExactBitsCapture {
               SchedulerFixtures.greedy(ExactBitsSpec.ROW_B, ExactBitsSpec.MAX_NEW_TOKENS), e -> {});
       GenerationResult resultA = SchedulerFixtures.await(rowA);
       GenerationResult resultB = SchedulerFixtures.await(rowB);
+      if (!scheduler.cohortSizes().equals(List.of(2))) {
+        throw new AssertionError(
+            "scheduler capture did not form one 2-row cohort: " + scheduler.cohortSizes());
+      }
       return List.of(
           new SchedulerRow(resultA.tokenIds(), resultA.finishReason().name()),
           new SchedulerRow(resultB.tokenIds(), resultB.finishReason().name()));

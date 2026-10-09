@@ -27,10 +27,12 @@ import java.util.Objects;
  *
  * <p>The output owns the expanded IDs and, per image in prompt order, the ordered start positions
  * of each tile's {@code tokensPerTile}-token image run (crops row-major, global thumbnail last —
- * the processor's frame order). {@link #expand(int[], SmolVlmPromptTokens, List, int)} verifies
- * that every projected feature row has exactly one destination, in order, before returning. This
- * class never receives native tensors or pixels: it is pure ID-space arithmetic with checked length
- * math.
+ * the processor's frame order). {@link #expand(int[], SmolVlmPromptTokens, List, int)} builds the
+ * plan — whose constructor enforces that every projected feature-row destination is in bounds for
+ * the expanded IDs and strictly increasing — and then verifies that the expanded prompt holds
+ * exactly one image token per projected feature row and that every destination holds the image
+ * token, before returning. This class never receives native tensors or pixels: it is pure ID-space
+ * arithmetic with checked length math.
  */
 final class SmolVlmPromptExpander {
 

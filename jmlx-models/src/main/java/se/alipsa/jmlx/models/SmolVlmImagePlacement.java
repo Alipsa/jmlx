@@ -10,7 +10,7 @@ import java.util.Objects;
  * feature rows occupy {@code [tileStart, tileStart + tokensPerTile)}. Equality is by value: the
  * tile-start arrays elementwise.
  *
- * @param tileStarts one start position per tile, strictly increasing
+ * @param tileStarts one start position per tile, non-negative and strictly increasing
  */
 record SmolVlmImagePlacement(int[] tileStarts) {
 
@@ -18,6 +18,9 @@ record SmolVlmImagePlacement(int[] tileStarts) {
     tileStarts = Objects.requireNonNull(tileStarts, "tileStarts").clone();
     if (tileStarts.length == 0) {
       throw new IllegalArgumentException("at least one tile start is required");
+    }
+    if (tileStarts[0] < 0) {
+      throw new IllegalArgumentException("tile starts must be non-negative: " + tileStarts[0]);
     }
     for (int i = 1; i < tileStarts.length; i++) {
       if (tileStarts[i] <= tileStarts[i - 1]) {
@@ -32,7 +35,7 @@ record SmolVlmImagePlacement(int[] tileStarts) {
     }
   }
 
-  /** One start position per tile, strictly increasing; defensive copy. */
+  /** One start position per tile, non-negative and strictly increasing; defensive copy. */
   public int[] tileStarts() {
     return tileStarts.clone();
   }

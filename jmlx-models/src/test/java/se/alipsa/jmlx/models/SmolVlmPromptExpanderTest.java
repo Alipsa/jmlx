@@ -468,6 +468,13 @@ class SmolVlmPromptExpanderTest {
     assertThrows(IllegalArgumentException.class, () -> new SmolVlmImagePlacement(new int[] {5, 5}));
     assertThrows(IllegalArgumentException.class, () -> new SmolVlmImagePlacement(new int[] {9, 4}));
     assertDoesNotThrow(() -> new SmolVlmImagePlacement(new int[] {1, 4, 9}));
+    String negative =
+        assertThrows(
+                IllegalArgumentException.class, () -> new SmolVlmImagePlacement(new int[] {-1}))
+            .getMessage();
+    assertTrue(negative.contains("non-negative"));
+    assertTrue(negative.contains("-1"));
+    assertFalse(negative.contains("strictly increasing"));
   }
 
   @Test

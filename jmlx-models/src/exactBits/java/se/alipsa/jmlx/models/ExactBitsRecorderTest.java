@@ -246,9 +246,9 @@ class ExactBitsRecorderTest {
             "quantized checkpoint derivation for "
                 + variant.name
                 + " is not reproducible: recorded "
-                + variant.derivedHashes
+                + mapOf(recordedVariant.path("derivedHashes"))
                 + ", candidate "
-                + mapOf(recordedVariant.path("derivedHashes")));
+                + variant.derivedHashes);
       }
       List<String> recordedCaptures = stringList(recordedVariant.path("captures"));
       List<String> candidateCaptures = captureNames(variant);

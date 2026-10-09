@@ -10,6 +10,12 @@ import se.alipsa.jmlx.nn.KVCachePolicy;
  * with each image's ordered tile feature destinations, and the checked cache-budget arithmetic the
  * generation loop uses.
  *
+ * <p>Every plan is valid by construction: the constructor rejects placements whose feature
+ * destinations fall out of bounds for the expanded IDs or are not strictly increasing in (image,
+ * tile, feature row) order. What a destination <i>holds</i> is not a placement fact — the plan has
+ * no image token of its own — so verifying that every destination holds the image token (and that
+ * no image token is left undelivered) is the expander's job.
+ *
  * <p>{@code promptPositions} for the finished result is {@link #expandedLength()}; the {@link
  * #unexpandedIds()} are retained (owned copy) so results and capacity errors can report both
  * lengths. Equality is by value: the ID arrays elementwise and the placements listwise.
@@ -40,6 +46,10 @@ record SmolVlmPromptPlan(
               + " image(s) need at least "
               + minimum);
     }
+    // Every plan is valid by construction: destinations in bounds, strictly increasing. The
+    // check is static and takes the components as parameters: the record's field stores happen
+    // only after the compact constructor body, so an instance method would read null fields.
+    verifyDestinations(expandedIds.length, tokensPerTile, images);
   }
 
   /** The original (unexpanded) prompt IDs; defensive copy. */
@@ -68,7 +78,7 @@ record SmolVlmPromptPlan(
     for (SmolVlmImagePlacement image : images) {
       total = Math.addExact(total, image.tileCount());
     }
-    return (int) total;
+    return Math.toIntExact(total);
   }
 
   /** Total projected feature rows: one per image token in the expanded prompt. */
@@ -129,6 +139,40 @@ record SmolVlmPromptPlan(
       }
     }
     return destinations;
+  }
+
+  /**
+   * Rejects placements whose feature destinations (in {@link #featureDestinations()} order) are not
+   * in bounds for the expanded prompt or not strictly increasing; the compact constructor runs it
+   * so every plan is valid by construction. Enumerates the destinations itself rather than via
+   * {@link #featureDestinations()} for the same reason it is static.
+   */
+  private static void verifyDestinations(
+      int expandedLength, int tokensPerTile, List<SmolVlmImagePlacement> images) {
+    int previous = -1;
+    for (SmolVlmImagePlacement image : images) {
+      for (int start : image.tileStartsArray()) {
+        for (int row = 0; row < tokensPerTile; row++) {
+          int destination = Math.addExact(start, row);
+          if (destination <= previous) {
+            throw new IllegalArgumentException(
+                "feature destinations must be strictly increasing: "
+                    + destination
+                    + " after "
+                    + previous);
+          }
+          if (destination >= expandedLength) {
+            throw new IllegalArgumentException(
+                "feature destination "
+                    + destination
+                    + " is out of bounds for the expanded prompt ("
+                    + expandedLength
+                    + " tokens)");
+          }
+          previous = destination;
+        }
+      }
+    }
   }
 
   @Override

@@ -44,12 +44,16 @@ final class SmolVlmPromptExpander {
    * @param grids one split grid per supplied image, in placeholder order
    * @param tokensPerTile image tokens per tile (the processor's {@code image_seq_len})
    * @return the expanded prompt plan
-   * @throws IllegalArgumentException on a null argument, non-positive {@code tokensPerTile}, a grid
-   *     outside the 6x6 marker space, a placeholder/image count mismatch, a processor-only marker
-   *     (fake, row/column, global) in the prompt, a video token in the prompt, or an expanded
-   *     length that overflows a signed 32-bit integer
-   * @throws IllegalStateException if the built expansion fails the feature-destination invariant
-   *     (unreachable: the builder emits the destinations it verifies)
+   * @throws NullPointerException on a null argument ({@code unexpandedIds}, {@code tokens}, {@code
+   *     grids}, or a {@code grids} entry)
+   * @throws IllegalArgumentException on a non-positive {@code tokensPerTile}, a grid outside the
+   *     6x6 marker space, a placeholder/image count mismatch, a processor-only marker (fake,
+   *     row/column, global) in the prompt, a video token in the prompt, or an expanded length that
+   *     overflows a signed 32-bit integer
+   * @throws IllegalStateException if the built expansion fails the feature-destination invariant:
+   *     the expanded prompt must hold exactly one image token per projected feature row, and every
+   *     destination must hold the image token (destination bounds and strict ordering are enforced
+   *     by the plan's constructor)
    */
   static SmolVlmPromptPlan expand(
       int[] unexpandedIds,
@@ -223,29 +227,29 @@ final class SmolVlmPromptExpander {
   }
 
   /**
-   * Invariant the builder must satisfy: every projected feature row has exactly one destination, in
-   * (image, tile, feature row) order, and each destination holds the image token.
+   * Invariant the builder must satisfy: the expanded prompt holds exactly one image token per
+   * projected feature row, and each destination holds the image token. Destination bounds and
+   * strict ordering are enforced by the plan's constructor, so only the image-token content checks
+   * remain here. Package-private so the package's tests can drive it against hand-constructed plans
+   * the builder can never emit.
    */
-  private static void verifyFeatureDestinations(SmolVlmPromptPlan plan, int imageTokenId) {
-    int[] destinations = plan.featureDestinations();
-    if (destinations.length != plan.totalFeatureRows()) {
-      throw new IllegalStateException(
-          "feature destination count "
-              + destinations.length
-              + " != feature row count "
-              + plan.totalFeatureRows());
-    }
+  static void verifyFeatureDestinations(SmolVlmPromptPlan plan, int imageTokenId) {
     int[] expanded = plan.expandedIds();
-    int previous = -1;
-    for (int destination : destinations) {
-      if (destination <= previous) {
-        throw new IllegalStateException(
-            "feature destinations are not strictly increasing: "
-                + destination
-                + " after "
-                + previous);
+    int imageTokens = 0;
+    for (int id : expanded) {
+      if (id == imageTokenId) {
+        imageTokens++;
       }
-      previous = destination;
+    }
+    if (imageTokens != plan.totalFeatureRows()) {
+      throw new IllegalStateException(
+          "expanded prompt holds "
+              + imageTokens
+              + " image tokens but "
+              + plan.totalFeatureRows()
+              + " feature rows");
+    }
+    for (int destination : plan.featureDestinations()) {
       if (expanded[destination] != imageTokenId) {
         throw new IllegalStateException(
             "feature destination " + destination + " does not hold the image token");

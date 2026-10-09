@@ -252,6 +252,28 @@ class SmolVlmPromptExpanderTest {
   }
 
   @Test
+  void nullArgumentsAreRejectedWithNullPointer() {
+    SmolVlmPromptTokens tokens = synthetic(-1);
+    assertThrows(
+        NullPointerException.class,
+        () -> SmolVlmPromptExpander.expand(null, tokens, List.of(), TPP));
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            SmolVlmPromptExpander.expand(
+                new int[] {IMAGE}, null, List.of(new SmolVlmImageGrid(0, 0)), TPP));
+    assertThrows(
+        NullPointerException.class,
+        () -> SmolVlmPromptExpander.expand(new int[] {IMAGE}, tokens, null, TPP));
+    // List.of rejects nulls at construction, so the null entry needs a mutable list.
+    List<SmolVlmImageGrid> withNull = new ArrayList<>();
+    withNull.add(null);
+    assertThrows(
+        NullPointerException.class,
+        () -> SmolVlmPromptExpander.expand(new int[] {IMAGE}, tokens, withNull, TPP));
+  }
+
+  @Test
   void placeholderCountMismatchIsRejectedNamingBothSides() {
     SmolVlmPromptTokens tokens = synthetic(-1);
     IllegalArgumentException twoToOne =
@@ -528,6 +550,93 @@ class SmolVlmPromptExpanderTest {
                 new SmolVlmPromptPlan(
                     new int[0], new int[] {1}, Integer.MAX_VALUE, List.of(placement)));
     assertTrue(over.getMessage().contains("2147483650"));
+  }
+
+  @Test
+  void expandedPromptWithStrayImageTokenFailsTheFeatureInvariant() {
+    // The builder cannot emit a plan like this (it emits the destinations it verifies), so the
+    // verifier is driven directly against a hand-constructed plan holding one image token past
+    // the last destination.
+    SmolVlmPromptPlan plan =
+        new SmolVlmPromptPlan(
+            new int[] {1, IMAGE, 2},
+            new int[] {0, IMAGE, IMAGE, 7, IMAGE},
+            2,
+            List.of(new SmolVlmImagePlacement(new int[] {1})));
+    IllegalStateException stray =
+        assertThrows(
+            IllegalStateException.class,
+            () -> SmolVlmPromptExpander.verifyFeatureDestinations(plan, IMAGE));
+    assertEquals("expanded prompt holds 3 image tokens but 2 feature rows", stray.getMessage());
+  }
+
+  @Test
+  void planConstructorRejectsDestinationsAtOrPastTheExpandedLength() {
+    // The constructor, not the verifier, is what now rejects these: the bare expanded[destination]
+    // access would have thrown ArrayIndexOutOfBoundsException instead.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new SmolVlmPromptPlan(
+                new int[] {1, IMAGE, 2},
+                new int[] {IMAGE, IMAGE, 3, 4, 5},
+                2,
+                List.of(new SmolVlmImagePlacement(new int[] {5}))));
+    IllegalArgumentException outOfBounds =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new SmolVlmPromptPlan(
+                    new int[] {1, IMAGE, 2},
+                    new int[] {IMAGE, IMAGE, 3, 4, 5},
+                    2,
+                    List.of(new SmolVlmImagePlacement(new int[] {10}))));
+    assertTrue(outOfBounds.getMessage().contains("10"));
+  }
+
+  @Test
+  void planConstructorRejectsOverlappingAndOutOfOrderDestinationsAcrossImages() {
+    // Two images whose placements interleave: the second image's tile starts inside the first's,
+    // so the flattened (image, tile, feature row) destination sequence goes backwards.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new SmolVlmPromptPlan(
+                new int[] {IMAGE, IMAGE},
+                new int[] {IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, 0, 0, 0, 0, 0, 0},
+                2,
+                List.of(
+                    new SmolVlmImagePlacement(new int[] {0, 6}),
+                    new SmolVlmImagePlacement(new int[] {2}))));
+    // A second image whose tile starts before the first image's tile ends: overlapping runs.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new SmolVlmPromptPlan(
+                new int[] {IMAGE, IMAGE},
+                new int[] {IMAGE, IMAGE, IMAGE, IMAGE, 0, 0, 0, 0, 0, 0, 0, 0},
+                2,
+                List.of(
+                    new SmolVlmImagePlacement(new int[] {0}),
+                    new SmolVlmImagePlacement(new int[] {1}))));
+  }
+
+  @Test
+  void destinationNotHoldingTheImageTokenFailsTheFeatureInvariant() {
+    // Bounds and ordering are the plan's; the verifier's own job is that each destination holds
+    // the image token, so it is driven against a plan whose second destination falls on an
+    // ordinary token (the count check passes: exactly two image tokens, two feature rows).
+    SmolVlmPromptPlan plan =
+        new SmolVlmPromptPlan(
+            new int[] {1, IMAGE, 2},
+            new int[] {IMAGE, IMAGE, 3, 4, 5},
+            2,
+            List.of(new SmolVlmImagePlacement(new int[] {1})));
+    IllegalStateException notImage =
+        assertThrows(
+            IllegalStateException.class,
+            () -> SmolVlmPromptExpander.verifyFeatureDestinations(plan, IMAGE));
+    assertEquals("feature destination 2 does not hold the image token", notImage.getMessage());
   }
 
   @Test

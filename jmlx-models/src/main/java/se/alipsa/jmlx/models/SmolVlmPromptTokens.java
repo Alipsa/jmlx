@@ -19,10 +19,10 @@ import java.util.Objects;
  * never contain a special token, and a colliding ID would insert a token that no feature
  * destination owns.
  *
- * <p>{@code rowColTokenBase} anchors the contiguous {@code <row_r_col_c>} marker block: the marker
- * for 1-based row {@code r} and column {@code c} is {@code rowColTokenBase + (r - 1) * 6 + c}, so
- * the used IDs are {@code rowColTokenBase + 1 .. rowColTokenBase + 36} (the base itself is not a
- * row/column marker). Equality is by value: the newline arrays elementwise.
+ * <p>{@code rowColTokenIdBase} anchors the contiguous {@code <row_r_col_c>} marker block: the
+ * marker for 1-based row {@code r} and column {@code c} is {@code rowColTokenIdBase + (r - 1) * 6 +
+ * c}, so the used IDs are {@code rowColTokenIdBase + 1 .. rowColTokenIdBase + 36} (the base itself
+ * is not a row/column marker). Equality is by value: the newline arrays elementwise.
  *
  * @param imageTokenId the {@code <image>} expansion marker
  * @param videoTokenId the tokenizer's {@code <video>} token, or -1 when the tokenizer declares no
@@ -120,7 +120,7 @@ record SmolVlmPromptTokens(
     return globalBlockNewlineTokenIds.clone();
   }
 
-  /** The {@code <row_row_col_col>} marker ID for 1-based row and column. */
+  /** The {@code <row_r_col_c>} marker ID for 1-based row and column. */
   int rowColTokenId(int row, int col) {
     if (row < 1 || row > MARKER_GRID_SIDE || col < 1 || col > MARKER_GRID_SIDE) {
       throw new IllegalArgumentException(

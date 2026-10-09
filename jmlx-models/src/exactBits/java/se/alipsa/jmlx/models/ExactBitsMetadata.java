@@ -99,7 +99,7 @@ final class ExactBitsMetadata {
         inputs,
         derived,
         gitDirty.isBoolean() && gitDirty.asBoolean(false),
-        decoderModelSha256.isTextual() ? decoderModelSha256.asString() : "");
+        decoderModelSha256.isString() ? decoderModelSha256.asString() : "");
   }
 
   /**

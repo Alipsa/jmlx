@@ -144,8 +144,13 @@ class ExactBitsRecorderTest {
     return variants;
   }
 
-  // Package-private so the candidate-metadata builder is exerciseable without the full
-  // record/verify run.
+  /**
+   * The host/runtime metadata for one recording. Both native pin keys ({@code mlxMetalVersion} and
+   * {@code mlxcCommit}) are required in {@code native/install/lib/native-pin.properties}: a missing
+   * key fails here with the key and the file named, instead of resurfacing later as a bare
+   * NullPointerException from {@link ExactBitsMetadata#escapeJson}. Package-private so the
+   * candidate-metadata builder is exerciseable without the full record/verify run.
+   */
   static ExactBitsMetadata metadata(Path repoRoot) throws Exception {
     String commit = gitRevParse(repoRoot);
     // Provenance only, never compared: which actual source state was recorded (a dirty tree
@@ -157,15 +162,15 @@ class ExactBitsRecorderTest {
             Files.readAllBytes(
                 repoRoot.resolve(
                     "jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderModel.java")));
+    Path pinFile = repoRoot.resolve("native/install/lib/native-pin.properties");
     Properties pins = new Properties();
-    try (InputStream in =
-        Files.newInputStream(repoRoot.resolve("native/install/lib/native-pin.properties"))) {
+    try (InputStream in = Files.newInputStream(pinFile)) {
       pins.load(in);
     }
     return new ExactBitsMetadata(
         commit,
-        pins.getProperty("mlxMetalVersion"),
-        pins.getProperty("mlxcCommit"),
+        requirePin(pins, "mlxMetalVersion", pinFile),
+        requirePin(pins, "mlxcCommit", pinFile),
         deviceName(),
         System.getProperty("os.name"),
         System.getProperty("os.version"),
@@ -175,6 +180,24 @@ class ExactBitsRecorderTest {
         Map.of(),
         dirty,
         decoderModelSha256);
+  }
+
+  /**
+   * Reads a required native pin property, naming the missing key and the properties file in an
+   * {@link AssertionError} (matching this file's environment-failure style) instead of letting a
+   * null resurface later as a bare NullPointerException from {@link ExactBitsMetadata#escapeJson}.
+   */
+  private static String requirePin(Properties pins, String key, Path pinFile) {
+    String value = pins.getProperty(key);
+    if (value == null) {
+      throw new AssertionError(
+          "native pin property '"
+              + key
+              + "' is missing from "
+              + pinFile
+              + " -- run ./scripts/bootstrap-native.sh");
+    }
+    return value;
   }
 
   /** Fails (rather than skips) with the actionable bootstrap step when the runtime is absent. */

@@ -157,7 +157,10 @@ final class ExactBitsMetadata {
    * quote get backslash escapes, tab/newline/carriage return/backspace/form feed use their standard
    * short escapes, and every other C0 control character U+0000-U+001F is written as a
    * backslash-{@code u} escape followed by four lowercase hex digits. A no-op for values without
-   * such characters, so re-serialization of the recorded safe values stays byte-identical.
+   * such characters, so re-serialization of the recorded safe values stays byte-identical. A {@code
+   * null} input is not accepted (it fails with a {@link NullPointerException}); a call site with a
+   * nullable source (e.g. a properties read) must check for null where the nullness is meaningful
+   * instead of relying on the escaper.
    */
   static String escapeJson(String value) {
     StringBuilder out = new StringBuilder(value.length());

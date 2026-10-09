@@ -36,6 +36,9 @@ import tools.jackson.databind.JsonNode;
  *       {@code values}, the Base64 of the big-endian IEEE-754 bits of every float32 in row-major
  *       order ({@code Float.floatToIntBits}); the greedy capture carries {@code generatedTokenIds};
  *       the scheduler capture carries per-row {@code tokenIds} and {@code finishReason}.
+ *   <li>{@code tf32-<0|1>/derived/<family>-q4/} -- the quantized checkpoints derived at record
+ *       time; verify mode re-derives into a separate {@code tf32-<0|1>/derived-verify/} directory
+ *       (same layout) so the recorded tree is never overwritten.
  *   <li>{@code tf32-<0|1>/manifest.json} -- host metadata plus every variant's applicability, input
  *       SHA-256 hashes, derived quantized checkpoint SHA-256 hashes and capture list.
  * </ul>
@@ -66,8 +69,12 @@ class ExactBitsRecorderTest {
         Path.of(System.getProperty("jmlx.exact.bits.dir", "build/exact-bits"))
             .resolve("tf32-" + tf32);
     Path goldens = repoRoot.resolve("tools/hf-reference/goldens");
-
-    List<ExactBitsCapture.Variant> variants = captureAll(goldens, modeDir);
+    // Verify re-derives into a separate directory so the recorded derived/ tree (the baseline
+    // being checked against) is never overwritten: if a re-derivation ever differs, the recorded
+    // files remain intact for diffing.
+    Path deriveBase =
+        mode.equals("record") ? modeDir.resolve("derived") : modeDir.resolve("derived-verify");
+    List<ExactBitsCapture.Variant> variants = captureAll(goldens, deriveBase);
     ExactBitsMetadata global = metadata(repoRoot);
     if (mode.equals("record")) {
       record(global, variants, modeDir);
@@ -77,8 +84,12 @@ class ExactBitsRecorderTest {
     System.out.println("exact-bits " + mode + " tf32=" + tf32 + ": " + summary(variants));
   }
 
-  /** Every family, then its quantized variant, in the spec's deterministic order. */
-  private static List<ExactBitsCapture.Variant> captureAll(Path goldens, Path modeDir)
+  /**
+   * Every family, then its quantized variant, in the spec's deterministic order. Quantized
+   * checkpoints are derived under {@code deriveBase} ({@code derived/} when recording, {@code
+   * derived-verify/} when verifying).
+   */
+  private static List<ExactBitsCapture.Variant> captureAll(Path goldens, Path deriveBase)
       throws Exception {
     List<ExactBitsCapture.Variant> variants = new ArrayList<>();
     for (String family : ExactBitsSpec.FAMILIES) {
@@ -90,7 +101,7 @@ class ExactBitsRecorderTest {
         Map<String, String> derived = new TreeMap<>();
         Path derivedDir =
             ExactBitsCapture.deriveQuantized(
-                checkpoint, modeDir.resolve("derived").resolve(family + "-q4"), derived);
+                checkpoint, deriveBase.resolve(family + "-q4"), derived);
         ExactBitsCapture.Variant quantized =
             ExactBitsCapture.capture(family + "-q4", family, derivedDir, goldenFile, golden);
         quantized.derivedHashes.putAll(derived);

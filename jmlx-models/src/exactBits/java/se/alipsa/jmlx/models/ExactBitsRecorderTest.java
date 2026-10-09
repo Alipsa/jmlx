@@ -319,6 +319,10 @@ class ExactBitsRecorderTest {
       List<ExactBitsCapture.Variant> variants,
       Path modeDir)
       throws IOException {
+    List<String> captured = variants.stream().map(v -> v.name).toList();
+    if (!captured.equals(candidateVariantNames())) {
+      throw new AssertionError("captureAll order diverged from candidateVariantNames: " + captured);
+    }
     Map<String, JsonNode> recordedVariants = new LinkedHashMap<>();
     for (JsonNode node : manifest.path("variants")) {
       recordedVariants.put(node.path("name").asString(), node);
@@ -371,7 +375,9 @@ class ExactBitsRecorderTest {
   /**
    * The candidate variant names in the deterministic order {@link #captureAll} produces: every
    * family then its quantized variant. Derived from the spec alone, so {@link #verifyPreCapture}
-   * can check the recorded variant set before any capture has run.
+   * can check the recorded variant set before any capture has run, and {@link #verifyPostCapture}
+   * can check the variants actually captured stayed in this order (the name lookups below would
+   * otherwise die with a bare NullPointerException if the two loops ever drift apart).
    */
   private static List<String> candidateVariantNames() {
     List<String> names = new ArrayList<>();

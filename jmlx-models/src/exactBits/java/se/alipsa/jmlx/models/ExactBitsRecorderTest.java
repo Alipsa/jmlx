@@ -45,9 +45,12 @@ import tools.jackson.databind.ObjectMapper;
  *       SHA-256 hashes, derived quantized checkpoint SHA-256 hashes and capture list.
  * </ul>
  *
- * <p>Verify mode recomputes everything and requires bit-exact agreement of every float and ID, and
- * metadata equality in every field except the git commit (the comparison crosses the refactor's own
- * commits); anything else that differs means the recordings are not comparable on this host.
+ * <p>Verify mode checks the recorded manifest cheaply first -- existence, format version, globally
+ * comparable metadata (everything except the git commit) and the variant set -- so an absent or
+ * non-comparable recording fails fast before any capture runs. Only then does it recompute
+ * everything and require bit-exact agreement of every float and ID, and metadata equality in every
+ * field except the git commit (the comparison crosses the refactor's own commits); anything else
+ * that differs means the recordings are not comparable on this host.
  */
 class ExactBitsRecorderTest {
 
@@ -77,12 +80,16 @@ class ExactBitsRecorderTest {
     // files remain intact for diffing.
     Path deriveBase =
         mode.equals("record") ? modeDir.resolve("derived") : modeDir.resolve("derived-verify");
-    List<ExactBitsCapture.Variant> variants = captureAll(goldens, deriveBase);
     ExactBitsMetadata global = metadata(repoRoot);
+    // Verify mode fails fast on an absent or non-comparable recording before captureAll's 14
+    // variants x 9 GPU captures (plus quantized re-derivation) are spent: the manifest's
+    // existence, format version, global metadata and variant set are all cheap to check.
+    JsonNode manifest = mode.equals("verify") ? verifyPreCapture(global, modeDir) : null;
+    List<ExactBitsCapture.Variant> variants = captureAll(goldens, deriveBase);
     if (mode.equals("record")) {
       record(global, variants, modeDir);
     } else {
-      verify(global, variants, modeDir);
+      verifyPostCapture(global, manifest, variants, modeDir);
     }
     System.out.println("exact-bits " + mode + " tf32=" + tf32 + ": " + summary(variants));
   }
@@ -223,9 +230,16 @@ class ExactBitsRecorderTest {
     writeManifest(global, variants, modeDir);
   }
 
-  private static void verify(
-      ExactBitsMetadata global, List<ExactBitsCapture.Variant> variants, Path modeDir)
-      throws IOException {
+  /**
+   * The cheap half of verification, run before {@link #captureAll}: the recording must exist, use
+   * the supported format version, carry globally comparable metadata (everything except the git
+   * commit, which is allowed to differ across the refactor's own commits), and name exactly the
+   * candidate variants. An absent or non-comparable recording therefore fails fast, before any
+   * capture is spent; the comparison messages are shared with the per-capture checks below. Returns
+   * the parsed manifest for {@link #verifyPostCapture}. Package-private so the fast-fail contract
+   * is exerciseable without the full capture run.
+   */
+  static JsonNode verifyPreCapture(ExactBitsMetadata global, Path modeDir) throws IOException {
     Path manifestPath = modeDir.resolve("manifest.json");
     if (!Files.isRegularFile(manifestPath)) {
       throw new AssertionError(
@@ -243,18 +257,36 @@ class ExactBitsRecorderTest {
     if (!mismatches.isEmpty()) {
       throw new AssertionError(notComparable(mismatches));
     }
+    List<String> recordedNames = new ArrayList<>();
+    for (JsonNode node : manifest.path("variants")) {
+      recordedNames.add(node.path("name").asString());
+    }
+    List<String> candidateNames = candidateVariantNames();
+    if (!candidateNames.equals(recordedNames)) {
+      throw new AssertionError(
+          "variant set differs from the recording: recorded "
+              + recordedNames
+              + ", candidate "
+              + candidateNames
+              + " -- re-record after recording the spec at the base commit");
+    }
+    return manifest;
+  }
+
+  /**
+   * The expensive half of verification, run after {@link #verifyPreCapture} passed and {@link
+   * #captureAll} finished: every variant's applicability, derived quantized checkpoint hashes and
+   * capture set must match the recording, and every capture must agree bit-for-bit.
+   */
+  private static void verifyPostCapture(
+      ExactBitsMetadata global,
+      JsonNode manifest,
+      List<ExactBitsCapture.Variant> variants,
+      Path modeDir)
+      throws IOException {
     Map<String, JsonNode> recordedVariants = new LinkedHashMap<>();
     for (JsonNode node : manifest.path("variants")) {
       recordedVariants.put(node.path("name").asString(), node);
-    }
-    List<String> names = variants.stream().map(v -> v.name).toList();
-    if (!names.equals(new ArrayList<>(recordedVariants.keySet()))) {
-      throw new AssertionError(
-          "variant set differs from the recording: recorded "
-              + recordedVariants.keySet()
-              + ", candidate "
-              + names
-              + " -- re-record after recording the spec at the base commit");
     }
     for (ExactBitsCapture.Variant variant : variants) {
       JsonNode recordedVariant = recordedVariants.get(variant.name);
@@ -297,7 +329,24 @@ class ExactBitsRecorderTest {
         verifyCapture(global, variant, capture, modeDir);
       }
     }
-    System.out.println("verified " + variants.size() + " variants against " + manifestPath);
+    System.out.println(
+        "verified " + variants.size() + " variants against " + modeDir.resolve("manifest.json"));
+  }
+
+  /**
+   * The candidate variant names in the deterministic order {@link #captureAll} produces: every
+   * family then its quantized variant. Derived from the spec alone, so {@link #verifyPreCapture}
+   * can check the recorded variant set before any capture has run.
+   */
+  private static List<String> candidateVariantNames() {
+    List<String> names = new ArrayList<>();
+    for (String family : ExactBitsSpec.FAMILIES) {
+      names.add(family);
+      if (ExactBitsSpec.QUANTIZED_FAMILIES.contains(family)) {
+        names.add(family + "-q4");
+      }
+    }
+    return names;
   }
 
   private static void verifyCapture(

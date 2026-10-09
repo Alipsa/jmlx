@@ -606,7 +606,8 @@ subprojects {
     spotless {
         java {
             target 'src/main/java/**/*.java', 'src/test/java/**/*.java',
-                    'src/testFixtures/java/**/*.java', 'src/tierB/java/**/*.java'
+                    'src/testFixtures/java/**/*.java', 'src/tierB/java/**/*.java',
+                    'src/exactBits/java/**/*.java'
             importOrder()
             removeUnusedImports()
             googleJavaFormat(googleJavaFormatVersion).reflowLongStrings()
@@ -668,7 +669,7 @@ subprojects {
 
     if (project.name == 'jmlx-models') {
         tasks.named('check') {
-            dependsOn 'checkstyleTierB', tasks.named('spotlessCheck')
+            dependsOn 'checkstyleTierB', 'checkstyleExactBits', tasks.named('spotlessCheck')
         }
     }
 }

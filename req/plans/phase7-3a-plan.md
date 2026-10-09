@@ -1,6 +1,7 @@
 # Phase 7.3a — Vision foundation and SmolVLM-256M
 
-- **Status:** proposed, 2026-10-06; implementation and reference probes have not run.
+- **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`), WP4
+  via PR #43 (pending merge as of 2026-10-08); WP5 is the next work package.
 - **Parent:** `req/plans/phase7-plan.md` §7.3a, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Prerequisite:** 7.1 layer/oracle/inventory acceptance. 7.2 cross-attention and 7.0 are
@@ -289,18 +290,38 @@ rendering/expansion references belong in HF/image tools. Add any required Jinja 
 own regression and CHANGELOG entry. Qwen3-VL execution tests wait for 7.3b; generic structured
 content must preserve its wrapper-shaped template output without assuming SmolVLM syntax.
 
+Delivered via PR #42 (merge `0dac174`, 2026-10-08): `GenerationRequest.withImages`/`images()`,
+`InputModality`, model and scheduler image rejection, structured `renderChat` content, the pinned
+chat template in metadata loading, and the HF `--chat` golden (`tools/hf-reference/goldens/
+chat-smolvlm.json`) with unexpanded and expanded IDs committed separately.
+
 ## 6. Pure expansion and generation accounting (WP4)
 
 Implement a package-private pure `SmolVlmPromptExpander` in models. Inputs are unexpanded IDs,
 validated special IDs and per-image processor grids. Output owns expanded IDs and ordered image
-feature positions/ranges. It never receives native tensors.
+feature positions/ranges. It never receives native tensors. The validated special IDs also carry
+the newline-run encodings: the reference expands at the string level and re-tokenizes the result
+(reference findings §6), and the only non-special characters it inserts are the row newlines — a
+lone `\n` after every row except the last and the merged `\n\n` run before the global block, both
+ordinary BPE tokens resolved from the tokenizer at model load (`[198]` and `[1116]` for the pinned
+SmolVLM-256M tokenizer). Reject newline IDs that collide with the image, fake, global or video
+token or the row/column marker block: a run is a plain-text encoding and a colliding ID would
+insert a token that no feature destination owns. The plan/placement/token records own their
+arrays; accessors return defensive copies and internal paths read the fields directly. The
+records compare by value (arrays elementwise) and render the arrays in toString.
 
 Count each `<image>` as one unit. `<image><image>` is valid for two supplied images. Reject
 count mismatches, any processor-only fake/row-column/global marker and unsupported video with
-distinct messages. Freeze exact markers and tile/global sequence in WP1; feature positions must
-exclude wrapper/row/column text. Expand after preprocessing, before native allocation; use
-checked token length arithmetic. Validate every projected-feature row has exactly one
-destination, in order.
+distinct messages. Unsupported video means the tokenizer's `<video>` token when the tokenizer
+declares one; the pinned SmolVLM-256M tokenizer has no `<video>` added token, so WP3's
+content-part rejection is the effective gate there. Freeze exact markers and tile/global sequence
+in WP1 (amended in place with the re-tokenization counts, per the committed golden); feature
+positions must exclude wrapper/row/column text. Expand after preprocessing, before native
+allocation; use checked token length arithmetic. Validate every projected-feature row has exactly
+one destination, in order. The expander anchors the marker block at its base and cannot detect a
+block that is contiguous but ordered differently, so WP6 must verify all 36 `<row_r_col_c>` IDs
+against the row-major formula when it resolves them from the tokenizer (or store the 36 IDs in an
+explicit table).
 
 Use expanded IDs for penalties, positions, context limits and cache budget `expandedLength +
 maxNewTokens - 1` when maxNewTokens is positive. Include both unexpanded and expanded lengths in
@@ -312,8 +333,12 @@ For `maxNewTokens == 0`, still validate placeholder counts and processor-only/vi
 pure geometry planning and expansion, and report the expanded promptPositions. Skip pixel
 resize/rescale/normalize, vision tower, embedding/native work and KV allocation; required cache
 capacity is zero. Geometry planning must share the processor's rounding/splitting code so counts
-cannot drift. Validate context length and image/geometry limits even in this path. Test
-rejection, position reporting and zero native/tower calls explicitly.
+cannot drift; it is delivered as pure `SmolVlmImageProcessor.geometry(height, width)` /
+`SmolVlmGeometryPlan` in jmlx-vision, which `intermediates()` itself uses. Validate context
+length and image/geometry limits even in this path. Test rejection, position reporting and zero
+native/tower calls explicitly; the model-level parts of this paragraph (pixel-work skip, zero
+tower calls, the cancellation points) are realized in WP6's `SmolVlmModel.generate`, which
+composes these pure components, while WP4's acceptance covers their pure side.
 
 Add `int promptPositions` as a GenerationResult component: define it as the effective input
 prompt length, expanded VLM length, ordinary decoder/scheduler prompt length, and **encoder
@@ -333,6 +358,32 @@ Tests cover exact HF expansion, different tile counts, images between text, malf
 count mismatch, exact/one-over capacity, zero/one/many generated tokens, EOS/stop and abort IDs.
 Generated image-special tokens are ordinary decoder history, not an instruction to re-run
 vision.
+
+Delivered via PR #43 (branch `phase7-3a-wp4`, 2026-10-08): the package-private
+`SmolVlmPromptExpander` and the `SmolVlmPromptTokens`/`SmolVlmImageGrid`/`SmolVlmImagePlacement`/
+`SmolVlmPromptPlan` records in `se.alipsa.jmlx.models`; the shared
+`SmolVlmImageProcessor.geometry`/`SmolVlmGeometryPlan` landed in jmlx-vision in the same PR.
+`SmolVlmPromptExpanderTest` matches all six golden `expanded_ids` byte-for-byte against the
+pinned transformers 4.57.6 reference (grids derived from the shared geometry plan, not the
+golden's names) and covers the synthetic unsplit/split sequences, prompt-order placements, every
+distinct rejection (count mismatch, fake, row/column, global, video, the 6x6 bound, length
+overflow) and the cache budget at exact/one-over/zero. `GenerationResult` is now a six-component
+record with `promptPositions` (the four-/five-argument compatibility constructors default to the
+prompt ID count; the floor `promptPositions >= promptTokenIds().size()` is enforced;
+`DecoderModel`, `T5Model` and `BatchGenerationScheduler` pass the explicit length). Runtime
+coverage: `LlamaModelTest` zero/one/many/EOS/stop/abort, `Seq2SeqGenerationTest` T5
+source-length equality and aborted prompt IDs, `BatchGenerationSchedulerTest` per-row scheduler
+lengths against the direct path. The model-level `maxNewTokens == 0` path (pixel-work skip,
+zero tower calls, the cancellation points) remains in WP6's `SmolVlmModel.generate`. Post-review
+amendments: the plan's minimum-length check computes the per-image marker minimum in long
+arithmetic (an int wrap of `tokensPerTile + 3` would pass the check at extreme values); the
+record array accessors return defensive copies; `SmolVlmPromptTokens` rejects newline IDs
+colliding with the special tokens or the marker block; the pinned-fixture test verifies all 36
+`<row_r_col_c>` IDs against the row-major formula, not just the block's ends. Second review
+round: the array-holding records override equals/hashCode/toString with elementwise array
+semantics (the generated versions compared and printed the arrays by reference), and
+`featureDestinations` reads the placements' internal start arrays through a package-private
+raw accessor so the same-package path pays no copy.
 
 ## 7. Decoder refactor and model assembly (WP5–WP6)
 
@@ -376,10 +427,12 @@ source/start/history semantics remain independent. Test shared-loop changes agai
 
 ## 8. Request ownership and cache/memory evidence
 
-A model holds weights only. Within generate, use a per-request generation scope, then a
-temporary vision activation child. Evaluate/hoist projected image features into the generation
-scope before closing the child. Prefill/decode activation scopes may read those features but
-cannot own retained state. Build KV caches in the generation scope. Always close request scopes
+A model holds weights only. Adopt parent decision 8's 2026-10-08 lifetime amendment: within
+generate, use a per-request generation scope for KV and a prefill child scope for projected
+image features. Evaluate/hoist features from shorter vision activation children into the
+prefill scope. Evaluate prefill logits and retained KV, then close the prefill scope and
+release features and embedding-hook references before cached decode. Decode reads only KV
+and surviving request state. Build KV caches in the generation scope. Always close request scopes
 on completion, cancellation, listener/tokenizer/native failures and failed prefill.
 
 Use a package-private models observer to count actual vision/connector executions and identify
@@ -389,13 +442,14 @@ state for a second request. Observer injection is test-only; production uses a n
 Add `VisionLanguageMemoryTest` with warm-up, evaluated arrays and `MLXMemory.activeBytes()`:
 repeated same/different images, changing tile counts, text-only requests, cancellation before
 vision/between steps, and injected post-prefill/listener/tokenizer/native failures return to
-baseline within a measured fixed allocator margin. Verify state remains live after temporary
-vision/prefill scopes close and becomes unusable after request closure.
+baseline within a measured fixed allocator margin. Verify features remain live after temporary
+vision activation closure, visual storage is released after prefill, retained KV remains valid
+after prefill closure, and request-lived state becomes unusable after request closure.
 
 For batch one, FLOAT32 retained self-KV bytes per position are `2 * decoderLayers * kvHeads *
-headDim * 4`. Projected features add `totalImageFeatureRows * textHiddenSize * 4` once, plus
-documented mask/metadata overhead. These features stay live until the request scope closes even
-though only prefill reads them, as required by parent decision 8. Use these coefficients and a
+headDim * 4`. Projected features add `totalImageFeatureRows * textHiddenSize * 4` during prefill,
+plus documented mask/metadata overhead; their retained cost during decode is zero. Assert
+post-prefill visual release within a measured allocator margin. Use KV bytes and a
 measured fixed margin for early/late per-token slope tests. Full(capacity) rejects an
 over-budget request before native work and never evicts; only sliding retention requires a
 plateau after its window fills. Support the composed text decoder's existing cache policies only

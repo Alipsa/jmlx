@@ -1222,7 +1222,8 @@ public final class BatchGenerationScheduler implements AutoCloseable {
             r.generated,
             reason,
             r.logProbabilities,
-            r.text == null ? null : r.text.toString());
+            r.text == null ? null : r.text.toString(),
+            r.prompt.length);
     try {
       r.listener.accept(
           terminalDelta == null

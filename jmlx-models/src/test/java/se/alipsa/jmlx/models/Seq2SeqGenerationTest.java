@@ -37,6 +37,9 @@ class Seq2SeqGenerationTest {
       List<GenerationEvent> events = new ArrayList<>();
       GenerationResult result = model.generate(request(3), events::add);
       assertEquals(3, result.generatedTokenIds().size());
+      // T5's effective prompt length is the encoder source length: it equals the prompt count.
+      assertEquals(result.promptTokenIds().size(), result.promptPositions());
+      assertEquals(4, result.promptPositions());
       assertEquals(4, events.size());
       assertEquals(
           result.generatedTokenIds(),
@@ -101,6 +104,7 @@ class Seq2SeqGenerationTest {
                         }
                       }));
       assertEquals(1, aborted.generatedTokenIds().size());
+      assertEquals(List.of(5, 7, 9, 1), aborted.promptTokenIds());
       assertEquals(
           1,
           model

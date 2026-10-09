@@ -54,6 +54,9 @@ class BatchGenerationSchedulerTest {
       assertEquals(expected.generatedTokenIds(), actual.generatedTokenIds(), family);
       assertEquals(expected.finishReason(), actual.finishReason());
       assertEquals(expected.promptTokenIds(), actual.promptTokenIds());
+      // The scheduler's effective prompt length is the prompt ID count.
+      assertEquals(actual.promptTokenIds().size(), actual.promptPositions(), family);
+      assertEquals(expected.promptPositions(), actual.promptPositions(), family);
     }
   }
 
@@ -77,6 +80,7 @@ class BatchGenerationSchedulerTest {
         GenerationResult actual = await(handles.get(i));
         assertEquals(expected.get(i).generatedTokenIds(), actual.generatedTokenIds(), "row " + i);
         assertEquals(newTokens[i], actual.generatedTokenIds().size(), "uneven lengths");
+        assertEquals(PROMPTS[i].length, actual.promptPositions(), "prompt length per row");
       }
       long perRequest = 7 + 3 + 5;
       assertTrue(

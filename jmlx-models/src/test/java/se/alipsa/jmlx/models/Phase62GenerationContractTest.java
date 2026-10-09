@@ -47,6 +47,7 @@ class Phase62GenerationContractTest {
 
     assertEquals(PromptSpecialTokens.PRETOKENIZED, request.promptSpecialTokens());
     assertNull(result.generatedText());
+    assertEquals(1, result.promptPositions(), "the 4-arg constructor defaults to the prompt count");
     assertNull(GenerationEvent.finished(FinishReason.CANCELLED).textDelta());
     assertEquals("", GenerationEvent.finished(FinishReason.CANCELLED, "").textDelta());
   }

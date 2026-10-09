@@ -182,6 +182,77 @@ class LlamaModelTest {
   }
 
   @Test
+  void promptPositionsReportThePromptLengthOnEveryTerminalPath(@TempDir Path dir) throws Exception {
+    writeTinyLlamaCheckpoint(dir);
+    try (MLXScope modelScope = new MLXScope()) {
+      LlamaModel model = LlamaModel.load(modelScope, dir);
+      int[] prompt = {1, 2};
+
+      GenerationResult promptOnly =
+          model.generate(
+              new GenerationRequest(
+                  prompt, GenerationConfig.greedyDefaults(0, Set.of()), CancellationToken.NONE),
+              ignored -> {});
+      assertEquals(List.of(), promptOnly.generatedTokenIds());
+      assertEquals(FinishReason.MAX_TOKENS, promptOnly.finishReason());
+      assertEquals(List.of(1, 2), promptOnly.promptTokenIds());
+      assertEquals(2, promptOnly.promptPositions());
+
+      GenerationResult one =
+          model.generate(
+              new GenerationRequest(
+                  prompt, GenerationConfig.greedyDefaults(1, Set.of()), CancellationToken.NONE),
+              ignored -> {});
+      assertEquals(List.of(0), one.generatedTokenIds());
+      assertEquals(2, one.promptPositions());
+
+      GenerationResult many =
+          model.generate(
+              new GenerationRequest(
+                  prompt, GenerationConfig.greedyDefaults(5, Set.of()), CancellationToken.NONE),
+              ignored -> {});
+      assertEquals(5, many.generatedTokenIds().size());
+      assertEquals(2, many.promptPositions());
+
+      GenerationResult eos =
+          model.generate(
+              new GenerationRequest(
+                  prompt,
+                  GenerationConfig.greedyDefaults(2, Set.of(0), Set.of()),
+                  CancellationToken.NONE),
+              ignored -> {});
+      assertEquals(FinishReason.EOS, eos.finishReason());
+      assertEquals(2, eos.promptPositions());
+
+      GenerationResult stopped =
+          model.generate(
+              new GenerationRequest(
+                  prompt,
+                  GenerationConfig.greedyDefaults(2, Set.of(), Set.of(0)),
+                  CancellationToken.NONE),
+              ignored -> {});
+      assertEquals(FinishReason.STOP_TOKEN, stopped.finishReason());
+      assertEquals(2, stopped.promptPositions());
+
+      // The aborted partial retains the unexpanded prompt IDs.
+      GenerationAbortedException aborted =
+          assertThrows(
+              GenerationAbortedException.class,
+              () ->
+                  model.generate(
+                      new GenerationRequest(
+                          prompt,
+                          GenerationConfig.greedyDefaults(2, Set.of()),
+                          CancellationToken.NONE),
+                      event -> {
+                        throw new IllegalStateException("listener failed");
+                      }));
+      assertEquals(List.of(1, 2), aborted.promptTokenIds());
+      assertEquals(List.of(0), aborted.generatedTokenIds());
+    }
+  }
+
+  @Test
   void cancellationIsPolledByTheGenerationThread(@TempDir Path dir) throws Exception {
     writeTinyLlamaCheckpoint(dir);
     try (MLXScope modelScope = new MLXScope()) {

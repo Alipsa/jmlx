@@ -127,16 +127,22 @@ for every new op.
 7. **Failure policy unchanged.** An unknown `model_type`, an unsupported config field (for example
    `qwen3_moe`, video, a per-layer quantization override) or an unexpected tensor fails before a
    model is returned.
-8. **Request-owned inference state.** Some tensors outlive one decode step but belong to one
-   request: the T5 static cross-attention K/V (7.2), the projected image features (7.3a), the
+8. **Request-owned inference state.** Some tensors outlive one activation scope (vision child
+   or decode step) but belong to one request: the T5 static cross-attention K/V (7.2),
+   the projected image features (7.3a), the
    Qwen3-VL DeepStack features and the multimodal position state after prefill (7.3b). Under the
-   current scope rules, a tensor allocated in a step's `activation` scope dangles once that step
+   current scope rules, a tensor allocated in an `activation` scope dangles once that scope
    closes. A tensor held on the model scope instead accumulates across requests. Both are bugs, so
    the rule follows the existing `KVCache` placement in `DecoderModel.generate`:
-   - Every such tensor is owned by the per-request `generation` scope, which today owns the KV
-     caches. It is computed directly into that scope before the step loop, or moved there with
-     `MLX.hoist` from the step that produced it. Either way the move is explicit and named in
-     code, never implied by scope inference.
+   - **2026-10-08 lifetime amendment (7.3a and 7.3b):** request-owned tensors are released
+     no later than request close; they need not all survive until then. KV caches and state
+     needed during decode live in the per-request `generation` scope. Visual/DeepStack
+     features used only during prefill live in a request-owned prefill child scope and are
+     released after prefill once logits and retained KV are evaluated. Both VLM families
+     adopt this rule. Computation into the intended scope or transfer with `MLX.hoist`
+     from shorter activation children is explicit, never implied by scope inference.
+     Tests prove retained state remains valid after prefill closure and visual storage is
+     released then. T5 cross-attention K/V remains request-lived because decode reads it.
    - Nothing request-specific is stored on the model or its scope. Model fields hold weights only.
    - The `generation` scope closes on every terminal path: EOS, stop token, `maxNewTokens`,
      cancellation before or between steps, listener exceptions, tokenizer failures and native
@@ -151,9 +157,9 @@ for every new op.
        "generous for 2 layers x 3 rows of a tiny model"). New request-state tests use a
        per-token budget derived from layers, KV heads, head size and dtype, plus a stated
        margin. **2026-10-05 amendment:** replacing the existing scheduler test's constant is
-       separate follow-up work, not a 7.2 dependency. Request-specific static tensors
-       (cross-attention K/V, image and DeepStack
-       features) add no per-step growth;
+       separate follow-up work, not a 7.2 dependency. Request-specific static T5
+       cross-attention K/V adds no per-step growth; image and DeepStack features are
+       released after evaluated prefill and add no retained storage during decode;
      - a capacity-bounded FULL cache (`KVCachePolicy.full(capacity)`) never evicts. It rejects a
        position beyond capacity, and generation validates the whole token budget up front. So it
        is tested for the same bounded growth, plus rejection before native work of a request one

@@ -427,10 +427,12 @@ source/start/history semantics remain independent. Test shared-loop changes agai
 
 ## 8. Request ownership and cache/memory evidence
 
-A model holds weights only. Within generate, use a per-request generation scope, then a
-temporary vision activation child. Evaluate/hoist projected image features into the generation
-scope before closing the child. Prefill/decode activation scopes may read those features but
-cannot own retained state. Build KV caches in the generation scope. Always close request scopes
+A model holds weights only. Adopt parent decision 8's 2026-10-08 lifetime amendment: within
+generate, use a per-request generation scope for KV and a prefill child scope for projected
+image features. Evaluate/hoist features from shorter vision activation children into the
+prefill scope. Evaluate prefill logits and retained KV, then close the prefill scope and
+release features and embedding-hook references before cached decode. Decode reads only KV
+and surviving request state. Build KV caches in the generation scope. Always close request scopes
 on completion, cancellation, listener/tokenizer/native failures and failed prefill.
 
 Use a package-private models observer to count actual vision/connector executions and identify
@@ -440,13 +442,14 @@ state for a second request. Observer injection is test-only; production uses a n
 Add `VisionLanguageMemoryTest` with warm-up, evaluated arrays and `MLXMemory.activeBytes()`:
 repeated same/different images, changing tile counts, text-only requests, cancellation before
 vision/between steps, and injected post-prefill/listener/tokenizer/native failures return to
-baseline within a measured fixed allocator margin. Verify state remains live after temporary
-vision/prefill scopes close and becomes unusable after request closure.
+baseline within a measured fixed allocator margin. Verify features remain live after temporary
+vision activation closure, visual storage is released after prefill, retained KV remains valid
+after prefill closure, and request-lived state becomes unusable after request closure.
 
 For batch one, FLOAT32 retained self-KV bytes per position are `2 * decoderLayers * kvHeads *
-headDim * 4`. Projected features add `totalImageFeatureRows * textHiddenSize * 4` once, plus
-documented mask/metadata overhead. These features stay live until the request scope closes even
-though only prefill reads them, as required by parent decision 8. Use these coefficients and a
+headDim * 4`. Projected features add `totalImageFeatureRows * textHiddenSize * 4` during prefill,
+plus documented mask/metadata overhead; their retained cost during decode is zero. Assert
+post-prefill visual release within a measured allocator margin. Use KV bytes and a
 measured fixed margin for early/late per-token slope tests. Full(capacity) rejects an
 over-budget request before native work and never evicts; only sliding retention requires a
 plateau after its window fills. Support the composed text decoder's existing cache policies only

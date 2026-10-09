@@ -19,7 +19,9 @@ import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.ffi.mlx_h;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Opt-in exact-bit recorder/comparator for the WP5 decoder-embedding refactor.
@@ -53,6 +55,7 @@ class ExactBitsRecorderTest {
 
   @Test
   void recordOrVerify() throws Exception {
+    checkJsonEscaping();
     String mode = System.getProperty("jmlx.exact.bits.mode", "");
     if (!mode.equals("record") && !mode.equals("verify")) {
       throw new AssertionError(
@@ -82,6 +85,25 @@ class ExactBitsRecorderTest {
       verify(global, variants, modeDir);
     }
     System.out.println("exact-bits " + mode + " tf32=" + tf32 + ": " + summary(variants));
+  }
+
+  /**
+   * Proves the hand-built JSON escaper round-trips a value containing quotes, backslashes and
+   * control characters through Jackson, so a broken escaper fails the run before it can write an
+   * invalid recording or make an invalid one unreadable.
+   */
+  private static void checkJsonEscaping() {
+    String nasty = "quote \" backslash \\ newline \n tab \t control " + (char) 1;
+    String snippet = "{\"reason\":\"" + ExactBitsMetadata.escapeJson(nasty) + "\"}";
+    JsonNode node;
+    try {
+      node = new ObjectMapper().readTree(snippet);
+    } catch (JacksonException e) {
+      throw new AssertionError("escaped hand-built JSON does not parse: " + snippet, e);
+    }
+    if (!nasty.equals(node.path("reason").asString())) {
+      throw new AssertionError("JSON escape round-trip changed the value: " + nasty);
+    }
   }
 
   /**
@@ -448,7 +470,7 @@ class ExactBitsRecorderTest {
                   .reduce((a, b) -> a + "," + b)
                   .orElse(""))
           .append("],\"finishReason\":\"")
-          .append(recorded.get(i).finishReason())
+          .append(ExactBitsMetadata.escapeJson(recorded.get(i).finishReason()))
           .append("\"}");
     }
     Files.writeString(
@@ -496,9 +518,9 @@ class ExactBitsRecorderTest {
     return "{\"formatVersion\":"
         + FORMAT_VERSION
         + ",\"variant\":\""
-        + variant
+        + ExactBitsMetadata.escapeJson(variant)
         + "\",\"capture\":\""
-        + capture
+        + ExactBitsMetadata.escapeJson(capture)
         + "\",\"metadata\":"
         + meta.toJsonString()
         + ","
@@ -518,9 +540,9 @@ class ExactBitsRecorderTest {
       if (i > 0) {
         out.append(',');
       }
-      out.append("{\"name\":\"").append(variant.name).append('"');
+      out.append("{\"name\":\"").append(ExactBitsMetadata.escapeJson(variant.name)).append('"');
       out.append(",\"applicable\":").append(variant.applicable);
-      out.append(",\"reason\":\"").append(variant.reason).append('"');
+      out.append(",\"reason\":\"").append(ExactBitsMetadata.escapeJson(variant.reason)).append('"');
       out.append(",\"inputHashes\":").append(mapToJson(variant.inputHashes));
       out.append(",\"derivedHashes\":").append(mapToJson(variant.derivedHashes));
       out.append(",\"captures\":[");
@@ -529,7 +551,7 @@ class ExactBitsRecorderTest {
         if (j > 0) {
           out.append(',');
         }
-        out.append('"').append(captures.get(j)).append('"');
+        out.append('"').append(ExactBitsMetadata.escapeJson(captures.get(j))).append('"');
       }
       out.append("]}");
     }
@@ -592,7 +614,11 @@ class ExactBitsRecorderTest {
       if (i++ > 0) {
         out.append(',');
       }
-      out.append('"').append(entry.getKey()).append("\":\"").append(entry.getValue()).append('"');
+      out.append('"')
+          .append(ExactBitsMetadata.escapeJson(entry.getKey()))
+          .append("\":\"")
+          .append(ExactBitsMetadata.escapeJson(entry.getValue()))
+          .append('"');
     }
     return out.append('}').toString();
   }

@@ -50,17 +50,17 @@ final class ExactBitsMetadata {
     this.derivedHashes = Map.copyOf(new TreeMap<>(derivedHashes));
   }
 
-  /** Renders the metadata object in fixed key order (JSON-safe values only). */
+  /** Renders the metadata object in fixed key order, escaping every string value for JSON. */
   String toJsonString() {
     StringBuilder out = new StringBuilder("{");
-    out.append("\"gitCommit\":\"").append(gitCommit).append("\",");
-    out.append("\"mlxMetalVersion\":\"").append(mlxMetalVersion).append("\",");
-    out.append("\"mlxcCommit\":\"").append(mlxcCommit).append("\",");
-    out.append("\"device\":\"").append(device).append("\",");
-    out.append("\"osName\":\"").append(osName).append("\",");
-    out.append("\"osVersion\":\"").append(osVersion).append("\",");
-    out.append("\"mlxEnableTf32\":\"").append(mlxEnableTf32).append("\",");
-    out.append("\"specHash\":\"").append(specHash).append("\",");
+    out.append("\"gitCommit\":\"").append(escapeJson(gitCommit)).append("\",");
+    out.append("\"mlxMetalVersion\":\"").append(escapeJson(mlxMetalVersion)).append("\",");
+    out.append("\"mlxcCommit\":\"").append(escapeJson(mlxcCommit)).append("\",");
+    out.append("\"device\":\"").append(escapeJson(device)).append("\",");
+    out.append("\"osName\":\"").append(escapeJson(osName)).append("\",");
+    out.append("\"osVersion\":\"").append(escapeJson(osVersion)).append("\",");
+    out.append("\"mlxEnableTf32\":\"").append(escapeJson(mlxEnableTf32)).append("\",");
+    out.append("\"specHash\":\"").append(escapeJson(specHash)).append("\",");
     out.append("\"inputHashes\":").append(mapToJson(inputHashes)).append(',');
     out.append("\"derivedHashes\":").append(mapToJson(derivedHashes));
     out.append('}');
@@ -122,9 +122,44 @@ final class ExactBitsMetadata {
       if (i++ > 0) {
         out.append(',');
       }
-      out.append('"').append(entry.getKey()).append("\":\"").append(entry.getValue()).append('"');
+      out.append('"')
+          .append(escapeJson(entry.getKey()))
+          .append("\":\"")
+          .append(escapeJson(entry.getValue()))
+          .append('"');
     }
     return out.append('}').toString();
+  }
+
+  /**
+   * Escapes a value for interpolation into a hand-built JSON string literal: backslash and double
+   * quote get backslash escapes, tab/newline/carriage return/backspace/form feed use their standard
+   * short escapes, and every other C0 control character U+0000-U+001F is written as a
+   * backslash-{@code u} escape followed by four lowercase hex digits. A no-op for values without
+   * such characters, so re-serialization of the recorded safe values stays byte-identical.
+   */
+  static String escapeJson(String value) {
+    StringBuilder out = new StringBuilder(value.length());
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      switch (c) {
+        case '"' -> out.append("\\\"");
+        case '\\' -> out.append("\\\\");
+        case '\b' -> out.append("\\b");
+        case '\f' -> out.append("\\f");
+        case '\n' -> out.append("\\n");
+        case '\r' -> out.append("\\r");
+        case '\t' -> out.append("\\t");
+        default -> {
+          if (c < 0x20) {
+            out.append(String.format("\\u%04x", (int) c));
+          } else {
+            out.append(c);
+          }
+        }
+      }
+    }
+    return out.toString();
   }
 
   private static Map<String, String> strings(JsonNode node) {

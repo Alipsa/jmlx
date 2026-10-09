@@ -25,5 +25,17 @@
   always retains the unexpanded prompt IDs (as do `tokenIds()` and `GenerationAbortedException`
   partials), so `promptPositions >= promptTokenIds().size()`. The four- and five-argument
   compatibility constructors default `promptPositions` to the prompt ID count.
+- Factor the decoder stack's embedding lookup into an internal embedding-input helper plus a
+  package-private embedding-start stack entry that takes decoder-ready activations, the explicit
+  padded sequence width and the valid lengths. No public or protected API changed; the embedding
+  hook still fires at the identical post-lookup/pre-scale point and the refactor is verified
+  bit-exact in both TF32 precision modes against the pre-refactor recordings. The upcoming
+  SmolVLM work feeds merged text and image embeddings through this entry.
+- Add the opt-in `exactBitsRecord` / `exactBitsVerify` Gradle tasks: an exact-bit
+  recorder/comparator that captures raw float bits and exact greedy IDs for every Tier-A decoder
+  family (plus derived quantized variants) across direct forward, the lazy batched step (null and
+  non-null embedding hook), greedy generation and the batch scheduler, in both TF32 precision
+  modes. The recordings under `build/exact-bits` are PR evidence, never committed goldens and
+  never part of `check`.
 
 Versions are unchanged; implementation does not publish artifacts.

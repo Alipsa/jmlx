@@ -301,8 +301,13 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     }
   }
 
-  private MLXArray normalizedHiddenStatesBatch(
-      MLXArray tokenIds, List<KVCache> caches, int[] validLengths, EmbeddingHook hook) {
+  /**
+   * The embedding-input half of the decoder stack: the embedding lookup, the optional hook invoked
+   * at the identical post-lookup/pre-scale point, and the optional sqrt-hidden scale. Both the
+   * single-row and the batched stack call it, so the hook and the scale are written once, in one
+   * order.
+   */
+  private MLXArray decoderEmbeddings(MLXArray tokenIds, EmbeddingHook hook) {
     MLXArray x = embedding.forward(tokenIds);
     if (hook != null) {
       x = hook.apply(x);
@@ -312,6 +317,23 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
           MLX.array(x.scope(), new float[] {(float) Math.sqrt(config.hiddenSize())}, new int[] {1});
       x = MLXOps.multiply(x, MLX.astype(scale, x.dtype()));
     }
+    return x;
+  }
+
+  /**
+   * The internal embedding-start entry of the batched decoder stack: the left-padded attention
+   * mask, the RoPE step frequencies, every block and the final normalization, run over
+   * already-embedded activations. It takes the explicit padded sequence width and valid lengths
+   * that the token-ID entry derived, preserves the graph operation order, dtypes and
+   * lazy-evaluation boundaries of the stack it was factored from, and it neither evaluates nor
+   * poisons: the caller keeps the preflight, postflight, evaluation and cache-poisoning
+   * responsibilities. The upcoming SmolVLM work (WP6, this package) feeds its merged text and image
+   * embeddings through this entry; production token-ID callers keep the identical stack via {@link
+   * #normalizedHiddenStatesBatch}.
+   */
+  final MLXArray decoderStack(
+      MLXArray embeddings, List<KVCache> caches, int[] validLengths, int sequenceWidth) {
+    MLXArray x = embeddings;
     KVCache first = caches.getFirst();
     int batch = validLengths.length;
     int[] queryStarts = new int[batch];
@@ -331,7 +353,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             queryStarts,
             keyStarts,
             validLengths,
-            tokenIds.shape()[1],
+            sequenceWidth,
             keyWidth,
             window == null ? 0 : window);
     MLXArray frequencies =
@@ -340,6 +362,12 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       x = layers.get(i).forward(x, caches.get(i), mask, frequencies, validLengths);
     }
     return norm.forward(x);
+  }
+
+  private MLXArray normalizedHiddenStatesBatch(
+      MLXArray tokenIds, List<KVCache> caches, int[] validLengths, EmbeddingHook hook) {
+    MLXArray x = decoderEmbeddings(tokenIds, hook);
+    return decoderStack(x, caches, validLengths, tokenIds.shape()[1]);
   }
 
   private int[] preflight(MLXArray tokenIds, List<KVCache> caches) {
@@ -436,12 +464,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     for (int i = 0; i < caches.size(); i++) {
       Objects.requireNonNull(caches.get(i), "cache " + i);
     }
-    MLXArray x = embedding.forward(tokenIds);
-    if (descriptor.embedding().scaleBySqrtHidden()) {
-      MLXArray scale =
-          MLX.array(x.scope(), new float[] {(float) Math.sqrt(config.hiddenSize())}, new int[] {1});
-      x = MLXOps.multiply(x, MLX.astype(scale, x.dtype()));
-    }
+    MLXArray x = decoderEmbeddings(tokenIds, null);
     Integer window = descriptor.attention().slidingWindow();
     int keyLength = caches.get(0).length() + tokenIds.shape()[1];
     MLXArray mask =

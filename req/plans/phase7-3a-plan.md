@@ -1,7 +1,8 @@
 # Phase 7.3a — Vision foundation and SmolVLM-256M
 
-- **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`), WP4
-  via PR #43 (pending merge as of 2026-10-08); WP5 is the next work package.
+- **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`),
+  WP4 via PR #43 (merge `d658309`), WP5 via PR #44 (pending merge as of 2026-10-09); WP6 is the
+  next work package.
 - **Parent:** `req/plans/phase7-plan.md` §7.3a, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Prerequisite:** 7.1 layer/oracle/inventory acceptance. 7.2 cross-attention and 7.0 are
@@ -393,6 +394,27 @@ sequence width/valid lengths and unchanged cache checks. Invoke EmbeddingHook at
 post-lookup/pre-scale point; scheduler Hooks and production token-ID callers retain their
 contracts. Preserve graph operation ordering, dtype and synchronization. No public forward-from-
 embeddings API is needed for this milestone.
+
+Delivered via PR #44 (branch `phase7-3a-wp5`, 2026-10-09) — this section's WP5 parts, the §9
+recorder and the refactor. The opt-in `:jmlx-models:exactBitsRecord` / `exactBitsVerify` tasks
+(new `exactBits` source set; compiled by `check` via `checkstyleExactBits`, never run by it)
+capture raw float bits and exact greedy IDs for `direct-prefill`, each golden decode step,
+2-row left-padded `stepLogits` batch prefill/decode steps (null and a deterministic non-null
+hook), direct greedy generation and an end-to-end gated two-request scheduler run, for all eight
+Tier-A decoder families plus the six derived 4-bit/group-32 quantized variants the README claims,
+in both TF32 modes. Recordings (14 variants × 9 captures per mode) live under
+`build/exact-bits/tf32-{1,0}/` with commit, native-pin, device, macOS, precision, spec and
+fixture-hash metadata; verify allows only the git commit to differ. The refactor splits
+`normalizedHiddenStatesBatch` into the private `decoderEmbeddings(tokenIds, hook)` (lookup, hook
+at the identical post-lookup/pre-scale point, sqrt-hidden scale) and the package-private `final
+decoderStack(embeddings, caches, validLengths, sequenceWidth)` (left-padded mask, RoPE, blocks,
+final norm; no evaluation, no poisoning, callers keep preflight/postflight); the single-row path
+reuses `decoderEmbeddings` and keeps its own sliding-window mask. No public or protected member
+was added and T5 was not touched (its §9 capture clause stays live for any later shared-generation
+extraction). Acceptance: `exactBitsVerify` bit-exact in both modes against the pre-refactor
+baseline recorded at `d658309` (a one-bit recording flip fails with the first divergent element
+named), and every existing scheduler test green, including `BatchStepEquivalenceTest` in both
+modes.
 
 Add `SmolVlmModel implements TextGenerationModel`, composing DecoderModel rather than extending
 it. Dispatch confirmed artifact model types before decoder-only ArchitectureMappings parsing.

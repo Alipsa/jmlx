@@ -31,6 +31,17 @@ sourceSets {
                 sourceSets.test.compileClasspath
         runtimeClasspath += output + compileClasspath + sourceSets.test.runtimeClasspath
     }
+    // Phase 7.3a WP5: the opt-in exact-bit recorder/comparator. Like tierB it sits outside
+    // main/test, on top of the test outputs so it can reuse package-private test helpers and
+    // drive package-private model steps (stepLogits). It is compiled by check (via
+    // checkstyleExactBits) so contributors always get it compiling, but never run except by the
+    // opt-in exactBits* tasks below.
+    exactBits {
+        java.srcDir 'src/exactBits/java'
+        compileClasspath += sourceSets.main.output + sourceSets.test.output +
+                sourceSets.test.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.test.runtimeClasspath
+    }
 }
 
 dependencies {
@@ -45,6 +56,8 @@ dependencies {
     testImplementation testFixtures(project(':jmlx-ffi'))
     tierBImplementation sourceSets.test.output
     tierBImplementation testFixtures(project(':jmlx-ffi'))
+    exactBitsImplementation sourceSets.test.output
+    exactBitsImplementation testFixtures(project(':jmlx-ffi'))
 }
 
 tasks.register('tierBTest', Test) {
@@ -172,6 +185,68 @@ tasks.register('float32GoldenTest', Test) {
     // MLX supports one active thread per process. Run the two precision tasks sequentially
     // to avoid GPU contention, while allowing this task to be invoked independently.
     mustRunAfter tasks.named('test')
+}
+
+// Phase 7.3a WP5: opt-in exact-bit recorder/comparator for the decoder-embedding refactor
+// (req/plans/phase7-3a-plan.md section 9). Each task forks its own JVM with an explicit
+// MLX_ENABLE_TF32, mirroring the test/float32GoldenTest split (1 = default reduced precision,
+// 0 = full float32). Recordings are PR evidence under build/exact-bits (never committed); the
+// tasks write and read files outside their declared outputs, so they never track state.
+// Deliberately NOT part of check or build: they are baseline evidence, run manually before
+// (record) and after (verify) the refactor.
+def exactBitsBaseDir = layout.buildDirectory.get().dir('exact-bits').asFile.absolutePath
+def configureExactBitsTest = { Test task, String tf32, String mode, String purpose ->
+    task.group = 'verification'
+    task.description = "Opt-in exact-bit recorder/comparator, ${purpose}, MLX_ENABLE_TF32=${tf32} " +
+            "(1 = default reduced precision, 0 = full float32). Recordings live under " +
+            "build/exact-bits/tf32-${tf32}/; never part of check."
+    task.doNotTrackState('opt-in exact-bit tool; recordings are PR evidence files, not build outputs')
+    task.testClassesDirs = sourceSets.exactBits.output.classesDirs
+    task.classpath = sourceSets.exactBits.runtimeClasspath
+    task.useJUnitPlatform()
+    task.environment 'MLX_ENABLE_TF32', tf32
+    task.inputs.property('mlxEnableTf32', tf32)
+    task.systemProperty 'jmlx.exact.bits.mode', mode
+    task.systemProperty 'jmlx.exact.bits.dir', exactBitsBaseDir
+    task.mustRunAfter tasks.named('test'), tasks.named('float32GoldenTest')
+}
+
+tasks.register('exactBitsRecordTf32On', Test) {
+    configureExactBitsTest(delegate, '1', 'record', 'records the baseline')
+}
+
+tasks.register('exactBitsRecordTf32Off', Test) {
+    configureExactBitsTest(delegate, '0', 'record', 'records the baseline')
+    mustRunAfter 'exactBitsRecordTf32On'
+}
+
+tasks.register('exactBitsVerifyTf32On', Test) {
+    configureExactBitsTest(delegate, '1', 'verify', 'verifies against the recorded baseline')
+}
+
+tasks.register('exactBitsVerifyTf32Off', Test) {
+    configureExactBitsTest(delegate, '0', 'verify', 'verifies against the recorded baseline')
+    mustRunAfter 'exactBitsVerifyTf32On'
+}
+
+// Sequential per mode pair: MLX allows one active thread per process, and the two precision
+// modes must not contend for the GPU mid-recording.
+tasks.register('exactBitsRecord') {
+    group = 'verification'
+    description = 'Opt-in: records exact float bits and greedy IDs for every Tier-A decoder family ' +
+            'and quantized variant in both TF32 modes (build/exact-bits/tf32-1 and tf32-0). ' +
+            'Never part of check; run before the refactor it guards.'
+    doNotTrackState('lifecycle task over the two opt-in record tasks')
+    dependsOn 'exactBitsRecordTf32On', 'exactBitsRecordTf32Off'
+}
+
+tasks.register('exactBitsVerify') {
+    group = 'verification'
+    description = 'Opt-in: recomputes the exact-bit captures in both TF32 modes and requires ' +
+            'bit-exact agreement with build/exact-bits (metadata may differ only in git commit). ' +
+            'Never part of check; run after the refactor it guards.'
+    doNotTrackState('lifecycle task over the two opt-in verify tasks')
+    dependsOn 'exactBitsVerifyTf32On', 'exactBitsVerifyTf32Off'
 }
 
 tasks.register('threadProbeTest', Test) {

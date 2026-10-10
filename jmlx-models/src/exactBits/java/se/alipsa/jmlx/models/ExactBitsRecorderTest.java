@@ -1,0 +1,836 @@
+package se.alipsa.jmlx.models;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.TreeMap;
+import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.ffi.mlx_h;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * Opt-in exact-bit recorder/comparator for the WP5 decoder-embedding refactor.
+ *
+ * <p>Driven by {@code jmlx.exact.bits.mode} ({@code record} | {@code verify}) and the {@code
+ * MLX_ENABLE_TF32} environment (1 = default reduced precision, 0 = full float32); the four {@code
+ * exactBits{Record,Verify}Tf32{On,Off}} tasks set both and fork their own JVMs. Deliberately NOT
+ * {@code @EnabledIfNativeAvailable}: as an opt-in baseline tool it fails loudly when the native
+ * runtime is absent instead of silently skipping. Recordings are PR evidence under {@code
+ * build/exact-bits}, never committed goldens:
+ *
+ * <ul>
+ *   <li>{@code tf32-<0|1>/<variant>/<capture>.json} -- one file per capture. Float captures carry
+ *       {@code values}, the Base64 of the big-endian IEEE-754 bits of every float32 in row-major
+ *       order ({@code Float.floatToIntBits}); the greedy capture carries {@code generatedTokenIds};
+ *       the scheduler capture carries per-row {@code tokenIds} and {@code finishReason}.
+ *   <li>{@code tf32-<0|1>/derived/<family>-q4/} -- the quantized checkpoints derived at record
+ *       time; verify mode re-derives into a separate {@code tf32-<0|1>/derived-verify/} directory
+ *       (same layout) so the recorded tree is never overwritten.
+ *   <li>{@code tf32-<0|1>/manifest.json} -- host metadata (including the provenance-only,
+ *       never-compared {@code gitDirty} tree-dirtiness flag and {@code decoderModelSha256} source
+ *       hash), plus every variant's applicability, input SHA-256 hashes, derived quantized
+ *       checkpoint SHA-256 hashes and capture list.
+ * </ul>
+ *
+ * <p>Verify mode checks the recorded manifest cheaply first -- existence, format version, globally
+ * comparable metadata (every field except the git commit and the provenance-only
+ * gitDirty/decoderModelSha256) and the variant set -- so an absent or non-comparable recording
+ * fails fast before any capture runs. Only then does it recompute everything and require bit-exact
+ * agreement of every float and ID, and metadata equality in every field except the git commit (the
+ * comparison crosses the refactor's own commits) and the two provenance-only fields (absent from
+ * recordings made before they existed); anything else that differs means the recordings are not
+ * comparable on this host.
+ *
+ * <p>Record mode refuses to overwrite an existing {@code tf32-<0|1>} recording (its {@code
+ * manifest.json} already present): a baseline is evidence, and silently replacing it with a
+ * recording from a later commit would invalidate the very comparison it feeds. An intentional
+ * re-record moves or deletes the directory first. It likewise refuses to record a baseline in which
+ * any variant failed to load, listing each not-applicable variant with its reason: a load failure
+ * would otherwise be baked into the baseline as a hole that verify could never see, proving
+ * bit-exactness for the surviving variants only while looking like it does so for all of them.
+ */
+class ExactBitsRecorderTest {
+
+  static final int FORMAT_VERSION = 1;
+
+  @Test
+  void recordOrVerify() throws Exception {
+    checkJsonEscaping();
+    String mode = System.getProperty("jmlx.exact.bits.mode", "");
+    if (!mode.equals("record") && !mode.equals("verify")) {
+      throw new AssertionError(
+          "jmlx.exact.bits.mode must be 'record' or 'verify'; run one of the "
+              + "exactBitsRecord/exactBitsVerify Gradle tasks, not this test directly");
+    }
+    String tf32 = System.getenv("MLX_ENABLE_TF32");
+    if (!"0".equals(tf32) && !"1".equals(tf32)) {
+      throw new AssertionError("MLX_ENABLE_TF32 must be set to 0 or 1 by the Gradle task");
+    }
+    Path repoRoot = Path.of(System.getProperty("jmlx.repository.root", "."));
+    requireNativeRuntime(repoRoot);
+    Path modeDir =
+        Path.of(System.getProperty("jmlx.exact.bits.dir", "build/exact-bits"))
+            .resolve("tf32-" + tf32);
+    Path goldens = repoRoot.resolve("tools/hf-reference/goldens");
+    // Verify re-derives into a separate directory so the recorded derived/ tree (the baseline
+    // being checked against) is never overwritten: if a re-derivation ever differs, the recorded
+    // files remain intact for diffing.
+    Path deriveBase =
+        mode.equals("record") ? modeDir.resolve("derived") : modeDir.resolve("derived-verify");
+    ExactBitsMetadata global = metadata(repoRoot);
+    // Verify mode fails fast on an absent or non-comparable recording before captureAll's 14
+    // variants x 9 GPU captures (plus quantized re-derivation) are spent: the manifest's
+    // existence, format version, global metadata and variant set are all cheap to check.
+    // Record mode never silently replaces an existing baseline: fail before captureAll's GPU
+    // captures and before any file is written, naming the existing recording's commit.
+    if (mode.equals("record")) {
+      refuseOverwrite(modeDir);
+    }
+    JsonNode manifest = mode.equals("verify") ? verifyPreCapture(global, modeDir) : null;
+    List<ExactBitsCapture.Variant> variants = captureAll(goldens, deriveBase);
+    if (mode.equals("record")) {
+      record(global, variants, modeDir);
+    } else {
+      verifyPostCapture(global, manifest, variants, modeDir);
+    }
+    if (mode.equals("verify")) {
+      // The recorded commit at a glance: whether the on-disk baseline is the pre-refactor one or
+      // a later re-record shows here immediately.
+      System.out.println(
+          "exact-bits verify tf32="
+              + tf32
+              + " (recorded at "
+              + manifest.path("metadata").path("gitCommit").asString()
+              + "): "
+              + summary(variants));
+    } else {
+      System.out.println("exact-bits record tf32=" + tf32 + ": " + summary(variants));
+    }
+  }
+
+  /**
+   * Proves the hand-built JSON escaper round-trips a value containing quotes, backslashes and
+   * control characters through Jackson, so a broken escaper fails the run before it can write an
+   * invalid recording or make an invalid one unreadable.
+   */
+  private static void checkJsonEscaping() {
+    String nasty = "quote \" backslash \\ newline \n tab \t control " + (char) 1;
+    String snippet = "{\"reason\":\"" + ExactBitsMetadata.escapeJson(nasty) + "\"}";
+    JsonNode node;
+    try {
+      node = new ObjectMapper().readTree(snippet);
+    } catch (JacksonException e) {
+      throw new AssertionError("escaped hand-built JSON does not parse: " + snippet, e);
+    }
+    if (!nasty.equals(node.path("reason").asString())) {
+      throw new AssertionError("JSON escape round-trip changed the value: " + nasty);
+    }
+  }
+
+  /**
+   * Every family, then its quantized variant, in the spec's deterministic order. Quantized
+   * checkpoints are derived under {@code deriveBase} ({@code derived/} when recording, {@code
+   * derived-verify/} when verifying).
+   */
+  private static List<ExactBitsCapture.Variant> captureAll(Path goldens, Path deriveBase)
+      throws Exception {
+    List<ExactBitsCapture.Variant> variants = new ArrayList<>();
+    for (String family : ExactBitsSpec.FAMILIES) {
+      Path checkpoint = goldens.resolve("checkpoints").resolve(family);
+      Path goldenFile = goldens.resolve(family + ".json");
+      JsonNode golden = JsonFiles.read(goldenFile);
+      variants.add(ExactBitsCapture.capture(family, family, checkpoint, goldenFile, golden));
+      if (ExactBitsSpec.QUANTIZED_FAMILIES.contains(family)) {
+        Map<String, String> derived = new TreeMap<>();
+        Path derivedDir =
+            ExactBitsCapture.deriveQuantized(
+                checkpoint, deriveBase.resolve(family + "-q4"), derived);
+        ExactBitsCapture.Variant quantized =
+            ExactBitsCapture.capture(family + "-q4", family, derivedDir, goldenFile, golden);
+        quantized.derivedHashes.putAll(derived);
+        variants.add(quantized);
+      }
+    }
+    return variants;
+  }
+
+  /**
+   * The host/runtime metadata for one recording. Both native pin keys ({@code mlxMetalVersion} and
+   * {@code mlxcCommit}) are required in {@code native/install/lib/native-pin.properties}: a missing
+   * key fails here with the key and the file named, instead of resurfacing later as a bare
+   * NullPointerException from {@link ExactBitsMetadata#escapeJson}. Package-private so the
+   * candidate-metadata builder is exerciseable without the full record/verify run.
+   */
+  static ExactBitsMetadata metadata(Path repoRoot) throws Exception {
+    String commit = gitRevParse(repoRoot);
+    // Provenance only, never compared: which actual source state was recorded (a dirty tree
+    // means uncommitted work is part of it), and the SHA-256 of the DecoderModel source -- the
+    // very class the guarded refactor changes -- so the evidence says which decoder stack.
+    boolean dirty = gitStatusDirty(repoRoot);
+    String decoderModelSha256 =
+        ExactBitsSpec.sha256(
+            Files.readAllBytes(
+                repoRoot.resolve(
+                    "jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderModel.java")));
+    Path pinFile = repoRoot.resolve("native/install/lib/native-pin.properties");
+    Properties pins = new Properties();
+    try (InputStream in = Files.newInputStream(pinFile)) {
+      pins.load(in);
+    }
+    return new ExactBitsMetadata(
+        commit,
+        requirePin(pins, "mlxMetalVersion", pinFile),
+        requirePin(pins, "mlxcCommit", pinFile),
+        deviceName(),
+        System.getProperty("os.name"),
+        System.getProperty("os.version"),
+        System.getenv("MLX_ENABLE_TF32"),
+        ExactBitsSpec.sha256(),
+        Map.of(),
+        Map.of(),
+        dirty,
+        decoderModelSha256);
+  }
+
+  /**
+   * Reads a required native pin property, naming the missing key and the properties file in an
+   * {@link AssertionError} (matching this file's environment-failure style) instead of letting a
+   * null resurface later as a bare NullPointerException from {@link ExactBitsMetadata#escapeJson}.
+   */
+  private static String requirePin(Properties pins, String key, Path pinFile) {
+    String value = pins.getProperty(key);
+    if (value == null) {
+      throw new AssertionError(
+          "native pin property '"
+              + key
+              + "' is missing from "
+              + pinFile
+              + " -- run ./scripts/bootstrap-native.sh");
+    }
+    return value;
+  }
+
+  /** Fails (rather than skips) with the actionable bootstrap step when the runtime is absent. */
+  private static void requireNativeRuntime(Path repoRoot) {
+    String libDir = System.getProperty("jmlx.library.path", "");
+    Path metallib =
+        libDir.isBlank()
+            ? repoRoot.resolve("native/install/lib/mlx.metallib")
+            : Path.of(libDir).resolve("mlx.metallib");
+    if (!Files.isRegularFile(metallib)) {
+      throw new AssertionError(
+          "exact-bits recording needs the staged native runtime, but "
+              + metallib
+              + " is missing -- run ./scripts/bootstrap-native.sh first");
+    }
+  }
+
+  /** The MLX default device as a stable string: the same query MLXGpuVerificationTest asserts. */
+  private static String deviceName() {
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment typeOut = tmp.allocate(ValueLayout.JAVA_INT);
+      int status = mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice());
+      if (status != 0) {
+        throw new AssertionError("mlx_device_get_type failed with status " + status);
+      }
+      int type = typeOut.get(ValueLayout.JAVA_INT, 0);
+      return type == 1 ? "gpu" : type == 0 ? "cpu" : "unknown(" + type + ")";
+    }
+  }
+
+  private static String gitRevParse(Path repoRoot) throws Exception {
+    Process process =
+        new ProcessBuilder("git", "rev-parse", "HEAD")
+            .directory(repoRoot.toFile())
+            .redirectErrorStream(true)
+            .start();
+    String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+    if (process.waitFor() != 0) {
+      throw new AssertionError("git rev-parse HEAD failed in " + repoRoot + ": " + out);
+    }
+    return out;
+  }
+
+  /**
+   * Whether the tree at {@code repoRoot} is dirty: {@code git status --porcelain} prints anything
+   * at all (even a blank line). Provenance only, never compared.
+   */
+  private static boolean gitStatusDirty(Path repoRoot) throws Exception {
+    Process process =
+        new ProcessBuilder("git", "status", "--porcelain")
+            .directory(repoRoot.toFile())
+            .redirectErrorStream(true)
+            .start();
+    String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    if (process.waitFor() != 0) {
+      throw new AssertionError("git status --porcelain failed in " + repoRoot + ": " + out);
+    }
+    return !out.isEmpty();
+  }
+
+  private static void record(
+      ExactBitsMetadata global, List<ExactBitsCapture.Variant> variants, Path modeDir)
+      throws IOException {
+    requireAllVariantsApplicable(variants);
+    Files.createDirectories(modeDir);
+    for (ExactBitsCapture.Variant variant : variants) {
+      Path dir = Files.createDirectories(modeDir.resolve(variant.name));
+      int floats = 0;
+      for (Map.Entry<String, float[]> capture : variant.floatCaptures.entrySet()) {
+        floatBits(global, dir, variant, capture.getKey(), capture.getValue());
+        floats += capture.getValue().length;
+      }
+      writeGreedy(global, dir, variant);
+      writeScheduler(global, dir, variant);
+      System.out.println(
+          "recorded "
+              + variant.name
+              + ": "
+              + captureCount(variant)
+              + " captures, "
+              + floats
+              + " floats");
+    }
+    writeManifest(global, variants, modeDir);
+  }
+
+  /**
+   * The record-mode counterpart of the per-variant tolerance in {@link #verifyPostCapture}: verify
+   * may keep a variant not-applicable (a recorded hole stays a hole), but record must never write a
+   * baseline containing one -- a variant that failed to load (a broken fixture or a broken loader)
+   * would be baked in as {@code applicable: false}, and every later verify would then prove
+   * bit-exactness for the surviving variants only while looking like it does so for all of them.
+   * Collects every not-applicable variant with its reason and fails before any directory is created
+   * or file written, so the load failure is a loud, fix-it-now failure at record time instead of a
+   * silent baseline hole.
+   */
+  private static void requireAllVariantsApplicable(List<ExactBitsCapture.Variant> variants) {
+    List<String> notApplicable = new ArrayList<>();
+    for (ExactBitsCapture.Variant variant : variants) {
+      if (!variant.applicable) {
+        notApplicable.add(variant.name + " (" + variant.reason + ")");
+      }
+    }
+    if (!notApplicable.isEmpty()) {
+      throw new AssertionError(
+          "refusing to record an exact-bit baseline with not-applicable variants "
+              + notApplicable
+              + " -- a load failure would be baked into the baseline as a hole that verify "
+              + "could never detect; fix the fixture or loader and record again");
+    }
+  }
+
+  /**
+   * The cheap half of verification, run before {@link #captureAll}: the recording must exist, use
+   * the supported format version, carry globally comparable metadata (every field except the git
+   * commit, which is allowed to differ across the refactor's own commits, and the provenance-only
+   * gitDirty/decoderModelSha256, which are recorded but never compared), and name exactly the
+   * candidate variants. An absent or non-comparable recording therefore fails fast, before any
+   * capture is spent; the comparison messages are shared with the per-capture checks below. Returns
+   * the parsed manifest for {@link #verifyPostCapture}. Package-private so the fast-fail contract
+   * is exerciseable without the full capture run.
+   */
+  static JsonNode verifyPreCapture(ExactBitsMetadata global, Path modeDir) throws IOException {
+    Path manifestPath = modeDir.resolve("manifest.json");
+    if (!Files.isRegularFile(manifestPath)) {
+      throw new AssertionError(
+          "no exact-bit recordings under "
+              + modeDir
+              + " -- record first: ./gradlew :jmlx-models:exactBitsRecord");
+    }
+    JsonNode manifest = JsonFiles.read(manifestPath);
+    if (manifest.path("formatVersion").asInt() != FORMAT_VERSION) {
+      throw new AssertionError(
+          "unsupported recording format version " + manifest.path("formatVersion").asInt());
+    }
+    List<String> mismatches =
+        global.mismatches(ExactBitsMetadata.fromJson(manifest.path("metadata")), false);
+    if (!mismatches.isEmpty()) {
+      throw new AssertionError(notComparable(mismatches));
+    }
+    List<String> recordedNames = new ArrayList<>();
+    for (JsonNode node : manifest.path("variants")) {
+      recordedNames.add(node.path("name").asString());
+    }
+    List<String> candidateNames = candidateVariantNames();
+    if (!candidateNames.equals(recordedNames)) {
+      throw new AssertionError(
+          "variant set differs from the recording: recorded "
+              + recordedNames
+              + ", candidate "
+              + candidateNames
+              + " -- re-record after recording the spec at the base commit");
+    }
+    return manifest;
+  }
+
+  /**
+   * The record-mode counterpart of {@link #verifyPreCapture}: a recording is refused, not replaced,
+   * when its {@code manifest.json} already exists. A baseline is PR evidence, and a silent
+   * replacement (e.g. by re-recording at a later commit) invalidates the comparison without anyone
+   * noticing -- exactly the accident this guard exists to stop. Fails before any capture runs and
+   * before any file is written; an intentional re-record moves or deletes the tf32-<mode> directory
+   * first.
+   */
+  private static void refuseOverwrite(Path modeDir) throws IOException {
+    Path manifestPath = modeDir.resolve("manifest.json");
+    if (!Files.isRegularFile(manifestPath)) {
+      return;
+    }
+    JsonNode manifest = JsonFiles.read(manifestPath);
+    throw new AssertionError(
+        "refusing to overwrite the existing exact-bit recording under "
+            + modeDir
+            + " (recorded at git commit "
+            + manifest.path("metadata").path("gitCommit").asString()
+            + ") -- a baseline is never silently replaced; to re-record, move or delete "
+            + modeDir
+            + " first");
+  }
+
+  /**
+   * The expensive half of verification, run after {@link #verifyPreCapture} passed and {@link
+   * #captureAll} finished: every variant's applicability, derived quantized checkpoint hashes and
+   * capture set must match the recording, and every capture must agree bit-for-bit.
+   */
+  private static void verifyPostCapture(
+      ExactBitsMetadata global,
+      JsonNode manifest,
+      List<ExactBitsCapture.Variant> variants,
+      Path modeDir)
+      throws IOException {
+    List<String> captured = variants.stream().map(v -> v.name).toList();
+    if (!captured.equals(candidateVariantNames())) {
+      throw new AssertionError("captureAll order diverged from candidateVariantNames: " + captured);
+    }
+    Map<String, JsonNode> recordedVariants = new LinkedHashMap<>();
+    for (JsonNode node : manifest.path("variants")) {
+      recordedVariants.put(node.path("name").asString(), node);
+    }
+    for (ExactBitsCapture.Variant variant : variants) {
+      JsonNode recordedVariant = recordedVariants.get(variant.name);
+      if (variant.applicable != recordedVariant.path("applicable").asBoolean(true)) {
+        throw new AssertionError(
+            variant.name
+                + " applicability differs: recorded "
+                + recordedVariant.path("applicable").asBoolean(true)
+                + " (reason: "
+                + recordedVariant.path("reason").asString()
+                + "), candidate "
+                + variant.applicable
+                + " (reason: "
+                + variant.reason
+                + ")");
+      }
+      if (!variant.applicable) {
+        continue;
+      }
+      if (!variant.derivedHashes.equals(mapOf(recordedVariant.path("derivedHashes")))) {
+        throw new AssertionError(
+            "quantized checkpoint derivation for "
+                + variant.name
+                + " is not reproducible: recorded "
+                + mapOf(recordedVariant.path("derivedHashes"))
+                + ", candidate "
+                + variant.derivedHashes);
+      }
+      List<String> recordedCaptures = stringList(recordedVariant.path("captures"));
+      List<String> candidateCaptures = captureNames(variant);
+      if (!candidateCaptures.equals(recordedCaptures)) {
+        throw new AssertionError(
+            variant.name
+                + " capture set differs: recorded "
+                + recordedCaptures
+                + ", candidate "
+                + candidateCaptures);
+      }
+      for (String capture : recordedCaptures) {
+        verifyCapture(global, variant, capture, modeDir);
+      }
+    }
+    System.out.println(
+        "verified " + variants.size() + " variants against " + modeDir.resolve("manifest.json"));
+  }
+
+  /**
+   * The candidate variant names in the deterministic order {@link #captureAll} produces: every
+   * family then its quantized variant. Derived from the spec alone, so {@link #verifyPreCapture}
+   * can check the recorded variant set before any capture has run, and {@link #verifyPostCapture}
+   * can check the variants actually captured stayed in this order (the name lookups below would
+   * otherwise die with a bare NullPointerException if the two loops ever drift apart).
+   */
+  private static List<String> candidateVariantNames() {
+    List<String> names = new ArrayList<>();
+    for (String family : ExactBitsSpec.FAMILIES) {
+      names.add(family);
+      if (ExactBitsSpec.QUANTIZED_FAMILIES.contains(family)) {
+        names.add(family + "-q4");
+      }
+    }
+    return names;
+  }
+
+  private static void verifyCapture(
+      ExactBitsMetadata global, ExactBitsCapture.Variant variant, String capture, Path modeDir)
+      throws IOException {
+    Path file = modeDir.resolve(variant.name).resolve(capture + ".json");
+    if (!Files.isRegularFile(file)) {
+      throw new AssertionError("missing recording " + file + " -- record first");
+    }
+    JsonNode node = JsonFiles.read(file);
+    List<String> mismatches =
+        metadataFor(global, variant)
+            .mismatches(ExactBitsMetadata.fromJson(node.path("metadata")), true);
+    if (!mismatches.isEmpty()) {
+      throw new AssertionError(
+          notComparable(mismatches) + " [" + variant.name + " / " + capture + "]");
+    }
+    if (variant.floatCaptures.containsKey(capture)) {
+      float[] actual = variant.floatCaptures.get(capture);
+      int[] expected = floatBits(node.path("values").asString());
+      int[] actualBits = new int[actual.length];
+      for (int i = 0; i < actual.length; i++) {
+        actualBits[i] = Float.floatToIntBits(actual[i]);
+      }
+      if (expected.length != actualBits.length) {
+        throw new AssertionError(
+            mismatch(
+                variant.name,
+                capture,
+                0,
+                "lengths differ: recorded "
+                    + expected.length
+                    + " floats, candidate "
+                    + actual.length));
+      }
+      for (int i = 0; i < expected.length; i++) {
+        if (expected[i] != actualBits[i]) {
+          throw new AssertionError(
+              mismatch(
+                  variant.name,
+                  capture,
+                  i,
+                  "expected bits 0x"
+                      + Integer.toHexString(expected[i])
+                      + " ("
+                      + Float.intBitsToFloat(expected[i])
+                      + "), actual bits 0x"
+                      + Integer.toHexString(actualBits[i])
+                      + " ("
+                      + Float.intBitsToFloat(actualBits[i])
+                      + ")"));
+        }
+      }
+      return;
+    }
+    if ("greedy".equals(capture)) {
+      List<Integer> expected = ints(node.path("generatedTokenIds"));
+      compareIds(variant.name, capture, expected, variant.greedyIds);
+      return;
+    }
+    if ("scheduler".equals(capture)) {
+      List<JsonNode> recordedRows = new ArrayList<>();
+      for (JsonNode row : node.path("rows")) {
+        recordedRows.add(row);
+      }
+      List<ExactBitsCapture.SchedulerRow> actual = variant.schedulerRows;
+      if (recordedRows.size() != actual.size()) {
+        throw new AssertionError(
+            mismatch(
+                variant.name,
+                capture,
+                0,
+                "row count differs: recorded "
+                    + recordedRows.size()
+                    + ", candidate "
+                    + actual.size()));
+      }
+      for (int row = 0; row < recordedRows.size(); row++) {
+        compareIds(
+            variant.name,
+            capture + " row " + row,
+            ints(recordedRows.get(row).path("tokenIds")),
+            actual.get(row).tokenIds());
+        String reason = recordedRows.get(row).path("finishReason").asString();
+        if (!reason.equals(actual.get(row).finishReason())) {
+          throw new AssertionError(
+              mismatch(
+                  variant.name,
+                  capture + " row " + row,
+                  0,
+                  "finishReason recorded "
+                      + reason
+                      + ", candidate "
+                      + actual.get(row).finishReason()));
+        }
+      }
+      return;
+    }
+    throw new AssertionError("unknown capture " + capture + " for " + variant.name);
+  }
+
+  private static String notComparable(List<String> fields) {
+    return "recordings are not comparable on this host; re-record: metadata mismatch in " + fields;
+  }
+
+  private static String mismatch(String variant, String capture, int index, String detail) {
+    return "exact-bit mismatch ["
+        + variant
+        + " / "
+        + capture
+        + "]: first divergent element "
+        + index
+        + "; "
+        + detail;
+  }
+
+  private static void compareIds(
+      String variant, String capture, List<Integer> expected, List<Integer> actual) {
+    if (expected.size() != actual.size()) {
+      throw new AssertionError(
+          mismatch(
+              variant,
+              capture,
+              0,
+              "ID list length recorded " + expected.size() + ", candidate " + actual.size()));
+    }
+    for (int i = 0; i < expected.size(); i++) {
+      if (!expected.get(i).equals(actual.get(i))) {
+        throw new AssertionError(
+            mismatch(
+                variant,
+                capture,
+                i,
+                "expected ID " + expected.get(i) + ", actual ID " + actual.get(i)));
+      }
+    }
+  }
+
+  private static void writeGreedy(
+      ExactBitsMetadata global, Path dir, ExactBitsCapture.Variant variant) throws IOException {
+    StringBuilder ids = new StringBuilder("[");
+    List<Integer> generated = variant.greedyIds;
+    for (int i = 0; i < generated.size(); i++) {
+      if (i > 0) {
+        ids.append(',');
+      }
+      ids.append(generated.get(i));
+    }
+    Files.writeString(
+        dir.resolve("greedy.json"),
+        captureJson(
+            variant.name,
+            "greedy",
+            metadataFor(global, variant),
+            "\"generatedTokenIds\":" + ids + ']'));
+  }
+
+  private static void writeScheduler(
+      ExactBitsMetadata global, Path dir, ExactBitsCapture.Variant variant) throws IOException {
+    StringBuilder rows = new StringBuilder("[");
+    List<ExactBitsCapture.SchedulerRow> recorded = variant.schedulerRows;
+    for (int i = 0; i < recorded.size(); i++) {
+      if (i > 0) {
+        rows.append(',');
+      }
+      rows.append("{\"tokenIds\":[")
+          .append(
+              recorded.get(i).tokenIds().stream()
+                  .map(Object::toString)
+                  .reduce((a, b) -> a + "," + b)
+                  .orElse(""))
+          .append("],\"finishReason\":\"")
+          .append(ExactBitsMetadata.escapeJson(recorded.get(i).finishReason()))
+          .append("\"}");
+    }
+    Files.writeString(
+        dir.resolve("scheduler.json"),
+        captureJson(
+            variant.name, "scheduler", metadataFor(global, variant), "\"rows\":" + rows + ']'));
+  }
+
+  private static void floatBits(
+      ExactBitsMetadata global,
+      Path dir,
+      ExactBitsCapture.Variant variant,
+      String capture,
+      float[] values)
+      throws IOException {
+    ByteBuffer buffer = ByteBuffer.allocate(4 * values.length);
+    for (float value : values) {
+      buffer.putFloat(value);
+    }
+    Files.writeString(
+        dir.resolve(capture + ".json"),
+        captureJson(
+            variant.name,
+            capture,
+            metadataFor(global, variant),
+            "\"values\":\"" + Base64.getEncoder().encodeToString(buffer.array()) + '"'));
+  }
+
+  /** Decodes a recorded {@code values} string into the raw bits of each float, in order. */
+  private static int[] floatBits(String encoded) {
+    byte[] bytes = Base64.getDecoder().decode(encoded);
+    if (bytes.length % 4 != 0) {
+      throw new AssertionError("recorded values are not a multiple of 4 bytes: " + bytes.length);
+    }
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    int[] bits = new int[bytes.length / 4];
+    for (int i = 0; i < bits.length; i++) {
+      bits[i] = buffer.getInt();
+    }
+    return bits;
+  }
+
+  private static String captureJson(
+      String variant, String capture, ExactBitsMetadata meta, String payload) {
+    return "{\"formatVersion\":"
+        + FORMAT_VERSION
+        + ",\"variant\":\""
+        + ExactBitsMetadata.escapeJson(variant)
+        + "\",\"capture\":\""
+        + ExactBitsMetadata.escapeJson(capture)
+        + "\",\"metadata\":"
+        + meta.toJsonString()
+        + ","
+        + payload
+        + "}\n";
+  }
+
+  private static void writeManifest(
+      ExactBitsMetadata global, List<ExactBitsCapture.Variant> variants, Path modeDir)
+      throws IOException {
+    StringBuilder out = new StringBuilder();
+    out.append("{\"formatVersion\":").append(FORMAT_VERSION).append(',');
+    out.append("\"metadata\":").append(global.toJsonString()).append(',');
+    out.append("\"variants\":[");
+    for (int i = 0; i < variants.size(); i++) {
+      ExactBitsCapture.Variant variant = variants.get(i);
+      if (i > 0) {
+        out.append(',');
+      }
+      out.append("{\"name\":\"").append(ExactBitsMetadata.escapeJson(variant.name)).append('"');
+      out.append(",\"applicable\":").append(variant.applicable);
+      out.append(",\"reason\":\"").append(ExactBitsMetadata.escapeJson(variant.reason)).append('"');
+      out.append(",\"inputHashes\":").append(mapToJson(variant.inputHashes));
+      out.append(",\"derivedHashes\":").append(mapToJson(variant.derivedHashes));
+      out.append(",\"captures\":[");
+      List<String> captures = captureNames(variant);
+      for (int j = 0; j < captures.size(); j++) {
+        if (j > 0) {
+          out.append(',');
+        }
+        out.append('"').append(ExactBitsMetadata.escapeJson(captures.get(j))).append('"');
+      }
+      out.append("]}");
+    }
+    out.append("]}\n");
+    Files.writeString(modeDir.resolve("manifest.json"), out.toString());
+  }
+
+  private static ExactBitsMetadata metadataFor(
+      ExactBitsMetadata global, ExactBitsCapture.Variant variant) {
+    return new ExactBitsMetadata(
+        global.gitCommit,
+        global.mlxMetalVersion,
+        global.mlxcCommit,
+        global.device,
+        global.osName,
+        global.osVersion,
+        global.mlxEnableTf32,
+        global.specHash,
+        variant.inputHashes,
+        variant.derivedHashes,
+        global.gitDirty,
+        global.decoderModelSha256);
+  }
+
+  /** Capture names in the recorded order: float captures, then greedy, then scheduler. */
+  private static List<String> captureNames(ExactBitsCapture.Variant variant) {
+    List<String> out = new ArrayList<>(variant.floatCaptures.keySet());
+    if (variant.applicable) {
+      out.add("greedy");
+      out.add("scheduler");
+    }
+    return out;
+  }
+
+  private static int captureCount(ExactBitsCapture.Variant variant) {
+    return variant.floatCaptures.size() + 2;
+  }
+
+  private static String summary(List<ExactBitsCapture.Variant> variants) {
+    int applicable = 0;
+    int captures = 0;
+    List<String> notApplicable = new ArrayList<>();
+    for (ExactBitsCapture.Variant variant : variants) {
+      if (variant.applicable) {
+        applicable++;
+        captures += captureCount(variant);
+      } else {
+        notApplicable.add(variant.name);
+      }
+    }
+    return applicable
+        + " applicable variants, "
+        + captures
+        + " captures"
+        + (notApplicable.isEmpty() ? "" : ", not applicable: " + notApplicable);
+  }
+
+  private static String mapToJson(Map<String, String> map) {
+    StringBuilder out = new StringBuilder("{");
+    int i = 0;
+    for (Map.Entry<String, String> entry : map.entrySet()) {
+      if (i++ > 0) {
+        out.append(',');
+      }
+      out.append('"')
+          .append(ExactBitsMetadata.escapeJson(entry.getKey()))
+          .append("\":\"")
+          .append(ExactBitsMetadata.escapeJson(entry.getValue()))
+          .append('"');
+    }
+    return out.append('}').toString();
+  }
+
+  private static Map<String, String> mapOf(JsonNode node) {
+    Map<String, String> out = new TreeMap<>();
+    if (node.isObject()) {
+      node.properties().forEach(e -> out.put(e.getKey(), e.getValue().asString()));
+    }
+    return out;
+  }
+
+  private static List<String> stringList(JsonNode node) {
+    List<String> out = new ArrayList<>();
+    for (JsonNode child : node) {
+      out.add(child.asString());
+    }
+    return out;
+  }
+
+  private static List<Integer> ints(JsonNode node) {
+    List<Integer> out = new ArrayList<>();
+    for (JsonNode child : node) {
+      out.add(child.asInt());
+    }
+    return out;
+  }
+}

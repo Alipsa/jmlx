@@ -176,7 +176,10 @@ final class ExactBitsCapture {
 
   /**
    * Batched left-padded prefill and two 1-column batched decode steps on one cache set, then the
-   * same prefill with the row-B embedding hook on a fresh cache set.
+   * same prefill with the row-B embedding hook on a fresh cache set. In both record and verify
+   * modes, asserts that the hook capture stays bit-identical to {@code batch-prefill} on row 0 and
+   * differs on the hooked row, so a refactor that drops the hook fails loudly at record/verify time
+   * instead of silently verifying against a numerically-dead recording.
    */
   private static void batchCaptures(
       Variant variant,
@@ -216,6 +219,45 @@ final class ExactBitsCapture {
           "batch-prefill-hook",
           step(model, inference, caches, padded, valid, ExactBitsCapture::hook));
     }
+    assertHookRowActive(variant);
+  }
+
+  /**
+   * Asserts the embedding hook actually changed bits in the captured step: {@code
+   * batch-prefill-hook} must be bit-for-bit identical to {@code batch-prefill} on row 0 and must
+   * differ on row {@link ExactBitsSpec#HOOK_ROW} in at least one element. Runs in both record and
+   * verify mode, since it is a property of the candidate run itself, so a refactor that silently
+   * drops the hook fails loudly at record/verify time instead of matching a recording made with a
+   * numerically-dead hook.
+   */
+  private static void assertHookRowActive(Variant variant) {
+    float[] prefill = variant.floatCaptures.get("batch-prefill");
+    float[] hooked = variant.floatCaptures.get("batch-prefill-hook");
+    int rowStride = prefill.length / 2;
+    for (int i = 0; i < rowStride; i++) {
+      int plainBits = Float.floatToIntBits(prefill[i]);
+      int hookBits = Float.floatToIntBits(hooked[i]);
+      if (plainBits != hookBits) {
+        throw new AssertionError(
+            variant.name
+                + ": batch-prefill row 0 diverges from batch-prefill-hook at index "
+                + i
+                + ": plain bits 0x"
+                + Integer.toHexString(plainBits)
+                + ", hook bits 0x"
+                + Integer.toHexString(hookBits));
+      }
+    }
+    for (int i = rowStride; i < prefill.length; i++) {
+      if (Float.floatToIntBits(prefill[i]) != Float.floatToIntBits(hooked[i])) {
+        return;
+      }
+    }
+    throw new AssertionError(
+        variant.name
+            + ": batch-prefill-hook row "
+            + ExactBitsSpec.HOOK_ROW
+            + " is bit-identical to batch-prefill: the embedding hook is numerically dead");
   }
 
   /**

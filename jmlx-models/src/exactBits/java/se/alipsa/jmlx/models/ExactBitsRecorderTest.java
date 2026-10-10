@@ -59,7 +59,10 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Record mode refuses to overwrite an existing {@code tf32-<0|1>} recording (its {@code
  * manifest.json} already present): a baseline is evidence, and silently replacing it with a
  * recording from a later commit would invalidate the very comparison it feeds. An intentional
- * re-record moves or deletes the directory first.
+ * re-record moves or deletes the directory first. It likewise refuses to record a baseline in which
+ * any variant failed to load, listing each not-applicable variant with its reason: a load failure
+ * would otherwise be baked into the baseline as a hole that verify could never see, proving
+ * bit-exactness for the surviving variants only while looking like it does so for all of them.
  */
 class ExactBitsRecorderTest {
 
@@ -283,12 +286,9 @@ class ExactBitsRecorderTest {
   private static void record(
       ExactBitsMetadata global, List<ExactBitsCapture.Variant> variants, Path modeDir)
       throws IOException {
+    requireAllVariantsApplicable(variants);
     Files.createDirectories(modeDir);
     for (ExactBitsCapture.Variant variant : variants) {
-      if (!variant.applicable) {
-        System.out.println("not applicable: " + variant.name + " (" + variant.reason + ")");
-        continue;
-      }
       Path dir = Files.createDirectories(modeDir.resolve(variant.name));
       int floats = 0;
       for (Map.Entry<String, float[]> capture : variant.floatCaptures.entrySet()) {
@@ -307,6 +307,32 @@ class ExactBitsRecorderTest {
               + " floats");
     }
     writeManifest(global, variants, modeDir);
+  }
+
+  /**
+   * The record-mode counterpart of the per-variant tolerance in {@link #verifyPostCapture}: verify
+   * may keep a variant not-applicable (a recorded hole stays a hole), but record must never write a
+   * baseline containing one -- a variant that failed to load (a broken fixture or a broken loader)
+   * would be baked in as {@code applicable: false}, and every later verify would then prove
+   * bit-exactness for the surviving variants only while looking like it does so for all of them.
+   * Collects every not-applicable variant with its reason and fails before any directory is created
+   * or file written, so the load failure is a loud, fix-it-now failure at record time instead of a
+   * silent baseline hole.
+   */
+  private static void requireAllVariantsApplicable(List<ExactBitsCapture.Variant> variants) {
+    List<String> notApplicable = new ArrayList<>();
+    for (ExactBitsCapture.Variant variant : variants) {
+      if (!variant.applicable) {
+        notApplicable.add(variant.name + " (" + variant.reason + ")");
+      }
+    }
+    if (!notApplicable.isEmpty()) {
+      throw new AssertionError(
+          "refusing to record an exact-bit baseline with not-applicable variants "
+              + notApplicable
+              + " -- a load failure would be baked into the baseline as a hole that verify "
+              + "could never detect; fix the fixture or loader and record again");
+    }
   }
 
   /**

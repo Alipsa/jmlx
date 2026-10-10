@@ -220,16 +220,38 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     Objects.requireNonNull(tokenIds, "tokenIds");
     Objects.requireNonNull(validLengths, "validLengths");
     Objects.requireNonNull(caches, "caches");
-    if (tokenIds.ndim() != 2
-        || tokenIds.shape()[0] <= 0
-        || tokenIds.shape()[1] <= 0
-        || caches.size() != layers.size()
-        || validLengths.length != tokenIds.shape()[0]) {
+    if (tokenIds.ndim() != 2 || tokenIds.shape()[0] <= 0 || tokenIds.shape()[1] <= 0) {
       throw new IllegalArgumentException(
           "batched forward requires nonempty [B,T], B lengths and one cache per layer");
     }
-    int batch = tokenIds.shape()[0];
-    int width = tokenIds.shape()[1];
+    return preflightBatch(tokenIds.shape()[0], tokenIds.shape()[1], caches, validLengths);
+  }
+
+  /**
+   * The shape-keyed core of the batched preflight, run by the token-ID entries ({@link
+   * #forward(MLXArray, List, int[])} and {@link #stepLogits}) through the token-ID overload and, by
+   * embedding-start callers (the SmolVLM work, WP6, this package), directly with {@code
+   * (embeddings.shape()[0], sequenceWidth)}. It is pure int arithmetic over the caches and valid
+   * lengths: it builds no graph node, evaluates nothing and changes no captured bit. It validates
+   * the valid-length invariants (one positive length per row, each within {@code 1..width}, and the
+   * padded width equal to the longest valid row), the cache count and batch size against {@code
+   * batch}, policy consistency across the layers, the per-row and padded capacity of each policy,
+   * matching row positions across the layer caches, and the DynamicNtk requirement of equal batch
+   * positions. A poisoned cache or a wrong cache batch size throws {@link IllegalStateException};
+   * every other violation throws {@link IllegalArgumentException}. It returns the {@code before}
+   * snapshot of every layer and row's next position, which the caller passes to {@link
+   * #poisonBatchIfMutated} in its own catch.
+   */
+  int[][] preflightBatch(int batch, int width, List<KVCache> caches, int[] validLengths) {
+    Objects.requireNonNull(validLengths, "validLengths");
+    Objects.requireNonNull(caches, "caches");
+    if (batch <= 0
+        || width <= 0
+        || caches.size() != layers.size()
+        || validLengths.length != batch) {
+      throw new IllegalArgumentException(
+          "batched forward requires nonempty [B,T], B lengths and one cache per layer");
+    }
     int maxValid = 0;
     for (int valid : validLengths) {
       if (valid <= 0 || valid > width) {
@@ -326,12 +348,13 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * already-embedded activations. It takes the explicit padded sequence width and valid lengths
    * that the token-ID entry derived, preserves the graph operation order, dtypes and
    * lazy-evaluation boundaries of the stack it was factored from, and it neither evaluates nor
-   * poisons: the caller keeps the preflight, postflight, evaluation and cache-poisoning
-   * responsibilities, while this entry itself validates the batch shape of {@code embeddings}
-   * against {@code validLengths}, {@code sequenceWidth} and {@code caches} (shape {@code [B,
-   * sequenceWidth, hiddenSize]} with one cache per layer) before building any graph node. The
-   * upcoming SmolVLM work (WP6, this package) feeds its merged text and image embeddings through
-   * this entry; production token-ID callers keep the identical stack via {@link
+   * poisons: an embedding-start caller (the SmolVLM work, WP6, this package) must run {@link
+   * #preflightBatch(int, int, List, int[])} itself with {@code (embeddings.shape()[0],
+   * sequenceWidth)} and pass the returned snapshot to {@link #poisonBatchIfMutated} in its own
+   * catch, and keeps the postflight and evaluation responsibilities. This entry itself validates
+   * the batch shape of {@code embeddings} against {@code validLengths}, {@code sequenceWidth} and
+   * {@code caches} (shape {@code [B, sequenceWidth, hiddenSize]} with one cache per layer) before
+   * building any graph node. Production token-ID callers keep the identical stack via {@link
    * #normalizedHiddenStatesBatch}.
    */
   final MLXArray decoderStack(

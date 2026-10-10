@@ -54,8 +54,8 @@ final class ExactBitsMetadata {
     this.osVersion = osVersion;
     this.mlxEnableTf32 = mlxEnableTf32;
     this.specHash = specHash;
-    this.inputHashes = Map.copyOf(new TreeMap<>(inputHashes));
-    this.derivedHashes = Map.copyOf(new TreeMap<>(derivedHashes));
+    this.inputHashes = Collections.unmodifiableMap(new TreeMap<>(inputHashes));
+    this.derivedHashes = Collections.unmodifiableMap(new TreeMap<>(derivedHashes));
     this.gitDirty = gitDirty;
     this.decoderModelSha256 = decoderModelSha256;
   }

@@ -55,6 +55,11 @@ import tools.jackson.databind.ObjectMapper;
  * comparison crosses the refactor's own commits) and the two provenance-only fields (absent from
  * recordings made before they existed); anything else that differs means the recordings are not
  * comparable on this host.
+ *
+ * <p>Record mode refuses to overwrite an existing {@code tf32-<0|1>} recording (its {@code
+ * manifest.json} already present): a baseline is evidence, and silently replacing it with a
+ * recording from a later commit would invalidate the very comparison it feeds. An intentional
+ * re-record moves or deletes the directory first.
  */
 class ExactBitsRecorderTest {
 
@@ -88,6 +93,11 @@ class ExactBitsRecorderTest {
     // Verify mode fails fast on an absent or non-comparable recording before captureAll's 14
     // variants x 9 GPU captures (plus quantized re-derivation) are spent: the manifest's
     // existence, format version, global metadata and variant set are all cheap to check.
+    // Record mode never silently replaces an existing baseline: fail before captureAll's GPU
+    // captures and before any file is written, naming the existing recording's commit.
+    if (mode.equals("record")) {
+      refuseOverwrite(modeDir);
+    }
     JsonNode manifest = mode.equals("verify") ? verifyPreCapture(global, modeDir) : null;
     List<ExactBitsCapture.Variant> variants = captureAll(goldens, deriveBase);
     if (mode.equals("record")) {
@@ -95,7 +105,19 @@ class ExactBitsRecorderTest {
     } else {
       verifyPostCapture(global, manifest, variants, modeDir);
     }
-    System.out.println("exact-bits " + mode + " tf32=" + tf32 + ": " + summary(variants));
+    if (mode.equals("verify")) {
+      // The recorded commit at a glance: whether the on-disk baseline is the pre-refactor one or
+      // a later re-record shows here immediately.
+      System.out.println(
+          "exact-bits verify tf32="
+              + tf32
+              + " (recorded at "
+              + manifest.path("metadata").path("gitCommit").asString()
+              + "): "
+              + summary(variants));
+    } else {
+      System.out.println("exact-bits record tf32=" + tf32 + ": " + summary(variants));
+    }
   }
 
   /**
@@ -329,6 +351,30 @@ class ExactBitsRecorderTest {
               + " -- re-record after recording the spec at the base commit");
     }
     return manifest;
+  }
+
+  /**
+   * The record-mode counterpart of {@link #verifyPreCapture}: a recording is refused, not replaced,
+   * when its {@code manifest.json} already exists. A baseline is PR evidence, and a silent
+   * replacement (e.g. by re-recording at a later commit) invalidates the comparison without anyone
+   * noticing -- exactly the accident this guard exists to stop. Fails before any capture runs and
+   * before any file is written; an intentional re-record moves or deletes the tf32-<mode> directory
+   * first.
+   */
+  private static void refuseOverwrite(Path modeDir) throws IOException {
+    Path manifestPath = modeDir.resolve("manifest.json");
+    if (!Files.isRegularFile(manifestPath)) {
+      return;
+    }
+    JsonNode manifest = JsonFiles.read(manifestPath);
+    throw new AssertionError(
+        "refusing to overwrite the existing exact-bit recording under "
+            + modeDir
+            + " (recorded at git commit "
+            + manifest.path("metadata").path("gitCommit").asString()
+            + ") -- a baseline is never silently replaced; to re-record, move or delete "
+            + modeDir
+            + " first");
   }
 
   /**

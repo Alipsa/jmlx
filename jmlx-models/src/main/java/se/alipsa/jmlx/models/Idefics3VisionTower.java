@@ -40,7 +40,11 @@ import se.alipsa.jmlx.nn.Sequential;
  * attention.{query,key,value,output}} for {@code self_attn.{q,k,v,out}_proj}, {@code
  * attentionNorm}/{@code outputNorm} for {@code layer_norm1}/{@code layer_norm2} and {@code
  * feedForward.0/.2} for {@code mlp.fc1/fc2}, the tanh GELU {@code feedForward.1} carrying no
- * parameters), and {@code postLayernorm} is {@code post_layernorm}.
+ * parameters), and {@code postLayernorm} is {@code post_layernorm}. The tower also registers the
+ * model-supplied {@link Idefics3Connector} as the child {@code connector} (the checkpoint's {@code
+ * connector.*} subtree): {@link #forward} deliberately stops after the post LayerNorm, and the
+ * model reaches the connector through {@link #connector()} to project the tower's output into the
+ * text hidden space.
  */
 public final class Idefics3VisionTower extends Module {
 
@@ -59,21 +63,27 @@ public final class Idefics3VisionTower extends Module {
   private final Embedding positionEmbedding;
   private final List<EncoderBlock> layers = new ArrayList<>();
   private final LayerNorm postLayernorm;
+  private final Idefics3Connector connector;
 
   /**
    * Builds the tower from checkpoint weights keyed by this module's own dotted parameter paths (see
    * the class javadoc for the HF key mapping). Every weight must be present and shaped consistently
    * with every other weight; any extra or missing key is rejected.
    *
+   * @param connector the image-feature connector, registered as the tower's {@code connector}
+   *     child; {@link #forward} returns the post-LayerNorm states, and the model applies {@code
+   *     connector.forward} to them (via {@link #connector()}) to get the final text-space features
    * @throws IllegalArgumentException if a dimension is invalid, a weight is missing or extra, or
    *     the weights are mutually inconsistent
+   * @throws NullPointerException if {@code connector} is {@code null}
    */
   public Idefics3VisionTower(
       MLXScope scope,
       int numLayers,
       int numHeads,
       float layerNormEps,
-      Map<String, MLXArray> weights) {
+      Map<String, MLXArray> weights,
+      Idefics3Connector connector) {
     super(scope);
     Objects.requireNonNull(weights, "weights");
     if (numLayers <= 0) {
@@ -235,7 +245,13 @@ public final class Idefics3VisionTower extends Module {
                 weight(weights, "postLayernorm.weight"),
                 weight(weights, "postLayernorm.bias"),
                 layerNormEps));
+    this.connector = child("connector", connector);
     train(false);
+  }
+
+  /** The pixel-shuffle projection child; the model applies it to {@link #forward} output. */
+  Idefics3Connector connector() {
+    return connector;
   }
 
   /**
@@ -249,6 +265,11 @@ public final class Idefics3VisionTower extends Module {
    * this module's own scope or a descendant of it — the same contract as {@link T5Model}. A fully
    * padded tile must not reach this method: its all-zero mask row is rejected by the attention-mask
    * builder, and callers drop such tiles with {@link #isZeroTile} first.
+   *
+   * <p>This method deliberately stops at the post LayerNorm: it does not apply the {@code
+   * connector} child, and the model applies {@code connector.forward(towerForwardOutput)} (see
+   * {@link #connector()}) to the result to get the final {@code [N, (H/(patch*s)) * (W/(patch*s)),
+   * textHidden]} text-space features.
    *
    * @return the post-LayerNorm hidden states, {@code [N, (H/patch) * (W/patch), hidden]}
    * @throws IllegalArgumentException if the pixel shape, dtype or patch mask is invalid
@@ -267,14 +288,14 @@ public final class Idefics3VisionTower extends Module {
               + "] channels-last, got "
               + java.util.Arrays.toString(shape));
     }
-    int ph = Math.floorDiv(shape[2], patchSize);
-    int pw = Math.floorDiv(shape[3], patchSize);
-    if (shape[2] % patchSize != 0 || shape[3] % patchSize != 0 || ph == 0 || pw == 0) {
+    int ph = Math.floorDiv(shape[1], patchSize);
+    int pw = Math.floorDiv(shape[2], patchSize);
+    if (shape[1] % patchSize != 0 || shape[2] % patchSize != 0 || ph == 0 || pw == 0) {
       throw new IllegalArgumentException(
           "pixel extents "
-              + shape[2]
+              + shape[1]
               + "x"
-              + shape[3]
+              + shape[2]
               + " are not multiples of the patch size "
               + patchSize);
     }
@@ -303,13 +324,15 @@ public final class Idefics3VisionTower extends Module {
     MLXArray tokens =
         MLXShape.reshape(patchEmbedding.forward(pixels), new int[] {shape[0], numPatches, hidden});
     int[] ids = positionIds(patchMask, ph, pw);
-    MLXArray positions =
-        positionEmbedding.forward(MLX.array(step, ids, new int[] {shape[0], numPatches}));
-    MLXArray x = MLXOps.add(tokens, positions);
+    int[] flatIds = new int[Math.multiplyExact(shape[0], numPatches)];
     int[][] padding = new int[shape[0]][numPatches];
     for (int row = 0; row < shape[0]; row++) {
+      System.arraycopy(ids, 0, flatIds, row * numPatches, numPatches);
       System.arraycopy(patchMask, 0, padding[row], 0, numPatches);
     }
+    MLXArray positions =
+        positionEmbedding.forward(MLX.array(step, flatIds, new int[] {shape[0], numPatches}));
+    MLXArray x = MLXOps.add(tokens, positions);
     MLXArray mask = AttentionMask.bidirectional(step, padding, numPatches);
     for (EncoderBlock layer : layers) {
       x = layer.forward(x, mask, null);

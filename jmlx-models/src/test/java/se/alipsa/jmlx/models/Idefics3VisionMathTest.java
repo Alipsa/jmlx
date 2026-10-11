@@ -30,6 +30,14 @@ class Idefics3VisionMathTest {
   // --- positionIds -------------------------------------------------------------
 
   @Test
+  void rectangularValidityUsesTheLearnedConfigGrid() {
+    int[] mask = {1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    assertArrayEquals(
+        new int[] {0, 10, 21, 0, 480, 490, 501, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        Idefics3VisionTower.positionIds(mask, 4, 4, 32));
+  }
+
+  @Test
   void positionIdsFull4x4MatchEveryGoldenTile() {
     // Every tile of tools/hf-reference/goldens/idefics3.json carries this exact 16-id vector
     // (all-ones 4x4 patch mask, P = 4): HF's h / nb * (1 - 1e-6) bucketize with the 0.25/0.5/0.75
@@ -301,8 +309,7 @@ class Idefics3VisionMathTest {
         IllegalArgumentException.class, () -> Idefics3Connector.pixelShuffleIndices(3, 4, 2, 8));
     assertThrows(
         IllegalArgumentException.class, () -> Idefics3Connector.pixelShuffleIndices(4, 6, 4, 8));
-    assertThrows(
-        IllegalArgumentException.class, () -> Idefics3Connector.pixelShuffleIndices(4, 4, 2, 10));
+    assertEquals(160, Idefics3Connector.pixelShuffleIndices(4, 4, 2, 10).length);
     assertThrows(
         IllegalArgumentException.class, () -> Idefics3Connector.pixelShuffleIndices(0, 4, 2, 8));
     assertThrows(

@@ -36,6 +36,7 @@ record SmolVlmImagePlacement(int[] tileStarts) {
   }
 
   /** One start position per tile, non-negative and strictly increasing; defensive copy. */
+  @Override
   public int[] tileStarts() {
     return tileStarts.clone();
   }

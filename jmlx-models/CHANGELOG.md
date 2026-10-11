@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Add `SmolVlmModel` and `idefics3` dispatch through `TextGenerationModels.load`: strict floating
+  checkpoint assembly, FLOAT32 computation, image-marker resolution, tower/connector prefill,
+  concatenate/gather feature replacement and cached generation using the shared decoder loop.
+  Metadata reports `{TEXT, IMAGE}`. Full/bounded-full retention is supported; sliding VLM
+  retention, memory evidence and real-artifact acceptance remain deferred.
+- Verify tiny Idefics3 intermediate tensors, merged embeddings, prefill/cached logits, cached/full
+  equivalence and exact greedy IDs; cover terminal/failure paths, zero-token geometry-only
+  requests and actual visual execution counts. Require the new native suites in CI.
+- Fix tower position-table validation to use its learned grid instead of patch-kernel size, and
+  use the configured learned grid for rectangular valid-patch positions. Remove the connector's
+  unnecessary channel-divisibility restriction and check merge-index overflow.
+- Zero-token decoder requests now avoid the shared loop's native generation/sampling scope.
+
 - Add `GenerationRequest.withImages(List<RgbImage>)` / `images()`: requests start image-free and
   carry an immutable, copied list of pixel values. Copy methods (`withImages`, `withCachePolicy`)
   retain the images in either order.

@@ -21,6 +21,9 @@ public final class TextGenerationModels {
       // finding 7c).
       return T5Model.load(scope, directory, T5LoadOptions.defaults(), root);
     }
+    if ("idefics3".equals(root.path("model_type").asString())) {
+      return SmolVlmModel.load(scope, directory, root);
+    }
     return loadDecoder(scope, directory, ArchitectureMappings.parse(root));
   }
 

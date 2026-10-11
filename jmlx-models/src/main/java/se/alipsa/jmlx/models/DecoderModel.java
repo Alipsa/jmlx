@@ -666,7 +666,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     IncrementalTokenDecoder decoder = null;
     LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(frequencySeed);
     FinishReason reason = FinishReason.MAX_TOKENS;
-    if (!request.cancellationToken().isCancelled()) {
+    if (!request.cancellationToken().isCancelled() && policy.maxNewTokens() > 0) {
       decoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
       try (MLXScope generation = scope().newChild();
           SamplingPipeline sampler =
@@ -743,7 +743,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
           }
         }
       }
-    } else {
+    } else if (request.cancellationToken().isCancelled()) {
       reason = FinishReason.CANCELLED;
     }
     String terminalDelta = null;

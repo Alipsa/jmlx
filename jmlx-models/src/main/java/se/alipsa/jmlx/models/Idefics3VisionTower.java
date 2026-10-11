@@ -58,6 +58,7 @@ public final class Idefics3VisionTower extends Module {
 
   private final int patchSize;
   private final int hidden;
+  private final int positionSide;
   private final int numChannels;
   private final Conv2d patchEmbedding;
   private final Embedding positionEmbedding;
@@ -117,7 +118,14 @@ public final class Idefics3VisionTower extends Module {
     this.hidden = hiddenSize;
     this.numChannels = conv[3];
     MLXArray positionTable = weight(weights, "positionEmbedding.weight");
-    int numPatches = Math.multiplyExact(patchSize, patchSize);
+    if (positionTable.ndim() != 2) {
+      throw new IllegalArgumentException("positionEmbedding.weight must be a matrix");
+    }
+    int numPatches = positionTable.shape()[0];
+    positionSide = (int) Math.sqrt(numPatches);
+    if (positionSide <= 0 || positionSide * positionSide != numPatches) {
+      throw new IllegalArgumentException("positionEmbedding.weight must contain a square grid");
+    }
     requireShape(positionTable, "positionEmbedding.weight", new int[] {numPatches, hiddenSize});
     for (int i = 0; i < numLayers; i++) {
       String layer = "layer" + i + ".";
@@ -323,7 +331,7 @@ public final class Idefics3VisionTower extends Module {
     // row-major patch order.
     MLXArray tokens =
         MLXShape.reshape(patchEmbedding.forward(pixels), new int[] {shape[0], numPatches, hidden});
-    int[] ids = positionIds(patchMask, ph, pw);
+    int[] ids = positionIds(patchMask, ph, pw, positionSide);
     int[] flatIds = new int[Math.multiplyExact(shape[0], numPatches)];
     int[][] padding = new int[shape[0]][numPatches];
     for (int row = 0; row < shape[0]; row++) {
@@ -338,6 +346,13 @@ public final class Idefics3VisionTower extends Module {
       x = layer.forward(x, mask, null);
     }
     return postLayernorm.forward(x);
+  }
+
+  MLXArray patchTokens(MLXArray pixels) {
+    int[] shape = pixels.shape();
+    return MLXShape.reshape(
+        patchEmbedding.forward(pixels),
+        new int[] {shape[0], shape[1] / patchSize * (shape[2] / patchSize), hidden});
   }
 
   /**
@@ -378,6 +393,15 @@ public final class Idefics3VisionTower extends Module {
    * @throws IllegalArgumentException if the dimensions or mask are invalid
    */
   public static int[] positionIds(int[] patchMask, int ph, int pw) {
+    return positionIds(patchMask, ph, pw, ph, pw);
+  }
+
+  static int[] positionIds(int[] patchMask, int ph, int pw, int positionSide) {
+    return positionIds(patchMask, ph, pw, positionSide, positionSide);
+  }
+
+  private static int[] positionIds(
+      int[] patchMask, int ph, int pw, int positionRows, int positionCols) {
     Objects.requireNonNull(patchMask, "patchMask");
     if (ph <= 0 || pw <= 0) {
       throw new IllegalArgumentException("the patch grid dimensions must be positive");
@@ -412,16 +436,17 @@ public final class Idefics3VisionTower extends Module {
     int[] colBucket = new int[pw];
     if (nbH > 0 && nbW > 0) {
       for (int r = 0; r < ph; r++) {
-        rowBucket[r] = bucketOf(r, nbH, ph);
+        rowBucket[r] = bucketOf(r, nbH, positionRows);
       }
       for (int c = 0; c < pw; c++) {
-        colBucket[c] = bucketOf(c, nbW, pw);
+        colBucket[c] = bucketOf(c, nbW, positionCols);
       }
     }
     int[] ids = new int[numPatches];
     for (int r = 0; r < ph; r++) {
       for (int c = 0; c < pw; c++) {
-        ids[r * pw + c] = patchMask[r * pw + c] == 1 ? rowBucket[r] * pw + colBucket[c] : 0;
+        ids[r * pw + c] =
+            patchMask[r * pw + c] == 1 ? rowBucket[r] * positionCols + colBucket[c] : 0;
       }
     }
     return ids;
@@ -569,6 +594,7 @@ public final class Idefics3VisionTower extends Module {
       }
       previous = destination;
     }
+    Math.addExact(expandedLength, features);
     int[] indices = new int[expandedLength];
     int next = 0;
     for (int i = 0; i < expandedLength; i++) {

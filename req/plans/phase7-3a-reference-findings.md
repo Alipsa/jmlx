@@ -128,7 +128,7 @@ vision linear biases are required. Absent any of the above is a load failure.
 
 | Key | Value | Disposition |
 | --- | --- | --- |
-| `model_type` | `siglip_vision_model` | supported |
+| `model_type` | `idefics3` | supported — actual pinned nested value; architecture is SigLIP-style |
 | `use_base_siglip` | `true` | supported — selects base dimensions |
 | `hidden_size` | `768` | supported |
 | `image_size` | `512` | supported — tile edge |
@@ -552,3 +552,23 @@ a *deliberate extension* of the reference, and the two orderings agree only for 
 
 The decode path is byte-exact for every accepted family; the byte-exact full-chain fixtures use opaque RGB
 only (the oracle runner enforces `image.mode == "RGB"`) — documented in `jmlx-vision/README.md`.
+
+
+### WP6 pinned-config recheck (2026-10-11)
+
+The raw config at revision `7e3e67edbbed1bf9888184d9df282b700a323964` was fetched again;
+its SHA-256 remains `b70fb4bfde88df9eeebc9d8ff523733b8bf70d6c9b06c610325960e06ae9db52`.
+The vision table above incorrectly called its nested `model_type` `siglip_vision_model`: the raw
+value is `idefics3` (the tower is still SigLIP-style). The tiny Transformers-created fixture uses
+`idefics3_vision`. Both dispatch to the same validated tower, with explicit dimensions.
+`jmlx-models/src/test/resources/smolvlm/config.json` preserves the raw pinned config and its
+pure test verifies the SHA before parsing.
+
+The raw text/vision configs also serialize PretrainedConfig generation defaults and metadata
+(`bad_words_ids`, `num_beams`, `top_k`, `return_dict`, etc.). `SmolVlmDescriptor` enumerates
+these inert export fields; runtime generation is controlled by GenerationRequest. Cross-attention,
+nonzero feed-forward chunking, pruned heads and interleaved RoPE are rejected; unknown fields
+fail rather than warn. Top-level `transformers.js_config` is explicit export metadata.
+The learned position table has `(image_size / patch_size)^2` rows, independent of the kernel
+size. Rectangular valid-patch coordinates bucket against that configured square table's side
+and stride, rather than changing the learned coordinate system to the input grid.

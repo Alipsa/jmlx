@@ -53,11 +53,13 @@ record SmolVlmPromptPlan(
   }
 
   /** The original (unexpanded) prompt IDs; defensive copy. */
+  @Override
   public int[] unexpandedIds() {
     return unexpandedIds.clone();
   }
 
   /** The expanded prompt IDs; defensive copy. */
+  @Override
   public int[] expandedIds() {
     return expandedIds.clone();
   }

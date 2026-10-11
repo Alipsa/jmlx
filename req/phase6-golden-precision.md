@@ -114,3 +114,19 @@ The new suites still need their first macOS 26 CI execution; local evidence is e
 Per-family maxima including cached T5 histories: BERT `1.4835596084594727e-4`, T5 ReLU
 `0.006804823875427246`, T5 gated `0.020420074462890625`. Each remains below the independent
 default-mode bound; strict suites keep their original bound.
+
+
+## Phase 7.3a WP6 local synthetic precision (2026-10-11)
+
+`SmolVlmGoldenTest` uses the pinned tiny Idefics3 checkpoint, CPU Transformers oracle pixels,
+and absolute `1e-4` for patch embeddings, positioned embeddings, tower output, connector,
+merged embeddings, prefill/cached logits and three cached/full-history comparisons. The same
+strict test separately composes Java preprocessing with prefill at `1e-4`. It runs only with
+TF32 disabled; no goldens or strict tolerances were changed.
+
+`SmolVlmDefaultPrecisionTest` runs the five cases through Java preprocessing and prefill plus
+two cached score comparisons, including closing the visual scope before decode. The observed
+maximum absolute logit error was `9.0524554e-4` with TF32 enabled on macOS 27.0.1 / Apple Silicon,
+MLX 0.31.2 / mlx-c fba4470. Its separately named TF32 logit bound is `0.002`, with margin for
+device variation. This is local synthetic evidence, not a real-checkpoint error bound or the
+required macOS 26 CI acceptance. WP7 establishes the real-artifact gaps/error/memory gates.

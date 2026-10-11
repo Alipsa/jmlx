@@ -7,7 +7,8 @@ import java.util.Set;
  * models. Implementations are internal and may gain additional metadata as architectural support
  * expands.
  */
-public sealed interface ModelMetadata permits DecoderMetadata, EncoderMetadata, Seq2SeqMetadata {
+public sealed interface ModelMetadata
+    permits DecoderMetadata, EncoderMetadata, Seq2SeqMetadata, VisionLanguageMetadata {
   /** The Hugging Face {@code model_type}. */
   String modelType();
 

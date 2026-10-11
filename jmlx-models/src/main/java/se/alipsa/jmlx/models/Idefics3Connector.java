@@ -131,10 +131,6 @@ public final class Idefics3Connector extends Module {
           "the token-grid columns " + pw + " are not a multiple of the scale " + scale);
     }
     int scaleSquared = Math.multiplyExact(scale, scale);
-    if (channels % scaleSquared != 0) {
-      throw new IllegalArgumentException(
-          "the channels " + channels + " are not a multiple of scale^2 = " + scaleSquared);
-    }
     int block = Math.multiplyExact(channels, scaleSquared);
     int[] perm = new int[Math.multiplyExact(Math.multiplyExact(ph, pw), channels)];
     for (int blockRow = 0; blockRow < ph / scale; blockRow++) {

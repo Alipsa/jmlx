@@ -50,29 +50,32 @@ class SmolVlmGenerationTest {
 
   @Test
   void oversizedTokenizerReportsVocabularySizes(@TempDir Path dir) throws Exception {
-    var mapper = new ObjectMapper();
-    var tree = mapper.readTree(SmolVlmGoldenTest.directory().resolve("tokenizer.json").toFile());
-    ((ObjectNode) tree.required("model").required("vocab"))
-        .put("oversized-vocabulary-entry", 49280);
-    Path file = dir.resolve("tokenizer.json");
-    Files.writeString(file, mapper.writeValueAsString(tree));
-    HfTokenizer tokenizer = HfTokenizer.fromFile(file);
-    assertEquals(49281, tokenizer.vocabSize());
-    GenerationRequest request =
-        GenerationRequest.text(
-            tokenizer,
-            "text",
-            PromptSpecialTokens.OMIT,
-            GenerationConfig.greedyDefaults(0, Set.of()),
-            CancellationToken.NONE);
     try (MLXScope root = new MLXScope()) {
       SmolVlmModel model = SmolVlmModel.load(root, SmolVlmGoldenTest.directory());
-      assertEquals(296, model.metadata().vocabSize());
+      int checkpoint = model.metadata().vocabSize();
+      var mapper = new ObjectMapper();
+      var tree = mapper.readTree(SmolVlmGoldenTest.directory().resolve("tokenizer.json").toFile());
+      ((ObjectNode) tree.required("model").required("vocab"))
+          .put("oversized-vocabulary-entry", checkpoint);
+      Path file = dir.resolve("tokenizer.json");
+      Files.writeString(file, mapper.writeValueAsString(tree));
+      HfTokenizer tokenizer = HfTokenizer.fromFile(file);
+      assertEquals(checkpoint + 1, tokenizer.vocabSize());
+      GenerationRequest request =
+          GenerationRequest.text(
+              tokenizer,
+              "text",
+              PromptSpecialTokens.OMIT,
+              GenerationConfig.greedyDefaults(0, Set.of()),
+              CancellationToken.NONE);
       IllegalArgumentException failure =
           assertThrows(
               IllegalArgumentException.class, () -> model.generate(request, ignored -> {}));
       assertEquals(
-          "tokenizer vocabulary size 49281 exceeds checkpoint vocabulary size 296",
+          "tokenizer vocabulary size "
+              + (checkpoint + 1)
+              + " exceeds checkpoint vocabulary size "
+              + checkpoint,
           failure.getMessage());
     }
   }

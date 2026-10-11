@@ -77,7 +77,8 @@ tasks.register('tierBTest', Test) {
         ? new groovy.json.JsonSlurper().parse(rootProject.file(tierBManifest)).task ?: 'generation'
         : 'generation'
     def suites = [generation: 'TierBSmokeTest', embedding: 'TierBEmbeddingTest',
-                  classification: 'TierBClassificationTest', seq2seq: 'TierBSeq2SeqTest']
+                  classification: 'TierBClassificationTest', seq2seq: 'TierBSeq2SeqTest',
+                  'image-text-generation': 'TierBVisionLanguageTest']
     if (!suites.containsKey(taskName)) { throw new GradleException("Unsupported Tier-B task: ${taskName}") }
     def assertedTask = System.getenv('JMLX_TIER_B_TASK')
     if (assertedTask && assertedTask != taskName) {

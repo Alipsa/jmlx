@@ -70,3 +70,22 @@ family bundles under `jmlx-tokenizer/src/test/resources/families`. It writes
 `goldens/chat-{mistral,gemma,phi3,mixtral}.json`, pins their hashes in `provenance.json`, and
 records hashes of the input tokenizer bundles in `chat_sources`. The existing model and RoPE
 goldens are left unchanged.
+
+### SmolVLM real-artifact reference
+
+Generate a reviewed candidate from the SHA-verified local pinned artifact:
+
+```sh
+tools/hf-reference/.venv/bin/python tools/hf-reference/vision_tier_b.py \
+  --directory .tier-b/smolvlm-256m-instruct \
+  --manifest tools/tier-b/smolvlm-256m-instruct.json
+```
+
+This uses raw `PIL.Image.open -> load` and the explicit slow Idefics3 image processor, CPU float32
+and eager attention. It records structured chat, original/expanded IDs, greedy histories, full raw
+logits, gaps, pixel/source/template/checkpoint hashes and environment versions. Compact full logits
+live in `goldens/smolvlm-tier-b-logits.json`; the manifest pins that file's digest. It updates the
+additive vision Tier-B provenance entries without rewriting existing synthetic goldens. The root
+`verifyHfReferenceGoldens` verifies both the new golden and manifest/image/generator digests with no
+Python execution. Regeneration resets numerical acceptance: rerun Java, review the changed outputs
+and record the measured error/memory before setting local eligibility again.

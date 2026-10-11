@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add WP7 evaluated vision-language memory and lifetime regressions, including repeated varied
+  requests, cancellation, listener/tokenizer/native failures, visual release and derived full-KV
+  retention budgets. Require the memory suite in macOS CI and upload native acceptance evidence.
+- Add opt-in `image-text-generation` Tier-B dispatch, a pinned SmolVLM-256M checkpoint/image/chat
+  manifest, full CPU logits at prefill and three cached histories, stable exact greedy IDs and
+  sampled memory evidence. The weekly/on-demand workflow includes the new task; local macOS 27
+  evidence passes while macOS 26 acceptance remains pending.
+
 - Compare tied image/text checkpoint head aliases on the device, reading back one scalar;
   numerical equality accepts signed-zero differences and rejects NaNs. Normalize request-tokenizer
   marker validation failures to `IllegalArgumentException` while preserving their causes.

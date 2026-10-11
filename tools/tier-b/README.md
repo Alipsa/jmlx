@@ -18,3 +18,22 @@ remove partial files. Ordinary builds do not download artifacts or require Pytho
 Downloader tests run with `./gradlew -p buildSrc check`, independently of root `check`, and use
 in-memory responses and local HTTP servers. Python remains confined to optional reference tools
 and the existing CI reporting script.
+
+SmolVLM uses `smolvlm-256m-instruct.json` and task `image-text-generation`, selecting
+`TierBVisionLanguageTest` in the TF32-off JVM. The image is committed under `images/`, MIT-licensed,
+and hash-pinned independently of the downloaded Apache-2.0 checkpoint. No image URL is fetched.
+Structured chat, rendered text, original/expanded IDs, all four greedy IDs, every history's full
+logits, top-two IDs/gaps and local peak-memory evidence are pinned. Numerical comparisons and
+stable-margin eligibility always run, regardless of host; macOS 26 acceptance is still pending.
+
+```sh
+./gradlew downloadTierBArtifact \
+  -PtierBManifest=tools/tier-b/smolvlm-256m-instruct.json -PtierBTarget=.tier-b/smolvlm
+JMLX_TIER_B_MODEL_DIR=.tier-b/smolvlm \
+  JMLX_TIER_B_MANIFEST=tools/tier-b/smolvlm-256m-instruct.json \
+  JMLX_TIER_B_MODEL_TYPE=idefics3 ./gradlew :jmlx-models:tierBTest
+```
+
+The test samples test-JVM RSS every 20 ms and reports the highest sample separately from the native
+allocator peak. RSS samples can miss short peaks and exclude Gradle and unified GPU allocations.
+The workflow uploads JUnit numerical/memory evidence even when the test fails.

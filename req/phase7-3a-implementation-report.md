@@ -64,8 +64,79 @@ No Torch regeneration, Tier-B download, Maven publication or version bump was pe
 ## Remaining acceptance
 
 This host's successful native runs are local evidence. The plan's original macOS 26 GPU profile
-and required new-suite CI gate remain pending until PR CI runs. WP7 still owns measured allocator
-margins/leak and retention-slope tests, pinned SmolVLM-256M Tier-B dispatch, real-artifact stable
-ID/logit-gap/peak-memory evidence and its CI row. WP8 owns final seven-artifact consumer/capability
+and required new-suite CI gate remain pending until PR CI runs. WP7 local memory and real-artifact work is recorded below; its required macOS 26 Tier-B
+execution/hosted fit remains pending. WP8 owns final seven-artifact consumer/capability
 acceptance. The compatibility matrix gains no verified real image+text family claim from WP6.
 No Maven publication or version bump is included.
+
+## WP7 — memory, precision, Tier-B and CI gates, 2026-10-11
+
+WP7 builds on merged WP6 (`9c59e23`, PR #45). Existing tiny Idefics3 intermediates, identical
+oracle pixels, merged embeddings, prefill/cached/full-history logits and greedy goldens remain
+unchanged. Their strict float32 bound stays `1e-4`; the independently measured TF32 bound stays
+`0.002`. No further decoder/shared-generation extraction or T5 change was needed.
+
+`VisionLanguageMemoryTest` uses evaluated arrays and `MLXMemory.activeBytes`, excluding cached
+free storage. Twelve rounds across all five synthetic cases cover same/different images, changing
+tile counts, text-only requests, full and bounded-full caches, exact/one-over capacity,
+cancellation before vision/between decode steps/between images, listener and tokenizer failures,
+injected vision/post-prefill failures and an actual native invalid-transpose error. Every request
+returns to the warmed baseline; measured baseline/max were 847,360 bytes with late growth zero.
+The post-prefill observer remains package-private and production uses the existing no-op observer.
+A failing observer preserves cache poisoning before the enclosing request scope closes.
+
+The lifetime test evaluates features after their vision activation children close, then evaluates
+prefill logits and every retained KV array before closing prefill. Features become unusable with
+the closed prefill scope; cached decode continues successfully. KV becomes unusable when the
+request scope closes. The tiny decoder derives 512 FLOAT32 KV bytes per position (2 layers,
+2 KV heads, head dimension 16, K/V) and 5,120 projected-feature bytes for 20 rows × hidden 64.
+Prefill closure releases 723,122 bytes of total visual/activation storage in the isolated run;
+retained KV measures 32,768 bytes for 46 positions (logical 23,552). Decode retention samples at
+8/64 additional positions were 32,768/57,088 bytes, inside the derived KV budget with a fixed
+16 KiB allocator envelope. Maximum observed retained-minus-logical overhead in the combined
+suite was 11,264 bytes; the envelope does not grow with tokens or requests. The early/late slope
+check spans 56 positions to distinguish growth from a plateau despite allocator rounding.
+Only full/bounded-full policies are accepted; sliding image-prefill remains explicitly rejected,
+so no sliding plateau or equivalence acceptance is claimed.
+
+`TierBVisionLanguageTest` is selected by manifest task `image-text-generation`, independently of
+model type, in the opt-in TF32-off JVM. Its manifest pins SmolVLM-256M's immutable revision,
+all 13 checkpoint/config/tokenizer/template/model-card files, aggregate 517,903,046-byte cap,
+licensed local RGB input and structured prompt. It verifies rendered chat, 16 original / 347
+expanded IDs, full logits at prefill and three cached histories, original result IDs, effective
+positions, finish reason and exact greedy IDs `[378, 2443, 21559, 354]`. Native features are
+computed only at prefill, then the test closes the visual scope before the teacher-forced cached
+steps. The highest all-vocabulary error is `5.2928924560546875e-5` versus CPU float32 eager,
+below the independent `1e-4` bound. Gaps are `[1.51336098, 4.38764763, 0.92834282, 0.26448631]`;
+every gap exceeds `2 * allowedError + margin = 0.0003`. The suite recomputes both top IDs and
+gaps from the full logits. Actual public generation independently matches every greedy ID.
+
+Measured native allocator peak was 5,737,416,464 bytes; highest test-JVM RSS sampled at 20 ms
+was 487,312 KiB. RSS samples exclude Gradle/unified GPU allocations and can miss short peaks.
+These measurements precede addition of the weekly/on-demand SmolVLM CI row. Hosted macOS 26
+execution/fit remains pending. An earlier 17-tile square-input probe also passed, with maximum
+error `8.58306884765625e-5` and native peak 5,739,185,936 bytes; the committed case uses the
+five-tile wide opaque RGB fixture. Neither existing golden values nor strict tolerances were
+changed to choose that case.
+
+The generate-only `vision_tier_b.py` uses the existing hash-locked CPython 3.12/Pillow 12.3.0/
+NumPy 2.5.3/Transformers 4.57.6/Torch 2.6.0 environment, raw PIL open/load and explicit slow
+Idefics3 processing. It records pixels, sources, template/checkpoint hashes and full CPU scores.
+New logits live in `goldens/smolvlm-tier-b-logits.json`. Additive provenance pins that golden
+and the manifest/image/generator; `verifyHfReferenceGoldens` checks them without Torch execution.
+Regeneration is manual and resets eligibility before remeasurement. Existing download containment,
+size and SHA checks are reused without buildSrc changes. No ordinary test downloads an artifact.
+
+CI requires the memory suite in ordinary `test` XML, alongside WP6's default-precision/generation
+suites; strict `SmolVlmGoldenTest` stays required in `float32GoldenTest`. Ubuntu retains vision
+Java 21 bytecode/style/preprocessing/tokenizer/oracle gates. Native and Tier-B workflows upload
+JUnit evidence even on failure. The compatibility matrix receives no final verified VLM claim
+until the pending host gates and WP8 consumer/capability work close.
+
+Local verification passed root `build`, both exact-bit comparisons using the retained WP5/WP6
+same-host baseline, all three memory tests with no skips, strict/default synthetic native suites,
+opt-in pinned Tier-B, executable image/tokenizer oracles, supported Phase 7.1 MLX oracle and
+seven-artifact release-smoke `ci`. Raw bit recordings remain under
+`jmlx-models/build/exact-bits/tf32-{1,0}` as local PR evidence; baseline provenance caveats are
+unchanged from WP6 above. The Phase 6 MLX oracle explicitly skips this macOS 27 host because it
+requires macOS 26. No native pins, bindings, module versions or publication were changed.

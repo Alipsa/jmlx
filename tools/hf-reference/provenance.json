@@ -79,7 +79,8 @@
     "phase72-semantics.json": "9ac909d01e650680a8a19b8bd18b44fd5b42bbaf9ce759a2797ca4c7bf02c800",
     "t5-gated.json": "f0a8b2c8efdafa34fc4f55a130da75f13fc72dddfffda47c9d6464c255202d56",
     "t5-relu.json": "8f94a656a6c3f5d27f4bdaf9fb356d7cce440677e0977d1106d0c05100ee2433",
-    "chat-smolvlm.json": "775aaf27cf4138182165fbfd8d57512ae9e2256560df11ab5e6e935a1d029c6f"
+    "chat-smolvlm.json": "775aaf27cf4138182165fbfd8d57512ae9e2256560df11ab5e6e935a1d029c6f",
+    "smolvlm-tier-b-logits.json": "ab8f1fe12b3ef1a318eb329c97a04abc2021e0e0a2fe45547aa1a19cddee8d22"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -120,5 +121,10 @@
       "pooling": "attended special tokens included; CLS index 0; Mean/Max exclude padding; Normalize follows Pooling; artifact maximum sequence length enforced by tokenizer truncation upstream"
     },
     "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b"
+  },
+  "vision_tier_b_files": {
+    "tools/tier-b/smolvlm-256m-instruct.json": "9341d1754dcabcccba6f1cd7f4d8c1ab3805c668902601ff0d9d75f961a16b09",
+    "tools/hf-reference/vision_tier_b.py": "e8e44173decbff687edb4ecde891569eb8d99a6adc9aa0540a0c8fcf2e6486ab",
+    "tools/tier-b/images/smolvlm-pattern.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7"
   }
 }

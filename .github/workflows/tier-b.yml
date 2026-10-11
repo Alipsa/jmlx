@@ -59,6 +59,12 @@ jobs:
             suite: TierBSeq2SeqTest
             revision: 0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab
             manifest: tools/tier-b/flan-t5-small.json
+          - name: smolvlm
+            model_type: idefics3
+            task: image-text-generation
+            suite: TierBVisionLanguageTest
+            revision: 7e3e67edbbed1bf9888184d9df282b700a323964
+            manifest: tools/tier-b/smolvlm-256m-instruct.json
     env:
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}
@@ -101,3 +107,10 @@ jobs:
               raise SystemExit('Tier B smoke test failed')
           print(suite.findtext('system-out') or 'No Tier B observations recorded')
           PY
+      - name: Upload numerical and memory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier-b-${{ matrix.name }}-results
+          path: jmlx-models/build/test-results/tierBTest/
+          if-no-files-found: warn

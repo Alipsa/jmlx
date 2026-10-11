@@ -607,5 +607,9 @@ reports TEXT+IMAGE, results retain original IDs and charge expanded promptPositi
 token request performs geometry/expansion validation without pixel or native work. Full and bounded
 full retention are supported; sliding image-prefill retention is rejected. Native suites are
 `SmolVlmGoldenTest` (full-float32), `SmolVlmGenerationTest`, `SmolVlmDefaultPrecisionTest` and
-`Idefics3VisionTowerSmokeTest`, all required by macOS CI. WP7 memory/Tier-B and WP8 capability
-acceptance remain pending; see `req/phase7-3a-implementation-report.md`.
+`Idefics3VisionTowerSmokeTest`, all required by macOS CI. WP7 adds `VisionLanguageMemoryTest` (required in ordinary macOS CI) and opt-in
+`TierBVisionLanguageTest`, selected by manifest task `image-text-generation`, with pinned
+SmolVLM-256M CPU logits, licensed local image, expanded IDs, stable greedy IDs and memory
+measurements. `verifyHfReferenceGoldens` also verifies the vision Tier-B manifest/image/generator
+digests; neural regeneration remains manual via `tools/hf-reference/vision_tier_b.py`. Local
+WP7 evidence passes; macOS 26 CI/Tier-B and WP8 capability acceptance remain pending; see `req/phase7-3a-implementation-report.md`.

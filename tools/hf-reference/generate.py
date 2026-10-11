@@ -17,6 +17,9 @@ from transformers import (
     AutoProcessor,
     AutoTokenizer,
     GemmaConfig,
+    Idefics3Config,
+    Idefics3ForConditionalGeneration,
+    Idefics3VisionConfig,
     LlamaConfig,
     MistralConfig,
     MixtralConfig,
@@ -448,6 +451,486 @@ def generate_chat_smolvlm(out, tokenizer_root):
     )
 
 
+# ---------------------------------------------------------------------------
+# Idefics3 (WP6 unit 1): the tiny checkpoint, the byte-identity tokenizer
+# bundle, the processor fixture, and the tile-geometry probe. Unit 1b appends
+# the numerical case goldens to generate_idefics3.
+# ---------------------------------------------------------------------------
+
+IDEFICS3_CHECKPOINT_DIR = "checkpoints/idefics3"
+# The committed WP4 SmolVLM bundle, the source of the canonical byte-level strings.
+WP4_SMOLOLM_TOKENIZER = Path("jmlx-tokenizer/src/test/resources/families/smolvlm/tokenizer.json")
+# content -> id. Bytes 0-255 occupy ids 0-255 (byte b encodes to id b); the 40
+# special tokens follow, mirroring the Idefics3Processor marker layout.
+IDEFICS3_SPECIAL_TOKENS = (
+    [("<image>", 256), ("<fake_token_around_image>", 257), ("<global-img>", 258)]
+    + [
+        (f"<row_{r}_col_{c}>", 258 + (r - 1) * 6 + c)
+        for r in range(1, 7)
+        for c in range(1, 7)
+    ]
+    + [("<eos>", 295)]
+)
+# name -> (image file names in prompt order, unexpanded prompt, expected (rows, cols) per
+# image). The expectations are the D6a tile table for size.longest_edge=64 and
+# max_image_size.longest_edge=32; the prompt text is ASCII and newline-free.
+IDEFICS3_CASES = (
+    ("one_image", ("img-32x32.png",), "<image>what is this", ((2, 2),)),
+    (
+        "two_images",
+        ("img-32x32.png", "img-64x32.png"),
+        "<image>what is this and <image>that",
+        ((2, 2), (1, 2)),
+    ),
+    (
+        "image_text_image",
+        ("img-32x32.png", "img-32x32.png"),
+        "<image>one image and <image>another",
+        ((2, 2), (2, 2)),
+    ),
+    ("resized_image", ("img-24x32.png",), "<image>what is this", ((2, 2),)),
+    ("text_only", (), "what is this", ()),
+)
+
+
+def _idefics3_byte_token_table(wp4_vocab):
+    """The 256 byte-level strings of the tiny Idefics3 tokenizer, as {byte: string}.
+
+    The table is the canonical GPT-2 `bytes_to_unicode` byte-to-character mapping (the same
+    one the WP4 SmolVLM bundle's ByteLevel pre-tokenizer implements). It is not trusted on
+    faith: every byte value that can be isolated through a valid UTF-8 sequence is re-derived
+    from the pinned `tokenizers` library's ByteLevel pre-tokenizer and must agree, and the
+    WP4 committed vocab must place the 0x0A byte string at its GPT-2 id 198. The few byte
+    values that are not valid UTF-8 lead bytes (0xC0, 0xC1, 0xED, 0xF5-0xFF) cannot be
+    probed through a string, so they are taken from the canonical table. Byte b then occupies
+    id b in the 296-entry tiny vocab, so any byte value round-trips to its own id.
+    """
+    from tokenizers.pre_tokenizers import ByteLevel
+
+    primary = list(range(33, 127)) + list(range(161, 173)) + list(range(174, 256))
+    codepoints = primary[:]
+    n = 0
+    for byte in range(256):
+        if byte not in primary:
+            primary.append(byte)
+            codepoints.append(256 + n)
+            n += 1
+    table = {byte: chr(codepoint) for byte, codepoint in zip(primary, codepoints)}
+    if len(set(table.values())) != 256:
+        raise ValueError("the byte table is not a 256-entry bijection")
+
+    # Bytes that are never a valid UTF-8 lead byte cannot be isolated through a Python
+    # string, so they are verified only via the canonical table.
+    non_isolatable = {0xC0, 0xC1, 0xED, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF}
+
+    def probe_for(byte):
+        if byte < 0x80:
+            return chr(byte), 0
+        if byte <= 0xBF:
+            return chr(0x80 + (byte & 0x3F)), 1
+        if byte <= 0xDF:
+            return chr((byte & 0x1F) << 6), 0
+        if byte == 0xE0:
+            return chr(0x0800), 0
+        if byte == 0xE1:
+            return chr(0x1800), 0
+        if byte <= 0xEF:
+            return chr(((byte & 0x0F) << 12) | 0x800), 0
+        # 0xF0-0xF4 are 4-byte lead bytes (0xF5-0xFF are non-isolatable, handled above).
+        if byte == 0xF0:
+            return chr(0x10000), 0
+        return chr((byte & 0x07) << 18), 0
+
+    encoder = ByteLevel(add_prefix_space=False, trim_offsets=True, use_regex=True)
+    for byte in range(256):
+        if byte in non_isolatable:
+            continue
+        probe, index = probe_for(byte)
+        pretokens = encoder.pre_tokenize_str(probe)
+        if len(pretokens) != 1:
+            raise ValueError(f"byte {byte:#04x} probe {probe!r} gave {pretokens!r}, expected one token")
+        token = pretokens[0][0]
+        if token[index] != table[byte]:
+            raise ValueError(
+                f"pinned ByteLevel maps byte {byte:#04x} to {token[index]!r}, "
+                f"but the canonical table has {table[byte]!r}"
+            )
+    if wp4_vocab.get(table[10]) != 198:
+        raise ValueError(
+            f"expected the WP4 id 198 entry to be the 0x0A byte string {table[10]!r}, "
+            f"got id {wp4_vocab.get(table[10])}"
+        )
+    return table
+
+
+def _idefics3_expected_tensors():
+    text = {"model.text_model.embed_tokens.weight", "model.text_model.norm.weight", "lm_head.weight"}
+    for i in range(2):
+        prefix = f"model.text_model.layers.{i}"
+        text |= {
+            f"{prefix}.input_layernorm.weight",
+            f"{prefix}.post_attention_layernorm.weight",
+        } | {
+            f"{prefix}.self_attn.{proj}_proj.weight" for proj in ("q", "k", "v", "o")
+        } | {
+            f"{prefix}.mlp.{proj}_proj.weight" for proj in ("gate", "up", "down")
+        }
+    vision = {
+        "model.vision_model.embeddings.patch_embedding.weight",
+        "model.vision_model.embeddings.patch_embedding.bias",
+        "model.vision_model.embeddings.position_embedding.weight",
+        "model.vision_model.post_layernorm.weight",
+        "model.vision_model.post_layernorm.bias",
+        "model.connector.modality_projection.proj.weight",
+    }
+    for i in range(2):
+        prefix = f"model.vision_model.encoder.layers.{i}"
+        vision |= {
+            f"{prefix}.layer_norm1.weight",
+            f"{prefix}.layer_norm1.bias",
+            f"{prefix}.layer_norm2.weight",
+            f"{prefix}.layer_norm2.bias",
+        } | {
+            f"{prefix}.self_attn.{proj}_proj.weight" for proj in ("q", "k", "v", "out")
+        } | {
+            f"{prefix}.self_attn.{proj}_proj.bias" for proj in ("q", "k", "v", "out")
+        } | {
+            f"{prefix}.mlp.{proj}.weight" for proj in ("fc1", "fc2")
+        } | {
+            f"{prefix}.mlp.{proj}.bias" for proj in ("fc1", "fc2")
+        }
+    return text | vision
+
+
+def _idefics3_checkpoint(directory):
+    text_config = LlamaConfig(
+        vocab_size=296,
+        hidden_size=64,
+        intermediate_size=128,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        max_position_embeddings=256,
+        rope_theta=10000.0,
+        rms_norm_eps=1e-6,
+        attention_bias=False,
+        tie_word_embeddings=False,
+        bos_token_id=None,
+        pad_token_id=None,
+        eos_token_id=295,
+    )
+    # The pinned transformers releases Idefics3's vision tower as Idefics3VisionConfig
+    # (SiglipVisionConfig instances are not accepted by Idefics3Config); same field set.
+    vision_config = Idefics3VisionConfig(
+        hidden_size=64,
+        intermediate_size=128,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        image_size=32,
+        patch_size=8,
+        hidden_act="gelu_pytorch_tanh",
+        layer_norm_eps=1e-6,
+        attention_dropout=0.0,
+        num_channels=3,
+    )
+    config = Idefics3Config(
+        text_config=text_config,
+        vision_config=vision_config,
+        image_token_id=256,
+        scale_factor=2,
+        tie_word_embeddings=False,
+        torch_dtype="float32",
+    )
+    model = Idefics3ForConditionalGeneration(config).eval().float()
+    expected = _idefics3_expected_tensors()
+    actual = set(model.state_dict())
+    if actual != expected:
+        raise ValueError(
+            "Idefics3 checkpoint tensor manifest mismatch: "
+            f"missing={sorted(expected - actual)} extra={sorted(actual - expected)}"
+        )
+    model.save_pretrained(directory, safe_serialization=True)
+    reloaded = Idefics3ForConditionalGeneration.from_pretrained(
+        directory, attn_implementation="eager", dtype=torch.float32, local_files_only=True
+    )
+    if set(reloaded.state_dict()) != expected:
+        raise ValueError("the reloaded Idefics3 checkpoint does not match the expected tensor manifest")
+
+
+def _idefics3_tokenizer_bundle(directory):
+    """Write the 296-token byte-identity BPE bundle. The file mirrors the WP4 SmolVLM
+    bundle field-for-field (same pre-tokenizer, decoder and BPE field names, the
+    pre-merge_criteria schema) so both the pinned transformers stack and the jmlx-tokenizer
+    Java loader read it; only the vocab and the (empty) merges differ."""
+    wp4_vocab = json.loads(WP4_SMOLOLM_TOKENIZER.read_text())["model"]["vocab"]
+    table = _idefics3_byte_token_table(wp4_vocab)
+    vocab = {string: byte for byte, string in table.items()}
+    vocab.update(dict(IDEFICS3_SPECIAL_TOKENS))
+    if len(vocab) != 296:
+        raise ValueError(f"the tiny Idefics3 vocab must have 296 entries, got {len(vocab)}")
+    tokenizer_json = {
+        "version": "1.0",
+        "truncation": None,
+        "padding": None,
+        "added_tokens": [
+            {
+                "id": token_id,
+                "content": content,
+                "single_word": False,
+                "lstrip": False,
+                "rstrip": False,
+                "normalized": False,
+                "special": True,
+            }
+            for content, token_id in IDEFICS3_SPECIAL_TOKENS
+        ],
+        "normalizer": None,
+        "pre_tokenizer": {
+            "type": "Sequence",
+            "pretokenizers": [
+                {"type": "Digits", "individual_digits": True},
+                {
+                    "type": "ByteLevel",
+                    "add_prefix_space": False,
+                    "trim_offsets": True,
+                    "use_regex": True,
+                },
+            ],
+        },
+        "post_processor": None,
+        "decoder": {"type": "ByteLevel", "add_prefix_space": True, "trim_offsets": True, "use_regex": True},
+        "model": {
+            "type": "BPE",
+            "dropout": None,
+            "unk_token": None,
+            "continuing_subword_prefix": None,
+            "end_of_word_suffix": None,
+            "fuse_unk": False,
+            "byte_fallback": True,
+            "ignore_merges": False,
+            "vocab": vocab,
+            "merges": [],
+        },
+    }
+    (directory / "tokenizer.json").write_text(json.dumps(tokenizer_json, indent=2) + "\n")
+    # No bos/pad/unk keys: GPT2TokenizerFast's defaults are empty-string tokens with
+    # add_bos_token=False, so add_special_tokens=True adds nothing.
+    tokenizer_config = {
+        "add_prefix_space": False,
+        "eos_token": "<eos>",
+        "model_max_length": 1000000,
+        "processor_class": "Idefics3Processor",
+        "tokenizer_class": "GPT2Tokenizer",
+    }
+    (directory / "tokenizer_config.json").write_text(json.dumps(tokenizer_config, indent=2) + "\n")
+    (directory / "added_tokens.json").write_text(
+        json.dumps(dict(IDEFICS3_SPECIAL_TOKENS), indent=2, sort_keys=True) + "\n"
+    )
+    # WP4's special_tokens_map.json entry shape (no "special" key on the markers).
+    marker_entries = [
+        {"content": content, "lstrip": False, "normalized": False, "rstrip": False, "single_word": False}
+        for content, _ in IDEFICS3_SPECIAL_TOKENS
+        if content != "<eos>"
+    ]
+    special_tokens_map = {"eos_token": "<eos>", "additional_special_tokens": marker_entries}
+    (directory / "special_tokens_map.json").write_text(json.dumps(special_tokens_map, indent=2) + "\n")
+    preprocessor_config = {
+        "do_convert_rgb": True,
+        "do_image_splitting": True,
+        "do_normalize": True,
+        "do_pad": True,
+        "do_rescale": True,
+        "do_resize": True,
+        "image_mean": [0.5, 0.5, 0.5],
+        "image_processor_type": "Idefics3ImageProcessor",
+        "image_std": [0.5, 0.5, 0.5],
+        "max_image_size": {"longest_edge": 32},
+        "processor_class": "Idefics3Processor",
+        "resample": 1,
+        "rescale_factor": 0.00392156862745098,
+        "size": {"longest_edge": 64},
+    }
+    (directory / "preprocessor_config.json").write_text(json.dumps(preprocessor_config, indent=2) + "\n")
+    # Same two keys as the WP4 bundle's processor_config.json.
+    (directory / "processor_config.json").write_text(
+        json.dumps({"image_seq_len": 4, "processor_class": "Idefics3Processor"}, indent=2) + "\n"
+    )
+
+
+def _idefics3_images(images_dir):
+    """The three deterministic WP6 probe images: opaque 8-bit RGB lossless PNGs whose
+    row-major pixel channel index i (over w*h*3 channels) is (i * 7 + 3) % 256, the
+    smolvlm_images() formula."""
+    import numpy as np
+    from PIL import Image
+
+    images = {}
+    for name, width, height in (
+        ("img-32x32.png", 32, 32),
+        ("img-64x32.png", 64, 32),
+        ("img-24x32.png", 24, 32),
+    ):
+        arr = ((np.arange(width * height * 3, dtype=np.uint32) * 7 + 3) % 256).astype(
+            "uint8").reshape(height, width, 3)
+        path = images_dir / name
+        Image.fromarray(arr, "RGB").save(path)
+        images[name] = Image.open(path)
+    return images
+
+
+def _idefics3_check_tokenizer(tokenizer, label):
+    for content, token_id in IDEFICS3_SPECIAL_TOKENS:
+        if tokenizer.encode(content, add_special_tokens=False) != [token_id]:
+            raise ValueError(f"{label} encodes {content!r} as {tokenizer.encode(content, add_special_tokens=False)}, expected [{token_id}]")
+    for text, expected in (("\n", [10]), ("\n\n", [10, 10]), ("a b", [97, 32, 98])):
+        actual = tokenizer.encode(text, add_special_tokens=False)
+        if actual != expected:
+            raise ValueError(f"{label} encodes {text!r} as {actual}, expected {expected}")
+    prompt = "<image> what is this"
+    plain = tokenizer.encode(prompt, add_special_tokens=False)
+    special = tokenizer(prompt, add_special_tokens=True).input_ids
+    if special != plain:
+        raise ValueError(
+            f"{label} with add_special_tokens=True must encode {prompt!r} exactly like "
+            f"add_special_tokens=False (no bos added): {special} vs {plain}"
+        )
+
+
+def _idefics3_check_slot_tokens(name, prompt, expanded, expected_geometry):
+    """Every <image> slot must expand to exactly (rows * cols + 1) * 4 copies of the image
+    token, bracketed by rows * cols + 2 fake-token markers, and carry rows + 1 newlines."""
+    if "\n" in prompt:
+        raise ValueError(f"{name}: probe prompts must not contain newlines")
+    fake_positions = [index for index, token in enumerate(expanded) if token == 257]
+    cursor = 0
+    total_image_tokens = 0
+    for index, (rows, cols) in enumerate(expected_geometry):
+        expected_fakes = rows * cols + 2
+        if cursor + expected_fakes > len(fake_positions):
+            raise ValueError(f"{name} image {index + 1}: not enough fake-token markers to delimit the slot")
+        region = expanded[fake_positions[cursor]: fake_positions[cursor + expected_fakes - 1] + 1]
+        image_count = region.count(256)
+        newline_count = region.count(10)
+        expected_images = (rows * cols + 1) * 4
+        if image_count != expected_images:
+            raise ValueError(
+                f"{name} image {index + 1}: slot carries {image_count} image tokens, expected {expected_images}"
+            )
+        if rows > 0 and newline_count != rows + 1:
+            raise ValueError(
+                f"{name} image {index + 1}: slot carries {newline_count} newlines, expected {rows + 1}"
+            )
+        total_image_tokens += expected_images
+        cursor += expected_fakes
+    if cursor != len(fake_positions):
+        raise ValueError(f"{name}: {len(fake_positions) - cursor} stray fake-token markers")
+    if expanded.count(256) != total_image_tokens:
+        raise ValueError(
+            f"{name}: {expanded.count(256)} image tokens in the expanded sequence, expected {total_image_tokens}"
+        )
+
+
+def _idefics3_geometry_probe(processor, tokenizer, images, cases_spec):
+    cases = []
+    for name, image_names, prompt, expected_geometry in cases_spec:
+        pil_images = [images[image_name] for image_name in image_names]
+        unexpanded = processor.tokenizer(prompt, add_special_tokens=False).input_ids
+        if image_names:
+            output = processor(images=pil_images, text=[prompt], return_tensors=None)
+        else:
+            output = processor(text=[prompt], return_tensors=None)
+        expanded = output["input_ids"][0]
+        # The processor does not surface the per-image geometry; the image processor's own
+        # patch-count helper is the authoritative source for the rows/cols of each split.
+        rows, cols = [], []
+        for image_name in image_names:
+            image = images[image_name]
+            # 4.57.6 reads images_kwargs unguarded, so it must be a (possibly empty) dict.
+            _, tile_rows, tile_cols = processor.image_processor.get_number_of_image_patches(
+                image.height, image.width, images_kwargs={}
+            )
+            rows.append(tile_rows)
+            cols.append(tile_cols)
+        if (len(rows), len(cols)) != (len(expected_geometry),) * 2:
+            raise ValueError(
+                f"{name}: expected {len(expected_geometry)} tile groups, got rows={rows} cols={cols}"
+            )
+        num_tiles = []
+        for index, (expected_rows, expected_cols) in enumerate(expected_geometry):
+            if (rows[index], cols[index]) != (expected_rows, expected_cols):
+                raise ValueError(
+                    f"{name} image {index + 1}: expected rows={expected_rows} cols={expected_cols}, "
+                    f"got rows={rows[index]} cols={cols[index]}"
+                )
+            num_tiles.append(rows[index] * cols[index] + 1 if rows[index] > 0 else 1)
+        _idefics3_check_slot_tokens(name, prompt, expanded, expected_geometry)
+        cases.append(
+            {
+                "name": name,
+                "prompt": prompt,
+                "images": [
+                    {"file": image_name, "width": images[image_name].width, "height": images[image_name].height}
+                    for image_name in image_names
+                ],
+                "unexpanded_ids": unexpanded,
+                "expanded_ids": expanded,
+                "rows": rows,
+                "cols": cols,
+                "num_tiles": num_tiles,
+                "note": "skeleton golden: WP6 unit 1b appends the numerical case results "
+                        "(pixel values, image features, logits, decoded ids) to this case",
+            }
+        )
+    return cases
+
+
+def generate_idefics3(out):
+    """WP6 unit 1: the tiny Idefics3 checkpoint, the byte-identity tokenizer bundle, the
+    processor fixture, the tile-geometry probe, and the skeleton idefics3.json golden.
+    Unit 1b appends the numerical case goldens (embeddings, logits, decode) here."""
+    directory = out / IDEFICS3_CHECKPOINT_DIR
+    images_dir = directory / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    torch.manual_seed(SEED + 11)
+    previous_threads = torch.get_num_threads()
+    torch.set_num_threads(1)
+    try:
+        _idefics3_checkpoint(directory)
+    finally:
+        torch.set_num_threads(previous_threads)
+    _idefics3_tokenizer_bundle(directory)
+    images = _idefics3_images(images_dir)
+
+    processor = AutoProcessor.from_pretrained(directory, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(directory, local_files_only=True)
+    _idefics3_check_tokenizer(tokenizer, "the standalone tokenizer")
+    _idefics3_check_tokenizer(processor.tokenizer, "the processor tokenizer")
+
+    cases = _idefics3_geometry_probe(processor, tokenizer, images, IDEFICS3_CASES)
+    image_info = [
+        {
+            "file": image_name,
+            "width": images[image_name].width,
+            "height": images[image_name].height,
+            "png_sha256": hashlib.sha256((images_dir / image_name).read_bytes()).hexdigest(),
+        }
+        for image_name in ("img-32x32.png", "img-64x32.png", "img-24x32.png")
+    ]
+    golden = {
+        "family": "idefics3",
+        "seed": SEED + 11,
+        "config": json.loads((directory / "config.json").read_text()),
+        "preprocessor_config": json.loads((directory / "preprocessor_config.json").read_text()),
+        "processor_config": json.loads((directory / "processor_config.json").read_text()),
+        "special_tokens": dict(IDEFICS3_SPECIAL_TOKENS),
+        "images": image_info,
+        "cases": cases,
+    }
+    (out / "idefics3.json").write_text(json.dumps(golden, indent=2) + "\n")
+    update_provenance(out)
+
+
 def update_provenance(out, tokenizer_root=None):
     source = Path(transformers.__file__).parent / "modeling_rope_utils.py"
     files = {str(path.relative_to(out)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -495,7 +978,8 @@ def main():
     if sys.version_info[:2] != (3, 12):
         raise RuntimeError("Python 3.12 is required")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--family", choices=(*FAMILIES, "smolvlm", "rope", "phase72", "all"),
+    parser.add_argument("--family",
+                        choices=(*FAMILIES, "smolvlm", "rope", "phase72", "idefics3", "all"),
                         required=True)
     parser.add_argument("--out", type=Path, required=True, help="goldens directory")
     parser.add_argument("--chat", action="store_true", help="generate chat goldens only")
@@ -508,6 +992,9 @@ def main():
     if args.family == "phase72":
         from phase72 import generate
         generate(args.out)
+        return
+    if args.family == "idefics3":
+        generate_idefics3(args.out)
         return
     if args.window_cases:
         if args.family != "mistral" or args.chat:

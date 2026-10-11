@@ -2,21 +2,35 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import se.alipsa.jmlx.core.DType;
+import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
+import se.alipsa.jmlx.tokenizer.TokenizerException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Native public-generation contracts, including zero-work and failure/reuse paths. */
 @EnabledIfNativeAvailable
@@ -24,13 +38,10 @@ class SmolVlmGenerationTest {
   @Test
   void tiedWeightsUseNumericalDeviceEquality() {
     try (MLXScope root = new MLXScope()) {
-      MLXArray embedding =
-          se.alipsa.jmlx.core.MLX.array(root, new float[] {1f, 0f}, new int[] {1, 2});
-      MLXArray equal = se.alipsa.jmlx.core.MLX.array(root, new float[] {1f, -0f}, new int[] {1, 2});
-      MLXArray different =
-          se.alipsa.jmlx.core.MLX.array(root, new float[] {2f, 0f}, new int[] {1, 2});
-      MLXArray nan =
-          se.alipsa.jmlx.core.MLX.array(root, new float[] {Float.NaN, 0f}, new int[] {1, 2});
+      MLXArray embedding = MLX.array(root, new float[] {1f, 0f}, new int[] {1, 2});
+      MLXArray equal = MLX.array(root, new float[] {1f, -0f}, new int[] {1, 2});
+      MLXArray different = MLX.array(root, new float[] {2f, 0f}, new int[] {1, 2});
+      MLXArray nan = MLX.array(root, new float[] {Float.NaN, 0f}, new int[] {1, 2});
       assertTrue(SmolVlmModel.sameWeights(equal, embedding));
       assertFalse(SmolVlmModel.sameWeights(different, embedding));
       assertFalse(SmolVlmModel.sameWeights(nan, nan));
@@ -38,24 +49,22 @@ class SmolVlmGenerationTest {
   }
 
   @Test
-  void missingRequestMarkersAreArgumentErrors(
-      @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+  void missingRequestMarkersAreArgumentErrors(@TempDir Path dir) throws Exception {
     try (MLXScope root = new MLXScope()) {
       SmolVlmModel model = SmolVlmModel.load(root, SmolVlmGoldenTest.directory());
       for (String marker : List.of("<image>", "<row_1_col_1>")) {
-        var mapper = new tools.jackson.databind.ObjectMapper();
+        var mapper = new ObjectMapper();
         var tree =
             mapper.readTree(SmolVlmGoldenTest.directory().resolve("tokenizer.json").toFile());
-        ((tools.jackson.databind.node.ObjectNode) tree.required("model").required("vocab"))
-            .remove(marker);
-        var added = (tools.jackson.databind.node.ArrayNode) tree.required("added_tokens");
+        ((ObjectNode) tree.required("model").required("vocab")).remove(marker);
+        var added = (ArrayNode) tree.required("added_tokens");
         for (int i = added.size() - 1; i >= 0; i--) {
           if (marker.equals(added.get(i).required("content").asString())) {
             added.remove(i);
           }
         }
-        java.nio.file.Path file = dir.resolve("tokenizer.json");
-        java.nio.file.Files.writeString(file, mapper.writeValueAsString(tree));
+        Path file = dir.resolve("tokenizer.json");
+        Files.writeString(file, mapper.writeValueAsString(tree));
         HfTokenizer tokenizer = HfTokenizer.fromFile(file);
         GenerationRequest request =
             GenerationRequest.text(
@@ -68,8 +77,7 @@ class SmolVlmGenerationTest {
             assertThrows(
                 IllegalArgumentException.class, () -> model.generate(request, ignored -> {}));
         assertEquals("request tokenizer does not match model image markers", failure.getMessage());
-        org.junit.jupiter.api.Assertions.assertInstanceOf(
-            se.alipsa.jmlx.tokenizer.TokenizerException.class, failure.getCause());
+        assertInstanceOf(TokenizerException.class, failure.getCause());
       }
     }
   }
@@ -86,25 +94,24 @@ class SmolVlmGenerationTest {
   }
 
   @Test
-  void tokenizerFailureReportsUnexpandedPrompt(
-      @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+  void tokenizerFailureReportsUnexpandedPrompt(@TempDir Path dir) throws Exception {
     JsonNode c = SmolVlmGoldenTest.golden().required("cases").get(0);
     try (MLXScope root = new MLXScope()) {
       SmolVlmModel model = SmolVlmModel.load(root, SmolVlmGoldenTest.directory());
       GenerationRequest base = SmolVlmGoldenTest.request(c, 1);
       int first = model.generate(base, ignored -> {}).generatedTokenIds().getFirst();
-      tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+      ObjectMapper mapper = new ObjectMapper();
       var tree = mapper.readTree(SmolVlmGoldenTest.directory().resolve("tokenizer.json").toFile());
-      var vocab = (tools.jackson.databind.node.ObjectNode) tree.required("model").required("vocab");
+      var vocab = (ObjectNode) tree.required("model").required("vocab");
       String missing =
           vocab.properties().stream()
               .filter(e -> e.getValue().asInt() == first)
-              .map(java.util.Map.Entry::getKey)
+              .map(Map.Entry::getKey)
               .findFirst()
               .orElseThrow();
       vocab.remove(missing);
-      java.nio.file.Path file = dir.resolve("tokenizer.json");
-      java.nio.file.Files.writeString(file, mapper.writeValueAsString(tree));
+      Path file = dir.resolve("tokenizer.json");
+      Files.writeString(file, mapper.writeValueAsString(tree));
       HfTokenizer tokenizer = HfTokenizer.fromFile(file);
       GenerationRequest request =
           GenerationRequest.text(
@@ -125,48 +132,40 @@ class SmolVlmGenerationTest {
   }
 
   @Test
-  void halfStorageIsUpcastAndBadPatchShapesAreRejected(
-      @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
-    try (var files = java.nio.file.Files.list(SmolVlmGoldenTest.directory())) {
-      for (java.nio.file.Path source : files.filter(java.nio.file.Files::isRegularFile).toList()) {
+  void halfStorageIsUpcastAndBadPatchShapesAreRejected(@TempDir Path dir) throws Exception {
+    try (var files = Files.list(SmolVlmGoldenTest.directory())) {
+      for (Path source : files.filter(Files::isRegularFile).toList()) {
         if (!source.toString().endsWith(".safetensors")) {
-          java.nio.file.Files.copy(source, dir.resolve(source.getFileName()));
+          Files.copy(source, dir.resolve(source.getFileName()));
         }
       }
     }
     try (MLXScope root = new MLXScope()) {
       var original =
-          se.alipsa
-              .jmlx
-              .core
-              .MLXIO
+          MLXIO
               .loadSafetensors(
                   root, SmolVlmGoldenTest.directory().resolve("model.safetensors").toString())
               .tensors();
-      for (var dtype :
-          List.of(se.alipsa.jmlx.core.DType.FLOAT16, se.alipsa.jmlx.core.DType.BFLOAT16)) {
-        java.util.Map<String, MLXArray> half = new java.util.LinkedHashMap<>();
-        original.forEach(
-            (key, value) -> half.put(key, se.alipsa.jmlx.core.MLX.astype(value, dtype)));
-        se.alipsa.jmlx.core.MLXIO.saveSafetensors(
-            dir.resolve("model.safetensors").toString(), half, java.util.Map.of());
+      for (var dtype : List.of(DType.FLOAT16, DType.BFLOAT16)) {
+        Map<String, MLXArray> half = new LinkedHashMap<>();
+        original.forEach((key, value) -> half.put(key, MLX.astype(value, dtype)));
+        MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), half, Map.of());
         SmolVlmModel model = SmolVlmModel.load(root, dir);
         assertTrue(
             model.towerForTest().parameters().values().stream()
-                .allMatch(a -> a.dtype() == se.alipsa.jmlx.core.DType.FLOAT32));
+                .allMatch(a -> a.dtype() == DType.FLOAT32));
         assertTrue(
             model.decoderForTest().parameters().values().stream()
-                .allMatch(a -> a.dtype() == se.alipsa.jmlx.core.DType.FLOAT32));
+                .allMatch(a -> a.dtype() == DType.FLOAT32));
         GenerationRequest request =
             SmolVlmGoldenTest.request(SmolVlmGoldenTest.golden().required("cases").get(0), 1);
         assertEquals(1, model.generate(request, ignored -> {}).generatedTokenIds().size());
       }
-      java.util.Map<String, MLXArray> wrong = new java.util.LinkedHashMap<>(original);
+      Map<String, MLXArray> wrong = new LinkedHashMap<>(original);
       wrong.put(
           "model.vision_model.embeddings.patch_embedding.weight",
-          se.alipsa.jmlx.core.MLX.array(root, new float[64 * 8 * 8 * 3], new int[] {64, 8, 8, 3}));
-      se.alipsa.jmlx.core.MLXIO.saveSafetensors(
-          dir.resolve("model.safetensors").toString(), wrong, java.util.Map.of());
+          MLX.array(root, new float[64 * 8 * 8 * 3], new int[] {64, 8, 8, 3}));
+      MLXIO.saveSafetensors(dir.resolve("model.safetensors").toString(), wrong, Map.of());
       assertThrows(IllegalArgumentException.class, () -> SmolVlmModel.load(root, dir));
     }
   }
@@ -328,7 +327,7 @@ class SmolVlmGenerationTest {
           IllegalArgumentException.class,
           () ->
               model.generate(
-                  base.withImages(java.util.Collections.nCopies(17, base.images().getFirst())),
+                  base.withImages(Collections.nCopies(17, base.images().getFirst())),
                   ignored -> {}));
       int[] tooLong = new int[257];
       Arrays.fill(tooLong, 32);

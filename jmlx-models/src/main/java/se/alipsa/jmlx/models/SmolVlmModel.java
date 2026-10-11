@@ -221,7 +221,11 @@ public final class SmolVlmModel implements TextGenerationModel {
     DecoderModel.validateTokenIds(original, request.config(), metadata.vocabSize());
     if (request.tokenizer() != null) {
       if (request.tokenizer().vocabSize() > metadata.vocabSize()) {
-        throw new IllegalArgumentException("request tokenizer does not match model image markers");
+        throw new IllegalArgumentException(
+            "tokenizer vocabulary size "
+                + request.tokenizer().vocabSize()
+                + " exceeds checkpoint vocabulary size "
+                + metadata.vocabSize());
       }
       SmolVlmPromptTokens requestTokens;
       try {

@@ -13,11 +13,13 @@ import java.util.function.Consumer;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.KVCache;
 import se.alipsa.jmlx.nn.KVCachePolicy;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
+import se.alipsa.jmlx.tokenizer.TokenizerException;
 import se.alipsa.jmlx.vision.ImageTensor;
 import se.alipsa.jmlx.vision.RgbImage;
 import se.alipsa.jmlx.vision.SmolVlmImageProcessor;
@@ -127,9 +129,8 @@ public final class SmolVlmModel implements TextGenerationModel {
     validateTextShapes(d, textWeights);
     if (d.text().head().tied()
         && textWeights.containsKey("lm_head.weight")
-        && !Arrays.equals(
-            textWeights.get("lm_head.weight").toFloatArray(),
-            textWeights.get("model.embed_tokens.weight").toFloatArray())) {
+        && !sameWeights(
+            textWeights.get("lm_head.weight"), textWeights.get("model.embed_tokens.weight"))) {
       throw new IllegalArgumentException("tied lm_head alias differs from token embeddings");
     }
     Map<String, MLXArray> vision = new LinkedHashMap<>();
@@ -197,6 +198,8 @@ public final class SmolVlmModel implements TextGenerationModel {
   }
 
   private static int special(HfTokenizer tokenizer, String name) {
+    // The tokenizer's configured-token lookup is exposed through eosTokenId(String); it accepts
+    // any vocabulary token. The checks below independently require a declared special marker.
     int id = tokenizer.eosTokenId(name).orElseThrow();
     if (!tokenizer.decode(List.of(id), true).isEmpty()
         || !tokenizer.encode(name, false).equals(List.of(id))) {
@@ -217,8 +220,17 @@ public final class SmolVlmModel implements TextGenerationModel {
     int[] original = request.promptTokenIds();
     DecoderModel.validateTokenIds(original, request.config(), metadata.vocabSize());
     if (request.tokenizer() != null) {
-      if (request.tokenizer().vocabSize() > metadata.vocabSize()
-          || !resolveTokens(request.tokenizer()).equals(tokens)) {
+      if (request.tokenizer().vocabSize() > metadata.vocabSize()) {
+        throw new IllegalArgumentException("request tokenizer does not match model image markers");
+      }
+      SmolVlmPromptTokens requestTokens;
+      try {
+        requestTokens = resolveTokens(request.tokenizer());
+      } catch (TokenizerException | IllegalArgumentException failure) {
+        throw new IllegalArgumentException(
+            "request tokenizer does not match model image markers", failure);
+      }
+      if (!requestTokens.equals(tokens)) {
         throw new IllegalArgumentException("request tokenizer does not match model image markers");
       }
     }
@@ -394,6 +406,15 @@ public final class SmolVlmModel implements TextGenerationModel {
 
   private static int[] ints(List<Integer> ids) {
     return ids.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  /** Numerical device equality: signed zeros agree; NaNs fail alias validation, even in pairs. */
+  static boolean sameWeights(MLXArray head, MLXArray embedding) {
+    try (MLXArray equal = MLXOps.equal(head, embedding);
+        MLXArray all = MLXOps.all(equal);
+        MLXArray scalar = MLX.astype(all, DType.INT32)) {
+      return scalar.toIntArray()[0] != 0;
+    }
   }
 
   private static void requireShape(MLXArray array, int... shape) {

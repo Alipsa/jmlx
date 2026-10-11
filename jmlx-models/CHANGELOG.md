@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Compare tied image/text checkpoint head aliases on the device, reading back one scalar;
+  numerical equality accepts signed-zero differences and rejects NaNs. Normalize request-tokenizer
+  marker validation failures to `IllegalArgumentException` while preserving their causes.
+- Remove the shared generation loop's unused step-zero token array/preflight; first-step callers
+  own their real prompt validation and cache-failure guards. Document the production embedding
+  hook and its position before embedding scaling.
+
 - Add `SmolVlmModel` and `idefics3` dispatch through `TextGenerationModels.load`: strict floating
   checkpoint assembly, FLOAT32 computation, image-marker resolution, tower/connector prefill,
   concatenate/gather feature replacement and cached generation using the shared decoder loop.

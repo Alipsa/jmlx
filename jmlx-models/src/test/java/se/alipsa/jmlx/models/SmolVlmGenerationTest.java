@@ -22,6 +22,59 @@ import tools.jackson.databind.JsonNode;
 @EnabledIfNativeAvailable
 class SmolVlmGenerationTest {
   @Test
+  void tiedWeightsUseNumericalDeviceEquality() {
+    try (MLXScope root = new MLXScope()) {
+      MLXArray embedding =
+          se.alipsa.jmlx.core.MLX.array(root, new float[] {1f, 0f}, new int[] {1, 2});
+      MLXArray equal = se.alipsa.jmlx.core.MLX.array(root, new float[] {1f, -0f}, new int[] {1, 2});
+      MLXArray different =
+          se.alipsa.jmlx.core.MLX.array(root, new float[] {2f, 0f}, new int[] {1, 2});
+      MLXArray nan =
+          se.alipsa.jmlx.core.MLX.array(root, new float[] {Float.NaN, 0f}, new int[] {1, 2});
+      assertTrue(SmolVlmModel.sameWeights(equal, embedding));
+      assertFalse(SmolVlmModel.sameWeights(different, embedding));
+      assertFalse(SmolVlmModel.sameWeights(nan, nan));
+    }
+  }
+
+  @Test
+  void missingRequestMarkersAreArgumentErrors(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    try (MLXScope root = new MLXScope()) {
+      SmolVlmModel model = SmolVlmModel.load(root, SmolVlmGoldenTest.directory());
+      for (String marker : List.of("<image>", "<row_1_col_1>")) {
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        var tree =
+            mapper.readTree(SmolVlmGoldenTest.directory().resolve("tokenizer.json").toFile());
+        ((tools.jackson.databind.node.ObjectNode) tree.required("model").required("vocab"))
+            .remove(marker);
+        var added = (tools.jackson.databind.node.ArrayNode) tree.required("added_tokens");
+        for (int i = added.size() - 1; i >= 0; i--) {
+          if (marker.equals(added.get(i).required("content").asString())) {
+            added.remove(i);
+          }
+        }
+        java.nio.file.Path file = dir.resolve("tokenizer.json");
+        java.nio.file.Files.writeString(file, mapper.writeValueAsString(tree));
+        HfTokenizer tokenizer = HfTokenizer.fromFile(file);
+        GenerationRequest request =
+            GenerationRequest.text(
+                tokenizer,
+                "text",
+                PromptSpecialTokens.OMIT,
+                GenerationConfig.greedyDefaults(0, Set.of()),
+                CancellationToken.NONE);
+        IllegalArgumentException failure =
+            assertThrows(
+                IllegalArgumentException.class, () -> model.generate(request, ignored -> {}));
+        assertEquals("request tokenizer does not match model image markers", failure.getMessage());
+        org.junit.jupiter.api.Assertions.assertInstanceOf(
+            se.alipsa.jmlx.tokenizer.TokenizerException.class, failure.getCause());
+      }
+    }
+  }
+
+  @Test
   void zeroTokenPathDoesNotTouchEvenAClosedNativeScope() throws Exception {
     SmolVlmModel model;
     try (MLXScope root = new MLXScope()) {

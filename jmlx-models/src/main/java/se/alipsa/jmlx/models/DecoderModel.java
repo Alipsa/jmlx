@@ -158,7 +158,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
         tiedOutput);
   }
 
-  /** Test seam: perturbs the embedded activations of selected rows right after the lookup. */
+  /**
+   * Transforms embeddings immediately after token lookup, before the optional sqrt-hidden scale.
+   * Composing vision models merge image features here; scheduler tests also perturb selected rows.
+   * Any supplied features receive the same subsequent embedding scale as the token embeddings.
+   */
   @FunctionalInterface
   interface EmbeddingHook {
     MLXArray apply(MLXArray embedded);
@@ -682,8 +686,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             break;
           }
           try (MLXScope activation = generation.newChild()) {
-            MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
-            int[] before = preflight(ids, caches);
+            int[] before = null;
             StepFailureGuard firstStepGuard = null;
             SamplingPipeline.Selection selection;
             try {
@@ -693,6 +696,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
                 lastLogits = first.logits();
                 firstStepGuard = first.guard();
               } else {
+                MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
+                before = preflight(ids, caches);
                 lastLogits = decode(ids, caches);
               }
               selection =
@@ -704,9 +709,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             } catch (RuntimeException | Error failure) {
               if (step == 0 && firstStepGuard != null) {
                 firstStepGuard.onStepFailure(caches);
-              } else {
+              } else if (before != null) {
                 poisonIfMutated(caches, before);
               }
+              // A firstStep.apply failure is guarded by the first step's own preflight/catch.
               throw failure;
             }
             int next = selection.tokenId();

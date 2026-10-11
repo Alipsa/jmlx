@@ -884,10 +884,288 @@ def _idefics3_geometry_probe(processor, tokenizer, images, cases_spec):
     return cases
 
 
+def _idefics3_tile_position_ids(pixel_mask, patch_size, patches_per_side):
+    """One tile's (position_ids, patch_mask) as the replica of get_image_features' unfold
+    plus Idefics3VisionEmbeddings.forward' bucketing: the 32x32 pixel mask is unfolded to
+    the 4x4 patch grid (source: the unfold runs on the batched 3D mask), then the
+    fractional coordinates h / nb * (1 - 1e-6) (division then multiplication, float32) are
+    bucketize(right=True)ed against the torch.arange(1/P, 1.0, 1/P) boundaries into the
+    row-major bucket_h * P + bucket_w ids, 0 at invalid patch positions."""
+    unfolded = (
+        pixel_mask[None, ...]
+        .unfold(1, patch_size, patch_size)
+        .unfold(2, patch_size, patch_size)
+        .sum((-1, -2))
+        > 0
+    )
+    patch_mask = unfolded[0]
+    nb_h = int(patch_mask[:, 0].sum())
+    nb_w = int(patch_mask[0].sum())
+    h = torch.arange(nb_h, dtype=torch.float32)
+    w = torch.arange(nb_w, dtype=torch.float32)
+    frac_h = (h / nb_h) * (1 - 1e-6)
+    frac_w = (w / nb_w) * (1 - 1e-6)
+    boundaries = torch.arange(1 / patches_per_side, 1.0, 1 / patches_per_side)
+    bucket_h = torch.bucketize(frac_h, boundaries, right=True)
+    bucket_w = torch.bucketize(frac_w, boundaries, right=True)
+    valid_ids = (bucket_h[:, None] * patches_per_side + bucket_w).flatten()
+    position_ids = torch.full((patches_per_side**2,), 0)
+    position_ids[patch_mask.view(-1)] = valid_ids
+    return position_ids.tolist(), patch_mask.view(-1).to(torch.int64).tolist()
+
+
+def _idefics3_vision_out(model, pixel_values, pixel_attention_mask):
+    """The vision encoder's post-LayerNorm output (num_tiles, 16, 64) that the hooked
+    tower_out is cross-checked against: a verbatim replica of get_image_features minus the
+    modality projection (the zero-tile drop and the patch-mask unfold included)."""
+    vision = model.model.vision_model
+    batch_size, num_images = pixel_values.shape[:2]
+    patch_size = model.config.vision_config.patch_size
+    pixels = pixel_values.to(model.dtype).view(batch_size * num_images, *pixel_values.shape[2:])
+    nb_values_per_image = pixels.shape[1:].numel()
+    real_images_inds = (pixels == 0.0).sum(dim=(-1, -2, -3)) != nb_values_per_image
+    if not bool(real_images_inds.all()):
+        raise ValueError("an all-zero padding tile would shift the per-tile cross-check indices")
+    mask = pixel_attention_mask.view(batch_size * num_images, *pixel_attention_mask.shape[2:])
+    mask = mask[real_images_inds].contiguous()
+    subgrid = mask.unfold(1, patch_size, patch_size).unfold(2, patch_size, patch_size)
+    patch_attention_mask = (subgrid.sum(dim=(-1, -2)) > 0).bool()
+    hidden = vision(
+        pixel_values=pixels[real_images_inds].contiguous(), patch_attention_mask=patch_attention_mask
+    ).last_hidden_state
+    num_patches = (pixels.shape[2] // patch_size) * (pixels.shape[3] // patch_size)
+    if tuple(hidden.shape) != (num_images, num_patches, model.config.vision_config.hidden_size):
+        raise ValueError(f"unexpected vision encoder output shape {tuple(hidden.shape)}")
+    return hidden
+
+
+def _idefics3_case_numerics(model, processor, images, case):
+    """WP6 unit 1b: compute and record the numerical goldens for one case (and drop the
+    skeleton `note`): the processor pixel data, the hooked per-tile vision intermediates
+    cross-checked against independent calls, the three-line inputs_merger replica asserted
+    bit-equal to the model's own merge, the prefill logits, a 3-step cached decode, the
+    cached/uncached agreement, and the greedy run under the checkpoint's own stop
+    semantics. All calls run single-threaded under torch.inference_mode()."""
+    expanded_list = case["expanded_ids"]
+    expanded = torch.tensor(expanded_list, dtype=torch.long)
+    seq_len = len(expanded_list)
+    image_token_id = model.config.image_token_id
+    if image_token_id != 256:
+        raise ValueError(f"the tiny Idefics3 fixture is pinned to image_token_id 256, got {image_token_id}")
+    hidden_size = model.config.text_config.hidden_size
+
+    image_files = [entry["file"] for entry in case["images"]]
+    if image_files:
+        import numpy as np
+
+        output = processor(images=[images[name] for name in image_files], text=[case["prompt"]],
+                           return_tensors=None)
+        # With return_tensors=None the processor returns nested Python lists of per-tile
+        # numpy arrays; stack them before touching torch.
+        pixel_values = torch.as_tensor(np.asarray(output["pixel_values"])).to(torch.float32)
+        pixel_mask = torch.as_tensor(np.asarray(output["pixel_attention_mask"])).to(torch.int64)
+        n_tiles = sum(case["num_tiles"])
+        if tuple(pixel_values.shape) != (1, n_tiles, 3, 32, 32):
+            raise ValueError(f"{case['name']}: pixel_values shape {tuple(pixel_values.shape)}")
+        if tuple(pixel_mask.shape) != (1, n_tiles, 32, 32):
+            raise ValueError(f"{case['name']}: pixel_attention_mask shape {tuple(pixel_mask.shape)}")
+    else:
+        output = processor(text=[case["prompt"]], return_tensors=None)
+        for key in ("pixel_values", "pixel_attention_mask"):
+            if key in output:
+                raise ValueError(f"text-only case {case['name']} unexpectedly carries {key!r}")
+        pixel_values = pixel_mask = None
+        n_tiles = 0
+    if list(output["input_ids"][0]) != expanded_list:
+        raise ValueError(f"{case['name']}: the processor re-run disagrees with the recorded expansion")
+
+    if n_tiles:
+        case["pixel_values"] = rounded(pixel_values[0].permute(0, 2, 3, 1))
+        case["pixel_attention_masks"] = pixel_mask[0].tolist()
+    else:
+        case["pixel_values"] = []
+        case["pixel_attention_masks"] = []
+
+    tiles = []
+    if n_tiles:
+        for tile in range(n_tiles):
+            position_ids, patch_mask = _idefics3_tile_position_ids(pixel_mask[0, tile], 8, 4)
+            if any(value != 1 for value in patch_mask):
+                raise ValueError(
+                    f"{case['name']} tile {tile}: the fixture pixel masks are pinned to all-ones, "
+                    f"got mask {patch_mask}"
+                )
+            tiles.append(
+                {
+                    "patch_embed": None,
+                    "embeddings": None,
+                    "tower_out": None,
+                    "connector_out": None,
+                    "position_ids": position_ids,
+                    "patch_mask": patch_mask,
+                }
+            )
+
+    captured = {}
+
+    def hook(name, module):
+        def capture(_module, _inputs, output):
+            if name in captured:
+                raise ValueError(f"{case['name']}: {name} was called more than once in one prefill")
+            captured[name] = output
+        return module.register_forward_hook(capture)
+
+    handles = []
+    if n_tiles:
+        vision = model.model.vision_model
+        handles = [
+            hook("patch_embed", vision.embeddings.patch_embedding),
+            hook("embeddings", vision.embeddings),
+            hook("tower_out", vision.post_layernorm),
+            hook("connector_out", model.model.connector.modality_projection.proj),
+        ]
+    try:
+        if n_tiles:
+            prefill = model.forward(
+                input_ids=expanded[None],
+                pixel_values=pixel_values,
+                pixel_attention_mask=pixel_mask,
+                use_cache=False,
+            )
+        else:
+            prefill = model.forward(input_ids=expanded[None], use_cache=False)
+    finally:
+        for handle in handles:
+            handle.remove()
+    if n_tiles:
+        missing = [
+            name for name in ("patch_embed", "embeddings", "tower_out", "connector_out")
+            if name not in captured
+        ]
+        if missing:
+            raise ValueError(f"{case['name']}: the prefill captured no output for {missing}")
+
+    embed = model.model.text_model.embed_tokens(expanded)
+    if n_tiles:
+        features = model.get_image_features(pixel_values, pixel_mask)
+        if tuple(features.shape) != (n_tiles, model.model.image_seq_len, hidden_size):
+            raise ValueError(f"{case['name']}: get_image_features shape {tuple(features.shape)}")
+        vision_out = _idefics3_vision_out(model, pixel_values, pixel_mask)
+        for tile, tile_info in enumerate(tiles):
+            if not torch.equal(captured["tower_out"][tile], vision_out[tile]):
+                raise ValueError(
+                    f"{case['name']} tile {tile}: the hooked tower_out differs from the independent "
+                    "vision encoder output"
+                )
+            if not torch.equal(captured["connector_out"][tile], features[tile]):
+                raise ValueError(
+                    f"{case['name']} tile {tile}: the hooked connector_out differs from "
+                    "get_image_features"
+                )
+            tile_info["patch_embed"] = rounded(captured["patch_embed"][tile].flatten(1).transpose(0, 1))
+            tile_info["embeddings"] = rounded(captured["embeddings"][tile])
+            tile_info["tower_out"] = rounded(captured["tower_out"][tile])
+            tile_info["connector_out"] = rounded(captured["connector_out"][tile])
+        image_mask = (expanded == image_token_id).unsqueeze(-1).expand_as(embed)
+        merged = embed.masked_scatter(image_mask, features.flatten(0, 1))
+    else:
+        merged = embed
+    merged_out = model.forward(inputs_embeds=merged[None], use_cache=False)
+    if not torch.equal(merged_out.logits, prefill.logits):
+        diff = (merged_out.logits - prefill.logits).abs().max().item()
+        print(
+            f"{case['name']}: the inputs_merger replica differs from the merged forward by {diff}",
+            file=sys.stderr,
+        )
+        raise ValueError(f"{case['name']}: the inputs_merger replica is not bit-equal (max diff {diff})")
+
+    destinations = [i for i, token in enumerate(expanded_list) if token == image_token_id]
+    if len(destinations) != n_tiles * 4:
+        raise ValueError(
+            f"{case['name']}: {len(destinations)} image tokens in the expansion, expected {n_tiles * 4}"
+        )
+    case["tiles"] = tiles
+    case["feature_destinations"] = destinations
+    case["merged_embeddings"] = rounded(merged)
+    case["prefill_logits"] = rounded(prefill.logits[0, -1])
+
+    decode_kwargs = {
+        "max_new_tokens": 3,
+        "do_sample": False,
+        "eos_token_id": None,
+        "pad_token_id": None,
+        "output_scores": True,
+        "return_dict_in_generate": True,
+    }
+    if n_tiles:
+        decode_kwargs.update(pixel_values=pixel_values, pixel_attention_mask=pixel_mask)
+    decoded = model.generate(input_ids=expanded[None], **decode_kwargs)
+    if len(decoded.scores) != 3 or decoded.sequences.shape[1] != seq_len + 3:
+        raise ValueError(
+            f"{case['name']}: expected exactly 3 cached decode steps, got {len(decoded.scores)} scores "
+            f"and sequence length {decoded.sequences.shape[1]} (expected {seq_len + 3})"
+        )
+    generated_ids = decoded.sequences[0, seq_len:].tolist()
+    decode_steps = []
+    for i, step_logits in enumerate(decoded.scores):
+        greedy = int(step_logits[0].argmax(-1))
+        if greedy != generated_ids[i]:
+            raise ValueError(
+                f"{case['name']} step {i}: the greedy argmax {greedy} differs from the generated "
+                f"token {generated_ids[i]}"
+            )
+        decode_steps.append({"token_id": generated_ids[i], "logits": rounded(step_logits[0])})
+    if image_token_id in generated_ids:
+        raise ValueError(
+            f"{case['name']}: the 3 decode steps generated an image token {generated_ids}; the "
+            "cached/uncached comparison is only well-defined when no generated token is an image token"
+        )
+    case["decode_steps"] = decode_steps
+    case["generated_token_ids"] = generated_ids
+
+    full_ids = torch.cat([expanded, torch.tensor(generated_ids, dtype=torch.long)])
+    if n_tiles:
+        uncached = model.forward(
+            input_ids=full_ids[None],
+            pixel_values=pixel_values,
+            pixel_attention_mask=pixel_mask,
+            use_cache=False,
+        )
+    else:
+        uncached = model.forward(input_ids=full_ids[None], use_cache=False)
+    # Step i is conditioned on the first T+i tokens, so it matches the un-cached rows T-1..T+1
+    # of the T+3-row logits (the final row, conditioned on all T+3 tokens, has no cached twin).
+    uncached_rows = uncached.logits[0, seq_len - 1 : seq_len + 2]
+    diff = 0.0
+    for i in range(3):
+        diff = max(diff, float((decoded.scores[i][0] - uncached_rows[i]).abs().max()))
+    if not diff < 1e-5:
+        raise ValueError(f"{case['name']}: the cached and uncached decode logits diverge by {diff} (>= 1e-5)")
+    case["cached_vs_uncached_max_diff"] = rounded(diff)
+    case["uncached_last_logits"] = rounded(uncached_rows)
+
+    greedy_kwargs = {"max_new_tokens": 5, "do_sample": False}
+    if n_tiles:
+        greedy_kwargs.update(pixel_values=pixel_values, pixel_attention_mask=pixel_mask)
+    greedy_out = model.generate(input_ids=expanded[None], **greedy_kwargs)
+    greedy_ids = greedy_out[0, seq_len:].tolist()
+    eos_id = 295
+    if 295 in greedy_ids:
+        if greedy_ids[-1] != eos_id:
+            raise ValueError(f"{case['name']}: the eos token 295 is not the last greedy id in {greedy_ids}")
+        finish_reason = "stop"
+    else:
+        finish_reason = "max_tokens"
+    case["greedy_ids"] = greedy_ids
+    case["finish_reason"] = finish_reason
+    case.pop("note", None)
+
+
 def generate_idefics3(out):
-    """WP6 unit 1: the tiny Idefics3 checkpoint, the byte-identity tokenizer bundle, the
-    processor fixture, the tile-geometry probe, and the skeleton idefics3.json golden.
-    Unit 1b appends the numerical case goldens (embeddings, logits, decode) here."""
+    """WP6 unit 1 + 1b: the tiny Idefics3 checkpoint, the byte-identity tokenizer bundle,
+    the processor fixture, the tile-geometry probe, and the full numerical idefics3.json
+    golden (per-case pixel data, hooked vision intermediates, merged embeddings, prefill
+    logits, cached decode, and greedy finish)."""
     directory = out / IDEFICS3_CHECKPOINT_DIR
     images_dir = directory / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
@@ -908,6 +1186,17 @@ def generate_idefics3(out):
     _idefics3_check_tokenizer(processor.tokenizer, "the processor tokenizer")
 
     cases = _idefics3_geometry_probe(processor, tokenizer, images, IDEFICS3_CASES)
+    model = Idefics3ForConditionalGeneration.from_pretrained(
+        directory, attn_implementation="eager", dtype=torch.float32, local_files_only=True
+    ).eval()
+    previous_threads = torch.get_num_threads()
+    torch.set_num_threads(1)
+    try:
+        with torch.inference_mode():
+            for case in cases:
+                _idefics3_case_numerics(model, processor, images, case)
+    finally:
+        torch.set_num_threads(previous_threads)
     image_info = [
         {
             "file": image_name,
@@ -927,8 +1216,28 @@ def generate_idefics3(out):
         "images": image_info,
         "cases": cases,
     }
-    (out / "idefics3.json").write_text(json.dumps(golden, indent=2) + "\n")
-    update_provenance(out)
+    # This golden is the one exception to the house indent=2 style: at the pinned 7-significant
+    # figure rounding, the full nested field set is ~6.5 MB indented, and the golden sanity gate
+    # caps it at 3 MB. Compact (no indent) is 2.55 MB and keeps every shape's nesting intact.
+    (out / "idefics3.json").write_text(json.dumps(golden) + "\n")
+    _idefics3_update_provenance(out)
+
+
+def _idefics3_update_provenance(out):
+    """Record the new idefics3.json digest additively: only files["idefics3.json"] changes.
+    The shared update_provenance rewrites the file wholesale (fresh host metadata, re-sorted
+    files, the phase72 section dropped), which must not happen while this golden is the only
+    changed file."""
+    path = out.parent / "provenance.json"
+    previous = path.read_text()
+    data = json.loads(previous)
+    if json.dumps(data, indent=2) + "\n" != previous:
+        raise ValueError(
+            "provenance.json is not a stable json.dumps(indent=2) round-trip; "
+            "the additive idefics3 update would rewrite its formatting by hand"
+        )
+    data["files"]["idefics3.json"] = hashlib.sha256((out / "idefics3.json").read_bytes()).hexdigest()
+    path.write_text(json.dumps(data, indent=2) + "\n")
 
 
 def update_provenance(out, tokenizer_root=None):

@@ -51,7 +51,7 @@
     "checkpoints/qwen3/generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
     "checkpoints/qwen3/model.safetensors": "9b287aa3ed5343da031ad48e600ff8a9a2784c7efac5606fea957043e0a8d642",
     "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
-    "idefics3.json": "704565b07186c62be2937af303c5d6404c261e7d2af18b9fc358f5b6589d265d",
+    "idefics3.json": "684374ff2f632688b887db02cfd38ad0650db28d1a1ff8d418c50dbaa2d701db",
     "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
     "llama31.json": "51c231ec47bfa9461ca7b1b85cfc9899b21ab0691e218510d5f0f49cd706b5a4",
     "mistral-window.json": "66925477007852aaeddd4f0571c0ae410045b1359c8802caaf09a9a5431269e4",

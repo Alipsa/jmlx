@@ -594,11 +594,77 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               + " exceeds checkpoint vocabulary size "
               + config.vocabSize());
     }
+    return runStepLoop(
+        request,
+        policy,
+        prompt,
+        prompt,
+        prompt.length,
+        cachePolicy,
+        listener,
+        (activation, stepCaches) -> {
+          MLXArray ids = MLX.array(activation, prompt, new int[] {1, prompt.length});
+          int[][] before = preflightBatch(ids, stepCaches, new int[] {prompt.length});
+          MLXArray logits = stepLogits(ids, stepCaches, new int[] {prompt.length}, null);
+          return new FirstStepResult(
+              logits, cs -> poisonBatchIfMutated(cs, before, before[0].length));
+        });
+  }
+
+  /**
+   * Step 0 of {@link #runStepLoop}, caller-supplied so a composing model (the SmolVLM work, WP6,
+   * this package) can run its own vision-merge first step. It receives the step's activation scope,
+   * in which it must build any token-ID array it needs, and the request's fresh cache set.
+   */
+  @FunctionalInterface
+  interface FirstStep {
+    FirstStepResult apply(MLXScope activation, List<KVCache> caches);
+  }
+
+  /**
+   * Step 0's lazy {@code [1,1,V]} logits plus the guard the loop applies when a failure happens
+   * after the step's lazy graph has already advanced the caches.
+   */
+  record FirstStepResult(MLXArray logits, StepFailureGuard guard) {}
+
+  /**
+   * Poisons the caches on a first-step failure, using the position snapshot the first step captured
+   * before it advanced them.
+   */
+  @FunctionalInterface
+  interface StepFailureGuard {
+    void onStepFailure(List<KVCache> caches);
+  }
+
+  /**
+   * The shared generation step loop behind {@link #generate(GenerationRequest, Consumer)}: the
+   * per-step activation scope, the per-request generation scope, sampler, caches, cancellation
+   * checks, token and terminal events and the result construction. Step 0 is caller-supplied
+   * through {@code firstStep} -- the decoder passes a first step that runs the plain batched {@link
+   * #stepLogits} prefill, while a composing model (the SmolVLM work, WP6, this package) passes its
+   * vision-merge step; every step at 1 or higher always uses this model's own single-row {@code
+   * decode} path with its own preflight and poisoning. {@code prompt} (the unexpanded IDs) is what
+   * the result and abort reports carry; {@code frequencySeed} may differ from it, letting a vision
+   * model run the penalties over its expanded prompt; {@code promptPositions} becomes the result's
+   * {@link GenerationResult#promptPositions()}. All request validation stays with the caller,
+   * including the image rejection, the tokenizer-vocabulary check and the {@code maxNewTokens == 0}
+   * capacity accounting, so a zero-step run performs no step at all.
+   */
+  final GenerationResult runStepLoop(
+      GenerationRequest request,
+      GenerationConfig policy,
+      int[] prompt,
+      int[] frequencySeed,
+      int promptPositions,
+      KVCachePolicy cachePolicy,
+      Consumer<GenerationEvent> listener,
+      FirstStep firstStep) {
+    HfTokenizer tokenizer = request.tokenizer();
     List<Integer> generated = new ArrayList<>();
     List<Double> logProbabilities = new ArrayList<>();
     StringBuilder generatedText = tokenizer == null ? null : new StringBuilder();
     IncrementalTokenDecoder decoder = null;
-    LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(prompt);
+    LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(frequencySeed);
     FinishReason reason = FinishReason.MAX_TOKENS;
     if (!request.cancellationToken().isCancelled()) {
       decoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
@@ -618,9 +684,17 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
           try (MLXScope activation = generation.newChild()) {
             MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
             int[] before = preflight(ids, caches);
+            StepFailureGuard firstStepGuard = null;
             SamplingPipeline.Selection selection;
             try {
-              MLXArray lastLogits = step == 0 ? prefill(ids, caches) : decode(ids, caches);
+              MLXArray lastLogits;
+              if (step == 0) {
+                FirstStepResult first = firstStep.apply(activation, caches);
+                lastLogits = first.logits();
+                firstStepGuard = first.guard();
+              } else {
+                lastLogits = decode(ids, caches);
+              }
               selection =
                   sampler.select(
                       lastLogits,
@@ -628,7 +702,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
                       step,
                       cacheArrays(caches));
             } catch (RuntimeException | Error failure) {
-              poisonIfMutated(caches, before);
+              if (step == 0 && firstStepGuard != null) {
+                firstStepGuard.onStepFailure(caches);
+              } else {
+                poisonIfMutated(caches, before);
+              }
               throw failure;
             }
             int next = selection.tokenId();
@@ -688,7 +766,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             reason,
             logProbabilities,
             generatedText == null ? null : generatedText.toString(),
-            prompt.length);
+            promptPositions);
     try {
       listener.accept(
           terminalDelta == null
@@ -698,16 +776,6 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       LOGGER.log(System.Logger.Level.WARNING, "generation terminal listener failed", e);
     }
     return result;
-  }
-
-  private MLXArray prefill(MLXArray ids, List<KVCache> caches) {
-    MLXArray normalized = normalizedHiddenStates(ids, caches);
-    requirePostflight(caches);
-    int[] shape = normalized.shape();
-    MLXArray last =
-        MLXShape.slice(
-            normalized, new int[] {0, shape[1] - 1, 0}, new int[] {shape[0], shape[1], shape[2]});
-    return tiedOutput ? embedding.project(last) : lmHead.forward(last);
   }
 
   private MLXArray decode(MLXArray ids, List<KVCache> caches) {

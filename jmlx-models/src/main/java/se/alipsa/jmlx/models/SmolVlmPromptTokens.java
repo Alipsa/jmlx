@@ -111,11 +111,13 @@ record SmolVlmPromptTokens(
   }
 
   /** The tokenizer's lone-newline encoding; defensive copy. */
+  @Override
   public int[] rowNewlineTokenIds() {
     return rowNewlineTokenIds.clone();
   }
 
   /** The tokenizer's doubled-newline encoding; defensive copy. */
+  @Override
   public int[] globalBlockNewlineTokenIds() {
     return globalBlockNewlineTokenIds.clone();
   }

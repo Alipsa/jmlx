@@ -95,9 +95,29 @@ GenerationRequest request =
 ```
 
 Requests start image-free; `withImages` copies the caller's list (each `RgbImage` copies its pixel
-buffer), so later mutation cannot affect the request. Every delivered model is text-only today —
-`ModelMetadata.inputModalities()` defaults to `{TEXT}`, and generation (decoder and T5) as well as
-batch-scheduler admission reject non-empty images before any native work, naming the model type.
+buffer), so later mutation cannot affect the request. `SmolVlmModel` reports `{TEXT, IMAGE}` and
+accepts Idefics3 image-and-text requests. Ordinary decoder and T5 models remain text-only, and
+batch-scheduler admission rejects images before native work.
+
+`TextGenerationModels.load` dispatches `model_type=idefics3` before decoder parsing. The loader
+composes the existing Llama decoder with the Idefics3 tower/connector, resolves all image markers
+from the checkpoint tokenizer, validates the complete tensor plan, and converts floating weights
+to FLOAT32. FP16/BF16 checkpoints therefore need roughly twice their source weight storage. The
+pinned tiny checkpoint is verified; SmolVLM-256M real-artifact acceptance remains pending WP7.
+
+Generation expands image placeholders using the processor's tile geometry, runs vision once per
+tile during prefill, and merges features with a concatenate/gather. Visual features and activation
+scopes close after evaluated prefill logits/KV; cached decode uses ordinary token lookup. Results
+and abort reports retain original prompt IDs, while `promptPositions()` counts expanded positions
+and penalties use the expanded prompt. A zero-token request validates geometry, markers and context
+without pixel processing or native allocation.
+
+Only full and capacity-bounded full KV retention is supported for Idefics3. Sliding retention is
+rejected pending image-prefill equivalence evidence. Limits are 16 images, 67,108,864 aggregate
+input pixels, 256 tiles, and the checkpoint's context length (including the generation budget).
+The model does no remote image fetching. PNG/JPEG decoding and the documented RGB/color/EXIF
+policies live in [jmlx-vision](../jmlx-vision/README.md). WP7 memory/Tier-B gates and WP8 final
+capability documentation remain pending; see the [WP6 report](../req/phase7-3a-implementation-report.md).
 
 Use the existing `GenerationRequest(int[], ...)` constructor for pretokenized input. Its event
 `textDelta` and result `generatedText` remain null. Tokenizer-backed requests produce non-null,

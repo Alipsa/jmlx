@@ -596,3 +596,16 @@ full MIT-CMU license text) and is carried in all three vision jars. Vision's doc
 operation-order divergences from the reference (decode-then-resize in RGB space vs the reference's
 resize/split before `convert_to_rgb`) are recorded in `jmlx-vision/README.md` and the reference
 findings; strict full-chain fixtures use opaque RGB inputs where the two orders agree.
+
+
+Phase 7.3a WP6 adds `SmolVlmModel` (composition of an internal Llama decoder, Idefics3 vision
+tower and connector) and strict `idefics3` loader dispatch before decoder-only mappings. All
+floating source weights are converted to FLOAT32; vision/connector checkpoint keys and the
+PyTorch OIHW-to-MLX OHWI patch conversion are explicit. Per-request visual scopes close after
+evaluated prefill logits/KV; subsequent tokens use the shared decoder generation loop. Metadata
+reports TEXT+IMAGE, results retain original IDs and charge expanded promptPositions, and a zero-
+token request performs geometry/expansion validation without pixel or native work. Full and bounded
+full retention are supported; sliding image-prefill retention is rejected. Native suites are
+`SmolVlmGoldenTest` (full-float32), `SmolVlmGenerationTest`, `SmolVlmDefaultPrecisionTest` and
+`Idefics3VisionTowerSmokeTest`, all required by macOS CI. WP7 memory/Tier-B and WP8 capability
+acceptance remain pending; see `req/phase7-3a-implementation-report.md`.

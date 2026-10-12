@@ -123,7 +123,7 @@
     "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b"
   },
   "vision_tier_b_files": {
-    "tools/tier-b/smolvlm-256m-instruct.json": "9341d1754dcabcccba6f1cd7f4d8c1ab3805c668902601ff0d9d75f961a16b09",
+    "tools/tier-b/smolvlm-256m-instruct.json": "03d2c8213e30cceaee15d5f452dab3477a0c3339bd413b3fe040a26063ff69da",
     "tools/hf-reference/vision_tier_b.py": "e8e44173decbff687edb4ecde891569eb8d99a6adc9aa0540a0c8fcf2e6486ab",
     "tools/tier-b/images/smolvlm-pattern.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7"
   }

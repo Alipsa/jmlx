@@ -538,12 +538,14 @@
   },
   "recorded_pin": "mlxMetalVersion=0.31.2\nmlxcCommit=fba4470b89073180056c9ea46c443051375f7399",
   "local_evidence": {
-    "date": "2026-10-11",
+    "date": "2026-10-12",
     "host": "macOS 27.0.1 / Apple Silicon",
     "tf32": false,
     "max_abs_logit_error": 5.2928924560546875e-05,
     "native_peak_bytes": 5737416464,
-    "sampled_peak_jvm_rss_kib": 487312,
+    "sampled_peak_phys_footprint_bytes": 7129368904,
+    "footprint_sample_interval_ms": 20,
+    "sampled_peak_jvm_rss_kib": 471728,
     "rss_sample_interval_ms": 20,
     "download_bytes": 517903046
   }

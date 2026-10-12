@@ -11,7 +11,16 @@ permissions:
 
 jobs:
   artifact:
-    runs-on: macos-26
+    # The smolvlm arm overrides its runner via the `runner` matrix variable below. It needs
+    # macos-26-xlarge because its suite's measured MLX allocator peak is 5.7 GB
+    # (tools/tier-b/smolvlm-256m-instruct.json) and the test JVM plus Gradle daemon push the
+    # process total past the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub
+    # hosted-runners reference), which would swap or OOM-kill the job. macos-26-xlarge is the
+    # larger GitHub-hosted arm64 tier (M2, 14 GB RAM; GitHub larger-runners reference) and
+    # remains arm64, which the native runtime requires. TierBVisionLanguageTest also asserts
+    # upper bounds on the measured peaks, so a memory regression fails the suite explicitly
+    # instead of killing the runner.
+    runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -65,6 +74,7 @@ jobs:
             suite: TierBVisionLanguageTest
             revision: 7e3e67edbbed1bf9888184d9df282b700a323964
             manifest: tools/tier-b/smolvlm-256m-instruct.json
+            runner: macos-26-xlarge
     env:
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}

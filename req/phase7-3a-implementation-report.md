@@ -111,13 +111,22 @@ below the independent `1e-4` bound. Gaps are `[1.51336098, 4.38764763, 0.9283428
 every gap exceeds `2 * allowedError + margin = 0.0003`. The suite recomputes both top IDs and
 gaps from the full logits. Actual public generation independently matches every greedy ID.
 
-Measured native allocator peak was 5,737,416,464 bytes; highest test-JVM RSS sampled at 20 ms
-was 487,312 KiB. RSS samples exclude Gradle/unified GPU allocations and can miss short peaks.
-These measurements precede addition of the weekly/on-demand SmolVLM CI row. Hosted macOS 26
-execution/fit remains pending. An earlier 17-tile square-input probe also passed, with maximum
-error `8.58306884765625e-5` and native peak 5,739,185,936 bytes; the committed case uses the
-five-tile wide opaque RGB fixture. Neither existing golden values nor strict tolerances were
-changed to choose that case.
+Measured native allocator peak was 5,737,416,464 bytes; in the same 2026-10-12 run the test
+process's phys_footprint, sampled every 20 ms through libproc's `proc_pid_rusage(RUSAGE_INFO_V2)`,
+peaked at 7,129,368,904 bytes while test-JVM RSS (`ps -o rss`) sampled 471,728 KiB. The RSS figure
+counts only private resident pages and misses the MLX/Metal allocations the process holds -- it
+sampled below the checkpoint's own 513 MB weight file -- so it is not useful memory evidence, and
+no bound was ever asserted on either number. After review the suite now samples the process
+footprint (which the hosted runner's RAM must actually hold) and gates both figures:
+`MLXMemory.peakBytes() <= 6,261,704,464` (recorded peak plus 500 MiB, below one extra float32
+weight copy) and `footprint <= 8 GiB` (about 20% above the measured peak). Because the 7.1 GB
+measured footprint alone exceeds the standard `macos-26` arm64 hosted runner's 7 GB of RAM, the
+Tier-B smolvlm row runs on `macos-26-xlarge` (arm64 M2, 14 GB); a memory regression now fails the
+suite explicitly instead of OOM-killing the job. These measurements precede addition of the
+weekly/on-demand SmolVLM CI row. Hosted macOS 26 execution/fit remains pending. An earlier 17-tile
+square-input probe also passed, with maximum error `8.58306884765625e-5` and native peak
+5,739,185,936 bytes; the committed case uses the five-tile wide opaque RGB fixture. Neither
+existing golden values nor strict tolerances were changed to choose that case.
 
 The generate-only `vision_tier_b.py` uses the existing hash-locked CPython 3.12/Pillow 12.3.0/
 NumPy 2.5.3/Transformers 4.57.6/Torch 2.6.0 environment, raw PIL open/load and explicit slow

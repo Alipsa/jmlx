@@ -507,6 +507,18 @@ tasks.register('verifyHfReferenceGoldens') {
             throw new GradleException('Hugging Face provenance has no vision Tier-B hashes')
         }
         def repositoryRoot = projectDir.toPath().toRealPath()
+        // The map must cover exactly the files declared as this task's inputs: the vision
+        // Tier-B manifest, the reference generator, and every file under images/ -- a
+        // removed entry or an unprovenanced new file both fail the build.
+        def actualVisionPaths = (['tools/tier-b/smolvlm-256m-instruct.json',
+                'tools/hf-reference/vision_tier_b.py'] + fileTree('tools/tier-b/images').files.collect {
+            repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
+        }).toSet()
+        if (visionFiles.keySet().toSet() != actualVisionPaths) {
+            throw new GradleException("Vision Tier-B provenance file set differs: " +
+                    "missing ${visionFiles.keySet() - actualVisionPaths}; " +
+                    "extra ${actualVisionPaths - visionFiles.keySet()}")
+        }
         visionFiles.each { relativePath, expectedHash ->
             def path = repositoryRoot.resolve(relativePath.toString()).normalize()
             if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||

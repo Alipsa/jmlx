@@ -3,6 +3,15 @@ package se.alipsa.jmlx.models;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -15,19 +24,49 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.KVCache;
 import se.alipsa.jmlx.tokenizer.ChatTemplateOptions;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.vision.ImageDecoder;
+import se.alipsa.jmlx.vision.ImageTensor;
 import se.alipsa.jmlx.vision.RgbImage;
+import se.alipsa.jmlx.vision.SmolVlmImageProcessor;
+import se.alipsa.jmlx.vision.SmolVlmProcessorConfig;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Opt-in pinned real image/text references, stable greedy IDs and measured memory. */
+/**
+ * Opt-in pinned real image/text references, stable greedy IDs and gated measured memory.
+ *
+ * <p>Each case's recorded {@code pixel_values_sha256} is re-computed from the pinned image through
+ * {@code jmlx-vision}'s processor and asserted (see {@link #pixelValuesSha256}), so preprocessing
+ * on the real artifact is verified byte-for-byte, not only indirectly through the logits.
+ *
+ * <p>The memory gates close a review finding: the previously recorded Tier-B evidence (RSS 487,312
+ * KiB) sampled below this checkpoint's own 513 MB weight file because {@code ps -o rss} excludes
+ * the MLX/Metal allocations the process holds, so it could never bound real usage and a memory
+ * regression would have surfaced only as a runner OOM. Both bounds below are upper-bound gates on
+ * the two measured figures, sized from the manifest's recorded local_evidence
+ * (tools/tier-b/smolvlm-256m-instruct.json: native peak 5,737,416,464 bytes on macOS 27.0.1, TF32
+ * off, pinned mlx-metal 0.31.2 / mlx-c fba4470) so a regression fails this suite explicitly.
+ */
 @EnabledIfNativeAvailable
 class TierBVisionLanguageTest {
+  // Recorded in the manifest's local_evidence (macOS 27.0.1, TF32 off, pinned mlx-metal 0.31.2
+  // / mlx-c fba4470): the suite's MLX allocator peak is 5,737,416,464 bytes. The bound adds 500
+  // MiB, well above cross-host allocator variance (the peak is mlx's own byte accounting, not OS
+  // memory) yet below one extra float32 copy of this checkpoint's weights (about 1 GB), so a
+  // regression that retains a second converted copy fails explicitly instead of OOMing the runner.
+  private static final long NATIVE_PEAK_BOUND_BYTES = 5_737_416_464L + 500L * 1024 * 1024;
+  // The same local run's sampled process-footprint peak is 7,129,368,904 bytes (the 5.7 GB MLX
+  // pool plus the JVM). The bound is 8 GiB: about 20% headroom for JVM/OS variance on the hosted
+  // runner, still far below the 14 GB of the macos-26-xlarge tier the suite runs on, and below
+  // a footprint regression the size of one extra float32 weight copy plus its allocator rounds.
+  private static final long FOOTPRINT_BOUND_BYTES = 8L * 1024 * 1024 * 1024;
+
   @Test
   void expandedPromptCachedLogitsAndStableGreedyIds() throws Exception {
     TierBReferences reference = new TierBReferences("image-text-generation");
@@ -52,7 +91,13 @@ class TierBVisionLanguageTest {
       assertTrue(!spec.required("license").asString().isBlank());
       images.add(ImageDecoder.decode(file));
     }
-    try (RssSampler rss = new RssSampler();
+    // The checkpoint's preprocessor settings (hash-verified by TierBReferences above) drive the
+    // byte-for-byte pixel check; the model under test parses the same file at load time.
+    SmolVlmImageProcessor processor =
+        new SmolVlmImageProcessor(
+            SmolVlmProcessorConfig.fromJson(
+                Files.readAllBytes(reference.directory.resolve("preprocessor_config.json"))));
+    try (FootprintSampler footprint = new FootprintSampler();
         MLXScope root = new MLXScope()) {
       SmolVlmModel model = (SmolVlmModel) TextGenerationModels.load(root, reference.directory);
       reference.model(model.metadata());
@@ -71,6 +116,10 @@ class TierBVisionLanguageTest {
         for (JsonNode index : input.required("image_indices")) {
           selected.add(images.get(index.asInt()));
         }
+        assertEquals(
+            input.required("pixel_values_sha256").asString(),
+            pixelValuesSha256(processor, selected),
+            "processed pixel values drifted from the reference bytes");
         assertEquals(
             input.required("rendered_prompt").asString(),
             tokenizer.renderChat(messages, ChatTemplateOptions.defaults(true)));
@@ -167,18 +216,116 @@ class TierBVisionLanguageTest {
             result.finishReason());
       }
       reference.report();
-      System.out.println("Tier B sampled_peak_rss_kib=" + rss.maximum());
+      long nativePeak = MLXMemory.peakBytes();
+      long peakFootprint = footprint.maximum();
+      assertTrue(
+          nativePeak <= NATIVE_PEAK_BOUND_BYTES,
+          "MLX native peak "
+              + nativePeak
+              + " bytes exceeds the "
+              + NATIVE_PEAK_BOUND_BYTES
+              + " bound");
+      assertTrue(
+          peakFootprint <= FOOTPRINT_BOUND_BYTES,
+          "process footprint "
+              + peakFootprint
+              + " bytes exceeds the "
+              + FOOTPRINT_BOUND_BYTES
+              + " bound");
+      System.out.println("Tier B sampled_peak_phys_footprint_bytes=" + peakFootprint);
     }
   }
 
-  /** Samples JVM RSS while inference runs; this thread never calls MLX. */
-  private static final class RssSampler implements AutoCloseable {
+  /**
+   * Re-computes a reference case's {@code pixel_values_sha256} for its selected images.
+   *
+   * <p>{@code vision_tier_b.py} records {@code
+   * hashlib.sha256(inputs['pixel_values'].numpy().tobytes())}, where the pinned slow {@code
+   * Idefics3ImageProcessor} returns a C-contiguous little-endian float32 tensor, channel-first
+   * ({@code [tiles, 3, height, width]}), with one tile per split crop (row-major) plus the global
+   * thumbnail, per selected image in selection order. jmlx-vision emits the same normalized float32
+   * values per tile in NHWC order, so each tile is transposed channel-first here before
+   * serialization. The processor pads each image's tiles to that image's own largest tile, which
+   * equals the reference's batch-wide padding for the pinned manifest (one image per request, every
+   * tile the same size).
+   */
+  private static String pixelValuesSha256(SmolVlmImageProcessor processor, List<RgbImage> images)
+      throws Exception {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    for (RgbImage image : images) {
+      for (ImageTensor tile : processor.process(image).tiles()) {
+        int[] shape = tile.shape(); // NHWC [1, height, width, 3]
+        int height = shape[1];
+        int width = shape[2];
+        ByteBuffer bytes =
+            ByteBuffer.allocate(3 * height * width * 4).order(ByteOrder.LITTLE_ENDIAN);
+        float[] values = tile.values();
+        for (int channel = 0; channel < 3; channel++) {
+          for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+              bytes.putFloat(values[(y * width + x) * 3 + channel]);
+            }
+          }
+        }
+        digest.update(bytes.array());
+      }
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
+  /**
+   * Samples the test JVM's macOS physical footprint every 20 ms while inference runs; this thread
+   * never calls MLX.
+   *
+   * <p>{@code ps -o rss} counts only the process's private resident pages and misses memory the MLX
+   * allocator and Metal hold for the process (the recorded Tier-B RSS sampled below the
+   * checkpoint's own weight size), so it is not useful memory evidence. {@code ri_phys_footprint}
+   * from libproc's {@code proc_pid_rusage(RUSAGE_INFO_V2)} is the figure Activity Monitor and
+   * {@code top} report as the process's memory: it covers the JVM's private and shared pages plus
+   * file-backed mappings, so it is what the hosted runner's RAM must actually hold.
+   *
+   * <p>Binding: {@code /usr/lib/libproc.dylib} is loaded with {@link System#load} and resolved
+   * through {@link SymbolLookup#loaderLookup()}, the same mechanism the committed jextract bindings
+   * use for libmlxc. In the macOS SDK's {@code struct rusage_info_v2} (sys/resource.h) {@code
+   * ri_phys_footprint} is the ninth uint64 field at byte 72 -- the 16-byte {@code ri_uuid} plus
+   * eight 8-byte fields precede it, verified against the header's {@code offsetof} on macOS 27. The
+   * buffer over-allocates the whole struct, and each sample is rejected below a plausibility floor
+   * so a layout shift that moves or zeroes the field fails the gate instead of passing it with a
+   * tiny reading.
+   */
+  private static final class FootprintSampler implements AutoCloseable {
+    // proc_pid_rusage(int pid, int flavor, void *buffer); RUSAGE_INFO_V2 = 2.
+    private static final int FLAVOR_RUSAGE_INFO_V2 = 2;
+    // struct rusage_info_v2 in sys/resource.h: ri_phys_footprint at byte 72.
+    private static final int PHYS_FOOTPRINT_OFFSET = 72;
+    // A running test JVM always holds tens of MiB of footprint; a smaller reading means the
+    // field was misparsed, not that the process shrank.
+    private static final long MINIMUM_PLAUSIBLE_BYTES = 64L * 1024 * 1024;
+
+    // libproc must be loaded before its symbol is resolved; both run once at class
+    // initialization, before any sample.
+    private static final MethodHandle PROC_PID_RUSAGE = bindProcPidRusage();
+
+    private static MethodHandle bindProcPidRusage() {
+      System.load("/usr/lib/libproc.dylib");
+      return Linker.nativeLinker()
+          .downcallHandle(
+              SymbolLookup.loaderLookup()
+                  .or(Linker.nativeLinker().defaultLookup())
+                  .findOrThrow("proc_pid_rusage"),
+              FunctionDescriptor.of(
+                  ValueLayout.JAVA_INT,
+                  ValueLayout.JAVA_INT,
+                  ValueLayout.JAVA_INT,
+                  ValueLayout.ADDRESS));
+    }
+
     private volatile boolean running = true;
     private volatile long maximum;
     private volatile Exception failure;
     private final Thread worker;
 
-    RssSampler() {
+    private FootprintSampler() {
       worker =
           new Thread(
               () -> {
@@ -191,37 +338,50 @@ class TierBVisionLanguageTest {
                   failure = exception;
                 }
               },
-              "tier-b-rss-sampler");
+              "tier-b-footprint-sampler");
       worker.start();
     }
 
-    long maximum() throws java.io.IOException, InterruptedException {
+    long maximum() throws InterruptedException {
       sample();
       return maximum;
     }
 
-    private synchronized void sample() throws java.io.IOException, InterruptedException {
-      Process process =
-          new ProcessBuilder("ps", "-o", "rss=", "-p", Long.toString(ProcessHandle.current().pid()))
-              .start();
-      long rss =
-          Long.parseLong(
-              new String(
-                      process.getInputStream().readAllBytes(),
-                      java.nio.charset.StandardCharsets.UTF_8)
-                  .trim());
-      if (process.waitFor() != 0) {
-        throw new IllegalStateException("RSS sampling failed");
+    private synchronized void sample() throws InterruptedException {
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment buffer = arena.allocate(256, 8);
+        int status;
+        try {
+          status =
+              (int)
+                  PROC_PID_RUSAGE.invoke(
+                      (int) ProcessHandle.current().pid(), FLAVOR_RUSAGE_INFO_V2, buffer);
+        } catch (InterruptedException exception) {
+          throw exception;
+        } catch (Throwable exception) {
+          throw new IllegalStateException("proc_pid_rusage downcall failed", exception);
+        }
+        if (status != 0) {
+          throw new IllegalStateException("proc_pid_rusage failed with status " + status);
+        }
+        long footprint = buffer.get(ValueLayout.JAVA_LONG, PHYS_FOOTPRINT_OFFSET);
+        if (footprint < MINIMUM_PLAUSIBLE_BYTES) {
+          throw new IllegalStateException(
+              "implausible phys_footprint "
+                  + footprint
+                  + " bytes at offset "
+                  + PHYS_FOOTPRINT_OFFSET);
+        }
+        maximum = Math.max(maximum, footprint);
       }
-      maximum = Math.max(maximum, rss);
     }
 
     @Override
     public void close() throws InterruptedException {
       running = false;
       worker.join();
-      assertEquals(null, failure, "RSS sampler failure");
-      assertTrue(maximum > 0);
+      assertEquals(null, failure, "footprint sampler failure");
+      assertTrue(maximum >= MINIMUM_PLAUSIBLE_BYTES);
     }
   }
 }

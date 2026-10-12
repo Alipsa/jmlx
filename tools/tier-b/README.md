@@ -34,6 +34,9 @@ JMLX_TIER_B_MODEL_DIR=.tier-b/smolvlm \
   JMLX_TIER_B_MODEL_TYPE=idefics3 ./gradlew :jmlx-models:tierBTest
 ```
 
-The test samples test-JVM RSS every 20 ms and reports the highest sample separately from the native
-allocator peak. RSS samples can miss short peaks and exclude Gradle and unified GPU allocations.
-The workflow uploads JUnit numerical/memory evidence even when the test fails.
+The test samples the test process's physical footprint (libproc's `ri_phys_footprint`, the figure
+the runner's RAM must actually hold, unlike `ps -o rss` which misses MLX/Metal allocations) every
+20 ms and reports the highest sample alongside the native allocator peak, asserting both stay
+below bounds sized from the manifest's recorded local evidence so a memory regression fails the
+suite instead of OOMing the runner. The workflow uploads JUnit numerical/memory evidence even when
+the test fails.

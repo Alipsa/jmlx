@@ -63,8 +63,10 @@ class TierBVisionLanguageTest {
   private static final long NATIVE_PEAK_BOUND_BYTES = 5_737_416_464L + 500L * 1024 * 1024;
   // The same local run's sampled process-footprint peak is 7,129,368,904 bytes (the 5.7 GB MLX
   // pool plus the JVM). The bound is 8 GiB: about 20% headroom for JVM/OS variance on the hosted
-  // runner, still far below the 14 GB of the macos-26-xlarge tier the suite runs on, and below
-  // a footprint regression the size of one extra float32 weight copy plus its allocator rounds.
+  // runner, still far below the 14 GB of the macos-26-xlarge tier the suite runs on. The ~1.36
+  // GiB of headroom is deliberately not tight enough to catch one extra float32 weight copy
+  // (about 1 GB plus rounding); catching that regression is the job of the tighter
+  // NATIVE_PEAK_BOUND_BYTES gate above.
   private static final long FOOTPRINT_BOUND_BYTES = 8L * 1024 * 1024 * 1024;
 
   @Test
@@ -287,11 +289,11 @@ class TierBVisionLanguageTest {
    * <p>Binding: {@code /usr/lib/libproc.dylib} is loaded with {@link System#load} and resolved
    * through {@link SymbolLookup#loaderLookup()}, the same mechanism the committed jextract bindings
    * use for libmlxc. In the macOS SDK's {@code struct rusage_info_v2} (sys/resource.h) {@code
-   * ri_phys_footprint} is the ninth uint64 field at byte 72 -- the 16-byte {@code ri_uuid} plus
-   * eight 8-byte fields precede it, verified against the header's {@code offsetof} on macOS 27. The
-   * buffer over-allocates the whole struct, and each sample is rejected below a plausibility floor
-   * so a layout shift that moves or zeroes the field fails the gate instead of passing it with a
-   * tiny reading.
+   * ri_phys_footprint} sits at byte 72 -- the 16-byte {@code ri_uuid} plus the seven 8-byte fields
+   * {@code ri_user_time} through {@code ri_resident_size} precede it -- verified against the SDK
+   * header's layout on this machine. The buffer over-allocates the whole struct, and each sample is
+   * rejected below a plausibility floor so a layout shift that moves or zeroes the field fails the
+   * gate instead of passing it with a tiny reading.
    */
   private static final class FootprintSampler implements AutoCloseable {
     // proc_pid_rusage(int pid, int flavor, void *buffer); RUSAGE_INFO_V2 = 2.

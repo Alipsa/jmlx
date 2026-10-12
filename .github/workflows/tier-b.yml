@@ -15,11 +15,14 @@ jobs:
     # macos-26-xlarge because its suite's measured MLX allocator peak is 5.7 GB
     # (tools/tier-b/smolvlm-256m-instruct.json) and the test JVM plus Gradle daemon push the
     # process total past the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub
-    # hosted-runners reference), which would swap or OOM-kill the job. macos-26-xlarge is the
-    # larger GitHub-hosted arm64 tier (M2, 14 GB RAM; GitHub larger-runners reference) and
-    # remains arm64, which the native runtime requires. TierBVisionLanguageTest also asserts
-    # upper bounds on the measured peaks, so a memory regression fails the suite explicitly
-    # instead of killing the runner.
+    # hosted-runners reference), which would swap or OOM-kill the job. macos-26-xlarge is
+    # GitHub's larger macOS arm64 runner tier (5-core M2, 14 GB RAM; GitHub larger-runners
+    # reference) and remains arm64, which the native runtime requires. It is a billed larger
+    # runner: GitHub charges it per minute even in public repositories, and usage is blocked
+    # until a payment method is set up on the account (GitHub larger-runners reference and
+    # GitHub Actions billing docs). TierBVisionLanguageTest also asserts upper bounds on the
+    # measured peaks, so a memory regression fails the suite explicitly instead of killing
+    # the runner.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
     strategy:

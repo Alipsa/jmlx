@@ -40,3 +40,10 @@ the runner's RAM must actually hold, unlike `ps -o rss` which misses MLX/Metal a
 below bounds sized from the manifest's recorded local evidence so a memory regression fails the
 suite instead of OOMing the runner. The workflow uploads JUnit numerical/memory evidence even when
 the test fails.
+
+In CI, the SmolVLM row of the `tier-b` workflow runs on `macos-26-xlarge`, a GitHub larger runner.
+GitHub's Actions billing docs state that larger runners are always charged per minute, even in
+public repositories, and that larger-runner usage is blocked until a payment method is set up on
+the account (https://docs.github.com/en/billing/concepts/product-billing/github-actions). If the
+repository's account has no billing configured, the smolvlm row fails to start while the other rows
+are unaffected; fixing it is an account/billing setting, not a repository change.

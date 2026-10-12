@@ -44,7 +44,7 @@ class VisionLanguageMemoryTest {
       for (var request : requests) {
         model.generate(request, ignored -> {});
       }
-      long baseline = MLXMemory.activeBytes();
+      long baseline = MLXMemory.settledActiveBytes();
       long maximum = baseline;
       long first = baseline;
       for (int repeat = 0; repeat < 12; repeat++) {
@@ -101,15 +101,16 @@ class VisionLanguageMemoryTest {
                   });
           assertThrows(MLXException.class, () -> model.generate(request, ignored -> {}));
           model.decoderForTest().setStepBoundaryEvaluatorForTest(StepBoundaryEvaluator.NATIVE);
-          maximum = Math.max(maximum, MLXMemory.activeBytes());
+          maximum = Math.max(maximum, MLXMemory.settledActiveBytes());
           assertTrue(
-              MLXMemory.activeBytes() <= baseline + FIXED_MARGIN, "request leaked active storage");
+              MLXMemory.settledActiveBytes() <= baseline + FIXED_MARGIN,
+              "request leaked active storage");
         }
         if (repeat == 0) {
-          first = MLXMemory.activeBytes();
+          first = MLXMemory.settledActiveBytes();
         }
       }
-      long growth = MLXMemory.activeBytes() - first;
+      long growth = MLXMemory.settledActiveBytes() - first;
       assertTrue(growth <= FIXED_MARGIN, "late request growth: " + growth);
       System.out.println(
           "VLM requests: baseline="
@@ -163,7 +164,7 @@ class VisionLanguageMemoryTest {
               .getFirst()
               .tileCount();
       model.generate(twoImages, ignored -> {});
-      long baseline = MLXMemory.activeBytes();
+      long baseline = MLXMemory.settledActiveBytes();
       for (int repeat = 0; repeat < 12; repeat++) {
         var failure =
             assertThrows(
@@ -184,9 +185,9 @@ class VisionLanguageMemoryTest {
             FinishReason.CANCELLED, model.generate(cancellable, ignored -> {}).finishReason());
         assertEquals(firstImageTiles, tiles.get(), "second image must never execute");
         model.setObserverForTest(ignored -> {});
-        assertTrue(MLXMemory.activeBytes() <= baseline + FIXED_MARGIN);
+        assertTrue(MLXMemory.settledActiveBytes() <= baseline + FIXED_MARGIN);
       }
-      assertEquals(baseline, MLXMemory.activeBytes());
+      assertEquals(baseline, MLXMemory.settledActiveBytes());
     }
   }
 
@@ -197,7 +198,7 @@ class VisionLanguageMemoryTest {
       var request =
           SmolVlmGoldenTest.request(SmolVlmGoldenTest.golden().required("cases").get(0), 1);
       model.generate(request, ignored -> {});
-      long baseline = MLXMemory.activeBytes();
+      long baseline = MLXMemory.settledActiveBytes();
       var plan = model.plan(request.promptTokenIds(), request.images());
       var config = model.decoderForTest().config();
       long kvPerPosition =
@@ -218,7 +219,7 @@ class VisionLanguageMemoryTest {
         try (MLXScope prefill = generation.newChild()) {
           deadFeature = model.features(request, prefill);
           assertEquals(featureBytes / Float.BYTES, deadFeature.toFloatArray().length);
-          long featuresOnly = MLXMemory.activeBytes() - baseline;
+          long featuresOnly = MLXMemory.settledActiveBytes() - baseline;
           assertTrue(featuresOnly >= featureBytes, "features did not survive vision child closure");
           var logits =
               model
@@ -230,10 +231,10 @@ class VisionLanguageMemoryTest {
                       embedded -> SmolVlmModel.merge(embedded, deadFeature, plan));
           MLX.eval(logits);
           MLX.eval(DecoderModel.stepCacheArrays(caches));
-          withVisual = MLXMemory.activeBytes();
+          withVisual = MLXMemory.settledActiveBytes();
         }
         assertThrows(IllegalStateException.class, deadFeature::toFloatArray);
-        long afterPrefill = MLXMemory.activeBytes();
+        long afterPrefill = MLXMemory.settledActiveBytes();
         assertTrue(
             withVisual - afterPrefill >= featureBytes, "prefill visual storage was retained");
         assertTrue(
@@ -257,7 +258,7 @@ class VisionLanguageMemoryTest {
             MLX.eval(logits);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
           }
-          long retained = MLXMemory.activeBytes() - baseline;
+          long retained = MLXMemory.settledActiveBytes() - baseline;
           long expected = kvPerPosition * (plan.expandedLength() + step);
           assertTrue(
               Math.abs(retained - expected) <= FIXED_MARGIN,
@@ -285,7 +286,7 @@ class VisionLanguageMemoryTest {
                 + late);
       }
       assertThrows(IllegalStateException.class, deadKeys::toFloatArray);
-      assertTrue(MLXMemory.activeBytes() <= baseline + FIXED_MARGIN);
+      assertTrue(MLXMemory.settledActiveBytes() <= baseline + FIXED_MARGIN);
     }
   }
 }

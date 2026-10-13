@@ -7,9 +7,12 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>MLX Metal frees buffers through GPU completion handlers that run after {@code eval} or a
  * scope's {@code close()} has already returned, so a plain {@code MLXMemory.activeBytes()} read
- * taken right after work can race those delayed frees and report bytes that are already dead. The
- * settled read below is the sanctioned way for a memory-measurement test to sample the counter; do
- * not inline a plain read in a measurement assertion.
+ * taken right after work can race those delayed frees and report bytes that are already dead. Use
+ * {@link #settledActiveBytes()} for any measurement compared against a tight bound (well under 64
+ * KiB). A plain read is only safe (a) immediately after a settled read with no intervening frees,
+ * or (b) against a margin wide enough to absorb in-flight completion-handler frees. The older
+ * memory tests that read the counter plainly use 64 KiB-scale margins and pass today; that is
+ * accepted, not an endorsement, and they may still carry the same latent race.
  */
 public final class MLXMemoryTestSupport {
   private static final long SETTLE_INTERVAL_MS = 2;

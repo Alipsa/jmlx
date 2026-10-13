@@ -40,7 +40,7 @@
       "category": "downcall",
       "status": "implemented",
       "facadeOrReason": "MLXMemory",
-      "tests": "VisionLanguageMemoryTest"
+      "tests": "MLXMemoryLeakTest; VisionLanguageMemoryTest"
     },
     {
       "bindings": ["mlx_h.mlx_fast_rope_dynamic"],

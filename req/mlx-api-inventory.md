@@ -197,7 +197,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_broadcast_to` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_ceil` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_checkpoint` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_clear_cache` | downcall | implemented | MLXMemory | VisionLanguageMemoryTest | — | all handwritten source |
+| `mlx_h.mlx_clear_cache` | downcall | implemented | MLXMemory | MLXMemoryLeakTest; VisionLanguageMemoryTest | — | all handwritten source |
 | `mlx_h.mlx_clip` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_closure_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_closure_custom_apply` | downcall | unplanned | — | — | — | — |

@@ -53,11 +53,11 @@ public final class MLXMemory {
 
   /**
    * Releases every pooled (recycled) device buffer -- the Metal allocator's buffer cache -- back to
-   * the OS. Live arrays are unaffected. Because {@link #activeBytes()} already excludes pooled
-   * bytes, this does not directly change that counter; it makes subsequent allocations draw fresh,
-   * exact-size buffers instead of possibly oversized recycled ones, which is what makes post-clear
-   * retained-memory measurements deterministic in any pool state. Primarily a test and diagnostic
-   * aid.
+   * the OS. Live arrays are unaffected, and {@link #activeBytes()} does not change. Until buffers
+   * are freed again, new allocations get fresh buffers (rounded up to the page size above 16 KiB)
+   * rather than possibly larger recycled ones. Pending Metal completion-handler frees can refill
+   * the pool right after this call, so post-clear measurements are deterministic only while nothing
+   * is freed. Primarily a test and diagnostic aid.
    */
   public static void clearCache() {
     NativeOps.checked("mlx_clear_cache", mlx_h::mlx_clear_cache);

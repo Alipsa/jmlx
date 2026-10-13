@@ -83,6 +83,14 @@ The weekly/on-demand row is owned by the project maintainer and uploads numerica
 
 Local macOS 27 measured maximum all-vocabulary logit error `5.2928924560546875e-5` (allowed
 `1e-4`), minimum top-two gap `0.26448631286621094` (required `> 0.0003`), native allocator peak
-5,737,416,464 bytes and highest 20-ms sampled test-JVM RSS 487,312 KiB. RSS excludes Gradle and
-unified GPU allocations and may miss short peaks. This is local eligibility evidence; hosted
-macOS 26 execution/fit and final WP8 compatibility acceptance remain pending.
+5,737,416,464 bytes and highest 20-ms sampled process phys_footprint 7,129,368,904 bytes. The
+suite gates the process footprint at 8 GiB — the RAM a hosted runner must actually hold — and
+the native allocator peak at 6,261,704,464 bytes; test-JVM RSS is not asserted because it misses
+the MLX/Metal allocations. This is local eligibility evidence.
+
+WP8 (2026-10-13, `phase7-3a-implementation-report.md`) re-ran this exact manifest on the merged
+tree: identical greedy IDs, identical maximum logit error, and a fresh margin-eligible run, closing
+the seven-artifact consumer and capability-documentation acceptance. The row remains local
+eligibility evidence until the first supported macOS 26 hosted execution lands — the weekly
+`macos-26-xlarge` Tier-B row, whose larger-runner usage requires a payment method on the account
+(`tools/tier-b/README.md`).

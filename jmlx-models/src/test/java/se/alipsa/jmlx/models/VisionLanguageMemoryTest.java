@@ -9,7 +9,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -18,6 +17,7 @@ import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXException;
 import se.alipsa.jmlx.core.MLXMemory;
+import se.alipsa.jmlx.core.MLXMemoryTestSupport;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -37,9 +37,6 @@ class VisionLanguageMemoryTest {
   // Both contexts (fresh-class JVM and full-suite JVM) settled at exactly the baseline once
   // every scope closed, so the bound only covers allocator rounding.
   private static final long CLEANUP_MARGIN = 512;
-  private static final long SETTLE_INTERVAL_MS = 2;
-  private static final long SETTLE_TAIL_MS = 16;
-  private static final long SETTLE_TIMEOUT_MS = 1000;
 
   @Test
   void repeatedRequestsAndEveryFailureReleaseState() throws Exception {
@@ -53,7 +50,7 @@ class VisionLanguageMemoryTest {
       for (var request : requests) {
         model.generate(request, ignored -> {});
       }
-      long baseline = settledActiveBytes();
+      long baseline = MLXMemoryTestSupport.settledActiveBytes();
       MLXMemory.resetPeak();
       long first = baseline;
       for (int repeat = 0; repeat < 12; repeat++) {
@@ -113,13 +110,14 @@ class VisionLanguageMemoryTest {
           assertThrows(MLXException.class, () -> model.generate(request, ignored -> {}));
           model.decoderForTest().setStepBoundaryEvaluatorForTest(StepBoundaryEvaluator.NATIVE);
           assertTrue(
-              settledActiveBytes() <= baseline + FIXED_MARGIN, "request leaked active storage");
+              MLXMemoryTestSupport.settledActiveBytes() <= baseline + FIXED_MARGIN,
+              "request leaked active storage");
         }
         if (repeat == 0) {
-          first = settledActiveBytes();
+          first = MLXMemoryTestSupport.settledActiveBytes();
         }
       }
-      long growth = settledActiveBytes() - first;
+      long growth = MLXMemoryTestSupport.settledActiveBytes() - first;
       assertTrue(growth <= FIXED_MARGIN, "late request growth: " + growth);
       long peak = MLXMemory.peakBytes();
       System.out.println(
@@ -169,7 +167,7 @@ class VisionLanguageMemoryTest {
               .getFirst()
               .tileCount();
       model.generate(twoImages, ignored -> {});
-      long baseline = settledActiveBytes();
+      long baseline = MLXMemoryTestSupport.settledActiveBytes();
       for (int repeat = 0; repeat < 12; repeat++) {
         var failure =
             assertThrows(
@@ -190,9 +188,9 @@ class VisionLanguageMemoryTest {
             FinishReason.CANCELLED, model.generate(cancellable, ignored -> {}).finishReason());
         assertEquals(firstImageTiles, tiles.get(), "second image must never execute");
         model.setObserverForTest(ignored -> {});
-        assertTrue(settledActiveBytes() <= baseline + FIXED_MARGIN);
+        assertTrue(MLXMemoryTestSupport.settledActiveBytes() <= baseline + FIXED_MARGIN);
       }
-      assertTrue(settledActiveBytes() <= baseline + FIXED_MARGIN);
+      assertTrue(MLXMemoryTestSupport.settledActiveBytes() <= baseline + FIXED_MARGIN);
     }
   }
 
@@ -220,7 +218,7 @@ class VisionLanguageMemoryTest {
       var request =
           SmolVlmGoldenTest.request(SmolVlmGoldenTest.golden().required("cases").get(0), 1);
       model.generate(request, ignored -> {});
-      long baseline = settledActiveBytes();
+      long baseline = MLXMemoryTestSupport.settledActiveBytes();
       var plan = model.plan(request.promptTokenIds(), request.images());
       var config = model.decoderForTest().config();
       var descriptor =
@@ -268,7 +266,7 @@ class VisionLanguageMemoryTest {
         try (MLXScope prefill = requestScope.newChild()) {
           deadFeature = model.features(request, prefill);
           assertEquals(featureBytes / Float.BYTES, deadFeature.toFloatArray().length);
-          long featuresOnly = settledActiveBytes() - baseline;
+          long featuresOnly = MLXMemoryTestSupport.settledActiveBytes() - baseline;
           assertTrue(featuresOnly >= featureBytes, "features did not survive vision child closure");
           // Empty the allocator's buffer pool before the prefill runs: with an empty pool every
           // allocation up to the KV concat is a fresh, exact-size buffer, so once the prefill
@@ -285,10 +283,10 @@ class VisionLanguageMemoryTest {
                       embedded -> SmolVlmModel.merge(embedded, deadFeature, plan));
           MLX.eval(logits);
           MLX.eval(DecoderModel.stepCacheArrays(caches));
-          withVisual = settledActiveBytes();
+          withVisual = MLXMemoryTestSupport.settledActiveBytes();
         }
         assertThrows(IllegalStateException.class, deadFeature::toFloatArray);
-        long afterPrefill = settledActiveBytes();
+        long afterPrefill = MLXMemoryTestSupport.settledActiveBytes();
         // Sanity only: the release is dominated by the other prefill buffers, so a retained
         // feature tensor alone would not move it; the cleanup checks below detect retention.
         assertTrue(
@@ -326,7 +324,7 @@ class VisionLanguageMemoryTest {
             MLX.eval(logits);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
           }
-          long retained = settledActiveBytes() - baseline;
+          long retained = MLXMemoryTestSupport.settledActiveBytes() - baseline;
           long logical = kvPerPosition * (plan.expandedLength() + step);
           // Every retained buffer holds at least its logical payload, in any pool state;
           // the pooled-buffer slack on top is context-dependent and is not bounded here.
@@ -378,7 +376,7 @@ class VisionLanguageMemoryTest {
         // A feature hoisted into requestScope itself, the cache scope, is not visible to this
         // check -- the scope is already closed -- but is caught by the step-64 exact endpoint,
         // whose measurement precedes the close.
-        long afterRequestClose = settledActiveBytes();
+        long afterRequestClose = MLXMemoryTestSupport.settledActiveBytes();
         assertTrue(
             afterRequestClose - baseline <= CLEANUP_MARGIN,
             "test-shape request retained visual storage: " + (afterRequestClose - baseline));
@@ -387,7 +385,7 @@ class VisionLanguageMemoryTest {
       // and pooled bytes are excluded from the active counter: the counter is back at the
       // baseline in any pool state. A retained request buffer -- the 5,120-byte visual
       // feature tensor in this fixture -- exceeds CLEANUP_MARGIN and fails here.
-      long afterCleanup = settledActiveBytes();
+      long afterCleanup = MLXMemoryTestSupport.settledActiveBytes();
       assertTrue(
           afterCleanup - baseline <= CLEANUP_MARGIN,
           "closed request retained visual storage: " + (afterCleanup - baseline));
@@ -395,38 +393,10 @@ class VisionLanguageMemoryTest {
       // prefill scope closes after the prefill logits and KV are evaluated); it must
       // leave no visual storage behind either.
       model.generate(request, ignored -> {});
-      long afterProduction = settledActiveBytes();
+      long afterProduction = MLXMemoryTestSupport.settledActiveBytes();
       assertTrue(
           afterProduction - baseline <= CLEANUP_MARGIN,
           "production generate retained visual storage: " + (afterProduction - baseline));
     }
-  }
-
-  /**
-   * {@link MLXMemory#activeBytes()} once its in-flight Metal completion-handler frees (see {@link
-   * MLXMemory}'s class javadoc) have drained: polls until the value has been unchanged for {@value
-   * #SETTLE_TAIL_MS} milliseconds. Throws {@link IllegalStateException} if the counter is still
-   * moving {@value #SETTLE_TIMEOUT_MS} milliseconds after the first read, instead of silently
-   * returning an unsettled value.
-   */
-  private static long settledActiveBytes() throws InterruptedException {
-    long previous = MLXMemory.activeBytes();
-    long lastChange = System.nanoTime();
-    long deadline = lastChange + TimeUnit.MILLISECONDS.toNanos(SETTLE_TIMEOUT_MS);
-    while (System.nanoTime() < deadline) {
-      Thread.sleep(SETTLE_INTERVAL_MS);
-      long current = MLXMemory.activeBytes();
-      if (current != previous) {
-        previous = current;
-        lastChange = System.nanoTime();
-      } else if (System.nanoTime() - lastChange >= TimeUnit.MILLISECONDS.toNanos(SETTLE_TAIL_MS)) {
-        return current;
-      }
-    }
-    throw new IllegalStateException(
-        "MLXMemory.activeBytes() did not settle within "
-            + SETTLE_TIMEOUT_MS
-            + " ms; last value: "
-            + previous);
   }
 }

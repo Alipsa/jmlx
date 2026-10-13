@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.NativeMemoryProbe;
@@ -41,10 +40,6 @@ class MLXMemoryLeakTest {
   // Generous relative to one iteration's ~400 KB, but far too small to
   // hide a real per-iteration leak accumulated over 200 iterations.
   private static final long LEAK_THRESHOLD_BYTES = 2_000_000;
-
-  private static final long SETTLE_INTERVAL_MS = 2;
-  private static final long SETTLE_TAIL_MS = 16;
-  private static final long SETTLE_TIMEOUT_MS = 1000;
 
   @Test
   void activeMemoryDoesNotGrowWhenScopeClosesArrays() {
@@ -121,9 +116,9 @@ class MLXMemoryLeakTest {
    * In-module coverage for {@link MLXMemory#clearCache()}, which otherwise only has jmlx-models'
    * VisionLanguageMemoryTest. The pool is filled with one known freed buffer first, because
    * activeBytes() excludes pooled bytes and a no-op clear is indistinguishable in a JVM whose pool
-   * is already empty. The before/after reads are settled (see {@link #settledActiveBytes()}) so
-   * that no delayed Metal completion-handler free can land between them (see {@link MLXMemory}'s
-   * class javadoc).
+   * is already empty. The before/after reads are settled (see {@link
+   * MLXMemoryTestSupport#settledActiveBytes()}) so that no delayed Metal completion-handler free
+   * can land between them (see {@link MLXMemory}'s class javadoc).
    */
   @Test
   void clearCacheReleasesPooledBuffersWithoutTouchingLiveArrays() throws InterruptedException {
@@ -137,7 +132,7 @@ class MLXMemoryLeakTest {
         MLX.eval(pooled);
       }
 
-      long before = settledActiveBytes();
+      long before = MLXMemoryTestSupport.settledActiveBytes();
 
       assertTrue(
           MLXMemory.cachedBytes() > 0, "expected the buffer freed by the child scope to be pooled");
@@ -216,33 +211,5 @@ class MLXMemoryLeakTest {
       MLXArray c = MLXOps.log(b);
       MLX.eval(a, b, c);
     }
-  }
-
-  /**
-   * {@link MLXMemory#activeBytes()} once its in-flight Metal completion-handler frees (see {@link
-   * MLXMemory}'s class javadoc) have drained: polls until the value has been unchanged for {@value
-   * #SETTLE_TAIL_MS} milliseconds. Throws {@link IllegalStateException} if the counter is still
-   * moving {@value #SETTLE_TIMEOUT_MS} milliseconds after the first read, instead of silently
-   * returning an unsettled value.
-   */
-  private static long settledActiveBytes() throws InterruptedException {
-    long previous = MLXMemory.activeBytes();
-    long lastChange = System.nanoTime();
-    long deadline = lastChange + TimeUnit.MILLISECONDS.toNanos(SETTLE_TIMEOUT_MS);
-    while (System.nanoTime() < deadline) {
-      Thread.sleep(SETTLE_INTERVAL_MS);
-      long current = MLXMemory.activeBytes();
-      if (current != previous) {
-        previous = current;
-        lastChange = System.nanoTime();
-      } else if (System.nanoTime() - lastChange >= TimeUnit.MILLISECONDS.toNanos(SETTLE_TAIL_MS)) {
-        return current;
-      }
-    }
-    throw new IllegalStateException(
-        "MLXMemory.activeBytes() did not settle within "
-            + SETTLE_TIMEOUT_MS
-            + " ms; last value: "
-            + previous);
   }
 }

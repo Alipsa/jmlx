@@ -42,3 +42,20 @@ platform, and source-file hashes are recorded in `tools/tokenizer-oracle/provena
 Python offsets are Unicode-code-point indices and the runner converts them to the public jmlx
 half-open UTF-8 byte-offset contract before comparison. These fixtures prove tokenizer components,
 not additional model architectures or unrestricted compatibility with public artifacts.
+
+## Phase 7.3a vision fixtures (2026-10-13)
+
+| Fixture | Input / seed | Golden | Test or verifier |
+| --- | --- | --- | --- |
+| Pillow image decode oracle | committed PNG/JPEG decode fixtures (palette/tRNS, grayscale, LA/RGBA, ICC/gAMA, EXIF-orientation JPEG, truncated JPEG, decode-limit inputs) under `tools/image-oracle/fixtures/decode/` | byte-exact decoded RGB against pinned Pillow 12.3.0 (max channel error `0`) | `verifyImageOracleFixtures`; `ImageDecoderTest` |
+| Pillow resize oracle | committed resize fixtures, bilinear/bicubic/LANCZOS (`resample=1` three-lobe) | byte-exact uint8 resized output | `verifyImageOracleFixtures`; `ImageOracleResizeTest`, `ImageTransformsTest` |
+| Idefics3 processor full chain | committed opaque-RGB fixture image plus the pinned SmolVLM `preprocessor_config.json` | byte-exact uint8 resize/split output; normalized float32 tiles within `1e-6` | `verifyImageOracleFixtures`; `ImageOracleChainTest`, `SmolVlmImageProcessorTest` |
+| Tiny Idefics3 checkpoint | committed 2-layer seeded synthetic checkpoint (`tools/hf-reference/goldens/checkpoints/idefics3`) with the SmolVLM processor and chat fixtures | patch/positioned embeddings, tower, connector, merged embeddings, prefill/cached/full-history logits and exact five-token greedy IDs, strict absolute `1e-4` against the CPU float32 reference in `idefics3.json` | `SmolVlmGoldenTest` in `:jmlx-models:float32GoldenTest` |
+| SmolVLM tokenizer bundle | committed `smolvlm.tokenizer.json` plus `smolvlm.input.json` chat cases | IDs, decoded text and rendered chat against the pinned Rust tokenizer oracle | `verifyTokenizerOracleFixtures`; `TokenizerOracleTest` |
+
+The image oracle's exact environment (Pillow 12.3.0, NumPy 2.5.3, Transformers 4.57.6) is pinned in
+`tools/image-oracle/provenance.json` and re-verified by `verifyImageOracle`; `verifyHfReferenceGoldens`
+SHA-256-pins the tiny checkpoint, the `idefics3.json` numerics, the Tier-B logits golden, the
+manifest, the licensed input image and the generator. The decoded-image fixtures exercise
+`jmlx-vision`'s pure-Java path (no native runtime needed); the tiny-checkpoint row exercises the
+native `SmolVlmModel` and runs only where the MLX runtime is available.

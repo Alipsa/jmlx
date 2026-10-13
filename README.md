@@ -117,3 +117,16 @@ including MiniLM pooling/Normalize, and T5/Flan-T5 through `TextGenerationModels
 See [model API examples](jmlx-models/README.md) and [implementation evidence](req/phase7-2-implementation-report.md).
 Pair tokenization and SentencePiece charsmap normalization are pure Java; model execution retains
 its existing native runtime requirements. Python reference/oracle execution remains opt-in.
+
+## SmolVLM image+text
+
+Phase 7.3a adds the published pure-Java `jmlx-vision` module (PNG/JPEG decode, Pillow-exact
+bilinear/bicubic/LANCZOS resampling, normalization, Idefics3 image processor) and `SmolVlmModel`
+in `jmlx-models`: structured chat content with image parts, `GenerationRequest.withImages`,
+placeholder expansion, tower/connector prefill and cached image+text generation through
+`TextGenerationModels.load` (`model_type=idefics3`, verified against the pinned
+SmolVLM-256M-Instruct artifact). See [model API examples](jmlx-models/README.md),
+[jmlx-vision](jmlx-vision/README.md) and
+[capability evidence](req/phase7-3a-implementation-report.md). Image preprocessing is pure Java;
+model execution retains the existing native runtime requirements, and Python oracle execution
+remains opt-in.

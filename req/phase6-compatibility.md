@@ -56,3 +56,15 @@ named. Quantized KV cache remains unsupported.
 All three new real-artifact checks passed locally on M5 Max/macOS 27.0.1 with TF32 disabled.
 Their first supported macOS 26 CI executions remain pending. See `phase7-2-implementation-report.md`
 for pins, margins and measured resource use; synthetic head checks do not imply other model families.
+
+## Phase 7.3a image+text task (2026-10-13)
+
+| Task/family | Tier-A | Tier-B | Limits |
+| --- | --- | --- | --- |
+| Image+text → text, SmolVLM / Idefics3 | Byte-exact Pillow image oracle fixtures (decode, resize, full preprocess chain); tiny Idefics3 checkpoint with strict 1e-4 CPU reference logits for patch/positioned embeddings, tower, connector, merged embeddings, prefill/cached/full-history steps and exact greedy IDs | [SmolVLM-256M-Instruct pin](phase6-tier-b-artifacts.md#phase-73a-wp7-imagetext-candidate-2026-10-11): 16 original / 347 expanded prompt IDs, exact greedy IDs `[378, 2443, 21559, 354]`, full logits at prefill and three cached histories within 1e-4 of CPU float32 eager | float safetensors only (storage FP16/BF16 up-cast; quantized and per-layer-overridden vision checkpoints rejected); 16 images, 67,108,864 decoded pixels, 256 tiles, context-length budget; FULL and capacity-bounded KV retention, sliding image-prefill retention rejected; no VLM batching or scheduler cohorts |
+
+The row above is evidence-backed but its real-artifact check is **local eligibility evidence**: the
+recorded runs used M5 Max/macOS 27.0.1 with TF32 disabled, and the first supported macOS 26 hosted
+execution (the weekly `macos-26-xlarge` Tier-B row) remains pending. See
+`phase7-3a-implementation-report.md` for pins, margins and measured resource use; the synthetic
+checks do not imply other vision families.

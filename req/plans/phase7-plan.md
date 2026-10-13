@@ -437,7 +437,10 @@ modality rows.
 
 ## 7.3a — Vision foundation and SmolVLM-256M
 
-Implementation sub-plan: [phase7-3a-plan.md](phase7-3a-plan.md) (proposed, 2026-10-06).
+Implementation sub-plan: [phase7-3a-plan.md](phase7-3a-plan.md) (proposed, 2026-10-06; WP1–WP8
+delivered 2026-10-06–2026-10-13 via PRs #41–#46 plus the WP8 PR — the macOS 26 hosted acceptance
+of the WP6/WP7 suites and the Tier-B row remains pending, see
+[phase7-3a-implementation-report.md](../phase7-3a-implementation-report.md)).
 
 **Review amendments, 2026-10-06:**
 

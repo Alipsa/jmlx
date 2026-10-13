@@ -149,3 +149,60 @@ seven-artifact release-smoke `ci`. Raw bit recordings remain under
 `jmlx-models/build/exact-bits/tf32-{1,0}` as local PR evidence; baseline provenance caveats are
 unchanged from WP6 above. The Phase 6 MLX oracle explicitly skips this macOS 27 host because it
 requires macOS 26. No native pins, bindings, module versions or publication were changed.
+
+## WP8 — final consumer evidence and capability documentation, 2026-10-13
+
+WP8 builds on merged WP7 (PR #46, merge `0d648e1`). It changes no API, version, native pin,
+generated binding, golden, manifest or tolerance; it re-runs the plan's required final checks on
+the merged tree in fresh JVMs and finalizes the capability documentation. Host: Apple M5 Max,
+macOS 27.0.1, MLX 0.31.2 / mlx-c `fba4470`, Java 25.
+
+- Root `./gradlew build` green: every module `check`, `spotlessCheck`/checkstyle,
+  `verifyBytecodeLevel`, `verifyReleaseScriptsMatch`, `verifyMlxApiCallSites`, the
+  `req/mlx-api-inventory.md` freshness check, `verifyHfReferenceGoldens` and
+  `verifyImageOracleDependencyPins`.
+- Fresh full-suite native runs with no skips: `:jmlx-core:test` 46 suites / 405 tests (the single
+  skip is the pre-existing `MoeMlpBenchmarkTest` benchmark probe, excluded by design) and
+  `:jmlx-models:test` 47 suites / 337 tests, zero failures; fresh
+  `:jmlx-core:float32GoldenTest` (19 tests) and `:jmlx-models:float32GoldenTest` (31 tests) green
+  with TF32 disabled.
+- Oracle verification under supported profiles: image oracle environment and all three committed
+  fixtures (Python 3.12, Pillow 12.3.0, NumPy 2.5.3, Transformers 4.57.6, Darwin/arm64); tokenizer
+  oracle environment and all four fixtures (tokenizers 0.23.2); MLX oracle on the Phase 7.1
+  profile (Python 3.12.15, mlx 0.31.2) with its fixtures. The Phase 6 MLX profile is explicitly
+  skipped on this macOS 27 host because it requires exactly macOS 26.
+- Both exact-bit comparisons (TF32 on and off) are bit-identical to the retained WP6 same-host
+  baseline (14 applicable variants, 126 captures per mode, recorded at `6fc5b8c`); only the git
+  commit differs, as the verifier permits.
+- Opt-in pinned Tier-B `smolvlm-256m-instruct` re-run: exact greedy IDs
+  `[378, 2443, 21559, 354]`, maximum all-vocabulary logit error `5.2928924560546875e-5`
+  (allowed `1e-4`), minimum top-two gap `0.26448631286621094` (required `> 0.0003`), native
+  allocator peak 5,737,416,464 bytes and sampled process peak 7,146,752,688 bytes, under the
+  suite's gates. Margin eligibility passed; the run is local macOS 27 evidence.
+- Seven-artifact release-smoke `ci`: seven coordinates resolved from the disposable repository
+  only, POM-only and module-metadata runtime classpaths equal (11 components), licenses in all
+  seven runtime jars, the native jar payload, the three `jmlx-vision` jars' Pillow `NOTICE`
+  content, seven Javadoc and seven sources jars, a fresh native extraction with no path override,
+  and the seeded two-request batch equal to the committed golden.
+
+Documentation finalized: the [compatibility matrix](phase6-compatibility.md) gains the Phase 7.3a
+image+text row with the evidence and limits above; the [Tier-A fixtures](phase6-tier-a-fixtures.md)
+and [Tier-B artifacts](phase6-tier-b-artifacts.md) documents record the vision fixtures and the
+WP8 re-run status; the [inference report](phase6-inference-report.md) covers the seven-module
+release chain and the 7.2/7.3a surface; the root README documents the SmolVLM image+text entry
+point.
+
+### Separation of evidence
+
+- **Local evidence (this host):** everything above. It proves preprocessing, synthetic
+  prefill/cached logits, real-artifact exact greedy output, unchanged text bits, request/result
+  contracts, cleanup and the consumer smoke on the merged tree.
+- **macOS 26 CI acceptance (pending):** the first supported hosted execution of the WP6/WP7 native
+  suites in the new-CI required-suite assertions, and the first `macos-26-xlarge` Tier-B SmolVLM
+  row. The latter is additionally gated on the account's larger-runner billing being configured
+  (`tools/tier-b/README.md`); until both land, the compatibility-matrix row is local eligibility
+  evidence, never a hosted-verified claim.
+- **Deferred capabilities:** sliding image-prefill KV retention (rejected pending equivalence
+  evidence), VLM batching/multimodal scheduler cohorts, Qwen3-VL (Phase 7.3b), LLaVA-style models
+  (Phase 7.3c or a dated deferral), and the Phase 6 rows with pending artifact pins (Gemma v1,
+  Phi-3, Mixtral). No Maven publication or version bump is part of WP8.

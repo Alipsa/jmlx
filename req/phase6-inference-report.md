@@ -15,6 +15,14 @@ real-artifact one. **The first Maven Central release has not happened**: see
   top-k/top-p/min-p filtering.
 - `BatchGenerationScheduler` (Phase 6.5): one MLX-owning worker batching requests into cohorts, with
   bounded admission, per-request cancellation, row-level failure isolation and a worker-owned model.
+- Phase 7.2: BERT text encoder, sequence and token classification, and T5/Flan-T5 generation
+  (`TextEncoderModels`, `SequenceClassifiers`, `TokenClassifiers`). See
+  [phase7-2-implementation-report.md](phase7-2-implementation-report.md).
+- Phase 7.3a: the published pure-Java `jmlx-vision` module (PNG/JPEG decode, Pillow-exact
+  bilinear/bicubic/LANCZOS resampling, Idefics3 processor) and `SmolVlmModel` in `jmlx-models`:
+  structured chat content with image parts, `GenerationRequest.withImages`, placeholder expansion,
+  tower/connector prefill and cached image+text generation through `TextGenerationModels.load`
+  (`model_type=idefics3`). See [phase7-3a-implementation-report.md](phase7-3a-implementation-report.md).
 
 ## Verification evidence
 
@@ -56,8 +64,9 @@ module's own, else the root's), and `META-INF/NOTICE` where the module has one:
 - `jmlx-ffi`: bindings generated from mlx-c.
 - `jmlx-native-macos-arm64`: MLX and mlx-c (MIT); `libmlx.dylib` also embeds Apache-2.0 metal-cpp.
 
-The release smoke asserts the license in all six runtime jars and the notice and native payload in
-the native jar. Model weights are never redistributed; see the download guidance in the
+The release smoke asserts the license in all seven runtime jars, the notice and native payload in
+the native jar, and the Pillow `NOTICE` content in the three `jmlx-vision` jars. Model weights are
+never redistributed; see the download guidance in the
 [`jmlx-models` README](../jmlx-models/README.md).
 
 ## Unsupported features
@@ -70,6 +79,10 @@ Each is rejected with a named error at config parsing or load time, not silently
 | Packed (quantized) KV cache | Not supported: the pinned runtime rejects packed K/V in SDPA (see the [quantized KV probe](phase6-4-benchmark.md#quantized-kv-retention-probe)) |
 | Gemma 2/3, Phi-2, Phi-3 `longrope`, shared-expert MoE | `planned`; the unsupported `model_type` or `rope_type` is named |
 | Qwen2 `use_sliding_window=true` | Config key named |
+| Quantized, per-layer-overridden or non-affine vision (Idefics3) checkpoints; affine-quantized SmolVLM | Rejected at load with the offending key named; float safetensors only, storage FP16/BF16 up-cast |
+| Sliding KV retention for image-prefill (vision-language models) | Rejected pending image-prefill equivalence evidence; FULL and capacity-bounded retention only |
+| VLM batching and multimodal scheduler cohorts | Not supported; `BatchGenerationScheduler` admission rejects images before native work |
+| Qwen3-VL, LLaVA-style vision models | Phase 7.3b / 7.3c, not implemented |
 | SentencePiece `Precompiled` normalizers | Rejected by the tokenizer |
 | Multi-GPU, non-Apple platforms | No native artifact |
 | Concurrent MLX use from several threads | Unsupported; use the scheduler's single worker. The `Cleaner` backstops are the one known exception (see the `se.alipsa.jmlx.core` package Javadoc) |
@@ -89,20 +102,30 @@ The first release is **open**. Nothing has been published to Maven Central.
 | 3 | `jmlx-native-macos-arm64` | 0.1.0 | published and resolved | not published |
 | 4 | `jmlx-ffi` | 0.5.0 | published and resolved | not published |
 | 5 | `jmlx-core` | 0.5.0 | published and resolved | not published |
-| 6 | `jmlx-models` | 0.1.0 | published and resolved | not published |
+| 6 | `jmlx-vision` | 0.1.0 | published and resolved | not published |
+| 7 | `jmlx-models` | 0.1.0 | published and resolved | not published |
+
+`jmlx-vision` (Phase 7.3a) starts a fresh `0.1.0` line and is the seventh published module; it
+publishes before `jmlx-models`, which `api`-depends on it.
 
 `tools/release-smoke/run.sh ci` passed locally on 2026-10-02 (Apple M2 Max, Java 25.0.3): six
 coordinates from the disposable repository only, the POM-only and module-metadata runtime classpaths
 equal (10 components), licenses, native payload, Javadoc and sources jars present, a fresh native
 extraction into a disposable cache with no path override, and the seeded two-request batch equal to
 `tools/release-smoke/goldens/mistral-sampled.properties`. Tampering with the golden fails the run.
+WP8 (2026-10-13) re-ran the same `ci` consumer against all **seven** artifacts on the merged tree
+(Apple M5 Max, macOS 27.0.1): seven coordinates from the disposable repository only, the POM-only
+and module-metadata runtime classpaths equal (11 components), licenses across all seven runtime
+jars, the native payload, the three vision jars' Pillow `NOTICE` content, seven Javadoc and seven
+sources jars, a fresh native extraction, and the seeded two-request batch equal to the committed
+golden. See the [WP8 section](phase7-3a-implementation-report.md) for the full run.
 
 Still to do, by hand on macOS ARM64 with credentials (CI never publishes):
 
 1. Set each module to its release version, in the order above, and run `run.sh candidate`.
 2. For each module follow `release.sh`, plus `jmlx-jinja/req/release-checklist.md` for jinja, and
    confirm Central availability before releasing its dependents.
-3. Run `run.sh central`, which resolves all six from Central under a fresh Gradle home.
+3. Run `run.sh central`, which resolves all seven from Central under a fresh Gradle home.
 4. Only then move each module to its next `-SNAPSHOT` version, and record the final coordinates and
    the Central smoke result here.
 

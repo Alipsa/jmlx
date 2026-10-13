@@ -319,6 +319,7 @@ public final class SmolVlmModel implements TextGenerationModel {
     checkCancellation(request);
     int[][] before =
         decoder.preflightBatch(1, plan.expandedLength(), caches, new int[] {plan.expandedLength()});
+    DecoderModel.FirstStepResult result;
     try (MLXScope prefill = activation.newChild()) {
       MLXArray features = features(request, prefill);
       checkCancellation(request);
@@ -333,12 +334,21 @@ public final class SmolVlmModel implements TextGenerationModel {
       evaluated.add(logits);
       evaluated.addAll(Arrays.asList(DecoderModel.stepCacheArrays(caches)));
       MLX.eval(evaluated.toArray(MLXArray[]::new));
-      return new DecoderModel.FirstStepResult(
-          MLX.hoist(logits, activation), cs -> DecoderModel.poisonBatchIfMutated(cs, before, 1));
+      result =
+          new DecoderModel.FirstStepResult(
+              MLX.hoist(logits, activation),
+              cs -> DecoderModel.poisonBatchIfMutated(cs, before, 1));
     } catch (RuntimeException | Error failure) {
       DecoderModel.poisonBatchIfMutated(caches, before, 1);
       throw failure;
     }
+    try {
+      observer.accept("prefill-closed");
+    } catch (RuntimeException | Error failure) {
+      DecoderModel.poisonBatchIfMutated(caches, before, 1);
+      throw failure;
+    }
+    return result;
   }
 
   MLXArray features(GenerationRequest request, MLXScope prefill) {

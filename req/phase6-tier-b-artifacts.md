@@ -71,3 +71,18 @@ its tests run in the existing `./gradlew -p buildSrc check` CI step. Python down
 Actual sentence-transformers and HF CPU references, source hashes, full logits, gaps, final local
 measurements and host are recorded in manifests. Numerical comparisons always run; exact IDs
 require stable margin eligibility. Initial macOS 26 workflow acceptance remains pending.
+
+## Phase 7.3a WP7 image/text candidate (2026-10-11)
+
+`tools/tier-b/smolvlm-256m-instruct.json` pins public Apache-2.0
+`HuggingFaceTB/SmolVLM-256M-Instruct` at `7e3e67edbbed1bf9888184d9df282b700a323964`, all
+13 consumed files (517,903,046 bytes), a committed MIT synthetic RGB image, structured chat,
+16 unexpanded / 347 expanded prompt IDs and four exact greedy IDs `[378, 2443, 21559, 354]`.
+Task `image-text-generation` dispatches `TierBVisionLanguageTest` in the existing TF32-off profile.
+The weekly/on-demand row is owned by the project maintainer and uploads numerical/memory evidence.
+
+Local macOS 27 measured maximum all-vocabulary logit error `5.2928924560546875e-5` (allowed
+`1e-4`), minimum top-two gap `0.26448631286621094` (required `> 0.0003`), native allocator peak
+5,737,416,464 bytes and highest 20-ms sampled test-JVM RSS 487,312 KiB. RSS excludes Gradle and
+unified GPU allocations and may miss short peaks. This is local eligibility evidence; hosted
+macOS 26 execution/fit and final WP8 compatibility acceptance remain pending.

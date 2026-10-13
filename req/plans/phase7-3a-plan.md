@@ -1,9 +1,9 @@
 # Phase 7.3a — Vision foundation and SmolVLM-256M
 
 - **Status:** WP1–WP2 delivered via PR #41 (merge `6e82590`), WP3 via PR #42 (merge `0dac174`),
-  WP4 via PR #43 (merge `d658309`), WP5 via PR #44 (merge `3a8a2f0`); WP6 implemented
-  on branch `phase7-3a-wp6` (2026-10-11), with local synthetic/reference evidence and required
-  macOS 26 CI acceptance still pending. WP7–WP8 remain pending.
+  WP4 via PR #43 (merge `d658309`), WP5 via PR #44 (merge `3a8a2f0`); WP6 delivered via PR #45 (merge `9c59e23`). WP7 implemented on branch `phase7-3a-wp7`
+  (2026-10-11), with local memory/precision/real-artifact evidence; required macOS 26 CI and
+  real-artifact acceptance remain pending. WP8 remains pending.
 - **Parent:** `req/plans/phase7-plan.md` §7.3a, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Prerequisite:** 7.1 layer/oracle/inventory acceptance. 7.2 cross-attention and 7.0 are

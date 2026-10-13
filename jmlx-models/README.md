@@ -103,7 +103,8 @@ batch-scheduler admission rejects images before native work.
 composes the existing Llama decoder with the Idefics3 tower/connector, resolves all image markers
 from the checkpoint tokenizer, validates the complete tensor plan, and converts floating weights
 to FLOAT32. FP16/BF16 checkpoints therefore need roughly twice their source weight storage. The
-pinned tiny checkpoint is verified; SmolVLM-256M real-artifact acceptance remains pending WP7.
+pinned tiny checkpoint is verified. WP7 also verifies the pinned SmolVLM-256M checkpoint
+locally against CPU float32 logits and stable greedy IDs; macOS 26 acceptance remains pending.
 
 Generation expands image placeholders using the processor's tile geometry, runs vision once per
 tile during prefill, and merges features with a concatenate/gather. Visual features and activation
@@ -116,8 +117,11 @@ Only full and capacity-bounded full KV retention is supported for Idefics3. Slid
 rejected pending image-prefill equivalence evidence. Limits are 16 images, 67,108,864 aggregate
 input pixels, 256 tiles, and the checkpoint's context length (including the generation budget).
 The model does no remote image fetching. PNG/JPEG decoding and the documented RGB/color/EXIF
-policies live in [jmlx-vision](../jmlx-vision/README.md). WP7 memory/Tier-B gates and WP8 final
-capability documentation remain pending; see the [WP6 report](../req/phase7-3a-implementation-report.md).
+policies live in [jmlx-vision](../jmlx-vision/README.md). Evaluated request memory tests cover
+visual release, full-cache growth and failure cleanup. Run the opt-in real-artifact check with
+the [SmolVLM manifest](../tools/tier-b/smolvlm-256m-instruct.json) using the commands in
+[tools/tier-b](../tools/tier-b/README.md). WP8 final capability documentation and macOS 26
+acceptance remain pending; see the [implementation report](../req/phase7-3a-implementation-report.md).
 
 Use the existing `GenerationRequest(int[], ...)` constructor for pretokenized input. Its event
 `textDelta` and result `generatedText` remain null. Tokenizer-backed requests produce non-null,

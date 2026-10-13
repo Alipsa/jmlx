@@ -18,3 +18,32 @@ remove partial files. Ordinary builds do not download artifacts or require Pytho
 Downloader tests run with `./gradlew -p buildSrc check`, independently of root `check`, and use
 in-memory responses and local HTTP servers. Python remains confined to optional reference tools
 and the existing CI reporting script.
+
+SmolVLM uses `smolvlm-256m-instruct.json` and task `image-text-generation`, selecting
+`TierBVisionLanguageTest` in the TF32-off JVM. The image is committed under `images/`, MIT-licensed,
+and hash-pinned independently of the downloaded Apache-2.0 checkpoint. No image URL is fetched.
+Structured chat, rendered text, original/expanded IDs, all four greedy IDs, every history's full
+logits, top-two IDs/gaps and local peak-memory evidence are pinned. Numerical comparisons and
+stable-margin eligibility always run, regardless of host; macOS 26 acceptance is still pending.
+
+```sh
+./gradlew downloadTierBArtifact \
+  -PtierBManifest=tools/tier-b/smolvlm-256m-instruct.json -PtierBTarget=.tier-b/smolvlm
+JMLX_TIER_B_MODEL_DIR=.tier-b/smolvlm \
+  JMLX_TIER_B_MANIFEST=tools/tier-b/smolvlm-256m-instruct.json \
+  JMLX_TIER_B_MODEL_TYPE=idefics3 ./gradlew :jmlx-models:tierBTest
+```
+
+The test samples the test process's physical footprint (libproc's `ri_phys_footprint`, the figure
+the runner's RAM must actually hold, unlike `ps -o rss` which misses MLX/Metal allocations) every
+20 ms and reports the highest sample alongside the native allocator peak, asserting both stay
+below bounds sized from the manifest's recorded local evidence so a memory regression fails the
+suite instead of OOMing the runner. The workflow uploads JUnit numerical/memory evidence even when
+the test fails.
+
+In CI, the SmolVLM row of the `tier-b` workflow runs on `macos-26-xlarge`, a GitHub larger runner.
+GitHub's Actions billing docs state that larger runners are always charged per minute, even in
+public repositories, and that larger-runner usage is blocked until a payment method is set up on
+the account (https://docs.github.com/en/billing/concepts/product-billing/github-actions). If the
+repository's account has no billing configured, the smolvlm row fails to start while the other rows
+are unaffected; fixing it is an account/billing setting, not a repository change.

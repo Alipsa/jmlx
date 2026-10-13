@@ -36,6 +36,13 @@
       "tests": "KVCacheMemoryPlateauTest"
     },
     {
+      "bindings": ["mlx_h.mlx_clear_cache"],
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "MLXMemory",
+      "tests": "MLXMemoryLeakTest; VisionLanguageMemoryTest"
+    },
+    {
       "bindings": ["mlx_h.mlx_fast_rope_dynamic"],
       "category": "downcall",
       "status": "implemented",

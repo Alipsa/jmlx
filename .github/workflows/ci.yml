@@ -160,7 +160,8 @@ jobs:
                             'KVCacheQuantizationProbeTest', 'PackedAttentionProbeTest', 'AttentionMaskTest',
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest', 'StridedViewSafetyTest',
-                            'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest', 'EncoderAttentionTest'],
+                            'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest', 'EncoderAttentionTest',
+                            'MLXMemoryLeakTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
@@ -171,7 +172,7 @@ jobs:
                               'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
                               'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest',
                               'ModalityRejectionTest', 'Idefics3VisionTowerSmokeTest',
-                              'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest'],
+                              'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
@@ -230,6 +231,18 @@ jobs:
         with:
           name: kv-cache-quantization-probe
           path: jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheQuantizationProbeTest.xml
+          if-no-files-found: warn
+
+      - name: Upload vision-language acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vision-language-native-results
+          path: |
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.VisionLanguageMemoryTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmGenerationTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmDefaultPrecisionTest.xml
+            jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.SmolVlmGoldenTest.xml
           if-no-files-found: warn
 
       - name: Upload packed attention probe

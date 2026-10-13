@@ -1,5 +1,7 @@
 package se.alipsa.jmlx.core;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -107,6 +109,37 @@ class MLXMemoryLeakTest {
               + " per-iteration child scopes (threshold "
               + LEAK_THRESHOLD_BYTES
               + " bytes)");
+    }
+  }
+
+  /**
+   * In-module coverage for {@link MLXMemory#clearCache()}, which otherwise only has jmlx-models'
+   * VisionLanguageMemoryTest. The pool is filled with one known freed buffer first, because
+   * activeBytes() excludes pooled bytes and a no-op clear is indistinguishable in a JVM whose pool
+   * is already empty. The before/after reads are settled (see {@link
+   * MLXMemoryTestSupport#settledActiveBytes()}) so that no delayed Metal completion-handler free
+   * can land between them (see {@link MLXMemory}'s class javadoc).
+   */
+  @Test
+  void clearCacheReleasesPooledBuffersWithoutTouchingLiveArrays() throws InterruptedException {
+    try (MLXScope scope = new MLXScope()) {
+      MLXArray a = MLX.array(scope, new float[] {1, 2, 3}, new int[] {3});
+      MLX.eval(a);
+
+      // Populate the allocator's pool: closing the child scope frees its buffer into it.
+      try (MLXScope child = scope.newChild()) {
+        MLXArray pooled = MLX.array(child, new float[1024], new int[] {1024});
+        MLX.eval(pooled);
+      }
+
+      long before = MLXMemoryTestSupport.settledActiveBytes();
+
+      assertTrue(
+          MLXMemory.cachedBytes() > 0, "expected the buffer freed by the child scope to be pooled");
+      MLXMemory.clearCache();
+      assertEquals(before, MLXMemory.activeBytes(), "clearCache must not change active bytes");
+      assertEquals(0, MLXMemory.cachedBytes(), "clearCache must empty the pool");
+      assertArrayEquals(new float[] {1, 2, 3}, a.toFloatArray());
     }
   }
 

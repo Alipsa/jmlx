@@ -130,3 +130,20 @@ maximum absolute logit error was `9.0524554e-4` with TF32 enabled on macOS 27.0.
 MLX 0.31.2 / mlx-c fba4470. Its separately named TF32 logit bound is `0.002`, with margin for
 device variation. This is local synthetic evidence, not a real-checkpoint error bound or the
 required macOS 26 CI acceptance. WP7 establishes the real-artifact gaps/error/memory gates.
+
+## Phase 7.3a WP7 real-artifact precision (2026-10-11)
+
+The pinned `SmolVLM-256M-Instruct` Tier-B case runs the Java image decoder and full slow-compatible
+resize/split/normalize chain with FLOAT32 checkpoint computation and TF32 off. Maximum absolute
+logit error versus CPU float32 eager was `5.2928924560546875e-5` over all 49,280 vocabulary scores
+at prefill and three cached histories. The independent strict allowed error stays `1e-4`.
+The smallest recorded top-two gap is `0.26448631286621094`; every greedy ID is exact and every gap
+exceeds `2 * 1e-4 + 1e-4`. The test recomputes gaps/top-two IDs from full golden logits, so the
+eligibility check cannot accept inconsistent summary fields. These are combined Java-preprocessor
+end-to-end errors, separately measured from the identical-oracle-pixel synthetic model-math tests.
+The opaque RGB image stays within the existing bit-exact PNG/resize/full-chain acceptance domain.
+The synthetic TF32 bound remains `0.002` and strict model-math assertions remain `1e-4`.
+
+This local run used macOS 27.0.1 / Apple Silicon, MLX 0.31.2 and mlx-c
+`fba4470b89073180056c9ea46c443051375f7399`. macOS 26 CI acceptance is pending; host differences
+never replace these numerical/exact-ID gates with structural checks. No existing golden was changed.

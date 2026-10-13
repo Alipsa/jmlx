@@ -23,7 +23,8 @@ checkpoint is compatible.
 The independent pure-Java tokenizer module additionally verifies synthetic/reference fixtures for
 Metaspace BPE, Metaspace Unigram, and Bert/WordPiece. Phase 6.3 family tokenizer bundles are synthetic
 and establish component and chat-rendering behavior, not byte-level parity with a production tokenizer.
-SentencePiece `Precompiled` normalizers are rejected. The [2026-09-29 macOS native CI run](https://github.com/Alipsa/jmlx/actions/runs/36627571854)
+SentencePiece `Precompiled` normalizers decode the real Darts charsmap (Phase 7.2); malformed
+binary tables are rejected at load with a named `Precompiled: malformed ...` error. The [2026-09-29 macOS native CI run](https://github.com/Alipsa/jmlx/actions/runs/36627571854)
 executed the Phase 6.3 attention, MoE, Llama/Qwen, Mistral, Gemma, Phi-3 and Mixtral suites;
 the workflow checks their JUnit XML to prevent a silent native skip. The
 [Llama](https://github.com/Alipsa/jmlx/actions/runs/36640308134),
@@ -61,7 +62,7 @@ for pins, margins and measured resource use; synthetic head checks do not imply 
 
 | Task/family | Tier-A | Tier-B | Limits |
 | --- | --- | --- | --- |
-| Image+text → text, SmolVLM / Idefics3 | Byte-exact Pillow image oracle fixtures (decode, resize, full preprocess chain); tiny Idefics3 checkpoint with strict 1e-4 CPU reference logits for patch/positioned embeddings, tower, connector, merged embeddings, prefill/cached/full-history steps and exact greedy IDs | [SmolVLM-256M-Instruct pin](phase6-tier-b-artifacts.md#phase-73a-wp7-imagetext-candidate-2026-10-11): 16 original / 347 expanded prompt IDs, exact greedy IDs `[378, 2443, 21559, 354]`, full logits at prefill and three cached histories within 1e-4 of CPU float32 eager | float safetensors only (storage FP16/BF16 up-cast; quantized and per-layer-overridden vision checkpoints rejected); 16 images, 67,108,864 decoded pixels, 256 tiles, context-length budget; FULL and capacity-bounded KV retention, sliding image-prefill retention rejected; no VLM batching or scheduler cohorts |
+| Image+text → text, SmolVLM / Idefics3 | Byte-exact Pillow image oracle fixtures (decode, resize, full preprocess chain); tiny Idefics3 checkpoint with strict 1e-4 CPU reference logits for patch/positioned embeddings, tower, connector, merged embeddings, prefill/cached/full-history steps and exact greedy IDs | [SmolVLM-256M-Instruct pin](phase6-tier-b-artifacts.md#phase-73a-wp7-imagetext-candidate-2026-10-11): 16 original / 347 expanded prompt IDs, exact greedy IDs `[378, 2443, 21559, 354]`, full logits at prefill and three cached histories within 1e-4 of CPU float32 eager | float safetensors only (storage FP16/BF16 up-cast; quantized and per-layer-overridden vision checkpoints rejected); per request: ≤16 images, ≤67,108,864 decoded pixels and ≤256 tiles in total, plus the context-length budget; FULL and capacity-bounded KV retention, sliding image-prefill retention rejected; no VLM batching or scheduler cohorts |
 
 The row above is evidence-backed but its real-artifact check is **local eligibility evidence**: the
 recorded runs used M5 Max/macOS 27.0.1 with TF32 disabled, and the first supported macOS 26 hosted

@@ -611,5 +611,6 @@ full retention are supported; sliding image-prefill retention is rejected. Nativ
 `TierBVisionLanguageTest`, selected by manifest task `image-text-generation`, with pinned
 SmolVLM-256M CPU logits, licensed local image, expanded IDs, stable greedy IDs and memory
 measurements. `verifyHfReferenceGoldens` also verifies the vision Tier-B manifest/image/generator
-digests; neural regeneration remains manual via `tools/hf-reference/vision_tier_b.py`. Local
-WP7 evidence passes; macOS 26 CI/Tier-B and WP8 capability acceptance remain pending; see `req/phase7-3a-implementation-report.md`.
+digests; neural regeneration remains manual via `tools/hf-reference/vision_tier_b.py`. Local WP7
+evidence passes. WP8 is implemented via PR #47, with local consumer/capability evidence in
+`req/phase7-3a-implementation-report.md`; the macOS 26 hosted CI/Tier-B acceptance remains pending.

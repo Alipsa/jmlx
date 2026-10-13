@@ -63,6 +63,8 @@ module's own, else the root's), and `META-INF/NOTICE` where the module has one:
 - `jmlx-jinja`: attribution for the vendored `@huggingface/jinja` 0.5.9 source (MIT).
 - `jmlx-ffi`: bindings generated from mlx-c.
 - `jmlx-native-macos-arm64`: MLX and mlx-c (MIT); `libmlx.dylib` also embeds Apache-2.0 metal-cpp.
+- `jmlx-vision`: the ported Pillow resampling and alpha-composite source (MIT-CMU), with
+  pinned source SHA-256s and the full license text.
 
 The release smoke asserts the license in all seven runtime jars, the notice and native payload in
 the native jar, and the Pillow `NOTICE` content in the three `jmlx-vision` jars. Model weights are
@@ -79,11 +81,11 @@ Each is rejected with a named error at config parsing or load time, not silently
 | Packed (quantized) KV cache | Not supported: the pinned runtime rejects packed K/V in SDPA (see the [quantized KV probe](phase6-4-benchmark.md#quantized-kv-retention-probe)) |
 | Gemma 2/3, Phi-2, Phi-3 `longrope`, shared-expert MoE | `planned`; the unsupported `model_type` or `rope_type` is named |
 | Qwen2 `use_sliding_window=true` | Config key named |
-| Quantized, per-layer-overridden or non-affine vision (Idefics3) checkpoints; affine-quantized SmolVLM | Rejected at load with the offending key named; float safetensors only, storage FP16/BF16 up-cast |
+| Any quantized Idefics3/SmolVLM checkpoint (affine, non-affine or per-layer) | Rejected at load ("quantized vision-language checkpoints are unsupported" for a plain affine block; malformed, per-layer or root-level blocks name the key); float safetensors only, storage FP16/BF16 up-cast |
 | Sliding KV retention for image-prefill (vision-language models) | Rejected pending image-prefill equivalence evidence; FULL and capacity-bounded retention only |
 | VLM batching and multimodal scheduler cohorts | Not supported; `BatchGenerationScheduler` admission rejects images before native work |
 | Qwen3-VL, LLaVA-style vision models | Phase 7.3b / 7.3c, not implemented |
-| SentencePiece `Precompiled` normalizers | Rejected by the tokenizer |
+| Malformed SentencePiece `Precompiled` charsmap binary tables | Rejected at tokenizer load with a named `Precompiled: malformed ...` error; well-formed charsmaps decode (Phase 7.2) |
 | Multi-GPU, non-Apple platforms | No native artifact |
 | Concurrent MLX use from several threads | Unsupported; use the scheduler's single worker. The `Cleaner` backstops are the one known exception (see the `se.alipsa.jmlx.core` package Javadoc) |
 | Mixing the direct `generate` API with a running scheduler | Documentation-only rule; not enforced |

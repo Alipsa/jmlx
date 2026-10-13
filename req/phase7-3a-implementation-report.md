@@ -161,9 +161,9 @@ macOS 27.0.1, MLX 0.31.2 / mlx-c `fba4470`, Java 25.
   `verifyBytecodeLevel`, `verifyReleaseScriptsMatch`, `verifyMlxApiCallSites`, the
   `req/mlx-api-inventory.md` freshness check, `verifyHfReferenceGoldens` and
   `verifyImageOracleDependencyPins`.
-- Fresh full-suite native runs with no skips: `:jmlx-core:test` 46 suites / 405 tests (the single
-  skip is the pre-existing `MoeMlpBenchmarkTest` benchmark probe, excluded by design) and
-  `:jmlx-models:test` 47 suites / 337 tests, zero failures; fresh
+- Fresh full-suite native runs with no native-gate skips: `:jmlx-core:test` 46 suites / 405 tests
+  (the single skip is the pre-existing `MoeMlpBenchmarkTest` benchmark probe, excluded by design)
+  and `:jmlx-models:test` 47 suites / 337 tests, zero failures; fresh
   `:jmlx-core:float32GoldenTest` (19 tests) and `:jmlx-models:float32GoldenTest` (31 tests) green
   with TF32 disabled.
 - Oracle verification under supported profiles: image oracle environment and all three committed

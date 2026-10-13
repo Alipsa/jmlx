@@ -10,7 +10,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 - mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
 - generated entries: 733
 - by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=194, planned=9, unplanned=530
+- by status: implemented=195, planned=9, unplanned=529
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -197,7 +197,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_broadcast_to` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_ceil` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_checkpoint` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_clear_cache` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_clear_cache` | downcall | implemented | MLXMemory | VisionLanguageMemoryTest | — | all handwritten source |
 | `mlx_h.mlx_clip` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_closure_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_closure_custom_apply` | downcall | unplanned | — | — | — | — |

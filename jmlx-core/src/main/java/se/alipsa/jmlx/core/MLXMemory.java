@@ -51,6 +51,18 @@ public final class MLXMemory {
     NativeOps.checked("mlx_reset_peak_memory", mlx_h::mlx_reset_peak_memory);
   }
 
+  /**
+   * Releases every pooled (recycled) device buffer -- the Metal allocator's buffer cache -- back to
+   * the OS. Live arrays are unaffected. Because {@link #activeBytes()} already excludes pooled
+   * bytes, this does not directly change that counter; it makes subsequent allocations draw fresh,
+   * exact-size buffers instead of possibly oversized recycled ones, which is what makes post-clear
+   * retained-memory measurements deterministic in any pool state. Primarily a test and diagnostic
+   * aid.
+   */
+  public static void clearCache() {
+    NativeOps.checked("mlx_clear_cache", mlx_h::mlx_clear_cache);
+  }
+
   private static long read(String operation, Function<MemorySegment, Integer> call) {
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment result = arena.allocate(ValueLayout.JAVA_LONG);

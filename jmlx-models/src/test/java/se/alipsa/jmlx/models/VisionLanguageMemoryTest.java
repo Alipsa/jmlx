@@ -196,6 +196,23 @@ class VisionLanguageMemoryTest {
     }
   }
 
+  /**
+   * Visual release and per-step KV growth evidence. The four cleared endpoints -- right after
+   * prefill closes and at decode steps 1, midLimit and 64 -- are asserted to retain exactly their
+   * KV payload: {@link MLXMemory#clearCache()} empties the Metal allocator's buffer pool before
+   * each endpoint, so that step's KV buffers are allocated fresh, at exactly the requested size
+   * (every endpoint request here stays below the allocator's 16 KiB page-alignment threshold), and
+   * the endpoint's retained bytes equal the logical payload in any pool state. Each endpoint is
+   * measured while every request scope is still open, so any retained or overgrown request buffer
+   * -- a visual feature tensor hoisted into the request or generation scope in particular -- fails
+   * one of them before a scope closes. Every other step keeps the pool-independent lower bound
+   * {@code retained >= logical}, the check that catches request storage that undergrew its logical
+   * payload. The three decode endpoint values are additionally reported as {@code early}, {@code
+   * mid} and {@code late} in the test's {@code VLM retention} evidence line, so {@code early} is
+   * both asserted and reported. The three cleanup checks at the end then verify the release path
+   * itself: that closing the request scope and running the production {@code generate} leave no
+   * request buffer active.
+   */
   @Test
   void visualReleaseAndEarlyLateKvSlopesHaveDerivedBudgets() throws Exception {
     try (MLXScope root = new MLXScope()) {
@@ -216,23 +233,32 @@ class VisionLanguageMemoryTest {
           2L * config.numHiddenLayers() * config.numKeyValueHeads() * headDim * Float.BYTES;
       long featureBytes = (long) plan.totalFeatureRows() * config.hiddenSize() * Float.BYTES;
       // One key or value tensor's bytes per position (kvHeads * headDim * 4);
-      // kvPerPosition is 2 * numHiddenLayers times this.
+      // kvPerPosition is 2 * numHiddenLayers times this. Keys and values are separate
+      // buffers -- KVCache concatenates them independently -- so at step s each of the
+      // 2 * numHiddenLayers buffers requests kvBytesPerBuffer * (expandedLength + s)
+      // bytes. The boundary the mid endpoint must land on is the TEXT hidden tier
+      // [1, expandedLength, hiddenSize] f32 (Q-projection and embedding outputs) that
+      // prefill definitely allocates and frees; at midLimit each buffer's request equals
+      // hiddenBytes exactly.
       long kvBytesPerBuffer = config.numKeyValueHeads() * headDim * Float.BYTES;
-      // The MLP intermediate-tier buffer size, [1, expandedLength, intermediateSize] f32 (the
-      // gate/up/down projection outputs prefill creates). Each layer's KV buffer packs key
-      // and value, so at step s its request is 2 * kvBytesPerBuffer * (expandedLength + s)
-      // bytes; at midLimit that request equals intermediateBytes exactly. The text hidden
-      // tier is smaller than the request, so this is the smallest prefill tier that fits
-      // and the buffer draws on it exact-fit, with no pooled slack in any pool state.
-      long intermediateBytes =
-          (long) plan.expandedLength() * config.intermediateSize() * Float.BYTES;
-      long midLimit = intermediateBytes / (2L * kvBytesPerBuffer) - plan.expandedLength();
+      long hiddenBytes = (long) plan.expandedLength() * config.hiddenSize() * Float.BYTES;
+      assertTrue(
+          hiddenBytes % kvBytesPerBuffer == 0,
+          "hidden tier "
+              + hiddenBytes
+              + " B is not a multiple of the per-buffer KV size "
+              + kvBytesPerBuffer
+              + " B");
+      long midLimit = hiddenBytes / kvBytesPerBuffer - plan.expandedLength();
+      assertTrue(
+          midLimit > 1 && midLimit < 64, "midLimit=" + midLimit + " outside the decode span");
       MLXArray deadFeature;
       MLXArray deadKeys;
       try (MLXScope generation = root.newChild()) {
         // Owns every buffer of this test-shaped request (caches, prefill, activations). It
         // is closed while `generation` is still open, so the test-shape cleanup check below
-        // sees a feature tensor hoisted out of the prefill scope as retained.
+        // sees a feature tensor hoisted into `generation` as retained; retention in this scope
+        // itself is caught by the exact endpoints above, measured before the close.
         MLXScope requestScope = generation.newChild();
         List<KVCache> caches = new ArrayList<>();
         for (int i = 0; i < config.numHiddenLayers(); i++) {
@@ -244,6 +270,11 @@ class VisionLanguageMemoryTest {
           assertEquals(featureBytes / Float.BYTES, deadFeature.toFloatArray().length);
           long featuresOnly = settledActiveBytes() - baseline;
           assertTrue(featuresOnly >= featureBytes, "features did not survive vision child closure");
+          // Empty the allocator's buffer pool before the prefill runs: with an empty pool every
+          // allocation up to the KV concat is a fresh, exact-size buffer, so once the prefill
+          // scope closes the only live bytes are the four KV buffers, exactly sized, in any pool
+          // state.
+          MLXMemory.clearCache();
           var logits =
               model
                   .decoderForTest()
@@ -262,18 +293,27 @@ class VisionLanguageMemoryTest {
         // feature tensor alone would not move it; the cleanup checks below detect retention.
         assertTrue(
             withVisual - afterPrefill >= featureBytes, "prefill visual storage was retained");
-        // Every retained buffer holds at least its logical payload, in any pool state. No
-        // upper bound is asserted: the pooled-buffer slack (recycled-buffer tiers) depends
-        // on prior allocations in the JVM; retained visual storage is detected by the
-        // cleanup checks below.
+        // The pool was cleared before the KV buffers were materialized and the only other
+        // prefill buffers live in the just-closed prefill scope, so at this point the only live
+        // buffers are the four exact-size KV buffers: retained bytes equal the logical KV
+        // payload exactly, in any pool state.
         long logicalPrefill = kvPerPosition * plan.expandedLength();
-        assertTrue(
-            afterPrefill - baseline >= logicalPrefill,
+        assertEquals(
+            logicalPrefill,
+            afterPrefill - baseline,
             "prefill retained=" + (afterPrefill - baseline) + ", logical=" + logicalPrefill);
         long early = 0;
         long mid = 0;
         long late = 0;
         for (int step = 1; step <= 64; step++) {
+          // Cleared endpoint: the pool is empty for this whole step, and the only allocations
+          // before its KV concat are single-token intermediates far smaller than the KV
+          // request, so the step's KV buffers are allocated fresh, exactly sized, and the
+          // endpoint retains exactly the logical payload, in any pool state (including whatever
+          // prior test classes left pooled in this JVM).
+          if (step == 1 || step == midLimit || step == 64) {
+            MLXMemory.clearCache();
+          }
           try (MLXScope activation = requestScope.newChild()) {
             var logits =
                 model
@@ -293,6 +333,12 @@ class VisionLanguageMemoryTest {
           assertTrue(
               retained >= logical,
               "step=" + step + ", retained=" + retained + ", logical=" + logical);
+          if (step == 1 || step == midLimit || step == 64) {
+            assertEquals(
+                logical,
+                retained,
+                "step=" + step + ", retained=" + retained + ", logical=" + logical);
+          }
           if (step == 1) {
             early = retained;
           } else if (step == midLimit) {
@@ -301,18 +347,12 @@ class VisionLanguageMemoryTest {
             late = retained;
           }
         }
-        // The growth span midLimit..64 must carry the logical increment of 64 - midLimit
-        // positions, (64 - midLimit) * kvPerPosition. midLimit sits on the intermediate-tier
-        // boundary, where the per-buffer request equals the tier exactly and its endpoint
-        // therefore carries no pooled slack in any pool state; the late endpoint draws on
-        // fresh or small-recycled tiers beyond it, with a measured excess over logical of
-        // 768 bytes in a fresh-class JVM and 2,048 bytes in the full-suite JVM. The
-        // 8-KV-position margin is below half the span's logical growth, so halved growth
-        // still fails.
+        // Consistency check subsumed by the exact endpoint equalities above: the growth
+        // span midLimit..64 must carry exactly the logical increment of 64 - midLimit
+        // positions, (64 - midLimit) * kvPerPosition.
         long logicalGrowth = (64L - midLimit) * kvPerPosition;
-        assertTrue(
-            Math.abs((late - mid) - logicalGrowth) <= 8 * kvPerPosition,
-            "growth=" + (late - mid) + ", logical=" + logicalGrowth);
+        assertEquals(
+            logicalGrowth, late - mid, "growth=" + (late - mid) + ", logical=" + logicalGrowth);
         deadKeys = caches.getFirst().keys();
         System.out.println(
             "VLM retention: KV_bytes_per_position="
@@ -331,12 +371,13 @@ class VisionLanguageMemoryTest {
                 + late);
         requestScope.close();
         assertThrows(IllegalStateException.class, deadKeys::toFloatArray);
-        // Test-shape cleanup: requestScope is closed while `generation` is still open, so a
-        // feature tensor lifted out of the prefill scope by a longer-lived reference (a hoist
-        // into `generation` in particular) is still active here. Every legitimately released
-        // buffer is pooled, and pooled bytes are excluded from the active counter in any pool
-        // state, so the residual is back at the baseline; the 5,120-byte fixture feature
-        // tensor exceeds CLEANUP_MARGIN and fails here if retained.
+        // Test-shape cleanup: verifies the scope-close release path itself -- that
+        // requestScope.close() released every request buffer to the pool, leaving a residual
+        // <= CLEANUP_MARGIN in any pool state. A feature tensor hoisted into `generation`
+        // (which outlives the request scope) would still be active here and exceed the margin.
+        // A feature hoisted into requestScope itself, the cache scope, is not visible to this
+        // check -- the scope is already closed -- but is caught by the step-64 exact endpoint,
+        // whose measurement precedes the close.
         long afterRequestClose = settledActiveBytes();
         assertTrue(
             afterRequestClose - baseline <= CLEANUP_MARGIN,

@@ -32,6 +32,11 @@ class VisionLanguageMemoryTest {
   // Warm measured retained-vs-logical overhead is at most 11,264 bytes in the tiny checkpoint.
   // A fixed 16 KiB envelope covers allocator rounding without scaling with requests/tokens.
   private static final long FIXED_MARGIN = 16384;
+  // Cleanup retention bound, strictly below the fixture's featureBytes (5,120 B): any retained
+  // request buffer -- the visual feature tensor in particular -- must fail the cleanup checks.
+  // Both contexts (fresh-class JVM and full-suite JVM) settled at exactly the baseline once
+  // every scope closed, so the bound only covers allocator rounding.
+  private static final long CLEANUP_MARGIN = 512;
   private static final long SETTLE_INTERVAL_MS = 2;
   private static final long SETTLE_TAIL_MS = 16;
   private static final long SETTLE_TIMEOUT_MS = 1000;
@@ -201,23 +206,40 @@ class VisionLanguageMemoryTest {
       long baseline = settledActiveBytes();
       var plan = model.plan(request.promptTokenIds(), request.images());
       var config = model.decoderForTest().config();
-      long headDim =
+      var descriptor =
           SmolVlmDescriptor.parse(
-                  JsonFiles.read(SmolVlmGoldenTest.directory().resolve("config.json")))
-              .text()
-              .headDim();
+              JsonFiles.read(SmolVlmGoldenTest.directory().resolve("config.json")));
+      long headDim = descriptor.text().headDim();
+      // Two key/value tensors per layer, each kvHeads * headDim floats, per sequence
+      // position.
       long kvPerPosition =
           2L * config.numHiddenLayers() * config.numKeyValueHeads() * headDim * Float.BYTES;
       long featureBytes = (long) plan.totalFeatureRows() * config.hiddenSize() * Float.BYTES;
+      // One key or value tensor's bytes per position (kvHeads * headDim * 4);
+      // kvPerPosition is 2 * numHiddenLayers times this.
+      long kvBytesPerBuffer = config.numKeyValueHeads() * headDim * Float.BYTES;
+      // The MLP intermediate-tier buffer size, [1, expandedLength, intermediateSize] f32 (the
+      // gate/up/down projection outputs prefill creates). Each layer's KV buffer packs key
+      // and value, so at step s its request is 2 * kvBytesPerBuffer * (expandedLength + s)
+      // bytes; at midLimit that request equals intermediateBytes exactly. The text hidden
+      // tier is smaller than the request, so this is the smallest prefill tier that fits
+      // and the buffer draws on it exact-fit, with no pooled slack in any pool state.
+      long intermediateBytes =
+          (long) plan.expandedLength() * config.intermediateSize() * Float.BYTES;
+      long midLimit = intermediateBytes / (2L * kvBytesPerBuffer) - plan.expandedLength();
       MLXArray deadFeature;
       MLXArray deadKeys;
       try (MLXScope generation = root.newChild()) {
+        // Owns every buffer of this test-shaped request (caches, prefill, activations). It
+        // is closed while `generation` is still open, so the test-shape cleanup check below
+        // sees a feature tensor hoisted out of the prefill scope as retained.
+        MLXScope requestScope = generation.newChild();
         List<KVCache> caches = new ArrayList<>();
         for (int i = 0; i < config.numHiddenLayers(); i++) {
-          caches.add(new KVCache(generation));
+          caches.add(new KVCache(requestScope));
         }
         long withVisual;
-        try (MLXScope prefill = generation.newChild()) {
+        try (MLXScope prefill = requestScope.newChild()) {
           deadFeature = model.features(request, prefill);
           assertEquals(featureBytes / Float.BYTES, deadFeature.toFloatArray().length);
           long featuresOnly = settledActiveBytes() - baseline;
@@ -236,18 +258,23 @@ class VisionLanguageMemoryTest {
         }
         assertThrows(IllegalStateException.class, deadFeature::toFloatArray);
         long afterPrefill = settledActiveBytes();
+        // Sanity only: the release is dominated by the other prefill buffers, so a retained
+        // feature tensor alone would not move it; the cleanup checks below detect retention.
         assertTrue(
             withVisual - afterPrefill >= featureBytes, "prefill visual storage was retained");
+        // Every retained buffer holds at least its logical payload, in any pool state. No
+        // upper bound is asserted: the pooled-buffer slack (recycled-buffer tiers) depends
+        // on prior allocations in the JVM; retained visual storage is detected by the
+        // cleanup checks below.
+        long logicalPrefill = kvPerPosition * plan.expandedLength();
         assertTrue(
-            afterPrefill - baseline <= kvPerPosition * plan.expandedLength() + FIXED_MARGIN,
-            "prefill retained="
-                + (afterPrefill - baseline)
-                + ", logical="
-                + kvPerPosition * plan.expandedLength());
+            afterPrefill - baseline >= logicalPrefill,
+            "prefill retained=" + (afterPrefill - baseline) + ", logical=" + logicalPrefill);
         long early = 0;
+        long mid = 0;
         long late = 0;
         for (int step = 1; step <= 64; step++) {
-          try (MLXScope activation = generation.newChild()) {
+          try (MLXScope activation = requestScope.newChild()) {
             var logits =
                 model
                     .decoderForTest()
@@ -260,22 +287,37 @@ class VisionLanguageMemoryTest {
             MLX.eval(DecoderModel.stepCacheArrays(caches));
           }
           long retained = settledActiveBytes() - baseline;
-          long expected = kvPerPosition * (plan.expandedLength() + step);
+          long logical = kvPerPosition * (plan.expandedLength() + step);
+          // Every retained buffer holds at least its logical payload, in any pool state;
+          // the pooled-buffer slack on top is context-dependent and is not bounded here.
           assertTrue(
-              Math.abs(retained - expected) <= FIXED_MARGIN,
-              "retained=" + retained + ", expected KV=" + expected);
-          if (step == 8) {
+              retained >= logical,
+              "step=" + step + ", retained=" + retained + ", logical=" + logical);
+          if (step == 1) {
             early = retained;
+          } else if (step == midLimit) {
+            mid = retained;
           } else if (step == 64) {
             late = retained;
           }
         }
-        assertTrue(Math.abs((late - early) - 56 * kvPerPosition) <= FIXED_MARGIN);
+        // The growth span midLimit..64 must carry the logical increment of 64 - midLimit
+        // positions, (64 - midLimit) * kvPerPosition. midLimit sits on the intermediate-tier
+        // boundary, where the per-buffer request equals the tier exactly and its endpoint
+        // therefore carries no pooled slack in any pool state; the late endpoint draws on
+        // fresh or small-recycled tiers beyond it, with a measured excess over logical of
+        // 768 bytes in a fresh-class JVM and 2,048 bytes in the full-suite JVM. The
+        // 8-KV-position margin is below half the span's logical growth, so halved growth
+        // still fails.
+        long logicalGrowth = (64L - midLimit) * kvPerPosition;
+        assertTrue(
+            Math.abs((late - mid) - logicalGrowth) <= 8 * kvPerPosition,
+            "growth=" + (late - mid) + ", logical=" + logicalGrowth);
         deadKeys = caches.getFirst().keys();
         System.out.println(
             "VLM retention: KV_bytes_per_position="
                 + kvPerPosition
-                + ", projected_bytes="
+                + ", features_bytes="
                 + featureBytes
                 + ", visual_release="
                 + (withVisual - afterPrefill)
@@ -283,11 +325,39 @@ class VisionLanguageMemoryTest {
                 + (afterPrefill - baseline)
                 + ", early="
                 + early
+                + ", mid="
+                + mid
                 + ", late="
                 + late);
+        requestScope.close();
+        assertThrows(IllegalStateException.class, deadKeys::toFloatArray);
+        // Test-shape cleanup: requestScope is closed while `generation` is still open, so a
+        // feature tensor lifted out of the prefill scope by a longer-lived reference (a hoist
+        // into `generation` in particular) is still active here. Every legitimately released
+        // buffer is pooled, and pooled bytes are excluded from the active counter in any pool
+        // state, so the residual is back at the baseline; the 5,120-byte fixture feature
+        // tensor exceeds CLEANUP_MARGIN and fails here if retained.
+        long afterRequestClose = settledActiveBytes();
+        assertTrue(
+            afterRequestClose - baseline <= CLEANUP_MARGIN,
+            "test-shape request retained visual storage: " + (afterRequestClose - baseline));
       }
-      assertThrows(IllegalStateException.class, deadKeys::toFloatArray);
-      assertTrue(settledActiveBytes() <= baseline + FIXED_MARGIN);
+      // Every scope of the work is closed here, so every request buffer is freed and pooled,
+      // and pooled bytes are excluded from the active counter: the counter is back at the
+      // baseline in any pool state. A retained request buffer -- the 5,120-byte visual
+      // feature tensor in this fixture -- exceeds CLEANUP_MARGIN and fails here.
+      long afterCleanup = settledActiveBytes();
+      assertTrue(
+          afterCleanup - baseline <= CLEANUP_MARGIN,
+          "closed request retained visual storage: " + (afterCleanup - baseline));
+      // The production path manages its own visual scopes internally (SmolVlmModel's
+      // prefill scope closes after the prefill logits and KV are evaluated); it must
+      // leave no visual storage behind either.
+      model.generate(request, ignored -> {});
+      long afterProduction = settledActiveBytes();
+      assertTrue(
+          afterProduction - baseline <= CLEANUP_MARGIN,
+          "production generate retained visual storage: " + (afterProduction - baseline));
     }
   }
 

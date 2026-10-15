@@ -52,11 +52,16 @@ use (an unpinned or drifted fixture stops the run), then writes to
   and `size`, and per (configuration, image) source size, resized size,
   grid, dtype, shape, the normalized patch-buffer SHA-256, and the
   pre-rescale uint8 patch SHA-256 (splitting resize divergence from
-  normalization divergence), plus the slow-vs-fast identity flags.
-* `fast__<image>.npy` / `slow_compensated__<image>.npy` — lossless float32
-  patch exports for the two model fixtures only. The geometry probe exceeds
-  the 16777216-pixel budget (a ~400 MB export) and is fingerprinted by
-  grid/shape/SHA-256 only.
+  normalization divergence), plus the slow-vs-fast identity flags. The
+  geometry fixture runs only the uint8 pass, so its records carry
+  `pixel_values_sha256: null` plus an explanatory `note`, with dtype/shape
+  taken from the raw uint8 buffer.
+* `fast__<image>.npy`, `slow_compensated__<image>.npy` and
+  `slow_default__<image>.npy` — lossless float32 patch exports for the two
+  model fixtures only, one per configuration. The geometry probe exceeds
+  the 16777216-pixel budget, is never exported, and (its normalized buffer
+  would be ~400 MB of float32 with no consumer) skips the full-normalized
+  pass, so it is fingerprinted by grid/shape/uint8 SHA-256 only.
 
 Feed the export directory to the model-side comparison:
 

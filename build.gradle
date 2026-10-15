@@ -412,21 +412,38 @@ tasks.register('runImageOracleFastComparison', Exec) {
 }
 
 // The Python-executing tasks above stay explicit (they need the pinned venv). What CI runs in
-// ordinary check without Python: the image, fast-comparison and HF reference lock files must
-// agree on the three shared reference pins (Pillow/NumPy/Transformers, versions and environment
-// markers), and every committed image fixture source must still carry its provenance SHA-256.
-// The runners re-verify both under their venvs, so a local drift is caught before any fixture
-// is used and again in check. The fast-comparison venv itself stays opt-in: only its lock is
-// read here, never its Python.
+// ordinary check without Python: the image, fast-comparison, Qwen-VL and HF reference lock
+// files must agree on the three shared reference pins (Pillow/NumPy/Transformers, versions and
+// environment markers), and every committed image fixture source must still carry its
+// provenance SHA-256. The runners re-verify both under their venvs, so a local drift is caught
+// before any fixture is used and again in check. The fast-comparison and Qwen-VL venvs
+// themselves stay opt-in: only their locks are read here, never their Python.
+
+// Shared by the provenance guards below: stream one file through SHA-256 in 8 KiB chunks and
+// return its lowercase hex digest.
+def sha256File = { File file ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    java.nio.file.Files.newInputStream(file.toPath()).withCloseable { stream ->
+        byte[] bytes = new byte[8192]
+        int count
+        while ((count = stream.read(bytes)) != -1) {
+            digest.update(bytes, 0, count)
+        }
+    }
+    return digest.digest().encodeHex().toString()
+}
+
 tasks.register('verifyImageOracleDependencyPins') {
     group = 'verification'
-    description = 'Verifies the image, fast-comparison and HF reference locks agree on ' +
-            'Pillow, NumPy and Transformers.'
+    description = 'Verifies the image, fast-comparison, Qwen-VL and HF reference locks agree ' +
+            'on Pillow, NumPy and Transformers.'
     def imageLock = imageOracleDir.file('requirements.lock')
     def fastLock = imageOracleDir.file('fast-comparison/requirements.lock')
+    def qwenVlLock = layout.projectDirectory.file('tools/qwen-vl-reference/requirements.lock')
     def referenceLock = layout.projectDirectory.file('tools/hf-reference/requirements.lock')
     inputs.file(imageLock)
     inputs.file(fastLock)
+    inputs.file(qwenVlLock)
     inputs.file(referenceLock)
     doLast {
         def parseLock = { File lock ->
@@ -443,6 +460,7 @@ tasks.register('verifyImageOracleDependencyPins') {
         def locks = [
                 'image-oracle': parseLock(imageLock.asFile),
                 'fast-comparison': parseLock(fastLock.asFile),
+                'qwen-vl-reference': parseLock(qwenVlLock.asFile),
                 'hf-reference': parseLock(referenceLock.asFile),
         ]
         ['pillow', 'numpy', 'transformers'].each { packageName ->
@@ -473,68 +491,64 @@ tasks.register('verifyImageOracleDependencyPins') {
 
 tasks.register('verifyImageOracleFixtureDigests') {
     group = 'verification'
-    description = 'Verifies every committed image oracle fixture source against its provenance SHA-256.'
+    description = 'Verifies every committed image oracle and fast-comparison fixture source ' +
+            'against its provenance SHA-256.'
     def fixtures = imageOracleDir.dir('fixtures')
     def provenance = imageOracleDir.file('provenance.json')
+    def fastFixtures = fastComparisonDir.dir('fixtures')
+    def fastProvenance = fastComparisonDir.file('provenance.json')
     inputs.file(provenance)
     inputs.files(fileTree(fixtures))
+    inputs.file(fastProvenance)
+    inputs.files(fileTree(fastFixtures))
     doLast {
-        def metadata = new JsonSlurper().parse(provenance.asFile)
-        def expected = metadata.fixtureSources
-        if (!(expected instanceof Map) || expected.isEmpty()) {
-            throw new GradleException('Image oracle provenance has no fixture hashes')
-        }
-        def root = fixtures.asFile.toPath().toRealPath()
-        def actualPaths = fileTree(fixtures) { exclude '*.expected.json' }.files.collect {
-            root.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
-        }.toSet()
-        if (actualPaths != expected.keySet().toSet()) {
-            throw new GradleException("Image oracle fixture source set differs: " +
-                    "missing ${expected.keySet() - actualPaths}; extra ${actualPaths - expected.keySet()}")
-        }
-        expected.each { relativePath, expectedHash ->
-            def path = root.resolve(relativePath.toString()).normalize()
-            if (!path.startsWith(root) || !java.nio.file.Files.isRegularFile(path)) {
-                throw new GradleException("Invalid image oracle fixture path: ${relativePath}")
+        def verifyFixtureSet = { String name, dir, provenanceFile, String mapKey ->
+            def metadata = new JsonSlurper().parse(provenanceFile.asFile)
+            def expected = metadata[mapKey]
+            if (!(expected instanceof Map) || expected.isEmpty()) {
+                throw new GradleException("${name} provenance has no fixture hashes")
             }
-            def digest = MessageDigest.getInstance('SHA-256')
-            java.nio.file.Files.newInputStream(path).withCloseable { stream ->
-                byte[] bytes = new byte[8192]
-                int count
-                while ((count = stream.read(bytes)) != -1) {
-                    digest.update(bytes, 0, count)
+            def root = dir.asFile.toPath().toRealPath()
+            def actualPaths = fileTree(dir) { exclude '*.expected.json' }.files.collect {
+                root.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
+            }.toSet()
+            if (actualPaths != expected.keySet().toSet()) {
+                throw new GradleException("${name} fixture source set differs: " +
+                        "missing ${expected.keySet() - actualPaths}; extra ${actualPaths - expected.keySet()}")
+            }
+            expected.each { relativePath, expectedHash ->
+                def path = root.resolve(relativePath.toString()).normalize()
+                if (!path.startsWith(root) || !java.nio.file.Files.isRegularFile(path)) {
+                    throw new GradleException("Invalid ${name.toLowerCase()} fixture path: ${relativePath}")
+                }
+                def actualHash = sha256File(path.toFile())
+                if (actualHash != expectedHash) {
+                    throw new GradleException("${name} fixture SHA-256 differs: ${relativePath}")
                 }
             }
-            def actualHash = digest.digest().encodeHex().toString()
-            if (actualHash != expectedHash) {
-                throw new GradleException("Image oracle fixture SHA-256 differs: ${relativePath}")
-            }
         }
+        verifyFixtureSet('Image oracle', fixtures, provenance, 'fixtureSources')
+        verifyFixtureSet('Fast comparison', fastFixtures, fastProvenance, 'fixtures')
     }
 }
 
 // The 8B checkpoint itself is a 6.8 GB opt-in download, so this guard only covers the small
-// committed evidence: the probe golden and the hash-locked requirements lock.
+// committed evidence: the probe golden and the hash-locked requirements lock, plus the
+// cross-referenced fast-comparison lock and HF reference golden named in provenance.json.
 tasks.register('verifyQwenVlReferenceProvenance') {
     group = 'verification'
-    description = 'Verifies the committed Qwen3-VL MLX reference golden and lock against their provenance SHA-256.'
+    description = 'Verifies the committed Qwen3-VL MLX reference golden, lock and ' +
+            'cross-referenced fast-comparison lock and HF reference golden against their ' +
+            'provenance SHA-256.'
     def qwenVlDir = layout.projectDirectory.dir('tools/qwen-vl-reference')
     def provenance = qwenVlDir.file('provenance.json')
     def golden = qwenVlDir.file('goldens/qwen3-vl-8b-wp1-mlx-probe.json')
     def lock = qwenVlDir.file('requirements.lock')
+    def fastComparisonLock = fastComparisonDir.file('requirements.lock')
+    def hfReferenceGolden = layout.projectDirectory.file('tools/hf-reference/goldens/qwen3-vl-2b-wp1-probe.json')
     inputs.file(provenance)
     inputs.files(golden, lock)
-    def sha256 = { File file ->
-        def digest = MessageDigest.getInstance('SHA-256')
-        java.nio.file.Files.newInputStream(file.toPath()).withCloseable { stream ->
-            byte[] bytes = new byte[8192]
-            int count
-            while ((count = stream.read(bytes)) != -1) {
-                digest.update(bytes, 0, count)
-            }
-        }
-        return digest.digest().encodeHex().toString()
-    }
+    inputs.files(fastComparisonLock, hfReferenceGolden)
     doLast {
         def metadata = new JsonSlurper().parse(provenance.asFile)
         def probe = metadata.probe
@@ -544,13 +558,32 @@ tasks.register('verifyQwenVlReferenceProvenance') {
         if (probe.golden != 'goldens/qwen3-vl-8b-wp1-mlx-probe.json') {
             throw new GradleException("Qwen-VL reference provenance names an unexpected golden: ${probe.golden}")
         }
-        def actualGolden = sha256(golden.asFile)
+        def actualGolden = sha256File(golden.asFile)
         if (actualGolden != probe.golden_sha256) {
             throw new GradleException("Qwen-VL reference golden SHA-256 differs: ${actualGolden}")
         }
-        def actualLock = sha256(lock.asFile)
+        def actualLock = sha256File(lock.asFile)
         if (actualLock != metadata.requirements_lock_sha256) {
             throw new GradleException("Qwen-VL reference lock SHA-256 differs: ${actualLock}")
+        }
+        def patches = metadata.fast_comparison_patches
+        if (!(patches instanceof Map) || patches.lock_sha256 == null) {
+            throw new GradleException('Qwen-VL reference provenance is missing the fast-comparison lock hash')
+        }
+        def actualFastLock = sha256File(fastComparisonLock.asFile)
+        if (actualFastLock != patches.lock_sha256) {
+            throw new GradleException("Qwen-VL reference fast-comparison lock SHA-256 differs: ${actualFastLock}")
+        }
+        def cross = metadata.hf_reference_cross_reference
+        if (!(cross instanceof Map) || cross.golden_sha256 == null) {
+            throw new GradleException('Qwen-VL reference provenance is missing the HF reference cross-reference hash')
+        }
+        if (cross.golden != 'tools/hf-reference/goldens/qwen3-vl-2b-wp1-probe.json') {
+            throw new GradleException("Qwen-VL reference provenance names an unexpected HF reference golden: ${cross.golden}")
+        }
+        def actualHfGolden = sha256File(hfReferenceGolden.asFile)
+        if (actualHfGolden != cross.golden_sha256) {
+            throw new GradleException("Qwen-VL reference HF golden SHA-256 differs: ${actualHfGolden}")
         }
     }
 }
@@ -615,8 +648,7 @@ tasks.register('verifyHfReferenceGoldens') {
                     !path.toRealPath().startsWith(repositoryRoot)) {
                 throw new GradleException("Invalid vision Tier-B reference path: ${relativePath}")
             }
-            def actualHash = MessageDigest.getInstance('SHA-256')
-                    .digest(java.nio.file.Files.readAllBytes(path)).encodeHex().toString()
+            def actualHash = sha256File(path.toFile())
             if (actualHash != expectedHash) {
                 throw new GradleException("Vision Tier-B reference SHA-256 differs: ${relativePath}")
             }
@@ -637,15 +669,7 @@ tasks.register('verifyHfReferenceGoldens') {
             if (!path.startsWith(root) || !java.nio.file.Files.isRegularFile(path)) {
                 throw new GradleException("Invalid Hugging Face golden path: ${relativePath}")
             }
-            def digest = MessageDigest.getInstance('SHA-256')
-            java.nio.file.Files.newInputStream(path).withCloseable { stream ->
-                byte[] bytes = new byte[8192]
-                int count
-                while ((count = stream.read(bytes)) != -1) {
-                    digest.update(bytes, 0, count)
-                }
-            }
-            def actualHash = digest.digest().encodeHex().toString()
+            def actualHash = sha256File(path.toFile())
             if (actualHash != expectedHash) {
                 throw new GradleException("Hugging Face golden SHA-256 differs: ${relativePath}")
             }

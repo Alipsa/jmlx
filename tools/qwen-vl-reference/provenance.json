@@ -19,7 +19,7 @@
   "probe": {
     "runner": "tools/qwen-vl-reference/run_qwen3vl_mlx_probe.py",
     "golden": "goldens/qwen3-vl-8b-wp1-mlx-probe.json",
-    "golden_sha256": "10536b90f1575c8dd5de90dcf292c6ceb47c63ae2a4eeaa135878c4a92cb4b75",
+    "golden_sha256": "a7d5716c140b4d5d21b85a497a1e731340e81fc385226afd42586dd7b08f40f5",
     "schema": "jmlx-phase7-3b-wp1-qwen3vl-mlx8b-v1"
   },
   "artifact": {
@@ -51,7 +51,7 @@
   "fast_comparison_patches": {
     "runner": "tools/image-oracle/fast-comparison/runner.py",
     "schema": "jmlx-phase7-3b-wp1-qwen3vl-fastcomparison-v1",
-    "manifest_sha256": "548b440f2a09283c337d0f70ab6d48c3af23a310e7dd63d143b10c86c9947541",
+    "manifest_sha256": "c3af7ebe5591c365f8fa199bcc2d54e5f7f7a6b02233f9213d8869082b21bb00",
     "lock_sha256": "4f2e898b8ad91228741f8adb4ca7e1f321c6ec37619711cf9c6a10879eb442d5",
     "environment": {
       "system": "Darwin",
@@ -67,7 +67,7 @@
   },
   "hf_reference_cross_reference": {
     "golden": "tools/hf-reference/goldens/qwen3-vl-2b-wp1-probe.json",
-    "golden_sha256": "03d7915315714fe146e1e969bfe1784ec661fe9ed494c9e401be7af8783fc420",
+    "golden_sha256": "b49702639e049951e10688d84781cb3ff30eb29884078f308e9232e50a9bbfb7",
     "rendered_prompt_sha256": "c58e38df71e55a90a320171f1f007a2cffc975056b33398ee704830799c4dfcc",
     "note": "sequence-expansion facts (prompt length, image span, grids, rope deltas) must match the 2B HF reference because the template, prompt, tokenizer and grids are identical; the logits/greedy ids are from a different runtime and checkpoint and are recorded for compatibility only"
   }

@@ -8,8 +8,10 @@ buffer, and the SHA-256 of the pre-rescale uint8 patches (which splits resize
 divergence from normalization divergence). The two model fixtures are additionally exported losslessly as ``.npy``
 files so the HF-reference model runtime
 (``tools/hf-reference/qwen3vl_slowfast_logits.py``) can feed both patch sets
-through the same checkpoint in one runtime. This tool produces processed patches
-only; it never computes model logits.
+through the same checkpoint in one runtime; the geometry probe runs only the
+uint8 pass (its normalized buffer would be ~400 MB of float32 and has no
+consumer), so its records carry ``pixel_values_sha256: null`` with a note.
+This tool produces processed patches only; it never computes model logits.
 
 The configurations:
 
@@ -48,8 +50,8 @@ TORCHVISION_VERSIONS = ("0.21.0", "0.21.0+cpu")
 SCHEMA = "jmlx-phase7-3b-wp1-qwen3vl-fastcomparison-v1"
 # The model fixtures are exported losslessly; they are the model inputs. The
 # geometry probe exceeds the 16777216-pixel budget (its resized patch buffer
-# would be ~400 MB of float32), so it is fingerprinted by grid/shape/SHA-256
-# only and never exported.
+# would be ~400 MB of float32), so its full-normalized pass is skipped, it is
+# fingerprinted by grid/shape/uint8 SHA-256 only, and it is never exported.
 LOSSLESS_EXPORT = ("model-rgb-256x256.png", "model-rgb-64x32.png")
 CONFIG_ORDER = ("fast", "slow_compensated", "slow_default")
 
@@ -177,35 +179,54 @@ def main() -> None:
         source = {"width": image.width, "height": image.height}
         configs = {}
         for name in CONFIG_ORDER:
-            # The fast processor only returns PyTorch tensors; use "pt" for all three so
-            # the buffers are compared on identical footing, then reduce to float32.
-            result = processors[name](images=[image], return_tensors="pt")
-            pixel_values = np.ascontiguousarray(
-                result["pixel_values"].detach().cpu().numpy(), dtype=np.float32
+            # The pre-rescale uint8 patch pixels (no rescale, no normalization), to split
+            # resize divergence from normalization divergence. The raw pass also carries
+            # the grid, so the geometry probe never needs a second pass.
+            raw_result = processors[name](
+                images=[image], do_rescale=False, do_normalize=False, return_tensors="pt"
             )
-            grid = [int(v) for v in result["image_grid_thw"][0].tolist()]
-            # The pre-rescale uint8 patch pixels, to split resize divergence from
-            # normalization divergence.
-            raw_result = processors[name](images=[image], do_rescale=False, return_tensors="pt")
             raw_patches = np.ascontiguousarray(
                 raw_result["pixel_values"].detach().cpu().numpy(), dtype=np.uint8
             )
-            export = None
+            grid = [int(v) for v in raw_result["image_grid_thw"][0].tolist()]
             if path.name in LOSSLESS_EXPORT:
+                # The full-normalized float32 pass, for the model fixtures only. The fast
+                # processor only returns PyTorch tensors; use "pt" for all three so the
+                # buffers are compared on identical footing, then reduce to float32.
+                result = processors[name](images=[image], return_tensors="pt")
+                pixel_values = np.ascontiguousarray(
+                    result["pixel_values"].detach().cpu().numpy(), dtype=np.float32
+                )
                 export_name = f"{name}__{path.stem}.npy"
                 np.save(args.out / export_name, pixel_values)
-                export = export_name
-            configs[name] = {
-                "resized": {"width": grid[2] * 16, "height": grid[1] * 16},
-                "grid_thw": grid,
-                "dtype": pixel_values.dtype.name,
-                "shape": list(pixel_values.shape),
-                "pixel_values_sha256": sha256_bytes(pixel_values.tobytes()),
-                "uint8_dtype": raw_patches.dtype.name,
-                "uint8_shape": list(raw_patches.shape),
-                "uint8_patches_sha256": sha256_bytes(raw_patches.tobytes()),
-                "lossless_export": export,
-            }
+                configs[name] = {
+                    "resized": {"width": grid[2] * 16, "height": grid[1] * 16},
+                    "grid_thw": grid,
+                    "dtype": pixel_values.dtype.name,
+                    "shape": list(pixel_values.shape),
+                    "pixel_values_sha256": sha256_bytes(pixel_values.tobytes()),
+                    "uint8_dtype": raw_patches.dtype.name,
+                    "uint8_shape": list(raw_patches.shape),
+                    "uint8_patches_sha256": sha256_bytes(raw_patches.tobytes()),
+                    "lossless_export": export_name,
+                }
+            else:
+                # The geometry-only fixture: the full-normalized pass would materialize a
+                # ~400 MB float32 buffer nothing consumes, so it is skipped and the record
+                # is derived from the raw pass alone.
+                configs[name] = {
+                    "resized": {"width": grid[2] * 16, "height": grid[1] * 16},
+                    "grid_thw": grid,
+                    "dtype": raw_patches.dtype.name,
+                    "shape": list(raw_patches.shape),
+                    "pixel_values_sha256": None,
+                    "note": "normalized pass skipped (geometry-only fixture, ~400 MB "
+                            "float32); fingerprinted by grid/shape/uint8 SHA-256 only",
+                    "uint8_dtype": raw_patches.dtype.name,
+                    "uint8_shape": list(raw_patches.shape),
+                    "uint8_patches_sha256": sha256_bytes(raw_patches.tobytes()),
+                    "lossless_export": None,
+                }
         image_records.append(
             {
                 "file": path.name,

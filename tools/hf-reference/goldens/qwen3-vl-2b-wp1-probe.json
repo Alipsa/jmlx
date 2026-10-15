@@ -17,9 +17,6 @@
     "revision": "89644892e4d85e24eaac8bacfd4f463576704203",
     "hub": {
       "commit_sha": "89644892e4d85e24eaac8bacfd4f463576704203",
-      "last_modified": "2025-10-23 11:30:44+00:00",
-      "downloads": 2385218,
-      "likes": 497,
       "tags": [
         "arxiv:2308.12966",
         "arxiv:2409.12191",
@@ -6565,8 +6562,7 @@
     "loading": {
       "storage_dtype": "bfloat16 (safetensors)",
       "loaded_dtype": "float32",
-      "attn_implementation": "eager",
-      "load_seconds": 1.313
+      "attn_implementation": "eager"
     },
     "tied_embedding": {
       "lm_head_is_embed_tokens": true,
@@ -7316,8 +7312,7 @@
           374,
           15,
           220
-        ],
-        "elapsed_seconds": 1.538
+        ]
       },
       "rgb_64x32": {
         "sequence": {
@@ -7999,8 +7994,7 @@
           374,
           13,
           13
-        ],
-        "elapsed_seconds": 1.557
+        ]
       }
     }
   }

@@ -34,7 +34,6 @@ import platform
 import struct
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 ORG = "Qwen"
@@ -324,9 +323,6 @@ def main() -> None:
                 sys.exit(f"hub size mismatch for {entry['path']}")
     result["artifact"]["hub"] = {
         "commit_sha": hub.sha,
-        "last_modified": str(hub.lastModified),
-        "downloads": hub.downloads,
-        "likes": hub.likes,
         "tags": sorted(hub.tags),
     }
     result["artifact"]["files"] = files
@@ -624,12 +620,10 @@ def main() -> None:
         from transformers import Qwen3VLForConditionalGeneration
 
         torch.manual_seed(0)
-        started = time.perf_counter()
         model = Qwen3VLForConditionalGeneration.from_pretrained(
             str(directory), dtype=torch.float32, attn_implementation="eager"
         )
         model.eval()
-        load_seconds = time.perf_counter() - started
 
         llm = model.model
         visual = llm.visual
@@ -643,7 +637,6 @@ def main() -> None:
             "storage_dtype": "bfloat16 (safetensors)",
             "loaded_dtype": "float32",
             "attn_implementation": "eager",
-            "load_seconds": round(load_seconds, 3),
         }
         model_info["tied_embedding"] = {
             "lm_head_is_embed_tokens": model.lm_head.weight.data_ptr()
@@ -699,7 +692,6 @@ def main() -> None:
             case_results = {}
             for name in ("rgb_256x256", "rgb_64x32"):
                 capture.clear()
-                started = time.perf_counter()
                 image = Image.open(images[name])
                 batch = processor(images=[image.convert("RGB")], text=[rendered])
                 input_ids = torch.as_tensor(batch["input_ids"], dtype=torch.long)
@@ -821,7 +813,6 @@ def main() -> None:
                     "determinism": {"repeat_prefill_sha256_match": determinism_match},
                     "decode": decode_steps,
                     "greedy_ids": greedy,
-                    "elapsed_seconds": round(time.perf_counter() - started, 3),
                 }
             model_info["cases"] = case_results
         result["model"] = model_info

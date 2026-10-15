@@ -23,6 +23,13 @@ Runtime facts recorded here:
     ``N = prod(grid) // merge**2`` copies. mlx-vlm's ``prepare_inputs``
     inserts exactly one image token and cannot be reused for the multi-token
     Qwen3-VL expansion;
+  * the ``AutoProcessor`` compatibility probe records only deterministic
+    fields on failure: the exception class name and the SORTED list of
+    missing framework names parsed from the message (the "requires the
+    <Framework> library but it was not found" lines). The raw message is
+    never recorded: transformers assembles its two missing-library
+    paragraphs in a process-dependent order, so the raw text would break
+    byte-for-byte golden reproducibility;
   * the KV cache is ``mlx_lm.models.cache.KVCache`` via
     ``mlx_vlm.models.cache.make_prompt_cache(model.language_model)``;
     prefill is ``model(input_ids, pixel_values, mask, cache,
@@ -43,7 +50,6 @@ import hashlib
 import json
 import platform
 import sys
-import time
 from collections import Counter
 from pathlib import Path
 
@@ -60,6 +66,20 @@ PROMPT_MESSAGES = [
          {"type": "text", "text": "Describe the image in one short sentence."},
      ]}
 ]
+
+# Pinned digests of the fast-comparison runner's manifest.json, the output of
+# tools/image-oracle/fast-comparison/runner.py produced by its pinned venv
+# (a manual, reviewed step: regenerating the runner output changes this). The
+# lock digest is that comparison environment's requirements.lock digest,
+# carried in the manifest's own "lock_sha256" field. A manifest that does not
+# match BOTH digests came from a drifted environment and its exports must not
+# be fed to a model.
+FAST_COMPARISON_MANIFEST_SHA256 = (
+    "c3af7ebe5591c365f8fa199bcc2d54e5f7f7a6b02233f9213d8869082b21bb00"
+)
+FAST_COMPARISON_LOCK_SHA256 = (
+    "4f2e898b8ad91228741f8adb4ca7e1f321c6ec37619711cf9c6a10879eb442d5"
+)
 
 # Cross-reference values from the committed HF reference evidence
 # (tools/hf-reference/goldens/qwen3-vl-2b-wp1-probe.json, schema
@@ -156,6 +176,18 @@ def verify_exports(patches_dir: Path) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema") != "jmlx-phase7-3b-wp1-qwen3vl-fastcomparison-v1":
         raise SystemExit("unexpected fast-comparison manifest schema")
+    manifest_digest = sha256_bytes(manifest_path.read_bytes())
+    if manifest_digest != FAST_COMPARISON_MANIFEST_SHA256:
+        raise SystemExit(
+            f"fast-comparison manifest sha256 {manifest_digest} does not match "
+            f"the pinned {FAST_COMPARISON_MANIFEST_SHA256}; the patches came "
+            "from a drifted fast-comparison environment")
+    if manifest["lock_sha256"] != FAST_COMPARISON_LOCK_SHA256:
+        raise SystemExit(
+            f"fast-comparison manifest lock_sha256 "
+            f"{manifest['lock_sha256']} does not match the pinned "
+            f"{FAST_COMPARISON_LOCK_SHA256}; the patches came from a drifted "
+            "fast-comparison environment")
     by_file = {rec["file"]: rec for rec in manifest["images"]}
     exports = {}
     for image_name in MODEL_IMAGES:
@@ -179,7 +211,7 @@ def verify_exports(patches_dir: Path) -> dict:
         }
     return {
         "exports": exports,
-        "manifest_sha256": sha256_bytes(manifest_path.read_bytes()),
+        "manifest_sha256": manifest_digest,
         "lock_sha256": manifest["lock_sha256"],
         "environment": manifest["environment"],
     }
@@ -216,6 +248,30 @@ def top20(last_logits):
     values = last_logits[indices]
     return [[int(i), float(v)]
             for i, v in zip(indices.tolist(), values.tolist())]
+
+
+def parse_missing_frameworks(message: str):
+    """Extract the deterministic missing-library finding from a transformers
+    ImportError message: the framework names in "requires the <Framework>
+    library but it was not found" lines, sorted for determinism. Returns
+    None when no such line is found, so the caller records only the
+    exception class name and never the raw (order-unstable) message."""
+    import re
+
+    names = re.findall(
+        r"requires the ([A-Z]\w*) library but it was not found", message)
+    return sorted(set(names)) if names else None
+
+
+def check_facts(image_name: str, field: str, actual, expected, note: str = ""):
+    """Sequence-expansion fact gate: an explicit check (not an assert), so it
+    cannot be disabled by python -O, and a mismatch exits non-zero, as the
+    README promises. Returns whether the fact matched."""
+    if actual != expected:
+        suffix = f" ({note})" if note else ""
+        sys.exit(f"{image_name}: {field} {actual} != HF reference {expected}"
+                 + suffix)
+    return True
 
 
 def main() -> None:
@@ -283,9 +339,6 @@ def main() -> None:
                 sys.exit(f"hub size mismatch for {entry['path']}")
     result["artifact"]["hub"] = {
         "commit_sha": hub.sha,
-        "last_modified": str(hub.lastModified),
-        "downloads": hub.downloads,
-        "likes": hub.likes,
         "tags": sorted(hub.tags),
         "license": (hub.cardData or {}).get("license") if hub.cardData else None,
     }
@@ -435,26 +488,28 @@ def main() -> None:
         # processor (patches are injected) or the processor's chat-template
         # path (the tokenizer is used directly), so load_model alone is the
         # exact surface it exercises. The AutoProcessor failure is recorded
-        # below as a compatibility finding (same call load_processor makes).
+        # below as a compatibility finding (same call load_processor makes)
+        # using deterministic fields only (exception class + sorted missing
+        # framework names), never the raw message: transformers assembles
+        # its missing-library paragraphs in a process-dependent order.
         try:
             from transformers import AutoProcessor
 
             AutoProcessor.from_pretrained(str(directory))
             processor_probe = {"auto_processor_loaded": True, "error": None}
         except Exception as exc:  # noqa: BLE001 - the probe records the failure
+            missing = parse_missing_frameworks(str(exc))
             processor_probe = {"auto_processor_loaded": False,
-                               "error": f"{type(exc).__name__}: {exc}"}
+                               "error": type(exc).__name__,
+                               "missing_frameworks": missing}
 
-        started = time.perf_counter()
         model = load_model(directory)
-        load_seconds = time.perf_counter() - started
 
         vision = model.vision_tower
         language = model.language_model
         lm = language.model
         layer0 = lm.layers[0]
         model_info["loading"] = {
-            "load_seconds": round(load_seconds, 3),
             "lazy": False,
             "loader": "mlx_vlm.utils.load_model (no AutoProcessor)",
             "auto_processor_probe": processor_probe,
@@ -549,20 +604,21 @@ def main() -> None:
         for image_name in MODEL_IMAGES:
             expected = HF_REFERENCE[image_name]
             exp = fast["exports"][image_name]
-            assert exp["grid_thw"] == expected["grid_thw"], \
-                f"{image_name}: grid mismatch vs HF reference"
+            grid_ok = check_facts(
+                image_name, "grid_thw", exp["grid_thw"],
+                expected["grid_thw"], "grid mismatch vs HF reference")
             pixel_values = np.load(args.patches_dir / exp["export"])
             grid = exp["grid_thw"]
             n_merged = grid[0] * grid[1] * grid[2] // 4
             image_pos = base_ids.index(IMAGE_TOKEN_ID)
             ids = base_ids[:image_pos] + [IMAGE_TOKEN_ID] * n_merged \
                 + base_ids[image_pos + 1:]
-            assert len(ids) == expected["prompt_length_after_expansion"], \
-                f"{image_name}: length {len(ids)} != " \
-                f"{expected['prompt_length_after_expansion']}"
+            length_ok = check_facts(
+                image_name, "prompt_length_after_expansion",
+                len(ids), expected["prompt_length_after_expansion"])
             span = [image_pos, image_pos + n_merged - 1]
-            assert span == expected["image_token_span"], \
-                f"{image_name}: span {span} != {expected['image_token_span']}"
+            span_ok = check_facts(image_name, "image_token_span", span,
+                                  expected["image_token_span"])
 
             ids_2d = mx.array([ids])
             mask_2d = mx.array([[1] * len(ids)])
@@ -570,11 +626,9 @@ def main() -> None:
             grid_arr = mx.array([grid])
 
             cache = mlx_cache.make_prompt_cache(model.language_model)
-            started = time.perf_counter()
             out = model(ids_2d, pixel_values=pv, mask=mask_2d, cache=cache,
                         image_grid_thw=grid_arr)
             mx.eval(out.logits)
-            prefill_seconds = time.perf_counter() - started
 
             last = out.logits[0, -1]
             last_f32 = last.astype(mx.float32)
@@ -585,7 +639,6 @@ def main() -> None:
                 "last_position_sha256": sha256_bytes(logits_np.tobytes()),
                 "argmax": int(mx.argmax(last).item()),
                 "top20": top20(last),
-                "elapsed_seconds": round(prefill_seconds, 3),
             }
 
             # mlx-lm 0.29.1 KVCache preallocates capacity in 256-token
@@ -611,6 +664,10 @@ def main() -> None:
 
             deltas = language._rope_deltas
             delta = int(deltas[0].item() if deltas.ndim else deltas.item())
+            delta_match = delta == expected["rope_delta"]
+            if not delta_match:
+                sys.exit(f"{image_name}: MRoPE delta {delta} != HF reference "
+                         f"{expected['rope_delta']}")
 
             current = mx.array([[prefill["argmax"]]])
             greedy = [prefill["argmax"]]
@@ -638,7 +695,8 @@ def main() -> None:
                     "length": len(ids),
                     "image_token_span": span,
                     "image_token_count": n_merged,
-                    "matches_hf_reference": True,
+                    "matches_hf_reference":
+                        grid_ok and length_ok and span_ok and delta_match,
                     "hf_reference_greedy_ids_2b":
                         expected["greedy_ids_2b"],
                 },
@@ -646,8 +704,7 @@ def main() -> None:
                 "rope": {
                     "delta_mlx": delta,
                     "delta_hf_reference": expected["rope_delta"],
-                    "delta_matches_hf_reference":
-                        delta == expected["rope_delta"],
+                    "delta_matches_hf_reference": delta_match,
                 },
                 "kv_after_prefill": kv_after_prefill,
                 "prefill": prefill,

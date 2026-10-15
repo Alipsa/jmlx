@@ -23,9 +23,6 @@
     "revision": "defcdea7cc7a4b0858fea563cbbce171d328e457",
     "hub": {
       "commit_sha": "defcdea7cc7a4b0858fea563cbbce171d328e457",
-      "last_modified": "2025-10-14 18:11:53+00:00",
-      "downloads": 6624,
-      "likes": 9,
       "tags": [
         "4-bit",
         "conversational",
@@ -12713,7 +12710,7 @@
   },
   "fast_comparison": {
     "note": "pixel_values come from the lossless slow_compensated exports of the fast-comparison runner; the HF-reference runtime fed these same buffers through the 2B checkpoint",
-    "manifest_sha256": "548b440f2a09283c337d0f70ab6d48c3af23a310e7dd63d143b10c86c9947541",
+    "manifest_sha256": "c3af7ebe5591c365f8fa199bcc2d54e5f7f7a6b02233f9213d8869082b21bb00",
     "lock_sha256": "4f2e898b8ad91228741f8adb4ca7e1f321c6ec37619711cf9c6a10879eb442d5",
     "environment": {
       "system": "Darwin",
@@ -12729,12 +12726,15 @@
   "model": {
     "no_parity_claim": "this runtime (mlx-vlm 0.3.9 on Metal, 4-bit affine quantized 8B checkpoint) is a different runtime and checkpoint than the pinned HF CPU float32 reference; the recorded facts are compatibility and provenance evidence only, not a parity claim",
     "loading": {
-      "load_seconds": 0.196,
       "lazy": false,
       "loader": "mlx_vlm.utils.load_model (no AutoProcessor)",
       "auto_processor_probe": {
         "auto_processor_loaded": false,
-        "error": "ImportError: \nAutoVideoProcessor requires the Torchvision library but it was not found in your environment. Check out the instructions on the\ninstallation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.\nPlease note that you may need to restart your runtime after installation.\n\nAutoVideoProcessor requires the PyTorch library but it was not found in your environment. Check out the instructions on the\ninstallation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.\nPlease note that you may need to restart your runtime after installation.\n"
+        "error": "ImportError",
+        "missing_frameworks": [
+          "PyTorch",
+          "Torchvision"
+        ]
       }
     },
     "tied_embedding": {
@@ -12942,7 +12942,7 @@
             1536
           ],
           "pixel_values_sha256": "df316e1ea42d36286d68368e17cbbcb74dfb0bb332839059f48be6ac93f5b07a",
-          "manifest_uint8_patches_sha256": "0ff7caee03f709a353822538f63837296f5d8aa06023ebffb70a757e434663d6"
+          "manifest_uint8_patches_sha256": "c45b316460bfab551f799901e75a290c810d6cc5db5ad4b9b33f0197c8bc8d85"
         },
         "sequence": {
           "length": 82,
@@ -13071,8 +13071,7 @@
               20169,
               22.0
             ]
-          ],
-          "elapsed_seconds": 0.104
+          ]
         },
         "determinism": {
           "repeat_prefill_sha256_match": true
@@ -13133,7 +13132,7 @@
             1536
           ],
           "pixel_values_sha256": "1b98a584a002f17b3a62eac192dd9a1a473d52a60c4571a3acc10a40ffa72754",
-          "manifest_uint8_patches_sha256": "d15490a207cb2f635474888ceb510756c2608331da06e2e0fe1d9c6cf398318e"
+          "manifest_uint8_patches_sha256": "f27b1e88c7a950f01967d206af5abf41c99e872da5734a857831c1656e904b77"
         },
         "sequence": {
           "length": 90,
@@ -13262,8 +13261,7 @@
               59039,
               22.875
             ]
-          ],
-          "elapsed_seconds": 0.086
+          ]
         },
         "determinism": {
           "repeat_prefill_sha256_match": true

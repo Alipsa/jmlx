@@ -14,8 +14,16 @@ fast-comparison manifest and recorded here.
 It reuses ``qwen3vl_probe``'s environment gate, chat prompt, processor
 construction (slow compensated image processor + the ``ProbeProcessor``
 video-processor workaround) and rope re-derivation. It never re-runs the image
-processors: the patch buffers come from the runner's lossless exports, whose
-SHA-256s are re-verified against the runner manifest before use.
+processors for pixel values: the patch buffers come from the runner's lossless
+exports, whose SHA-256s are re-verified against the runner manifest before
+use. The fixture images it tokenizes come from the committed fast-comparison
+fixtures directory (``--fixtures``, default
+``tools/image-oracle/fast-comparison/fixtures``) and are digest-verified
+against the manifest's per-file fixtures digests before any processor or model
+work; after the processor call that builds ``input_ids``, the processor's own
+``image_grid_thw`` is verified against the exported ``grid_thw`` of the
+slow_compensated config, and the slow and fast export grids are verified to
+agree with each other.
 
 Usage (from the repository root):
 
@@ -23,14 +31,14 @@ Usage (from the repository root):
         --directory .tier-b/qwen3-vl-2b-instruct \
         --patches-dir <fast-comparison output dir> \
         --out tools/hf-reference/goldens/qwen3-vl-2b-wp1-slow-fast-logits.json
+        # optional: --fixtures <dir> (defaults to the committed
+        # tools/image-oracle/fast-comparison/fixtures)
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-import tempfile
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -50,6 +58,48 @@ PROMPT_MESSAGES = [
          {"type": "text", "text": "Describe the image in one short sentence."},
      ]}
 ]
+
+# Pinned digests of the fast-comparison runner's manifest.json, the output of
+# tools/image-oracle/fast-comparison/runner.py produced by its pinned venv
+# (a manual, reviewed step: regenerating the runner output changes this). The
+# lock digest is that comparison environment's requirements.lock digest,
+# carried in the manifest's own "lock_sha256" field. A manifest that does not
+# match BOTH digests came from a drifted environment and its exports must not
+# be fed to a model.
+FAST_COMPARISON_MANIFEST_SHA256 = (
+    "c3af7ebe5591c365f8fa199bcc2d54e5f7f7a6b02233f9213d8869082b21bb00"
+)
+FAST_COMPARISON_LOCK_SHA256 = (
+    "4f2e898b8ad91228741f8adb4ca7e1f321c6ec37619711cf9c6a10879eb442d5"
+)
+
+
+def load_manifest(patches_dir: Path) -> tuple[dict, Path]:
+    """Load the runner manifest, pinned to the fast-comparison environment.
+
+    Checks the schema, then the manifest's own SHA-256 and its
+    ``lock_sha256`` field against the pinned digests above, before any export
+    is read or any model code runs.
+    """
+    manifest_path = patches_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise SystemExit(f"fast-comparison manifest is missing: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema") != "jmlx-phase7-3b-wp1-qwen3vl-fastcomparison-v1":
+        raise SystemExit("unexpected fast-comparison manifest schema")
+    manifest_digest = probe.sha256_bytes(manifest_path.read_bytes())
+    if manifest_digest != FAST_COMPARISON_MANIFEST_SHA256:
+        raise SystemExit(
+            f"fast-comparison manifest sha256 {manifest_digest} does not match "
+            f"the pinned {FAST_COMPARISON_MANIFEST_SHA256}; the patches came "
+            "from a drifted fast-comparison environment")
+    if manifest["lock_sha256"] != FAST_COMPARISON_LOCK_SHA256:
+        raise SystemExit(
+            f"fast-comparison manifest lock_sha256 "
+            f"{manifest['lock_sha256']} does not match the pinned "
+            f"{FAST_COMPARISON_LOCK_SHA256}; the patches came from a drifted "
+            "fast-comparison environment")
+    return manifest, manifest_path
 
 
 def verify_exports(patches_dir: Path, manifest: dict) -> dict:
@@ -80,12 +130,74 @@ def verify_exports(patches_dir: Path, manifest: dict) -> dict:
     return exports
 
 
+def resolve_fixture(fixtures_dir: Path, image_name: str, manifest: dict) -> Path:
+    """Resolve a committed fixture image, verified against the pinned digest.
+
+    The digest comes from the manifest's per-file ``fixtures`` section when
+    present (the manifest is itself digest-pinned by ``load_manifest``, so the
+    chain is complete), otherwise from the committed
+    fast-comparison/provenance.json. A missing file or a digest mismatch
+    exits before any processor or model work.
+    """
+    path = fixtures_dir / image_name
+    if not path.is_file():
+        raise SystemExit(f"fast-comparison fixture is missing: {path}")
+    pinned = manifest.get("fixtures", {}).get(image_name)
+    if pinned is None:
+        provenance = json.loads(
+            (Path(__file__).resolve().parents[1] / "image-oracle" /
+             "fast-comparison" / "provenance.json").read_text(encoding="utf-8"))
+        pinned = provenance["fixtures"].get(image_name)
+        if pinned is None:
+            raise SystemExit(
+                f"no pinned digest for {image_name} in the manifest's "
+                "fixtures section or in fast-comparison/provenance.json")
+    digest = probe.sha256_bytes(path.read_bytes())
+    if digest != pinned:
+        raise SystemExit(
+            f"fast-comparison fixture {path} sha256 {digest} does not match "
+            f"the pinned {pinned}")
+    return path
+
+
+def verify_grids(processor, rendered: str, image, image_name: str,
+                 exports: dict) -> dict:
+    """Run the shared processor call and gate on the exported grids.
+
+    One processor call supplies input_ids/attention_mask for BOTH patch sets,
+    so before any model forward: the processor's ``image_grid_thw`` must equal
+    the slow_compensated export's ``grid_thw``, and the slow and fast export
+    grids must agree with each other.
+    """
+    batch = processor(images=[image.convert("RGB")], text=[rendered])
+    processor_grid = [[int(v) for v in row] for row in batch["image_grid_thw"]]
+    slow_grid = exports[image_name]["slow_compensated"]["grid_thw"]
+    fast_grid = exports[image_name]["fast"]["grid_thw"]
+    if processor_grid != [slow_grid]:
+        sys.exit(
+            f"{image_name}: processor image_grid_thw {processor_grid} does not "
+            f"match the slow_compensated export grid_thw {slow_grid}; the "
+            "input_ids expansion and the exported patch buffer are "
+            "inconsistent")
+    if slow_grid != fast_grid:
+        sys.exit(
+            f"{image_name}: slow_compensated export grid_thw {slow_grid} does "
+            f"not match fast export grid_thw {fast_grid}; the shared input_ids "
+            "cannot be valid for both patch sets")
+    return batch
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True,
                         help="pinned Qwen3-VL-2B-Instruct snapshot")
     parser.add_argument("--patches-dir", type=Path, required=True,
                         help="fast-comparison runner output directory")
+    parser.add_argument("--fixtures", type=Path,
+                        default=Path(__file__).resolve().parents[1] /
+                        "image-oracle" / "fast-comparison" / "fixtures",
+                        help="committed fast-comparison fixture images "
+                             "(default: tools/image-oracle/fast-comparison/fixtures)")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -100,13 +212,12 @@ def main() -> None:
     torch.set_num_threads(1)
     torch.use_deterministic_algorithms(True)
 
-    manifest_path = args.patches_dir / "manifest.json"
-    if not manifest_path.is_file():
-        raise SystemExit(f"fast-comparison manifest is missing: {manifest_path}")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema") != "jmlx-phase7-3b-wp1-qwen3vl-fastcomparison-v1":
-        raise SystemExit("unexpected fast-comparison manifest schema")
+    manifest, manifest_path = load_manifest(args.patches_dir)
     exports = verify_exports(args.patches_dir, manifest)
+    fixture_paths = {
+        name: resolve_fixture(args.fixtures, name, manifest)
+        for name in MODEL_IMAGES
+    }
 
     from transformers import Qwen2TokenizerFast, Qwen3VLForConditionalGeneration
     from transformers.models.qwen2_vl.image_processing_qwen2_vl import Qwen2VLImageProcessor
@@ -139,7 +250,6 @@ def main() -> None:
                                              tokenize=False)
 
     torch.manual_seed(0)
-    started = time.perf_counter()
     model = Qwen3VLForConditionalGeneration.from_pretrained(
         str(args.directory), dtype=torch.float32, attn_implementation="eager")
     model.eval()
@@ -163,19 +273,11 @@ def main() -> None:
     with torch.no_grad():
         for image_name in MODEL_IMAGES:
             per_config_exports = exports[image_name]
-            workdir = Path(tempfile.mkdtemp(prefix="qwen3vl-slowfast-"))
-            # The probe builds byte-identical images; the grid (and therefore the
-            # input_ids expansion) is identical for the slow and fast patch sets,
-            # so one processor call supplies input_ids/attention_mask for both.
-            image = Image.open(args.patches_dir.parent / "fixtures" / image_name) \
-                if (args.patches_dir.parent / "fixtures" / image_name).is_file() \
-                else None
-            if image is None:
-                # Rebuild the deterministic probe image for tokenization only.
-                probe_images = probe.build_test_images(workdir)
-                image = Image.open(probe_images["rgb_256x256"] if "256x256" in image_name
-                                   else probe_images["rgb_64x32"])
-            batch = processor(images=[image.convert("RGB")], text=[rendered])
+            # One processor call supplies input_ids/attention_mask for both
+            # patch sets; verify_grids gates that the processor grid matches
+            # the exported grid_thw for both configs before any forward.
+            image = Image.open(fixture_paths[image_name])
+            batch = verify_grids(processor, rendered, image, image_name, exports)
             input_ids = torch.as_tensor(batch["input_ids"], dtype=torch.long)
             attention_mask = torch.as_tensor(batch["attention_mask"], dtype=torch.long)
             ids_row = [int(v) for v in input_ids[0].tolist()]
@@ -271,7 +373,6 @@ def main() -> None:
             }
             result["cases"][image_name] = case
 
-    result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(probe.py(result), indent=2) + "\n", encoding="utf-8")
     print(f"wrote {args.out}")

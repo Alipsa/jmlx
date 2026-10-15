@@ -44,6 +44,7 @@ build
 /tools/mlx-oracle/.venv/
 /tools/tokenizer-oracle/.venv/
 /tools/image-oracle/.venv/
+/tools/image-oracle/fast-comparison/.venv/
 
 # Python bytecode
 __pycache__/
@@ -58,3 +59,4 @@ __pycache__/
 # Opt-in real checkpoint downloads
 /.tier-b/
 /tools/hf-reference/.venv/
+/tools/qwen-vl-reference/.venv/

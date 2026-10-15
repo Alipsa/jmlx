@@ -1,7 +1,8 @@
 # Phase 7.3b — Qwen3-VL image and text inference
 
-- **Status:** proposed, 2026-10-08. Source inspection completed for planning; artifact pins,
-  executable reference probes and implementation acceptance remain work below.
+- **Status:** WP0 and WP1 complete, 2026-10-15 — baseline, artifact pins, executable reference
+  probes and divergence evidence are recorded in `req/plans/phase7-3b-reference-findings.md`.
+  WP2–WP6 implementation and acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -486,10 +487,10 @@ Run `./gradlew -p buildSrc check` if downloader/manifest build logic changes. Ad
 native suite to `.github/workflows/ci.yml` with its correct ordinary/float32 result directory;
 obtain supported macOS 26 execution evidence. Existing native skip gates remain authoritative.
 
-- [ ] WP0 prerequisites accepted; no competing multimodal contracts introduced.
-- [ ] Immutable artifacts, license evidence and all config/tensor mappings recorded.
-- [ ] Slow-PIL and effective-area deviations, processor-construction probe and guarded fast-comparison lock accepted.
-- [ ] Locked `mlx-vlm` reference and separate HF/MLX provenance tensor plans accepted.
+- [x] WP0 prerequisites accepted; no competing multimodal contracts introduced.
+- [x] Immutable artifacts, license evidence and all config/tensor mappings recorded.
+- [x] Slow-PIL and effective-area deviations, processor-construction probe and guarded fast-comparison lock accepted.
+- [x] Locked `mlx-vlm` reference and separate HF/MLX provenance tensor plans accepted.
 - [ ] Qwen decode option, unchanged default conversion and exact preprocessing/prompt/position/template fixtures pass.
 - [ ] Old one-dimensional decoder path remains bit-identical in both precision modes.
 - [ ] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.

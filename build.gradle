@@ -330,6 +330,24 @@ def configureImageOracle = { Exec task ->
     }
 }
 
+// The slow-vs-fast comparison venv (Phase 7.3b WP1) is opt-in like the image oracle: an
+// explicit task against its own pinned venv, never part of check. The ordinary build only
+// reads its lock file, via verifyImageOracleDependencyPins above.
+def fastComparisonDir = imageOracleDir.dir('fast-comparison')
+def fastComparisonPython = fastComparisonDir.file('.venv/bin/python').asFile
+def configureFastComparison = { Exec task ->
+    task.inputs.file(fastComparisonDir.file('requirements.lock'))
+    task.inputs.file(fastComparisonDir.file('provenance.json'))
+    task.inputs.files(fileTree(fastComparisonDir.dir('fixtures')))
+    task.executable = fastComparisonPython
+    task.doFirst {
+        if (!fastComparisonPython.isFile()) {
+            throw new GradleException(
+                    'Fast comparison environment is missing; run ./tools/image-oracle/fast-comparison/install.sh')
+        }
+    }
+}
+
 tasks.register('verifyImageOracle', Exec) {
     group = 'verification'
     description = 'Verifies the pinned image preprocessing oracle environment.'
@@ -379,17 +397,36 @@ tasks.register('verifyImageOracleFixtures', Exec) {
             '--verify-all'
 }
 
+tasks.register('runImageOracleFastComparison', Exec) {
+    group = 'verification'
+    description = 'Runs the opt-in slow-vs-fast Qwen2-VL processor comparison ' +
+            '(Phase 7.3b WP1) against its pinned venv.'
+    configureFastComparison(delegate)
+    inputs.file(fastComparisonDir.file('runner.py'))
+    def outputDir = layout.buildDirectory.dir('fast-comparison')
+    outputs.dir(outputDir)
+    args fastComparisonDir.file('runner.py').asFile,
+            '--fixtures', fastComparisonDir.file('fixtures').asFile,
+            '--provenance', fastComparisonDir.file('provenance.json').asFile,
+            '--out', outputDir.get().asFile
+}
+
 // The Python-executing tasks above stay explicit (they need the pinned venv). What CI runs in
-// ordinary check without Python: the image and HF reference lock files must agree on the three
-// shared reference pins (Pillow/NumPy/Transformers), and every committed image fixture source
-// must still carry its provenance SHA-256. The runner re-verifies both under the venv, so a
-// local drift is caught before any fixture is used and again in check.
+// ordinary check without Python: the image, fast-comparison and HF reference lock files must
+// agree on the three shared reference pins (Pillow/NumPy/Transformers, versions and environment
+// markers), and every committed image fixture source must still carry its provenance SHA-256.
+// The runners re-verify both under their venvs, so a local drift is caught before any fixture
+// is used and again in check. The fast-comparison venv itself stays opt-in: only its lock is
+// read here, never its Python.
 tasks.register('verifyImageOracleDependencyPins') {
     group = 'verification'
-    description = 'Verifies the image and HF reference locks agree on Pillow, NumPy and Transformers.'
+    description = 'Verifies the image, fast-comparison and HF reference locks agree on ' +
+            'Pillow, NumPy and Transformers.'
     def imageLock = imageOracleDir.file('requirements.lock')
+    def fastLock = imageOracleDir.file('fast-comparison/requirements.lock')
     def referenceLock = layout.projectDirectory.file('tools/hf-reference/requirements.lock')
     inputs.file(imageLock)
+    inputs.file(fastLock)
     inputs.file(referenceLock)
     doLast {
         def parseLock = { File lock ->
@@ -403,22 +440,32 @@ tasks.register('verifyImageOracleDependencyPins') {
             }
             pins
         }
-        def imagePins = parseLock(imageLock.asFile)
-        def referencePins = parseLock(referenceLock.asFile)
+        def locks = [
+                'image-oracle': parseLock(imageLock.asFile),
+                'fast-comparison': parseLock(fastLock.asFile),
+                'hf-reference': parseLock(referenceLock.asFile),
+        ]
         ['pillow', 'numpy', 'transformers'].each { packageName ->
-            if (!imagePins.containsKey(packageName)) {
-                throw new GradleException("image-oracle lock is missing a pinned ${packageName} dependency")
+            def byLock = [:]
+            locks.each { label, pins ->
+                if (!pins.containsKey(packageName)) {
+                    throw new GradleException("${label} lock is missing a pinned ${packageName} dependency")
+                }
+                byLock[label] = pins[packageName]
             }
-            if (!referencePins.containsKey(packageName)) {
-                throw new GradleException("hf-reference lock is missing a pinned ${packageName} dependency")
-            }
-            if (imagePins[packageName].version != referencePins[packageName].version) {
-                throw new GradleException("${packageName} pin disagrees: image-oracle " +
-                        "${imagePins[packageName].version} vs hf-reference ${referencePins[packageName].version}")
-            }
-            if (imagePins[packageName].marker != referencePins[packageName].marker) {
-                throw new GradleException("${packageName} environment marker disagrees: image-oracle " +
-                        "'${imagePins[packageName].marker}' vs hf-reference '${referencePins[packageName].marker}'")
+            def baseline = locks.keySet().first()
+            byLock.each { label, pin ->
+                if (label == baseline) {
+                    return
+                }
+                if (pin.version != byLock[baseline].version) {
+                    throw new GradleException("${packageName} pin disagrees: ${label} " +
+                            "${pin.version} vs ${baseline} ${byLock[baseline].version}")
+                }
+                if (pin.marker != byLock[baseline].marker) {
+                    throw new GradleException("${packageName} environment marker disagrees: ${label} " +
+                            "'${pin.marker}' vs ${baseline} '${byLock[baseline].marker}'")
+                }
             }
         }
     }
@@ -466,6 +513,48 @@ tasks.register('verifyImageOracleFixtureDigests') {
     }
 }
 
+// The 8B checkpoint itself is a 6.8 GB opt-in download, so this guard only covers the small
+// committed evidence: the probe golden and the hash-locked requirements lock.
+tasks.register('verifyQwenVlReferenceProvenance') {
+    group = 'verification'
+    description = 'Verifies the committed Qwen3-VL MLX reference golden and lock against their provenance SHA-256.'
+    def qwenVlDir = layout.projectDirectory.dir('tools/qwen-vl-reference')
+    def provenance = qwenVlDir.file('provenance.json')
+    def golden = qwenVlDir.file('goldens/qwen3-vl-8b-wp1-mlx-probe.json')
+    def lock = qwenVlDir.file('requirements.lock')
+    inputs.file(provenance)
+    inputs.files(golden, lock)
+    def sha256 = { File file ->
+        def digest = MessageDigest.getInstance('SHA-256')
+        java.nio.file.Files.newInputStream(file.toPath()).withCloseable { stream ->
+            byte[] bytes = new byte[8192]
+            int count
+            while ((count = stream.read(bytes)) != -1) {
+                digest.update(bytes, 0, count)
+            }
+        }
+        return digest.digest().encodeHex().toString()
+    }
+    doLast {
+        def metadata = new JsonSlurper().parse(provenance.asFile)
+        def probe = metadata.probe
+        if (!(probe instanceof Map) || probe.golden_sha256 == null || metadata.requirements_lock_sha256 == null) {
+            throw new GradleException('Qwen-VL reference provenance is missing probe hashes')
+        }
+        if (probe.golden != 'goldens/qwen3-vl-8b-wp1-mlx-probe.json') {
+            throw new GradleException("Qwen-VL reference provenance names an unexpected golden: ${probe.golden}")
+        }
+        def actualGolden = sha256(golden.asFile)
+        if (actualGolden != probe.golden_sha256) {
+            throw new GradleException("Qwen-VL reference golden SHA-256 differs: ${actualGolden}")
+        }
+        def actualLock = sha256(lock.asFile)
+        if (actualLock != metadata.requirements_lock_sha256) {
+            throw new GradleException("Qwen-VL reference lock SHA-256 differs: ${actualLock}")
+        }
+    }
+}
+
 // This source-only guard runs under the project's Java toolchain, so parsing coverage cannot
 // silently lag the source language level or constrain the Gradle daemon's Java version.
 tasks.register('verifyMlxApiCallSites', JavaExec) {
@@ -486,7 +575,8 @@ tasks.named('check') {
     dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites'),
             tasks.named('verifyHfReferenceGoldens'),
             tasks.named('verifyImageOracleDependencyPins'),
-            tasks.named('verifyImageOracleFixtureDigests')
+            tasks.named('verifyImageOracleFixtureDigests'),
+            tasks.named('verifyQwenVlReferenceProvenance')
 }
 
 tasks.register('verifyHfReferenceGoldens') {

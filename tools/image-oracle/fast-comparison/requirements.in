@@ -1,0 +1,14 @@
+# Hash-locked slow-vs-fast comparison environment (Phase 7.3b WP1). Opt-in: install it
+# explicitly with install.sh; Gradle never installs or imports it, and root check never
+# needs it (only the lock's shared pins are compared, by verifyImageOracleDependencyPins).
+# Pillow/NumPy/Transformers must stay in agreement with ../requirements.lock and
+# tools/hf-reference/requirements.lock (verifyImageOracleDependencyPins fails a build
+# if the locks ever disagree on those three packages or their environment markers).
+# Torch/torchvision are the reviewed comparison runtime; they never enter the
+# slow-reference locks.
+torch==2.6.0+cpu ; sys_platform != "darwin"
+torch==2.6.0 ; sys_platform == "darwin"
+torchvision==0.21.0
+transformers==4.57.6
+Pillow==12.3.0
+numpy==2.5.3

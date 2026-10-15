@@ -1,0 +1,711 @@
+{
+  "schema": "jmlx-phase7-3b-wp1-qwen3vl-slowfast-v1",
+  "environment": {
+    "python": "3.12.15",
+    "platform": "Darwin-arm64",
+    "torch": "2.6.0",
+    "transformers": "4.57.6",
+    "pillow": "12.3.0",
+    "numpy": "2.5.3",
+    "safetensors": "0.6.2",
+    "huggingface_hub": "0.36.2"
+  },
+  "comparison_runtime": {
+    "note": "the patch sets were produced in the fast-comparison venv; this runtime feeds both through one model in the HF-reference venv",
+    "fast_comparison_environment": {
+      "system": "Darwin",
+      "machine": "arm64",
+      "python": "3.12",
+      "pillow": "12.3.0",
+      "numpy": "2.5.3",
+      "transformers": "4.57.6",
+      "torch": "2.6.0",
+      "torchvision": "0.21.0"
+    },
+    "fast_comparison_lock_sha256": "4f2e898b8ad91228741f8adb4ca7e1f321c6ec37619711cf9c6a10879eb442d5",
+    "fast_comparison_manifest_sha256": "548b440f2a09283c337d0f70ab6d48c3af23a310e7dd63d143b10c86c9947541"
+  },
+  "exports": {
+    "model-rgb-256x256.png": {
+      "slow_compensated": {
+        "export": "slow_compensated__model-rgb-256x256.npy",
+        "grid_thw": [
+          1,
+          16,
+          16
+        ],
+        "dtype": "float32",
+        "shape": [
+          256,
+          1536
+        ],
+        "pixel_values_sha256": "df316e1ea42d36286d68368e17cbbcb74dfb0bb332839059f48be6ac93f5b07a",
+        "manifest_uint8_patches_sha256": "0ff7caee03f709a353822538f63837296f5d8aa06023ebffb70a757e434663d6"
+      },
+      "fast": {
+        "export": "fast__model-rgb-256x256.npy",
+        "grid_thw": [
+          1,
+          16,
+          16
+        ],
+        "dtype": "float32",
+        "shape": [
+          256,
+          1536
+        ],
+        "pixel_values_sha256": "62608d9e895b449ba81fc5f2f57873f3bf4f01ba1777fd78eb4498bebfb9b017",
+        "manifest_uint8_patches_sha256": "0ff7caee03f709a353822538f63837296f5d8aa06023ebffb70a757e434663d6"
+      }
+    },
+    "model-rgb-64x32.png": {
+      "slow_compensated": {
+        "export": "slow_compensated__model-rgb-64x32.npy",
+        "grid_thw": [
+          1,
+          12,
+          24
+        ],
+        "dtype": "float32",
+        "shape": [
+          288,
+          1536
+        ],
+        "pixel_values_sha256": "1b98a584a002f17b3a62eac192dd9a1a473d52a60c4571a3acc10a40ffa72754",
+        "manifest_uint8_patches_sha256": "d15490a207cb2f635474888ceb510756c2608331da06e2e0fe1d9c6cf398318e"
+      },
+      "fast": {
+        "export": "fast__model-rgb-64x32.npy",
+        "grid_thw": [
+          1,
+          12,
+          24
+        ],
+        "dtype": "float32",
+        "shape": [
+          288,
+          1536
+        ],
+        "pixel_values_sha256": "b4175aec99dd80ae9c2fce98cc8f5e9e617795c02ae544f82d5283db0797b8da",
+        "manifest_uint8_patches_sha256": "c5749a1a551395f537174f1f7591845030726fcf691d0d4ff0c75bf9c1b21570"
+      }
+    }
+  },
+  "cases": {
+    "model-rgb-256x256.png": {
+      "sequence": {
+        "length": 82,
+        "image_token_span": [
+          4,
+          67
+        ]
+      },
+      "configs": {
+        "slow_compensated": {
+          "grid": [
+            1,
+            16,
+            16
+          ],
+          "rope_delta": -56,
+          "prefill": {
+            "prefill_sha256": "c2f25ed98eee76bb4331c9f2e180e9d41fba324905ec9932a3dcdc0f88566c35",
+            "prefill_argmax": 32,
+            "prefill_top20": [
+              [
+                41,
+                32.0
+              ],
+              [
+                34,
+                785.0
+              ],
+              [
+                30,
+                1986.0
+              ],
+              [
+                30,
+                2082.0
+              ],
+              [
+                29,
+                362.0
+              ],
+              [
+                29,
+                2132.0
+              ],
+              [
+                24,
+                64.0
+              ],
+              [
+                22,
+                641.0
+              ],
+              [
+                22,
+                6464.0
+              ],
+              [
+                22,
+                4923.0
+              ],
+              [
+                22,
+                3862.0
+              ],
+              [
+                22,
+                22985.0
+              ],
+              [
+                21,
+                1906.0
+              ],
+              [
+                21,
+                1925.0
+              ],
+              [
+                20,
+                23999.0
+              ],
+              [
+                20,
+                14417.0
+              ],
+              [
+                20,
+                11613.0
+              ],
+              [
+                20,
+                1249.0
+              ],
+              [
+                20,
+                2121.0
+              ],
+              [
+                20,
+                8420.0
+              ]
+            ],
+            "logits_shape": [
+              1,
+              82,
+              151936
+            ]
+          },
+          "determinism": {
+            "repeat_prefill_sha256_match": true
+          },
+          "decode": [
+            {
+              "step": 0,
+              "cache_position": 82,
+              "kv_length": 83,
+              "expected_decode_positions_all_axes": 26,
+              "logits_sha256": "c36934017e6e79379419f9e6af0a57bad2e0f1beb9b88830d122d5865642206a",
+              "argmax": 10876
+            },
+            {
+              "step": 1,
+              "cache_position": 83,
+              "kv_length": 84,
+              "expected_decode_positions_all_axes": 27,
+              "logits_sha256": "c846e9a0bc75d09f1b139e4f69931d877a92c24d6cede515d07c45a8681d95e9",
+              "argmax": 374
+            },
+            {
+              "step": 2,
+              "cache_position": 84,
+              "kv_length": 85,
+              "expected_decode_positions_all_axes": 28,
+              "logits_sha256": "2f82835d60dedd95e931481219c66d9549ae5f29255716905783745aaede43e2",
+              "argmax": 15
+            },
+            {
+              "step": 3,
+              "cache_position": 85,
+              "kv_length": 86,
+              "expected_decode_positions_all_axes": 29,
+              "logits_sha256": "48e4f04dc01042fc6605e30596d81a44a7c4253ad872176a58aa356ab680d1fd",
+              "argmax": 220
+            }
+          ],
+          "greedy_ids": [
+            32,
+            10876,
+            374,
+            15,
+            220
+          ]
+        },
+        "fast": {
+          "grid": [
+            1,
+            16,
+            16
+          ],
+          "rope_delta": -56,
+          "prefill": {
+            "prefill_sha256": "8f6537e95ff23ef90477c1c34d4e3240e3a9a6f2dbb427cfb14a15958baecf3b",
+            "prefill_argmax": 32,
+            "prefill_top20": [
+              [
+                41,
+                32.0
+              ],
+              [
+                34,
+                785.0
+              ],
+              [
+                30,
+                1986.0
+              ],
+              [
+                30,
+                2082.0
+              ],
+              [
+                29,
+                362.0
+              ],
+              [
+                29,
+                2132.0
+              ],
+              [
+                24,
+                64.0
+              ],
+              [
+                22,
+                641.0
+              ],
+              [
+                22,
+                6464.0
+              ],
+              [
+                22,
+                4923.0
+              ],
+              [
+                22,
+                3862.0
+              ],
+              [
+                22,
+                22985.0
+              ],
+              [
+                21,
+                1906.0
+              ],
+              [
+                21,
+                1925.0
+              ],
+              [
+                20,
+                23999.0
+              ],
+              [
+                20,
+                14417.0
+              ],
+              [
+                20,
+                11613.0
+              ],
+              [
+                20,
+                1249.0
+              ],
+              [
+                20,
+                2121.0
+              ],
+              [
+                20,
+                8420.0
+              ]
+            ],
+            "logits_shape": [
+              1,
+              82,
+              151936
+            ]
+          },
+          "determinism": {
+            "repeat_prefill_sha256_match": true
+          },
+          "decode": [
+            {
+              "step": 0,
+              "cache_position": 82,
+              "kv_length": 83,
+              "expected_decode_positions_all_axes": 26,
+              "logits_sha256": "244746cc95f362ce7cee382c5210edf7839301a8ef4a3b19259826771139164d",
+              "argmax": 10876
+            },
+            {
+              "step": 1,
+              "cache_position": 83,
+              "kv_length": 84,
+              "expected_decode_positions_all_axes": 27,
+              "logits_sha256": "5f1607584b062e9efe168e1a688a4bf8c8e853ec80aa721617a3e6d1de121e36",
+              "argmax": 374
+            },
+            {
+              "step": 2,
+              "cache_position": 84,
+              "kv_length": 85,
+              "expected_decode_positions_all_axes": 28,
+              "logits_sha256": "83040a28284fbfd26cb7566eb6c24c63bd6643c4068960913ec3ad19cd735596",
+              "argmax": 15
+            },
+            {
+              "step": 3,
+              "cache_position": 85,
+              "kv_length": 86,
+              "expected_decode_positions_all_axes": 29,
+              "logits_sha256": "eb7f5518336430622ef50d5b7a801d0152e881f2e259894b38e542db26ab00e7",
+              "argmax": 220
+            }
+          ],
+          "greedy_ids": [
+            32,
+            10876,
+            374,
+            15,
+            220
+          ]
+        }
+      },
+      "cross": {
+        "prefill_logits_identical": false,
+        "greedy_ids_identical": true,
+        "diff": {
+          "differing_entries": 151075,
+          "entries": 151936,
+          "max_abs": 9.393692016601562e-05,
+          "mean_abs": 1.7964664948522113e-05
+        }
+      }
+    },
+    "model-rgb-64x32.png": {
+      "sequence": {
+        "length": 90,
+        "image_token_span": [
+          4,
+          75
+        ]
+      },
+      "configs": {
+        "slow_compensated": {
+          "grid": [
+            1,
+            12,
+            24
+          ],
+          "rope_delta": -60,
+          "prefill": {
+            "prefill_sha256": "ae43c06f22c3e6d0bb5af25579f2971b7b40160bc6bc0732140b9e4692c95b1e",
+            "prefill_argmax": 32,
+            "prefill_top20": [
+              [
+                40,
+                32.0
+              ],
+              [
+                33,
+                785.0
+              ],
+              [
+                30,
+                1986.0
+              ],
+              [
+                28,
+                2082.0
+              ],
+              [
+                28,
+                2132.0
+              ],
+              [
+                27,
+                362.0
+              ],
+              [
+                24,
+                64.0
+              ],
+              [
+                22,
+                11613.0
+              ],
+              [
+                22,
+                4923.0
+              ],
+              [
+                22,
+                641.0
+              ],
+              [
+                22,
+                19641.0
+              ],
+              [
+                22,
+                21685.0
+              ],
+              [
+                21,
+                53.0
+              ],
+              [
+                21,
+                1925.0
+              ],
+              [
+                21,
+                1636.0
+              ],
+              [
+                20,
+                3862.0
+              ],
+              [
+                20,
+                13108.0
+              ],
+              [
+                20,
+                50.0
+              ],
+              [
+                20,
+                2121.0
+              ],
+              [
+                20,
+                26972.0
+              ]
+            ],
+            "logits_shape": [
+              1,
+              90,
+              151936
+            ]
+          },
+          "determinism": {
+            "repeat_prefill_sha256_match": true
+          },
+          "decode": [
+            {
+              "step": 0,
+              "cache_position": 90,
+              "kv_length": 91,
+              "expected_decode_positions_all_axes": 30,
+              "logits_sha256": "b07b194d7291d7f28a6653caff92582c85bf159f9418b14f6011a9321d721f0b",
+              "argmax": 10876
+            },
+            {
+              "step": 1,
+              "cache_position": 91,
+              "kv_length": 92,
+              "expected_decode_positions_all_axes": 31,
+              "logits_sha256": "21fe9288fb4c1b508454c788defb5e6bfa6084ee05b11c3f0fd8a237da59cae9",
+              "argmax": 374
+            },
+            {
+              "step": 2,
+              "cache_position": 92,
+              "kv_length": 93,
+              "expected_decode_positions_all_axes": 32,
+              "logits_sha256": "24db209b3bfd3a1fe52d8f97324aeac1c5ad211888da2d415ece833828030073",
+              "argmax": 13
+            },
+            {
+              "step": 3,
+              "cache_position": 93,
+              "kv_length": 94,
+              "expected_decode_positions_all_axes": 33,
+              "logits_sha256": "604e040f84e1f5aa570f90b59e1f53f6a440aade639ec84f7ab2807f0d46f44e",
+              "argmax": 13
+            }
+          ],
+          "greedy_ids": [
+            32,
+            10876,
+            374,
+            13,
+            13
+          ]
+        },
+        "fast": {
+          "grid": [
+            1,
+            12,
+            24
+          ],
+          "rope_delta": -60,
+          "prefill": {
+            "prefill_sha256": "070c25655eb342a3ab5c2d477d7d1b84d880304b7e332ec75d6781bfbe99bc81",
+            "prefill_argmax": 32,
+            "prefill_top20": [
+              [
+                40,
+                32.0
+              ],
+              [
+                33,
+                785.0
+              ],
+              [
+                30,
+                1986.0
+              ],
+              [
+                28,
+                2082.0
+              ],
+              [
+                28,
+                2132.0
+              ],
+              [
+                27,
+                362.0
+              ],
+              [
+                24,
+                64.0
+              ],
+              [
+                22,
+                11613.0
+              ],
+              [
+                22,
+                4923.0
+              ],
+              [
+                22,
+                641.0
+              ],
+              [
+                22,
+                19641.0
+              ],
+              [
+                22,
+                21685.0
+              ],
+              [
+                21,
+                53.0
+              ],
+              [
+                21,
+                1925.0
+              ],
+              [
+                21,
+                1636.0
+              ],
+              [
+                20,
+                3862.0
+              ],
+              [
+                20,
+                13108.0
+              ],
+              [
+                20,
+                50.0
+              ],
+              [
+                20,
+                2121.0
+              ],
+              [
+                20,
+                26972.0
+              ]
+            ],
+            "logits_shape": [
+              1,
+              90,
+              151936
+            ]
+          },
+          "determinism": {
+            "repeat_prefill_sha256_match": true
+          },
+          "decode": [
+            {
+              "step": 0,
+              "cache_position": 90,
+              "kv_length": 91,
+              "expected_decode_positions_all_axes": 30,
+              "logits_sha256": "afc362c98e97e7ae794e8bfdd0f4877d28a1a326105d2f4a4eac1169f03b18cf",
+              "argmax": 10876
+            },
+            {
+              "step": 1,
+              "cache_position": 91,
+              "kv_length": 92,
+              "expected_decode_positions_all_axes": 31,
+              "logits_sha256": "95efac4ea260dc3d5eb8ab1097283e6957e24da1c22dc271d3eaa56ec2063610",
+              "argmax": 374
+            },
+            {
+              "step": 2,
+              "cache_position": 92,
+              "kv_length": 93,
+              "expected_decode_positions_all_axes": 32,
+              "logits_sha256": "71f45235ede12042c3cc5440d50637410cac2e2d204000fce07b65237988d702",
+              "argmax": 13
+            },
+            {
+              "step": 3,
+              "cache_position": 93,
+              "kv_length": 94,
+              "expected_decode_positions_all_axes": 33,
+              "logits_sha256": "91fd408b9cad174e69ecf9d6c616445ea3ac88578ceb5a0028fee84abffda871",
+              "argmax": 13
+            }
+          ],
+          "greedy_ids": [
+            32,
+            10876,
+            374,
+            13,
+            13
+          ]
+        }
+      },
+      "cross": {
+        "prefill_logits_identical": false,
+        "greedy_ids_identical": true,
+        "diff": {
+          "differing_entries": 151924,
+          "entries": 151936,
+          "max_abs": 0.00845956802368164,
+          "mean_abs": 0.0012854780070483685
+        }
+      }
+    }
+  },
+  "elapsed_seconds": 7.98
+}

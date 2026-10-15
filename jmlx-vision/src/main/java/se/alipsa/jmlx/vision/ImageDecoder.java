@@ -49,14 +49,18 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * {@code APP14} transform codes other than RGB/unspecified), inputs above the configured {@link
  * ImageDecodeLimits}, and non-PNG/non-JPEG or corrupt input.
  *
- * <p><b>Alpha policy:</b> alpha (RGBA and LA) is composited over a white background using Pillow's
- * exact integer compositing formula (ported from the pinned Pillow 12.3.0 {@code
- * src/libImaging/AlphaComposite.c}), matching the reference processor's {@code convert_to_rgb}
- * step. Palette {@code tRNS} is <em>not</em> applied: the pinned processor rebuilds a palette image
- * from {@code getpalette()} (RGB only) before that step, so its transparency never survives and
+ * <p><b>Alpha policy:</b> by default alpha (RGBA and LA) is composited over a white background
+ * using Pillow's exact integer compositing formula (ported from the pinned Pillow 12.3.0 {@code
+ * src/libImaging/AlphaComposite.c}). The overloads that take an {@link AlphaPolicy} select instead
+ * between that compositing ({@link AlphaPolicy#COMPOSITE_OVER_WHITE}) and dropping the alpha band
+ * while keeping the source color channels ({@link AlphaPolicy#DROP_ALPHA}, the behavior of Pillow's
+ * own {@code convert("RGB")} — the reference Qwen3-VL image path drops alpha rather than
+ * compositing; see the Phase 7.3b WP1 reference findings). Palette {@code tRNS} is <em>not</em>
+ * applied under either policy: the pinned processor rebuilds a palette image from {@code
+ * getpalette()} (RGB only) before the RGB conversion, so its transparency never survives and
  * transparent entries decode to their opaque palette color — the same outcome as a truecolor or
- * grayscale {@code tRNS}, which the processor's RGB conversion drops. Opaque input passes through
- * unchanged.
+ * grayscale {@code tRNS}, which the RGB conversion drops. Opaque input passes through unchanged
+ * under either policy.
  *
  * <p><b>EXIF orientation is ignored:</b> an EXIF-rotated JPEG decodes to its stored, unrotated
  * pixels, matching the pinned reference path ({@code PIL.Image.open} → {@code load()} with no
@@ -97,6 +101,40 @@ public final class ImageDecoder {
   }
 
   /**
+   * Decodes the PNG or JPEG file at {@code path} with explicit limits and an explicit {@link
+   * AlphaPolicy} for RGBA / grayscale-with-alpha input.
+   *
+   * @param path existing PNG or JPEG file
+   * @param limits positive decode bounds checked from header metadata before any pixel allocation
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @return the decoded image, with alpha handled per {@code policy}
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
+   *     limits}
+   */
+  public static RgbImage decode(Path path, ImageDecodeLimits limits, AlphaPolicy policy)
+      throws IOException {
+    if (policy == null) {
+      throw new IllegalArgumentException("policy must not be null");
+    }
+    if (path == null) {
+      throw new IllegalArgumentException("path must not be null");
+    }
+    if (limits == null) {
+      throw new IllegalArgumentException("limits must not be null");
+    }
+    long cap = maxInputBytes(limits);
+    if (Files.size(path) > cap) {
+      throw new IOException("image input exceeds the " + cap + "-byte decode buffer limit");
+    }
+    byte[] bytes;
+    try (InputStream in = Files.newInputStream(path)) {
+      bytes = readAllBounded(in, cap);
+    }
+    return decode(bytes, limits, policy);
+  }
+
+  /**
    * Decodes the PNG or JPEG content of {@code input} using the default limits. The stream is
    * consumed in full; it is not closed by this method.
    *
@@ -110,6 +148,34 @@ public final class ImageDecoder {
   }
 
   /**
+   * Decodes the PNG or JPEG content of {@code input} with explicit limits and an explicit {@link
+   * AlphaPolicy}. The stream is consumed in full; it is not closed by this method (internal
+   * wrappers are closed).
+   *
+   * @param input non-null stream with the whole image
+   * @param limits positive decode bounds checked from header metadata before any pixel allocation
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @return the decoded image, with alpha handled per {@code policy}
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
+   *     limits}
+   */
+  public static RgbImage decode(InputStream input, ImageDecodeLimits limits, AlphaPolicy policy)
+      throws IOException {
+    if (policy == null) {
+      throw new IllegalArgumentException("policy must not be null");
+    }
+    if (input == null) {
+      throw new IllegalArgumentException("input must not be null");
+    }
+    if (limits == null) {
+      throw new IllegalArgumentException("limits must not be null");
+    }
+    byte[] bytes = readAllBounded(input, maxInputBytes(limits));
+    return decode(bytes, limits, policy);
+  }
+
+  /**
    * Decodes the PNG or JPEG file at {@code path} with explicit limits permitting larger inputs.
    *
    * @param path existing PNG or JPEG file
@@ -119,22 +185,7 @@ public final class ImageDecoder {
    *     limits}
    */
   public static RgbImage decode(Path path, ImageDecodeLimits limits) throws IOException {
-    if (path == null) {
-      throw new IllegalArgumentException("path must not be null");
-    }
-    if (limits == null) {
-      throw new IllegalArgumentException("limits must not be null");
-    }
-    long cap = maxInputBytes(limits);
-    // Reject an oversized file from its size before a single byte is read.
-    if (Files.size(path) > cap) {
-      throw new IOException("image input exceeds the " + cap + "-byte decode buffer limit");
-    }
-    byte[] bytes;
-    try (InputStream in = Files.newInputStream(path)) {
-      bytes = readAllBounded(in, cap);
-    }
-    return decode(bytes, limits);
+    return decode(path, limits, AlphaPolicy.COMPOSITE_OVER_WHITE);
   }
 
   /**
@@ -148,17 +199,11 @@ public final class ImageDecoder {
    *     limits}
    */
   public static RgbImage decode(InputStream input, ImageDecodeLimits limits) throws IOException {
-    if (input == null) {
-      throw new IllegalArgumentException("input must not be null");
-    }
-    if (limits == null) {
-      throw new IllegalArgumentException("limits must not be null");
-    }
-    byte[] bytes = readAllBounded(input, maxInputBytes(limits));
-    return decode(bytes, limits);
+    return decode(input, limits, AlphaPolicy.COMPOSITE_OVER_WHITE);
   }
 
-  private static RgbImage decode(byte[] bytes, ImageDecodeLimits limits) throws IOException {
+  private static RgbImage decode(byte[] bytes, ImageDecodeLimits limits, AlphaPolicy policy)
+      throws IOException {
     String format;
     int width;
     int height;
@@ -198,7 +243,7 @@ public final class ImageDecoder {
       try {
         reader.setInput(stream);
         BufferedImage bi = reader.read(0, null);
-        return toRgbImage(bi, plan);
+        return toRgbImage(bi, plan, policy);
       } finally {
         reader.dispose();
       }
@@ -658,7 +703,8 @@ public final class ImageDecoder {
     }
   }
 
-  private static RgbImage toRgbImage(BufferedImage bi, DecodePlan plan) throws IOException {
+  private static RgbImage toRgbImage(BufferedImage bi, DecodePlan plan, AlphaPolicy policy)
+      throws IOException {
     int w = bi.getWidth();
     int h = bi.getHeight();
     Raster raster = bi.getRaster();
@@ -770,8 +816,10 @@ public final class ImageDecoder {
             "unexpected raster sample model: " + sampleModel.getClass().getSimpleName());
       }
     } else if (plan.expectedBands == 2) {
-      // Grayscale + alpha: composite L over white, replicate. redBand carries the gray band
-      // (red == green == blue, validated by the probe).
+      // Grayscale + alpha: composite L over white, replicate — or keep L as-is when the policy
+      // drops alpha (Pillow's convert("RGB") on an LA image replicates the gray band and
+      // discards the alpha). redBand carries the gray band (red == green == blue, validated by
+      // the probe).
       int p = 0;
       for (int y = 0; y < h; y++) {
         int rowBase = bankOffset + y * scanlineStride;
@@ -779,7 +827,7 @@ public final class ImageDecoder {
           int base = rowBase + x * pixelStride;
           int l = data[base + bandOffsets[redBand]] & 0xFF;
           int a = data[base + bandOffsets[alphaBand]] & 0xFF;
-          int c = compositeOverWhite(l, a);
+          int c = policy == AlphaPolicy.DROP_ALPHA ? l : compositeOverWhite(l, a);
           out[p] = (byte) c;
           out[p + 1] = (byte) c;
           out[p + 2] = (byte) c;
@@ -799,7 +847,8 @@ public final class ImageDecoder {
         }
       }
     } else {
-      // RGBA: composite over white.
+      // RGBA: composite over white, or keep the source color channels and drop the alpha band
+      // (Pillow's convert("RGB") preserves R/G/B and discards the alpha).
       int p = 0;
       for (int y = 0; y < h; y++) {
         int rowBase = bankOffset + y * scanlineStride;
@@ -809,9 +858,15 @@ public final class ImageDecoder {
           int g = data[base + bandOffsets[greenBand]] & 0xFF;
           int b = data[base + bandOffsets[blueBand]] & 0xFF;
           int a = data[base + bandOffsets[alphaBand]] & 0xFF;
-          out[p] = (byte) compositeOverWhite(r, a);
-          out[p + 1] = (byte) compositeOverWhite(g, a);
-          out[p + 2] = (byte) compositeOverWhite(b, a);
+          if (policy == AlphaPolicy.DROP_ALPHA) {
+            out[p] = (byte) r;
+            out[p + 1] = (byte) g;
+            out[p + 2] = (byte) b;
+          } else {
+            out[p] = (byte) compositeOverWhite(r, a);
+            out[p + 1] = (byte) compositeOverWhite(g, a);
+            out[p + 2] = (byte) compositeOverWhite(b, a);
+          }
           p += 3;
         }
       }

@@ -80,7 +80,9 @@
     "t5-gated.json": "f0a8b2c8efdafa34fc4f55a130da75f13fc72dddfffda47c9d6464c255202d56",
     "t5-relu.json": "8f94a656a6c3f5d27f4bdaf9fb356d7cce440677e0977d1106d0c05100ee2433",
     "chat-smolvlm.json": "775aaf27cf4138182165fbfd8d57512ae9e2256560df11ab5e6e935a1d029c6f",
-    "smolvlm-tier-b-logits.json": "ab8f1fe12b3ef1a318eb329c97a04abc2021e0e0a2fe45547aa1a19cddee8d22"
+    "smolvlm-tier-b-logits.json": "ab8f1fe12b3ef1a318eb329c97a04abc2021e0e0a2fe45547aa1a19cddee8d22",
+    "qwen3-vl-2b-wp1-probe.json": "10cd4a4bd06a07f7e67d9a1739a66053f35300cda75c91c58e2448b1f8bc206b",
+    "qwen3-vl-2b-wp1-slow-fast-logits.json": "f19ab7458ac2754e78689eafc9470545cefd223a423d2509fcd8645afe9ae749"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",

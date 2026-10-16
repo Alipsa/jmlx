@@ -1,0 +1,15 @@
+# Hash-locked MLX-affine reference environment for the Qwen3-VL 8B quantized
+# candidate probe (Phase 7.3b WP1, item 5). Opt-in: install it explicitly with
+# install.sh; Gradle never installs or imports it.
+#
+# mlx-vlm 0.3.9 is the newest release in the transformers-4.57 / mlx-0.31.2
+# generation: 0.3.4 added Qwen3-VL, 0.3.6 fixed its attention/position ids/mrope,
+# 0.3.8 and 0.3.9 fixed further qwen3_vl issues (image-feature/token matching).
+# 0.3.10+ require transformers 5 and a newer MLX, which would break alignment
+# with the pinned HF reference (transformers 4.57.6) and the native/oracle pins
+# (mlx 0.31.2); they are rejected for this probe.
+mlx-vlm==0.3.9
+mlx==0.31.2
+transformers==4.57.6
+Pillow==12.3.0
+numpy==2.5.3

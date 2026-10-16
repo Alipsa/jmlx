@@ -1,7 +1,8 @@
 # Phase 7.3b — Qwen3-VL image and text inference
 
-- **Status:** proposed, 2026-10-08. Source inspection completed for planning; artifact pins,
-  executable reference probes and implementation acceptance remain work below.
+- **Status:** WP0 and WP1 complete, 2026-10-15 — baseline, artifact pins, executable reference
+  probes and divergence evidence are recorded in `req/plans/phase7-3b-reference-findings.md`.
+  WP2–WP6 implementation and acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -459,19 +460,55 @@ Update compatibility, Tier-A/Tier-B documentation, models/vision READMEs, CHANGE
 architecture notes with the exact implemented scope. Distinguish synthetic, real-artifact,
 quantized manual and pending CI evidence. No release or publication is part of this plan.
 
-## 10. Work packages and completion checklist
+## 10. EXIF orientation policy (WP9)
+
+**2026-10-16 second-review addition:** proposed as a new "WP2" in that review; WP2 is this
+plan's Qwen processor item, so this takes the next free number, WP9.
+
+**2026-10-16 third-review fix:** the WP9/WP2 dependency contradiction with the table below is
+fixed by gating WP2's acceptance on the WP9 decision; WP9 depends on WP1 only.
+
+`jmlx-vision`'s `ImageDecoder` ignores EXIF orientation: an EXIF-rotated JPEG decodes to its
+stored, unrotated pixels. That agrees with the pinned SmolVLM/Idefics3 image-oracle reference
+path (Pillow decode with no `exif_transpose`), but not with the Qwen3-VL path: the pinned
+Qwen2VL slow processor runs `exif_transpose` before resize (findings §4.4; golden case
+`exif_orientation6`, where only the 90° CW transposed decode matches the reference). A Qwen
+preprocessing implementation that reuses `ImageDecoder` with the WP2 drop-alpha option as-is
+would silently disagree with the reference on rotated JPEGs.
+
+Before accepting the Qwen preprocessing (WP2), decide and record the orientation policy: apply
+EXIF orientation in the Qwen path (for example, an orientation accessor or an explicit
+decode/rotate option on `ImageDecoder`, additive to the existing SmolVLM contract) versus
+leaving decode unrotated and rotating inside `Qwen3VlImageProcessor`. Keep the SmolVLM decode
+behavior unchanged either way; do not change `ImageDecoder`'s default semantics.
+
+WP9 therefore depends on WP1 only, not on WP2: the decision and its recorded rationale land
+before WP2 acceptance, which the table gates on the policy being reflected in the preprocessing
+design, while the rotated-fixture parity evidence below is verified against the Qwen path once
+WP2's implementation exists; WP9 is complete only when the decision and the parity evidence are
+both in hand.
+
+Evidence: EXIF-rotated fixture pairs (at least the orientation-6 case, plus one flip/mirror
+tag) run through both the pinned slow processor and the jmlx path, digest-pinned in provenance
+like the existing image-oracle cases, with the unrotated decode as a non-matching control.
+Exit gate: the policy decision is recorded before WP2 acceptance, the Qwen path bit-matches the
+slow processor on the rotated fixtures once that implementation exists, and the existing
+SmolVLM fixtures are unchanged.
+
+## 11. Work packages and completion checklist
 
 | Package | Deliverable | Depends on | Exit evidence |
 | --- | --- | --- | --- |
 | WP0 | Complete/reverify 7.0 and 7.3a integration prerequisites | Existing milestone plans | Accepted contracts, SmolVLM execution/lifecycle suites and base recorder |
 | WP1 | Reference probes, immutable artifact/tensor/config mappings | Discovery only | Populated reference-findings document; executable tiny prefill/decode |
-| WP2 | Qwen processor and image oracle | WP1 | Exact geometry/permutation/resize; pinned processed-patch fixtures |
+| WP2 | Qwen processor and image oracle | WP1 | Exact geometry/permutation/resize; pinned processed-patch fixtures; WP9 orientation policy decided and reflected in the preprocessing design |
 | WP3 | Expansion, templates, three-axis position planner | WP0–WP2 | Pure tests and HF template/expanded-ID/position goldens |
 | WP4 | Core multi-axis RoPE and decoder injection seam | WP0, WP1, WP3 | Strict rotary tests; exact before/after decoder bits in both modes |
 | WP5 | Vision tower, main/DeepStack mergers | WP1, WP2, core primitives | HF intermediate-feature references |
 | WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests |
 | WP7 | Generation, ownership and cache accounting | WP6 | Cached/full equivalence, lifecycle/failure/memory tests |
 | WP8 | Tier-B, manual 8B, CI and documentation | WP7 | Parent numerical/artifact/performance/matrix gates |
+| WP9 | EXIF orientation policy decision (pre-WP2) and rotated-fixture parity (post-WP2 implementation) | WP1 | Policy recorded before WP2 acceptance; rotated-fixture parity with the slow processor once the Qwen path exists; SmolVLM fixtures unchanged |
 
 Implement in reviewable PRs in this order; source discovery and pure processor work may overlap
 with WP0. Do not mark later gates complete based only on compile success or skipped native tests.
@@ -486,10 +523,10 @@ Run `./gradlew -p buildSrc check` if downloader/manifest build logic changes. Ad
 native suite to `.github/workflows/ci.yml` with its correct ordinary/float32 result directory;
 obtain supported macOS 26 execution evidence. Existing native skip gates remain authoritative.
 
-- [ ] WP0 prerequisites accepted; no competing multimodal contracts introduced.
-- [ ] Immutable artifacts, license evidence and all config/tensor mappings recorded.
-- [ ] Slow-PIL and effective-area deviations, processor-construction probe and guarded fast-comparison lock accepted.
-- [ ] Locked `mlx-vlm` reference and separate HF/MLX provenance tensor plans accepted.
+- [x] WP0 prerequisites accepted; no competing multimodal contracts introduced.
+- [x] Immutable artifacts, license evidence and all config/tensor mappings recorded.
+- [x] Slow-PIL and effective-area deviations, processor-construction probe and guarded fast-comparison lock accepted.
+- [x] Locked `mlx-vlm` reference and separate HF/MLX provenance tensor plans accepted.
 - [ ] Qwen decode option, unchanged default conversion and exact preprocessing/prompt/position/template fixtures pass.
 - [ ] Old one-dimensional decoder path remains bit-identical in both precision modes.
 - [ ] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
@@ -499,3 +536,4 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [ ] Default per-image attention limit/peak, one-over rejection and post-prefill visual release verified.
 - [ ] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded.
 - [ ] Required CI suites executed; matrix/docs state actual modality and verification limits.
+- [ ] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.

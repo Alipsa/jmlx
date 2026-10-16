@@ -41,9 +41,11 @@ produced.
 - **Rejected with format-specific `IOException`s:** 16-bit PNG, CMYK/YCCK JPEG, and any input
   above the configured limits.
 - **EXIF orientation is ignored.** An EXIF-rotated JPEG decodes to its stored (unrotated)
-  pixels, matching the pinned reference path (`PIL.Image.open` → `load()` with no
-  `exif_transpose`). When you need the rotated view — in particular for phone photos — rotate
-  the image yourself before decoding. No orientation accessor is exposed in this milestone.
+  pixels. That matches the pinned SmolVLM/Idefics3 image-oracle reference path
+  (`PIL.Image.open` → `load()` with no `exif_transpose`), but not every reference — for
+  example the Qwen3-VL/Qwen2VL processors apply orientation before resize — so callers whose
+  reference applies orientation must rotate the image themselves. No orientation accessor is
+  exposed in this milestone.
 - **ICC and gAMA color management are ignored.** Embedded color profiles and gamma chunks are
   not applied to samples, matching the reference path, which performs no `ImageCms` conversion.
   Do not expect display-referred colors; callers doing color management must do it themselves.

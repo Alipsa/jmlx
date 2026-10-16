@@ -188,6 +188,134 @@ class ImageDecoderTest {
   }
 
   @Test
+  void dropAlphaKeepsTheSourceChannelsWhileTheDefaultCompositesOverWhite() throws Exception {
+    // Expected pixels come from the fixtures' pinned generator formulas (the fixture bytes are
+    // SHA-256-pinned in tools/image-oracle/provenance.json): rgba-32x32 is
+    // R=(x*3+y), G=(x+y*7), B=(x*y), A=(x*8) mod 256 and la-32x24 is L=(x*8), A=(y*16) mod 256.
+    // Alpha spans 0..248 (RGBA) and 0..240 (LA), so the two policies must differ.
+    Path fixtures = OracleFixtures.fixtures();
+    Path rgba = fixtures.resolve("decode/rgba-32x32.png");
+    byte[] raw = new byte[32 * 32 * 3];
+    int p = 0;
+    for (int y = 0; y < 32; y++) {
+      for (int x = 0; x < 32; x++) {
+        raw[p++] = (byte) ((x * 3 + y) % 256);
+        raw[p++] = (byte) ((x + y * 7) % 256);
+        raw[p++] = (byte) ((x * y) % 256);
+      }
+    }
+    ImageDecodeLimits limits = new ImageDecodeLimits(1_000_000L, 1_024);
+    RgbImage dropped = ImageDecoder.decode(rgba, limits, AlphaPolicy.DROP_ALPHA);
+    assertArrayEquals(raw, dropped.pixels());
+    RgbImage composited = ImageDecoder.decode(rgba);
+    assertFalse(Arrays.equals(dropped.pixels(), composited.pixels()));
+    // Pixel (x=0, y=1) is fully transparent (A=0): the default composites it to white.
+    int q = (1 * 32 + 0) * 3;
+    assertEquals(255, composited.pixels()[q] & 0xFF);
+    assertEquals(255, composited.pixels()[q + 1] & 0xFF);
+    assertEquals(255, composited.pixels()[q + 2] & 0xFF);
+    assertEquals(1, dropped.pixels()[q] & 0xFF);
+    assertEquals(7, dropped.pixels()[q + 1] & 0xFF);
+    assertEquals(0, dropped.pixels()[q + 2] & 0xFF);
+
+    Path la = fixtures.resolve("decode/la-32x24.png");
+    byte[] rawGray = new byte[32 * 24 * 3];
+    p = 0;
+    for (int y = 0; y < 24; y++) {
+      for (int x = 0; x < 32; x++) {
+        int gray = (x * 8) % 256;
+        rawGray[p++] = (byte) gray;
+        rawGray[p++] = (byte) gray;
+        rawGray[p++] = (byte) gray;
+      }
+    }
+    RgbImage droppedLa = ImageDecoder.decode(la, limits, AlphaPolicy.DROP_ALPHA);
+    assertArrayEquals(rawGray, droppedLa.pixels());
+    assertFalse(Arrays.equals(droppedLa.pixels(), ImageDecoder.decode(la).pixels()));
+  }
+
+  @Test
+  void alphaPolicyDoesNotChangeTrnsStrippingOrOpaqueDecoding() throws Exception {
+    // tRNS is stripped before decode for every color type under either policy, and opaque input
+    // passes through unchanged, so both policies agree with the default on these fixtures.
+    Path fixtures = OracleFixtures.fixtures();
+    ImageDecodeLimits limits = new ImageDecodeLimits(1_000_000L, 1_024);
+    for (String name :
+        List.of(
+            "decode/palette-trns-perentry-32x32.png",
+            "decode/palette8-trns-perentry-32x32.png",
+            "decode/rgb-trns-64x48.png",
+            "decode/gray-trns-60x40.png",
+            "decode/rgb-64x48.png")) {
+      Path path = fixtures.resolve(name);
+      RgbImage drop = ImageDecoder.decode(path, limits, AlphaPolicy.DROP_ALPHA);
+      RgbImage composite = ImageDecoder.decode(path, limits, AlphaPolicy.COMPOSITE_OVER_WHITE);
+      assertEquals(drop, composite, name);
+      assertEquals(composite, ImageDecoder.decode(path), name);
+    }
+  }
+
+  @Test
+  void nullAlphaPolicyIsRejected() throws Exception {
+    Path rgba = OracleFixtures.fixtures().resolve("decode/rgba-32x32.png");
+    ImageDecodeLimits limits = new ImageDecodeLimits(1_000_000L, 1_024);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ImageDecoder.decode(rgba, limits, (AlphaPolicy) null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ImageDecoder.decode(
+                new ByteArrayInputStream(new byte[] {1}), limits, (AlphaPolicy) null));
+  }
+
+  @Test
+  void decodeWithAlphaPolicyUsesTheDefaultLimitsLikeTheNoLimitsOverloads() throws Exception {
+    // The convenience (path|stream, policy) overloads are the explicit overloads called with
+    // ImageDecodeLimits.DEFAULTS, the same bounds the no-limits overloads use.
+    assertEquals(new ImageDecodeLimits(16_777_216L, 16_384), ImageDecodeLimits.DEFAULTS);
+    Path rgba = OracleFixtures.fixtures().resolve("decode/rgba-32x32.png");
+    RgbImage dropped = ImageDecoder.decode(rgba, AlphaPolicy.DROP_ALPHA);
+    assertEquals(
+        dropped, ImageDecoder.decode(rgba, ImageDecodeLimits.DEFAULTS, AlphaPolicy.DROP_ALPHA));
+    try (InputStream in = Files.newInputStream(rgba)) {
+      assertEquals(dropped, ImageDecoder.decode(in, AlphaPolicy.DROP_ALPHA));
+    }
+    // The constant must also match the simple path's behavior: compositing with it
+    // must agree with the default decode.
+    assertEquals(
+        ImageDecoder.decode(rgba),
+        ImageDecoder.decode(rgba, ImageDecodeLimits.DEFAULTS, AlphaPolicy.COMPOSITE_OVER_WHITE));
+    assertThrows(
+        IllegalArgumentException.class, () -> ImageDecoder.decode(rgba, (AlphaPolicy) null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ImageDecoder.decode((InputStream) null, AlphaPolicy.DROP_ALPHA));
+  }
+
+  @Test
+  void decodeWithAlphaPolicyEnforcesTheDefaultLimits() throws Exception {
+    // A fixture above the default limits (8192x5760 = 47,185,920 pixels > 16,777,216) must be
+    // rejected by the policy overloads with the same message as the no-limits path: the
+    // convenience overloads substitute the default bounds, not a looser budget.
+    Path limits = OracleFixtures.fixtures().resolve("decode/limits-8192x5760.png");
+    IOException plain = assertThrows(IOException.class, () -> ImageDecoder.decode(limits));
+    assertEquals(
+        "image size 8192x5760 (47185920 pixels) exceeds the maximum of 16777216 pixels",
+        plain.getMessage());
+    IOException droppedPath =
+        assertThrows(IOException.class, () -> ImageDecoder.decode(limits, AlphaPolicy.DROP_ALPHA));
+    assertEquals(plain.getMessage(), droppedPath.getMessage());
+    IOException droppedStream =
+        assertThrows(
+            IOException.class,
+            () ->
+                ImageDecoder.decode(
+                    new ByteArrayInputStream(Files.readAllBytes(limits)), AlphaPolicy.DROP_ALPHA));
+    assertEquals(plain.getMessage(), droppedStream.getMessage());
+  }
+
+  @Test
   void truecolorPngWithSuggestedPlteDecodesAsOpaqueTwin() throws Exception {
     // A PLTE chunk on a truecolor image is only a *suggested* palette (RFC 2083 s11.2); the
     // decoder must ignore it, exactly as Pillow does.
@@ -396,7 +524,10 @@ class ImageDecoderTest {
         () -> ImageDecoder.decode((InputStream) null, new ImageDecodeLimits(1, 1)));
     assertThrows(
         IllegalArgumentException.class,
-        () -> ImageDecoder.decode(OracleFixtures.fixtures().resolve("decode/rgb-64x48.png"), null));
+        () ->
+            ImageDecoder.decode(
+                OracleFixtures.fixtures().resolve("decode/rgb-64x48.png"),
+                (ImageDecodeLimits) null));
   }
 
   @Test

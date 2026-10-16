@@ -465,6 +465,9 @@ quantized manual and pending CI evidence. No release or publication is part of t
 **2026-10-16 second-review addition:** proposed as a new "WP2" in that review; WP2 is this
 plan's Qwen processor item, so this takes the next free number, WP9.
 
+**2026-10-16 third-review fix:** the WP9/WP2 dependency contradiction with the table below is
+fixed by gating WP2's acceptance on the WP9 decision; WP9 depends on WP1 only.
+
 `jmlx-vision`'s `ImageDecoder` ignores EXIF orientation: an EXIF-rotated JPEG decodes to its
 stored, unrotated pixels. That agrees with the pinned SmolVLM/Idefics3 image-oracle reference
 path (Pillow decode with no `exif_transpose`), but not with the Qwen3-VL path: the pinned
@@ -479,11 +482,18 @@ decode/rotate option on `ImageDecoder`, additive to the existing SmolVLM contrac
 leaving decode unrotated and rotating inside `Qwen3VlImageProcessor`. Keep the SmolVLM decode
 behavior unchanged either way; do not change `ImageDecoder`'s default semantics.
 
+WP9 therefore depends on WP1 only, not on WP2: the decision and its recorded rationale land
+before WP2 acceptance, which the table gates on the policy being reflected in the preprocessing
+design, while the rotated-fixture parity evidence below is verified against the Qwen path once
+WP2's implementation exists; WP9 is complete only when the decision and the parity evidence are
+both in hand.
+
 Evidence: EXIF-rotated fixture pairs (at least the orientation-6 case, plus one flip/mirror
 tag) run through both the pinned slow processor and the jmlx path, digest-pinned in provenance
 like the existing image-oracle cases, with the unrotated decode as a non-matching control.
-Exit gate: the Qwen path bit-matches the slow processor on the rotated fixtures, and the
-existing SmolVLM fixtures are unchanged.
+Exit gate: the policy decision is recorded before WP2 acceptance, the Qwen path bit-matches the
+slow processor on the rotated fixtures once that implementation exists, and the existing
+SmolVLM fixtures are unchanged.
 
 ## 11. Work packages and completion checklist
 
@@ -491,14 +501,14 @@ existing SmolVLM fixtures are unchanged.
 | --- | --- | --- | --- |
 | WP0 | Complete/reverify 7.0 and 7.3a integration prerequisites | Existing milestone plans | Accepted contracts, SmolVLM execution/lifecycle suites and base recorder |
 | WP1 | Reference probes, immutable artifact/tensor/config mappings | Discovery only | Populated reference-findings document; executable tiny prefill/decode |
-| WP2 | Qwen processor and image oracle | WP1 | Exact geometry/permutation/resize; pinned processed-patch fixtures |
+| WP2 | Qwen processor and image oracle | WP1 | Exact geometry/permutation/resize; pinned processed-patch fixtures; WP9 orientation policy decided and reflected in the preprocessing design |
 | WP3 | Expansion, templates, three-axis position planner | WP0–WP2 | Pure tests and HF template/expanded-ID/position goldens |
 | WP4 | Core multi-axis RoPE and decoder injection seam | WP0, WP1, WP3 | Strict rotary tests; exact before/after decoder bits in both modes |
 | WP5 | Vision tower, main/DeepStack mergers | WP1, WP2, core primitives | HF intermediate-feature references |
 | WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests |
 | WP7 | Generation, ownership and cache accounting | WP6 | Cached/full equivalence, lifecycle/failure/memory tests |
 | WP8 | Tier-B, manual 8B, CI and documentation | WP7 | Parent numerical/artifact/performance/matrix gates |
-| WP9 | EXIF orientation policy for the Qwen path | WP1, WP2 | Rotated-fixture parity with the slow processor; SmolVLM fixtures unchanged |
+| WP9 | EXIF orientation policy decision (pre-WP2) and rotated-fixture parity (post-WP2 implementation) | WP1 | Policy recorded before WP2 acceptance; rotated-fixture parity with the slow processor once the Qwen path exists; SmolVLM fixtures unchanged |
 
 Implement in reviewable PRs in this order; source discovery and pure processor work may overlap
 with WP0. Do not mark later gates complete based only on compile success or skipped native tests.

@@ -710,6 +710,16 @@ scales/biases `[out, in/64]`, group 64), quantized embeddings, and an all-BF16 v
   | hf-reference lock | `b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b` | `verifyHfReferenceGoldens` |
   | fast-comparison lock | `4f2e898b8ad91228741f8adb4ca7e1f321c6ec37619711cf9c6a10879eb442d5` | `verifyQwenVlReferenceProvenance` |
   | qwen-vl lock | `451c7a9fb8053d25b466da7103e2f92a2fd7af48baccce5117a6d57a4c210e6c` | `verifyQwenVlReferenceProvenance` |
+
+  The `hf-reference lock` row's failure path was additionally verified **manually** (one-off,
+  during the second-review fix; not an in-repo automated test): appending one byte to
+  `tools/hf-reference/requirements.lock` made `verifyHfReferenceGoldens` fail with
+  `Hugging Face requirements.lock (phase72.requirements_lock_sha256) SHA-256 differs:
+  f8d59a69f341eb084835982e4a10a1cb66916917f93653203fdb4f6694b0029b7c`. The restored lock
+  re-hashes to the pinned `b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b`
+  and the guard suite re-ran green; no automated negative test covers this check in-repo —
+  the ordinary positive digest check runs as part of root `check`.
+
   Guards: `verifyHfReferenceGoldens` (committed files map must equal the goldens tree exactly,
   plus the `requirements.lock` digest recorded in its provenance),
   `verifyQwenVlReferenceProvenance` (pure Java; also verifies the cross-referenced

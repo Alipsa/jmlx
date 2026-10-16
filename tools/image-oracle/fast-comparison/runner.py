@@ -195,7 +195,7 @@ def main() -> None:
                 np.issubdtype(arr.dtype, np.integer) and arr.min() >= 0 and arr.max() <= 255
             ):
                 raise SystemExit(
-                    f"{name}: raw pixel_values are not exact uint8 (dtype={arr.dtype})"
+                    f"{name}/{path.name}: raw pixel_values are not exact uint8 (dtype={arr.dtype})"
                 )
             raw_patches = np.ascontiguousarray(arr, dtype=np.uint8)
             grid = [int(v) for v in raw_result["image_grid_thw"][0].tolist()]

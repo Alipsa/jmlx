@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import platform
@@ -487,6 +488,23 @@ def main() -> None:
             return tensor_summary(batch[key])
 
         factor = img_proc.patch_size * img_proc.merge_size
+        # The "without torchvision" premise is verified, not assumed:
+        # find_spec checks this process's own venv, so a lock that ever
+        # gains torchvision flips the field to false and rewrites the note
+        # instead of silently misdescribing the environment.
+        torchvision_absent = importlib.util.find_spec("torchvision") is None
+        if torchvision_absent:
+            class_check_note = ("without torchvision, 4.57.6 resolves "
+                                "BaseVideoProcessor to a dummy class, so the mixin class check "
+                                "rejects every video processor; the probe overrides "
+                                "check_argument_for_proper_class for video_processor only "
+                                "(image-only behavior is unaffected)")
+        else:
+            class_check_note = ("torchvision is present (venv drift: the hf-reference "
+                                "lock excludes it), so the dummy-BaseVideoProcessor "
+                                "premise may no longer hold; the probe still overrides "
+                                "check_argument_for_proper_class for video_processor only "
+                                "(image-only behavior is unaffected)")
         result["processor"] = {
             "declared_image_processor_class": preprocessor.get("image_processor_type"),
             "construction": {
@@ -497,16 +515,12 @@ def main() -> None:
                 "video_processor": type(video_proc).__name__,
                 "video_processor_module": type(video_proc).__module__,
                 "video_processor_constructed_without_torchvision":
-                    video_processor_constructed,
+                    video_processor_constructed and torchvision_absent,
                 "video_processor_none_probe": none_probe,
                 "slow_vs_declared": "deviation: artifact declares "
                 f"{preprocessor.get('image_processor_type')}; probe uses the slow "
                 "Python Qwen2VLImageProcessor explicitly (plan decision 2026-10-08)",
-                "class_check_note": "without torchvision, 4.57.6 resolves "
-                "BaseVideoProcessor to a dummy class, so the mixin class check "
-                "rejects every video processor; the probe overrides "
-                "check_argument_for_proper_class for video_processor only "
-                "(image-only behavior is unaffected)",
+                "class_check_note": class_check_note,
             },
             "slow_size_bug": size_bug,
             "video_processor_options": {

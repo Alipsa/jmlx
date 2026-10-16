@@ -324,6 +324,8 @@ def main() -> None:
         files.append({"path": path.name, "bytes": size, "sha256": sha256_file(path)})
 
     hub = huggingface_hub.HfApi().model_info(f"{ORG}/{REPO}", revision=REVISION)
+    if hub.sha != REVISION:
+        sys.exit(f"hub commit {hub.sha} does not match pinned revision {REVISION}")
     siblings = {
         s.rfilename: {"bytes": s.size, "lfs_sha256": (s.lfs or {}).get("sha256")}
         for s in hub.siblings
@@ -337,11 +339,7 @@ def main() -> None:
                 sys.exit(f"hub LFS SHA-256 mismatch for {entry['path']}")
             if hub_entry["bytes"] is not None and entry["bytes"] != hub_entry["bytes"]:
                 sys.exit(f"hub size mismatch for {entry['path']}")
-    result["artifact"]["hub"] = {
-        "commit_sha": hub.sha,
-        "tags": sorted(hub.tags),
-        "license": (hub.cardData or {}).get("license") if hub.cardData else None,
-    }
+    result["artifact"]["hub"] = {"commit_sha": hub.sha}
     result["artifact"]["files"] = files
     result["artifact"]["total_bytes"] = total_bytes
 

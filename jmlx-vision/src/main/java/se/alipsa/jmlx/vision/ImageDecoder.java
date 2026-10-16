@@ -63,16 +63,21 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * under either policy.
  *
  * <p><b>EXIF orientation is ignored:</b> an EXIF-rotated JPEG decodes to its stored, unrotated
- * pixels, matching the pinned reference path ({@code PIL.Image.open} → {@code load()} with no
- * {@code exif_transpose}). Callers that need the rotated view — in particular for phone photos —
- * must rotate the image themselves before decoding. No orientation accessor is exposed in this
- * milestone.
+ * pixels. That matches the pinned SmolVLM/Idefics3 image-oracle reference path ({@code
+ * PIL.Image.open} → {@code load()} with no {@code exif_transpose}), but not every reference: the
+ * Qwen3-VL/Qwen2VL slow processor applies EXIF orientation before resize (see {@code
+ * req/plans/phase7-3b-reference-findings.md} §4.4, golden case {@code exif_orientation6}), so a
+ * caller whose reference path applies orientation must rotate the image itself until that gap is
+ * closed by the Phase 7.3b plan WP9 (EXIF orientation policy). No orientation accessor is exposed
+ * in this milestone.
  *
  * <p><b>ICC and gAMA color management are ignored:</b> embedded color profiles and gamma chunks are
  * not applied to samples, matching the reference path, which performs no conversion. Callers doing
  * color management must do it themselves.
  *
- * <p>The no-options overloads use {@code ImageDecodeLimits(16_777_216L, 16_384)}: a conservative
+ * <p>The no-limits overloads ({@code decode(Path)}, {@code decode(InputStream)}, {@code
+ * decode(Path, AlphaPolicy)} and {@code decode(InputStream, AlphaPolicy)}) use {@link
+ * ImageDecodeLimits#DEFAULTS} ({@code ImageDecodeLimits(16_777_216L, 16_384)}): a conservative
  * default that rejects typical 24 MP and 48 MP phone photos. Use the explicit limits overloads to
  * accept such inputs when your memory budget allows. Model-specific aggregate pixel/tile/token
  * budgets are separate.
@@ -82,27 +87,41 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * ImageIO cache settings are never changed.
  */
 public final class ImageDecoder {
-  private static final ImageDecodeLimits DEFAULT_LIMITS =
-      new ImageDecodeLimits(16_777_216L, 16_384);
-
   private ImageDecoder() {}
 
   /**
-   * Decodes the PNG or JPEG file at {@code path} using the default limits ({@code
+   * Decodes the PNG or JPEG file at {@code path} using {@link ImageDecodeLimits#DEFAULTS} ({@code
    * ImageDecodeLimits(16_777_216L, 16_384)}, which reject typical 24 MP/48 MP phone photos).
    *
    * @param path existing PNG or JPEG file
    * @return the decoded image, alpha composited over white
    * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds the
-   *     limits
+   *     default limits
    */
   public static RgbImage decode(Path path) throws IOException {
-    return decode(path, DEFAULT_LIMITS);
+    return decode(path, ImageDecodeLimits.DEFAULTS);
+  }
+
+  /**
+   * Decodes the PNG or JPEG file at {@code path} using {@link ImageDecodeLimits#DEFAULTS} and an
+   * explicit {@link AlphaPolicy} for RGBA / grayscale-with-alpha input. To accept inputs beyond the
+   * default limits, use {@link #decode(Path, ImageDecodeLimits, AlphaPolicy)} instead.
+   *
+   * @param path existing PNG or JPEG file
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @return the decoded image, with alpha handled per {@code policy}
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds the
+   *     default limits
+   */
+  public static RgbImage decode(Path path, AlphaPolicy policy) throws IOException {
+    return decode(path, ImageDecodeLimits.DEFAULTS, policy);
   }
 
   /**
    * Decodes the PNG or JPEG file at {@code path} with explicit limits and an explicit {@link
-   * AlphaPolicy} for RGBA / grayscale-with-alpha input.
+   * AlphaPolicy} for RGBA / grayscale-with-alpha input. {@link #decode(Path, AlphaPolicy)} is the
+   * same call with {@link ImageDecodeLimits#DEFAULTS} substituted for {@code limits}.
    *
    * @param path existing PNG or JPEG file
    * @param limits positive decode bounds checked from header metadata before any pixel allocation
@@ -135,22 +154,41 @@ public final class ImageDecoder {
   }
 
   /**
-   * Decodes the PNG or JPEG content of {@code input} using the default limits. The stream is
-   * consumed in full; it is not closed by this method.
+   * Decodes the PNG or JPEG content of {@code input} using {@link ImageDecodeLimits#DEFAULTS}. The
+   * stream is consumed in full; it is not closed by this method.
    *
    * @param input non-null stream with the whole image
    * @return the decoded image, alpha composited over white
    * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds the
-   *     limits
+   *     default limits
    */
   public static RgbImage decode(InputStream input) throws IOException {
-    return decode(input, DEFAULT_LIMITS);
+    return decode(input, ImageDecodeLimits.DEFAULTS);
+  }
+
+  /**
+   * Decodes the PNG or JPEG content of {@code input} using {@link ImageDecodeLimits#DEFAULTS} and
+   * an explicit {@link AlphaPolicy} for RGBA / grayscale-with-alpha input. The stream is consumed
+   * in full; it is not closed by this method (internal wrappers are closed). To accept inputs
+   * beyond the default limits, use {@link #decode(InputStream, ImageDecodeLimits, AlphaPolicy)}
+   * instead.
+   *
+   * @param input non-null stream with the whole image
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @return the decoded image, with alpha handled per {@code policy}
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds the
+   *     default limits
+   */
+  public static RgbImage decode(InputStream input, AlphaPolicy policy) throws IOException {
+    return decode(input, ImageDecodeLimits.DEFAULTS, policy);
   }
 
   /**
    * Decodes the PNG or JPEG content of {@code input} with explicit limits and an explicit {@link
    * AlphaPolicy}. The stream is consumed in full; it is not closed by this method (internal
-   * wrappers are closed).
+   * wrappers are closed). {@link #decode(InputStream, AlphaPolicy)} is the same call with {@link
+   * ImageDecodeLimits#DEFAULTS} substituted for {@code limits}.
    *
    * @param input non-null stream with the whole image
    * @param limits positive decode bounds checked from header metadata before any pixel allocation

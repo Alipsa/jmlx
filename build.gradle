@@ -614,17 +614,32 @@ tasks.named('check') {
 
 tasks.register('verifyHfReferenceGoldens') {
     group = 'verification'
-    description = 'Verifies every committed Hugging Face golden and checkpoint SHA-256.'
+    description = 'Verifies every committed Hugging Face golden, checkpoint and ' +
+            'requirements-lock SHA-256.'
     def referenceDir = layout.projectDirectory.dir('tools/hf-reference')
     def provenance = referenceDir.file('provenance.json')
     def goldens = referenceDir.dir('goldens')
+    def lock = referenceDir.file('requirements.lock')
     inputs.file(provenance)
+    inputs.file(lock)
     inputs.files(fileTree(goldens))
     // WP7's opt-in real-artifact reference inputs/outputs are committed and hash-pinned too.
     inputs.files(fileTree('tools/tier-b') { include 'smolvlm-256m-instruct.json', 'images/**' })
     inputs.file('tools/hf-reference/vision_tier_b.py')
     doLast {
         def metadata = new JsonSlurper().parse(provenance.asFile)
+        // The Phase 7.2 provenance block pins the tool's own hash-locked requirements lock,
+        // part of the same pinned surface as the goldens it documents.
+        def phase72 = metadata.phase72
+        def expectedLock = phase72 instanceof Map ? phase72.requirements_lock_sha256 : null
+        if (expectedLock == null) {
+            throw new GradleException('Hugging Face provenance is missing the Phase 7.2 lock hash')
+        }
+        def actualLock = sha256File(lock.asFile)
+        if (actualLock != expectedLock) {
+            throw new GradleException("Hugging Face requirements.lock " +
+                    "(phase72.requirements_lock_sha256) SHA-256 differs: ${actualLock}")
+        }
         def visionFiles = metadata.vision_tier_b_files
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no vision Tier-B hashes')

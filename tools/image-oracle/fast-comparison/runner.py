@@ -185,9 +185,19 @@ def main() -> None:
             raw_result = processors[name](
                 images=[image], do_rescale=False, do_normalize=False, return_tensors="pt"
             )
-            raw_patches = np.ascontiguousarray(
-                raw_result["pixel_values"].detach().cpu().numpy(), dtype=np.uint8
-            )
+            # Refuse to silently cast a raw buffer whose dtype is not exact uint8: if the
+            # export environment drifts (e.g. a config change rescaling to float32), fail
+            # loudly instead of wrapping or saturating pixels. Integer dtypes pass only
+            # when their values lie exactly in the uint8 range (checked, not optimized:
+            # this fixture tool is not a hot path).
+            arr = raw_result["pixel_values"].detach().cpu().numpy()
+            if arr.dtype != np.uint8 and not (
+                np.issubdtype(arr.dtype, np.integer) and arr.min() >= 0 and arr.max() <= 255
+            ):
+                raise SystemExit(
+                    f"{name}: raw pixel_values are not exact uint8 (dtype={arr.dtype})"
+                )
+            raw_patches = np.ascontiguousarray(arr, dtype=np.uint8)
             grid = [int(v) for v in raw_result["image_grid_thw"][0].tolist()]
             if path.name in LOSSLESS_EXPORT:
                 # The full-normalized float32 pass, for the model fixtures only. The fast

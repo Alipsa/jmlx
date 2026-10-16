@@ -31,6 +31,7 @@ import hashlib
 import json
 import math
 import platform
+import shutil
 import struct
 import sys
 import tempfile
@@ -42,6 +43,14 @@ REVISION = "89644892e4d85e24eaac8bacfd4f463576704203"
 
 IMAGE_TOKEN_ID = 151655
 VISION_START_TOKEN_ID = 151652
+
+# Full standard safetensors header dtype -> element byte size, so the tensor
+# inventory cannot KeyError on a checkpoint stored in any other dtype.
+SAFETENSORS_ITEMSIZE = {
+    "F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1,
+    "U64": 8, "U32": 4, "U16": 2, "U8": 1, "I64": 8, "I32": 4, "I16": 2,
+    "I8": 1, "BOOL": 1,
+}
 
 
 def gate_versions() -> dict:
@@ -145,7 +154,7 @@ def build_test_images(workdir: Path) -> dict:
         return path
 
     # 256x256: exactly at min_pixels, no smart_resize branch taken.
-    px = bytes()
+    px = bytearray()
     for y in range(256):
         for x in range(256):
             px += bytes((x, y, (x + y) // 2))
@@ -154,7 +163,7 @@ def build_test_images(workdir: Path) -> dict:
     )
 
     # 64x32: below min_pixels, exercises the upscale branch (192x384).
-    px = bytes()
+    px = bytearray()
     for y in range(32):
         for x in range(64):
             px += bytes(((x * 255) // 63, (y * 255) // 31, (x * 3 + y * 5) % 256))
@@ -261,6 +270,18 @@ def rederive_rope(input_ids: list[int], grid: list[int]) -> dict:
     }
 
 
+def check_facts(name: str, field: str, actual, expected, note: str = "") -> bool:
+    """Explicit (python -O safe) fact gate: a mismatch exits non-zero rather
+    than silently skipping like an assert would, so a golden is only ever
+    written after every check has passed. Returns whether the fact matched,
+    so callers can record the computed comparison instead of a hard-coded
+    literal."""
+    if actual != expected:
+        suffix = f" ({note})" if note else ""
+        sys.exit(f"{name}: {field} {actual} != expected {expected}" + suffix)
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     default_dir = Path(__file__).resolve().parent.parent.parent / ".tier-b" / "qwen3-vl-2b-instruct"
@@ -306,6 +327,8 @@ def main() -> None:
         files.append({"path": path.name, "bytes": size, "sha256": sha256_file(path)})
 
     hub = huggingface_hub.HfApi().model_info(f"{ORG}/{REPO}", revision=REVISION)
+    if hub.sha != REVISION:
+        sys.exit(f"hub commit {hub.sha} does not match pinned revision {REVISION}")
     siblings = {
         s.rfilename: {"bytes": s.size, "lfs_sha256": (s.lfs or {}).get("sha256")}
         for s in hub.siblings
@@ -321,10 +344,7 @@ def main() -> None:
                 sys.exit(f"hub LFS SHA-256 mismatch for {entry['path']}")
             if hub_entry["bytes"] is not None and entry["bytes"] != hub_entry["bytes"]:
                 sys.exit(f"hub size mismatch for {entry['path']}")
-    result["artifact"]["hub"] = {
-        "commit_sha": hub.sha,
-        "tags": sorted(hub.tags),
-    }
+    result["artifact"]["hub"] = {"commit_sha": hub.sha}
     result["artifact"]["files"] = files
     result["artifact"]["total_bytes"] = total_bytes
 
@@ -333,9 +353,11 @@ def main() -> None:
         for key in st.keys():
             slice_ = st.get_slice(key)
             shape = list(slice_.get_shape())
-            itemsize = {"F32": 4, "F16": 2, "BF16": 2, "I32": 4, "I16": 2,
-                        "I8": 1, "U8": 1, "F64": 8}[slice_.get_dtype()]
-            stensors.append({"key": key, "dtype": slice_.get_dtype(),
+            tensor_dtype = slice_.get_dtype()
+            itemsize = SAFETENSORS_ITEMSIZE.get(tensor_dtype)
+            if itemsize is None:
+                sys.exit(f"unknown safetensors dtype {tensor_dtype} for tensor {key}")
+            stensors.append({"key": key, "dtype": tensor_dtype,
                              "shape": shape, "bytes": math.prod(shape) * itemsize})
     stensors.sort(key=lambda e: e["key"])
     by_prefix: dict[str, int] = {}
@@ -393,438 +415,479 @@ def main() -> None:
     from transformers.models.qwen3_vl.processing_qwen3_vl import Qwen3VLProcessor
 
     workdir = Path(tempfile.mkdtemp(prefix="qwen3vl-probe-"))
-    images = build_test_images(workdir)
-
-    from transformers.models.qwen3_vl.video_processing_qwen3_vl import Qwen3VLVideoProcessor
-
-    # A 4.57.6 slow-processor bug changes the effective geometry: the
-    # __init__'s else branch replaces ANY size (including a valid
-    # shortest_edge/longest_edge dict) with the defaults 3136/1003520, so
-    # from_pretrained alone resolves min/max pixels to the defaults, not to
-    # the artifact's declared 65536/16777216. The probe records the
-    # with-config-only resolution as evidence, then compensates with explicit
-    # min_pixels/max_pixels so the pipeline matches the artifact-declared
-    # semantics (the fast processor the artifact names honors its config).
-    img_proc_config_only = Qwen2VLImageProcessor.from_pretrained(str(directory))
-    declared_min = int(preprocessor["size"]["shortest_edge"])
-    declared_max = int(preprocessor["size"]["longest_edge"])
-    size_bug = {
-        "declared_min_pixels": declared_min,
-        "declared_max_pixels": declared_max,
-        "resolved_with_config_only": {
-            "min_pixels": img_proc_config_only.min_pixels,
-            "max_pixels": img_proc_config_only.max_pixels,
-        },
-        "config_size_ignored": img_proc_config_only.min_pixels != declared_min,
-        "note": "transformers 4.57.6 slow Qwen2VLImageProcessor.__init__ "
-        "overwrites a valid size dict with the 3136/1003520 defaults; the "
-        "probe passes min_pixels/max_pixels explicitly to match the "
-        "artifact-declared semantics",
-    }
-    img_proc = Qwen2VLImageProcessor.from_pretrained(
-        str(directory), min_pixels=declared_min, max_pixels=declared_max
-    )
-    tokenizer = Qwen2TokenizerFast.from_pretrained(str(directory))
-    video_proc = Qwen3VLVideoProcessor.from_pretrained(str(directory))
-
-    # Probe the plan's video_processor=None construction first and record the
-    # outcome: 4.57.6's ProcessorMixin hard-rejects None for a non-optional
-    # attribute.
     try:
-        Qwen3VLProcessor(image_processor=img_proc, tokenizer=tokenizer,
-                         video_processor=None)
-        none_probe = {"constructed": True, "error": None}
-    except Exception as exc:  # noqa: BLE001 - the probe records the failure
-        none_probe = {"constructed": False, "error": f"{type(exc).__name__}: {exc}"}
+        images = build_test_images(workdir)
 
-    # A second finding: without torchvision, BaseVideoProcessor resolves to a
-    # dummy class, so even the concrete Qwen3VLVideoProcessor fails the
-    # mixin's class check. The probe subclasses the processor and satisfies
-    # that one check against the concrete class; image-only behavior is
-    # unaffected because the image path never touches the video processor.
-    class ProbeProcessor(Qwen3VLProcessor):
-        def check_argument_for_proper_class(self, name, arg):
-            if name == "video_processor":
-                return Qwen3VLVideoProcessor
-            return super().check_argument_for_proper_class(name, arg)
+        from transformers.models.qwen3_vl.video_processing_qwen3_vl import Qwen3VLVideoProcessor
 
-    processor = ProbeProcessor(image_processor=img_proc, tokenizer=tokenizer,
-                               video_processor=video_proc,
-                               chat_template=tokenizer_config["chat_template"])
-
-    def pixel_summary(batch, key: str = "pixel_values") -> dict:
-        return tensor_summary(batch[key])
-
-    factor = img_proc.patch_size * img_proc.merge_size
-    result["processor"] = {
-        "declared_image_processor_class": preprocessor.get("image_processor_type"),
-        "construction": {
-            "image_processor": type(img_proc).__name__,
-            "image_processor_module": type(img_proc).__module__,
-            "tokenizer": type(tokenizer).__name__,
-            "processor": type(processor).__name__,
-            "video_processor": type(video_proc).__name__,
-            "video_processor_module": type(video_proc).__module__,
-            "video_processor_constructed_without_torchvision": True,
-            "video_processor_none_probe": none_probe,
-            "slow_vs_declared": "deviation: artifact declares "
-            f"{preprocessor.get('image_processor_type')}; probe uses the slow "
-            "Python Qwen2VLImageProcessor explicitly (plan decision 2026-10-08)",
-            "class_check_note": "without torchvision, 4.57.6 resolves "
-            "BaseVideoProcessor to a dummy class, so the mixin class check "
-            "rejects every video processor; the probe overrides "
-            "check_argument_for_proper_class for video_processor only "
-            "(image-only behavior is unaffected)",
-        },
-        "slow_size_bug": size_bug,
-        "video_processor_options": {
-            "size": video_proc.size,
-            "do_rescale": video_proc.do_rescale,
-            "rescale_factor": video_proc.rescale_factor,
-            "do_normalize": video_proc.do_normalize,
-            "image_mean": video_proc.image_mean,
-            "image_std": video_proc.image_std,
-            "do_convert_rgb": video_proc.do_convert_rgb,
-            "patch_size": video_proc.patch_size,
-            "temporal_patch_size": video_proc.temporal_patch_size,
-            "merge_size": video_proc.merge_size,
-            "do_sample_frames": video_proc.do_sample_frames,
-        },
-        "resolved_options": {
-            "size": img_proc.size,
-            "min_pixels": img_proc.min_pixels,
-            "max_pixels": img_proc.max_pixels,
-            "do_resize": img_proc.do_resize,
-            "resample": repr(img_proc.resample),
-            "do_rescale": img_proc.do_rescale,
-            "rescale_factor": img_proc.rescale_factor,
-            "do_normalize": img_proc.do_normalize,
-            "image_mean": img_proc.image_mean,
-            "image_std": img_proc.image_std,
-            "do_convert_rgb": img_proc.do_convert_rgb,
-            "patch_size": img_proc.patch_size,
-            "temporal_patch_size": img_proc.temporal_patch_size,
-            "merge_size": img_proc.merge_size,
-        },
-        "tokenizer_ids": {
-            "image_token_id": processor.image_token_id,
-            "video_token_id": processor.video_token_id,
-            "vision_start_token_id": processor.vision_start_token_id,
-            "vision_end_token_id": processor.vision_end_token_id,
-            "pad_token_id": tokenizer.pad_token_id,
-            "eos_token_id": tokenizer.eos_token_id,
-        },
-        "geometry": {},
-        "color": {},
-        "cases": {},
-    }
-
-    def run_case(name: str, image_path: Path, as_file: bool = False,
-                 prompt_text: str | None = None) -> dict:
-        from PIL import Image as _Image
-
-        source = _Image.open(image_path)
-        size = source.size
-        batch = img_proc(images=source) if not as_file else img_proc(images=str(image_path))
-        grid = [int(v) for v in torch.as_tensor(batch["image_grid_thw"][0]).tolist()]
-        h_bar, w_bar = smart_resize(size[1], size[0], factor,
-                                    img_proc.min_pixels, img_proc.max_pixels)
-        expected_grid = [1, h_bar // img_proc.patch_size, w_bar // img_proc.patch_size]
-        n_merged_expected = (grid[0] * grid[1] * grid[2]) // img_proc.merge_size**2
-        entry = {
-            "source_wh": [size[0], size[1]],
-            "expected_resized_hw": [h_bar, w_bar],
-            "grid": grid,
-            "grid_matches_rederived_smart_resize": grid == expected_grid,
-            "merged_token_count_expected": n_merged_expected,
-            "slow_processor_reports_num_image_tokens": "num_image_tokens" in batch.keys(),
-            "pixel_values": pixel_summary(batch),
+        # A 4.57.6 slow-processor bug changes the effective geometry: the
+        # __init__'s else branch replaces ANY size (including a valid
+        # shortest_edge/longest_edge dict) with the defaults 3136/1003520, so
+        # from_pretrained alone resolves min/max pixels to the defaults, not to
+        # the artifact's declared 65536/16777216. The probe records the
+        # with-config-only resolution as evidence, then compensates with explicit
+        # min_pixels/max_pixels so the pipeline matches the artifact-declared
+        # semantics (the fast processor the artifact names honors its config).
+        img_proc_config_only = Qwen2VLImageProcessor.from_pretrained(str(directory))
+        declared_min = int(preprocessor["size"]["shortest_edge"])
+        declared_max = int(preprocessor["size"]["longest_edge"])
+        size_bug = {
+            "declared_min_pixels": declared_min,
+            "declared_max_pixels": declared_max,
+            "resolved_with_config_only": {
+                "min_pixels": img_proc_config_only.min_pixels,
+                "max_pixels": img_proc_config_only.max_pixels,
+            },
+            "config_size_ignored": img_proc_config_only.min_pixels != declared_min,
+            "note": "transformers 4.57.6 slow Qwen2VLImageProcessor.__init__ "
+            "overwrites a valid size dict with the 3136/1003520 defaults; the "
+            "probe passes min_pixels/max_pixels explicitly to match the "
+            "artifact-declared semantics",
         }
-        if prompt_text is not None:
-            entry["prompt"] = {"text": prompt_text,
-                               "sha256": sha256_bytes(prompt_text.encode("utf-8"))}
-        return entry
-
-    # Geometry + patch evidence for the two model images.
-    prompt_messages = [
-        {"role": "user",
-         "content": [
-             {"type": "image"},
-             {"type": "text", "text": "Describe the image in one short sentence."},
-         ]}
-    ]
-    rendered = processor.apply_chat_template(prompt_messages, add_generation_prompt=True,
-                                             tokenize=False)
-    result["processor"]["prompt_template"] = {
-        "rendered": rendered,
-        "sha256": sha256_bytes(rendered.encode("utf-8")),
-    }
-    for name in ("rgb_256x256", "rgb_64x32"):
-        result["processor"]["cases"][name] = run_case(name, images[name])
-        result["processor"]["cases"][name]["prompt_length_after_expansion"] = None  # set below
-
-    # Color / alpha / EXIF path evidence.
-    def color_case(original_input, variants: dict) -> dict:
-        import numpy as np
-
-        original = img_proc(images=original_input)
-        summary = pixel_summary(original)
-        per_variant = {}
-        matches = {}
-        for label, variant in variants.items():
-            out = img_proc(images=variant)
-            per_variant[label] = pixel_summary(out)
-            matches[label] = bool(np.array_equal(original["pixel_values"],
-                                                 out["pixel_values"]))
-        return {"pixel_values": summary, "variants": per_variant, "matches": matches}
-
-    def white_composite(image: Image.Image) -> Image.Image:
-        white = Image.new("RGB", image.size, (255, 255, 255))
-        if image.mode == "RGBA":
-            white.paste(image, mask=image.getchannel("A"))
-        else:
-            white.paste(image.convert("L").convert("RGB"), mask=image.getchannel("A"))
-        return white
-
-    rgba = Image.open(images["rgba_8x8"])
-    result["processor"]["color"]["rgba_8x8"] = color_case(
-        Image.open(images["rgba_8x8"]),
-        {"drop_alpha": rgba.convert("RGB"), "composite_over_white": white_composite(rgba)})
-    la = Image.open(images["la_8x8"])
-    result["processor"]["color"]["la_8x8"] = color_case(
-        Image.open(images["la_8x8"]),
-        {"drop_alpha": la.convert("RGB"), "composite_over_white": white_composite(la)})
-    palette = Image.open(images["palette_4bit_trns"])
-    result["processor"]["color"]["palette_4bit_trns"] = {
-        "tRNS_from_file": list(palette.info.get("transparency", [])),
-        **color_case(Image.open(images["palette_4bit_trns"]),
-                     {"drop_trns_convert_rgb": palette.convert("RGB")})
-    }
-    raw_exif = Image.open(images["exif_orientation6"])
-    orientation = raw_exif.getexif().get(0x0112)
-    result["processor"]["color"]["exif_orientation6"] = {
-        "exif_orientation_tag": orientation,
-        "source_wh": list(raw_exif.size),
-        **color_case(
-            str(images["exif_orientation6"]),
-            {"no_transpose": raw_exif,
-             "transpose_90cw": raw_exif.transpose(Image.Transpose.ROTATE_270)},
-        ),
-        "note": "original input was the file path, so the reference load_image "
-        "path (exif_transpose + convert_to_rgb) is exercised",
-    }
-
-    # -------------------------------------------------------------------- model
-    model_info: dict = {}
-    if not args.skip_model:
-        from transformers import Qwen3VLForConditionalGeneration
-
-        torch.manual_seed(0)
-        model = Qwen3VLForConditionalGeneration.from_pretrained(
-            str(directory), dtype=torch.float32, attn_implementation="eager"
+        img_proc = Qwen2VLImageProcessor.from_pretrained(
+            str(directory), min_pixels=declared_min, max_pixels=declared_max
         )
-        model.eval()
+        tokenizer = Qwen2TokenizerFast.from_pretrained(str(directory))
+        video_proc = Qwen3VLVideoProcessor.from_pretrained(str(directory))
 
-        llm = model.model
-        visual = llm.visual
-        text = llm.language_model
-        embed = text.embed_tokens
+        # Probe the plan's video_processor=None construction first and record the
+        # outcome: 4.57.6's ProcessorMixin hard-rejects None for a non-optional
+        # attribute.
+        try:
+            Qwen3VLProcessor(image_processor=img_proc, tokenizer=tokenizer,
+                             video_processor=None)
+            none_probe = {"constructed": True, "error": None}
+        except Exception as exc:  # noqa: BLE001 - the probe records the failure
+            none_probe = {"constructed": False, "error": f"{type(exc).__name__}: {exc}"}
 
-        def params_of(module) -> int:
-            return sum(p.numel() for p in module.parameters())
+        # A second finding: without torchvision, BaseVideoProcessor resolves to a
+        # dummy class, so even the concrete Qwen3VLVideoProcessor fails the
+        # mixin's class check. The probe subclasses the processor and satisfies
+        # that one check against the concrete class; image-only behavior is
+        # unaffected because the image path never touches the video processor.
+        class ProbeProcessor(Qwen3VLProcessor):
+            def check_argument_for_proper_class(self, name, arg):
+                if name == "video_processor":
+                    return Qwen3VLVideoProcessor
+                return super().check_argument_for_proper_class(name, arg)
 
-        model_info["loading"] = {
-            "storage_dtype": "bfloat16 (safetensors)",
-            "loaded_dtype": "float32",
-            "attn_implementation": "eager",
+        # The construction is attempted, not assumed: the flag is set only on the
+        # success branch, so the recorded fact is evidence of what actually
+        # happened rather than a hard-coded literal.
+        video_processor_constructed = False
+        try:
+            processor = ProbeProcessor(image_processor=img_proc, tokenizer=tokenizer,
+                                       video_processor=video_proc,
+                                       chat_template=tokenizer_config["chat_template"])
+            video_processor_constructed = True
+        except Exception as exc:  # noqa: BLE001 - construction must succeed for the probe to continue
+            sys.exit(f"ProbeProcessor construction failed: {type(exc).__name__}: {exc}")
+
+        def pixel_summary(batch, key: str = "pixel_values") -> dict:
+            return tensor_summary(batch[key])
+
+        factor = img_proc.patch_size * img_proc.merge_size
+        result["processor"] = {
+            "declared_image_processor_class": preprocessor.get("image_processor_type"),
+            "construction": {
+                "image_processor": type(img_proc).__name__,
+                "image_processor_module": type(img_proc).__module__,
+                "tokenizer": type(tokenizer).__name__,
+                "processor": type(processor).__name__,
+                "video_processor": type(video_proc).__name__,
+                "video_processor_module": type(video_proc).__module__,
+                "video_processor_constructed_without_torchvision":
+                    video_processor_constructed,
+                "video_processor_none_probe": none_probe,
+                "slow_vs_declared": "deviation: artifact declares "
+                f"{preprocessor.get('image_processor_type')}; probe uses the slow "
+                "Python Qwen2VLImageProcessor explicitly (plan decision 2026-10-08)",
+                "class_check_note": "without torchvision, 4.57.6 resolves "
+                "BaseVideoProcessor to a dummy class, so the mixin class check "
+                "rejects every video processor; the probe overrides "
+                "check_argument_for_proper_class for video_processor only "
+                "(image-only behavior is unaffected)",
+            },
+            "slow_size_bug": size_bug,
+            "video_processor_options": {
+                "size": video_proc.size,
+                "do_rescale": video_proc.do_rescale,
+                "rescale_factor": video_proc.rescale_factor,
+                "do_normalize": video_proc.do_normalize,
+                "image_mean": video_proc.image_mean,
+                "image_std": video_proc.image_std,
+                "do_convert_rgb": video_proc.do_convert_rgb,
+                "patch_size": video_proc.patch_size,
+                "temporal_patch_size": video_proc.temporal_patch_size,
+                "merge_size": video_proc.merge_size,
+                "do_sample_frames": video_proc.do_sample_frames,
+            },
+            "resolved_options": {
+                "size": img_proc.size,
+                "min_pixels": img_proc.min_pixels,
+                "max_pixels": img_proc.max_pixels,
+                "do_resize": img_proc.do_resize,
+                "resample": repr(img_proc.resample),
+                "do_rescale": img_proc.do_rescale,
+                "rescale_factor": img_proc.rescale_factor,
+                "do_normalize": img_proc.do_normalize,
+                "image_mean": img_proc.image_mean,
+                "image_std": img_proc.image_std,
+                "do_convert_rgb": img_proc.do_convert_rgb,
+                "patch_size": img_proc.patch_size,
+                "temporal_patch_size": img_proc.temporal_patch_size,
+                "merge_size": img_proc.merge_size,
+            },
+            "tokenizer_ids": {
+                "image_token_id": processor.image_token_id,
+                "video_token_id": processor.video_token_id,
+                "vision_start_token_id": processor.vision_start_token_id,
+                "vision_end_token_id": processor.vision_end_token_id,
+                "pad_token_id": tokenizer.pad_token_id,
+                "eos_token_id": tokenizer.eos_token_id,
+            },
+            "geometry": {},
+            "color": {},
+            "cases": {},
         }
-        model_info["tied_embedding"] = {
-            "lm_head_is_embed_tokens": model.lm_head.weight.data_ptr()
-            == embed.weight.data_ptr(),
-            "tied_weights_keys": config.get("tied_weights_keys"),
+
+        def run_case(name: str, image_path: Path, as_file: bool = False,
+                     prompt_text: str | None = None) -> dict:
+            from PIL import Image as _Image
+
+            source = _Image.open(image_path)
+            try:
+                size = source.size
+                batch = img_proc(images=source) if not as_file else img_proc(images=str(image_path))
+            finally:
+                source.close()
+            grid = [int(v) for v in torch.as_tensor(batch["image_grid_thw"][0]).tolist()]
+            h_bar, w_bar = smart_resize(size[1], size[0], factor,
+                                        img_proc.min_pixels, img_proc.max_pixels)
+            expected_grid = [1, h_bar // img_proc.patch_size, w_bar // img_proc.patch_size]
+            n_merged_expected = (grid[0] * grid[1] * grid[2]) // img_proc.merge_size**2
+            entry = {
+                "source_wh": [size[0], size[1]],
+                "expected_resized_hw": [h_bar, w_bar],
+                "grid": grid,
+                "grid_matches_rederived_smart_resize": grid == expected_grid,
+                "merged_token_count_expected": n_merged_expected,
+                "slow_processor_reports_num_image_tokens": "num_image_tokens" in batch.keys(),
+                "pixel_values": pixel_summary(batch),
+            }
+            if prompt_text is not None:
+                entry["prompt"] = {"text": prompt_text,
+                                   "sha256": sha256_bytes(prompt_text.encode("utf-8"))}
+            return entry
+
+        # Geometry + patch evidence for the two model images.
+        prompt_messages = [
+            {"role": "user",
+             "content": [
+                 {"type": "image"},
+                 {"type": "text", "text": "Describe the image in one short sentence."},
+             ]}
+        ]
+        rendered = processor.apply_chat_template(prompt_messages, add_generation_prompt=True,
+                                                 tokenize=False)
+        result["processor"]["prompt_template"] = {
+            "rendered": rendered,
+            "sha256": sha256_bytes(rendered.encode("utf-8")),
         }
-        model_info["parameter_counts"] = {
-            "visual": params_of(visual),
-            "language_model": params_of(text),
-            "deepstack_merger_list": params_of(visual.deepstack_merger_list),
-        }
-        model_info["vision_shapes"] = {
-            "pos_embed": list(visual.pos_embed.weight.shape),
-            "num_grid_per_side": visual.num_grid_per_side,
-            "patch_embed_weight": list(visual.patch_embed.proj.weight.shape),
-            "patch_embed_bias": list(visual.patch_embed.proj.bias.shape),
-            "deepstack_visual_indexes": list(visual.deepstack_visual_indexes),
-            "rotary_head_dim": config["vision_config"]["hidden_size"]
-            // config["vision_config"]["num_heads"] // 2,
-        }
-        layer0 = text.layers[0].self_attn
-        model_info["text_shapes"] = {
-            "embed_tokens": list(embed.weight.shape),
-            "num_layers": len(text.layers),
-            "layer0_self_attn_attrs": sorted(vars(layer0).keys()),
-            "layer0_q_proj": list(layer0.q_proj.weight.shape),
-            "layer0_k_proj": list(layer0.k_proj.weight.shape),
-            "layer0_v_proj": list(layer0.v_proj.weight.shape),
-            "layer0_o_proj": list(layer0.o_proj.weight.shape),
-            "layer0_q_norm": list(layer0.q_norm.weight.shape) if hasattr(layer0, "q_norm") else None,
-            "layer0_k_norm": list(layer0.k_norm.weight.shape) if hasattr(layer0, "k_norm") else None,
-            "final_norm": list(text.norm.weight.shape),
-        }
+        for name in ("rgb_256x256", "rgb_64x32"):
+            result["processor"]["cases"][name] = run_case(name, images[name])
+            result["processor"]["cases"][name]["prompt_length_after_expansion"] = None  # set below
 
-        capture: dict[str, list[list[int]]] = {}
+        # Color / alpha / EXIF path evidence.
+        def color_case(original_input, variants: dict) -> dict:
+            import numpy as np
 
-        def make_hook(name: str):
-            def hook(_module, _inputs, output):
-                value = output[0] if isinstance(output, (tuple, list)) else output
-                if torch.is_tensor(value):
-                    capture.setdefault(name, []).append(list(value.shape))
+            original = img_proc(images=original_input)
+            summary = pixel_summary(original)
+            per_variant = {}
+            matches = {}
+            for label, variant in variants.items():
+                out = img_proc(images=variant)
+                per_variant[label] = pixel_summary(out)
+                matches[label] = bool(np.array_equal(original["pixel_values"],
+                                                     out["pixel_values"]))
+            return {"pixel_values": summary, "variants": per_variant, "matches": matches}
 
-            return hook
+        def white_composite(image: Image.Image) -> Image.Image:
+            white = Image.new("RGB", image.size, (255, 255, 255))
+            if image.mode == "RGBA":
+                white.paste(image, mask=image.getchannel("A"))
+            else:
+                white.paste(image.convert("L").convert("RGB"), mask=image.getchannel("A"))
+            return white
 
-        visual.patch_embed.register_forward_hook(make_hook("patch_embed"))
-        visual.blocks[0].register_forward_hook(make_hook("block0"))
-        visual.blocks[-1].register_forward_hook(make_hook("block_last"))
-        visual.merger.register_forward_hook(make_hook("merger"))
-        for i, merger in enumerate(visual.deepstack_merger_list):
-            merger.register_forward_hook(make_hook(f"deepstack_merger{i}"))
+        rgba = Image.open(images["rgba_8x8"])
+        rgba_original = Image.open(images["rgba_8x8"])
+        try:
+            result["processor"]["color"]["rgba_8x8"] = color_case(
+                rgba_original,
+                {"drop_alpha": rgba.convert("RGB"), "composite_over_white": white_composite(rgba)})
+        finally:
+            rgba.close()
+            rgba_original.close()
+        la = Image.open(images["la_8x8"])
+        la_original = Image.open(images["la_8x8"])
+        try:
+            result["processor"]["color"]["la_8x8"] = color_case(
+                la_original,
+                {"drop_alpha": la.convert("RGB"), "composite_over_white": white_composite(la)})
+        finally:
+            la.close()
+            la_original.close()
+        palette = Image.open(images["palette_4bit_trns"])
+        palette_original = Image.open(images["palette_4bit_trns"])
+        try:
+            result["processor"]["color"]["palette_4bit_trns"] = {
+                "tRNS_from_file": list(palette.info.get("transparency", [])),
+                **color_case(palette_original,
+                             {"drop_trns_convert_rgb": palette.convert("RGB")})
+            }
+        finally:
+            palette.close()
+            palette_original.close()
+        raw_exif = Image.open(images["exif_orientation6"])
+        try:
+            orientation = raw_exif.getexif().get(0x0112)
+            result["processor"]["color"]["exif_orientation6"] = {
+                "exif_orientation_tag": orientation,
+                "source_wh": list(raw_exif.size),
+                **color_case(
+                    str(images["exif_orientation6"]),
+                    {"no_transpose": raw_exif,
+                     "transpose_90cw": raw_exif.transpose(Image.Transpose.ROTATE_270)},
+                ),
+                "note": "original input was the file path, so the reference load_image "
+                "path (exif_transpose + convert_to_rgb) is exercised",
+            }
+        finally:
+            raw_exif.close()
 
-        with torch.no_grad():
-            case_results = {}
-            for name in ("rgb_256x256", "rgb_64x32"):
-                capture.clear()
-                image = Image.open(images[name])
-                batch = processor(images=[image.convert("RGB")], text=[rendered])
-                input_ids = torch.as_tensor(batch["input_ids"], dtype=torch.long)
-                attention_mask = torch.as_tensor(batch["attention_mask"], dtype=torch.long)
-                pixel_values = torch.as_tensor(batch["pixel_values"], dtype=torch.float32)
-                image_grid_thw = torch.as_tensor(batch["image_grid_thw"], dtype=torch.long)
-                ids_row = [int(v) for v in input_ids[0].tolist()]
-                span_start, span_end = image_token_span(ids_row)
-                grid = [int(v) for v in image_grid_thw[0].tolist()]
-                n_merged = (grid[0] * grid[1] * grid[2]) // img_proc.merge_size**2
-                result["processor"]["cases"][name]["prompt_length_after_expansion"] = len(ids_row)
-                assert span_end - span_start + 1 == n_merged, "image span != merged count"
+        # -------------------------------------------------------------------- model
+        model_info: dict = {}
+        if not args.skip_model:
+            from transformers import Qwen3VLForConditionalGeneration
 
-                expected = rederive_rope(ids_row, grid)
-                position_ids, rope_deltas = llm.get_rope_index(
-                    input_ids, image_grid_thw, None, attention_mask=attention_mask
-                )
-                actual = [[int(v) for v in row] for row in position_ids[:, 0].tolist()]
-                delta = int(rope_deltas[0][0].item())
-                assert actual == expected["position_ids"], "position_ids mismatch"
-                assert delta == expected["rope_delta"], "rope delta mismatch"
+            torch.manual_seed(0)
+            model = Qwen3VLForConditionalGeneration.from_pretrained(
+                str(directory), dtype=torch.float32, attn_implementation="eager"
+            )
+            model.eval()
 
-                pos_samples = {}
-                for label, idx in (
-                    ("first_token", 0),
-                    ("last_text_before_image", span_start - 1),
-                    ("first_image_token", span_start),
-                    ("last_image_token", span_end),
-                    ("last_token", len(ids_row) - 1),
-                ):
-                    if 0 <= idx < len(ids_row):
-                        pos_samples[label] = [int(position_ids[a, 0, idx].item())
-                                              for a in range(3)]
+            llm = model.model
+            visual = llm.visual
+            text = llm.language_model
+            embed = text.embed_tokens
 
-                visual_forward = {
-                    "pixel_values": tensor_summary(pixel_values),
-                    "pos_embed_interpolated": list(
-                        visual.fast_pos_embed_interpolate(image_grid_thw).shape
-                    ),
-                    "rot_pos_emb": list(visual.rot_pos_emb(image_grid_thw).shape),
-                }
+            def params_of(module) -> int:
+                return sum(p.numel() for p in module.parameters())
 
-                model.model.rope_deltas = None
-                out = model(input_ids=input_ids, attention_mask=attention_mask,
-                            pixel_values=pixel_values, image_grid_thw=image_grid_thw)
-                assert torch.equal(model.model.rope_deltas, rope_deltas), \
-                    "model-cached rope_deltas mismatch"
-                last_logits = out.logits[0, -1].float().contiguous()
-                first_step = {
-                    "prefill_sha256": sha256_bytes(last_logits.numpy().tobytes()),
-                    "prefill_argmax": int(last_logits.argmax().item()),
-                    "prefill_top20": [
-                        [int(i), float(v)]
-                        for i, v in zip(*torch.topk(last_logits, 20))
-                    ],
-                    "logits_shape": list(out.logits.shape),
-                    "shapes": {k: v[0] for k, v in capture.items()},
-                }
-                visual_forward["patch_embed_out"] = capture["patch_embed"][0]
-                visual_forward["block0_out"] = capture["block0"][0]
-                visual_forward["block_last_out"] = capture["block_last"][0]
-                visual_forward["merger_out"] = capture["merger"][0]
-                visual_forward["deepstack_merger_outs"] = [
-                    capture[f"deepstack_merger{i}"][0]
-                    for i in range(len(visual.deepstack_merger_list))
-                ]
+            model_info["loading"] = {
+                "storage_dtype": "bfloat16 (safetensors)",
+                "loaded_dtype": "float32",
+                "attn_implementation": "eager",
+            }
+            model_info["tied_embedding"] = {
+                "lm_head_is_embed_tokens": model.lm_head.weight.data_ptr()
+                == embed.weight.data_ptr(),
+                "tied_weights_keys": config.get("tied_weights_keys"),
+            }
+            model_info["parameter_counts"] = {
+                "visual": params_of(visual),
+                "language_model": params_of(text),
+                "deepstack_merger_list": params_of(visual.deepstack_merger_list),
+            }
+            model_info["vision_shapes"] = {
+                "pos_embed": list(visual.pos_embed.weight.shape),
+                "num_grid_per_side": visual.num_grid_per_side,
+                "patch_embed_weight": list(visual.patch_embed.proj.weight.shape),
+                "patch_embed_bias": list(visual.patch_embed.proj.bias.shape),
+                "deepstack_visual_indexes": list(visual.deepstack_visual_indexes),
+                "rotary_head_dim": config["vision_config"]["hidden_size"]
+                // config["vision_config"]["num_heads"] // 2,
+            }
+            layer0 = text.layers[0].self_attn
+            model_info["text_shapes"] = {
+                "embed_tokens": list(embed.weight.shape),
+                "num_layers": len(text.layers),
+                "layer0_self_attn_attrs": sorted(vars(layer0).keys()),
+                "layer0_q_proj": list(layer0.q_proj.weight.shape),
+                "layer0_k_proj": list(layer0.k_proj.weight.shape),
+                "layer0_v_proj": list(layer0.v_proj.weight.shape),
+                "layer0_o_proj": list(layer0.o_proj.weight.shape),
+                "layer0_q_norm": list(layer0.q_norm.weight.shape) if hasattr(layer0, "q_norm") else None,
+                "layer0_k_norm": list(layer0.k_norm.weight.shape) if hasattr(layer0, "k_norm") else None,
+                "final_norm": list(text.norm.weight.shape),
+            }
 
-                # Determinism: a fresh prefill must reproduce the logits bit-exactly.
-                model.model.rope_deltas = None
-                out_repeat = model(input_ids=input_ids, attention_mask=attention_mask,
-                                   pixel_values=pixel_values,
-                                   image_grid_thw=image_grid_thw)
-                repeat_logits = out_repeat.logits[0, -1].float().contiguous()
-                determinism_match = sha256_bytes(repeat_logits.numpy().tobytes()) \
-                    == first_step["prefill_sha256"]
+            capture: dict[str, list[list[int]]] = {}
 
-                past = out.past_key_values
-                current = torch.tensor([[first_step["prefill_argmax"]]], dtype=torch.long)
-                greedy = [first_step["prefill_argmax"]]
-                decode_steps = []
-                for step in range(4):
-                    cache_position = len(ids_row) + step
-                    out_step = model(input_ids=current, past_key_values=past,
-                                     cache_position=torch.tensor([cache_position]))
-                    past = out_step.past_key_values
-                    step_logits = out_step.logits[0, -1].float().contiguous()
-                    nxt = int(step_logits.argmax().item())
-                    greedy.append(nxt)
-                    decode_steps.append({
-                        "step": step,
-                        "cache_position": cache_position,
-                        "kv_length": int(past.get_seq_length()),
-                        "expected_decode_positions_all_axes":
-                            cache_position + delta,
-                        "logits_sha256": sha256_bytes(step_logits.numpy().tobytes()),
-                        "argmax": nxt,
-                        "top5": [[int(i), float(v)]
-                                 for i, v in zip(*torch.topk(step_logits, 5))],
-                    })
-                case_results[name] = {
-                    "sequence": {
-                        "length": len(ids_row),
-                        "image_token_span": [span_start, span_end],
-                        "image_token_count": span_end - span_start + 1,
-                        "merged_token_count_expected": n_merged,
-                    },
-                    "grid": grid,
-                    "rope": {
-                        "delta": delta,
-                        "rederived_match": True,
-                        "delta_formula": "max(llm_pos)+1-seq_len = "
-                        f"max(llm_grid_h, llm_grid_w) - merged_count = "
-                        f"{max(grid[1] // 2, grid[2] // 2)} - {n_merged}",
-                        "position_samples": pos_samples,
-                        "position_ids_full": actual,
-                    },
-                    "visual_forward": visual_forward,
-                    "prefill": first_step,
-                    "determinism": {"repeat_prefill_sha256_match": determinism_match},
-                    "decode": decode_steps,
-                    "greedy_ids": greedy,
-                }
-            model_info["cases"] = case_results
-        result["model"] = model_info
-    else:
-        result["model"] = {"skipped": True}
+            def make_hook(name: str):
+                def hook(_module, _inputs, output):
+                    value = output[0] if isinstance(output, (tuple, list)) else output
+                    if torch.is_tensor(value):
+                        capture.setdefault(name, []).append(list(value.shape))
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(py(result), indent=2) + "\n")
-    print(f"wrote {args.out}")
-    for name, case in result["model"].get("cases", {}).items():
-        print(f"{name}: grid={case['grid']} delta={case['rope']['delta']} "
-              f"greedy={case['greedy_ids']}")
+                return hook
+
+            visual.patch_embed.register_forward_hook(make_hook("patch_embed"))
+            visual.blocks[0].register_forward_hook(make_hook("block0"))
+            visual.blocks[-1].register_forward_hook(make_hook("block_last"))
+            visual.merger.register_forward_hook(make_hook("merger"))
+            for i, merger in enumerate(visual.deepstack_merger_list):
+                merger.register_forward_hook(make_hook(f"deepstack_merger{i}"))
+
+            with torch.no_grad():
+                case_results = {}
+                for name in ("rgb_256x256", "rgb_64x32"):
+                    capture.clear()
+                    image = Image.open(images[name])
+                    try:
+                        batch = processor(images=[image.convert("RGB")], text=[rendered])
+                    finally:
+                        image.close()
+                    input_ids = torch.as_tensor(batch["input_ids"], dtype=torch.long)
+                    attention_mask = torch.as_tensor(batch["attention_mask"], dtype=torch.long)
+                    pixel_values = torch.as_tensor(batch["pixel_values"], dtype=torch.float32)
+                    image_grid_thw = torch.as_tensor(batch["image_grid_thw"], dtype=torch.long)
+                    ids_row = [int(v) for v in input_ids[0].tolist()]
+                    span_start, span_end = image_token_span(ids_row)
+                    grid = [int(v) for v in image_grid_thw[0].tolist()]
+                    n_merged = (grid[0] * grid[1] * grid[2]) // img_proc.merge_size**2
+                    result["processor"]["cases"][name]["prompt_length_after_expansion"] = len(ids_row)
+                    check_facts(name, "image_token_count", span_end - span_start + 1,
+                                n_merged, "image span != merged count")
+
+                    expected = rederive_rope(ids_row, grid)
+                    position_ids, rope_deltas = llm.get_rope_index(
+                        input_ids, image_grid_thw, None, attention_mask=attention_mask
+                    )
+                    actual = [[int(v) for v in row] for row in position_ids[:, 0].tolist()]
+                    delta = int(rope_deltas[0][0].item())
+                    position_ids_match = check_facts(
+                        name, "position_ids", actual, expected["position_ids"])
+                    delta_match = check_facts(
+                        name, "rope_delta", delta, expected["rope_delta"])
+
+                    pos_samples = {}
+                    for label, idx in (
+                        ("first_token", 0),
+                        ("last_text_before_image", span_start - 1),
+                        ("first_image_token", span_start),
+                        ("last_image_token", span_end),
+                        ("last_token", len(ids_row) - 1),
+                    ):
+                        if 0 <= idx < len(ids_row):
+                            pos_samples[label] = [int(position_ids[a, 0, idx].item())
+                                                  for a in range(3)]
+
+                    visual_forward = {
+                        "pixel_values": tensor_summary(pixel_values),
+                        "pos_embed_interpolated": list(
+                            visual.fast_pos_embed_interpolate(image_grid_thw).shape
+                        ),
+                        "rot_pos_emb": list(visual.rot_pos_emb(image_grid_thw).shape),
+                    }
+
+                    model.model.rope_deltas = None
+                    out = model(input_ids=input_ids, attention_mask=attention_mask,
+                                pixel_values=pixel_values, image_grid_thw=image_grid_thw)
+                    if not torch.equal(model.model.rope_deltas, rope_deltas):
+                        sys.exit(f"{name}: model-cached rope_deltas "
+                                 f"{model.model.rope_deltas.tolist()} != "
+                                 f"get_rope_index output {rope_deltas.tolist()}")
+                    last_logits = out.logits[0, -1].float().contiguous()
+                    first_step = {
+                        "prefill_sha256": sha256_bytes(last_logits.numpy().tobytes()),
+                        "prefill_argmax": int(last_logits.argmax().item()),
+                        "prefill_top20": [
+                            [int(i), float(v)]
+                            for i, v in zip(*torch.topk(last_logits, 20))
+                        ],
+                        "logits_shape": list(out.logits.shape),
+                        "shapes": {k: v[0] for k, v in capture.items()},
+                    }
+                    visual_forward["patch_embed_out"] = capture["patch_embed"][0]
+                    visual_forward["block0_out"] = capture["block0"][0]
+                    visual_forward["block_last_out"] = capture["block_last"][0]
+                    visual_forward["merger_out"] = capture["merger"][0]
+                    visual_forward["deepstack_merger_outs"] = [
+                        capture[f"deepstack_merger{i}"][0]
+                        for i in range(len(visual.deepstack_merger_list))
+                    ]
+
+                    # Determinism: a fresh prefill must reproduce the logits bit-exactly.
+                    model.model.rope_deltas = None
+                    out_repeat = model(input_ids=input_ids, attention_mask=attention_mask,
+                                       pixel_values=pixel_values,
+                                       image_grid_thw=image_grid_thw)
+                    repeat_logits = out_repeat.logits[0, -1].float().contiguous()
+                    determinism_match = sha256_bytes(repeat_logits.numpy().tobytes()) \
+                        == first_step["prefill_sha256"]
+
+                    past = out.past_key_values
+                    current = torch.tensor([[first_step["prefill_argmax"]]], dtype=torch.long)
+                    greedy = [first_step["prefill_argmax"]]
+                    decode_steps = []
+                    for step in range(4):
+                        cache_position = len(ids_row) + step
+                        out_step = model(input_ids=current, past_key_values=past,
+                                         cache_position=torch.tensor([cache_position]))
+                        past = out_step.past_key_values
+                        step_logits = out_step.logits[0, -1].float().contiguous()
+                        nxt = int(step_logits.argmax().item())
+                        greedy.append(nxt)
+                        decode_steps.append({
+                            "step": step,
+                            "cache_position": cache_position,
+                            "kv_length": int(past.get_seq_length()),
+                            "expected_decode_positions_all_axes":
+                                cache_position + delta,
+                            "logits_sha256": sha256_bytes(step_logits.numpy().tobytes()),
+                            "argmax": nxt,
+                            "top5": [[int(i), float(v)]
+                                     for i, v in zip(*torch.topk(step_logits, 5))],
+                        })
+                    case_results[name] = {
+                        "sequence": {
+                            "length": len(ids_row),
+                            "image_token_span": [span_start, span_end],
+                            "image_token_count": span_end - span_start + 1,
+                            "merged_token_count_expected": n_merged,
+                        },
+                        "grid": grid,
+                        "rope": {
+                            "delta": delta,
+                            "rederived_match": position_ids_match and delta_match,
+                            "delta_formula": "max(llm_pos)+1-seq_len = "
+                            f"max(llm_grid_h, llm_grid_w) - merged_count = "
+                            f"{max(grid[1] // 2, grid[2] // 2)} - {n_merged}",
+                            "position_samples": pos_samples,
+                            "position_ids_full": actual,
+                        },
+                        "visual_forward": visual_forward,
+                        "prefill": first_step,
+                        "determinism": {"repeat_prefill_sha256_match": determinism_match},
+                        "decode": decode_steps,
+                        "greedy_ids": greedy,
+                    }
+                model_info["cases"] = case_results
+            result["model"] = model_info
+        else:
+            result["model"] = {"skipped": True}
+
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(py(result), indent=2) + "\n")
+        print(f"wrote {args.out}")
+        for name, case in result["model"].get("cases", {}).items():
+            print(f"{name}: grid={case['grid']} delta={case['rope']['delta']} "
+                  f"greedy={case['greedy_ids']}")
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 if __name__ == "__main__":

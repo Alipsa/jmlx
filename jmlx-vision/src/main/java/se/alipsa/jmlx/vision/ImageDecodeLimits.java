@@ -3,13 +3,24 @@ package se.alipsa.jmlx.vision;
 /**
  * Decode-size bounds checked from decoded metadata before any pixel allocation.
  *
- * <p>Both fields must be positive. The module default ({@link
- * ImageDecoder#decode(java.nio.file.Path)}) uses {@code ImageDecodeLimits(16_777_216L, 16_384)}: a
- * conservative ceiling that rejects typical 24 MP and 48 MP phone photos. Callers that need to
- * accept such images with adequate memory use the explicit {@code ImageDecoder.decode(..., limits)}
- * overloads.
+ * <p>Both fields must be positive. The module default, {@link #DEFAULTS} ({@code
+ * ImageDecodeLimits(16_777_216L, 16_384)}), is used by every {@code ImageDecoder} overload that
+ * takes no explicit limits: a conservative ceiling that rejects typical 24 MP and 48 MP phone
+ * photos. Callers that need to accept such images with adequate memory use the explicit {@code
+ * ImageDecoder.decode(..., limits)} overloads.
  */
 public record ImageDecodeLimits(long maxPixels, int maxDimension) {
+
+  /**
+   * The decode bounds used by every {@code ImageDecoder} overload that takes no explicit {@code
+   * ImageDecodeLimits}: {@code decode(Path)}, {@code decode(InputStream)}, {@code decode(Path,
+   * AlphaPolicy)} and {@code decode(InputStream, AlphaPolicy)}. It accepts up to 16,777,216 pixels
+   * with a maximum side of 16,384 — a conservative ceiling that rejects typical 24 MP and 48 MP
+   * phone photos. The explicit {@code ImageDecoder.decode(..., limits, policy)} overloads accept
+   * any positive {@code ImageDecodeLimits} for callers whose memory budget allows larger inputs.
+   */
+  public static final ImageDecodeLimits DEFAULTS = new ImageDecodeLimits(16_777_216L, 16_384);
+
   /**
    * Validates that both bounds are positive.
    *

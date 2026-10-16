@@ -22,18 +22,7 @@
     "repo": "Qwen3-VL-8B-Instruct-4bit",
     "revision": "defcdea7cc7a4b0858fea563cbbce171d328e457",
     "hub": {
-      "commit_sha": "defcdea7cc7a4b0858fea563cbbce171d328e457",
-      "tags": [
-        "4-bit",
-        "conversational",
-        "image-text-to-text",
-        "license:apache-2.0",
-        "mlx",
-        "qwen3_vl",
-        "region:us",
-        "safetensors"
-      ],
-      "license": "apache-2.0"
+      "commit_sha": "defcdea7cc7a4b0858fea563cbbce171d328e457"
     },
     "files": [
       {

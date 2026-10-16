@@ -277,7 +277,10 @@ def main() -> None:
             # patch sets; verify_grids gates that the processor grid matches
             # the exported grid_thw for both configs before any forward.
             image = Image.open(fixture_paths[image_name])
-            batch = verify_grids(processor, rendered, image, image_name, exports)
+            try:
+                batch = verify_grids(processor, rendered, image, image_name, exports)
+            finally:
+                image.close()
             input_ids = torch.as_tensor(batch["input_ids"], dtype=torch.long)
             attention_mask = torch.as_tensor(batch["attention_mask"], dtype=torch.long)
             ids_row = [int(v) for v in input_ids[0].tolist()]
@@ -302,13 +305,19 @@ def main() -> None:
                     input_ids, image_grid_thw, None, attention_mask=attention_mask)
                 actual = [[int(v) for v in row] for row in position_ids[:, 0].tolist()]
                 delta = int(rope_deltas[0][0].item())
-                assert actual == expected["position_ids"], "position_ids mismatch"
-                assert delta == expected["rope_delta"], "rope delta mismatch"
+                probe.check_facts(f"{image_name}/{name}", "position_ids", actual,
+                                  expected["position_ids"])
+                probe.check_facts(f"{image_name}/{name}", "rope_delta", delta,
+                                  expected["rope_delta"])
 
                 model.model.rope_deltas = None
                 out = model(input_ids=input_ids, attention_mask=attention_mask,
                             pixel_values=pixel_values, image_grid_thw=image_grid_thw)
-                assert torch.equal(model.model.rope_deltas, rope_deltas)
+                if not torch.equal(model.model.rope_deltas, rope_deltas):
+                    sys.exit(
+                        f"{image_name}/{name}: model-cached rope_deltas "
+                        f"{model.model.rope_deltas.tolist()} != "
+                        f"get_rope_index output {rope_deltas.tolist()}")
                 last_logits = out.logits[0, -1].float().contiguous()
                 first_step = {
                     "prefill_sha256": probe.sha256_bytes(last_logits.numpy().tobytes()),

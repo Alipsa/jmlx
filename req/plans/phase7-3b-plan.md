@@ -460,7 +460,32 @@ Update compatibility, Tier-A/Tier-B documentation, models/vision READMEs, CHANGE
 architecture notes with the exact implemented scope. Distinguish synthetic, real-artifact,
 quantized manual and pending CI evidence. No release or publication is part of this plan.
 
-## 10. Work packages and completion checklist
+## 10. EXIF orientation policy (WP9)
+
+**2026-10-16 second-review addition:** proposed as a new "WP2" in that review; WP2 is this
+plan's Qwen processor item, so this takes the next free number, WP9.
+
+`jmlx-vision`'s `ImageDecoder` ignores EXIF orientation: an EXIF-rotated JPEG decodes to its
+stored, unrotated pixels. That agrees with the pinned SmolVLM/Idefics3 image-oracle reference
+path (Pillow decode with no `exif_transpose`), but not with the Qwen3-VL path: the pinned
+Qwen2VL slow processor runs `exif_transpose` before resize (findings §4.4; golden case
+`exif_orientation6`, where only the 90° CW transposed decode matches the reference). A Qwen
+preprocessing implementation that reuses `ImageDecoder` with the WP2 drop-alpha option as-is
+would silently disagree with the reference on rotated JPEGs.
+
+Before accepting the Qwen preprocessing (WP2), decide and record the orientation policy: apply
+EXIF orientation in the Qwen path (for example, an orientation accessor or an explicit
+decode/rotate option on `ImageDecoder`, additive to the existing SmolVLM contract) versus
+leaving decode unrotated and rotating inside `Qwen3VlImageProcessor`. Keep the SmolVLM decode
+behavior unchanged either way; do not change `ImageDecoder`'s default semantics.
+
+Evidence: EXIF-rotated fixture pairs (at least the orientation-6 case, plus one flip/mirror
+tag) run through both the pinned slow processor and the jmlx path, digest-pinned in provenance
+like the existing image-oracle cases, with the unrotated decode as a non-matching control.
+Exit gate: the Qwen path bit-matches the slow processor on the rotated fixtures, and the
+existing SmolVLM fixtures are unchanged.
+
+## 11. Work packages and completion checklist
 
 | Package | Deliverable | Depends on | Exit evidence |
 | --- | --- | --- | --- |
@@ -473,6 +498,7 @@ quantized manual and pending CI evidence. No release or publication is part of t
 | WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests |
 | WP7 | Generation, ownership and cache accounting | WP6 | Cached/full equivalence, lifecycle/failure/memory tests |
 | WP8 | Tier-B, manual 8B, CI and documentation | WP7 | Parent numerical/artifact/performance/matrix gates |
+| WP9 | EXIF orientation policy for the Qwen path | WP1, WP2 | Rotated-fixture parity with the slow processor; SmolVLM fixtures unchanged |
 
 Implement in reviewable PRs in this order; source discovery and pure processor work may overlap
 with WP0. Do not mark later gates complete based only on compile success or skipped native tests.
@@ -500,3 +526,4 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [ ] Default per-image attention limit/peak, one-over rejection and post-prefill visual release verified.
 - [ ] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded.
 - [ ] Required CI suites executed; matrix/docs state actual modality and verification limits.
+- [ ] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.

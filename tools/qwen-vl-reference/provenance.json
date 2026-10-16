@@ -19,7 +19,7 @@
   "probe": {
     "runner": "tools/qwen-vl-reference/run_qwen3vl_mlx_probe.py",
     "golden": "goldens/qwen3-vl-8b-wp1-mlx-probe.json",
-    "golden_sha256": "a7d5716c140b4d5d21b85a497a1e731340e81fc385226afd42586dd7b08f40f5",
+    "golden_sha256": "e9beefee332ae042a182f4a8940a3af1098b2e9e12be0026aecaaf468670b581",
     "schema": "jmlx-phase7-3b-wp1-qwen3vl-mlx8b-v1"
   },
   "artifact": {
@@ -67,7 +67,7 @@
   },
   "hf_reference_cross_reference": {
     "golden": "tools/hf-reference/goldens/qwen3-vl-2b-wp1-probe.json",
-    "golden_sha256": "b49702639e049951e10688d84781cb3ff30eb29884078f308e9232e50a9bbfb7",
+    "golden_sha256": "10cd4a4bd06a07f7e67d9a1739a66053f35300cda75c91c58e2448b1f8bc206b",
     "rendered_prompt_sha256": "c58e38df71e55a90a320171f1f007a2cffc975056b33398ee704830799c4dfcc",
     "note": "sequence-expansion facts (prompt length, image span, grids, rope deltas) must match the 2B HF reference because the template, prompt, tokenizer and grids are identical; the logits/greedy ids are from a different runtime and checkpoint and are recorded for compatibility only"
   }

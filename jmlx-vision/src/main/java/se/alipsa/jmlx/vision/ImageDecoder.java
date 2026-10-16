@@ -62,25 +62,30 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * grayscale {@code tRNS}, which the RGB conversion drops. Opaque input passes through unchanged
  * under either policy.
  *
- * <p><b>EXIF orientation is ignored:</b> an EXIF-rotated JPEG decodes to its stored, unrotated
- * pixels. That matches the pinned SmolVLM/Idefics3 image-oracle reference path ({@code
- * PIL.Image.open} → {@code load()} with no {@code exif_transpose}), but not every reference: the
- * Qwen3-VL/Qwen2VL slow processor applies EXIF orientation before resize (see {@code
- * req/plans/phase7-3b-reference-findings.md} §4.4, golden case {@code exif_orientation6}), so a
- * caller whose reference path applies orientation must rotate the image itself until that gap is
- * closed by the Phase 7.3b plan WP9 (EXIF orientation policy). No orientation accessor is exposed
- * in this milestone.
+ * <p><b>EXIF orientation:</b> by default — every overload that does not take an explicit {@link
+ * ExifOrientationPolicy} — an EXIF-rotated JPEG decodes to its stored, unrotated pixels. That
+ * matches the pinned SmolVLM/Idefics3 image-oracle reference path ({@code PIL.Image.open} → {@code
+ * load()} with no {@code exif_transpose}), and the committed SmolVLM decode fixtures stay pinned
+ * under it. The overloads that take an {@link ExifOrientationPolicy} select instead between that
+ * ignoring ({@link ExifOrientationPolicy#IGNORE}) and applying the stored orientation ({@link
+ * ExifOrientationPolicy#APPLY}, the behavior of Pillow's {@code ImageOps.exif_transpose} followed
+ * by {@code convert("RGB")} — the reference Qwen3-VL/Qwen2VL slow-processor image path; see {@code
+ * req/plans/phase7-3b-reference-findings.md} §4.4, golden case {@code exif_orientation6}). Under
+ * either policy a malformed EXIF block is data, not corruption: it is treated as absent and never
+ * breaks the decode (the header walkers still reject structural corruption of the container
+ * itself).
  *
  * <p><b>ICC and gAMA color management are ignored:</b> embedded color profiles and gamma chunks are
  * not applied to samples, matching the reference path, which performs no conversion. Callers doing
  * color management must do it themselves.
  *
  * <p>The no-limits overloads ({@code decode(Path)}, {@code decode(InputStream)}, {@code
- * decode(Path, AlphaPolicy)} and {@code decode(InputStream, AlphaPolicy)}) use {@link
- * ImageDecodeLimits#DEFAULTS} ({@code ImageDecodeLimits(16_777_216L, 16_384)}): a conservative
- * default that rejects typical 24 MP and 48 MP phone photos. Use the explicit limits overloads to
- * accept such inputs when your memory budget allows. Model-specific aggregate pixel/tile/token
- * budgets are separate.
+ * decode(Path, AlphaPolicy)}, {@code decode(InputStream, AlphaPolicy)}, {@code decode(Path,
+ * AlphaPolicy, ExifOrientationPolicy)} and {@code decode(InputStream, AlphaPolicy,
+ * ExifOrientationPolicy)}) use {@link ImageDecodeLimits#DEFAULTS} ({@code
+ * ImageDecodeLimits(16_777_216L, 16_384)}): a conservative default that rejects typical 24 MP and
+ * 48 MP phone photos. Use the explicit limits overloads to accept such inputs when your memory
+ * budget allows. Model-specific aggregate pixel/tile/token budgets are separate.
  *
  * <p>Reader providers are selected through {@link IIORegistry} with a java.desktop-module check; a
  * missing built-in provider is rejected rather than falling back to installed plugins. Global
@@ -120,8 +125,9 @@ public final class ImageDecoder {
 
   /**
    * Decodes the PNG or JPEG file at {@code path} with explicit limits and an explicit {@link
-   * AlphaPolicy} for RGBA / grayscale-with-alpha input. {@link #decode(Path, AlphaPolicy)} is the
-   * same call with {@link ImageDecodeLimits#DEFAULTS} substituted for {@code limits}.
+   * AlphaPolicy} for RGBA / grayscale-with-alpha input. EXIF orientation is ignored. {@link
+   * #decode(Path, AlphaPolicy)} is the same call with {@link ImageDecodeLimits#DEFAULTS}
+   * substituted for {@code limits}.
    *
    * @param path existing PNG or JPEG file
    * @param limits positive decode bounds checked from header metadata before any pixel allocation
@@ -133,6 +139,29 @@ public final class ImageDecoder {
    */
   public static RgbImage decode(Path path, ImageDecodeLimits limits, AlphaPolicy policy)
       throws IOException {
+    return decode(path, limits, policy, ExifOrientationPolicy.IGNORE);
+  }
+
+  /**
+   * Decodes the PNG or JPEG file at {@code path} with explicit limits, an explicit {@link
+   * AlphaPolicy} for RGBA / grayscale-with-alpha input, and an explicit {@link
+   * ExifOrientationPolicy} for EXIF-rotated input. {@link #decode(Path, AlphaPolicy,
+   * ExifOrientationPolicy)} is the same call with {@link ImageDecodeLimits#DEFAULTS} substituted
+   * for {@code limits}.
+   *
+   * @param path existing PNG or JPEG file
+   * @param limits positive decode bounds checked from header metadata before any pixel allocation
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @param orientation non-null policy for the EXIF orientation tag; {@link
+   *     ExifOrientationPolicy#IGNORE} returns the stored, unrotated pixels
+   * @return the decoded image, with alpha and orientation handled per the policies
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
+   *     limits}
+   */
+  public static RgbImage decode(
+      Path path, ImageDecodeLimits limits, AlphaPolicy policy, ExifOrientationPolicy orientation)
+      throws IOException {
     if (policy == null) {
       throw new IllegalArgumentException("policy must not be null");
     }
@@ -142,6 +171,9 @@ public final class ImageDecoder {
     if (limits == null) {
       throw new IllegalArgumentException("limits must not be null");
     }
+    if (orientation == null) {
+      throw new IllegalArgumentException("orientation must not be null");
+    }
     long cap = maxInputBytes(limits);
     if (Files.size(path) > cap) {
       throw new IOException("image input exceeds the " + cap + "-byte decode buffer limit");
@@ -150,7 +182,27 @@ public final class ImageDecoder {
     try (InputStream in = Files.newInputStream(path)) {
       bytes = readAllBounded(in, cap);
     }
-    return decode(bytes, limits, policy);
+    return decode(bytes, limits, policy, orientation);
+  }
+
+  /**
+   * Decodes the PNG or JPEG file at {@code path} using {@link ImageDecodeLimits#DEFAULTS} with an
+   * explicit {@link AlphaPolicy} for RGBA / grayscale-with-alpha input and an explicit {@link
+   * ExifOrientationPolicy} for EXIF-rotated input. To accept inputs beyond the default limits, use
+   * {@link #decode(Path, ImageDecodeLimits, AlphaPolicy, ExifOrientationPolicy)} instead.
+   *
+   * @param path existing PNG or JPEG file
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @param orientation non-null policy for the EXIF orientation tag; {@link
+   *     ExifOrientationPolicy#IGNORE} returns the stored, unrotated pixels
+   * @return the decoded image, with alpha and orientation handled per the policies
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds the
+   *     default limits
+   */
+  public static RgbImage decode(Path path, AlphaPolicy policy, ExifOrientationPolicy orientation)
+      throws IOException {
+    return decode(path, ImageDecodeLimits.DEFAULTS, policy, orientation);
   }
 
   /**
@@ -186,9 +238,9 @@ public final class ImageDecoder {
 
   /**
    * Decodes the PNG or JPEG content of {@code input} with explicit limits and an explicit {@link
-   * AlphaPolicy}. The stream is consumed in full; it is not closed by this method (internal
-   * wrappers are closed). {@link #decode(InputStream, AlphaPolicy)} is the same call with {@link
-   * ImageDecodeLimits#DEFAULTS} substituted for {@code limits}.
+   * AlphaPolicy}. EXIF orientation is ignored. The stream is consumed in full; it is not closed by
+   * this method (internal wrappers are closed). {@link #decode(InputStream, AlphaPolicy)} is the
+   * same call with {@link ImageDecodeLimits#DEFAULTS} substituted for {@code limits}.
    *
    * @param input non-null stream with the whole image
    * @param limits positive decode bounds checked from header metadata before any pixel allocation
@@ -200,6 +252,33 @@ public final class ImageDecoder {
    */
   public static RgbImage decode(InputStream input, ImageDecodeLimits limits, AlphaPolicy policy)
       throws IOException {
+    return decode(input, limits, policy, ExifOrientationPolicy.IGNORE);
+  }
+
+  /**
+   * Decodes the PNG or JPEG content of {@code input} with explicit limits, an explicit {@link
+   * AlphaPolicy} for RGBA / grayscale-with-alpha input, and an explicit {@link
+   * ExifOrientationPolicy} for EXIF-rotated input. The stream is consumed in full; it is not closed
+   * by this method (internal wrappers are closed). {@link #decode(InputStream, AlphaPolicy,
+   * ExifOrientationPolicy)} is the same call with {@link ImageDecodeLimits#DEFAULTS} substituted
+   * for {@code limits}.
+   *
+   * @param input non-null stream with the whole image
+   * @param limits positive decode bounds checked from header metadata before any pixel allocation
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @param orientation non-null policy for the EXIF orientation tag; {@link
+   *     ExifOrientationPolicy#IGNORE} returns the stored, unrotated pixels
+   * @return the decoded image, with alpha and orientation handled per the policies
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
+   *     limits}
+   */
+  public static RgbImage decode(
+      InputStream input,
+      ImageDecodeLimits limits,
+      AlphaPolicy policy,
+      ExifOrientationPolicy orientation)
+      throws IOException {
     if (policy == null) {
       throw new IllegalArgumentException("policy must not be null");
     }
@@ -209,8 +288,32 @@ public final class ImageDecoder {
     if (limits == null) {
       throw new IllegalArgumentException("limits must not be null");
     }
+    if (orientation == null) {
+      throw new IllegalArgumentException("orientation must not be null");
+    }
     byte[] bytes = readAllBounded(input, maxInputBytes(limits));
-    return decode(bytes, limits, policy);
+    return decode(bytes, limits, policy, orientation);
+  }
+
+  /**
+   * Decodes the PNG or JPEG content of {@code input} using {@link ImageDecodeLimits#DEFAULTS} with
+   * an explicit {@link AlphaPolicy} for RGBA / grayscale-with-alpha input and an explicit {@link
+   * ExifOrientationPolicy} for EXIF-rotated input. The stream is consumed in full; it is not closed
+   * by this method (internal wrappers are closed). To accept inputs beyond the default limits, use
+   * {@link #decode(InputStream, ImageDecodeLimits, AlphaPolicy, ExifOrientationPolicy)} instead.
+   *
+   * @param input non-null stream with the whole image
+   * @param policy non-null policy for the alpha band; palette {@code tRNS} stripping is unaffected
+   *     by the choice
+   * @param orientation non-null policy for the EXIF orientation tag; {@link
+   *     ExifOrientationPolicy#IGNORE} returns the stored, unrotated pixels
+   * @return the decoded image, with alpha and orientation handled per the policies
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds the
+   *     default limits
+   */
+  public static RgbImage decode(
+      InputStream input, AlphaPolicy policy, ExifOrientationPolicy orientation) throws IOException {
+    return decode(input, ImageDecodeLimits.DEFAULTS, policy, orientation);
   }
 
   /**
@@ -240,18 +343,21 @@ public final class ImageDecoder {
     return decode(input, limits, AlphaPolicy.COMPOSITE_OVER_WHITE);
   }
 
-  private static RgbImage decode(byte[] bytes, ImageDecodeLimits limits, AlphaPolicy policy)
+  private static RgbImage decode(
+      byte[] bytes, ImageDecodeLimits limits, AlphaPolicy policy, ExifOrientationPolicy orientation)
       throws IOException {
     String format;
     int width;
     int height;
     DecodePlan plan;
+    int orientationTag = 0;
     if (isPng(bytes)) {
       PngInfo info = parsePngHeader(bytes);
       format = "png";
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
+      orientationTag = info.orientation;
       if (info.trns != null) {
         // The pinned processor never applies tRNS: truecolor/grayscale PNGs stay in mode RGB/L
         // and the RGB conversion drops the chunk, and a palette image is rebuilt from
@@ -268,6 +374,7 @@ public final class ImageDecoder {
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
+      orientationTag = info.orientation;
     } else {
       throw new IOException(
           "unsupported image input: expected a PNG or JPEG file, found " + describeMagic(bytes));
@@ -281,13 +388,81 @@ public final class ImageDecoder {
       try {
         reader.setInput(stream);
         BufferedImage bi = reader.read(0, null);
-        return toRgbImage(bi, plan, policy);
+        RgbImage image = toRgbImage(bi, plan, policy);
+        // The transform is a pure pixel permutation and commutes with the color/alpha mapping
+        // (a pixel is a pixel), so permuting the final RGB buffer is exactly the reference
+        // order: transpose in the original mode, then convert to RGB.
+        return applyOrientation(image, orientation, orientationTag);
       } finally {
         reader.dispose();
       }
     } finally {
       stream.close();
     }
+  }
+
+  /**
+   * Permutes the decoded pixels to the stored EXIF orientation when {@code policy} is {@link
+   * ExifOrientationPolicy#APPLY} and {@code orientationTag} is one of the values 2–8; returns the
+   * image untouched — no allocation — otherwise. The transform is Pillow's {@code
+   * ImageOps.exif_transpose} table (see {@link ExifOrientationPolicy#APPLY}), applied to the final
+   * RGB buffer with {@code x} = column, {@code y} = row, and a {@code src} pair reading (column,
+   * row): 2: {@code src[W-1-x, y]}; 3: {@code src[W-1-x, H-1-y]}; 4: {@code src[x, H-1-y]}; 5:
+   * {@code src[y, x]}; 6: {@code src[y, H-1-x]}; 7: {@code src[W-1-y, H-1-x]}; 8: {@code src[W-1-y,
+   * x]}; the result dimensions swap for 5–8.
+   */
+  private static RgbImage applyOrientation(
+      RgbImage image, ExifOrientationPolicy policy, int orientationTag) {
+    if (policy != ExifOrientationPolicy.APPLY || orientationTag < 2 || orientationTag > 8) {
+      return image;
+    }
+    int w = image.width();
+    int h = image.height();
+    boolean dimsSwap = orientationTag >= 5;
+    int w2 = dimsSwap ? h : w;
+    int h2 = dimsSwap ? w : h;
+    byte[] src = image.pixelsRaw();
+    byte[] dst = new byte[src.length];
+    for (int y = 0; y < h2; y++) {
+      for (int x = 0; x < w2; x++) {
+        int sx;
+        int sy;
+        switch (orientationTag) {
+          case 2 -> {
+            sx = w - 1 - x;
+            sy = y;
+          }
+          case 3 -> {
+            sx = w - 1 - x;
+            sy = h - 1 - y;
+          }
+          case 4 -> {
+            sx = x;
+            sy = h - 1 - y;
+          }
+          case 5 -> {
+            sx = y;
+            sy = x;
+          }
+          case 6 -> {
+            sx = y;
+            sy = h - 1 - x;
+          }
+          case 7 -> {
+            sx = w - 1 - y;
+            sy = h - 1 - x;
+          }
+          default -> {
+            sx = w - 1 - y;
+            sy = x;
+          }
+        }
+        System.arraycopy(src, (sy * w + sx) * 3, dst, (y * w2 + x) * 3, 3);
+      }
+    }
+    // dst was allocated and filled here and is never shared, so it is adopted without the
+    // public constructor's defensive copy.
+    return RgbImage.ofUnchecked(w2, h2, dst);
   }
 
   private static void checkLimits(int width, int height, ImageDecodeLimits limits)
@@ -476,6 +651,11 @@ public final class ImageDecoder {
     // when the file carries none. Malformed input may carry more than one; the built-in reader
     // would honor each of them, so all must be stripped.
     List<int[]> trns;
+    // IFD0 Orientation tag value of the first eXIf chunk, 0 when absent or malformed.
+    int orientation;
+    // True once the first eXIf chunk has been examined (valid or not): like the reference,
+    // only the first one is ever read.
+    boolean exifSeen;
   }
 
   private static PngInfo parsePngHeader(byte[] b) throws IOException {
@@ -548,6 +728,11 @@ public final class ImageDecoder {
           info.trns = new ArrayList<>();
         }
         info.trns.add(new int[] {pos, (int) length});
+      } else if (cid == 0x65584966 && !info.exifSeen) { // "eXIf"
+        // The chunk data is the TIFF block directly (no "Exif" prefix). Only the first eXIf
+        // chunk is ever read, like the reference.
+        info.exifSeen = true;
+        info.orientation = parseTiffOrientation(b, pos + 8, (int) length);
       } else if (cid == 0x49444154) { // "IDAT"
         haveIdat = true;
       }
@@ -565,6 +750,12 @@ public final class ImageDecoder {
     int height;
     int components;
     int adobeTransform = -1;
+    // IFD0 Orientation tag value of the first valid EXIF APP1 segment, 0 when absent or
+    // malformed.
+    int orientation;
+    // True once the first EXIF-prefixed APP1 segment has been examined (valid or not): like
+    // the reference, only the first one is ever read.
+    boolean exifSeen;
   }
 
   /**
@@ -646,7 +837,25 @@ public final class ImageDecoder {
         }
         continue;
       }
-      if (marker == 0xEE
+      if (marker == 0xE1 && !info.exifSeen) { // APP1: only an EXIF segment carries orientation
+        // The EXIF payload is the 6-byte prefix "Exif\x00\x00" followed by a TIFF block. Only
+        // the first EXIF-prefixed segment in the file is ever read (the reference does the
+        // same); APP1 segments without the prefix (XMP and the like) are skipped. A malformed
+        // block is EXIF data, not container corruption: the walk must continue and the decode
+        // must never fail because of it (the reference's getexif() simply returns an empty
+        // object for such input), so parseTiffOrientation reports absence instead of throwing.
+        int payloadLength = length - 2; // the segment length includes the two length bytes
+        if (payloadLength >= 6
+            && (b[pos + 4] & 0xFF) == 0x45
+            && (b[pos + 5] & 0xFF) == 0x78
+            && (b[pos + 6] & 0xFF) == 0x69
+            && (b[pos + 7] & 0xFF) == 0x66
+            && (b[pos + 8] & 0xFF) == 0x00
+            && (b[pos + 9] & 0xFF) == 0x00) { // "Exif\x00\x00"
+          info.exifSeen = true;
+          info.orientation = parseTiffOrientation(b, pos + 10, payloadLength - 6);
+        }
+      } else if (marker == 0xEE
           && length >= 14) { // APP14: "Adobe" + version(2) + flags0(2) + flags1(2) + transform(1)
         if ((b[pos + 4] & 0xFF) == 0x41
             && (b[pos + 5] & 0xFF) == 0x64
@@ -707,6 +916,66 @@ public final class ImageDecoder {
 
   private static int u16(byte[] b, int off) {
     return ((b[off] & 0xFF) << 8) | (b[off + 1] & 0xFF);
+  }
+
+  private static int leU16(byte[] b, int off) {
+    return (b[off] & 0xFF) | (b[off + 1] & 0xFF) << 8;
+  }
+
+  private static int leU32(byte[] b, int off) {
+    return (b[off] & 0xFF)
+        | (b[off + 1] & 0xFF) << 8
+        | (b[off + 2] & 0xFF) << 16
+        | (b[off + 3] & 0xFF) << 24;
+  }
+
+  /**
+   * Reads the IFD0 {@code Orientation} tag (0x0112) value from the TIFF block at {@code
+   * b[off..off+len)} (a JPEG EXIF segment's block follows its {@code Exif\x00\x00} prefix; a PNG
+   * {@code eXIf} chunk's data is the block directly), or 0 when the block is malformed or carries
+   * no such tag. Malformation at any step — a byte order that is neither {@code II} (little-endian)
+   * nor {@code MM} (big-endian), a TIFF magic other than 42, an out-of-range first-IFD offset, a
+   * truncated IFD (a count whose entries run past the end of the block) — is EXIF data, not
+   * container corruption: it is reported as an absent orientation, never thrown, so a bad EXIF
+   * block can never break a decode. The tag must be type SHORT (3) with count 1; its value is the
+   * two-byte half of the entry's value field in the block's byte order. Every access is
+   * bounds-checked against {@code len}.
+   */
+  private static int parseTiffOrientation(byte[] b, int off, int len) {
+    if (len < 8) {
+      return 0; // byte order (2) + magic (2) + first-IFD offset (4)
+    }
+    int byteOrder = u16(b, off);
+    boolean little = byteOrder == 0x4949; // "II"
+    if (!little && byteOrder != 0x4D4D) { // "MM"
+      return 0;
+    }
+    int magic = little ? leU16(b, off + 2) : u16(b, off + 2);
+    if (magic != 42) {
+      return 0;
+    }
+    int ifdOffset = little ? leU32(b, off + 4) : (int) u32(b, off + 4);
+    if (ifdOffset < 0 || (long) ifdOffset + 2 > len) {
+      return 0; // the 2-byte entry count must be inside the block
+    }
+    int count = little ? leU16(b, off + ifdOffset) : u16(b, off + ifdOffset);
+    // Each IFD entry is 12 bytes: tag (2), type (2), count (4), value-or-offset (4).
+    if (count < 0 || ifdOffset + 2 + (long) count * 12 > len) {
+      return 0; // truncated IFD
+    }
+    for (int i = 0; i < count; i++) {
+      int entry = off + ifdOffset + 2 + i * 12;
+      int tag = little ? leU16(b, entry) : u16(b, entry);
+      int type = little ? leU16(b, entry + 2) : u16(b, entry + 2);
+      if (tag == 0x0112 && type == 3) {
+        int entryCount = little ? leU32(b, entry + 4) : (int) u32(b, entry + 4);
+        if (entryCount != 1) {
+          return 0;
+        }
+        return little ? leU16(b, entry + 8) : u16(b, entry + 8);
+      }
+    }
+    return 0;
   }
 
   // --------------------------------------------------------------- raster to RgbImage

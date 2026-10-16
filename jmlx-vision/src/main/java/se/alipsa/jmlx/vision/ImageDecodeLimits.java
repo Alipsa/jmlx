@@ -14,10 +14,12 @@ public record ImageDecodeLimits(long maxPixels, int maxDimension) {
   /**
    * The decode bounds used by every {@code ImageDecoder} overload that takes no explicit {@code
    * ImageDecodeLimits}: {@code decode(Path)}, {@code decode(InputStream)}, {@code decode(Path,
-   * AlphaPolicy)} and {@code decode(InputStream, AlphaPolicy)}. It accepts up to 16,777,216 pixels
-   * with a maximum side of 16,384 — a conservative ceiling that rejects typical 24 MP and 48 MP
-   * phone photos. The explicit {@code ImageDecoder.decode(..., limits, policy)} overloads accept
-   * any positive {@code ImageDecodeLimits} for callers whose memory budget allows larger inputs.
+   * AlphaPolicy)}, {@code decode(InputStream, AlphaPolicy)}, {@code decode(Path, AlphaPolicy,
+   * ExifOrientationPolicy)} and {@code decode(InputStream, AlphaPolicy, ExifOrientationPolicy)}. It
+   * accepts up to 16,777,216 pixels with a maximum side of 16,384 — a conservative ceiling that
+   * rejects typical 24 MP and 48 MP phone photos. The explicit {@code ImageDecoder.decode(...,
+   * limits, ...)} overloads accept any positive {@code ImageDecodeLimits} for callers whose memory
+   * budget allows larger inputs.
    */
   public static final ImageDecodeLimits DEFAULTS = new ImageDecodeLimits(16_777_216L, 16_384);
 

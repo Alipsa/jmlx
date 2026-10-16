@@ -712,10 +712,10 @@ scales/biases `[out, in/64]`, group 64), quantized embeddings, and an all-BF16 v
   | qwen-vl lock | `451c7a9fb8053d25b466da7103e2f92a2fd7af48baccce5117a6d57a4c210e6c` | `verifyQwenVlReferenceProvenance` |
 
   The `hf-reference lock` row's failure path was additionally verified **manually** (one-off,
-  during the second-review fix; not an in-repo automated test): appending one byte to
-  `tools/hf-reference/requirements.lock` made `verifyHfReferenceGoldens` fail with
+  during the second-review fix; not an in-repo automated test): appending one byte, `x`
+  (0x78), to `tools/hf-reference/requirements.lock` made `verifyHfReferenceGoldens` fail with
   `Hugging Face requirements.lock (phase72.requirements_lock_sha256) SHA-256 differs:
-  f8d59a69f341eb084835982e4a10a1cb66916917f93653203fdb4f6694b0029b7c`. The restored lock
+  48936da8f5811e50a3d1abcaa2ec3c3b210d486c30af55fb2895ddcfc653a812`. The restored lock
   re-hashes to the pinned `b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b`
   and the guard suite re-ran green; no automated negative test covers this check in-repo —
   the ordinary positive digest check runs as part of root `check`.

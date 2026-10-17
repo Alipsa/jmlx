@@ -360,6 +360,17 @@ class Qwen3VlProcessorConfigTest {
   }
 
   @Test
+  void minExceedingTheCappedMaxNamesTheEffectiveCap() {
+    // Declared 16,777,216 is capped at the raw-row hard cap 1,048,576 (decision (b)); the
+    // rejection must name the effective cap and the declared value, not present the cap as
+    // if it were the declared max_pixels.
+    expectRejection(
+        BASE.replace("\"shortest_edge\": 65536", "\"shortest_edge\": 2000000"),
+        "min_pixels 2000000 exceeds the effective max_pixels 1048576 (declared 16777216, "
+            + "capped at the raw-row hard cap 1048576)");
+  }
+
+  @Test
   void skippedPipelineStagesAreRejected() {
     String anchor = "{\n    \"size\": {";
     expectRejection(

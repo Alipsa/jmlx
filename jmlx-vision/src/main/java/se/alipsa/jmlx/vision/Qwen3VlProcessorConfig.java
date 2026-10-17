@@ -192,6 +192,22 @@ public final class Qwen3VlProcessorConfig {
           "declaredMaxPixels must be at least maxPixels: " + declaredMaxPixels + " < " + maxPixels);
     }
     if (minPixels > maxPixels) {
+      if (declaredMaxPixels > maxPixels) {
+        // The effective value was lowered by the decision (b) cap; naming it as the declared
+        // value would be misleading (declaredMaxPixels > maxPixels implies maxPixels == hardCap
+        // on the JSON path, and the builder passes equal values, so the else branch below is
+        // the only one that can apply there).
+        throw new IllegalArgumentException(
+            "min_pixels "
+                + minPixels
+                + " exceeds the effective max_pixels "
+                + maxPixels
+                + " (declared "
+                + declaredMaxPixels
+                + ", capped at the raw-row hard cap "
+                + hardCap
+                + ")");
+      }
       throw new IllegalArgumentException(
           "minPixels must be at most maxPixels: " + minPixels + " > " + maxPixels);
     }

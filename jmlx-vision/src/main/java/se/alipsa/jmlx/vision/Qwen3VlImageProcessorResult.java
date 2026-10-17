@@ -10,8 +10,10 @@ package se.alipsa.jmlx.vision;
  * patch_row, patch_col}. The post-merge token count the vision tower will produce for this image is
  * {@link #mergedRowCount()}; the merge itself happens in the model, not here.
  *
- * <p>The grid and values are defensive: mutation by a caller is never observable, and the values
- * array is copied both on construction and access.
+ * <p>The grid and values are defensive on read: mutation by a caller is never observable, and the
+ * values array is copied on every access. The constructor takes its array by ownership, without a
+ * defensive copy; its sole caller, {@link Qwen3VlImageProcessor#process(RgbImage)}, allocates it
+ * fresh and must not retain or mutate it after handing it over.
  */
 public final class Qwen3VlImageProcessorResult {
   private final int[] gridThw;
@@ -20,6 +22,16 @@ public final class Qwen3VlImageProcessorResult {
   private final int patchStride;
   private final float[] values;
 
+  /**
+   * Takes ownership of {@code values}, which is retained as-is without a defensive copy: the caller
+   * must allocate it fresh for this result and must not retain or mutate it afterwards.
+   *
+   * @param plan the validated geometry plan; null is rejected
+   * @param values the finished flattened patch tensor, exactly {@code rawPatchRows * patchStride}
+   *     floats; null is rejected
+   * @throws IllegalArgumentException if either argument is null or the values length does not equal
+   *     {@code rawPatchRows * patchStride}
+   */
   Qwen3VlImageProcessorResult(Qwen3VlGeometryPlan plan, float[] values) {
     if (plan == null) {
       throw new IllegalArgumentException("plan must not be null");
@@ -39,7 +51,7 @@ public final class Qwen3VlImageProcessorResult {
     this.rawPatchRows = plan.rawPatchRows();
     this.mergedRowCount = plan.mergedRowCount();
     this.patchStride = plan.patchStride();
-    this.values = values.clone();
+    this.values = values;
   }
 
   /**

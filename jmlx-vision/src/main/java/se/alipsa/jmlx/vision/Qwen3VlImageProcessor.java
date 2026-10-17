@@ -152,8 +152,8 @@ public final class Qwen3VlImageProcessor {
     ImageTensor norm =
         ImageTransforms.normalize(
             working, config.rescaleFactor(), config.imageMean(), config.imageStd());
-    // valuesRaw(): the normalized buffer is only read here; the flattened output buffer is fresh
-    // and is copied exactly once, by the result constructor.
+    // valuesRaw(): the normalized buffer is only read here; the flattened output buffer is
+    // allocated once and handed to the result constructor by ownership, with no copy.
     float[] normRaw = norm.valuesRaw();
     int ps = config.patchSize();
     int tps = config.temporalPatchSize();

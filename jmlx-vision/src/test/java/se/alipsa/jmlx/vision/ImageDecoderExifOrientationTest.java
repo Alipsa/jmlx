@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import org.junit.jupiter.api.Test;
@@ -21,10 +22,12 @@ import org.junit.jupiter.api.Test;
 /**
  * The EXIF-orientation policy of {@link ImageDecoder}: the default (and every existing overload)
  * decodes to the stored, unrotated pixels, and {@link ExifOrientationPolicy#APPLY} applies the
- * stored orientation exactly as Pillow's {@code ImageOps.exif_transpose} does. The orientation
- * tables below are pinned against the reference (Pillow 12.3.0) in the Phase 7.3b WP2 cross-check;
- * the committed {@code decode/exif-orient6-100x60.jpg} fixture (a 100x60 stored image whose
- * big-endian EXIF block says rotate 90° clockwise) is the end-to-end anchor.
+ * stored orientation exactly as Pillow's {@code ImageOps.exif_transpose} does. The committed {@code
+ * decode/exif-orient6-100x60.jpg} fixture (a 100x60 stored image whose big-endian EXIF block says
+ * rotate 90° clockwise) is the end-to-end anchor; every other expectation below — the TIFF
+ * type/count matrix, the truncation and last-wins rules, and the XMP fallback in both formats — was
+ * verified against the reference in its pinned venv ({@code tools/image-oracle/.venv}, Pillow
+ * 12.3.0) during the Phase 7.3b WP2 review before hardcoding.
  */
 class ImageDecoderExifOrientationTest {
 
@@ -186,9 +189,11 @@ class ImageDecoderExifOrientationTest {
               // A first-IFD offset that overflows a signed 32-bit addition when the bounds
               // check is computed in int arithmetic (0x7FFFFFFF + 2 wraps negative).
               tiffBlockWithIfdOffset(little, 0x7FFFFFFF),
-              // An IFD entry count truncated mid-entry: count 2, but only one and a half
-              // 12-byte entries present.
-              tiffBlockWithTruncatedEntries(little));
+              // A single IFD entry truncated mid-entry: no entry is stored, so the tag stays
+              // absent.
+              tiffBlockWithTruncatedFirstEntry(little),
+              // An IFD with a zero entry count: no tags at all.
+              tiffBlockWithNoEntries(little));
       for (int i = 0; i < blocks.size(); i++) {
         byte[] spliced = spliceJpegApp1(jpeg, blocks.get(i));
         RgbImage applied =
@@ -200,6 +205,142 @@ class ImageDecoderExifOrientationTest {
         assertEquals(stored, applied, label(little, -1) + " malformed block " + i);
       }
     }
+  }
+
+  @Test
+  void truncatedEntriesKeepTheIntactPrefixAndRotate() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    for (boolean little : new boolean[] {true, false}) {
+      // The IFD claims two entries but carries one and a half: the reference (Pillow 12.3.0,
+      // verified in its pinned venv) keeps the intact first entry — Orientation 6 — and stops at
+      // the truncated second one, so the image rotates in both endians.
+      byte[] spliced = spliceJpegApp1(jpeg, tiffBlockWithTruncatedEntries(little));
+      assertEquals(
+          stored, ImageDecoder.decode(new ByteArrayInputStream(spliced)), label(little, 6));
+      RgbImage applied = applyDecode(spliced);
+      assertEquals(64, applied.width(), label(little, 6));
+      assertEquals(96, applied.height(), label(little, 6));
+      assertEquals(permuted(stored, 6), applied, label(little, 6));
+    }
+  }
+
+  @Test
+  void anEntryOffsetPastTheEndStopsTheWalkKeepingEarlierEntries() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    for (boolean little : new boolean[] {true, false}) {
+      // The reference (Pillow 12.3.0, verified in its pinned venv) reads an offset value with a
+      // _safe_read that raises on a short read: the whole IFD walk stops there, keeping the
+      // entries stored before it. An intact Orientation 6 before the bad offset still rotates.
+      byte[] spliced = spliceJpegApp1(jpeg, badOffsetAfterOrientationBlock(little));
+      RgbImage applied = applyDecode(spliced);
+      assertEquals(64, applied.width(), label(little, 6));
+      assertEquals(96, applied.height(), label(little, 6));
+      assertEquals(permuted(stored, 6), applied, label(little, 6));
+      // …and a valid entry after the bad offset is never reached, so the orientation stays
+      // absent under both the default policy and APPLY.
+      byte[] splicedAbsent = spliceJpegApp1(jpeg, badOffsetBeforeOrientationBlock(little));
+      assertEquals(
+          stored, ImageDecoder.decode(new ByteArrayInputStream(splicedAbsent)), label(little, -1));
+      assertEquals(stored, applyDecode(splicedAbsent), label(little, -1));
+    }
+  }
+
+  @Test
+  void orientationTypeMatrixMatchesTheReference() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    byte[] xmp = xmpPayload(XMP_ATTR_6);
+    for (TypeCase typeCase : TYPE_CASES) {
+      for (boolean little : new boolean[] {true, false}) {
+        byte[] block =
+            orientationBlock(
+                little, typeCase.type(), typeCase.count(), typeCase.value().apply(little));
+        // Without XMP: the tag's own (possibly never-rotating) value decides; an absent tag
+        // leaves the pixels as stored.
+        int plain = typeCase.present() ? typeCase.effective() : 0;
+        assertEquals(
+            effective(stored, plain),
+            applyDecode(spliceJpegApp1(jpeg, block)),
+            caseLabel(little, typeCase.label()));
+        // With an XMP 6 packet: a present tag (even a never-rotating one) suppresses the
+        // fallback; only an absent tag consults it.
+        int withXmp = typeCase.present() ? typeCase.effective() : 6;
+        assertEquals(
+            effective(stored, withXmp),
+            applyDecode(spliceJpegPayloads(jpeg, exifPayload(block), xmp)),
+            caseLabel(little, typeCase.label()) + " + xmp");
+      }
+    }
+    // Two same-tag entries: the later one overwrites the earlier, like the reference's
+    // _tagdata dictionary.
+    for (boolean little : new boolean[] {true, false}) {
+      assertEquals(
+          permuted(stored, 6),
+          applyDecode(spliceJpegApp1(jpeg, duplicateOrientationBlock(little))),
+          caseLabel(little, "DUP SHORT3 then LONG6"));
+    }
+  }
+
+  @Test
+  void jpegXmpFallbackSuppliesTheOrientationWhenTheTagIsAbsent() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    // No EXIF at all: the XMP packet alone decides.
+    assertEquals(
+        permuted(stored, 6), applyDecode(spliceJpegPayloads(jpeg, xmpPayload(XMP_ATTR_6))));
+    // A packet without the tag leaves the pixels as stored.
+    assertEquals(stored, applyDecode(spliceJpegPayloads(jpeg, xmpPayload(XMP_NO_TAG))));
+    // The element form (>6) matches too.
+    assertEquals(
+        permuted(stored, 6), applyDecode(spliceJpegPayloads(jpeg, xmpPayload(XMP_ELEMENT_6))));
+    // Exactly one digit is captured: "12" resolves to 1 (no rotation).
+    assertEquals(stored, applyDecode(spliceJpegPayloads(jpeg, xmpPayload(XMP_ATTR_12))));
+    // The first left-to-right match wins.
+    assertEquals(
+        permuted(stored, 3), applyDecode(spliceJpegPayloads(jpeg, xmpPayload(XMP_FIRST_3_THEN_6))));
+    // Two XMP APP1 segments: the last one before the scan wins.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(spliceJpegPayloads(jpeg, xmpPayload(XMP_ATTR_3), xmpPayload(XMP_ATTR_6))));
+    // An XMP segment after the scan is ignored, like the reference's _open, which breaks at the
+    // first SOS.
+    assertEquals(stored, applyDecode(spliceJpegAfterScan(jpeg, xmpPayload(XMP_ATTR_6))));
+  }
+
+  @Test
+  void jpegXmpFallbackIsSuppressedByAPresentOrientationTag() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    byte[] xmp = xmpPayload(XMP_ATTR_6);
+    // A present tag that rotates: the EXIF value (3) wins over the XMP's 6, in both endians.
+    for (boolean little : new boolean[] {true, false}) {
+      assertEquals(
+          permuted(stored, 3),
+          applyDecode(spliceJpegPayloads(jpeg, exifPayload(exifTiffBlock(little, 3)), xmp)),
+          label(little, 3));
+    }
+    // A present tag whose value never rotates (0) suppresses the fallback.
+    assertEquals(
+        stored,
+        applyDecode(
+            spliceJpegPayloads(
+                jpeg, exifPayload(orientationBlock(true, 3, 1, shortValue(true, 0))), xmp)));
+    // An absent tag — a zero-entry IFD, a block without the tag, a bare package prefix — still
+    // falls back to the XMP packet.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(spliceJpegPayloads(jpeg, exifPayload(tiffBlockWithNoEntries(true)), xmp)));
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(spliceJpegPayloads(jpeg, exifPayload(tiffBlockWithOtherTag(true)), xmp)));
+    assertEquals(permuted(stored, 6), applyDecode(spliceJpegPayloads(jpeg, EXIF_PREFIX, xmp)));
   }
 
   @Test
@@ -231,6 +372,159 @@ class ImageDecoderExifOrientationTest {
     assertEquals(2, applied.width());
     assertEquals(4, applied.height());
     assertEquals(permuted(ignored, 6), applied);
+  }
+
+  @Test
+  void pngExifAndXmpChunkSemanticsMatchTheReference() throws Exception {
+    // The 4x2 pixel recipe of the Phase 7.3b WP2 venv cross-check (probe4/probe5): every
+    // expectation below was verified against the pinned Pillow 12.3.0 venv before hardcoding.
+    int width = 4;
+    int height = 2;
+    byte[] pixels = gradientPixels(width, height);
+    RgbImage stored = new RgbImage(width, height, pixels);
+    byte[] block6 = exifTiffBlock(true, 6);
+    // Two eXIf chunks: the last one in file order wins.
+    byte[] twoExif =
+        multiChunkPng(
+            width,
+            height,
+            pixels,
+            List.of(new PngChunk("eXIf", exifTiffBlock(true, 3)), new PngChunk("eXIf", block6)),
+            List.of());
+    // An eXIf chunk after IDAT is still read, like the reference's load().
+    assertEquals(stored, ImageDecoder.decode(new ByteArrayInputStream(twoExif)));
+    assertEquals(permuted(stored, 6), applyDecode(twoExif));
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width, height, pixels, List.of(), List.of(new PngChunk("eXIf", block6)))));
+    // A leading Exif\0\0 package prefix on the eXIf data is stripped before the TIFF parse.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(new PngChunk("eXIf", concat(EXIF_PREFIX, block6))),
+                List.of())));
+    // A tEXt "exif" keyword carries the raw TIFF block, parseable just like an eXIf chunk.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width, height, pixels, List.of(textChunk("tEXt", "exif", block6)), List.of())));
+    // The XMP packet from a tEXt, a (decompressed) zTXt or an iTXt chunk all fire the fallback.
+    PngChunk xmp = textChunk("tEXt", "XML:com.adobe.xmp", XMP_ATTR_6);
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(multiChunkPng(width, height, pixels, List.of(xmp), List.of())));
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(textChunk("zTXt", "XML:com.adobe.xmp", XMP_ATTR_6)),
+                List.of())));
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(textChunk("iTXt", "XML:com.adobe.xmp", XMP_ATTR_6)),
+                List.of())));
+    // A present eXIf orientation (3) wins over the XMP's 6.
+    assertEquals(
+        permuted(stored, 3),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(new PngChunk("eXIf", exifTiffBlock(true, 3)), xmp),
+                List.of())));
+    // An empty tEXt XMP value is falsy; the iTXt byte-valued slot supplies the packet.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(
+                    textChunk("tEXt", "XML:com.adobe.xmp", new byte[0]),
+                    textChunk("iTXt", "XML:com.adobe.xmp", XMP_ATTR_6)),
+                List.of())));
+    // A non-TIFF "exif" tEXt value is treated as an absent tag here (the reference's getexif()
+    // raises on it — a documented defensive divergence), so without XMP the pixels stay as stored.
+    assertEquals(
+        stored,
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(textChunk("tEXt", "exif", "garbage".getBytes(StandardCharsets.US_ASCII))),
+                List.of())));
+    // ... and with an XMP packet the fallback fires instead of raising.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(
+                    textChunk("tEXt", "exif", "garbage".getBytes(StandardCharsets.US_ASCII)), xmp),
+                List.of())));
+    // A post-IDAT XMP chunk is still read.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(multiChunkPng(width, height, pixels, List.of(), List.of(xmp))));
+    // An eXIf before IDAT is overwritten by a later eXIf after IDAT.
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(new PngChunk("eXIf", exifTiffBlock(true, 3))),
+                List.of(new PngChunk("eXIf", block6)))));
+    // A bare Exif\0\0 prefix (eXIf data or tEXt value) leaves the tag absent: no rotation
+    // without XMP, the fallback with it.
+    assertEquals(
+        stored,
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(new PngChunk("eXIf", EXIF_PREFIX.clone())),
+                List.of())));
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(new PngChunk("eXIf", EXIF_PREFIX.clone()), xmp),
+                List.of())));
+    assertEquals(
+        permuted(stored, 6),
+        applyDecode(
+            multiChunkPng(
+                width,
+                height,
+                pixels,
+                List.of(textChunk("tEXt", "exif", EXIF_PREFIX), xmp),
+                List.of())));
   }
 
   @Test
@@ -315,8 +609,105 @@ class ImageDecoderExifOrientationTest {
 
   // ----------------------------------------------------------------------------- helpers
 
+  /** The 6-byte EXIF package prefix. */
+  private static final byte[] EXIF_PREFIX = {'E', 'x', 'i', 'f', 0, 0};
+
+  /** The 29-byte (NUL-terminated) Adobe XMP package prefix of a JPEG XMP {@code APP1} payload. */
+  private static final byte[] XMP_PREFIX =
+      "http://ns.adobe.com/xap/1.0/\u0000".getBytes(StandardCharsets.US_ASCII);
+
+  private static final String XMP_ATTR_TEMPLATE =
+      "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:Description"
+          + " xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\" tiff:Orientation=\"%s\"/>"
+          + "</rdf:RDF></x:xmpmeta>";
+
+  /** The same packets the venv cross-check (probe4/probe5) was verified with. */
+  private static final byte[] XMP_ATTR_6 =
+      String.format(XMP_ATTR_TEMPLATE, "6").getBytes(StandardCharsets.US_ASCII);
+
+  private static final byte[] XMP_ATTR_3 =
+      String.format(XMP_ATTR_TEMPLATE, "3").getBytes(StandardCharsets.US_ASCII);
+  private static final byte[] XMP_ATTR_12 =
+      String.format(XMP_ATTR_TEMPLATE, "12").getBytes(StandardCharsets.US_ASCII);
+  private static final byte[] XMP_ELEMENT_6 =
+      ("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:Description"
+           + " xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\"><tiff:Orientation>6</tiff:Orientation>"
+           + "</rdf:Description></x:xmpmeta>")
+          .getBytes(StandardCharsets.US_ASCII);
+  private static final byte[] XMP_NO_TAG =
+      ("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:Description"
+              + " xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\"><tiff:Software>probe</tiff:Software>"
+              + "</rdf:Description></x:xmpmeta>")
+          .getBytes(StandardCharsets.US_ASCII);
+  private static final byte[] XMP_FIRST_3_THEN_6 =
+      concat(XMP_ATTR_3, "<second tiff:Orientation=\"6\"/>".getBytes(StandardCharsets.US_ASCII));
+
+  /** One row of the reference's IFD Orientation type/count matrix. */
+  private record TypeCase(
+      String label,
+      boolean present,
+      int effective,
+      int type,
+      int count,
+      Function<Boolean, byte[]> value) {}
+
+  /**
+   * The type/count matrix pinned against the reference (Pillow 12.3.0, its pinned venv, both
+   * endians — probe3 and probe6 of the Phase 7.3b WP2 cross-check): {@code present} is whether the
+   * tag is stored at all (unregistered types and count 0 keep it absent), and {@code effective} the
+   * orientation APPLY resolves it to (2–8 when it rotates, 0 when a present value never matches the
+   * transpose table).
+   */
+  private static final List<TypeCase> TYPE_CASES =
+      List.of(
+          new TypeCase("SHORT c1 6", true, 6, 3, 1, l -> shortValue(l, 6)),
+          new TypeCase(
+              "SHORT c2 (2,6)", true, 2, 3, 2, l -> concat(shortValue(l, 2), shortValue(l, 6))),
+          new TypeCase(
+              "SHORT c2 (1,6)", true, 1, 3, 2, l -> concat(shortValue(l, 1), shortValue(l, 6))),
+          new TypeCase("LONG c1 6", true, 6, 4, 1, l -> longValue(l, 6)),
+          new TypeCase("LONG c1 3", true, 3, 4, 1, l -> longValue(l, 3)),
+          new TypeCase(
+              "LONG c2 (1,6)", true, 1, 4, 2, l -> concat(longValue(l, 1), longValue(l, 6))),
+          new TypeCase("SIGNED_BYTE c1 6", true, 6, 6, 1, l -> new byte[] {6}),
+          new TypeCase("SIGNED_SHORT c1 6", true, 6, 8, 1, l -> shortValue(l, 6)),
+          new TypeCase("SIGNED_LONG c1 6", true, 6, 9, 1, l -> longValue(l, 6)),
+          new TypeCase("IFD c1 6", true, 6, 13, 1, l -> longValue(l, 6)),
+          new TypeCase("LONG8 c1 6", true, 6, 16, 1, l -> long8Value(l, 6)),
+          new TypeCase("RATIONAL (6,1)", true, 6, 5, 1, l -> rationalValue(l, 6, 1)),
+          new TypeCase("RATIONAL (12,2)", true, 6, 5, 1, l -> rationalValue(l, 12, 2)),
+          new TypeCase("RATIONAL (1,6)", true, 0, 5, 1, l -> rationalValue(l, 1, 6)),
+          new TypeCase("RATIONAL (0,0)", true, 0, 5, 1, l -> rationalValue(l, 0, 0)),
+          new TypeCase("SRATIONAL (6,1)", true, 6, 10, 1, l -> rationalValue(l, 6, 1)),
+          new TypeCase("FLOAT 6.0", true, 6, 11, 1, l -> floatValue(l, 6.0f)),
+          new TypeCase("FLOAT 2.5", true, 0, 11, 1, l -> floatValue(l, 2.5f)),
+          new TypeCase("DOUBLE 6.0", true, 6, 12, 1, l -> doubleValue(l, 6.0)),
+          new TypeCase("UNICODE(14) c1 6", false, 0, 14, 1, l -> longValue(l, 6)),
+          new TypeCase("IFD8(17) c1 6", false, 0, 17, 1, l -> longValue(l, 6)),
+          new TypeCase("SHORT c0", false, 0, 3, 0, l -> new byte[0]),
+          new TypeCase("BYTE c1 6", true, 0, 1, 1, l -> new byte[] {6}),
+          new TypeCase("ASCII c1 '6'", true, 0, 2, 1, l -> new byte[] {'6'}),
+          new TypeCase("UNDEFINED c1 6", true, 0, 7, 1, l -> new byte[] {6}));
+
   private static String label(boolean little, int orientation) {
     return "orientation " + orientation + " " + (little ? "II" : "MM");
+  }
+
+  private static String caseLabel(boolean little, String label) {
+    return label + " " + (little ? "II" : "MM");
+  }
+
+  /** The image APPLY should produce for an effective orientation (no rotation outside 2–8). */
+  private static RgbImage effective(RgbImage stored, int orientation) {
+    return orientation >= 2 && orientation <= 8 ? permuted(stored, orientation) : stored;
+  }
+
+  private static RgbImage applyDecode(byte[] bytes) throws IOException {
+    return ImageDecoder.decode(
+        new ByteArrayInputStream(bytes),
+        ImageDecodeLimits.DEFAULTS,
+        AlphaPolicy.COMPOSITE_OVER_WHITE,
+        ExifOrientationPolicy.APPLY);
   }
 
   private static byte[] concat(byte[] a, byte[] b) {
@@ -383,27 +774,68 @@ class ImageDecoderExifOrientationTest {
    * immediately after the SOI.
    */
   private static byte[] spliceJpegApp1(byte[] jpeg, byte[] tiffBlock) {
+    return spliceJpegPayloads(jpeg, exifPayload(tiffBlock));
+  }
+
+  /**
+   * Splices the given APP1 payloads (EXIF or XMP segments) immediately after the SOI, in the order
+   * given.
+   */
+  private static byte[] spliceJpegPayloads(byte[] jpeg, byte[]... payloads) {
     if ((jpeg[0] & 0xFF) != 0xFF || (jpeg[1] & 0xFF) != 0xD8) {
       throw new IllegalArgumentException("not a JPEG: expected the SOI marker");
     }
-    byte[] payload = new byte[6 + tiffBlock.length];
-    payload[0] = 'E';
-    payload[1] = 'x';
-    payload[2] = 'i';
-    payload[3] = 'f';
-    payload[4] = 0;
-    payload[5] = 0;
-    System.arraycopy(tiffBlock, 0, payload, 6, tiffBlock.length);
-    byte[] out = new byte[jpeg.length + 4 + payload.length];
+    int total = 0;
+    for (byte[] payload : payloads) {
+      total += payload.length;
+    }
+    byte[] out = new byte[jpeg.length + 4 * payloads.length + total];
     out[0] = (byte) 0xFF;
     out[1] = (byte) 0xD8;
-    out[2] = (byte) 0xFF;
-    out[3] = (byte) 0xE1;
-    int segmentLength = payload.length + 2; // includes the two length bytes
-    out[4] = (byte) (segmentLength >>> 8);
-    out[5] = (byte) segmentLength;
-    System.arraycopy(payload, 0, out, 6, payload.length);
-    System.arraycopy(jpeg, 2, out, 6 + payload.length, jpeg.length - 2);
+    int pos = 2;
+    for (byte[] payload : payloads) {
+      out[pos] = (byte) 0xFF;
+      out[pos + 1] = (byte) 0xE1;
+      int segmentLength = payload.length + 2; // includes the two length bytes
+      out[pos + 2] = (byte) (segmentLength >>> 8);
+      out[pos + 3] = (byte) segmentLength;
+      System.arraycopy(payload, 0, out, pos + 4, payload.length);
+      pos += 4 + payload.length;
+    }
+    System.arraycopy(jpeg, 2, out, pos, jpeg.length - 2);
+    return out;
+  }
+
+  /** The EXIF APP1 payload: the 6-byte package prefix plus a TIFF block. */
+  private static byte[] exifPayload(byte[] tiffBlock) {
+    return concat(EXIF_PREFIX, tiffBlock);
+  }
+
+  /** The XMP APP1 payload: the 29-byte (NUL-terminated) Adobe package prefix plus the packet. */
+  private static byte[] xmpPayload(byte[] packet) {
+    return concat(XMP_PREFIX, packet);
+  }
+
+  /**
+   * Splices one APP1 payload between the scan data and the trailing EOI marker — a segment the
+   * reference's marker walk never sees, because it breaks out at the first SOS.
+   */
+  private static byte[] spliceJpegAfterScan(byte[] jpeg, byte[] payload) {
+    int n = jpeg.length;
+    if ((jpeg[n - 2] & 0xFF) != 0xFF || (jpeg[n - 1] & 0xFF) != 0xD9) {
+      throw new IllegalArgumentException("not a JPEG: expected a trailing EOI marker");
+    }
+    byte[] out = new byte[n + 4 + payload.length];
+    System.arraycopy(jpeg, 0, out, 0, n - 2);
+    int pos = n - 2;
+    out[pos] = (byte) 0xFF;
+    out[pos + 1] = (byte) 0xE1;
+    int segmentLength = payload.length + 2;
+    out[pos + 2] = (byte) (segmentLength >>> 8);
+    out[pos + 3] = (byte) segmentLength;
+    System.arraycopy(payload, 0, out, pos + 4, payload.length);
+    out[pos + 4 + payload.length] = (byte) 0xFF;
+    out[pos + 4 + payload.length + 1] = (byte) 0xD9;
     return out;
   }
 
@@ -519,6 +951,153 @@ class ImageDecoderExifOrientationTest {
     return concat(concat(concat(header, count), ifdEntry(0x0112, 3, 1, 6, little)), halfEntry);
   }
 
+  /** A block whose single IFD entry is truncated mid-entry (6 of its 12 bytes present). */
+  private static byte[] tiffBlockWithTruncatedFirstEntry(boolean little) {
+    byte[] header = tiffHeader(little, 42, 8);
+    byte[] count = new byte[2];
+    writeU16(count, 0, 1, little);
+    byte[] halfEntry = Arrays.copyOf(ifdEntry(0x0112, 3, 1, 6, little), 6);
+    return concat(concat(header, count), halfEntry);
+  }
+
+  /** A block whose IFD claims zero entries. */
+  private static byte[] tiffBlockWithNoEntries(boolean little) {
+    byte[] header = tiffHeader(little, 42, 8);
+    byte[] count = new byte[2];
+    writeU16(count, 0, 0, little);
+    return concat(concat(header, count), new byte[4]);
+  }
+
+  /** An Orientation SHORT value (2 bytes, the block's endianness). */
+  private static byte[] shortValue(boolean little, int v) {
+    byte[] b = new byte[2];
+    writeU16(b, 0, v, little);
+    return b;
+  }
+
+  /** An Orientation LONG/SIGNED_LONG/IFD value (4 bytes, the block's endianness). */
+  private static byte[] longValue(boolean little, long v) {
+    byte[] b = new byte[4];
+    writeU32(b, 0, (int) v, little);
+    return b;
+  }
+
+  /**
+   * An Orientation LONG8 value (8 bytes, the block's endianness; the low word first when little).
+   */
+  private static byte[] long8Value(boolean little, long v) {
+    byte[] b = new byte[8];
+    if (little) {
+      writeU32(b, 0, (int) v, little);
+      writeU32(b, 4, (int) (v >>> 32), little);
+    } else {
+      writeU32(b, 0, (int) (v >>> 32), little);
+      writeU32(b, 4, (int) v, little);
+    }
+    return b;
+  }
+
+  /** An Orientation RATIONAL/SIGNED_RATIONAL value (an 8-byte numerator/denominator pair). */
+  private static byte[] rationalValue(boolean little, long numerator, long denominator) {
+    return concat(longValue(little, numerator), longValue(little, denominator));
+  }
+
+  /** An Orientation FLOAT value (4 raw IEEE-754 bytes, the block's endianness). */
+  private static byte[] floatValue(boolean little, float v) {
+    return longValue(little, Float.floatToRawIntBits(v));
+  }
+
+  /** An Orientation DOUBLE value (8 raw IEEE-754 bytes, the block's endianness). */
+  private static byte[] doubleValue(boolean little, double v) {
+    return long8Value(little, Double.doubleToRawLongBits(v));
+  }
+
+  /**
+   * A TIFF block whose single Orientation entry has the given type and count and the given encoded
+   * value bytes (already in the block's endianness). Values of four bytes or less sit inline in the
+   * entry's value field; longer values are stored at block offset 26 (header(8) + count(2) +
+   * entry(12) + next-IFD(4)) through the entry's offset field, the same layout the venv probes use.
+   */
+  private static byte[] orientationBlock(boolean little, int type, int count, byte[] value) {
+    byte[] block = new byte[value.length > 4 ? 26 + value.length : 26];
+    block[0] = (byte) (little ? 'I' : 'M');
+    block[1] = (byte) (little ? 'I' : 'M');
+    writeU16(block, 2, 42, little);
+    writeU32(block, 4, 8, little); // first IFD at offset 8
+    writeU16(block, 8, count, little);
+    writeU16(block, 10, 0x0112, little); // Orientation
+    writeU16(block, 12, type, little);
+    writeU32(block, 14, count, little);
+    if (value.length <= 4) {
+      System.arraycopy(value, 0, block, 18, value.length);
+    } else {
+      writeU32(block, 18, 26, little);
+      System.arraycopy(value, 0, block, 26, value.length);
+    }
+    return block;
+  }
+
+  /** A two-entry block: Orientation SHORT 3, then Orientation LONG 6 (the later one wins). */
+  private static byte[] duplicateOrientationBlock(boolean little) {
+    byte[] block = new byte[38];
+    block[0] = (byte) (little ? 'I' : 'M');
+    block[1] = (byte) (little ? 'I' : 'M');
+    writeU16(block, 2, 42, little);
+    writeU32(block, 4, 8, little);
+    writeU16(block, 8, 2, little);
+    writeU16(block, 10, 0x0112, little);
+    writeU16(block, 12, 3, little); // SHORT
+    writeU32(block, 14, 1, little);
+    writeU16(block, 18, 3, little);
+    writeU16(block, 22, 0x0112, little);
+    writeU16(block, 24, 4, little); // LONG
+    writeU32(block, 26, 1, little);
+    writeU32(block, 30, 6, little);
+    return block;
+  }
+
+  /**
+   * A two-entry block: Orientation SHORT 6, then an Orientation RATIONAL whose 8-byte value offset
+   * points past the end of the block (the reference's short offset read stops the walk there).
+   */
+  private static byte[] badOffsetAfterOrientationBlock(boolean little) {
+    return badOffsetOrientationBlock(little, true);
+  }
+
+  /** The reverse of {@link #badOffsetAfterOrientationBlock}: the bad-offset entry comes first. */
+  private static byte[] badOffsetBeforeOrientationBlock(boolean little) {
+    return badOffsetOrientationBlock(little, false);
+  }
+
+  private static byte[] badOffsetOrientationBlock(boolean little, boolean orientationFirst) {
+    byte[] block = new byte[38];
+    block[0] = (byte) (little ? 'I' : 'M');
+    block[1] = (byte) (little ? 'I' : 'M');
+    writeU16(block, 2, 42, little);
+    writeU32(block, 4, 8, little);
+    writeU16(block, 8, 2, little);
+    int good = orientationFirst ? 10 : 22;
+    writeShortOrientation6(block, good, little);
+    writeBadOffsetRational(block, good == 10 ? 22 : 10, little);
+    return block;
+  }
+
+  /** An Orientation SHORT 1 6 entry at the given 12-byte entry offset. */
+  private static void writeShortOrientation6(byte[] block, int entry, boolean little) {
+    writeU16(block, entry, 0x0112, little);
+    writeU16(block, entry + 2, 3, little); // SHORT
+    writeU32(block, entry + 4, 1, little);
+    writeU16(block, entry + 8, 6, little);
+  }
+
+  /** An Orientation RATIONAL entry whose 8-byte value offset points past the end of the block. */
+  private static void writeBadOffsetRational(byte[] block, int entry, boolean little) {
+    writeU16(block, entry, 0x0112, little);
+    writeU16(block, entry + 2, 5, little); // RATIONAL
+    writeU32(block, entry + 4, 1, little);
+    writeU32(block, entry + 8, 0x10000000, little); // past the end of the block
+  }
+
   /** A little/big-endian byte writer for hand-built TIFF blocks. */
   private static final class Tiff {
     private final boolean little;
@@ -566,6 +1145,18 @@ class ImageDecoderExifOrientationTest {
    */
   private static byte[] minimalTruecolorPng(int width, int height, byte[] pixels, byte[] exif)
       throws IOException {
+    List<PngChunk> preIdat = exif != null ? List.of(new PngChunk("eXIf", exif)) : List.of();
+    return multiChunkPng(width, height, pixels, preIdat, List.of());
+  }
+
+  /**
+   * An 8-bit truecolor PNG with arbitrary chunks spliced in before the first IDAT and between the
+   * IDAT and the IEND — the reference reads eXIf and the text chunks in both positions during
+   * {@code load()} — with correct CRC32s.
+   */
+  private static byte[] multiChunkPng(
+      int width, int height, byte[] pixels, List<PngChunk> preIdat, List<PngChunk> postIdat)
+      throws IOException {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     out.writeBytes(new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, (byte) 0x1A, 0x0A});
     byte[] ihdr = new byte[13];
@@ -574,23 +1165,59 @@ class ImageDecoderExifOrientationTest {
     ihdr[8] = 8; // bit depth
     ihdr[9] = 2; // color type: truecolor
     writeChunk(out, "IHDR", ihdr);
-    if (exif != null) {
-      writeChunk(out, "eXIf", exif);
+    for (PngChunk chunk : preIdat) {
+      writeChunk(out, chunk.type(), chunk.data());
     }
     ByteArrayOutputStream raw = new ByteArrayOutputStream();
     for (int y = 0; y < height; y++) {
       raw.write(0); // filter type: none
       raw.write(pixels, y * width * 3, width * 3);
     }
-    Deflater deflater = new Deflater();
-    deflater.setInput(raw.toByteArray());
-    deflater.finish();
-    byte[] compressed = new byte[raw.size() * 2 + 64];
-    int n = deflater.deflate(compressed);
-    deflater.end();
-    writeChunk(out, "IDAT", Arrays.copyOf(compressed, n));
+    writeChunk(out, "IDAT", zlibCompress(raw.toByteArray()));
+    for (PngChunk chunk : postIdat) {
+      writeChunk(out, chunk.type(), chunk.data());
+    }
     writeChunk(out, "IEND", new byte[0]);
     return out.toByteArray();
+  }
+
+  /** One named PNG chunk for the multi-chunk builder. */
+  private record PngChunk(String type, byte[] data) {}
+
+  /** A text chunk ({@code tEXt}/{@code zTXt}/{@code iTXt}) with the given keyword and value. */
+  private static PngChunk textChunk(String kind, String keyword, byte[] value) {
+    byte[] k = keyword.getBytes(StandardCharsets.US_ASCII);
+    return switch (kind) {
+      case "tEXt" -> new PngChunk(kind, concat(k, concat(new byte[] {0}, value)));
+      case "zTXt" -> new PngChunk(kind, concat(k, concat(new byte[] {0, 0}, zlibCompress(value))));
+      // cf=0 (uncompressed), cm=0, an empty language tag and translated keyword
+      default -> new PngChunk(kind, concat(k, concat(new byte[] {0, 0, 0, 0, 0}, value)));
+    };
+  }
+
+  /** A complete zlib (RFC 1950) stream over {@code data}. */
+  private static byte[] zlibCompress(byte[] data) {
+    Deflater deflater = new Deflater();
+    deflater.setInput(data);
+    deflater.finish();
+    byte[] compressed = new byte[data.length * 2 + 64];
+    int n = deflater.deflate(compressed);
+    deflater.end();
+    return Arrays.copyOf(compressed, n);
+  }
+
+  /** The 4x2 pixel recipe of the venv cross-check, sized for any width and height. */
+  private static byte[] gradientPixels(int width, int height) {
+    byte[] pixels = new byte[width * height * 3];
+    int p = 0;
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        pixels[p++] = (byte) (x * 60 % 256);
+        pixels[p++] = (byte) (y * 120 % 256);
+        pixels[p++] = (byte) ((255 - x * 20) % 256);
+      }
+    }
+    return pixels;
   }
 
   private static void writeChunk(OutputStream out, String type, byte[] data) throws IOException {

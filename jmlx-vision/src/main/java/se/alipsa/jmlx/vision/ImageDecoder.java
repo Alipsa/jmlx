@@ -11,14 +11,20 @@ import java.awt.image.Raster;
 import java.awt.image.SampleModel;
 import java.awt.image.WritableRaster;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.spi.IIORegistry;
@@ -70,10 +76,35 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * ignoring ({@link ExifOrientationPolicy#IGNORE}) and applying the stored orientation ({@link
  * ExifOrientationPolicy#APPLY}, the behavior of Pillow's {@code ImageOps.exif_transpose} followed
  * by {@code convert("RGB")} — the reference Qwen3-VL/Qwen2VL slow-processor image path; see {@code
- * req/plans/phase7-3b-reference-findings.md} §4.4, golden case {@code exif_orientation6}). Under
- * either policy a malformed EXIF block is data, not corruption: it is treated as absent and never
- * breaks the decode (the header walkers still reject structural corruption of the container
- * itself).
+ * req/plans/phase7-3b-reference-findings.md} §4.4, golden case {@code exif_orientation6}).
+ *
+ * <p>Under {@link ExifOrientationPolicy#APPLY} the effective orientation is resolved exactly the
+ * way the pinned reference's {@code getexif()} resolves it. The IFD0 {@code Orientation} tag
+ * (0x0112) wins whenever it is <em>present</em>: in a JPEG from the first {@code APP1} segment
+ * whose payload starts with {@code Exif\x00\x00} (later EXIF {@code APP1}s are concatenated to its
+ * bytes, but the first segment's IFD0 dominates the parse, and only {@code APP1}s before the first
+ * scan are considered); in a PNG from the last {@code eXIf} chunk or text-chunk {@code exif}
+ * keyword in file order, including chunks after {@code IDAT}. A later same-tag entry overwrites an
+ * earlier one; entries stored before a truncated IFD or a short offset read are kept; only the
+ * reference's registered TIFF types (BYTE, ASCII, SHORT, LONG, RATIONAL, SIGNED_BYTE, UNDEFINED,
+ * SIGNED_SHORT, SIGNED_LONG, FLOAT, DOUBLE, IFD, LONG8) with a non-zero count make the tag present
+ * — unregistered types and count 0 keep it absent. A present tag rotates only when its first value
+ * is an integer in 2–8, or an integer-valued float or rational (a 0/0 rational is nan): BYTE, ASCII
+ * and UNDEFINED values, non-integral values and out-of-range values never rotate, but they still
+ * suppress the fallback. Only an absent tag consults the XMP fallback: the first single-digit match
+ * of {@code tiff:Orientation(="|>)} in the XMP packet — in a JPEG the last {@code APP1} before the
+ * scan whose payload starts with the 29-byte (NUL-terminated) Adobe XMP package prefix; in a PNG
+ * the last text-chunk keyword {@code XML:com.adobe.xmp} ({@code tEXt} or decompressed {@code zTXt}
+ * value first, the {@code iTXt} value otherwise) — supplies the orientation, or none.
+ *
+ * <p>Like the reference, a malformed EXIF or XMP block is data, not corruption: it is treated as
+ * absent and never breaks the decode (the header walkers still reject structural corruption of the
+ * container itself). Where the reference's {@code getexif()} would instead raise on pathological
+ * metadata — a bad TIFF byte order or magic, a truncated post-{@code IDAT} chunk, an {@code iTXt}
+ * XMP value stored as an object its regex cannot scan — the decode here treats the orientation as
+ * absent, and a {@code zTXt} or valid-UTF-8 {@code iTXt} {@code exif} value, which the reference
+ * stores as a string it cannot load, is parsed as the underlying bytes (and can rotate): a
+ * defensive leniency on input the reference rejects outright.
  *
  * <p><b>ICC and gAMA color management are ignored:</b> embedded color profiles and gamma chunks are
  * not applied to samples, matching the reference path, which performs no conversion. Callers doing
@@ -93,6 +124,27 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  */
 public final class ImageDecoder {
   private ImageDecoder() {}
+
+  /** The IFD0 Orientation tag. */
+  private static final int ORIENTATION_TAG = 0x0112;
+
+  /** The EXIF package prefix, stripped (repeatedly) before the TIFF block is parsed. */
+  private static final byte[] EXIF_PACKAGE_PREFIX = {'E', 'x', 'i', 'f', 0, 0};
+
+  /** The 29-byte (NUL-terminated) Adobe XMP package prefix of a JPEG XMP {@code APP1} segment. */
+  private static final byte[] XMP_PACKAGE_PREFIX =
+      "http://ns.adobe.com/xap/1.0/\u0000".getBytes(StandardCharsets.US_ASCII);
+
+  /** The reference's XMP fallback search tag. */
+  private static final byte[] XMP_ORIENTATION_TAG =
+      "tiff:Orientation".getBytes(StandardCharsets.US_ASCII);
+
+  /** The PNG text-chunk keyword whose value carries EXIF bytes. */
+  private static final byte[] EXIF_TEXT_KEYWORD = "exif".getBytes(StandardCharsets.US_ASCII);
+
+  /** The PNG text-chunk keyword whose value carries the XMP packet. */
+  private static final byte[] XMP_TEXT_KEYWORD =
+      "XML:com.adobe.xmp".getBytes(StandardCharsets.US_ASCII);
 
   /**
    * Decodes the PNG or JPEG file at {@code path} using {@link ImageDecodeLimits#DEFAULTS} ({@code
@@ -357,7 +409,7 @@ public final class ImageDecoder {
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
-      orientationTag = info.orientation;
+      orientationTag = resolveOrientation(info.exif, info.xmpText, info.xmpBytes);
       if (info.trns != null) {
         // The pinned processor never applies tRNS: truecolor/grayscale PNGs stay in mode RGB/L
         // and the RGB conversion drops the chunk, and a palette image is rebuilt from
@@ -374,7 +426,7 @@ public final class ImageDecoder {
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
-      orientationTag = info.orientation;
+      orientationTag = resolveOrientation(info.exif, null, info.xmp);
     } else {
       throw new IOException(
           "unsupported image input: expected a PNG or JPEG file, found " + describeMagic(bytes));
@@ -647,15 +699,22 @@ public final class ImageDecoder {
     int colorType;
     byte[] palette; // RGB triples, paletteCount * 3 bytes
     int paletteCount;
-    // {offset of the length field, data length} for every tRNS chunk in file order, or null
-    // when the file carries none. Malformed input may carry more than one; the built-in reader
-    // would honor each of them, so all must be stripped.
+    // {offset of the length field, data length} for every pre-IDAT tRNS chunk in file order, or
+    // null when the file carries none. Malformed input may carry more than one; the built-in
+    // reader would honor each of them, so all must be stripped.
     List<int[]> trns;
-    // IFD0 Orientation tag value of the first eXIf chunk, 0 when absent or malformed.
-    int orientation;
-    // True once the first eXIf chunk has been examined (valid or not): like the reference,
-    // only the first one is ever read.
-    boolean exifSeen;
+    // Raw value of the last "exif" entry in file order — an eXIf chunk's data (the TIFF block
+    // directly, no prefix) or a tEXt/zTXt/iTXt "exif" keyword's value — or null when the file
+    // carries none. Leading "Exif\x00\x00" prefixes are stripped when it is parsed.
+    byte[] exifPayload;
+    // Value of the last "XML:com.adobe.xmp" text-chunk entry (tEXt or decompressed zTXt value),
+    // or null; an empty value is falsy, like the reference's str-valued slot.
+    byte[] xmpText;
+    // (Decompressed) value of the last iTXt "XML:com.adobe.xmp" entry — the reference's
+    // byte-valued slot — or null.
+    byte[] xmpBytes;
+    // The orientation resolved from exifPayload, filled in after the walk.
+    TiffOrientation exif = TiffOrientation.ABSENT;
   }
 
   private static PngInfo parsePngHeader(byte[] b) throws IOException {
@@ -708,40 +767,185 @@ public final class ImageDecoder {
     if (info.colorType == 3) {
       info.paletteCount = 0;
     }
-    // Walk chunks (PLTE and tRNS must precede IDAT).
+    // Walk chunks: PLTE and tRNS must precede IDAT; eXIf and the text chunks may legally follow
+    // it (the reference reads them during load()), so the walk continues past the first IDAT to
+    // IEND. A truncation before IDAT is container corruption and is rejected; one after IDAT
+    // never breaks the metadata walk — the available bytes are processed, then the walk stops.
     int pos = 8;
     boolean haveIdat = false;
-    while (pos + 12 <= b.length && !haveIdat) {
+    while (pos + 12 <= b.length) {
       long length = u32(b, pos);
-      if (pos + 8 + length + 4 > b.length) {
+      boolean complete = pos + 8 + length + 4 <= b.length;
+      if (!complete && !haveIdat) {
         throw new IOException("corrupt PNG: truncated chunk at offset " + pos);
       }
       long cid = u32(b, pos + 4);
-      if (cid == 0x504C5445) { // "PLTE"
-        if (length < 3 || length % 3 != 0) {
-          throw new IOException("corrupt PNG: malformed PLTE chunk");
-        }
-        info.palette = Arrays.copyOfRange(b, pos + 8, pos + 8 + (int) length);
-        info.paletteCount = (int) (length / 3);
-      } else if (cid == 0x74524E53) { // "tRNS"
-        if (info.trns == null) {
-          info.trns = new ArrayList<>();
-        }
-        info.trns.add(new int[] {pos, (int) length});
-      } else if (cid == 0x65584966 && !info.exifSeen) { // "eXIf"
-        // The chunk data is the TIFF block directly (no "Exif" prefix). Only the first eXIf
-        // chunk is ever read, like the reference.
-        info.exifSeen = true;
-        info.orientation = parseTiffOrientation(b, pos + 8, (int) length);
-      } else if (cid == 0x49444154) { // "IDAT"
+      pngChunk(b, pos, complete ? (int) length : b.length - pos - 8, !haveIdat, info);
+      if (cid == 0x49454E44) { // "IEND"
+        break;
+      }
+      if (cid == 0x49444154) { // "IDAT"
         haveIdat = true;
+      }
+      if (!complete) {
+        break;
       }
       pos += 12 + (int) length;
     }
     if (info.colorType == 3 && info.palette == null) {
       throw new IOException("corrupt PNG: palette image has no PLTE chunk");
     }
+    if (info.exifPayload != null) {
+      info.exif = parseExifPayload(info.exifPayload);
+    }
     return info;
+  }
+
+  /**
+   * Records the orientation-relevant metadata of one PNG chunk at {@code pos} with {@code length}
+   * data bytes (the full declared length, or the truncated remainder after IDAT). Later chunks of
+   * the same kind overwrite earlier ones, like the reference's {@code im_info} dictionary.
+   */
+  private static void pngChunk(byte[] b, int pos, int length, boolean preIdat, PngInfo info)
+      throws IOException {
+    long cid = u32(b, pos + 4);
+    int data = pos + 8;
+    if (cid == 0x504C5445) { // "PLTE"
+      if (!preIdat) {
+        return;
+      }
+      if (length < 3 || length % 3 != 0) {
+        throw new IOException("corrupt PNG: malformed PLTE chunk");
+      }
+      info.palette = Arrays.copyOfRange(b, data, data + length);
+      info.paletteCount = length / 3;
+    } else if (cid == 0x74524E53) { // "tRNS"
+      if (!preIdat) {
+        return;
+      }
+      if (info.trns == null) {
+        info.trns = new ArrayList<>();
+      }
+      info.trns.add(new int[] {pos, length});
+    } else if (cid == 0x65584966) { // "eXIf"
+      // The chunk data is the TIFF block directly (no "Exif" prefix); the last one in file
+      // order wins, like the reference.
+      info.exifPayload = Arrays.copyOfRange(b, data, data + length);
+    } else if (cid == 0x74455874) { // "tEXt"
+      pngTextChunk(b, data, length, info);
+    } else if (cid == 0x7A545874) { // "zTXt"
+      pngZTxtChunk(b, data, length, info);
+    } else if (cid == 0x69545874) { // "iTXt"
+      pngITxtChunk(b, data, length, info);
+    }
+  }
+
+  /**
+   * A {@code tEXt} chunk's data: {@code keyword \0 value}. The reference stores the raw value bytes
+   * in its {@code exif} entry for the exact keyword {@code exif} (parseable EXIF!) and the value in
+   * its str-valued XMP entry for {@code XML:com.adobe.xmp}; any other keyword is irrelevant to
+   * orientation. A missing NUL keeps the whole data as the keyword (the reference's broken-tEXt
+   * fallback) and leaves the value empty.
+   */
+  private static void pngTextChunk(byte[] b, int data, int length, PngInfo info) {
+    int end = data + length;
+    int nul = indexOfByte(b, data, end);
+    int kEnd = nul >= 0 ? nul : end;
+    int vStart = nul >= 0 ? nul + 1 : end;
+    if (kEnd == data) {
+      return;
+    }
+    if (equalsRegion(b, data, kEnd - data, EXIF_TEXT_KEYWORD)) {
+      info.exifPayload = Arrays.copyOfRange(b, vStart, end);
+    } else if (equalsRegion(b, data, kEnd - data, XMP_TEXT_KEYWORD)) {
+      info.xmpText = Arrays.copyOfRange(b, vStart, end);
+    }
+  }
+
+  /**
+   * A {@code zTXt} chunk's data: {@code keyword \0 comp_method zlib(value)}. Only comp method 0 is
+   * known — the reference raises on any other, so it is simply not captured here. A corrupt or
+   * incomplete zlib payload yields the reference's empty value, which is stored (the slot is set,
+   * to a falsy value), like the reference's {@code v = b""} on {@code zlib.error}.
+   */
+  private static void pngZTxtChunk(byte[] b, int data, int length, PngInfo info) {
+    int end = data + length;
+    int nul = indexOfByte(b, data, end);
+    int kEnd = nul >= 0 ? nul : end;
+    int restStart = nul >= 0 ? nul + 1 : end;
+    if (kEnd == data) {
+      return;
+    }
+    if (restStart < end && (b[restStart] & 0xFF) != 0) {
+      return;
+    }
+    byte[] value = inflateZlib(Arrays.copyOfRange(b, restStart + 1, end));
+    if (value == null) {
+      value = new byte[0];
+    }
+    if (equalsRegion(b, data, kEnd - data, EXIF_TEXT_KEYWORD)) {
+      info.exifPayload = value;
+    } else if (equalsRegion(b, data, kEnd - data, XMP_TEXT_KEYWORD)) {
+      info.xmpText = value;
+    }
+  }
+
+  /**
+   * An {@code iTXt} chunk's data: {@code keyword \0 cf(1) cm(1) lang \0 translated \0 value}. The
+   * reference stores the (decompressed) value in its byte-valued {@code xmp} entry for the exact
+   * keyword {@code XML:com.adobe.xmp} — before the strict UTF-8 check — and, only when the keyword,
+   * language, translation and value all decode as strict UTF-8, in its str-valued entry; the exact
+   * keyword {@code exif} ends up string-valued there, which makes the reference's {@code getexif()}
+   * raise — here it is parsed as bytes instead (and is almost always absent). A compressed value
+   * ({@code cf} 1) must use comp method 0, and any inflate failure leaves the slots untouched, like
+   * the reference's early returns.
+   */
+  private static void pngITxtChunk(byte[] b, int data, int length, PngInfo info) {
+    int end = data + length;
+    int nul1 = indexOfByte(b, data, end);
+    if (nul1 < 0) {
+      return;
+    }
+    int p = nul1 + 1;
+    if (p + 2 > end) {
+      return;
+    }
+    int cf = b[p] & 0xFF;
+    int cm = b[p + 1] & 0xFF;
+    int langStart = p + 2;
+    int langEnd = indexOfByte(b, langStart, end);
+    if (langEnd < 0) {
+      return;
+    }
+    int tkEnd = indexOfByte(b, langEnd + 1, end);
+    if (tkEnd < 0) {
+      return;
+    }
+    int vStart = tkEnd + 1;
+    byte[] value = Arrays.copyOfRange(b, vStart, end);
+    if (cf != 0) {
+      if (cm != 0) {
+        return;
+      }
+      byte[] inflated = inflateZlib(value);
+      if (inflated == null) {
+        return;
+      }
+      value = inflated;
+    }
+    if (equalsRegion(b, data, nul1 - data, XMP_TEXT_KEYWORD)) {
+      info.xmpBytes = value;
+    }
+    if (validUtf8(b, data, nul1)
+        && validUtf8(b, langStart, langEnd)
+        && validUtf8(b, langEnd + 1, tkEnd)
+        && validUtf8(value, 0, value.length)) {
+      if (equalsRegion(b, data, nul1 - data, EXIF_TEXT_KEYWORD)) {
+        info.exifPayload = value;
+      } else if (equalsRegion(b, data, nul1 - data, XMP_TEXT_KEYWORD)) {
+        info.xmpText = value;
+      }
+    }
   }
 
   /** JPEG metadata extracted by walking the full marker structure. */
@@ -750,12 +954,17 @@ public final class ImageDecoder {
     int height;
     int components;
     int adobeTransform = -1;
-    // IFD0 Orientation tag value of the first valid EXIF APP1 segment, 0 when absent or
-    // malformed.
-    int orientation;
-    // True once the first EXIF-prefixed APP1 segment has been examined (valid or not): like
-    // the reference, only the first one is ever read.
+    // The reference's info["exif"] value: the first EXIF-prefixed APP1 segment's payload (prefix
+    // included) with every later EXIF-prefixed segment's payload (minus its prefix) concatenated,
+    // or null when the file carries none before the first scan.
+    ByteArrayOutputStream exifBuffer;
+    // True once the first EXIF-prefixed APP1 segment has been seen.
     boolean exifSeen;
+    // Payload after the 29-byte (NUL-terminated) Adobe XMP package prefix of the last XMP APP1
+    // segment before the first scan, or null.
+    byte[] xmp;
+    // The orientation resolved from exifBuffer, filled in after the walk.
+    TiffOrientation exif = TiffOrientation.ABSENT;
   }
 
   /**
@@ -776,6 +985,7 @@ public final class ImageDecoder {
     int pos = 2;
     int n = b.length;
     boolean eoiSeen = false;
+    boolean sosSeen = false;
     while (!eoiSeen) {
       while (pos + 1 < n && (b[pos] & 0xFF) == 0xFF && (b[pos + 1] & 0xFF) == 0xFF) {
         pos++; // fill byte
@@ -806,6 +1016,7 @@ public final class ImageDecoder {
         throw new IOException("corrupt JPEG: bad segment length " + length + " at offset " + pos);
       }
       if (marker == 0xDA) { // SOS: the compressed scan follows; find its terminating marker
+        sosSeen = true;
         if (length < 6) {
           throw new IOException("corrupt JPEG: bad SOS segment length " + length);
         }
@@ -837,23 +1048,31 @@ public final class ImageDecoder {
         }
         continue;
       }
-      if (marker == 0xE1 && !info.exifSeen) { // APP1: only an EXIF segment carries orientation
-        // The EXIF payload is the 6-byte prefix "Exif\x00\x00" followed by a TIFF block. Only
-        // the first EXIF-prefixed segment in the file is ever read (the reference does the
-        // same); APP1 segments without the prefix (XMP and the like) are skipped. A malformed
-        // block is EXIF data, not container corruption: the walk must continue and the decode
-        // must never fail because of it (the reference's getexif() simply returns an empty
-        // object for such input), so parseTiffOrientation reports absence instead of throwing.
+      if (marker == 0xE1 && !sosSeen) { // APP1: only EXIF and XMP segments carry orientation
+        // Like the reference's _open, only APP1 segments before the first scan are considered:
+        // it breaks out of the marker walk at the first SOS. The EXIF payload is the 6-byte
+        // prefix "Exif\x00\x00" followed by a TIFF block; the first EXIF-prefixed segment sets
+        // the value (prefix included), every later one is concatenated without its prefix — but
+        // the first segment's IFD0 still dominates the parse, since it is read first and the
+        // only tag honored (Orientation) lives in IFD0. A malformed block is EXIF data, not
+        // container corruption: the walk must continue and the decode must never fail because
+        // of it (the reference's getexif() simply returns an empty object for such input), so
+        // parseTiffOrientation reports absence instead of throwing.
+        int payloadStart = pos + 4;
         int payloadLength = length - 2; // the segment length includes the two length bytes
-        if (payloadLength >= 6
-            && (b[pos + 4] & 0xFF) == 0x45
-            && (b[pos + 5] & 0xFF) == 0x78
-            && (b[pos + 6] & 0xFF) == 0x69
-            && (b[pos + 7] & 0xFF) == 0x66
-            && (b[pos + 8] & 0xFF) == 0x00
-            && (b[pos + 9] & 0xFF) == 0x00) { // "Exif\x00\x00"
-          info.exifSeen = true;
-          info.orientation = parseTiffOrientation(b, pos + 10, payloadLength - 6);
+        if (startsWith(b, payloadStart, payloadLength, EXIF_PACKAGE_PREFIX)) {
+          if (!info.exifSeen) {
+            info.exifSeen = true;
+            info.exifBuffer = new ByteArrayOutputStream();
+            info.exifBuffer.write(b, payloadStart, payloadLength);
+          } else {
+            info.exifBuffer.write(b, payloadStart + 6, payloadLength - 6);
+          }
+        } else if (startsWith(b, payloadStart, payloadLength, XMP_PACKAGE_PREFIX)) {
+          // The XMP payload is everything after the 29-byte (NUL-terminated) package prefix;
+          // the last XMP segment before the scan wins.
+          int xmpStart = payloadStart + XMP_PACKAGE_PREFIX.length;
+          info.xmp = Arrays.copyOfRange(b, xmpStart, payloadStart + payloadLength);
         }
       } else if (marker == 0xEE
           && length >= 14) { // APP14: "Adobe" + version(2) + flags0(2) + flags1(2) + transform(1)
@@ -904,6 +1123,9 @@ public final class ImageDecoder {
               + info.adobeTransform
               + ")");
     }
+    if (info.exifBuffer != null) {
+      info.exif = parseExifPayload(info.exifBuffer.toByteArray());
+    }
     return info;
   }
 
@@ -929,53 +1151,315 @@ public final class ImageDecoder {
         | (b[off + 3] & 0xFF) << 24;
   }
 
+  private static long leU64(byte[] b, int off) {
+    long v = 0;
+    for (int i = 0; i < 8; i++) {
+      v |= (b[off + i] & 0xFFL) << (i * 8);
+    }
+    return v;
+  }
+
+  private static long u64(byte[] b, int off) {
+    long v = 0;
+    for (int i = 0; i < 8; i++) {
+      v = (v << 8) | (b[off + i] & 0xFFL);
+    }
+    return v;
+  }
+
   /**
-   * Reads the IFD0 {@code Orientation} tag (0x0112) value from the TIFF block at {@code
-   * b[off..off+len)} (a JPEG EXIF segment's block follows its {@code Exif\x00\x00} prefix; a PNG
-   * {@code eXIf} chunk's data is the block directly), or 0 when the block is malformed or carries
-   * no such tag. Malformation at any step — a byte order that is neither {@code II} (little-endian)
-   * nor {@code MM} (big-endian), a TIFF magic other than 42, an out-of-range first-IFD offset, a
-   * truncated IFD (a count whose entries run past the end of the block) — is EXIF data, not
-   * container corruption: it is reported as an absent orientation, never thrown, so a bad EXIF
-   * block can never break a decode. The tag must be type SHORT (3) with count 1; its value is the
-   * two-byte half of the entry's value field in the block's byte order. Every access is
-   * bounds-checked against {@code len}.
+   * The IFD0 {@code Orientation} tag (0x0112) of one EXIF payload, resolved to what the reference's
+   * {@code exif_transpose} would do with it: {@code present} is false when the block carries no
+   * Orientation tag at all (malformed block, missing tag, unregistered type or count 0) — in which
+   * case the XMP fallback may fire — and {@code value} is the effective orientation: a usable 2–8,
+   * or 0 when the tag is present but its first value (a BYTE/ASCII/ UNDEFINED value, a non-integral
+   * or out-of-range value, a 0/0 rational) never matches the reference's int-keyed transpose table.
    */
-  private static int parseTiffOrientation(byte[] b, int off, int len) {
+  private record TiffOrientation(int value, boolean present) {
+    static final TiffOrientation ABSENT = new TiffOrientation(0, false);
+  }
+
+  /**
+   * Resolves the effective orientation exactly the way the reference's {@code getexif()} does: the
+   * EXIF Orientation tag wins whenever it is <em>present</em> (even when it never rotates); only an
+   * absent tag consults the XMP fallback, where the str-valued slot (the PNG text chunks) wins over
+   * the byte-valued one and an empty value is falsy.
+   */
+  private static int resolveOrientation(TiffOrientation exif, byte[] xmpText, byte[] xmpBytes) {
+    if (exif.present()) {
+      return exif.value();
+    }
+    byte[] xmp = xmpText != null && xmpText.length > 0 ? xmpText : xmpBytes;
+    return xmp != null && xmp.length > 0 ? xmpOrientationScan(xmp) : 0;
+  }
+
+  /**
+   * Strips the repeated leading {@code Exif\x00\x00} package prefixes the reference strips in a
+   * loop, then parses the remaining TIFF block; an empty remainder (a bare prefix) is absent.
+   */
+  private static TiffOrientation parseExifPayload(byte[] payload) {
+    int off = 0;
+    while (off + EXIF_PACKAGE_PREFIX.length <= payload.length
+        && bytesEqualAt(payload, off, EXIF_PACKAGE_PREFIX)) {
+      off += EXIF_PACKAGE_PREFIX.length;
+    }
+    if (off >= payload.length) {
+      return TiffOrientation.ABSENT;
+    }
+    return parseTiffOrientation(payload, off, payload.length - off);
+  }
+
+  /**
+   * Reads the IFD0 {@code Orientation} tag (0x0112) from the TIFF block at {@code b[off..off+len)}
+   * (the part of an EXIF payload left behind by {@link #parseExifPayload}), mirroring the
+   * reference's IFD walk ({@code ImageFileDirectory_v2.load}): entries are processed in file order
+   * and a later same-tag entry overwrites an earlier one; a truncated entry count or a short read
+   * of an offset value stops the walk, keeping the entries stored before it; entries whose type has
+   * no registered loader, or whose count is 0, are skipped without being stored. Malformation at
+   * any step — a byte order that is neither {@code II} (little-endian) nor {@code MM} (big-endian),
+   * a TIFF magic other than 42, an out-of-range first-IFD offset — is EXIF data, not container
+   * corruption: it is reported as an absent orientation, never thrown, so a bad EXIF block can
+   * never break a decode. Every access is bounds-checked against {@code len}.
+   */
+  private static TiffOrientation parseTiffOrientation(byte[] b, int off, int len) {
     if (len < 8) {
-      return 0; // byte order (2) + magic (2) + first-IFD offset (4)
+      return TiffOrientation.ABSENT; // byte order (2) + magic (2) + first-IFD offset (4)
     }
     int byteOrder = u16(b, off);
     boolean little = byteOrder == 0x4949; // "II"
     if (!little && byteOrder != 0x4D4D) { // "MM"
-      return 0;
+      return TiffOrientation.ABSENT;
     }
     int magic = little ? leU16(b, off + 2) : u16(b, off + 2);
     if (magic != 42) {
-      return 0;
+      return TiffOrientation.ABSENT;
     }
     int ifdOffset = little ? leU32(b, off + 4) : (int) u32(b, off + 4);
     if (ifdOffset < 0 || (long) ifdOffset + 2 > len) {
-      return 0; // the 2-byte entry count must be inside the block
+      return TiffOrientation.ABSENT; // the 2-byte entry count must be inside the block
     }
     int count = little ? leU16(b, off + ifdOffset) : u16(b, off + ifdOffset);
+    TiffOrientation orientation = TiffOrientation.ABSENT;
     // Each IFD entry is 12 bytes: tag (2), type (2), count (4), value-or-offset (4).
-    if (count < 0 || ifdOffset + 2 + (long) count * 12 > len) {
-      return 0; // truncated IFD
-    }
     for (int i = 0; i < count; i++) {
       int entry = off + ifdOffset + 2 + i * 12;
-      int tag = little ? leU16(b, entry) : u16(b, entry);
-      int type = little ? leU16(b, entry + 2) : u16(b, entry + 2);
-      if (tag == 0x0112 && type == 3) {
-        int entryCount = little ? leU32(b, entry + 4) : (int) u32(b, entry + 4);
-        if (entryCount != 1) {
-          return 0;
-        }
-        return little ? leU16(b, entry + 8) : u16(b, entry + 8);
+      if (entry + 12 > off + len) {
+        break; // a short entry read stops the walk; the earlier entries are kept
       }
+      int tag = little ? leU16(b, entry) : u16(b, entry);
+      if (tag != ORIENTATION_TAG) {
+        continue;
+      }
+      int type = little ? leU16(b, entry + 2) : u16(b, entry + 2);
+      int unit = unitSize(type);
+      if (unit == 0) {
+        continue; // an unregistered type is skipped, not stored, and the walk continues
+      }
+      long entryCount = little ? leU32(b, entry + 4) : u32(b, entry + 4);
+      if (entryCount == 0) {
+        continue; // the reference's "if not data: continue"
+      }
+      long size = entryCount * unit;
+      int dataOff;
+      if (size <= 4) {
+        dataOff = entry + 8; // inline: the first size bytes of the value field
+      } else {
+        long offset = little ? leU32(b, entry + 8) : u32(b, entry + 8);
+        if (offset < 0 || (long) off + offset + size > (long) off + len) {
+          break; // a short offset read stops the walk; the earlier entries are kept
+        }
+        dataOff = off + (int) offset;
+      }
+      orientation = orientationValue(type, b, dataOff, little);
+    }
+    return orientation;
+  }
+
+  /** The loader's unit size for a registered TIFF type, 0 for an unregistered one. */
+  private static int unitSize(int type) {
+    return switch (type) {
+      case 1, 2, 6, 7 -> 1; // BYTE, ASCII, SIGNED_BYTE, UNDEFINED
+      case 3, 8 -> 2; // SHORT, SIGNED_SHORT
+      case 4, 9, 11, 13 -> 4; // LONG, SIGNED_LONG, FLOAT, IFD
+      case 5, 10, 12, 16 -> 8; // RATIONAL, SIGNED_RATIONAL, DOUBLE, LONG8
+      default -> 0;
+    };
+  }
+
+  /**
+   * Decodes the first element of a stored Orientation value to the rotation the reference's
+   * transpose table would apply: the integer types rotate when their value is one of 2–8, the float
+   * types when it is an integer-valued value in 2–8, the rational types when the quotient is
+   * integral and in 2–8 (a 0/0 quotient is nan); BYTE, ASCII and UNDEFINED are stored and present
+   * but never match the table. The value is always present.
+   */
+  private static TiffOrientation orientationValue(int type, byte[] b, int off, boolean little) {
+    int rotation;
+    switch (type) {
+      case 3 -> rotation = usable(little ? leU16(b, off) : u16(b, off));
+      case 4, 13 -> rotation = usable(little ? leU32(b, off) : u32(b, off));
+      case 6 -> rotation = usable(b[off]);
+      case 8 -> rotation = usable((short) (little ? leU16(b, off) : u16(b, off)));
+      case 9 -> rotation = usable(little ? leU32(b, off) : (int) u32(b, off));
+      case 11 ->
+          rotation =
+              usableFloat(
+                  little
+                      ? Float.intBitsToFloat(leU32(b, off))
+                      : Float.intBitsToFloat((int) u32(b, off)));
+      case 12 ->
+          rotation =
+              usableFloat(
+                  little
+                      ? Double.longBitsToDouble(leU64(b, off))
+                      : Double.longBitsToDouble(u64(b, off)));
+      case 16 -> rotation = usable(little ? leU64(b, off) : u64(b, off));
+      case 5 ->
+          rotation =
+              usableRational(
+                  little ? leU32(b, off) : u32(b, off),
+                  little ? leU32(b, off + 4) : u32(b, off + 4));
+      case 10 ->
+          rotation =
+              usableRational(
+                  little ? leU32(b, off) : (int) u32(b, off),
+                  little ? leU32(b, off + 4) : (int) u32(b, off + 4));
+      default -> rotation = 0; // BYTE, ASCII, UNDEFINED
+    }
+    return new TiffOrientation(rotation, true);
+  }
+
+  /** An integer value rotates when it is one of the transpose table's keys 2–8. */
+  private static int usable(long v) {
+    return v >= 2 && v <= 8 ? (int) v : 0;
+  }
+
+  /** A float value rotates when it is integral and in 2–8 (a Python float equals its int twin). */
+  private static int usableFloat(double d) {
+    return d >= 2 && d <= 8 && d == Math.rint(d) ? (int) d : 0;
+  }
+
+  /**
+   * A rational value rotates when the quotient is integral and in 2–8 (the reference compares it
+   * against the int-keyed table via its Fraction value, so 6/1 and 12/2 both match key 6); a 0/0
+   * quotient is nan and a non-integral quotient never matches.
+   */
+  private static int usableRational(long numerator, long denominator) {
+    if (denominator == 0 || numerator % denominator != 0) {
+      return 0;
+    }
+    return usable(numerator / denominator);
+  }
+
+  /**
+   * The XMP fallback: the first left-to-right match of the reference's own regex {@code
+   * tiff:Orientation(="|>)([0-9])} — exactly one digit, 0–9 — or 0 when the packet carries no
+   * match. A {@code tiff:Orientation} occurrence whose following characters do not form {@code ="d}
+   * or {@code >d} does not end the scan, like the regex engine.
+   */
+  private static int xmpOrientationScan(byte[] xmp) {
+    int at = indexOf(xmp, 0, XMP_ORIENTATION_TAG);
+    while (at >= 0) {
+      int j = at + XMP_ORIENTATION_TAG.length;
+      int digit = -1;
+      if (j + 3 <= xmp.length && (xmp[j] & 0xFF) == '=' && (xmp[j + 1] & 0xFF) == '"') {
+        digit = digitAt(xmp, j + 2);
+      } else if (j + 2 <= xmp.length && (xmp[j] & 0xFF) == '>') {
+        digit = digitAt(xmp, j + 1);
+      }
+      if (digit >= 0) {
+        return digit;
+      }
+      at = indexOf(xmp, at + 1, XMP_ORIENTATION_TAG);
     }
     return 0;
+  }
+
+  /** The digit at {@code b[i]}, or -1 when the byte is not 0–9. */
+  private static int digitAt(byte[] b, int i) {
+    int c = b[i] & 0xFF;
+    return c >= '0' && c <= '9' ? c - '0' : -1;
+  }
+
+  /** The first index at or after {@code from} where {@code needle} occurs in {@code haystack}. */
+  private static int indexOf(byte[] haystack, int from, byte[] needle) {
+    for (int i = from; i + needle.length <= haystack.length; i++) {
+      if (bytesEqualAt(haystack, i, needle)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /** True when the region {@code b[off..)} of the right length starts with {@code prefix}. */
+  private static boolean startsWith(byte[] b, int off, int len, byte[] prefix) {
+    return len >= prefix.length && bytesEqualAt(b, off, prefix);
+  }
+
+  /** True when {@code b[off..off+len)} equals {@code keyword} exactly. */
+  private static boolean equalsRegion(byte[] b, int off, int len, byte[] keyword) {
+    return len == keyword.length && bytesEqualAt(b, off, keyword);
+  }
+
+  /** True when {@code b[off..off+needle.length)} equals {@code needle}. */
+  private static boolean bytesEqualAt(byte[] b, int off, byte[] needle) {
+    if (off < 0 || off + needle.length > b.length) {
+      return false;
+    }
+    for (int i = 0; i < needle.length; i++) {
+      if (b[off + i] != needle[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** The index of the first NUL byte in {@code b[from..to)}, or -1. */
+  private static int indexOfByte(byte[] b, int from, int to) {
+    for (int i = from; i < to; i++) {
+      if (b[i] == 0) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /** True when {@code b[off..end)} is valid strict UTF-8, the reference's strict decode. */
+  private static boolean validUtf8(byte[] b, int off, int end) {
+    if (off >= end) {
+      return true;
+    }
+    try {
+      StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(b, off, end - off));
+      return true;
+    } catch (CharacterCodingException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Inflates a complete zlib (RFC 1950) stream, the reference's {@code _safe_zlib_decompress}: the
+   * inflated bytes when the data ends at a stream end, null when it is corrupt or incomplete.
+   */
+  private static byte[] inflateZlib(byte[] data) {
+    Inflater inflater = new Inflater();
+    try {
+      inflater.setInput(data);
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      byte[] buffer = new byte[8192];
+      while (!inflater.finished()) {
+        int n = inflater.inflate(buffer);
+        if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
+          return null; // an incomplete stream
+        }
+        out.write(buffer, 0, n);
+      }
+      return out.toByteArray();
+    } catch (DataFormatException e) {
+      return null;
+    } finally {
+      inflater.end();
+    }
   }
 
   // --------------------------------------------------------------- raster to RgbImage

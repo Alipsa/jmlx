@@ -167,6 +167,43 @@ def run_resize(input_path: Path, provenance: dict) -> dict:
     return {"cases": cases}
 
 
+def run_exif_orientation(input_path: Path, provenance: dict) -> dict:
+    """Per case: the stored (unrotated) RGB decode and the Reference's
+    `ImageOps.exif_transpose` result, plus the effective orientation `getexif().get(274, 0)`
+    reports *after* the XMP fallback. A present Orientation tag suppresses the fallback even
+    when its value never matches the transpose table (2-8), so such a fixture records the
+    raw stored value, not the XMP's."""
+    import numpy as np
+    from PIL import Image, ImageOps
+
+    root = input_path.parent.resolve()
+    cases = []
+    for case in json.loads(input_path.read_text(encoding="utf-8"))["cases"]:
+        fixture = verify_fixture(root, case["image"], provenance)
+        image = Image.open(fixture)
+        image.load()
+        orientation = int(image.getexif().get(274, 0))
+        stored = np.asarray(image.convert("RGB"), dtype=np.uint8)
+        transposed = np.asarray(ImageOps.exif_transpose(image).convert("RGB"), dtype=np.uint8)
+        cases.append(
+            {
+                "name": case["name"],
+                "orientation": orientation,
+                "stored": {
+                    "height": int(stored.shape[0]),
+                    "pixelsBase64": uint8_base64(stored),
+                    "width": int(stored.shape[1]),
+                },
+                "transposed": {
+                    "height": int(transposed.shape[0]),
+                    "pixelsBase64": uint8_base64(transposed),
+                    "width": int(transposed.shape[1]),
+                },
+            }
+        )
+    return {"cases": cases}
+
+
 def run_chain(input_path: Path, provenance: dict) -> dict:
     import numpy as np
     from PIL import Image
@@ -356,6 +393,7 @@ def stale_message(path: Path, expected: str, actual: str) -> str:
 
 RUNNERS = {
     "decode.input.json": run_decode,
+    "exif-orientation.input.json": run_exif_orientation,
     "resize.input.json": run_resize,
     "chain.input.json": run_chain,
 }

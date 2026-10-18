@@ -230,12 +230,20 @@ ceil/floor and aspect checks; no FLOAT32 intermediates or algebraic reassociatio
 half-factor rounding ties and a hash-pinned boundary fixture recording final geometry and
 digests. **2026-10-18 review waiver:** the clause originally required the boundary fixture to
 be sensitive to division order and to record reference binary64 intermediates; that is waived
-because the sweep recorded in findings §4.5 — a full venv sweep of [2, 4000)^2 (12,087,517
-cells reaching the max-pixels branch) plus the squares in [1000, 20000) step 16, comparing the
-two sequential divisions against the folded form — found no reachable input whose geometry
-depends on the division order, so such a fixture is impossible to construct. The sweep's
-evidence is recorded in `Qwen3VlGeometryPlanTest`, whose venv-verified geometry cases (including
-the max-pixels-branch case) re-run under the ordinary `:jmlx-vision:test` task. The geometry
+within the scope of the default decode limits. The committed probe
+`tools/image-oracle/qwen3vl_division_order_sweep.py` (the sweep recorded in findings §4.5)
+sweeps the full `ImageDecodeLimits.DEFAULTS` range (sides ≤ 16,384, area ≤ 16,777,216;
+56,380,384 cells reaching the max-pixels branch), comparing the port's two sequential divisions
+`height / beta / factor` against the folded form `height / (beta * factor)`, and found no input
+reachable under the defaults whose geometry depends on the division order. The control variant
+`height * (1 / beta) / factor` flags 1,333 of those cells (a non-vacuous sweep), and the spot
+check 1920x1080 → 1344x768 matches the venv-verified case recorded in
+`Qwen3VlGeometryPlanTest`, whose venv-verified geometry cases (including
+the max-pixels-branch case) re-run under the ordinary `:jmlx-vision:test` task. The first
+recorded evidence was a narrower sweep of [2, 4000)^2 (12,087,517 cells) plus the squares in
+[1000, 20000) step 16, now subsumed by the wider sweep. Callers may pass larger
+`ImageDecodeLimits`, so a division-order-sensitive input remains unproven beyond the defaults;
+the waiver covers the clause only within that scope. The geometry
 factor is derived from patch and merge sizes;
 never copy Qwen2's default factor into Qwen3. Probe very small dimensions and non-divisible
 inputs. Establish precedence of legacy min/max-pixel fields versus size fields from the

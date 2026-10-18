@@ -298,15 +298,22 @@ Probe cross-check: `grid_matches_rederived_smart_resize: True` — the processor
 
 - **Division-order waiver record (2026-10-18).** The plan §4 clause asked for "a hash-pinned
   boundary fixture sensitive to division order, recording reference binary64 intermediates and
-  final geometry". No such fixture is constructible: a full venv sweep of [2, 4000)^2
-  (12,087,517 cells reaching the max-pixels branch) plus the squares in [1000, 20000) step 16
-  compared the port's two sequential divisions `height / beta / factor` with the folded form
-  `height / (beta * factor)` and found zero cells where the folded form differs, so no
-  reachable input is sensitive to division order and the clause is waived on this evidence.
-  The boundary fixtures instead record final geometry and digests. The sweep's ranges and
-  conclusion are recorded in the comment above the 160x6560 max-pixels case in
+  final geometry". No such fixture exists within the default decode limits: the committed probe
+  `tools/image-oracle/qwen3vl_division_order_sweep.py` sweeps the full
+  `ImageDecodeLimits.DEFAULTS` range (sides ≤ 16,384, area ≤ 16,777,216; 56,380,384
+  cells reaching the max-pixels branch), comparing the port's two sequential divisions
+  `height / beta / factor` with the folded form `height / (beta * factor)`, and found no
+  sensitive cell. The control variant `height * (1 / beta) / factor` flags 1,333 of the same
+  cells, demonstrating that the sweep detects order differences (non-vacuous); the spot check
+  1920x1080 → 1344x768 matches the venv-verified case. The first recorded evidence was a
+  narrower venv sweep of [2, 4000)^2 (12,087,517 cells reaching the max-pixels branch) plus the
+  squares in [1000, 20000) step 16, now subsumed by the wider sweep; its ranges and conclusion
+  remain in the comment above the 160x6560 max-pixels case in
   `Qwen3VlGeometryPlanTest` (`jmlx-vision`), whose venv-verified geometry cases — including
-  that max-branch case — re-run under the ordinary `:jmlx-vision:test` task.
+  that max-branch case — re-run under the ordinary `:jmlx-vision:test` task. Callers may pass
+  larger `ImageDecodeLimits`, so a division-order-sensitive input remains unproven beyond the
+  defaults; the clause is waived on this evidence within that scope. The boundary fixtures
+  instead record final geometry and digests.
 
 ### 4.6 Normalization, temporal duplication, patch permutation
 

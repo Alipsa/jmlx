@@ -248,6 +248,34 @@ normalized float bits where the reference order permits; record any justified fl
 independently of model-logit tolerances. Add a shared hash-pinned processed-patch fixture consumed
 by both image and HF tools, so model-math tests cannot conceal preprocessing errors.
 
+**2026-10-18 WP2 part-1 status:** PR #49 (merged) landed the processor half of WP2:
+`Qwen3VlProcessorConfig`, `Qwen3VlGeometryPlan`, `Qwen3VlImageProcessor` and
+`Qwen3VlImageProcessorResult`, the geometry and budget cases above as Java unit tests, both WP1
+probe goldens reproduced byte-identically, and the WP9 decision (`ExifOrientationPolicy`, with
+decode-level `exif-orientation` oracle fixtures against Pillow's `exif_transpose`). WP2 is not
+accepted until the following land in a part-2 PR:
+
+- The `tools/image-oracle` Qwen family path, provenance pins and Java oracle-match tests,
+  covering the cases listed in the previous paragraph.
+- The geometry cases above (1920x1080, 1280x960, 1080x1920, 1024x1024 at the 4096-row cap,
+  and the 160x6560 raw-row rejection) recorded as oracle fixtures, not only as Java unit tests.
+- `DROP_ALPHA` oracle fixtures: RGBA/LA and palette/tRNS inputs, including transparent pixels
+  with non-white source colors, asserting both the Qwen-selected conversion and the unchanged
+  default SmolVLM conversion. `AlphaPolicy.DROP_ALPHA` is so far covered only by
+  `ImageDecoderTest` unit tests.
+- The shared hash-pinned processed-patch fixture consumed by both `tools/image-oracle` and
+  `tools/hf-reference`.
+- Mixed-image ordering: two differently sized images through the processor.
+  `Qwen3VlImageProcessorTest` so far processes one image per test.
+- Qwen file-to-processor decode wiring. `Qwen3VlImageProcessor` takes only a decoded
+  `RgbImage`, so the `DROP_ALPHA` + `APPLY` decode that the `ExifOrientationPolicy` Javadoc
+  calls "the Qwen3-VL file path" is so far a caller contract. Either add the entry point with a
+  file-to-processor parity test, or, if a later WP (loader/model) owns it, say so in that
+  Javadoc.
+- WP9 rotated-fixture parity through the Qwen processor (§10), not only at decode level.
+- Integration docs: findings §4.4/§4.8, this plan's status and §11 checklist, AGENTS.md
+  architecture list and `jmlx-vision/README.md`.
+
 ## 5. Prompt expansion and position planning (WP3)
 
 Add a package-private pure `Qwen3VlPromptExpander` beside the 7.3a expander. Inputs are original

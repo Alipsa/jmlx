@@ -1,8 +1,10 @@
 # jmlx-vision
 
 Pure-Java image preprocessing for `jmlx-models`: PNG/JPEG decoding, RGB conversion,
-Pillow-exact resampling, rescale/normalize, and the SmolVLM/Idefics3 image processor (tile
-splitting, padding masks, grid/order metadata). No native dependency; Java 21+.
+Pillow-exact resampling, rescale/normalize, the SmolVLM/Idefics3 image processor (tile
+splitting, padding masks, grid/order metadata) and the Qwen3-VL image preprocessing port
+(smart_resize, BICUBIC resize, rescale/normalize, merge-block patch flatten). No native
+dependency; Java 21+.
 
 ## Public surface
 
@@ -14,9 +16,15 @@ splitting, padding masks, grid/order metadata). No native dependency; Java 21+.
 | `ImageTensor` | Immutable `float[]` with shape/layout (`HWC` or `NHWC`), defensive copies, bounded `toString`. |
 | `ImageTransforms` | `resize(RgbImage, w, h, Resampling)` and `normalize(RgbImage, scale, mean, std)`. |
 | `Resampling` | `BILINEAR`, `BICUBIC`, `LANCZOS` — ports of the pinned Pillow kernels. |
+| `AlphaPolicy` | `COMPOSITE_OVER_WHITE` (every overload's default) or `DROP_ALPHA` (keeps the source color channels, discards the alpha band — the Qwen3-VL reference's `convert("RGB")` semantics). `tRNS` is stripped before decode under both. |
+| `ExifOrientationPolicy` | `IGNORE` (default: stored pixels) or `APPLY` (Pillow's `exif_transpose` before the RGB conversion). `APPLY` is the Qwen3-VL file path's policy (Phase 7.3b WP9); the SmolVLM path keeps `IGNORE`. |
 | `SmolVlmProcessorConfig` | Parsed, validated `preprocessor_config.json`. |
 | `SmolVlmImageProcessor` | Full processor: two-stage resize chain, tile splitting, global thumbnail, masks, per-tile normalized tensors. |
 | `SmolVlmGeometryPlan` | Pure per-image geometry (stage-1/stage-2 sizes, split grid, tile count) computed from dimensions alone, with no pixel work. |
+| `Qwen3VlProcessorConfig` | Parsed, validated `preprocessor_config.json` for the slow-processor Qwen3-VL path; the declared max-pixel bound is capped at the raw-row budget's derived hard cap (1,048,576 at the default 4,096-row budget, decision (b)), and the 4,096 raw-patch-row budget (decision (c)) is a builder option only. |
+| `Qwen3VlGeometryPlan` | Pure per-image geometry (resized size, `grid_thw`, raw/merged row counts) from dimensions alone, with the aspect and raw-row-budget checks, shared with the zero-token path. |
+| `Qwen3VlImageProcessor` | `process(RgbImage)` runs the ported chain; `processFile(Path, ImageDecodeLimits)` reads a PNG/JPEG from disk and `processEncoded(byte[], ImageDecodeLimits)` decodes in-memory bytes — both are the file-to-processor entry points applying the Qwen file policy (decode `DROP_ALPHA` + `APPLY`, then process). |
+| `Qwen3VlImageProcessorResult` | The flattened merge-block patch tensor (`grid_h*grid_w` rows of 1,536 floats at the pinned geometry — not an image layout) with grid/order metadata; defensive buffer accessors. |
 
 `SmolVlmImageProcessor.geometry(height, width)` returns the `SmolVlmGeometryPlan` for an image's
 dimensions; the processor's pixel chain uses that same plan for its resize targets and split
@@ -67,9 +75,40 @@ resampling port and its license are recorded in `NOTICE` and in the source-file 
 The committed oracle fixtures are compared **byte-exactly**: every accepted decode (including
 the color and grayscale JPEG fixtures) matches the pinned Pillow output with maximum channel
 error `0`, and the full two-stage resize/split/normalize chain matches byte-for-byte on uint8
-pixels (normalized float tiles within the documented `1e-6` float32 tolerance). See
-`req/plans/phase7-3a-reference-findings.md` §8 for the decode-path findings behind the
-byte-exactness (raster band order, packed sub-8-bit palettes, JPEG truncation detection).
+pixels (normalized float tiles within the documented `1e-6` float32 tolerance). The Qwen3-VL
+`qwen3vl` family (21 cases, including the shared processed-patch bins under
+`qwen3vl/patches/`) is byte-verified the same way by `ImageOracleQwen3VlTest` (see
+"Qwen3-VL preprocessing" below). See `req/plans/phase7-3a-reference-findings.md` §8 for the
+decode-path findings behind the byte-exactness (raster band order, packed sub-8-bit palettes,
+JPEG truncation detection).
+
+## Qwen3-VL preprocessing
+
+Phase 7.3b WP2 port of the pinned transformers 4.57.6 slow `Qwen2VLImageProcessor` image path:
+`smart_resize` (Python's ties-to-even rounding, binary64 operation order preserved),
+Pillow-exact BICUBIC resize, rescale/normalize in float32, temporal duplication and the
+merge-block patch permutation/flatten. The config is parsed from the pinned
+`preprocessor_config.json` (committed as the `qwen3vl` fixture, byte-identical to the 2B
+artifact's file): the declared `max_pixels` is capped at the raw-row budget's derived hard cap
+`rawRowBudget * patchSize * patchSize` — 1,048,576 at the default 4,096-row budget (the
+planned-effective bound, decision (b); the pre-cap value stays available as
+`declaredMaxPixels()` for provenance) — and the 4,096 raw-patch-row per-image budget
+(decision (c)) is a builder option only, so an untrusted config cannot lift it.
+
+`Qwen3VlImageProcessor.processFile(Path, ImageDecodeLimits)` reads the image bytes from disk and
+`processEncoded(byte[], ImageDecodeLimits)` decodes them from memory; both are the
+file-to-processor entry points and apply the Qwen file policy: `ImageDecoder` with
+`AlphaPolicy.DROP_ALPHA` + `ExifOrientationPolicy.APPLY` — the
+reference's `exif_transpose` + `convert("RGB")`, which drops alpha, never composites over white
+and never applies a palette `tRNS` — then `process`. This is a deliberate contrast with the
+module-default decode (`COMPOSITE_OVER_WHITE` + `IGNORE`) used by the SmolVLM path, which is
+unchanged.
+
+Byte-exactness evidence: the `qwen3vl` family of the `tools/image-oracle` fixtures (21 cases,
+including the rotated eXIf fixtures with their stored-decode controls) plus the shared
+processed-patch bins under `tools/image-oracle/fixtures/qwen3vl/patches/`, byte-verified by
+`ImageOracleQwen3VlTest`; the reference findings behind them are §4 of
+`req/plans/phase7-3b-reference-findings.md` (§4.8 for the part-2 fixture set).
 
 ## Divergences from the reference's operation order
 

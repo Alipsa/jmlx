@@ -16,6 +16,9 @@ Layout (all paths relative to tools/image-oracle/fixtures/):
   resize/  opaque RGB fixtures for single-resize and full-processor-chain cases
   exif-orientation/  4x2 EXIF/XMP orientation edge cases (stored and transposed RGB
                      recorded by runner.py; the Java decoder must match both)
+  qwen3vl/  Qwen3-VL preprocessing oracle fixtures (Phase 7.3b WP2): byte copies of the
+            WP1 fast-comparison model images and pinned preprocessor config, plus
+            smart_resize geometry, flatten-order, alpha/tRNS and EXIF-orientation cases
 """
 import io
 import struct
@@ -566,6 +569,118 @@ def main() -> None:
     write_bytes(
         "exif-orientation/png-crossendian-orient-4x2.png",
         png_insert(base_or_png, [(b"eXIf", tiff_block(6, True, 0x2A00))]),
+    )
+
+    # qwen3vl: Qwen3-VL preprocessing oracle fixtures (Phase 7.3b WP2). The two model
+    # images and the preprocessor config are byte copies of the WP1 fast-comparison pins
+    # (byte-identity with the WP1 pins is load-bearing); every other file is derived from
+    # fixed arithmetic like the rest of this script.
+    import hashlib
+
+    fast_fixtures = ROOT.parent / "fast-comparison" / "fixtures"
+
+    def copy_pinned(src: Path, rel: str, expected_sha: str) -> None:
+        data = src.read_bytes()
+        actual = hashlib.sha256(data).hexdigest()
+        if actual != expected_sha:
+            raise SystemExit(
+                f"qwen3vl pinned source digest differs: {src.name} {actual} != {expected_sha}")
+        write_bytes(rel, data)
+
+    copy_pinned(
+        fast_fixtures / "preprocessor_config.json",
+        "qwen3vl/preprocessor_config.json",
+        "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+    )
+    copy_pinned(
+        fast_fixtures / "model-rgb-256x256.png",
+        "qwen3vl/model-rgb-256x256.png",
+        "58d3ec55b7570fd66ec4b37705b2f3864bc678e7aa091ea573c741f6d6829153",
+    )
+    copy_pinned(
+        fast_fixtures / "model-rgb-64x32.png",
+        "qwen3vl/model-rgb-64x32.png",
+        "6370bf6df07f28f934f3a3ebd969b9eb632a3c659377ce307f5188c1014595e3",
+    )
+
+    # Far below the 65536-pixel min: the min-pixels branch scales 8x8 up to 256x256.
+    px = bytearray()
+    for y in range(8):
+        for x in range(8):
+            px += bytes(((x * 255) // 7, (y * 255) // 7, (x * 3 + y * 5) % 256))
+    save(Image.frombytes("RGB", (8, 8), bytes(px)), "qwen3vl/min-8x8.png")
+
+    # smart_resize geometry cases (the venv-verified expectations live in
+    # Qwen3VlGeometryPlanTest under the same source dimensions).
+    save(gradient_rgb(1040, 1040), "qwen3vl/boundary-1040x1040.png")
+    save(gradient_rgb(1920, 1080), "qwen3vl/geometry-1920x1080.png")
+    save(gradient_rgb(1280, 960), "qwen3vl/geometry-1280x960.png")
+    save(gradient_rgb(1080, 1920), "qwen3vl/geometry-1080x1920.png")
+    save(gradient_rgb(1024, 1024), "qwen3vl/geometry-1024x1024.png")
+    save(gradient_rgb(2000, 10), "qwen3vl/geometry-2000x10.png")
+    save(gradient_rgb(2002, 10), "qwen3vl/geometry-2002x10.png")
+    save(gradient_rgb(160, 6560), "qwen3vl/geometry-160x6560.png")
+    save(gradient_rgb(144, 144), "qwen3vl/rounding-144x144.png")
+    save(gradient_rgb(176, 176), "qwen3vl/rounding-176x176.png")
+    save(gradient_rgb(96, 64), "qwen3vl/noresize-96x64.png")
+    save(gradient_rgb(256, 128), "qwen3vl/mixed-a-256x128.png")
+    save(gradient_rgb(128, 256), "qwen3vl/mixed-b-128x256.png")
+
+    # Flatten-order probe: each pixel encodes (patch-col, inner-col) in R, (patch-row,
+    # inner-row) in G and (patch-row, patch-col) in B, so any permutation of the
+    # reference's merge-block patch flatten is visible in single pixels.
+    px = bytearray()
+    for y in range(128):
+        for x in range(256):
+            px += bytes(
+                (
+                    (x // 16 * 16 + x % 16) % 256,
+                    (y // 16 * 16 + y % 16) % 256,
+                    (y // 16 * 16 + x // 16) % 256,
+                )
+            )
+    save(Image.frombytes("RGB", (256, 128), bytes(px)), "qwen3vl/order-indexcoded-256x128.png")
+
+    # Alpha fixtures: the reference's convert("RGB") drops alpha and never composites,
+    # and a palette tRNS chunk is never applied (the x=0 columns carry alpha 0 over
+    # non-white colors, so drop-alpha and composite-over-white visibly differ).
+    rgba = Image.new("RGBA", (32, 32))
+    rgba.putdata([
+        ((x * 3 + y) % 256, (x + y * 7) % 256, (x * y) % 256, (x * 8) % 256)
+        for y in range(32) for x in range(32)
+    ])
+    save(rgba, "qwen3vl/alpha-rgba-32x32.png")
+
+    la = Image.new("LA", (32, 32))
+    la.putdata([((x * 8 + y * 4) % 256, (x * 8) % 256) for y in range(32) for x in range(32)])
+    save(la, "qwen3vl/alpha-la-32x32.png")
+
+    palette16 = [(i * 16, 255 - i * 16, (i * 40) % 256) for i in range(16)]
+    p = Image.new("P", (32, 32))
+    p.putpalette([c for rgb in palette16 for c in rgb])
+    p.putdata([(x + y * 2) % 16 for y in range(32) for x in range(32)])
+    # Transparent index 3 carries the non-white palette color (48, 207, 120).
+    p.info["transparency"] = bytes([255] * 3 + [0] + [255] * 12)
+    save(p, "qwen3vl/alpha-palette-trns-32x32.png")
+
+    # EXIF orientation fixtures: the 64x32 model-rgb formula (distinct per pixel, so an
+    # orientation error cannot hide in a smooth gradient), with the same eXIf-chunk
+    # pattern as the exif-orientation PNG cases (5)/(6). The runner feeds the processor
+    # the file path (the only 4.57.6 path that runs exif_transpose) and separately
+    # records the storedDecode stored-pixel control the APPLY/IGNORE decodes must
+    # differ from.
+    px = bytearray()
+    for y in range(32):
+        for x in range(64):
+            px += bytes(((x * 255) // 63, (y * 255) // 31, (x * 3 + y * 5) % 256))
+    base_rot = png_bytes(Image.frombytes("RGB", (64, 32), bytes(px)))
+    write_bytes(
+        "qwen3vl/rotated-orient6-64x32.png",
+        png_insert(base_rot, [(b"eXIf", tiff_block(6))]),
+    )
+    write_bytes(
+        "qwen3vl/rotated-orient2-64x32.png",
+        png_insert(base_rot, [(b"eXIf", tiff_block(2))]),
     )
 
     # resize: opaque RGB fixtures (shared by single-resize and full-chain cases)

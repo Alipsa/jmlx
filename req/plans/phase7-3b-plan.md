@@ -2,7 +2,7 @@
 
 - **Status:** WP0 and WP1 complete, 2026-10-15 — baseline, artifact pins, executable reference
   probes and divergence evidence are recorded in `req/plans/phase7-3b-reference-findings.md`.
-  WP2–WP6 implementation and acceptance remain work below.
+  WP3–WP6 implementation and acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -227,9 +227,24 @@ including Python ties-to-even. Preserve Python's binary64 operation order with `
 and `Math.sqrt`: in particular `floor(h / beta / factor)` must retain its two sequential
 divisions, not become `floor(h / (beta * factor))`. Keep the same order in area scaling,
 ceil/floor and aspect checks; no FLOAT32 intermediates or algebraic reassociation. Add
-half-factor rounding ties and a hash-pinned boundary fixture sensitive to division order,
-recording reference binary64 intermediates and final geometry. The geometry factor is derived
-from patch and merge sizes;
+half-factor rounding ties and a hash-pinned boundary fixture recording final geometry and
+digests. **2026-10-18 review waiver:** the clause originally required the boundary fixture to
+be sensitive to division order and to record reference binary64 intermediates; that is waived
+within the scope of the default decode limits. The committed probe
+`tools/image-oracle/qwen3vl_division_order_sweep.py` (the sweep recorded in findings §4.5)
+sweeps the full `ImageDecodeLimits.DEFAULTS` range (sides ≤ 16,384, area ≤ 16,777,216;
+56,380,384 cells reaching the max-pixels branch), comparing the port's two sequential divisions
+`height / beta / factor` against the folded form `height / (beta * factor)`, and found no input
+reachable under the defaults whose geometry depends on the division order. The control variant
+`height * (1 / beta) / factor` flags 1,334 of those cells (a non-vacuous sweep), and the spot
+check 1920x1080 → 1344x768 matches the venv-verified case recorded in
+`Qwen3VlGeometryPlanTest`, whose venv-verified geometry cases (including
+the max-pixels-branch case) re-run under the ordinary `:jmlx-vision:test` task. The first
+recorded evidence was a narrower sweep of [2, 4000)^2 (12,087,517 cells) plus the squares in
+[1000, 20000) step 16, now subsumed by the wider sweep. Callers may pass larger
+`ImageDecodeLimits`, so a division-order-sensitive input remains unproven beyond the defaults;
+the waiver covers the clause only within that scope. The geometry
+factor is derived from patch and merge sizes;
 never copy Qwen2's default factor into Qwen3. Probe very small dimensions and non-divisible
 inputs. Establish precedence of legacy min/max-pixel fields versus size fields from the
 resolved processor, and reject contradictory unsupported settings.
@@ -247,6 +262,53 @@ normalization and mixed-image ordering. Compare geometry/ordering/uint8 resize e
 normalized float bits where the reference order permits; record any justified float tolerance
 independently of model-logit tolerances. Add a shared hash-pinned processed-patch fixture consumed
 by both image and HF tools, so model-math tests cannot conceal preprocessing errors.
+
+**2026-10-18 WP2 part-1 status:** PR #49 (merged) landed the processor half of WP2:
+`Qwen3VlProcessorConfig`, `Qwen3VlGeometryPlan`, `Qwen3VlImageProcessor` and
+`Qwen3VlImageProcessorResult`, the geometry and budget cases above as Java unit tests, both WP1
+probe goldens reproduced byte-identically, and the WP9 decision (`ExifOrientationPolicy`, with
+decode-level `exif-orientation` oracle fixtures against Pillow's `exif_transpose`). WP2 is not
+accepted until the following land in a part-2 PR:
+
+- The `tools/image-oracle` Qwen family path, provenance pins and Java oracle-match tests,
+  covering the cases listed in the previous paragraph.
+- The geometry cases above (1920x1080, 1280x960, 1080x1920, 1024x1024 at the 4096-row cap,
+  and the 160x6560 raw-row rejection) recorded as oracle fixtures, not only as Java unit tests.
+- `DROP_ALPHA` oracle fixtures: RGBA/LA and palette/tRNS inputs, including transparent pixels
+  with non-white source colors, asserting both the Qwen-selected conversion and the unchanged
+  default SmolVLM conversion. `AlphaPolicy.DROP_ALPHA` is so far covered only by
+  `ImageDecoderTest` unit tests.
+- The shared hash-pinned processed-patch fixture consumed by both `tools/image-oracle` and
+  `tools/hf-reference`.
+- Mixed-image ordering: two differently sized images through the processor.
+  `Qwen3VlImageProcessorTest` so far processes one image per test.
+- Qwen file-to-processor decode wiring. `Qwen3VlImageProcessor` takes only a decoded
+  `RgbImage`, so the `DROP_ALPHA` + `APPLY` decode that the `ExifOrientationPolicy` Javadoc
+  calls "the Qwen3-VL file path" is so far a caller contract. Either add the entry point with a
+  file-to-processor parity test, or, if a later WP (loader/model) owns it, say so in that
+  Javadoc.
+- WP9 rotated-fixture parity through the Qwen processor (§10), not only at decode level.
+- Integration docs: findings §4.4/§4.8, this plan's status and §11 checklist, AGENTS.md
+  architecture list and `jmlx-vision/README.md`.
+
+**2026-10-18 WP2 part-2 status:** all eight part-2 items above land in PR #50
+(branch `phase7-3b-wp2-part2`): the `qwen3vl` oracle family (21 cases) with its provenance pins and
+`ImageOracleQwen3VlTest` byte-verification, including the exact rejection messages and the
+`whiteComposite`/`storedDecode` controls; the planned geometry cases (1920x1080, 1280x960,
+1080x1920, 1024x1024 at the 4096-row cap, the 2000x10 extreme-aspect case and the 2002x10
+rejected aspect, plus the 160x6560 raw-row rejection) recorded as oracle fixtures; the
+`DROP_ALPHA` fixtures (RGBA/LA/palette+tRNS with non-white transparent pixels) with the
+unchanged SmolVLM composite-over-white default asserted by the `whiteComposite` controls; the
+shared hash-pinned processed-patch fixture (`fixtures/qwen3vl/patches/`) consumed by
+`tools/image-oracle` (`run_qwen3vl` + the Java oracle test) and `tools/hf-reference`
+(`qwen3vl_processed_patches` provenance pin enforced by `verifyHfReferenceGoldens`,
+consumption contract in its README); the two-different-sizes ordering case (plus a
+statelessness unit test); the file-to-processor entry points
+(`Qwen3VlImageProcessor.processFile(Path)` and `processEncoded(byte[])`) with parity tests; the
+WP9 rotated-fixture parity (orientations 6 and 2, eXIf-chunk PNGs, `storedDecode` non-matching
+control, path-input `exif_transpose` invariant, findings §4.4/§4.8); and the documentation
+updates. WP2 is accepted with this landing; the prompt/position/template fixture clause of the
+§11 preprocessing/prompt/position/template item remains open for WP3.
 
 ## 5. Prompt expansion and position planning (WP3)
 
@@ -536,4 +598,4 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [ ] Default per-image attention limit/peak, one-over rejection and post-prefill visual release verified.
 - [ ] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded.
 - [ ] Required CI suites executed; matrix/docs state actual modality and verification limits.
-- [ ] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.
+- [x] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.

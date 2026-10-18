@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -103,6 +104,20 @@ class Qwen3VlImageProcessorTest {
     return new RgbImage(64, 32, pixels);
   }
 
+  /** Probe image for the mixed-order statelessness test: r=x, g=y, b=(x*y)%256. */
+  private static RgbImage probeImage(int width, int height) {
+    byte[] pixels = new byte[width * height * 3];
+    int i = 0;
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        pixels[i++] = (byte) x;
+        pixels[i++] = (byte) y;
+        pixels[i++] = (byte) ((x * y) % 256);
+      }
+    }
+    return new RgbImage(width, height, pixels);
+  }
+
   /** Index-coded pixels for the no-resize exact-value tests. */
   private static int indexPixel(int x, int y, int channel) {
     return switch (channel) {
@@ -161,6 +176,12 @@ class Qwen3VlImageProcessorTest {
     assertThrows(IllegalArgumentException.class, () -> new Qwen3VlImageProcessor(null));
     assertThrows(IllegalArgumentException.class, () -> pinnedProcessor().process(null));
     assertThrows(IllegalArgumentException.class, () -> noResizeProcessor().process(null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> pinnedProcessor().processFile((Path) null, ImageDecodeLimits.DEFAULTS));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> pinnedProcessor().processEncoded(null, ImageDecodeLimits.DEFAULTS));
   }
 
   @Test
@@ -329,6 +350,30 @@ class Qwen3VlImageProcessorTest {
       }
     }
     assertArrayEquals(expected, result.values());
+  }
+
+  @Test
+  void processingTwoImagesInEitherOrderYieldsIdenticalValues() {
+    Qwen3VlImageProcessor processor = pinnedProcessor();
+    RgbImage wide = probeImage(256, 128);
+    RgbImage tall = probeImage(128, 256);
+
+    // Wide first, then tall.
+    Qwen3VlImageProcessorResult wideFirst = processor.process(wide);
+    Qwen3VlImageProcessorResult tallFirst = processor.process(tall);
+    assertArrayEquals(new int[] {1, 12, 24}, wideFirst.gridThw());
+    assertArrayEquals(new int[] {1, 24, 12}, tallFirst.gridThw());
+    assertEquals(288, wideFirst.rawPatchRows());
+    assertEquals(288, tallFirst.rawPatchRows());
+
+    // Tall first, then wide: each image must produce byte-identical values in the other order —
+    // the processor is stateless per call; nothing is padded or shared between images.
+    Qwen3VlImageProcessorResult tallSecond = processor.process(tall);
+    Qwen3VlImageProcessorResult wideSecond = processor.process(wide);
+    assertArrayEquals(new int[] {1, 24, 12}, tallSecond.gridThw());
+    assertArrayEquals(new int[] {1, 12, 24}, wideSecond.gridThw());
+    assertArrayEquals(wideFirst.values(), wideSecond.values());
+    assertArrayEquals(tallFirst.values(), tallSecond.values());
   }
 
   @Test

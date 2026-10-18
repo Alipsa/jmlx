@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {"name": "model-rgb-256x256", "image": "qwen3vl/model-rgb-256x256.png"},
+    {"name": "model-rgb-64x32", "image": "qwen3vl/model-rgb-64x32.png"},
+    {"name": "min-8x8", "image": "qwen3vl/min-8x8.png"},
+    {"name": "boundary-1040x1040", "image": "qwen3vl/boundary-1040x1040.png"},
+    {"name": "geometry-1920x1080", "image": "qwen3vl/geometry-1920x1080.png"},
+    {"name": "geometry-1280x960", "image": "qwen3vl/geometry-1280x960.png"},
+    {"name": "geometry-1080x1920", "image": "qwen3vl/geometry-1080x1920.png"},
+    {"name": "geometry-1024x1024", "image": "qwen3vl/geometry-1024x1024.png"},
+    {"name": "geometry-2000x10", "image": "qwen3vl/geometry-2000x10.png"},
+    {"name": "geometry-2002x10-reject", "image": "qwen3vl/geometry-2002x10.png", "expectedRejected": true, "rejectKind": "aspect"},
+    {"name": "geometry-160x6560-noresize", "image": "qwen3vl/geometry-160x6560.png", "doResize": false, "expectedRejected": true, "rejectKind": "raw-row-budget"},
+    {"name": "rounding-144x144", "image": "qwen3vl/rounding-144x144.png"},
+    {"name": "rounding-176x176", "image": "qwen3vl/rounding-176x176.png"},
+    {"name": "noresize-96x64", "image": "qwen3vl/noresize-96x64.png", "doResize": false},
+    {"name": "order-indexcoded-256x128", "image": "qwen3vl/order-indexcoded-256x128.png"},
+    {"name": "mixed-256x128-128x256", "images": ["qwen3vl/mixed-a-256x128.png", "qwen3vl/mixed-b-128x256.png"]},
+    {"name": "alpha-rgba-32x32", "image": "qwen3vl/alpha-rgba-32x32.png"},
+    {"name": "alpha-la-32x32", "image": "qwen3vl/alpha-la-32x32.png"},
+    {"name": "alpha-palette-trns-32x32", "image": "qwen3vl/alpha-palette-trns-32x32.png"},
+    {"name": "rotated-orient6-64x32", "image": "qwen3vl/rotated-orient6-64x32.png"},
+    {"name": "rotated-orient2-64x32", "image": "qwen3vl/rotated-orient2-64x32.png"}
+  ]
+}

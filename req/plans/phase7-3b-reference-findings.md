@@ -262,9 +262,16 @@ with mean/std [0.5, 0.5, 0.5], `do_convert_rgb` true, `patch_size` 16, `temporal
   dropped (`drop_trns_convert_rgb matches true`).
 - **EXIF orientation is applied**: the reference pipeline runs `exif_transpose` before
   resize. Verified with an orientation-6 fixture (90° CW transpose matches; no transpose does
-  not). Note the divergence from jmlx-vision's `ImageDecoder`, which ignores EXIF orientation
-  (matching the pinned SmolVLM/Idefics3 reference path, not this one); closing the gap for the
-  Qwen path is tracked as plan WP9 (`req/plans/phase7-3b-plan.md`).
+  not). That divergence from jmlx-vision's `ImageDecoder` is closed: the WP9 policy (decided
+  2026-10-16, delivered in WP2 part 1) added `ExifOrientationPolicy`, under which the Qwen3-VL
+  file path decodes with `APPLY` while the SmolVLM/Idefics3 decode keeps `IGNORE` — its
+  unchanged byte-for-byte contract. Since 2026-10-18 (WP2 part 2) the Qwen-path parity is
+  oracle-pinned: the `qwen3vl` family's rotated cases (orientations 6 and 2, eXIf-chunk PNGs,
+  §4.8) verify the slow processor's file-to-processor pipeline against jmlx's decode(`APPLY`)
+  + process byte-for-byte, with an EXIF-ignoring pipeline asserted NOT to match. One
+  refinement of that evidence: in 4.57.6 the slow processor's `exif_transpose` runs only on
+  the string-input load path (PIL-image inputs skip it), and the WP1 exif golden above was
+  measured through that path pipeline (§4.8).
 - jmlx-vision's `ImageDecoder` drops the tRNS chunk before decode in all cases (existing
   behavior, retained).
 
@@ -288,6 +295,25 @@ elif h_bar * w_bar < min_pixels:
 
 Probe cross-check: `grid_matches_rederived_smart_resize: True` — the processor's reported
 `grid_thw` for both pinned cases equals a from-scratch re-implementation of the above.
+
+- **Division-order waiver record (2026-10-18).** The plan §4 clause asked for "a hash-pinned
+  boundary fixture sensitive to division order, recording reference binary64 intermediates and
+  final geometry". No such fixture exists within the default decode limits: the committed probe
+  `tools/image-oracle/qwen3vl_division_order_sweep.py` sweeps the full
+  `ImageDecodeLimits.DEFAULTS` range (sides ≤ 16,384, area ≤ 16,777,216; 56,380,384
+  cells reaching the max-pixels branch), comparing the port's two sequential divisions
+  `height / beta / factor` with the folded form `height / (beta * factor)`, and found no
+  sensitive cell. The control variant `height * (1 / beta) / factor` flags 1,334 of the same
+  cells, demonstrating that the sweep detects order differences (non-vacuous); the spot check
+  1920x1080 → 1344x768 matches the venv-verified case. The first recorded evidence was a
+  narrower venv sweep of [2, 4000)^2 (12,087,517 cells reaching the max-pixels branch) plus the
+  squares in [1000, 20000) step 16, now subsumed by the wider sweep; its ranges and conclusion
+  remain in the comment above the 160x6560 max-pixels case in
+  `Qwen3VlGeometryPlanTest` (`jmlx-vision`), whose venv-verified geometry cases — including
+  that max-branch case — re-run under the ordinary `:jmlx-vision:test` task. Callers may pass
+  larger `ImageDecodeLimits`, so a division-order-sensitive input remains unproven beyond the
+  defaults; the clause is waived on this evidence within that scope. The boundary fixtures
+  instead record final geometry and digests.
 
 ### 4.6 Normalization, temporal duplication, patch permutation
 
@@ -318,6 +344,83 @@ Probe cross-check: `grid_matches_rederived_smart_resize: True` — the processor
 
 The asymmetric grid (1, 12, 24) → merged 6×12 is the hand-checkable non-square example used in
 §6.
+
+### 4.8 WP2 part-2 oracle fixture set (2026-10-18)
+
+- **Family and reference construction.** A `qwen3vl` family in `tools/image-oracle`
+  (`fixtures/qwen3vl.input.json` / `qwen3vl.expected.json`, 21 cases, `run_qwen3vl` in
+  `runner.py`) pins the §4.1–§4.3 reference as an executable oracle: the slow
+  `Qwen2VLImageProcessor` built from the committed `fixtures/qwen3vl/preprocessor_config.json`
+  (the pinned 2B artifact's file, sha `27225450ac9c…`, byte-identical to the WP1
+  fast-comparison pin) with the 4.57.6 size-dict bug (§4.2) compensated by explicit options —
+  `Qwen2VLImageProcessor.from_pretrained(qwen3vl, min_pixels=65536, max_pixels=1048576)` —
+  where `max_pixels` is the jmlx planned-effective bound per decision (b), not the artifact's
+  declared 16,777,216. The runner re-verifies the resolved options (min/max, BICUBIC,
+  `do_convert_rgb`, mean/std) before use and exits on drift; the `doResize: false` cases run
+  through a second instance built with the construct-time `do_resize=False` flag.
+- **Path-input invariant.** Every case feeds the processor the fixture's absolute **path
+  string**, never a PIL image object: in the 4.57.6 slow processor `exif_transpose` runs only
+  on the string-input load path, while PIL-image inputs skip it entirely. Probed 2026-10-18:
+  the rotated fixtures differ by input mode (orientation 6: grid [1,24,12] via the path vs
+  [1,12,24] via a PIL object, with different pixel shas; orientation 2 likewise), while the
+  alpha and plain cases are input-mode-insensitive. The file-to-processor pipeline is what the
+  jmlx Qwen decode policy (`ExifOrientationPolicy.APPLY` + `AlphaPolicy.DROP_ALPHA`) mirrors
+  and what the WP1 exif golden (§4.4) measured, so it is the pipeline this family pins.
+- **Case coverage (21 cases).** The two WP1 probe images, byte-identical to the fast-
+  comparison pins (processed shas `df316e1e…` / `1b98a584…`, the WP1 probe golden's
+  `pixel_values` shas); the five planned geometries — 1920x1080→1344x768 (4032 raw patch
+  rows), 1280x960→1152x864 (3888), 1080x1920→768x1344 (4032), 1024x1024→1024x1024 (exactly
+  the 4096-row cap), 2000x10→3648x32 (extreme legal aspect); the rejected aspect 2002x10,
+  pinned as a rejection by catching **the reference's own** `ValueError` (the runner exits if
+  the guard does not fire); the resize-disabled raw-row rejection 160x6560 (rawPatchRows 4100
+  > budget 4096), deliberately **not** run through the reference, which would process it
+  fine — the rejection is jmlx decision (c), and the record carries 4100/4096; banker's-
+  rounding ties 144² and 176² → 256²; min-upscale 8x8→256²; the just-above-cap boundary
+  1040²→1024²; resize-disabled validation (96x64 legal, 160x6560 rejected above); index-coded
+  flatten order on 256x128 (each pixel encodes its patch-row/patch-col/inner-row/inner-col);
+  two differently sized images in one case (256x128 + 128x256, per-image records in input
+  order, nothing padded); three alpha/tRNS drop cases (RGBA, LA, palette+tRNS; transparent
+  pixels carry non-white source colors), each with a `whiteComposite` control recording the
+  unchanged SmolVLM composite-over-white decode; two eXIf-orientation cases (orientations 6
+  and 2 on a 64x32 per-pixel-distinct base), each with a `storedDecode` control (the raw
+  stored, untransformed pixels).
+- **Record format: shaOnly + samples.** Full base64 is impractical (a 256² tensor is 1.57 MB
+  of raw float32 before encoding), so each image record carries `pixelSha256` (the whole tensor as little-endian
+  IEEE-754 float32), `uint8Sha256` (the resized RGB as HWC contiguous uint8, reconstructed by
+  inverting the merge-block flatten — `qwen3vl_reconstruct_hwc` — so resize divergence stays
+  separable from normalization divergence), three full patch rows (1,536 floats each,
+  big-endian base64) as `samples` (the bit-exact order evidence), and the geometry fields
+  `source`, `resized`, `gridThw`, `rawPatchRows`, `mergedRowCount`.
+- **Shared processed-patch fixture.** The two WP1 probe images' full-pass float32 bytes are
+  additionally materialized as committed bins under `fixtures/qwen3vl/patches/`:
+  `model-rgb-256x256.pixel-values.f32` [256, 1536] and `model-rgb-64x32.pixel-values.f32`
+  [288, 1536] (little-endian IEEE-754 float32, C order) plus `manifest.json` (schema
+  `jmlx-phase7-3b-wp2-qwen3vl-processed-patches-v1`, per-bin grid/rows/digests and
+  source-image digests); the runner writes them in `--generate-all` mode and digest-verifies
+  them otherwise. The three files are pinned in **both** `tools/image-oracle/provenance.json`
+  (enforced by the root `verifyImageOracleFixtureDigests`) and `tools/hf-reference/
+  provenance.json` under `qwen3vl_processed_patches` (enforced by the root
+  `verifyHfReferenceGoldens` with the vision-Tier-B-style set-equality and digest guards).
+  `tools/hf-reference/README.md` documents the WP5+ consumption contract: model-math tests
+  feed the bins directly as `pixel_values` (with the manifest's grids) without
+  re-preprocessing. The bin digests equal the WP1 probe golden's `pixel_values` shas —
+  bit-level agreement across the `max_pixels` bound choice (the probe ran at the declared
+  16,777,216): neither geometry is affected by the bound, the 256² image sitting exactly at
+  `min_pixels` with no scaling and the 64x32 image taking the upscale branch under either
+  bound.
+- **Java consumption.** `Qwen3VlImageProcessor.processFile(Path, ImageDecodeLimits)` (disk) and
+  `processEncoded(byte[], ImageDecodeLimits)` (in-memory) — WP2 part 2's file-to-processor entry
+  points: `ImageDecoder.decode` with
+  `DROP_ALPHA` + `APPLY`, then `process` — closes the part-1 caller contract.
+  `ImageOracleQwen3VlTest` byte-verifies all 21 committed cases against the pure-Java chain:
+  geometry, the little-endian `pixelSha256`/`uint8Sha256` shas, the bit-identical sample
+  rows, the exact rejection messages ("absolute aspect ratio must be smaller than 200, got
+  200.2"; "raw patch rows 4100 exceed the raw patch row budget of 4096 for 160x6560"), the
+  `whiteComposite`/`storedDecode` controls — including the assertion that the EXIF-ignoring
+  pipeline does **not** match the rotated records — the byte-equality of the two shared patch
+  bins, and `processFile(Path)`/`processEncoded(byte[])` parity; a statelessness unit test
+  processes the two
+  differently sized images in either order.
 
 ## 5. Vision tower arithmetic (transformers 4.57.6, `modeling_qwen3_vl.py`)
 

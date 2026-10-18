@@ -2,7 +2,7 @@
 
 - **Status:** WP0 and WP1 complete, 2026-10-15 — baseline, artifact pins, executable reference
   probes and divergence evidence are recorded in `req/plans/phase7-3b-reference-findings.md`.
-  WP2–WP6 implementation and acceptance remain work below.
+  WP3–WP6 implementation and acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,

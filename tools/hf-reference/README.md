@@ -89,3 +89,37 @@ additive vision Tier-B provenance entries without rewriting existing synthetic g
 `verifyHfReferenceGoldens` verifies both the new golden and manifest/image/generator digests with no
 Python execution. Regeneration resets numerical acceptance: rerun Java, review the changed outputs
 and record the measured error/memory before setting local eligibility again.
+
+### Qwen3-VL processed-patch fixtures (Phase 7.3b WP2)
+
+The two WP1 probe images (256x256 and 64x32) are committed through the pinned
+transformers 4.57.6 slow `Qwen2VLImageProcessor` file-to-processor pipeline --
+`exif_transpose`, `convert("RGB")`, `smart_resize`, BICUBIC resize, rescale and
+normalize, and the merge-block patch flatten -- at the jmlx planned-effective
+bounds `min_pixels=65536` / `max_pixels=1048576` (the artifact declares
+`max_pixels=16777216`). They live under
+`tools/image-oracle/fixtures/qwen3vl/patches/` as two little-endian IEEE-754
+float32 bins of shape `[rawPatchRows, 1536]` (256 and 288 rows) plus
+`manifest.json`, which records the schema, per-patch row counts, `gridThw` and
+the source-image digests.
+
+The fixtures are owned by `tools/image-oracle`, never by this tool: only its
+runner produces and verifies them (`./gradlew generateImageOracleFixtures`
+rewrites, `./gradlew verifyImageOracleFixtures` verifies). Their digests are
+pinned twice: in `tools/image-oracle/provenance.json` (enforced by the root
+`verifyImageOracleFixtureDigests`) and in this `provenance.json` under
+`qwen3vl_processed_patches` (enforced by the root `verifyHfReferenceGoldens`
+with the same set-equality and path-traversal guards as the vision Tier-B
+files).
+
+Cross-tool agreement (verified 2026-10-18): the two bin digests are exactly the
+`pixel_values.sha256` of the `rgb_256x256` and `rgb_64x32` cases in
+`goldens/qwen3-vl-2b-wp1-probe.json`, which was produced on the pinned 2B
+artifact at the declared max bound of 16,777,216 -- bit-level agreement across
+the bound choice, because neither geometry is affected by `max_pixels`: the
+256x256 image sits exactly at `min_pixels` with no scaling, and the 64x32 image
+takes the upscale branch under either bound.
+
+Consumption contract for the Phase 7.3b WP5+ model-math tests: feed these bins
+directly as `pixel_values` (with the manifest's grids) without re-preprocessing,
+so a model-math error cannot be concealed by a preprocessing drift.

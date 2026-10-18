@@ -626,6 +626,9 @@ tasks.register('verifyHfReferenceGoldens') {
     // WP7's opt-in real-artifact reference inputs/outputs are committed and hash-pinned too.
     inputs.files(fileTree('tools/tier-b') { include 'smolvlm-256m-instruct.json', 'images/**' })
     inputs.file('tools/hf-reference/vision_tier_b.py')
+    // Phase 7.3b WP2's shared Qwen3-VL processed-patch fixtures are image-oracle-owned but
+    // consumed on the HF side, so the root task pins their digests too.
+    inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
     doLast {
         def metadata = new JsonSlurper().parse(provenance.asFile)
         // The Phase 7.2 provenance block pins the tool's own hash-locked requirements lock,
@@ -666,6 +669,32 @@ tasks.register('verifyHfReferenceGoldens') {
             def actualHash = sha256File(path.toFile())
             if (actualHash != expectedHash) {
                 throw new GradleException("Vision Tier-B reference SHA-256 differs: ${relativePath}")
+            }
+        }
+        def processedPatches = metadata.qwen3vl_processed_patches
+        if (!(processedPatches instanceof Map) || processedPatches.isEmpty()) {
+            throw new GradleException('Hugging Face provenance has no Qwen3-VL processed-patch hashes')
+        }
+        // The map must cover exactly the image-oracle-owned processed-patch fixtures: the
+        // manifest and both float32 bins -- a removed entry or an unprovenanced new file both
+        // fail the build.
+        def actualPatchPaths = fileTree('tools/image-oracle/fixtures/qwen3vl/patches').files.collect {
+            repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
+        }.toSet()
+        if (processedPatches.keySet().toSet() != actualPatchPaths) {
+            throw new GradleException("Qwen3-VL processed-patch provenance file set differs: " +
+                    "missing ${processedPatches.keySet() - actualPatchPaths}; " +
+                    "extra ${actualPatchPaths - processedPatches.keySet()}")
+        }
+        processedPatches.each { relativePath, expectedHash ->
+            def path = repositoryRoot.resolve(relativePath.toString()).normalize()
+            if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
+                    !path.toRealPath().startsWith(repositoryRoot)) {
+                throw new GradleException("Invalid Qwen3-VL processed-patch reference path: ${relativePath}")
+            }
+            def actualHash = sha256File(path.toFile())
+            if (actualHash != expectedHash) {
+                throw new GradleException("Qwen3-VL processed-patch SHA-256 differs: ${relativePath}")
             }
         }
         def expected = metadata.files

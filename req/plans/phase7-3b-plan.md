@@ -295,8 +295,8 @@ shared hash-pinned processed-patch fixture (`fixtures/qwen3vl/patches/`) consume
 `tools/image-oracle` (`run_qwen3vl` + the Java oracle test) and `tools/hf-reference`
 (`qwen3vl_processed_patches` provenance pin enforced by `verifyHfReferenceGoldens`,
 consumption contract in its README); the two-different-sizes ordering case (plus a
-statelessness unit test); the file-to-processor entry point
-(`Qwen3VlImageProcessor.processFile`, `Path` and `byte[]` overloads) with parity tests; the
+statelessness unit test); the file-to-processor entry points
+(`Qwen3VlImageProcessor.processFile(Path)` and `processEncoded(byte[])`) with parity tests; the
 WP9 rotated-fixture parity (orientations 6 and 2, eXIf-chunk PNGs, `storedDecode` non-matching
 control, path-input `exif_transpose` invariant, findings §4.4/§4.8); and the documentation
 updates. WP2 is accepted with this landing; the prompt/position/template fixture clause of the

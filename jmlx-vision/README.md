@@ -23,7 +23,7 @@ dependency; Java 21+.
 | `SmolVlmGeometryPlan` | Pure per-image geometry (stage-1/stage-2 sizes, split grid, tile count) computed from dimensions alone, with no pixel work. |
 | `Qwen3VlProcessorConfig` | Parsed, validated `preprocessor_config.json` for the slow-processor Qwen3-VL path; the declared max-pixel bound is capped at the raw-row budget's derived hard cap (1,048,576 at the default 4,096-row budget, decision (b)), and the 4,096 raw-patch-row budget (decision (c)) is a builder option only. |
 | `Qwen3VlGeometryPlan` | Pure per-image geometry (resized size, `grid_thw`, raw/merged row counts) from dimensions alone, with the aspect and raw-row-budget checks, shared with the zero-token path. |
-| `Qwen3VlImageProcessor` | `process(RgbImage)` runs the ported chain; `processFile(Path\|byte[], ImageDecodeLimits)` are the file-to-processor entry points applying the Qwen file policy (decode `DROP_ALPHA` + `APPLY`, then process). |
+| `Qwen3VlImageProcessor` | `process(RgbImage)` runs the ported chain; `processFile(Path, ImageDecodeLimits)` reads a PNG/JPEG from disk and `processEncoded(byte[], ImageDecodeLimits)` decodes in-memory bytes — both are the file-to-processor entry points applying the Qwen file policy (decode `DROP_ALPHA` + `APPLY`, then process). |
 | `Qwen3VlImageProcessorResult` | The flattened merge-block patch tensor (`grid_h*grid_w` rows of 1,536 floats at the pinned geometry — not an image layout) with grid/order metadata; defensive buffer accessors. |
 
 `SmolVlmImageProcessor.geometry(height, width)` returns the `SmolVlmGeometryPlan` for an image's
@@ -95,8 +95,10 @@ planned-effective bound, decision (b); the pre-cap value stays available as
 `declaredMaxPixels()` for provenance) — and the 4,096 raw-patch-row per-image budget
 (decision (c)) is a builder option only, so an untrusted config cannot lift it.
 
-`Qwen3VlImageProcessor.processFile` is the file-to-processor entry point and applies the Qwen
-file policy: `ImageDecoder` with `AlphaPolicy.DROP_ALPHA` + `ExifOrientationPolicy.APPLY` — the
+`Qwen3VlImageProcessor.processFile(Path, ImageDecodeLimits)` reads the image bytes from disk and
+`processEncoded(byte[], ImageDecodeLimits)` decodes them from memory; both are the
+file-to-processor entry points and apply the Qwen file policy: `ImageDecoder` with
+`AlphaPolicy.DROP_ALPHA` + `ExifOrientationPolicy.APPLY` — the
 reference's `exif_transpose` + `convert("RGB")`, which drops alpha, never composites over white
 and never applies a palette `tRNS` — then `process`. This is a deliberate contrast with the
 module-default decode (`COMPOSITE_OVER_WHITE` + `IGNORE`) used by the SmolVLM path, which is

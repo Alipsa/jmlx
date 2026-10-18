@@ -29,7 +29,10 @@ class ImageOracleQwen3VlTest {
   /** Cases whose processed patch bin is committed under {@code qwen3vl/patches/}. */
   private static final Set<String> PATCH_CASES = Set.of("model-rgb-256x256", "model-rgb-64x32");
 
-  /** Cases whose {@code processFile} entry point must be exercised for parity. */
+  /**
+   * Cases whose {@code processFile}/{@code processEncoded} entry points must be exercised for
+   * parity.
+   */
   private static final Set<String> PROCESS_FILE_CASES =
       Set.of("model-rgb-256x256", "rotated-orient6-64x32");
 
@@ -259,10 +262,10 @@ class ImageOracleQwen3VlTest {
           Arrays.equals(littleEndianFloat32(fromFile.values()), littleEndian),
           label + " processFile(Path) parity");
       Qwen3VlImageProcessorResult fromBytes =
-          processor.processFile(Files.readAllBytes(fixture), ImageDecodeLimits.DEFAULTS);
+          processor.processEncoded(Files.readAllBytes(fixture), ImageDecodeLimits.DEFAULTS);
       assertTrue(
           Arrays.equals(littleEndianFloat32(fromBytes.values()), littleEndian),
-          label + " processFile(byte[]) parity");
+          label + " processEncoded(byte[]) parity");
     }
   }
 

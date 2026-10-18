@@ -638,8 +638,9 @@ probe goldens. In `jmlx-vision`, WP2 part 1 landed the pure-Java `Qwen3Vl*` prep
 `Qwen3VlImageProcessorResult`) plus `ExifOrientationPolicy` and the decode-level
 `exif-orientation` oracle family (the WP9 policy: `APPLY` for the Qwen file path, `IGNORE` kept
 for SmolVLM). WP2 part 2 (2026-10-18) landed the `qwen3vl` image-oracle family (21 cases,
-`run_qwen3vl` in `tools/image-oracle/runner.py`), the `Qwen3VlImageProcessor.processFile`
-file-to-processor entry points (decode `DROP_ALPHA` + `APPLY`), and the shared processed-patch
+`run_qwen3vl` in `tools/image-oracle/runner.py`), the `Qwen3VlImageProcessor.processFile(Path)`
+and `processEncoded(byte[])` file-to-processor entry points (decode `DROP_ALPHA` + `APPLY`), and
+the shared processed-patch
 fixture under `tools/image-oracle/fixtures/qwen3vl/patches/`, whose manifest and bins are
 digest-pinned in both `tools/image-oracle/provenance.json` and `tools/hf-reference/
 provenance.json`; it also pinned the 4.57.6 path-input invariant that the slow processor's

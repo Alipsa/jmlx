@@ -401,8 +401,9 @@ The asymmetric grid (1, 12, 24) → merged 6×12 is the hand-checkable non-squar
   16,777,216): neither geometry is affected by the bound, the 256² image sitting exactly at
   `min_pixels` with no scaling and the 64x32 image taking the upscale branch under either
   bound.
-- **Java consumption.** `Qwen3VlImageProcessor.processFile(Path|byte[], ImageDecodeLimits)`
-  — WP2 part 2's file-to-processor entry points: `ImageDecoder.decode` with
+- **Java consumption.** `Qwen3VlImageProcessor.processFile(Path, ImageDecodeLimits)` (disk) and
+  `processEncoded(byte[], ImageDecodeLimits)` (in-memory) — WP2 part 2's file-to-processor entry
+  points: `ImageDecoder.decode` with
   `DROP_ALPHA` + `APPLY`, then `process` — closes the part-1 caller contract.
   `ImageOracleQwen3VlTest` byte-verifies all 21 committed cases against the pure-Java chain:
   geometry, the little-endian `pixelSha256`/`uint8Sha256` shas, the bit-identical sample
@@ -410,7 +411,8 @@ The asymmetric grid (1, 12, 24) → merged 6×12 is the hand-checkable non-squar
   200.2"; "raw patch rows 4100 exceed the raw patch row budget of 4096 for 160x6560"), the
   `whiteComposite`/`storedDecode` controls — including the assertion that the EXIF-ignoring
   pipeline does **not** match the rotated records — the byte-equality of the two shared patch
-  bins, and `processFile` Path/byte[] parity; a statelessness unit test processes the two
+  bins, and `processFile(Path)`/`processEncoded(byte[])` parity; a statelessness unit test
+  processes the two
   differently sized images in either order.
 
 ## 5. Vision tower arithmetic (transformers 4.57.6, `modeling_qwen3_vl.py`)

@@ -181,7 +181,7 @@ class Qwen3VlImageProcessorTest {
         () -> pinnedProcessor().processFile((Path) null, ImageDecodeLimits.DEFAULTS));
     assertThrows(
         IllegalArgumentException.class,
-        () -> pinnedProcessor().processFile((byte[]) null, ImageDecodeLimits.DEFAULTS));
+        () -> pinnedProcessor().processEncoded(null, ImageDecodeLimits.DEFAULTS));
   }
 
   @Test

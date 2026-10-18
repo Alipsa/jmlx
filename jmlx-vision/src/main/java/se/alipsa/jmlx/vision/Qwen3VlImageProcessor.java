@@ -240,10 +240,12 @@ public final class Qwen3VlImageProcessor {
   }
 
   /**
-   * In-memory counterpart of {@link #processFile(Path, ImageDecodeLimits)}: decodes the PNG or JPEG
-   * content of {@code bytes} with the same Qwen3-VL file policy (drop-alpha + EXIF-apply, see that
-   * method's Javadoc for the reference pipeline it mirrors) and runs the full preprocessing chain
-   * on the result.
+   * In-memory counterpart of {@link #processFile(Path, ImageDecodeLimits)}: where that method reads
+   * the image bytes from a file on disk, this one decodes the PNG or JPEG content of {@code bytes}
+   * directly from memory (no filesystem access) and then runs the full preprocessing chain on the
+   * result with the same Qwen3-VL file policy (drop-alpha + EXIF-apply; see {@code processFile}'s
+   * Javadoc for the reference pipeline it mirrors). The two names are therefore deliberate: {@code
+   * processFile} for the on-disk path, {@code processEncoded} for already-encoded in-memory bytes.
    *
    * @param bytes PNG or JPEG image bytes; null is rejected; the array is consumed and never
    *     retained
@@ -254,7 +256,7 @@ public final class Qwen3VlImageProcessor {
    * @throws IllegalArgumentException if {@code bytes} is null, or the decoded image dimensions fail
    *     the geometry checks (aspect guard, no-resize divisibility, raw-patch-row budget)
    */
-  public Qwen3VlImageProcessorResult processFile(byte[] bytes, ImageDecodeLimits limits)
+  public Qwen3VlImageProcessorResult processEncoded(byte[] bytes, ImageDecodeLimits limits)
       throws IOException {
     if (bytes == null) {
       throw new IllegalArgumentException("bytes must not be null");

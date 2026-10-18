@@ -506,6 +506,8 @@ def run_qwen3vl(input_path: Path, provenance: dict) -> dict:
         do_resize = case.get("doResize", True)
         image_rels = [case["image"]] if "image" in case else list(case["images"])
         image_records = []
+        multi_pixel_values = []
+        multi_grids = []
         for rel in image_rels:
             fixture = verify_fixture(root, rel, provenance)
             image = Image.open(fixture)
@@ -532,6 +534,8 @@ def run_qwen3vl(input_path: Path, provenance: dict) -> dict:
                     f"qwen3vl pixel_values shape {pv.shape} != "
                     f"[{expected_rows}, {QWEN3VL_PATCH_STRIDE}]: {rel}"
                 )
+            multi_pixel_values.append(pv)
+            multi_grids.append(grid)
 
             raw_result = p(
                 images=[str(fixture)], do_rescale=False, do_normalize=False, return_tensors=None
@@ -600,6 +604,23 @@ def run_qwen3vl(input_path: Path, provenance: dict) -> dict:
             if case["name"] in QWEN3VL_PATCH_CASES:
                 patch_blobs[case["name"]] = pv.tobytes()
                 patch_grids[case["name"]] = grid
+        if len(image_rels) > 1:
+            # The combined call must reproduce the per-image results in order: a
+            # reference version that padded or reordered images would change this
+            # batch layout without changing any single-image output.
+            both = processor_for(do_resize)(
+                images=[str(root / r) for r in image_rels], return_tensors=None
+            )
+            combined_grids = [
+                [int(v) for v in row] for row in np.asarray(both["image_grid_thw"]).tolist()
+            ]
+            if not np.array_equal(
+                np.asarray(both["pixel_values"], dtype=np.float32),
+                np.concatenate(multi_pixel_values),
+            ) or combined_grids != multi_grids:
+                raise SystemExit(
+                    f"qwen3vl multi-image call disagrees with per-image concat: {case['name']}"
+                )
         cases.append({"images": image_records, "name": case["name"]})
 
     patches_dir = root / "qwen3vl" / "patches"

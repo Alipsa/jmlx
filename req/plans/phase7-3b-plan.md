@@ -236,7 +236,7 @@ sweeps the full `ImageDecodeLimits.DEFAULTS` range (sides ≤ 16,384, area ≤ 1
 56,380,384 cells reaching the max-pixels branch), comparing the port's two sequential divisions
 `height / beta / factor` against the folded form `height / (beta * factor)`, and found no input
 reachable under the defaults whose geometry depends on the division order. The control variant
-`height * (1 / beta) / factor` flags 1,333 of those cells (a non-vacuous sweep), and the spot
+`height * (1 / beta) / factor` flags 1,334 of those cells (a non-vacuous sweep), and the spot
 check 1920x1080 → 1344x768 matches the venv-verified case recorded in
 `Qwen3VlGeometryPlanTest`, whose venv-verified geometry cases (including
 the max-pixels-branch case) re-run under the ordinary `:jmlx-vision:test` task. The first

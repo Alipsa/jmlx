@@ -29,7 +29,7 @@ Only numpy is required. Expected output as of 2026-10-18 (the script exits
 non-zero if either count drifts from these):
 
   default:   max-branch cells 56380384 division-order-sensitive 0
-  --control: max-branch cells 56380384 division-order-sensitive 1333
+  --control: max-branch cells 56380384 division-order-sensitive 1334
 
 The trailing examples list the first sensitive (h, w) cells, at most three
 per height; it is empty for the default comparison. The venv-verified
@@ -51,13 +51,14 @@ MAXAREA = 16777216
 
 EXPECTED = {
     "default": (56_380_384, 0),
-    "control": (56_380_384, 1333),
+    "control": (56_380_384, 1334),
 }
 
 
 def sweep(control: bool) -> tuple[int, int, list[tuple[int, int]]]:
     hits: list[tuple[int, int]] = []
     cells = 0
+    sensitive = 0
     for h in range(1, MAXSIDE + 1):
         w = np.arange(1, min(MAXSIDE, MAXAREA // h) + 1, dtype=np.float64)
         hf = float(h)
@@ -78,9 +79,10 @@ def sweep(control: bool) -> tuple[int, int, list[tuple[int, int]]]:
             dw = np.floor(w / beta / F) != np.floor(w / (beta * F))
         d = dh | dw
         if d.any():
+            sensitive += int(d.sum())
             for ww in w[d][:3]:
                 hits.append((h, int(ww)))
-    return cells, len(hits), hits
+    return cells, sensitive, hits
 
 
 def main() -> int:

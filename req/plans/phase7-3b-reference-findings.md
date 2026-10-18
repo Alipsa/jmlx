@@ -303,7 +303,7 @@ Probe cross-check: `grid_matches_rederived_smart_resize: True` — the processor
   `ImageDecodeLimits.DEFAULTS` range (sides ≤ 16,384, area ≤ 16,777,216; 56,380,384
   cells reaching the max-pixels branch), comparing the port's two sequential divisions
   `height / beta / factor` with the folded form `height / (beta * factor)`, and found no
-  sensitive cell. The control variant `height * (1 / beta) / factor` flags 1,333 of the same
+  sensitive cell. The control variant `height * (1 / beta) / factor` flags 1,334 of the same
   cells, demonstrating that the sweep detects order differences (non-vacuous); the spot check
   1920x1080 → 1344x768 matches the venv-verified case. The first recorded evidence was a
   narrower venv sweep of [2, 4000)^2 (12,087,517 cells reaching the max-pixels branch) plus the

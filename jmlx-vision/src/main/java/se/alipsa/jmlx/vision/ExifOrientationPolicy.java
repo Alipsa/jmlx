@@ -19,9 +19,11 @@ package se.alipsa.jmlx.vision;
  * fallback below never fires. It rotates only when its first value is an integer in 2–8, or an
  * integer-valued float or rational (so 6/1 and 12/2 both match 6); a BYTE, ASCII or UNDEFINED
  * value, a non-integral or out-of-range value, and a 0/0 rational never rotate. A block without the
- * tag — a malformed or truncated block (bad byte order, wrong TIFF magic, an out-of-range IFD
- * offset, a truncated IFD, a bare {@code Exif\x00\x00} prefix), an unregistered entry type, or a
- * zero entry count — keeps the tag absent.
+ * tag — a malformed or truncated block (bad byte order, a head prefix the reference's TIFF
+ * constructor rejects, an out-of-range IFD offset, a truncated IFD, a bare {@code Exif\x00\x00}
+ * prefix), an unregistered entry type, or a zero entry count — keeps the tag absent. A non-42 magic
+ * field on a parseable head (the cross-endian prefixes and the big-endian BigTIFF prefix) is read
+ * normally and does not keep the tag absent.
  *
  * <p>Only an absent tag consults the XMP fallback: the first single-digit match of {@code
  * tiff:Orientation(="|>)} in the XMP packet supplies the orientation, or none when the packet
@@ -32,11 +34,11 @@ package se.alipsa.jmlx.vision;
  *
  * <p>A malformed or truncated EXIF or XMP block is data, not corruption: under either policy the
  * pixels are returned as stored, and the decode never fails because of it. Where the reference's
- * {@code getexif()} would itself raise on pathological metadata (a bad TIFF byte order or magic, a
- * truncated post-{@code IDAT} chunk, an {@code iTXt} XMP value it stores as an object its regex
- * cannot scan), {@link ImageDecoder} treats the orientation as absent instead, and a {@code zTXt}
- * or valid-UTF-8 {@code iTXt} {@code exif} value — a string the reference cannot load — is parsed
- * as the underlying bytes (and can rotate): defensive divergences documented on {@link
+ * {@code getexif()} would itself raise on pathological metadata (a bad TIFF byte order or head
+ * prefix, a truncated post-{@code IDAT} chunk, an {@code iTXt} XMP value it stores as an object its
+ * regex cannot scan), {@link ImageDecoder} treats the orientation as absent instead, and a {@code
+ * zTXt} or valid-UTF-8 {@code iTXt} {@code exif} value — a string the reference cannot load — is
+ * parsed as the underlying bytes (and can rotate): defensive divergences documented on {@link
  * ImageDecoder}.
  *
  * <p>One JPEG-specific twist on that fallback: when the {@code APP1}'s TIFF head itself is invalid

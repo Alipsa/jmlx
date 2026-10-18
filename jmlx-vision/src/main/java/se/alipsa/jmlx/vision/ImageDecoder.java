@@ -100,11 +100,11 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
  * <p>Like the reference, a malformed EXIF or XMP block is data, not corruption: it is treated as
  * absent and never breaks the decode (the header walkers still reject structural corruption of the
  * container itself). Where the reference's {@code getexif()} would instead raise on pathological
- * metadata — a bad TIFF byte order or magic, a truncated post-{@code IDAT} chunk, an {@code iTXt}
- * XMP value stored as an object its regex cannot scan — the decode here treats the orientation as
- * absent, and a {@code zTXt} or valid-UTF-8 {@code iTXt} {@code exif} value, which the reference
- * stores as a string it cannot load, is parsed as the underlying bytes (and can rotate): a
- * defensive leniency on input the reference rejects outright.
+ * metadata — a bad TIFF byte order or head prefix, a truncated post-{@code IDAT} chunk, an {@code
+ * iTXt} XMP value stored as an object its regex cannot scan — the decode here treats the
+ * orientation as absent, and a {@code zTXt} or valid-UTF-8 {@code iTXt} {@code exif} value, which
+ * the reference stores as a string it cannot load, is parsed as the underlying bytes (and can
+ * rotate): a defensive leniency on input the reference rejects outright.
  *
  * <p><b>ICC and gAMA color management are ignored:</b> embedded color profiles and gamma chunks are
  * not applied to samples, matching the reference path, which performs no conversion. Callers doing
@@ -1239,8 +1239,9 @@ public final class ImageDecoder {
    * reads an 8-byte offset from the always-empty bytes 8–15 of the 8-byte head and always raises;
    * {@code II\x00\x2b} and {@code MM\x2b\x00} are not among the reference's accepted prefixes at
    * all. This method only decides which unparseable heads the JPEG path must treat as invalid
-   * (suppressing the XMP fallback); the parse itself below still only reads {@code
-   * II\x2a\x00}/{@code MM\x00\x2a} with magic 42.
+   * (suppressing the XMP fallback); the parseable heads — all five, including the three whose magic
+   * field is not 42 — are read normally by the parse below, which chooses the byte order from the
+   * II/MM prefix and ignores the magic.
    */
   private static boolean parseableTiffHead(byte[] b, int off, int len) {
     if (len < 8) {
@@ -1267,35 +1268,31 @@ public final class ImageDecoder {
    * of an offset value on any entry — not only the Orientation entry, since the reference loads
    * every entry's data before it filters by tag — stops the walk, keeping the entries stored before
    * it; entries whose type has no registered loader, or whose count is 0, are skipped without being
-   * stored. Malformation at any step — a byte order that is neither {@code II} (little-endian) nor
-   * {@code MM} (big-endian), a TIFF magic other than 42, an out-of-range first-IFD offset — is EXIF
-   * data, not container corruption: it is reported as an absent orientation, never thrown, so a bad
-   * EXIF block can never break a decode. Every access is bounds-checked against {@code len}.
+   * stored. A head the reference's TIFF constructor rejects — a head shorter than 8 bytes, a byte
+   * order that is neither {@code II} (little-endian) nor {@code MM} (big-endian), or an unparseable
+   * prefix (see {@link #parseableTiffHead}) — carries the invalid marker, which suppresses the JPEG
+   * path's XMP fallback; the constructor reads only the 8-byte head, so the marker holds no matter
+   * what follows it. The two-byte magic field is never checked — the reference's classic path reads
+   * every parseable head, magic 42 or not, choosing the byte order from the prefix — so a non-42
+   * magic on a parseable head is read normally. An out-of-range first-IFD offset on a parseable
+   * head is reported as an absent orientation, never thrown, so a bad EXIF block can never break a
+   * decode. Every access is bounds-checked against {@code len}.
    */
   private static TiffOrientation parseTiffOrientation(byte[] b, int off, int len) {
     // An invalid TIFF head makes the reference's open-time getexif() (JPEG without JFIF DPI)
     // swallow its parse error and cache an empty object: its XMP fallback never ran, so the JPEG
     // path must not consult one either. For PNG the same head makes the reference raise, which is
-    // tolerated with the fallback intact — the flag is consulted only on the JPEG path.
-    boolean xmpSuppressed = !parseableTiffHead(b, off, len);
-    if (len < 8) {
-      return xmpSuppressed
-          ? TiffOrientation.INVALID
-          : TiffOrientation.ABSENT; // byte order (2) + magic (2) + first-IFD offset (4)
+    // tolerated with the fallback intact — the marker is consulted only on the JPEG path. The
+    // constructor reads only the 8-byte head, so the marker holds no matter what follows it: it is
+    // returned before any structural read.
+    if (!parseableTiffHead(b, off, len)) {
+      return TiffOrientation.INVALID;
     }
+    // The parseable prefixes guarantee len >= 8 and an II/MM byte-order prefix — the 8-byte head
+    // is byte order (2) + magic (2) + first-IFD offset (4); the two-byte magic field is never
+    // checked.
     int byteOrder = u16(b, off);
     boolean little = byteOrder == 0x4949; // "II"
-    if (!little && byteOrder != 0x4D4D) { // "MM"
-      return xmpSuppressed ? TiffOrientation.INVALID : TiffOrientation.ABSENT;
-    }
-    int magic = little ? leU16(b, off + 2) : u16(b, off + 2);
-    if (magic != 42) {
-      // The cross-endian heads (II\x00\x2a, MM\x2a\x00) and the big-endian BigTIFF head
-      // (MM\x00\x2b) are parseable: the reference's constructor accepts them, so the XMP
-      // fallback stays allowed. Every other non-42 head — II\x2b\x00, II\x00\x2b, MM\x2b\x00,
-      // magic 44, garbage — is invalid: the marker.
-      return xmpSuppressed ? TiffOrientation.INVALID : TiffOrientation.ABSENT;
-    }
     int ifdOffset = little ? leU32(b, off + 4) : (int) u32(b, off + 4);
     if (ifdOffset < 0 || (long) ifdOffset + 2 > len) {
       // A parseable head whose IFD offset is out of range is NOT invalid: the reference's

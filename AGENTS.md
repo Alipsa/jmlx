@@ -262,7 +262,12 @@ chain should its modules be bumped back to their next `-SNAPSHOT` versions.
 Signing and Central credentials come from Gradle properties (`signing.keyId`,
 `sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is
 inert when `signing.keyId` is absent, so `check` and CI stay keyless. Releasing is a local,
-credentialed, manual action — CI verifies but never publishes.
+credentialed, manual action — CI verifies but never publishes. `main` is protected by
+repository push rules — a direct push is rejected with "push declined due to repository rule
+violations" — so every change, including a one-line doc or status note, must ride a PR that
+passes CI (branch, `gh pr create`, `gh pr merge <n> --merge`). A local `main` can therefore sit
+ahead of `origin/main` with a commit it cannot push; reset it to `origin/main` and carry the
+commit on a feature branch instead.
 
 `release.sh` runs `check` (via the `release` task's own dependencies), but not `jmlx-jinja`'s
 heavier `releaseVerification` matrix (isolated Gradle home, candidate-vs.-two-clean-archives diff,

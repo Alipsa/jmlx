@@ -245,16 +245,20 @@ public final class Qwen3VlImageProcessor {
    * method's Javadoc for the reference pipeline it mirrors) and runs the full preprocessing chain
    * on the result.
    *
-   * @param bytes PNG or JPEG image bytes; the array is consumed and never retained
+   * @param bytes PNG or JPEG image bytes; null is rejected; the array is consumed and never
+   *     retained
    * @param limits positive decode bounds checked from header metadata before any pixel allocation
    * @return the flattened patch tensor of the decoded image
    * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
    *     limits}
-   * @throws IllegalArgumentException if the decoded image dimensions fail the geometry checks
-   *     (aspect guard, no-resize divisibility, raw-patch-row budget)
+   * @throws IllegalArgumentException if {@code bytes} is null, or the decoded image dimensions fail
+   *     the geometry checks (aspect guard, no-resize divisibility, raw-patch-row budget)
    */
   public Qwen3VlImageProcessorResult processFile(byte[] bytes, ImageDecodeLimits limits)
       throws IOException {
+    if (bytes == null) {
+      throw new IllegalArgumentException("bytes must not be null");
+    }
     return process(
         ImageDecoder.decode(
             new ByteArrayInputStream(bytes),

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -175,6 +176,12 @@ class Qwen3VlImageProcessorTest {
     assertThrows(IllegalArgumentException.class, () -> new Qwen3VlImageProcessor(null));
     assertThrows(IllegalArgumentException.class, () -> pinnedProcessor().process(null));
     assertThrows(IllegalArgumentException.class, () -> noResizeProcessor().process(null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> pinnedProcessor().processFile((Path) null, ImageDecodeLimits.DEFAULTS));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> pinnedProcessor().processFile((byte[]) null, ImageDecodeLimits.DEFAULTS));
   }
 
   @Test

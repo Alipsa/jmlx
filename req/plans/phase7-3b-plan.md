@@ -291,8 +291,8 @@ accepted until the following land in a part-2 PR:
 - Integration docs: findings §4.4/§4.8, this plan's status and §11 checklist, AGENTS.md
   architecture list and `jmlx-vision/README.md`.
 
-**2026-10-18 WP2 part-2 status:** all eight part-2 items above land in PR #50
-(branch `phase7-3b-wp2-part2`): the `qwen3vl` oracle family (21 cases) with its provenance pins and
+**2026-10-18 WP2 part-2 status:** PR #50 (merged) landed all eight part-2 items above: the
+`qwen3vl` oracle family (21 cases) with its provenance pins and
 `ImageOracleQwen3VlTest` byte-verification, including the exact rejection messages and the
 `whiteComposite`/`storedDecode` controls; the planned geometry cases (1920x1080, 1280x960,
 1080x1920, 1024x1024 at the 4096-row cap, the 2000x10 extreme-aspect case and the 2002x10

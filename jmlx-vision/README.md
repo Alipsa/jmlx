@@ -9,7 +9,7 @@ splitting, padding masks, grid/order metadata). No native dependency; Java 21+.
 | Type | Role |
 | --- | --- |
 | `RgbImage` | Immutable interleaved unsigned-RGB, row-major, `w*h*3` bytes. Content equality/hashCode; defensive copies. |
-| `ImageDecoder` | Decodes a `Path` or `InputStream` to an `RgbImage`. The no-argument overloads apply `ImageDecodeLimits(16_777_216, 16_384)`. |
+| `ImageDecoder` | Decodes a `Path` or `InputStream` to an `RgbImage`. The no-argument overloads apply `ImageDecodeLimits(16_777_216, 16_384)`. The policy overloads take an `AlphaPolicy` and/or an `ExifOrientationPolicy`. |
 | `ImageDecodeLimits` | Positive `maxPixels` / `maxDimension` bound, checked from decoded metadata *before* any pixel allocation. |
 | `ImageTensor` | Immutable `float[]` with shape/layout (`HWC` or `NHWC`), defensive copies, bounded `toString`. |
 | `ImageTransforms` | `resize(RgbImage, w, h, Resampling)` and `normalize(RgbImage, scale, mean, std)`. |
@@ -40,12 +40,16 @@ produced.
   mapping is probed once through the decoded `ColorModel`, so the band order is never assumed.
 - **Rejected with format-specific `IOException`s:** 16-bit PNG, CMYK/YCCK JPEG, and any input
   above the configured limits.
-- **EXIF orientation is ignored.** An EXIF-rotated JPEG decodes to its stored (unrotated)
-  pixels. That matches the pinned SmolVLM/Idefics3 image-oracle reference path
-  (`PIL.Image.open` → `load()` with no `exif_transpose`), but not every reference — for
-  example the Qwen3-VL/Qwen2VL processors apply orientation before resize — so callers whose
-  reference applies orientation must rotate the image themselves. No orientation accessor is
-  exposed in this milestone.
+- **EXIF orientation:** ignored by default — every overload that does not take an
+  `ExifOrientationPolicy` decodes an EXIF-rotated JPEG to its stored (unrotated) pixels. That
+  matches the pinned SmolVLM/Idefics3 image-oracle reference path (`PIL.Image.open` → `load()`
+  with no `exif_transpose`), and the committed decode fixtures stay pinned under it. The
+  overloads that take an `ExifOrientationPolicy` add an opt-in `APPLY` that applies the stored
+  orientation before the RGB conversion exactly as Pillow's `ImageOps.exif_transpose` does — a
+  pure pixel permutation, no resampling; both JPEG `APP1` `Exif` segments and PNG `eXIf` chunks
+  are honored. `APPLY` is the decode policy of the Qwen3-VL file path (the Phase 7.3b WP9
+  decision: the SmolVLM path keeps the default). Under either policy a malformed or truncated
+  EXIF block is treated as absent — it never breaks a decode.
 - **ICC and gAMA color management are ignored.** Embedded color profiles and gamma chunks are
   not applied to samples, matching the reference path, which performs no `ImageCms` conversion.
   Do not expect display-referred colors; callers doing color management must do it themselves.

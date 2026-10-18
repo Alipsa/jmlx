@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "name": "jpeg-orient-long",
+      "image": "exif-orientation/jpeg-orient-long-4x2.jpg"
+    },
+    {
+      "name": "jpeg-ifd-truncated",
+      "image": "exif-orientation/jpeg-ifd-truncated-4x2.jpg"
+    },
+    {
+      "name": "jpeg-xmp-orient-attr",
+      "image": "exif-orientation/jpeg-xmp-orient-attr-4x2.jpg"
+    },
+    {
+      "name": "jpeg-xmp-orient-el",
+      "image": "exif-orientation/jpeg-xmp-orient-el-4x2.jpg"
+    },
+    {
+      "name": "png-exif-twice",
+      "image": "exif-orientation/png-exif-twice-4x2.png"
+    },
+    {
+      "name": "png-exif-after-idat",
+      "image": "exif-orientation/png-exif-after-idat-4x2.png"
+    },
+    {
+      "name": "png-exif-prefixed",
+      "image": "exif-orientation/png-exif-prefixed-4x2.png"
+    },
+    {
+      "name": "jpeg-plain",
+      "image": "exif-orientation/jpeg-plain-4x2.jpg"
+    },
+    {
+      "name": "png-plain",
+      "image": "exif-orientation/png-plain-4x2.png"
+    },
+    {
+      "name": "jpeg-badoffset-before-orient",
+      "image": "exif-orientation/jpeg-badoffset-before-orient-4x2.jpg"
+    },
+    {
+      "name": "png-xmp-badoffset-before-orient",
+      "image": "exif-orientation/png-xmp-badoffset-before-orient-4x2.png"
+    },
+    {
+      "name": "jpeg-invalid-head-xmp",
+      "image": "exif-orientation/jpeg-invalid-head-xmp-4x2.jpg"
+    },
+    {
+      "name": "jpeg-badmagic-xmp",
+      "image": "exif-orientation/jpeg-badmagic-xmp-4x2.jpg"
+    },
+    {
+      "name": "jpeg-crossendian-orient",
+      "image": "exif-orientation/jpeg-crossendian-orient-4x2.jpg"
+    },
+    {
+      "name": "png-crossendian-orient",
+      "image": "exif-orientation/png-crossendian-orient-4x2.png"
+    }
+  ]
+}

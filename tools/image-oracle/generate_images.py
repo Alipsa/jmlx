@@ -14,7 +14,10 @@ Layout (all paths relative to tools/image-oracle/fixtures/):
   decode/  accepted-mode decode fixtures (expected RGB bytes recorded by runner.py)
   reject/  explicit rejection fixtures (Java ImageDecoder header pre-scan messages)
   resize/  opaque RGB fixtures for single-resize and full-processor-chain cases
+  exif-orientation/  4x2 EXIF/XMP orientation edge cases (stored and transposed RGB
+                     recorded by runner.py; the Java decoder must match both)
 """
+import io
 import struct
 import zlib
 from pathlib import Path
@@ -110,6 +113,140 @@ def write_png(rel: str, width: int, height: int, bit_depth: int, color_type: int
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     print(f"wrote {rel} ({path.stat().st_size} bytes)")
+
+
+# ----------------------------------------------- exif-orientation fixture helpers
+
+def orientation_pixels() -> Image.Image:
+    """A 4x2 image whose channels differ per coordinate (x*60, y*120, 255 - x*20), so stored
+    and transposed orderings are trivially distinguishable."""
+    im = Image.new("RGB", (4, 2))
+    px = im.load()
+    for y in range(2):
+        for x in range(4):
+            px[x, y] = (x * 60 % 256, y * 120 % 256, (255 - x * 20) % 256)
+    return im
+
+
+def jpeg_bytes(im: Image.Image) -> bytes:
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=JPEG_QUALITY)
+    return buf.getvalue()
+
+
+def png_bytes(im: Image.Image) -> bytes:
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def write_bytes(rel: str, data: bytes) -> None:
+    path = ROOT / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    print(f"wrote {rel} ({len(data)} bytes)")
+
+
+def tiff_header(little: bool, magic: int = 42) -> bytes:
+    o = "<" if little else ">"
+    return (b"II" if little else b"MM") + struct.pack(o + "H", magic) + struct.pack(o + "L", 8)
+
+
+def tiff_orient_entry(orientation: int, little: bool) -> bytes:
+    """One SHORT (type 3) Orientation entry; a single SHORT fits inline in the value field."""
+    o = "<" if little else ">"
+    return struct.pack(o + "HHI", 0x0112, 3, 1) + struct.pack(o + "H", orientation) + b"\x00\x00"
+
+
+def tiff_block(orientation: int, little: bool = True, magic: int = 42) -> bytes:
+    """Minimal single-entry IFD block carrying the orientation as a SHORT."""
+    o = "<" if little else ">"
+    return (
+        tiff_header(little, magic)
+        + struct.pack(o + "H", 1)
+        + tiff_orient_entry(orientation, little)
+        + struct.pack(o + "L", 0)
+    )
+
+
+def tiff_block_long(orientation: int) -> bytes:
+    """LE block whose orientation is an inline LONG (type 4, count 1); unlike tiff_block,
+    this exercises the reference's registered type-4 loader."""
+    o = "<"
+    entry = struct.pack(o + "HHI", 0x0112, 4, 1) + struct.pack(o + "I", orientation)
+    return tiff_header(True) + struct.pack(o + "H", 1) + entry + struct.pack(o + "L", 0)
+
+
+def tiff_block_truncated() -> bytes:
+    """LE block claiming two entries but carrying only the second entry's first six bytes:
+    the IFD walk must stop at the short read and keep the intact SHORT-6 entry."""
+    o = "<"
+    full = tiff_orient_entry(6, True)
+    return tiff_header(True) + struct.pack(o + "H", 2) + full + full[:6]
+
+
+def tiff_block_mm_bad_offset() -> bytes:
+    """MM block with a 0x8769 DOUBLE entry (count 1, size 8) whose data offset (50) points
+    past the end of the block, then an inline ASCII entry, then the Orientation LONG-3
+    entry: the reference's short read aborts the walk before Orientation is stored, so
+    nothing rotates."""
+    o = ">"
+    double_entry = struct.pack(o + "HHI", 0x8769, 12, 1) + struct.pack(o + "L", 50)
+    ascii_entry = struct.pack(o + "HHI", 0x0110, 2, 1) + b"A\x00\x00\x00"
+    orient_entry = struct.pack(o + "HHI", 0x0112, 4, 1) + struct.pack(o + "L", 3)
+    return (
+        tiff_header(False)
+        + struct.pack(o + "H", 3)
+        + double_entry
+        + ascii_entry
+        + orient_entry
+    )
+
+
+def tiff_block_le_bad_offset() -> bytes:
+    """LE block with an inline 0x8769 SBYTE entry, then a 0x0110 SSHORT entry (count 4,
+    size 8) whose data offset (50) points past the end of the block, then an ASCII
+    Orientation entry: the walk aborts at the SSHORT entry, so the Orientation tag is
+    never stored and only the XMP fallback can supply one."""
+    o = "<"
+    sbyte_entry = struct.pack(o + "HHI", 0x8769, 6, 1) + b"\x00" * 4
+    sshort_entry = struct.pack(o + "HHI", 0x0110, 8, 4) + struct.pack(o + "L", 50)
+    orient_entry = struct.pack(o + "HHI", 0x0112, 2, 1) + b"A\x00\x00\x00"
+    return (
+        tiff_header(True)
+        + struct.pack(o + "H", 3)
+        + sbyte_entry
+        + sshort_entry
+        + orient_entry
+    )
+
+
+XMP_PREFIX = b"http://ns.adobe.com/xap/1.0/\x00"
+XMP_ATTR_6 = (
+    b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description xmlns:tiff='
+    b'"http://ns.adobe.com/tiff/1.0/" tiff:Orientation="6"/></rdf:RDF></x:xmpmeta>'
+)
+XMP_EL_6 = (
+    b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description xmlns:tiff='
+    b'"http://ns.adobe.com/tiff/1.0/"><tiff:Orientation>6</tiff:Orientation>'
+    b"</rdf:Description></x:xmpmeta>"
+)
+
+
+def jpeg_app1(payload: bytes) -> bytes:
+    return b"\xff\xe1" + struct.pack(">H", len(payload) + 2) + payload
+
+
+def jpeg_with_app1s(jpeg: bytes, payloads: list[bytes]) -> bytes:
+    """Insert APP1 segments right after the SOI marker (pixel-neutral for the DCT data)."""
+    return jpeg[:2] + b"".join(jpeg_app1(payload) for payload in payloads) + jpeg[2:]
+
+
+def png_insert(png: bytes, chunks: list[tuple[bytes, bytes]], after_idat: bool = False) -> bytes:
+    """Insert chunks before the first IDAT chunk, or before IEND when after_idat is set."""
+    at = png.index(b"IEND" if after_idat else b"IDAT") - 4  # back off the length field
+    inserted = b"".join(png_chunk(cid, data) for cid, data in chunks)
+    return png[:at] + inserted + png[at:]
 
 
 # ----------------------------------------------------------------------- main
@@ -314,6 +451,122 @@ def main() -> None:
     bmp = Image.new("RGB", (32, 32), (0, 0, 0))
     bmp.putpixel((5, 6), (255, 0, 0))
     save(bmp, "reject/bmp-32x32.bmp")
+
+    # exif-orientation: 4x2 base image (x*60, y*120, 255 - x*20); every case below was
+    # verified against the pinned Pillow 12.3.0 before its bytes were committed.
+    base_or = orientation_pixels()
+    base_or_jpg = jpeg_bytes(base_or)
+    base_or_png = png_bytes(base_or)
+
+    # (1) EXIF Orientation stored as an inline LONG (count 1, type 4).
+    write_bytes(
+        "exif-orientation/jpeg-orient-long-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [b"Exif\x00\x00" + tiff_block_long(6)]),
+    )
+
+    # (2) IFD walk stops at the short read: the block claims two entries, the second
+    # is cut off after six bytes, and the intact SHORT-6 entry must be kept.
+    write_bytes(
+        "exif-orientation/jpeg-ifd-truncated-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [b"Exif\x00\x00" + tiff_block_truncated()]),
+    )
+
+    # (3) No EXIF at all: the XMP fallback reads the orientation from the
+    # tiff:Orientation attribute of the JPEG's XMP APP1.
+    write_bytes(
+        "exif-orientation/jpeg-xmp-orient-attr-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [XMP_PREFIX + XMP_ATTR_6]),
+    )
+
+    # (4) XMP fallback via the element form <tiff:Orientation>6</tiff:Orientation>.
+    write_bytes(
+        "exif-orientation/jpeg-xmp-orient-el-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [XMP_PREFIX + XMP_EL_6]),
+    )
+
+    # (5) Two eXIf chunks before IDAT: the last chunk wins (6 overrides 3).
+    write_bytes(
+        "exif-orientation/png-exif-twice-4x2.png",
+        png_insert(base_or_png, [(b"eXIf", tiff_block(3)), (b"eXIf", tiff_block(6))]),
+    )
+
+    # (6) An eXIf chunk after IDAT: the reference's load_end still processes it.
+    write_bytes(
+        "exif-orientation/png-exif-after-idat-4x2.png",
+        png_insert(base_or_png, [(b"eXIf", tiff_block(6))], after_idat=True),
+    )
+
+    # (7) eXIf data carrying a TIFF package prefix itself: the repeated
+    # "Exif\0\0" prefix is stripped before the IFD parse.
+    write_bytes(
+        "exif-orientation/png-exif-prefixed-4x2.png",
+        png_insert(base_or_png, [(b"eXIf", b"Exif\x00\x00" + tiff_block(6))]),
+    )
+
+    # (8, 9) Plain twins with no EXIF and no XMP: the effective orientation is 0.
+    write_bytes("exif-orientation/jpeg-plain-4x2.jpg", base_or_jpg)
+    write_bytes("exif-orientation/png-plain-4x2.png", base_or_png)
+
+    # (10) A bad data offset on a non-Orientation entry (0x8769, DOUBLE, before the
+    # Orientation entry): the reference's short read aborts the walk, so Orientation is
+    # never stored and nothing rotates.
+    write_bytes(
+        "exif-orientation/jpeg-badoffset-before-orient-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [b"Exif\x00\x00" + tiff_block_mm_bad_offset()]),
+    )
+
+    # (11) The same abort inside a PNG eXIf chunk (LE, the bad offset on 0x0110, before
+    # the ASCII Orientation entry), combined with the XMP fallback: the walk never
+    # stores the Orientation tag, so the tEXt XMP packet supplies orientation 6.
+    write_bytes(
+        "exif-orientation/png-xmp-badoffset-before-orient-4x2.png",
+        png_insert(
+            base_or_png,
+            [
+                (b"eXIf", tiff_block_le_bad_offset()),
+                (b"tEXt", b"XML:com.adobe.xmp\x00" + XMP_EL_6),
+            ],
+        ),
+    )
+
+    # (12) An invalid TIFF head (3 bytes after the doubled package prefixes: truncated,
+    # so the reference's ImageFileDirectory_v2 constructor raises a struct.error) plus an
+    # XMP packet: the reference's open-time getexif() swallowed the error and cached an
+    # empty object, so its XMP fallback never ran — orientation 0, no rotation, even
+    # though the XMP packet says 6.
+    write_bytes(
+        "exif-orientation/jpeg-invalid-head-xmp-4x2.jpg",
+        jpeg_with_app1s(
+            base_or_jpg, [b"Exif\x00\x00Exif\x00\x00MM\x00", XMP_PREFIX + XMP_ATTR_6]
+        ),
+    )
+
+    # (13) The prefix-check half of the same rule: a valid byte order (II) with the wrong
+    # TIFF magic (44 instead of 42) — a full 8-byte head, so only the prefix (not the
+    # length) marks it invalid: the constructor raises a SyntaxError, orientation 0, no
+    # rotation despite the XMP packet's 6.
+    write_bytes(
+        "exif-orientation/jpeg-badmagic-xmp-4x2.jpg",
+        jpeg_with_app1s(
+            base_or_jpg, [b"Exif\x00\x00II\x2c\x00\x08\x00\x00\x00", XMP_PREFIX + XMP_ATTR_6]
+        ),
+    )
+
+    # (14) A cross-endian TIFF head: II 00 2a — the little-endian prefix with the magic
+    # bytes swapped. The reference's constructor takes the classic path for this head and
+    # chooses the byte order from the prefix, ignoring the magic, so the Orientation
+    # SHORT 6 inside is honoured (orientation 6, the 4x2 image transposes to 2x4).
+    write_bytes(
+        "exif-orientation/jpeg-crossendian-orient-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [b"Exif\x00\x00" + tiff_block(6, True, 0x2A00)]),
+    )
+
+    # (15) The same cross-endian head in a PNG eXIf chunk: the reference honours the tag
+    # on the PNG path too (probe-verified against the pinned venv).
+    write_bytes(
+        "exif-orientation/png-crossendian-orient-4x2.png",
+        png_insert(base_or_png, [(b"eXIf", tiff_block(6, True, 0x2A00))]),
+    )
 
     # resize: opaque RGB fixtures (shared by single-resize and full-chain cases)
     save(gradient_rgb(100, 80), "resize/gradient-100x80.png")

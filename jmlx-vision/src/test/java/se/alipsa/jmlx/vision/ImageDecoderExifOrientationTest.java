@@ -180,10 +180,12 @@ class ImageDecoderExifOrientationTest {
           List.of(
               // A truncated TIFF block: only the byte order.
               Arrays.copyOf(exifTiffBlock(little, 6), 4),
-              // The little-endian BigTIFF prefix II 2b 00 (magic 43 instead of 42): the
-              // reference's constructor takes the BigTIFF path and reads past the head, so the
-              // head is invalid in either body endianness.
-              tiffBlockWithMagic(true, 43, 8),
+              // The little-endian pass uses the BigTIFF prefix II 2b 00 (magic 43 instead of
+              // 42): the reference's constructor takes the BigTIFF path and reads past the
+              // head, so the head is invalid in either body endianness. The big-endian pass
+              // uses MM 2b 00: a magic byte pair the reference's TIFF constructor does not
+              // accept at all.
+              little ? tiffBlockWithMagic(true, 43, 8) : tiffBlockWithMagic(false, 0x2b00, 8),
               // A bad byte order (neither II nor MM).
               badByteOrderBlock(little),
               // A first-IFD offset past the end of the block.

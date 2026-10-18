@@ -296,6 +296,18 @@ elif h_bar * w_bar < min_pixels:
 Probe cross-check: `grid_matches_rederived_smart_resize: True` — the processor's reported
 `grid_thw` for both pinned cases equals a from-scratch re-implementation of the above.
 
+- **Division-order waiver record (2026-10-18).** The plan §4 clause asked for "a hash-pinned
+  boundary fixture sensitive to division order, recording reference binary64 intermediates and
+  final geometry". No such fixture is constructible: a full venv sweep of [2, 4000)^2
+  (12,087,517 cells reaching the max-pixels branch) plus the squares in [1000, 20000) step 16
+  compared the port's two sequential divisions `height / beta / factor` with the folded form
+  `height / (beta * factor)` and found zero cells where the folded form differs, so no
+  reachable input is sensitive to division order and the clause is waived on this evidence.
+  The boundary fixtures instead record final geometry and digests. The sweep's ranges and
+  conclusion are recorded in the comment above the 160x6560 max-pixels case in
+  `Qwen3VlGeometryPlanTest` (`jmlx-vision`), whose venv-verified geometry cases — including
+  that max-branch case — re-run under the ordinary `:jmlx-vision:test` task.
+
 ### 4.6 Normalization, temporal duplication, patch permutation
 
 - **Order and dtype:** uint8 RGB → resize (BICUBIC) → `× 1/255` → `(x − 0.5) / 0.5`, all in

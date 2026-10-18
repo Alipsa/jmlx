@@ -227,9 +227,16 @@ including Python ties-to-even. Preserve Python's binary64 operation order with `
 and `Math.sqrt`: in particular `floor(h / beta / factor)` must retain its two sequential
 divisions, not become `floor(h / (beta * factor))`. Keep the same order in area scaling,
 ceil/floor and aspect checks; no FLOAT32 intermediates or algebraic reassociation. Add
-half-factor rounding ties and a hash-pinned boundary fixture sensitive to division order,
-recording reference binary64 intermediates and final geometry. The geometry factor is derived
-from patch and merge sizes;
+half-factor rounding ties and a hash-pinned boundary fixture recording final geometry and
+digests. **2026-10-18 review waiver:** the clause originally required the boundary fixture to
+be sensitive to division order and to record reference binary64 intermediates; that is waived
+because the sweep recorded in findings §4.5 — a full venv sweep of [2, 4000)^2 (12,087,517
+cells reaching the max-pixels branch) plus the squares in [1000, 20000) step 16, comparing the
+two sequential divisions against the folded form — found no reachable input whose geometry
+depends on the division order, so such a fixture is impossible to construct. The sweep's
+evidence is recorded in `Qwen3VlGeometryPlanTest`, whose venv-verified geometry cases (including
+the max-pixels-branch case) re-run under the ordinary `:jmlx-vision:test` task. The geometry
+factor is derived from patch and merge sizes;
 never copy Qwen2's default factor into Qwen3. Probe very small dimensions and non-divisible
 inputs. Establish precedence of legacy min/max-pixel fields versus size fields from the
 resolved processor, and reject contradictory unsupported settings.

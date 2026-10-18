@@ -180,8 +180,10 @@ class ImageDecoderExifOrientationTest {
           List.of(
               // A truncated TIFF block: only the byte order.
               Arrays.copyOf(exifTiffBlock(little, 6), 4),
-              // The wrong TIFF magic (43 instead of 42).
-              tiffBlockWithMagic(little, 43, 8),
+              // The little-endian BigTIFF prefix II 2b 00 (magic 43 instead of 42): the
+              // reference's constructor takes the BigTIFF path and reads past the head, so the
+              // head is invalid in either body endianness.
+              tiffBlockWithMagic(true, 43, 8),
               // A bad byte order (neither II nor MM).
               badByteOrderBlock(little),
               // A first-IFD offset past the end of the block.
@@ -370,11 +372,13 @@ class ImageDecoderExifOrientationTest {
     byte[] jpeg =
         Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
     RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
-    byte[] xmp = xmpPayload(XMP_ATTR_6);
+    // XMP says 3: when the tag rotates, its value must win over the packet, so the expected
+    // result pins the EXIF-derived orientation, not the XMP one.
+    byte[] xmp = xmpPayload(XMP_ATTR_3);
     // Invalid TIFF heads (Pillow 12.3.0, verified in its pinned venv): the reference's
     // open-time getexif() swallowed the ImageFileDirectory_v2 constructor error on each of
     // them and cached an empty exif object, so its XMP fallback never ran — orientation 0,
-    // pixels as stored, despite the XMP packet's 6.
+    // pixels as stored, despite the XMP packet's 3.
     List<byte[]> invalidHeads =
         List.of(
             // The exact fuzz case: 3 bytes left after the doubled Exif\0\0 package prefixes.
@@ -401,19 +405,60 @@ class ImageDecoderExifOrientationTest {
           stored, ImageDecoder.decode(new ByteArrayInputStream(spliced)), "invalid head " + i);
       assertEquals(stored, applyDecode(spliced), "invalid head " + i);
     }
-    // Parseable heads the decoder itself cannot extract an orientation from keep the XMP
-    // fallback alive: the reference's constructor accepts the big-endian BigTIFF prefix
-    // MM 00 2b and the cross-endian prefixes II 00 2a / MM 2a 00, so the packet's 6
-    // rotates the pixels — as does the plain valid-head-without-the-tag contrast.
-    List<byte[]> parseableNoOrientation =
+    // Parseable heads the reference's constructor accepts — the big-endian BigTIFF prefix
+    // MM 00 2b and the cross-endian prefixes II 00 2a / MM 2a 00 — are read in the prefix's
+    // byte order, so the Orientation 6 embedded in each of these blocks beats the XMP
+    // packet's 3 (EXIF wins whenever the tag is present).
+    List<byte[]> parseableHeads =
         List.of(
             exifPayload(tiffBlockWithMagic(false, 43, 8)),
             exifPayload(tiffBlockWithMagic(true, 0x2a00, 8)),
-            exifPayload(tiffBlockWithMagic(false, 0x2a00, 8)),
-            exifPayload(tiffBlockWithNoEntries(true)));
-    for (int i = 0; i < parseableNoOrientation.size(); i++) {
-      byte[] spliced = spliceJpegPayloads(jpeg, parseableNoOrientation.get(i), xmp);
+            exifPayload(tiffBlockWithMagic(false, 0x2a00, 8)));
+    for (int i = 0; i < parseableHeads.size(); i++) {
+      byte[] spliced = spliceJpegPayloads(jpeg, parseableHeads.get(i), xmp);
       assertEquals(permuted(stored, 6), applyDecode(spliced), "parseable head " + i);
+    }
+    // …and a parseable head without the tag (the plain valid-head zero-entry contrast)
+    // still falls back to the XMP packet's 3.
+    assertEquals(
+        permuted(stored, 3),
+        applyDecode(spliceJpegPayloads(jpeg, exifPayload(tiffBlockWithNoEntries(true)), xmp)));
+  }
+
+  @Test
+  void crossEndianHeadsRotateInThePrefixByteOrderInBothFormats() throws Exception {
+    // The three non-42 heads the reference's TIFF constructor accepts (Pillow 12.3.0,
+    // verified in its pinned venv for the JPEG and the PNG paths alike): the constructor
+    // takes the classic path for all of them and chooses the byte order from the II/MM
+    // prefix, so the Orientation 6 embedded in each block rotates under APPLY — a 96x64
+    // stored JPEG to 64x96, a 4x2 stored PNG to 2x4 — and the default policy leaves the
+    // stored pixels untouched.
+    List<byte[]> crossEndianBlocks =
+        List.of(
+            tiffBlockWithMagic(true, 0x2a00, 8), // II 00 2a, little-endian body
+            tiffBlockWithMagic(false, 0x2a00, 8), // MM 2a 00, big-endian body
+            tiffBlockWithMagic(false, 43, 8)); // MM 00 2b, big-endian body, BigTIFF magic
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    for (int i = 0; i < crossEndianBlocks.size(); i++) {
+      byte[] spliced = spliceJpegPayloads(jpeg, exifPayload(crossEndianBlocks.get(i)));
+      assertEquals(stored, ImageDecoder.decode(new ByteArrayInputStream(spliced)), "head " + i);
+      RgbImage applied = applyDecode(spliced);
+      assertEquals(64, applied.width(), "head " + i);
+      assertEquals(96, applied.height(), "head " + i);
+      assertEquals(permuted(stored, 6), applied, "head " + i);
+    }
+    // The same three heads in a PNG eXIf chunk (no XMP) rotate identically.
+    byte[] pixels = gradientPixels(4, 2);
+    RgbImage pngStored = new RgbImage(4, 2, pixels);
+    for (int i = 0; i < crossEndianBlocks.size(); i++) {
+      byte[] png = minimalTruecolorPng(4, 2, pixels, crossEndianBlocks.get(i));
+      assertEquals(pngStored, ImageDecoder.decode(new ByteArrayInputStream(png)), "head " + i);
+      RgbImage applied = applyDecode(png);
+      assertEquals(2, applied.width(), "head " + i);
+      assertEquals(4, applied.height(), "head " + i);
+      assertEquals(permuted(pngStored, 6), applied, "head " + i);
     }
   }
 
@@ -991,10 +1036,14 @@ class ImageDecoderExifOrientationTest {
     return concat(concat(header, entry), new byte[4]);
   }
 
-  /** A full one-entry Orientation block with the given TIFF magic. */
+  /**
+   * A full one-entry Orientation block with the given TIFF magic (a readable IFD at the offset).
+   */
   private static byte[] tiffBlockWithMagic(boolean little, int magic, int ifdOffset) {
     byte[] header = tiffHeader(little, magic, ifdOffset);
-    return concat(concat(header, ifdEntry(0x0112, 3, 1, 6, little)), new byte[4]);
+    byte[] count = new byte[2];
+    writeU16(count, 0, 1, little);
+    return concat(concat(concat(header, count), ifdEntry(0x0112, 3, 1, 6, little)), new byte[4]);
   }
 
   /**

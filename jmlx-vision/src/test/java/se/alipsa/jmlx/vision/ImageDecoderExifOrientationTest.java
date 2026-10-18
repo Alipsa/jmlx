@@ -366,6 +366,58 @@ class ImageDecoderExifOrientationTest {
   }
 
   @Test
+  void jpegInvalidExifHeadSuppressesTheXmpFallback() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    byte[] xmp = xmpPayload(XMP_ATTR_6);
+    // Invalid TIFF heads (Pillow 12.3.0, verified in its pinned venv): the reference's
+    // open-time getexif() swallowed the ImageFileDirectory_v2 constructor error on each of
+    // them and cached an empty exif object, so its XMP fallback never ran — orientation 0,
+    // pixels as stored, despite the XMP packet's 6.
+    List<byte[]> invalidHeads =
+        List.of(
+            // The exact fuzz case: 3 bytes left after the doubled Exif\0\0 package prefixes.
+            concat(EXIF_PREFIX, concat(EXIF_PREFIX, new byte[] {'M', 'M', 0})),
+            // Any other truncation under 8 bytes is equally invalid.
+            exifPayload(new byte[] {'I', 'I', 0}),
+            // A bad byte order (NN) with a full 8-byte head.
+            exifPayload(badByteOrderBlock(true)),
+            exifPayload(badByteOrderBlock(false)),
+            // A valid byte order but the wrong TIFF magic (44) — pins that the rule is the
+            // prefix check, not just the length.
+            exifPayload(tiffBlockWithMagic(true, 44, 8)),
+            exifPayload(tiffBlockWithMagic(false, 44, 8)),
+            // The little-endian BigTIFF prefix II 2b 00: the reference reads an 8-byte
+            // BigTIFF offset past its 8-byte head and always raises.
+            exifPayload(tiffBlockWithMagic(true, 43, 8)),
+            // The other two magic byte pairs the reference does not accept at all: II 00 2b
+            // and MM 2b 00.
+            exifPayload(tiffBlockWithMagic(true, 0x2b00, 8)),
+            exifPayload(tiffBlockWithMagic(false, 0x2b00, 8)));
+    for (int i = 0; i < invalidHeads.size(); i++) {
+      byte[] spliced = spliceJpegPayloads(jpeg, invalidHeads.get(i), xmp);
+      assertEquals(
+          stored, ImageDecoder.decode(new ByteArrayInputStream(spliced)), "invalid head " + i);
+      assertEquals(stored, applyDecode(spliced), "invalid head " + i);
+    }
+    // Parseable heads the decoder itself cannot extract an orientation from keep the XMP
+    // fallback alive: the reference's constructor accepts the big-endian BigTIFF prefix
+    // MM 00 2b and the cross-endian prefixes II 00 2a / MM 2a 00, so the packet's 6
+    // rotates the pixels — as does the plain valid-head-without-the-tag contrast.
+    List<byte[]> parseableNoOrientation =
+        List.of(
+            exifPayload(tiffBlockWithMagic(false, 43, 8)),
+            exifPayload(tiffBlockWithMagic(true, 0x2a00, 8)),
+            exifPayload(tiffBlockWithMagic(false, 0x2a00, 8)),
+            exifPayload(tiffBlockWithNoEntries(true)));
+    for (int i = 0; i < parseableNoOrientation.size(); i++) {
+      byte[] spliced = spliceJpegPayloads(jpeg, parseableNoOrientation.get(i), xmp);
+      assertEquals(permuted(stored, 6), applyDecode(spliced), "parseable head " + i);
+    }
+  }
+
+  @Test
   void pngExifChunkIsHonoredWithOrientationSix() throws Exception {
     // A minimal 8-bit truecolor PNG (4x2) with an eXIf chunk (little-endian block, orientation
     // 6): APPLY decodes to the 90° clockwise transform, IGNORE to the unrotated stored pixels.

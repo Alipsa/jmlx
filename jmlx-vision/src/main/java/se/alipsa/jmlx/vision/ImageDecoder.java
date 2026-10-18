@@ -426,7 +426,17 @@ public final class ImageDecoder {
       width = info.width;
       height = info.height;
       plan = new DecodePlan(info);
-      orientationTag = resolveOrientation(info.exif, null, info.xmp);
+      if (info.exif.xmpSuppressed()) {
+        // The reference's open-time getexif() swallowed the EXIF parse error (SyntaxError /
+        // struct.error from ImageFileDirectory_v2 on an invalid TIFF head) and cached an empty
+        // object, so its XMP fallback never ran: no rotation regardless of any XMP packet. This
+        // matches the reference only when the JFIF header carries no DPI (the case where
+        // _read_dpi_from_exif calls getexif() at open); with JFIF DPI the reference raises instead,
+        // which we tolerate.
+        orientationTag = 0;
+      } else {
+        orientationTag = resolveOrientation(info.exif, null, info.xmp);
+      }
     } else {
       throw new IOException(
           "unsupported image input: expected a PNG or JPEG file, found " + describeMagic(bytes));
@@ -1174,9 +1184,15 @@ public final class ImageDecoder {
    * case the XMP fallback may fire — and {@code value} is the effective orientation: a usable 2–8,
    * or 0 when the tag is present but its first value (a BYTE/ASCII/ UNDEFINED value, a non-integral
    * or out-of-range value, a 0/0 rational) never matches the reference's int-keyed transpose table.
+   * {@code xmpSuppressed} is true exactly when the TIFF head itself is invalid (see {@link
+   * #parseableTiffHead}): the reference's open-time {@code getexif()} then swallowed the parse
+   * error and cached an empty object, so its XMP fallback never ran and no rotation happens
+   * regardless of any XMP packet. It is consulted only by the JPEG path (for PNG an invalid head
+   * makes the reference raise, which is tolerated with the XMP fallback intact).
    */
-  private record TiffOrientation(int value, boolean present) {
-    static final TiffOrientation ABSENT = new TiffOrientation(0, false);
+  private record TiffOrientation(int value, boolean present, boolean xmpSuppressed) {
+    static final TiffOrientation ABSENT = new TiffOrientation(0, false, false);
+    static final TiffOrientation INVALID = new TiffOrientation(0, false, true);
   }
 
   /**
@@ -1210,6 +1226,40 @@ public final class ImageDecoder {
   }
 
   /**
+   * Whether the reference's TIFF constructor ({@code ImageFileDirectory_v2}) would accept the head
+   * at {@code b[off..off+len)}: it reads the first {@code min(8, len)} bytes and raises — a
+   * bad-prefix {@code SyntaxError} or a truncated-head {@code struct.error} — unless {@code len >=
+   * 8} and the first four bytes are one of the five parseable prefixes {@code II\x2a\x00}, {@code
+   * MM\x00\x2a}, {@code II\x00\x2a}, {@code MM\x2a\x00} or {@code MM\x00\x2b}. The two cross-endian
+   * prefixes ({@code II\x00\x2a}, {@code MM\x2a\x00}) are accepted even though they pair a byte
+   * order with the other endian's magic, and so is the big-endian BigTIFF prefix {@code
+   * MM\x00\x2b}: its third head byte is not 43, so the constructor takes the classic path and only
+   * needs {@code len >= 8}. The remaining three of the four magic byte pairs are rejected: the
+   * little-endian BigTIFF prefix {@code II\x2b\x00} (third byte 43) takes the BigTIFF path, which
+   * reads an 8-byte offset from the always-empty bytes 8–15 of the 8-byte head and always raises;
+   * {@code II\x00\x2b} and {@code MM\x2b\x00} are not among the reference's accepted prefixes at
+   * all. This method only decides which unparseable heads the JPEG path must treat as invalid
+   * (suppressing the XMP fallback); the parse itself below still only reads {@code
+   * II\x2a\x00}/{@code MM\x00\x2a} with magic 42.
+   */
+  private static boolean parseableTiffHead(byte[] b, int off, int len) {
+    if (len < 8) {
+      return false;
+    }
+    int p0 = b[off] & 0xFF;
+    int p1 = b[off + 1] & 0xFF;
+    int p2 = b[off + 2] & 0xFF;
+    int p3 = b[off + 3] & 0xFF;
+    boolean ii = p0 == 0x49 && p1 == 0x49; // "II"
+    boolean mm = p0 == 0x4d && p1 == 0x4d; // "MM"
+    boolean classic = (p2 == 0x2a && p3 == 0x00) || (p2 == 0x00 && p3 == 0x2a);
+    if (classic) {
+      return ii || mm;
+    }
+    return mm && p2 == 0x00 && p3 == 0x2b;
+  }
+
+  /**
    * Reads the IFD0 {@code Orientation} tag (0x0112) from the TIFF block at {@code b[off..off+len)}
    * (the part of an EXIF payload left behind by {@link #parseExifPayload}), mirroring the
    * reference's IFD walk ({@code ImageFileDirectory_v2.load}): entries are processed in file order
@@ -1223,20 +1273,33 @@ public final class ImageDecoder {
    * EXIF block can never break a decode. Every access is bounds-checked against {@code len}.
    */
   private static TiffOrientation parseTiffOrientation(byte[] b, int off, int len) {
+    // An invalid TIFF head makes the reference's open-time getexif() (JPEG without JFIF DPI)
+    // swallow its parse error and cache an empty object: its XMP fallback never ran, so the JPEG
+    // path must not consult one either. For PNG the same head makes the reference raise, which is
+    // tolerated with the fallback intact — the flag is consulted only on the JPEG path.
+    boolean xmpSuppressed = !parseableTiffHead(b, off, len);
     if (len < 8) {
-      return TiffOrientation.ABSENT; // byte order (2) + magic (2) + first-IFD offset (4)
+      return xmpSuppressed
+          ? TiffOrientation.INVALID
+          : TiffOrientation.ABSENT; // byte order (2) + magic (2) + first-IFD offset (4)
     }
     int byteOrder = u16(b, off);
     boolean little = byteOrder == 0x4949; // "II"
     if (!little && byteOrder != 0x4D4D) { // "MM"
-      return TiffOrientation.ABSENT;
+      return xmpSuppressed ? TiffOrientation.INVALID : TiffOrientation.ABSENT;
     }
     int magic = little ? leU16(b, off + 2) : u16(b, off + 2);
     if (magic != 42) {
-      return TiffOrientation.ABSENT;
+      // The cross-endian heads (II\x00\x2a, MM\x2a\x00) and the big-endian BigTIFF head
+      // (MM\x00\x2b) are parseable: the reference's constructor accepts them, so the XMP
+      // fallback stays allowed. Every other non-42 head — II\x2b\x00, II\x00\x2b, MM\x2b\x00,
+      // magic 44, garbage — is invalid: the marker.
+      return xmpSuppressed ? TiffOrientation.INVALID : TiffOrientation.ABSENT;
     }
     int ifdOffset = little ? leU32(b, off + 4) : (int) u32(b, off + 4);
     if (ifdOffset < 0 || (long) ifdOffset + 2 > len) {
+      // A parseable head whose IFD offset is out of range is NOT invalid: the reference's
+      // constructor succeeds and the IFD walk just aborts internally, XMP fallback allowed.
       return TiffOrientation.ABSENT; // the 2-byte entry count must be inside the block
     }
     int count = little ? leU16(b, off + ifdOffset) : u16(b, off + ifdOffset);
@@ -1323,7 +1386,7 @@ public final class ImageDecoder {
                   little ? leU32(b, off + 4) : (int) u32(b, off + 4));
       default -> rotation = 0; // BYTE, ASCII, UNDEFINED
     }
-    return new TiffOrientation(rotation, true);
+    return new TiffOrientation(rotation, true, false);
   }
 
   /** An integer value rotates when it is one of the transpose table's keys 2–8. */

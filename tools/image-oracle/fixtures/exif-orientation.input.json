@@ -43,6 +43,14 @@
     {
       "name": "png-xmp-badoffset-before-orient",
       "image": "exif-orientation/png-xmp-badoffset-before-orient-4x2.png"
+    },
+    {
+      "name": "jpeg-invalid-head-xmp",
+      "image": "exif-orientation/jpeg-invalid-head-xmp-4x2.jpg"
+    },
+    {
+      "name": "jpeg-badmagic-xmp",
+      "image": "exif-orientation/jpeg-badmagic-xmp-4x2.jpg"
     }
   ]
 }

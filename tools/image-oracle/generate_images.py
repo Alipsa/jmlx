@@ -529,6 +529,29 @@ def main() -> None:
         ),
     )
 
+    # (12) An invalid TIFF head (3 bytes after the doubled package prefixes: truncated,
+    # so the reference's ImageFileDirectory_v2 constructor raises a struct.error) plus an
+    # XMP packet: the reference's open-time getexif() swallowed the error and cached an
+    # empty object, so its XMP fallback never ran — orientation 0, no rotation, even
+    # though the XMP packet says 6.
+    write_bytes(
+        "exif-orientation/jpeg-invalid-head-xmp-4x2.jpg",
+        jpeg_with_app1s(
+            base_or_jpg, [b"Exif\x00\x00Exif\x00\x00MM\x00", XMP_PREFIX + XMP_ATTR_6]
+        ),
+    )
+
+    # (13) The prefix-check half of the same rule: a valid byte order (II) with the wrong
+    # TIFF magic (44 instead of 42) — a full 8-byte head, so only the prefix (not the
+    # length) marks it invalid: the constructor raises a SyntaxError, orientation 0, no
+    # rotation despite the XMP packet's 6.
+    write_bytes(
+        "exif-orientation/jpeg-badmagic-xmp-4x2.jpg",
+        jpeg_with_app1s(
+            base_or_jpg, [b"Exif\x00\x00II\x2c\x00\x08\x00\x00\x00", XMP_PREFIX + XMP_ATTR_6]
+        ),
+    )
+
     # resize: opaque RGB fixtures (shared by single-resize and full-chain cases)
     save(gradient_rgb(100, 80), "resize/gradient-100x80.png")
     save(gradient_rgb(80, 100), "resize/gradient-80x100.png")

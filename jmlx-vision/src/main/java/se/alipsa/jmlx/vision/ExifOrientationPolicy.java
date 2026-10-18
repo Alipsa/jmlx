@@ -39,6 +39,20 @@ package se.alipsa.jmlx.vision;
  * as the underlying bytes (and can rotate): defensive divergences documented on {@link
  * ImageDecoder}.
  *
+ * <p>One JPEG-specific twist on that fallback: when the {@code APP1}'s TIFF head itself is invalid
+ * (fewer than 8 bytes after the repeated {@code Exif\x00\x00} prefixes, or a prefix the reference's
+ * TIFF constructor rejects — everything other than {@code II\x2a\x00}, {@code MM\x00\x2a}, {@code
+ * II\x00\x2a}, {@code MM\x2a\x00} and {@code MM\x00\x2b}), {@link ImageDecoder} suppresses the XMP
+ * fallback entirely. The precondition is that the JFIF header carries no DPI: the reference then
+ * calls {@code getexif()} at open ({@code _read_dpi_from_exif}), where the constructor's {@code
+ * SyntaxError}/{@code struct.error} on the invalid head is swallowed and an <em>empty</em> exif
+ * object is cached — so the later {@code exif_transpose} finds no orientation and returns the
+ * stored pixels, XMP packet or not. With a JFIF header that DOES carry DPI, the first {@code
+ * getexif()} call comes from {@code exif_transpose} itself and the reference raises instead; {@link
+ * ImageDecoder} tolerates that with the same stored-pixels outcome, so the pixels agree either way.
+ * For a PNG an invalid head makes the reference raise the same way and the XMP fallback stays
+ * intact there (a documented leniency).
+ *
  * <p><b>Scope (Phase 7.3b WP9):</b> the Qwen3-VL file path decodes with {@link #APPLY} (Pillow
  * {@code ImageOps.exif_transpose} followed by {@code convert("RGB")}); the SmolVLM/Idefics3 path
  * keeps {@link #IGNORE}, the existing decode contract pinned byte-for-byte by the committed

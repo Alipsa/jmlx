@@ -147,9 +147,9 @@ def write_bytes(rel: str, data: bytes) -> None:
     print(f"wrote {rel} ({len(data)} bytes)")
 
 
-def tiff_header(little: bool) -> bytes:
+def tiff_header(little: bool, magic: int = 42) -> bytes:
     o = "<" if little else ">"
-    return (b"II" if little else b"MM") + struct.pack(o + "H", 42) + struct.pack(o + "L", 8)
+    return (b"II" if little else b"MM") + struct.pack(o + "H", magic) + struct.pack(o + "L", 8)
 
 
 def tiff_orient_entry(orientation: int, little: bool) -> bytes:
@@ -158,11 +158,11 @@ def tiff_orient_entry(orientation: int, little: bool) -> bytes:
     return struct.pack(o + "HHI", 0x0112, 3, 1) + struct.pack(o + "H", orientation) + b"\x00\x00"
 
 
-def tiff_block(orientation: int, little: bool = True) -> bytes:
+def tiff_block(orientation: int, little: bool = True, magic: int = 42) -> bytes:
     """Minimal single-entry IFD block carrying the orientation as a SHORT."""
     o = "<" if little else ">"
     return (
-        tiff_header(little)
+        tiff_header(little, magic)
         + struct.pack(o + "H", 1)
         + tiff_orient_entry(orientation, little)
         + struct.pack(o + "L", 0)
@@ -550,6 +550,22 @@ def main() -> None:
         jpeg_with_app1s(
             base_or_jpg, [b"Exif\x00\x00II\x2c\x00\x08\x00\x00\x00", XMP_PREFIX + XMP_ATTR_6]
         ),
+    )
+
+    # (14) A cross-endian TIFF head: II 00 2a — the little-endian prefix with the magic
+    # bytes swapped. The reference's constructor takes the classic path for this head and
+    # chooses the byte order from the prefix, ignoring the magic, so the Orientation
+    # SHORT 6 inside is honoured (orientation 6, the 4x2 image transposes to 2x4).
+    write_bytes(
+        "exif-orientation/jpeg-crossendian-orient-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [b"Exif\x00\x00" + tiff_block(6, True, 0x2A00)]),
+    )
+
+    # (15) The same cross-endian head in a PNG eXIf chunk: the reference honours the tag
+    # on the PNG path too (probe-verified against the pinned venv).
+    write_bytes(
+        "exif-orientation/png-crossendian-orient-4x2.png",
+        png_insert(base_or_png, [(b"eXIf", tiff_block(6, True, 0x2A00))]),
     )
 
     # resize: opaque RGB fixtures (shared by single-resize and full-chain cases)

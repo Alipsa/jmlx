@@ -15,8 +15,10 @@ import tools.jackson.databind.JsonNode;
  * tag, a truncated IFD walk, the JPEG XMP fallback (attribute and element form), PNG eXIf last-wins
  * / post-IDAT / prefixed semantics, the plain no-metadata twins, the IFD walk's abort at a bad
  * offset on a non-Orientation entry — the JPEG twin records orientation 0 and the PNG twin falls
- * back to the XMP packet's 6 — and the two invalid-EXIF-head JPEG cases whose swallowed constructor
- * error suppresses the XMP fallback (orientation 0, stored equals transposed).
+ * back to the XMP packet's 6 — the two invalid-EXIF-head JPEG cases whose swallowed constructor
+ * error suppresses the XMP fallback (orientation 0, stored equals transposed), and the
+ * cross-endian-head JPEG and PNG twins whose non-42 magic the reference ignores, reading the
+ * embedded Orientation 6 in the prefix's byte order.
  */
 class ImageOracleExifOrientationTest {
 
@@ -33,7 +35,9 @@ class ImageOracleExifOrientationTest {
     "jpeg-badoffset-before-orient",
     "png-xmp-badoffset-before-orient",
     "jpeg-invalid-head-xmp",
-    "jpeg-badmagic-xmp"
+    "jpeg-badmagic-xmp",
+    "jpeg-crossendian-orient",
+    "png-crossendian-orient"
   };
 
   @Test

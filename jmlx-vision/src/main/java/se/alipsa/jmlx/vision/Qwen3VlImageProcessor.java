@@ -1,5 +1,9 @@
 package se.alipsa.jmlx.vision;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.file.Path;
+
 /**
  * The Qwen3-VL image preprocessing chain, ported from the pinned transformers 4.57.6 slow {@code
  * Qwen2VLImageProcessor._preprocess} image path (the video path is out of scope):
@@ -204,6 +208,59 @@ public final class Qwen3VlImageProcessor {
       }
     }
     return new Qwen3VlImageProcessorResult(plan, out);
+  }
+
+  /**
+   * Decodes the PNG or JPEG file at {@code file} with the Qwen3-VL file policy and runs the full
+   * preprocessing chain on the result ({@link ImageDecoder#decode} with {@code
+   * AlphaPolicy.DROP_ALPHA} and {@link ExifOrientationPolicy#APPLY}, then {@link
+   * #process(RgbImage)}).
+   *
+   * <p>The Qwen3-VL file policy is drop-alpha + EXIF-apply because the pinned reference's
+   * file-to-processor pipeline runs {@code exif_transpose} (the string-input path only in 4.57.6)
+   * followed by {@code convert("RGB")}, which drops alpha, never composites over white, and never
+   * applies a palette {@code tRNS} (findings §4.4, {@code
+   * req/plans/phase7-3b-reference-findings.md}). The committed {@code qwen3vl} image-oracle family
+   * pins this pipeline, and its parity is asserted by the corresponding oracle test. This is a
+   * deliberate contrast with the module-default decode ({@code COMPOSITE_OVER_WHITE} + {@code
+   * IGNORE}), which is the unchanged SmolVLM/Idefics3 path.
+   *
+   * @param file existing PNG or JPEG file
+   * @param limits positive decode bounds checked from header metadata before any pixel allocation
+   * @return the flattened patch tensor of the decoded image
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
+   *     limits}
+   * @throws IllegalArgumentException if the decoded image dimensions fail the geometry checks
+   *     (aspect guard, no-resize divisibility, raw-patch-row budget)
+   */
+  public Qwen3VlImageProcessorResult processFile(Path file, ImageDecodeLimits limits)
+      throws IOException {
+    return process(
+        ImageDecoder.decode(file, limits, AlphaPolicy.DROP_ALPHA, ExifOrientationPolicy.APPLY));
+  }
+
+  /**
+   * In-memory counterpart of {@link #processFile(Path, ImageDecodeLimits)}: decodes the PNG or JPEG
+   * content of {@code bytes} with the same Qwen3-VL file policy (drop-alpha + EXIF-apply, see that
+   * method's Javadoc for the reference pipeline it mirrors) and runs the full preprocessing chain
+   * on the result.
+   *
+   * @param bytes PNG or JPEG image bytes; the array is consumed and never retained
+   * @param limits positive decode bounds checked from header metadata before any pixel allocation
+   * @return the flattened patch tensor of the decoded image
+   * @throws IOException if the format is unsupported, the input is corrupt, or it exceeds {@code
+   *     limits}
+   * @throws IllegalArgumentException if the decoded image dimensions fail the geometry checks
+   *     (aspect guard, no-resize divisibility, raw-patch-row budget)
+   */
+  public Qwen3VlImageProcessorResult processFile(byte[] bytes, ImageDecodeLimits limits)
+      throws IOException {
+    return process(
+        ImageDecoder.decode(
+            new ByteArrayInputStream(bytes),
+            limits,
+            AlphaPolicy.DROP_ALPHA,
+            ExifOrientationPolicy.APPLY));
   }
 
   /**

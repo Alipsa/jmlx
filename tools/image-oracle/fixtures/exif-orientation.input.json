@@ -35,6 +35,14 @@
     {
       "name": "png-plain",
       "image": "exif-orientation/png-plain-4x2.png"
+    },
+    {
+      "name": "jpeg-badoffset-before-orient",
+      "image": "exif-orientation/jpeg-badoffset-before-orient-4x2.jpg"
+    },
+    {
+      "name": "png-xmp-badoffset-before-orient",
+      "image": "exif-orientation/png-xmp-badoffset-before-orient-4x2.png"
     }
   ]
 }

@@ -185,6 +185,42 @@ def tiff_block_truncated() -> bytes:
     return tiff_header(True) + struct.pack(o + "H", 2) + full + full[:6]
 
 
+def tiff_block_mm_bad_offset() -> bytes:
+    """MM block with a 0x8769 DOUBLE entry (count 1, size 8) whose data offset (50) points
+    past the end of the block, then an inline ASCII entry, then the Orientation LONG-3
+    entry: the reference's short read aborts the walk before Orientation is stored, so
+    nothing rotates."""
+    o = ">"
+    double_entry = struct.pack(o + "HHI", 0x8769, 12, 1) + struct.pack(o + "L", 50)
+    ascii_entry = struct.pack(o + "HHI", 0x0110, 2, 1) + b"A\x00\x00\x00"
+    orient_entry = struct.pack(o + "HHI", 0x0112, 4, 1) + struct.pack(o + "L", 3)
+    return (
+        tiff_header(False)
+        + struct.pack(o + "H", 3)
+        + double_entry
+        + ascii_entry
+        + orient_entry
+    )
+
+
+def tiff_block_le_bad_offset() -> bytes:
+    """LE block with an inline 0x8769 SBYTE entry, then a 0x0110 SSHORT entry (count 4,
+    size 8) whose data offset (50) points past the end of the block, then an ASCII
+    Orientation entry: the walk aborts at the SSHORT entry, so the Orientation tag is
+    never stored and only the XMP fallback can supply one."""
+    o = "<"
+    sbyte_entry = struct.pack(o + "HHI", 0x8769, 6, 1) + b"\x00" * 4
+    sshort_entry = struct.pack(o + "HHI", 0x0110, 8, 4) + struct.pack(o + "L", 50)
+    orient_entry = struct.pack(o + "HHI", 0x0112, 2, 1) + b"A\x00\x00\x00"
+    return (
+        tiff_header(True)
+        + struct.pack(o + "H", 3)
+        + sbyte_entry
+        + sshort_entry
+        + orient_entry
+    )
+
+
 XMP_PREFIX = b"http://ns.adobe.com/xap/1.0/\x00"
 XMP_ATTR_6 = (
     b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description xmlns:tiff='
@@ -470,6 +506,28 @@ def main() -> None:
     # (8, 9) Plain twins with no EXIF and no XMP: the effective orientation is 0.
     write_bytes("exif-orientation/jpeg-plain-4x2.jpg", base_or_jpg)
     write_bytes("exif-orientation/png-plain-4x2.png", base_or_png)
+
+    # (10) A bad data offset on a non-Orientation entry (0x8769, DOUBLE, before the
+    # Orientation entry): the reference's short read aborts the walk, so Orientation is
+    # never stored and nothing rotates.
+    write_bytes(
+        "exif-orientation/jpeg-badoffset-before-orient-4x2.jpg",
+        jpeg_with_app1s(base_or_jpg, [b"Exif\x00\x00" + tiff_block_mm_bad_offset()]),
+    )
+
+    # (11) The same abort inside a PNG eXIf chunk (LE, the bad offset on 0x0110, before
+    # the ASCII Orientation entry), combined with the XMP fallback: the walk never
+    # stores the Orientation tag, so the tEXt XMP packet supplies orientation 6.
+    write_bytes(
+        "exif-orientation/png-xmp-badoffset-before-orient-4x2.png",
+        png_insert(
+            base_or_png,
+            [
+                (b"eXIf", tiff_block_le_bad_offset()),
+                (b"tEXt", b"XML:com.adobe.xmp\x00" + XMP_EL_6),
+            ],
+        ),
+    )
 
     # resize: opaque RGB fixtures (shared by single-resize and full-chain cases)
     save(gradient_rgb(100, 80), "resize/gradient-100x80.png")

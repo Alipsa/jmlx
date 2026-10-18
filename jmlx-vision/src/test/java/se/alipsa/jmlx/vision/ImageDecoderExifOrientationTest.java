@@ -250,6 +250,28 @@ class ImageDecoderExifOrientationTest {
   }
 
   @Test
+  void anEarlierNonOrientationEntryBadOffsetStopsTheWalk() throws Exception {
+    byte[] jpeg =
+        Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
+    RgbImage stored = ImageDecoder.decode(new ByteArrayInputStream(jpeg));
+    for (boolean little : new boolean[] {true, false}) {
+      // The reference (Pillow 12.3.0, verified in its pinned venv) reads the data of every
+      // entry with a registered type before it filters by tag: the short read of the 0x8769
+      // DOUBLE entry's offset value aborts the walk, so the intact Orientation 6 that
+      // follows is never stored and APPLY leaves the pixels as stored.
+      byte[] spliced = spliceJpegApp1(jpeg, badOffsetOnPriorEntryBlock(little));
+      assertEquals(stored, applyDecode(spliced), label(little, -1));
+      // …and because the tag was never stored, an XMP packet supplies orientation 6.
+      assertEquals(
+          permuted(stored, 6),
+          applyDecode(
+              spliceJpegPayloads(
+                  jpeg, exifPayload(badOffsetOnPriorEntryBlock(little)), xmpPayload(XMP_ATTR_6))),
+          label(little, 6));
+    }
+  }
+
+  @Test
   void orientationTypeMatrixMatchesTheReference() throws Exception {
     byte[] jpeg =
         Files.readAllBytes(OracleFixtures.fixtures().resolve("decode/jpeg-color-96x64.jpg"));
@@ -1096,6 +1118,29 @@ class ImageDecoderExifOrientationTest {
     writeU16(block, entry + 2, 5, little); // RATIONAL
     writeU32(block, entry + 4, 1, little);
     writeU32(block, entry + 8, 0x10000000, little); // past the end of the block
+  }
+
+  /**
+   * A two-entry block: a non-Orientation entry (0x8769, DOUBLE, count 1) whose 8-byte data offset
+   * points past the end of the block, then an intact Orientation SHORT 6 entry. The reference reads
+   * the data of every registered entry before it filters by tag, so its short read of the 0x8769
+   * value aborts the walk and the Orientation entry is never stored.
+   */
+  private static byte[] badOffsetOnPriorEntryBlock(boolean little) {
+    Tiff tiff = new Tiff(little);
+    tiff.header(42, 8);
+    tiff.u16(2); // two IFD entries
+    tiff.u16(0x8769); // the Exif IFD pointer tag, not Orientation
+    tiff.u16(12); // DOUBLE
+    tiff.u32(1);
+    tiff.u32(0x10000000); // past the end of the block
+    tiff.u16(0x0112); // Orientation
+    tiff.u16(3); // SHORT
+    tiff.u32(1);
+    tiff.u16(6);
+    tiff.u16(0); // pad the second half of the value field
+    tiff.u32(0); // no next IFD
+    return tiff.bytes();
   }
 
   /** A little/big-endian byte writer for hand-built TIFF blocks. */

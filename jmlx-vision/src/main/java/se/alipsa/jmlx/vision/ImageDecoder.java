@@ -1213,13 +1213,14 @@ public final class ImageDecoder {
    * Reads the IFD0 {@code Orientation} tag (0x0112) from the TIFF block at {@code b[off..off+len)}
    * (the part of an EXIF payload left behind by {@link #parseExifPayload}), mirroring the
    * reference's IFD walk ({@code ImageFileDirectory_v2.load}): entries are processed in file order
-   * and a later same-tag entry overwrites an earlier one; a truncated entry count or a short read
-   * of an offset value stops the walk, keeping the entries stored before it; entries whose type has
-   * no registered loader, or whose count is 0, are skipped without being stored. Malformation at
-   * any step — a byte order that is neither {@code II} (little-endian) nor {@code MM} (big-endian),
-   * a TIFF magic other than 42, an out-of-range first-IFD offset — is EXIF data, not container
-   * corruption: it is reported as an absent orientation, never thrown, so a bad EXIF block can
-   * never break a decode. Every access is bounds-checked against {@code len}.
+   * and a later same-tag entry overwrites an earlier one; a truncated entry count, or a short read
+   * of an offset value on any entry — not only the Orientation entry, since the reference loads
+   * every entry's data before it filters by tag — stops the walk, keeping the entries stored before
+   * it; entries whose type has no registered loader, or whose count is 0, are skipped without being
+   * stored. Malformation at any step — a byte order that is neither {@code II} (little-endian) nor
+   * {@code MM} (big-endian), a TIFF magic other than 42, an out-of-range first-IFD offset — is EXIF
+   * data, not container corruption: it is reported as an absent orientation, never thrown, so a bad
+   * EXIF block can never break a decode. Every access is bounds-checked against {@code len}.
    */
   private static TiffOrientation parseTiffOrientation(byte[] b, int off, int len) {
     if (len < 8) {
@@ -1246,29 +1247,25 @@ public final class ImageDecoder {
       if (entry + 12 > off + len) {
         break; // a short entry read stops the walk; the earlier entries are kept
       }
-      int tag = little ? leU16(b, entry) : u16(b, entry);
-      if (tag != ORIENTATION_TAG) {
-        continue;
-      }
       int type = little ? leU16(b, entry + 2) : u16(b, entry + 2);
       int unit = unitSize(type);
       if (unit == 0) {
-        continue; // an unregistered type is skipped, not stored, and the walk continues
+        continue; // an unregistered type is skipped for every tag, not stored, and the walk
+        // continues
       }
       long entryCount = little ? leU32(b, entry + 4) : u32(b, entry + 4);
-      if (entryCount == 0) {
-        continue; // the reference's "if not data: continue"
-      }
       long size = entryCount * unit;
-      int dataOff;
-      if (size <= 4) {
-        dataOff = entry + 8; // inline: the first size bytes of the value field
-      } else {
+      int dataOff = entry + 8;
+      if (size > 4) {
         long offset = little ? leU32(b, entry + 8) : u32(b, entry + 8);
         if (offset < 0 || (long) off + offset + size > (long) off + len) {
-          break; // a short offset read stops the walk; the earlier entries are kept
+          break; // the reference's short read raises: any entry's bad offset stops the walk
         }
         dataOff = off + (int) offset;
+      }
+      int tag = little ? leU16(b, entry) : u16(b, entry);
+      if (tag != ORIENTATION_TAG || entryCount == 0) {
+        continue; // the reference's "if not data: continue"
       }
       orientation = orientationValue(type, b, dataOff, little);
     }

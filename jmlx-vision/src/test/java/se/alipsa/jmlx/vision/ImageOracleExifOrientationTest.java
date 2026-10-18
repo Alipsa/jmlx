@@ -13,7 +13,9 @@ import tools.jackson.databind.JsonNode;
  * (the default) must reproduce the recorded stored, unrotated decode, and {@code APPLY} must
  * reproduce the recorded {@code ImageOps.exif_transpose} result, covering the LONG-type orientation
  * tag, a truncated IFD walk, the JPEG XMP fallback (attribute and element form), PNG eXIf last-wins
- * / post-IDAT / prefixed semantics, and the plain no-metadata twins.
+ * / post-IDAT / prefixed semantics, the plain no-metadata twins, and the IFD walk's abort at a bad
+ * offset on a non-Orientation entry — the JPEG twin records orientation 0 and the PNG twin falls
+ * back to the XMP packet's 6.
  */
 class ImageOracleExifOrientationTest {
 
@@ -26,7 +28,9 @@ class ImageOracleExifOrientationTest {
     "png-exif-after-idat",
     "png-exif-prefixed",
     "jpeg-plain",
-    "png-plain"
+    "png-plain",
+    "jpeg-badoffset-before-orient",
+    "png-xmp-badoffset-before-orient"
   };
 
   @Test

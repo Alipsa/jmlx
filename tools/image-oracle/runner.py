@@ -365,6 +365,315 @@ def run_chain(input_path: Path, provenance: dict) -> dict:
     }
 
 
+# The pinned Qwen3-VL artifact's preprocessing constants (findings §4.2-§4.3): the slow
+# PIL processor's size-dict bug is compensated with explicit min/max pixels, and
+# max_pixels is the jmlx planned-effective bound (decision (b)), not the artifact's
+# declared 16777216. The raw-patch-row budget is the jmlx decision-(c) hard bound.
+QWEN3VL_MIN_PIXELS = 65536
+QWEN3VL_MAX_PIXELS = 1048576
+QWEN3VL_RAW_ROW_BUDGET = 4096
+QWEN3VL_PATCH_STRIDE = 1536  # 3 channels * 2 temporal slots * 16 * 16 patch pixels
+QWEN3VL_PATCH_CASES = ("model-rgb-256x256", "model-rgb-64x32")
+
+
+def qwen3vl_reconstruct_hwc(raw, grid_h: int, grid_w: int):
+    """Invert the reference's merge-block patch flatten (findings §4.6) back to the resized
+    HWC uint8 image: rows are C-order over (merged_h, merged_w, merge_h, merge_w) and each
+    row is C-order over (channel, temporal, patch_row, patch_col), so the [rows, 1536]
+    buffer is [merged_h, merged_w, 2, 2, 3, 2, 16, 16]. The one image frame is duplicated
+    across both temporal slots (checked by the caller), so slot 0 recovers every pixel
+    losslessly."""
+    import numpy as np
+
+    buf = raw.reshape(grid_h // 2, grid_w // 2, 2, 2, 3, 2, 16, 16)
+    hwc = buf[:, :, :, :, :, 0, :, :].transpose(0, 2, 5, 1, 3, 6, 4)
+    return np.ascontiguousarray(hwc, dtype=np.uint8).reshape(grid_h * 16, grid_w * 16, 3)
+
+
+def run_qwen3vl(input_path: Path, provenance: dict) -> dict:
+    """Qwen3-VL preprocessing oracle (Phase 7.3b WP2): the documented jmlx reference
+    (findings §4.1-§4.3) is the slow PIL processor built over the pinned
+    preprocessor_config.json with the 4.57.6 size-dict bug compensated by explicit
+    options: Qwen2VLImageProcessor.from_pretrained(qwen3vl, min_pixels=65536,
+    max_pixels=1048576), the planned-effective max per decision (b). doResize:false
+    cases run through a second instance built with the construct-time do_resize=False
+    flag.
+
+    Every case feeds the processor the fixture's absolute path string, never a PIL
+    image object: in the 4.57.6 slow processor exif_transpose runs only on the
+    string-input load path, while PIL-image inputs skip it entirely, and the
+    file->processor pipeline is what the jmlx Qwen decode policy
+    (ExifOrientationPolicy.APPLY + AlphaPolicy.DROP_ALPHA) mirrors and what the WP1
+    exif golden measured. Parent-probed 2026-10-18 that alpha and plain cases are
+    input-mode-insensitive while the rotated fixtures differ. The processor's own
+    convert_to_rgb drops alpha (never composites) and never applies palette tRNS;
+    the per-image source dims and the storedDecode/whiteComposite controls are read
+    from a separate Image.open(fixture), keeping them on the stored (untransformed)
+    pixels. Per image, both the full pass (rescaled
+    and normalized float32 patch buffer) and the pre-rescale pass (do_rescale=False,
+    do_normalize=False, uint8 patch buffer) are pinned; the uint8 buffer is inverted
+    back to the resized HWC image (qwen3vl_reconstruct_hwc) so resize divergence stays
+    separable from normalization divergence. The two model fixtures' full-pass float32
+    bytes are additionally materialized as the committed processed-patch bins under
+    qwen3vl/patches/ (written in --generate-all mode, digest-verified otherwise;
+    --verify-all never writes)."""
+    import sys
+
+    import numpy as np
+    from PIL import Image
+    from transformers.models.qwen2_vl.image_processing_qwen2_vl import Qwen2VLImageProcessor
+
+    generate = "--generate-all" in sys.argv
+    specification = json.loads(input_path.read_text(encoding="utf-8"))
+    root = input_path.parent.resolve()
+    # The pinned config the processor resolves its options from; digest-checked here so a
+    # tampered copy fails before from_pretrained reads it.
+    verify_fixture(root, "qwen3vl/preprocessor_config.json", provenance)
+
+    processors = {}
+
+    def processor_for(do_resize: bool) -> Qwen2VLImageProcessor:
+        if do_resize not in processors:
+            kwargs = {"min_pixels": QWEN3VL_MIN_PIXELS, "max_pixels": QWEN3VL_MAX_PIXELS}
+            if not do_resize:
+                kwargs["do_resize"] = False
+            processors[do_resize] = Qwen2VLImageProcessor.from_pretrained(
+                str(root / "qwen3vl"), **kwargs
+            )
+        return processors[do_resize]
+
+    proc = processor_for(True)
+    if (int(proc.min_pixels), int(proc.max_pixels)) != (
+        QWEN3VL_MIN_PIXELS,
+        QWEN3VL_MAX_PIXELS,
+    ):
+        raise SystemExit(f"qwen3vl processor options drifted: {proc.min_pixels}/{proc.max_pixels}")
+    if int(proc.resample) != 3 or not proc.do_convert_rgb:
+        raise SystemExit("qwen3vl processor options drifted: resample or do_convert_rgb")
+    if list(proc.image_mean) != [0.5, 0.5, 0.5] or list(proc.image_std) != [0.5, 0.5, 0.5]:
+        raise SystemExit("qwen3vl processor options drifted: image_mean/image_std")
+
+    patch_blobs = {}
+    patch_grids = {}
+    cases = []
+    for case in specification["cases"]:
+        if case.get("expectedRejected"):
+            fixture = verify_fixture(root, case["image"], provenance)
+            image = Image.open(fixture)
+            image.load()
+            source = [image.width, image.height]
+            if case["rejectKind"] == "aspect":
+                # The reference's smart_resize aspect guard must reject: the evidence
+                # pins that the rejection is the reference's own, not only jmlx's.
+                try:
+                    processor_for(True)(images=[str(fixture)], return_tensors=None)
+                except ValueError:
+                    pass
+                else:
+                    raise SystemExit(f"qwen3vl aspect guard did not reject: {case['name']}")
+                cases.append(
+                    {
+                        "expectedRejected": True,
+                        "name": case["name"],
+                        "rejectKind": "aspect",
+                        "source": source,
+                    }
+                )
+            elif case["rejectKind"] == "raw-row-budget":
+                # jmlx decision-(c) budget: the reference would process this image
+                # fine, so it is deliberately not run; the stored dims must be
+                # patch-size divisible or the fixture would hit the no-resize
+                # divisibility check instead.
+                if source[0] % 16 != 0 or source[1] % 16 != 0:
+                    raise SystemExit(
+                        f"qwen3vl raw-row-budget fixture must be divisible by 16: {case['image']}"
+                    )
+                cases.append(
+                    {
+                        "doResize": False,
+                        "expectedRejected": True,
+                        "name": case["name"],
+                        "rawPatchRows": (source[1] // 16) * (source[0] // 16),
+                        "rawRowBudget": QWEN3VL_RAW_ROW_BUDGET,
+                        "rejectKind": "raw-row-budget",
+                        "source": source,
+                    }
+                )
+            else:
+                raise SystemExit(f"unknown qwen3vl rejectKind: {case['rejectKind']}")
+            continue
+
+        do_resize = case.get("doResize", True)
+        image_rels = [case["image"]] if "image" in case else list(case["images"])
+        image_records = []
+        for rel in image_rels:
+            fixture = verify_fixture(root, rel, provenance)
+            image = Image.open(fixture)
+            image.load()
+            source = [image.width, image.height]
+            p = processor_for(do_resize)
+            # Path string, not PIL object: the 4.57.6 slow processor applies
+            # exif_transpose only on the string-input load path (PIL inputs skip
+            # it), and this file->processor pipeline is what the jmlx Qwen decode
+            # policy (APPLY + DROP_ALPHA) mirrors and what the WP1 exif golden
+            # measured; alpha/plain cases are input-mode-insensitive while the
+            # rotated fixtures differ (parent-probed 2026-10-18).
+            full = p(images=[str(fixture)], return_tensors=None)
+            pv = np.ascontiguousarray(full["pixel_values"], dtype=np.float32)
+            grid = [int(v) for v in np.asarray(full["image_grid_thw"][0]).tolist()]
+            if grid[0] != 1:
+                raise SystemExit(
+                    f"qwen3vl grid_t != 1 for a still image: {case['name']} {rel}"
+                )
+            grid_h, grid_w = grid[1], grid[2]
+            expected_rows = grid_h * grid_w
+            if tuple(pv.shape) != (expected_rows, QWEN3VL_PATCH_STRIDE):
+                raise SystemExit(
+                    f"qwen3vl pixel_values shape {pv.shape} != "
+                    f"[{expected_rows}, {QWEN3VL_PATCH_STRIDE}]: {rel}"
+                )
+
+            raw_result = p(
+                images=[str(fixture)], do_rescale=False, do_normalize=False, return_tensors=None
+            )
+            raw = raw_result["pixel_values"]
+            if not isinstance(raw, np.ndarray) or raw.dtype != np.uint8:
+                raise SystemExit(
+                    f"qwen3vl pre-rescale pass is not a uint8 array: {rel} "
+                    f"(type={type(raw).__name__}, dtype={getattr(raw, 'dtype', None)})"
+                )
+            raw = np.ascontiguousarray(raw, dtype=np.uint8)
+            raw_grid = [int(v) for v in np.asarray(raw_result["image_grid_thw"][0]).tolist()]
+            if raw_grid != grid or tuple(raw.shape) != (expected_rows, QWEN3VL_PATCH_STRIDE):
+                raise SystemExit(
+                    f"qwen3vl pre-rescale pass disagrees with the full pass: {rel}"
+                )
+            # The one image frame fills both temporal slots identically (a per-channel
+            # column-band check, the t axis sits inside each channel's 512 columns); a
+            # mismatch would mean the reference's duplication changed, breaking the
+            # HWC inversion below.
+            for c in range(3):
+                if not np.array_equal(
+                    raw[:, c * 512:c * 512 + 256], raw[:, c * 512 + 256:c * 512 + 512]
+                ):
+                    raise SystemExit(f"qwen3vl temporal slots differ: {rel}")
+            hwc = qwen3vl_reconstruct_hwc(raw, grid_h, grid_w)
+
+            sample_rows = sorted({0, expected_rows // 2, expected_rows - 1})
+            record = {
+                "gridThw": [1, grid_h, grid_w],
+                "image": rel,
+                "mergedRowCount": expected_rows // 4,
+                "pixelSha256": hashlib.sha256(pv.tobytes()).hexdigest(),
+                "rawPatchRows": expected_rows,
+                "resized": [grid_w * 16, grid_h * 16],
+                "samples": [
+                    {"row": i, "valuesBase64": float32_be_base64(pv[i])}
+                    for i in sample_rows
+                ],
+                "source": source,
+                "uint8Sha256": hashlib.sha256(hwc.tobytes()).hexdigest(),
+            }
+            if case["name"].startswith("alpha-"):
+                # The unchanged SmolVLM composite-over-white decode: the control a
+                # drop-alpha implementation must visibly differ from.
+                white = reference_decode(fixture)
+                record["whiteComposite"] = {
+                    "height": int(white.shape[0]),
+                    "pixelsBase64": uint8_base64(white),
+                    "width": int(white.shape[1]),
+                }
+            if case["name"].startswith("rotated-"):
+                # The raw stored (untransformed) pixels, read straight from the
+                # opened image before any transpose. The path-input pipeline
+                # applies exif_transpose to exactly these (orient6: 90 CW,
+                # orient2: mirrored left-right), so the processor output must
+                # differ from this control; an exif-ignoring implementation
+                # would produce exactly the stored-pixel pipeline instead.
+                stored = np.asarray(image.convert("RGB"), dtype=np.uint8)
+                record["storedDecode"] = {
+                    "height": int(stored.shape[0]),
+                    "pixelsBase64": uint8_base64(stored),
+                    "width": int(stored.shape[1]),
+                }
+            image_records.append(record)
+            if case["name"] in QWEN3VL_PATCH_CASES:
+                patch_blobs[case["name"]] = pv.tobytes()
+                patch_grids[case["name"]] = grid
+        cases.append({"images": image_records, "name": case["name"]})
+
+    patches_dir = root / "qwen3vl" / "patches"
+    manifest_entries = {}
+    for name in QWEN3VL_PATCH_CASES:
+        if name not in patch_blobs:
+            raise SystemExit(f"qwen3vl patch case missing from input: {name}")
+        data = patch_blobs[name]
+        grid = patch_grids[name]
+        digest = hashlib.sha256(data).hexdigest()
+        bin_path = patches_dir / f"{name}.pixel-values.f32"
+        if generate:
+            patches_dir.mkdir(parents=True, exist_ok=True)
+            bin_path.write_bytes(data)
+        elif not bin_path.is_file() or source_digest(bin_path) != digest:
+            raise SystemExit(f"qwen3vl patch bin missing or stale: {bin_path}")
+        manifest_entries[f"{name}.pixel-values.f32"] = {
+            "gridThw": [1, grid[1], grid[2]],
+            "rows": grid[1] * grid[2],
+            "sha256": digest,
+            "sourceImage": f"qwen3vl/{name}.png",
+            "sourceImageSha256": provenance["fixtureSources"][f"qwen3vl/{name}.png"],
+            "stride": QWEN3VL_PATCH_STRIDE,
+        }
+    manifest = {
+        "layout": (
+            "little-endian IEEE-754 float32, C order, [rawPatchRows, 1536] (patch stride "
+            "= 3 * temporal_patch_size * patch_size * patch_size)"
+        ),
+        "patches": manifest_entries,
+        "processor": (
+            "Qwen2VLImageProcessor.from_pretrained(qwen3vl, min_pixels=65536, "
+            "max_pixels=1048576)"
+        ),
+        "schema": "jmlx-phase7-3b-wp2-qwen3vl-processed-patches-v1",
+    }
+    manifest_path = patches_dir / "manifest.json"
+    if generate:
+        manifest_path.write_text(canonical(manifest), encoding="utf-8")
+    else:
+        if not manifest_path.is_file():
+            raise SystemExit(f"qwen3vl patch manifest is missing: {manifest_path}")
+        committed = manifest_path.read_text(encoding="utf-8")
+        if canonical(json.loads(committed)) != committed:
+            raise SystemExit(
+                f"qwen3vl patch manifest is not in canonical form: {manifest_path}"
+            )
+        if json.loads(committed) != manifest:
+            raise SystemExit(
+                f"qwen3vl patch manifest disagrees with recomputed patches: {manifest_path}"
+            )
+
+    return {
+        "cases": cases,
+        "config": {
+            "class": "Qwen2VLImageProcessor",
+            "construction": (
+                "Qwen2VLImageProcessor.from_pretrained(qwen3vl, min_pixels=65536, "
+                "max_pixels=1048576)"
+            ),
+            "imageMean": list(proc.image_mean),
+            "imageStd": list(proc.image_std),
+            "maxPixels": QWEN3VL_MAX_PIXELS,
+            "mergeSize": 2,
+            "minPixels": QWEN3VL_MIN_PIXELS,
+            "patchSize": 16,
+            "rawRowBudget": QWEN3VL_RAW_ROW_BUDGET,
+            "resample": int(proc.resample),
+            "rescaleFactor": proc.rescale_factor,
+            "temporalPatchSize": 2,
+        },
+    }
+
+
 def stale_message(path: Path, expected: str, actual: str) -> str:
     try:
         expected_value = json.loads(expected)
@@ -396,6 +705,7 @@ RUNNERS = {
     "exif-orientation.input.json": run_exif_orientation,
     "resize.input.json": run_resize,
     "chain.input.json": run_chain,
+    "qwen3vl.input.json": run_qwen3vl,
 }
 
 

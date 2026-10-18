@@ -276,6 +276,25 @@ accepted until the following land in a part-2 PR:
 - Integration docs: findings §4.4/§4.8, this plan's status and §11 checklist, AGENTS.md
   architecture list and `jmlx-vision/README.md`.
 
+**2026-10-18 WP2 part-2 status:** all eight part-2 items above landed on branch
+`phase7-3b-wp2-part2`: the `qwen3vl` oracle family (21 cases) with its provenance pins and
+`ImageOracleQwen3VlTest` byte-verification, including the exact rejection messages and the
+`whiteComposite`/`storedDecode` controls; the planned geometry cases (1920x1080, 1280x960,
+1080x1920, 1024x1024 at the 4096-row cap, the 2000x10 extreme-aspect case and the 2002x10
+rejected aspect, plus the 160x6560 raw-row rejection) recorded as oracle fixtures; the
+`DROP_ALPHA` fixtures (RGBA/LA/palette+tRNS with non-white transparent pixels) with the
+unchanged SmolVLM composite-over-white default asserted by the `whiteComposite` controls; the
+shared hash-pinned processed-patch fixture (`fixtures/qwen3vl/patches/`) consumed by
+`tools/image-oracle` (`run_qwen3vl` + the Java oracle test) and `tools/hf-reference`
+(`qwen3vl_processed_patches` provenance pin enforced by `verifyHfReferenceGoldens`,
+consumption contract in its README); the two-different-sizes ordering case (plus a
+statelessness unit test); the file-to-processor entry point
+(`Qwen3VlImageProcessor.processFile`, `Path` and `byte[]` overloads) with parity tests; the
+WP9 rotated-fixture parity (orientations 6 and 2, eXIf-chunk PNGs, `storedDecode` non-matching
+control, path-input `exif_transpose` invariant, findings §4.4/§4.8); and the documentation
+updates. WP2 is accepted with this landing; the prompt/position/template fixture clause of the
+§11 preprocessing/prompt/position/template item remains open for WP3.
+
 ## 5. Prompt expansion and position planning (WP3)
 
 Add a package-private pure `Qwen3VlPromptExpander` beside the 7.3a expander. Inputs are original
@@ -564,4 +583,4 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [ ] Default per-image attention limit/peak, one-over rejection and post-prefill visual release verified.
 - [ ] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded.
 - [ ] Required CI suites executed; matrix/docs state actual modality and verification limits.
-- [ ] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.
+- [x] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.

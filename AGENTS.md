@@ -116,7 +116,10 @@ The Python Pillow/Transformers image-preprocessing oracle (`tools/image-oracle/`
 fixture tool for `jmlx-vision`: a hash-locked CPython 3.12 venv pinning Pillow 12.3.0, NumPy 2.5.3
 and Transformers 4.57.6, used to generate and verify the decode/resize/normalize/full-processor
 fixtures under `tools/image-oracle/fixtures/` (`*.input.json` specs, `*.expected.json` canonical
-oracle output, the fixture images and `preprocessor_config.json`). Install and verify with:
+oracle output, the fixture images and `preprocessor_config.json`) and, since Phase 7.3b WP2,
+the Qwen3-VL `qwen3vl` family (`fixtures/qwen3vl/`), whose shared processed-patch bins under
+`fixtures/qwen3vl/patches/` are digest-pinned in both `tools/image-oracle/provenance.json` and
+`tools/hf-reference/provenance.json`. Install and verify with:
 
 ```sh
 ./tools/image-oracle/install.sh
@@ -355,12 +358,20 @@ jmlx-jinja       se.alipsa.jmlx.jinja              Template, chat-template Jinja
 
 jmlx-vision      se.alipsa.jmlx.vision             ImageDecoder, RgbImage, ImageTensor, Layout,
                                                     PillowResample, ImageTransforms, Resampling,
-                                                    ImageDecodeLimits, SmolVlmImageProcessor/
+                                                    ImageDecodeLimits, AlphaPolicy,
+                                                    ExifOrientationPolicy,
+                                                    SmolVlmImageProcessor/
                                                     SmolVlmProcessorConfig/
-                                                    SmolVlmImageProcessorResult
+                                                    SmolVlmImageProcessorResult,
+                                                    Qwen3VlImageProcessor/
+                                                    Qwen3VlProcessorConfig/
+                                                    Qwen3VlGeometryPlan/
+                                                    Qwen3VlImageProcessorResult
                                                     pure Java; Pillow-exact bilinear/bicubic/
-                                                    LANCZOS resampling; no dependency on
-                                                    jmlx-ffi or native/install/lib
+                                                    LANCZOS resampling; SmolVLM/Idefics3 and
+                                                    Qwen3-VL (Phase 7.3b WP2) image
+                                                    processors; no dependency on jmlx-ffi or
+                                                    native/install/lib
 
 jmlx-models      se.alipsa.jmlx.models             TextGenerationModel, TextGenerationModels,
                                                     GenerationConfig/Request/Result/Event,
@@ -614,3 +625,26 @@ measurements. `verifyHfReferenceGoldens` also verifies the vision Tier-B manifes
 digests; neural regeneration remains manual via `tools/hf-reference/vision_tier_b.py`. Local WP7
 evidence passes. WP8 is implemented via PR #47, with local consumer/capability evidence in
 `req/phase7-3a-implementation-report.md`; the macOS 26 hosted CI/Tier-B acceptance remains pending.
+
+## Phase 7.3b additions
+
+Phase 7.3b is the Qwen3-VL image+text milestone; `req/plans/phase7-3b-plan.md` and
+`req/plans/phase7-3b-reference-findings.md` are the authoritative records for this section. The
+landed prerequisites: WP0 pinned the `Qwen/Qwen3-VL-2B-Instruct` 2B artifact (revision plus full
+file/tensor inventory), and WP1 recorded the executable reference probes, including the
+fast-vs-slow preprocessing comparison under `tools/image-oracle/fast-comparison/` and the WP1
+probe goldens. In `jmlx-vision`, WP2 part 1 landed the pure-Java `Qwen3Vl*` preprocessing port
+(`Qwen3VlProcessorConfig`, `Qwen3VlGeometryPlan`, `Qwen3VlImageProcessor`,
+`Qwen3VlImageProcessorResult`) plus `ExifOrientationPolicy` and the decode-level
+`exif-orientation` oracle family (the WP9 policy: `APPLY` for the Qwen file path, `IGNORE` kept
+for SmolVLM). WP2 part 2 (2026-10-18) landed the `qwen3vl` image-oracle family (21 cases,
+`run_qwen3vl` in `tools/image-oracle/runner.py`), the `Qwen3VlImageProcessor.processFile`
+file-to-processor entry points (decode `DROP_ALPHA` + `APPLY`), and the shared processed-patch
+fixture under `tools/image-oracle/fixtures/qwen3vl/patches/`, whose manifest and bins are
+digest-pinned in both `tools/image-oracle/provenance.json` and `tools/hf-reference/
+provenance.json`; it also pinned the 4.57.6 path-input invariant that the slow processor's
+`exif_transpose` runs only on the string-input load path (PIL-image inputs skip it), verified
+against the rotated fixtures (findings §4.8). No native pins or generated bindings changed, and
+no new Gradle tasks were added — the existing `verifyImageOracleFixtureDigests` and
+`verifyHfReferenceGoldens` guards cover the new fixtures, and `ImageOracleQwen3VlTest` (part of
+`:jmlx-vision:test`) is the Java-side byte verification.

@@ -656,10 +656,13 @@ no extra tokens.
   integer is rejected, and a grid that extends past the expanded prompt is rejected as a
   geometry/prompt mismatch — both before any array is written (the bounds-check ordering was
   verified and fixed this session). The t > 1 (multi-frame / video frame) coordinate path —
-  T = base + frame index while H/W restart per frame — is implemented and cross-checked by
-  logic against the reference in both the Python re-derivation
-  (`qwen3vl_wp3_prompt.rederive_rope_all`) and the planner, but the pinned WP3 golden is
-  t = 1 only, so no golden case exercises it.
+  T = base + frame index while H/W restart per frame — is implemented in both the Python
+  re-derivation (`qwen3vl_wp3_prompt.rederive_rope_all`) and the planner; since the pinned
+  WP3 golden is t = 1 only, the opt-in script
+  `tools/hf-reference/qwen3vl_rope_multiframe_check.py` (pinned venv, never Gradle-invoked,
+  no golden output) cross-checks the re-derivation against the real `get_rope_index` on
+  synthetic grids with t = 1, 2, 3 and 5 plus a two-image prompt with a text run between the
+  images, requiring exact equality of all three position axes and the delta.
 - **Plan record** (`Qwen3VlPromptPlan`, mirroring 7.3a's `SmolVlmPromptPlan`): owned copies of
   the original and expanded IDs, one contiguous `Qwen3VlImagePlacement` (start + count) per
   image in prompt order, the three position axes and the delta. The constructor rejects axes of

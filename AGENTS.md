@@ -265,7 +265,9 @@ inert when `signing.keyId` is absent, so `check` and CI stay keyless. Releasing 
 credentialed, manual action — CI verifies but never publishes. `main` is protected by
 repository push rules — a direct push is rejected with "push declined due to repository rule
 violations" — so every change, including a one-line doc or status note, must ride a PR that
-passes CI (branch, `gh pr create`, `gh pr merge <n> --merge`). A local `main` can therefore sit
+passes CI (branch, `gh pr create`, then stop and wait for the human's review: a green CI is
+not a merge — run `gh pr merge <n> --merge` only after the human has reviewed the PR and
+explicitly approved it). A local `main` can therefore sit
 ahead of `origin/main` with a commit it cannot push; reset it to `origin/main` and carry the
 commit on a feature branch instead.
 

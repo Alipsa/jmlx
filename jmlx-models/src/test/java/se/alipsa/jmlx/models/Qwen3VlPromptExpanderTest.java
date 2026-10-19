@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -86,6 +87,7 @@ class Qwen3VlPromptExpanderTest {
   @Test
   void goldenExpansionsAndPositionsMatchThePinnedReference() throws Exception {
     Qwen3VlPromptTokens tokens = goldenTokens();
+    int checked = 0;
     for (JsonNode caseNode : golden().required("cases")) {
       String caseName = caseNode.required("name").asString();
       for (var variant : caseNode.required("variants").properties()) {
@@ -116,13 +118,21 @@ class Qwen3VlPromptExpanderTest {
         assertArrayEquals(ints(positions.required("h")), plan.heightPositions(), name);
         assertArrayEquals(ints(positions.required("w")), plan.widthPositions(), name);
         assertEquals(value.required("delta").asInt(), plan.positionDelta(), name);
+        checked++;
       }
     }
+    assertEquals(
+        16,
+        checked,
+        "golden must contain exactly 16 case variants (8 cases x 2 add_generation_prompt "
+            + "variants): "
+            + goldenPath());
   }
 
   @Test
   void singleImageCasesReproduceTheWp1ProbeNumbers() throws Exception {
     Qwen3VlPromptTokens tokens = goldenTokens();
+    int checked = 0;
     for (String caseName : List.of("single_image_256x256", "single_image_64x32")) {
       JsonNode caseNode = caseByName(caseName);
       for (var variant : caseNode.required("variants").properties()) {
@@ -141,8 +151,14 @@ class Qwen3VlPromptExpanderTest {
           assertEquals(90, plan.expandedLength(), name);
           assertEquals(-60, plan.positionDelta(), name);
         }
+        checked++;
       }
     }
+    assertEquals(
+        2,
+        checked,
+        "golden must contain exactly 2 single-image add_generation_prompt_true variants: "
+            + goldenPath());
   }
 
   private static JsonNode caseByName(String name) throws Exception {
@@ -192,7 +208,7 @@ class Qwen3VlPromptExpanderTest {
     assertArrayEquals(new int[] {0, 1, 2, 3, 3, 3, 3, 3, 3, 6, 7, 8}, plan.temporalPositions());
     assertArrayEquals(new int[] {0, 1, 2, 3, 3, 3, 4, 4, 4, 6, 7, 8}, plan.heightPositions());
     assertArrayEquals(new int[] {0, 1, 2, 3, 4, 5, 3, 4, 5, 6, 7, 8}, plan.widthPositions());
-    // The block's largest coordinate (8) plus one minus the 12-token length: -3.
+    // The prompt's largest coordinate (8) plus one minus the 12-token length: -3.
     assertEquals(-3, plan.positionDelta());
   }
 
@@ -212,9 +228,12 @@ class Qwen3VlPromptExpanderTest {
     assertArrayEquals(new int[] {0, 1, 1, 1, 2, 2, 2, 4, 5, 6, 7, 7, 9}, plan.heightPositions());
     assertArrayEquals(new int[] {0, 1, 2, 3, 1, 2, 3, 4, 5, 6, 7, 8, 9}, plan.widthPositions());
     assertEquals(-3, plan.positionDelta());
-    // Decode continues from the logical cache position plus the delta, never the KV length.
+    // Decode continues from the logical cache position plus the delta, never the KV length,
+    // and only at or after the expanded prompt's finished position.
     assertEquals(10, plan.ropePositionAt(13));
-    assertEquals(9, plan.ropePositionAt(12));
+    assertEquals(
+        "cachePosition 12 is inside the expanded prompt: decode starts at cache position 13",
+        assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(12)).getMessage());
   }
 
   @Test
@@ -228,7 +247,10 @@ class Qwen3VlPromptExpanderTest {
     assertEquals(List.of(), plan.images());
     assertEquals(0, plan.totalFeatureRows());
     assertArrayEquals(new int[0], plan.featureDestinations());
-    assertEquals(0, plan.ropePositionAt(0));
+    assertEquals(3, plan.ropePositionAt(3));
+    assertEquals(
+        "cachePosition 0 is inside the expanded prompt: decode starts at cache position 3",
+        assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(0)).getMessage());
   }
 
   @Test
@@ -253,6 +275,32 @@ class Qwen3VlPromptExpanderTest {
             () -> Qwen3VlPromptExpander.expand(new int[] {1, VIDEO, 2}, tokens(), List.of()));
     assertEquals(
         "prompt contains the video token (ID 11); video is not supported", failure.getMessage());
+  }
+
+  @Test
+  void completeVideoWrapperReceivesTheVideoError() {
+    // START/VIDEO/END is a complete video wrapper: the start-token check must not hide the
+    // video error behind the less helpful malformed-wrapper message.
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Qwen3VlPromptExpander.expand(new int[] {START, VIDEO, END}, tokens(), List.of()));
+    assertEquals(
+        "prompt contains the video token (ID 11); video is not supported", failure.getMessage());
+  }
+
+  @Test
+  void videoTokenInsideImageWrapperReceivesTheVideoError() {
+    // A video token in the third (or fourth, with a trailing end) position of an image wrapper
+    // must report the video error, not the malformed-wrapper error the grammar check would emit.
+    for (int[] prompt : new int[][] {{START, IMAGE, VIDEO}, {START, IMAGE, VIDEO, END}}) {
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Qwen3VlPromptExpander.expand(prompt, tokens(), List.of()));
+      assertEquals(
+          "prompt contains the video token (ID 11); video is not supported", failure.getMessage());
+    }
   }
 
   @Test
@@ -459,6 +507,70 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
+  void multiFrameImagePlanTakesPerFrameTemporalCoordinates() {
+    // Production preprocessing currently rejects gridT != 1 (Qwen3VlGeometryPlan), so this
+    // test calls the planner directly to pin its multi-frame contract ahead of that.
+    // The reference's single_image_t2 case: vision grid (2, 4, 4) with merge 2 (the LLM grid
+    // (2, 2, 2)), wrapped in three text tokens, the vision start sentinel, the eight image
+    // sentinels, the vision end sentinel and two text tokens: 15 tokens in total.
+    Qwen3VlRopePlan plan =
+        Qwen3VlPositionPlanner.plan(
+            new int[] {
+              1000, 1001, 1002, START, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, END,
+              1003, 1004
+            },
+            tokens(),
+            List.of(new int[] {2, 2, 2}));
+    // The text run is 0..3 (the vision start sentinel counts as text); the image block at 4..11
+    // takes base 4: T is 4,4,4,4,5,5,5,5 by frame while H and W restart per frame, and the
+    // trailing text resumes at the block maximum (5) plus one.
+    assertArrayEquals(
+        new int[] {0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 7, 8}, plan.temporalPositions());
+    assertArrayEquals(
+        new int[] {0, 1, 2, 3, 4, 4, 5, 5, 4, 4, 5, 5, 6, 7, 8}, plan.heightPositions());
+    assertArrayEquals(
+        new int[] {0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 8}, plan.widthPositions());
+    // The prompt's largest coordinate (8) plus one minus the 15-token length: -6.
+    assertEquals(-6, plan.delta());
+
+    // The reference's single_image_t5 case: vision grid (5, 4, 4) with merge 2 (the LLM grid
+    // (5, 2, 2)), the same wrapper shape with the twenty image sentinels: 27 tokens in total.
+    // Here the frame count (5) is the block's largest dimension, so a block maximum computed
+    // without it would shift the trailing text to 6..8 and the delta to -18.
+    int[] t5Ids = new int[27];
+    t5Ids[0] = 1000;
+    t5Ids[1] = 1001;
+    t5Ids[2] = 1002;
+    t5Ids[3] = START;
+    Arrays.fill(t5Ids, 4, 24, IMAGE);
+    t5Ids[24] = END;
+    t5Ids[25] = 1003;
+    t5Ids[26] = 1004;
+    Qwen3VlRopePlan t5Plan =
+        Qwen3VlPositionPlanner.plan(t5Ids, tokens(), List.of(new int[] {5, 2, 2}));
+    // The text run is again 0..3; the image block at 4..23 takes base 4: T is 4, 5, 6, 7, 8
+    // by frame (five frames of four tokens) while H and W restart per frame, and the trailing
+    // text resumes at the block maximum (8) plus one.
+    assertArrayEquals(
+        new int[] {
+          0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 9, 10, 11
+        },
+        t5Plan.temporalPositions());
+    assertArrayEquals(
+        new int[] {
+          0, 1, 2, 3, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 9, 10, 11
+        },
+        t5Plan.heightPositions());
+    assertArrayEquals(
+        new int[] {
+          0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 9, 10, 11
+        },
+        t5Plan.widthPositions());
+    // The prompt's largest coordinate (11) plus one minus the 27-token length: -15.
+    assertEquals(-15, t5Plan.delta());
+  }
+
+  @Test
   void theTokensRecordValidatesItsIds() {
     assertEquals(new Qwen3VlPromptTokens(IMAGE, VIDEO, START, END), tokens());
     assertDoesNotThrow(() -> new Qwen3VlPromptTokens(IMAGE, -1, START, END));
@@ -560,6 +672,37 @@ class Qwen3VlPromptExpanderTest {
     assertThrows(
         TokenizerException.class,
         () -> Qwen3VlPromptTokens.resolve(tokenizer, IMAGE, VIDEO, START, END));
+  }
+
+  @Test
+  void resolveSkipsTheVideoLookupWhenTheConfigDeclaresNoVideoToken(@TempDir Path tempDir)
+      throws Exception {
+    // The config's -1 must not require the video sentinel in the vocabulary at all: it must
+    // resolve through a fixture variant that has no video token added.
+    HfTokenizer noVideoTokenizer = fixtureTokenizerMissingAddedToken(VIDEO, tempDir);
+    Qwen3VlPromptTokens resolved =
+        Qwen3VlPromptTokens.resolve(noVideoTokenizer, IMAGE, -1, START, END);
+    assertEquals(new Qwen3VlPromptTokens(IMAGE, -1, START, END), resolved);
+    // The -1 also resolves against the full fixture, where the video sentinel is present: the
+    // config's declaration wins over the vocabulary.
+    assertEquals(
+        new Qwen3VlPromptTokens(IMAGE, -1, START, END),
+        Qwen3VlPromptTokens.resolve(fixtureTokenizer(), IMAGE, -1, START, END));
+    // The other three roles still resolve and cross-check with the config while the video
+    // role is absent from it.
+    for (String role : List.of("image", "vision start", "vision end")) {
+      int configImage = role.equals("image") ? 99 : IMAGE;
+      int configStart = role.equals("vision start") ? 99 : START;
+      int configEnd = role.equals("vision end") ? 99 : END;
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  Qwen3VlPromptTokens.resolve(
+                      noVideoTokenizer, configImage, -1, configStart, configEnd));
+      assertTrue(failure.getMessage().contains(role), role + ": " + failure.getMessage());
+      assertTrue(failure.getMessage().contains("99"), role + ": " + failure.getMessage());
+    }
   }
 
   @Test
@@ -764,7 +907,7 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
-  void theDecodeContinuationRejectsNegativePositions() {
+  void theDecodeContinuationRejectsCachePositionsBeforePrefill() {
     Qwen3VlPromptPlan plan =
         Qwen3VlPromptExpander.expand(
             new int[] {START, IMAGE, END, 7, START, IMAGE, END},
@@ -774,8 +917,7 @@ class Qwen3VlPromptExpanderTest {
         "cachePosition must be non-negative: -1",
         assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(-1)).getMessage());
     assertEquals(
-        "RoPE position at cache position 2 is negative: -1 (delta -3); decode starts at cache "
-            + "position 13",
+        "cachePosition 2 is inside the expanded prompt: decode starts at cache position 13",
         assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(2)).getMessage());
   }
 

@@ -118,13 +118,18 @@ final class Qwen3VlPromptExpander {
     int end = tokens.visionEndTokenId();
     int image = tokens.imageTokenId();
     int video = tokens.videoTokenId();
+    // A declared video token is rejected anywhere in the prompt, before the grammar scan: the
+    // video error is reported instead of whichever wrapper error its position would trigger.
+    if (video >= 0) {
+      for (int id : ids) {
+        if (id == video) {
+          throw videoError(id);
+        }
+      }
+    }
     int wrappers = 0;
     for (int i = 0; i < ids.length; i++) {
       int id = ids[i];
-      if (video >= 0 && id == video) {
-        throw new IllegalArgumentException(
-            "prompt contains the video token (ID " + id + "); video is not supported");
-      }
       if (id == start) {
         if (i + 2 >= ids.length || ids[i + 1] != image || ids[i + 2] != end) {
           throw new IllegalArgumentException(
@@ -160,6 +165,11 @@ final class Qwen3VlPromptExpander {
       }
     }
     return wrappers;
+  }
+
+  private static IllegalArgumentException videoError(int id) {
+    return new IllegalArgumentException(
+        "prompt contains the video token (ID " + id + "); video is not supported");
   }
 
   private static int mergedTokens(int[] grid) {

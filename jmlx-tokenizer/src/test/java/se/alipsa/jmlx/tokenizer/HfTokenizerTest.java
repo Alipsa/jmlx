@@ -347,7 +347,7 @@ class HfTokenizerTest {
   }
 
   @Test
-  void aBundleWithoutAnyTemplateSourceStillHasNoTemplates() throws Exception {
+  void bundleWithoutAnyTemplateSourceStillHasNoTemplates() throws Exception {
     Path directory = Files.createDirectory(temporaryDirectory.resolve("no-templates"));
     Files.copy(wordPieceFixture(), directory.resolve("tokenizer.json"));
     HfTokenizer tokenizer = HfTokenizer.fromDirectory(directory);
@@ -360,7 +360,7 @@ class HfTokenizerTest {
   }
 
   @Test
-  void aMalformedLegacyChatTemplateFileIsRejected() throws Exception {
+  void malformedLegacyChatTemplateFileIsRejected() throws Exception {
     Path missingKey = Files.createDirectory(temporaryDirectory.resolve("legacy-missing-key"));
     Files.copy(wordPieceFixture(), missingKey.resolve("tokenizer.json"));
     Files.writeString(missingKey.resolve("chat_template.json"), "{\"other\": \"nope\"}");

@@ -784,6 +784,10 @@ subprojects {
     checkstyle {
         toolVersion = checkstyleVersion
         configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+        // The config's severity is 'warning', and Gradle's default maxWarnings is unlimited, so
+        // without this a violation only prints a [WARN] line and check still passes. Zero
+        // tolerance makes every checkstyle violation fail check, just like spotlessCheck.
+        maxWarnings = 0
     }
 
     // jmlx-ffi/src/main/generated/java is committed jextract output, not

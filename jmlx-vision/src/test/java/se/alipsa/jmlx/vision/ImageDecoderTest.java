@@ -154,7 +154,7 @@ class ImageDecoderTest {
   }
 
   @Test
-  void tRnsOnTruecolorAndGrayscaleDecodesAsOpaque() throws Exception {
+  void trnsOnTruecolorAndGrayscaleDecodesAsOpaque() throws Exception {
     // A tRNS chunk on truecolor/grayscale is ignored (the reference keeps mode RGB/L and its
     // RGB conversion drops the transparency): each twin decodes byte-identical to its opaque
     // counterpart.
@@ -169,7 +169,7 @@ class ImageDecoderTest {
   }
 
   @Test
-  void tRnsOnPalettedPngDecodesAsOpaqueTwin() throws Exception {
+  void trnsOnPalettedPngDecodesAsOpaqueTwin() throws Exception {
     // Palette tRNS is dropped to match the pinned processor (its palette is rebuilt from
     // getpalette(), RGB only): each tRNS twin decodes byte-identical to its opaque counterpart.
     Path fixtures = OracleFixtures.fixtures();

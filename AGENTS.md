@@ -300,8 +300,15 @@ Hand-written sources are Google Java Style, 2-space indent, 100-column width. Fo
 enforced by running `googleJavaFormat(...)` directly from root `build.gradle`'s Spotless block (no
 separate Spotless config file); linting is `config/checkstyle/checkstyle.xml`, derived from
 checkstyle's own bundled `google_checks.xml` with deviations documented in a comment at the top of
-that file. The generated jextract bindings under `jmlx-ffi/src/main/generated/java` are exempt from
-both and must stay byte-identical to `scripts/regen-bindings.sh`'s output — never hand-edit them.
+that file. Checkstyle runs with `maxWarnings = 0` in both builds: the config reports violations at
+`warning` severity, but any violation fails `check` (for `buildSrc`, run
+`./gradlew -p buildSrc check`; see below), the same as a Spotless difference. Fix a violation
+(rename, add the Javadoc) rather than leaving it. Never raise `maxWarnings`. Use a targeted
+suppression (`@SuppressWarnings("checkstyle:<Check>")` or a
+`// CHECKSTYLE.SUPPRESS: <Check> for +N lines` comment) only where a name is genuinely externally
+constrained, with a comment saying why. The generated jextract bindings under
+`jmlx-ffi/src/main/generated/java` are exempt from both and must stay byte-identical to
+`scripts/regen-bindings.sh`'s output — never hand-edit them.
 `buildSrc` (shared Gradle build-logic helpers, e.g. `PublishedPomDependencies`) is its own isolated
 Gradle build, so root `build.gradle`'s `subprojects{}` conventions never reach it -- it applies the
 same checkstyle/Spotless configuration independently in its own `buildSrc/build.gradle` instead

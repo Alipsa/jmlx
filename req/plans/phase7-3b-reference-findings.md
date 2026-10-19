@@ -701,7 +701,7 @@ no extra tokens.
     spans and deltas against the pinned WP1 probe golden, plus a string-level re-expansion and
     re-tokenization round-trip and a model `get_rope_index` comparison, exiting non-zero on any
     drift.
-  - `Qwen3VlPromptExpanderTest` (`jmlx-models`): 33 pure-Java tests (no native bootstrap, no
+  - `Qwen3VlPromptExpanderTest` (`jmlx-models`): pure-Java tests (no native bootstrap, no
     Tier-B download) over the golden's cases, the `resolve` match/mismatch/missing-token paths
     against the synthetic fixture `jmlx-models/src/test/resources/qwen3vl-tokens/tokenizer.json`
     (the four sentinel spellings at local IDs 10/11/12/13, `PROVENANCE.md` alongside) and

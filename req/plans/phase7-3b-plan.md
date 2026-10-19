@@ -347,7 +347,7 @@ resolving each sentinel name to its ID through the tokenizer and cross-checking 
 outer `config.json` ID (no hard-coded numeric IDs in production code) — the golden
 `tools/hf-reference/goldens/qwen3-vl-wp3-prompt.json` (8 cases * 2 `add_generation_prompt`
 variants, schema `jmlx-phase7-3b-wp3-qwen3vl-prompt-v1`) digest-pinned in
-`tools/hf-reference/provenance.json`, the 33 pure-Java tests (no native bootstrap), the
+`tools/hf-reference/provenance.json`, the 36 pure-Java tests (no native bootstrap), the
 accepted prompt grammar record, and the correction of the earlier sentinel assumption
 (terminal display stripping; findings §6.8). Non-goals held: no native-pin change, no
 generated-binding edit, no loader and no RoPE kernel — those are later WPs.

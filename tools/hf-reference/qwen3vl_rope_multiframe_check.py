@@ -33,14 +33,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import qwen3vl_probe as probe
-from qwen3vl_wp3_prompt import rederive_rope_all
+from qwen3vl_wp3_prompt import CONFIG_FIELDS, rederive_rope_all
 
-CONFIG_FIELDS = {
-    "image": "image_token_id",
-    "video": "video_token_id",
-    "vision_start": "vision_start_token_id",
-    "vision_end": "vision_end_token_id",
-}
 AXIS_NAMES = ("t", "h", "w")
 
 # (name, segments): a segment is ("text", n) -- n text tokens -- or

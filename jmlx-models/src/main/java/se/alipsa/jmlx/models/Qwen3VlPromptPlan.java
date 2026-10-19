@@ -160,29 +160,25 @@ record Qwen3VlPromptPlan(
 
   /**
    * The shared RoPE coordinate all three axes take at one decode step: the logical cache position
-   * plus this plan's delta. A negative result is rejected: decoding before the expanded prompt is
-   * fully prefilled has no valid coordinate.
+   * plus this plan's delta. Decoding before the expanded prompt is fully prefilled has no valid
+   * coordinate, so a cache position inside the expanded prompt is rejected.
    *
-   * @param cachePosition the logical cache position of the decode step; must be non-negative
+   * @param cachePosition the logical cache position of the decode step; must be at least {@link
+   *     #expandedLength()}
    * @return the coordinate to use on all three axes
    */
   public int ropePositionAt(int cachePosition) {
     if (cachePosition < 0) {
       throw new IllegalArgumentException("cachePosition must be non-negative: " + cachePosition);
     }
-    int position = Math.addExact(cachePosition, positionDelta);
-    if (position < 0) {
+    if (cachePosition < expandedLength()) {
       throw new IllegalArgumentException(
-          "RoPE position at cache position "
+          "cachePosition "
               + cachePosition
-              + " is negative: "
-              + position
-              + " (delta "
-              + positionDelta
-              + "); decode starts at cache position "
+              + " is inside the expanded prompt: decode starts at cache position "
               + expandedLength());
     }
-    return position;
+    return Math.addExact(cachePosition, positionDelta);
   }
 
   private static int[] requireAxis(int[] axis, String name, int expandedLength) {

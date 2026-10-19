@@ -655,7 +655,14 @@ no extra tokens.
   checked: an image run, cursor advance or coordinate that would overflow a signed 32-bit
   integer is rejected, and a grid that extends past the expanded prompt is rejected as a
   geometry/prompt mismatch — both before any array is written (the bounds-check ordering was
-  verified and fixed this session).
+  verified and fixed this session). The t > 1 (multi-frame / video frame) coordinate path —
+  T = base + frame index while H/W restart per frame — is implemented in both the Python
+  re-derivation (`qwen3vl_wp3_prompt.rederive_rope_all`) and the planner; since the pinned
+  WP3 golden is t = 1 only, the opt-in script
+  `tools/hf-reference/qwen3vl_rope_multiframe_check.py` (pinned venv, never Gradle-invoked,
+  no golden output) cross-checks the re-derivation against the real `get_rope_index` on
+  synthetic grids with t = 1, 2, 3 and 5 plus a two-image prompt with a text run between the
+  images, requiring exact equality of all three position axes and the delta.
 - **Plan record** (`Qwen3VlPromptPlan`, mirroring 7.3a's `SmolVlmPromptPlan`): owned copies of
   the original and expanded IDs, one contiguous `Qwen3VlImagePlacement` (start + count) per
   image in prompt order, the three position axes and the delta. The constructor rejects axes of
@@ -694,7 +701,7 @@ no extra tokens.
     spans and deltas against the pinned WP1 probe golden, plus a string-level re-expansion and
     re-tokenization round-trip and a model `get_rope_index` comparison, exiting non-zero on any
     drift.
-  - `Qwen3VlPromptExpanderTest` (`jmlx-models`): 33 pure-Java tests (no native bootstrap, no
+  - `Qwen3VlPromptExpanderTest` (`jmlx-models`): pure-Java tests (no native bootstrap, no
     Tier-B download) over the golden's cases, the `resolve` match/mismatch/missing-token paths
     against the synthetic fixture `jmlx-models/src/test/resources/qwen3vl-tokens/tokenizer.json`
     (the four sentinel spellings at local IDs 10/11/12/13, `PROVENANCE.md` alongside) and

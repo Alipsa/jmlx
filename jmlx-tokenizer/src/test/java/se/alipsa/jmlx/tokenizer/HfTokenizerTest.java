@@ -92,6 +92,15 @@ class HfTokenizerTest {
   }
 
   @Test
+  void tokenIdIsANeutralVocabularyLookupWithoutSpecialTokenSemantics() {
+    HfTokenizer tokenizer = HfTokenizer.fromFile(fixture("qwen-style.tokenizer.json"));
+    assertEquals(OptionalInt.of(13), tokenizer.tokenId("low"));
+    assertEquals(OptionalInt.of(15), tokenizer.tokenId("the"));
+    assertThrows(TokenizerException.class, () -> tokenizer.tokenId("not-a-token"));
+    assertEquals(OptionalInt.empty(), tokenizer.tokenId(null));
+  }
+
+  @Test
   void decodeSkipsAnAboveVocabIdInsteadOfAbortingTheWholeSequence() {
     // e.g. Qwen2.5's config.json vocab_size (152064) exceeds its tokenizer vocab (151665) -- a
     // sampled logit can legitimately land in that gap. qwen-style.tokenizer.json's ids top out at

@@ -274,6 +274,26 @@ public final class HfTokenizer {
   }
 
   /**
+   * Performs a plain exact name-to-ID lookup over this tokenizer's vocabulary, with no BOS/EOS or
+   * other special-token role semantics and no {@code tokenizer_config.json} consultation. Use this
+   * for ordinary vocabulary entries (for example added tokens such as vision sentinels); prefer the
+   * role-specific overloads when the token's meaning comes from configuration. {@code null} returns
+   * empty; an unknown non-null token throws.
+   *
+   * @param token vocabulary token name
+   * @return empty if {@code token} is null; otherwise its resolved id
+   */
+  public OptionalInt tokenId(String token) {
+    if (token == null) {
+      return OptionalInt.empty();
+    }
+    if (!vocabulary.hasToken(token)) {
+      throw new TokenizerException("HfTokenizer: no vocabulary entry for token '" + token + "'");
+    }
+    return OptionalInt.of(vocabulary.idOf(token));
+  }
+
+  /**
    * Returns the tokenizer's contiguous id range. This is not the model's output-head size; obtain
    * that from the checkpoint's {@code config.json}.
    *

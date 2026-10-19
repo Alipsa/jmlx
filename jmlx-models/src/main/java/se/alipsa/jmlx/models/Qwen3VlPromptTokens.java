@@ -114,7 +114,8 @@ record Qwen3VlPromptTokens(
 
   private static int resolveRole(
       HfTokenizer tokenizer, String sentinel, int configId, String role) {
-    int resolved = tokenizer.eosTokenId(sentinel).getAsInt();
+    // The sentinels are ordinary vocabulary entries, not EOS role tokens.
+    int resolved = tokenizer.tokenId(sentinel).getAsInt();
     if (resolved != configId) {
       throw new IllegalArgumentException(
           "the "

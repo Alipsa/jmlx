@@ -212,9 +212,12 @@ class Qwen3VlPromptExpanderTest {
     assertArrayEquals(new int[] {0, 1, 1, 1, 2, 2, 2, 4, 5, 6, 7, 7, 9}, plan.heightPositions());
     assertArrayEquals(new int[] {0, 1, 2, 3, 1, 2, 3, 4, 5, 6, 7, 8, 9}, plan.widthPositions());
     assertEquals(-3, plan.positionDelta());
-    // Decode continues from the logical cache position plus the delta, never the KV length.
+    // Decode continues from the logical cache position plus the delta, never the KV length,
+    // and only at or after the expanded prompt's finished position.
     assertEquals(10, plan.ropePositionAt(13));
-    assertEquals(9, plan.ropePositionAt(12));
+    assertEquals(
+        "cachePosition 12 is inside the expanded prompt: decode starts at cache position 13",
+        assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(12)).getMessage());
   }
 
   @Test
@@ -228,7 +231,10 @@ class Qwen3VlPromptExpanderTest {
     assertEquals(List.of(), plan.images());
     assertEquals(0, plan.totalFeatureRows());
     assertArrayEquals(new int[0], plan.featureDestinations());
-    assertEquals(0, plan.ropePositionAt(0));
+    assertEquals(3, plan.ropePositionAt(3));
+    assertEquals(
+        "cachePosition 0 is inside the expanded prompt: decode starts at cache position 3",
+        assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(0)).getMessage());
   }
 
   @Test
@@ -795,7 +801,7 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
-  void theDecodeContinuationRejectsNegativePositions() {
+  void theDecodeContinuationRejectsCachePositionsBeforePrefill() {
     Qwen3VlPromptPlan plan =
         Qwen3VlPromptExpander.expand(
             new int[] {START, IMAGE, END, 7, START, IMAGE, END},
@@ -805,8 +811,7 @@ class Qwen3VlPromptExpanderTest {
         "cachePosition must be non-negative: -1",
         assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(-1)).getMessage());
     assertEquals(
-        "RoPE position at cache position 2 is negative: -1 (delta -3); decode starts at cache "
-            + "position 13",
+        "cachePosition 2 is inside the expanded prompt: decode starts at cache position 13",
         assertThrows(IllegalArgumentException.class, () -> plan.ropePositionAt(2)).getMessage());
   }
 

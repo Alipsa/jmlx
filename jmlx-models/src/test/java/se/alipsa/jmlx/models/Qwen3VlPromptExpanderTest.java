@@ -278,7 +278,7 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
-  void aCompleteVideoWrapperReceivesTheVideoError() {
+  void completeVideoWrapperReceivesTheVideoError() {
     // START/VIDEO/END is a complete video wrapper: the start-token check must not hide the
     // video error behind the less helpful malformed-wrapper message.
     IllegalArgumentException failure =
@@ -290,7 +290,7 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
-  void aVideoTokenInsideOtherPositionsOfImageWrappersReceivesTheVideoError() {
+  void videoTokenInsideImageWrapperReceivesTheVideoError() {
     // A video token in the third (or fourth, with a trailing end) position of an image wrapper
     // must report the video error, not the malformed-wrapper error the grammar check would emit.
     for (int[] prompt : new int[][] {{START, IMAGE, VIDEO}, {START, IMAGE, VIDEO, END}}) {
@@ -507,7 +507,7 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
-  void aMultiFrameImagePlanTakesPerFrameTRoPECoordinates() {
+  void multiFrameImagePlanTakesPerFrameTemporalCoordinates() {
     // Production preprocessing currently rejects gridT != 1 (Qwen3VlGeometryPlan), so this
     // test calls the planner directly to pin its multi-frame contract ahead of that.
     // The reference's single_image_t2 case: vision grid (2, 4, 4) with merge 2 (the LLM grid

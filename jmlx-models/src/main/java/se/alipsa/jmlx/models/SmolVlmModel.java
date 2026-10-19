@@ -198,8 +198,9 @@ public final class SmolVlmModel implements TextGenerationModel {
   }
 
   private static int special(HfTokenizer tokenizer, String name) {
-    // The sentinels are ordinary vocabulary entries, not configured special tokens, so this is a
-    // neutral name-to-ID lookup; the checks below independently require a declared special marker.
+    // The sentinels are ordinary vocabulary entries, not role tokens configured in
+    // tokenizer_config.json, so this is a neutral name-to-ID lookup; the checks below independently
+    // require a declared special marker.
     int id = tokenizer.tokenId(name).orElseThrow();
     if (!tokenizer.decode(List.of(id), true).isEmpty()
         || !tokenizer.encode(name, false).equals(List.of(id))) {

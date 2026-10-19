@@ -563,6 +563,37 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
+  void resolveSkipsTheVideoLookupWhenTheConfigDeclaresNoVideoToken(@TempDir Path tempDir)
+      throws Exception {
+    // The config's -1 must not require the video sentinel in the vocabulary at all: it must
+    // resolve through a fixture variant that has no video token added.
+    HfTokenizer noVideoTokenizer = fixtureTokenizerMissingAddedToken(VIDEO, tempDir);
+    Qwen3VlPromptTokens resolved =
+        Qwen3VlPromptTokens.resolve(noVideoTokenizer, IMAGE, -1, START, END);
+    assertEquals(new Qwen3VlPromptTokens(IMAGE, -1, START, END), resolved);
+    // The -1 also resolves against the full fixture, where the video sentinel is present: the
+    // config's declaration wins over the vocabulary.
+    assertEquals(
+        new Qwen3VlPromptTokens(IMAGE, -1, START, END),
+        Qwen3VlPromptTokens.resolve(fixtureTokenizer(), IMAGE, -1, START, END));
+    // The other three roles still resolve and cross-check with the config while the video
+    // role is absent from it.
+    for (String role : List.of("image", "vision start", "vision end")) {
+      int configImage = role.equals("image") ? 99 : IMAGE;
+      int configStart = role.equals("vision start") ? 99 : START;
+      int configEnd = role.equals("vision end") ? 99 : END;
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  Qwen3VlPromptTokens.resolve(
+                      noVideoTokenizer, configImage, -1, configStart, configEnd));
+      assertTrue(failure.getMessage().contains(role), role + ": " + failure.getMessage());
+      assertTrue(failure.getMessage().contains("99"), role + ": " + failure.getMessage());
+    }
+  }
+
+  @Test
   void theFixtureDecodesEachSentinelIdBackToItsContractConstant() throws Exception {
     HfTokenizer tokenizer = fixtureTokenizer();
     assertEquals(Qwen3VlPromptTokens.IMAGE_TOKEN_CONTENT, tokenizer.decode(List.of(IMAGE), false));

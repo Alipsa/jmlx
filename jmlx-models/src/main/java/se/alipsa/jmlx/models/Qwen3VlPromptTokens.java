@@ -84,11 +84,13 @@ record Qwen3VlPromptTokens(
    * tokenizer's name-to-ID direction, in the order image, video, vision start, vision end. A
    * sentinel that is not a vocabulary token fails the load (the tokenizer's own exception is left
    * to propagate), and a sentinel whose resolved ID differs from the config's declaration for that
-   * role is rejected rather than silently overridden.
+   * role is rejected rather than silently overridden. The video sentinel is the one exception: a
+   * config video token ID of -1 (the checkpoint declares no video token) resolves to the same -1
+   * without ever looking the video spelling up in the vocabulary.
    *
    * @param tokenizer the model's tokenizer; null is rejected
    * @param configImageTokenId the outer config's image token ID
-   * @param configVideoTokenId the outer config's video token ID
+   * @param configVideoTokenId the outer config's video token ID, or -1 when it declares none
    * @param configVisionStartTokenId the outer config's vision start token ID
    * @param configVisionEndTokenId the outer config's vision end token ID
    * @return the resolved, cross-checked token set
@@ -103,7 +105,12 @@ record Qwen3VlPromptTokens(
       int configVisionEndTokenId) {
     Objects.requireNonNull(tokenizer, "tokenizer");
     int image = resolveRole(tokenizer, IMAGE_TOKEN_CONTENT, configImageTokenId, "image");
-    int video = resolveRole(tokenizer, VIDEO_TOKEN_CONTENT, configVideoTokenId, "video");
+    // -1 is the record's "no video token" convention: a config that declares none must not be
+    // required to have a video sentinel in its vocabulary.
+    int video =
+        configVideoTokenId == -1
+            ? -1
+            : resolveRole(tokenizer, VIDEO_TOKEN_CONTENT, configVideoTokenId, "video");
     int start =
         resolveRole(
             tokenizer, VISION_START_TOKEN_CONTENT, configVisionStartTokenId, "vision start");

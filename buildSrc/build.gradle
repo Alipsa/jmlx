@@ -41,6 +41,8 @@ test {
 checkstyle {
     toolVersion = '13.10.0'
     configFile = file('../config/checkstyle/checkstyle.xml')
+    // Same zero-tolerance policy as the main build's subprojects block.
+    maxWarnings = 0
 }
 
 spotless {

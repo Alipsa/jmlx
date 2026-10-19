@@ -289,6 +289,20 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
+  void aVideoTokenInsideOtherPositionsOfImageWrappersReceivesTheVideoError() {
+    // A video token in the third (or fourth, with a trailing end) position of an image wrapper
+    // must report the video error, not the malformed-wrapper error the grammar check would emit.
+    for (int[] prompt : new int[][] {{START, IMAGE, VIDEO}, {START, IMAGE, VIDEO, END}}) {
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Qwen3VlPromptExpander.expand(prompt, tokens(), List.of()));
+      assertEquals(
+          "prompt contains the video token (ID 11); video is not supported", failure.getMessage());
+    }
+  }
+
+  @Test
   void anUndeclaredVideoIdIsAnOrdinaryToken() {
     Qwen3VlPromptPlan plan =
         Qwen3VlPromptExpander.expand(new int[] {1, VIDEO, 2}, tokens(-1), List.of());

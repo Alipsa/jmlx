@@ -80,16 +80,20 @@ def rederive_rope_all(
     """Independent re-derivation of the 4.57.6 get_rope_index image path.
 
     Encodes the exact algorithm for N images in prompt order: text runs get
-    all three axes equal (arange + st_idx); image runs get T = base, H =
-    base + h_idx (rows of llm_w), W = base + w_idx with base = st_idx +
-    text_len and llm grid = (t, h/merge, w/merge); st advances past the run;
-    every block starts at the previous block's maximum plus one; the delta is
-    the largest coordinate plus one minus the sequence length.
+    all three axes equal (arange + st_idx); an image's llm grid is
+    (t, h/merge, w/merge) and its t * lh * lw tokens get T = base + f for
+    every token of frame f, while H = base + h_idx (rows of llm_w) and
+    W = base + w_idx restart per frame, with base = st_idx + text_len -- the
+    reference's (t, h, w) index stack flattened t-major (see the arange/expand
+    construction at modular_qwen3_vl.py:939-943, shared with the video path);
+    st advances past the whole run (t * lh * lw); every block starts at the
+    previous block's maximum plus one; the delta is the largest coordinate
+    plus one minus the sequence length.
     """
     positions: list[list[int]] = [[], [], []]
     st = 0
     for t, h, w in grids:
-        lh, lw = h // merge, w // merge
+        lt, lh, lw = t, h // merge, w // merge
         ed = input_ids.index(image_token_id, st)
         text_len = ed - st
         st_idx = max(max(axis) for axis in positions) + 1 if positions[0] else 0
@@ -97,12 +101,13 @@ def rederive_rope_all(
             for axis in positions:
                 axis.append(st_idx + i)
         base = st_idx + text_len
-        for hi in range(lh):
-            for wi in range(lw):
-                positions[0].append(base + 0)
-                positions[1].append(base + hi)
-                positions[2].append(base + wi)
-        st = ed + lh * lw
+        for frame in range(lt):
+            for hi in range(lh):
+                for wi in range(lw):
+                    positions[0].append(base + frame)
+                    positions[1].append(base + hi)
+                    positions[2].append(base + wi)
+        st = ed + lt * lh * lw
     if st < len(input_ids):
         st_idx = max(max(axis) for axis in positions) + 1 if positions[0] else 0
         for i in range(len(input_ids) - st):
@@ -341,6 +346,10 @@ def main() -> None:
                 rope_self, ids_tensor, grid_tensor, None, attention_mask=attention_mask)
             actual = [[int(v) for v in row] for row in position_ids[:, 0].tolist()]
             delta = int(rope_deltas[0][0].item())
+            # The golden contains only t = 1 (single-frame) image grids, so
+            # rederive_rope_all's multi-frame (t > 1) coordinates are verified
+            # by logic against the pinned reference's get_rope_index, not by
+            # golden coverage.
             expected = rederive_rope_all(expanded, grids, img_proc.merge_size, tokens["image"])
             probe.check_facts(name, "position_ids", actual, expected["position_ids"],
                               "get_rope_index != independent re-derivation")

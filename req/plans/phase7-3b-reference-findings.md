@@ -655,7 +655,11 @@ no extra tokens.
   checked: an image run, cursor advance or coordinate that would overflow a signed 32-bit
   integer is rejected, and a grid that extends past the expanded prompt is rejected as a
   geometry/prompt mismatch — both before any array is written (the bounds-check ordering was
-  verified and fixed this session).
+  verified and fixed this session). The t > 1 (multi-frame / video frame) coordinate path —
+  T = base + frame index while H/W restart per frame — is implemented and cross-checked by
+  logic against the reference in both the Python re-derivation
+  (`qwen3vl_wp3_prompt.rederive_rope_all`) and the planner, but the pinned WP3 golden is
+  t = 1 only, so no golden case exercises it.
 - **Plan record** (`Qwen3VlPromptPlan`, mirroring 7.3a's `SmolVlmPromptPlan`): owned copies of
   the original and expanded IDs, one contiguous `Qwen3VlImagePlacement` (start + count) per
   image in prompt order, the three position axes and the delta. The constructor rejects axes of

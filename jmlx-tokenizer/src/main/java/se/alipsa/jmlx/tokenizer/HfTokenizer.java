@@ -284,13 +284,7 @@ public final class HfTokenizer {
    * @return empty if {@code token} is null; otherwise its resolved id
    */
   public OptionalInt tokenId(String token) {
-    if (token == null) {
-      return OptionalInt.empty();
-    }
-    if (!vocabulary.hasToken(token)) {
-      throw new TokenizerException("HfTokenizer: no vocabulary entry for token '" + token + "'");
-    }
-    return OptionalInt.of(vocabulary.idOf(token));
+    return vocabularyTokenId(token, "HfTokenizer: no vocabulary entry for token");
   }
 
   /**
@@ -316,12 +310,16 @@ public final class HfTokenizer {
   }
 
   private OptionalInt configuredTokenId(String token) {
+    return vocabularyTokenId(
+        token, "HfTokenizer: no vocabulary entry for configured special token");
+  }
+
+  private OptionalInt vocabularyTokenId(String token, String missingEntryMessage) {
     if (token == null) {
       return OptionalInt.empty();
     }
     if (!vocabulary.hasToken(token)) {
-      throw new TokenizerException(
-          "HfTokenizer: no vocabulary entry for configured special token '" + token + "'");
+      throw new TokenizerException(missingEntryMessage + " '" + token + "'");
     }
     return OptionalInt.of(vocabulary.idOf(token));
   }

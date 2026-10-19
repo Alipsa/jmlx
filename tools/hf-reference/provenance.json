@@ -82,7 +82,8 @@
     "chat-smolvlm.json": "775aaf27cf4138182165fbfd8d57512ae9e2256560df11ab5e6e935a1d029c6f",
     "smolvlm-tier-b-logits.json": "ab8f1fe12b3ef1a318eb329c97a04abc2021e0e0a2fe45547aa1a19cddee8d22",
     "qwen3-vl-2b-wp1-probe.json": "10cd4a4bd06a07f7e67d9a1739a66053f35300cda75c91c58e2448b1f8bc206b",
-    "qwen3-vl-2b-wp1-slow-fast-logits.json": "f19ab7458ac2754e78689eafc9470545cefd223a423d2509fcd8645afe9ae749"
+    "qwen3-vl-2b-wp1-slow-fast-logits.json": "f19ab7458ac2754e78689eafc9470545cefd223a423d2509fcd8645afe9ae749",
+    "qwen3-vl-wp3-prompt.json": "34be92ef482f537652016c1d107e88a1af51e48bd0cbee2799ba930f8fc4e0b9"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",

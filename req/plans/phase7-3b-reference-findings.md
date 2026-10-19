@@ -213,8 +213,10 @@ shortest_edge 4,096}, `Qwen3VLVideoProcessor`, mean/std [0.5, 0.5, 0.5].
 ### 3.8 `chat_template.json` (5,502 B, sha `6f8a6a55…`)
 
 Single `chat_template` field (5,292 B, sha
-`3636d0f0bd6bef02654cdffdc447b79cb2cef8ab02cc75267345946291a489e4`), Jinja with the
-`<img></img>` placeholder and `{{ image }}` loop; **byte-identical to the 8B artifact's
+`3636d0f0bd6bef02654cdffdc447b79cb2cef8ab02cc75267345946291a489e4`), Jinja whose `{{ image }}`
+loop renders each image as a three-token wrapper — one unexpanded <|image_pad|> sentinel flanked
+by the <|vision_start|> and <|vision_end|> sentinels (their real spellings, hex-verified, in §6.8);
+**byte-identical to the 8B artifact's
 `chat_template.jinja`** (§8.4). `tools/jmlx-jinja` already renders this template (existing
 `ChatTemplateRenderer` path; no new template machinery needed).
 
@@ -590,6 +592,118 @@ no extra tokens.
   `[32, 10876, 374, 13, 13]` (HF reference, float32, deterministic single-threaded).
 - Case wall-clock at generation time: 1.538 s / 1.557 s (whole case incl. model load) —
   recorded here only; wall-clock fields are excluded from the pinned golden.
+
+### 6.8 Token contract, prompt grammar and position planner (WP3, 2026-10-19)
+
+- **Token contract.** The four prompt-side sentinels are real added tokens of the pinned artifact
+  (present in `tokenizer.json`'s `added_tokens` and `tokenizer_config.json`'s
+  `added_tokens_decoder`), all spelled `<` + `|` + name + `|` + `>` (byte-verified with `od -c`
+  this session):
+  | sentinel | bytes (hex) | outer config key (§3.1) | ID |
+  |---|---|---|---:|
+  | <|vision_start|> | `3c 7c 76 69 73 69 6f 6e 5f 73 74 61 72 74 7c 3e` | `vision_start_token_id` | 151652 |
+  | <|vision_end|> | `3c 7c 76 69 73 69 6f 6e 5f 65 6e 64 7c 3e` | `vision_end_token_id` | 151653 |
+  | <|image_pad|> | `3c 7c 69 6d 61 67 65 5f 70 61 64 7c 3e` | `image_token_id` | 151655 |
+  | <|video_pad|> | `3c 7c 76 69 64 65 6f 5f 70 61 64 7c 3e` | `video_token_id` (rejected role) | 151656 |
+
+  The chat template renders each image as exactly three tokens — 151652, 151655, 151653: one
+  unexpanded image sentinel wrapped by the vision start/end sentinels. Hex-verified from the WP1
+  probe golden's `rendered` field (sha `c58e38df…`, §6.1): the rendered prompt contains
+  `…user\n`<|vision_start|><|image_pad|><|vision_end|>`Describe the image in one short sentence.` — exactly
+  one wrapper, one image sentinel inside it, and no newline between the wrapper and the following
+  text.
+- **Accepted pretokenized grammar** (`Qwen3VlPromptExpander.expand` / `scanGrammar`): each image
+  is exactly one unexpanded <|image_pad|> inside one `vision start, image, vision end` triple;
+  the wrapper's start and end tokens are retained; wrappers match the provided image geometries
+  in prompt order; all other tokens are free. Rejections are `IllegalArgumentException`s with
+  these exact id-based messages (N/M = the offending index or count; the ID values are the
+  pinned artifact's declared IDs):
+  | case | exact message |
+  |---|---|
+  | video marker present | `prompt contains the video token (ID 151656); video is not supported` |
+  | bare image token outside a wrapper | `bare image token (ID 151655) at index N is not wrapped in vision start/end tokens` |
+  | consecutive image tokens (a pre-expanded run) | `consecutive image tokens (ID 151655) at indices N and N+1 look like an already-expanded placeholder; pass the unexpanded prompt` |
+  | unmatched vision start (incl. nested) | `vision start token (ID 151652) at index N is not the start of a complete vision start, image, vision end wrapper` |
+  | unmatched vision end | `unmatched vision end token (ID 151653) at index N` |
+  | wrapper/geometry count mismatch | `prompt contains N image placeholder(s) but M image(s) were provided` |
+
+  A repeated image-token run is never guessed to represent one image or several — it is always
+  the consecutive-token rejection above. An empty prompt with no images is a valid degenerate
+  plan, and every plan re-verifies its feature destinations before use.
+- **jmlx-tokenizer directions.** All three directions work for all four sentinels, verified via
+  jshell against the pinned artifact: `decode(151655)` returns the image sentinel, encoding the
+  image sentinel returns the single ID `[151655]` (no BPE split), and `eosTokenId` on the image
+  sentinel returns 151655; the same holds for the other three. Chat-render-then-tokenize already
+  yields the clean unexpanded ID stream of §6.1, so WP6 loading needs no expansion workaround.
+  The load-time resolution is `Qwen3VlPromptTokens.resolve(tokenizer, configImageTokenId,
+  configVideoTokenId, configVisionStartTokenId, configVisionEndTokenId)`: each sentinel spelling
+  is resolved name→ID through the tokenizer (a sentinel that is not a vocabulary token fails the
+  load with the tokenizer's own exception, left to propagate), and a resolved ID that disagrees
+  with the outer config's declaration for that role is rejected, not silently overridden. No
+  numeric ID is hard-coded in production code — the constants carry only the sentinel spellings;
+  the golden and the tests carry the pinned values.
+- **Position planner** (`Qwen3VlPositionPlanner`): a faithful port of the pinned reference's
+  `Qwen3VLModel.get_rope_index` image path (transformers 4.57.6, `modular_qwen3_vl.py:858-955`).
+  Per image, in prompt order: the text run `[st, ed)` takes equal coordinates
+  `st_idx + arange(text_len)` on all three axes; the image run of `llm_t·llm_h·llm_w` tokens
+  takes T constant, H row-major by `llm_w` and W fastest, each offset by `st_idx + text_len`;
+  the cursor advances to `ed + imageLen`; `st_idx` is the previous block's maximum plus one
+  (zero for the first block) and trailing text resumes the same way. The delta is the largest
+  coordinate plus one minus the sequence length — negative for image prompts, zero for
+  text-only. Decode continues from the logical cache position plus this delta on all three axes
+  (`Qwen3VlPromptPlan.ropePositionAt`), never from a retained-KV length. All arithmetic is
+  checked: an image run, cursor advance or coordinate that would overflow a signed 32-bit
+  integer is rejected, and a grid that extends past the expanded prompt is rejected as a
+  geometry/prompt mismatch — both before any array is written (the bounds-check ordering was
+  verified and fixed this session).
+- **Plan record** (`Qwen3VlPromptPlan`, mirroring 7.3a's `SmolVlmPromptPlan`): owned copies of
+  the original and expanded IDs, one contiguous `Qwen3VlImagePlacement` (start + count) per
+  image in prompt order, the three position axes and the delta. The constructor rejects axes of
+  the wrong length or holding a negative coordinate, out-of-bounds or non-increasing feature
+  destinations, and a delta that is not the largest coordinate plus one minus the expanded
+  length. The checked cache budget mirrors the 7.3a pattern: `requiredCacheCapacity` is zero for
+  zero-new-token requests, otherwise `expandedLength + maxNewTokens − 1`, and
+  `requireCacheCapacity(policy, maxNewTokens)` asks the policy to guarantee it (clamped to
+  `Integer.MAX_VALUE` so unbounded and sliding caches accept it), naming both lengths in the
+  rejection.
+- **Evidence.**
+  - Golden `tools/hf-reference/goldens/qwen3-vl-wp3-prompt.json` (schema
+    `jmlx-phase7-3b-wp3-qwen3vl-prompt-v1`, sha256
+    `34be92ef482f537652016c1d107e88a1af51e48bd0cbee2799ba930f8fc4e0b9`, digest-pinned in
+    `tools/hf-reference/provenance.json` and enforced by `verifyHfReferenceGoldens`): 8 cases ×
+    2 `add_generation_prompt` variants (false/true), each recording the rendered prompt and its
+    sha, the unexpanded and expanded IDs, the image geometries, the three position axes and the
+    delta:
+    | case | unexpanded | expanded | delta | merged rows |
+    |---|---|---|---:|---|
+    | text_only | 9 / 12 | 9 / 12 | 0 | — |
+    | single_image_256x256 | 16 / 19 | 79 / 82 | −56 | [64] |
+    | single_image_64x32 | 16 / 19 | 87 / 90 | −60 | [72] |
+    | image_after_text | 16 / 19 | 79 / 82 | −56 | [64] |
+    | text_between_images | 24 / 27 | 158 / 161 | −116 | [64, 72] |
+    | two_images_adjacent | 16 / 19 | 150 / 153 | −116 | [64, 72] |
+    | three_images | 18 / 21 | 223 / 226 | −176 | [64, 72, 72] |
+    | system_multi_turn | 44 / 47 | 115 / 118 | −60 | [72] |
+
+    The WP1-consistent values 82/−56 and 90/−60 are the **expanded** prompt lengths of the
+    `add_generation_prompt: true` variants (matching the WP1 probe golden's
+    `processor.cases.….prompt_length_after_expansion` and `model.cases.….rope.delta`); unexpanded
+    there are 19/16.
+  - Generated by `tools/hf-reference/qwen3vl_wp3_prompt.py` (opt-in Python oracle, never
+    Gradle-invoked): its in-run gates cross-check the rendered shas, expansion lengths, image
+    spans and deltas against the pinned WP1 probe golden, plus a string-level re-expansion and
+    re-tokenization round-trip and a model `get_rope_index` comparison, exiting non-zero on any
+    drift.
+  - `Qwen3VlPromptExpanderTest` (`jmlx-models`): 33 pure-Java tests (no native bootstrap, no
+    Tier-B download) over the golden's cases, the `resolve` match/mismatch/missing-token paths
+    against the synthetic fixture `jmlx-models/src/test/resources/qwen3vl-tokens/tokenizer.json`
+    (the four sentinel spellings at local IDs 10/11/12/13, `PROVENANCE.md` alongside) and
+    hand-computed position, grammar, overflow and cache-budget cases.
+  - **History correction (2026-10-19).** An earlier session recorded the sentinels as
+    `!IMAGE` / `!VIDEO` / `<img>` / `</img>` and claimed the tokens were absent from the
+    tokenizer, unresolvable or BPE-split by jmlx-tokenizer. All of that was wrong: an artifact
+    of this machine's terminal display stripping the 0x7c byte from displayed text (the true
+    sentinels contain it). The hex-verified spellings above supersede those claims.
 
 ## 7. Fast-vs-slow preprocessing divergence (measured once, both sides)
 

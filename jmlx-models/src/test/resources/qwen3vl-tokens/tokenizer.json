@@ -1,0 +1,102 @@
+{
+  "normalizer": {
+    "type": "NFC"
+  },
+  "pre_tokenizer": {
+    "type": "Sequence",
+    "pretokenizers": [
+      {
+        "type": "Split",
+        "pattern": {
+          "Regex": "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+        },
+        "behavior": "Isolated",
+        "invert": false
+      },
+      {
+        "type": "ByteLevel",
+        "add_prefix_space": false,
+        "trim_offsets": false,
+        "use_regex": false
+      }
+    ]
+  },
+  "post_processor": {
+    "type": "ByteLevel",
+    "add_prefix_space": false,
+    "trim_offsets": false,
+    "use_regex": false
+  },
+  "decoder": {
+    "type": "ByteLevel",
+    "add_prefix_space": false,
+    "trim_offsets": false,
+    "use_regex": false
+  },
+  "model": {
+    "type": "BPE",
+    "ignore_merges": false,
+    "vocab": {
+      "<": 0,
+      "|": 1,
+      ">": 2,
+      "i": 3,
+      "m": 4,
+      "a": 5,
+      "g": 6,
+      "e": 7,
+      "_": 8,
+      "p": 9,
+      "d": 14,
+      "v": 15,
+      "o": 16,
+      "s": 17,
+      "t": 18,
+      "n": 19,
+      "r": 20,
+      "<|image_pad|>": 10,
+      "<|video_pad|>": 11,
+      "<|vision_start|>": 12,
+      "<|vision_end|>": 13
+    },
+    "merges": []
+  },
+  "added_tokens": [
+    {
+      "id": 10,
+      "content": "<|image_pad|>",
+      "special": true,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "single_word": false
+    },
+    {
+      "id": 11,
+      "content": "<|video_pad|>",
+      "special": true,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "single_word": false
+    },
+    {
+      "id": 12,
+      "content": "<|vision_start|>",
+      "special": true,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "single_word": false
+    },
+    {
+      "id": 13,
+      "content": "<|vision_end|>",
+      "special": true,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "single_word": false
+    }
+  ]
+}

@@ -25,6 +25,7 @@ package se.alipsa.jmlx.vision;
 public record SmolVlmGeometryPlan(
     int stage1Height, int stage1Width, int stage2Height, int stage2Width, int rows, int cols) {
 
+  /** Validates that the component values are mutually consistent (see the record Javadoc). */
   public SmolVlmGeometryPlan {
     if (stage1Height <= 0 || stage1Width <= 0) {
       throw new IllegalArgumentException(

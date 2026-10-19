@@ -844,9 +844,9 @@ public final class ImageDecoder {
     } else if (cid == 0x74455874) { // "tEXt"
       pngTextChunk(b, data, length, info);
     } else if (cid == 0x7A545874) { // "zTXt"
-      pngZTxtChunk(b, data, length, info);
+      pngZtxtChunk(b, data, length, info);
     } else if (cid == 0x69545874) { // "iTXt"
-      pngITxtChunk(b, data, length, info);
+      pngItxtChunk(b, data, length, info);
     }
   }
 
@@ -860,15 +860,15 @@ public final class ImageDecoder {
   private static void pngTextChunk(byte[] b, int data, int length, PngInfo info) {
     int end = data + length;
     int nul = indexOfByte(b, data, end);
-    int kEnd = nul >= 0 ? nul : end;
-    int vStart = nul >= 0 ? nul + 1 : end;
-    if (kEnd == data) {
+    int keyEnd = nul >= 0 ? nul : end;
+    int valueStart = nul >= 0 ? nul + 1 : end;
+    if (keyEnd == data) {
       return;
     }
-    if (equalsRegion(b, data, kEnd - data, EXIF_TEXT_KEYWORD)) {
-      info.exifPayload = Arrays.copyOfRange(b, vStart, end);
-    } else if (equalsRegion(b, data, kEnd - data, XMP_TEXT_KEYWORD)) {
-      info.xmpText = Arrays.copyOfRange(b, vStart, end);
+    if (equalsRegion(b, data, keyEnd - data, EXIF_TEXT_KEYWORD)) {
+      info.exifPayload = Arrays.copyOfRange(b, valueStart, end);
+    } else if (equalsRegion(b, data, keyEnd - data, XMP_TEXT_KEYWORD)) {
+      info.xmpText = Arrays.copyOfRange(b, valueStart, end);
     }
   }
 
@@ -878,12 +878,12 @@ public final class ImageDecoder {
    * incomplete zlib payload yields the reference's empty value, which is stored (the slot is set,
    * to a falsy value), like the reference's {@code v = b""} on {@code zlib.error}.
    */
-  private static void pngZTxtChunk(byte[] b, int data, int length, PngInfo info) {
+  private static void pngZtxtChunk(byte[] b, int data, int length, PngInfo info) {
     int end = data + length;
     int nul = indexOfByte(b, data, end);
-    int kEnd = nul >= 0 ? nul : end;
+    int keyEnd = nul >= 0 ? nul : end;
     int restStart = nul >= 0 ? nul + 1 : end;
-    if (kEnd == data) {
+    if (keyEnd == data) {
       return;
     }
     if (restStart < end && (b[restStart] & 0xFF) != 0) {
@@ -893,9 +893,9 @@ public final class ImageDecoder {
     if (value == null) {
       value = new byte[0];
     }
-    if (equalsRegion(b, data, kEnd - data, EXIF_TEXT_KEYWORD)) {
+    if (equalsRegion(b, data, keyEnd - data, EXIF_TEXT_KEYWORD)) {
       info.exifPayload = value;
-    } else if (equalsRegion(b, data, kEnd - data, XMP_TEXT_KEYWORD)) {
+    } else if (equalsRegion(b, data, keyEnd - data, XMP_TEXT_KEYWORD)) {
       info.xmpText = value;
     }
   }
@@ -910,7 +910,7 @@ public final class ImageDecoder {
    * ({@code cf} 1) must use comp method 0, and any inflate failure leaves the slots untouched, like
    * the reference's early returns.
    */
-  private static void pngITxtChunk(byte[] b, int data, int length, PngInfo info) {
+  private static void pngItxtChunk(byte[] b, int data, int length, PngInfo info) {
     int end = data + length;
     int nul1 = indexOfByte(b, data, end);
     if (nul1 < 0) {
@@ -931,8 +931,8 @@ public final class ImageDecoder {
     if (tkEnd < 0) {
       return;
     }
-    int vStart = tkEnd + 1;
-    byte[] value = Arrays.copyOfRange(b, vStart, end);
+    int valueStart = tkEnd + 1;
+    byte[] value = Arrays.copyOfRange(b, valueStart, end);
     if (cf != 0) {
       if (cm != 0) {
         return;

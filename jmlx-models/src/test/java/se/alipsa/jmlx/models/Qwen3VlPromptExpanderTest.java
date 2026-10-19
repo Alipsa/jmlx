@@ -277,6 +277,18 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
+  void aCompleteVideoWrapperReceivesTheVideoError() {
+    // START/VIDEO/END is a complete video wrapper: the start-token check must not hide the
+    // video error behind the less helpful malformed-wrapper message.
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Qwen3VlPromptExpander.expand(new int[] {START, VIDEO, END}, tokens(), List.of()));
+    assertEquals(
+        "prompt contains the video token (ID 11); video is not supported", failure.getMessage());
+  }
+
+  @Test
   void anUndeclaredVideoIdIsAnOrdinaryToken() {
     Qwen3VlPromptPlan plan =
         Qwen3VlPromptExpander.expand(new int[] {1, VIDEO, 2}, tokens(-1), List.of());

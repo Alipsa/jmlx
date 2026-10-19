@@ -122,10 +122,14 @@ final class Qwen3VlPromptExpander {
     for (int i = 0; i < ids.length; i++) {
       int id = ids[i];
       if (video >= 0 && id == video) {
-        throw new IllegalArgumentException(
-            "prompt contains the video token (ID " + id + "); video is not supported");
+        throw videoError(id);
       }
       if (id == start) {
+        // A start followed by the video token is a (malformed or complete) video wrapper: report
+        // the video error instead of the less helpful malformed-wrapper error.
+        if (video >= 0 && i + 1 < ids.length && ids[i + 1] == video) {
+          throw videoError(video);
+        }
         if (i + 2 >= ids.length || ids[i + 1] != image || ids[i + 2] != end) {
           throw new IllegalArgumentException(
               "vision start token (ID "
@@ -160,6 +164,11 @@ final class Qwen3VlPromptExpander {
       }
     }
     return wrappers;
+  }
+
+  private static IllegalArgumentException videoError(int id) {
+    return new IllegalArgumentException(
+        "prompt contains the video token (ID " + id + "); video is not supported");
   }
 
   private static int mergedTokens(int[] grid) {

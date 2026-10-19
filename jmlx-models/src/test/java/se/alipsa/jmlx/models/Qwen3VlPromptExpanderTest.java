@@ -506,6 +506,34 @@ class Qwen3VlPromptExpanderTest {
   }
 
   @Test
+  void aMultiFrameImagePlanTakesPerFrameTRoPECoordinates() {
+    // Production preprocessing currently rejects gridT != 1 (Qwen3VlGeometryPlan), so this
+    // test calls the planner directly to pin its multi-frame contract ahead of that.
+    // The reference's single_image_t2 case: vision grid (2, 4, 4) with merge 2 (the LLM grid
+    // (2, 2, 2)), wrapped in three text tokens, the vision start sentinel, the eight image
+    // sentinels, the vision end sentinel and two text tokens: 15 tokens in total.
+    Qwen3VlRopePlan plan =
+        Qwen3VlPositionPlanner.plan(
+            new int[] {
+              1000, 1001, 1002, START, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, IMAGE, END,
+              1003, 1004
+            },
+            tokens(),
+            List.of(new int[] {2, 2, 2}));
+    // The text run is 0..3 (the vision start sentinel counts as text); the image block at 4..11
+    // takes base 4: T is 4,4,4,4,5,5,5,5 by frame while H and W restart per frame, and the
+    // trailing text resumes at the block maximum (5) plus one.
+    assertArrayEquals(
+        new int[] {0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 7, 8}, plan.temporalPositions());
+    assertArrayEquals(
+        new int[] {0, 1, 2, 3, 4, 4, 5, 5, 4, 4, 5, 5, 6, 7, 8}, plan.heightPositions());
+    assertArrayEquals(
+        new int[] {0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 8}, plan.widthPositions());
+    // The block's largest coordinate (8) plus one minus the 15-token length: -6.
+    assertEquals(-6, plan.delta());
+  }
+
+  @Test
   void theTokensRecordValidatesItsIds() {
     assertEquals(new Qwen3VlPromptTokens(IMAGE, VIDEO, START, END), tokens());
     assertDoesNotThrow(() -> new Qwen3VlPromptTokens(IMAGE, -1, START, END));

@@ -304,9 +304,9 @@ that file. Checkstyle runs with `maxWarnings = 0` in both builds: the config rep
 `warning` severity, but any violation fails `check` (for `buildSrc`, run
 `./gradlew -p buildSrc check`; see below), the same as a Spotless difference. Fix a violation
 (rename, add the Javadoc) rather than leaving it. Never raise `maxWarnings`. Use a targeted
-suppression (the config supports `@SuppressWarnings`, `CHECKSTYLE.SUPPRESS:` comments and an
-optional `checkstyle-suppressions.xml`) only where a name is genuinely externally constrained,
-with a comment saying why. The generated jextract bindings under
+suppression (`@SuppressWarnings("checkstyle:<Check>")` or a
+`// CHECKSTYLE.SUPPRESS: <Check> for +N lines` comment) only where a name is genuinely externally
+constrained, with a comment saying why. The generated jextract bindings under
 `jmlx-ffi/src/main/generated/java` are exempt from both and must stay byte-identical to
 `scripts/regen-bindings.sh`'s output — never hand-edit them.
 `buildSrc` (shared Gradle build-logic helpers, e.g. `PublishedPomDependencies`) is its own isolated

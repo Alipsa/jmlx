@@ -86,6 +86,7 @@ class Qwen3VlPromptExpanderTest {
   @Test
   void goldenExpansionsAndPositionsMatchThePinnedReference() throws Exception {
     Qwen3VlPromptTokens tokens = goldenTokens();
+    int checked = 0;
     for (JsonNode caseNode : golden().required("cases")) {
       String caseName = caseNode.required("name").asString();
       for (var variant : caseNode.required("variants").properties()) {
@@ -116,13 +117,21 @@ class Qwen3VlPromptExpanderTest {
         assertArrayEquals(ints(positions.required("h")), plan.heightPositions(), name);
         assertArrayEquals(ints(positions.required("w")), plan.widthPositions(), name);
         assertEquals(value.required("delta").asInt(), plan.positionDelta(), name);
+        checked++;
       }
     }
+    assertEquals(
+        16,
+        checked,
+        "golden must contain exactly 16 case variants (8 cases x 2 add_generation_prompt "
+            + "variants): "
+            + goldenPath());
   }
 
   @Test
   void singleImageCasesReproduceTheWp1ProbeNumbers() throws Exception {
     Qwen3VlPromptTokens tokens = goldenTokens();
+    int checked = 0;
     for (String caseName : List.of("single_image_256x256", "single_image_64x32")) {
       JsonNode caseNode = caseByName(caseName);
       for (var variant : caseNode.required("variants").properties()) {
@@ -141,8 +150,14 @@ class Qwen3VlPromptExpanderTest {
           assertEquals(90, plan.expandedLength(), name);
           assertEquals(-60, plan.positionDelta(), name);
         }
+        checked++;
       }
     }
+    assertEquals(
+        2,
+        checked,
+        "golden must contain exactly 2 single-image add_generation_prompt_true variants: "
+            + goldenPath());
   }
 
   private static JsonNode caseByName(String name) throws Exception {

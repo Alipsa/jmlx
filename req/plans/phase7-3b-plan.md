@@ -339,6 +339,19 @@ cache position plus that request's delta. Do not derive them from retained KV le
 eviction. Test negative deltas, rectangular grids, text after an image, two different grids and
 text-only zero delta. Reject coordinate/arithmetic overflow before creating GPU arrays.
 
+**2026-10-19 WP3 status:** WP3 is accepted: the package-private pure expander plus the
+three-axis position planner (a faithful port of the pinned `get_rope_index` image path,
+transformers 4.57.6 `modular_qwen3_vl.py:858-955`), the token contract — the four real Qwen
+sentinels, hex-verified against the pinned artifact, with `Qwen3VlPromptTokens.resolve`
+resolving each sentinel name to its ID through the tokenizer and cross-checking it against the
+outer `config.json` ID (no hard-coded numeric IDs in production code) — the golden
+`tools/hf-reference/goldens/qwen3-vl-wp3-prompt.json` (8 cases * 2 `add_generation_prompt`
+variants, schema `jmlx-phase7-3b-wp3-qwen3vl-prompt-v1`) digest-pinned in
+`tools/hf-reference/provenance.json`, the 33 pure-Java tests (no native bootstrap), the
+accepted prompt grammar record, and the correction of the earlier sentinel assumption
+(terminal display stripping; findings §6.8). Non-goals held: no native-pin change, no
+generated-binding edit, no loader and no RoPE kernel — those are later WPs.
+
 ## 6. Core RoPE and decoder integration (WP4)
 
 Capture all existing Tier-A decoder prefill/decode raw float bits and exact greedy IDs before

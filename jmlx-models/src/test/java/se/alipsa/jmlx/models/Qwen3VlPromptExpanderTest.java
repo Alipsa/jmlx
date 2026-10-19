@@ -530,7 +530,7 @@ class Qwen3VlPromptExpanderTest {
         new int[] {0, 1, 2, 3, 4, 4, 5, 5, 4, 4, 5, 5, 6, 7, 8}, plan.heightPositions());
     assertArrayEquals(
         new int[] {0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 8}, plan.widthPositions());
-    // The block's largest coordinate (8) plus one minus the 15-token length: -6.
+    // The prompt's largest coordinate (8) plus one minus the 15-token length: -6.
     assertEquals(-6, plan.delta());
 
     // The reference's single_image_t5 case: vision grid (5, 4, 4) with merge 2 (the LLM grid
@@ -566,7 +566,7 @@ class Qwen3VlPromptExpanderTest {
           0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 9, 10, 11
         },
         t5Plan.widthPositions());
-    // The block's largest coordinate (8) plus one minus the 27-token length: -15.
+    // The prompt's largest coordinate (11) plus one minus the 27-token length: -15.
     assertEquals(-15, t5Plan.delta());
   }
 

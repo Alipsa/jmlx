@@ -208,7 +208,7 @@ class Qwen3VlPromptExpanderTest {
     assertArrayEquals(new int[] {0, 1, 2, 3, 3, 3, 3, 3, 3, 6, 7, 8}, plan.temporalPositions());
     assertArrayEquals(new int[] {0, 1, 2, 3, 3, 3, 4, 4, 4, 6, 7, 8}, plan.heightPositions());
     assertArrayEquals(new int[] {0, 1, 2, 3, 4, 5, 3, 4, 5, 6, 7, 8}, plan.widthPositions());
-    // The block's largest coordinate (8) plus one minus the 12-token length: -3.
+    // The prompt's largest coordinate (8) plus one minus the 12-token length: -3.
     assertEquals(-3, plan.positionDelta());
   }
 

@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -531,6 +532,42 @@ class Qwen3VlPromptExpanderTest {
         new int[] {0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 8}, plan.widthPositions());
     // The block's largest coordinate (8) plus one minus the 15-token length: -6.
     assertEquals(-6, plan.delta());
+
+    // The reference's single_image_t5 case: vision grid (5, 4, 4) with merge 2 (the LLM grid
+    // (5, 2, 2)), the same wrapper shape with the twenty image sentinels: 27 tokens in total.
+    // Here the frame count (5) is the block's largest dimension, so a block maximum computed
+    // without it would shift the trailing text to 6..8 and the delta to -18.
+    int[] t5Ids = new int[27];
+    t5Ids[0] = 1000;
+    t5Ids[1] = 1001;
+    t5Ids[2] = 1002;
+    t5Ids[3] = START;
+    Arrays.fill(t5Ids, 4, 24, IMAGE);
+    t5Ids[24] = END;
+    t5Ids[25] = 1003;
+    t5Ids[26] = 1004;
+    Qwen3VlRopePlan t5Plan =
+        Qwen3VlPositionPlanner.plan(t5Ids, tokens(), List.of(new int[] {5, 2, 2}));
+    // The text run is again 0..3; the image block at 4..23 takes base 4: T is 4, 5, 6, 7, 8
+    // by frame (five frames of four tokens) while H and W restart per frame, and the trailing
+    // text resumes at the block maximum (8) plus one.
+    assertArrayEquals(
+        new int[] {
+          0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 9, 10, 11
+        },
+        t5Plan.temporalPositions());
+    assertArrayEquals(
+        new int[] {
+          0, 1, 2, 3, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 9, 10, 11
+        },
+        t5Plan.heightPositions());
+    assertArrayEquals(
+        new int[] {
+          0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 9, 10, 11
+        },
+        t5Plan.widthPositions());
+    // The block's largest coordinate (8) plus one minus the 27-token length: -15.
+    assertEquals(-15, t5Plan.delta());
   }
 
   @Test

@@ -787,11 +787,13 @@ mode with explicit `MLX_ENABLE_TF32=1` / `=0`) PASSES at the base commit with a 
    `[24,20,20]`: H owns `1, 4, …, 58` (20 frequencies), W owns `2, 5, …, 59` (20), T owns
    the remaining 24 — a T-starting round-robin `T H W T H W …` with a terminal run of four
    T frequencies. The implementation realizes the selection with static owner masks: three
-   float32 weight vectors of length `rotaryDims/2` (1.0 at the owned frequencies, 0.0
-   elsewhere, derived from the sections at construction) give
-   `freqs_t = freqsT·wT + freqsH·wH + freqsW·wW` — a bit-identical copy for non-negative
-   finite frequencies (multiply by 1.0/0.0 and add in float32 are exact there) using only
-   the existing facades.
+   0/1 weight vectors of length `rotaryDims/2` (1 at the owned frequencies, 0 elsewhere,
+   derived from the sections at construction) select, per (token, frequency) on the CPU
+   before any array is written, the owned row's position — the same copy the mask expression
+   `freqsT·wT + freqsH·wH + freqsW·wW` is a bit-identical copy of for non-negative finite
+   frequencies (multiply by 1.0/0.0 and add in float32 are exact there) — so each `freqs_t`
+   element is still exactly one float32 multiply of the same two operands (owned position ·
+   `invFreq[i]`) using only the existing facades.
 3. `emb = cat((freqs_t, freqs_t), −1)` → per token `[rotaryDims]` (128 pinned, = head_dim).
 4. `cos = cos(emb) · attention_scaling`, `sin = sin(emb) · attention_scaling`, computed in
    float32; `attention_scaling = 1.0` for `rope_type: default` (the pinned artifact), so
@@ -830,11 +832,12 @@ source compatibility for exhaustive consumer switches (plan §6).
   element ≥ 0, Σ ≥ 1 (rotaryDims is even by construction); `prepare` — batch ≥ 1, sequence ≥
   1, exactly 3 rows, each row's length == batch·sequence (computed in `long` with overflow
   checked before use), and no negative coordinate (rejected). Frequencies/cos/sin are
-  computed on every `prepare` call: no position-derived state is cached. The computation,
-  in `scope`, follows the frozen order: three float32 position arrays (built directly from
-  the int rows — the exact cast) × the `[1, rotaryDims/2]` `invFreq` array by broadcast
-  multiply → the per-axis `[B·T, rotaryDims/2]` freqs; owner-mask selection → `freqs_t`;
-  concatenate → `emb`; `MLXOps.cos`/`MLXOps.sin` → FLOAT32 arrays reshaped to
+  computed on every `prepare` call: no position-derived state is cached. The computation
+  follows the frozen order: one `[B·T, rotaryDims/2]` float32 position matrix (the
+  owner-mask-selected row per frequency, built directly from the int rows — the exact
+  cast) × the `[1, rotaryDims/2]` `invFreq` array by a single broadcast multiply →
+  `freqs_t` (bit-identical to the per-axis ×-then-owner-mask selection, step 2);
+  concatenate → `emb`; `MLXOps.cos`/`MLXOps.sin` in `scope` → FLOAT32 arrays reshaped to
   `[batch, 1, sequence, rotaryDims]` (broadcastable over the heads axis).
 - `public final class MultiAxisRotation` — the per-step rotation state one `prepare`
   produces and every layer of that step shares, computed once per step and threaded exactly

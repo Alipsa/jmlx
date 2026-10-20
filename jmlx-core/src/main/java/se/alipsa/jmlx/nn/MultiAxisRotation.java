@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.EnumMap;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -25,11 +26,15 @@ public final class MultiAxisRotation {
   private final MLXArray cos;
   private final MLXArray sin;
   private final int rotaryDims;
+  private final EnumMap<DType, MLXArray> castCos;
+  private final EnumMap<DType, MLXArray> castSin;
 
   MultiAxisRotation(MLXArray cos, MLXArray sin, int rotaryDims) {
     this.cos = cos;
     this.sin = sin;
     this.rotaryDims = rotaryDims;
+    this.castCos = new EnumMap<>(DType.class);
+    this.castSin = new EnumMap<>(DType.class);
   }
 
   /** Returns the float32 cosine table, {@code [batch, 1, sequence, rotaryDims]}. */
@@ -100,9 +105,11 @@ public final class MultiAxisRotation {
    * IllegalArgumentException} and runs before any array is written: {@code x} is non-null with rank
    * 4, its batch and sequence axes match the prepared rotation, and {@code rotaryDims} does not
    * exceed the head dimension. Then the cos/sin tables are cast to {@code x.dtype()} (frozen step
-   * 5) and, in the input dtype, {@code out = x * cos + rotate_half(x) * sin} on the {@code
-   * rotaryDims} prefix with the untouched tail concatenated back (frozen step 6). Every built array
-   * allocates per the usual {@code scopeOf} rule (the innermost related scope of its operands).
+   * 5; a no-op for the FLOAT32 model, and otherwise cached per dtype in this per-step rotation so
+   * the step's repeated q/k rotates share one cast pair per dtype) and, in the input dtype, {@code
+   * out = x * cos + rotate_half(x) * sin} on the {@code rotaryDims} prefix with the untouched tail
+   * concatenated back (frozen step 6). Every built array allocates per the usual {@code scopeOf}
+   * rule (the innermost related scope of its operands).
    */
   public MLXArray rotate(MLXArray x) {
     if (x == null) {
@@ -116,8 +123,8 @@ public final class MultiAxisRotation {
     }
     validate(shape[0], shape[2], shape[3]);
     DType dtype = x.dtype();
-    MLXArray cosInput = cos.dtype() == dtype ? cos : MLX.astype(cos, dtype);
-    MLXArray sinInput = sin.dtype() == dtype ? sin : MLX.astype(sin, dtype);
+    MLXArray cosInput = cos.dtype() == dtype ? cos : castTable(cos, dtype, castCos);
+    MLXArray sinInput = sin.dtype() == dtype ? sin : castTable(sin, dtype, castSin);
     int[] prefixStop = shape.clone();
     prefixStop[3] = rotaryDims;
     MLXArray prefix = rotaryDims == shape[3] ? x : MLXShape.slice(x, new int[4], prefixStop);
@@ -136,5 +143,21 @@ public final class MultiAxisRotation {
     tailStart[3] = rotaryDims;
     return MLXShape.concatenate(
         new MLXArray[] {out, MLXShape.slice(x, tailStart, shape.clone())}, 3);
+  }
+
+  /**
+   * The {@code dtype} view of one of the float32 tables, cached in this per-step rotation: the
+   * first rotate in a non-table dtype builds the cast (allocated into the table's own scope,
+   * exactly where an uncached per-call cast would land) and every later rotate of the same dtype
+   * reuses it, so a step's 2 × layers q/k rotates pay for one cast pair per dtype instead of one
+   * per call. The rotation lives for exactly one step, so the cache never outlives its tables.
+   */
+  private static MLXArray castTable(MLXArray table, DType dtype, EnumMap<DType, MLXArray> cache) {
+    MLXArray cast = cache.get(dtype);
+    if (cast == null) {
+      cast = MLX.astype(table, dtype);
+      cache.put(dtype, cast);
+    }
+    return cast;
   }
 }

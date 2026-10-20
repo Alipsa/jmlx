@@ -114,16 +114,17 @@ public final class MultiAxisRope {
    * tokens. All validation is {@link IllegalArgumentException} and runs before any MLX array is
    * written: {@code batch} and {@code sequence} are at least 1, {@code positions} has exactly 3
    * non-null rows, each row has length {@code batch * sequence} (computed in {@code long} so the
-   * product cannot overflow) and no coordinate is negative. The frozen compute order then runs in
-   * {@code scope}: three float32 position arrays of shape {@code [B*T, 1]} (built directly from the
-   * int rows, an exact cast) broadcast-multiplied against the {@code [1, rotaryDims/2]} {@code
-   * invFreq} array give the per-axis frequencies; the static owner masks select {@code freqs_t =
-   * freqsT * wT + freqsH * wH + freqsW * wW} (multiplying by the static 0/1 masks and adding in
-   * float32 is a bit-identical copy for non-negative finite frequencies); {@code emb =
-   * cat((freqs_t, freqs_t), -1)}; {@code MLXOps.cos}/{@code sin} in float32, with the attention
-   * scaling of 1.0 (the pinned {@code rope_type: default}) omitted as the identity on finite
-   * values; finally the two arrays are reshaped to {@code [batch, 1, sequence, rotaryDims]},
-   * broadcastable over the heads axis.
+   * product cannot overflow) and no coordinate is negative. The frozen compute order then runs: the
+   * static owner masks select, per (token, frequency) on the CPU before any array is written, the
+   * owned row's position, giving one float32 position matrix of shape {@code [B*T, rotaryDims/2]}
+   * (the exact int-to-float casts) that is broadcast-multiplied once against the {@code [1,
+   * rotaryDims/2]} {@code invFreq} array in {@code scope} -- a single float32 multiply per element
+   * with the same two operands the frozen mask expression {@code freqs_t = freqsT * wT + freqsH *
+   * wH + freqsW * wW} copies, which is a bit-identical copy for non-negative finite frequencies
+   * (findings §6.9, step 2); {@code emb = cat((freqs_t, freqs_t), -1)}; {@code MLXOps.cos}/{@code
+   * sin} in float32, with the attention scaling of 1.0 (the pinned {@code rope_type: default})
+   * omitted as the identity on finite values; finally the two arrays are reshaped to {@code [batch,
+   * 1, sequence, rotaryDims]}, broadcastable over the heads axis.
    */
   public MultiAxisRotation prepare(MLXScope scope, int batch, int sequence, int[][] positions) {
     if (batch < 1) {
@@ -158,29 +159,34 @@ public final class MultiAxisRope {
     int flat = (int) tokens;
     int half = rotaryDims / 2;
     MLXArray invFreqArray = MLX.array(scope, invFreq, new int[] {1, half});
-    MLXArray weightT = MLX.array(scope, ownerT, new int[] {1, half});
-    MLXArray weightH = MLX.array(scope, ownerH, new int[] {1, half});
-    MLXArray weightW = MLX.array(scope, ownerW, new int[] {1, half});
-    MLXArray freqsT = axisFrequencies(scope, positions[0], flat, invFreqArray);
-    MLXArray freqsH = axisFrequencies(scope, positions[1], flat, invFreqArray);
-    MLXArray freqsW = axisFrequencies(scope, positions[2], flat, invFreqArray);
-    MLXArray selected =
-        MLXOps.add(
-            MLXOps.add(MLXOps.multiply(freqsT, weightT), MLXOps.multiply(freqsH, weightH)),
-            MLXOps.multiply(freqsW, weightW));
-    MLXArray emb = MLXShape.concatenate(new MLXArray[] {selected, selected}, 1);
+    MLXArray owned =
+        MLX.array(scope, ownedPositions(positions, flat, half), new int[] {flat, half});
+    MLXArray freqs = MLXOps.multiply(owned, invFreqArray);
+    MLXArray emb = MLXShape.concatenate(new MLXArray[] {freqs, freqs}, 1);
     MLXArray cos = MLXShape.reshape(MLXOps.cos(emb), new int[] {batch, 1, sequence, rotaryDims});
     MLXArray sin = MLXShape.reshape(MLXOps.sin(emb), new int[] {batch, 1, sequence, rotaryDims});
     return new MultiAxisRotation(cos, sin, rotaryDims);
   }
 
-  private static MLXArray axisFrequencies(MLXScope scope, int[] row, int flat, MLXArray invFreq) {
-    float[] data = new float[flat];
+  /**
+   * The per-token owned-position matrix in row-major {@code [flat, half]} order: element {@code (i,
+   * f)} is the exact float32 cast of {@code positions[owner(f)][i]}, selected on the CPU with the
+   * static owner masks before any array is written. This is the bit-identical copy the frozen mask
+   * expression {@code freqsT * wT + freqsH * wH + freqsW * wW} makes for non-negative finite
+   * frequencies (multiplying by the 0/1 masks and adding in float32 is exact there), so multiplying
+   * this matrix once by {@code invFreq} performs the same per-element float32 multiply of the same
+   * two operands as the frozen per-axis broadcast-multiplies (findings §6.9, step 2).
+   */
+  private float[] ownedPositions(int[][] positions, int flat, int half) {
+    float[] out = new float[flat * half];
     for (int i = 0; i < flat; i++) {
-      data[i] = (float) row[i];
+      for (int f = 0; f < half; f++) {
+        int coordinate =
+            ownerT[f] != 0f ? positions[0][i] : ownerH[f] != 0f ? positions[1][i] : positions[2][i];
+        out[i * half + f] = (float) coordinate;
+      }
     }
-    MLXArray positions = MLX.array(scope, data, new int[] {flat, 1});
-    return MLXOps.multiply(positions, invFreq);
+    return out;
   }
 
   /**

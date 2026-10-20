@@ -1078,8 +1078,8 @@ the acceptance commit (Unit 4 — `VisualFeatureInjection` and `VisualFeatureInj
   matching jshell twin was not re-run at acceptance (its component was last touched in
   Unit 2, where its per-case max absolute error was ≤ 2.4e-7 against the 1e-5
   threshold); both sides were re-run 2026-10-20 in the locked environments after the
-  review rounds, against the restructured `prepare` (review round 2), the row-length
-  overflow guard (review round 3) and the byte owner-table refactor (review round 4),
+  review rounds, against the restructured `prepare` (review round 2), the position-matrix
+  size overflow guard (review round 3) and the byte owner-table refactor (review round 4),
   head `bf69877` — Python exit 0, all 7 cases passed;
   the jshell twin exits 0 with every case OK and self-consistent, max absolute error
   2.38e-7 against the 1e-5 threshold.

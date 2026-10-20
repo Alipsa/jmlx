@@ -84,6 +84,37 @@ class SingleRowDecodeEquivalenceTest {
             AttentionMask.slidingWindow(scope, keyLength - 1, 0, 1, keyLength, keyLength);
         assertArrayEquals(asFloat(batched), asFloat(twoD));
       }
+      // Windowed batch-1 unpadded rows, parameterized as {queryStart, keyStart, queryLength,
+      // keyLength, window}: a prefill longer than the window, a one-token decode over an evicted
+      // cache (keyStart > 0) whose retained keys all sit within the window, and multi-token steps
+      // over evicted caches where the window actually masks keys.
+      for (int[] row :
+          new int[][] {
+            {0, 0, 9, 9, 4},
+            {8, 5, 1, 4, 4},
+            {8, 5, 2, 5, 4},
+            {14, 11, 3, 6, 4}
+          }) {
+        int queryStart = row[0];
+        int keyStart = row[1];
+        int queryLength = row[2];
+        int keyLength = row[3];
+        int window = row[4];
+        MLXArray batched =
+            AttentionMask.batched(
+                scope,
+                new int[] {queryStart},
+                new int[] {keyStart},
+                new int[] {queryLength},
+                queryLength,
+                keyLength,
+                window);
+        MLXArray twoD =
+            AttentionMask.slidingWindow(
+                scope, queryStart, keyStart, queryLength, keyLength, window);
+        assertArrayEquals(new int[] {1, 1, queryLength, keyLength}, batched.shape());
+        assertArrayEquals(asFloat(batched), asFloat(twoD));
+      }
     }
   }
 

@@ -910,8 +910,8 @@ delegating to the new one with `null` rotation/hook so its graph is unchanged:
   the single-row path with a non-null `rotation` or `postBlockHook` routes each block
   through the batch-aware overloads with
   `validLengths = {sequenceWidth}` and a `[1,1,T,L]` batched mask (elementwise the same as
-  the 2-D mask for B = 1; `cache.append(k, v, {T})` is the same arithmetic as
-  `cache.append(k, v)` for a uniform row — Unit 2 pins both against the `KVCache`
+  the 2-D mask for B = 1, windowed and evicted included; `cache.append(k, v, {T})` is the same
+  arithmetic as `cache.append(k, v)` for a uniform row — Unit 2 pins both against the `KVCache`
   contract). The hook-only route (no rotation, a no-op hook) is pinned bit-exact
   end-to-end against the old path at the logits by
   `DecoderSeamTest.decodeWithNoOpPostBlockHookMatchesOldSingleRowPath` (full-float32; the

@@ -23,11 +23,13 @@ import se.alipsa.jmlx.memory.MLXScope;
  * java.util.List)} as the single shared gather-index algorithm — feature row {@code f} overwrites
  * exactly the {@code f}-th destination and every other row reads itself — so one helper serves both
  * compositions. All validation is checked before any MLX array is written, and every
- * non-destination row comes back bit-identical (the masked add is an exact {@code + 0.0} per
- * element there). The destinations follow the existing semantics: a flat, strictly increasing list
- * in {@code [0, L)} whose runs are the images' contiguous placeholder ranges in prompt order. WP6's
- * {@code Qwen3VlModel} is the consumer; the class is package-private on purpose, with no new public
- * API.
+ * non-destination row comes back unchanged: the replacement leaves its untouched rows
+ * bit-identical, and the masked add is an exact {@code + 0.0} per element there, so its
+ * non-destination rows come back numerically identical (note IEEE {@code -0.0 + 0.0 = +0.0}, so a
+ * negative-zero element in a non-destination row is normalised to {@code +0.0}). The destinations
+ * follow the existing semantics: a flat, strictly increasing list in {@code [0, L)} whose runs are
+ * the images' contiguous placeholder ranges in prompt order. WP6's {@code Qwen3VlModel} is the
+ * consumer; the class is package-private on purpose, with no new public API.
  */
 final class VisualFeatureInjection {
 
@@ -60,8 +62,9 @@ final class VisualFeatureInjection {
    * Masked residual add: the frozen {@code zero = MLX.zeros(scope, hidden.shape(), hidden.dtype());
    * source = concatenate([zero, features], 1); mask = takeAxis(source, gather, 1); updated =
    * MLXOps.add(hidden, mask)} composition that adds one DeepStack level into exactly the
-   * destination rows, leaving every other row bit-identical through the exact {@code + 0.0} per
-   * element.
+   * destination rows, leaving every other row numerically identical through the exact {@code + 0.0}
+   * per element (note IEEE {@code -0.0 + 0.0 = +0.0}, so a negative-zero element in an untouched
+   * row is normalised to {@code +0.0}).
    *
    * @param scope the scope the zero pad and gather indices are allocated in; the results land per
    *     the standard scope rule (innermost scope among the operands)

@@ -19,12 +19,13 @@ import se.alipsa.jmlx.memory.MLXScope;
  * phase7-3b-reference-findings.md §6.9): the row-gather replacement and the masked residual add.
  * Every float32 case builds the expected result by hand in Java and compares it at zero tolerance
  * after {@code toFloatArray()} forces evaluation: the destination rows must equal the feature rows
- * bit-for-bit, every other row must equal the original row bit-for-bit, and the masked add's exact
- * {@code + 0.0} on the non-image rows stays observable (the zero-feature case uses exactly
- * representable values such as {@code -1.5f}, where any non-exact add would change bits). The
- * float32 cases are tagged {@code full-float32} so they select into {@code
- * :jmlx-models:float32GoldenTest} with {@code MLX_ENABLE_TF32=0}; the rejection cases run in the
- * ordinary {@code :jmlx-models:test} task and expect {@link IllegalArgumentException} from the
+ * bit-for-bit, every other row must equal the original row, and the masked add's exact {@code +
+ * 0.0} on the non-image rows stays observable (the zero-feature case uses exactly representable
+ * values such as {@code -1.5f}, where any non-exact add would change bits; the negative-zero case
+ * records that an untouched {@code -0.0} is normalised to {@code +0.0} while every non-zero value
+ * keeps its exact bits). The float32 cases are tagged {@code full-float32} so they select into
+ * {@code :jmlx-models:float32GoldenTest} with {@code MLX_ENABLE_TF32=0}; the rejection cases run in
+ * the ordinary {@code :jmlx-models:test} task and expect {@link IllegalArgumentException} from the
  * helper's own validation, before any MLX array is written.
  */
 @EnabledIfNativeAvailable
@@ -187,6 +188,47 @@ class VisualFeatureInjectionTest {
           VisualFeatureInjection.addMaskedFeatures(
               run, array(run, hidden), features, new int[] {2, 3});
       assertArrayEquals(flat(hidden), updated.toFloatArray());
+    }
+  }
+
+  /**
+   * The masked add's exact {@code + 0.0} on a non-image row is an identity numerically, not
+   * bit-for-bit: an IEEE {@code -0.0} element is normalised to {@code +0.0} (raw bits {@code
+   * 0x00000000}), while the row's non-zero values — negative non-zero included — keep their exact
+   * bits.
+   */
+  @Test
+  @Tag("full-float32")
+  void maskedAddNormalisesNegativeZeroInAnUntouchedRow() {
+    try (MLXScope run = scope.newChild()) {
+      int length = 8;
+      float[][] hidden = rows(length, 0f);
+      hidden[5][0] = -0.0f;
+      hidden[5][1] = -1.5f;
+      hidden[5][2] = 2.25f;
+      hidden[5][3] = -0.125f;
+      assertEquals(0x80000000, Float.floatToIntBits(hidden[5][0]));
+      float[][] features = rows(2, 10f);
+      int[] destinations = {3, 4};
+      MLXArray updated =
+          VisualFeatureInjection.addMaskedFeatures(
+              run, array(run, hidden), array(run, features), destinations);
+      float[] out = updated.toFloatArray();
+      float[] expected = new float[length * HIDDEN];
+      for (int r = 0; r < length; r++) {
+        boolean destination = destinations[0] == r || destinations[1] == r;
+        for (int c = 0; c < HIDDEN; c++) {
+          expected[r * HIDDEN + c] =
+              destination ? hidden[r][c] + features[r - destinations[0]][c] : hidden[r][c] + 0.0f;
+        }
+      }
+      assertArrayEquals(expected, out);
+      // The -0.0 element is normalised to +0.0: raw bits 0x00000000, not 0x80000000.
+      assertEquals(0x00000000, Float.floatToIntBits(out[5 * HIDDEN]));
+      // The row's non-zero values keep their exact bits.
+      assertEquals(Float.floatToIntBits(-1.5f), Float.floatToIntBits(out[5 * HIDDEN + 1]));
+      assertEquals(Float.floatToIntBits(2.25f), Float.floatToIntBits(out[5 * HIDDEN + 2]));
+      assertEquals(Float.floatToIntBits(-0.125f), Float.floatToIntBits(out[5 * HIDDEN + 3]));
     }
   }
 

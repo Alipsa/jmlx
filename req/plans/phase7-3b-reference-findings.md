@@ -964,8 +964,9 @@ joins) — no new public core API.
   ```
   `gather` is the same index algorithm as the replacement (strictly increasing
   destinations → row `L + f`), so one helper serves both; the add matches the reference's
-  masked clone + add + write-back (§6.6) and leaves every non-image row bit-identical
-  (an exact `+ 0.0` per element).
+  masked clone + add + write-back (§6.6) and leaves every non-image row numerically
+  identical (an exact `+ 0.0` per element; IEEE `-0.0 + 0.0 = +0.0`, so a negative-zero
+  element in a non-image row is normalised to `+0.0`).
 
 **Old-path bit-identity proof plan (the WP4 exit gate).**
 

@@ -53,9 +53,10 @@ public final class MultiAxisRotation {
    * sequence axes of the heads to be rotated must match the prepared rotation, and the rotated
    * prefix must fit within the head width. All validation is {@link IllegalArgumentException} and
    * nothing is allocated. {@link #rotate} delegates its shape checks here, and the {@code
-   * DecoderAttention}/{@code DecoderModel} rotation entries call it before any projection, mask or
-   * embedding builds a graph node, so a mismatched rotation is rejected before any array is
-   * written.
+   * DecoderAttention}/{@code DecoderModel} rotation entries call {@link #validateAgainst(int, int,
+   * int, int)} -- which additionally requires the rotation's own width to equal the decoder's
+   * configured rotary width -- before any projection, mask or embedding builds a graph node, so a
+   * mismatched rotation is rejected before any array is written.
    */
   public void validate(int batch, int sequence, int headDim) {
     int[] cosShape = cos.shape();
@@ -73,6 +74,25 @@ public final class MultiAxisRotation {
     }
     if (rotaryDims > headDim) {
       throw new IllegalArgumentException("rotaryDims exceeds head dimension");
+    }
+  }
+
+  /**
+   * The width-aware rotation preflight the {@code DecoderAttention}/{@code DecoderModel} rotation
+   * entries run at their earliest point: {@link #validate(int, int, int)} plus the requirement that
+   * the rotation's own width equals the decoder's configured rotary width (the partial-rotary width
+   * from the rope spec or model descriptor) -- a rotation prepared from a different mrope-section
+   * sum would otherwise pass the prefix-fit check and silently rotate a different head prefix. All
+   * validation is {@link IllegalArgumentException} and nothing is allocated.
+   */
+  public void validateAgainst(int batch, int sequence, int headDim, int configuredRotaryDims) {
+    validate(batch, sequence, headDim);
+    if (rotaryDims != configuredRotaryDims) {
+      throw new IllegalArgumentException(
+          "rotation rotaryDims "
+              + rotaryDims
+              + " does not match the configured rotary width "
+              + configuredRotaryDims);
     }
   }
 

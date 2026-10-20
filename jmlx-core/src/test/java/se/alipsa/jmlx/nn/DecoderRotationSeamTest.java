@@ -261,7 +261,9 @@ class DecoderRotationSeamTest {
    * The rotation overload must reject a missing {@code validLengths} (it always runs the batch
    * bookkeeping), a null rotation, a wrong number of lengths and a rotation prepared for a
    * different sequence or batch or with a prefix wider than the head -- all {@link
-   * IllegalArgumentException} before any array is written, the cache left untouched.
+   * IllegalArgumentException} before any array is written, the cache left untouched -- and a
+   * rotation whose prefix fits the head but differs from the attention's configured rotary width
+   * (the case the prefix-fit check alone would let through).
    */
   @Test
   void rotationForwardRejectsInvalidArguments() {
@@ -310,6 +312,17 @@ class DecoderRotationSeamTest {
                 IllegalArgumentException.class,
                 () -> fixture.attention.forward(x, cache, null, new int[] {3}, wideRotation));
         assertTrue(wideHead.getMessage().contains("rotaryDims exceeds head dimension"));
+        // A rotation prepared from a different mrope-section sum: its prefix (6) fits the head
+        // (8) but differs from the attention's configured rotary width (HEAD_DIM == 8), so only
+        // the width-mismatch check rejects it, and it does so before any projection is built.
+        MultiAxisRope narrowRope = new MultiAxisRope(10_000f, new int[] {1, 1, 1}); // rotaryDims 6
+        MultiAxisRotation narrowRotation =
+            narrowRope.prepare(run, 1, 3, new int[][] {{0, 1, 2}, {1, 2, 3}, {2, 3, 4}});
+        IllegalArgumentException wrongWidth =
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> fixture.attention.forward(x, cache, null, new int[] {3}, narrowRotation));
+        assertTrue(wrongWidth.getMessage().contains("does not match the configured rotary width"));
         assertEquals(0, cache.nextPosition());
       }
     }

@@ -208,9 +208,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * replaces the stack's derived step frequencies with the request's own multi-axis rotation, and
    * {@code postBlockHook} fires after every block's residual output, before the final
    * normalization. The preflight, postflight, evaluation and poisoning invariants are the batched
-   * ones, unchanged. A non-null {@code rotation} is validated against the batch, the sequence width
-   * and the head dimension before the embedding lookup builds any graph node. The existing
-   * 4-argument overload delegates with {@code (null, null)} and keeps the identical graph.
+   * ones, unchanged. A non-null {@code rotation} is validated against the batch, the sequence
+   * width, the head dimension and the configured rotary width ({@link
+   * MultiAxisRotation#validateAgainst(int, int, int, int)}) before the embedding lookup builds any
+   * graph node. The existing 4-argument overload delegates with {@code (null, null)} and keeps the
+   * identical graph.
    */
   final MLXArray stepLogits(
       MLXArray tokenIds,
@@ -222,7 +224,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     int[][] before = preflightBatch(tokenIds, caches, validLengths);
     if (rotation != null) {
       // Reject a mismatched rotation before the embedding lookup builds any graph node.
-      rotation.validate(tokenIds.shape()[0], tokenIds.shape()[1], descriptor.headDim());
+      rotation.validateAgainst(
+          tokenIds.shape()[0], tokenIds.shape()[1], descriptor.headDim(), descriptor.rotaryDims());
     }
     try {
       MLXArray normalized =
@@ -415,7 +418,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * the request's own multi-axis rotation instead; a non-null {@code postBlockHook} is invoked
    * after every block's residual output and before the final {@code norm.forward} (see {@link
    * PostBlockHook}). The batched mask is the same in both cases. A non-null {@code rotation} is
-   * validated against the batch, the sequence width and the head dimension before the mask or any
+   * validated against the batch, the sequence width, the head dimension and the configured rotary
+   * width ({@link MultiAxisRotation#validateAgainst(int, int, int, int)}) before the mask or any
    * block builds a graph node. With {@code (null, null)} this runs the byte-identical stack the
    * 4-argument overload always ran: one frequency derivation at the same graph position, the same
    * block forwards and the same final normalization. This entry itself still neither evaluates nor
@@ -457,7 +461,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     int batch = validLengths.length;
     if (rotation != null) {
       // Reject a mismatched rotation before the batched mask or any block builds a graph node.
-      rotation.validate(batch, sequenceWidth, descriptor.headDim());
+      rotation.validateAgainst(batch, sequenceWidth, descriptor.headDim(), descriptor.rotaryDims());
     }
     int[] queryStarts = new int[batch];
     int[] keyStarts = new int[batch];
@@ -951,7 +955,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * The single-row decode step with request-supplied rotary state and post-block injection: the
    * same one-token and populated-cache validation as {@link #decode(MLXArray, List)}, then the
    * seam-carrying stack and the same postflight and tied projection. A non-null {@code rotation} is
-   * validated against the batch, the sequence width and the head dimension before the embedding
+   * validated against the batch, the sequence width, the head dimension and the configured rotary
+   * width ({@link MultiAxisRotation#validateAgainst(int, int, int, int)}) before the embedding
    * lookup builds any graph node. Package-private (like the other seam entries) so a {@link
    * DecodeStep} and the in-package seam tests can call it directly; production ordinary decoders
    * reach it through the 8-argument {@link #runStepLoop} delegation with {@code (null, null)} and
@@ -964,7 +969,8 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     }
     if (rotation != null) {
       // Reject a mismatched rotation before the embedding lookup builds any graph node.
-      rotation.validate(ids.shape()[0], ids.shape()[1], descriptor.headDim());
+      rotation.validateAgainst(
+          ids.shape()[0], ids.shape()[1], descriptor.headDim(), descriptor.rotaryDims());
     }
     MLXArray normalized = normalizedHiddenStates(ids, caches, rotation, postBlockHook);
     requirePostflight(caches);

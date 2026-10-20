@@ -203,7 +203,10 @@ public final class DecoderAttention extends CachedAttention {
    * keys are already rotated. {@code validLengths} is required: this path always runs the
    * batch-aware validation and per-row cache bookkeeping, which reduce to the single-row arithmetic
    * for a uniform B = 1 row (pinned by {@code SingleRowDecodeEquivalenceTest}). All validation is
-   * {@link IllegalArgumentException} before any array is written.
+   * {@link IllegalArgumentException} before any array is written, including the rotation's own
+   * width against this attention's configured {@code rotaryDims} ({@link
+   * MultiAxisRotation#validateAgainst(int, int, int, int)}): a rotation prepared from a different
+   * mrope-section sum is rejected up front rather than silently rotating a different head prefix.
    */
   public MLXArray forward(
       MLXArray x,
@@ -293,8 +296,9 @@ public final class DecoderAttention extends CachedAttention {
     MLXArray freqs;
     if (rotation != null) {
       // The rotation path rotates from its own cos/sin tables; no frequency array is derived.
-      // Validate the rotation's shape before any projection builds a graph node.
-      rotation.validate(batch, sequence, headDim);
+      // Validate the rotation's shape, and its width against this attention's configured rotary
+      // width, before any projection builds a graph node.
+      rotation.validateAgainst(batch, sequence, headDim, rotaryDims);
       freqs = null;
     } else {
       freqs = staticFreqs != null ? staticFreqs : stepFrequencies;

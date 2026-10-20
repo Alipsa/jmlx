@@ -3,6 +3,7 @@ package se.alipsa.jmlx.models;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -296,7 +297,11 @@ class DecoderSeamTest {
   /**
    * A rotation prepared for a different sequence width must be rejected by the seam entries before
    * any array is written: {@code stepLogits} rejects it before the embedding lookup, {@code decode}
-   * before its own embedding lookup, and the populated caches are left unadvanced.
+   * before its own embedding lookup, and the populated caches are left unadvanced. So must a
+   * rotation prepared from a different mrope-section sum whose prefix fits the head dimension but
+   * differs from the descriptor's configured rotary width: {@code stepLogits}, the embedding-start
+   * {@code decoderStack} and {@code decode} all reject it before the mask or any embedding lookup
+   * builds a graph node.
    */
   @Test
   void seamEntriesRejectWrongWidthRotationBeforeArraysAreWritten() {
@@ -313,6 +318,25 @@ class DecoderSeamTest {
             () -> model.stepLogits(ids, populated, new int[] {1}, null, wrongWidth, null));
         assertThrows(
             IllegalArgumentException.class, () -> model.decode(ids, populated, wrongWidth, null));
+        // A rotation prepared from a different mrope-section sum: its prefix (14) fits the llama
+        // head dimension (16) but differs from the descriptor's configured rotary width (16), so
+        // only the width-mismatch check rejects it -- at each seam entry, before any graph node.
+        MultiAxisRope narrowRope = new MultiAxisRope(10_000f, new int[] {4, 2, 1}); // rotaryDims 14
+        MultiAxisRotation wrongPrefix = narrowRope.prepare(gen, 1, 1, new int[][] {{4}, {4}, {4}});
+        MLXArray embeddings = assembled.embedding().forward(ids);
+        IllegalArgumentException wrongPrefixStepLogits =
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> model.stepLogits(ids, populated, new int[] {1}, null, wrongPrefix, null));
+        assertTrue(
+            wrongPrefixStepLogits
+                .getMessage()
+                .contains("does not match the configured rotary width"));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> model.decoderStack(embeddings, populated, new int[] {1}, 1, wrongPrefix, null));
+        assertThrows(
+            IllegalArgumentException.class, () -> model.decode(ids, populated, wrongPrefix, null));
         assertEquals(4, populated.getFirst().nextPosition());
       }
     }

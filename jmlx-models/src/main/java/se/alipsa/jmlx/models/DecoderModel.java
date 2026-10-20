@@ -19,6 +19,7 @@ import se.alipsa.jmlx.nn.EmbeddingLayer;
 import se.alipsa.jmlx.nn.KVCache;
 import se.alipsa.jmlx.nn.KVCachePolicy;
 import se.alipsa.jmlx.nn.Module;
+import se.alipsa.jmlx.nn.MultiAxisRotation;
 import se.alipsa.jmlx.nn.RMSNorm;
 import se.alipsa.jmlx.nn.UnaryLayer;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
@@ -169,6 +170,22 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   /**
+   * Injects a transform after each decoder block's residual output and before the final
+   * normalization, invoked with the block's 0-based layer index. Qwen3-VL DeepStack (WP6/WP7) uses
+   * this seam to add DeepStack level {@code i} after text block {@code i}, where the level's
+   * features come from the vision tower's {@code deepstack_visual_indexes[i]} (findings §6.6/§6.9).
+   * Those are different counters that must never be mixed: the vision extraction indices address
+   * blocks of the 24-block vision stack (pinned 2B: {@code [5, 11, 17]}), while the injection index
+   * addresses blocks of the 28-block text stack. The hook is invoked after <em>every</em> block's
+   * residual output; selecting which layers actually receive an injection is the hook's own job.
+   * Production ordinary decoders pass no-op or null hooks.
+   */
+  @FunctionalInterface
+  interface PostBlockHook {
+    MLXArray apply(int layerIndex, MLXArray hidden);
+  }
+
+  /**
    * Lazy batched step shared with the scheduler: runs one forward over a left-padded {@code [B,T]}
    * batch and returns the {@code [B,1,V]} logits of every row's last valid column, with <em>no</em>
    * evaluation and no cache poisoning bookkeeping beyond {@link #poisonBatchIfMutated}. Because
@@ -182,9 +199,30 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    */
   final MLXArray stepLogits(
       MLXArray tokenIds, List<KVCache> caches, int[] validLengths, EmbeddingHook hook) {
+    return stepLogits(tokenIds, caches, validLengths, hook, null, null);
+  }
+
+  /**
+   * The seam-carrying form of {@link #stepLogits(MLXArray, List, int[], EmbeddingHook)}: the
+   * embedding hook keeps its fourth, post-lookup/pre-scale position; a non-null {@code rotation}
+   * replaces the stack's derived step frequencies with the request's own multi-axis rotation, and
+   * {@code postBlockHook} fires after every block's residual output, before the final
+   * normalization. The preflight, postflight, evaluation and poisoning invariants are the batched
+   * ones, unchanged. The existing 4-argument overload delegates with {@code (null, null)} and keeps
+   * the identical graph.
+   */
+  final MLXArray stepLogits(
+      MLXArray tokenIds,
+      List<KVCache> caches,
+      int[] validLengths,
+      EmbeddingHook hook,
+      MultiAxisRotation rotation,
+      PostBlockHook postBlockHook) {
     int[][] before = preflightBatch(tokenIds, caches, validLengths);
     try {
-      MLXArray normalized = normalizedHiddenStatesBatch(tokenIds, caches, validLengths, hook);
+      MLXArray normalized =
+          normalizedHiddenStatesBatch(
+              tokenIds, caches, validLengths, hook, rotation, postBlockHook);
       requirePostflightBatch(caches, validLengths.length);
       int[] shape = normalized.shape();
       MLXArray last =
@@ -363,6 +401,28 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    */
   final MLXArray decoderStack(
       MLXArray embeddings, List<KVCache> caches, int[] validLengths, int sequenceWidth) {
+    return decoderStack(embeddings, caches, validLengths, sequenceWidth, null, null);
+  }
+
+  /**
+   * The seam-carrying form of {@link #decoderStack(MLXArray, List, int[], int)}: a non-null {@code
+   * rotation} skips the step frequency derivation and rotates each block's query and key heads from
+   * the request's own multi-axis rotation instead; a non-null {@code postBlockHook} is invoked
+   * after every block's residual output and before the final {@code norm.forward} (see {@link
+   * PostBlockHook}). The batched mask is the same in both cases. With {@code (null, null)} this
+   * runs the byte-identical stack the 4-argument overload always ran: one frequency derivation at
+   * the same graph position, the same block forwards and the same final normalization. This entry
+   * itself still neither evaluates nor poisons; embedding-start callers keep the {@link
+   * #preflightBatch(int, int, List, int[])}/{@link #poisonBatchIfMutated} and postflight/evaluation
+   * responsibilities of the 4- argument entry.
+   */
+  final MLXArray decoderStack(
+      MLXArray embeddings,
+      List<KVCache> caches,
+      int[] validLengths,
+      int sequenceWidth,
+      MultiAxisRotation rotation,
+      PostBlockHook postBlockHook) {
     int[] shape = embeddings.shape();
     if (shape.length != 3
         || shape[0] != validLengths.length
@@ -409,18 +469,39 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
             sequenceWidth,
             keyWidth,
             window == null ? 0 : window);
+    // The null-rotation path derives the step frequencies exactly once, in the same scope and at
+    // the same graph position as before the seam existed; the rotation path skips the derivation
+    // and rotates from the request's own cos/sin tables.
     MLXArray frequencies =
-        descriptor.rope().stepFrequencies(x.scope(), descriptor.rotaryDims(), maxEnding);
+        rotation == null
+            ? descriptor.rope().stepFrequencies(x.scope(), descriptor.rotaryDims(), maxEnding)
+            : null;
     for (int i = 0; i < layers.size(); i++) {
-      x = layers.get(i).forward(x, caches.get(i), mask, frequencies, validLengths);
+      x =
+          rotation == null
+              ? layers.get(i).forward(x, caches.get(i), mask, frequencies, validLengths)
+              : layers.get(i).forward(x, caches.get(i), mask, validLengths, rotation);
+      if (postBlockHook != null) {
+        x = postBlockHook.apply(i, x);
+      }
     }
     return norm.forward(x);
   }
 
   private MLXArray normalizedHiddenStatesBatch(
       MLXArray tokenIds, List<KVCache> caches, int[] validLengths, EmbeddingHook hook) {
+    return normalizedHiddenStatesBatch(tokenIds, caches, validLengths, hook, null, null);
+  }
+
+  private MLXArray normalizedHiddenStatesBatch(
+      MLXArray tokenIds,
+      List<KVCache> caches,
+      int[] validLengths,
+      EmbeddingHook hook,
+      MultiAxisRotation rotation,
+      PostBlockHook postBlockHook) {
     MLXArray x = decoderEmbeddings(tokenIds, hook);
-    return decoderStack(x, caches, validLengths, tokenIds.shape()[1]);
+    return decoderStack(x, caches, validLengths, tokenIds.shape()[1], rotation, postBlockHook);
   }
 
   private int[] preflight(MLXArray tokenIds, List<KVCache> caches) {
@@ -514,33 +595,58 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private MLXArray normalizedHiddenStates(MLXArray tokenIds, List<KVCache> caches) {
+    return normalizedHiddenStates(tokenIds, caches, null, null);
+  }
+
+  /**
+   * The single-row seam-carrying form of {@link #normalizedHiddenStates(MLXArray, List)}. With
+   * {@code (null, null)} it runs the old single-row graph byte for byte: the 2-D windowed mask (or
+   * the implicit causal one), the derived step frequencies and the non-batch block forwards. A
+   * non-null rotation or hook routes the row through the batch-aware overloads instead: the {@link
+   * #decoderStack(MLXArray, List, int[], int, MultiAxisRotation, PostBlockHook)} entry with one
+   * uniform valid length per row. For a batch-1 unpadded row these are the same arithmetic as the
+   * old single-row path (the uniform append and the {@code [1,1,T,L]} batched mask match the
+   * single-row ones element for element, pinned by {@code SingleRowDecodeEquivalenceTest}), plus
+   * the hook firing after every block's residual output, before the final normalization.
+   */
+  private MLXArray normalizedHiddenStates(
+      MLXArray tokenIds,
+      List<KVCache> caches,
+      MultiAxisRotation rotation,
+      PostBlockHook postBlockHook) {
     for (int i = 0; i < caches.size(); i++) {
       Objects.requireNonNull(caches.get(i), "cache " + i);
     }
     MLXArray x = decoderEmbeddings(tokenIds, null);
-    Integer window = descriptor.attention().slidingWindow();
-    int keyLength = caches.get(0).length() + tokenIds.shape()[1];
-    MLXArray mask =
-        window != null && (window < keyLength || caches.get(0).startPosition() > 0)
-            ? AttentionMask.slidingWindow(
-                x.scope(),
-                caches.get(0).nextPosition(),
-                caches.get(0).startPosition(),
-                tokenIds.shape()[1],
-                keyLength,
-                window)
-            : null;
-    MLXArray stepFrequencies =
-        descriptor
-            .rope()
-            .stepFrequencies(
-                x.scope(),
-                descriptor.rotaryDims(),
-                caches.get(0).nextPosition() + tokenIds.shape()[1]);
-    for (int i = 0; i < layers.size(); i++) {
-      x = layers.get(i).forward(x, caches.get(i), mask, stepFrequencies);
+    if (rotation == null && postBlockHook == null) {
+      Integer window = descriptor.attention().slidingWindow();
+      int keyLength = caches.get(0).length() + tokenIds.shape()[1];
+      MLXArray mask =
+          window != null && (window < keyLength || caches.get(0).startPosition() > 0)
+              ? AttentionMask.slidingWindow(
+                  x.scope(),
+                  caches.get(0).nextPosition(),
+                  caches.get(0).startPosition(),
+                  tokenIds.shape()[1],
+                  keyLength,
+                  window)
+              : null;
+      MLXArray stepFrequencies =
+          descriptor
+              .rope()
+              .stepFrequencies(
+                  x.scope(),
+                  descriptor.rotaryDims(),
+                  caches.get(0).nextPosition() + tokenIds.shape()[1]);
+      for (int i = 0; i < layers.size(); i++) {
+        x = layers.get(i).forward(x, caches.get(i), mask, stepFrequencies);
+      }
+      return norm.forward(x);
     }
-    return norm.forward(x);
+    int sequence = tokenIds.shape()[1];
+    int[] validLengths = new int[tokenIds.shape()[0]];
+    Arrays.fill(validLengths, sequence);
+    return decoderStack(x, caches, validLengths, sequence, rotation, postBlockHook);
   }
 
   /**
@@ -641,6 +747,18 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   /**
+   * The decode step {@link #runStepLoop} uses for every step at 1 or higher, returning the lazy
+   * {@code [1,1,V]} logits of the new token. The 8-argument entry's shared default is this model's
+   * own single-row {@code decode} path; a composing model (the Qwen3-VL work, WP6/WP7, this
+   * package) passes a step that calls the seam-carrying {@code decode} overload with its request's
+   * rotary state. The loop's own preflight, poisoning and evaluation ordering stay around the call.
+   */
+  @FunctionalInterface
+  interface DecodeStep {
+    MLXArray apply(MLXArray ids, List<KVCache> caches);
+  }
+
+  /**
    * The shared generation step loop behind {@link #generate(GenerationRequest, Consumer)}: the
    * per-step activation scope, the per-request generation scope, sampler, caches, cancellation
    * checks, token and terminal events and the result construction. Step 0 is caller-supplied
@@ -663,6 +781,37 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       KVCachePolicy cachePolicy,
       Consumer<GenerationEvent> listener,
       FirstStep firstStep) {
+    return runStepLoop(
+        request,
+        policy,
+        prompt,
+        frequencySeed,
+        promptPositions,
+        cachePolicy,
+        listener,
+        firstStep,
+        this::decode);
+  }
+
+  /**
+   * The seam-carrying form of {@link #runStepLoop(GenerationRequest, GenerationConfig, int[],
+   * int[], int, KVCachePolicy, Consumer, FirstStep)}: steps at 1 or higher call {@code
+   * decodeStep.apply(ids, caches)} where the 8-argument entry calls the model's own single-row
+   * {@code decode}. Everything else -- the per-step activation scope, the first step, the sampler,
+   * cancellation, token and terminal events, the preflight, poisoning, evaluation ordering and the
+   * result construction -- is the identical loop body. The existing 8-argument entry delegates with
+   * {@code this::decode}, so its path is unchanged.
+   */
+  final GenerationResult runStepLoop(
+      GenerationRequest request,
+      GenerationConfig policy,
+      int[] prompt,
+      int[] frequencySeed,
+      int promptPositions,
+      KVCachePolicy cachePolicy,
+      Consumer<GenerationEvent> listener,
+      FirstStep firstStep,
+      DecodeStep decodeStep) {
     HfTokenizer tokenizer = request.tokenizer();
     List<Integer> generated = new ArrayList<>();
     List<Double> logProbabilities = new ArrayList<>();
@@ -698,7 +847,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               } else {
                 MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
                 before = preflight(ids, caches);
-                lastLogits = decode(ids, caches);
+                lastLogits = decodeStep.apply(ids, caches);
               }
               selection =
                   sampler.select(
@@ -785,10 +934,23 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   private MLXArray decode(MLXArray ids, List<KVCache> caches) {
+    return decode(ids, caches, null, null);
+  }
+
+  /**
+   * The single-row decode step with request-supplied rotary state and post-block injection: the
+   * same one-token and populated-cache validation as {@link #decode(MLXArray, List)}, then the
+   * seam-carrying stack and the same postflight and tied projection. Package-private (like the
+   * other seam entries) so a {@link DecodeStep} and the in-package seam tests can call it directly;
+   * production ordinary decoders reach it through the 8-argument {@link #runStepLoop} delegation
+   * with {@code (null, null)} and keep the old graph.
+   */
+  final MLXArray decode(
+      MLXArray ids, List<KVCache> caches, MultiAxisRotation rotation, PostBlockHook postBlockHook) {
     if (ids.shape()[1] != 1 || caches.get(0).nextPosition() == 0) {
       throw new IllegalArgumentException("decode requires one token and a populated cache");
     }
-    MLXArray normalized = normalizedHiddenStates(ids, caches);
+    MLXArray normalized = normalizedHiddenStates(ids, caches, rotation, postBlockHook);
     requirePostflight(caches);
     return tiedOutput ? embedding.project(normalized) : lmHead.forward(normalized);
   }

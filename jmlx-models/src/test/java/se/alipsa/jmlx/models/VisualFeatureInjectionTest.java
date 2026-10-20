@@ -262,6 +262,14 @@ class VisualFeatureInjectionTest {
           () -> VisualFeatureInjection.replaceImageRows(embedded, features, null));
       assertThrows(
           IllegalArgumentException.class,
+          () -> VisualFeatureInjection.replaceImageRows(null, features, new int[] {3, 4, 5}),
+          "embedded must not be null");
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> VisualFeatureInjection.replaceImageRows(embedded, null, new int[] {3, 4, 5}),
+          "features must not be null");
+      assertThrows(
+          IllegalArgumentException.class,
           () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {3, 4}));
       assertThrows(
           IllegalArgumentException.class,
@@ -299,6 +307,14 @@ class VisualFeatureInjectionTest {
           () ->
               VisualFeatureInjection.addMaskedFeatures(
                   null, embedded, features, new int[] {3, 4, 5}));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> VisualFeatureInjection.addMaskedFeatures(run, null, features, new int[] {3, 4, 5}),
+          "hidden must not be null");
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> VisualFeatureInjection.addMaskedFeatures(run, embedded, null, new int[] {3, 4, 5}),
+          "features must not be null");
       assertThrows(
           IllegalArgumentException.class,
           () ->

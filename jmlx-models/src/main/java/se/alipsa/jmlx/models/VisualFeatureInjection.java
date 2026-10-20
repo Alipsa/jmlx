@@ -1,7 +1,6 @@
 package se.alipsa.jmlx.models;
 
 import java.util.Arrays;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import se.alipsa.jmlx.core.MLX;
@@ -103,8 +102,12 @@ final class VisualFeatureInjection {
 
   private static int validatePair(
       String baseName, MLXArray base, String featuresName, MLXArray features, int[] destinations) {
-    Objects.requireNonNull(base, baseName);
-    Objects.requireNonNull(features, featuresName);
+    if (base == null) {
+      throw new IllegalArgumentException(baseName + " must not be null");
+    }
+    if (features == null) {
+      throw new IllegalArgumentException(featuresName + " must not be null");
+    }
     if (destinations == null) {
       throw new IllegalArgumentException("destinations must not be null");
     }

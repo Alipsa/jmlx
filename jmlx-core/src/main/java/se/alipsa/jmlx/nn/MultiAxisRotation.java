@@ -49,6 +49,34 @@ public final class MultiAxisRotation {
   }
 
   /**
+   * The rotation-shape preflight the decoder seam runs before any array is written: the batch and
+   * sequence axes of the heads to be rotated must match the prepared rotation, and the rotated
+   * prefix must fit within the head width. All validation is {@link IllegalArgumentException} and
+   * nothing is allocated. {@link #rotate} delegates its shape checks here, and the {@code
+   * DecoderAttention}/{@code DecoderModel} rotation entries call it before any projection, mask or
+   * embedding builds a graph node, so a mismatched rotation is rejected before any array is
+   * written.
+   */
+  public void validate(int batch, int sequence, int headDim) {
+    int[] cosShape = cos.shape();
+    if (batch != cosShape[0] || sequence != cosShape[2]) {
+      throw new IllegalArgumentException(
+          "rotation batch and sequence must match the prepared rotation ("
+              + batch
+              + ", "
+              + sequence
+              + " against "
+              + cosShape[0]
+              + ", "
+              + cosShape[2]
+              + ")");
+    }
+    if (rotaryDims > headDim) {
+      throw new IllegalArgumentException("rotaryDims exceeds head dimension");
+    }
+  }
+
+  /**
    * Rotates a {@code [batch, heads, sequence, headDim]} tensor. All validation is {@link
    * IllegalArgumentException} and runs before any array is written: {@code x} is non-null with rank
    * 4, its batch and sequence axes match the prepared rotation, and {@code rotaryDims} does not
@@ -65,22 +93,7 @@ public final class MultiAxisRotation {
           "rotate requires [batch, heads, sequence, headDim], got shape "
               + java.util.Arrays.toString(shape));
     }
-    int[] cosShape = cos.shape();
-    if (shape[0] != cosShape[0] || shape[2] != cosShape[2]) {
-      throw new IllegalArgumentException(
-          "x batch and sequence must match the prepared rotation ("
-              + shape[0]
-              + ", "
-              + shape[2]
-              + " against "
-              + cosShape[0]
-              + ", "
-              + cosShape[2]
-              + ")");
-    }
-    if (rotaryDims > shape[3]) {
-      throw new IllegalArgumentException("rotaryDims exceeds head dimension");
-    }
+    validate(shape[0], shape[2], shape[3]);
     DType dtype = x.dtype();
     MLXArray cosInput = cos.dtype() == dtype ? cos : MLX.astype(cos, dtype);
     MLXArray sinInput = sin.dtype() == dtype ? sin : MLX.astype(sin, dtype);

@@ -208,8 +208,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * replaces the stack's derived step frequencies with the request's own multi-axis rotation, and
    * {@code postBlockHook} fires after every block's residual output, before the final
    * normalization. The preflight, postflight, evaluation and poisoning invariants are the batched
-   * ones, unchanged. The existing 4-argument overload delegates with {@code (null, null)} and keeps
-   * the identical graph.
+   * ones, unchanged. A non-null {@code rotation} is validated against the batch, the sequence width
+   * and the head dimension before the embedding lookup builds any graph node. The existing
+   * 4-argument overload delegates with {@code (null, null)} and keeps the identical graph.
    */
   final MLXArray stepLogits(
       MLXArray tokenIds,
@@ -219,6 +220,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       MultiAxisRotation rotation,
       PostBlockHook postBlockHook) {
     int[][] before = preflightBatch(tokenIds, caches, validLengths);
+    if (rotation != null) {
+      // Reject a mismatched rotation before the embedding lookup builds any graph node.
+      rotation.validate(tokenIds.shape()[0], tokenIds.shape()[1], descriptor.headDim());
+    }
     try {
       MLXArray normalized =
           normalizedHiddenStatesBatch(
@@ -409,12 +414,13 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * rotation} skips the step frequency derivation and rotates each block's query and key heads from
    * the request's own multi-axis rotation instead; a non-null {@code postBlockHook} is invoked
    * after every block's residual output and before the final {@code norm.forward} (see {@link
-   * PostBlockHook}). The batched mask is the same in both cases. With {@code (null, null)} this
-   * runs the byte-identical stack the 4-argument overload always ran: one frequency derivation at
-   * the same graph position, the same block forwards and the same final normalization. This entry
-   * itself still neither evaluates nor poisons; embedding-start callers keep the {@link
-   * #preflightBatch(int, int, List, int[])}/{@link #poisonBatchIfMutated} and postflight/evaluation
-   * responsibilities of the 4-argument entry.
+   * PostBlockHook}). The batched mask is the same in both cases. A non-null {@code rotation} is
+   * validated against the batch, the sequence width and the head dimension before the mask or any
+   * block builds a graph node. With {@code (null, null)} this runs the byte-identical stack the
+   * 4-argument overload always ran: one frequency derivation at the same graph position, the same
+   * block forwards and the same final normalization. This entry itself still neither evaluates nor
+   * poisons; embedding-start callers keep the {@link #preflightBatch(int, int, List, int[])}/{@link
+   * #poisonBatchIfMutated} and postflight/evaluation responsibilities of the 4-argument entry.
    */
   final MLXArray decoderStack(
       MLXArray embeddings,
@@ -449,6 +455,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
     MLXArray x = embeddings;
     KVCache first = caches.getFirst();
     int batch = validLengths.length;
+    if (rotation != null) {
+      // Reject a mismatched rotation before the batched mask or any block builds a graph node.
+      rotation.validate(batch, sequenceWidth, descriptor.headDim());
+    }
     int[] queryStarts = new int[batch];
     int[] keyStarts = new int[batch];
     int keyWidth = 0;
@@ -940,15 +950,21 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   /**
    * The single-row decode step with request-supplied rotary state and post-block injection: the
    * same one-token and populated-cache validation as {@link #decode(MLXArray, List)}, then the
-   * seam-carrying stack and the same postflight and tied projection. Package-private (like the
-   * other seam entries) so a {@link DecodeStep} and the in-package seam tests can call it directly;
-   * production ordinary decoders reach it through the 8-argument {@link #runStepLoop} delegation
-   * with {@code (null, null)} and keep the old graph.
+   * seam-carrying stack and the same postflight and tied projection. A non-null {@code rotation} is
+   * validated against the batch, the sequence width and the head dimension before the embedding
+   * lookup builds any graph node. Package-private (like the other seam entries) so a {@link
+   * DecodeStep} and the in-package seam tests can call it directly; production ordinary decoders
+   * reach it through the 8-argument {@link #runStepLoop} delegation with {@code (null, null)} and
+   * keep the old graph.
    */
   final MLXArray decode(
       MLXArray ids, List<KVCache> caches, MultiAxisRotation rotation, PostBlockHook postBlockHook) {
     if (ids.shape()[1] != 1 || caches.get(0).nextPosition() == 0) {
       throw new IllegalArgumentException("decode requires one token and a populated cache");
+    }
+    if (rotation != null) {
+      // Reject a mismatched rotation before the embedding lookup builds any graph node.
+      rotation.validate(ids.shape()[0], ids.shape()[1], descriptor.headDim());
     }
     MLXArray normalized = normalizedHiddenStates(ids, caches, rotation, postBlockHook);
     requirePostflight(caches);

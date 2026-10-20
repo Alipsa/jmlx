@@ -293,6 +293,8 @@ public final class DecoderAttention extends CachedAttention {
     MLXArray freqs;
     if (rotation != null) {
       // The rotation path rotates from its own cos/sin tables; no frequency array is derived.
+      // Validate the rotation's shape before any projection builds a graph node.
+      rotation.validate(batch, sequence, headDim);
       freqs = null;
     } else {
       freqs = staticFreqs != null ? staticFreqs : stepFrequencies;

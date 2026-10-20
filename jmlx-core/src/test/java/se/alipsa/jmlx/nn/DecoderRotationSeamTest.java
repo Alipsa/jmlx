@@ -259,8 +259,9 @@ class DecoderRotationSeamTest {
 
   /**
    * The rotation overload must reject a missing {@code validLengths} (it always runs the batch
-   * bookkeeping) and a null rotation before any array is written, and the batch validation must
-   * reject a wrong number of lengths.
+   * bookkeeping), a null rotation, a wrong number of lengths and a rotation prepared for a
+   * different sequence or batch or with a prefix wider than the head -- all {@link
+   * IllegalArgumentException} before any array is written, the cache left untouched.
    */
   @Test
   void rotationForwardRejectsInvalidArguments() {
@@ -283,6 +284,32 @@ class DecoderRotationSeamTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> fixture.attention.forward(x, cache, null, new int[] {3, 3}, rotation));
+        // A rotation prepared for a different sequence or batch, or with a prefix wider than the
+        // head, is rejected before any projection builds a graph node.
+        MultiAxisRotation shortRotation =
+            rope.prepare(run, 1, 2, new int[][] {{0, 1}, {1, 2}, {2, 3}});
+        IllegalArgumentException wrongSequence =
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> fixture.attention.forward(x, cache, null, new int[] {3}, shortRotation));
+        assertTrue(wrongSequence.getMessage().contains("must match the prepared rotation"));
+        MultiAxisRotation wideBatch =
+            rope.prepare(
+                run,
+                2,
+                3,
+                new int[][] {{0, 1, 0, 1, 2, 3}, {1, 2, 0, 1, 2, 3}, {2, 3, 0, 1, 2, 3}});
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> fixture.attention.forward(x, cache, null, new int[] {3}, wideBatch));
+        MultiAxisRope wideRope = new MultiAxisRope(10_000f, new int[] {8, 1, 1}); // rotaryDims 10
+        MultiAxisRotation wideRotation =
+            wideRope.prepare(run, 1, 3, new int[][] {{0, 1, 2}, {1, 2, 3}, {2, 3, 4}});
+        IllegalArgumentException wideHead =
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> fixture.attention.forward(x, cache, null, new int[] {3}, wideRotation));
+        assertTrue(wideHead.getMessage().contains("rotaryDims exceeds head dimension"));
         assertEquals(0, cache.nextPosition());
       }
     }

@@ -293,6 +293,31 @@ class DecoderSeamTest {
     }
   }
 
+  /**
+   * A rotation prepared for a different sequence width must be rejected by the seam entries before
+   * any array is written: {@code stepLogits} rejects it before the embedding lookup, {@code decode}
+   * before its own embedding lookup, and the populated caches are left unadvanced.
+   */
+  @Test
+  void seamEntriesRejectWrongWidthRotationBeforeArraysAreWritten() {
+    int[] prompt = tokens(4);
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> populated = caches(run);
+      model.forward(MLX.array(run, prompt, new int[] {1, 4}), populated);
+      try (MLXScope gen = run.newChild()) {
+        MultiAxisRotation wrongWidth =
+            rope.prepare(gen, 1, 2, new int[][] {{0, 1}, {2, 3}, {4, 5}});
+        MLXArray ids = MLX.array(gen, new int[] {token(4)}, new int[] {1, 1});
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> model.stepLogits(ids, populated, new int[] {1}, null, wrongWidth, null));
+        assertThrows(
+            IllegalArgumentException.class, () -> model.decode(ids, populated, wrongWidth, null));
+        assertEquals(4, populated.getFirst().nextPosition());
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------------

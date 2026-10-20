@@ -1020,6 +1020,55 @@ Adding the suite to `.github/workflows/ci.yml`'s required-execution list is defe
 WP8 (plan §9); the `full-float32` tag selection into `:jmlx-core:float32GoldenTest`
 happens in this WP's implementation units.
 
+**WP4 acceptance (2026-10-20).** Delivered on `phase7-3b-wp4` in four commits over base
+`128cd1e`: `d5de40e` (Unit 1 — the pre-change exact-bits baseline recorded in both TF32
+modes on this device, plus this §6.9 frozen design), `2fe2926` (Unit 2 — the
+`MultiAxisRope`/`MultiAxisRotation` core components, `MultiAxisRopeTest`, and the
+Python/jshell cross-check probe pair), `c50b5cc` (Unit 3 — the additive rotation/
+post-block seam across `DecoderAttention`/`DecoderBlock`/`DecoderModel`, with
+`DecoderRotationSeamTest`, `SingleRowDecodeEquivalenceTest` and `DecoderSeamTest`), and
+the acceptance commit (Unit 4 — `VisualFeatureInjection` and `VisualFeatureInjectionTest`).
+
+- **Validation matrix, all green.** Root `./gradlew check` BUILD SUCCESSFUL;
+  `./gradlew verifyMlxApiCallSites` BUILD SUCCESSFUL unchanged (the new code composes
+  existing facades only, so no inventory override or call-site mapping changed). Zero
+  failures in every suite; counts: `:jmlx-core:test` 49 suites / 414 tests with 1
+  pre-existing skip (`MoeMlpBenchmarkTest.gatheredDecodeIsFasterThanDense`, the
+  untimed benchmark guard — not a regression), `:jmlx-core:float32GoldenTest` 8 / 30,
+  `:jmlx-models:test` 50 / 376, `:jmlx-models:float32GoldenTest` 13 / 43. The WP4
+  suites (ordinary / full-float32): `MultiAxisRopeTest` 5 / 6, `DecoderRotationSeamTest`
+  2 / 5, `SingleRowDecodeEquivalenceTest` 2 / 0 (no float32 cases), `DecoderSeamTest`
+  1 / 5, `VisualFeatureInjectionTest` 1 / 7 (the one ordinary case is the pre-write
+  rejection test; the float32 cases compare `toFloatArray` bit-exactly). `./gradlew
+  -p buildSrc check` was not run: buildSrc is unchanged by this WP.
+- **Old-path bit-identity gate, both TF32 modes, verbatim.** The Unit 1 baseline
+  recordings (spec hash
+  `846396b1dbab5a770a4f2c36841fe5ed1570a586b908956ed6e224fe5248e687`, recorded at
+  `128cd1ec2fb1004487015377183081827a29b956` before any WP4 change) were verified, not
+  re-recorded; each run re-derived its captures into a fresh
+  `build/exact-bits/tf32-{1,0}/derived-verify/` side effect.
+  `./gradlew :jmlx-models:exactBitsVerifyTf32On` → BUILD SUCCESSFUL with stdout
+  `verified 14 variants against .../tf32-1/manifest.json` and
+  `exact-bits verify tf32=1 (recorded at 128cd1ec2fb1004487015377183081827a29b956):
+  14 applicable variants, 126 captures`;
+  `./gradlew :jmlx-models:exactBitsVerifyTf32Off` → the same two lines with `tf32-0`
+  and `tf32=0` (14 variants × 9 captures). Verify mode permits only the git-commit
+  metadata field to drift, and it is the only drift — the old one-dimensional decoder
+  path is bit-identical in both precision modes after the seam, the kernel and the
+  helpers landed.
+- **Probe and diff evidence.** The Python probe was re-run once in the locked venv
+  after the final code state: all 7 cases (`pinned_prefill_indexed`,
+  `pinned_prefill_maxpos`, `pinned_decode_negative_delta`, `pinned_decode_equal_axes`,
+  `pinned_batched_rows`, `small_212_every_owner`, `small_111`) passed, exit 0. The
+  matching jshell twin was not re-run: its component was last touched in Unit 2, where
+  its per-case max absolute error was ≤ 2.4e-7 against the 1e-5 threshold.
+  `git diff main` over `RopeSpec.java` and `MLXFast.java` is empty: the sealed
+  hierarchy gained no variant and no fast kernel changed.
+- **Deferrals, per plan.** Adding the new native suites to
+  `.github/workflows/ci.yml`'s required-execution list is WP8 (plan §9);
+  `Qwen3VlModel`, the `qwen3_vl` loader dispatch and the DeepStack consumption of
+  `VisualFeatureInjection` are WP5/WP6.
+
 ## 7. Fast-vs-slow preprocessing divergence (measured once, both sides)
 
 - **Tool:** `tools/image-oracle/fast-comparison/` — an independent hash-locked CPython 3.12 venv

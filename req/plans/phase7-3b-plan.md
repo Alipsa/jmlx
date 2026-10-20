@@ -1,10 +1,10 @@
 # Phase 7.3b — Qwen3-VL image and text inference
 
-- **Status:** WP0–WP3 complete: WP0/WP1 2026-10-15 (reference findings), WP2 accepted
-  2026-10-18 per PR #50, WP3 accepted 2026-10-19 per PR #55. WP4 in progress as of
-  2026-10-20 — the pre-change exact-bits baseline is recorded and the core RoPE / decoder
-  seam design is frozen in `req/plans/phase7-3b-reference-findings.md` §6.9. WP5–WP8
-  implementation and acceptance remain work below.
+- **Status:** WP0–WP4 complete: WP0/WP1 2026-10-15 (reference findings), WP2 accepted
+  2026-10-18 per PR #50, WP3 accepted 2026-10-19 per PR #55, WP4 completed 2026-10-20
+  (local acceptance evidence in `req/plans/phase7-3b-reference-findings.md` §6.9's
+  acceptance block; acceptance rides this branch's PR). WP5–WP8 implementation and
+  acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -399,6 +399,29 @@ update inventory overrides/call-site coverage and test scope/error behavior. Do 
 add general indexing APIs. After the refactor, require exact old-path bit and greedy-ID equality
 under the same reproducibility tuple, not just tolerance-golden passes.
 
+**2026-10-20 WP4 status:** WP4 is completed locally (the acceptance record is
+`req/plans/phase7-3b-reference-findings.md` §6.9's acceptance block): the frozen core
+components `MultiAxisRope` (validated `[3,B,T]` positions, the interleaved frequency /
+rotate-half kernel with the pinned compute/cast order, equal and index-coded axes,
+`cachePosition + delta` decode coordinates, partial-rotary tail passthrough, and
+pre-write `IllegalArgumentException` rejections) and its `MultiAxisRotation`
+family specification; the additive decoder seam — request-supplied rotary state and the
+post-block injection callback across `DecoderAttention`/`DecoderBlock`/`DecoderModel`,
+existing overloads preserved and routed through the identical old graph, production
+decoders on no-op hooks — with the old-path parity suites; and the frozen
+`VisualFeatureInjection` compositions in `se.alipsa.jmlx.models` (row-gather
+replacement and masked DeepStack residual add over existing core facades, reusing
+`Idefics3VisionTower`'s gather-index algorithm, no new primitive, no FFI from model
+code, package-private with no new public API). Old-path evidence: the pre-change
+baseline recorded at `128cd1e` in both TF32 modes then verified bit-exact
+(`exactBitsVerifyTf32On`/`Off`, 14 variants × 9 captures, git-commit metadata the only
+drift), `RopeSpec.java` and `MLXFast.java` empty diffs, root `check` and
+`verifyMlxApiCallSites` green, and the pinned-vendor probe pair still matching (Python
+exit 0 on all 7 cases; Java twin per-case max error ≤ 2.4e-7 against the 1e-5
+threshold from Unit 2, its component untouched since). Non-goals held: no public core
+API, no build/CI change — the required-execution suite list addition is WP8 per §9 —
+and no `Qwen3VlModel` or loader dispatch; those are WP5/WP6.
+
 ## 7. Vision tower and checkpoint assembly (WP5–WP6)
 
 Add `Qwen3VlModel implements TextGenerationModel`, composing the decoder so the scheduler's
@@ -605,8 +628,8 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [x] Slow-PIL and effective-area deviations, processor-construction probe and guarded fast-comparison lock accepted.
 - [x] Locked `mlx-vlm` reference and separate HF/MLX provenance tensor plans accepted.
 - [ ] Qwen decode option, unchanged default conversion and exact preprocessing/prompt/position/template fixtures pass.
-- [ ] Old one-dimensional decoder path remains bit-identical in both precision modes.
-- [ ] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
+- [x] Old one-dimensional decoder path remains bit-identical in both precision modes.
+- [x] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
 - [ ] Vision/merger/DeepStack intermediate references and quantized synthetic tests pass.
 - [ ] All four Tier-A cases and forced generated-marker continuations pass strict/default cached/full-forward checks.
 - [ ] Resource validation, request reuse, cancellation/failure cleanup and memory bounds pass.

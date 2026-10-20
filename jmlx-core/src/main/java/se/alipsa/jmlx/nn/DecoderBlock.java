@@ -102,7 +102,9 @@ public final class DecoderBlock extends Module {
       int[] validLengths,
       MultiAxisRotation rotation) {
     Objects.requireNonNull(x, "DecoderBlock.forward: x must not be null");
-    Objects.requireNonNull(rotation, "DecoderBlock.forward: rotation must not be null");
+    if (rotation == null) {
+      throw new IllegalArgumentException("DecoderBlock.forward: rotation must not be null");
+    }
     if (!(attention instanceof DecoderAttention decoderAttention)) {
       throw new IllegalArgumentException(
           "DecoderBlock.forward with a MultiAxisRotation requires a DecoderAttention child");

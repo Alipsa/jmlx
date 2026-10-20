@@ -281,7 +281,7 @@ class DecoderRotationSeamTest {
                 () -> fixture.attention.forward(x, cache, null, null, rotation));
         assertTrue(missingLengths.getMessage().contains("valid lengths"));
         assertThrows(
-            NullPointerException.class,
+            IllegalArgumentException.class,
             () -> fixture.attention.forward(x, cache, null, new int[] {3}, null));
         assertThrows(
             IllegalArgumentException.class,

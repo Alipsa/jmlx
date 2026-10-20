@@ -214,7 +214,9 @@ public final class DecoderAttention extends CachedAttention {
       MLXArray attentionMask,
       int[] validLengths,
       MultiAxisRotation rotation) {
-    Objects.requireNonNull(rotation, "rotation");
+    if (rotation == null) {
+      throw new IllegalArgumentException("rotation must not be null");
+    }
     if (validLengths == null) {
       throw new IllegalArgumentException(
           "the rotation path requires batch valid lengths, one per row");

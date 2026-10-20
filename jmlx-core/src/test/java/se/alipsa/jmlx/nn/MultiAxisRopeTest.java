@@ -133,7 +133,7 @@ class MultiAxisRopeTest {
           () ->
               rotation.rotate(
                   MLX.array(scope, values(1 * 1 * 3 * 16, 3), new int[] {1, 1, 3, 16})));
-      assertThrows(NullPointerException.class, () -> rotation.rotate(null));
+      assertThrows(IllegalArgumentException.class, () -> rotation.rotate(null));
     }
   }
 

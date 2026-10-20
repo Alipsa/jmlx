@@ -1,6 +1,5 @@
 package se.alipsa.jmlx.nn;
 
-import java.util.Objects;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -106,7 +105,9 @@ public final class MultiAxisRotation {
    * allocates per the usual {@code scopeOf} rule (the innermost related scope of its operands).
    */
   public MLXArray rotate(MLXArray x) {
-    Objects.requireNonNull(x, "x");
+    if (x == null) {
+      throw new IllegalArgumentException("x must not be null");
+    }
     int[] shape = x.shape();
     if (shape.length != 4) {
       throw new IllegalArgumentException(

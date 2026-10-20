@@ -786,10 +786,11 @@ mode with explicit `MLX_ENABLE_TF32=1` / `=0`) PASSES at the base commit with a 
    stays T (owner(f) = T when `f % 3 == 0` or `f >= 3·(s1+s2)`). Pinned reference
    `[24,20,20]`: H owns `1, 4, …, 58` (20 frequencies), W owns `2, 5, …, 59` (20), T owns
    the remaining 24 — a T-starting round-robin `T H W T H W …` with a terminal run of four
-   T frequencies. The implementation realizes the selection with static owner masks: three
-   0/1 weight vectors of length `rotaryDims/2` (1 at the owned frequencies, 0 elsewhere,
-   derived from the sections at construction) select, per (token, frequency) on the CPU
-   before any array is written, the owned row's position — the same copy the mask expression
+   T frequencies. The implementation realizes the selection with a static owner table: a
+   single byte array of length `rotaryDims/2` holding one 0/1/2 owner (T/H/W) per frequency
+   slot, derived from the sections at construction (the H and W conditions are disjoint, so
+   every slot has exactly one owner) selects, per (token, frequency) on the CPU before any
+   array is written, the owned row's position — the same copy the mask expression
    `freqsT·wT + freqsH·wH + freqsW·wW` is a bit-identical copy of for non-negative finite
    frequencies (multiply by 1.0/0.0 and add in float32 are exact there) — so each `freqs_t`
    element is still exactly one float32 multiply of the same two operands (owned position ·

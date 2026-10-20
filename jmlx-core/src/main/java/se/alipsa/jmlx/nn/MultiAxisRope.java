@@ -35,13 +35,11 @@ public final class MultiAxisRope {
   private final int[] mropeSection;
   private final int rotaryDims;
   private final float[] invFreq;
-  private final float[] ownerT;
-  private final float[] ownerH;
-  private final float[] ownerW;
+  private final byte[] owner;
 
   /**
    * Validates the base and the sections and derives the per-frequency inverse and the static T/H/W
-   * owner masks. All validation is {@link IllegalArgumentException} and runs before any MLX array
+   * owner table. All validation is {@link IllegalArgumentException} and runs before any MLX array
    * is written: {@code theta} must be finite and positive (the {@code RopeSpec} convention); {@code
    * mropeSection} must be a non-null 3-entry array, every element non-negative, with a sum of at
    * least 1 (so {@code rotaryDims = 2 * sum} is even by construction) and small enough to fit an
@@ -75,21 +73,19 @@ public final class MultiAxisRope {
     this.mropeSection = mropeSection.clone();
     this.rotaryDims = 2 * half;
     this.invFreq = deriveInvFrequencies(theta, half);
-    this.ownerT = new float[half];
-    this.ownerH = new float[half];
-    this.ownerW = new float[half];
+    this.owner = new byte[half];
     for (int f = 0; f < half; f++) {
       // The pinned reference (transformers 4.57.6 apply_interleaved_mrope) starts from the T row
       // and overwrites in place: for dim 1 (H) idx = slice(1, mrope_section[1] * 3, 3) -- H owns
       // 1 + 3j for j < mrope_section[1]; for dim 2 (W) idx = slice(2, mrope_section[2] * 3, 3) --
-      // W owns 2 + 3j for j < mrope_section[2]; everything else stays T. The masks realize that
-      // selection as a static 0/1 weight vector per axis.
+      // W owns 2 + 3j for j < mrope_section[2]; everything else stays T. The table records that
+      // selection as one static owner (0 = T, 1 = H, 2 = W) per frequency slot; the T slots stay
+      // at the byte zero, and the H and W conditions are disjoint, so every slot has exactly one
+      // owner.
       if (f % 3 == 1 && f < 1L + 3L * mropeSection[1]) {
-        ownerH[f] = 1f;
+        owner[f] = 1;
       } else if (f % 3 == 2 && f < 2L + 3L * mropeSection[2]) {
-        ownerW[f] = 1f;
-      } else {
-        ownerT[f] = 1f;
+        owner[f] = 2;
       }
     }
   }
@@ -117,7 +113,7 @@ public final class MultiAxisRope {
    * product cannot overflow), no coordinate is negative and the position-matrix size {@code batch *
    * sequence * rotaryDims/2} fits an {@code int} array (checked in {@code long} before the
    * allocation, so an overflowing size is an IAE rather than a {@code NegativeArraySizeException}).
-   * The frozen compute order then runs: the static owner masks select, per (token, frequency) on
+   * The frozen compute order then runs: the static owner table selects, per (token, frequency) on
    * the CPU before any array is written, the owned row's position, giving one float32 position
    * matrix of shape {@code [B*T, rotaryDims/2]} (the exact int-to-float casts) that is
    * broadcast-multiplied once against the {@code [1, rotaryDims/2]} {@code invFreq} array in {@code
@@ -176,8 +172,8 @@ public final class MultiAxisRope {
 
   /**
    * The per-token owned-position matrix in row-major {@code [flat, half]} order: element {@code (i,
-   * f)} is the exact float32 cast of {@code positions[owner(f)][i]}, selected on the CPU with the
-   * static owner masks before any array is written. This is the bit-identical copy the frozen mask
+   * f)} is the exact float32 cast of {@code positions[owner[f]][i]}, selected on the CPU with the
+   * static owner table before any array is written. This is the bit-identical copy the frozen mask
    * expression {@code freqsT * wT + freqsH * wH + freqsW * wW} makes for non-negative finite
    * frequencies (multiplying by the 0/1 masks and adding in float32 is exact there), so multiplying
    * this matrix once by {@code invFreq} performs the same per-element float32 multiply of the same
@@ -187,9 +183,7 @@ public final class MultiAxisRope {
     float[] out = new float[flat * half];
     for (int i = 0; i < flat; i++) {
       for (int f = 0; f < half; f++) {
-        int coordinate =
-            ownerT[f] != 0f ? positions[0][i] : ownerH[f] != 0f ? positions[1][i] : positions[2][i];
-        out[i * half + f] = (float) coordinate;
+        out[i * half + f] = (float) positions[owner[f]][i];
       }
     }
     return out;

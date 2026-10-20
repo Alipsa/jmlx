@@ -1074,8 +1074,13 @@ the acceptance commit (Unit 4 — `VisualFeatureInjection` and `VisualFeatureInj
   after the final code state: all 7 cases (`pinned_prefill_indexed`,
   `pinned_prefill_maxpos`, `pinned_decode_negative_delta`, `pinned_decode_equal_axes`,
   `pinned_batched_rows`, `small_212_every_owner`, `small_111`) passed, exit 0. The
-  matching jshell twin was not re-run: its component was last touched in Unit 2, where
-  its per-case max absolute error was ≤ 2.4e-7 against the 1e-5 threshold.
+  matching jshell twin was not re-run at acceptance (its component was last touched in
+  Unit 2, where its per-case max absolute error was ≤ 2.4e-7 against the 1e-5
+  threshold); both sides were re-run 2026-10-20 in the locked environments after the
+  review rounds, against the restructured `prepare` (review round 2) and the row-length
+  overflow guard (review round 3), head `2c40b6d` — Python exit 0, all 7 cases passed;
+  the jshell twin exits 0 with every case OK and self-consistent, max absolute error
+  2.38e-7 against the 1e-5 threshold.
   `git diff main` over `RopeSpec.java` and `MLXFast.java` is empty: the sealed
   hierarchy gained no variant and no fast kernel changed.
 - **Deferrals, per plan.** The new native suites' addition to

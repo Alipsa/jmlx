@@ -841,7 +841,7 @@ source compatibility for exhaustive consumer switches (plan §6).
   concatenate → `emb`; `MLXOps.cos`/`MLXOps.sin` in `scope` → FLOAT32 arrays reshaped to
   `[batch, 1, sequence, rotaryDims]` (broadcastable over the heads axis). Host-memory trade-off
   (accepted in review): the one position-matrix upload now holds `B·T·rotaryDims/2` float32 values
-  on the host where the pre-restructure path held `3·B·T` (three owner masks) — about 21× more for
+  on the host where the pre-restructure path held `3·B·T` (three per-axis position arrays) — about 21× more for
   the pinned 2B at a 32k prefill (8 MB vs 384 KB) — while decode (`B·T = 1`) is strictly cheaper
   and the prefill cost is small next to the prefill compute.
 - `public final class MultiAxisRotation` — the per-step rotation state one `prepare`

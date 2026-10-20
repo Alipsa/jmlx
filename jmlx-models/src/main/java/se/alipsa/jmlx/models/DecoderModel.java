@@ -618,10 +618,17 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * the implicit causal one), the derived step frequencies and the non-batch block forwards. A
    * non-null rotation or hook routes the row through the batch-aware overloads instead: the {@link
    * #decoderStack(MLXArray, List, int[], int, MultiAxisRotation, PostBlockHook)} entry with one
-   * uniform valid length per row. For a batch-1 unpadded row these are the same arithmetic as the
-   * old single-row path (the uniform append and the {@code [1,1,T,L]} batched mask match the
-   * single-row ones element for element, pinned by {@code SingleRowDecodeEquivalenceTest}), plus
-   * the hook firing after every block's residual output, before the final normalization.
+   * uniform valid length per row. With only a hook, that route is the same arithmetic as the old
+   * single-row path for a batch-1 unpadded row: the uniform append and the {@code [1,1,T,L]}
+   * batched mask match the single-row ones element for element (pinned by {@code
+   * SingleRowDecodeEquivalenceTest}), the per-row RoPE form delegates to the offset form for a
+   * uniform row, and the explicit mask yields the same SDPA result as the implicit causal one --
+   * pinned bit-exact at the logits, end to end, by {@code
+   * DecoderSeamTest.decodeWithNoOpPostBlockHookMatchesOldSingleRowPath} -- plus the hook firing
+   * after every block's residual output, before the final normalization. A non-null rotation
+   * deliberately changes the arithmetic instead: it rotates from the request's own cos/sin tables
+   * rather than the rope fast kernel, within the 1e-5 that {@code
+   * DecoderSeamTest.equalAxisRotationMatchesRopePathWithinKernelTolerance} pins.
    */
   private MLXArray normalizedHiddenStates(
       MLXArray tokenIds,

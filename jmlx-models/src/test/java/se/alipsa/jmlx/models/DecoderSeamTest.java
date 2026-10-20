@@ -31,8 +31,10 @@ import se.alipsa.jmlx.nn.RopeSpec;
  * post-block hook, and the explicit {@code DecodeStep} form of {@code runStepLoop}. Every float32
  * case compares the seam against an independent manual composition over a forked cache set, built
  * from a parallel {@link DecoderAssembler} component set with identical weight values and the same
- * operation order and scopes, so those comparisons run at zero tolerance. The cases are tagged
- * {@code full-float32} so they select into {@code :jmlx-models:float32GoldenTest} with {@code
+ * operation order and scopes, so those comparisons run at zero tolerance. The hook-only case
+ * ({@link #decodeWithNoOpPostBlockHookMatchesOldSingleRowPath}) instead compares the batched route
+ * against the old single-row path itself, bit-exact at the logits. The cases are tagged {@code
+ * full-float32} so they select into {@code :jmlx-models:float32GoldenTest} with {@code
  * MLX_ENABLE_TF32=0}; the single exception is the fast-kernel-versus-explicit-rotation comparison
  * in {@link #equalAxisRotationMatchesRopePathWithinKernelTolerance}, which uses the documented 1e-5
  * tolerance. The rejection cases run in the ordinary {@code :jmlx-models:test} task.
@@ -254,6 +256,77 @@ class DecoderSeamTest {
           model.stepLogits(ids, rotationCaches, new int[] {7}, null, rotation, null);
       assertArrayEquals(ropeLogits.toFloatArray(), rotationLogits.toFloatArray(), 1e-5f);
     }
+  }
+
+  /**
+   * The hook-only single-row decode -- rotation {@code null}, the hook a no-op lambda that returns
+   * its input unchanged -- must be bit-identical at the logits to the old single-row path for the
+   * same prompt, weights and cache contents. Both cache sets are prefilled by the same old-path
+   * forward (and asserted bit-equal before decoding), then every one-token decode step is compared
+   * element for element in raw IEEE bits and the greedy choices must stay in lockstep. This pins
+   * the {@code normalizedHiddenStates} claim that the hook-only batched route is "the same
+   * arithmetic as the old single-row path" end to end: for a uniform row the per-row RoPE form
+   * delegates to the offset form, and the explicit {@code [1,1,1,L]} mask selects the same SDPA
+   * result as the old path's implicit causal flag -- observed max absolute error 0.0, i.e. all 4
+   * steps' 128-vocabulary logits bit-equal, full-float32.
+   */
+  @Test
+  @Tag("full-float32")
+  void decodeWithNoOpPostBlockHookMatchesOldSingleRowPath() {
+    int[] prompt = tokens(32);
+    int steps = 4;
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> plain = caches(run);
+      List<KVCache> hooked = caches(run);
+      model.forward(MLX.array(run, prompt, new int[] {1, prompt.length}), plain);
+      model.forward(MLX.array(run, prompt, new int[] {1, prompt.length}), hooked);
+      for (int i = 0; i < plain.size(); i++) {
+        assertArrayEquals(plain.get(i).keys().toFloatArray(), hooked.get(i).keys().toFloatArray());
+        assertArrayEquals(
+            plain.get(i).values().toFloatArray(), hooked.get(i).values().toFloatArray());
+      }
+      try (MLXScope gen = run.newChild()) {
+        int input = token(32);
+        for (int step = 0; step < steps; step++) {
+          MLXArray ids = MLX.array(gen, new int[] {input}, new int[] {1, 1});
+          MLXArray expected = model.decode(ids, plain, null, null);
+          MLXArray actual = model.decode(ids, hooked, null, (layer, hidden) -> hidden);
+          float[] oldLogits = expected.toFloatArray();
+          float[] hookLogits = actual.toFloatArray();
+          assertArrayEquals(
+              rawBits(oldLogits),
+              rawBits(hookLogits),
+              "step " + step + ": the no-op-hook decode must be bit-identical to the old path");
+          int oldGreedy = argMax(oldLogits);
+          assertEquals(
+              oldGreedy,
+              argMax(hookLogits),
+              "step " + step + ": the greedy choice must stay in lockstep");
+          input = oldGreedy;
+        }
+        assertEquals(prompt.length + steps, plain.getFirst().nextPosition());
+        assertEquals(prompt.length + steps, hooked.getFirst().nextPosition());
+      }
+    }
+  }
+
+  /** The raw IEEE bits of an evaluated row, so {@code -0.0} cannot pass for {@code +0.0}. */
+  private static int[] rawBits(float[] values) {
+    int[] bits = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      bits[i] = Float.floatToIntBits(values[i]);
+    }
+    return bits;
+  }
+
+  private static int argMax(float[] values) {
+    int best = 0;
+    for (int i = 1; i < values.length; i++) {
+      if (values[i] > values[best]) {
+        best = i;
+      }
+    }
+    return best;
   }
 
   // ---------------------------------------------------------------------

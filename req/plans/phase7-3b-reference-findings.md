@@ -906,12 +906,18 @@ delegating to the new one with `null` rotation/hook so its graph is unchanged:
   (L516) and the single-row decode path `decode` (L787-794) get matching additive private
   overloads `normalizedHiddenStates(tokenIds, caches, rotation, postBlockHook)` /
   `decode(ids, caches, rotation, postBlockHook)` with the same delegation rule: the
-  `rotation == null` path keeps the old graph bit-for-bit, and the `rotation != null`
-  single-row path routes each block through the batch-aware overloads with
+  `rotation == null && postBlockHook == null` path keeps the old graph bit-for-bit, and
+  the single-row path with a non-null `rotation` or `postBlockHook` routes each block
+  through the batch-aware overloads with
   `validLengths = {sequenceWidth}` and a `[1,1,T,L]` batched mask (elementwise the same as
   the 2-D mask for B = 1; `cache.append(k, v, {T})` is the same arithmetic as
   `cache.append(k, v)` for a uniform row — Unit 2 pins both against the `KVCache`
-  contract). The shared generation loop gets
+  contract). The hook-only route (no rotation, a no-op hook) is pinned bit-exact
+  end-to-end against the old path at the logits by
+  `DecoderSeamTest.decodeWithNoOpPostBlockHookMatchesOldSingleRowPath` (full-float32; the
+  per-row RoPE form delegates to the offset form for a uniform row, so the two routes
+  build the same rope kernel call, and the explicit mask selects the same SDPA result as
+  the old path's implicit causal flag). The shared generation loop gets
   ```java
   @FunctionalInterface
   interface DecodeStep { MLXArray apply(MLXArray ids, List<KVCache> caches); }

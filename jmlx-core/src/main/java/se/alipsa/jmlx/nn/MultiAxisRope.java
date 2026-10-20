@@ -114,17 +114,20 @@ public final class MultiAxisRope {
    * tokens. All validation is {@link IllegalArgumentException} and runs before any MLX array is
    * written: {@code batch} and {@code sequence} are at least 1, {@code positions} has exactly 3
    * non-null rows, each row has length {@code batch * sequence} (computed in {@code long} so the
-   * product cannot overflow) and no coordinate is negative. The frozen compute order then runs: the
-   * static owner masks select, per (token, frequency) on the CPU before any array is written, the
-   * owned row's position, giving one float32 position matrix of shape {@code [B*T, rotaryDims/2]}
-   * (the exact int-to-float casts) that is broadcast-multiplied once against the {@code [1,
-   * rotaryDims/2]} {@code invFreq} array in {@code scope} -- a single float32 multiply per element
-   * with the same two operands the frozen mask expression {@code freqs_t = freqsT * wT + freqsH *
-   * wH + freqsW * wW} copies, which is a bit-identical copy for non-negative finite frequencies
-   * (findings §6.9, step 2); {@code emb = cat((freqs_t, freqs_t), -1)}; {@code MLXOps.cos}/{@code
-   * sin} in float32, with the attention scaling of 1.0 (the pinned {@code rope_type: default})
-   * omitted as the identity on finite values; finally the two arrays are reshaped to {@code [batch,
-   * 1, sequence, rotaryDims]}, broadcastable over the heads axis.
+   * product cannot overflow), no coordinate is negative and the position-matrix size {@code batch *
+   * sequence * rotaryDims/2} fits an {@code int} array (checked in {@code long} before the
+   * allocation, so an overflowing size is an IAE rather than a {@code NegativeArraySizeException}).
+   * The frozen compute order then runs: the static owner masks select, per (token, frequency) on
+   * the CPU before any array is written, the owned row's position, giving one float32 position
+   * matrix of shape {@code [B*T, rotaryDims/2]} (the exact int-to-float casts) that is
+   * broadcast-multiplied once against the {@code [1, rotaryDims/2]} {@code invFreq} array in {@code
+   * scope} -- a single float32 multiply per element with the same two operands the frozen mask
+   * expression {@code freqs_t = freqsT * wT + freqsH * wH + freqsW * wW} copies, which is a
+   * bit-identical copy for non-negative finite frequencies (findings §6.9, step 2); {@code emb =
+   * cat((freqs_t, freqs_t), -1)}; {@code MLXOps.cos}/{@code sin} in float32, with the attention
+   * scaling of 1.0 (the pinned {@code rope_type: default}) omitted as the identity on finite
+   * values; finally the two arrays are reshaped to {@code [batch, 1, sequence, rotaryDims]},
+   * broadcastable over the heads axis.
    */
   public MultiAxisRotation prepare(MLXScope scope, int batch, int sequence, int[][] positions) {
     if (batch < 1) {
@@ -158,6 +161,9 @@ public final class MultiAxisRope {
     }
     int flat = (int) tokens;
     int half = rotaryDims / 2;
+    if ((long) flat * half > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("batch * sequence * rotaryDims/2 must fit an int array");
+    }
     MLXArray invFreqArray = MLX.array(scope, invFreq, new int[] {1, half});
     MLXArray owned =
         MLX.array(scope, ownedPositions(positions, flat, half), new int[] {flat, half});

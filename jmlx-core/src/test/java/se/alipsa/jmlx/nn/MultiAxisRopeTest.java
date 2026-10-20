@@ -108,6 +108,27 @@ class MultiAxisRopeTest {
     }
   }
 
+  /**
+   * The int-overflow guard on the position-matrix size: sections {64000, 0, 0} give half = 64,000
+   * and 33,555 tokens pass the row-length check (each row has exactly that length), so the long
+   * product is 33,555 * 64,000 = 2,147,520,000 > Integer.MAX_VALUE (2,147,483,647) while the plain
+   * int product wraps to -2,147,447,296 -- without the guard, the allocation itself would throw a
+   * NegativeArraySizeException instead of the documented IllegalArgumentException. The guard fires
+   * before any float[] allocation: only the three 33,555-int rows (about 402 KB total) are built.
+   */
+  @Test
+  void prepareRejectsPositionMatrixSizeThatOverflowsInt() {
+    try (MLXScope scope = new MLXScope()) {
+      MultiAxisRope rope = new MultiAxisRope(1000f, new int[] {64_000, 0, 0});
+      int[] row = new int[33_555];
+      IllegalArgumentException thrown =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> rope.prepare(scope, 1, 33_555, new int[][] {row, row, row}));
+      assertTrue(thrown.getMessage().contains("fit an int array"));
+    }
+  }
+
   @Test
   void rotateRejectsInvalidInputs() {
     try (MLXScope scope = new MLXScope()) {

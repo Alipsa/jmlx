@@ -414,7 +414,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * the same graph position, the same block forwards and the same final normalization. This entry
    * itself still neither evaluates nor poisons; embedding-start callers keep the {@link
    * #preflightBatch(int, int, List, int[])}/{@link #poisonBatchIfMutated} and postflight/evaluation
-   * responsibilities of the 4- argument entry.
+   * responsibilities of the 4-argument entry.
    */
   final MLXArray decoderStack(
       MLXArray embeddings,

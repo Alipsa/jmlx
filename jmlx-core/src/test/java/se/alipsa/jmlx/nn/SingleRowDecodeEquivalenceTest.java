@@ -58,7 +58,7 @@ class SingleRowDecodeEquivalenceTest {
   @Test
   void singleRowBatchedMaskMatchesTwoDimensionalMask() {
     try (MLXScope scope = new MLXScope()) {
-      // Prefill rows have T == S (no key padding), so the batched row is unpaddded and
+      // Prefill rows have T == S (no key padding), so the batched row is unpadded and
       // elementwise equal to the 2-D mask; decode rows are the queryStart = S - 1 case below.
       for (int[] shape : new int[][] {{4, 4}, {90, 90}, {7, 7}}) {
         int queryLength = shape[0];

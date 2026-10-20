@@ -1023,8 +1023,8 @@ the rejection cases running in ordinary `:jmlx-core:test`):
 - head-dimension validation and the dtype-cast check that cos/sin are cast to the input
   dtype before the rotation.
 
-Adding the suite to `.github/workflows/ci.yml`'s required-execution list is deferred to
-WP8 (plan §9); the `full-float32` tag selection into `:jmlx-core:float32GoldenTest`
+The suite was added to `.github/workflows/ci.yml`'s required-execution list in PR #57
+(review round 2); the `full-float32` tag selection into `:jmlx-core:float32GoldenTest`
 happens in this WP's implementation units.
 
 **WP4 acceptance (2026-10-20).** Delivered on `phase7-3b-wp4` in four commits over base
@@ -1071,10 +1071,10 @@ the acceptance commit (Unit 4 — `VisualFeatureInjection` and `VisualFeatureInj
   its per-case max absolute error was ≤ 2.4e-7 against the 1e-5 threshold.
   `git diff main` over `RopeSpec.java` and `MLXFast.java` is empty: the sealed
   hierarchy gained no variant and no fast kernel changed.
-- **Deferrals, per plan.** Adding the new native suites to
-  `.github/workflows/ci.yml`'s required-execution list is WP8 (plan §9);
-  `Qwen3VlModel`, the `qwen3_vl` loader dispatch and the DeepStack consumption of
-  `VisualFeatureInjection` are WP5/WP6.
+- **Deferrals, per plan.** The new native suites' addition to
+  `.github/workflows/ci.yml`'s required-execution list landed in PR #57 (review
+  round 2); `Qwen3VlModel`, the `qwen3_vl` loader dispatch and the DeepStack
+  consumption of `VisualFeatureInjection` are WP5/WP6.
 
 ## 7. Fast-vs-slow preprocessing divergence (measured once, both sides)
 

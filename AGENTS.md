@@ -679,6 +679,6 @@ verified against the pre-change exact-bits baseline (`exactBitsVerifyTf32On`/`Of
 14 variants × 9 captures), and the pinned-vendor probe pair
 (`tools/hf-reference/qwen3vl_rope_interleaved_check.{py,jsh}` — manually run in their
 locked environments, never Gradle-invoked) cross-checks the component. The CI
-required-suite list addition is deferred to WP8, and `Qwen3VlModel`, its loader
-dispatch and the DeepStack consumption of `VisualFeatureInjection` are WP5/WP6.
-No native pins, generated bindings, build files or CI changed.
+required-suite list addition landed in PR #57 (review round 2), and `Qwen3VlModel`,
+its loader dispatch and the DeepStack consumption of `VisualFeatureInjection` are
+WP5/WP6. No native pins, generated bindings or build files changed.

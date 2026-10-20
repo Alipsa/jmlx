@@ -161,7 +161,8 @@ jobs:
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest', 'StridedViewSafetyTest',
                             'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest', 'EncoderAttentionTest',
-                            'MLXMemoryLeakTest'],
+                            'MLXMemoryLeakTest',
+                            'MultiAxisRopeTest', 'DecoderRotationSeamTest', 'SingleRowDecodeEquivalenceTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
@@ -172,7 +173,8 @@ jobs:
                               'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
                               'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest',
                               'ModalityRejectionTest', 'Idefics3VisionTowerSmokeTest',
-                              'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest'],
+                              'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest',
+                              'DecoderSeamTest', 'VisualFeatureInjectionTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
@@ -181,9 +183,12 @@ jobs:
                             'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
+          model_results['DecoderSeamTest'] = ['test', 'float32GoldenTest']
+          model_results['VisualFeatureInjectionTest'] = ['test', 'float32GoldenTest']
           model_results['WorkerStreamProbeTest'] = ['threadProbeTest']
           core_results = {name: ['test', 'float32GoldenTest'] for name in
-                          ['DecoderAttentionTest', 'MultiHeadAttentionTest', 'MoeMlpTest', 'SwitchGluTest']}
+                          ['DecoderAttentionTest', 'MultiHeadAttentionTest', 'MoeMlpTest', 'SwitchGluTest',
+                           'MultiAxisRopeTest', 'DecoderRotationSeamTest']}
           core_results['Phase71OracleTest'] = ['float32GoldenTest']
           core_results['EncoderAttentionTest'] = ['float32GoldenTest']
           results_dirs = {'jmlx-models': model_results, 'jmlx-core': core_results}

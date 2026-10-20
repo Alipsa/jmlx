@@ -419,8 +419,8 @@ drift), `RopeSpec.java` and `MLXFast.java` empty diffs, root `check` and
 `verifyMlxApiCallSites` green, and the pinned-vendor probe pair still matching (Python
 exit 0 on all 7 cases; Java twin per-case max error ≤ 2.4e-7 against the 1e-5
 threshold from Unit 2, its component untouched since). Non-goals held: no public core
-API, no build/CI change — the required-execution suite list addition is WP8 per §9 —
-and no `Qwen3VlModel` or loader dispatch; those are WP5/WP6.
+API, no build/CI change — the required-execution suite list addition landed in PR #57
+(review round 2) — and no `Qwen3VlModel` or loader dispatch; those are WP5/WP6.
 
 ## 7. Vision tower and checkpoint assembly (WP5–WP6)
 

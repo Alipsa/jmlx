@@ -971,16 +971,21 @@ joins) — no new public core API.
 - **Masked residual add** (DeepStack level i: add `features_i [1, F_i, hidden]` into the
   `[1, L, hidden]` hidden states at exactly the image-token rows, zero elsewhere):
   ```
-  zero    = MLX.zeros(scope, hidden.shape(), hidden.dtype())        // [1, L, hidden]
-  source  = concatenate([zero, features_i], 1)                      // [1, L + F_i, hidden]
-  mask    = takeAxis(source, MLXArray(gather(L, destinations_i), [L]), 1)
+  zeroRow = MLX.zeros(scope, {1, 1, hidden}, hidden.dtype())        // [1, 1, hidden]
+  source  = concatenate([zeroRow, features_i], 1)                   // [1, 1 + F_i, hidden]
+  mask    = takeAxis(source, MLXArray(maskedAddGatherIndices(L, F_i, destinations_i), [L]), 1)
   updated = MLXOps.add(hidden, mask)
   ```
-  `gather` is the same index algorithm as the replacement (strictly increasing
-  destinations → row `L + f`), so one helper serves both; the add matches the reference's
-  masked clone + add + write-back (§6.6) and leaves every non-image row numerically
-  identical (an exact `+ 0.0` per element; IEEE `-0.0 + 0.0 = +0.0`, so a negative-zero
-  element in a non-image row is normalised to `+0.0`).
+  The gather indices come from the masked add's own builder — every non-destination row
+  reads the zero row (source index `0`), the `f`-th destination (strictly increasing)
+  reads source row `1 + f` — which is what lets the zero pad be a single `[1, 1, hidden]`
+  row instead of a full `[1, L, hidden]` zero tensor; the row-gather replacement above
+  keeps the shared `mergeGatherIndices` helper. The caller `scope`'s relatedness to the
+  operands' scopes (one an ancestor of the other) is validated before any MLX array is
+  written. The add matches the reference's masked clone + add + write-back (§6.6) and
+  leaves every non-image row numerically identical (an exact `+ 0.0` per element; IEEE
+  `-0.0 + 0.0 = +0.0`, so a negative-zero element in a non-image row is normalised to
+  `+0.0`).
 
 **Old-path bit-identity proof plan (the WP4 exit gate).**
 

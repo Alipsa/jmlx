@@ -383,6 +383,27 @@ class VisualFeatureInjectionTest {
     }
   }
 
+  /**
+   * The scope is the common ancestor of both operands: each operand-vs.-scope pair is related (the
+   * operand's child scope is inside the parameter scope) and passes, so the rejection can only come
+   * from the operand-vs.-operand pair — the two sibling operand scopes — which the pre-write scope
+   * check still catches before the zero row or the gather index array is allocated.
+   */
+  @Test
+  void addMaskedFeaturesRejectsSiblingOperandsUnderACommonParentScope()
+      throws InterruptedException {
+    try (MLXScope a = scope.newChild();
+        MLXScope b = scope.newChild()) {
+      MLXArray hidden = array(a, rows(8, 0f));
+      MLXArray features = array(b, rows(3, 10f));
+      assertRejection(
+          () ->
+              VisualFeatureInjection.addMaskedFeatures(
+                  scope, hidden, features, new int[] {3, 4, 5}),
+          "scope must be related to hidden's and features' scopes (one an ancestor of the other)");
+    }
+  }
+
   // ---------------------------------------------------------------------
   // data builders (Java-side expectations)
   // ---------------------------------------------------------------------

@@ -428,6 +428,13 @@ Add `Qwen3VlModel implements TextGenerationModel`, composing the decoder so the 
 existing non-DecoderModel check rejects it. Dispatch `qwen3_vl` before generic decoder config
 parsing; explicitly reject `qwen3_vl_moe`. Metadata advertises TEXT and IMAGE, without exposing
 MLXArray results. Reuse shared generation mechanics and the 7.3a state/accounting contracts.
+Derive the decoder's configured rotary width (`descriptor.rotaryDims()`) from `head_dim`, not
+from the sum of `mrope_section`, and reject the config before model construction when
+`2 * sum(mrope_section) != head_dim`: `MultiAxisRope` derives both its rotated width and its
+inverse-frequency denominator from the section sum, and its partial-rotary tail passthrough — the
+unrotated slots beyond `2 * sum(mrope_section)` — is a jmlx extension, not reference behaviour, so
+a config violating the equality would load and silently diverge from the pinned reference (recorded
+in the PR #57 review of the plan §6 component; plan §6, findings §6.9).
 
 Build family-specific config/descriptor/tensor plans for vision and nested text. Verify required,
 optional and forbidden names, shapes, biases, aliases and all unexpected tensors before model

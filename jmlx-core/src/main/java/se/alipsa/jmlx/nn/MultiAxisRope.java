@@ -16,6 +16,15 @@ import se.alipsa.jmlx.memory.MLXScope;
  * coordinates, which is why the Qwen3-VL path composes this component from existing core facades
  * instead: no new FFI call.
  *
+ * <p>The partial-rotary tail passthrough is a jmlx extension, not reference behaviour. The rotated
+ * width and the inverse-frequency denominator are both derived from {@code 2 * sum(mropeSection)}
+ * rather than the head dimension, so the frequency slots beyond that width pass through unrotated;
+ * in the pinned transformers Qwen3-VL reference, by contrast, both the denominator and the rotated
+ * width come from {@code head_dim}, and the frequency slots outside the H/W slices stay T-owned and
+ * are still rotated. This class agrees with the reference only when {@code 2 * sum(mropeSection) ==
+ * head_dim} (the pinned config [24,20,20] with head_dim 128 satisfies this), which is why the plan
+ * §7 Qwen3-VL loader rejects a config violating that equality.
+ *
  * <p>Deliberately not a {@link Module}: no parameters, no children, no owned scope. Every MLX array
  * {@link #prepare} builds allocates into the caller's scope, and every array {@link
  * MultiAxisRotation#rotate} builds allocates per the usual {@code scopeOf} rule (the innermost

@@ -188,7 +188,8 @@ final class VisualFeatureInjection {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           paramName
-              + " must be related to hidden's and features' scopes (one an ancestor of the other)");
+              + " must be related to hidden's and features' scopes (one an ancestor of the other)",
+          e);
     }
   }
 

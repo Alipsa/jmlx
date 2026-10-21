@@ -411,9 +411,9 @@ existing overloads preserved and routed through the identical old graph, product
 decoders on no-op hooks — with the old-path parity suites; and the frozen
 `VisualFeatureInjection` compositions in `se.alipsa.jmlx.models` (row-gather
 replacement and masked DeepStack residual add over existing core facades; the
-replacement reuses `Idefics3VisionTower`'s gather-index algorithm, the masked add its
-own dedicated builder over a single zero row, no new primitive, no FFI from model
-code, package-private with no new public API). Old-path evidence: the pre-change
+replacement reuses `Idefics3VisionTower`'s gather-index algorithm, the masked add
+the same algorithm with its output remapped over a single zero row, no new primitive,
+no FFI from model code, package-private with no new public API). Old-path evidence: the pre-change
 baseline recorded at `128cd1e` in both TF32 modes then verified bit-exact
 (`exactBitsVerifyTf32On`/`Off`, 14 variants × 9 captures, git-commit metadata the only
 drift), `RopeSpec.java` and `MLXFast.java` empty diffs, root `check` and

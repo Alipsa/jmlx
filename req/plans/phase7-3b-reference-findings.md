@@ -973,19 +973,21 @@ joins) — no new public core API.
   ```
   zeroRow = MLX.zeros(scope, {1, 1, hidden}, hidden.dtype())        // [1, 1, hidden]
   source  = concatenate([zeroRow, features_i], 1)                   // [1, 1 + F_i, hidden]
-  mask    = takeAxis(source, MLXArray(maskedAddGatherIndices(L, F_i, destinations_i), [L]), 1)
+  gather  = gatherIndices(L, destinations_i) remapped: i -> 0, L + f -> 1 + f   // int[L]
+  mask    = takeAxis(source, MLXArray(gather, [L]), 1)
   updated = MLXOps.add(hidden, mask)
   ```
-  The gather indices come from the masked add's own builder — every non-destination row
-  reads the zero row (source index `0`), the `f`-th destination (strictly increasing)
-  reads source row `1 + f` — which is what lets the zero pad be a single `[1, 1, hidden]`
-  row instead of a full `[1, L, hidden]` zero tensor; the row-gather replacement above
-  keeps the shared `mergeGatherIndices` helper. The caller `scope`'s relatedness to the
-  operands' scopes (one an ancestor of the other) is validated before any MLX array is
-  written. The add matches the reference's masked clone + add + write-back (§6.6) and
-  leaves every non-image row numerically identical (an exact `+ 0.0` per element; IEEE
-  `-0.0 + 0.0 = +0.0`, so a negative-zero element in a non-image row is normalised to
-  `+0.0`).
+  The gather indices are the shared `mergeGatherIndices` helper's output (the same
+  one the row-gather replacement above applies directly) remapped over the source's
+  `1 + F_i` rows — every identity row (shared index `i < L`) remaps to the zero row
+  (source index `0`), the `f`-th destination (shared index `L + f`, strictly
+  increasing) remaps to source row `1 + f` — which is what lets the zero pad be a
+  single `[1, 1, hidden]` row instead of a full `[1, L, hidden]` zero tensor. The
+  caller `scope`'s relatedness to the operands' scopes (one an ancestor of the
+  other) is validated before any MLX array is written. The add matches the
+  reference's masked clone + add + write-back (§6.6) and leaves every non-image
+  row numerically identical (an exact `+ 0.0` per element; IEEE `-0.0 + 0.0 = +0.0`,
+  so a negative-zero element in a non-image row is normalised to `+0.0`).
 
 **Old-path bit-identity proof plan (the WP4 exit gate).**
 

@@ -336,7 +336,8 @@ jmlx-core        se.alipsa.jmlx.nn                 Module, Linear, QuantizedLine
                                                     MultiHeadAttention, GroupedQueryAttention,
                                                     DecoderAttention, DecoderBlock, AttentionMask,
                                                     RopeSpec, KVCache, KVCachePolicy, GatedMlp,
-                                                    SwiGLU, MoeMlp, SwitchGlu, ModuleGrad
+                                                    SwiGLU, MoeMlp, SwitchGlu, ModuleGrad,
+                                                    MultiAxisRope, MultiAxisRotation
                  se.alipsa.jmlx.core                MLX, MLXOps, MLXShape, MLXFast, MLXQuant,
                                                     MLXRandom, MLXGrad, MLXIO, MLXMemory, MLXArray,
                                                     DType, MLXException
@@ -663,3 +664,21 @@ against the rotated fixtures (findings §4.8). No native pins or generated bindi
 no new Gradle tasks were added — the existing `verifyImageOracleFixtureDigests` and
 `verifyHfReferenceGoldens` guards cover the new fixtures, and `ImageOracleQwen3VlTest` (part of
 `:jmlx-vision:test`) is the Java-side byte verification.
+
+Phase 7.3b WP4 (2026-10-20) landed the frozen `MultiAxisRope`/`MultiAxisRotation`
+core components in `jmlx-core`'s `se.alipsa.jmlx.nn` (the Qwen3-VL interleaved
+three-axis RoPE kernel with its `cachePosition + delta` decode coordinates), the
+additive request-supplied rotary-state / post-block injection seam on the
+`DecoderModel` path (existing overloads untouched; production decoders use no-op
+hooks; `RopeSpec`'s sealed hierarchy and `MLXFast` are byte-identical — verified by
+empty diff), and the package-private `VisualFeatureInjection` compositions in
+`jmlx-models` (row-gather image-row replacement plus masked DeepStack residual add,
+composed from existing core facades over the Idefics3 gather-index algorithm — no new
+primitive, no FFI from model code). Old-path bit identity in both TF32 modes is
+verified against the pre-change exact-bits baseline (`exactBitsVerifyTf32On`/`Off`,
+14 variants × 9 captures), and the pinned-vendor probe pair
+(`tools/hf-reference/qwen3vl_rope_interleaved_check.{py,jsh}` — manually run in their
+locked environments, never Gradle-invoked) cross-checks the component. The CI
+required-suite list addition landed in PR #57 (review round 2), and `Qwen3VlModel`,
+its loader dispatch and the DeepStack consumption of `VisualFeatureInjection` are
+WP5/WP6. No native pins, generated bindings or build files changed.

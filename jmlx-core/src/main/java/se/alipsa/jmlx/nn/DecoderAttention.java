@@ -182,7 +182,7 @@ public final class DecoderAttention extends CachedAttention {
   @Override
   public MLXArray forward(
       MLXArray x, KVCache cache, MLXArray attentionMask, MLXArray stepFrequencies) {
-    return forwardInternal(x, cache, attentionMask, stepFrequencies, null);
+    return forwardInternal(x, cache, attentionMask, stepFrequencies, null, null);
   }
 
   @Override
@@ -192,7 +192,36 @@ public final class DecoderAttention extends CachedAttention {
       MLXArray attentionMask,
       MLXArray stepFrequencies,
       int[] validLengths) {
-    return forwardInternal(x, cache, attentionMask, stepFrequencies, validLengths);
+    return forwardInternal(x, cache, attentionMask, stepFrequencies, validLengths, null);
+  }
+
+  /**
+   * Batch-aware forward that rotates the projected query and key heads from a request-supplied
+   * {@link MultiAxisRotation} instead of the {@link RopeSpec} fast kernels, skipping the
+   * frequency-array derivation entirely. The rotation lands where {@code rope.apply} runs today --
+   * after projection and the optional QK normalization, before the cache append -- so the retained
+   * keys are already rotated. {@code validLengths} is required: this path always runs the
+   * batch-aware validation and per-row cache bookkeeping, which reduce to the single-row arithmetic
+   * for a uniform B = 1 row (pinned by {@code SingleRowDecodeEquivalenceTest}). All validation is
+   * {@link IllegalArgumentException} before any array is written, including the rotation's own
+   * width against this attention's configured {@code rotaryDims} ({@link
+   * MultiAxisRotation#validateAgainst(int, int, int, int)}): a rotation prepared from a different
+   * mrope-section sum is rejected up front rather than silently rotating a different head prefix.
+   */
+  public MLXArray forward(
+      MLXArray x,
+      KVCache cache,
+      MLXArray attentionMask,
+      int[] validLengths,
+      MultiAxisRotation rotation) {
+    if (rotation == null) {
+      throw new IllegalArgumentException("rotation must not be null");
+    }
+    if (validLengths == null) {
+      throw new IllegalArgumentException(
+          "the rotation path requires batch valid lengths, one per row");
+    }
+    return forwardInternal(x, cache, attentionMask, null, validLengths, rotation);
   }
 
   private MLXArray forwardInternal(
@@ -200,7 +229,8 @@ public final class DecoderAttention extends CachedAttention {
       KVCache cache,
       MLXArray attentionMask,
       MLXArray stepFrequencies,
-      int[] validLengths) {
+      int[] validLengths,
+      MultiAxisRotation rotation) {
     Objects.requireNonNull(x, "x");
     int[] shape = x.shape();
     if (shape.length != 3 || shape[0] <= 0 || shape[1] <= 0) {
@@ -265,18 +295,27 @@ public final class DecoderAttention extends CachedAttention {
       throw new IllegalArgumentException(
           "attentionMask must be BOOL " + Arrays.toString(expectedMask));
     }
-    MLXArray freqs = staticFreqs != null ? staticFreqs : stepFrequencies;
-    if (freqs == null) {
-      // Only dynamic specs reach here; computed once so q and k share one upload.
-      int ending = offset + sequence;
-      if (validLengths != null) {
-        ending = 0;
-        for (int row = 0; row < batch; row++) {
-          ending =
-              Math.max(ending, (cache == null ? 0 : cache.nextPosition(row)) + validLengths[row]);
+    MLXArray freqs;
+    if (rotation != null) {
+      // The rotation path rotates from its own cos/sin tables; no frequency array is derived.
+      // Validate the rotation's shape, and its width against this attention's configured rotary
+      // width, before any projection builds a graph node.
+      rotation.validateAgainst(batch, sequence, headDim, rotaryDims);
+      freqs = null;
+    } else {
+      freqs = staticFreqs != null ? staticFreqs : stepFrequencies;
+      if (freqs == null) {
+        // Only dynamic specs reach here; computed once so q and k share one upload.
+        int ending = offset + sequence;
+        if (validLengths != null) {
+          ending = 0;
+          for (int row = 0; row < batch; row++) {
+            ending =
+                Math.max(ending, (cache == null ? 0 : cache.nextPosition(row)) + validLengths[row]);
+          }
         }
+        freqs = rope.stepFrequencies(x.scope(), rotaryDims, ending);
       }
-      freqs = rope.stepFrequencies(x.scope(), rotaryDims, ending);
     }
     MLXArray q = AttentionHeads.toHeads(queryProj.forward(x), batch, sequence, numHeads, headDim);
     MLXArray k =
@@ -289,7 +328,10 @@ public final class DecoderAttention extends CachedAttention {
     if (keyNorm != null) {
       k = keyNorm.forward(k);
     }
-    if (validLengths == null) {
+    if (rotation != null) {
+      q = rotation.rotate(q);
+      k = rotation.rotate(k);
+    } else if (validLengths == null) {
       q = rope.apply(q, rotaryDims, offset, freqs);
       k = rope.apply(k, rotaryDims, offset, freqs);
     } else {

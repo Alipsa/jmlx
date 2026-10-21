@@ -86,4 +86,34 @@ public final class DecoderBlock extends Module {
                 inputNorm.forward(x), cache, attentionMask, stepFrequencies, validLengths));
     return MLXOps.add(afterAttention, mlp.forward(postAttentionNorm.forward(afterAttention)));
   }
+
+  /**
+   * Applies this block to a left-padded batch, rotating the attention heads from a request-supplied
+   * {@link MultiAxisRotation} instead of the block's rotary spec. Same residual structure as the
+   * batch overload: input plus the rotated attention output, plus the MLP of the post-attention
+   * normalization. The attention child must be a {@link DecoderAttention}, the only cached
+   * attention with the rotation overload; blocks built from another {@link CachedAttention}
+   * subclass are rejected before any array is written.
+   */
+  public MLXArray forward(
+      MLXArray x,
+      KVCache cache,
+      MLXArray attentionMask,
+      int[] validLengths,
+      MultiAxisRotation rotation) {
+    Objects.requireNonNull(x, "DecoderBlock.forward: x must not be null");
+    if (rotation == null) {
+      throw new IllegalArgumentException("DecoderBlock.forward: rotation must not be null");
+    }
+    if (!(attention instanceof DecoderAttention decoderAttention)) {
+      throw new IllegalArgumentException(
+          "DecoderBlock.forward with a MultiAxisRotation requires a DecoderAttention child");
+    }
+    MLXArray afterAttention =
+        MLXOps.add(
+            x,
+            decoderAttention.forward(
+                inputNorm.forward(x), cache, attentionMask, validLengths, rotation));
+    return MLXOps.add(afterAttention, mlp.forward(postAttentionNorm.forward(afterAttention)));
+  }
 }

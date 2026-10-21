@@ -123,3 +123,51 @@ takes the upscale branch under either bound.
 Consumption contract for the Phase 7.3b WP5+ model-math tests: feed these bins
 directly as `pixel_values` (with the manifest's grids) without re-preprocessing,
 so a model-math error cannot be concealed by a preprocessing drift.
+
+### Qwen3-VL interleaved multi-axis RoPE cross-check (Phase 7.3b WP4)
+
+`qwen3vl_rope_interleaved_check.py` and its Java twin
+`qwen3vl_rope_interleaved_check.jsh` are an opt-in pair, never invoked by
+Gradle, that writes no golden: the Python probe runs the real pinned
+`Qwen3VLTextRotaryEmbedding` plus `apply_rotary_pos_emb` (transformers 4.57.6,
+CPU float32, single-threaded, deterministic) on fixed, index-coded asymmetric
+cases -- prefill, prefill at the pinned maximum coordinate (89), decode at the
+all-axes-equal shape, decode at the negative-delta coordinate (26), per-row
+batched positions, and small sections that exercise every interleaved `f % 3`
+owner -- and prints a deterministic full-precision float32 case table to
+stdout. It exits non-zero if its internal gates fail: the pinned snapshot's
+`text_config` must carry theta 5,000,000 / head_dim 128 /
+`mrope_section [24, 20, 20]` / `mrope_interleaved true` / rope type default;
+each module's `inv_freq` must be bit-exact against the documented float32
+derivation order; each case's explicit owner-gather recomputation must be
+bit-exact against the module's own `apply_interleaved_mrope` output; the
+equal-axes case's 2-D position-ids path must equal its 3-D path; the q and k
+outputs must be bit-equal; and a double run must reproduce the table's
+SHA-256.
+
+The Java twin reads that table through `JMLX_ROPE_REFERENCE` (jshell has no
+argv), runs the frozen `se.alipsa.jmlx.nn.MultiAxisRope` component over every
+case, and requires a max absolute error at or below 1e-5 against the
+reference rotate-half output (plus bit-identical rotate self-consistency).
+The pinned transformers output is authoritative: a divergence means the Java
+component is fixed, not the probe. Run both from the repository root:
+
+```sh
+./gradlew :jmlx-core:jar :jmlx-ffi:jar
+tools/hf-reference/.venv/bin/python \
+  tools/hf-reference/qwen3vl_rope_interleaved_check.py \
+  > build/qwen3vl-rope-reference.txt
+JMLX_LIBRARY_PATH=$PWD/native/install/lib \
+JMLX_ROPE_REFERENCE=$PWD/build/qwen3vl-rope-reference.txt \
+  "$JDK25_HOME/bin/jshell" --execution local -s -J--enable-native-access=ALL-UNNAMED \
+  --class-path jmlx-core/build/libs/jmlx-core-0.5.0-SNAPSHOT.jar:jmlx-ffi/build/libs/jmlx-ffi-0.5.0-SNAPSHOT.jar \
+  tools/hf-reference/qwen3vl_rope_interleaved_check.jsh
+```
+
+where `$JDK25_HOME` is the Java 25 toolchain home the build uses. The Python
+probe exits non-zero on any gate failure; the Java twin exits 0 when every
+case is within 1e-5, 1 when any case exceeds the threshold or a rotate is not
+self-consistent, 2 on a missing or unrecognized table, and 3 on any other
+failure. Each per-case max error is printed. `--execution local` runs the
+snippets inside the jshell process so the `System.exit` verdict is the probe's
+exit code (the default child-engine mode swallows it).

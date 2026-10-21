@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -20,8 +21,9 @@ import se.alipsa.jmlx.nn.KVCache;
  * DecoderModel#decoderStack}) and for its shape-keyed preflight {@link
  * DecoderModel#preflightBatch(int, int, List, int[])}: the checks added with the entry point must
  * reject a wrong rank, batch, width or hidden size and a wrong cache count before any layer
- * advances, a correctly shaped call must run the whole stack, and the preflight itself must keep
- * the poisoned-cache and width-vs-valid-length guarantees a WP6 caller relies on.
+ * advances, a post-block hook returning a null, differently shaped, or differently typed state must
+ * be rejected naming the block, a correctly shaped call must run the whole stack, and the preflight
+ * itself must keep the poisoned-cache and width-vs-valid-length guarantees a WP6 caller relies on.
  */
 @EnabledIfNativeAvailable
 class DecoderStackContractTest {
@@ -235,6 +237,119 @@ class DecoderStackContractTest {
       for (KVCache cache : caches) {
         assertEquals(WIDTH, cache.nextPosition(0));
       }
+    }
+  }
+
+  /**
+   * A post-block hook that returns a differently shaped state must be rejected immediately after
+   * the first block, naming the block index and the expected versus returned shape, instead of
+   * surfacing later inside the next block's projection.
+   */
+  @Test
+  void postBlockHookReturningWrongShapeIsRejectedNamingTheBlock() {
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> caches = caches(run);
+      int hidden = model.config().hiddenSize();
+      DecoderModel.PostBlockHook hook = (layer, state) -> embeddings(run, BATCH, WIDTH, hidden + 1);
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  model.decoderStack(
+                      embeddings(run, BATCH, WIDTH, hidden),
+                      caches,
+                      validLengths(),
+                      WIDTH,
+                      null,
+                      hook));
+      assertEquals(
+          "postBlockHook for block 0 must return the block's hidden state with the same shape ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + hidden
+              + "] and dtype FLOAT32: got ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + (hidden + 1)
+              + "] of dtype FLOAT32",
+          failure.getMessage());
+    }
+  }
+
+  /**
+   * A post-block hook that returns null is rejected by the same check, naming the block index and
+   * the expected shape and dtype.
+   */
+  @Test
+  void postBlockHookReturningNullIsRejectedNamingTheBlock() {
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> caches = caches(run);
+      int hidden = model.config().hiddenSize();
+      DecoderModel.PostBlockHook hook = (layer, state) -> null;
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  model.decoderStack(
+                      embeddings(run, BATCH, WIDTH, hidden),
+                      caches,
+                      validLengths(),
+                      WIDTH,
+                      null,
+                      hook));
+      assertEquals(
+          "postBlockHook for block 0 must return the block's hidden state with the same shape ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + hidden
+              + "] and dtype FLOAT32: got null",
+          failure.getMessage());
+    }
+  }
+
+  /**
+   * A post-block hook that returns a same-shape but differently typed state must be rejected
+   * immediately after the first block, naming the block index and the expected versus returned
+   * dtype, instead of silently retyping every later block's projection input.
+   */
+  @Test
+  void postBlockHookReturningWrongDtypeIsRejectedNamingTheBlock() {
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> caches = caches(run);
+      int hidden = model.config().hiddenSize();
+      DecoderModel.PostBlockHook hook = (layer, state) -> MLX.astype(state, DType.FLOAT16);
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  model.decoderStack(
+                      embeddings(run, BATCH, WIDTH, hidden),
+                      caches,
+                      validLengths(),
+                      WIDTH,
+                      null,
+                      hook));
+      assertEquals(
+          "postBlockHook for block 0 must return the block's hidden state with the same shape ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + hidden
+              + "] and dtype FLOAT32: got ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + hidden
+              + "] of dtype FLOAT16",
+          failure.getMessage());
     }
   }
 

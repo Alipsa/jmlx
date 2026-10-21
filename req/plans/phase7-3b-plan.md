@@ -1,8 +1,10 @@
 # Phase 7.3b — Qwen3-VL image and text inference
 
-- **Status:** WP0 and WP1 complete, 2026-10-15 — baseline, artifact pins, executable reference
-  probes and divergence evidence are recorded in `req/plans/phase7-3b-reference-findings.md`.
-  WP3–WP6 implementation and acceptance remain work below.
+- **Status:** WP0–WP4 complete: WP0/WP1 2026-10-15 (reference findings), WP2 accepted
+  2026-10-18 per PR #50, WP3 accepted 2026-10-19 per PR #55, WP4 completed 2026-10-20
+  (local acceptance evidence in `req/plans/phase7-3b-reference-findings.md` §6.9's
+  acceptance block; acceptance rides this branch's PR). WP5–WP8 implementation and
+  acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -397,12 +399,43 @@ update inventory overrides/call-site coverage and test scope/error behavior. Do 
 add general indexing APIs. After the refactor, require exact old-path bit and greedy-ID equality
 under the same reproducibility tuple, not just tolerance-golden passes.
 
+**2026-10-20 WP4 status:** WP4 is completed locally (the acceptance record is
+`req/plans/phase7-3b-reference-findings.md` §6.9's acceptance block): the frozen core
+components `MultiAxisRope` (validated `[3,B,T]` positions, the interleaved frequency /
+rotate-half kernel with the pinned compute/cast order, equal and index-coded axes,
+`cachePosition + delta` decode coordinates, partial-rotary tail passthrough, and
+pre-write `IllegalArgumentException` rejections) and its `MultiAxisRotation`
+family specification; the additive decoder seam — request-supplied rotary state and the
+post-block injection callback across `DecoderAttention`/`DecoderBlock`/`DecoderModel`,
+existing overloads preserved and routed through the identical old graph, production
+decoders on no-op hooks — with the old-path parity suites; and the frozen
+`VisualFeatureInjection` compositions in `se.alipsa.jmlx.models` (row-gather
+replacement and masked DeepStack residual add over existing core facades; the
+replacement reuses `Idefics3VisionTower`'s gather-index algorithm, the masked add
+the same algorithm with its output remapped over a single zero row, no new primitive,
+no FFI from model code, package-private with no new public API). Old-path evidence: the pre-change
+baseline recorded at `128cd1e` in both TF32 modes then verified bit-exact
+(`exactBitsVerifyTf32On`/`Off`, 14 variants × 9 captures, git-commit metadata the only
+drift), `RopeSpec.java` and `MLXFast.java` empty diffs, root `check` and
+`verifyMlxApiCallSites` green, and the pinned-vendor probe pair still matching (Python
+exit 0 on all 7 cases; Java twin per-case max error ≤ 2.4e-7 against the 1e-5
+threshold from Unit 2, its component untouched since). Non-goals held: no public core
+API, no build/CI change — the required-execution suite list addition landed in PR #57
+(review round 2) — and no `Qwen3VlModel` or loader dispatch; those are WP5/WP6.
+
 ## 7. Vision tower and checkpoint assembly (WP5–WP6)
 
 Add `Qwen3VlModel implements TextGenerationModel`, composing the decoder so the scheduler's
 existing non-DecoderModel check rejects it. Dispatch `qwen3_vl` before generic decoder config
 parsing; explicitly reject `qwen3_vl_moe`. Metadata advertises TEXT and IMAGE, without exposing
 MLXArray results. Reuse shared generation mechanics and the 7.3a state/accounting contracts.
+Derive the decoder's configured rotary width (`descriptor.rotaryDims()`) from `head_dim`, not
+from the sum of `mrope_section`, and reject the config before model construction when
+`2 * sum(mrope_section) != head_dim`: `MultiAxisRope` derives both its rotated width and its
+inverse-frequency denominator from the section sum, and its partial-rotary tail passthrough — the
+unrotated slots beyond `2 * sum(mrope_section)` — is a jmlx extension, not reference behaviour, so
+a config violating the equality would load and silently diverge from the pinned reference (recorded
+in the PR #57 review of the plan §6 component; plan §6, findings §6.9).
 
 Build family-specific config/descriptor/tensor plans for vision and nested text. Verify required,
 optional and forbidden names, shapes, biases, aliases and all unexpected tensors before model
@@ -439,6 +472,17 @@ If the 8B artifact packs vision matrices, implement and test those categories to
 compatible artifact and record why. Synthetic quantized tests compare against the same
 dequantized weights. Never compare quantized weights against unrelated HF float goldens or
 silently dequantize the entire 8B model to satisfy the manual run.
+
+**2026-10-21 PR #57 review addition:** the WP4 seam is correct but its decode performance is
+unmeasured: `normalizedHiddenStates(..., rotation, postBlockHook)` routes every single-row step
+with a non-null rotation or hook through `decoderStack`, which passes an explicit `[1,1,1,L]`
+BOOL batched mask to SDPA where the old path used `mask == null` (implicit causal). Qwen3-VL
+decode always needs a rotation (`cachePosition + delta`), so once `Qwen3VlModel` exists every
+generated token takes the masked path, and the bit-exact seam suites cover correctness but not
+per-step cost. Before WP6 acceptance, run a one-off `:jmlx-examples:benchmarkDecode` comparison
+of the seam path against the old implicit-causal path and record the result in
+`req/phase6-4-benchmark.md` with the complete reproducibility tuple, as the other decode
+benchmarks do.
 
 ## 8. Request lifecycle and cache policies (WP7)
 
@@ -580,7 +624,7 @@ SmolVLM fixtures are unchanged.
 | WP3 | Expansion, templates, three-axis position planner | WP0–WP2 | Pure tests and HF template/expanded-ID/position goldens |
 | WP4 | Core multi-axis RoPE and decoder injection seam | WP0, WP1, WP3 | Strict rotary tests; exact before/after decoder bits in both modes |
 | WP5 | Vision tower, main/DeepStack mergers | WP1, WP2, core primitives | HF intermediate-feature references |
-| WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests |
+| WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests; one-off benchmark of the seam's explicit SDPA mask against the implicit-causal decode path |
 | WP7 | Generation, ownership and cache accounting | WP6 | Cached/full equivalence, lifecycle/failure/memory tests |
 | WP8 | Tier-B, manual 8B, CI and documentation | WP7 | Parent numerical/artifact/performance/matrix gates |
 | WP9 | EXIF orientation policy decision (pre-WP2) and rotated-fixture parity (post-WP2 implementation) | WP1 | Policy recorded before WP2 acceptance; rotated-fixture parity with the slow processor once the Qwen path exists; SmolVLM fixtures unchanged |
@@ -603,8 +647,8 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [x] Slow-PIL and effective-area deviations, processor-construction probe and guarded fast-comparison lock accepted.
 - [x] Locked `mlx-vlm` reference and separate HF/MLX provenance tensor plans accepted.
 - [ ] Qwen decode option, unchanged default conversion and exact preprocessing/prompt/position/template fixtures pass.
-- [ ] Old one-dimensional decoder path remains bit-identical in both precision modes.
-- [ ] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
+- [x] Old one-dimensional decoder path remains bit-identical in both precision modes.
+- [x] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
 - [ ] Vision/merger/DeepStack intermediate references and quantized synthetic tests pass.
 - [ ] All four Tier-A cases and forced generated-marker continuations pass strict/default cached/full-forward checks.
 - [ ] Resource validation, request reuse, cancellation/failure cleanup and memory bounds pass.

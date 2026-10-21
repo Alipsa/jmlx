@@ -712,6 +712,391 @@ no extra tokens.
     of this machine's terminal display stripping the 0x7c byte from displayed text (the true
     sentinels contain it). The hex-verified spellings above supersede those claims.
 
+### 6.9 Core multi-axis RoPE and decoder integration seam (WP4 design freeze, 2026-10-20)
+
+This section freezes the WP4 design (plan §6) so the implementation units proceed without
+re-deciding. Base commit at implementation start: `main` at
+`128cd1ec2fb1004487015377183081827a29b956` ("Merge pull request #56 from
+Alipsa/checkstyle-zero-warnings"); native pins `mlx-metal==0.31.2` / mlx-c
+`fba4470b89073180056c9ea46c443051375f7399` (`native/install/lib/native-pin.properties`);
+host Mac OS X 27.0.1, arm64, Apple M5 Max (MLX default device `gpu`).
+
+**Pre-change exact-bits baseline (recorded 2026-10-20, before any decoder or RoPE change).**
+`./gradlew :jmlx-models:exactBitsRecord` (the 7.3a recorder, reused unchanged; one JVM per
+mode with explicit `MLX_ENABLE_TF32=1` / `=0`) PASSES at the base commit with a clean tree:
+
+- spec hash `846396b1dbab5a770a4f2c36841fe5ed1570a586b908956ed6e224fe5248e687` (both modes;
+  identical to the 7.3a baseline — no spec constant changed), recorded git commit
+  `128cd1ec2fb1004487015377183081827a29b956`, `gitDirty: false`,
+  `decoderModelSha256 dee4004857eed4a08633f1c44fb3cca5cda7f90148c4a2f4ca0e47305e5809f9`;
+- host tuple: device `gpu`, `Mac OS X` `27.0.1`, arm64, `mlxMetalVersion 0.31.2`,
+  `mlxcCommit fba4470b89073180056c9ea46c443051375f7399`;
+- variants captured: 14 applicable per mode — llama, llama-q4, llama31, mistral, mistral-q4,
+  mixtral, phi3, phi3-q4, qwen2, qwen2-q4, qwen3, qwen3-q4, gemma, gemma-q4 (the 8 Tier-A
+  families plus the 6 derived q4/group-32 variants; mixtral is MoE and has no quantized
+  variant) with 9 captures each (126 per mode, 2,048 floats per variant): `direct-prefill`
+  (`model.forward` prefill logits), `decode-step-0/1` (single-row decode), `batch-prefill`,
+  `batch-decode-0/1`, `batch-prefill-hook` (batched `stepLogits` with the deterministic +1e-3
+  row-1 `EmbeddingHook`, alongside the no-hook `batch-prefill`), `greedy` (exact generated
+  IDs) and `scheduler` (the gated end-to-end 2-request run, per-row IDs plus finish reason).
+- Recordings: `jmlx-models/build/exact-bits/tf32-{1,0}/` (the module build directory the
+  tasks write to; never committed, wiped by `gradle clean`, device-specific PR evidence). The
+  WP4 units keep these trees in place: `:jmlx-models:exactBitsVerifyTf32{On,Off}` runs
+  against them on this machine. The stale 7.3a trees on disk (recorded at a dirty, earlier
+  commit) were deleted first, as the recorder's own re-record contract requires (a baseline
+  is never silently replaced).
+- **No recorder extension is needed:** WP4 touches the decoder only additively (existing
+  overloads keep the identical graph by delegating with `null`), and the spec's captures
+  already exercise every path the change can reach — direct prefill bits, per-step decode
+  bits, batched `stepLogits` with and without the hook, exact greedy IDs and the full
+  scheduler run over all 8 families plus the quantized variants — with verify mode
+  (commit-only metadata drift allowed) as the bit-identity gate.
+
+**Per-path kernel matrix (frozen).**
+
+- Qwen3-VL — multimodal prefill, cached decode, text-only prefill and fresh full forward
+  alike — uses the dedicated explicit FLOAT32 frequency/cos/sin and half-rotation path below
+  (`MultiAxisRope`/`MultiAxisRotation`), a pure composition of existing core facades: no new
+  FFI call and no `mlx_fast_rope*` on this path.
+- Ordinary decoders (llama, llama31, mistral, mixtral, phi3, qwen2, qwen3, gemma) and the
+  T5/encoder attention paths keep the unchanged `mlx_fast_rope`/`mlx_fast_rope_dynamic` fast
+  kernels via the existing `RopeSpec.apply` path (and the existing direct `MLXFast.rope`
+  call sites in `MultiHeadAttention`/`GroupedQueryAttention`). Absent multimodal inputs
+  route through the identical old graph: every new overload delegates with `null`
+  rotation/hook, and no existing overload is modified.
+- No fast-kernel optimization of the Qwen3-VL path in this WP: the fast kernels'
+  offset-plus-arange contract cannot express unequal multimodal coordinates, and any later
+  optimization requires a dated amendment with shifted-offset probes, strict/default
+  cached/full equivalence and performance evidence (plan §6) — never a silent kernel mix
+  between the compared paths.
+
+**Compute/cast order (frozen; transcribed from §6.5).**
+
+1. Per-axis float32 frequencies: for d ∈ {0=T, 1=H, 2=W},
+   `freqs[d][t, i] = float32(positions[d][t]) · invFreq[i]` — the position ids cast to
+   float32 (exact for the non-negative coordinates) and a single float32 multiply per
+   frequency, a length-1 reduction, exact. `invFreq[i] = 1 / theta^(2i/rotaryDims)` is
+   derived once at construction (pinned reference: `theta = 5,000,000`,
+   `rotaryDims = 2·Σ mrope_section = 128`, `Σ = 64 = head_dim/2`).
+2. Interleaved overwrite starting from the T row (a per-frequency owner selection, bit-
+   identical to the reference's in-place overwrite): for dim 1 (H) `length =
+   mrope_section[1]·3` and `idx = slice(1, length, 3)` — H owns frequency indices
+   `1, 4, 7, …, 1+3(s1−1)` (count s1); for dim 2 (W) `length = mrope_section[2]·3` and
+   `idx = slice(2, length, 3)` — W owns `2, 5, 8, …, 2+3(s2−1)` (count s2); everything else
+   stays T (owner(f) = T when `f % 3 == 0` or `f >= 3·(s1+s2)`). Pinned reference
+   `[24,20,20]`: H owns `1, 4, …, 58` (20 frequencies), W owns `2, 5, …, 59` (20), T owns
+   the remaining 24 — a T-starting round-robin `T H W T H W …` with a terminal run of four
+   T frequencies. The implementation realizes the selection with a static owner table: a
+   single byte array of length `rotaryDims/2` holding one 0/1/2 owner (T/H/W) per frequency
+   slot, derived from the sections at construction (the H and W conditions are disjoint, so
+   every slot has exactly one owner) selects, per (token, frequency) on the CPU before any
+   array is written, the owned row's position — the same copy the mask expression
+   `freqsT·wT + freqsH·wH + freqsW·wW` is a bit-identical copy of for non-negative finite
+   frequencies (multiply by 1.0/0.0 and add in float32 are exact there) — so each `freqs_t`
+   element is still exactly one float32 multiply of the same two operands (owned position ·
+   `invFreq[i]`) using only the existing facades.
+3. `emb = cat((freqs_t, freqs_t), −1)` → per token `[rotaryDims]` (128 pinned, = head_dim).
+4. `cos = cos(emb) · attention_scaling`, `sin = sin(emb) · attention_scaling`, computed in
+   float32; `attention_scaling = 1.0` for `rope_type: default` (the pinned artifact), so
+   the multiply is the identity on finite float32 values and is omitted.
+5. Cast cos/sin to the input array's dtype (a no-op for the FLOAT32 model; kept for dtype
+   correctness of the composition).
+6. In the input dtype, `out = x·cos + rotate_half(x)·sin`, where `rotate_half` is the NeoX
+   half-split form `(−x2, x1)`: `cat((−x[…, n:], x[…, :n]), −1)` — the same layout the fast
+   kernels use with `traditional=false`. Only the `rotaryDims` prefix of each head is
+   rotated; the tail `[rotaryDims, headDim)` passes through unchanged (partial rotary).
+
+**Frozen signatures.**
+
+New core components in `se.alipsa.jmlx.nn` — a dedicated component, **not** a new
+`RopeSpec` variant: the sealed `RopeSpec` hierarchy gains no permitted variant, preserving
+source compatibility for exhaustive consumer switches (plan §6).
+
+- `public final class MultiAxisRope` — immutable; holds theta, the cloned sections and the
+  derived `rotaryDims`/`invFreq`/owner masks. Deliberately not a `Module`: no parameters,
+  no children, no owned scope; every MLX array it builds allocates into the caller's scope.
+  ```java
+  public MultiAxisRope(float theta, int[] mropeSection)
+  public float theta()
+  public int[] mropeSection()     // defensive copy
+  public int rotaryDims()         // 2 · Σ mropeSection
+  public MultiAxisRotation prepare(MLXScope scope, int batch, int sequence, int[][] positions)
+  ```
+  `positions` is `int[3][batch·sequence]` — three rows of length B·T (row-major flattened
+  `[B,T]`), row 0 = T (time), row 1 = H (height), row 2 = W (width). Chosen over three
+  separate `int[]` parameters: it is the reference's `[3, B·T]` `position_ids` layout as
+  one validated object, its row order is the `mrope_section` order and the §6.5 axis
+  indices 0/1/2, and `Qwen3VlPromptPlan`'s `temporalPositions()`/`heightPositions()`/
+  `widthPositions()` map to the rows one-to-one in that order. Validation, all
+  `IllegalArgumentException`, all checked **before any MLX array is written**: constructor —
+  theta finite and positive (the `RopeSpec` convention), sections non-null (cloned), every
+  element ≥ 0, Σ ≥ 1 (rotaryDims is even by construction); `prepare` — batch ≥ 1, sequence ≥
+  1, exactly 3 rows, each row's length == batch·sequence (computed in `long` with overflow
+  checked before use), and no negative coordinate (rejected). Frequencies/cos/sin are
+  computed on every `prepare` call: no position-derived state is cached. The computation
+  follows the frozen order: one `[B·T, rotaryDims/2]` float32 position matrix (the
+  owner-mask-selected row per frequency, built directly from the int rows — the exact
+  cast) × the `[1, rotaryDims/2]` `invFreq` array by a single broadcast multiply →
+  `freqs_t` (bit-identical to the per-axis ×-then-owner-mask selection, step 2);
+  concatenate → `emb`; `MLXOps.cos`/`MLXOps.sin` in `scope` → FLOAT32 arrays reshaped to
+  `[batch, 1, sequence, rotaryDims]` (broadcastable over the heads axis). Host-memory trade-off
+  (accepted in review): the one position-matrix upload now holds `B·T·rotaryDims/2` float32 values
+  on the host where the pre-restructure path held `3·B·T` (three per-axis position arrays) — about 21× more for
+  the pinned 2B at a 32k prefill (8 MB vs 384 KB) — while decode (`B·T = 1`) is strictly cheaper
+  and the prefill cost is small next to the prefill compute.
+- `public final class MultiAxisRotation` — the per-step rotation state one `prepare`
+  produces and every layer of that step shares, computed once per step and threaded exactly
+  like the existing per-step `stepFrequencies`:
+  ```java
+  public MLXArray cos()     // FLOAT32 [batch, 1, sequence, rotaryDims]
+  public MLXArray sin()     // FLOAT32 [batch, 1, sequence, rotaryDims]
+  public int rotaryDims()
+  public MLXArray rotate(MLXArray x)    // x: [batch, heads, sequence, headDim]
+  ```
+  `rotate` casts cos/sin to `x.dtype()` (frozen step 5), rotates the `rotaryDims` prefix
+  (frozen step 6) and concatenates the untouched tail back; it validates `x`'s rank/shape
+  against the stored cos/sin shape and `rotaryDims ≤ headDim` (the head-dimension
+  validation) before building anything.
+
+Decoder seam — all additive; **every existing signature stays**, each current overload
+delegating to the new one with `null` rotation/hook so its graph is unchanged:
+
+- `DecoderAttention` (jmlx-core; the current forwards at L177-196 funnel into
+  `forwardInternal` L198-321):
+  ```java
+  public MLXArray forward(
+      MLXArray x, KVCache cache, MLXArray attentionMask,
+      int[] validLengths, MultiAxisRotation rotation)
+  ```
+  funneled into `forwardInternal` with `stepFrequencies == null`; where `rope.apply` runs
+  today (after `AttentionHeads.toHeads` and the optional QK normalization), `rotation !=
+  null` applies `q = rotation.rotate(q); k = rotation.rotate(k);` instead and skips the
+  frequency-array derivation. `validLengths` is required (non-null) on this path: the
+  rotation path always runs the batch-aware validation and per-row cache bookkeeping, which
+  reduce to the single-row arithmetic for B = 1.
+- `DecoderBlock` (jmlx-core; the current forwards at L55-84):
+  ```java
+  public MLXArray forward(
+      MLXArray x, KVCache cache, MLXArray attentionMask,
+      int[] validLengths, MultiAxisRotation rotation)
+  ```
+  the same residual structure as the existing batch overload, passing the rotation through
+  to `attention.forward(…, validLengths, rotation)`.
+- `DecoderModel` (jmlx-models) gains a package-private functional interface beside
+  `EmbeddingHook`:
+  ```java
+  @FunctionalInterface
+  interface PostBlockHook { MLXArray apply(int layerIndex, MLXArray hidden); }
+  ```
+  invoked after each selected early decoder block's residual output and before the final
+  `norm.forward` — where Qwen3-VL DeepStack adds level `i` after text block `i` (WP6/WP7).
+  Vision extraction indices and decoder injection indices are different counters and are
+  never mixed: the vision tower extracts its DeepStack features from vision blocks
+  `deepstack_visual_indexes = [5, 11, 17]` of the 24-block vision stack (§5), while the
+  text decoder injects level `i` (0-based) after text block `i` of the 28-block text stack
+  (§6.6). The additive overloads:
+  ```java
+  final MLXArray decoderStack(
+      MLXArray embeddings, List<KVCache> caches, int[] validLengths, int sequenceWidth,
+      MultiAxisRotation rotation, PostBlockHook postBlockHook)
+  final MLXArray stepLogits(
+      MLXArray tokenIds, List<KVCache> caches, int[] validLengths,
+      EmbeddingHook hook, MultiAxisRotation rotation, PostBlockHook postBlockHook)
+  ```
+  (`decoderStack` keeps its package-private final embedding-start entry visibility;
+  `stepLogits` keeps the `EmbeddingHook` in its existing fourth position — the scheduler's
+  hook stays exactly where it is, post-lookup/pre-scale inside `decoderEmbeddings`.) The
+  existing `decoderStack(…, sequenceWidth)` (L364-418) and `stepLogits(…, hook)` (L183-198)
+  delegate with `(null, null)`. Inside `decoderStack`, `rotation != null` skips the
+  `stepFrequencies` derivation and calls the new block overload; the layer loop becomes
+  `x = blockᵢ.forward(…); if (postBlockHook != null) x = postBlockHook.apply(i, x);`,
+  ending in the unchanged `norm.forward(x)`. The single-row stack `normalizedHiddenStates`
+  (L516) and the single-row decode path `decode` (L787-794) get matching additive private
+  overloads `normalizedHiddenStates(tokenIds, caches, rotation, postBlockHook)` /
+  `decode(ids, caches, rotation, postBlockHook)` with the same delegation rule: the
+  `rotation == null && postBlockHook == null` path keeps the old graph bit-for-bit, and
+  the single-row path with a non-null `rotation` or `postBlockHook` routes each block
+  through the batch-aware overloads with
+  `validLengths = {sequenceWidth}` and a `[1,1,T,L]` batched mask (elementwise the same as
+  the 2-D mask for B = 1, windowed and evicted included; `cache.append(k, v, {T})` is the same
+  arithmetic as `cache.append(k, v)` for a uniform row — Unit 2 pins both against the `KVCache`
+  contract). The hook-only route (no rotation, a no-op hook) is pinned bit-exact
+  end-to-end against the old path at the logits by
+  `DecoderSeamTest.decodeWithNoOpPostBlockHookMatchesOldSingleRowPath` (full-float32; the
+  per-row RoPE form delegates to the offset form for a uniform row, so the two routes
+  build the same rope kernel call, and the explicit mask selects the same SDPA result as
+  the old path's implicit causal flag). The shared generation loop gets
+  ```java
+  @FunctionalInterface
+  interface DecodeStep { MLXArray apply(MLXArray ids, List<KVCache> caches); }
+  final GenerationResult runStepLoop(
+      GenerationRequest request, GenerationConfig policy, int[] prompt,
+      int[] frequencySeed, int promptPositions, KVCachePolicy cachePolicy,
+      Consumer<GenerationEvent> listener, FirstStep firstStep, DecodeStep decodeStep)
+  ```
+  (the existing 8-argument `runStepLoop` delegates with `this::decode`); steps ≥ 1 call
+  `decodeStep.apply(ids, caches)` where they call `decode(ids, caches)` today, and the
+  loop's own preflight, poisoning, evaluation ordering and result construction stay around
+  that call unchanged. Production ordinary decoders pass `null`/no-op for every new
+  parameter. Evaluation ordering, valid-length checks, cache preflight/postflight and
+  poisoning, and tied projection are all preserved and remain based on sequence/cache
+  positions — never on RoPE coordinates.
+- Qwen3-VL wiring (WP6/WP7, stated here so the seam is closed): the request-supplied
+  rotary state is exactly what `Qwen3VlPromptPlan` already carries — the three prefill
+  position axes plus `positionDelta()`. Prefill uses
+  `mrope.prepare(scope, 1, L, plan.temporal/height/widthPositions())` (L = expanded
+  length); every decode step takes `p = plan.ropePositionAt(caches.get(0).nextPosition())`
+  — the logical cache position plus the delta, never a retained-KV length — as all three
+  axes (`new int[][] {{p}, {p}, {p}}`, B = 1, T = 1) through a `DecodeStep` that calls the
+  new `decode` overload with a `null` `PostBlockHook` (DeepStack injection is prefill-
+  only).
+
+**Visual replacement and masked residual add (frozen compositions; WP6/WP7 use them, WP4
+delivers the facades they build on).** Both are pure compositions of existing core
+facades — `MLX.zeros`, `MLXShape.concatenate`, `MLXShape.takeAxis`, `MLXOps.add` (and
+`slice` where a span is contiguous); model code never calls FFI, and no new primitive is
+required. If a later unit ever needs one, the plan's rule applies: record the exact mlx-c
+declaration first, probe the native semantics, update the inventory/call-site coverage and
+test the scope/error behavior. They live as package-private static helpers in
+`se.alipsa.jmlx.models` (beside `SmolVlmModel.merge`, the package WP6's `Qwen3VlModel`
+joins) — no new public core API.
+
+- **Row-gather replacement** (merger features replace the image-placeholder embeddings) —
+  the same composition as `SmolVlmModel.merge` (L385-400):
+  ```
+  source   = concatenate([embedded, features], axis 1)     // [1, L + F, hidden]
+  gather   = mergeGatherIndices(L, destinations)           // int[L], the existing algorithm
+  replaced = takeAxis(source, MLXArray(gather, [L]), 1)    // [1, L, hidden]
+  ```
+- **Masked residual add** (DeepStack level i: add `features_i [1, F_i, hidden]` into the
+  `[1, L, hidden]` hidden states at exactly the image-token rows, zero elsewhere):
+  ```
+  zeroRow = MLX.zeros(scope, {1, 1, hidden}, hidden.dtype())        // [1, 1, hidden]
+  source  = concatenate([zeroRow, features_i], 1)                   // [1, 1 + F_i, hidden]
+  gather  = gatherIndices(L, destinations_i) remapped: i -> 0, L + f -> 1 + f   // int[L]
+  mask    = takeAxis(source, MLXArray(gather, [L]), 1)
+  updated = MLXOps.add(hidden, mask)
+  ```
+  The gather indices are the shared `mergeGatherIndices` helper's output (the same
+  one the row-gather replacement above applies directly) remapped over the source's
+  `1 + F_i` rows — every identity row (shared index `i < L`) remaps to the zero row
+  (source index `0`), the `f`-th destination (shared index `L + f`, strictly
+  increasing) remaps to source row `1 + f` — which is what lets the zero pad be a
+  single `[1, 1, hidden]` row instead of a full `[1, L, hidden]` zero tensor. The
+  caller `scope`'s relatedness to the operands' scopes (one an ancestor of the
+  other) is validated before any MLX array is written. The add matches the
+  reference's masked clone + add + write-back (§6.6) and leaves every non-image
+  row numerically identical (an exact `+ 0.0` per element; IEEE `-0.0 + 0.0 = +0.0`,
+  so a negative-zero element in a non-image row is normalised to `+0.0`).
+
+**Old-path bit-identity proof plan (the WP4 exit gate).**
+
+1. All existing suites green unchanged: `:jmlx-core:check` and `:jmlx-models:check`,
+   including `float32GoldenTest` (the full-float32 `DecoderAttentionTest` /
+   `MultiHeadAttentionTest` oracles and the family goldens).
+2. `:jmlx-models:exactBitsVerifyTf32On` and `:jmlx-models:exactBitsVerifyTf32Off` pass
+   against the recordings above — 14 variants × 9 captures bit-exact in both TF32 modes on
+   this device (device-specific evidence; verify mode permits only the git-commit field to
+   drift).
+3. `RopeSpec`'s sealed hierarchy and `MLXFast` are untouched: `git diff` over
+   `RopeSpec.java` and `MLXFast.java` is empty at WP4 completion (diff evidence).
+
+**Cross-check probe (planned; opt-in, same pattern as `qwen3vl_rope_multiframe_check.py`).**
+`tools/hf-reference/qwen3vl_rope_interleaved_check.py` — pinned 4.57.6 venv
+(`tools/hf-reference/.venv`: transformers 4.57.6, torch 2.6.0, CPU float32; never
+Gradle-invoked, no golden output) — computes, for a fixed set of index-coded asymmetric
+position cases (including the pinned 2B config theta 5,000,000 / sections `[24,20,20]` and
+a small rotaryDims/sections case that exercises the owner pattern at every frequency), the
+pinned `apply_interleaved_mrope` + rotate-half result in float32, prints one deterministic
+case table at full float32 precision, and exits non-zero on any internal drift. The
+matching Java probe (`tools/hf-reference/qwen3vl_rope_interleaved_check.jsh`, run manually
+with the jmlx-core build classpath; also never Gradle-invoked) feeds the same cases to
+`MultiAxisRope` and cross-checks the component element-wise with a strict max absolute
+error of 1e-5 on the rotate-half output — an ulp-class tolerance for libm/Metal float32
+trigonometry, orders of magnitude below the O(1) difference any owner, frequency,
+cast-order or rotation-layout error would produce; it prints the achieved max error per
+case and exits non-zero past the threshold.
+
+**Test matrix the later units must deliver.**
+`MultiAxisRopeTest` in `jmlx-core` (`@EnabledIfNativeAvailable`; the float32-comparison
+cases tagged `full-float32` so they select into `:jmlx-core:float32GoldenTest` (MLX_ENABLE_TF32=0),
+the rejection cases running in ordinary `:jmlx-core:test`):
+
+- identical axes (T = H = W) against a Java double-precision-derived float32 reference
+  with a tight bound (equal axes reduce mathematically to 1-D RoPE, but bit equality with
+  the fast kernels is **not** assumed — plan §6);
+- unequal/index-coded axes: the pinned `[24,20,20]` owner pattern and a small sections
+  case, with small index-coded position integers so the output encodes the coordinates;
+- nonzero decode positions at `cachePosition + delta` (B = 1, T = 1), including a negative
+  delta (e.g. cache position 82, delta −56 → coordinate 26), plus a batched case with
+  per-row positions;
+- rejections: wrong row count (≠ 3), row-length mismatch (≠ B·T), negative coordinates,
+  negative or zero-sum sections, non-positive or non-finite theta, `rotaryDims > headDim`
+  and invalid `x` shapes — all `IllegalArgumentException` before any array is written;
+- partial-rotary tail passthrough: the tail `[rotaryDims, headDim)` is bit-identical to
+  the input tail slice;
+- head-dimension validation and the dtype-cast check that cos/sin are cast to the input
+  dtype before the rotation.
+
+The suite was added to `.github/workflows/ci.yml`'s required-execution list in PR #57
+(review round 2); the `full-float32` tag selection into `:jmlx-core:float32GoldenTest`
+happens in this WP's implementation units.
+
+**WP4 acceptance (2026-10-20).** Delivered on `phase7-3b-wp4` in four commits over base
+`128cd1e`: `d5de40e` (Unit 1 — the pre-change exact-bits baseline recorded in both TF32
+modes on this device, plus this §6.9 frozen design), `2fe2926` (Unit 2 — the
+`MultiAxisRope`/`MultiAxisRotation` core components, `MultiAxisRopeTest`, and the
+Python/jshell cross-check probe pair), `c50b5cc` (Unit 3 — the additive rotation/
+post-block seam across `DecoderAttention`/`DecoderBlock`/`DecoderModel`, with
+`DecoderRotationSeamTest`, `SingleRowDecodeEquivalenceTest` and `DecoderSeamTest`), and
+the acceptance commit (Unit 4 — `VisualFeatureInjection` and `VisualFeatureInjectionTest`).
+
+- **Validation matrix, all green.** Root `./gradlew check` BUILD SUCCESSFUL;
+  `./gradlew verifyMlxApiCallSites` BUILD SUCCESSFUL unchanged (the new code composes
+  existing facades only, so no inventory override or call-site mapping changed). Zero
+  failures in every suite; counts: `:jmlx-core:test` 49 suites / 414 tests with 1
+  pre-existing skip (`MoeMlpBenchmarkTest.gatheredDecodeIsFasterThanDense`, the
+  untimed benchmark guard — not a regression), `:jmlx-core:float32GoldenTest` 8 / 30,
+  `:jmlx-models:test` 50 / 376, `:jmlx-models:float32GoldenTest` 13 / 43. The WP4
+  suites (ordinary / full-float32): `MultiAxisRopeTest` 5 / 6, `DecoderRotationSeamTest`
+  2 / 5, `SingleRowDecodeEquivalenceTest` 2 / 0 (no float32 cases), `DecoderSeamTest`
+  1 / 5, `VisualFeatureInjectionTest` 1 / 7 (the one ordinary case is the pre-write
+  rejection test; the float32 cases compare `toFloatArray` bit-exactly). `./gradlew
+  -p buildSrc check` was not run: buildSrc is unchanged by this WP.
+- **Old-path bit-identity gate, both TF32 modes, verbatim.** The Unit 1 baseline
+  recordings (spec hash
+  `846396b1dbab5a770a4f2c36841fe5ed1570a586b908956ed6e224fe5248e687`, recorded at
+  `128cd1ec2fb1004487015377183081827a29b956` before any WP4 change) were verified, not
+  re-recorded; each run re-derived its captures into a fresh
+  `build/exact-bits/tf32-{1,0}/derived-verify/` side effect.
+  `./gradlew :jmlx-models:exactBitsVerifyTf32On` → BUILD SUCCESSFUL with stdout
+  `verified 14 variants against .../tf32-1/manifest.json` and
+  `exact-bits verify tf32=1 (recorded at 128cd1ec2fb1004487015377183081827a29b956):
+  14 applicable variants, 126 captures`;
+  `./gradlew :jmlx-models:exactBitsVerifyTf32Off` → the same two lines with `tf32-0`
+  and `tf32=0` (14 variants × 9 captures). Verify mode permits only the git-commit
+  metadata field to drift, and it is the only drift — the old one-dimensional decoder
+  path is bit-identical in both precision modes after the seam, the kernel and the
+  helpers landed.
+- **Probe and diff evidence.** The Python probe was re-run once in the locked venv
+  after the final code state: all 7 cases (`pinned_prefill_indexed`,
+  `pinned_prefill_maxpos`, `pinned_decode_negative_delta`, `pinned_decode_equal_axes`,
+  `pinned_batched_rows`, `small_212_every_owner`, `small_111`) passed, exit 0. The
+  matching jshell twin was not re-run at acceptance (its component was last touched in
+  Unit 2, where its per-case max absolute error was ≤ 2.4e-7 against the 1e-5
+  threshold); both sides were re-run 2026-10-20 in the locked environments after the
+  review rounds, against the restructured `prepare` (review round 2), the position-matrix
+  size overflow guard (review round 3) and the byte owner-table refactor (review round 4),
+  head `bf69877` — Python exit 0, all 7 cases passed;
+  the jshell twin exits 0 with every case OK and self-consistent, max absolute error
+  2.38e-7 against the 1e-5 threshold.
+  `git diff main` over `RopeSpec.java` and `MLXFast.java` is empty: the sealed
+  hierarchy gained no variant and no fast kernel changed.
+- **Deferrals, per plan.** The new native suites' addition to
+  `.github/workflows/ci.yml`'s required-execution list landed in PR #57 (review
+  round 2); `Qwen3VlModel`, the `qwen3_vl` loader dispatch and the DeepStack
+  consumption of `VisualFeatureInjection` are WP5/WP6.
+
 ## 7. Fast-vs-slow preprocessing divergence (measured once, both sides)
 
 - **Tool:** `tools/image-oracle/fast-comparison/` — an independent hash-locked CPython 3.12 venv

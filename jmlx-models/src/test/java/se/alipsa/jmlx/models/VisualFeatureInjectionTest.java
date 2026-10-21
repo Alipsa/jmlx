@@ -370,20 +370,16 @@ class VisualFeatureInjectionTest {
    * allocated; the message names the parameter.
    */
   @Test
-  void addMaskedFeaturesRejectsAUnrelatedSiblingScope() {
+  void addMaskedFeaturesRejectsAUnrelatedSiblingScope() throws InterruptedException {
     try (MLXScope child = scope.newChild();
         MLXScope sibling = scope.newChild()) {
       MLXArray hidden = array(child, rows(8, 0f));
       MLXArray features = array(child, rows(3, 10f));
-      IllegalArgumentException exception =
-          assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  VisualFeatureInjection.addMaskedFeatures(
-                      sibling, hidden, features, new int[] {3, 4, 5}));
-      assertEquals(
-          "scope must be related to hidden's and features' scopes (one an ancestor of the other)",
-          exception.getMessage());
+      assertRejection(
+          () ->
+              VisualFeatureInjection.addMaskedFeatures(
+                  sibling, hidden, features, new int[] {3, 4, 5}),
+          "scope must be related to hidden's and features' scopes (one an ancestor of the other)");
     }
   }
 

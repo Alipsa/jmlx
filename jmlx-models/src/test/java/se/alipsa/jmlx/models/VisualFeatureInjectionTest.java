@@ -141,6 +141,27 @@ class VisualFeatureInjectionTest {
   }
 
   /**
+   * Scattered (non-contiguous) destinations: single-row images at rows 1, 4 and 6 each receive
+   * exactly their own feature row, and every other row is the hidden row plus the exact {@code +
+   * 0.0}.
+   */
+  @Test
+  @Tag("full-float32")
+  void scatteredDestinationsAddIntoExactlyTheirRows() {
+    try (MLXScope run = scope.newChild()) {
+      int length = 8;
+      int[] destinations = {1, 4, 6};
+      float[][] hidden = rows(length, 0f);
+      float[][] features = rows(3, 10f);
+      MLXArray updated =
+          VisualFeatureInjection.addMaskedFeatures(
+              run, array(run, hidden), array(run, features), destinations);
+      assertArrayEquals(new int[] {1, length, HIDDEN}, updated.shape());
+      assertArrayEquals(flat(addRows(hidden, features, destinations)), updated.toFloatArray());
+    }
+  }
+
+  /**
    * Two levels at different destinations applied sequentially, mirroring the reference's per-level
    * masked clone + add + write-back: level 0 into rows 1-2, then level 1 into rows 5-7, with the
    * second add running on the first add's output.
@@ -238,10 +259,10 @@ class VisualFeatureInjectionTest {
 
   /**
    * Every invalid input is rejected with {@link IllegalArgumentException} by the helper's own
-   * validation — destination semantics via the shared gather-index algorithm, count and shape
-   * checks via the pair validation — before any MLX array is written; a native failure from a
-   * mis-built index array would surface as an {@code MLXException}, not an {@code
-   * IllegalArgumentException}.
+   * validation — destination semantics via the gather-index builders (the shared {@code
+   * mergeGatherIndices} and the masked add's mirror), count and shape checks via the pair
+   * validation — before any MLX array is written; a native failure from a mis-built index array
+   * would surface as an {@code MLXException}, not an {@code IllegalArgumentException}.
    */
   @Test
   void rejectionsThrowBeforeAnyArrayIsWritten() {

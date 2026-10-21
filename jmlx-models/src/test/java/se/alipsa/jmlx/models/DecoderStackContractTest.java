@@ -20,7 +20,8 @@ import se.alipsa.jmlx.nn.KVCache;
  * DecoderModel#decoderStack}) and for its shape-keyed preflight {@link
  * DecoderModel#preflightBatch(int, int, List, int[])}: the checks added with the entry point must
  * reject a wrong rank, batch, width or hidden size and a wrong cache count before any layer
- * advances, a correctly shaped call must run the whole stack, and the preflight itself must keep
+ * advances, a post-block hook returning a null or differently shaped state must be rejected naming
+ * the block, a correctly shaped call must run the whole stack, and the preflight itself must keep
  * the poisoned-cache and width-vs-valid-length guarantees a WP6 caller relies on.
  */
 @EnabledIfNativeAvailable
@@ -235,6 +236,79 @@ class DecoderStackContractTest {
       for (KVCache cache : caches) {
         assertEquals(WIDTH, cache.nextPosition(0));
       }
+    }
+  }
+
+  /**
+   * A post-block hook that returns a differently shaped state must be rejected immediately after
+   * the first block, naming the block index and the expected versus returned shape, instead of
+   * surfacing later inside the next block's projection.
+   */
+  @Test
+  void postBlockHookReturningWrongShapeIsRejectedNamingTheBlock() {
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> caches = caches(run);
+      int hidden = model.config().hiddenSize();
+      DecoderModel.PostBlockHook hook = (layer, state) -> embeddings(run, BATCH, WIDTH, hidden + 1);
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  model.decoderStack(
+                      embeddings(run, BATCH, WIDTH, hidden),
+                      caches,
+                      validLengths(),
+                      WIDTH,
+                      null,
+                      hook));
+      assertEquals(
+          "postBlockHook for block 0 must return the block's hidden state with the same shape ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + hidden
+              + "]: got ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + (hidden + 1)
+              + "]",
+          failure.getMessage());
+    }
+  }
+
+  /**
+   * A post-block hook that returns null is rejected by the same check, naming the block index and
+   * the expected shape.
+   */
+  @Test
+  void postBlockHookReturningNullIsRejectedNamingTheBlock() {
+    try (MLXScope run = scope.newChild()) {
+      List<KVCache> caches = caches(run);
+      int hidden = model.config().hiddenSize();
+      DecoderModel.PostBlockHook hook = (layer, state) -> null;
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  model.decoderStack(
+                      embeddings(run, BATCH, WIDTH, hidden),
+                      caches,
+                      validLengths(),
+                      WIDTH,
+                      null,
+                      hook));
+      assertEquals(
+          "postBlockHook for block 0 must return the block's hidden state with the same shape ["
+              + BATCH
+              + ", "
+              + WIDTH
+              + ", "
+              + hidden
+              + "]: got null",
+          failure.getMessage());
     }
   }
 

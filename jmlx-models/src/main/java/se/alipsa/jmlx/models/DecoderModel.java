@@ -178,7 +178,11 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * blocks of the 24-block vision stack (pinned 2B: {@code [5, 11, 17]}), while the injection index
    * addresses blocks of the 28-block text stack. The hook is invoked after <em>every</em> block's
    * residual output; selecting which layers actually receive an injection is the hook's own job.
-   * Production ordinary decoders pass no-op or null hooks.
+   * Production ordinary decoders pass no-op or null hooks. Implementations must return a non-null
+   * array with exactly the same shape as the hidden state they were given; {@code decoderStack}
+   * checks this immediately after each call and throws {@link IllegalArgumentException} naming the
+   * block index, so a bad result is reported at the hook rather than later inside the next block's
+   * projection.
    */
   @FunctionalInterface
   interface PostBlockHook {
@@ -374,6 +378,24 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
   }
 
   /**
+   * The post-block hook's contract: it must hand back the block's own hidden state, non-null and
+   * with the exact shape it was given, so the next block's projection sees the same tensor
+   * contract. Enforced immediately after the call, so a violation names the block instead of
+   * surfacing later inside the next block's projection.
+   */
+  private static void requirePostBlockResult(int blockIndex, MLXArray hidden, int[] expected) {
+    if (hidden == null || !Arrays.equals(expected, hidden.shape())) {
+      throw new IllegalArgumentException(
+          "postBlockHook for block "
+              + blockIndex
+              + " must return the block's hidden state with the same shape "
+              + Arrays.toString(expected)
+              + ": got "
+              + (hidden == null ? "null" : Arrays.toString(hidden.shape())));
+    }
+  }
+
+  /**
    * The embedding-input half of the decoder stack: the embedding lookup, the optional hook invoked
    * at the identical post-lookup/pre-scale point, and the optional sqrt-hidden scale. Both the
    * single-row and the batched stack call it, so the hook and the scale are written once, in one
@@ -417,12 +439,14 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * rotation} skips the step frequency derivation and rotates each block's query and key heads from
    * the request's own multi-axis rotation instead; a non-null {@code postBlockHook} is invoked
    * after every block's residual output and before the final {@code norm.forward} (see {@link
-   * PostBlockHook}). The batched mask is the same in both cases. A non-null {@code rotation} is
-   * validated against the batch, the sequence width, the head dimension and the configured rotary
-   * width ({@link MultiAxisRotation#validateAgainst(int, int, int, int)}) before the mask or any
-   * block builds a graph node. With {@code (null, null)} this runs the byte-identical stack the
-   * 4-argument overload always ran: one frequency derivation at the same graph position, the same
-   * block forwards and the same final normalization. This entry itself still neither evaluates nor
+   * PostBlockHook}). Its result is checked immediately: a null or differently shaped return is
+   * rejected as an {@link IllegalArgumentException} naming the block index. The batched mask is the
+   * same in both cases. A non-null {@code rotation} is validated against the batch, the sequence
+   * width, the head dimension and the configured rotary width ({@link
+   * MultiAxisRotation#validateAgainst(int, int, int, int)}) before the mask or any block builds a
+   * graph node. With {@code (null, null)} this runs the byte-identical stack the 4-argument
+   * overload always ran: one frequency derivation at the same graph position, the same block
+   * forwards and the same final normalization. This entry itself still neither evaluates nor
    * poisons; embedding-start callers keep the {@link #preflightBatch(int, int, List, int[])}/{@link
    * #poisonBatchIfMutated} and postflight/evaluation responsibilities of the 4-argument entry.
    */
@@ -496,7 +520,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               ? layers.get(i).forward(x, caches.get(i), mask, frequencies, validLengths)
               : layers.get(i).forward(x, caches.get(i), mask, validLengths, rotation);
       if (postBlockHook != null) {
+        // MLXArray.shape() returns a fresh array on every call, so the hook cannot alias it.
+        int[] expected = x.shape();
         x = postBlockHook.apply(i, x);
+        requirePostBlockResult(i, x, expected);
       }
     }
     return norm.forward(x);

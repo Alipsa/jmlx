@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
@@ -179,10 +180,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * addresses blocks of the 28-block text stack. The hook is invoked after <em>every</em> block's
    * residual output; selecting which layers actually receive an injection is the hook's own job.
    * Production ordinary decoders pass no-op or null hooks. Implementations must return a non-null
-   * array with exactly the same shape as the hidden state they were given; {@code decoderStack}
-   * checks this immediately after each call and throws {@link IllegalArgumentException} naming the
-   * block index, so a bad result is reported at the hook rather than later inside the next block's
-   * projection.
+   * array with exactly the same shape and dtype as the hidden state they were given; {@code
+   * decoderStack} checks this immediately after each call and throws {@link
+   * IllegalArgumentException} naming the block index, so a bad result is reported at the hook
+   * rather than later inside the next block's projection.
    */
   @FunctionalInterface
   interface PostBlockHook {
@@ -379,19 +380,26 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
 
   /**
    * The post-block hook's contract: it must hand back the block's own hidden state, non-null and
-   * with the exact shape it was given, so the next block's projection sees the same tensor
-   * contract. Enforced immediately after the call, so a violation names the block instead of
+   * with the exact shape and dtype it was given, so the next block's projection sees the same
+   * tensor contract. Enforced immediately after the call, so a violation names the block instead of
    * surfacing later inside the next block's projection.
    */
-  private static void requirePostBlockResult(int blockIndex, MLXArray hidden, int[] expected) {
-    if (hidden == null || !Arrays.equals(expected, hidden.shape())) {
+  private static void requirePostBlockResult(
+      int blockIndex, MLXArray hidden, int[] expectedShape, DType expectedDtype) {
+    if (hidden == null
+        || !Arrays.equals(expectedShape, hidden.shape())
+        || hidden.dtype() != expectedDtype) {
       throw new IllegalArgumentException(
           "postBlockHook for block "
               + blockIndex
               + " must return the block's hidden state with the same shape "
-              + Arrays.toString(expected)
+              + Arrays.toString(expectedShape)
+              + " and dtype "
+              + expectedDtype
               + ": got "
-              + (hidden == null ? "null" : Arrays.toString(hidden.shape())));
+              + (hidden == null
+                  ? "null"
+                  : Arrays.toString(hidden.shape()) + " of dtype " + hidden.dtype()));
     }
   }
 
@@ -439,10 +447,10 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * rotation} skips the step frequency derivation and rotates each block's query and key heads from
    * the request's own multi-axis rotation instead; a non-null {@code postBlockHook} is invoked
    * after every block's residual output and before the final {@code norm.forward} (see {@link
-   * PostBlockHook}). Its result is checked immediately: a null or differently shaped return is
-   * rejected as an {@link IllegalArgumentException} naming the block index. The batched mask is the
-   * same in both cases. A non-null {@code rotation} is validated against the batch, the sequence
-   * width, the head dimension and the configured rotary width ({@link
+   * PostBlockHook}). Its result is checked immediately: a null, differently shaped, or differently
+   * typed return is rejected as an {@link IllegalArgumentException} naming the block index. The
+   * batched mask is the same in both cases. A non-null {@code rotation} is validated against the
+   * batch, the sequence width, the head dimension and the configured rotary width ({@link
    * MultiAxisRotation#validateAgainst(int, int, int, int)}) before the mask or any block builds a
    * graph node. With {@code (null, null)} this runs the byte-identical stack the 4-argument
    * overload always ran: one frequency derivation at the same graph position, the same block
@@ -522,8 +530,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       if (postBlockHook != null) {
         // MLXArray.shape() returns a fresh array on every call, so the hook cannot alias it.
         int[] expected = x.shape();
+        DType expectedDtype = x.dtype();
         x = postBlockHook.apply(i, x);
-        requirePostBlockResult(i, x, expected);
+        requirePostBlockResult(i, x, expected, expectedDtype);
       }
     }
     return norm.forward(x);

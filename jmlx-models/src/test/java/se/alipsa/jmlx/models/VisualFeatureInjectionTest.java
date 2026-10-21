@@ -355,6 +355,30 @@ class VisualFeatureInjectionTest {
     }
   }
 
+  /**
+   * A sibling scope (the operands live in one child of the class scope, the parameter scope is the
+   * other child) is unrelated to both operand scopes — neither an ancestor of the other — and is
+   * rejected by the pre-write scope check, before the zero row or the gather index array is
+   * allocated; the message names the parameter.
+   */
+  @Test
+  void addMaskedFeaturesRejectsAUnrelatedSiblingScope() {
+    try (MLXScope child = scope.newChild();
+        MLXScope sibling = scope.newChild()) {
+      MLXArray hidden = array(child, rows(8, 0f));
+      MLXArray features = array(child, rows(3, 10f));
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  VisualFeatureInjection.addMaskedFeatures(
+                      sibling, hidden, features, new int[] {3, 4, 5}));
+      assertEquals(
+          "scope must be related to hidden's and features' scopes (one an ancestor of the other)",
+          exception.getMessage());
+    }
+  }
+
   // ---------------------------------------------------------------------
   // data builders (Java-side expectations)
   // ---------------------------------------------------------------------

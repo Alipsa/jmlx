@@ -74,14 +74,17 @@ final class VisualFeatureInjection {
    * {@code [1, 1, hidden]} row instead of a full-sequence {@code [1, L, hidden]} zero tensor.
    *
    * @param scope the scope the zero pad and gather indices are allocated in; the results land per
-   *     the standard scope rule (innermost scope among the operands)
+   *     the standard scope rule (innermost scope among the operands); like the shapes, dtypes, row
+   *     count and destinations, its relation to the operands' scopes (one an ancestor of the other)
+   *     is validated before any MLX array is written
    * @param hidden the current {@code [1, L, hidden]} hidden states
    * @param features the {@code [1, F, hidden]} DeepStack level rows, in destination order
    * @param destinations the image-token rows to add into, strictly increasing in {@code [0, L)},
    *     whose runs are the images' contiguous placeholder ranges in prompt order
    * @return the {@code [1, L, hidden]} hidden states with the level added into the destination rows
    * @throws IllegalArgumentException if the shapes, dtypes, row count or destinations are invalid,
-   *     before any MLX array is written
+   *     or any of {@code scope} and the operands' scopes is unrelated (neither an ancestor of the
+   *     other), in every case before any MLX array is written
    */
   static MLXArray addMaskedFeatures(
       MLXScope scope, MLXArray hidden, MLXArray features, int[] destinations) {
@@ -89,6 +92,7 @@ final class VisualFeatureInjection {
       throw new IllegalArgumentException("scope must not be null");
     }
     int length = validatePair("hidden", hidden, "features", features, destinations);
+    checkRelatedScopes("scope", scope, hidden, features);
     int[] gather = maskedAddGatherIndices(length, features.shape()[1], destinations);
     MLXArray zeroRow = MLX.zeros(scope, new int[] {1, 1, hidden.shape()[2]}, hidden.dtype());
     MLXArray source = MLXShape.concatenate(new MLXArray[] {zeroRow, features}, 1);
@@ -159,6 +163,33 @@ final class VisualFeatureInjection {
       }
     }
     return indices;
+  }
+
+  /**
+   * The masked add's pre-write scope-compatibility check, applying {@link MLXScope#innermost} — the
+   * same relatedness test the ops' own {@code scopeOf} resolution applies — to the three pairs the
+   * method's chain requires to be related (one an ancestor of the other): {@code scope} against
+   * each operand (the final {@code add} resolves against {@code hidden}, {@code concatenate}
+   * against {@code features}), and the two operand scopes against each other. The operand-vs.
+   * operand pair is not implied by the other two: when {@code scope} is a common ancestor of both
+   * operand scopes, sibling operand scopes pass both operand-vs.-scope checks yet fail at the final
+   * {@code add}, whose mask lives in the deeper of {@code scope} and {@code features.scope()} —
+   * after the zero row was already allocated, breaking the pre-write validation promise.
+   *
+   * @throws IllegalArgumentException naming {@code paramName} if any of the three pairs is
+   *     unrelated
+   */
+  private static void checkRelatedScopes(
+      String paramName, MLXScope paramScope, MLXArray base, MLXArray features) {
+    try {
+      MLXScope.innermost(paramScope, base.scope());
+      MLXScope.innermost(paramScope, features.scope());
+      MLXScope.innermost(base.scope(), features.scope());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          paramName
+              + " must be related to hidden's and features' scopes (one an ancestor of the other)");
+    }
   }
 
   private static int validatePair(

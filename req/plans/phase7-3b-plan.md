@@ -472,6 +472,17 @@ compatible artifact and record why. Synthetic quantized tests compare against th
 dequantized weights. Never compare quantized weights against unrelated HF float goldens or
 silently dequantize the entire 8B model to satisfy the manual run.
 
+**2026-10-21 PR #57 review addition:** the WP4 seam is correct but its decode performance is
+unmeasured: `normalizedHiddenStates(..., rotation, postBlockHook)` routes every single-row step
+with a non-null rotation or hook through `decoderStack`, which passes an explicit `[1,1,1,L]`
+BOOL batched mask to SDPA where the old path used `mask == null` (implicit causal). Qwen3-VL
+decode always needs a rotation (`cachePosition + delta`), so once `Qwen3VlModel` exists every
+generated token takes the masked path, and the bit-exact seam suites cover correctness but not
+per-step cost. Before WP6 acceptance, run a one-off `:jmlx-examples:benchmarkDecode` comparison
+of the seam path against the old implicit-causal path and record the result in
+`req/phase6-4-benchmark.md` with the complete reproducibility tuple, as the other decode
+benchmarks do.
+
 ## 8. Request lifecycle and cache policies (WP7)
 
 Adopt parent decision 8's 2026-10-08 lifetime amendment, also adopted by 7.3a.
@@ -612,7 +623,7 @@ SmolVLM fixtures are unchanged.
 | WP3 | Expansion, templates, three-axis position planner | WP0–WP2 | Pure tests and HF template/expanded-ID/position goldens |
 | WP4 | Core multi-axis RoPE and decoder injection seam | WP0, WP1, WP3 | Strict rotary tests; exact before/after decoder bits in both modes |
 | WP5 | Vision tower, main/DeepStack mergers | WP1, WP2, core primitives | HF intermediate-feature references |
-| WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests |
+| WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests; one-off benchmark of the seam's explicit SDPA mask against the implicit-causal decode path |
 | WP7 | Generation, ownership and cache accounting | WP6 | Cached/full equivalence, lifecycle/failure/memory tests |
 | WP8 | Tier-B, manual 8B, CI and documentation | WP7 | Parent numerical/artifact/performance/matrix gates |
 | WP9 | EXIF orientation policy decision (pre-WP2) and rotated-fixture parity (post-WP2 implementation) | WP1 | Policy recorded before WP2 acceptance; rotated-fixture parity with the slow processor once the Qwen path exists; SmolVLM fixtures unchanged |

@@ -8,9 +8,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXMemoryTestSupport;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
@@ -25,8 +27,9 @@ import se.alipsa.jmlx.memory.MLXScope;
  * records that an untouched {@code -0.0} is normalised to {@code +0.0} while every non-zero value
  * keeps its exact bits). The float32 cases are tagged {@code full-float32} so they select into
  * {@code :jmlx-models:float32GoldenTest} with {@code MLX_ENABLE_TF32=0}; the rejection cases run in
- * the ordinary {@code :jmlx-models:test} task and expect {@link IllegalArgumentException} from the
- * helper's own validation, before any MLX array is written.
+ * the ordinary {@code :jmlx-models:test} task and expect {@link IllegalArgumentException} with the
+ * exact message from the helper's own validation, before any MLX array is written — each case also
+ * pins the unchanged settled process-wide active-byte count across the rejected call.
  */
 @EnabledIfNativeAvailable
 class VisualFeatureInjectionTest {
@@ -262,97 +265,102 @@ class VisualFeatureInjectionTest {
    * validation — destination semantics via the gather-index builders (the shared {@code
    * mergeGatherIndices} and the masked add's mirror), count and shape checks via the pair
    * validation — before any MLX array is written; a native failure from a mis-built index array
-   * would surface as an {@code MLXException}, not an {@code IllegalArgumentException}.
+   * would surface as an {@code MLXException}, not an {@code IllegalArgumentException}. Each case
+   * pins the exact rejection message and the "before any array is written" promise itself: the
+   * settled process-wide active-byte count ({@link MLXMemoryTestSupport#settledActiveBytes()}) is
+   * sampled before and after the rejected call and must be unchanged, so a stray allocation — the
+   * masked add's zero row in particular — would fail the test.
    */
   @Test
-  void rejectionsThrowBeforeAnyArrayIsWritten() {
+  void rejectionsThrowBeforeAnyArrayIsWritten() throws InterruptedException {
     try (MLXScope run = scope.newChild()) {
-      MLXArray embedded = array(run, rows(8, 0f));
-      MLXArray features = array(run, rows(3, 10f));
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {3, 8}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {-1}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {4, 3}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.replaceImageRows(embedded, features, null));
-      assertThrows(
-          IllegalArgumentException.class,
+      final MLXArray embedded = array(run, rows(8, 0f));
+      final MLXArray features = array(run, rows(3, 10f));
+      final MLXArray twoRows = array(run, rows(2, 10f));
+      final MLXArray twoDim = array(run, flat(rows(3, 10f)), new int[] {3, HIDDEN});
+      final MLXArray badBatch = MLX.array(run, flat(rows(6, 10f)), new int[] {2, 3, HIDDEN});
+      final MLXArray badHiddenDim = MLX.zeros(run, new int[] {1, 3, HIDDEN + 1}, DType.FLOAT32);
+      final MLXArray half = MLX.astype(features, DType.FLOAT16);
+
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {3, 4, 8}),
+          "feature destination 8 is out of range [0, 8)");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {-1, 3, 4}),
+          "feature destination -1 is out of range [0, 8)");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {4, 3, 5}),
+          "feature destinations must be strictly increasing; index 1 has 3 after 4");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, features, null),
+          "destinations must not be null");
+      assertRejection(
           () -> VisualFeatureInjection.replaceImageRows(null, features, new int[] {3, 4, 5}),
           "embedded must not be null");
-      assertThrows(
-          IllegalArgumentException.class,
+      assertRejection(
           () -> VisualFeatureInjection.replaceImageRows(embedded, null, new int[] {3, 4, 5}),
           "features must not be null");
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {3, 4}));
-      assertThrows(
-          IllegalArgumentException.class,
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, features, new int[] {3, 4}),
+          "features row count 3 must equal the destination count 2");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, twoRows, new int[] {3, 4, 5}),
+          "features row count 2 must equal the destination count 3");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, twoDim, new int[] {3, 4, 5}),
+          "features must be a [1, F, 4] array of dtype FLOAT32 to match embedded, "
+              + "got [3, 4] of dtype FLOAT32");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, badBatch, new int[] {3, 4, 5}),
+          "features must be a [1, F, 4] array of dtype FLOAT32 to match embedded, "
+              + "got [2, 3, 4] of dtype FLOAT32");
+      assertRejection(
           () ->
-              VisualFeatureInjection.replaceImageRows(
-                  embedded, array(run, rows(2, 10f)), new int[] {3, 4, 5}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              VisualFeatureInjection.replaceImageRows(
-                  embedded,
-                  array(run, flat(rows(3, 10f)), new int[] {3, HIDDEN}),
-                  new int[] {3, 4, 5}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              VisualFeatureInjection.replaceImageRows(
-                  embedded,
-                  MLX.array(run, flat(rows(6, 10f)), new int[] {2, 3, HIDDEN}),
-                  new int[] {3, 4, 5}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              VisualFeatureInjection.replaceImageRows(
-                  embedded,
-                  MLX.array(run, flat(rows(3, 10f)), new int[] {1, 3, HIDDEN + 1}),
-                  new int[] {3, 4, 5}));
-      MLXArray half = MLX.astype(features, DType.FLOAT16);
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.replaceImageRows(embedded, half, new int[] {3, 4, 5}));
+              VisualFeatureInjection.replaceImageRows(embedded, badHiddenDim, new int[] {3, 4, 5}),
+          "features must be a [1, F, 4] array of dtype FLOAT32 to match embedded, "
+              + "got [1, 3, 5] of dtype FLOAT32");
+      assertRejection(
+          () -> VisualFeatureInjection.replaceImageRows(embedded, half, new int[] {3, 4, 5}),
+          "features must be a [1, F, 4] array of dtype FLOAT32 to match embedded, "
+              + "got [1, 3, 4] of dtype FLOAT16");
 
-      assertThrows(
-          IllegalArgumentException.class,
+      assertRejection(
           () ->
               VisualFeatureInjection.addMaskedFeatures(
-                  null, embedded, features, new int[] {3, 4, 5}));
-      assertThrows(
-          IllegalArgumentException.class,
+                  null, embedded, features, new int[] {3, 4, 5}),
+          "scope must not be null");
+      assertRejection(
           () -> VisualFeatureInjection.addMaskedFeatures(run, null, features, new int[] {3, 4, 5}),
           "hidden must not be null");
-      assertThrows(
-          IllegalArgumentException.class,
+      assertRejection(
           () -> VisualFeatureInjection.addMaskedFeatures(run, embedded, null, new int[] {3, 4, 5}),
           "features must not be null");
-      assertThrows(
-          IllegalArgumentException.class,
+      assertRejection(
           () ->
-              VisualFeatureInjection.addMaskedFeatures(
-                  run,
-                  array(run, flat(rows(3, 10f)), new int[] {3, HIDDEN}),
-                  features,
-                  new int[] {3, 4, 5}));
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> VisualFeatureInjection.addMaskedFeatures(run, embedded, half, new int[] {3, 4, 5}));
-      assertThrows(
-          IllegalArgumentException.class,
+              VisualFeatureInjection.addMaskedFeatures(run, twoDim, features, new int[] {3, 4, 5}),
+          "hidden must be a [1, L, hidden] array, got [3, 4]");
+      assertRejection(
+          () -> VisualFeatureInjection.addMaskedFeatures(run, embedded, half, new int[] {3, 4, 5}),
+          "features must be a [1, F, 4] array of dtype FLOAT32 to match hidden, "
+              + "got [1, 3, 4] of dtype FLOAT16");
+      assertRejection(
           () ->
-              VisualFeatureInjection.addMaskedFeatures(
-                  run, embedded, array(run, rows(2, 10f)), new int[] {3, 4, 5}));
+              VisualFeatureInjection.addMaskedFeatures(run, embedded, twoRows, new int[] {3, 4, 5}),
+          "features row count 2 must equal the destination count 3");
     }
+  }
+
+  /**
+   * Runs {@code call}, pinning both halves of the pre-write rejection contract: the exact {@link
+   * IllegalArgumentException} message and the unchanged settled process-wide active-byte count
+   * across the call (a plain read would race in-flight Metal completion-handler frees; the settled
+   * read is immune, and a stray allocation still moves it).
+   */
+  private static void assertRejection(Executable call, String message) throws InterruptedException {
+    long before = MLXMemoryTestSupport.settledActiveBytes();
+    IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, call);
+    assertEquals(message, thrown.getMessage());
+    assertEquals(before, MLXMemoryTestSupport.settledActiveBytes(), "rejection must not allocate");
   }
 
   /**

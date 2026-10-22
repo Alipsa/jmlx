@@ -3,8 +3,15 @@
 
 Runs under tools/hf-reference/.venv (transformers 4.57.6, torch 2.6.0+cpu,
 safetensors 0.6.2, Pillow 12.3.0, NumPy 2.5.3, Python 3.12), CPU float32,
-single-threaded, deterministic (seed 20261021). It is never invoked by
-Gradle. It writes:
+single-threaded, deterministic (seed 20261021). Every LayerNorm affine
+(blocks.*.norm1/norm2, merger.norm, deepstack_merger_list.*.norm) is
+perturbed away from its PyTorch default (weight 1, bias 0) before the
+checkpoint is saved -- weight ~ N(1.0, 0.1), bias ~ N(0, 0.05), drawn from a
+dedicated seed-20261021 generator -- so the 16 norms are mutually distinct
+and the strict golden discriminates the tower's norm-to-key wiring (a
+norm1/norm2 swap, a weight/bias swap, the wrong norm on the merger versus a
+DeepStack merger, or a checkpoint-key typo would all change the captures).
+It is never invoked by Gradle. It writes:
 
   * a tiny synthetic vision checkpoint at
     tools/hf-reference/goldens/checkpoints/qwen3vl-vision/
@@ -220,6 +227,30 @@ def vision_config():
     )
 
 
+def perturb_layer_norms(model, seed: int) -> int:
+    """Perturb every LayerNorm affine with a dedicated seeded generator.
+
+    The reference's model init leaves every LayerNorm at its PyTorch default
+    (weight 1, bias 0): with all 16 norms identical, the strict golden would
+    still pass if the tower swapped norm1 and norm2, swapped a norm's weight
+    and bias, used the wrong norm for the merger versus a DeepStack merger,
+    or mistyped a norm's checkpoint key. Drawing each affine from a dedicated
+    torch.Generator (seeded once, draws in model.modules() order, weight then
+    bias per norm) keeps the perturbation deterministic and isolated from the
+    global RNG the model init already consumed. Returns the norm count.
+    """
+    import torch
+
+    gen = torch.Generator().manual_seed(seed)
+    count = 0
+    for module in model.modules():
+        if isinstance(module, torch.nn.LayerNorm):
+            torch.nn.init.normal_(module.weight, mean=1.0, std=0.1, generator=gen)
+            torch.nn.init.normal_(module.bias, mean=0.0, std=0.05, generator=gen)
+            count += 1
+    return count
+
+
 def slow_processor():
     # The pinned 4.57.6 slow PIL processor has no Qwen3VLImageProcessor
     # counterpart; the explicit min_pixels/max_pixels compensate for the
@@ -275,6 +306,14 @@ def main() -> None:
     torch.manual_seed(SEED)
     cfg = vision_config()
     model = Qwen3VLVisionModel(cfg)
+    # The model init leaves every LayerNorm at its PyTorch default (weight 1,
+    # bias 0): with all norms identical the strict golden could not catch a
+    # norm1/norm2 swap, a weight/bias swap, the wrong norm on the merger
+    # versus a DeepStack merger, or a norm-key typo. Perturb before saving.
+    norm_count = perturb_layer_norms(model, SEED)
+    expected_norms = 2 * cfg.depth + 1 + len(cfg.deepstack_visual_indexes)
+    if norm_count != expected_norms:
+        sys.exit(f"expected {expected_norms} LayerNorm affines to perturb, found {norm_count}")
     cfg.save_pretrained(checkpoint_dir)
 
     bare_state = model.state_dict()
@@ -513,6 +552,22 @@ def main() -> None:
             "pillow": environment["pillow"],
             "numpy": environment["numpy"],
             "seed": SEED,
+            "norm_perturbation": {
+                "seed": SEED,
+                "generator": "dedicated torch.Generator (does not consume the global model-init RNG)",
+                "weight_distribution": "normal(mean=1.0, std=0.1)",
+                "bias_distribution": "normal(mean=0.0, std=0.05)",
+                "count": norm_count,
+                "note": (
+                    "every LayerNorm affine (blocks.*.norm1/norm2, merger.norm, "
+                    "deepstack_merger_list.*.norm) is perturbed before the "
+                    "checkpoint is saved so the 16 norms are mutually distinct "
+                    "and the strict golden discriminates the tower's norm "
+                    "wiring (a norm1/norm2 swap, a weight/bias swap, the wrong "
+                    "norm on the merger versus a DeepStack merger, or a "
+                    "checkpoint-key typo would all change the captures)"
+                ),
+            },
             "config": py(vision_config().to_dict()),
             "checkpoint_files": {
                 "config.json": sha256_file(checkpoint_dir / "config.json"),

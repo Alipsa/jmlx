@@ -682,3 +682,23 @@ locked environments, never Gradle-invoked) cross-checks the component. The CI
 required-suite list addition landed in PR #57 (review round 2), and `Qwen3VlModel`,
 its loader dispatch and the DeepStack consumption of `VisualFeatureInjection` are
 WP5/WP6. No native pins, generated bindings or build files changed.
+
+Phase 7.3b WP5 (2026-10-22) landed the Qwen3-VL vision tower in `jmlx-models`:
+`Qwen3VlVisionTower` (patch embed + 3-D interpolated position embeddings, N
+`Qwen3VlVisionBlock`s — each a LayerNorm/attention/LayerNorm/MLP two-statement residual
+block, matching the pinned 4.57.6 `Qwen3VLVisionBlock.forward` sequential semantics
+where `norm2` sees the updated residual — plus DeepStack level merges) composed with
+`jmlx-core`'s new `PatchMerger`, `TwoAxisRope`, `TwoAxisRotation` and
+`TwoAxisRotaryAttention` components (all with their own core tests), returning
+`Qwen3VlVisionFeatures` (merged rows + per-level DeepStack rows) hoisted into the
+tower's scope. The strict HF intermediate-feature golden
+`tools/hf-reference/goldens/qwen3vl-vision-wp5.json` plus its tiny synthetic
+checkpoint, image and generator script (`tools/hf-reference/qwen3vl_vision.py`,
+digest-pinned in `tools/hf-reference/provenance.json`) drive
+`Qwen3VlVisionTowerGoldenTest` (full-float32), and `Qwen3VlVisionPeakTest`
+(ordinary `test`) measures the real-2B-geometry per-image peak — sustained 16 MiB,
+attention transient ≈ 0.33 GiB, far under the plan §4 5 GiB bound — recorded in the
+reference findings §11.4. Both suites are required by the macOS CI assertion.
+`Qwen3VlModel`, its loader dispatch and the DeepStack consumption of
+`VisualFeatureInjection` remain WP6. No native pins, generated bindings or Gradle
+task changes.

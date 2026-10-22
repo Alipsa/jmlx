@@ -141,7 +141,9 @@ class Qwen3VlVisionTowerGoldenTest {
         results.add(result);
       }
 
-      Qwen3VlVisionTower.ForwardCaptures captures = tower.forwardForTest(results);
+      // The tower's module scope is the test scope itself, so it is a legal target; the
+      // hoisted features and captures live in it until the test scope closes below.
+      Qwen3VlVisionTower.ForwardCaptures captures = tower.forwardForTest(scope, results);
 
       // The final merged and DeepStack arrays are stored once over the packed rows (image
       // order); the tower concatenates its per-image rows on axis 0 the same way.
@@ -266,7 +268,7 @@ class Qwen3VlVisionTowerGoldenTest {
             processor.processFile(
                 directory().resolve(c.required("file").asString()), ImageDecodeLimits.DEFAULTS);
         final Qwen3VlVisionTower.ImageCaptures capture =
-            tower.forwardForTest(List.of(result)).images().get(0);
+            tower.forwardForTest(scope, List.of(result)).images().get(0);
 
         // The tower's bilinear corner indices for that patch must be the reference's exactly.
         Qwen3VlVisionTower.PositionLookup lookup =

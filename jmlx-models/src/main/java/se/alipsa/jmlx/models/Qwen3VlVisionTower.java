@@ -37,7 +37,7 @@ import se.alipsa.jmlx.vision.Qwen3VlImageProcessorResult;
  * Qwen3VLVisionPatchMerger}, {@code Qwen3VLVisionPatchEmbed} and {@code
  * Qwen3VLVisionRotaryEmbedding}; the verbatim transcription is findings §11.1. The reference runs
  * in float32 (its default dtype), so every weight is converted to float32 by this constructor and
- * {@link #forward(List)} is bit-exact against the reference's op order on float32 inputs.
+ * {@link #forward(MLXScope, List)} is bit-exact against the reference's op order on float32 inputs.
  *
  * <p>The module child names mirror the HF checkpoint tree through the mapping of {@link
  * #visionKeyToTowerKey(String, int, int[])}: {@code patchEmbedding} is {@code patch_embed.proj}
@@ -50,27 +50,33 @@ import se.alipsa.jmlx.vision.Qwen3VlImageProcessorResult;
  * no parameters — the reference's {@code hidden_act = gelu_pytorch_tanh}), {@code merger} is {@code
  * merger} (post-shuffle norm <em>off</em>, norm width {@code hidden}) and {@code
  * deepstackMerger0..} are {@code deepstack_merger_list.{j}} (post- shuffle norm <em>on</em>, norm
- * width {@code hidden * merge^2}). {@link #forward(List)} stops at the mergers; it returns the
- * main-merger rows and, per DeepStack index, that level's rows.
+ * width {@code hidden * merge^2}). {@link #forward(MLXScope, List)} stops at the mergers; it
+ * returns the main-merger rows and, per DeepStack index, that level's rows.
  *
  * <p>Two layout facts worth knowing before reasoning about the math:
  *
  * <ul>
  *   <li>The reference convolves channels-first pixel batches; MLX's convolutions are channels-last,
  *       so both the conv weight (in {@link #visionWeights(Map, int, int[])}) and the per-image
- *       pixel tensor (in {@link #forward(List)}) are transposed {@code {0, 2, 3, 4, 1}} before the
- *       convolution.
+ *       pixel tensor (in {@link #forward(MLXScope, List)}) are transposed {@code {0, 2, 3, 4, 1}}
+ *       before the convolution.
  *   <li>The reference builds the bilinear position-embedding rows in per-image row-major patch
  *       order, sums the four weighted corner rows, and only then permutes into merge-block order;
- *       {@link #forward(List)} gathers the corners directly in merge-block order instead. The sum
- *       is per-row, so the two orderings produce identical bits.
+ *       {@link #forward(MLXScope, List)} gathers the corners directly in merge-block order instead.
+ *       The sum is per-row, so the two orderings produce identical bits.
  * </ul>
  *
- * <p>Memory: {@link #forward(List)} allocates every activation of image {@code i} into a private
- * child scope of this module's scope, evaluates the image's DeepStack and main-merger rows, hoists
- * them into the module scope and closes the child — the same per-request pattern as {@code
- * SmolVlmModel}. The returned {@link Qwen3VlVisionFeatures} arrays therefore live in this module's
- * own scope and outlive each image's temporary scope.
+ * <p>Memory: {@link #forward(MLXScope, List)} follows the {@code SmolVlmModel} per-request pattern:
+ * every activation of image {@code i} is allocated into a private child scope of the caller's
+ * target scope, the image's DeepStack and main-merger rows are evaluated and hoisted into the
+ * target scope, and the child is closed on return — the tower's own module scope receives no
+ * per-forward handle. The returned {@link Qwen3VlVisionFeatures} arrays therefore live in the
+ * target scope, which the caller owns and closes (a per-request scope under the model scope, as
+ * {@code SmolVlmModel}'s tower runs under its per-request prefill scope). With more than one image,
+ * each output level's per-image parts are concatenated on axis 0, the concatenation is evaluated,
+ * and the parts are closed, so only the concatenations are retained. If a forward fails partway,
+ * the parts already hoisted for earlier images remain in the target scope (the caller's to
+ * release); the failing image's own child scope is still closed.
  */
 public final class Qwen3VlVisionTower extends Module {
 
@@ -476,9 +482,9 @@ public final class Qwen3VlVisionTower extends Module {
    * embedding is gathered directly in merge-block order and added, the two-axis RoPE is prepared
    * for the image's merge-block coordinates, the pre-norm encoder stack runs while capturing the
    * DeepStack features at {@code deepstackIndexes}, and the main merger runs. The image's DeepStack
-   * rows and main-merger row are evaluated, hoisted into this module's scope, and the image's
-   * private child scope is closed. The per-image results are concatenated on axis 0 across the
-   * input images (a single image is returned as-is).
+   * rows and main-merger row are evaluated and hoisted into {@code target}, and the image's private
+   * child scope is closed. The per-image results are concatenated on axis 0 across the input images
+   * (a single image is returned as-is).
    *
    * <p>Every image must be a still image ({@code gridThw()} {@code [1, h, w]}), with {@code h} and
    * {@code w} positive multiples of {@link #spatialMergeSize()}, {@code h * w} equal to the
@@ -486,36 +492,56 @@ public final class Qwen3VlVisionTower extends Module {
    * temporal * patchHeight * patchWidth} and {@code values().length} equal to {@code rawPatchRows()
    * * patchStride()}.
    *
+   * <p>Memory contract (the {@code SmolVlmModel} per-request pattern): every activation is
+   * allocated into a private child scope of {@code target}, and this tower's own module scope
+   * receives no per-forward handle. The returned arrays live in {@code target}, which the caller
+   * owns and closes. When more than one image is given, each level's per-image parts are
+   * concatenated, the concatenation is evaluated, and the per-image parts are closed, so only the
+   * concatenations are retained in {@code target}. If a forward fails partway, the parts already
+   * hoisted for earlier images remain in {@code target} — the caller's to release — while the
+   * failing image's own child scope is still closed.
+   *
+   * @param target the caller's per-request scope; must be this tower's module scope or a descendant
+   *     of it (the per-image child scopes mix this tower's weights with the image activations, and
+   *     unrelated scopes are rejected by the first such op)
    * @param images the processed images, in the order their rows must be concatenated
-   * @return the concatenated main-merger rows and per-level DeepStack rows, in this module's scope
-   * @throws NullPointerException if {@code images} or an element is {@code null}
-   * @throws IllegalArgumentException if an image's geometry disagrees with the tower's
+   * @return the concatenated main-merger rows and per-level DeepStack rows, in {@code target}
+   * @throws NullPointerException if {@code target}, {@code images} or an element is {@code null}
+   * @throws IllegalArgumentException if {@code target} is not this tower's module scope or a
+   *     descendant of it, or if an image's geometry disagrees with the tower's
    */
-  public Qwen3VlVisionFeatures forward(List<Qwen3VlImageProcessorResult> images) {
-    return run(images, null).features();
+  public Qwen3VlVisionFeatures forward(MLXScope target, List<Qwen3VlImageProcessorResult> images) {
+    return run(target, images, null).features();
   }
 
   /**
-   * The golden-verification view of {@link #forward(List)} (findings §11.3): the identical
-   * computation and scope handling, plus one {@link ImageCaptures} per input image holding the
-   * bilinear-interpolated position-embedding rows, the patch-embedding (convolution) output before
-   * the position-embedding add, and the output of block 0 followed by each DeepStack source block
-   * in this tower's {@code deepstackIndexes} order — the reference's hook-based per-image captures.
-   * Every captured array is evaluated and hoisted into this module's scope with the final features,
-   * so it outlives each image's private scope. Package-private: the golden test ({@code
-   * Qwen3VlVisionTowerGoldenTest}) is the intended consumer; {@link #forward(List)} stays the
-   * production surface and discards the captures.
+   * The golden-verification view of {@link #forward(MLXScope, List)} (findings §11.3): the
+   * identical computation and scope handling, plus one {@link ImageCaptures} per input image
+   * holding the bilinear-interpolated position-embedding rows, the patch-embedding (convolution)
+   * output before the position-embedding add, and the output of block 0 followed by each DeepStack
+   * source block in this tower's {@code deepstackIndexes} order — the reference's hook-based
+   * per-image captures. Every captured array is evaluated and hoisted into {@code target} with the
+   * final features, so it outlives each image's private scope. Package-private: the golden test
+   * ({@code Qwen3VlVisionTowerGoldenTest}) is the intended consumer; {@link #forward(MLXScope,
+   * List)} stays the production surface and discards the captures.
    *
-   * @param images the processed images; see {@link #forward(List)}
-   * @return the final features and the per-image captures, in this module's scope
+   * @param target the caller's scope for the features and captures; see {@link #forward(MLXScope,
+   *     List)}
+   * @param images the processed images; see {@link #forward(MLXScope, List)}
+   * @return the final features and the per-image captures, in {@code target}
    */
-  ForwardCaptures forwardForTest(List<Qwen3VlImageProcessorResult> images) {
+  ForwardCaptures forwardForTest(MLXScope target, List<Qwen3VlImageProcessorResult> images) {
     List<ImageCaptures> captures = new ArrayList<>(images.size());
-    return run(images, captures);
+    return run(target, images, captures);
   }
 
   private ForwardCaptures run(
-      List<Qwen3VlImageProcessorResult> images, List<ImageCaptures> captures) {
+      MLXScope target, List<Qwen3VlImageProcessorResult> images, List<ImageCaptures> captures) {
+    Objects.requireNonNull(target, "target");
+    if (!scope().isAncestorOf(target)) {
+      throw new IllegalArgumentException(
+          "target scope must be the tower's module scope or a descendant of it, got " + target);
+    }
     Objects.requireNonNull(images, "images");
     if (images.isEmpty()) {
       throw new IllegalArgumentException("at least one image is required");
@@ -528,19 +554,13 @@ public final class Qwen3VlVisionTower extends Module {
     }
     for (Qwen3VlImageProcessorResult image : images) {
       Objects.requireNonNull(image, "images element");
-      runImage(image, mergedParts, deepstackParts, captures);
+      runImage(target, image, mergedParts, deepstackParts, captures);
     }
-    MLXArray merged =
-        mergedParts.size() == 1
-            ? mergedParts.get(0)
-            : MLXShape.concatenate(mergedParts.toArray(MLXArray[]::new), 0);
+    MLXArray merged = mergedParts.size() == 1 ? mergedParts.get(0) : concatenate(mergedParts);
     List<MLXArray> levels = new ArrayList<>(levelCount);
     for (int level = 0; level < levelCount; level++) {
       List<MLXArray> parts = deepstackParts.get(level);
-      levels.add(
-          parts.size() == 1
-              ? parts.get(0)
-              : MLXShape.concatenate(parts.toArray(MLXArray[]::new), 0));
+      levels.add(parts.size() == 1 ? parts.get(0) : concatenate(parts));
     }
     return new ForwardCaptures(
         new Qwen3VlVisionFeatures(merged, levels),
@@ -548,12 +568,29 @@ public final class Qwen3VlVisionTower extends Module {
   }
 
   /**
-   * One image of {@link #forward(List)}: the {@code SmolVlmModel} per-request pattern — a private
-   * child scope holds every activation, the DeepStack and main-merger rows (and, for the golden
-   * test, the intermediate captures) are evaluated and hoisted into this module's scope, and the
-   * child scope is closed on return.
+   * Joins the per-image parts of one output level: concatenates them on axis 0 (the parts all live
+   * in the caller's target scope, so the concatenation lands there too), evaluates the
+   * concatenation, and closes the per-image parts, so only the concatenation's own buffer is
+   * retained in the target scope.
+   */
+  private static MLXArray concatenate(List<MLXArray> parts) {
+    MLXArray joined = MLXShape.concatenate(parts.toArray(MLXArray[]::new), 0);
+    MLX.eval(joined);
+    for (MLXArray part : parts) {
+      part.close();
+    }
+    return joined;
+  }
+
+  /**
+   * One image of {@link #forward(MLXScope, List)}: the {@code SmolVlmModel} per-request pattern — a
+   * private child scope of the caller's target scope holds every activation, the DeepStack and
+   * main-merger rows (and, for the golden test, the intermediate captures) are evaluated and
+   * hoisted into the target scope, and the child scope is closed on return, so this tower's own
+   * module scope receives no handle from the image.
    */
   private void runImage(
+      MLXScope target,
       Qwen3VlImageProcessorResult image,
       List<MLXArray> mergedParts,
       List<List<MLXArray>> deepstackParts,
@@ -605,7 +642,7 @@ public final class Qwen3VlVisionTower extends Module {
               + image.values().length);
     }
 
-    try (MLXScope img = scope().newChild()) {
+    try (MLXScope img = target.newChild()) {
       MLXArray pixels =
           MLX.array(
               img, image.values(), new int[] {n, inChannels, temporal, patchHeight, patchWidth});
@@ -665,18 +702,18 @@ public final class Qwen3VlVisionTower extends Module {
       }
       MLX.eval(toEvaluate.toArray(MLXArray[]::new));
       for (int c = 0; c < levelCount; c++) {
-        deepstackParts.get(c).add(MLX.hoist(outputs.get(c), scope()));
+        deepstackParts.get(c).add(MLX.hoist(outputs.get(c), target));
       }
-      mergedParts.add(MLX.hoist(outputs.get(levelCount), scope()));
+      mergedParts.add(MLX.hoist(outputs.get(levelCount), target));
       if (captures != null) {
         List<MLXArray> hoistedBlocks = new ArrayList<>(capturedBlocks.size());
         for (MLXArray block : capturedBlocks) {
-          hoistedBlocks.add(MLX.hoist(block, scope()));
+          hoistedBlocks.add(MLX.hoist(block, target));
         }
         captures.add(
             new ImageCaptures(
-                MLX.hoist(pe, scope()),
-                MLX.hoist(patchRows, scope()),
+                MLX.hoist(pe, target),
+                MLX.hoist(patchRows, target),
                 hoistedBlocks.toArray(MLXArray[]::new)));
       }
     }
@@ -993,11 +1030,12 @@ public final class Qwen3VlVisionTower extends Module {
   static final record PositionLookup(int[][] cornerIndices, float[][] cornerWeights) {}
 
   /**
-   * One image's golden-verification captures of {@link #forwardForTest(List)} (findings §11.3): the
-   * interpolated position-embedding rows {@code [n, hidden]}, the patch-embedding (convolution)
-   * output before the position-embedding add {@code [n, hidden]}, and the block outputs — block 0
-   * first, then the DeepStack source blocks in this tower's {@code deepstackIndexes} order — each
-   * {@code [n, hidden]}. Every array lives in the tower's own scope.
+   * One image's golden-verification captures of {@link #forwardForTest(MLXScope, List)} (findings
+   * §11.3): the interpolated position-embedding rows {@code [n, hidden]}, the patch-embedding
+   * (convolution) output before the position-embedding add {@code [n, hidden]}, and the block
+   * outputs — block 0 first, then the DeepStack source blocks in this tower's {@code
+   * deepstackIndexes} order — each {@code [n, hidden]}. Every array lives in the target scope
+   * passed to {@link #forwardForTest(MLXScope, List)}.
    */
   record ImageCaptures(
       MLXArray posEmbedInterpolated, MLXArray patchEmbed, MLXArray[] blockOutputs) {
@@ -1010,8 +1048,9 @@ public final class Qwen3VlVisionTower extends Module {
   }
 
   /**
-   * The final features of {@link #forwardForTest(List)} plus the per-image {@link ImageCaptures},
-   * one per input image in input order (empty for {@link #forward(List)}).
+   * The final features of {@link #forwardForTest(MLXScope, List)} plus the per-image {@link
+   * ImageCaptures}, one per input image in input order (empty for {@link #forward(MLXScope,
+   * List)}).
    */
   record ForwardCaptures(Qwen3VlVisionFeatures features, List<ImageCaptures> images) {
     ForwardCaptures {

@@ -40,13 +40,14 @@ import se.alipsa.jmlx.vision.RgbImage;
  * <p>The sustained per-image evaluated peak settles a baseline {@link
  * MLXMemoryTestSupport#settledActiveBytes()} after every static array (tower weights, the bracket
  * attention's weights, input and rotation) has been evaluated, runs the tower forward over the
- * image (its per-image child scope closes inside the forward), settles again, and takes the
- * difference — the hoisted merged and DeepStack rows that outlive the forward. The transient
- * per-image attention workspace is then bracketed by a direct single {@link TwoAxisRotaryAttention}
- * forward at 4096 rows with constant weights: {@link MLXMemory#resetPeak()} before, {@link
- * MLXMemory#peakBytes()} after the evaluated forward. Both measurements must stay below the plan §4
- * attention-workspace planning bound of 5 GiB (one float32 score matrix at 4096 rows / 16 heads is
- * 1 GiB).
+ * image in a per-request scope — the tower's per-image child scope closes inside the forward, and
+ * the hoisted merged and DeepStack rows live in the per-request scope until it closes, as in
+ * production — settles again while the per-request scope is still open, and takes the difference:
+ * the rows the per-request scope retains for the request. The transient per-image attention
+ * workspace is then bracketed by a direct single {@link TwoAxisRotaryAttention} forward at 4096
+ * rows with constant weights: {@link MLXMemory#resetPeak()} before, {@link MLXMemory#peakBytes()}
+ * after the evaluated forward. Both measurements must stay below the plan §4 attention-workspace
+ * planning bound of 5 GiB (one float32 score matrix at 4096 rows / 16 heads is 1 GiB).
  */
 @EnabledIfNativeAvailable
 class Qwen3VlVisionPeakTest {
@@ -107,15 +108,21 @@ class Qwen3VlVisionPeakTest {
       MLXMemoryTestSupport.settledActiveBytes(); // warm settle before the baseline
       final long baseline = MLXMemoryTestSupport.settledActiveBytes();
 
-      Qwen3VlVisionFeatures features = tower.forward(List.of(image));
-      assertArrayEquals(new int[] {MERGED_ROWS, OUT_HIDDEN}, features.merged().shape(), "merged");
-      assertEquals(DEEPSTACK_INDEXES.length, features.deepstackLevels().size(), "deepstack levels");
-      assertArrayEquals(
-          new int[] {MERGED_ROWS, OUT_HIDDEN},
-          features.deepstackLevels().get(0).shape(),
-          "deepstack level 0");
-      long settledAfter = MLXMemoryTestSupport.settledActiveBytes();
-      long sustained = settledAfter - baseline;
+      // The caller's per-request scope (the SmolVlmModel pattern): the forward's per-image child
+      // scope closes inside the forward, and the hoisted rows live in this scope until the
+      // measurement below closes it, so the settled delta is the per-request retained rows.
+      long sustained;
+      try (MLXScope request = scope.newChild()) {
+        Qwen3VlVisionFeatures features = tower.forward(request, List.of(image));
+        assertArrayEquals(new int[] {MERGED_ROWS, OUT_HIDDEN}, features.merged().shape(), "merged");
+        assertEquals(
+            DEEPSTACK_INDEXES.length, features.deepstackLevels().size(), "deepstack levels");
+        assertArrayEquals(
+            new int[] {MERGED_ROWS, OUT_HIDDEN},
+            features.deepstackLevels().get(0).shape(),
+            "deepstack level 0");
+        sustained = MLXMemoryTestSupport.settledActiveBytes() - baseline;
+      }
       long logicalRetained = 2L * MERGED_ROWS * OUT_HIDDEN * Float.BYTES;
       assertTrue(
           sustained >= logicalRetained,

@@ -1996,10 +1996,14 @@ deepstack indexes [1] (documented: the measured peak is attention-workspace-domi
 depth-independent — the score-matrix budget does not scale with depth), constant 0.001
 weights via `MLX.full`, and one synthetic 1024×1024 image (grid (1, 64, 64), 4096 patch
 rows) processed through `Qwen3VlImageProcessor`. The test settles a baseline
-`MLXMemory.activeBytes()`, runs the tower forward over the image, settles again, and
-records `max(settledAfter - settledBefore)` as the sustained per-image evaluated peak; it
-then runs a direct single `TwoAxisRotaryAttention` forward at 4096 rows (q/k/v
-[4096, 16, 64], constant weights) to bracket the transient per-image attention workspace.
+`MLXMemory.activeBytes()`, runs the tower forward over the image in a per-request scope
+(`forward(MLXScope, List)`: the per-image child scope closes inside the forward and the
+hoisted rows live in the per-request scope), settles again while the per-request scope is
+still open, and records `settledAfter - baseline` as the sustained per-image evaluated
+peak; it then closes the per-request scope and runs a direct single
+`TwoAxisRotaryAttention` forward at 4096 rows (q/k/v [4096, 16, 64], constant weights) to
+bracket the transient per-image attention workspace, so the bracket peak carries no
+retained-row offset.
 
 Measured (M5 Max, ordinary `test` task, TF32 default mode, 2026-10-22):
 
@@ -2007,12 +2011,18 @@ Measured (M5 Max, ordinary `test` task, TF32 default mode, 2026-10-22):
   logical retained output of the tower on the 4096-row image after the per-image scope closes:
   the merged 1024-row × 2048-float `out_hidden` representation plus one DeepStack level
   (1024 × 2048 floats), i.e. 2 × 1024 × 2048 × 4 B = 16 MiB — the merged rows and the `[1]`
-  deepstack capture, nothing else retained.
+  deepstack capture, nothing else retained. Unchanged by the per-request-scope review fix:
+  the retained rows now live in the caller's per-request scope instead of the tower's module
+  scope, but the single-image forward concatenates nothing, so the same 16 MiB is retained
+  until the per-request scope closes.
 - Transient attention workspace (bracketed by the direct `TwoAxisRotaryAttention` forward at
-  4096 rows): **352,321,536 B ≈ 0.33 GiB** peak over baseline. MLX's fused scaled-dot-product
-  kernel tiles the score computation and does not materialize the full float32 score matrix —
-  the full 16 heads × 4096² × 4 B matrix (4 GiB) is never resident, which is why the measured
-  transient is well under even one such matrix.
+  4096 rows): **335,544,320 B = exactly 320 MiB (0.3125 GiB)** peak over baseline. MLX's
+  fused scaled-dot-product kernel tiles the score computation and does not materialize the
+  full float32 score matrix — the full 16 heads × 4096² × 4 B matrix (4 GiB) is never
+  resident, which is why the measured transient is well under even one such matrix. The
+  bracket now runs after the per-request scope closes, so the 16 MiB of retained rows no
+  longer offsets the bracket peak: the pre-fix figure of 352,321,536 B ≈ 0.33 GiB equals
+  335,544,320 + 16,777,216 B exactly.
 
 Both figures are far below the 5 GiB bound.
 

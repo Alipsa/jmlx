@@ -691,13 +691,16 @@ where `norm2` sees the updated residual — plus DeepStack level merges) compose
 `jmlx-core`'s new `PatchMerger`, `TwoAxisRope`, `TwoAxisRotation` and
 `TwoAxisRotaryAttention` components (all with their own core tests), returning
 `Qwen3VlVisionFeatures` (merged rows + per-level DeepStack rows) hoisted into the
-tower's scope. The strict HF intermediate-feature golden
+caller's per-request target scope (`forward(MLXScope, List)`, the `SmolVlmModel`
+per-request pattern — the tower's module scope receives no per-forward handles, and
+multi-image per-image parts are released after the evaluated concatenation). The
+strict HF intermediate-feature golden
 `tools/hf-reference/goldens/qwen3vl-vision-wp5.json` plus its tiny synthetic
 checkpoint, image and generator script (`tools/hf-reference/qwen3vl_vision.py`,
 digest-pinned in `tools/hf-reference/provenance.json`) drive
 `Qwen3VlVisionTowerGoldenTest` (full-float32), and `Qwen3VlVisionPeakTest`
 (ordinary `test`) measures the real-2B-geometry per-image peak — sustained 16 MiB,
-attention transient ≈ 0.33 GiB, far under the plan §4 5 GiB bound — recorded in the
+attention transient ≈ 0.31 GiB, far under the plan §4 5 GiB bound — recorded in the
 reference findings §11.4. Both suites are required by the macOS CI assertion.
 `Qwen3VlModel`, its loader dispatch and the DeepStack consumption of
 `VisualFeatureInjection` remain WP6. No native pins, generated bindings or Gradle

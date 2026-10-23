@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -992,6 +993,16 @@ public final class Qwen3VlVisionTower extends Module {
    * skipped. Completeness against the tower's expected-key set is the constructor's job ({@code
    * rejectUnexpected}), not this method's.
    *
+   * <p>All-or-nothing: the method makes two passes. The first pass maps and validates every key —
+   * the duplicate, out-of-range and unrecognised-key rejections above — and does nothing else; the
+   * second pass only then materializes the result, transposing the conv weight there. A thrown
+   * {@link IllegalArgumentException} therefore leaves the caller's checkpoint map byte-for-byte
+   * untouched: every entry is still its original, still-open {@code MLXArray}, and no transposed
+   * copy has been allocated. On success the returned map holds the caller's own arrays for every
+   * mapped key except {@code patchEmbedding.weight}, which holds the transposed, evaluated copy
+   * (allocated into the original's scope); the caller's original conv weight array is closed, and
+   * the caller's map itself is never written to.
+   *
    * @throws IllegalArgumentException if two checkpoint keys map to the same tower key, if a key
    *     names a block or DeepStack merger index out of the configured range, or if a {@code
    *     model.visual.*} key is not recognised
@@ -1001,9 +1012,10 @@ public final class Qwen3VlVisionTower extends Module {
       Map<String, MLXArray> checkpoint, int depth, int[] deepstackIndexes) {
     Objects.requireNonNull(checkpoint, "checkpoint");
     Objects.requireNonNull(deepstackIndexes, "deepstackIndexes");
-    Map<String, MLXArray> weights = new LinkedHashMap<>();
-    for (Map.Entry<String, MLXArray> entry : checkpoint.entrySet()) {
-      String key = entry.getKey();
+    // Pass 1: map and validate every key before transposing, closing or inserting anything, so a
+    // rejection leaves the caller's map untouched.
+    Set<String> towerKeys = new HashSet<>();
+    for (String key : checkpoint.keySet()) {
       String towerKey = visionKeyToTowerKey(key, depth, deepstackIndexes);
       if (towerKey == null) {
         if (!key.startsWith(VISUAL_PREFIX)) {
@@ -1015,13 +1027,18 @@ public final class Qwen3VlVisionTower extends Module {
         }
         throw new IllegalArgumentException("unrecognized vision checkpoint key \"" + key + "\"");
       }
-      if (weights.containsKey(towerKey)) {
+      if (!towerKeys.add(towerKey)) {
         throw new IllegalArgumentException(
-            "duplicate vision tower key \""
-                + towerKey
-                + "\" from checkpoint key \""
-                + entry.getKey()
-                + "\"");
+            "duplicate vision tower key \"" + towerKey + "\" from checkpoint key \"" + key + "\"");
+      }
+    }
+    // Pass 2: pass 1 proved every visual key maps to a distinct tower key, so this cannot fail;
+    // the transpose happens only here, after the whole map is known valid.
+    Map<String, MLXArray> weights = new LinkedHashMap<>();
+    for (Map.Entry<String, MLXArray> entry : checkpoint.entrySet()) {
+      String towerKey = visionKeyToTowerKey(entry.getKey(), depth, deepstackIndexes);
+      if (towerKey == null) {
+        continue; // pass 1 proved every unmapped key is non-visual
       }
       MLXArray value = entry.getValue();
       if (towerKey.equals("patchEmbedding.weight")) {

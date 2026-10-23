@@ -2,7 +2,9 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,6 +19,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.vision.Qwen3VlImageProcessor;
@@ -28,9 +31,11 @@ import se.alipsa.jmlx.vision.RgbImage;
  * Validation coverage for the WP5 vision tower's argument and key-mapping checks (PR #58 review
  * finding 4): the public {@link Qwen3VlVisionTower#visionKeyToTowerKey(String, int, int[])}
  * branches, {@link Qwen3VlVisionTower#visionWeights(Map, int, int[])}'s skip/transpose/duplicate
- * behavior, its finding-5 out-of-range rejection and its unrecognised-visual-key rejection, the
- * weight, deepstack-index, position-grid and merge-width rejections, {@code runImage}'s geometry
- * rejections, the {@link Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
+ * behavior, its all-or-nothing failure atomicity (a rejection leaves the caller's map untouched)
+ * and its success-path conv-weight ownership transfer, its finding-5 out-of-range rejection and its
+ * unrecognised-visual-key rejection, the weight, deepstack-index, position-grid and merge-width
+ * rejections, {@code runImage}'s geometry rejections, the {@link
+ * Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
  * Qwen3VlVisionTower#positionLookup(int, int, int)} and {@link
  * Qwen3VlVisionTower#linspaceValue(int, int, int)} argument checks, and the {@link
  * Qwen3VlVisionTower#forwardForTest(MLXScope, List)} block-capture count and entry order for zero-
@@ -163,19 +168,10 @@ class Qwen3VlVisionTowerValidationTest {
       assertEquals(2, weights.size(), "only the in-range visual keys survive");
       assertArrayEquals(
           new String[] {"patchEmbedding.weight", "layer1.norm1.bias"}, weights.keySet().toArray());
-      // jmlx's channels-last layout [out, T, H, W, in], transposed {0, 2, 3, 4, 1}: output
-      // [o, t, h, w, c] reads input [o, c, t, h, w]; with T = 1 the t term is always zero.
-      float[] expected = new float[24];
-      for (int o = 0; o < 2; o++) {
-        for (int h = 0; h < 2; h++) {
-          for (int w = 0; w < 2; w++) {
-            for (int c = 0; c < 3; c++) {
-              expected[o * 12 + h * 6 + w * 3 + c] = input[o * 12 + c * 4 + h * 2 + w];
-            }
-          }
-        }
-      }
-      assertArrayEquals(expected, weights.get("patchEmbedding.weight").toFloatArray(), 0f);
+      // jmlx's channels-last layout [out, T, H, W, in], transposed {0, 2, 3, 4, 1}; see
+      // transposedConvValues for the index math.
+      assertArrayEquals(
+          transposedConvValues(input), weights.get("patchEmbedding.weight").toFloatArray(), 0f);
     }
   }
 
@@ -313,6 +309,87 @@ class Qwen3VlVisionTowerValidationTest {
           "duplicate vision tower key \"layer0.norm1.weight\" from checkpoint key"
               + " \"model.visual.blocks.00.norm1.weight\"",
           e.getMessage());
+    }
+  }
+
+  @Test
+  void visionWeightsOutOfRangeRejectionLeavesMapUntouched() {
+    // The conv weight is reached before the rejecting key: the pre-fix code had already
+    // transposed and closed it when the out-of-range key threw.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      float[] conv = putConvWeightFirst(scope, checkpoint);
+      checkpoint.put("model.visual.blocks.2.norm1.weight", full(scope, HIDDEN));
+      expectVisionWeightsFailureLeavesMapUntouched(
+          checkpoint,
+          checkpoint.get("model.visual.patch_embed.proj.weight"),
+          conv,
+          "checkpoint key \"model.visual.blocks.2.norm1.weight\" names block 2, out of range [0, 2)"
+              + " for the configured depth");
+    }
+  }
+
+  @Test
+  void visionWeightsUnrecognizedRejectionLeavesMapUntouched() {
+    // Same ordering: the conv weight is transposed and closed in the pre-fix code before the
+    // unrecognised key throws.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      float[] conv = putConvWeightFirst(scope, checkpoint);
+      checkpoint.put("model.visual.foo.weight", full(scope, HIDDEN));
+      expectVisionWeightsFailureLeavesMapUntouched(
+          checkpoint,
+          checkpoint.get("model.visual.patch_embed.proj.weight"),
+          conv,
+          "unrecognized vision checkpoint key \"model.visual.foo.weight\"");
+    }
+  }
+
+  @Test
+  void visionWeightsDuplicateRejectionLeavesMapUntouched() {
+    // Same ordering: the conv weight is transposed and closed in the pre-fix code before the
+    // colliding key throws.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      float[] conv = putConvWeightFirst(scope, checkpoint);
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      // "00" parses to the same index as "0", so both keys collide on the same tower key.
+      checkpoint.put("model.visual.blocks.00.norm1.weight", full(scope, HIDDEN));
+      expectVisionWeightsFailureLeavesMapUntouched(
+          checkpoint,
+          checkpoint.get("model.visual.patch_embed.proj.weight"),
+          conv,
+          "duplicate vision tower key \"layer0.norm1.weight\" from checkpoint key"
+              + " \"model.visual.blocks.00.norm1.weight\"");
+    }
+  }
+
+  @Test
+  void visionWeightsSuccessTransfersConvWeightOwnership() {
+    try (MLXScope scope = new MLXScope()) {
+      float[] conv = new float[24];
+      for (int i = 0; i < conv.length; i++) {
+        conv[i] = i + 1f;
+      }
+      MLXArray original = MLX.array(scope, conv, new int[] {2, 3, 1, 2, 2});
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      checkpoint.put("model.visual.patch_embed.proj.weight", original);
+
+      Map<String, MLXArray> weights =
+          Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
+
+      MLXArray transposed = weights.get("patchEmbedding.weight");
+      assertNotSame(original, transposed, "the conv weight is replaced by its transposed copy");
+      // The transposed copy is allocated into the original's (the caller's) scope...
+      assertSame(scope, transposed.scope(), "the transposed copy lives in the caller's scope");
+      assertArrayEquals(new int[] {2, 1, 2, 2, 3}, transposed.shape(), "channels-last layout");
+      // ...and holds the {0, 2, 3, 4, 1} transpose of the original.
+      assertArrayEquals(transposedConvValues(conv), transposed.toFloatArray(), 0f);
+      // ...while the caller's map still references the original array, which is now closed
+      // (the SmolVlmModel ownership transfer the Javadoc documents).
+      assertSame(original, checkpoint.get("model.visual.patch_embed.proj.weight"));
+      assertThrows(
+          IllegalStateException.class, original::shape, "the original conv weight is closed");
     }
   }
 
@@ -870,6 +947,77 @@ class Qwen3VlVisionTowerValidationTest {
               () -> Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK));
       assertEquals(expectedMessage, e.getMessage());
     }
+  }
+
+  /**
+   * Runs {@code visionWeights} with the class's DEPTH and DEEPSTACK against the already-built
+   * {@code checkpoint} (a well-formed conv weight first, then the rejecting key(s)) and asserts the
+   * all-or-nothing contract: the rejection throws {@code expectedMessage} and the caller's map is
+   * left byte-for-byte untouched — the conv weight entry is still the very same, still-open array
+   * with its original values, the map's size is intact, and no MLX memory was stranded by the
+   * failed call (no transposed copy allocated, nothing closed).
+   */
+  private static void expectVisionWeightsFailureLeavesMapUntouched(
+      Map<String, MLXArray> checkpoint,
+      MLXArray convWeight,
+      float[] convValues,
+      String expectedMessage) {
+    int sizeBefore = checkpoint.size();
+    long baseline = MLXMemory.activeBytes();
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK));
+    assertEquals(expectedMessage, e.getMessage());
+    // Sampled before any further MLX work in this test: the failed call allocates and frees
+    // nothing (the validation pass does no MLX work at all), so the counter must sit exactly at
+    // the pre-call baseline.
+    assertTrue(
+        MLXMemory.activeBytes() <= baseline,
+        "a rejected visionWeights call must not strand MLX memory; baseline "
+            + baseline
+            + ", after "
+            + MLXMemory.activeBytes());
+    assertEquals(sizeBefore, checkpoint.size(), "the caller's map is intact");
+    assertSame(convWeight, checkpoint.get("model.visual.patch_embed.proj.weight"));
+    // toFloatArray throws IllegalStateException on a closed array, so this pins both that the
+    // original is still open and that its bytes are the original values.
+    assertArrayEquals(
+        convValues, convWeight.toFloatArray(), 0f, "the original conv weight is intact");
+  }
+
+  /**
+   * Puts the well-formed conv weight (distinct values 1..24 in the {@code [2, 3, 1, 2, 2]} PyTorch
+   * layout) first into {@code checkpoint} and returns its values, so callers append the rejecting
+   * key(s) after it — the ordering the pre-fix code mangled the map.
+   */
+  private static float[] putConvWeightFirst(MLXScope scope, Map<String, MLXArray> checkpoint) {
+    float[] conv = new float[24];
+    for (int i = 0; i < conv.length; i++) {
+      conv[i] = i + 1f;
+    }
+    checkpoint.put(
+        "model.visual.patch_embed.proj.weight", MLX.array(scope, conv, new int[] {2, 3, 1, 2, 2}));
+    return conv;
+  }
+
+  /**
+   * The {@code {0, 2, 3, 4, 1}} transpose of the tests' {@code [2, 3, 1, 2, 2]} conv weight: jmlx's
+   * channels-last output {@code [o, t, h, w, c]} reads the PyTorch input {@code [o, c, t, h, w]};
+   * with T = 1 the t term is always zero.
+   */
+  private static float[] transposedConvValues(float[] input) {
+    float[] expected = new float[24];
+    for (int o = 0; o < 2; o++) {
+      for (int h = 0; h < 2; h++) {
+        for (int w = 0; w < 2; w++) {
+          for (int c = 0; c < 3; c++) {
+            expected[o * 12 + h * 6 + w * 3 + c] = input[o * 12 + c * 4 + h * 2 + w];
+          }
+        }
+      }
+    }
+    return expected;
   }
 
   /** One 64x64 processor output: grid (1, 4, 4), 16 raw patch rows of stride 1536. */

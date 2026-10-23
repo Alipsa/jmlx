@@ -1946,7 +1946,11 @@ a numeric block or DeepStack merger index past the configured depth or DeepStack
 is named with the limit that excludes it, and any other unrecognised visual key — an
 unknown sub-key (the MLP branch maps only the `linear_fc1`/`linear_fc2` affine
 `weight`/`bias`), an unknown top-level visual key, a non-numeric or overflowing index —
-is named as unrecognised; only genuinely non-visual checkpoint keys are skipped.
+is named as unrecognised; only genuinely non-visual checkpoint keys are skipped. The
+method is all-or-nothing (PR #58 review round 2): it maps and validates every key
+before transposing or closing anything, so a thrown rejection leaves the caller's
+checkpoint map byte-for-byte untouched (the conv weight is transposed and its original
+closed only on success, the `SmolVlmModel` pattern).
 
 ### 11.3 Golden/checkpoint inventory (planned values)
 

@@ -74,6 +74,13 @@ import tools.jackson.databind.JsonNode;
  *       the capture list.
  * </ul>
  *
+ * <p>In the vision baselines the manifest field {@code decoderModelSha256} holds the SHA-256 of the
+ * guarded {@code Qwen3VlVisionTower} source, not of any decoder model: the field name comes from
+ * the shared {@link ExactBitsMetadata}, whose field the 7.3a decoder recorder fills with the {@code
+ * DecoderModel} source hash. It is deliberately NOT renamed, because renaming the manifest key
+ * would invalidate the existing 7.3a decoder baselines, whose manifest format is required to stay
+ * byte-identical.
+ *
  * <p>Record mode refuses to overwrite an existing {@code tf32-<0|1>} recording: a baseline is
  * evidence, and silently replacing it with a recording from a later commit would invalidate the
  * very comparison it feeds. Verify mode checks the recorded manifest cheaply first — existence,

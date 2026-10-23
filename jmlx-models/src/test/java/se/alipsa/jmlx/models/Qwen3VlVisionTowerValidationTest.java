@@ -30,9 +30,11 @@ import se.alipsa.jmlx.vision.RgbImage;
  * branches, {@link Qwen3VlVisionTower#visionWeights(Map, int, int[])}'s skip/transpose/duplicate
  * behavior plus the finding-5 out-of-range rejection, the constructor's missing/extra/non-floating-
  * weight, deepstack-index, position-grid and merge-width rejections, {@code runImage}'s geometry
- * rejections, and the {@link Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
+ * rejections, the {@link Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
  * Qwen3VlVisionTower#positionLookup(int, int, int)} and {@link
- * Qwen3VlVisionTower#linspaceValue(int, int, int)} argument checks.
+ * Qwen3VlVisionTower#linspaceValue(int, int, int)} argument checks, and the {@link
+ * Qwen3VlVisionTower#forwardForTest(MLXScope, List)} block-capture count and entry order for zero-
+ * and non-zero-leading DeepStack indexes (PR #58 review finding 9).
  *
  * <p>Three of {@code runImage}'s documented rejections are untestable and intentionally not
  * covered: {@code gridThw()[0] != 1}, a {@code rawPatchRows()} that disagrees with the grid, and a
@@ -466,6 +468,87 @@ class Qwen3VlVisionTowerValidationTest {
   }
 
   @Test
+  void forwardForTestCapturesBlockZeroWhenFirstDeepstackIndexIsZero() {
+    Qwen3VlImageProcessorResult image = processedImage();
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> oneLevel = baseWeights(scope);
+      // A second DeepStack level over the same tiny depth: the extra merger's keys carry the
+      // same constant values, so every weight shared with oneLevel is the very same array.
+      Map<String, MLXArray> twoLevels = new LinkedHashMap<>(oneLevel);
+      putDeepstackMerger(twoLevels, scope, 1);
+
+      // The block loop is independent of the DeepStack indexes, so these towers produce the same
+      // block outputs for the same image; the cross-tower equalities below pin which block each
+      // capture entry came from.
+      Qwen3VlVisionTower indexZero =
+          new Qwen3VlVisionTower(scope, NUM_HEADS, oneLevel, new int[] {0});
+      Qwen3VlVisionTower indexOne =
+          new Qwen3VlVisionTower(scope, NUM_HEADS, oneLevel, new int[] {1});
+      Qwen3VlVisionTower indexZeroOne =
+          new Qwen3VlVisionTower(scope, NUM_HEADS, twoLevels, new int[] {0, 1});
+
+      Qwen3VlVisionTower.ForwardCaptures zeroFeatures =
+          indexZero.forwardForTest(scope, List.of(image));
+      Qwen3VlVisionTower.ForwardCaptures oneFeatures =
+          indexOne.forwardForTest(scope, List.of(image));
+      Qwen3VlVisionTower.ForwardCaptures zeroOneFeatures =
+          indexZeroOne.forwardForTest(scope, List.of(image));
+      Qwen3VlVisionTower.ImageCaptures zeroCaptures = zeroFeatures.images().get(0);
+      Qwen3VlVisionTower.ImageCaptures oneCaptures = oneFeatures.images().get(0);
+      Qwen3VlVisionTower.ImageCaptures zeroOneCaptures = zeroOneFeatures.images().get(0);
+
+      // The documented count is 1 + levelCount even when the first DeepStack index is 0 (the
+      // pre-fix code captured block 0 only once, losing one entry and misaligning the rest).
+      assertEquals(2, zeroCaptures.blockOutputs().length, "1 + 1 level, deepstackIndexes [0]");
+      assertEquals(2, oneCaptures.blockOutputs().length, "1 + 1 level, deepstackIndexes [1]");
+      assertEquals(
+          3, zeroOneCaptures.blockOutputs().length, "1 + 2 levels, deepstackIndexes [0, 1]");
+      int n = image.rawPatchRows();
+      for (MLXArray block : zeroOneCaptures.blockOutputs()) {
+        assertArrayEquals(new int[] {n, HIDDEN}, block.shape(), "capture shape");
+      }
+
+      // Entry 0 is block 0's own output, independent of the DeepStack indexes.
+      assertArrayEquals(
+          zeroCaptures.blockOutputs()[0].toFloatArray(),
+          oneCaptures.blockOutputs()[0].toFloatArray(),
+          0f,
+          "entry 0 is block 0 for both [0] and [1]");
+      // [0]: the DeepStack level-0 source block is block 0 itself, so entry 1 repeats entry 0.
+      assertArrayEquals(
+          zeroCaptures.blockOutputs()[0].toFloatArray(),
+          zeroCaptures.blockOutputs()[1].toFloatArray(),
+          0f,
+          "[0] entry 1 is block 0's output too");
+      // [0, 1]: entry 1 repeats block 0, and entry 2 is block 1's output, equal to the [1]
+      // tower's entry 1.
+      assertArrayEquals(
+          zeroOneCaptures.blockOutputs()[0].toFloatArray(),
+          zeroOneCaptures.blockOutputs()[1].toFloatArray(),
+          0f,
+          "[0, 1] entry 1 is block 0's output");
+      assertArrayEquals(
+          oneCaptures.blockOutputs()[1].toFloatArray(),
+          zeroOneCaptures.blockOutputs()[2].toFloatArray(),
+          0f,
+          "[0, 1] entry 2 is block 1's output");
+      // The feature rows line up with the blocks that fed them: DeepStack level 0 consumed block
+      // 0 in both the [0] and the [0, 1] towers (same merger, same input), and the main merger
+      // consumed block 1 in every tower, so the merged rows are equal across all three.
+      assertArrayEquals(
+          zeroOneFeatures.features().deepstackLevels().get(0).toFloatArray(),
+          zeroFeatures.features().deepstackLevels().get(0).toFloatArray(),
+          0f,
+          "level 0 DeepStack rows come from block 0 in both towers");
+      assertArrayEquals(
+          oneFeatures.features().merged().toFloatArray(),
+          zeroOneFeatures.features().merged().toFloatArray(),
+          0f,
+          "main merger rows come from block 1 in every tower");
+    }
+  }
+
+  @Test
   void rotaryCoordinatesRejectsInvalidArguments() {
     assertEquals(
         "merge must be positive",
@@ -634,15 +717,20 @@ class Qwen3VlVisionTowerValidationTest {
     put(weights, scope, "merger.linearFc2.weight", OUT_HIDDEN, MERGE_BLOCK);
     put(weights, scope, "merger.linearFc2.bias", OUT_HIDDEN);
     for (int j = 0; j < DEEPSTACK.length; j++) {
-      String prefix = "deepstackMerger" + j + ".";
-      put(weights, scope, prefix + "norm.weight", MERGE_BLOCK);
-      put(weights, scope, prefix + "norm.bias", MERGE_BLOCK);
-      put(weights, scope, prefix + "linearFc1.weight", MERGE_BLOCK, MERGE_BLOCK);
-      put(weights, scope, prefix + "linearFc1.bias", MERGE_BLOCK);
-      put(weights, scope, prefix + "linearFc2.weight", OUT_HIDDEN, MERGE_BLOCK);
-      put(weights, scope, prefix + "linearFc2.bias", OUT_HIDDEN);
+      putDeepstackMerger(weights, scope, j);
     }
     return weights;
+  }
+
+  /** Adds the tiny geometry's {@code deepstackMerger<index>.*} keys (constant 0.001) to the map. */
+  private static void putDeepstackMerger(Map<String, MLXArray> weights, MLXScope scope, int index) {
+    String prefix = "deepstackMerger" + index + ".";
+    put(weights, scope, prefix + "norm.weight", MERGE_BLOCK);
+    put(weights, scope, prefix + "norm.bias", MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc1.weight", MERGE_BLOCK, MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc1.bias", MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc2.weight", OUT_HIDDEN, MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc2.bias", OUT_HIDDEN);
   }
 
   /**

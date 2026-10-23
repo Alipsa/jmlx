@@ -520,12 +520,13 @@ public final class Qwen3VlVisionTower extends Module {
    * The golden-verification view of {@link #forward(MLXScope, List)} (findings §11.3): the
    * identical computation and scope handling, plus one {@link ImageCaptures} per input image
    * holding the bilinear-interpolated position-embedding rows, the patch-embedding (convolution)
-   * output before the position-embedding add, and the output of block 0 followed by each DeepStack
-   * source block in this tower's {@code deepstackIndexes} order — the reference's hook-based
-   * per-image captures. Every captured array is evaluated and hoisted into {@code target} with the
-   * final features, so it outlives each image's private scope. Package-private: the golden test
-   * ({@code Qwen3VlVisionTowerGoldenTest}) is the intended consumer; {@link #forward(MLXScope,
-   * List)} stays the production surface and discards the captures.
+   * output before the position-embedding add, and {@code 1 + deepstackIndexes.length} block outputs
+   * — block 0 first, then each DeepStack source block in this tower's {@code deepstackIndexes}
+   * order (so when the first index is 0, block 0's output is captured twice) — the reference's
+   * hook-based per-image captures. Every captured array is evaluated and hoisted into {@code
+   * target} with the final features, so it outlives each image's private scope. Package-private:
+   * the golden test ({@code Qwen3VlVisionTowerGoldenTest}) is the intended consumer; {@link
+   * #forward(MLXScope, List)} stays the production surface and discards the captures.
    *
    * @param target the caller's scope for the features and captures; see {@link #forward(MLXScope,
    *     List)}
@@ -685,10 +686,17 @@ public final class Qwen3VlVisionTower extends Module {
       int level = 0;
       for (int i = 0; i < depth; i++) {
         x = layers.get(i).forward(x, rotation);
-        if (captures != null && (i == 0 || level < levelCount && i == deepstackIndexes[level])) {
+        // The block-0 capture and the DeepStack capture are independent conditions: when
+        // deepstackIndexes[0] == 0 both fire in this order, so blockOutputs keeps the documented
+        // 1 + levelCount entries (block 0 first, then the DeepStack source blocks in
+        // deepstackIndexes order).
+        if (captures != null && i == 0) {
           capturedBlocks.add(x);
         }
         if (level < levelCount && i == deepstackIndexes[level]) {
+          if (captures != null) {
+            capturedBlocks.add(x);
+          }
           outputs.add(deepstackMergers.get(level).forward(x));
           level++;
         }
@@ -1092,9 +1100,11 @@ public final class Qwen3VlVisionTower extends Module {
    * One image's golden-verification captures of {@link #forwardForTest(MLXScope, List)} (findings
    * §11.3): the interpolated position-embedding rows {@code [n, hidden]}, the patch-embedding
    * (convolution) output before the position-embedding add {@code [n, hidden]}, and the block
-   * outputs — block 0 first, then the DeepStack source blocks in this tower's {@code
-   * deepstackIndexes} order — each {@code [n, hidden]}. Every array lives in the target scope
-   * passed to {@link #forwardForTest(MLXScope, List)}.
+   * outputs — exactly {@code 1 + deepstackIndexes.length} entries: block 0 first, then the
+   * DeepStack source blocks in this tower's {@code deepstackIndexes} order — each {@code [n,
+   * hidden]}. When {@code deepstackIndexes[0]} is 0, block 0's output appears twice: once as its
+   * own entry 0 and once as the DeepStack level-0 source at entry 1. Every array lives in the
+   * target scope passed to {@link #forwardForTest(MLXScope, List)}.
    */
   record ImageCaptures(
       MLXArray posEmbedInterpolated, MLXArray patchEmbed, MLXArray[] blockOutputs) {

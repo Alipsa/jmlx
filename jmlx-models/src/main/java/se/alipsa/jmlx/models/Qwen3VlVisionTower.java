@@ -896,15 +896,11 @@ public final class Qwen3VlVisionTower extends Module {
     }
     if (rest.startsWith("blocks.")) {
       String tail = rest.substring("blocks.".length());
-      int dot = tail.indexOf('.');
-      if (dot < 1) {
-        return null;
-      }
-      Integer index = parseNonNegativeInt(tail.substring(0, dot));
+      Integer index = visionListIndex(tail);
       if (index == null || index >= depth) {
         return null;
       }
-      String sub = tail.substring(dot + 1);
+      String sub = tail.substring(tail.indexOf('.') + 1);
       if (sub.equals("norm1.weight")
           || sub.equals("norm1.bias")
           || sub.equals("norm2.weight")
@@ -936,15 +932,11 @@ public final class Qwen3VlVisionTower extends Module {
     }
     if (rest.startsWith("deepstack_merger_list.")) {
       String tail = rest.substring("deepstack_merger_list.".length());
-      int dot = tail.indexOf('.');
-      if (dot < 1) {
-        return null;
-      }
-      Integer index = parseNonNegativeInt(tail.substring(0, dot));
+      Integer index = visionListIndex(tail);
       if (index == null || index >= deepstackIndexes.length) {
         return null;
       }
-      return mergerKey(tail.substring(dot + 1), "deepstackMerger" + index);
+      return mergerKey(tail.substring(tail.indexOf('.') + 1), "deepstackMerger" + index);
     }
     return null;
   }
@@ -955,10 +947,14 @@ public final class Qwen3VlVisionTower extends Module {
    * fresh map of tower keys to the checkpoint's arrays (the conv weight is the exception: it is
    * transposed {@code {0, 2, 3, 4, 1}} from PyTorch {@code [out, in, T, H, W]} to jmlx's
    * channels-last {@code [out, T, H, W, in]}, evaluated, with the original closed — the {@code
-   * SmolVlmModel} pattern). Completeness against the tower's expected-key set is the constructor's
-   * job ({@code rejectUnexpected}), not this method's.
+   * SmolVlmModel} pattern). A key that names a block or DeepStack merger past the configured depth
+   * or DeepStack count is rejected outright rather than skipped, since dropping it would truncate
+   * the tower to the configured depth instead of surfacing the mismatch. Completeness against the
+   * tower's expected-key set is the constructor's job ({@code rejectUnexpected}), not this
+   * method's.
    *
-   * @throws IllegalArgumentException if two checkpoint keys map to the same tower key
+   * @throws IllegalArgumentException if two checkpoint keys map to the same tower key, or if a key
+   *     names a block or DeepStack merger index out of the configured range
    * @throws NullPointerException if an argument is {@code null}
    */
   public static Map<String, MLXArray> visionWeights(
@@ -967,8 +963,13 @@ public final class Qwen3VlVisionTower extends Module {
     Objects.requireNonNull(deepstackIndexes, "deepstackIndexes");
     Map<String, MLXArray> weights = new LinkedHashMap<>();
     for (Map.Entry<String, MLXArray> entry : checkpoint.entrySet()) {
-      String towerKey = visionKeyToTowerKey(entry.getKey(), depth, deepstackIndexes);
+      String key = entry.getKey();
+      String towerKey = visionKeyToTowerKey(key, depth, deepstackIndexes);
       if (towerKey == null) {
+        String outOfRange = outOfRangeVisionIndex(key, depth, deepstackIndexes);
+        if (outOfRange != null) {
+          throw new IllegalArgumentException(outOfRange);
+        }
         continue;
       }
       if (weights.containsKey(towerKey)) {
@@ -991,6 +992,49 @@ public final class Qwen3VlVisionTower extends Module {
     return weights;
   }
 
+  /**
+   * The out-of-range rejection of {@link #visionWeights(Map, int, int[])}: a {@code
+   * model.visual.blocks.{i}} or {@code model.visual.deepstack_merger_list.{j}} key whose numeric
+   * index is out of the configured depth (respectively the configured DeepStack count) is a
+   * well-formed visual key that {@link #visionKeyToTowerKey(String, int, int[])} rejected only
+   * because of its index — the signature of a checkpoint deeper, or with more DeepStack mergers,
+   * than the configuration, which must fail loudly instead of truncating the tower silently.
+   * Returns the rejection message, or {@code null} for non-visual keys and for non-numeric,
+   * overflowing or missing indices, which stay skipped like any unknown key.
+   */
+  private static String outOfRangeVisionIndex(String key, int depth, int[] deepstackIndexes) {
+    if (!key.startsWith(VISUAL_PREFIX)) {
+      return null;
+    }
+    String rest = key.substring(VISUAL_PREFIX.length());
+    if (rest.startsWith("blocks.")) {
+      Integer index = visionListIndex(rest.substring("blocks.".length()));
+      if (index != null && index >= depth) {
+        return "checkpoint key \""
+            + key
+            + "\" names block "
+            + index
+            + ", out of range [0, "
+            + depth
+            + ") for the configured depth";
+      }
+      return null;
+    }
+    if (rest.startsWith("deepstack_merger_list.")) {
+      Integer index = visionListIndex(rest.substring("deepstack_merger_list.".length()));
+      if (index != null && index >= deepstackIndexes.length) {
+        return "checkpoint key \""
+            + key
+            + "\" names DeepStack merger "
+            + index
+            + ", out of range [0, "
+            + deepstackIndexes.length
+            + ") for the configured DeepStack count";
+      }
+    }
+    return null;
+  }
+
   /** The {@code {norm,linearFc1,linear_fc2}} rename shared by the main and DeepStack mergers. */
   private static String mergerKey(String sub, String prefix) {
     if (sub.equals("norm.weight") || sub.equals("norm.bias")) {
@@ -1003,6 +1047,19 @@ public final class Qwen3VlVisionTower extends Module {
       return prefix + ".linearFc2." + sub.substring("linear_fc2.".length());
     }
     return null;
+  }
+
+  /**
+   * The numeric list index before the tail's first dot (the {@code i} of {@code blocks.{i}.} or the
+   * {@code j} of {@code deepstack_merger_list.{j}.}), or {@code null} for a dot-less tail or a
+   * non-numeric or overflowing digit run.
+   */
+  private static Integer visionListIndex(String tail) {
+    int dot = tail.indexOf('.');
+    if (dot < 1) {
+      return null;
+    }
+    return parseNonNegativeInt(tail.substring(0, dot));
   }
 
   /** The non-negative decimal parse, or {@code null} for a non-numeric or overflowing digit run. */

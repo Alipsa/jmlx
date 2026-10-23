@@ -28,9 +28,9 @@ import se.alipsa.jmlx.vision.RgbImage;
  * Validation coverage for the WP5 vision tower's argument and key-mapping checks (PR #58 review
  * finding 4): the public {@link Qwen3VlVisionTower#visionKeyToTowerKey(String, int, int[])}
  * branches, {@link Qwen3VlVisionTower#visionWeights(Map, int, int[])}'s skip/transpose/duplicate
- * behavior, the constructor's missing/extra/non-floating-weight, deepstack-index, position-grid and
- * merge-width rejections, {@code runImage}'s geometry rejections, and the {@link
- * Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
+ * behavior plus the finding-5 out-of-range rejection, the constructor's missing/extra/non-floating-
+ * weight, deepstack-index, position-grid and merge-width rejections, {@code runImage}'s geometry
+ * rejections, and the {@link Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
  * Qwen3VlVisionTower#positionLookup(int, int, int)} and {@link
  * Qwen3VlVisionTower#linspaceValue(int, int, int)} argument checks.
  *
@@ -135,7 +135,7 @@ class Qwen3VlVisionTowerValidationTest {
   }
 
   @Test
-  void visionWeightsSkipsNonVisualAndOutOfRangeKeysAndTransposesConvWeight() {
+  void visionWeightsSkipsNonVisualAndMalformedKeysAndTransposesConvWeight() {
     try (MLXScope scope = new MLXScope()) {
       float[] input = new float[24];
       for (int i = 0; i < input.length; i++) {
@@ -149,11 +149,14 @@ class Qwen3VlVisionTowerValidationTest {
       checkpoint.put("model.visual.blocks.1.norm1.bias", full(scope, HIDDEN));
       checkpoint.put(
           "model.language_model.embed_tokens.weight", full(scope, new int[] {4, HIDDEN}));
-      // Current behavior: well-formed keys whose block or merger index is out of the configured
-      // range are silently dropped. PR #58 review finding 5 changes visionWeights to throw for
-      // those keys; update this expectation when that lands.
-      checkpoint.put("model.visual.blocks.9.norm1.weight", full(scope, HIDDEN));
-      checkpoint.put("model.visual.deepstack_merger_list.5.norm.weight", full(scope, HIDDEN));
+      // Malformed visual keys (a non-numeric index, an overflowing one, a missing sub-key) are
+      // unknown keys, not out-of-range ones: they stay skipped, like the non-visual key above.
+      // A well-formed key whose index is out of range is rejected instead; see
+      // visionWeightsRejectsOutOfRangeBlockKeys and
+      // visionWeightsRejectsOutOfRangeDeepstackMergerKeys.
+      checkpoint.put("model.visual.blocks.x.norm1.weight", full(scope, HIDDEN));
+      checkpoint.put("model.visual.blocks.99999999999999999999.norm1.weight", full(scope, HIDDEN));
+      checkpoint.put("model.visual.blocks.1", full(scope, HIDDEN));
 
       Map<String, MLXArray> weights =
           Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
@@ -175,6 +178,42 @@ class Qwen3VlVisionTowerValidationTest {
       }
       assertArrayEquals(expected, weights.get("patchEmbedding.weight").toFloatArray(), 0f);
     }
+  }
+
+  @Test
+  void visionWeightsRejectsOutOfRangeBlockKeys() {
+    // A numeric block index past the configured DEPTH (2) is rejected for every sub-key family.
+    expectOutOfRangeRejection(
+        "model.visual.blocks.2.norm1.weight",
+        "checkpoint key \"model.visual.blocks.2.norm1.weight\" names block 2, out of range [0, 2)"
+            + " for the configured depth");
+    expectOutOfRangeRejection(
+        "model.visual.blocks.9.attn.qkv.bias",
+        "checkpoint key \"model.visual.blocks.9.attn.qkv.bias\" names block 9, out of range [0, 2)"
+            + " for the configured depth");
+    expectOutOfRangeRejection(
+        "model.visual.blocks.77.mlp.linear_fc2.weight",
+        "checkpoint key \"model.visual.blocks.77.mlp.linear_fc2.weight\" names block 77,"
+            + " out of range [0, 2) for the configured depth");
+    // An unknown sub-key does not make the key non-visual: a numeric block index past the
+    // configured depth is a depth mismatch either way.
+    expectOutOfRangeRejection(
+        "model.visual.blocks.4.other.weight",
+        "checkpoint key \"model.visual.blocks.4.other.weight\" names block 4, out of range [0, 2)"
+            + " for the configured depth");
+  }
+
+  @Test
+  void visionWeightsRejectsOutOfRangeDeepstackMergerKeys() {
+    // DEEPSTACK has one entry, so every numeric merger index >= 1 is out of range.
+    expectOutOfRangeRejection(
+        "model.visual.deepstack_merger_list.1.norm.weight",
+        "checkpoint key \"model.visual.deepstack_merger_list.1.norm.weight\" names DeepStack"
+            + " merger 1, out of range [0, 1) for the configured DeepStack count");
+    expectOutOfRangeRejection(
+        "model.visual.deepstack_merger_list.5.linear_fc2.bias",
+        "checkpoint key \"model.visual.deepstack_merger_list.5.linear_fc2.bias\" names DeepStack"
+            + " merger 5, out of range [0, 1) for the configured DeepStack count");
   }
 
   @Test
@@ -644,6 +683,25 @@ class Qwen3VlVisionTowerValidationTest {
             IllegalArgumentException.class,
             () -> new Qwen3VlVisionTower(scope, numHeads, weights, deepstackIndexes));
     assertEquals(message, e.getMessage());
+  }
+
+  /**
+   * Runs {@code visionWeights} with the class's DEPTH and DEEPSTACK against one in-range weight
+   * followed by the out-of-range {@code checkpointKey} and asserts the rejection message.
+   */
+  private static void expectOutOfRangeRejection(String checkpointKey, String expectedMessage) {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      // The in-range key is accepted and processed first, then the out-of-range key rejects the
+      // whole map.
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      checkpoint.put(checkpointKey, full(scope, HIDDEN));
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK));
+      assertEquals(expectedMessage, e.getMessage());
+    }
   }
 
   /** One 64x64 processor output: grid (1, 4, 4), 16 raw patch rows of stride 1536. */

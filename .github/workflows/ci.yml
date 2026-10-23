@@ -175,7 +175,8 @@ jobs:
                               'ModalityRejectionTest', 'Idefics3VisionTowerSmokeTest',
                               'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest',
                               'DecoderSeamTest', 'VisualFeatureInjectionTest',
-                              'Qwen3VlVisionTowerGoldenTest', 'Qwen3VlVisionPeakTest'],
+                              'Qwen3VlVisionTowerGoldenTest', 'Qwen3VlVisionPeakTest',
+                              'Qwen3VlVisionTowerValidationTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.

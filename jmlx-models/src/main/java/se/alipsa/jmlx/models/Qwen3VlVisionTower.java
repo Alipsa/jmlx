@@ -70,15 +70,20 @@ import se.alipsa.jmlx.vision.Qwen3VlImageProcessorResult;
  *
  * <p>Memory: {@link #forward(MLXScope, List)} follows the {@code SmolVlmModel} per-request pattern:
  * every activation of image {@code i} is allocated into a private child scope of the caller's
- * target scope, the image's DeepStack and main-merger rows are evaluated and hoisted into the
- * target scope, and the child is closed on return — the tower's own module scope receives no
- * per-forward handle. The returned {@link Qwen3VlVisionFeatures} arrays therefore live in the
- * target scope, which the caller owns and closes (a per-request scope under the model scope, as
- * {@code SmolVlmModel}'s tower runs under its per-request prefill scope). With more than one image,
- * each output level's per-image parts are concatenated on axis 0, the concatenation is evaluated,
- * and the parts are closed, so only the concatenations are retained. If a forward fails partway,
- * the parts already hoisted for earlier images remain in the target scope (the caller's to
- * release); the failing image's own child scope is still closed.
+ * target scope, and each encoder block's activations are further confined to a private per-block
+ * child scope of the image scope — a block's output (and its DeepStack rows, when tapped) is
+ * evaluated and hoisted out before the block scope closes, so one block's intermediates do not
+ * accumulate across blocks and the per-image peak does not scale with depth (findings §11.4). The
+ * image's DeepStack and main-merger rows are hoisted into the target scope, and the block and image
+ * scopes are closed on return — the tower's own module scope receives no per-forward handle. The
+ * returned {@link Qwen3VlVisionFeatures} arrays therefore live in the target scope, which the
+ * caller owns and closes (a per-request scope under the model scope, as {@code SmolVlmModel}'s
+ * tower runs under its per-request prefill scope). With more than one image, each output level's
+ * per-image parts are concatenated on axis 0, the concatenation is evaluated, and the parts are
+ * closed, so only the concatenations are retained. If a forward fails partway, the parts already
+ * hoisted for earlier images — and, for a failing image, the per-level parts hoisted from its
+ * earlier blocks — remain in the target scope (the caller's to release); the failing image's block
+ * and image scopes are still closed.
  */
 public final class Qwen3VlVisionTower extends Module {
 
@@ -494,14 +499,18 @@ public final class Qwen3VlVisionTower extends Module {
    * temporal * patchHeight * patchWidth} and {@code values().length} equal to {@code rawPatchRows()
    * * patchStride()}.
    *
-   * <p>Memory contract (the {@code SmolVlmModel} per-request pattern): every activation is
-   * allocated into a private child scope of {@code target}, and this tower's own module scope
-   * receives no per-forward handle. The returned arrays live in {@code target}, which the caller
-   * owns and closes. When more than one image is given, each level's per-image parts are
-   * concatenated, the concatenation is evaluated, and the per-image parts are closed, so only the
-   * concatenations are retained in {@code target}. If a forward fails partway, the parts already
-   * hoisted for earlier images remain in {@code target} — the caller's to release — while the
-   * failing image's own child scope is still closed.
+   * <p>Memory contract (the {@code SmolVlmModel} per-request pattern): every image's activations
+   * are allocated into a private child scope of {@code target}, and each encoder block's
+   * activations into a further per-block child scope of the image scope that closes after the
+   * block's evaluated output is hoisted out, so one block's intermediates do not accumulate across
+   * blocks and the per-image peak does not scale with depth. This tower's own module scope receives
+   * no per-forward handle. The returned arrays live in {@code target}, which the caller owns and
+   * closes. When more than one image is given, each level's per-image parts are concatenated, the
+   * concatenation is evaluated, and the per-image parts are closed, so only the concatenations are
+   * retained in {@code target}. If a forward fails partway, the parts already hoisted for earlier
+   * images — and, for the failing image, the per-level parts hoisted from its earlier blocks —
+   * remain in {@code target} (the caller's to release), while the failing image's block and image
+   * scopes are still closed.
    *
    * @param target the caller's per-request scope; must be this tower's module scope or a descendant
    *     of it (the per-image child scopes mix this tower's weights with the image activations, and
@@ -524,9 +533,10 @@ public final class Qwen3VlVisionTower extends Module {
    * — block 0 first, then each DeepStack source block in this tower's {@code deepstackIndexes}
    * order (so when the first index is 0, block 0's output is captured twice) — the reference's
    * hook-based per-image captures. Every captured array is evaluated and hoisted into {@code
-   * target} with the final features, so it outlives each image's private scope. Package-private:
-   * the golden test ({@code Qwen3VlVisionTowerGoldenTest}) is the intended consumer; {@link
-   * #forward(MLXScope, List)} stays the production surface and discards the captures.
+   * target} with the final features, so it outlives each image's private scopes (the image scope
+   * and the per-block scopes). Package-private: the golden test ({@code
+   * Qwen3VlVisionTowerGoldenTest}) is the intended consumer; {@link #forward(MLXScope, List)} stays
+   * the production surface and discards the captures.
    *
    * @param target the caller's scope for the features and captures; see {@link #forward(MLXScope,
    *     List)}
@@ -587,10 +597,15 @@ public final class Qwen3VlVisionTower extends Module {
 
   /**
    * One image of {@link #forward(MLXScope, List)}: the {@code SmolVlmModel} per-request pattern — a
-   * private child scope of the caller's target scope holds every activation, the DeepStack and
-   * main-merger rows (and, for the golden test, the intermediate captures) are evaluated and
-   * hoisted into the target scope, and the child scope is closed on return, so this tower's own
-   * module scope receives no handle from the image.
+   * private child scope of the caller's target scope holds the image's own activations, and each
+   * encoder block runs in a further private child scope of it: the block's output (and its
+   * DeepStack rows, when tapped) is evaluated and hoisted out, then the block scope closes, so one
+   * block's intermediates never accumulate across blocks and the per-image peak does not scale with
+   * depth. The DeepStack and main-merger rows (and, for the golden test, the intermediate captures)
+   * are hoisted into the target scope, and both the block and image scopes are closed on return, so
+   * this tower's own module scope receives no handle from the image. If the image's forward fails
+   * partway, the per-level rows hoisted from its earlier blocks remain in the target scope (the
+   * caller's to release); the block and image scopes are still closed.
    */
   private void runImage(
       MLXScope target,
@@ -681,50 +696,61 @@ public final class Qwen3VlVisionTower extends Module {
       MLXArray x = MLXOps.add(patchRows, pe);
 
       TwoAxisRotation rotation = rope.prepare(img, n, rowCoords, colCoords);
-      List<MLXArray> outputs = new ArrayList<>(levelCount + 1);
       List<MLXArray> capturedBlocks = captures == null ? null : new ArrayList<>(levelCount + 1);
       int level = 0;
       for (int i = 0; i < depth; i++) {
-        x = layers.get(i).forward(x, rotation);
-        // The block-0 capture and the DeepStack capture are independent conditions: when
-        // deepstackIndexes[0] == 0 both fire in this order, so blockOutputs keeps the documented
-        // 1 + levelCount entries (block 0 first, then the DeepStack source blocks in
-        // deepstackIndexes order).
-        if (captures != null && i == 0) {
-          capturedBlocks.add(x);
-        }
-        if (level < levelCount && i == deepstackIndexes[level]) {
-          if (captures != null) {
-            capturedBlocks.add(x);
+        try (MLXScope block = img.newChild()) {
+          // Pin this block's entry row into the block scope the way T5Model.project does: the
+          // same-shape broadcast view is a no-op that allocates a handle into `block`, so every
+          // op result of the block resolves into it (the weights and the rotation tables live in
+          // ancestor scopes, and GELU's scalar constants follow the input's scope).
+          MLXArray in = MLXShape.broadcastTo(x, block, x.shape());
+          MLXArray out = layers.get(i).forward(in, rotation);
+          boolean tap = level < levelCount && i == deepstackIndexes[level];
+          MLXArray ds = tap ? deepstackMergers.get(level).forward(out) : null;
+          // Evaluate this block before the next one starts: closing the block scope below frees
+          // every intermediate of this block (the peak does not accumulate across blocks), while
+          // `out` (and `ds`) are hoisted out first, so the computation is unchanged — uncompiled
+          // MLX does not fuse across eval boundaries (verified bit-identical in both TF32 modes
+          // against the pre-change recording, findings §11.4).
+          MLX.eval(tap ? new MLXArray[] {out, ds} : new MLXArray[] {out});
+          // The block-0 capture and the DeepStack capture are independent conditions: when
+          // deepstackIndexes[0] == 0 both fire in this order, so blockOutputs keeps the
+          // documented 1 + levelCount entries (block 0 first, then the DeepStack source blocks in
+          // deepstackIndexes order).
+          if (captures != null && i == 0) {
+            capturedBlocks.add(MLX.hoist(out, target));
           }
-          outputs.add(deepstackMergers.get(level).forward(x));
-          level++;
+          if (tap) {
+            if (captures != null) {
+              capturedBlocks.add(MLX.hoist(out, target));
+            }
+            deepstackParts.get(level).add(MLX.hoist(ds, target));
+            level++;
+          }
+          // Drop the previous residual before the next block's intermediates accumulate: only
+          // the hoisted `out` (now `x`) survives this block's scope.
+          x.close();
+          x = MLX.hoist(out, img);
         }
       }
-      outputs.add(merger.forward(x));
+      MLXArray merged = merger.forward(x);
 
-      List<MLXArray> toEvaluate = new ArrayList<>(outputs.size() + 2);
-      toEvaluate.addAll(outputs);
+      List<MLXArray> toEvaluate = new ArrayList<>(2);
+      toEvaluate.add(merged);
       if (captures != null) {
         toEvaluate.add(pe);
         toEvaluate.add(patchRows);
         toEvaluate.addAll(capturedBlocks);
       }
       MLX.eval(toEvaluate.toArray(MLXArray[]::new));
-      for (int c = 0; c < levelCount; c++) {
-        deepstackParts.get(c).add(MLX.hoist(outputs.get(c), target));
-      }
-      mergedParts.add(MLX.hoist(outputs.get(levelCount), target));
+      mergedParts.add(MLX.hoist(merged, target));
       if (captures != null) {
-        List<MLXArray> hoistedBlocks = new ArrayList<>(capturedBlocks.size());
-        for (MLXArray block : capturedBlocks) {
-          hoistedBlocks.add(MLX.hoist(block, target));
-        }
         captures.add(
             new ImageCaptures(
                 MLX.hoist(pe, target),
                 MLX.hoist(patchRows, target),
-                hoistedBlocks.toArray(MLXArray[]::new)));
+                capturedBlocks.toArray(MLXArray[]::new)));
       }
     }
   }

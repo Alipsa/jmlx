@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,38 +30,41 @@ import se.alipsa.jmlx.vision.RgbImage;
  * Measured per-image peak of the WP5 vision tower ({@code
  * req/plans/phase7-3b-reference-findings.md} §11.4). Runs the real-2B tower geometry — hidden 1024,
  * 16 heads, head_dim 64, intermediate 4096, out_hidden 2048, 2304 position embeddings (48×48),
- * patch/temporal 16/2, merge 2 — at reduced depth 3 with DeepStack index [1]. The depth reduction
- * is documented in §11.4: the tower forward's per-image peak scales roughly linearly with depth
- * (measured ≈1.09 GiB per added block — each block's attention workspace and activations stay live
- * inside the one lazy-evaluated graph), so three blocks capture the per-block cost and bracket the
- * per-block transient that every real-depth block incurs, while the full depth-24 figure is the
- * recorded linear extrapolation. The weights are constant 0.001 via {@link MLX#full} — the peak
- * depends on geometry and dtype, not on values. One synthetic 1024×1024 image (grid (1, 64, 64),
- * 4096 patch rows, the default 4096-row raw budget's exact hard cap) is processed through {@link
- * Qwen3VlImageProcessor}.
+ * patch/temporal 16/2, merge 2 — at three reduced depths, each with one DeepStack index (depth 1:
+ * index 0; depths 3 and 4: index 1). The depth reduction is documented in §11.4: the tower's
+ * per-block evaluate-and-release loop confines every block's intermediates to a private per-block
+ * child scope that closes before the next block starts, so the per-image peak does not scale with
+ * depth — the pre-fix tower leaked ≈1.09 GiB per block (the full depth-24 tower extrapolated ≈26.8
+ * GiB). The depth-1-versus-depth-4 transient comparison below is the regression guard for that: the
+ * delta must stay under 64 MiB, so the depth-3 transient is a fair proxy for the per-image
+ * transient the plan §4 bound applies to at any depth. The weights are constant 0.001 via {@link
+ * MLX#full} — the peak depends on geometry and dtype, not on values. One synthetic 1024×1024 image
+ * (grid (1, 64, 64), 4096 patch rows, the default 4096-row raw budget's exact hard cap) is
+ * processed through {@link Qwen3VlImageProcessor}.
  *
- * <p>Three measurements share one settled baseline, taken with every static array (tower weights,
- * the bracket attention's weights, inputs and rotations) already evaluated:
+ * <p>Four tower measurements share one settled baseline, taken with every static array (all three
+ * towers' weights, the bracket attention's weights, inputs and rotations) already evaluated:
  *
  * <ol>
- *   <li>The tower forward's own per-image transient peak: {@link MLXMemory#resetPeak()} right
- *       before {@code tower.forward}, {@link MLXMemory#peakBytes()} right after — the forward
- *       evaluates its outputs and closes its per-image child scope internally, so the peak covers
- *       the conv, the per-block attention workspaces, the 4096×4096 MLP intermediates and the
- *       mergers alive inside the one evaluated graph, plus the 16 MiB of rows the forward hoists
- *       into the per-request scope.
- *   <li>The sustained per-image evaluated peak: a settled active-bytes delta taken while the
- *       per-request scope is still open — the tower's per-image child scope closes inside the
+ *   <li>The tower forward's own per-image transient peak at depth 1: the depth-independent floor —
+ *       one block's intermediates plus the conv, the position-embedding gathers and the mergers,
+ *       each evaluated and released inside the forward.
+ *   <li>The same transient at the depth-3 proxy: must stay under the plan §4 planning bound of 5
+ *       GiB and at least the 16 MiB of evaluated rows the forward hoists into the per-request
+ *       scope.
+ *   <li>The sustained per-image evaluated peak at depth 3: a settled active-bytes delta taken while
+ *       the per-request scope is still open — the per-block and per-image scopes close inside the
  *       forward, and the hoisted merged and DeepStack rows live in the per-request scope until it
  *       closes, as in production — the rows the per-request scope retains for the request.
- *   <li>The transient per-image attention workspace, bracketed by a direct single {@link
- *       TwoAxisRotaryAttention} forward at 4096 rows with constant weights ({@link
- *       MLXMemory#resetPeak()} before, {@link MLXMemory#peakBytes()} after the evaluated forward),
- *       run after the per-request scope closes so the bracket peak carries no retained-row offset.
+ *   <li>The same transient at depth 4; together with depth 1 it bounds per-block accumulation — the
+ *       difference must stay under 64 MiB, so a deeper tower (the real depth 24) incurs no larger
+ *       per-image transient than the depth-3 proxy.
  * </ol>
  *
- * <p>All three must stay below the plan §4 attention-workspace planning bound of 5 GiB (one float32
- * score matrix at 4096 rows / 16 heads is 1 GiB).
+ * <p>A fifth bracket, the transient per-image attention workspace of one standalone {@link
+ * TwoAxisRotaryAttention} forward at 4096 rows with constant weights (run after every per-request
+ * scope closes, so it carries no retained-row offset), must also stay under the plan §4 bound (one
+ * float32 score matrix at 4096 rows / 16 heads is 1 GiB).
  */
 @EnabledIfNativeAvailable
 class Qwen3VlVisionPeakTest {
@@ -71,8 +75,16 @@ class Qwen3VlVisionPeakTest {
   private static final int INTERMEDIATE = 4096;
   private static final int OUT_HIDDEN = 2048;
   private static final int POSITION_EMBEDDINGS = 2304;
-  private static final int DEPTH = 3;
-  private static final int[] DEEPSTACK_INDEXES = {1};
+  private static final int DEPTH_MIN = 1;
+  private static final int DEPTH_PROXY = 3;
+  private static final int DEPTH_MAX = 4;
+
+  /**
+   * The depth-independence bound: the depth-4 transient minus the depth-1 transient must stay under
+   * 64 MiB, so the per-image peak does not scale with depth.
+   */
+  private static final long DEPTH_DELTA_BOUND = 64L * 1024L * 1024L;
+
   private static final int MERGE = 2;
   private static final int MERGE_BLOCK = HIDDEN * MERGE * MERGE;
   private static final int IMAGE = 1024;
@@ -83,10 +95,12 @@ class Qwen3VlVisionPeakTest {
   private static final long PLANNING_BOUND = 5 * GIB;
 
   @Test
-  void realGeometryForwardPeakStaysUnderPlanningBound() throws Exception {
+  void realGeometryPeakIsDepthIndependentAndUnderPlanningBound() throws Exception {
     try (MLXScope scope = new MLXScope()) {
       List<MLXArray> statics = new ArrayList<>();
-      final Qwen3VlVisionTower tower = buildTower(scope, statics);
+      final Qwen3VlVisionTower towerMin = buildTower(scope, statics, DEPTH_MIN, new int[] {0});
+      final Qwen3VlVisionTower towerProxy = buildTower(scope, statics, DEPTH_PROXY, new int[] {1});
+      final Qwen3VlVisionTower towerMax = buildTower(scope, statics, DEPTH_MAX, new int[] {1});
       // The transient bracket: one standalone attention of the same geometry with constant
       // weights, whose input rows and prepared rotation live in this scope too, so the baseline
       // below counts every array the bracket forward reads.
@@ -112,8 +126,8 @@ class Qwen3VlVisionPeakTest {
       assertEquals(PATCH_ROWS, image.rawPatchRows(), "patch rows");
       assertEquals(MERGED_ROWS, image.mergedRowCount(), "merged rows");
 
-      // Everything the three measurements read is static: materialize it (and the rotation
-      // tables) before the baseline so only the forwards' own work moves the counter.
+      // Everything the measurements read is static: materialize it (and the rotation tables)
+      // before the baseline so only the forwards' own work moves the counter.
       List<MLXArray> toMaterialize = new ArrayList<>(statics);
       toMaterialize.add(rotation.cos());
       toMaterialize.add(rotation.sin());
@@ -121,58 +135,82 @@ class Qwen3VlVisionPeakTest {
       MLXMemoryTestSupport.settledActiveBytes(); // warm settle before the baseline
       final long baseline = MLXMemoryTestSupport.settledActiveBytes();
 
-      // The caller's per-request scope (the SmolVlmModel pattern): the forward's per-image child
-      // scope closes inside the forward, and the hoisted rows live in this scope until the
-      // measurement below closes it, so the settled delta is the per-request retained rows. The
-      // forward's own transient peak is bracketed with the peak counter: reset right before the
-      // forward (so no earlier work is counted), read right after it returns — the forward
-      // evaluates its outputs and closes the per-image scope internally, so the peak covers the
-      // conv, the per-block attention workspaces, the 4096×4096 MLP intermediates and the mergers
-      // alive inside the one evaluated graph, plus the 16 MiB of rows it hoists into this scope.
+      // Each tower measurement is one forward in a fresh per-request child scope of the caller
+      // scope (the SmolVlmModel pattern): the forward's per-image and per-block scopes close
+      // inside the forward, and only the hoisted merged and DeepStack rows live in the request
+      // scope until it closes, so a settled delta read while it is still open is the per-request
+      // retained rows. Each transient is bracketed with the peak counter: reset right before the
+      // forward (so no earlier work is counted), read right after it returns.
       MLXMemory.resetPeak();
-      long towerPeak;
+      long peakMin;
+      try (MLXScope request = scope.newChild()) {
+        assertOutput(towerMin.forward(request, List.of(image)));
+        peakMin = MLXMemory.peakBytes() - baseline;
+      }
+      MLXMemoryTestSupport.settledActiveBytes(); // settle the delayed frees before the next window
+      MLXMemory.resetPeak();
+      long peakProxy;
       long sustained;
       try (MLXScope request = scope.newChild()) {
-        Qwen3VlVisionFeatures features = tower.forward(request, List.of(image));
-        assertArrayEquals(new int[] {MERGED_ROWS, OUT_HIDDEN}, features.merged().shape(), "merged");
-        assertEquals(
-            DEEPSTACK_INDEXES.length, features.deepstackLevels().size(), "deepstack levels");
-        assertArrayEquals(
-            new int[] {MERGED_ROWS, OUT_HIDDEN},
-            features.deepstackLevels().get(0).shape(),
-            "deepstack level 0");
-        towerPeak = MLXMemory.peakBytes() - baseline;
+        assertOutput(towerProxy.forward(request, List.of(image)));
+        peakProxy = MLXMemory.peakBytes() - baseline;
         sustained = MLXMemoryTestSupport.settledActiveBytes() - baseline;
       }
-      long logicalRetained = 2L * MERGED_ROWS * OUT_HIDDEN * Float.BYTES;
+      MLXMemoryTestSupport.settledActiveBytes(); // settle the delayed frees before the next window
+      MLXMemory.resetPeak();
+      long peakMax;
+      try (MLXScope request = scope.newChild()) {
+        assertOutput(towerMax.forward(request, List.of(image)));
+        peakMax = MLXMemory.peakBytes() - baseline;
+      }
+      MLXMemoryTestSupport.settledActiveBytes(); // settle the delayed frees before the bracket
+
+      final long logicalRetained = 2L * MERGED_ROWS * OUT_HIDDEN * Float.BYTES;
+      for (int depth : new int[] {DEPTH_MIN, DEPTH_PROXY, DEPTH_MAX}) {
+        long peak = depth == DEPTH_MIN ? peakMin : depth == DEPTH_PROXY ? peakProxy : peakMax;
+        assertTrue(
+            peak >= logicalRetained,
+            "depth-"
+                + depth
+                + " tower peak "
+                + peak
+                + " B below the logical retained rows "
+                + logicalRetained
+                + " B");
+      }
       assertTrue(
-          towerPeak >= logicalRetained,
-          "tower peak "
-              + towerPeak
-              + " B below the logical retained rows "
-              + logicalRetained
-              + " B");
-      assertTrue(
-          towerPeak < PLANNING_BOUND,
-          "tower transient "
-              + towerPeak
+          peakProxy < PLANNING_BOUND,
+          "depth-3 tower transient "
+              + peakProxy
               + " B exceeded the "
               + PLANNING_BOUND
               + " B planning bound");
       assertTrue(
           sustained >= logicalRetained,
-          "sustained peak "
+          "depth-3 sustained peak "
               + sustained
               + " B below the logical retained rows "
               + logicalRetained
               + " B");
       assertTrue(
           sustained < PLANNING_BOUND,
-          "sustained peak "
+          "depth-3 sustained peak "
               + sustained
               + " B exceeded the "
               + PLANNING_BOUND
               + " B planning bound");
+      final long depthDelta = peakMax - peakMin;
+      assertTrue(
+          depthDelta < DEPTH_DELTA_BOUND,
+          "per-image transient delta "
+              + depthDelta
+              + " B between depth "
+              + DEPTH_MIN
+              + " and depth "
+              + DEPTH_MAX
+              + " exceeded the "
+              + DEPTH_DELTA_BOUND
+              + " B depth-independence bound");
 
       MLXMemory.resetPeak();
       MLX.eval(attention.forward(attentionInput, rotation));
@@ -186,25 +224,40 @@ class Qwen3VlVisionPeakTest {
               + " B planning bound");
 
       System.out.println(
-          "WP5 vision peak: grid=(1,"
+          "WP5 vision peak (per-block scopes): grid=(1,"
               + GRID
               + ","
               + GRID
-              + "), tower transient="
-              + towerPeak
+              + "), depth-1 transient="
+              + peakMin
               + " B ("
-              + String.format(Locale.ROOT, "%.2f", towerPeak / (double) GIB)
-              + " GiB), sustained="
+              + gib(peakMin)
+              + "), depth-3 transient="
+              + peakProxy
+              + " B ("
+              + gib(peakProxy)
+              + "), depth-3 sustained="
               + sustained
               + " B ("
               + sustained / (1024 * 1024)
-              + " MiB), attention transient="
+              + " MiB), depth-4 transient="
+              + peakMax
+              + " B ("
+              + gib(peakMax)
+              + "), depth-4 minus depth-1="
+              + depthDelta
+              + " B ("
+              + depthDelta / (1024 * 1024)
+              + " MiB), attention bracket="
               + transientDelta
               + " B ("
-              + String.format(Locale.ROOT, "%.2f", transientDelta / (double) GIB)
-              + " GiB), bound="
+              + gib(transientDelta)
+              + "), bound="
               + PLANNING_BOUND / GIB
-              + " GiB");
+              + " GiB (plan §4); measured on M5 Max under the ordinary test task "
+              + "(MLX_ENABLE_TF32=1 default, "
+              + LocalDate.now()
+              + ")");
     }
   }
 
@@ -236,13 +289,29 @@ class Qwen3VlVisionPeakTest {
     return new RgbImage(IMAGE, IMAGE, pixels);
   }
 
-  /** The real-2B geometry at reduced depth 3 / DeepStack [1], constant 0.001 weights. */
-  private static Qwen3VlVisionTower buildTower(MLXScope scope, List<MLXArray> statics) {
+  /**
+   * Asserts one image's forward output shapes for any of the measured depths (every measured tower
+   * has exactly one DeepStack level).
+   */
+  private static void assertOutput(Qwen3VlVisionFeatures features) {
+    assertArrayEquals(new int[] {MERGED_ROWS, OUT_HIDDEN}, features.merged().shape(), "merged");
+    assertEquals(1, features.deepstackLevels().size(), "deepstack levels");
+    assertArrayEquals(
+        new int[] {MERGED_ROWS, OUT_HIDDEN},
+        features.deepstackLevels().get(0).shape(),
+        "deepstack level 0");
+  }
+
+  /**
+   * The real-2B geometry at the given reduced depth and DeepStack index, constant 0.001 weights.
+   */
+  private static Qwen3VlVisionTower buildTower(
+      MLXScope scope, List<MLXArray> statics, int depth, int[] deepstackIndexes) {
     Map<String, MLXArray> weights = new LinkedHashMap<>();
     put(weights, statics, scope, "patchEmbedding.weight", HIDDEN, 2, 16, 16, 3);
     put(weights, statics, scope, "patchEmbedding.bias", HIDDEN);
     put(weights, statics, scope, "positionEmbedding.weight", POSITION_EMBEDDINGS, HIDDEN);
-    for (int i = 0; i < DEPTH; i++) {
+    for (int i = 0; i < depth; i++) {
       String layer = "layer" + i + ".";
       put(weights, statics, scope, layer + "attention.qkv.weight", 3 * HIDDEN, HIDDEN);
       put(weights, statics, scope, layer + "attention.qkv.bias", 3 * HIDDEN);
@@ -269,7 +338,7 @@ class Qwen3VlVisionPeakTest {
     put(weights, statics, scope, "deepstackMerger0.linearFc1.bias", MERGE_BLOCK);
     put(weights, statics, scope, "deepstackMerger0.linearFc2.weight", OUT_HIDDEN, MERGE_BLOCK);
     put(weights, statics, scope, "deepstackMerger0.linearFc2.bias", OUT_HIDDEN);
-    return new Qwen3VlVisionTower(scope, NUM_HEADS, weights, DEEPSTACK_INDEXES);
+    return new Qwen3VlVisionTower(scope, NUM_HEADS, weights, deepstackIndexes);
   }
 
   private static void put(
@@ -285,5 +354,13 @@ class Qwen3VlVisionPeakTest {
     MLXArray value = MLX.full(scope, shape, 0.001f, DType.FLOAT32);
     statics.add(value);
     return value;
+  }
+
+  /** {@code bytes} as {@code "x.xx GiB (y MiB)"} for the evidence line. */
+  private static String gib(long bytes) {
+    return String.format(Locale.ROOT, "%.2f", bytes / (double) GIB)
+        + " GiB ("
+        + bytes / (1024 * 1024)
+        + " MiB)";
   }
 }

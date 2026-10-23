@@ -30,24 +30,37 @@ import se.alipsa.jmlx.vision.RgbImage;
  * req/plans/phase7-3b-reference-findings.md} §11.4). Runs the real-2B tower geometry — hidden 1024,
  * 16 heads, head_dim 64, intermediate 4096, out_hidden 2048, 2304 position embeddings (48×48),
  * patch/temporal 16/2, merge 2 — at reduced depth 3 with DeepStack index [1]. The depth reduction
- * is documented in §11.4: the measured peak is attention-workspace-dominated and depth-independent
- * (the score-matrix budget does not scale with depth), so three blocks bracket the per-block
- * transient that every real-depth block incurs. The weights are constant 0.001 via {@link MLX#full}
- * — the peak depends on geometry and dtype, not on values. One synthetic 1024×1024 image (grid (1,
- * 64, 64), 4096 patch rows, the default 4096-row raw budget's exact hard cap) is processed through
- * {@link Qwen3VlImageProcessor}.
+ * is documented in §11.4: the tower forward's per-image peak scales roughly linearly with depth
+ * (measured ≈1.09 GiB per added block — each block's attention workspace and activations stay live
+ * inside the one lazy-evaluated graph), so three blocks capture the per-block cost and bracket the
+ * per-block transient that every real-depth block incurs, while the full depth-24 figure is the
+ * recorded linear extrapolation. The weights are constant 0.001 via {@link MLX#full} — the peak
+ * depends on geometry and dtype, not on values. One synthetic 1024×1024 image (grid (1, 64, 64),
+ * 4096 patch rows, the default 4096-row raw budget's exact hard cap) is processed through {@link
+ * Qwen3VlImageProcessor}.
  *
- * <p>The sustained per-image evaluated peak settles a baseline {@link
- * MLXMemoryTestSupport#settledActiveBytes()} after every static array (tower weights, the bracket
- * attention's weights, input and rotation) has been evaluated, runs the tower forward over the
- * image in a per-request scope — the tower's per-image child scope closes inside the forward, and
- * the hoisted merged and DeepStack rows live in the per-request scope until it closes, as in
- * production — settles again while the per-request scope is still open, and takes the difference:
- * the rows the per-request scope retains for the request. The transient per-image attention
- * workspace is then bracketed by a direct single {@link TwoAxisRotaryAttention} forward at 4096
- * rows with constant weights: {@link MLXMemory#resetPeak()} before, {@link MLXMemory#peakBytes()}
- * after the evaluated forward. Both measurements must stay below the plan §4 attention-workspace
- * planning bound of 5 GiB (one float32 score matrix at 4096 rows / 16 heads is 1 GiB).
+ * <p>Three measurements share one settled baseline, taken with every static array (tower weights,
+ * the bracket attention's weights, inputs and rotations) already evaluated:
+ *
+ * <ol>
+ *   <li>The tower forward's own per-image transient peak: {@link MLXMemory#resetPeak()} right
+ *       before {@code tower.forward}, {@link MLXMemory#peakBytes()} right after — the forward
+ *       evaluates its outputs and closes its per-image child scope internally, so the peak covers
+ *       the conv, the per-block attention workspaces, the 4096×4096 MLP intermediates and the
+ *       mergers alive inside the one evaluated graph, plus the 16 MiB of rows the forward hoists
+ *       into the per-request scope.
+ *   <li>The sustained per-image evaluated peak: a settled active-bytes delta taken while the
+ *       per-request scope is still open — the tower's per-image child scope closes inside the
+ *       forward, and the hoisted merged and DeepStack rows live in the per-request scope until it
+ *       closes, as in production — the rows the per-request scope retains for the request.
+ *   <li>The transient per-image attention workspace, bracketed by a direct single {@link
+ *       TwoAxisRotaryAttention} forward at 4096 rows with constant weights ({@link
+ *       MLXMemory#resetPeak()} before, {@link MLXMemory#peakBytes()} after the evaluated forward),
+ *       run after the per-request scope closes so the bracket peak carries no retained-row offset.
+ * </ol>
+ *
+ * <p>All three must stay below the plan §4 attention-workspace planning bound of 5 GiB (one float32
+ * score matrix at 4096 rows / 16 heads is 1 GiB).
  */
 @EnabledIfNativeAvailable
 class Qwen3VlVisionPeakTest {
@@ -99,7 +112,7 @@ class Qwen3VlVisionPeakTest {
       assertEquals(PATCH_ROWS, image.rawPatchRows(), "patch rows");
       assertEquals(MERGED_ROWS, image.mergedRowCount(), "merged rows");
 
-      // Everything the two measurements read is static: materialize it (and the rotation
+      // Everything the three measurements read is static: materialize it (and the rotation
       // tables) before the baseline so only the forwards' own work moves the counter.
       List<MLXArray> toMaterialize = new ArrayList<>(statics);
       toMaterialize.add(rotation.cos());
@@ -110,7 +123,14 @@ class Qwen3VlVisionPeakTest {
 
       // The caller's per-request scope (the SmolVlmModel pattern): the forward's per-image child
       // scope closes inside the forward, and the hoisted rows live in this scope until the
-      // measurement below closes it, so the settled delta is the per-request retained rows.
+      // measurement below closes it, so the settled delta is the per-request retained rows. The
+      // forward's own transient peak is bracketed with the peak counter: reset right before the
+      // forward (so no earlier work is counted), read right after it returns — the forward
+      // evaluates its outputs and closes the per-image scope internally, so the peak covers the
+      // conv, the per-block attention workspaces, the 4096×4096 MLP intermediates and the mergers
+      // alive inside the one evaluated graph, plus the 16 MiB of rows it hoists into this scope.
+      MLXMemory.resetPeak();
+      long towerPeak;
       long sustained;
       try (MLXScope request = scope.newChild()) {
         Qwen3VlVisionFeatures features = tower.forward(request, List.of(image));
@@ -121,9 +141,24 @@ class Qwen3VlVisionPeakTest {
             new int[] {MERGED_ROWS, OUT_HIDDEN},
             features.deepstackLevels().get(0).shape(),
             "deepstack level 0");
+        towerPeak = MLXMemory.peakBytes() - baseline;
         sustained = MLXMemoryTestSupport.settledActiveBytes() - baseline;
       }
       long logicalRetained = 2L * MERGED_ROWS * OUT_HIDDEN * Float.BYTES;
+      assertTrue(
+          towerPeak >= logicalRetained,
+          "tower peak "
+              + towerPeak
+              + " B below the logical retained rows "
+              + logicalRetained
+              + " B");
+      assertTrue(
+          towerPeak < PLANNING_BOUND,
+          "tower transient "
+              + towerPeak
+              + " B exceeded the "
+              + PLANNING_BOUND
+              + " B planning bound");
       assertTrue(
           sustained >= logicalRetained,
           "sustained peak "
@@ -155,7 +190,11 @@ class Qwen3VlVisionPeakTest {
               + GRID
               + ","
               + GRID
-              + "), sustained="
+              + "), tower transient="
+              + towerPeak
+              + " B ("
+              + String.format(Locale.ROOT, "%.2f", towerPeak / (double) GIB)
+              + " GiB), sustained="
               + sustained
               + " B ("
               + sustained / (1024 * 1024)

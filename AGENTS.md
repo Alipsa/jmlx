@@ -699,9 +699,12 @@ strict HF intermediate-feature golden
 checkpoint, image and generator script (`tools/hf-reference/qwen3vl_vision.py`,
 digest-pinned in `tools/hf-reference/provenance.json`) drive
 `Qwen3VlVisionTowerGoldenTest` (full-float32), and `Qwen3VlVisionPeakTest`
-(ordinary `test`) measures the real-2B-geometry per-image peak — sustained 16 MiB,
-attention transient ≈ 0.31 GiB, far under the plan §4 5 GiB bound — recorded in the
-reference findings §11.4. Both suites are required by the macOS CI assertion.
+(ordinary `test`) measures the real-2B-geometry per-image peak — the tower forward's
+own transient 3.81 GiB at its depth-3 proxy, sustained 16 MiB, and the isolated
+attention-bracket transient 0.31 GiB, all under the plan §4 5 GiB bound at that depth
+— recorded in the reference findings §11.4, which flags that the peak scales ≈1.09 GiB
+per block (the full depth-24 tower extrapolates ≈26.8 GiB) as a planning concern. Both
+suites are required by the macOS CI assertion.
 `Qwen3VlModel`, its loader dispatch and the DeepStack consumption of
 `VisualFeatureInjection` remain WP6. No native pins, generated bindings or Gradle
 task changes.

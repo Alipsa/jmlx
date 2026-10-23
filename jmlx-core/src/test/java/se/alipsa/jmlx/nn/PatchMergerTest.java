@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
@@ -215,6 +216,15 @@ class PatchMergerTest {
       MLXArray rank3 = MLX.array(scope, new float[2 * N * HIDDEN], new int[] {2, N, HIDDEN});
       assertThrows(IllegalArgumentException.class, () -> merger.forward(rank3));
       assertThrows(IllegalArgumentException.class, () -> merger.forward(null));
+      // exact (INT32) dtype with the right shape
+      MLXArray int32 =
+          MLX.astype(MLX.array(scope, new float[N * HIDDEN], new int[] {N, HIDDEN}), DType.INT32);
+      IllegalArgumentException notInexact =
+          assertThrows(IllegalArgumentException.class, () -> merger.forward(int32));
+      assertTrue(notInexact.getMessage().contains("inexact dtype"));
+      // the same shape in float32 is accepted
+      MLXArray floatInput = MLX.array(scope, new float[N * HIDDEN], new int[] {N, HIDDEN});
+      assertArrayEquals(new int[] {N / (MERGE * MERGE), OUT}, merger.forward(floatInput).shape());
     }
   }
 

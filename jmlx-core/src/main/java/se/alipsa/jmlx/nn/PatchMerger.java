@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.nn;
 
 import java.util.Arrays;
+import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -149,11 +150,12 @@ public final class PatchMerger extends Module {
 
   /**
    * Merges one image's or block's rows. All validation is {@link IllegalArgumentException} and runs
-   * before any graph node is built: {@code x} is non-null rank 2 {@code [N, hiddenSize]} (inexact
-   * dtype) with {@code N % merge^2 == 0}. Then the frozen order: {@code y = x} or, for the
-   * post-shuffle norm, {@code reshape(x, [N/merge^2, m])} first; {@code norm.forward(y)} over the
-   * corresponding width; for the main placement, the post-norm rows are then reshaped to {@code
-   * [N/merge^2, m]}; finally {@code linearFc2(actFn(linearFc1(y)))} to {@code [N/merge^2,
+   * before any graph node is built: {@code x} is non-null rank 2 {@code [N, hiddenSize]} with an
+   * inexact dtype (an exact dtype would truncate silently, the same reason {@code toFloatArray()}
+   * rejects exact dtypes) and {@code N % merge^2 == 0}. Then the frozen order: {@code y = x} or,
+   * for the post-shuffle norm, {@code reshape(x, [N/merge^2, m])} first; {@code norm.forward(y)}
+   * over the corresponding width; for the main placement, the post-norm rows are then reshaped to
+   * {@code [N/merge^2, m]}; finally {@code linearFc2(actFn(linearFc1(y)))} to {@code [N/merge^2,
    * outHiddenSize]}.
    */
   public MLXArray forward(MLXArray x) {
@@ -173,6 +175,10 @@ public final class PatchMerger extends Module {
     int mergeSq = spatialMergeSize * spatialMergeSize;
     if (n % mergeSq != 0) {
       throw new IllegalArgumentException("N = " + n + " must be divisible by merge^2 = " + mergeSq);
+    }
+    DType dtype = x.dtype();
+    if (!dtype.isInexact()) {
+      throw new IllegalArgumentException("forward requires an inexact dtype, got " + dtype);
     }
     int merged = n / mergeSq;
     int m = hiddenSize * mergeSq;

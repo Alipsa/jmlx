@@ -25,9 +25,12 @@ import se.alipsa.jmlx.memory.MLXScope;
  * head_dim // 2} -- and must be even (each axis owns {@code rotaryDims / 2} frequencies) and at
  * least 2 (at least one frequency per axis). The full head dimension a rotation can be applied to
  * is {@code 2 * rotaryDims}: {@code prepare} doubles it via {@code emb = cat((freqs, freqs), -1)}
- * exactly as the reference's model {@code forward} does, so the two halves of a head share
- * identical cos/sin and rotate as two independent {@code rotaryDims}-wide half-rotations -- the
- * first on the row frequency, the second on the col frequency (findings §11.2 "Vision RoPE").
+ * exactly as the reference's model {@code forward} does. {@link TwoAxisRotation#rotate} then pairs
+ * every element with its half-turn partner -- element {@code i} with element {@code i + rotaryDims}
+ * -- and rotates both members of the pair by the angle from {@code freqs[i]}, which the doubled
+ * table repeats identically in its second half. The frequency table's first half holds the row
+ * ({@code axis0}) frequencies and its second half the col ({@code axis1}) frequencies, so each half
+ * of a head contains both row and col components (findings §11.2 "Vision RoPE").
  */
 public final class TwoAxisRope {
 

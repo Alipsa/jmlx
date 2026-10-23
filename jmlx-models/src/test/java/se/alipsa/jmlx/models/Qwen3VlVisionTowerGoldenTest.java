@@ -212,7 +212,9 @@ class Qwen3VlVisionTowerGoldenTest {
   @Test
   void linspaceProbesBitMatchPinnedTorch() throws Exception {
     JsonNode golden = golden();
-    // The tiny tower's num_position_embeddings 64 gives num_grid_per_side 8, the probe's side.
+    // The tiny tower's num_position_embeddings 64 gives num_grid_per_side 8, the default probe
+    // side. Probes recorded with an explicit "side" (the real 2B model's side 48, PR #58 review
+    // round 2) use that geometry instead of the tiny tower's config-derived side.
     int side =
         (int)
             Math.sqrt(
@@ -222,6 +224,7 @@ class Qwen3VlVisionTowerGoldenTest {
                     .required("num_position_embeddings")
                     .intValue());
     for (JsonNode probe : golden.required("probes").required("linspace")) {
+      int probeSide = probe.path("side").isInt() ? probe.path("side").intValue() : side;
       int n = probe.required("n").intValue();
       for (int i = 0; i < n; i++) {
         long bits = Long.parseUnsignedLong(probe.required("values_hex").get(i).asString(), 16);
@@ -230,8 +233,14 @@ class Qwen3VlVisionTowerGoldenTest {
         // float32 rounding of the pinned torch linspace kernel bits exactly.
         assertEquals(
             Float.floatToRawIntBits((float) pinned),
-            Float.floatToRawIntBits(Qwen3VlVisionTower.linspaceValue(side, n, i)),
-            "linspace(" + side + ", " + n + ", " + i + ") must bit-match the pinned torch bits");
+            Float.floatToRawIntBits(Qwen3VlVisionTower.linspaceValue(probeSide, n, i)),
+            "linspace("
+                + probeSide
+                + ", "
+                + n
+                + ", "
+                + i
+                + ") must bit-match the pinned torch bits");
       }
     }
   }

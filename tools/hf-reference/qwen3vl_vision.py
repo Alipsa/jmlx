@@ -403,6 +403,15 @@ def main() -> None:
     for n in (4, 6, 8):
         values = torch.linspace(0, 7, n)
         linspace_probe.append({"n": n, "values_hex": f64_hex(values.tolist())})
+    # The real 2B model uses num_position_embeddings 2304 (side 48) and the
+    # 4096-row grid-64x64 peak case reaches n up to 64 per axis (PR #58 review
+    # round 2: the side-8 probes never exercised the larger-n branch of the
+    # kernel). These entries carry an explicit "side" because they are not the
+    # tiny tower's config-derived side; the side-8 entries above keep their
+    # original shape.
+    for n in (16, 24, 32, 50, 64):
+        values = torch.linspace(0, 47, n)
+        linspace_probe.append({"side": 48, "n": n, "values_hex": f64_hex(values.tolist())})
 
     rot = Qwen3VLVisionRotaryEmbedding(32, 10000.0)
     if list(rot.inv_freq.shape) != [16]:

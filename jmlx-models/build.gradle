@@ -205,6 +205,10 @@ def configureExactBitsTest = { Test task, String tf32, String mode, String purpo
     task.testClassesDirs = sourceSets.exactBits.output.classesDirs
     task.classpath = sourceSets.exactBits.runtimeClasspath
     task.useJUnitPlatform()
+    // The WP5 vision probe recorder (Qwen3VlVisionExactBitsRecorderTest) records under
+    // build/exact-bits/wp5-vision/ via its own dedicated tasks; keep this 7.3a decoder tool's
+    // scope (and its recorded/verified baseline contract) unchanged.
+    task.exclude '**/Qwen3VlVisionExactBitsRecorderTest.class'
     task.environment 'MLX_ENABLE_TF32', tf32
     task.inputs.property('mlxEnableTf32', tf32)
     task.systemProperty 'jmlx.exact.bits.mode', mode
@@ -248,6 +252,68 @@ tasks.register('exactBitsVerify') {
             'Never part of check; run after the refactor it guards.'
     doNotTrackState('lifecycle task over the two opt-in verify tasks')
     dependsOn 'exactBitsVerifyTf32On', 'exactBitsVerifyTf32Off'
+}
+
+// Phase 7.3b WP5 (review round 2): opt-in exact-bit recorder/comparator for the Qwen3-VL vision
+// tower's per-block evaluate-and-release change (req/plans/phase7-3b-reference-findings.md
+// section 11.4). Same forked-JVM precision split as the 7.3a decoder recorder above, scoped to
+// the vision probe recorder only, and recording under build/exact-bits/wp5-vision/tf32-{1,0}/
+// so the 7.3a decoder baseline under build/exact-bits/tf32-{1,0}/ is left untouched. Never part
+// of check: run before (record) and after (verify) the tower change it guards.
+def configureExactBitsVisionTest = { Test task, String tf32, String mode, String purpose ->
+    task.group = 'verification'
+    task.description = "Opt-in exact-bit recorder/comparator for the Qwen3-VL vision tower probe, " +
+            "${purpose}, MLX_ENABLE_TF32=${tf32} (1 = default reduced precision, 0 = full float32). " +
+            "Recordings live under build/exact-bits/wp5-vision/tf32-${tf32}/; never part of check."
+    task.doNotTrackState('opt-in exact-bit tool; recordings are PR evidence files, not build outputs')
+    task.testClassesDirs = sourceSets.exactBits.output.classesDirs
+    task.classpath = sourceSets.exactBits.runtimeClasspath
+    task.useJUnitPlatform()
+    task.include '**/Qwen3VlVisionExactBitsRecorderTest.class'
+    task.environment 'MLX_ENABLE_TF32', tf32
+    task.inputs.property('mlxEnableTf32', tf32)
+    task.systemProperty 'jmlx.exact.bits.mode', mode
+    task.systemProperty 'jmlx.exact.bits.dir', exactBitsBaseDir
+    task.mustRunAfter tasks.named('test'), tasks.named('float32GoldenTest')
+}
+
+tasks.register('exactBitsRecordVisionTf32On', Test) {
+    configureExactBitsVisionTest(delegate, '1', 'record', 'records the baseline')
+}
+
+tasks.register('exactBitsRecordVisionTf32Off', Test) {
+    configureExactBitsVisionTest(delegate, '0', 'record', 'records the baseline')
+    mustRunAfter 'exactBitsRecordVisionTf32On'
+}
+
+tasks.register('exactBitsVerifyVisionTf32On', Test) {
+    configureExactBitsVisionTest(delegate, '1', 'verify', 'verifies against the recorded baseline')
+}
+
+tasks.register('exactBitsVerifyVisionTf32Off', Test) {
+    configureExactBitsVisionTest(delegate, '0', 'verify', 'verifies against the recorded baseline')
+    mustRunAfter 'exactBitsVerifyVisionTf32On'
+}
+
+// Sequential per mode pair: MLX allows one active thread per process, and the two precision
+// modes must not contend for the GPU mid-recording.
+tasks.register('exactBitsRecordVision') {
+    group = 'verification'
+    description = 'Opt-in: records the Qwen3-VL vision tower depth-3 probe capture in both ' +
+            'TF32 modes (build/exact-bits/wp5-vision/tf32-1 and tf32-0). Never part of check; ' +
+            'run before the tower change it guards.'
+    doNotTrackState('lifecycle task over the two opt-in record tasks')
+    dependsOn 'exactBitsRecordVisionTf32On', 'exactBitsRecordVisionTf32Off'
+}
+
+tasks.register('exactBitsVerifyVision') {
+    group = 'verification'
+    description = 'Opt-in: recomputes the Qwen3-VL vision tower depth-3 probe capture in both ' +
+            'TF32 modes and requires bit-exact agreement with build/exact-bits/wp5-vision ' +
+            '(metadata may differ only in git commit). Never part of check; run after the tower ' +
+            'change it guards.'
+    doNotTrackState('lifecycle task over the two opt-in verify tasks')
+    dependsOn 'exactBitsVerifyVisionTf32On', 'exactBitsVerifyVisionTf32Off'
 }
 
 tasks.register('threadProbeTest', Test) {

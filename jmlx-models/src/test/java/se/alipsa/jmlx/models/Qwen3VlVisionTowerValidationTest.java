@@ -1,0 +1,1079 @@
+package se.alipsa.jmlx.models;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import se.alipsa.jmlx.core.DType;
+import se.alipsa.jmlx.core.MLX;
+import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXMemory;
+import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
+import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.vision.Qwen3VlImageProcessor;
+import se.alipsa.jmlx.vision.Qwen3VlImageProcessorResult;
+import se.alipsa.jmlx.vision.Qwen3VlProcessorConfig;
+import se.alipsa.jmlx.vision.RgbImage;
+
+/**
+ * Validation coverage for the WP5 vision tower's argument and key-mapping checks (PR #58 review
+ * finding 4): the public {@link Qwen3VlVisionTower#visionKeyToTowerKey(String, int, int[])}
+ * branches, {@link Qwen3VlVisionTower#visionWeights(Map, int, int[])}'s skip/transpose/duplicate
+ * behavior, its all-or-nothing failure atomicity (a rejection leaves the caller's map untouched)
+ * and its success-path conv-weight ownership transfer, its finding-5 out-of-range rejection and its
+ * unrecognised-visual-key rejection, the weight, deepstack-index, position-grid and merge-width
+ * rejections, {@code runImage}'s geometry rejections, the {@link
+ * Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
+ * Qwen3VlVisionTower#positionLookup(int, int, int)} and {@link
+ * Qwen3VlVisionTower#linspaceValue(int, int, int)} argument checks, and the {@link
+ * Qwen3VlVisionTower#forwardForTest(MLXScope, List)} block-capture count and entry order for zero-
+ * and non-zero-leading DeepStack indexes (PR #58 review finding 9).
+ *
+ * <p>Three of {@code runImage}'s documented rejections are untestable and intentionally not
+ * covered: {@code gridThw()[0] != 1}, a {@code rawPatchRows()} that disagrees with the grid, and a
+ * {@code values()} length that disagrees with {@code rawPatchRows * patchStride}. The {@code
+ * Qwen3VlImageProcessorResult} sole constructor hard-codes the grid to {@code [1, h, w]} and its
+ * {@code Qwen3VlGeometryPlan} validates {@code rawPatchRows == gridH * gridW} and the values
+ * length, so no malformed result object can exist through the public API; those checks remain
+ * defensive only.
+ *
+ * <p>Gated like the other WP5 tower suites because the constructor and {@code runImage} paths
+ * allocate MLX arrays; the pure-Java mapping and coordinate methods are covered by the same class.
+ */
+@EnabledIfNativeAvailable
+class Qwen3VlVisionTowerValidationTest {
+
+  // Tiny consistent geometry: hidden 8 with 2 heads (headDim 4), a 4x4 position grid, depth 2
+  // with one DeepStack index, merge 2 (m = 8 * 4 = 32). The processor-matching conv weight is
+  // [hidden, temporal, patch, patch, channels] = [8, 2, 16, 16, 3] (the 16x16 / temporal-2
+  // patch stride 1536 of the pinned processor chain).
+  private static final int HIDDEN = 8;
+  private static final int NUM_HEADS = 2;
+  private static final int INTERMEDIATE = 8;
+  private static final int OUT_HIDDEN = 8;
+  private static final int GRID_SIDE = 4;
+  private static final int DEPTH = 2;
+  private static final int[] DEEPSTACK = {1};
+  private static final int MERGE_BLOCK = HIDDEN * 2 * 2;
+  private static final int IMAGE = 64;
+
+  @ParameterizedTest
+  @CsvSource({
+    "model.visual.patch_embed.proj.weight, patchEmbedding.weight",
+    "model.visual.patch_embed.proj.bias, patchEmbedding.bias",
+    "model.visual.pos_embed.weight, positionEmbedding.weight",
+    "model.visual.blocks.0.norm1.weight, layer0.norm1.weight",
+    "model.visual.blocks.2.norm2.bias, layer2.norm2.bias",
+    "model.visual.blocks.1.attn.qkv.weight, layer1.attention.qkv.weight",
+    "model.visual.blocks.1.attn.qkv.bias, layer1.attention.qkv.bias",
+    "model.visual.blocks.1.attn.proj.weight, layer1.attention.proj.weight",
+    "model.visual.blocks.1.attn.proj.bias, layer1.attention.proj.bias",
+    "model.visual.blocks.0.mlp.linear_fc1.weight, layer0.mlp.0.weight",
+    "model.visual.blocks.0.mlp.linear_fc2.bias, layer0.mlp.2.bias",
+    "model.visual.merger.norm.weight, merger.norm.weight",
+    "model.visual.merger.linear_fc1.bias, merger.linearFc1.bias",
+    "model.visual.merger.linear_fc2.weight, merger.linearFc2.weight",
+    "model.visual.deepstack_merger_list.0.norm.bias, deepstackMerger0.norm.bias",
+    "model.visual.deepstack_merger_list.1.linear_fc2.weight, deepstackMerger1.linearFc2.weight",
+  })
+  void checkpointKeysMapToTowerKeys(String checkpointKey, String expected) {
+    // Depth 3 with a length-2 DeepStack list: every in-range index maps, so an off-by-one in the
+    // block/merger bounds would surface here.
+    assertEquals(
+        expected, Qwen3VlVisionTower.visionKeyToTowerKey(checkpointKey, 3, new int[] {1, 5}));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "model.language_model.embed_tokens.weight", // non-visual
+        "visual.patch_embed.proj.weight", // missing model.visual. prefix
+        "model.visual.patch_embed.proj.gain", // unknown patch-embed sub-key
+        "model.visual.pos_embed.bias", // pos_embed maps weight only
+        "model.visual.blocks.3.norm1.weight", // block index out of range (depth 3)
+        "model.visual.blocks.x.norm1.weight", // non-numeric block index
+        "model.visual.blocks.-1.norm1.weight", // negative block index
+        "model.visual.blocks.99999999999999999999.norm1.weight", // overflowing block index
+        "model.visual.blocks..norm1.weight", // empty block index
+        "model.visual.blocks.1.", // block key without a sub-key
+        "model.visual.blocks.0.attn.gate.weight", // unknown attention sub-key
+        "model.visual.blocks.0.attn.qkv.gain", // unknown attention tail
+        "model.visual.blocks.0.mlp.linear_fc1.scales", // known linear, unknown sub-key
+        "model.visual.blocks.0.mlp.linear_fc3.weight", // unknown MLP sub-key
+        "model.visual.blocks.0.other.weight", // unknown block sub-key
+        "model.visual.merger.linear_fc3.weight", // unknown merger sub-key
+        "model.visual.merger.gain", // unknown merger tail
+        "model.visual.deepstack_merger_list.2.norm.weight", // merger index out of range (2)
+        "model.visual.deepstack_merger_list.x.norm.weight", // non-numeric merger index
+        "model.visual.deepstack_merger_list.99999999999999999999.norm.weight", // overflowing index
+        "model.visual.deepstack_merger_list.0.other.weight", // unknown merger sub-key
+      })
+  void unknownAndOutOfRangeKeysMapToNull(String checkpointKey) {
+    assertNull(Qwen3VlVisionTower.visionKeyToTowerKey(checkpointKey, 3, new int[] {1, 5}));
+  }
+
+  @Test
+  void visionKeyToTowerKeyRejectsNullArguments() {
+    assertEquals(
+        "key",
+        assertThrows(
+                NullPointerException.class,
+                () -> Qwen3VlVisionTower.visionKeyToTowerKey(null, DEPTH, DEEPSTACK))
+            .getMessage());
+    assertEquals(
+        "deepstackIndexes",
+        assertThrows(
+                NullPointerException.class,
+                () ->
+                    Qwen3VlVisionTower.visionKeyToTowerKey(
+                        "model.visual.pos_embed.weight", DEPTH, null))
+            .getMessage());
+  }
+
+  @Test
+  void visionWeightsSkipsNonVisualKeysAndTransposesConvWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      float[] input = new float[24];
+      for (int i = 0; i < input.length; i++) {
+        input[i] = i + 1f;
+      }
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      // PyTorch layout [out, in, T, H, W] = [2, 3, 1, 2, 2], distinct values per position.
+      checkpoint.put(
+          "model.visual.patch_embed.proj.weight",
+          MLX.array(scope, input, new int[] {2, 3, 1, 2, 2}));
+      checkpoint.put("model.visual.blocks.1.norm1.bias", full(scope, HIDDEN));
+      checkpoint.put(
+          "model.language_model.embed_tokens.weight", full(scope, new int[] {4, HIDDEN}));
+      // The non-visual key is the only kind that stays skipped: every other unrecognised
+      // model.visual.* key is rejected instead; see visionWeightsRejectsUnrecognizedVisualKeys,
+      // visionWeightsRejectsOutOfRangeBlockKeys and
+      // visionWeightsRejectsOutOfRangeDeepstackMergerKeys.
+
+      Map<String, MLXArray> weights =
+          Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
+
+      assertEquals(2, weights.size(), "only the in-range visual keys survive");
+      assertArrayEquals(
+          new String[] {"patchEmbedding.weight", "layer1.norm1.bias"}, weights.keySet().toArray());
+      // jmlx's channels-last layout [out, T, H, W, in], transposed {0, 2, 3, 4, 1}; see
+      // transposedConvValues for the index math.
+      assertArrayEquals(
+          transposedConvValues(input), weights.get("patchEmbedding.weight").toFloatArray(), 0f);
+    }
+  }
+
+  @Test
+  void visionWeightsRejectsOutOfRangeBlockKeys() {
+    // A numeric block index past the configured DEPTH (2) is rejected for every sub-key family.
+    expectVisionWeightsRejection(
+        "model.visual.blocks.2.norm1.weight",
+        "checkpoint key \"model.visual.blocks.2.norm1.weight\" names block 2, out of range [0, 2)"
+            + " for the configured depth");
+    expectVisionWeightsRejection(
+        "model.visual.blocks.9.attn.qkv.bias",
+        "checkpoint key \"model.visual.blocks.9.attn.qkv.bias\" names block 9, out of range [0, 2)"
+            + " for the configured depth");
+    expectVisionWeightsRejection(
+        "model.visual.blocks.77.mlp.linear_fc2.weight",
+        "checkpoint key \"model.visual.blocks.77.mlp.linear_fc2.weight\" names block 77,"
+            + " out of range [0, 2) for the configured depth");
+    // An unknown sub-key does not make the key non-visual: a numeric block index past the
+    // configured depth is a depth mismatch either way.
+    expectVisionWeightsRejection(
+        "model.visual.blocks.4.other.weight",
+        "checkpoint key \"model.visual.blocks.4.other.weight\" names block 4, out of range [0, 2)"
+            + " for the configured depth");
+  }
+
+  @Test
+  void visionWeightsRejectsOutOfRangeDeepstackMergerKeys() {
+    // DEEPSTACK has one entry, so every numeric merger index >= 1 is out of range.
+    expectVisionWeightsRejection(
+        "model.visual.deepstack_merger_list.1.norm.weight",
+        "checkpoint key \"model.visual.deepstack_merger_list.1.norm.weight\" names DeepStack"
+            + " merger 1, out of range [0, 1) for the configured DeepStack count");
+    expectVisionWeightsRejection(
+        "model.visual.deepstack_merger_list.5.linear_fc2.bias",
+        "checkpoint key \"model.visual.deepstack_merger_list.5.linear_fc2.bias\" names DeepStack"
+            + " merger 5, out of range [0, 1) for the configured DeepStack count");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "model.visual.blocks.0.mlp.linear_fc1.scales", // unknown MLP sub-key
+        "model.visual.blocks.0.mlp.linear_fc2.scales", // unknown MLP sub-key (second linear)
+        "model.visual.blocks.0.attn.qkv.scales", // unknown attention tail
+        "model.visual.blocks.0.attn.gate.weight", // unknown attention sub-key
+        "model.visual.blocks.0.norm3.weight", // unknown norm sub-key
+        "model.visual.blocks.1.", // block key without a sub-key
+        "model.visual.patch_embed.proj.gain", // unknown patch-embed sub-key
+        "model.visual.pos_embed.bias", // pos_embed maps weight only
+        "model.visual.foo.weight", // unknown top-level visual key
+        "model.visual.blocks.x.norm1.weight", // non-numeric block index
+        "model.visual.blocks.99999999999999999999.norm1.weight", // overflowing block index
+        "model.visual.merger.gain", // unknown merger tail
+        "model.visual.deepstack_merger_list.0.other.weight", // unknown DeepStack merger sub-key
+        "model.visual.deepstack_merger_list.x.norm.weight", // non-numeric merger index
+        "model.visual.deepstack_merger_list.99999999999999999999.norm.weight", // overflowing index
+      })
+  void visionWeightsRejectsUnrecognizedVisualKeys(String checkpointKey) {
+    expectVisionWeightsRejection(
+        checkpointKey, "unrecognized vision checkpoint key \"" + checkpointKey + "\"");
+  }
+
+  @Test
+  void visionWeightsAcceptsEveryInRangeKeyFamily() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      // One in-range key from every mapped family (DEPTH 2, one DeepStack) plus a non-visual key
+      // that stays skipped.
+      float[] conv = new float[24];
+      for (int i = 0; i < conv.length; i++) {
+        conv[i] = i + 1f;
+      }
+      checkpoint.put(
+          "model.visual.patch_embed.proj.weight",
+          MLX.array(scope, conv, new int[] {2, 3, 1, 2, 2}));
+      checkpoint.put("model.visual.pos_embed.weight", full(scope, GRID_SIDE * GRID_SIDE, HIDDEN));
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      checkpoint.put("model.visual.blocks.1.norm2.bias", full(scope, HIDDEN));
+      checkpoint.put("model.visual.blocks.1.attn.qkv.weight", full(scope, 3 * HIDDEN, HIDDEN));
+      checkpoint.put("model.visual.blocks.1.attn.proj.bias", full(scope, HIDDEN));
+      checkpoint.put(
+          "model.visual.blocks.0.mlp.linear_fc1.weight", full(scope, INTERMEDIATE, HIDDEN));
+      checkpoint.put("model.visual.blocks.0.mlp.linear_fc2.bias", full(scope, HIDDEN));
+      checkpoint.put("model.visual.merger.norm.weight", full(scope, HIDDEN));
+      checkpoint.put("model.visual.merger.linear_fc1.bias", full(scope, MERGE_BLOCK));
+      checkpoint.put("model.visual.merger.linear_fc2.weight", full(scope, OUT_HIDDEN, MERGE_BLOCK));
+      checkpoint.put("model.visual.deepstack_merger_list.0.norm.bias", full(scope, MERGE_BLOCK));
+      checkpoint.put(
+          "model.visual.deepstack_merger_list.0.linear_fc1.weight",
+          full(scope, MERGE_BLOCK, MERGE_BLOCK));
+      checkpoint.put(
+          "model.visual.deepstack_merger_list.0.linear_fc2.bias", full(scope, OUT_HIDDEN));
+      checkpoint.put(
+          "model.language_model.embed_tokens.weight", full(scope, new int[] {4, HIDDEN}));
+
+      Map<String, MLXArray> weights =
+          Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
+
+      // Every in-range key of every family maps, in checkpoint order; the non-visual key is
+      // skipped.
+      assertArrayEquals(
+          new String[] {
+            "patchEmbedding.weight",
+            "positionEmbedding.weight",
+            "layer0.norm1.weight",
+            "layer1.norm2.bias",
+            "layer1.attention.qkv.weight",
+            "layer1.attention.proj.bias",
+            "layer0.mlp.0.weight",
+            "layer0.mlp.2.bias",
+            "merger.norm.weight",
+            "merger.linearFc1.bias",
+            "merger.linearFc2.weight",
+            "deepstackMerger0.norm.bias",
+            "deepstackMerger0.linearFc1.weight",
+            "deepstackMerger0.linearFc2.bias",
+          },
+          weights.keySet().toArray());
+    }
+  }
+
+  @Test
+  void visionWeightsRejectsDuplicateTowerKeys() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      // "00" parses to the same index as "0", so both keys collide on the same tower key.
+      checkpoint.put("model.visual.blocks.00.norm1.weight", full(scope, HIDDEN));
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK));
+      assertEquals(
+          "duplicate vision tower key \"layer0.norm1.weight\" from checkpoint key"
+              + " \"model.visual.blocks.00.norm1.weight\"",
+          e.getMessage());
+    }
+  }
+
+  @Test
+  void visionWeightsOutOfRangeRejectionLeavesMapUntouched() {
+    // The conv weight is reached before the rejecting key: the pre-fix code had already
+    // transposed and closed it when the out-of-range key threw.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      float[] conv = putConvWeightFirst(scope, checkpoint);
+      checkpoint.put("model.visual.blocks.2.norm1.weight", full(scope, HIDDEN));
+      expectVisionWeightsFailureLeavesMapUntouched(
+          checkpoint,
+          checkpoint.get("model.visual.patch_embed.proj.weight"),
+          conv,
+          "checkpoint key \"model.visual.blocks.2.norm1.weight\" names block 2, out of range [0, 2)"
+              + " for the configured depth");
+    }
+  }
+
+  @Test
+  void visionWeightsUnrecognizedRejectionLeavesMapUntouched() {
+    // Same ordering: the conv weight is transposed and closed in the pre-fix code before the
+    // unrecognised key throws.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      float[] conv = putConvWeightFirst(scope, checkpoint);
+      checkpoint.put("model.visual.foo.weight", full(scope, HIDDEN));
+      expectVisionWeightsFailureLeavesMapUntouched(
+          checkpoint,
+          checkpoint.get("model.visual.patch_embed.proj.weight"),
+          conv,
+          "unrecognized vision checkpoint key \"model.visual.foo.weight\"");
+    }
+  }
+
+  @Test
+  void visionWeightsDuplicateRejectionLeavesMapUntouched() {
+    // Same ordering: the conv weight is transposed and closed in the pre-fix code before the
+    // colliding key throws.
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      float[] conv = putConvWeightFirst(scope, checkpoint);
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      // "00" parses to the same index as "0", so both keys collide on the same tower key.
+      checkpoint.put("model.visual.blocks.00.norm1.weight", full(scope, HIDDEN));
+      expectVisionWeightsFailureLeavesMapUntouched(
+          checkpoint,
+          checkpoint.get("model.visual.patch_embed.proj.weight"),
+          conv,
+          "duplicate vision tower key \"layer0.norm1.weight\" from checkpoint key"
+              + " \"model.visual.blocks.00.norm1.weight\"");
+    }
+  }
+
+  @Test
+  void visionWeightsSuccessTransfersConvWeightOwnership() {
+    try (MLXScope scope = new MLXScope()) {
+      float[] conv = new float[24];
+      for (int i = 0; i < conv.length; i++) {
+        conv[i] = i + 1f;
+      }
+      MLXArray original = MLX.array(scope, conv, new int[] {2, 3, 1, 2, 2});
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      checkpoint.put("model.visual.patch_embed.proj.weight", original);
+
+      Map<String, MLXArray> weights =
+          Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
+
+      MLXArray transposed = weights.get("patchEmbedding.weight");
+      assertNotSame(original, transposed, "the conv weight is replaced by its transposed copy");
+      // The transposed copy is allocated into the original's (the caller's) scope...
+      assertSame(scope, transposed.scope(), "the transposed copy lives in the caller's scope");
+      assertArrayEquals(new int[] {2, 1, 2, 2, 3}, transposed.shape(), "channels-last layout");
+      // ...and holds the {0, 2, 3, 4, 1} transpose of the original.
+      assertArrayEquals(transposedConvValues(conv), transposed.toFloatArray(), 0f);
+      // ...while the caller's map still references the original array, which is now closed
+      // (the SmolVlmModel ownership transfer the Javadoc documents).
+      assertSame(original, checkpoint.get("model.visual.patch_embed.proj.weight"));
+      assertThrows(
+          IllegalStateException.class, original::shape, "the original conv weight is closed");
+    }
+  }
+
+  @Test
+  void constructorRejectsMissingWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.remove("merger.norm.weight");
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "missing vision tower weight \"merger.norm.weight\"");
+    }
+  }
+
+  @Test
+  void constructorRejectsExtraWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.put("patchEmbedding.extra", full(scope, HIDDEN));
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "unexpected vision tower weights: [patchEmbedding.extra]");
+    }
+  }
+
+  @Test
+  void constructorRejectsNonFloatingWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.put(
+          "positionEmbedding.weight",
+          MLX.full(scope, new int[] {GRID_SIDE * GRID_SIDE, HIDDEN}, 1f, DType.INT32));
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "vision tower weights must be floating: positionEmbedding.weight");
+    }
+  }
+
+  @Test
+  void constructorRejectsInvalidDeepstackIndexes() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      expectConstructorMessage(
+          scope, weights, NUM_HEADS, new int[] {}, "deepstackIndexes must not be empty");
+      expectConstructorMessage(
+          scope, weights, NUM_HEADS, new int[] {5}, "deepstack index 0 = 5 is out of range [0, 2)");
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          new int[] {-1},
+          "deepstack index 0 = -1 is out of range [0, 2)");
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          new int[] {1, 1},
+          "deepstack indexes must be strictly increasing; index 1 has 1 after 1");
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          new int[] {1, 0},
+          "deepstack indexes must be strictly increasing; index 1 has 0 after 1");
+    }
+  }
+
+  @Test
+  void constructorRejectsLayerlessTower() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.remove("layer0.norm1.weight");
+      expectConstructorMessage(
+          scope, weights, NUM_HEADS, DEEPSTACK, "the vision tower needs at least one layer");
+    }
+  }
+
+  @Test
+  void constructorRejectsRankZeroFeedForwardWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      // A rank-0 (scalar) layer-0 fc1 weight used to reach shape()[0] before any rank check,
+      // throwing ArrayIndexOutOfBoundsException instead of the documented IllegalArgumentException.
+      weights.put("layer0.mlp.0.weight", MLX.array(scope, new float[] {0.001f}, new int[] {}));
+      expectConstructorMessage(
+          scope, weights, NUM_HEADS, DEEPSTACK, "layer0.mlp.0.weight must be a matrix, got rank 0");
+    }
+  }
+
+  @Test
+  void constructorRejectsNonSquarePositionGrid() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.put("positionEmbedding.weight", full(scope, 12, HIDDEN));
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "positionEmbedding.weight must contain a square grid, got 12 rows");
+    }
+  }
+
+  @Test
+  void constructorRejectsNonSquareMergeWidth() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.put("merger.linearFc1.weight", full(scope, 24, 24));
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "merger width m = 24 must be the hidden size times a square merge^2, got merge^2 = 3");
+      weights.put("merger.linearFc1.weight", full(scope, 20, 20));
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "merger width m = 20 must be divisible by hidden size 8");
+      weights.put("merger.linearFc1.weight", full(scope, 24, 16));
+      expectConstructorMessage(
+          scope,
+          weights,
+          NUM_HEADS,
+          DEEPSTACK,
+          "merger.linearFc1.weight must be square [m, m], got shape [24, 16]");
+    }
+  }
+
+  @Test
+  void constructorRejectsInvalidHeadCounts() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      expectConstructorMessage(
+          scope, weights, 0, DEEPSTACK, "the vision tower needs at least one attention head");
+      expectConstructorMessage(
+          scope, weights, 3, DEEPSTACK, "hidden size 8 is not divisible by 3 attention heads");
+    }
+  }
+
+  @Test
+  void constructorRejectsNullArguments() {
+    try (MLXScope scope = new MLXScope()) {
+      assertEquals(
+          "weights",
+          assertThrows(
+                  NullPointerException.class,
+                  () -> new Qwen3VlVisionTower(scope, NUM_HEADS, null, DEEPSTACK))
+              .getMessage());
+      Map<String, MLXArray> weights = baseWeights(scope);
+      assertEquals(
+          "deepstackIndexes",
+          assertThrows(
+                  NullPointerException.class,
+                  () -> new Qwen3VlVisionTower(scope, NUM_HEADS, weights, null))
+              .getMessage());
+    }
+  }
+
+  @Test
+  void runImageRejectsPatchStrideMismatch() {
+    Qwen3VlImageProcessorResult image = processedImage();
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      // The tower's 4x4 temporal-1 patch embed gives an expected stride of 3 * 1 * 4 * 4 = 48,
+      // disagreeing with the processor's 1536.
+      weights.put("patchEmbedding.weight", full(scope, HIDDEN, 1, 4, 4, 3));
+      Qwen3VlVisionTower tower = buildTower(scope, weights);
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> tower.forward(scope, List.of(image)));
+      assertEquals(
+          "image patch stride 1536 does not match the tower's 48 (inChannels * temporal *"
+              + " patchHeight * patchWidth)",
+          e.getMessage());
+    }
+  }
+
+  @Test
+  void runImageRejectsGridNotMultipleOfMerge() {
+    Qwen3VlImageProcessorResult image = processedImage();
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      // Merge size 3 (m = 8 * 9 = 72): the processor's 4x4 grid is not a multiple of 3.
+      putMergeWidth(weights, scope, 72);
+      Qwen3VlVisionTower tower = buildTower(scope, weights);
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> tower.forward(scope, List.of(image)));
+      assertEquals("image grid 4x4 must be multiples of the spatial merge size 3", e.getMessage());
+    }
+  }
+
+  @Test
+  void forwardRejectsUnrelatedTargetScopeAndEmptyImages() {
+    Qwen3VlImageProcessorResult image = processedImage();
+    try (MLXScope towerScope = new MLXScope();
+        MLXScope stranger = new MLXScope()) {
+      Qwen3VlVisionTower tower = buildTower(towerScope, baseWeights(towerScope));
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class, () -> tower.forward(stranger, List.of(image)));
+      assertTrue(
+          e.getMessage()
+              .startsWith(
+                  "target scope must be the tower's module scope or a descendant of it, got "),
+          e.getMessage());
+      assertEquals(
+          "at least one image is required",
+          assertThrows(IllegalArgumentException.class, () -> tower.forward(towerScope, List.of()))
+              .getMessage());
+    }
+  }
+
+  @Test
+  void forwardRejectsNullArguments() {
+    Qwen3VlImageProcessorResult image = processedImage();
+    try (MLXScope scope = new MLXScope()) {
+      Qwen3VlVisionTower tower = buildTower(scope, baseWeights(scope));
+      assertEquals(
+          "target",
+          assertThrows(NullPointerException.class, () -> tower.forward(null, List.of(image)))
+              .getMessage());
+      assertEquals(
+          "images",
+          assertThrows(NullPointerException.class, () -> tower.forward(scope, null)).getMessage());
+      assertEquals(
+          "images element",
+          assertThrows(
+                  NullPointerException.class,
+                  // Arrays.asList, not List.of: List.of rejects the null at creation with an
+                  // unattributed message; the tower's own element check must fire instead.
+                  () -> tower.forward(scope, Arrays.asList((Qwen3VlImageProcessorResult) null)))
+              .getMessage());
+    }
+  }
+
+  @Test
+  void forwardForTestCapturesBlockZeroWhenFirstDeepstackIndexIsZero() {
+    Qwen3VlImageProcessorResult image = processedImage();
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> oneLevel = baseWeights(scope);
+      // A second DeepStack level over the same tiny depth: the extra merger's keys carry the
+      // same constant values, so every weight shared with oneLevel is the very same array.
+      Map<String, MLXArray> twoLevels = new LinkedHashMap<>(oneLevel);
+      putDeepstackMerger(twoLevels, scope, 1);
+
+      // The block loop is independent of the DeepStack indexes, so these towers produce the same
+      // block outputs for the same image; the cross-tower equalities below pin which block each
+      // capture entry came from.
+      Qwen3VlVisionTower indexZero =
+          new Qwen3VlVisionTower(scope, NUM_HEADS, oneLevel, new int[] {0});
+      Qwen3VlVisionTower indexOne =
+          new Qwen3VlVisionTower(scope, NUM_HEADS, oneLevel, new int[] {1});
+      Qwen3VlVisionTower indexZeroOne =
+          new Qwen3VlVisionTower(scope, NUM_HEADS, twoLevels, new int[] {0, 1});
+
+      Qwen3VlVisionTower.ForwardCaptures zeroFeatures =
+          indexZero.forwardForTest(scope, List.of(image));
+      Qwen3VlVisionTower.ForwardCaptures oneFeatures =
+          indexOne.forwardForTest(scope, List.of(image));
+      Qwen3VlVisionTower.ForwardCaptures zeroOneFeatures =
+          indexZeroOne.forwardForTest(scope, List.of(image));
+      Qwen3VlVisionTower.ImageCaptures zeroCaptures = zeroFeatures.images().get(0);
+      Qwen3VlVisionTower.ImageCaptures oneCaptures = oneFeatures.images().get(0);
+      Qwen3VlVisionTower.ImageCaptures zeroOneCaptures = zeroOneFeatures.images().get(0);
+
+      // The documented count is 1 + levelCount even when the first DeepStack index is 0 (the
+      // pre-fix code captured block 0 only once, losing one entry and misaligning the rest).
+      assertEquals(2, zeroCaptures.blockOutputs().length, "1 + 1 level, deepstackIndexes [0]");
+      assertEquals(2, oneCaptures.blockOutputs().length, "1 + 1 level, deepstackIndexes [1]");
+      assertEquals(
+          3, zeroOneCaptures.blockOutputs().length, "1 + 2 levels, deepstackIndexes [0, 1]");
+      int n = image.rawPatchRows();
+      for (MLXArray block : zeroOneCaptures.blockOutputs()) {
+        assertArrayEquals(new int[] {n, HIDDEN}, block.shape(), "capture shape");
+      }
+
+      // Entry 0 is block 0's own output, independent of the DeepStack indexes.
+      assertArrayEquals(
+          zeroCaptures.blockOutputs()[0].toFloatArray(),
+          oneCaptures.blockOutputs()[0].toFloatArray(),
+          0f,
+          "entry 0 is block 0 for both [0] and [1]");
+      // [0]: the DeepStack level-0 source block is block 0 itself, so entry 1 repeats entry 0.
+      assertArrayEquals(
+          zeroCaptures.blockOutputs()[0].toFloatArray(),
+          zeroCaptures.blockOutputs()[1].toFloatArray(),
+          0f,
+          "[0] entry 1 is block 0's output too");
+      // [0, 1]: entry 1 repeats block 0, and entry 2 is block 1's output, equal to the [1]
+      // tower's entry 1.
+      assertArrayEquals(
+          zeroOneCaptures.blockOutputs()[0].toFloatArray(),
+          zeroOneCaptures.blockOutputs()[1].toFloatArray(),
+          0f,
+          "[0, 1] entry 1 is block 0's output");
+      assertArrayEquals(
+          oneCaptures.blockOutputs()[1].toFloatArray(),
+          zeroOneCaptures.blockOutputs()[2].toFloatArray(),
+          0f,
+          "[0, 1] entry 2 is block 1's output");
+      // The feature rows line up with the blocks that fed them: DeepStack level 0 consumed block
+      // 0 in both the [0] and the [0, 1] towers (same merger, same input), and the main merger
+      // consumed block 1 in every tower, so the merged rows are equal across all three.
+      assertArrayEquals(
+          zeroOneFeatures.features().deepstackLevels().get(0).toFloatArray(),
+          zeroFeatures.features().deepstackLevels().get(0).toFloatArray(),
+          0f,
+          "level 0 DeepStack rows come from block 0 in both towers");
+      assertArrayEquals(
+          oneFeatures.features().merged().toFloatArray(),
+          zeroOneFeatures.features().merged().toFloatArray(),
+          0f,
+          "main merger rows come from block 1 in every tower");
+    }
+  }
+
+  @Test
+  void rotaryCoordinatesRejectsInvalidArguments() {
+    assertEquals(
+        "merge must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.rotaryCoordinates(8, 8, 0))
+            .getMessage());
+    assertEquals(
+        "merge must be positive",
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> Qwen3VlVisionTower.rotaryCoordinates(8, 8, -1))
+            .getMessage());
+    assertEquals(
+        "h and w must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.rotaryCoordinates(0, 4, 2))
+            .getMessage());
+    assertEquals(
+        "h and w must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.rotaryCoordinates(4, 0, 2))
+            .getMessage());
+    assertEquals(
+        "h = 6 and w = 8 must be multiples of merge = 4",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.rotaryCoordinates(6, 8, 4))
+            .getMessage());
+    assertEquals(
+        "h = 8 and w = 7 must be multiples of merge = 2",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.rotaryCoordinates(8, 7, 2))
+            .getMessage());
+  }
+
+  @Test
+  void rotaryCoordinatesEmitMergeBlockOrder() {
+    int[][] coordinates = Qwen3VlVisionTower.rotaryCoordinates(8, 8, 2);
+    assertEquals(2, coordinates.length, "rows and cols");
+    assertEquals(64, coordinates[0].length, "row count");
+    assertEquals(64, coordinates[1].length, "col count");
+    // The reference loop order documented in the method's Javadoc: the first eight coordinates
+    // are (0,0),(0,1),(1,0),(1,1),(0,2),(0,3),(1,2),(1,3), the last four (6,6),(6,7),(7,6),(7,7).
+    assertArrayEquals(new int[] {0, 0, 1, 1, 0, 0, 1, 1}, Arrays.copyOf(coordinates[0], 8));
+    assertArrayEquals(new int[] {0, 1, 0, 1, 2, 3, 2, 3}, Arrays.copyOf(coordinates[1], 8));
+    assertArrayEquals(new int[] {6, 6, 7, 7}, Arrays.copyOfRange(coordinates[0], 60, 64));
+    assertArrayEquals(new int[] {6, 7, 6, 7}, Arrays.copyOfRange(coordinates[1], 60, 64));
+    for (int blockRow = 0; blockRow < 4; blockRow++) {
+      for (int blockCol = 0; blockCol < 4; blockCol++) {
+        for (int intraRow = 0; intraRow < 2; intraRow++) {
+          for (int intraCol = 0; intraCol < 2; intraCol++) {
+            int m = (blockRow * 4 + blockCol) * 4 + intraRow * 2 + intraCol;
+            assertEquals(blockRow * 2 + intraRow, coordinates[0][m], "row " + m);
+            assertEquals(blockCol * 2 + intraCol, coordinates[1][m], "col " + m);
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void positionLookupRejectsInvalidArguments() {
+    assertEquals(
+        "h, w and gridSide must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.positionLookup(0, 4, 4))
+            .getMessage());
+    assertEquals(
+        "h, w and gridSide must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.positionLookup(4, 0, 4))
+            .getMessage());
+    assertEquals(
+        "h, w and gridSide must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.positionLookup(4, 4, 0))
+            .getMessage());
+  }
+
+  @Test
+  void positionLookupComputesBilinearCorners() {
+    // Exact 4x4 grid over itself: every patch sits on a grid point, so the weights are {1, 0,
+    // 0, 0}; the corner indices are still the floor/ceil grid points, with the ceiling clipping
+    // at gridSide - 1 on the bottom and right edges (where it collapses back onto the floor).
+    Qwen3VlVisionTower.PositionLookup exact = Qwen3VlVisionTower.positionLookup(4, 4, 4);
+    for (int ph = 0; ph < 4; ph++) {
+      for (int pw = 0; pw < 4; pw++) {
+        int k = ph * 4 + pw;
+        int ceilH = Math.min(ph + 1, 3);
+        int ceilW = Math.min(pw + 1, 3);
+        int[] expectedCorners =
+            new int[] {ph * 4 + pw, ph * 4 + ceilW, ceilH * 4 + pw, ceilH * 4 + ceilW};
+        assertArrayEquals(expectedCorners, corners(exact, k), "exact corners " + ph + "x" + pw);
+        assertArrayEquals(
+            new float[] {1f, 0f, 0f, 0f},
+            cornerWeights(exact, k),
+            "exact weights " + ph + "x" + pw);
+      }
+    }
+    // Fractional 3x3 grid over the 4x4 table: linspace(0, 3, 3) = {0, 1.5, 3}, so the middle
+    // patch sits at (1.5, 1.5) and takes all four corners equally, while the top-left and
+    // bottom-right patches sit exactly on grid points (the bottom-right at the clipped (3, 3)).
+    Qwen3VlVisionTower.PositionLookup fractional = Qwen3VlVisionTower.positionLookup(3, 3, 4);
+    assertArrayEquals(new int[] {5, 6, 9, 10}, corners(fractional, 4));
+    assertArrayEquals(new float[] {0.25f, 0.25f, 0.25f, 0.25f}, cornerWeights(fractional, 4));
+    assertArrayEquals(new int[] {0, 1, 4, 5}, corners(fractional, 0));
+    assertArrayEquals(new float[] {1f, 0f, 0f, 0f}, cornerWeights(fractional, 0));
+    assertArrayEquals(new int[] {15, 15, 15, 15}, corners(fractional, 8));
+    assertArrayEquals(new float[] {1f, 0f, 0f, 0f}, cornerWeights(fractional, 8));
+  }
+
+  @Test
+  void linspaceValueRejectsInvalidArguments() {
+    assertEquals(
+        "side and n must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.linspaceValue(0, 4, 0))
+            .getMessage());
+    assertEquals(
+        "side and n must be positive",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.linspaceValue(4, 0, 0))
+            .getMessage());
+    assertEquals(
+        "i = -1 is out of range [0, 4)",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.linspaceValue(4, 4, -1))
+            .getMessage());
+    assertEquals(
+        "i = 4 is out of range [0, 4)",
+        assertThrows(
+                IllegalArgumentException.class, () -> Qwen3VlVisionTower.linspaceValue(4, 4, 4))
+            .getMessage());
+    assertEquals(0f, Qwen3VlVisionTower.linspaceValue(4, 1, 0), 0f, "the n = 1 fill guard");
+    float[] uniform = new float[4];
+    for (int i = 0; i < 4; i++) {
+      uniform[i] = Qwen3VlVisionTower.linspaceValue(4, 4, i);
+    }
+    assertArrayEquals(new float[] {0f, 1f, 2f, 3f}, uniform, 0f);
+  }
+
+  /** The all-expected-key weight map of the tiny geometry, constant 0.001 float32. */
+  private static Map<String, MLXArray> baseWeights(MLXScope scope) {
+    Map<String, MLXArray> weights = new LinkedHashMap<>();
+    put(weights, scope, "patchEmbedding.weight", HIDDEN, 2, 16, 16, 3);
+    put(weights, scope, "patchEmbedding.bias", HIDDEN);
+    put(weights, scope, "positionEmbedding.weight", GRID_SIDE * GRID_SIDE, HIDDEN);
+    for (int i = 0; i < DEPTH; i++) {
+      String layer = "layer" + i + ".";
+      put(weights, scope, layer + "attention.qkv.weight", 3 * HIDDEN, HIDDEN);
+      put(weights, scope, layer + "attention.qkv.bias", 3 * HIDDEN);
+      put(weights, scope, layer + "attention.proj.weight", HIDDEN, HIDDEN);
+      put(weights, scope, layer + "attention.proj.bias", HIDDEN);
+      for (String norm : new String[] {"norm1", "norm2"}) {
+        put(weights, scope, layer + norm + ".weight", HIDDEN);
+        put(weights, scope, layer + norm + ".bias", HIDDEN);
+      }
+      put(weights, scope, layer + "mlp.0.weight", INTERMEDIATE, HIDDEN);
+      put(weights, scope, layer + "mlp.0.bias", INTERMEDIATE);
+      put(weights, scope, layer + "mlp.2.weight", HIDDEN, INTERMEDIATE);
+      put(weights, scope, layer + "mlp.2.bias", HIDDEN);
+    }
+    put(weights, scope, "merger.norm.weight", HIDDEN);
+    put(weights, scope, "merger.norm.bias", HIDDEN);
+    put(weights, scope, "merger.linearFc1.weight", MERGE_BLOCK, MERGE_BLOCK);
+    put(weights, scope, "merger.linearFc1.bias", MERGE_BLOCK);
+    put(weights, scope, "merger.linearFc2.weight", OUT_HIDDEN, MERGE_BLOCK);
+    put(weights, scope, "merger.linearFc2.bias", OUT_HIDDEN);
+    for (int j = 0; j < DEEPSTACK.length; j++) {
+      putDeepstackMerger(weights, scope, j);
+    }
+    return weights;
+  }
+
+  /** Adds the tiny geometry's {@code deepstackMerger<index>.*} keys (constant 0.001) to the map. */
+  private static void putDeepstackMerger(Map<String, MLXArray> weights, MLXScope scope, int index) {
+    String prefix = "deepstackMerger" + index + ".";
+    put(weights, scope, prefix + "norm.weight", MERGE_BLOCK);
+    put(weights, scope, prefix + "norm.bias", MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc1.weight", MERGE_BLOCK, MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc1.bias", MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc2.weight", OUT_HIDDEN, MERGE_BLOCK);
+    put(weights, scope, prefix + "linearFc2.bias", OUT_HIDDEN);
+  }
+
+  /**
+   * Rewires the main merger and the first DeepStack merger to the non-default merge-block width
+   * {@code m} (kept consistent across the two so the constructor accepts the tower).
+   */
+  private static void putMergeWidth(Map<String, MLXArray> weights, MLXScope scope, int m) {
+    weights.put("merger.linearFc1.weight", full(scope, m, m));
+    weights.put("merger.linearFc1.bias", full(scope, m));
+    weights.put("merger.linearFc2.weight", full(scope, OUT_HIDDEN, m));
+    weights.put("deepstackMerger0.norm.weight", full(scope, m));
+    weights.put("deepstackMerger0.norm.bias", full(scope, m));
+    weights.put("deepstackMerger0.linearFc1.weight", full(scope, m, m));
+    weights.put("deepstackMerger0.linearFc1.bias", full(scope, m));
+    weights.put("deepstackMerger0.linearFc2.weight", full(scope, OUT_HIDDEN, m));
+  }
+
+  private static void put(Map<String, MLXArray> weights, MLXScope scope, String key, int... shape) {
+    weights.put(key, full(scope, shape));
+  }
+
+  private static MLXArray full(MLXScope scope, int... shape) {
+    return MLX.full(scope, shape, 0.001f, DType.FLOAT32);
+  }
+
+  private static Qwen3VlVisionTower buildTower(MLXScope scope, Map<String, MLXArray> weights) {
+    return new Qwen3VlVisionTower(scope, NUM_HEADS, weights, DEEPSTACK);
+  }
+
+  private static void expectConstructorMessage(
+      MLXScope scope,
+      Map<String, MLXArray> weights,
+      int numHeads,
+      int[] deepstackIndexes,
+      String message) {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Qwen3VlVisionTower(scope, numHeads, weights, deepstackIndexes));
+    assertEquals(message, e.getMessage());
+  }
+
+  /**
+   * Runs {@code visionWeights} with the class's DEPTH and DEEPSTACK against one in-range weight
+   * followed by the {@code checkpointKey} and asserts the rejection message.
+   */
+  private static void expectVisionWeightsRejection(String checkpointKey, String expectedMessage) {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      // The in-range key is accepted and processed first, then the out-of-range key rejects the
+      // whole map.
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      checkpoint.put(checkpointKey, full(scope, HIDDEN));
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK));
+      assertEquals(expectedMessage, e.getMessage());
+    }
+  }
+
+  /**
+   * Runs {@code visionWeights} with the class's DEPTH and DEEPSTACK against the already-built
+   * {@code checkpoint} (a well-formed conv weight first, then the rejecting key(s)) and asserts the
+   * all-or-nothing contract: the rejection throws {@code expectedMessage} and the caller's map is
+   * left byte-for-byte untouched — the conv weight entry is still the very same, still-open array
+   * with its original values, the map's size is intact, and no MLX memory was stranded by the
+   * failed call (no transposed copy allocated, nothing closed).
+   */
+  private static void expectVisionWeightsFailureLeavesMapUntouched(
+      Map<String, MLXArray> checkpoint,
+      MLXArray convWeight,
+      float[] convValues,
+      String expectedMessage) {
+    int sizeBefore = checkpoint.size();
+    long baseline = MLXMemory.activeBytes();
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK));
+    assertEquals(expectedMessage, e.getMessage());
+    // Sampled before any further MLX work in this test: the failed call allocates and frees
+    // nothing (the validation pass does no MLX work at all), so the counter must sit exactly at
+    // the pre-call baseline.
+    assertTrue(
+        MLXMemory.activeBytes() <= baseline,
+        "a rejected visionWeights call must not strand MLX memory; baseline "
+            + baseline
+            + ", after "
+            + MLXMemory.activeBytes());
+    assertEquals(sizeBefore, checkpoint.size(), "the caller's map is intact");
+    assertSame(convWeight, checkpoint.get("model.visual.patch_embed.proj.weight"));
+    // toFloatArray throws IllegalStateException on a closed array, so this pins both that the
+    // original is still open and that its bytes are the original values.
+    assertArrayEquals(
+        convValues, convWeight.toFloatArray(), 0f, "the original conv weight is intact");
+  }
+
+  /**
+   * Puts the well-formed conv weight (distinct values 1..24 in the {@code [2, 3, 1, 2, 2]} PyTorch
+   * layout) first into {@code checkpoint} and returns its values, so callers append the rejecting
+   * key(s) after it — the ordering the pre-fix code mangled the map.
+   */
+  private static float[] putConvWeightFirst(MLXScope scope, Map<String, MLXArray> checkpoint) {
+    float[] conv = new float[24];
+    for (int i = 0; i < conv.length; i++) {
+      conv[i] = i + 1f;
+    }
+    checkpoint.put(
+        "model.visual.patch_embed.proj.weight", MLX.array(scope, conv, new int[] {2, 3, 1, 2, 2}));
+    return conv;
+  }
+
+  /**
+   * The {@code {0, 2, 3, 4, 1}} transpose of the tests' {@code [2, 3, 1, 2, 2]} conv weight: jmlx's
+   * channels-last output {@code [o, t, h, w, c]} reads the PyTorch input {@code [o, c, t, h, w]};
+   * with T = 1 the t term is always zero.
+   */
+  private static float[] transposedConvValues(float[] input) {
+    float[] expected = new float[24];
+    for (int o = 0; o < 2; o++) {
+      for (int h = 0; h < 2; h++) {
+        for (int w = 0; w < 2; w++) {
+          for (int c = 0; c < 3; c++) {
+            expected[o * 12 + h * 6 + w * 3 + c] = input[o * 12 + c * 4 + h * 2 + w];
+          }
+        }
+      }
+    }
+    return expected;
+  }
+
+  /** One 64x64 processor output: grid (1, 4, 4), 16 raw patch rows of stride 1536. */
+  private static Qwen3VlImageProcessorResult processedImage() {
+    byte[] pixels = new byte[IMAGE * IMAGE * 3];
+    for (int i = 0; i < pixels.length; i++) {
+      pixels[i] = (byte) (i * 7 + 13);
+    }
+    Qwen3VlImageProcessorResult result = processor().process(new RgbImage(IMAGE, IMAGE, pixels));
+    assertArrayEquals(new int[] {1, 4, 4}, result.gridThw(), "grid");
+    assertEquals(16, result.rawPatchRows(), "raw patch rows");
+    assertEquals(1536, result.patchStride(), "patch stride");
+    return result;
+  }
+
+  /** The 2B artifact's slow-processor options (the golden/peak tests' pinned chain). */
+  private static Qwen3VlImageProcessor processor() {
+    return new Qwen3VlImageProcessor(
+        Qwen3VlProcessorConfig.builder()
+            .patchSize(16)
+            .temporalPatchSize(2)
+            .mergeSize(2)
+            .minPixels(3136)
+            .maxPixels(4096 * 16 * 16)
+            .imageMean(new float[] {0.5f, 0.5f, 0.5f})
+            .imageStd(new float[] {0.5f, 0.5f, 0.5f})
+            .build());
+  }
+
+  private static int[] corners(Qwen3VlVisionTower.PositionLookup lookup, int k) {
+    return new int[] {
+      lookup.cornerIndices()[0][k],
+      lookup.cornerIndices()[1][k],
+      lookup.cornerIndices()[2][k],
+      lookup.cornerIndices()[3][k]
+    };
+  }
+
+  private static float[] cornerWeights(Qwen3VlVisionTower.PositionLookup lookup, int k) {
+    return new float[] {
+      lookup.cornerWeights()[0][k],
+      lookup.cornerWeights()[1][k],
+      lookup.cornerWeights()[2][k],
+      lookup.cornerWeights()[3][k]
+    };
+  }
+}

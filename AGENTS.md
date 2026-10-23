@@ -682,3 +682,39 @@ locked environments, never Gradle-invoked) cross-checks the component. The CI
 required-suite list addition landed in PR #57 (review round 2), and `Qwen3VlModel`,
 its loader dispatch and the DeepStack consumption of `VisualFeatureInjection` are
 WP5/WP6. No native pins, generated bindings or build files changed.
+
+Phase 7.3b WP5 (2026-10-22) landed the Qwen3-VL vision tower in `jmlx-models`:
+`Qwen3VlVisionTower` (patch embed + 3-D interpolated position embeddings, N
+`Qwen3VlVisionBlock`s — each a LayerNorm/attention/LayerNorm/MLP two-statement residual
+block, matching the pinned 4.57.6 `Qwen3VLVisionBlock.forward` sequential semantics
+where `norm2` sees the updated residual — plus DeepStack level merges) composed with
+`jmlx-core`'s new `PatchMerger`, `TwoAxisRope`, `TwoAxisRotation` and
+`TwoAxisRotaryAttention` components (all with their own core tests), returning
+`Qwen3VlVisionFeatures` (merged rows + per-level DeepStack rows) hoisted into the
+caller's per-request target scope (`forward(MLXScope, List)`, the `SmolVlmModel`
+per-request pattern — the tower's module scope receives no per-forward handles, and
+multi-image per-image parts are released after the evaluated concatenation); each
+encoder block additionally runs in a private per-block child scope of the image scope
+that is evaluated and closed before the next block starts, and the embedding stage
+(patch embed + position-embedding gathers) runs in its own child scope of the image
+scope that is evaluated and closed before block 0 starts (the per-block and
+embedding-stage evaluate-and-release loops of the 2026-10-23 review round), so one
+block's intermediates never accumulate across blocks and the per-image peak neither
+scales with depth nor carries the embedding stage while the encoder runs. The strict
+HF intermediate-feature golden
+`tools/hf-reference/goldens/qwen3vl-vision-wp5.json` plus its tiny synthetic
+checkpoint, image and generator script (`tools/hf-reference/qwen3vl_vision.py`,
+digest-pinned in `tools/hf-reference/provenance.json`) drive
+`Qwen3VlVisionTowerGoldenTest` (full-float32), and `Qwen3VlVisionPeakTest`
+(ordinary `test`) measures the real-2B-geometry per-image peak — the tower forward's
+own transient 1.25 GiB (all three depth probes bit-for-bit equal, depth 4 − depth 1
+= 0 B against the test's 64 MiB depth-independence bound), sustained 16 MiB, and the
+isolated attention-bracket transient 0.31 GiB, all under the plan §4 5 GiB bound —
+recorded in the reference findings §11.4, which documents the pre-fix cause
+(per-image scope Java handles pinning every block's intermediates, slope
+1,174,405,136 B = 70 × 16 MiB + 16 B per block) and now covers the fix with the
+depth-independence regression test. Both suites are required by the macOS CI
+assertion. `Qwen3VlModel`, its loader dispatch and the DeepStack consumption of
+`VisualFeatureInjection` remain WP6. The review round added the opt-in
+`exactBitsRecord/VerifyVision` Gradle tasks (never part of `check`) for the
+bit-identity evidence; no native pins or generated bindings changed.

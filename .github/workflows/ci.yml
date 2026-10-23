@@ -174,13 +174,16 @@ jobs:
                               'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest',
                               'ModalityRejectionTest', 'Idefics3VisionTowerSmokeTest',
                               'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest',
-                              'DecoderSeamTest', 'VisualFeatureInjectionTest'],
+                              'DecoderSeamTest', 'VisualFeatureInjectionTest',
+                              'Qwen3VlVisionTowerGoldenTest', 'Qwen3VlVisionPeakTest',
+                              'Qwen3VlVisionTowerValidationTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
           float32_suites = ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                             'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
-                            'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest']
+                            'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest',
+                            'Qwen3VlVisionTowerGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['DecoderSeamTest'] = ['test', 'float32GoldenTest']

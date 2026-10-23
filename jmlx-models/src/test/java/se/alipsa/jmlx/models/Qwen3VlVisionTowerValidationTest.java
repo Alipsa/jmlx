@@ -477,6 +477,18 @@ class Qwen3VlVisionTowerValidationTest {
   }
 
   @Test
+  void constructorRejectsRankZeroFeedForwardWeight() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      // A rank-0 (scalar) layer-0 fc1 weight used to reach shape()[0] before any rank check,
+      // throwing ArrayIndexOutOfBoundsException instead of the documented IllegalArgumentException.
+      weights.put("layer0.mlp.0.weight", MLX.array(scope, new float[] {0.001f}, new int[] {}));
+      expectConstructorMessage(
+          scope, weights, NUM_HEADS, DEEPSTACK, "layer0.mlp.0.weight must be a matrix, got rank 0");
+    }
+  }
+
+  @Test
   void constructorRejectsNonSquarePositionGrid() {
     try (MLXScope scope = new MLXScope()) {
       Map<String, MLXArray> weights = baseWeights(scope);

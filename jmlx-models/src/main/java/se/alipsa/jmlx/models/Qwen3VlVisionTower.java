@@ -244,16 +244,20 @@ public final class Qwen3VlVisionTower extends Module {
         requireShape(
             weight(weights, layer + norm + ".bias"), layer + norm + ".bias", new int[] {hidden});
       }
+      MLXArray mlp0 = weight(weights, layer + "mlp.0.weight");
       if (i == 0) {
-        intermediate = weight(weights, layer + "mlp.0.weight").shape()[0];
+        // The feed-forward width is derived from this weight's rows, so its rank is checked here
+        // before the index; the other layers' rows are pinned by the requireShape below.
+        if (mlp0.ndim() != 2) {
+          throw new IllegalArgumentException(
+              layer + "mlp.0.weight must be a matrix, got rank " + mlp0.ndim());
+        }
+        intermediate = mlp0.shape()[0];
         if (intermediate <= 0) {
           throw new IllegalArgumentException("the feed-forward width must be positive");
         }
       }
-      requireShape(
-          weight(weights, layer + "mlp.0.weight"),
-          layer + "mlp.0.weight",
-          new int[] {intermediate, hidden});
+      requireShape(mlp0, layer + "mlp.0.weight", new int[] {intermediate, hidden});
       requireShape(
           weight(weights, layer + "mlp.0.bias"), layer + "mlp.0.bias", new int[] {intermediate});
       requireShape(

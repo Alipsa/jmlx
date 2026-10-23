@@ -717,7 +717,8 @@ public final class Qwen3VlVisionTower extends Module {
           // every intermediate of this block (the peak does not accumulate across blocks), while
           // `out` (and `ds`) are hoisted out first, so the computation is unchanged — uncompiled
           // MLX does not fuse across eval boundaries (verified bit-identical in both TF32 modes
-          // against the pre-change recording, findings §11.4).
+          // against the pre-change recording, with the probe's seeded non-constant weights and
+          // pixels, findings §11.4).
           MLX.eval(tap ? new MLXArray[] {out, ds} : new MLXArray[] {out});
           // The block-0 capture and the DeepStack capture are independent conditions: when
           // deepstackIndexes[0] == 0 both fire in this order, so blockOutputs keeps the

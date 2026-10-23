@@ -2105,8 +2105,36 @@ reading, not a profiler trace:
   next block starts, so one block's intermediates are released before the next
   accumulate. The computation is bit-identical to the pre-change graph — uncompiled MLX
   does not fuse across eval boundaries — verified exact-bits in both TF32 modes against
-  the pre-change recording (`exactBitsVerifyVision`, 6 captures × 20,971,520 floats
-  each, `build/exact-bits/wp5-vision/tf32-{1,0}/`, recorded at 0dc7595).
+  the pre-change recording (`exactBitsVerifyVision`, 6 captures, 20,971,520 floats total,
+  `build/exact-bits/wp5-vision/tf32-{1,0}/`, re-recorded at 0dc7595 with the probe
+  revision below).
+
+Probe revision (PR #58 review round 3): the first revision of the probe filled every
+tower weight with constant 0.001. Decoding those recordings showed the probe collapsed:
+every conv output channel and every position-embedding column is identical, so each row's
+columns are all equal (max distinct values per row = 1); LayerNorm then turns every row
+into its bias, so all `v` rows are identical; and the attention output is therefore `v`
+itself, whatever the scores, softmax or rotation are. The old `merged` capture held only
+2 distinct values across its 1024 rows, and `block0 − (patchEmbed + posEmbed)` was one
+constant 0.0082247 on every row — each block adds the same constant to every row, so
+dropping the rotation, rotating `v`, or swapping `q` and `k` would all have left the
+recordings unchanged. The bit-identity evidence was therefore weaker than it read (the
+change itself is carried by the strict HF golden). The probe now draws every tower weight
+from `MLXRandom.normal` (loc 0, standard deviation 0.02) after `MLXRandom.seed(42)`, and
+every image pixel from a `java.util.Random(42)` uniform in [0, 1) scaled to a full-range
+byte — fully deterministic (fixed seeds, no file inputs) and row-sensitive: with
+non-constant weights and pixels every activation row differs from the others, the
+softmax weights are position-dependent, and any change to the per-block loop, the
+attention, the RoPE or the norms changes the recorded bits. The seed and the weight scale
+are part of the probe spec hash, so the old constant-weight baseline can never compare
+silently against this one. Procedure: record at 0dc7595 (the pre per-block change; the
+only forward-numerics difference between 0dc7595 and the verify commit is the per-block
+`runImage` loop) using the byte-identical updated harness (recorder + the `a802357`
+`jmlx-models/build.gradle`, verified unchanged through HEAD) in a temporary worktree,
+then verify at HEAD in both TF32 modes — bit-identical. The sensitivity is visible in the
+recordings themselves: every capture now carries many distinct values per row (the old
+ones had 1). The peak test keeps constant weights, because peak memory depends only on
+shapes.
 
 The flagged concern is now a regression test: `Qwen3VlVisionPeakTest` asserts
 peak(4) − peak(1) < 67,108,864 B (64 MiB) in addition to the plan §4 bound on the

@@ -16,10 +16,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
+import se.alipsa.jmlx.core.MLXRandom;
 import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.vision.Qwen3VlImageProcessor;
@@ -37,10 +39,23 @@ import tools.jackson.databind.JsonNode;
  * their own JVMs — but records one vision-specific probe: the {@code Qwen3VlVisionPeakTest} depth-3
  * synthetic probe, i.e. the real-2B tower geometry (hidden 1024, 16 heads, head_dim 64,
  * intermediate 4096, out_hidden 2048, 2304 position embeddings, patch/temporal 16/2, merge 2) at
- * depth 3 with DeepStack index [1], constant 0.001 weights via {@link MLX#full} (the probe is fully
- * deterministic — no seed is involved) and the peak test's synthetic 1024×1024 image (grid (1, 64,
- * 64), 4096 patch rows, fixed per-pixel function of the coordinates) processed through {@link
- * Qwen3VlImageProcessor}.
+ * depth 3 with DeepStack index [1] and one 1024×1024 image (grid (1, 64, 64), 4096 patch rows)
+ * processed through {@link Qwen3VlImageProcessor}.
+ *
+ * <p>Weights and pixels are seeded, not constant (findings §11.4): the first probe revision filled
+ * every weight with constant 0.001, and decoding those recordings showed the probe collapsed —
+ * every conv output channel and position-embedding column is identical, so each row's columns are
+ * all equal, LayerNorm then turns every row into its bias, and the attention output is exactly
+ * {@code v} whatever the scores, softmax or rotation are (the old {@code merged} capture held only
+ * 2 distinct values across its 1024 rows, and each block added one constant to every row). The
+ * recording was therefore insensitive to attention, RoPE and norm changes. The probe now draws
+ * every tower parameter from {@code MLXRandom.normal} (loc 0, standard deviation {@link
+ * #WEIGHT_SCALE}) after {@code MLXRandom.seed({@link #SEED})}, and every image pixel from a {@code
+ * java.util.Random({@link #SEED})} uniform in {@code [0, 1)} scaled to a full-range byte: fully
+ * deterministic (fixed seeds, no file inputs) and row-sensitive, so a bit change anywhere in the
+ * per-block loop, the attention, the RoPE or the norms shows up in a capture. The seed and scale
+ * are part of the probe spec hash, so a constant-weight baseline can never compare silently against
+ * this one.
  *
  * <p>The probe runs through {@code Qwen3VlVisionTower.forwardForTest}, and six captures are
  * recorded: the final features (the merged rows and DeepStack level 0) plus the per-image golden
@@ -87,7 +102,12 @@ class Qwen3VlVisionExactBitsRecorderTest {
   private static final int GRID = IMAGE / 16;
   private static final int PATCH_ROWS = GRID * GRID;
   private static final int MERGED_ROWS = (GRID / MERGE) * (GRID / MERGE);
-  private static final float WEIGHT = 0.001f;
+
+  /** The fixed seed for both the MLX weight draws and the java.util.Random pixel draws. */
+  private static final long SEED = 42L;
+
+  /** The standard deviation of the seeded normal weight draws (loc 0). */
+  private static final float WEIGHT_SCALE = 0.02f;
 
   /** The capture names in the recorded order (final features first, then the golden captures). */
   private static final List<String> CAPTURES =
@@ -233,7 +253,8 @@ class Qwen3VlVisionExactBitsRecorderTest {
     canonical.append(",\"deepstackIndexes\":[").append(DEEPSTACK_INDEXES[0]).append(']');
     canonical.append(",\"merge\":").append(MERGE);
     canonical.append(",\"image\":").append(IMAGE);
-    canonical.append(",\"weightBits\":").append(Float.floatToIntBits(WEIGHT));
+    canonical.append(",\"seed\":").append(SEED);
+    canonical.append(",\"weightScaleBits\":").append(Float.floatToIntBits(WEIGHT_SCALE));
     canonical.append('}');
     return ExactBitsSpec.sha256(canonical.toString());
   }
@@ -515,8 +536,14 @@ class Qwen3VlVisionExactBitsRecorderTest {
     }
   }
 
-  /** The real-2B geometry at reduced depth 3 / DeepStack [1], constant 0.001 weights. */
+  /**
+   * The real-2B geometry at reduced depth 3 / DeepStack [1], seeded non-constant weights: one
+   * {@code MLXRandom.normal} draw per parameter (loc 0, scale {@link #WEIGHT_SCALE}) after {@code
+   * MLXRandom.seed(SEED)} — the constant-weight probe collapsed and was insensitive to attention,
+   * RoPE and norm changes (findings §11.4).
+   */
   private static Qwen3VlVisionTower buildTower(MLXScope scope, List<MLXArray> statics) {
+    MLXRandom.seed(SEED);
     Map<String, MLXArray> weights = new LinkedHashMap<>();
     put(weights, statics, scope, "patchEmbedding.weight", HIDDEN, 2, 16, 16, 3);
     put(weights, statics, scope, "patchEmbedding.bias", HIDDEN);
@@ -557,11 +584,12 @@ class Qwen3VlVisionExactBitsRecorderTest {
       MLXScope scope,
       String key,
       int... shape) {
-    weights.put(key, full(statics, scope, shape));
+    weights.put(key, draw(statics, scope, shape));
   }
 
-  private static MLXArray full(List<MLXArray> statics, MLXScope scope, int... shape) {
-    MLXArray value = MLX.full(scope, shape, WEIGHT, DType.FLOAT32);
+  /** One seeded weight draw: a normal with loc 0 and scale {@link #WEIGHT_SCALE}. */
+  private static MLXArray draw(List<MLXArray> statics, MLXScope scope, int... shape) {
+    MLXArray value = MLXRandom.normal(scope, shape, DType.FLOAT32, 0f, WEIGHT_SCALE);
     statics.add(value);
     return value;
   }
@@ -580,16 +608,16 @@ class Qwen3VlVisionExactBitsRecorderTest {
             .build());
   }
 
-  /** One deterministic 1024×1024 image: per-pixel linear functions of the coordinates. */
+  /**
+   * One deterministic 1024×1024 image: every channel byte is one {@code java.util.Random} uniform
+   * in {@code [0, 1)} (seed {@link #SEED}) scaled to the full 0-255 range, so the patch rows into
+   * the conv are non-constant across spatial positions (findings §11.4).
+   */
   private static RgbImage syntheticImage() {
     byte[] pixels = new byte[IMAGE * IMAGE * 3];
-    for (int y = 0; y < IMAGE; y++) {
-      for (int x = 0; x < IMAGE; x++) {
-        int i = (y * IMAGE + x) * 3;
-        pixels[i] = (byte) ((x * 7 + y * 11) % 256);
-        pixels[i + 1] = (byte) ((x * 13 + y * 5) % 256);
-        pixels[i + 2] = (byte) ((x * 19 + y * 3) % 256);
-      }
+    Random random = new Random(SEED);
+    for (int i = 0; i < pixels.length; i++) {
+      pixels[i] = (byte) (random.nextFloat() * 256f);
     }
     return new RgbImage(IMAGE, IMAGE, pixels);
   }

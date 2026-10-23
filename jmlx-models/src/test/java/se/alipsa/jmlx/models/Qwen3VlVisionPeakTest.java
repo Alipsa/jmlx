@@ -33,22 +33,26 @@ import se.alipsa.jmlx.vision.RgbImage;
  * patch/temporal 16/2, merge 2 — at three reduced depths, each with one DeepStack index (depth 1:
  * index 0; depths 3 and 4: index 1). The depth reduction is documented in §11.4: the tower's
  * per-block evaluate-and-release loop confines every block's intermediates to a private per-block
- * child scope that closes before the next block starts, so the per-image peak does not scale with
- * depth — the pre-fix tower leaked ≈1.09 GiB per block (the full depth-24 tower extrapolated ≈26.8
- * GiB). The depth-1-versus-depth-4 transient comparison below is the regression guard for that: the
- * delta must stay under 64 MiB, so the depth-3 transient is a fair proxy for the per-image
- * transient the plan §4 bound applies to at any depth. The weights are constant 0.001 via {@link
- * MLX#full} — the peak depends on geometry and dtype, not on values. One synthetic 1024×1024 image
- * (grid (1, 64, 64), 4096 patch rows, the default 4096-row raw budget's exact hard cap) is
- * processed through {@link Qwen3VlImageProcessor}.
+ * child scope that closes before the next block starts, and the embedding stage's intermediates
+ * (pixel tensor, patch-embedding convolution, position-embedding gathers and their weighted sum) to
+ * a private child scope of the image scope that closes before block 0 starts, so the per-image peak
+ * neither scales with depth nor carries the embedding stage while the encoder runs — the pre-fix
+ * tower leaked ≈1.09 GiB per block (the full depth-24 tower extrapolated ≈26.8 GiB). The
+ * depth-1-versus-depth-4 transient comparison below is the regression guard for that: the delta
+ * must stay under 64 MiB, so the depth-3 transient is a fair proxy for the per-image transient the
+ * plan §4 bound applies to at any depth. The weights are constant 0.001 via {@link MLX#full} — the
+ * peak depends on geometry and dtype, not on values. One synthetic 1024×1024 image (grid (1, 64,
+ * 64), 4096 patch rows, the default 4096-row raw budget's exact hard cap) is processed through
+ * {@link Qwen3VlImageProcessor}.
  *
  * <p>Four tower measurements share one settled baseline, taken with every static array (all three
  * towers' weights, the bracket attention's weights, inputs and rotations) already evaluated:
  *
  * <ol>
  *   <li>The tower forward's own per-image transient peak at depth 1: the depth-independent floor —
- *       one block's intermediates plus the conv, the position-embedding gathers and the mergers,
- *       each evaluated and released inside the forward.
+ *       one block's intermediates plus the entry row and the mergers, the conv and the
+ *       position-embedding gathers having been evaluated and released in the embedding stage before
+ *       block 0.
  *   <li>The same transient at the depth-3 proxy: must stay under the plan §4 planning bound of 5
  *       GiB and at least the 16 MiB of evaluated rows the forward hoists into the per-request
  *       scope.
@@ -68,16 +72,16 @@ import se.alipsa.jmlx.vision.RgbImage;
  *
  * <p>CI headroom: this suite is required by the {@code macos-26} hosted runner's native job in
  * {@code .github/workflows/ci.yml} and runs in the ordinary {@code test} task, where it is the
- * module's largest memory consumer. Its largest transient is the depth-1 peak, 1,757,020,216 B
- * (≈1.64 GiB, M5 Max, 2026-10-23), on top of the settled statics of the three towers and the
- * bracket (≈0.65 GiB), so the concurrent Metal peak is ≈2.3 GiB — the per-block
- * evaluate-and-release fix (this review round) dropped it from the pre-fix depth-3 peak of 3.81
- * GiB. Checked against the hosted runner's ≈7 GB RAM (a reviewer-recorded figure, not verified
- * against the runner image): ≈2.3 GiB Metal + ≤0.5 GiB test-JVM working set (no configured max
- * heap; the JVM's default ¼-RAM max is a ceiling, not a reservation) + ≈0.5 GiB Gradle daemon (512
- * MiB default) + ≈1.2 GiB OS ≈ 4.5 GiB, leaving ≈2.5 GiB of headroom, versus ≈1 GiB or less for the
- * pre-fix peak. See {@code req/plans/phase7-3b-reference-findings.md} §11.4 for the full
- * arithmetic.
+ * module's largest memory consumer. Its largest transient is any of the depth probes — all three
+ * are bit-for-bit equal at 1,345,847,352 B (≈1.25 GiB, M5 Max, 2026-10-23) — on top of the settled
+ * statics of the three towers and the bracket (≈0.65 GiB), so the concurrent Metal peak is ≈1.9 GiB
+ * — the per-block and embedding-stage evaluate-and-release fixes (this review round) dropped it
+ * from the pre-fix depth-3 peak of 3.81 GiB. Checked against the hosted runner's ≈7 GB RAM (a
+ * reviewer-recorded figure, not verified against the runner image): ≈1.9 GiB Metal + ≤0.5 GiB
+ * test-JVM working set (no configured max heap; the JVM's default ¼-RAM max is a ceiling, not a
+ * reservation) + ≈0.5 GiB Gradle daemon (512 MiB default) + ≈1.2 GiB OS ≈ 4.1 GiB, leaving ≈2.9 GiB
+ * of headroom, versus ≈1 GiB or less for the pre-fix peak. See {@code
+ * req/plans/phase7-3b-reference-findings.md} §11.4 for the full arithmetic.
  */
 @EnabledIfNativeAvailable
 class Qwen3VlVisionPeakTest {
@@ -237,7 +241,7 @@ class Qwen3VlVisionPeakTest {
               + " B planning bound");
 
       System.out.println(
-          "WP5 vision peak (per-block scopes): grid=(1,"
+          "WP5 vision peak (embedding-stage and per-block scopes): grid=(1,"
               + GRID
               + ","
               + GRID

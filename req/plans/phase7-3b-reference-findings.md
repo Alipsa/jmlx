@@ -2020,10 +2020,11 @@ measurements, each one forward in a fresh per-request scope:
 
 1. The tower forward's own per-image transient peak at depth 1 — the depth-independent
    floor: `MLXMemory.resetPeak()` right before `tower.forward(request, images)`,
-   `MLXMemory.peakBytes()` right after. The forward evaluates and releases each block's
-   intermediates internally (private per-block child scopes), so `peakBytes() - baseline`
-   is one block's live intermediates plus the conv, the position-embedding gathers and
-   the mergers, plus the 16 MiB of hoisted rows.
+   `MLXMemory.peakBytes()` right after. The forward evaluates and releases the embedding
+   stage's intermediates before block 0 (a private child scope of the image scope) and
+   each block's intermediates internally (private per-block child scopes), so
+   `peakBytes() - baseline` is one block's live intermediates plus the entry row, the
+   mergers, and the 16 MiB of hoisted rows.
 2. The same transient at the depth-3 proxy, which must stay under the plan §4 bound.
 3. The sustained per-image evaluated peak at depth 3: a settled active-bytes delta
    (`settledAfter - baseline`) taken while the per-request scope is still open — the
@@ -2040,38 +2041,44 @@ The depth-3 transient, the depth-3 sustained peak and the attention bracket are 
 against the plan §4 5 GiB planning bound; the depth-1/depth-4 pair is asserted against
 the 64 MiB depth-independence bound.
 
-Measured (M5 Max, ordinary `test` task, MLX_ENABLE_TF32=1 default, 2026-10-23, per-block
-evaluate-and-release in place):
+Measured (M5 Max, ordinary `test` task, MLX_ENABLE_TF32=1 default, 2026-10-23,
+embedding-stage and per-block evaluate-and-release in place):
 
-- Tower forward per-image transient peak (depth-3 proxy): **1,606,025,248 B ≈ 1.50 GiB
-  (1,531.63 MiB)** over the settled baseline — 2,483,028,048 B (≈2.31 GiB) below the
+- Tower forward per-image transient peak (depth-3 proxy): **1,345,847,352 B ≈ 1.25 GiB
+  (1,283.45 MiB)** over the settled baseline — 2,743,205,944 B (≈2.56 GiB) below the
   pre-fix depth-3 peak of 4,089,053,296 B, which carried every block's intermediates
-  live at once.
+  live at once (and the embedding stage's throughout).
 - Sustained per-image evaluated peak: **16,777,216 B — exactly 16 MiB**. This is precisely the
-  logical retained output of the tower on the 4096-row image after the per-block and
-  per-image scopes close: the merged 1024-row × 2048-float `out_hidden` representation
-  plus one DeepStack level (1024 × 2048 floats), i.e. 2 × 1024 × 2048 × 4 B = 16 MiB —
-  the merged rows and the `[1]` deepstack capture, nothing else retained. Unchanged by
-  the per-request-scope review fix: the retained rows now live in the caller's per-request
-  scope instead of the tower's module scope, but the single-image forward concatenates
-  nothing, so the same 16 MiB is retained until the per-request scope closes.
+  logical retained output of the tower on the 4096-row image after the embedding-stage,
+  per-block and per-image scopes close: the merged 1024-row × 2048-float `out_hidden`
+  representation plus one DeepStack level (1024 × 2048 floats), i.e. 2 × 1024 × 2048 × 4 B
+  = 16 MiB — the merged rows and the `[1]` deepstack capture, nothing else retained.
+  Unchanged by the per-request-scope review fix: the retained rows now live in the caller's
+  per-request scope instead of the tower's module scope, but the single-image forward
+  concatenates nothing, so the same 16 MiB is retained until the per-request scope closes;
+  the embedding-stage fix also leaves it unchanged, since the stage's arrays were never
+  part of the retained output.
 - Transient attention workspace (bracketed by the direct `TwoAxisRotaryAttention` forward at
-  4096 rows): **335,544,320 B = exactly 320 MiB (0.3125 GiB)** — unchanged by the per-block
-  fix, which never touches a single-attention call. Exactly five single-head 4096×4096
+  4096 rows): **335,544,320 B = exactly 320 MiB (0.3125 GiB)** — unchanged by the
+  per-block and embedding-stage fixes, which never touch a single-attention call. Exactly five single-head 4096×4096
   float32 matrices (67,108,864 B each); the full 16-head score matrix is
   1,073,741,824 B = 1 GiB. In the isolated call MLX's fused scaled-dot-product kernel
   tiles the score computation and never materializes the full matrix, which is why the
   measured transient is well under even one full matrix. The bracket runs after every
   per-request scope closes, so the 16 MiB of retained rows no longer offsets the bracket
   peak.
-- Depth sweep with the per-block fix in place (same probe, 2026-10-23): depth 1 =
-  **1,757,020,216 B (1.64 GiB)**, depth 3 = **1,606,025,248 B (1.50 GiB)**, depth 4 =
-  **1,606,025,248 B (1.50 GiB)** — the depth-3 and depth-4 transients are bit-for-bit
-  equal, and depth 4 − depth 1 = **−150,994,968 B (−144.00 MiB)**. The per-image peak no
-  longer scales with depth. The depth-1 transient being slightly *higher* than the
-  depth-3/4 ones is the allocator's pool floor on a shorter allocation sequence, not
-  accumulation — which is why the test's bound is one-sided: it fails only if depth 4
-  exceeds depth 1 by more than 64 MiB, the signature of per-block accumulation returning.
+- Depth sweep with the embedding-stage fix in place (same probe, 2026-10-23): depth 1 =
+  depth 3 = depth 4 = **1,345,847,352 B (1.25 GiB)** — all three transients are
+  bit-for-bit equal, and depth 4 − depth 1 = **0 B**. The per-image peak no longer
+  scales with depth, and the embedding stage no longer contributes to it at any depth.
+  The post per-block-fix sweep had depth 1 slightly *higher* than depth 3/4 (1,757,020,216
+  B vs 1,606,025,248 B, Δ = **−150,994,968 B (−144.00 MiB)**): the allocator's pool floor
+  on a shorter allocation sequence, while the embedding stage's arrays were still live
+  across the blocks at every depth. Confining the embedding stage to its own scope
+  released the only depth-independent arrays that survived the per-block loop, so all
+  three probes now agree to the byte. The test's bound stays one-sided: it fails only if
+  depth 4 exceeds depth 1 by more than 64 MiB, the signature of per-block accumulation
+  returning.
 
 Depth scaling — cause, decomposition, and the fix. The pre-fix peak **was** depth-dependent
 (pre-fix sweep, 2026-10-23: depths 1–4 gave 1,908,015,184 B, 2,914,648,160 B,
@@ -2098,16 +2105,31 @@ reading, not a profiler trace:
   theory: one 16-head float32 score matrix would be 1,073,741,824 B = 1 GiB, and the
   fused SDPA kernel tiles it — the bracket peaks at 20–23 row-units' worth, never a full
   matrix.
-- Fix (this review round): `runImage` now wraps each block in a private per-block child
-  scope of the image scope — the block's entry row is pinned into it (same-shape
-  `broadcastTo`, the `T5Model.project` idiom), the block's output and (when tapped)
-  DeepStack rows are evaluated and hoisted out, and the block scope closes before the
-  next block starts, so one block's intermediates are released before the next
-  accumulate. The computation is bit-identical to the pre-change graph — uncompiled MLX
-  does not fuse across eval boundaries — verified exact-bits in both TF32 modes against
-  the pre-change recording (`exactBitsVerifyVision`, 6 captures, 20,971,520 floats total,
-  `build/exact-bits/wp5-vision/tf32-{1,0}/`, re-recorded at 0dc7595 with the probe
-  revision below).
+- Fix (per-block unit, 2026-10-23 review round): `runImage` now wraps each block in a
+  private per-block child scope of the image scope — the block's entry row is pinned
+  into it (same-shape `broadcastTo`, the `T5Model.project` idiom), the block's output
+  and (when tapped) DeepStack rows are evaluated and hoisted out, and the block scope
+  closes before the next block starts, so one block's intermediates are released before
+  the next accumulate. The computation is bit-identical to the pre-change graph —
+  uncompiled MLX does not fuse across eval boundaries — verified exact-bits in both
+  TF32 modes against the pre-change recording (`exactBitsVerifyVision`, 6 captures,
+  20,971,520 floats total, `build/exact-bits/wp5-vision/tf32-{1,0}/`, re-recorded at
+  0dc7595 with the probe revision below).
+- Fix (embedding-stage unit, 2026-10-23 review round): the per-block loop leaves the
+  embedding stage's arrays — the pixel tensor, the conv output, the `[4, n, hidden]`
+  corner rows and their weighted product, and the pe add chain — in the image scope for
+  the whole image, so they still live through every block (roughly 0.2 GiB at the
+  4096-row geometry). The embedding stage now runs in its own private child scope of the
+  image scope: `x = patchRows + pe` is evaluated and hoisted to the image scope before
+  the stage scope closes (and, for the golden test's captures, the `pe` and `patchRows`
+  rows are evaluated and hoisted to the target scope there), so the rest of the stage is
+  released before block 0. Same eval-boundary property as the per-block unit — uncompiled
+  MLX does not fuse across eval boundaries — verified exact-bits in both TF32 modes
+  against the *existing* baseline (`exactBitsVerifyVision`, 6 captures, 20,971,520
+  floats total, `build/exact-bits/wp5-vision/tf32-{1,0}/` — no re-recording). Measured
+  drops: 260,177,896 B (≈248 MiB) at depth 3 and 4, 411,172,864 B (≈392 MiB) at depth 1
+  (which also shed the allocator pool-floor excess), and all three depth probes became
+  bit-for-bit equal.
 
 Probe revision (PR #58 review round 3): the first revision of the probe filled every
 tower weight with constant 0.001. Decoding those recordings showed the probe collapsed:
@@ -2145,26 +2167,28 @@ scopes and may scale the same way; it is out of scope for this fix.
 
 Planning bound (plan §4): below the 5 GiB bound — at 4096 rows and 16 heads one FLOAT32
 score matrix is 1 GiB, and the budget conservatively allows four such matrices (4 GiB)
-plus Q/K/V and block/merger activations. The depth-3 tower-forward proxy (1.50 GiB), the
+plus Q/K/V and block/merger activations. The depth-3 tower-forward proxy (1.25 GiB), the
 16 MiB sustained and the 0.31 GiB attention bracket all pass under it. Since the
-per-image peak is now depth-independent (depth 3 and 4 bit-for-bit equal, asserted),
-the bound applies to the full depth-24 tower's per-image transient as well — the
-pre-fix ≈26.8 GiB extrapolation no longer holds. Not a claim that the model fits a
+per-image peak is now depth-independent (all three depth probes bit-for-bit equal,
+asserted), the bound applies to the full depth-24 tower's per-image transient as well —
+the pre-fix ≈26.8 GiB extrapolation no longer holds. Not a claim that the model fits a
 7 GB host.
 
-CI headroom on the hosted runner (2026-10-23, PR #58 review round 2): the round-2 reviewer
-flagged the (then-current) 3.81 GiB depth-3 transient as possibly tight in ordinary `test` on
-the `macos-26` hosted runner — ≈7 GB RAM shared with the Gradle daemon and the test JVM, a
-reviewer-recorded figure, not verified against the runner image (the repo's own plan also
-records 7 GB RAM / 14 GB disk for this runner). The per-block evaluate-and-release fix
-resolves the concern: the largest transient is now the depth-1 peak, 1,757,020,216 B ≈ 1.64
-GiB, on top of the settled statics of the three towers and the bracket (685,053,640 B of
-computed weights/inputs/rotations, ≈0.65 GiB with allocator slack), so the concurrent Metal
-peak is ≈2.3 GiB. Against ≈7 GiB: ≈2.3 GiB Metal + ≤0.5 GiB test-JVM working set (no
-configured max heap; the JVM's default ¼-RAM max is a ceiling, not a reservation) + ≈0.5 GiB
-Gradle daemon (512 MiB default) + ≈1.2 GiB OS ≈ 4.5 GiB — ≈2.5 GiB of headroom, versus
-≈1 GiB or less for the pre-fix 3.81 GiB peak. The 4096-row geometry and the depth probes are
-therefore unchanged; no CI-specific probe reduction is needed.
+CI headroom on the hosted runner (updated 2026-10-23, PR #58 review round 3; first
+recorded in review round 2): the round-2 reviewer flagged the (then-current) 3.81 GiB
+depth-3 transient as possibly tight in ordinary `test` on the `macos-26` hosted runner —
+≈7 GB RAM shared with the Gradle daemon and the test JVM, a reviewer-recorded figure, not
+verified against the runner image (the repo's own plan also records 7 GB RAM / 14 GB disk
+for this runner). The per-block and embedding-stage evaluate-and-release fixes resolve the
+concern: the largest transient is now any of the depth probes — all three bit-for-bit
+equal at 1,345,847,352 B ≈ 1.25 GiB — on top of the settled statics of the three towers
+and the bracket (685,053,640 B of computed weights/inputs/rotations, ≈0.65 GiB with
+allocator slack), so the concurrent Metal peak is ≈1.9 GiB. Against ≈7 GiB: ≈1.9 GiB
+Metal + ≤0.5 GiB test-JVM working set (no configured max heap; the JVM's default ¼-RAM max
+is a ceiling, not a reservation) + ≈0.5 GiB Gradle daemon (512 MiB default) + ≈1.2 GiB OS
+≈ 4.1 GiB — ≈2.9 GiB of headroom, versus ≈1 GiB or less for the pre-fix 3.81 GiB peak.
+The 4096-row geometry and the depth probes are therefore unchanged; no CI-specific probe
+reduction is needed.
 
 ### 11.5 Linspace probes at the real 2B geometry (2026-10-23, PR #58 review round 2)
 

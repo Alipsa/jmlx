@@ -65,6 +65,19 @@ import se.alipsa.jmlx.vision.RgbImage;
  * TwoAxisRotaryAttention} forward at 4096 rows with constant weights (run after every per-request
  * scope closes, so it carries no retained-row offset), must also stay under the plan §4 bound (one
  * float32 score matrix at 4096 rows / 16 heads is 1 GiB).
+ *
+ * <p>CI headroom: this suite is required by the {@code macos-26} hosted runner's native job in
+ * {@code .github/workflows/ci.yml} and runs in the ordinary {@code test} task, where it is the
+ * module's largest memory consumer. Its largest transient is the depth-1 peak, 1,757,020,216 B
+ * (≈1.64 GiB, M5 Max, 2026-10-23), on top of the settled statics of the three towers and the
+ * bracket (≈0.65 GiB), so the concurrent Metal peak is ≈2.3 GiB — the per-block
+ * evaluate-and-release fix (this review round) dropped it from the pre-fix depth-3 peak of 3.81
+ * GiB. Checked against the hosted runner's ≈7 GB RAM (a reviewer-recorded figure, not verified
+ * against the runner image): ≈2.3 GiB Metal + ≤0.5 GiB test-JVM working set (no configured max
+ * heap; the JVM's default ¼-RAM max is a ceiling, not a reservation) + ≈0.5 GiB Gradle daemon (512
+ * MiB default) + ≈1.2 GiB OS ≈ 4.5 GiB, leaving ≈2.5 GiB of headroom, versus ≈1 GiB or less for the
+ * pre-fix peak. See {@code req/plans/phase7-3b-reference-findings.md} §11.4 for the full
+ * arithmetic.
  */
 @EnabledIfNativeAvailable
 class Qwen3VlVisionPeakTest {

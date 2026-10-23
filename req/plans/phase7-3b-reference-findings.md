@@ -2124,6 +2124,20 @@ the bound applies to the full depth-24 tower's per-image transient as well — t
 pre-fix ≈26.8 GiB extrapolation no longer holds. Not a claim that the model fits a
 7 GB host.
 
+CI headroom on the hosted runner (2026-10-23, PR #58 review round 2): the round-2 reviewer
+flagged the (then-current) 3.81 GiB depth-3 transient as possibly tight in ordinary `test` on
+the `macos-26` hosted runner — ≈7 GB RAM shared with the Gradle daemon and the test JVM, a
+reviewer-recorded figure, not verified against the runner image (the repo's own plan also
+records 7 GB RAM / 14 GB disk for this runner). The per-block evaluate-and-release fix
+resolves the concern: the largest transient is now the depth-1 peak, 1,757,020,216 B ≈ 1.64
+GiB, on top of the settled statics of the three towers and the bracket (685,053,640 B of
+computed weights/inputs/rotations, ≈0.65 GiB with allocator slack), so the concurrent Metal
+peak is ≈2.3 GiB. Against ≈7 GiB: ≈2.3 GiB Metal + ≤0.5 GiB test-JVM working set (no
+configured max heap; the JVM's default ¼-RAM max is a ceiling, not a reservation) + ≈0.5 GiB
+Gradle daemon (512 MiB default) + ≈1.2 GiB OS ≈ 4.5 GiB — ≈2.5 GiB of headroom, versus
+≈1 GiB or less for the pre-fix 3.81 GiB peak. The 4096-row geometry and the depth probes are
+therefore unchanged; no CI-specific probe reduction is needed.
+
 ### 11.5 Linspace probes at the real 2B geometry (2026-10-23, PR #58 review round 2)
 
 The original bit probes pinned only `torch.linspace(0, 7, n)` for the tiny tower's

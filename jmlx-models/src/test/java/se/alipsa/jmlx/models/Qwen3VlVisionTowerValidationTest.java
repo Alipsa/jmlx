@@ -28,7 +28,7 @@ import se.alipsa.jmlx.vision.RgbImage;
  * Validation coverage for the WP5 vision tower's argument and key-mapping checks (PR #58 review
  * finding 4): the public {@link Qwen3VlVisionTower#visionKeyToTowerKey(String, int, int[])}
  * branches, {@link Qwen3VlVisionTower#visionWeights(Map, int, int[])}'s skip/transpose/duplicate
- * behavior plus the finding-5 out-of-range rejection, the constructor's missing/extra/non-floating-
+ * behavior, its finding-5 out-of-range rejection and its unrecognised-visual-key rejection, the
  * weight, deepstack-index, position-grid and merge-width rejections, {@code runImage}'s geometry
  * rejections, the {@link Qwen3VlVisionTower#rotaryCoordinates(int, int, int)}, {@link
  * Qwen3VlVisionTower#positionLookup(int, int, int)} and {@link
@@ -105,6 +105,7 @@ class Qwen3VlVisionTowerValidationTest {
         "model.visual.blocks.1.", // block key without a sub-key
         "model.visual.blocks.0.attn.gate.weight", // unknown attention sub-key
         "model.visual.blocks.0.attn.qkv.gain", // unknown attention tail
+        "model.visual.blocks.0.mlp.linear_fc1.scales", // known linear, unknown sub-key
         "model.visual.blocks.0.mlp.linear_fc3.weight", // unknown MLP sub-key
         "model.visual.blocks.0.other.weight", // unknown block sub-key
         "model.visual.merger.linear_fc3.weight", // unknown merger sub-key
@@ -137,7 +138,7 @@ class Qwen3VlVisionTowerValidationTest {
   }
 
   @Test
-  void visionWeightsSkipsNonVisualAndMalformedKeysAndTransposesConvWeight() {
+  void visionWeightsSkipsNonVisualKeysAndTransposesConvWeight() {
     try (MLXScope scope = new MLXScope()) {
       float[] input = new float[24];
       for (int i = 0; i < input.length; i++) {
@@ -151,14 +152,10 @@ class Qwen3VlVisionTowerValidationTest {
       checkpoint.put("model.visual.blocks.1.norm1.bias", full(scope, HIDDEN));
       checkpoint.put(
           "model.language_model.embed_tokens.weight", full(scope, new int[] {4, HIDDEN}));
-      // Malformed visual keys (a non-numeric index, an overflowing one, a missing sub-key) are
-      // unknown keys, not out-of-range ones: they stay skipped, like the non-visual key above.
-      // A well-formed key whose index is out of range is rejected instead; see
+      // The non-visual key is the only kind that stays skipped: every other unrecognised
+      // model.visual.* key is rejected instead; see visionWeightsRejectsUnrecognizedVisualKeys,
       // visionWeightsRejectsOutOfRangeBlockKeys and
       // visionWeightsRejectsOutOfRangeDeepstackMergerKeys.
-      checkpoint.put("model.visual.blocks.x.norm1.weight", full(scope, HIDDEN));
-      checkpoint.put("model.visual.blocks.99999999999999999999.norm1.weight", full(scope, HIDDEN));
-      checkpoint.put("model.visual.blocks.1", full(scope, HIDDEN));
 
       Map<String, MLXArray> weights =
           Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
@@ -185,21 +182,21 @@ class Qwen3VlVisionTowerValidationTest {
   @Test
   void visionWeightsRejectsOutOfRangeBlockKeys() {
     // A numeric block index past the configured DEPTH (2) is rejected for every sub-key family.
-    expectOutOfRangeRejection(
+    expectVisionWeightsRejection(
         "model.visual.blocks.2.norm1.weight",
         "checkpoint key \"model.visual.blocks.2.norm1.weight\" names block 2, out of range [0, 2)"
             + " for the configured depth");
-    expectOutOfRangeRejection(
+    expectVisionWeightsRejection(
         "model.visual.blocks.9.attn.qkv.bias",
         "checkpoint key \"model.visual.blocks.9.attn.qkv.bias\" names block 9, out of range [0, 2)"
             + " for the configured depth");
-    expectOutOfRangeRejection(
+    expectVisionWeightsRejection(
         "model.visual.blocks.77.mlp.linear_fc2.weight",
         "checkpoint key \"model.visual.blocks.77.mlp.linear_fc2.weight\" names block 77,"
             + " out of range [0, 2) for the configured depth");
     // An unknown sub-key does not make the key non-visual: a numeric block index past the
     // configured depth is a depth mismatch either way.
-    expectOutOfRangeRejection(
+    expectVisionWeightsRejection(
         "model.visual.blocks.4.other.weight",
         "checkpoint key \"model.visual.blocks.4.other.weight\" names block 4, out of range [0, 2)"
             + " for the configured depth");
@@ -208,14 +205,97 @@ class Qwen3VlVisionTowerValidationTest {
   @Test
   void visionWeightsRejectsOutOfRangeDeepstackMergerKeys() {
     // DEEPSTACK has one entry, so every numeric merger index >= 1 is out of range.
-    expectOutOfRangeRejection(
+    expectVisionWeightsRejection(
         "model.visual.deepstack_merger_list.1.norm.weight",
         "checkpoint key \"model.visual.deepstack_merger_list.1.norm.weight\" names DeepStack"
             + " merger 1, out of range [0, 1) for the configured DeepStack count");
-    expectOutOfRangeRejection(
+    expectVisionWeightsRejection(
         "model.visual.deepstack_merger_list.5.linear_fc2.bias",
         "checkpoint key \"model.visual.deepstack_merger_list.5.linear_fc2.bias\" names DeepStack"
             + " merger 5, out of range [0, 1) for the configured DeepStack count");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "model.visual.blocks.0.mlp.linear_fc1.scales", // unknown MLP sub-key
+        "model.visual.blocks.0.mlp.linear_fc2.scales", // unknown MLP sub-key (second linear)
+        "model.visual.blocks.0.attn.qkv.scales", // unknown attention tail
+        "model.visual.blocks.0.attn.gate.weight", // unknown attention sub-key
+        "model.visual.blocks.0.norm3.weight", // unknown norm sub-key
+        "model.visual.blocks.1.", // block key without a sub-key
+        "model.visual.patch_embed.proj.gain", // unknown patch-embed sub-key
+        "model.visual.pos_embed.bias", // pos_embed maps weight only
+        "model.visual.foo.weight", // unknown top-level visual key
+        "model.visual.blocks.x.norm1.weight", // non-numeric block index
+        "model.visual.blocks.99999999999999999999.norm1.weight", // overflowing block index
+        "model.visual.merger.gain", // unknown merger tail
+        "model.visual.deepstack_merger_list.0.other.weight", // unknown DeepStack merger sub-key
+        "model.visual.deepstack_merger_list.x.norm.weight", // non-numeric merger index
+        "model.visual.deepstack_merger_list.99999999999999999999.norm.weight", // overflowing index
+      })
+  void visionWeightsRejectsUnrecognizedVisualKeys(String checkpointKey) {
+    expectVisionWeightsRejection(
+        checkpointKey, "unrecognized vision checkpoint key \"" + checkpointKey + "\"");
+  }
+
+  @Test
+  void visionWeightsAcceptsEveryInRangeKeyFamily() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
+      // One in-range key from every mapped family (DEPTH 2, one DeepStack) plus a non-visual key
+      // that stays skipped.
+      float[] conv = new float[24];
+      for (int i = 0; i < conv.length; i++) {
+        conv[i] = i + 1f;
+      }
+      checkpoint.put(
+          "model.visual.patch_embed.proj.weight",
+          MLX.array(scope, conv, new int[] {2, 3, 1, 2, 2}));
+      checkpoint.put("model.visual.pos_embed.weight", full(scope, GRID_SIDE * GRID_SIDE, HIDDEN));
+      checkpoint.put("model.visual.blocks.0.norm1.weight", full(scope, HIDDEN));
+      checkpoint.put("model.visual.blocks.1.norm2.bias", full(scope, HIDDEN));
+      checkpoint.put("model.visual.blocks.1.attn.qkv.weight", full(scope, 3 * HIDDEN, HIDDEN));
+      checkpoint.put("model.visual.blocks.1.attn.proj.bias", full(scope, HIDDEN));
+      checkpoint.put(
+          "model.visual.blocks.0.mlp.linear_fc1.weight", full(scope, INTERMEDIATE, HIDDEN));
+      checkpoint.put("model.visual.blocks.0.mlp.linear_fc2.bias", full(scope, HIDDEN));
+      checkpoint.put("model.visual.merger.norm.weight", full(scope, HIDDEN));
+      checkpoint.put("model.visual.merger.linear_fc1.bias", full(scope, MERGE_BLOCK));
+      checkpoint.put("model.visual.merger.linear_fc2.weight", full(scope, OUT_HIDDEN, MERGE_BLOCK));
+      checkpoint.put("model.visual.deepstack_merger_list.0.norm.bias", full(scope, MERGE_BLOCK));
+      checkpoint.put(
+          "model.visual.deepstack_merger_list.0.linear_fc1.weight",
+          full(scope, MERGE_BLOCK, MERGE_BLOCK));
+      checkpoint.put(
+          "model.visual.deepstack_merger_list.0.linear_fc2.bias", full(scope, OUT_HIDDEN));
+      checkpoint.put(
+          "model.language_model.embed_tokens.weight", full(scope, new int[] {4, HIDDEN}));
+
+      Map<String, MLXArray> weights =
+          Qwen3VlVisionTower.visionWeights(checkpoint, DEPTH, DEEPSTACK);
+
+      // Every in-range key of every family maps, in checkpoint order; the non-visual key is
+      // skipped.
+      assertArrayEquals(
+          new String[] {
+            "patchEmbedding.weight",
+            "positionEmbedding.weight",
+            "layer0.norm1.weight",
+            "layer1.norm2.bias",
+            "layer1.attention.qkv.weight",
+            "layer1.attention.proj.bias",
+            "layer0.mlp.0.weight",
+            "layer0.mlp.2.bias",
+            "merger.norm.weight",
+            "merger.linearFc1.bias",
+            "merger.linearFc2.weight",
+            "deepstackMerger0.norm.bias",
+            "deepstackMerger0.linearFc1.weight",
+            "deepstackMerger0.linearFc2.bias",
+          },
+          weights.keySet().toArray());
+    }
   }
 
   @Test
@@ -775,9 +855,9 @@ class Qwen3VlVisionTowerValidationTest {
 
   /**
    * Runs {@code visionWeights} with the class's DEPTH and DEEPSTACK against one in-range weight
-   * followed by the out-of-range {@code checkpointKey} and asserts the rejection message.
+   * followed by the {@code checkpointKey} and asserts the rejection message.
    */
-  private static void expectOutOfRangeRejection(String checkpointKey, String expectedMessage) {
+  private static void expectVisionWeightsRejection(String checkpointKey, String expectedMessage) {
     try (MLXScope scope = new MLXScope()) {
       Map<String, MLXArray> checkpoint = new LinkedHashMap<>();
       // The in-range key is accepted and processed first, then the out-of-range key rejects the

@@ -1939,8 +1939,14 @@ totalling 813,914,112 bytes (776.21 MiB) as stored; the float32 conversion doubl
 `model.visual.*` key scheme (WP1 probe inventory; §5 of this findings doc) — if the bare
 `Qwen3VLVisionModel.save_pretrained` omits the `model.visual.` prefix, the generator adds
 it back explicitly and documents the choice in the golden provenance. The tower's
-package-private `visionWeights` map renames the checkpoint keys to its own child-tree
-paths; the only structural rename is the conv weight transpose above.
+public `visionWeights` map renames the checkpoint keys to its own child-tree paths; the
+only structural rename is the conv weight transpose above. Every `model.visual.*` key
+that does not map to a known tower key is rejected rather than skipped (PR #58 review):
+a numeric block or DeepStack merger index past the configured depth or DeepStack count
+is named with the limit that excludes it, and any other unrecognised visual key — an
+unknown sub-key (the MLP branch maps only the `linear_fc1`/`linear_fc2` affine
+`weight`/`bias`), an unknown top-level visual key, a non-numeric or overflowing index —
+is named as unrecognised; only genuinely non-visual checkpoint keys are skipped.
 
 ### 11.3 Golden/checkpoint inventory (planned values)
 

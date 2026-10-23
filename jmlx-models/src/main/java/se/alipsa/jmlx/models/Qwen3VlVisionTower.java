@@ -954,10 +954,10 @@ public final class Qwen3VlVisionTower extends Module {
       }
       if (sub.startsWith("mlp.")) {
         String name = sub.substring("mlp.".length());
-        if (name.startsWith("linear_fc1.")) {
+        if (name.equals("linear_fc1.weight") || name.equals("linear_fc1.bias")) {
           return "layer" + index + ".mlp.0." + name.substring("linear_fc1.".length());
         }
-        if (name.startsWith("linear_fc2.")) {
+        if (name.equals("linear_fc2.weight") || name.equals("linear_fc2.bias")) {
           return "layer" + index + ".mlp.2." + name.substring("linear_fc2.".length());
         }
       }
@@ -983,14 +983,18 @@ public final class Qwen3VlVisionTower extends Module {
    * fresh map of tower keys to the checkpoint's arrays (the conv weight is the exception: it is
    * transposed {@code {0, 2, 3, 4, 1}} from PyTorch {@code [out, in, T, H, W]} to jmlx's
    * channels-last {@code [out, T, H, W, in]}, evaluated, with the original closed — the {@code
-   * SmolVlmModel} pattern). A key that names a block or DeepStack merger past the configured depth
-   * or DeepStack count is rejected outright rather than skipped, since dropping it would truncate
-   * the tower to the configured depth instead of surfacing the mismatch. Completeness against the
-   * tower's expected-key set is the constructor's job ({@code rejectUnexpected}), not this
-   * method's.
+   * SmolVlmModel} pattern). Every {@code model.visual.*} key that does not map to a known tower key
+   * is rejected outright rather than skipped: a block or DeepStack merger index past the configured
+   * depth or DeepStack count is rejected by name with the limit that excludes it (dropping it would
+   * truncate the tower to the configured depth instead of surfacing the mismatch), and any other
+   * unrecognised visual key — an unknown sub-key, an unknown top-level visual key, or a non-numeric
+   * or overflowing index — is rejected by name. Only genuinely non-visual checkpoint keys are
+   * skipped. Completeness against the tower's expected-key set is the constructor's job ({@code
+   * rejectUnexpected}), not this method's.
    *
-   * @throws IllegalArgumentException if two checkpoint keys map to the same tower key, or if a key
-   *     names a block or DeepStack merger index out of the configured range
+   * @throws IllegalArgumentException if two checkpoint keys map to the same tower key, if a key
+   *     names a block or DeepStack merger index out of the configured range, or if a {@code
+   *     model.visual.*} key is not recognised
    * @throws NullPointerException if an argument is {@code null}
    */
   public static Map<String, MLXArray> visionWeights(
@@ -1002,11 +1006,14 @@ public final class Qwen3VlVisionTower extends Module {
       String key = entry.getKey();
       String towerKey = visionKeyToTowerKey(key, depth, deepstackIndexes);
       if (towerKey == null) {
+        if (!key.startsWith(VISUAL_PREFIX)) {
+          continue;
+        }
         String outOfRange = outOfRangeVisionIndex(key, depth, deepstackIndexes);
         if (outOfRange != null) {
           throw new IllegalArgumentException(outOfRange);
         }
-        continue;
+        throw new IllegalArgumentException("unrecognized vision checkpoint key \"" + key + "\"");
       }
       if (weights.containsKey(towerKey)) {
         throw new IllegalArgumentException(
@@ -1035,8 +1042,9 @@ public final class Qwen3VlVisionTower extends Module {
    * well-formed visual key that {@link #visionKeyToTowerKey(String, int, int[])} rejected only
    * because of its index — the signature of a checkpoint deeper, or with more DeepStack mergers,
    * than the configuration, which must fail loudly instead of truncating the tower silently.
-   * Returns the rejection message, or {@code null} for non-visual keys and for non-numeric,
-   * overflowing or missing indices, which stay skipped like any unknown key.
+   * Returns the rejection message, or {@code null} for every other key — the non-visual keys {@code
+   * visionWeights} skips, and the non-numeric, overflowing or missing indices it rejects as
+   * unrecognised.
    */
   private static String outOfRangeVisionIndex(String key, int depth, int[] deepstackIndexes) {
     if (!key.startsWith(VISUAL_PREFIX)) {

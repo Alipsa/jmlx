@@ -36,8 +36,10 @@ import se.alipsa.jmlx.vision.Qwen3VlImageProcessorResult;
  * {@code Qwen3VLVisionBlock}, {@code Qwen3VLVisionAttention}, {@code Qwen3VLVisionMLP}, {@code
  * Qwen3VLVisionPatchMerger}, {@code Qwen3VLVisionPatchEmbed} and {@code
  * Qwen3VLVisionRotaryEmbedding}; the verbatim transcription is findings §11.1. The reference runs
- * in float32 (its default dtype), so every weight is converted to float32 by this constructor and
- * {@link #forward(MLXScope, List)} is bit-exact against the reference's op order on float32 inputs.
+ * in float32 (its default dtype), so every weight is converted to float32 by this constructor; on
+ * float32 inputs, {@link #forward(MLXScope, List)} matches the reference's op order within the
+ * golden test's 1e-4 tolerance (measured max diff 3.1e-6) — MLX's GPU kernels (matmul, SDPA) are
+ * not bit-identical to torch on the CPU.
  *
  * <p>The module child names mirror the HF checkpoint tree through the mapping of {@link
  * #visionKeyToTowerKey(String, int, int[])}: {@code patchEmbedding} is {@code patch_embed.proj}

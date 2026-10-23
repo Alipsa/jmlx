@@ -15,8 +15,9 @@ import se.alipsa.jmlx.nn.TwoAxisRotation;
  * {@code h = h + mlp(norm2(h))} — the second statement's {@code norm2} and residual both see the
  * block's <em>updated</em> residual (the attention output already added), not the block input. The
  * attention sublayer runs on the block's two-axis rotation for this image only (the tower feeds
- * each image's rows as a standalone sequence, which is bit-identical to the reference's
- * variable-length per-image attention chunks).
+ * each image's rows as a standalone sequence, so the rows and mask match the reference's
+ * variable-length per-image attention chunks exactly; any difference from the reference is kernel
+ * precision, not structure).
  *
  * <p>The submodules are supplied by the tower and registered here as the children {@code norm1},
  * {@code norm2}, {@code attention} and {@code mlp}, so the tower's dotted parameter paths mirror

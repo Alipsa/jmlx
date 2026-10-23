@@ -128,7 +128,7 @@ public final class TwoAxisRope {
     MLXArray emb = MLXShape.concatenate(new MLXArray[] {freqs, freqs}, 1);
     MLXArray cos = MLXShape.reshape(MLXOps.cos(emb), new int[] {sequence, 1, doubled});
     MLXArray sin = MLXShape.reshape(MLXOps.sin(emb), new int[] {sequence, 1, doubled});
-    return new TwoAxisRotation(cos, sin, rotaryDims);
+    return new TwoAxisRotation(cos, sin, rotaryDims, theta);
   }
 
   /**

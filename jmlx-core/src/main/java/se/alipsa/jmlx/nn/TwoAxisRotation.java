@@ -10,9 +10,10 @@ import se.alipsa.jmlx.core.MLXShape;
 /**
  * Per-image rotation state one {@link TwoAxisRope#prepare} produces and every vision block of that
  * image shares: the float32 {@code cos}/{@code sin} tables of shape {@code [sequence, 1, 2 *
- * rotaryDims]} (broadcastable over the heads axis) plus the per-row frequency width. Threading
- * exactly like {@link MultiAxisRotation}: computed once per image, handed to each rotary attention,
- * never cached between images.
+ * rotaryDims]} (broadcastable over the heads axis), the frequency base {@code theta} the tables
+ * were built with and the per-row frequency width. Threading exactly like {@link
+ * MultiAxisRotation}: computed once per image, handed to each rotary attention, never cached
+ * between images.
  *
  * <p>{@link #rotate} applies the frozen composition of transformers 4.57.6 {@code
  * apply_rotary_pos_emb_vision} (verbatim in req/plans/phase7-3b-reference-findings.md §11.1) with
@@ -30,11 +31,13 @@ public final class TwoAxisRotation {
   private final MLXArray cos;
   private final MLXArray sin;
   private final int rotaryDims;
+  private final float theta;
 
-  TwoAxisRotation(MLXArray cos, MLXArray sin, int rotaryDims) {
+  TwoAxisRotation(MLXArray cos, MLXArray sin, int rotaryDims, float theta) {
     this.cos = cos;
     this.sin = sin;
     this.rotaryDims = rotaryDims;
+    this.theta = theta;
   }
 
   /** Returns the float32 cosine table, {@code [sequence, 1, 2 * rotaryDims]}. */
@@ -54,8 +57,29 @@ public final class TwoAxisRotation {
     return rotaryDims;
   }
 
+  /** Returns the frequency base {@code theta} the tables were built with. */
+  public float theta() {
+    return theta;
+  }
+
   /**
-   * The rotation-shape preflight the attention seam runs before any array is written: the sequence
+   * The frequency-base match the attention seam checks before any array is written: the attention's
+   * {@code theta} must exactly equal the base the tables were prepared from (two ropes built from
+   * different bases produce different tables, so a rotated sequence would silently use the wrong
+   * frequencies). All validation is {@link IllegalArgumentException}; nothing is allocated. Then
+   * the same {@link #validate(int, int)} shape preflight runs for {@code sequence} and {@code
+   * headDim}.
+   */
+  public void validate(float expectedTheta, int sequence, int headDim) {
+    if (Float.compare(expectedTheta, theta) != 0) {
+      throw new IllegalArgumentException(
+          "theta must match the prepared rotation (" + expectedTheta + " against " + theta + ")");
+    }
+    validate(sequence, headDim);
+  }
+
+  /**
+   * The rotation-shape preflight {@link #rotate} runs before any array is written: the sequence
    * axis of the heads to be rotated must match the prepared rotation, and the head dimension must
    * be exactly {@code 2 * rotaryDims} (the reference's doubled table width -- unlike {@link
    * MultiAxisRotation#validate}, whose rotated prefix may be narrower than the head). All

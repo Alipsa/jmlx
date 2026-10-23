@@ -237,6 +237,55 @@ class TwoAxisRotaryAttentionTest {
   }
 
   @Test
+  void forwardRejectsRotationPreparedWithDifferentTheta() {
+    try (MLXScope scope = new MLXScope()) {
+      TwoAxisRotaryAttention attention =
+          new TwoAxisRotaryAttention(
+              scope,
+              HEADS,
+              HEAD_DIM,
+              10_000f,
+              MLX.zeros(scope, new int[] {3 * HIDDEN, HIDDEN}, DType.FLOAT32),
+              MLX.zeros(scope, new int[] {3 * HIDDEN}, DType.FLOAT32),
+              MLX.zeros(scope, new int[] {HIDDEN, HIDDEN}, DType.FLOAT32),
+              MLX.zeros(scope, new int[] {HIDDEN}, DType.FLOAT32));
+      MLXArray arrayInput =
+          MLX.array(scope, randomValues(new Random(15), N * HIDDEN), new int[] {N, HIDDEN});
+      // Same sequence and width, wrong base: the theta check must fire before any projection.
+      TwoAxisRotation wrongTheta =
+          new TwoAxisRope(50_000f, HEAD_DIM / 2).prepare(scope, N, row(N), row(N).clone());
+      IllegalArgumentException theta =
+          assertThrows(
+              IllegalArgumentException.class, () -> attention.forward(arrayInput, wrongTheta));
+      assertEquals(
+          "theta must match the prepared rotation (10000.0 against 50000.0)", theta.getMessage());
+    }
+  }
+
+  @Test
+  void forwardAcceptsRotationPreparedWithMatchingTheta() {
+    try (MLXScope scope = new MLXScope()) {
+      TwoAxisRotaryAttention attention =
+          new TwoAxisRotaryAttention(
+              scope,
+              HEADS,
+              HEAD_DIM,
+              1_024f,
+              MLX.zeros(scope, new int[] {3 * HIDDEN, HIDDEN}, DType.FLOAT32),
+              MLX.zeros(scope, new int[] {3 * HIDDEN}, DType.FLOAT32),
+              MLX.zeros(scope, new int[] {HIDDEN, HIDDEN}, DType.FLOAT32),
+              MLX.zeros(scope, new int[] {HIDDEN}, DType.FLOAT32));
+      MLXArray arrayInput =
+          MLX.array(scope, randomValues(new Random(16), N * HIDDEN), new int[] {N, HIDDEN});
+      // A base other than 10_000: matching theta in rope and attention is accepted for any base.
+      TwoAxisRotation rotation =
+          new TwoAxisRope(1_024f, HEAD_DIM / 2).prepare(scope, N, row(N), row(N).clone());
+      MLXArray out = attention.forward(arrayInput, rotation);
+      assertArrayEquals(new int[] {N, HIDDEN}, out.shape());
+    }
+  }
+
+  @Test
   void constructorRejectsInvalidGeometry() {
     try (MLXScope scope = new MLXScope()) {
       MLXArray qkv =

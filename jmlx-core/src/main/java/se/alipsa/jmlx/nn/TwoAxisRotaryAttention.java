@@ -18,8 +18,9 @@ import se.alipsa.jmlx.memory.MLXScope;
  * <p>The {@link TwoAxisRope} is deliberately NOT held here: it is stateless, and the rotation
  * arrives per-image from the caller through {@link #forward}, mirroring how {@link
  * MultiAxisRotation} is passed into the text-decoder attentions. The constructor's {@code theta} is
- * validated and exposed so a caller can build the matching {@link TwoAxisRope}, but the module
- * itself never derives a table.
+ * validated, exposed through {@link #theta()} and enforced in {@link #forward} against the
+ * rotation's own {@code theta} (a rotation prepared by a rope with a different base is rejected
+ * before any projection runs), but the module itself never derives a table.
  *
  * <p>jmlx runs one image at a time, so this module issues exactly one unmasked noncausal {@link
  * MLXFast#scaledDotProductAttention(MLXArray, MLXArray, MLXArray, float, boolean, MLXArray,
@@ -42,11 +43,12 @@ public final class TwoAxisRotaryAttention extends Module {
    * Registers the {@code qkv} and {@code proj} children. All validation is {@link
    * IllegalArgumentException} and runs before any child is registered: {@code heads} and {@code
    * headDim} are positive, {@code theta} is positive and finite (it must match the {@link
-   * TwoAxisRope} the caller prepares rotations with), and the weight/bias shapes are exactly {@code
-   * qkvWeight [3*hidden, hidden]}, {@code qkvBias [3*hidden]}, {@code projWeight [hidden, hidden]}
-   * and {@code projBias [hidden]} where {@code hidden = heads * headDim} (computed in {@code
-   * long}-safe exact math, so an overflowing geometry is an arithmetic failure, not a wrapped
-   * shape). The {@code scale} is the reference's {@code head_dim ** -0.5}, derived, not passed.
+   * TwoAxisRope} the caller prepares rotations with; {@link #forward} enforces that match against
+   * the rotation's own {@code theta}), and the weight/bias shapes are exactly {@code qkvWeight
+   * [3*hidden, hidden]}, {@code qkvBias [3*hidden]}, {@code projWeight [hidden, hidden]} and {@code
+   * projBias [hidden]} where {@code hidden = heads * headDim} (computed in {@code long}-safe exact
+   * math, so an overflowing geometry is an arithmetic failure, not a wrapped shape). The {@code
+   * scale} is the reference's {@code head_dim ** -0.5}, derived, not passed.
    */
   public TwoAxisRotaryAttention(
       MLXScope scope,
@@ -131,16 +133,17 @@ public final class TwoAxisRotaryAttention extends Module {
    * Runs one image's full attention. All validation is {@link IllegalArgumentException} and runs
    * before any graph node is built: {@code input} is non-null rank 2 {@code [N, hidden]} (the
    * image's patch rows, hidden = heads * headDim), {@code rotation} is non-null, and {@link
-   * TwoAxisRotation#validate} passes for the row count and head dimension (a rotation prepared for
-   * a different image size or a different rotary width is rejected before any projection runs).
-   * Then the frozen op sequence: {@code qkv.forward(input)} to {@code [N, 3*hidden]}; reshape to
-   * {@code [N, 3, heads, headDim]} and transpose {@code {1,0,2,3}} to {@code [3, N, heads,
-   * headDim]}; split into q, k, v on axis 0 (the split keeps the axis, so each part's size-1 axis 0
-   * is squeezed back to {@code [N, heads, headDim]}); {@code rotation.rotate} on q and k (v is
-   * unrotated, as in the reference); each of the three transposed to {@code [heads, N, headDim]}
-   * and reshaped to {@code [1, heads, N, headDim]}; one unmasked noncausal {@link
-   * MLXFast#scaledDotProductAttention} with the module's {@link #scale()}; the result reshaped back
-   * to {@code [N, hidden]} and passed through {@code proj}.
+   * TwoAxisRotation#validate(float, int, int)} passes for the module's {@code theta}, the row count
+   * and the head dimension (a rotation prepared with a different frequency base, for a different
+   * image size or a different rotary width, is rejected before any projection runs). Then the
+   * frozen op sequence: {@code qkv.forward(input)} to {@code [N, 3*hidden]}; reshape to {@code [N,
+   * 3, heads, headDim]} and transpose {@code {1,0,2,3}} to {@code [3, N, heads, headDim]}; split
+   * into q, k, v on axis 0 (the split keeps the axis, so each part's size-1 axis 0 is squeezed back
+   * to {@code [N, heads, headDim]}); {@code rotation.rotate} on q and k (v is unrotated, as in the
+   * reference); each of the three transposed to {@code [heads, N, headDim]} and reshaped to {@code
+   * [1, heads, N, headDim]}; one unmasked noncausal {@link MLXFast#scaledDotProductAttention} with
+   * the module's {@link #scale()}; the result reshaped back to {@code [N, hidden]} and passed
+   * through {@code proj}.
    */
   public MLXArray forward(MLXArray input, TwoAxisRotation rotation) {
     if (input == null) {
@@ -160,7 +163,7 @@ public final class TwoAxisRotaryAttention extends Module {
           "forward input must have hidden = heads * headDim = " + hidden + ", got " + shape[1]);
     }
     int n = shape[0];
-    rotation.validate(n, headDim);
+    rotation.validate(theta, n, headDim);
     MLXArray projected =
         MLXShape.transpose(
             MLXShape.reshape(qkv.forward(input), new int[] {n, 3, heads, headDim}),

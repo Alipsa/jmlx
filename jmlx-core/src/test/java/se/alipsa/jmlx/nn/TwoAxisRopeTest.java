@@ -282,6 +282,19 @@ class TwoAxisRopeTest {
     }
   }
 
+  @Test
+  void prepareCarriesTheRopeTheta() {
+    int[] axis = row(2);
+    try (MLXScope scope = new MLXScope()) {
+      TwoAxisRope rope = new TwoAxisRope(1_024f, 4);
+      TwoAxisRotation rotation = rope.prepare(scope, 2, axis, axis.clone());
+      assertEquals(1_024f, rotation.theta(), "the rotation must carry the rope's theta");
+      // A rotation from a different base carries that base, not the other rope's.
+      TwoAxisRotation other = new TwoAxisRope(10_000f, 4).prepare(scope, 2, axis, axis.clone());
+      assertEquals(10_000f, other.theta());
+    }
+  }
+
   private static void assertWithinOneUlp(float actual, float pinned, String fn, int p, int j) {
     double limit = Math.pow(2, -23) * Math.max(1.0, Math.abs(pinned));
     assertTrue(

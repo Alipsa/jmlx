@@ -26,34 +26,85 @@ final class SafetensorsHeaders {
   static Map<Path, Set<String>> tensorNames(List<Path> files) throws IOException {
     Map<Path, Set<String>> names = new LinkedHashMap<>();
     for (Path file : files) {
-      try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
-        ByteBuffer length = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-        readFully(channel, length, "invalid safetensors header in " + file);
-        length.flip();
-        long count = length.getLong();
-        if (count < 0 || count > MAX_HEADER_BYTES || count > channel.size() - Long.BYTES) {
-          throw new IllegalArgumentException("invalid safetensors header length in " + file);
-        }
-        ByteBuffer bytes = ByteBuffer.allocate((int) count);
-        readFully(channel, bytes, "truncated safetensors header in " + file);
-        JsonNode root;
-        try {
-          root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
-        } catch (JacksonException e) {
-          throw new IOException("invalid safetensors header JSON in " + file, e);
-        }
-        if (root == null || !root.isObject()) {
-          throw new IllegalArgumentException("invalid safetensors header JSON in " + file);
-        }
-        names.put(
-            file,
-            root.properties().stream()
-                .map(Map.Entry::getKey)
-                .filter(k -> !"__metadata__".equals(k))
-                .collect(java.util.stream.Collectors.toSet()));
-      }
+      names.put(
+          file,
+          header(file).properties().stream()
+              .map(Map.Entry::getKey)
+              .filter(k -> !"__metadata__".equals(k))
+              .collect(java.util.stream.Collectors.toSet()));
     }
     return names;
+  }
+
+  /**
+   * The merged {@code __metadata__} strings of every shard header, without loading tensor data or
+   * initializing the native runtime. Shards without a {@code __metadata__} block contribute
+   * nothing; a block that is not an object or that holds a non-string value is rejected by name and
+   * file; a key repeated across shards must agree in value, or the collision is rejected naming
+   * both files.
+   *
+   * @throws IOException if a header cannot be read or its JSON is malformed
+   * @throws IllegalArgumentException if a header, a {@code __metadata__} block or a value is
+   *     invalid, or a key's value disagrees across shards
+   */
+  static Map<String, String> metadata(List<Path> files) throws IOException {
+    Map<String, String> merged = new LinkedHashMap<>();
+    Map<String, Path> sources = new LinkedHashMap<>();
+    for (Path file : files) {
+      JsonNode block = header(file).get("__metadata__");
+      if (block == null || block.isNull()) {
+        continue;
+      }
+      if (!block.isObject()) {
+        throw new IllegalArgumentException("invalid __metadata__ block in " + file);
+      }
+      for (var entry : block.properties()) {
+        JsonNode value = entry.getValue();
+        if (!value.isString()) {
+          throw new IllegalArgumentException(
+              "__metadata__ key '" + entry.getKey() + "' in " + file + " must be a string");
+        }
+        Path source = sources.get(entry.getKey());
+        if (source == null) {
+          merged.put(entry.getKey(), value.asString());
+          sources.put(entry.getKey(), file);
+        } else if (!merged.get(entry.getKey()).equals(value.asString())) {
+          throw new IllegalArgumentException(
+              "__metadata__ key '"
+                  + entry.getKey()
+                  + "' differs between "
+                  + source
+                  + " and "
+                  + file);
+        }
+      }
+    }
+    return merged;
+  }
+
+  /** Reads and validates one shard's header JSON object. */
+  private static JsonNode header(Path file) throws IOException {
+    try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
+      ByteBuffer length = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+      readFully(channel, length, "invalid safetensors header in " + file);
+      length.flip();
+      long count = length.getLong();
+      if (count < 0 || count > MAX_HEADER_BYTES || count > channel.size() - Long.BYTES) {
+        throw new IllegalArgumentException("invalid safetensors header length in " + file);
+      }
+      ByteBuffer bytes = ByteBuffer.allocate((int) count);
+      readFully(channel, bytes, "truncated safetensors header in " + file);
+      JsonNode root;
+      try {
+        root = MAPPER.readTree(new String(bytes.array(), StandardCharsets.UTF_8));
+      } catch (JacksonException e) {
+        throw new IOException("invalid safetensors header JSON in " + file, e);
+      }
+      if (root == null || !root.isObject()) {
+        throw new IllegalArgumentException("invalid safetensors header JSON in " + file);
+      }
+      return root;
+    }
   }
 
   /** Validates serialized non-parameter BERT index buffers before any native loading. */

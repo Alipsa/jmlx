@@ -24,6 +24,19 @@ public final class TextGenerationModels {
     if ("idefics3".equals(root.path("model_type").asString())) {
       return SmolVlmModel.load(scope, directory, root);
     }
+    String modelType = root.path("model_type").asString();
+    if (modelType.startsWith("qwen3_vl")) {
+      // The composite loader owns its own strict config parse, so dispatch on the raw model_type
+      // before the generic decoder mapping: only the exact dense type loads, and a sibling type
+      // (qwen3_vl_moe or a future variant) is rejected by name rather than misrouted.
+      if (!"qwen3_vl".equals(modelType)) {
+        throw new IllegalArgumentException(
+            "model_type '"
+                + modelType
+                + "' is unsupported: only the dense qwen3_vl architecture loads");
+      }
+      return Qwen3VlModel.load(scope, directory, root);
+    }
     return loadDecoder(scope, directory, ArchitectureMappings.parse(root));
   }
 

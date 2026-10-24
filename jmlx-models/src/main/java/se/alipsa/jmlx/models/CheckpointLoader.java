@@ -55,6 +55,17 @@ final class CheckpointLoader {
     return tensors;
   }
 
+  /**
+   * The shard files {@code load} would read, discovered without reading any header and without
+   * native work: the index's shard set when {@code model.safetensors.index.json} is present,
+   * otherwise the sorted regular {@code *.safetensors} files (with the consolidated-file
+   * exclusion). Provenance selection runs on this list before the first tensor is loaded.
+   */
+  static List<Path> shards(Path directory) throws IOException {
+    Objects.requireNonNull(directory, "directory");
+    return List.copyOf(checkpointFiles(directory).shards());
+  }
+
   static Preflight preflight(Path directory, TensorPlan plan) throws IOException {
     Objects.requireNonNull(directory, "directory");
     Objects.requireNonNull(plan, "plan");

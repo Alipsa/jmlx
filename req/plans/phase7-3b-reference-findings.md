@@ -2270,10 +2270,17 @@ The seam one-off benchmark (plan §7's 2026-10-21 PR #57 review addition) ran th
 `seam-comparison` mode of `:jmlx-examples:benchmarkDecode`, comparing the seam's explicit
 `[1,1,1,L]` masked path against the old implicit-causal path on the same bit-identical text
 weights (the derived plain-qwen3 baseline, verified bit-exact in Java before timing), and is
-recorded with the complete reproducibility tuple in `req/phase6-4-benchmark.md`: the
-ratio of sustained medians 1.3608 (seam slower) on the 2-layer hidden-256 fixture.
-The former p10/p90 quotients compare marginal quantiles and are not a paired-ratio band;
-the historical JSON lacks raw timings, so it cannot support a noise-level conclusion. It is a one-off
-local measurement, not a CI gate, and implies no threshold; the correctness of the masked path
-rests on the suites above, not on the ratio.
+recorded with the complete reproducibility tuple in `req/phase6-4-benchmark.md`.
+The replacement run is clean commit `c8150b8`, 31 pairs after five warmups: median
+seam/old ratio 1.1621 (about 16% slower), p10/p90 0.9572/1.2016, with raw iteration
+nanos committed under `req/benchmarks/`. The spread describes these fixture pairs;
+it is not a confidence interval and supports no noise-level or production-performance
+claim. The earlier dirty-tree run and its marginal-quantile error remain documented
+as historical context. This is not a CI gate and implies no threshold.
 
+The review follow-up also adds `qwen3vl-wide-attention.json`: CPU float32 Transformers
+4.57.6 eager logits over the pinned model checkpoint with eight query heads (hidden
+256, attention width 512), asymmetric BF16-exact q_proj/o_proj weights, and text/image
+prefill plus full-history decode references. `Qwen3VlModelFloatGoldenTest` compares
+prefill and KV-cached decode at the unchanged 1e-4 tolerance; both cases pass. Generator
+and golden digests are enforced by `verifyHfReferenceGoldens`.

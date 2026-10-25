@@ -733,8 +733,11 @@ against the identical dequantized weights) plus the full-float32 `Qwen3VlModelFl
 the same angle table) — all four required by the macOS CI assertion. The plan §7 one-off
 `benchmarkDecode seam-comparison` (the seam's explicit-mask path versus the old implicit-causal
 path on bit-identical text weights) is recorded with the full reproducibility tuple in
-`req/phase6-4-benchmark.md`: historical ratio of sustained medians 1.3608 on the tiny fixture
-(seam slower). Its marginal-quantile quotients are not a paired-ratio band; raw timings were
-not retained, so no noise-level conclusion follows. New runs retain paired samples. This is
-a one-off, not a CI gate. No native pins or generated bindings
+`req/phase6-4-benchmark.md`: clean commit `c8150b8`, 31 paired samples after 5 warmups,
+median seam/old ratio 1.1621 (about 16% slower), p10/p90 0.9572/1.2016. Raw per-iteration
+nanos are committed under `req/benchmarks/`; the spread is descriptive, not a confidence
+interval or evidence of noise-level cost. This is a one-off fixture run, not a CI gate.
+The wide-attention path also has strict HF float32 logits coverage (hidden 256, attention
+width 512; asymmetric BF16-exact projections, text/image prefill and cached decode).
+No native pins or generated bindings
 changed.

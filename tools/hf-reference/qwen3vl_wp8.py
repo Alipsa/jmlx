@@ -283,6 +283,8 @@ def rounded(value):
 
 def py(obj):
     """Make numpy/torch values JSON-serializable (probe convention)."""
+    if obj is None:
+        return None
     if isinstance(obj, dict):
         return {k: py(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):

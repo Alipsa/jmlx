@@ -99,7 +99,7 @@
     "checkpoints/qwen3vl-model/images/a.png": "41cceca5a3d37363be739dd0b3d13c01eddf11cfdc310cca08f4fc439f14beef",
     "checkpoints/qwen3vl-model/images/b.png": "afa14e56e539b93bb7f1ff2595ea627af6fbee63f0349f64634fa030226c7b8e",
     "qwen3vl-wide-attention.json": "3dec41ce9308b5730c40ca32b4efb409ad133785ea06d553a3a132c9e1c33d04",
-    "qwen3vl-wp8.json": "bc52823e300291c1f7b56452f1f0e41e9cfa69092db4597353b61640b5bfb4bb",
+    "qwen3vl-wp8.json": "f37c05238d097339e3a64d5554a1c9d7f123ac178af005326c14b52336a474f0",
     "checkpoints/qwen3vl-wp8/config.json": "a521b78a85b73eab8322d61f5b90bff7a8cef5c03041bd7fe2f1bea78290a1d5",
     "checkpoints/qwen3vl-wp8/model.safetensors": "c53bc4afc88c808e2abe1d9f1f6aee0b496982b44ee42206e8e81f740334f5ee",
     "checkpoints/qwen3vl-wp8/preprocessor_config.json": "ad57fd445e3ffa746befc3c631b585d31b989554f9e7bb4725c934ccaac0bab7",
@@ -159,5 +159,5 @@
   },
   "qwen3vl_model_generator_sha256": "1677b82de22e2b7ab88da28d848a8635d26ec94e7b4fb4f6730738f0635ca409",
   "qwen3vl_wide_attention_generator_sha256": "3ffed6141f2180ea5fb70d4e78a32234550f08042e1564ffa13b704382216a64",
-  "qwen3vl_wp8_generator_sha256": "0f904cfcc3e1e330241f863687c43bf103e3ad61b93b3d98bfce4207dfb8f299"
+  "qwen3vl_wp8_generator_sha256": "28851e9166456d4b8d6326f18f3a2f2f18d40613b6d9946f350d331d64e2ccab"
 }

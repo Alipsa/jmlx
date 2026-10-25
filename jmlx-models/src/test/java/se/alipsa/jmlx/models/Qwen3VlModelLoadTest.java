@@ -22,6 +22,8 @@ import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXIO;
+import se.alipsa.jmlx.core.MLXQuant;
+import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.vision.RgbImage;
@@ -30,8 +32,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Native load, dispatch and request contracts for the composite Qwen3-VL model on the tiny HF float
- * checkpoint: metadata and FLOAT32 up-cast, rejection paths that fire before pixels or native work,
- * and deterministic greedy generation with and without one image.
+ * checkpoint and the MLX affine-quantized conversion of it: metadata and the dtype up-cast,
+ * rejection paths that fire before pixels or native work, and deterministic greedy generation with
+ * and without one image.
  */
 @EnabledIfNativeAvailable
 class Qwen3VlModelLoadTest {
@@ -279,12 +282,40 @@ class Qwen3VlModelLoadTest {
   }
 
   @Test
-  void mlxAffineCheckpointIsRejectedEndToEnd(@TempDir Path dir) throws Exception {
+  void mlxAffineCheckpointLoadsEndToEnd(@TempDir Path dir) throws Exception {
     Path checkpoint = tinyCheckpoint(dir, 12L);
     Path mlx = copyDirectory(checkpoint, dir.resolve("mlx"));
+    int group = 32;
     try (MLXScope root = new MLXScope()) {
-      Map<String, MLXArray> tensors =
+      Map<String, MLXArray> loaded =
           MLXIO.loadSafetensors(root, checkpoint.resolve("model.safetensors").toString()).tensors();
+      Map<String, MLXArray> tensors = new LinkedHashMap<>();
+      for (var entry : loaded.entrySet()) {
+        String key = entry.getKey();
+        if (key.startsWith("model.language_model.")) {
+          key = "language_model.model." + key.substring("model.language_model.".length());
+        } else if (key.startsWith("model.visual.")) {
+          key = "vision_tower." + key.substring("model.visual.".length());
+        }
+        tensors.put(key, entry.getValue());
+      }
+      // The converted artifact's conv arrives channels-last, not PyTorch OIHW.
+      tensors.put(
+          "vision_tower.patch_embed.proj.weight",
+          MLXShape.transpose(
+              tensors.remove("vision_tower.patch_embed.proj.weight"), new int[] {0, 2, 3, 4, 1}));
+      // The 4-bit affine packing of every projection; the embedding table keeps float storage,
+      // so the mixed float/packed layout loads through the same plan.
+      for (String key : new ArrayList<>(tensors.keySet())) {
+        if (!key.startsWith("language_model.") || !key.endsWith("_proj.weight")) {
+          continue;
+        }
+        String stem = key.substring(0, key.length() - ".weight".length());
+        MLXArray[] packed = MLXQuant.quantize(tensors.remove(key), group, 4, "affine", null);
+        tensors.put(stem + ".weight", packed[0]);
+        tensors.put(stem + ".scales", packed[1]);
+        tensors.put(stem + ".biases", packed[2]);
+      }
       MLXIO.saveSafetensors(
           mlx.resolve("model.safetensors").toString(), tensors, Map.of("format", "mlx"));
       rewriteJson(
@@ -293,10 +324,26 @@ class Qwen3VlModelLoadTest {
           config -> {
             ObjectNode quant = config.putObject("quantization");
             quant.put("bits", 4);
-            quant.put("group_size", 128);
+            quant.put("group_size", group);
             quant.put("mode", "affine");
           });
-      assertLoadRejected(root, mlx, "not supported in this work unit");
+      Qwen3VlModel model = Qwen3VlModel.load(root, mlx);
+      ArchitectureDescriptor.Quantization quantization =
+          model.descriptorForTest().text().quantization();
+      assertEquals(group, quantization.groupSize());
+      assertEquals(4, quantization.bits());
+      // The packed projections ride the packed decoder path as U32; the float embedding and the
+      // all-float vision tower load up-cast to FLOAT32.
+      assertTrue(
+          model.decoderForTest().parameters().values().stream()
+              .anyMatch(a -> a.dtype() == DType.UINT32));
+      assertTrue(
+          model.towerForTest().parameters().values().stream()
+              .allMatch(a -> a.dtype() == DType.FLOAT32));
+      GenerationResult result = model.generate(textRequest(new int[] {1, 2, 3}, 2), ignored -> {});
+      assertEquals(2, result.generatedTokenIds().size());
+      assertEquals(FinishReason.MAX_TOKENS, result.finishReason());
+      assertEquals(Arrays.stream(new int[] {1, 2, 3}).boxed().toList(), result.promptTokenIds());
     }
   }
 

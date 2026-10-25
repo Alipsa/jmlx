@@ -378,4 +378,206 @@ class Qwen3VlDescriptorTest {
     vision(c).put("patch_size", -16);
     assertRejected(c, "patch_size must be a positive integer");
   }
+
+  /**
+   * The real transformers artifact's inert generation/beam-search defaults plus null model fields,
+   * at one level (each level carries the same common set plus a few level-specific additions).
+   */
+  private static void addCommonInert(ObjectNode node) {
+    for (String key :
+        new String[] {
+          "add_cross_attention",
+          "do_sample",
+          "early_stopping",
+          "is_decoder",
+          "is_encoder_decoder",
+          "output_attentions",
+          "output_hidden_states",
+          "output_scores",
+          "remove_invalid_values",
+          "return_dict",
+          "return_dict_in_generate",
+          "tf_legacy_loss",
+          "tie_encoder_decoder",
+          "torchscript",
+          "use_bfloat16"
+        }) {
+      node.put(key, false);
+    }
+    for (String key :
+        new String[] {
+          "chunk_size_feed_forward",
+          "encoder_no_repeat_ngram_size",
+          "max_length",
+          "min_length",
+          "no_repeat_ngram_size",
+          "num_beam_groups",
+          "num_beams",
+          "num_return_sequences",
+          "top_k"
+        }) {
+      node.put(key, 0);
+    }
+    for (String key :
+        new String[] {
+          "diversity_penalty",
+          "length_penalty",
+          "repetition_penalty",
+          "temperature",
+          "top_p",
+          "typical_p"
+        }) {
+      node.put(key, 0.0);
+    }
+    node.putObject("id2label");
+    node.putObject("label2id");
+    node.putObject("pruned_heads");
+    for (String key :
+        new String[] {
+          "bad_words_ids",
+          "begin_suppress_tokens",
+          "cross_attention_hidden_size",
+          "decoder_start_token_id",
+          "exponential_decay_length_penalty",
+          "finetuning_task",
+          "forced_bos_token_id",
+          "forced_eos_token_id",
+          "pad_token_id",
+          "prefix",
+          "problem_type",
+          "sep_token_id",
+          "suppress_tokens",
+          "task_specific_params",
+          "tokenizer_class"
+        }) {
+      node.putNull(key);
+    }
+  }
+
+  @Test
+  void inertKeysAreStrippedAtEveryLevel() {
+    ObjectNode c = pinnedConfig();
+    addCommonInert(c);
+    addCommonInert(text(c));
+    addCommonInert(vision(c));
+    c.putNull("dtype");
+    c.putNull("bos_token_id");
+    c.putNull("eos_token_id");
+    ObjectNode quant = c.putObject("quantization");
+    quant.put("bits", 4);
+    quant.put("group_size", 64);
+    quant.put("mode", "affine");
+    text(c).put("_name_or_path", "/tmp/artifact");
+    text(c).putNull("architectures");
+    vision(c).put("_name_or_path", "/tmp/artifact");
+    vision(c).put("tie_word_embeddings", false);
+    vision(c).putNull("architectures");
+    vision(c).putNull("dtype");
+    vision(c).putNull("bos_token_id");
+    vision(c).putNull("eos_token_id");
+    // The full inert inventory parses to exactly the pinned config's descriptor.
+    Qwen3VlDescriptor d = Qwen3VlDescriptor.parse(c);
+    assertEquals(parse().text().dimensions(), d.text().dimensions());
+    assertEquals(parse().text().headDim(), d.text().headDim());
+    assertEquals(parse().tokens(), d.tokens());
+    assertEquals(parse().contextLength(), d.contextLength());
+    assertEquals(parse().depth(), d.depth());
+    assertEquals(parse().visionHidden(), d.visionHidden());
+    assertArrayEquals(parse().deepstackIndexes(), d.deepstackIndexes());
+    assertEquals(null, d.text().quantization());
+  }
+
+  @Test
+  void inertKeysOfTheWrongTypeAreRejectedByName() {
+    ObjectNode c = pinnedConfig();
+    c.put("do_sample", 1);
+    assertRejected(c, "inert key 'do_sample' must be a boolean");
+
+    c = pinnedConfig();
+    c.put("num_beams", 0.5);
+    assertRejected(c, "inert key 'num_beams' must be an integer");
+
+    c = pinnedConfig();
+    c.put("temperature", "warm");
+    assertRejected(c, "inert key 'temperature' must be a number");
+
+    c = pinnedConfig();
+    c.putNull("id2label");
+    assertRejected(c, "inert key 'id2label' must be an object");
+
+    c = pinnedConfig();
+    c.put("pad_token_id", 5);
+    assertRejected(c, "inert key 'pad_token_id' must be null");
+
+    c = pinnedConfig();
+    c.put("dtype", true);
+    assertRejected(c, "inert key 'dtype' must be null");
+
+    c = pinnedConfig();
+    c.put("quantization", "affine");
+    assertRejected(c, "inert key 'quantization' must be an object");
+
+    c = pinnedConfig();
+    text(c).put("_name_or_path", 4);
+    assertRejected(c, "inert key '_name_or_path' must be a string");
+
+    c = pinnedConfig();
+    text(c).put("architectures", "Qwen3VLForConditionalGeneration");
+    assertRejected(c, "inert key 'architectures' must be null");
+
+    c = pinnedConfig();
+    vision(c).put("tie_word_embeddings", "true");
+    assertRejected(c, "inert key 'tie_word_embeddings' must be a boolean");
+  }
+
+  @Test
+  void parseAffineCarriesThePackedQuantizationOnTheTextDescriptor() {
+    Qwen3VlDescriptor d = Qwen3VlDescriptor.parseAffine(pinnedConfig(), 64, 4);
+    assertEquals(new ArchitectureDescriptor.Quantization(64, 4), d.text().quantization());
+    // The re-wrap touches only the text quantization; every other component is untouched.
+    assertEquals(parse().text().dimensions(), d.text().dimensions());
+    assertEquals(parse().tokens(), d.tokens());
+    assertEquals(parse().videoTokenId(), d.videoTokenId());
+    assertEquals(parse().contextLength(), d.contextLength());
+    assertEquals(parse().depth(), d.depth());
+    assertEquals(parse().visionHidden(), d.visionHidden());
+  }
+
+  @Test
+  void affineTensorPlanRewritesEveryTextNameUnderLanguageModel() {
+    TensorPlan plan = parse().affineTensorPlan(64, 4);
+    // Every text name gains the pure language_model. prefix (the inner model. is retained).
+    assertTrue(plan.required().contains("language_model.model.embed_tokens.weight"));
+    assertTrue(plan.required().contains("language_model.model.norm.weight"));
+    assertTrue(plan.required().contains("language_model.model.layers.0.self_attn.q_norm.weight"));
+    assertTrue(plan.required().contains("language_model.model.layers.27.mlp.down_proj.weight"));
+    // The packed projections and the embedding travel with their optional sidecars.
+    assertTrue(plan.optional().contains("language_model.model.layers.0.self_attn.q_proj.scales"));
+    assertTrue(plan.optional().contains("language_model.model.layers.0.self_attn.q_proj.biases"));
+    assertTrue(plan.optional().contains("language_model.model.embed_tokens.scales"));
+    assertTrue(plan.optional().contains("language_model.model.embed_tokens.biases"));
+    // The tied lm_head and its sidecars are optional; the norm sidecars are never companions.
+    assertTrue(plan.optional().contains("language_model.lm_head.weight"));
+    assertTrue(plan.optional().contains("language_model.lm_head.scales"));
+    assertTrue(plan.optional().contains("language_model.lm_head.biases"));
+    assertFalse(plan.optional().contains("language_model.model.layers.0.self_attn.q_norm.scales"));
+    // The bare and the HF-prefixed names are not expected under the affine plan.
+    assertFalse(plan.required().contains("model.embed_tokens.weight"));
+    assertFalse(plan.required().contains("model.language_model.embed_tokens.weight"));
+    // The vision tower is all-float: the exact vision_tower.* required set, no sidecars.
+    assertTrue(plan.required().contains("vision_tower.patch_embed.proj.weight"));
+    assertTrue(plan.required().contains("vision_tower.blocks.0.attn.qkv.weight"));
+    assertTrue(plan.required().contains("vision_tower.deepstack_merger_list.2.linear_fc2.bias"));
+    long visualRequired =
+        plan.required().stream().filter(k -> k.startsWith("vision_tower.")).count();
+    assertEquals(3 + 24L * 12 + 4L * 6, visualRequired);
+    assertTrue(
+        plan.ignored().stream()
+            .anyMatch(p -> p.matcher("language_model.model.rotary_emb.inv_freq").matches()));
+    // The required set plus the packed embedding's sidecars validates.
+    java.util.Set<String> available = new java.util.HashSet<>(plan.required());
+    available.add("language_model.model.embed_tokens.scales");
+    available.add("language_model.model.embed_tokens.biases");
+    assertDoesNotThrow(() -> plan.validate(available));
+  }
 }

@@ -127,43 +127,45 @@ class Qwen3VlTensorPlanTest {
   @Test
   void hfFloatIsSelectedWithoutMetadataOrQuantization(@TempDir Path dir) throws Exception {
     writeShard(dir.resolve("model.safetensors"), "{}");
-    assertEquals(Qwen3VlProvenance.Kind.HF_FLOAT, Qwen3VlProvenance.resolve(dir, config()));
+    assertEquals(
+        new Qwen3VlProvenance.Resolved(Qwen3VlProvenance.Kind.HF_FLOAT, null, null),
+        Qwen3VlProvenance.resolve(dir, config()));
     // A shard without a metadata block contributes nothing; agreement across shards still resolves.
     writeShard(dir.resolve("part-00001.safetensors"), "{}");
-    assertEquals(Qwen3VlProvenance.Kind.HF_FLOAT, Qwen3VlProvenance.resolve(dir, config()));
+    assertEquals(
+        new Qwen3VlProvenance.Resolved(Qwen3VlProvenance.Kind.HF_FLOAT, null, null),
+        Qwen3VlProvenance.resolve(dir, config()));
   }
 
   @Test
-  void mlxAffineIsRecognizedAndRejected(@TempDir Path dir) throws Exception {
+  void mlxAffineIsRecognized(@TempDir Path dir) throws Exception {
     writeShard(dir.resolve("model.safetensors"), "{\"__metadata__\": {\"format\": \"mlx\"}}");
     ObjectNode config = config();
     quant(config, "quantization");
-    assertMlxRejected(dir, config);
+    assertMlxResolved(dir, config);
   }
 
   @Test
-  void mlxAffineUnderTheConfigAliasIsRecognizedAndRejected(@TempDir Path dir) throws Exception {
+  void mlxAffineUnderTheConfigAliasIsRecognized(@TempDir Path dir) throws Exception {
     writeShard(dir.resolve("model.safetensors"), "{\"__metadata__\": {\"format\": \"mlx\"}}");
     ObjectNode config = config();
     quant(config, "quantization_config");
-    assertMlxRejected(dir, config);
+    assertMlxResolved(dir, config);
   }
 
   @Test
-  void mlxAffineDeclaredUnderBothEqualKeysIsRejected(@TempDir Path dir) throws Exception {
+  void mlxAffineDeclaredUnderBothEqualKeysIsRecognized(@TempDir Path dir) throws Exception {
     writeShard(dir.resolve("model.safetensors"), "{\"__metadata__\": {\"format\": \"mlx\"}}");
     ObjectNode config = config();
     quant(config, "quantization");
     config.set("quantization_config", config.get("quantization").deepCopy());
-    assertMlxRejected(dir, config);
+    assertMlxResolved(dir, config);
   }
 
-  private static void assertMlxRejected(Path dir, ObjectNode config) {
-    IllegalArgumentException failure =
-        assertThrows(IllegalArgumentException.class, () -> Qwen3VlProvenance.resolve(dir, config));
-    assertTrue(
-        failure.getMessage().contains("not supported in this work unit"),
-        () -> "got " + failure.getMessage());
+  private static void assertMlxResolved(Path dir, ObjectNode config) throws IOException {
+    assertEquals(
+        new Qwen3VlProvenance.Resolved(Qwen3VlProvenance.Kind.MLX_AFFINE, 128, 4),
+        Qwen3VlProvenance.resolve(dir, config));
   }
 
   @Test
@@ -238,11 +240,11 @@ class Qwen3VlTensorPlanTest {
     assertTrue(failure.getMessage().contains(dir.resolve("a.safetensors").toString()));
     assertTrue(failure.getMessage().contains(dir.resolve("b.safetensors").toString()));
 
-    // Identical values across shards merge and resolve (to the MLX rejection).
+    // Identical values across shards merge and resolve (to the MLX affine layout).
     writeShard(dir.resolve("b.safetensors"), "{\"__metadata__\": {\"format\": \"mlx\"}}");
     ObjectNode config = config();
     quant(config, "quantization");
-    assertMlxRejected(dir, config);
+    assertMlxResolved(dir, config);
   }
 
   @Test
@@ -251,7 +253,7 @@ class Qwen3VlTensorPlanTest {
     writeShard(dir.resolve("b.safetensors"), "{\"__metadata__\": {\"other\": \"x\"}}");
     ObjectNode config = config();
     quant(config, "quantization");
-    assertMlxRejected(dir, config);
+    assertMlxResolved(dir, config);
   }
 
   private static void assertRejectedContains(Path dir, ObjectNode config, String expected) {

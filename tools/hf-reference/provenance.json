@@ -90,7 +90,14 @@
     "checkpoints/qwen3vl-vision/images/square.png": "c2613b301b2c613e7d2b20e6c0dba007290ca52546b5dd80b2a81a1bee40f265",
     "checkpoints/qwen3vl-vision/images/wide.png": "002ff61c5d24038c5a9255b827e79679287f5221381da99e3dc2460a12a1f910",
     "checkpoints/qwen3vl-vision/images/tall.png": "6962e08d87703791d4c7e8cc59e2636a50e852718f65e53720e02d7e873e083f",
-    "checkpoints/qwen3vl-vision/images/narrow.png": "8d5f484b21535d2a54c70955d7c067b937aab02914f95f41cd3c668ff9fd026e"
+    "checkpoints/qwen3vl-vision/images/narrow.png": "8d5f484b21535d2a54c70955d7c067b937aab02914f95f41cd3c668ff9fd026e",
+    "qwen3vl-model-wp6.json": "1b81d91d61abbaab41d75120939d5cfe0d60e060890190c3165ea32641db06b6",
+    "checkpoints/qwen3vl-model/config.json": "826dc0bc687fef2ca6ba375a78fa916bc62932024e189f7f1c9454ff946b301b",
+    "checkpoints/qwen3vl-model/model.safetensors": "d8d0b9229d961c8550134647439b5bd79a342fd2a59d8e2187e04e5f896a3f38",
+    "checkpoints/qwen3vl-model/preprocessor_config.json": "ad57fd445e3ffa746befc3c631b585d31b989554f9e7bb4725c934ccaac0bab7",
+    "checkpoints/qwen3vl-model/tokenizer.json": "43434cb4048b6b40dacd4e25a4e65cad7c51f54e64a137323b377ddc8164024d",
+    "checkpoints/qwen3vl-model/images/a.png": "41cceca5a3d37363be739dd0b3d13c01eddf11cfdc310cca08f4fc439f14beef",
+    "checkpoints/qwen3vl-model/images/b.png": "afa14e56e539b93bb7f1ff2595ea627af6fbee63f0349f64634fa030226c7b8e"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",

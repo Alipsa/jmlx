@@ -18,8 +18,11 @@ import tools.jackson.databind.JsonNode;
  * they must be JSON-equal). Every other combination is rejected by name, so a checkpoint can never
  * silently select the wrong tensor plan.
  *
- * <p>This work unit implements the HF float plan only: an MLX-affine checkpoint is recognized and
- * rejected with a clear "not supported in this work unit" error rather than loaded.
+ * <p>Both plans load: an MLX-affine checkpoint is recognized (the shard metadata plus a conforming
+ * config quantization block) and its group size and bit width are returned on the {@link Resolved}
+ * result so the loader can select the packed tensor plan; an HF float checkpoint resolves to {@link
+ * Kind#HF_FLOAT} with no group or bits. Every other combination is rejected by name, so a
+ * checkpoint can never silently select the wrong tensor plan.
  */
 final class Qwen3VlProvenance {
 
@@ -38,12 +41,13 @@ final class Qwen3VlProvenance {
    * @param configTree the already-read {@code config.json} tree (the quantization declarations are
    *     read from it; the strict config parse must not see the quantization keys, which sit outside
    *     the pinned ten-key outer set)
-   * @return {@link Kind#HF_FLOAT} for the layout this unit loads
-   * @throws IllegalArgumentException for an MLX-affine checkpoint (recognized, unsupported in this
-   *     work unit) or for any other format/quantization combination, naming the exact mismatch
+   * @return the recognized layout: {@link Kind#HF_FLOAT} with null group and bits, or {@link
+   *     Kind#MLX_AFFINE} with the config's group size and bit width
+   * @throws IllegalArgumentException for any other format/quantization combination, naming the
+   *     exact mismatch
    * @throws IOException if a shard header cannot be read
    */
-  static Kind resolve(Path directory, JsonNode configTree) throws IOException {
+  static Resolved resolve(Path directory, JsonNode configTree) throws IOException {
     Objects.requireNonNull(directory, "directory");
     Objects.requireNonNull(configTree, "configTree");
     Map<String, String> metadata = SafetensorsHeaders.metadata(CheckpointLoader.shards(directory));
@@ -51,7 +55,7 @@ final class Qwen3VlProvenance {
     Declaration quantization = quantization(configTree);
     if (format == null) {
       if (quantization == null) {
-        return Kind.HF_FLOAT;
+        return new Resolved(Kind.HF_FLOAT, null, null);
       }
       throw new IllegalArgumentException(
           "config.json declares a quantization block but the checkpoint shards carry no format"
@@ -67,11 +71,19 @@ final class Qwen3VlProvenance {
               + " {bits: 4, group_size: positive integer, mode: \"affine\"}, but none is declared");
     }
     requireAffine(quantization.key(), quantization.block());
-    throw new IllegalArgumentException(
-        "MLX affine quantized Qwen3-VL checkpoints (format=mlx, quantization "
-            + quantization.block()
-            + ") are not supported in this work unit; load an HF float checkpoint");
+    return new Resolved(
+        Kind.MLX_AFFINE,
+        quantization.block().get("group_size").intValue(),
+        quantization.block().get("bits").intValue());
   }
+
+  /**
+   * The resolved checkpoint layout: the recognized {@link Kind} plus, for {@link Kind#MLX_AFFINE}
+   * only, the config's quantization {@code group_size} and {@code bits} (both non-null and already
+   * validated by {@link #resolve}). For {@link Kind#HF_FLOAT} the group size and bits are null,
+   * since the float layout declares no quantization.
+   */
+  record Resolved(Kind kind, Integer groupSize, Integer bits) {}
 
   /**
    * The config's quantization declaration, if any: {@code quantization} wins when present, else

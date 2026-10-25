@@ -29,18 +29,21 @@ import se.alipsa.jmlx.vision.RgbImage;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Local float-checkpoint Qwen3-VL image-and-text generation. Weights and computation use FLOAT32,
- * including up-casts from the FP16/BF16 storage the pinned artifacts use (a BF16 checkpoint
- * therefore occupies roughly twice its source weight memory after loading). Images are processed
- * once during prefill and run through the vision tower there; each DeepStack level is injected
- * after its configured text block in the same prefill, and the cached decode retains only the
- * self-attention KV plus the per-step multi-axis rotation derived from the request's expansion
- * plan.
+ * Local Qwen3-VL image-and-text generation. The HF float layout loads every weight up-cast to
+ * FLOAT32 (a BF16 checkpoint therefore occupies roughly twice its source weight memory after
+ * loading); the MLX affine-quantized layout loads the packed U32 text projections straight into the
+ * packed decoder path, keeping their BF16/FP16 {@code .scales}/{@code .biases} sidecars up-cast to
+ * FLOAT32, up-casts every other text weight (embedding, norm) to FLOAT32, and up-casts the
+ * all-float vision tower to FLOAT32 (its conv weight already arrives channels-last and is never
+ * transposed). Images are processed once during prefill and run through the vision tower there;
+ * each DeepStack level is injected after its configured text block in the same prefill, and the
+ * cached decode retains only the self-attention KV plus the per-step multi-axis rotation derived
+ * from the request's expansion plan.
  *
  * <p>Checkpoint provenance is selected from the shard headers' {@code __metadata__} blocks and the
- * config before any tensor is loaded (see {@link Qwen3VlProvenance}): this work unit loads the HF
- * float layout only, and an MLX affine-quantized checkpoint is recognized and rejected by name. The
- * load then parses the config strictly ({@link Qwen3VlDescriptor}), cross-checks the image
+ * config before any tensor is loaded (see {@link Qwen3VlProvenance}): the HF float layout and the
+ * MLX affine-quantized layout are both recognized, and every other combination is rejected by name.
+ * The load then parses the config strictly ({@link Qwen3VlDescriptor}), cross-checks the image
  * processor config against the vision config, cross-checks the tokenizer's sentinel spellings
  * against the config's declared token IDs, and only then runs the combined tensor preflight and
  * load, the FLOAT32 up-cast, the text/vision split and the module construction.
@@ -51,6 +54,9 @@ import tools.jackson.databind.JsonNode;
  */
 public final class Qwen3VlModel implements TextGenerationModel {
   private static final String LANGUAGE_PREFIX = "model.language_model.";
+
+  /** The text prefix the real MLX-converted artifact carries on every text tensor key. */
+  static final String AFFINE_TEXT_PREFIX = "language_model.";
 
   private final Qwen3VlDescriptor descriptor;
   private final TextDecoder decoder;
@@ -102,11 +108,11 @@ public final class Qwen3VlModel implements TextGenerationModel {
    * The package entry the dispatch uses, passing the {@code config.json} tree it already read so
    * the file is parsed once.
    *
-   * <p>Load order: provenance selection (headers plus the quantization declarations; MLX affine is
-   * recognized and rejected as unsupported in this work unit), strict config parse, processor
-   * cross-check, tokenizer sentinel resolution, combined tensor preflight and load, the FLOAT32
-   * up-cast, the text/vision split with shape and alias validation, and finally the module
-   * construction on the caller's scope.
+   * <p>Load order: provenance selection (headers plus the quantization declarations), strict config
+   * parse (the affine parse carries the packed plan's group size and bit width), processor
+   * cross-check, tokenizer sentinel resolution, combined tensor preflight and load, the dtype
+   * up-cast (the affine layout keeps its packed U32 weights as-is), the text/vision split with
+   * shape and alias validation, and finally the module construction on the caller's scope.
    *
    * @throws IOException if a file cannot be read
    * @throws IllegalArgumentException when the provenance, config, processor config, tokenizer,
@@ -116,8 +122,14 @@ public final class Qwen3VlModel implements TextGenerationModel {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(directory, "directory");
     Objects.requireNonNull(root, "root");
-    Qwen3VlProvenance.resolve(directory, root);
-    Qwen3VlDescriptor d = Qwen3VlDescriptor.parse(root);
+    // Provenance selection reads the raw config tree (the quantization declaration is an outer
+    // inert key the strict descriptor parse strips, so it must be read before the parse).
+    Qwen3VlProvenance.Resolved provenance = Qwen3VlProvenance.resolve(directory, root);
+    boolean affine = provenance.kind() == Qwen3VlProvenance.Kind.MLX_AFFINE;
+    Qwen3VlDescriptor d =
+        affine
+            ? Qwen3VlDescriptor.parseAffine(root, provenance.groupSize(), provenance.bits())
+            : Qwen3VlDescriptor.parse(root);
     Qwen3VlProcessorConfig processorConfig =
         Qwen3VlProcessorConfig.fromJson(
             Files.readAllBytes(directory.resolve("preprocessor_config.json")));
@@ -156,26 +168,35 @@ public final class Qwen3VlModel implements TextGenerationModel {
       throw new IllegalArgumentException(
           "tokenizer sentinel spellings do not match the config's declared token IDs");
     }
-    Map<String, MLXArray> loaded = CheckpointLoader.load(scope, directory, d.tensorPlan());
-    Map<String, MLXArray> weights = upcastAll(loaded);
+    TensorPlan plan =
+        affine ? d.affineTensorPlan(provenance.groupSize(), provenance.bits()) : d.tensorPlan();
+    Map<String, MLXArray> loaded = CheckpointLoader.load(scope, directory, plan);
+    Map<String, MLXArray> weights = affine ? upcastFloatsKeepPacked(loaded) : upcastAll(loaded);
     Map<String, MLXArray> textWeights = new LinkedHashMap<>();
-    for (String key : weights.keySet()) {
-      if (key.startsWith(LANGUAGE_PREFIX)) {
-        textWeights.put("model." + key.substring(LANGUAGE_PREFIX.length()), weights.get(key));
-      } else if (key.equals("lm_head.weight")) {
-        textWeights.put(key, weights.get(key));
+    if (affine) {
+      for (String key : weights.keySet()) {
+        if (key.startsWith(AFFINE_TEXT_PREFIX)) {
+          textWeights.put(key.substring(AFFINE_TEXT_PREFIX.length()), weights.get(key));
+        }
       }
+      ArchitectureMappings.tensorPlan(d.text()).validate(textWeights.keySet());
+      validateQuantizedTextShapes(d, textWeights, provenance.groupSize(), provenance.bits());
+    } else {
+      for (String key : weights.keySet()) {
+        if (key.startsWith(LANGUAGE_PREFIX)) {
+          textWeights.put("model." + key.substring(LANGUAGE_PREFIX.length()), weights.get(key));
+        } else if (key.equals("lm_head.weight")) {
+          textWeights.put(key, weights.get(key));
+        }
+      }
+      ArchitectureMappings.tensorPlan(d.text()).validate(textWeights.keySet());
+      validateTextShapes(d, textWeights);
     }
-    ArchitectureMappings.tensorPlan(d.text()).validate(textWeights.keySet());
-    validateTextShapes(d, textWeights);
-    if (d.text().head().tied()
-        && textWeights.containsKey("lm_head.weight")
-        && !SmolVlmModel.sameWeights(
-            textWeights.get("lm_head.weight"), textWeights.get("model.embed_tokens.weight"))) {
-      throw new IllegalArgumentException("tied lm_head alias differs from token embeddings");
-    }
+    checkTiedLmHeadAlias(d, textWeights, affine);
     Map<String, MLXArray> vision =
-        Qwen3VlVisionTower.visionWeights(weights, d.depth(), d.deepstackIndexes());
+        affine
+            ? affineVisionWeights(weights, d)
+            : Qwen3VlVisionTower.visionWeights(weights, d.depth(), d.deepstackIndexes());
     validateVisionShapes(d, vision);
     return new Qwen3VlModel(
         d,
@@ -223,6 +244,35 @@ public final class Qwen3VlModel implements TextGenerationModel {
     return weights;
   }
 
+  /**
+   * The affine-quantized layout's dtype pass: the packed U32 weight tensors are kept as-is (they
+   * are not floating storage and cannot be up-cast), every other non-FLOAT32 float tensor is
+   * up-cast to FLOAT32 in place (evaluated, the original closed), and a non-inexact, non-U32 dtype
+   * is a storage the layout does not recognize and is rejected by name.
+   */
+  private static Map<String, MLXArray> upcastFloatsKeepPacked(Map<String, MLXArray> loaded) {
+    Map<String, MLXArray> weights = new LinkedHashMap<>();
+    for (var entry : loaded.entrySet()) {
+      MLXArray original = entry.getValue();
+      DType dtype = original.dtype();
+      if (!dtype.isInexact()) {
+        if (dtype != DType.UINT32) {
+          throw new IllegalArgumentException(
+              "Qwen3-VL weights must be floating or packed U32: " + entry.getKey());
+        }
+        weights.put(entry.getKey(), original);
+        continue;
+      }
+      MLXArray value = dtype == DType.FLOAT32 ? original : MLX.astype(original, DType.FLOAT32);
+      if (value != original) {
+        MLX.eval(value);
+        original.close();
+      }
+      weights.put(entry.getKey(), value);
+    }
+    return weights;
+  }
+
   private static void validateTextShapes(Qwen3VlDescriptor d, Map<String, MLXArray> weights) {
     DecoderConfig c = d.text().dimensions();
     int hidden = c.hiddenSize();
@@ -250,6 +300,170 @@ public final class Qwen3VlModel implements TextGenerationModel {
         requireShape(value, hidden, c.intermediateSize());
       } else {
         throw new IllegalArgumentException("unexpected text checkpoint key '" + key + "'");
+      }
+    }
+  }
+
+  /**
+   * The affine-quantized layout's text shape validation: every key must be a {@code .weight} of a
+   * known projection, the embedding or the head (plus, for packed weights, its {@code
+   * .scales}/{@code .biases} sidecars), and each shape must match the config's dimensions for the
+   * tensor's packing — a packed U32 weight is {@code [out, in/8]} (4-bit groups of 8) with its
+   * sidecars {@code [out, in/group_size]}, a floating weight {@code [out, in]} and a norm weight
+   * 1-D. A packed tensor whose input width does not divide the config's group size is rejected by
+   * name, since its groups cannot be reconstructed, as is a packed weight missing either sidecar or
+   * a floating weight that carries one. The names the tensor plan already validated, so this pass
+   * adds the shapes and the group division, not a second name check.
+   */
+  private static void validateQuantizedTextShapes(
+      Qwen3VlDescriptor d, Map<String, MLXArray> weights, int group, int bits) {
+    for (var entry : weights.entrySet()) {
+      String key = entry.getKey();
+      MLXArray value = entry.getValue();
+      int dot = key.lastIndexOf('.');
+      String stem = dot < 0 ? key : key.substring(0, dot);
+      String suffix = dot < 0 ? "" : key.substring(dot + 1);
+      if (suffix.equals("scales") || suffix.equals("biases")) {
+        MLXArray weight = weights.get(stem + ".weight");
+        if (weight == null || weight.dtype() != DType.UINT32) {
+          throw new IllegalArgumentException(
+              "checkpoint tensor '"
+                  + key
+                  + "' is a quantization sidecar without its packed weight");
+        }
+        requireShape(value, textOutputWidth(d, stem), textInputWidth(d, stem) / group);
+        continue;
+      }
+      if (!suffix.equals("weight")) {
+        throw new IllegalArgumentException("unexpected text checkpoint key '" + key + "'");
+      }
+      if (stem.endsWith("norm")) {
+        // q_norm/k_norm and the layer norms are float-only; the plan already bars their sidecars.
+        requireShape(value, textOutputWidth(d, stem));
+        if (weights.containsKey(stem + ".scales")) {
+          throw new IllegalArgumentException(
+              "checkpoint tensor '" + key + "' is floating but carries quantization sidecars");
+        }
+        continue;
+      }
+      int out = textOutputWidth(d, stem);
+      int input = textInputWidth(d, stem);
+      if (value.dtype() == DType.UINT32) {
+        if (input % group != 0) {
+          throw new IllegalArgumentException(
+              "checkpoint tensor '"
+                  + key
+                  + "' is incompatible with group_size "
+                  + group
+                  + " and input size "
+                  + input);
+        }
+        requireShape(value, out, Math.multiplyExact(input, bits) / 32);
+        MLXArray scales = weights.get(stem + ".scales");
+        if (scales == null) {
+          throw new IllegalArgumentException("checkpoint missing tensor '" + stem + ".scales'");
+        }
+        requireShape(scales, out, input / group);
+        MLXArray biases = weights.get(stem + ".biases");
+        if (biases == null) {
+          throw new IllegalArgumentException("checkpoint missing tensor '" + stem + ".biases'");
+        }
+        requireShape(biases, out, input / group);
+      } else {
+        if (weights.containsKey(stem + ".scales")) {
+          throw new IllegalArgumentException(
+              "checkpoint tensor '" + key + "' is floating but carries quantization sidecars");
+        }
+        requireShape(value, out, input);
+      }
+    }
+  }
+
+  /**
+   * The output width of one affine-layout text stem (the 1-D width for a norm). An unrecognized
+   * stem is a programming error, since the tensor plan validated the name set first.
+   */
+  private static int textOutputWidth(Qwen3VlDescriptor d, String stem) {
+    DecoderConfig c = d.text().dimensions();
+    if (stem.equals("model.embed_tokens") || stem.equals("lm_head")) {
+      return c.vocabSize();
+    }
+    if (stem.endsWith(".q_proj")) {
+      return Math.multiplyExact(c.numAttentionHeads(), d.text().headDim());
+    }
+    if (stem.endsWith(".k_proj") || stem.endsWith(".v_proj")) {
+      return Math.multiplyExact(c.numKeyValueHeads(), d.text().headDim());
+    }
+    int hidden = c.hiddenSize();
+    if (stem.endsWith(".o_proj") || stem.endsWith(".down_proj")) {
+      return hidden;
+    }
+    if (stem.endsWith(".gate_proj") || stem.endsWith(".up_proj")) {
+      return c.intermediateSize();
+    }
+    if (stem.endsWith(".q_norm") || stem.endsWith(".k_norm")) {
+      return d.text().headDim();
+    }
+    if (stem.endsWith(".input_layernorm")
+        || stem.endsWith(".post_attention_layernorm")
+        || stem.equals("model.norm")) {
+      return hidden;
+    }
+    throw new IllegalArgumentException("unexpected text checkpoint key '" + stem + ".weight'");
+  }
+
+  /** The input width of one affine-layout text stem (the rotation width for a norm). */
+  private static int textInputWidth(Qwen3VlDescriptor d, String stem) {
+    DecoderConfig c = d.text().dimensions();
+    int hidden = c.hiddenSize();
+    if (stem.equals("model.embed_tokens") || stem.equals("lm_head")) {
+      return hidden;
+    }
+    if (stem.endsWith(".o_proj")) {
+      return Math.multiplyExact(c.numAttentionHeads(), d.text().headDim());
+    }
+    if (stem.endsWith(".down_proj")) {
+      return c.intermediateSize();
+    }
+    if (stem.endsWith(".q_norm") || stem.endsWith(".k_norm")) {
+      return d.text().headDim();
+    }
+    if (stem.endsWith(".input_layernorm")
+        || stem.endsWith(".post_attention_layernorm")
+        || stem.equals("model.norm")) {
+      return hidden;
+    }
+    if (stem.endsWith(".q_proj")
+        || stem.endsWith(".k_proj")
+        || stem.endsWith(".v_proj")
+        || stem.endsWith(".gate_proj")
+        || stem.endsWith(".up_proj")) {
+      return hidden;
+    }
+    throw new IllegalArgumentException("unexpected text checkpoint key '" + stem + ".weight'");
+  }
+
+  /**
+   * The tied-head alias rule, both layouts: when the config declares tied embeddings and the
+   * checkpoint nevertheless stores an {@code lm_head} block, it must be bit-for-bit the token
+   * embeddings themselves. Under the affine layout every stored sidecar ({@code .scales}, {@code
+   * .biases}) must agree with the embedding's too; a sidecar present on only one side is an alias
+   * mismatch, as is one that differs.
+   */
+  private static void checkTiedLmHeadAlias(
+      Qwen3VlDescriptor d, Map<String, MLXArray> textWeights, boolean affine) {
+    if (!d.text().head().tied() || !textWeights.containsKey("lm_head.weight")) {
+      return;
+    }
+    for (String suffix :
+        affine ? new String[] {"weight", "scales", "biases"} : new String[] {"weight"}) {
+      MLXArray head = textWeights.get("lm_head." + suffix);
+      MLXArray embedding = textWeights.get("model.embed_tokens." + suffix);
+      if (head == null && embedding == null) {
+        continue;
+      }
+      if (head == null || embedding == null || !SmolVlmModel.sameWeights(head, embedding)) {
+        throw new IllegalArgumentException("tied lm_head alias differs from token embeddings");
       }
     }
   }
@@ -299,6 +513,36 @@ public final class Qwen3VlModel implements TextGenerationModel {
       requireShape(vision.get(prefix + "linearFc2.weight"), out, m);
       requireShape(vision.get(prefix + "linearFc2.bias"), out);
     }
+  }
+
+  /**
+   * The affine-layout vision split: every {@code vision_tower.*} key is mapped through the same
+   * tower-key scheme as the HF layout (the two subtrees are identical, so the mapped names and the
+   * shape validation are shared) but without the PyTorch OIHW-to-MLX conv transpose — the converted
+   * artifact's conv weight already arrives channels-last, and transposing it would corrupt it.
+   */
+  private static Map<String, MLXArray> affineVisionWeights(
+      Map<String, MLXArray> weights, Qwen3VlDescriptor d) {
+    Map<String, MLXArray> vision = new LinkedHashMap<>();
+    for (var entry : weights.entrySet()) {
+      String key = entry.getKey();
+      if (!key.startsWith(Qwen3VlDescriptor.VISION_TOWER_PREFIX)) {
+        continue;
+      }
+      String towerKey =
+          Qwen3VlVisionTower.visionKeyToTowerKey(
+              Qwen3VlVisionTower.VISUAL_PREFIX
+                  + key.substring(Qwen3VlDescriptor.VISION_TOWER_PREFIX.length()),
+              d.depth(),
+              d.deepstackIndexes());
+      if (towerKey == null) {
+        throw new IllegalArgumentException("unrecognized vision checkpoint key '" + key + "'");
+      }
+      if (vision.put(towerKey, entry.getValue()) != null) {
+        throw new IllegalArgumentException("duplicate vision checkpoint key '" + key + "'");
+      }
+    }
+    return vision;
   }
 
   @Override
@@ -531,6 +775,76 @@ public final class Qwen3VlModel implements TextGenerationModel {
     evaluated.addAll(Arrays.asList(DecoderModel.stepCacheArrays(caches)));
     MLX.eval(evaluated.toArray(MLXArray[]::new));
     return result.logits().toFloatArray();
+  }
+
+  /**
+   * The package-test probe of one prefill with images, on a fresh generation scope the caller
+   * passes and must release: the same plan, expansion, cached first step and evaluation {@code
+   * generate} runs. With no images it is the plain text forward over the whole prompt, returning
+   * every position's logits flat ({@code [T*V]}); with images it runs the vision tower and
+   * DeepStack injection like a request and returns the last position's logits ({@code [V]}).
+   */
+  float[] prefillLogitsForTest(MLXScope generation, int[] ids, List<RgbImage> images) {
+    Objects.requireNonNull(generation, "generation");
+    Objects.requireNonNull(ids, "ids");
+    Objects.requireNonNull(images, "images");
+    Qwen3VlPromptPlan plan = plan(ids, images);
+    List<KVCache> caches = freshCaches(generation);
+    if (images.isEmpty()) {
+      // The text-only multi-axis rotation is the family's base RoPE at the same sequential
+      // positions, so the plain text forward is the prefill's own computation (proven
+      // bit-for-bit by the text-only equivalence suite).
+      return decoder
+          .forward(
+              MLX.array(generation, ids, new int[] {1, ids.length}), caches, new int[] {ids.length})
+          .toFloatArray();
+    }
+    DecoderModel.FirstStepResult result =
+        prefill(CancellationToken.NONE, images, plan, generation, caches);
+    List<MLXArray> evaluated = new ArrayList<>();
+    evaluated.add(result.logits());
+    evaluated.addAll(Arrays.asList(DecoderModel.stepCacheArrays(caches)));
+    MLX.eval(evaluated.toArray(MLXArray[]::new));
+    return result.logits().toFloatArray();
+  }
+
+  /**
+   * The package-test probe of one KV-cached decode step after one prefill, on a fresh generation
+   * scope the caller passes and must release: the same prefill {@link
+   * #prefillLogitsForTest(MLXScope, int[], List)} runs first (its prefill logits are evaluated),
+   * then one decode step on {@code decodeTokenId} with the request's own multi-axis rotation at the
+   * next expansion position, returning the step's last-position logits ({@code [V]}).
+   */
+  float[] decodeStepLogitsForTest(
+      MLXScope generation, int[] ids, List<RgbImage> images, int decodeTokenId) {
+    Objects.requireNonNull(generation, "generation");
+    Objects.requireNonNull(ids, "ids");
+    Objects.requireNonNull(images, "images");
+    Qwen3VlPromptPlan plan = plan(ids, images);
+    List<KVCache> caches = freshCaches(generation);
+    DecoderModel.FirstStepResult result =
+        prefill(CancellationToken.NONE, images, plan, generation, caches);
+    List<MLXArray> evaluated = new ArrayList<>();
+    evaluated.add(result.logits());
+    evaluated.addAll(Arrays.asList(DecoderModel.stepCacheArrays(caches)));
+    MLX.eval(evaluated.toArray(MLXArray[]::new));
+    int position = plan.ropePositionAt(caches.get(0).nextPosition());
+    return decoder
+        .decode(
+            MLX.array(generation, new int[] {decodeTokenId}, new int[] {1, 1}),
+            caches,
+            mrope.prepare(generation, 1, 1, new int[][] {{position}, {position}, {position}}),
+            null)
+        .toFloatArray();
+  }
+
+  private List<KVCache> freshCaches(MLXScope generation) {
+    int layers = decoder.config().numHiddenLayers();
+    List<KVCache> caches = new ArrayList<>(layers);
+    for (int i = 0; i < layers; i++) {
+      caches.add(new KVCache(generation));
+    }
+    return caches;
   }
 
   void setObserverForTest(Consumer<String> observer) {

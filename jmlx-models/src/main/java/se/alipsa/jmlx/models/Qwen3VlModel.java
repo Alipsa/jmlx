@@ -785,6 +785,11 @@ public final class Qwen3VlModel implements TextGenerationModel {
    * generate} runs. With no images it is the plain text forward over the whole prompt, returning
    * every position's logits flat ({@code [T*V]}); with images it runs the vision tower and
    * DeepStack injection like a request and returns the last position's logits ({@code [V]}).
+   *
+   * <p>The text-only branch calls the plain decoder's {@code forward}, bypassing the composite's
+   * multi-axis prefill. The text-only equivalence suite proves the two paths bit-identical. The
+   * wide-attention golden's text decode case exercises the composite prefill through {@link
+   * #decodeStepLogitsForTest} before checking the cached decode logits.
    */
   float[] prefillLogitsForTest(MLXScope generation, int[] ids, List<RgbImage> images) {
     Objects.requireNonNull(generation, "generation");

@@ -2282,5 +2282,5 @@ The review follow-up also adds `qwen3vl-wide-attention.json`: CPU float32 Transf
 4.57.6 eager logits over the pinned model checkpoint with eight query heads (hidden
 256, attention width 512), asymmetric BF16-exact q_proj/o_proj weights, and text/image
 prefill plus full-history decode references. `Qwen3VlModelFloatGoldenTest` compares
-prefill and KV-cached decode at the unchanged 1e-4 tolerance; both cases pass. Generator
+prefill and KV-cached decode at the unchanged 1e-4 tolerance; all four cases pass. Generator
 and golden digests are enforced by `verifyHfReferenceGoldens`.

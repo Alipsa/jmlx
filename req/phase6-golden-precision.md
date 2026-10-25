@@ -147,3 +147,28 @@ The synthetic TF32 bound remains `0.002` and strict model-math assertions remain
 This local run used macOS 27.0.1 / Apple Silicon, MLX 0.31.2 and mlx-c
 `fba4470b89073180056c9ea46c443051375f7399`. macOS 26 CI acceptance is pending; host differences
 never replace these numerical/exact-ID gates with structural checks. No existing golden was changed.
+
+
+## Phase 7.3b WP7 cached/full precision (2026-10-25)
+
+`Qwen3VlCacheEquivalenceTest` runs in both TF32 modes on the pinned two-DeepStack-level WP6
+checkpoint, comparing four prompt layouts with nine greedy and forced-marker cached steps
+against a fresh full-history forward (images recomputed at every reference step). Maximum
+absolute cached/full error is `5.662441e-7` with TF32 off under the strict `1e-4` gate, and
+`0.0021870732` with TF32 on under a separate Qwen3-VL cached/full bound of `0.003`. All greedy
+IDs agree. The latter bound includes margin for reduced-precision kernel variation and does
+not weaken the HF-reference gate. Independent WP6 HF goldens and their digests are unchanged;
+WP8's expanded independent HF/default-mode reference acceptance remains pending.
+
+Host: macOS 27.0.1, Apple M5 Max, MLX 0.31.2, mlx-c fba4470. Request ownership, endpoint
+memory and reproduction commands are recorded in the reference findings §11.7. Supported
+macOS 26 execution is checked separately by the implementation PR's required CI suites.
+
+
+PR #60's [macOS 26 CI run 316](https://github.com/Alipsa/jmlx/actions/runs/40227040860)
+also executed `Qwen3VlCacheEquivalenceTest` in both modes with no skips or failures (uploaded
+`vision-language-native-results` artifact `12612020846`). Both modes measured the same maximum
+absolute cached/full error `5.364418e-7` on that runner, so TF32 was not active there and its
+default-mode run was effectively strict float32: the `1e-4` strict bound passed on a second
+host, while the `0.003` default-mode bound is still supported only by the local M5 Max
+measurement. The run does not establish an error bound for every Apple GPU generation.

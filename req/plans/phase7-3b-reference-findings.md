@@ -2284,3 +2284,126 @@ The review follow-up also adds `qwen3vl-wide-attention.json`: CPU float32 Transf
 prefill plus full-history decode references. `Qwen3VlModelFloatGoldenTest` compares
 prefill and KV-cached decode at the unchanged 1e-4 tolerance; all four cases pass. Generator
 and golden digests are enforced by `verifyHfReferenceGoldens`.
+
+
+### 11.7 WP7 request lifecycle, cache equivalence and evaluated memory (2026-10-25)
+
+Implementation base: merged WP6 commit `075833e002ce093449d328a970554cc16e497d46`.
+The existing shared generation loop owns each request's caches in a generation child scope;
+Qwen's prompt plan/position delta is request-local and no mutable `rope_deltas` model field
+exists. WP7 preserves those contracts and the no-image fast path. Image processing now runs
+sequentially with each image's tower execution, rather than keeping all Java processed patches
+until the tower starts. Each image has a vision child scope: evaluated main/DeepStack rows
+are hoisted into the prefill child, and all other vision activations and the Java processed
+patch reference leave scope before the next image. Per-level concatenation is evaluated and
+its separate image parts closed. Cancellation is checked before preprocessing, after processing,
+before tower execution, after each image, before decoder prefill and by the shared decode loop.
+The final features, rotations and injection callbacks leave scope after evaluating logits and
+every retained KV array; only evaluated KV and the request-local position plan survive decode.
+Generated special tokens use the ordinary one-token decode path without prompt re-expansion.
+
+`Qwen3VlCacheEquivalenceTest` runs in both precision JVMs (`batch-equivalence`, required by
+CI). It uses the existing digest-pinned WP6 checkpoint with two DeepStack levels and unequal
+4×4 / 6×4 raw grids, with four prompt layouts: one image, two images, reversed-size images
+with intervening/trailing text, and text-only. Each layout checks prefill plus nine cached
+steps, both greedy history and forced history `[7,10,11,12,13,12,10,13,6]`. Every comparison
+recomputes all images and the entire history using fresh caches and the original prompt axes.
+The reference derives `originalDelta = max(originalPromptAxes) + 1 - expandedPromptLength`,
+checks it against the plan's delta, and fills continuation axes explicitly with
+`logicalPosition + originalDelta`, without calling the production decode-position helper.
+Visual destinations stay restricted to the original prompt. Visual features are recomputed
+through production `model.features(...)`; this suite does not independently validate the tower
+or the prompt axes, which are covered by the pinned WP5/WP6 HF references. Every greedy ID
+agrees. A deliberate mutation shifting production `ropePositionAt` by one fails this suite with
+maximum error `0.1356698` against the strict `1e-4` bound; the source was then restored and
+verification rerun. Maximum absolute cached/full error:
+
+| Mode | Observed maximum | Independent allowed bound |
+| --- | ---: | ---: |
+| Full FLOAT32, TF32 off | 0.0000005662441 | 0.0001 |
+| Default, TF32 on | 0.0021870732 | 0.003 |
+
+This is Java cached/full equivalence evidence. The independent HF WP6 prefill/decode and
+wide-attention goldens remain unchanged at `1e-4`. WP8 still owns the expanded HF reference
+archive for multiple decode steps/forced markers, default-mode HF comparison, Tier-B and
+manual 8B evidence; these local Java comparisons do not close those gates.
+
+`Qwen3VlGenerationTest` exercises FULL and capacity-bounded FULL at the exact required capacity,
+one-over rejection before pixels with original/expanded lengths, both named sliding rejections,
+image → text-only → different-size images → image reuse, distinct request deltas, tower count,
+streaming, seeded sampling/filtering/penalties/log probabilities, EOS/stop and listener abort IDs.
+Cancellation probes cover pre-cancelled requests, pre-processing, the first image's closure
+(second image never starts), before prefill, after prefill closure and between decode steps.
+The zero-token and pre-native validation tests from WP6 remain required.
+
+`Qwen3VlMemoryTest` uses evaluated arrays and settled `MLXMemory.activeBytes()` after warmup,
+excluding the allocator's free-buffer pool. The pinned fixture has two decoder layers, two
+KV heads, head dimension 64 and FLOAT32 cache state: `2 * 2 * 2 * 64 * 4 = 2048` bytes per
+position. Its one-image case has four merged rows, hidden 256 and two DeepStack levels:
+`4 * 256 * (1 + 2) * 4 = 12288` final visual bytes. Production prefill release is checked through
+exact active-byte measurements while evaluated KV and position state remain usable. A separate
+`model.features(...)` call in a test-owned prefill scope checks that its final feature handles
+survive the image children and become unusable when that test scope closes. No production
+feature handles are captured for dead-handle assertions. With the
+free-buffer pool cleared before decoder prefill, retained post-prefill bytes equal exactly
+`11 * 2048 = 22528`; before the activation scope closes, the immediate prefill-closed
+measurement is exactly those KV bytes plus the 84-byte returned logits. Prefill closure releases
+869844 bytes in the isolated run (871380 in the full-suite allocator context), including all
+visual storage.
+After decode steps 1, 21 and 53, retained bytes are exactly 24576, 65536 and 131072. Endpoints
+21/53 derive from 16/32 KiB per-key/value allocator tiers, avoiding page rounding of an
+unaligned request (e.g. step 32's logical 88064 bytes occupies 131072). Early/late and mid/late
+slopes equal their logical KV increments exactly. No native metadata/allocator margin is
+needed at these aligned endpoints; cleanup allows only 512 bytes, below one feature tensor's
+4096 bytes, and measured residual is zero.
+
+Eight repetitions of four same/different-size/mixed/text-only requests exercise normal return,
+EOS/stop, cancellation before preprocessing and after a streamed token, listener failure, injected
+vision/prefill/post-prefill/decode errors, actual invalid native transposes at both first and
+cached sampler evaluation, and an output tokenizer missing a generated
+non-special token (presence penalty keeps it out of the input). Every failure is followed by
+a baseline check and successful model reuse. Isolated warm baseline/final both 30789632 bytes;
+peak 40518656 bytes (full-suite allocator context: baseline/final 30789656, peak 40520216).
+These are tiny-checkpoint lifecycle measurements, not real-2B memory or
+throughput claims. The WP5 per-image workspace limit/peak remains the independent vision gate.
+
+Local host: Apple M5 Max, macOS 27.0.1/arm64, Java 25.0.4.1, `mlx-metal` 0.31.2,
+mlx-c `fba4470b89073180056c9ea46c443051375f7399`; Gradle sets TF32 explicitly per task.
+Mandatory native suites are added to CI's ordinary and full-float32 execution assertions.
+No native pin, generated binding, public API, checkpoint, Python lock or golden changed.
+
+
+Verification commands (all passed locally; no native test skipped):
+
+```sh
+./gradlew check verifyMlxApiCallSites verifyHfReferenceGoldens \
+  verifyImageOracleFixtureDigests verifyImageOracleDependencyPins
+./gradlew check verifyMlxOracle verifyMlxOracleFixtures verifyImageOracle verifyImageOracleFixtures
+./gradlew :jmlx-models:check verifyHfReferenceGoldens
+tools/hf-reference/.venv/bin/python tools/hf-reference/qwen3vl_wide_attention.py
+```
+
+The complete models check reports 518 ordinary tests across 59 suites and 54 strict-mode tests
+across 17 suites, with zero failures/errors/skips; the separate first-thread probe also passes.
+The workflow's exact required-native-suite assertion was executed locally against those result
+XMLs, including the three WP7 suites and both cache-equivalence modes. The locked image oracle
+verifies all five fixture sets; the locked MLX oracle verifies its macOS 27-compatible Phase 7.1
+profile and explicitly skips the macOS 26-only Phase 6 profile. That host-policy skip is not
+macOS 26 acceptance. The locked HF wide-attention probe reproduces the pinned output digest
+`3dec41ce9308b5730c40ca32b4efb409ad133785ea06d553a3a132c9e1c33d04` byte-for-byte.
+
+
+PR #60's original [macOS 26.6.2 CI run 316](https://github.com/Alipsa/jmlx/actions/runs/40227040860)
+passed both Java and native jobs. Its `vision-language-native-results` artifact
+(`12612020846`, archive SHA-256
+`96982252b031ef86854c1fe4241faf9506e2fe7fa43d0499f22e9eab05be823a`) records
+`5.364418e-7` maximum cached/full error in both TF32 modes. The identical values mean TF32 was
+not active on that runner, so its default-mode run was effectively strict float32: the `1e-4`
+strict bound passed there, while the `0.003` default-mode bound above remains supported only by
+the local M5 Max measurement. The run verifies that runner, not every Apple GPU generation.
+The memory suite executed both tests with zero skips/failures/errors: post-prefill exact-byte
+assertions (including the 84-byte logits), aligned KV endpoints and cleanup all passed.
+Reported early/mid/late retention is 24576/65536/131072 bytes; cleanup baseline/final is
+30789656 bytes, peak 40520216. This confirms the allocator assumptions for the pinned fixture
+and runtime on macOS 26 as well as the local host. The test now explicitly guards
+`midStep > 1 && lateStep > midStep` so a future fixture that outgrows these tiers fails by name.

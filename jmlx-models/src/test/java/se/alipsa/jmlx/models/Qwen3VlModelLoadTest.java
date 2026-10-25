@@ -246,7 +246,7 @@ class Qwen3VlModelLoadTest {
   }
 
   @Test
-  void imagePrefillRunsTheTowerOnceAndGenerates(@TempDir Path dir) throws Exception {
+  void singleImagePrefillRunsTheTowerOnceAndGenerates(@TempDir Path dir) throws Exception {
     TinyCheckpoints.randomQwen3Vl(dir, 8L);
     try (MLXScope root = new MLXScope()) {
       Qwen3VlModel model = Qwen3VlModel.load(root, dir);

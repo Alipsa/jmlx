@@ -23,7 +23,6 @@ import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.tokenizer.TokenizerException;
 import se.alipsa.jmlx.vision.Qwen3VlGeometryPlan;
 import se.alipsa.jmlx.vision.Qwen3VlImageProcessor;
-import se.alipsa.jmlx.vision.Qwen3VlImageProcessorResult;
 import se.alipsa.jmlx.vision.Qwen3VlProcessorConfig;
 import se.alipsa.jmlx.vision.RgbImage;
 import tools.jackson.databind.JsonNode;
@@ -619,6 +618,7 @@ public final class Qwen3VlModel implements TextGenerationModel {
           (activation, caches) ->
               prefill(request.cancellationToken(), request.images(), plan, activation, caches),
           (ids, caches) -> {
+            observer.accept("decode");
             int position = plan.ropePositionAt(caches.get(0).nextPosition());
             return decoder.decode(
                 ids,
@@ -669,7 +669,11 @@ public final class Qwen3VlModel implements TextGenerationModel {
     return plan;
   }
 
-  private DecoderModel.FirstStepResult prefill(
+  /**
+   * Runs and evaluates the request's first step, releasing all visual work before returning.
+   * Package access lets lifecycle tests exercise this production boundary with caller-owned KV.
+   */
+  DecoderModel.FirstStepResult prefill(
       CancellationToken cancellation,
       List<RgbImage> images,
       Qwen3VlPromptPlan plan,
@@ -680,22 +684,8 @@ public final class Qwen3VlModel implements TextGenerationModel {
     int[][] before = decoder.preflightBatch(1, length, caches, new int[] {length});
     DecoderModel.FirstStepResult result;
     try (MLXScope prefill = activation.newChild()) {
-      List<Qwen3VlImageProcessorResult> processed = new ArrayList<>(images.size());
-      for (RgbImage image : images) {
-        checkCancellation(cancellation);
-        observer.accept("preprocess");
-        checkCancellation(cancellation);
-        processed.add(processor.process(image));
-        checkCancellation(cancellation);
-      }
-      Qwen3VlVisionFeatures features;
-      if (processed.isEmpty()) {
-        features = null;
-      } else {
-        observer.accept("vision");
-        checkCancellation(cancellation);
-        features = tower.forward(prefill, processed);
-      }
+      Qwen3VlVisionFeatures features = features(cancellation, images, prefill);
+      observer.accept("before-prefill");
       checkCancellation(cancellation);
       MLXArray ids = MLX.array(prefill, plan.expandedIds(), new int[] {1, length});
       MultiAxisRotation rotation =
@@ -738,6 +728,7 @@ public final class Qwen3VlModel implements TextGenerationModel {
       evaluated.add(logits);
       evaluated.addAll(Arrays.asList(DecoderModel.stepCacheArrays(caches)));
       MLX.eval(evaluated.toArray(MLXArray[]::new));
+      observer.accept("prefill-evaluated");
       result =
           new DecoderModel.FirstStepResult(
               MLX.hoist(logits, activation),
@@ -753,6 +744,46 @@ public final class Qwen3VlModel implements TextGenerationModel {
       throw failure;
     }
     return result;
+  }
+
+  /**
+   * Processes and evaluates one image at a time. Only the final main/DeepStack rows survive each
+   * image child; processed Java patches and native activations are released before the next image.
+   * All returned rows belong to the caller's prefill scope, never to the model or decode scope.
+   */
+  Qwen3VlVisionFeatures features(
+      CancellationToken cancellation, List<RgbImage> images, MLXScope prefill) {
+    if (images.isEmpty()) {
+      return null;
+    }
+    List<MLXArray> merged = new ArrayList<>();
+    List<List<MLXArray>> levels = new ArrayList<>();
+    for (int i = 0; i < tower.deepstackIndexes().length; i++) {
+      levels.add(new ArrayList<>());
+    }
+    for (RgbImage image : images) {
+      checkCancellation(cancellation);
+      observer.accept("preprocess");
+      checkCancellation(cancellation);
+      // On failure, this child also releases partially hoisted tower outputs for this image.
+      try (MLXScope vision = prefill.newChild()) {
+        var processed = processor.process(image);
+        observer.accept("vision");
+        checkCancellation(cancellation);
+        var output = tower.forward(vision, List.of(processed));
+        merged.add(MLX.hoist(output.merged(), prefill));
+        for (int level = 0; level < levels.size(); level++) {
+          levels.get(level).add(MLX.hoist(output.deepstackLevels().get(level), prefill));
+        }
+      }
+      observer.accept("image-closed");
+      checkCancellation(cancellation);
+    }
+    List<MLXArray> deepstack = new ArrayList<>();
+    for (List<MLXArray> parts : levels) {
+      deepstack.add(Qwen3VlVisionTower.concatenate(parts));
+    }
+    return new Qwen3VlVisionFeatures(Qwen3VlVisionTower.concatenate(merged), deepstack);
   }
 
   /**

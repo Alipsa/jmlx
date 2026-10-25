@@ -323,3 +323,12 @@ explicitly. Encoder output and per-layer cross K/V are request-owned, evaluated 
 at request completion/failure. Supported FFNs are ReLU and gated-GELU; tied heads rescale hidden
 states, untied Flan-T5 heads do not. Beam search, training, quantized weights and decoder prefixes
 are outside this release.
+
+
+Qwen3-VL dense image/text loading also has synthetic lifecycle coverage: request-local multi-axis
+positions, sequential image prefill, visual/DeepStack storage released before cached decode, and
+FULL or capacity-bounded FULL retention. Sliding retention is rejected for this family.
+`Qwen3VlCacheEquivalenceTest` compares cached and fresh full-history logits in both precision
+modes, including generated special-token histories; generation/memory suites cover reuse and
+failure cleanup. See [WP7 evidence](../req/plans/phase7-3b-reference-findings.md#117-wp7-request-lifecycle-cache-equivalence-and-evaluated-memory-2026-10-25).
+Tier-B, expanded independent HF references and manual quantized 8B acceptance remain WP8 work.

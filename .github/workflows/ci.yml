@@ -177,7 +177,8 @@ jobs:
                               'DecoderSeamTest', 'VisualFeatureInjectionTest',
                               'Qwen3VlVisionTowerGoldenTest', 'Qwen3VlVisionPeakTest',
                               'Qwen3VlVisionTowerValidationTest',
-                              'Qwen3VlModelLoadTest', 'Qwen3VlModelAffineLoadTest'],
+                              'Qwen3VlModelLoadTest', 'Qwen3VlModelAffineLoadTest',
+                              'Qwen3VlGenerationTest', 'Qwen3VlMemoryTest', 'Qwen3VlCacheEquivalenceTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
@@ -188,6 +189,7 @@ jobs:
                             'Qwen3VlTextOnlyEquivalenceTest', 'Qwen3VlModelFloatGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
+          model_results['Qwen3VlCacheEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['DecoderSeamTest'] = ['test', 'float32GoldenTest']
           model_results['VisualFeatureInjectionTest'] = ['test', 'float32GoldenTest']
           model_results['WorkerStreamProbeTest'] = ['threadProbeTest']
@@ -250,6 +252,10 @@ jobs:
           name: vision-language-native-results
           path: |
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.VisionLanguageMemoryTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlMemoryTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlGenerationTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest.xml
+            jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmGenerationTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmDefaultPrecisionTest.xml
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.SmolVlmGoldenTest.xml

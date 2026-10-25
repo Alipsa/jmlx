@@ -7,7 +7,8 @@
   and linspace evidence in the reference findings §11.4-§11.5), WP6 completed 2026-10-25
   (local acceptance evidence: the load/dispatch and strict suites and the seam one-off
   benchmark, recorded in the reference findings §11.6 and `req/phase6-4-benchmark.md`).
-  WP7–WP8 implementation and acceptance remain work below.
+  WP7 implemented 2026-10-25 (request lifecycle/cache/memory evidence in findings §11.7;
+  supported macOS 26 CI acceptance tracked in the implementation PR). WP8 remains work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -628,7 +629,7 @@ SmolVLM fixtures are unchanged.
 | WP4 | Core multi-axis RoPE and decoder injection seam | WP0, WP1, WP3 | Strict rotary tests; exact before/after decoder bits in both modes |
 | WP5 | Vision tower, main/DeepStack mergers | WP1, WP2, core primitives | HF intermediate-feature references |
 | WP6 | Loader, composed model and affine scope | WP3–WP5 | Complete tensor validation; float/quantized synthetic loading tests; one-off benchmark of the seam's explicit SDPA mask against the implicit-causal decode path |
-| WP7 | Generation, ownership and cache accounting | WP6 | Cached/full equivalence, lifecycle/failure/memory tests |
+| WP7 | Generation, ownership and cache accounting (implemented 2026-10-25) | WP6 | Cached/full equivalence in both modes, lifecycle/failure/memory tests; findings §11.7 |
 | WP8 | Tier-B, manual 8B, CI and documentation | WP7 | Parent numerical/artifact/performance/matrix gates |
 | WP9 | EXIF orientation policy decision (pre-WP2) and rotated-fixture parity (post-WP2 implementation) | WP1 | Policy recorded before WP2 acceptance; rotated-fixture parity with the slow processor once the Qwen path exists; SmolVLM fixtures unchanged |
 
@@ -654,8 +655,8 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [x] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
 - [ ] Vision/merger/DeepStack intermediate references and quantized synthetic tests pass.
 - [ ] All four Tier-A cases and forced generated-marker continuations pass strict/default cached/full-forward checks.
-- [ ] Resource validation, request reuse, cancellation/failure cleanup and memory bounds pass.
-- [ ] Default per-image attention limit/peak, one-over rejection and post-prefill visual release verified.
+- [x] Resource validation, request reuse, cancellation/failure cleanup and memory bounds pass locally (WP7; findings §11.7).
+- [x] Default per-image attention limit/peak and one-over rejection (WP5), plus post-prefill visual release (WP7), verified locally.
 - [ ] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded.
 - [ ] Required CI suites executed; matrix/docs state actual modality and verification limits.
 - [x] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.

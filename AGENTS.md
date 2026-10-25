@@ -741,3 +741,17 @@ The wide-attention path also has strict HF float32 logits coverage (hidden 256, 
 width 512; asymmetric BF16-exact projections, text/image prefill and cached decode).
 No native pins or generated bindings
 changed.
+
+
+Phase 7.3b WP7 (2026-10-25) verifies Qwen3-VL request ownership and full-cache accounting.
+Processing and tower execution run sequentially per image, checking cancellation between
+images; only evaluated main/DeepStack rows are hoisted to the request's prefill child scope.
+Prefill evaluates logits and every retained KV array before closing that scope. Cached decode
+retains only request-owned KV and the request-local expansion/position plan; generated image
+markers do not consume images or rerun vision. `Qwen3VlGenerationTest` and `Qwen3VlMemoryTest`
+cover mixed request reuse, capacity rejection, cancellation, failure cleanup and evaluated
+visual release/KV growth. `Qwen3VlCacheEquivalenceTest` runs in both precision tasks and
+compares four layouts with greedy/forced-marker histories against recomputed full forwards
+(strict `1e-4`, separately measured TF32 `0.003`). All three suites are required by CI;
+findings §11.7 records local evidence and the remaining WP8 independent-reference/artifact
+acceptance gates. No native pin, generated binding, public API or golden changed.

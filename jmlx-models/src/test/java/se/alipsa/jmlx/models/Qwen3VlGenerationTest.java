@@ -113,7 +113,6 @@ class Qwen3VlGenerationTest {
         } else if (boundary.equals("preprocess")) {
           assertEquals(
               List.of("preprocess"), stages, "cancellation must precede pixel/native work");
-          assertFalse(stages.contains("vision"));
         } else if (boundary.equals("before-prefill")) {
           assertEquals(2, stages.stream().filter("vision"::equals).count());
           assertFalse(stages.contains("prefill-evaluated"));

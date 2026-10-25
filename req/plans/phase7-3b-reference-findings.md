@@ -2397,8 +2397,10 @@ PR #60's original [macOS 26.6.2 CI run 316](https://github.com/Alipsa/jmlx/actio
 passed both Java and native jobs. Its `vision-language-native-results` artifact
 (`12612020846`, archive SHA-256
 `96982252b031ef86854c1fe4241faf9506e2fe7fa43d0499f22e9eab05be823a`) records
-`5.364418e-7` maximum cached/full error in both TF32 modes, below the separate `0.003` default
-and `1e-4` strict bounds. This verifies that runner, not every Apple GPU generation.
+`5.364418e-7` maximum cached/full error in both TF32 modes. The identical values mean TF32 was
+not active on that runner, so its default-mode run was effectively strict float32: the `1e-4`
+strict bound passed there, while the `0.003` default-mode bound above remains supported only by
+the local M5 Max measurement. The run verifies that runner, not every Apple GPU generation.
 The memory suite executed both tests with zero skips/failures/errors: post-prefill exact-byte
 assertions (including the 84-byte logits), aligned KV endpoints and cleanup all passed.
 Reported early/mid/late retention is 24576/65536/131072 bytes; cleanup baseline/final is

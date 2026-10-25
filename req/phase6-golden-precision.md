@@ -166,7 +166,9 @@ macOS 26 execution is checked separately by the implementation PR's required CI 
 
 
 PR #60's [macOS 26 CI run 316](https://github.com/Alipsa/jmlx/actions/runs/40227040860)
-also executed `Qwen3VlCacheEquivalenceTest` in both modes: maximum absolute cached/full error
-`5.364418e-7` in each, with no skips or failures (uploaded `vision-language-native-results`
-artifact `12612020846`). Both independent bounds passed on that runner. This supplies a
-second host measurement; it does not establish an error bound for every Apple GPU generation.
+also executed `Qwen3VlCacheEquivalenceTest` in both modes with no skips or failures (uploaded
+`vision-language-native-results` artifact `12612020846`). Both modes measured the same maximum
+absolute cached/full error `5.364418e-7` on that runner, so TF32 was not active there and its
+default-mode run was effectively strict float32: the `1e-4` strict bound passed on a second
+host, while the `0.003` default-mode bound is still supported only by the local M5 Max
+measurement. The run does not establish an error bound for every Apple GPU generation.

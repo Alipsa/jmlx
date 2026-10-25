@@ -23,6 +23,7 @@ import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXIO;
 import se.alipsa.jmlx.core.MLXQuant;
+import se.alipsa.jmlx.core.MLXRandom;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
@@ -173,12 +174,15 @@ class Qwen3VlModelLoadTest {
           new LinkedHashMap<>(
               MLXIO.loadSafetensors(root, dir.resolve("model.safetensors").toString()).tensors());
       // The fixture has hidden=64, head_dim=32: eight query heads give attention width 256.
+      MLXRandom.seed(4401L);
       for (int layer = 0; layer < 2; layer++) {
         String prefix = "model.language_model.layers." + layer + ".self_attn.";
         tensors.put(
-            prefix + "q_proj.weight", MLX.full(root, new int[] {256, 64}, 0.01f, DType.BFLOAT16));
+            prefix + "q_proj.weight",
+            MLXRandom.normal(root, new int[] {256, 64}, DType.BFLOAT16, 0f, 0.02f));
         tensors.put(
-            prefix + "o_proj.weight", MLX.full(root, new int[] {64, 256}, 0.01f, DType.BFLOAT16));
+            prefix + "o_proj.weight",
+            MLXRandom.normal(root, new int[] {64, 256}, DType.BFLOAT16, 0f, 0.02f));
       }
       MLX.eval(tensors.values().toArray(MLXArray[]::new));
       MLXIO.saveSafetensors(

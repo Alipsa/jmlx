@@ -405,3 +405,8 @@ text-only logits and rotation state bit-identical to the plain path in enforced 
 The load times are not comparable as such (old side: just-derived files, warm page cache,
 no weight evaluation; seam side: committed checkpoint read plus the in-place up-cast evaluation).
 This one-off is not a CI gate and no threshold on the ratio is implied or enforced anywhere.
+
+Schema versions identify report layouts. Direct mode now emits
+`jmlx-decode-benchmark-4` (the original direct layout plus `git_status_porcelain`);
+seam mode emits `jmlx-decode-benchmark-3` (paired statistics, raw samples and git
+status). Previously recorded schema-1 and schema-2 files keep their original versions.

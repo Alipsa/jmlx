@@ -97,7 +97,8 @@
     "checkpoints/qwen3vl-model/preprocessor_config.json": "ad57fd445e3ffa746befc3c631b585d31b989554f9e7bb4725c934ccaac0bab7",
     "checkpoints/qwen3vl-model/tokenizer.json": "43434cb4048b6b40dacd4e25a4e65cad7c51f54e64a137323b377ddc8164024d",
     "checkpoints/qwen3vl-model/images/a.png": "41cceca5a3d37363be739dd0b3d13c01eddf11cfdc310cca08f4fc439f14beef",
-    "checkpoints/qwen3vl-model/images/b.png": "afa14e56e539b93bb7f1ff2595ea627af6fbee63f0349f64634fa030226c7b8e"
+    "checkpoints/qwen3vl-model/images/b.png": "afa14e56e539b93bb7f1ff2595ea627af6fbee63f0349f64634fa030226c7b8e",
+    "qwen3vl-wide-attention.json": "3dec41ce9308b5730c40ca32b4efb409ad133785ea06d553a3a132c9e1c33d04"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -149,5 +150,6 @@
     "tools/image-oracle/fixtures/qwen3vl/patches/model-rgb-256x256.pixel-values.f32": "df316e1ea42d36286d68368e17cbbcb74dfb0bb332839059f48be6ac93f5b07a",
     "tools/image-oracle/fixtures/qwen3vl/patches/model-rgb-64x32.pixel-values.f32": "1b98a584a002f17b3a62eac192dd9a1a473d52a60c4571a3acc10a40ffa72754"
   },
-  "qwen3vl_model_generator_sha256": "1677b82de22e2b7ab88da28d848a8635d26ec94e7b4fb4f6730738f0635ca409"
+  "qwen3vl_model_generator_sha256": "1677b82de22e2b7ab88da28d848a8635d26ec94e7b4fb4f6730738f0635ca409",
+  "qwen3vl_wide_attention_generator_sha256": "3ffed6141f2180ea5fb70d4e78a32234550f08042e1564ffa13b704382216a64"
 }

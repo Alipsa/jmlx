@@ -164,7 +164,7 @@ public final class DecodeBenchmark {
         }
       }
       Map<String, Object> report = new LinkedHashMap<>();
-      report.put("schema", "jmlx-decode-benchmark-1");
+      report.put("schema", "jmlx-decode-benchmark-4");
       report.put("checkpoint", reportedCheckpoint(checkpoint));
       report.put("checkpoint_sha256", checkpointHashes);
       report.put("commit", commit());

@@ -279,11 +279,11 @@ jobs:
           import json
           from pathlib import Path
           data = json.loads(Path('build/phase6-4-ci.json').read_text())
-          required = ('schema', 'checkpoint_sha256', 'cold_load_ns', 'prefill_ns',
+          required = ('schema', 'git_status_porcelain', 'checkpoint_sha256', 'cold_load_ns', 'prefill_ns',
                       'one_token_decode_ns', 'sustained_generation_ns',
                       'tokens_per_second_median', 'peak_generation_active_bytes',
                       'active_per_generated_token_bytes')
           missing = [field for field in required if field not in data]
-          if missing or data['schema'] != 'jmlx-decode-benchmark-1':
+          if missing or data['schema'] != 'jmlx-decode-benchmark-4':
               raise SystemExit(f'benchmark JSON invalid: missing={missing}')
           PY

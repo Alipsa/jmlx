@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Verify Qwen3-VL request-local positions and cached/full logits in both precision modes, including
+  generated markers, and evaluated visual release/KV growth through cancellation and failure paths.
+  Process images sequentially with cancellation checks between tower executions. FULL and bounded
+  FULL retain all positions; sliding retention remains rejected. Real-artifact acceptance is WP8.
+
 - Add WP7 evaluated vision-language memory and lifetime regressions, including repeated varied
   requests, cancellation, listener/tokenizer/native failures, visual release and derived full-KV
   retention budgets. Require the memory suite in macOS CI and upload native acceptance evidence.

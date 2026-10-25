@@ -2235,3 +2235,43 @@ the original captures and these five entries were pinned on the same host
 scalar kernel above computes the values from bit-exact float arithmetic, so
 they are host-independent.
 
+### 11.6 WP6 composite model: dispatch, loaders and the seam one-off (2026-10-25)
+
+WP6 (plan §7) landed `Qwen3VlModel implements TextGenerationModel` composed on the WP4 seam
+(the decoder plus the §11 vision tower; not a `DecoderModel`, so the scheduler's existing
+non-DecoderModel check rejects it). `TextGenerationModels.load` dispatches `qwen3_vl` before
+the generic decoder config parse and rejects `qwen3_vl_moe` by name before model construction;
+the load guard rejects a config with `2 * sum(mrope_section) != head_dim` before construction,
+and the rotary width is derived from `head_dim`, not the section sum (plan §7). Every stored
+floating weight is up-cast to FLOAT32 in place (`upcastAll`: per-tensor `astype` + `eval` +
+original `close`), so the modules operate on one dtype; the affine plan keeps the packed U32
+tensors as-is and up-casts the floating sidecars. Both provenance plans (HF float and the
+MLX-affine conversion) are exercised on the tiny composite checkpoint
+(`tools/hf-reference/goldens/checkpoints/qwen3vl-model`, digest-pinned in
+`tools/hf-reference/provenance.json`):
+
+- `Qwen3VlModelLoadTest` and `Qwen3VlModelAffineLoadTest` (ordinary `test`, required by the
+  macOS CI assertion): load/dispatch/metadata on both plans, the dtype up-cast, the
+  pre-pixels/pre-native rejection paths, and deterministic greedy generation with and without
+  one image; the affine test packs every eligible text weight 4-bit group-64 in Java and
+  compares the packed decoder against the identical weights dequantized to float, isolating the
+  packed kernel from the quantization error itself.
+- `Qwen3VlModelFloatGoldenTest` (full-float32, required): the strict CPU-HF float32 logits
+  golden `tools/hf-reference/goldens/qwen3vl-model-wp6.json` on the four cases (text-only
+  prefill at every position, one-image wrapper-grammar prefill at the last position, one
+  KV-cached decode step after that prefill, and two-image prefill at the last position).
+- `Qwen3VlTextOnlyEquivalenceTest` (full-float32, required): the composite's multi-axis
+  prefill logits on a text-only prompt bit-match a bare Qwen3-family decoder built from the
+  same re-keyed text weights with the family's plain `RopeSpec.Base` rotation — the two paths
+  share one and the same angle table.
+
+The seam one-off benchmark (plan §7's 2026-10-21 PR #57 review addition) ran the new
+`seam-comparison` mode of `:jmlx-examples:benchmarkDecode`, comparing the seam's explicit
+`[1,1,1,L]` masked path against the old implicit-causal path on the same bit-identical text
+weights (the derived plain-qwen3 baseline, verified bit-exact in Java before timing), and is
+recorded with the complete reproducibility tuple in `req/phase6-4-benchmark.md`: median
+sustained seam/old ratio 1.3608, with the p10-p90 band 1.2002-0.9071 straddling 1.0 on the
+2-layer hidden-256 fixture — the seam's per-step cost is at noise level there. It is a one-off
+local measurement, not a CI gate, and implies no threshold; the correctness of the masked path
+rests on the suites above, not on the ratio.
+

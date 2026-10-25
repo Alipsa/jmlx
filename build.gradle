@@ -626,6 +626,7 @@ tasks.register('verifyHfReferenceGoldens') {
     // WP7's opt-in real-artifact reference inputs/outputs are committed and hash-pinned too.
     inputs.files(fileTree('tools/tier-b') { include 'smolvlm-256m-instruct.json', 'images/**' })
     inputs.file('tools/hf-reference/vision_tier_b.py')
+    inputs.file('tools/hf-reference/qwen3vl_model.py')
     // Phase 7.3b WP2's shared Qwen3-VL processed-patch fixtures are image-oracle-owned but
     // consumed on the HF side, so the root task pins their digests too.
     inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
@@ -642,6 +643,11 @@ tasks.register('verifyHfReferenceGoldens') {
         if (actualLock != expectedLock) {
             throw new GradleException("Hugging Face requirements.lock " +
                     "(phase72.requirements_lock_sha256) SHA-256 differs: ${actualLock}")
+        }
+        def generatorHash = metadata.qwen3vl_model_generator_sha256
+        if (generatorHash == null ||
+                sha256File(file('tools/hf-reference/qwen3vl_model.py')) != generatorHash) {
+            throw new GradleException('Qwen3-VL model generator SHA-256 differs or is missing')
         }
         def visionFiles = metadata.vision_tier_b_files
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {

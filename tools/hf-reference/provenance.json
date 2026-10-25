@@ -148,5 +148,6 @@
     "tools/image-oracle/fixtures/qwen3vl/patches/manifest.json": "74ebda8ed5fd569fe1dc17bc0c1fe0bdec6d1672455c61e061f2235a6641e967",
     "tools/image-oracle/fixtures/qwen3vl/patches/model-rgb-256x256.pixel-values.f32": "df316e1ea42d36286d68368e17cbbcb74dfb0bb332839059f48be6ac93f5b07a",
     "tools/image-oracle/fixtures/qwen3vl/patches/model-rgb-64x32.pixel-values.f32": "1b98a584a002f17b3a62eac192dd9a1a473d52a60c4571a3acc10a40ffa72754"
-  }
+  },
+  "qwen3vl_model_generator_sha256": "1677b82de22e2b7ab88da28d848a8635d26ec94e7b4fb4f6730738f0635ca409"
 }

@@ -138,6 +138,17 @@ class Qwen3VlTensorPlanTest {
   }
 
   @Test
+  void pytorchMetadataSelectsFloatAndRejectsQuantization(@TempDir Path dir) throws Exception {
+    writeShard(dir.resolve("model.safetensors"), "{\"__metadata__\": {\"format\": \"pt\"}}");
+    assertEquals(
+        new Qwen3VlProvenance.Resolved(Qwen3VlProvenance.Kind.HF_FLOAT, null, null),
+        Qwen3VlProvenance.resolve(dir, config()));
+    ObjectNode config = config();
+    quant(config, "quantization");
+    assertRejectedContains(dir, config, "format=pt selects HF float");
+  }
+
+  @Test
   void mlxAffineIsRecognized(@TempDir Path dir) throws Exception {
     writeShard(dir.resolve("model.safetensors"), "{\"__metadata__\": {\"format\": \"mlx\"}}");
     ObjectNode config = config();
@@ -187,8 +198,10 @@ class Qwen3VlTensorPlanTest {
     assertRejectedContains(dir, config, "quantization.bits must be 4");
 
     block = quant(config, "quantization");
-    block.put("group_size", 0);
-    assertRejectedContains(dir, config, "quantization.group_size must be a positive integer");
+    for (int invalid : new int[] {0, 16, 48, 256}) {
+      block.put("group_size", invalid);
+      assertRejectedContains(dir, config, "quantization.group_size must be 32, 64 or 128");
+    }
 
     block = quant(config, "quantization");
     block.put("mode", "symmetric");

@@ -142,6 +142,58 @@ class Qwen3VlModelLoadTest {
   }
 
   @Test
+  void pytorchFormatMetadataLoadsThroughDispatch(@TempDir Path dir) throws Exception {
+    TinyCheckpoints.randomQwen3Vl(dir, 43L);
+    try (MLXScope root = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          MLXIO.loadSafetensors(root, dir.resolve("model.safetensors").toString()).tensors();
+      MLX.eval(tensors.values().toArray(MLXArray[]::new));
+      MLXIO.saveSafetensors(
+          dir.resolve("model.safetensors").toString(), tensors, Map.of("format", "pt"));
+      TextGenerationModel model = TextGenerationModels.load(root, dir);
+      assertInstanceOf(Qwen3VlModel.class, model);
+      assertEquals(
+          2,
+          model
+              .generate(textRequest(new int[] {1, 2, 3}, 2), ignored -> {})
+              .generatedTokenIds()
+              .size());
+    }
+  }
+
+  @Test
+  void wideAttentionLoadsAndRunsTextAndImagePrefillAndDecode(@TempDir Path dir) throws Exception {
+    TinyCheckpoints.randomQwen3Vl(dir, 44L);
+    rewriteJson(
+        dir,
+        "config.json",
+        config -> ((ObjectNode) config.get("text_config")).put("num_attention_heads", 8));
+    try (MLXScope root = new MLXScope()) {
+      Map<String, MLXArray> tensors =
+          new LinkedHashMap<>(
+              MLXIO.loadSafetensors(root, dir.resolve("model.safetensors").toString()).tensors());
+      // The fixture has hidden=64, head_dim=32: eight query heads give attention width 256.
+      for (int layer = 0; layer < 2; layer++) {
+        String prefix = "model.language_model.layers." + layer + ".self_attn.";
+        tensors.put(
+            prefix + "q_proj.weight", MLX.full(root, new int[] {256, 64}, 0.01f, DType.BFLOAT16));
+        tensors.put(
+            prefix + "o_proj.weight", MLX.full(root, new int[] {64, 256}, 0.01f, DType.BFLOAT16));
+      }
+      MLX.eval(tensors.values().toArray(MLXArray[]::new));
+      MLXIO.saveSafetensors(
+          dir.resolve("model.safetensors").toString(), tensors, Map.of("format", "pt"));
+      Qwen3VlModel model = (Qwen3VlModel) TextGenerationModels.load(root, dir);
+      for (GenerationRequest request :
+          List.of(textRequest(new int[] {1, 2, 3}, 3), imageRequest(3))) {
+        GenerationResult result = model.generate(request, ignored -> {});
+        assertEquals(3, result.generatedTokenIds().size());
+        assertEquals(FinishReason.MAX_TOKENS, result.finishReason());
+      }
+    }
+  }
+
+  @Test
   void dispatchLoadsTheCompositeAndRejectsSiblingTypes(@TempDir Path dir) throws Exception {
     Path checkpoint = tinyCheckpoint(dir, 42L);
     try (MLXScope root = new MLXScope()) {

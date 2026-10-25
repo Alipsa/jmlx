@@ -83,7 +83,8 @@
 | `vocab.json` | 2,776,833 | `ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910` |
 
 **Tensor inventory.** Single shard `model.safetensors`, standard safetensors format (not the
-`mlx` container), **625 tensors, all under the `model.` prefix, all stored as BF16**.
+`mlx` container), with shard `__metadata__: {"format": "pt"}` (the Transformers
+HF float marker), **625 tensors, all under the `model.` prefix, all stored as BF16**.
 
 - **Tied embeddings:** `tie_word_embeddings: true` — `lm_head` aliases
   `model.language_model.embed_tokens`; there is no `lm_head` weight tensor in the checkpoint.
@@ -2269,9 +2270,10 @@ The seam one-off benchmark (plan §7's 2026-10-21 PR #57 review addition) ran th
 `seam-comparison` mode of `:jmlx-examples:benchmarkDecode`, comparing the seam's explicit
 `[1,1,1,L]` masked path against the old implicit-causal path on the same bit-identical text
 weights (the derived plain-qwen3 baseline, verified bit-exact in Java before timing), and is
-recorded with the complete reproducibility tuple in `req/phase6-4-benchmark.md`: median
-sustained seam/old ratio 1.3608, with the p10-p90 band 1.2002-0.9071 straddling 1.0 on the
-2-layer hidden-256 fixture — the seam's per-step cost is at noise level there. It is a one-off
+recorded with the complete reproducibility tuple in `req/phase6-4-benchmark.md`: the
+ratio of sustained medians 1.3608 (seam slower) on the 2-layer hidden-256 fixture.
+The former p10/p90 quotients compare marginal quantiles and are not a paired-ratio band;
+the historical JSON lacks raw timings, so it cannot support a noise-level conclusion. It is a one-off
 local measurement, not a CI gate, and implies no threshold; the correctness of the masked path
 rests on the suites above, not on the ratio.
 

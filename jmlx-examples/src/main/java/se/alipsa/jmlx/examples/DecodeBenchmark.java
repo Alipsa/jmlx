@@ -168,6 +168,7 @@ public final class DecodeBenchmark {
       report.put("checkpoint", reportedCheckpoint(checkpoint));
       report.put("checkpoint_sha256", checkpointHashes);
       report.put("commit", commit());
+      report.put("git_status_porcelain", gitStatus());
       report.put("java", System.getProperty("java.version"));
       report.put("os", System.getProperty("os.name"));
       report.put("architecture", System.getProperty("os.arch"));
@@ -414,7 +415,7 @@ public final class DecodeBenchmark {
         }
       }
       Map<String, Object> report = new LinkedHashMap<>();
-      report.put("schema", "jmlx-decode-benchmark-2");
+      report.put("schema", "jmlx-decode-benchmark-3");
       report.put("mode", "seam-comparison");
       report.put("checkpoint", reportedCheckpoint(checkpoint));
       report.put("checkpoint_sha256", checkpointHashes);
@@ -442,6 +443,7 @@ public final class DecodeBenchmark {
       verification.put("tensor_sha256", baselineTensorSha);
       report.put("text_weight_verification", verification);
       report.put("commit", commit());
+      report.put("git_status_porcelain", gitStatus());
       report.put("java", System.getProperty("java.version"));
       report.put("os", System.getProperty("os.name"));
       report.put("architecture", System.getProperty("os.arch"));
@@ -483,6 +485,9 @@ public final class DecodeBenchmark {
       oldSide.put("prefill_ns", stats(oldPrefill));
       oldSide.put("one_token_decode_ns", stats(oldDecode));
       oldSide.put("sustained_generation_ns", stats(oldGen));
+      oldSide.put("sustained_generation_samples_ns", oldGen);
+      oldSide.put("prefill_samples_ns", oldPrefill);
+      oldSide.put("one_token_decode_samples_ns", oldDecode);
       oldSide.put("tokens_per_second_median", tokens * 1_000_000_000.0 / median(oldGen));
       oldSide.put("generated_token_ids", oldGenerated);
       oldSide.put("active_before_prefill_bytes", oldPrefillBefore);
@@ -504,6 +509,7 @@ public final class DecodeBenchmark {
               + " prepare; generate only, with the prefill (6-arg stepLogits with the rotation)"
               + " and every decode step inside it");
       seamSide.put("sustained_generation_ns", stats(seamGen));
+      seamSide.put("sustained_generation_samples_ns", seamGen);
       seamSide.put("tokens_per_second_median", tokens * 1_000_000_000.0 / median(seamGen));
       seamSide.put("generated_token_ids", seamGenerated);
       seamSide.put("active_before_generation_bytes", seamGenBefore);
@@ -514,6 +520,10 @@ public final class DecodeBenchmark {
       Map<String, Object> ratios = new LinkedHashMap<>();
       ratios.put("sustained_generation_ns_seam_over_old", seamOverOld(seamGen, oldGen));
       report.put("ratios", ratios);
+      report.put(
+          "ratio_method",
+          "seam[i]/old[i] in iteration order, then sort ratios; median index n/2,"
+              + " p10 floor(0.1*(n-1)), p90 ceil(0.9*(n-1)); spread is not a confidence interval");
       Map<String, Object> scopeNotes = new LinkedHashMap<>();
       scopeNotes.put(
           "old_prefill_ns",
@@ -564,7 +574,8 @@ public final class DecodeBenchmark {
               + " median sustained "
               + (tokens * 1_000_000_000.0 / median(seamGen))
               + " tokens/s\n\n"
-              + "Sustained seam/old ratio: "
+              + "Paired sustained seam/old ratios (p10/p90 use floor/ceil indices; with 7 samples"
+              + " these are min/max): "
               + ratios.get("sustained_generation_ns_seam_over_old")
               + "\n";
       Files.writeString(output.resolveSibling(output.getFileName() + ".md"), markdown);
@@ -707,22 +718,24 @@ public final class DecodeBenchmark {
         result.generatedTokenIds());
   }
 
-  /**
-   * The per-quantile seam-over-old ratios on the sorted samples, using the same index rule as
-   * {@link #stats(List)}.
-   */
-  private static Map<String, Double> seamOverOld(List<Long> seam, List<Long> old) {
-    List<Long> s = seam.stream().sorted().toList();
-    List<Long> o = old.stream().sorted().toList();
-    int n = o.size();
+  /** Percentiles of per-iteration seam/old ratios, preserving the alternating-run pairs. */
+  static Map<String, Double> seamOverOld(List<Long> seam, List<Long> old) {
+    if (seam.isEmpty() || seam.size() != old.size()) {
+      throw new IllegalArgumentException("samples must be nonempty and paired");
+    }
+    List<Double> paired = new ArrayList<>();
+    for (int i = 0; i < old.size(); i++) {
+      if (old.get(i) <= 0 || seam.get(i) <= 0) {
+        throw new IllegalArgumentException("sample durations must be positive");
+      }
+      paired.add(seam.get(i) / (double) old.get(i));
+    }
+    List<Double> sorted = paired.stream().sorted().toList();
+    int n = sorted.size();
     Map<String, Double> ratios = new LinkedHashMap<>();
-    ratios.put("median", s.get(n / 2) / (double) o.get(n / 2));
-    ratios.put(
-        "p10",
-        s.get((int) Math.floor(0.1 * (n - 1))) / (double) o.get((int) Math.floor(0.1 * (n - 1))));
-    ratios.put(
-        "p90",
-        s.get((int) Math.ceil(0.9 * (n - 1))) / (double) o.get((int) Math.ceil(0.9 * (n - 1))));
+    ratios.put("median", sorted.get(n / 2));
+    ratios.put("p10", sorted.get((int) Math.floor(0.1 * (n - 1))));
+    ratios.put("p90", sorted.get((int) Math.ceil(0.9 * (n - 1))));
     return ratios;
   }
 
@@ -1053,6 +1066,19 @@ public final class DecodeBenchmark {
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       return "unspecified";
+    }
+  }
+
+  private static String gitStatus() {
+    try {
+      Process process = new ProcessBuilder("git", "status", "--porcelain").start();
+      String status = new String(process.getInputStream().readAllBytes());
+      return process.waitFor() == 0 ? status : "unknown";
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return "unknown";
+    } catch (IOException unavailable) {
+      return "unknown";
     }
   }
 

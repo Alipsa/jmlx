@@ -292,8 +292,10 @@ public final class Qwen3VlModel implements TextGenerationModel {
                 : hidden);
       } else if (key.endsWith("k_proj.weight") || key.endsWith("v_proj.weight")) {
         requireShape(value, kv, hidden);
-      } else if (key.endsWith("q_proj.weight") || key.endsWith("o_proj.weight")) {
+      } else if (key.endsWith("q_proj.weight")) {
         requireShape(value, qkv, hidden);
+      } else if (key.endsWith("o_proj.weight")) {
+        requireShape(value, hidden, qkv);
       } else if (key.endsWith("gate_proj.weight") || key.endsWith("up_proj.weight")) {
         requireShape(value, c.intermediateSize(), hidden);
       } else if (key.endsWith("down_proj.weight")) {

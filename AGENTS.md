@@ -733,6 +733,8 @@ against the identical dequantized weights) plus the full-float32 `Qwen3VlModelFl
 the same angle table) — all four required by the macOS CI assertion. The plan §7 one-off
 `benchmarkDecode seam-comparison` (the seam's explicit-mask path versus the old implicit-causal
 path on bit-identical text weights) is recorded with the full reproducibility tuple in
-`req/phase6-4-benchmark.md`: median sustained ratio 1.3608 with the p10-p90 band straddling 1.0
-on the tiny fixture — noise-level, one-off, not a CI gate. No native pins or generated bindings
+`req/phase6-4-benchmark.md`: historical ratio of sustained medians 1.3608 on the tiny fixture
+(seam slower). Its marginal-quantile quotients are not a paired-ratio band; raw timings were
+not retained, so no noise-level conclusion follows. New runs retain paired samples. This is
+a one-off, not a CI gate. No native pins or generated bindings
 changed.

@@ -407,7 +407,7 @@ class Qwen3VlModelAffineLoadTest {
           root,
           bad,
           "shard metadata format=mlx requires a config quantization block of exactly"
-              + " {bits: 4, group_size: positive integer, mode: \"affine\"}, but none is declared");
+              + " {bits: 4, group_size: 32, 64 or 128, mode: \"affine\"}, but none is declared");
     }
   }
 

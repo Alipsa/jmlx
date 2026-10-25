@@ -10,19 +10,18 @@ import tools.jackson.databind.JsonNode;
  * Qwen3-VL checkpoint provenance, selected from the shard headers' {@code __metadata__} blocks and
  * the config's quantization declarations before any tensor is loaded (findings §8).
  *
- * <p>The two layouts this loader family distinguishes: HF float safetensors (no {@code format}
- * metadata and no quantization declaration) and the MLX-affine-quantized layout the pinned {@code
- * mlx-community/Qwen3-VL-8B-Instruct-4bit} artifact carries (shard metadata {@code format: mlx}
- * plus a config quantization block of exactly {@code {bits: 4, group_size: positive integer, mode:
- * "affine"}} under {@code quantization} or {@code quantization_config}; when both keys are present
- * they must be JSON-equal). Every other combination is rejected by name, so a checkpoint can never
- * silently select the wrong tensor plan.
+ * <p>The two layouts this loader family distinguishes: HF float safetensors (missing {@code format}
+ * metadata or {@code format: pt}, and no quantization declaration) and the MLX-affine-quantized
+ * layout the pinned {@code mlx-community/Qwen3-VL-8B-Instruct-4bit} artifact carries (shard
+ * metadata {@code format: mlx} plus a config quantization block of exactly {@code {bits: 4,
+ * group_size: 32, 64 or 128, mode: "affine"}} under {@code quantization} or {@code
+ * quantization_config}; when both keys are present they must be JSON-equal). Every other
+ * combination is rejected by name, so a checkpoint can never silently select the wrong tensor plan.
  *
  * <p>Both plans load: an MLX-affine checkpoint is recognized (the shard metadata plus a conforming
  * config quantization block) and its group size and bit width are returned on the {@link Resolved}
  * result so the loader can select the packed tensor plan; an HF float checkpoint resolves to {@link
- * Kind#HF_FLOAT} with no group or bits. Every other combination is rejected by name, so a
- * checkpoint can never silently select the wrong tensor plan.
+ * Kind#HF_FLOAT} with no group or bits.
  */
 final class Qwen3VlProvenance {
 
@@ -53,13 +52,16 @@ final class Qwen3VlProvenance {
     Map<String, String> metadata = SafetensorsHeaders.metadata(CheckpointLoader.shards(directory));
     String format = metadata.get("format");
     Declaration quantization = quantization(configTree);
-    if (format == null) {
+    if (format == null || "pt".equals(format)) {
       if (quantization == null) {
         return new Resolved(Kind.HF_FLOAT, null, null);
       }
       throw new IllegalArgumentException(
-          "config.json declares a quantization block but the checkpoint shards carry no format"
-              + " metadata: unknown Qwen3-VL checkpoint provenance");
+          "config.json declares a quantization block but "
+              + (format == null
+                  ? "the checkpoint shards carry no format metadata"
+                  : "shard metadata format=pt selects HF float")
+              + ": unknown Qwen3-VL checkpoint provenance");
     }
     if (!"mlx".equals(format)) {
       throw new IllegalArgumentException(
@@ -68,7 +70,7 @@ final class Qwen3VlProvenance {
     if (quantization == null) {
       throw new IllegalArgumentException(
           "shard metadata format=mlx requires a config quantization block of exactly"
-              + " {bits: 4, group_size: positive integer, mode: \"affine\"}, but none is declared");
+              + " {bits: 4, group_size: 32, 64 or 128, mode: \"affine\"}, but none is declared");
     }
     requireAffine(quantization.key(), quantization.block());
     return new Resolved(
@@ -108,9 +110,7 @@ final class Qwen3VlProvenance {
         : new Declaration("quantization_config", alias);
   }
 
-  /**
-   * The MLX-affine block contract: exactly {@code bits: 4}, a positive integer group size, affine.
-   */
+  /** The MLX-affine block contract: exactly {@code bits: 4}, group size 32, 64 or 128, affine. */
   private static void requireAffine(String key, JsonNode quant) {
     if (!quant.isObject()) {
       throw new IllegalArgumentException("config.json " + key + " must be an object");
@@ -129,9 +129,11 @@ final class Qwen3VlProvenance {
     JsonNode groupSize = quant.get("group_size");
     if (!groupSize.isIntegralNumber()
         || !groupSize.canConvertToInt()
-        || groupSize.intValue() <= 0) {
+        || (groupSize.intValue() != 32
+            && groupSize.intValue() != 64
+            && groupSize.intValue() != 128)) {
       throw new IllegalArgumentException(
-          "config.json " + key + ".group_size must be a positive integer");
+          "config.json " + key + ".group_size must be 32, 64 or 128");
     }
     if (!"affine".equals(quant.path("mode").asString())) {
       throw new IllegalArgumentException(

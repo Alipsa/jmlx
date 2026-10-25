@@ -339,8 +339,8 @@ export JMLX_BENCH_DEVICE="$(sysctl -n machdep.cpu.brand_string)"
 
 Run on Apple M5 Max, Java 25.0.4.1, `mlx-metal==0.31.2`, mlx-c
 `fba4470b89073180056c9ea46c443051375f7399`, commit
-`4990be82b914d39ad946147ea3cbf2a917c7eed4` (branch `phase7-3b-wp6`; the
-`seam-comparison` mode's first commit, which also carries this record), `MLX_ENABLE_TF32` unset
+`4f9ba09` plus uncommitted `seam-comparison` changes (branch `phase7-3b-wp6`;
+the mode was later committed as `4990be82b914d39ad946147ea3cbf2a917c7eed4`), `MLX_ENABLE_TF32` unset
 (native default; both sides run in the one JVM, so both ran in the same mode). Source checkpoint
 `tools/hf-reference/goldens/checkpoints/qwen3vl-model` (2 layers, hidden 256, 4 q / 2 kv heads,
 head_dim 64, `mrope_section [12,10,10]`, vocab 21, tied head, BF16 storage,
@@ -355,12 +355,12 @@ report is `build/phase7-3b-wp6-seam.json` (schema `jmlx-decode-benchmark-2`, `mo
 
 | Metric (p10 / median / p90 over the 7 samples) | Old implicit-causal | Seam explicit-mask |
 | --- | ---: | ---: |
-| Load, ns (one JVM each) | 29,875,542 | 56,121,000 |
+| Load, ns (both models in one JVM) | 29,875,542 | 56,121,000 |
 | Prefill, ns (`forward`, all positions' logits, fresh caches) | 414,916 / 488,917 / 1,014,250 | — (inside `generate`) |
 | One-token decode, ns (`forward`, warmed caches) | 326,167 / 358,625 / 613,584 | — (inside `generate`) |
 | Sustained `generate`, ns (32 tokens) | 12,991,791 / 13,751,459 / 27,320,000 | 15,592,208 / 18,712,750 / 24,782,542 |
 | Sustained throughput, tokens/s (median) | 2327.03 | 1710.06 |
-| Seam/old sustained-ns ratio | — | 1.2002 / 1.3608 / 0.9071 |
+| Ratios of marginal sustained-ns quantiles (not paired-ratio percentiles) | — | 1.2002 / 1.3608 / 0.9071 |
 | Active bytes before / after generation | 35,549,184 / 35,549,184 | 35,549,184 / 35,549,184 |
 | Peak generation active bytes | 36,369,727 | 36,560,728 |
 
@@ -387,16 +387,21 @@ direct-mode run on the derived baseline alone confirms the load-laziness on the 
 path: `benchmarkDecode <baseline> <out> 1,2 4 1 0` gives `active_after_load_bytes = 0` and
 `cold_load_peak_active_bytes = 0`, with the weights materialized during the first prefill.
 
-How to read this: this is a 2-layer, hidden-256 fixture, so one decode step is a few hundred
-microseconds and the per-step difference the seam machinery adds is not separable from
-run-to-run noise at this size. The median ratio is 1.36 (seam side slower), but the p10-p90
-ratio band is 1.20-0.91 and straddles 1.0, and the median-to-median difference (4,961,291 ns
-over a 32-token run) is smaller than either side's own p10-p90 spread (about 14.3 million ns on
-the old side, about 9.2 million ns on the seam side). It shows the seam's per-step cost is
-measured and at noise level on this fixture, not that the explicit-mask path is slower or faster
-in general. Correctness does not rest on this run: `Qwen3VlTextOnlyEquivalenceTest` proves the
-seam's text-only logits and rotation state bit-identical to the plain path in the enforced
-float32 mode, and the load times are not comparable as such (old side: just-derived files, warm
-page cache, no weight evaluation; seam side: committed checkpoint read plus the in-place up-cast
-evaluation). This one-off is not a CI gate and no threshold on the ratio is implied or enforced
-anywhere.
+How to read this: this is a 2-layer, hidden-256 fixture. The seam minimum and median
+are respectively about 20% and 36% slower than the old side's; only the maximum is lower,
+driven by the old side's 27.3 ms outlier. The displayed quotients of marginal quantiles are
+not percentiles of paired ratios and do not form a band. With seven samples the floor/ceil
+p10/p90 indices select the minimum and maximum. This record does not establish a noise-level
+cost, and fixture timings do not establish performance on production models.
+
+The original JSON retained summary timings only, so paired ratios cannot be recovered for this
+historical run. Future runs retain raw per-iteration nanos and compute each seam/old ratio
+before sorting those ratios for the median and p10/p90 spread; with seven pairs that spread
+is still the min/max, not a confidence interval. New seam reports use schema
+`jmlx-decode-benchmark-3` and retain `git_status_porcelain` alongside the HEAD commit to identify runs with uncommitted changes.
+
+Correctness does not rest on this run: `Qwen3VlTextOnlyEquivalenceTest` proves the seam's
+text-only logits and rotation state bit-identical to the plain path in enforced float32 mode.
+The load times are not comparable as such (old side: just-derived files, warm page cache,
+no weight evaluation; seam side: committed checkpoint read plus the in-place up-cast evaluation).
+This one-off is not a CI gate and no threshold on the ratio is implied or enforced anywhere.

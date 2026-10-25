@@ -1,10 +1,13 @@
 # Phase 7.3b — Qwen3-VL image and text inference
 
-- **Status:** WP0–WP4 complete: WP0/WP1 2026-10-15 (reference findings), WP2 accepted
-  2026-10-18 per PR #50, WP3 accepted 2026-10-19 per PR #55, WP4 completed 2026-10-20
-  (local acceptance evidence in `req/plans/phase7-3b-reference-findings.md` §6.9's
-  acceptance block; acceptance rides this branch's PR). WP5–WP8 implementation and
-  acceptance remain work below.
+- **Status:** WP0–WP6 complete: WP0/WP1 2026-10-15 (reference findings), WP2 accepted
+  2026-10-18 per PR #50, WP3 accepted 2026-10-19 per PR #55, WP4 completed 2026-10-20 per
+  PR #57 (local acceptance evidence in `req/plans/phase7-3b-reference-findings.md` §6.9's
+  acceptance block), WP5 completed 2026-10-23 per PR #58 (measured per-image peak, bit-identity
+  and linspace evidence in the reference findings §11.4-§11.5), WP6 completed 2026-10-25
+  (local acceptance evidence: the load/dispatch and strict suites and the seam one-off
+  benchmark, recorded in the reference findings §11.6 and `req/phase6-4-benchmark.md`).
+  WP7–WP8 implementation and acceptance remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,

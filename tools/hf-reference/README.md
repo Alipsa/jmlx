@@ -171,3 +171,21 @@ self-consistent, 2 on a missing or unrecognized table, and 3 on any other
 failure. Each per-case max error is printed. `--execution local` runs the
 snippets inside the jshell process so the `System.exit` verdict is the probe's
 exit code (the default child-engine mode swallows it).
+
+### Wide Qwen3-VL attention regression
+
+`qwen3vl_wide_attention.py` reuses the pinned `qwen3vl-model` checkpoint and
+changes query heads from 4 to 8 (hidden 256, attention width 512). It replaces
+q_proj and o_proj with distinct asymmetric index-coded weights, exactly
+representable in BF16. This avoids duplicating the checkpoint or depending on
+matching Python/Java random generators. The four CPU float32 eager-reference
+cases cover text and image prefill plus full-history decode recomputation;
+Java compares its cached decode against those logits at the existing 1e-4
+tolerance in `Qwen3VlModelFloatGoldenTest`. The generator and its output are
+digest-pinned and checked by `verifyHfReferenceGoldens`.
+
+Regenerate manually in the locked environment and review the golden/pin diff:
+
+```sh
+tools/hf-reference/.venv/bin/python tools/hf-reference/qwen3vl_wide_attention.py
+```

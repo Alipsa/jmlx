@@ -714,7 +714,30 @@ recorded in the reference findings §11.4, which documents the pre-fix cause
 (per-image scope Java handles pinning every block's intermediates, slope
 1,174,405,136 B = 70 × 16 MiB + 16 B per block) and now covers the fix with the
 depth-independence regression test. Both suites are required by the macOS CI
-assertion. `Qwen3VlModel`, its loader dispatch and the DeepStack consumption of
-`VisualFeatureInjection` remain WP6. The review round added the opt-in
+assertion. The review round added the opt-in
 `exactBitsRecord/VerifyVision` Gradle tasks (never part of `check`) for the
 bit-identity evidence; no native pins or generated bindings changed.
+
+Phase 7.3b WP6 (2026-10-25) landed the composed `Qwen3VlModel` (the WP4 seam decoder plus the
+WP5 vision tower, whose DeepStack levels are consumed through the WP4 `VisualFeatureInjection`
+seam; a `TextGenerationModel`, not a `DecoderModel`, so the scheduler's existing
+non-DecoderModel check rejects it), `qwen3_vl` dispatch before the generic decoder config parse
+with `qwen3_vl_moe` rejected by name, the `2 * sum(mrope_section) == head_dim` load guard, the
+rotary width derived from `head_dim`, and the in-place BF16/FP16-to-FLOAT32 up-cast of every
+stored floating weight (the affine plan keeps the packed U32 tensors and up-casts the floating
+sidecars). Local acceptance evidence: `Qwen3VlModelLoadTest` and `Qwen3VlModelAffineLoadTest`
+(ordinary CI; the affine test packs 4-bit group-64 in Java and compares the packed decoder
+against the identical dequantized weights) plus the full-float32 `Qwen3VlModelFloatGoldenTest`
+(strict HF logits golden `qwen3vl-model-wp6.json`, four cases including text-only) and
+`Qwen3VlTextOnlyEquivalenceTest` (seam multi-axis versus plain-base text-only logits, one and
+the same angle table) — all four required by the macOS CI assertion. The plan §7 one-off
+`benchmarkDecode seam-comparison` (the seam's explicit-mask path versus the old implicit-causal
+path on bit-identical text weights) is recorded with the full reproducibility tuple in
+`req/phase6-4-benchmark.md`: clean commit `c8150b8`, 31 paired samples after 5 warmups,
+median seam/old ratio 1.1621 (about 16% slower), p10/p90 0.9572/1.2016. Raw per-iteration
+nanos are committed under `req/benchmarks/`; the spread is descriptive, not a confidence
+interval or evidence of noise-level cost. This is a one-off fixture run, not a CI gate.
+The wide-attention path also has strict HF float32 logits coverage (hidden 256, attention
+width 512; asymmetric BF16-exact projections, text/image prefill and cached decode).
+No native pins or generated bindings
+changed.

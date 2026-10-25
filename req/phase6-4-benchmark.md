@@ -290,3 +290,130 @@ M1-virtual test-JVM RSS of about 5.1-5.2 GB: the model **fits the 7 GB budget, b
 about a 25% RAM margin**, and that figure is an extrapolation from this machine, not a hosted
 measurement. A Qwen3-8B 4-bit Tier-B row would need a hosted run to establish that margin for
 real.
+
+## Phase 7.3b WP6 one-off: seam explicit-mask vs implicit-causal decode (clean rerun, 2026-10-25)
+
+The WP4 seam (`req/plans/phase7-3b-plan.md` §7; PR #57 review round 2) routes every single-row
+step with a non-null rotation through `decoderStack`, which passes an explicit `[1,1,1,L]` BOOL
+batched mask to SDPA where the old decode path used `mask == null` (implicit causal). Qwen3-VL
+decode always needs the rotation (`cachePosition + delta`), so once `Qwen3VlModel` (WP6) exists
+every generated token takes the masked path. The plan's 2026-10-21 PR #57 review addition
+requires, before WP6 acceptance, a one-off `:jmlx-examples:benchmarkDecode` comparison of the two
+paths recorded with the complete reproducibility tuple. A new first-argument mode selects it:
+`seam-comparison <qwen3vl-checkpoint> <output-prefix> [prompt-csv] [tokens] [samples] [warmups]`
+(cache policy fixed to full; the composite rejects sliding retention).
+
+The old side is a plain-`qwen3` checkpoint derived in Java from the composite before any timer
+starts: the 24 `model.language_model.*` tensors rekeyed to `model.*` and stored as an exact
+BF16-to-FLOAT32 up-cast (the composite loader applies the same up-cast, so both sides operate on
+bit-identical FLOAT32 weights), every `model.visual.*` tensor dropped, the tied head kept tied,
+a `model_type qwen3` config without `rope_scaling` (theta and head_dim kept, and
+`2 * sum(mrope_section) == head_dim`, so the plain rotation width equals the seam's), and
+`tokenizer.json` copied byte-identical (the plain loader never reads it). The derivation is
+verified before any timing: every written tensor's FLOAT32 bytes, re-read from the derived file
+at the written header's own offsets, are element-wise bit-equal to an independent
+field-decomposition decode (sign/exponent/mantissa through double) of the source BF16 bytes — a
+different construction from the bit-shift write — and the per-tensor SHA-256 of the written bytes
+is recorded in the JSON. On text-only input the two sides also share one and the same angle
+table (the composite's `MultiAxisRope` rotation and the family's plain `RopeSpec.Base` rotation,
+proven bit-identical by `Qwen3VlTextOnlyEquivalenceTest`), so the measured delta isolates the
+seam machinery (explicit mask, rotation prepare, hook wiring).
+
+One fresh JVM loads both models — the old baseline first (its files were just derived, so their
+page cache is warm), the seam checkpoint second — and the sides alternate which runs first each
+iteration. The request is identical on both sides: the 16-token text-only prompt
+`[1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 14, 15, 16, 17, 18, 19]` (vocab 21, avoiding the vision sentinels
+10-13), greedy, 32 new tokens, FULL cache, batch 1, 31 samples after 5 warm-ups. The old side's
+fine-grained prefill/one-token timers mirror the direct mode (the seam side times `generate`
+only, with its prefill and every decode step inside it); the reported ratio pair is the old
+`generate` versus the seam `generate`.
+
+Command (fresh JVM):
+
+```sh
+cd /Users/per/project/jmlx
+export JMLX_BENCH_DEVICE="$(sysctl -n machdep.cpu.brand_string)"
+env -u MLX_ENABLE_TF32 ./gradlew -q :jmlx-examples:benchmarkDecode \
+  --args="seam-comparison ${PWD}/tools/hf-reference/goldens/checkpoints/qwen3vl-model ${PWD}/build/phase7-3b-wp6-clean-seam 1,2,3,4,5,6,7,8,9,0,14,15,16,17,18,19 32 31 5"
+```
+
+Run on Apple M5 Max, Java 25.0.4.1, `mlx-metal==0.31.2`, mlx-c
+`fba4470b89073180056c9ea46c443051375f7399`, commit
+`c8150b8184993c13f211f7fd211881732b794f34` (branch `phase7-3b-wp6`, clean tree;
+`git_status_porcelain` is the empty string in the raw report), `MLX_ENABLE_TF32` unset
+(native default; both sides run in the one JVM, so both ran in the same mode). Source checkpoint
+`tools/hf-reference/goldens/checkpoints/qwen3vl-model` (2 layers, hidden 256, 4 q / 2 kv heads,
+head_dim 64, `mrope_section [12,10,10]`, vocab 21, tied head, BF16 storage,
+`transformers_version 4.57.6`) with `model.safetensors` SHA-256
+`d8d0b9229d961c8550134647439b5bd79a342fd2a59d8e2187e04e5f896a3f38` (all six file SHAs in the
+JSON's `checkpoint_sha256`; the checkpoint is digest-pinned in
+`tools/hf-reference/provenance.json`), and derived baseline
+`build/phase7-3b-wp6-clean-seam-plain-baseline/` (file SHAs in `baseline_checkpoint_sha256`). The
+report is `build/phase7-3b-wp6-clean-seam.json` (schema `jmlx-decode-benchmark-3`, `mode
+"seam-comparison"`; `scope_notes` states what each timer includes, and the memory fields carry
+`load_note`/`memory_note`) and `build/phase7-3b-wp6-clean-seam.md`.
+The raw JSON, including iteration-ordered nanos and all 31 paired samples, is committed at
+[`req/benchmarks/phase7-3b-wp6-seam-c8150b8.json`](benchmarks/phase7-3b-wp6-seam-c8150b8.json),
+SHA-256 `2160e902b729f6582511785e447481315a82377e6b64c2ee66aba787bce1cc38`.
+
+| Metric (p10 / median / p90 over the 31 samples) | Old implicit-causal | Seam explicit-mask |
+| --- | ---: | ---: |
+| Load, ns (both models in one JVM) | 25,135,709 | 48,845,583 |
+| Prefill, ns (`forward`, all positions' logits, fresh caches) | 409,709 / 447,333 / 825,167 | — (inside `generate`) |
+| One-token decode, ns (`forward`, warmed caches) | 316,917 / 330,041 / 468,875 | — (inside `generate`) |
+| Sustained `generate`, ns (32 tokens) | 12,503,875 / 12,859,917 / 19,090,208 | 14,569,208 / 14,891,667 / 17,051,958 |
+| Sustained throughput, tokens/s (median) | 2488.35 | 2148.85 |
+| Paired seam/old sustained-ns ratio (divide each pair, then sort) | — | 0.9572 / 1.1621 / 1.2016 |
+| Active bytes before (range) / after generation | 35,549,184–35,624,532 / 35,549,184 | 35,549,184 / 35,549,184 |
+| Peak generation active bytes | 36,386,111 | 36,577,112 |
+
+In every sample the greedy output on both sides is the all-19 sequence (a consequence of the
+synthetic fixture; the benchmark does not assert output equality).
+
+What the load memory fields include: `MLXMemory.activeBytes()` is the pinned Metal build's
+`mlx::core::get_active_memory()`, the single global Metal allocator's active bytes (on the Metal
+build `allocator::allocator()` *is* the Metal allocator, so every allocation — including the
+file-read buffers of MLX's lazy `Load` primitive — is a shared-storage Metal buffer; there is no
+separate CPU-side counter). The plain `DecoderModel` load is fully lazy: `MLXIO.loadSafetensors`
+builds `Load` primitives on the default CPU stream and nothing evaluates until the first
+forward, so `active_before_load_bytes`, `active_after_old_load_bytes` and
+`old_load_peak_active_bytes` are all 0; the baseline's 4,757,504 resident bytes (4,746,240 F32
+data + 11,264 page-alignment slack) first appear once the warm-up forwards evaluate that load
+graph. The seam's `Qwen3VlModel` load evaluates the whole model graph in place (the
+BF16-to-FLOAT32 up-cast's `eval` during loading), so its 30,791,680 resident bytes (30,778,368
+F32 data + 13,312 slack) are already counted in `active_after_load_bytes`, and
+`seam_load_peak_active_bytes` (31,315,968) is higher by the up-cast temporaries. During
+generation both models stay resident in the one JVM, so each side's generation baseline is the
+sum of both weight sets — 35,549,184 = 30,791,680 + 4,757,504 exactly. Old-side
+pre-generation snapshots sometimes exceed that baseline (up to 35,624,532 B), while all
+after-generation snapshots on both sides return to it; the raw JSON preserves every value.
+The generation peaks differ by 191,001 B; compare each side's deltas, not absolutes. A fresh-JVM
+direct-mode run on the derived baseline alone confirms the load-laziness on the untouched direct
+path: `benchmarkDecode <baseline> <out> 1,2 4 1 0` gives `active_after_load_bytes = 0` and
+`cold_load_peak_active_bytes = 0`, with the weights materialized during the first prefill.
+
+How to read this: on this 2-layer, hidden-256 fixture, the median paired ratio is
+1.1621, a roughly 16% seam slowdown. The p10/p90 spread is 0.9572–1.2016, selected
+at sorted indices 3 and 27 of 31 per-iteration seam/old ratios. It describes the
+observed pairs; it is not a confidence interval and does not establish a noise-level
+cost. The raw nanos reproduce all three ratio percentiles. The sides alternate order
+within the one JVM; thermal, allocator and order effects may remain, and this fixture
+does not establish performance on production models. Load times remain subject to
+the differing page-cache and evaluation behavior described above.
+
+Historical run (superseded): the original seven-sample run was at `4f9ba09` plus
+uncommitted mode changes, later committed as `4990be8`. Its ratio of sustained medians
+was 1.3608 (seam slower). The former p10/p90 quotients divided marginal quantiles,
+not paired ratios, and its summary-only JSON cannot recover the pairs. The original
+noise-level interpretation was withdrawn; the clean run above replaces that evidence.
+
+Correctness does not rest on this run: `Qwen3VlTextOnlyEquivalenceTest` proves the seam's
+text-only logits and rotation state bit-identical to the plain path in enforced float32 mode.
+The load times are not comparable as such (old side: just-derived files, warm page cache,
+no weight evaluation; seam side: committed checkpoint read plus the in-place up-cast evaluation).
+This one-off is not a CI gate and no threshold on the ratio is implied or enforced anywhere.
+
+Schema versions identify report layouts. Direct mode now emits
+`jmlx-decode-benchmark-4` (the original direct layout plus `git_status_porcelain`);
+seam mode emits `jmlx-decode-benchmark-3` (paired statistics, raw samples and git
+status). Previously recorded schema-1 and schema-2 files keep their original versions.

@@ -176,14 +176,16 @@ jobs:
                               'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest',
                               'DecoderSeamTest', 'VisualFeatureInjectionTest',
                               'Qwen3VlVisionTowerGoldenTest', 'Qwen3VlVisionPeakTest',
-                              'Qwen3VlVisionTowerValidationTest'],
+                              'Qwen3VlVisionTowerValidationTest',
+                              'Qwen3VlModelLoadTest', 'Qwen3VlModelAffineLoadTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
           float32_suites = ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                             'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest',
                             'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest',
-                            'Qwen3VlVisionTowerGoldenTest']
+                            'Qwen3VlVisionTowerGoldenTest',
+                            'Qwen3VlTextOnlyEquivalenceTest', 'Qwen3VlModelFloatGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['DecoderSeamTest'] = ['test', 'float32GoldenTest']
@@ -277,11 +279,11 @@ jobs:
           import json
           from pathlib import Path
           data = json.loads(Path('build/phase6-4-ci.json').read_text())
-          required = ('schema', 'checkpoint_sha256', 'cold_load_ns', 'prefill_ns',
+          required = ('schema', 'git_status_porcelain', 'checkpoint_sha256', 'cold_load_ns', 'prefill_ns',
                       'one_token_decode_ns', 'sustained_generation_ns',
                       'tokens_per_second_median', 'peak_generation_active_bytes',
                       'active_per_generated_token_bytes')
           missing = [field for field in required if field not in data]
-          if missing or data['schema'] != 'jmlx-decode-benchmark-1':
+          if missing or data['schema'] != 'jmlx-decode-benchmark-4':
               raise SystemExit(f'benchmark JSON invalid: missing={missing}')
           PY

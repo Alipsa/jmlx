@@ -83,7 +83,8 @@
 | `vocab.json` | 2,776,833 | `ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910` |
 
 **Tensor inventory.** Single shard `model.safetensors`, standard safetensors format (not the
-`mlx` container), **625 tensors, all under the `model.` prefix, all stored as BF16**.
+`mlx` container), with shard `__metadata__: {"format": "pt"}` (the Transformers
+HF float marker), **625 tensors, all under the `model.` prefix, all stored as BF16**.
 
 - **Tied embeddings:** `tie_word_embeddings: true` — `lm_head` aliases
   `model.language_model.embed_tokens`; there is no `lm_head` weight tensor in the checkpoint.
@@ -2235,3 +2236,51 @@ the original captures and these five entries were pinned on the same host
 scalar kernel above computes the values from bit-exact float arithmetic, so
 they are host-independent.
 
+### 11.6 WP6 composite model: dispatch, loaders and the seam one-off (2026-10-25)
+
+WP6 (plan §7) landed `Qwen3VlModel implements TextGenerationModel` composed on the WP4 seam
+(the decoder plus the §11 vision tower; not a `DecoderModel`, so the scheduler's existing
+non-DecoderModel check rejects it). `TextGenerationModels.load` dispatches `qwen3_vl` before
+the generic decoder config parse and rejects `qwen3_vl_moe` by name before model construction;
+the load guard rejects a config with `2 * sum(mrope_section) != head_dim` before construction,
+and the rotary width is derived from `head_dim`, not the section sum (plan §7). Every stored
+floating weight is up-cast to FLOAT32 in place (`upcastAll`: per-tensor `astype` + `eval` +
+original `close`), so the modules operate on one dtype; the affine plan keeps the packed U32
+tensors as-is and up-casts the floating sidecars. Both provenance plans (HF float and the
+MLX-affine conversion) are exercised on the tiny composite checkpoint
+(`tools/hf-reference/goldens/checkpoints/qwen3vl-model`, digest-pinned in
+`tools/hf-reference/provenance.json`):
+
+- `Qwen3VlModelLoadTest` and `Qwen3VlModelAffineLoadTest` (ordinary `test`, required by the
+  macOS CI assertion): load/dispatch/metadata on both plans, the dtype up-cast, the
+  pre-pixels/pre-native rejection paths, and deterministic greedy generation with and without
+  one image; the affine test packs every eligible text weight 4-bit group-64 in Java and
+  compares the packed decoder against the identical weights dequantized to float, isolating the
+  packed kernel from the quantization error itself.
+- `Qwen3VlModelFloatGoldenTest` (full-float32, required): the strict CPU-HF float32 logits
+  golden `tools/hf-reference/goldens/qwen3vl-model-wp6.json` on the four cases (text-only
+  prefill at every position, one-image wrapper-grammar prefill at the last position, one
+  KV-cached decode step after that prefill, and two-image prefill at the last position).
+- `Qwen3VlTextOnlyEquivalenceTest` (full-float32, required): the composite's multi-axis
+  prefill logits on a text-only prompt bit-match a bare Qwen3-family decoder built from the
+  same re-keyed text weights with the family's plain `RopeSpec.Base` rotation — the two paths
+  share one and the same angle table.
+
+The seam one-off benchmark (plan §7's 2026-10-21 PR #57 review addition) ran the new
+`seam-comparison` mode of `:jmlx-examples:benchmarkDecode`, comparing the seam's explicit
+`[1,1,1,L]` masked path against the old implicit-causal path on the same bit-identical text
+weights (the derived plain-qwen3 baseline, verified bit-exact in Java before timing), and is
+recorded with the complete reproducibility tuple in `req/phase6-4-benchmark.md`.
+The replacement run is clean commit `c8150b8`, 31 pairs after five warmups: median
+seam/old ratio 1.1621 (about 16% slower), p10/p90 0.9572/1.2016, with raw iteration
+nanos committed under `req/benchmarks/`. The spread describes these fixture pairs;
+it is not a confidence interval and supports no noise-level or production-performance
+claim. The earlier dirty-tree run and its marginal-quantile error remain documented
+as historical context. This is not a CI gate and implies no threshold.
+
+The review follow-up also adds `qwen3vl-wide-attention.json`: CPU float32 Transformers
+4.57.6 eager logits over the pinned model checkpoint with eight query heads (hidden
+256, attention width 512), asymmetric BF16-exact q_proj/o_proj weights, and text/image
+prefill plus full-history decode references. `Qwen3VlModelFloatGoldenTest` compares
+prefill and KV-cached decode at the unchanged 1e-4 tolerance; all four cases pass. Generator
+and golden digests are enforced by `verifyHfReferenceGoldens`.

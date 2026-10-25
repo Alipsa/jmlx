@@ -2307,9 +2307,16 @@ CI). It uses the existing digest-pinned WP6 checkpoint with two DeepStack levels
 4×4 / 6×4 raw grids, with four prompt layouts: one image, two images, reversed-size images
 with intervening/trailing text, and text-only. Each layout checks prefill plus nine cached
 steps, both greedy history and forced history `[7,10,11,12,13,12,10,13,6]`. Every comparison
-recomputes all images and the entire history using fresh caches, explicit original prompt axes
-and `logicalPosition + originalDelta` continuation axes; visual destinations stay restricted
-to the original prompt. Every greedy ID agrees. Maximum absolute cached/full error:
+recomputes all images and the entire history using fresh caches and the original prompt axes.
+The reference derives `originalDelta = max(originalPromptAxes) + 1 - expandedPromptLength`,
+checks it against the plan's delta, and fills continuation axes explicitly with
+`logicalPosition + originalDelta`, without calling the production decode-position helper.
+Visual destinations stay restricted to the original prompt. Visual features are recomputed
+through production `model.features(...)`; this suite does not independently validate the tower
+or the prompt axes, which are covered by the pinned WP5/WP6 HF references. Every greedy ID
+agrees. A deliberate mutation shifting production `ropePositionAt` by one fails this suite with
+maximum error `0.1356698` against the strict `1e-4` bound; the source was then restored and
+verification rerun. Maximum absolute cached/full error:
 
 | Mode | Observed maximum | Independent allowed bound |
 | --- | ---: | ---: |
@@ -2333,12 +2340,16 @@ The zero-token and pre-native validation tests from WP6 remain required.
 excluding the allocator's free-buffer pool. The pinned fixture has two decoder layers, two
 KV heads, head dimension 64 and FLOAT32 cache state: `2 * 2 * 2 * 64 * 4 = 2048` bytes per
 position. Its one-image case has four merged rows, hidden 256 and two DeepStack levels:
-`4 * 256 * (1 + 2) * 4 = 12288` final visual bytes. The test asserts all final feature handles
-are dead after prefill closes while evaluated KV and position state remain usable. With the
+`4 * 256 * (1 + 2) * 4 = 12288` final visual bytes. Production prefill release is checked through
+exact active-byte measurements while evaluated KV and position state remain usable. A separate
+`model.features(...)` call in a test-owned prefill scope checks that its final feature handles
+survive the image children and become unusable when that test scope closes. No production
+feature handles are captured for dead-handle assertions. With the
 free-buffer pool cleared before decoder prefill, retained post-prefill bytes equal exactly
 `11 * 2048 = 22528`; before the activation scope closes, the immediate prefill-closed
 measurement is exactly those KV bytes plus the 84-byte returned logits. Prefill closure releases
-869844 bytes in the isolated run (871380 in the full-suite allocator context), including all visual storage.
+869844 bytes in the isolated run (871380 in the full-suite allocator context), including all
+visual storage.
 After decode steps 1, 21 and 53, retained bytes are exactly 24576, 65536 and 131072. Endpoints
 21/53 derive from 16/32 KiB per-key/value allocator tiers, avoiding page rounding of an
 unaligned request (e.g. step 32's logical 88064 bytes occupies 131072). Early/late and mid/late
@@ -2348,10 +2359,12 @@ needed at these aligned endpoints; cleanup allows only 512 bytes, below one feat
 
 Eight repetitions of four same/different-size/mixed/text-only requests exercise normal return,
 EOS/stop, cancellation before preprocessing and after a streamed token, listener failure, injected
-vision/prefill/post-prefill/decode errors, actual invalid native transposes at both first and cached sampler evaluation, and an output tokenizer missing a generated
+vision/prefill/post-prefill/decode errors, actual invalid native transposes at both first and
+cached sampler evaluation, and an output tokenizer missing a generated
 non-special token (presence penalty keeps it out of the input). Every failure is followed by
 a baseline check and successful model reuse. Isolated warm baseline/final both 30789632 bytes;
-peak 40518656 bytes (full-suite allocator context: baseline/final 30789656, peak 40520216). These are tiny-checkpoint lifecycle measurements, not real-2B memory or
+peak 40518656 bytes (full-suite allocator context: baseline/final 30789656, peak 40520216).
+These are tiny-checkpoint lifecycle measurements, not real-2B memory or
 throughput claims. The WP5 per-image workspace limit/peak remains the independent vision gate.
 
 Local host: Apple M5 Max, macOS 27.0.1/arm64, Java 25.0.4.1, `mlx-metal` 0.31.2,
@@ -2378,3 +2391,17 @@ verifies all five fixture sets; the locked MLX oracle verifies its macOS 27-comp
 profile and explicitly skips the macOS 26-only Phase 6 profile. That host-policy skip is not
 macOS 26 acceptance. The locked HF wide-attention probe reproduces the pinned output digest
 `3dec41ce9308b5730c40ca32b4efb409ad133785ea06d553a3a132c9e1c33d04` byte-for-byte.
+
+
+PR #60's original [macOS 26.6.2 CI run 316](https://github.com/Alipsa/jmlx/actions/runs/40227040860)
+passed both Java and native jobs. Its `vision-language-native-results` artifact
+(`12612020846`, archive SHA-256
+`96982252b031ef86854c1fe4241faf9506e2fe7fa43d0499f22e9eab05be823a`) records
+`5.364418e-7` maximum cached/full error in both TF32 modes, below the separate `0.003` default
+and `1e-4` strict bounds. This verifies that runner, not every Apple GPU generation.
+The memory suite executed both tests with zero skips/failures/errors: post-prefill exact-byte
+assertions (including the 84-byte logits), aligned KV endpoints and cleanup all passed.
+Reported early/mid/late retention is 24576/65536/131072 bytes; cleanup baseline/final is
+30789656 bytes, peak 40520216. This confirms the allocator assumptions for the pinned fixture
+and runtime on macOS 26 as well as the local host. The test now explicitly guards
+`midStep > 1 && lateStep > midStep` so a future fixture that outgrows these tiers fails by name.

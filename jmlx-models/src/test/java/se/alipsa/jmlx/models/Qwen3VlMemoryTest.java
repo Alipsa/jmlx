@@ -6,9 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.core.MLX;
@@ -49,6 +53,14 @@ class Qwen3VlMemoryTest {
       int tierPositions = (int) (16384 / (kvPerPosition / (2 * config.numHiddenLayers())));
       int midStep = tierPositions - plan.expandedLength();
       int lateStep = 2 * tierPositions - plan.expandedLength();
+      assertTrue(
+          midStep > 1 && lateStep > midStep,
+          "fixture too long for allocator tiers: prompt="
+              + plan.expandedLength()
+              + ", midStep="
+              + midStep
+              + ", lateStep="
+              + lateStep);
       long featureBytes =
           (long) plan.featureDestinations().length
               * config.hiddenSize()
@@ -170,18 +182,7 @@ class Qwen3VlMemoryTest {
       var intactTokenizer = HfTokenizer.fromDirectory(Qwen3VlModelFloatGoldenTest.directory());
       var failurePolicy =
           new GenerationConfig(
-              5,
-              java.util.OptionalLong.empty(),
-              0,
-              0,
-              1,
-              0,
-              1,
-              0,
-              100,
-              java.util.Set.of(),
-              java.util.Set.of(),
-              false);
+              5, OptionalLong.empty(), 0, 0, 1, 0, 1, 0, 100, Set.of(), Set.of(), false);
       var intact =
           GenerationRequest.text(
                   intactTokenizer,
@@ -203,7 +204,7 @@ class Qwen3VlMemoryTest {
               .findFirst()
               .orElseThrow();
       assertTrue(
-          java.util.Arrays.stream(intact.promptTokenIds()).noneMatch(id -> id == first),
+          Arrays.stream(intact.promptTokenIds()).noneMatch(id -> id == first),
           "failure token must not alter input encoding");
       assertTrue(first < 10 || first > 13, "failure token must be non-special");
       vocab.remove(missing);
@@ -227,9 +228,7 @@ class Qwen3VlMemoryTest {
           for (boolean eos : List.of(true, false)) {
             var policy =
                 GenerationConfig.greedyDefaults(
-                    5,
-                    eos ? java.util.Set.of(firstToken) : java.util.Set.of(),
-                    java.util.Set.of(firstToken));
+                    5, eos ? Set.of(firstToken) : Set.of(), Set.of(firstToken));
             assertEquals(
                 eos ? FinishReason.EOS : FinishReason.STOP_TOKEN,
                 model
@@ -302,7 +301,7 @@ class Qwen3VlMemoryTest {
           assertClean(baseline);
           // Fail both first selection and a cached selection through an actual native error.
           for (int failingStep : new int[] {0, 1}) {
-            var evaluations = new java.util.concurrent.atomic.AtomicInteger();
+            var evaluations = new AtomicInteger();
             model
                 .decoderForTest()
                 .setStepBoundaryEvaluatorForTest(

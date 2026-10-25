@@ -163,3 +163,10 @@ WP8's expanded independent HF/default-mode reference acceptance remains pending.
 Host: macOS 27.0.1, Apple M5 Max, MLX 0.31.2, mlx-c fba4470. Request ownership, endpoint
 memory and reproduction commands are recorded in the reference findings §11.7. Supported
 macOS 26 execution is checked separately by the implementation PR's required CI suites.
+
+
+PR #60's [macOS 26 CI run 316](https://github.com/Alipsa/jmlx/actions/runs/40227040860)
+also executed `Qwen3VlCacheEquivalenceTest` in both modes: maximum absolute cached/full error
+`5.364418e-7` in each, with no skips or failures (uploaded `vision-language-native-results`
+artifact `12612020846`). Both independent bounds passed on that runner. This supplies a
+second host measurement; it does not establish an error bound for every Apple GPU generation.

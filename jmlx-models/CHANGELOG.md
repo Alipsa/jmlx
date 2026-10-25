@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Verify Qwen3-VL request-local positions and cached/full logits in both precision modes, including
-  generated markers, and evaluated visual release/KV growth through cancellation and failure paths.
+- Verify Qwen3-VL cached/full logits and continuation-axis consistency in both precision modes,
+  including generated markers, and evaluated visual release/KV growth on cancellation and failure.
   Process images sequentially with cancellation checks between tower executions. FULL and bounded
   FULL retain all positions; sliding retention remains rejected. Real-artifact acceptance is WP8.
 

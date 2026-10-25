@@ -765,9 +765,9 @@ public final class Qwen3VlModel implements TextGenerationModel {
       checkCancellation(cancellation);
       observer.accept("preprocess");
       checkCancellation(cancellation);
+      // On failure, this child also releases partially hoisted tower outputs for this image.
       try (MLXScope vision = prefill.newChild()) {
-        final var processed = processor.process(image);
-        checkCancellation(cancellation);
+        var processed = processor.process(image);
         observer.accept("vision");
         checkCancellation(cancellation);
         var output = tower.forward(vision, List.of(processed));
@@ -781,19 +781,9 @@ public final class Qwen3VlModel implements TextGenerationModel {
     }
     List<MLXArray> deepstack = new ArrayList<>();
     for (List<MLXArray> parts : levels) {
-      deepstack.add(joinFeatures(parts));
+      deepstack.add(Qwen3VlVisionTower.concatenate(parts));
     }
-    return new Qwen3VlVisionFeatures(joinFeatures(merged), deepstack);
-  }
-
-  private static MLXArray joinFeatures(List<MLXArray> parts) {
-    if (parts.size() == 1) {
-      return parts.getFirst();
-    }
-    MLXArray joined = MLXShape.concatenate(parts.toArray(MLXArray[]::new), 0);
-    MLX.eval(joined);
-    parts.forEach(MLXArray::close);
-    return joined;
+    return new Qwen3VlVisionFeatures(Qwen3VlVisionTower.concatenate(merged), deepstack);
   }
 
   /**

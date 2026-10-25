@@ -585,11 +585,11 @@ public final class Qwen3VlVisionTower extends Module {
       Objects.requireNonNull(image, "images element");
       runImage(target, image, mergedParts, deepstackParts, captures);
     }
-    MLXArray merged = mergedParts.size() == 1 ? mergedParts.get(0) : concatenate(mergedParts);
+    MLXArray merged = concatenate(mergedParts);
     List<MLXArray> levels = new ArrayList<>(levelCount);
     for (int level = 0; level < levelCount; level++) {
       List<MLXArray> parts = deepstackParts.get(level);
-      levels.add(parts.size() == 1 ? parts.get(0) : concatenate(parts));
+      levels.add(concatenate(parts));
     }
     return new ForwardCaptures(
         new Qwen3VlVisionFeatures(merged, levels),
@@ -600,9 +600,13 @@ public final class Qwen3VlVisionTower extends Module {
    * Joins the per-image parts of one output level: concatenates them on axis 0 (the parts all live
    * in the caller's target scope, so the concatenation lands there too), evaluates the
    * concatenation, and closes the per-image parts, so only the concatenation's own buffer is
-   * retained in the target scope.
+   * retained in the target scope. A single part is returned unchanged. Package access shares this
+   * ownership rule with the composite model's sequential image processing.
    */
-  private static MLXArray concatenate(List<MLXArray> parts) {
+  static MLXArray concatenate(List<MLXArray> parts) {
+    if (parts.size() == 1) {
+      return parts.getFirst();
+    }
     MLXArray joined = MLXShape.concatenate(parts.toArray(MLXArray[]::new), 0);
     MLX.eval(joined);
     for (MLXArray part : parts) {

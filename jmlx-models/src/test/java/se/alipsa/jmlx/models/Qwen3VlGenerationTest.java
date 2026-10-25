@@ -1,10 +1,13 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -107,9 +110,31 @@ class Qwen3VlGenerationTest {
         assertEquals(FinishReason.CANCELLED, result.finishReason(), boundary);
         if (boundary.equals("initial")) {
           assertTrue(stages.isEmpty());
+        } else if (boundary.equals("preprocess")) {
+          assertEquals(
+              List.of("preprocess"), stages, "cancellation must precede pixel/native work");
+          assertFalse(stages.contains("vision"));
+        } else if (boundary.equals("before-prefill")) {
+          assertEquals(2, stages.stream().filter("vision"::equals).count());
+          assertFalse(stages.contains("prefill-evaluated"));
+          assertFalse(stages.contains("prefill-closed"));
+          assertFalse(stages.contains("decode"));
+        } else if (boundary.equals("prefill-closed") || boundary.equals("listener")) {
+          assertEquals(1, stages.stream().filter("prefill-evaluated"::equals).count());
+          assertEquals(1, stages.stream().filter("prefill-closed"::equals).count());
+          assertFalse(stages.contains("decode"));
+          assertEquals(1, result.generatedTokenIds().size());
+        } else if (boundary.equals("decode")) {
+          assertEquals(1, stages.stream().filter("decode"::equals).count());
+          assertEquals(2, result.generatedTokenIds().size(), "no further decode step may start");
         } else if (boundary.equals("image-closed")) {
           assertEquals(1, stages.stream().filter("vision"::equals).count());
           assertEquals(1, stages.stream().filter("preprocess"::equals).count());
+          assertFalse(stages.contains("before-prefill"));
+          assertFalse(stages.contains("prefill-evaluated"));
+        }
+        if (List.of("initial", "preprocess", "image-closed", "before-prefill").contains(boundary)) {
+          assertTrue(result.generatedTokenIds().isEmpty());
         }
         assertTrue(result.generatedTokenIds().size() < 5);
       }
@@ -161,7 +186,7 @@ class Qwen3VlGenerationTest {
       assertEquals(sampled, model.generate(request, ignored -> {}));
       assertEquals(4, sampled.logProbabilities().size());
       assertEquals(5, events.size());
-      assertTrue(sampled.generatedText() != null);
+      assertNotNull(sampled.generatedText());
       var aborted =
           assertThrows(
               GenerationAbortedException.class,
@@ -174,9 +199,7 @@ class Qwen3VlGenerationTest {
                         }
                       }));
       assertEquals(List.of(first), aborted.generatedTokenIds());
-      assertEquals(
-          java.util.Arrays.stream(base.promptTokenIds()).boxed().toList(),
-          aborted.promptTokenIds());
+      assertEquals(Arrays.stream(base.promptTokenIds()).boxed().toList(), aborted.promptTokenIds());
       assertEquals(5, model.generate(base, ignored -> {}).generatedTokenIds().size());
     }
   }

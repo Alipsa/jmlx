@@ -1,5 +1,7 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -76,9 +78,19 @@ final class Qwen3VlTestSupport {
       Arrays.copyOf(plan.heightPositions(), length),
       Arrays.copyOf(plan.widthPositions(), length)
     };
+    // Derive the continuation origin from the original axes, independently of the production
+    // delta/helper. The pinned WP6 HF golden separately validates the prompt axes themselves.
+    int maxPromptPosition = -1;
+    for (int[] axis : positions) {
+      for (int i = 0; i < promptLength; i++) {
+        maxPromptPosition = Math.max(maxPromptPosition, axis[i]);
+      }
+    }
+    int originalDelta = maxPromptPosition + 1 - promptLength;
+    assertEquals(originalDelta, plan.positionDelta(), "delta derived from original prompt axes");
     for (int i = promptLength; i < length; i++) {
       for (int[] axis : positions) {
-        axis[i] = plan.ropePositionAt(i);
+        axis[i] = i + originalDelta;
       }
     }
     var features = model.features(CancellationToken.NONE, request.images(), scope);

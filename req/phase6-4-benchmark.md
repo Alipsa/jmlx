@@ -339,7 +339,8 @@ export JMLX_BENCH_DEVICE="$(sysctl -n machdep.cpu.brand_string)"
 
 Run on Apple M5 Max, Java 25.0.4.1, `mlx-metal==0.31.2`, mlx-c
 `fba4470b89073180056c9ea46c443051375f7399`, commit
-`4f9ba096e961eeea32888adc8696f59cfdc14255` (branch `phase7-3b-wp6`), `MLX_ENABLE_TF32` unset
+`4990be82b914d39ad946147ea3cbf2a917c7eed4` (branch `phase7-3b-wp6`; the
+`seam-comparison` mode's first commit, which also carries this record), `MLX_ENABLE_TF32` unset
 (native default; both sides run in the one JVM, so both ran in the same mode). Source checkpoint
 `tools/hf-reference/goldens/checkpoints/qwen3vl-model` (2 layers, hidden 256, 4 q / 2 kv heads,
 head_dim 64, `mrope_section [12,10,10]`, vocab 21, tied head, BF16 storage,

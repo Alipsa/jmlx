@@ -459,7 +459,7 @@ is byte-identical to the pinned artifact; the exclusion is documented in
 `Qwen3Vl8bManualProbeTest`'s Javadoc. No loader behavior was weakened.
 
 **Preprocessor-config production change.** The 8B dumps transformers' full-dump
-`preprocessor_config.json` form (27 keys, the inert ones `null`) rather than the 2B's
+`preprocessor_config.json` form (26 keys, the inert ones `null`) rather than the 2B's
 minimal 8-key form. `jmlx-vision`'s `Qwen3VlProcessorConfig` now accepts the full-dump
 form with strict checks: the inert keys (`crop_size`, `device`, `disable_grouping`,
 `do_center_crop`, `do_pad`, `input_data_format`, `pad_size`, `return_tensors`) must be
@@ -483,30 +483,34 @@ the 16-file digest set, the stale-index evidence, the 1,258/254 tensor counts, a
 case: the jmlx-processed pixel bytes' SHA-256 equals the probe's `pixel_values_sha256`
 (byte-exact preprocessing), expanded length, image-token span and RoPE delta from the
 golden. Prompt "Describe the image in one short sentence." (one image message each, 5
-greedy steps). Run under the ordinary `test` task, i.e. **default TF32-enabled mode**,
-not the enforced full-float32 mode. M5 Max, macOS 27.0.1, Java 25, `mlx-metal==0.31.2`,
-mlx-c `fba4470`.
+greedy steps). The probe runs one discarded warm-up sequence per case (first-run Metal
+kernel compilation and cold-cache effects must not enter the timing) and then five
+measured sequences; the table reports the medians with the min–max spread. Run under
+the ordinary `test` task, i.e. **default TF32-enabled mode**, not the enforced
+full-float32 mode. M5 Max, macOS 27.0.1, Java 25, `mlx-metal==0.31.2`, mlx-c `fba4470`.
 
-| Case | Image | Grid | Expanded | Prefill | Decode | jmlx greedy IDs | mlx-vlm probe IDs | Match |
+| Case | Image | Grid | Expanded | Prefill (median, min–max) | Decode ms/tok (median, min–max) | jmlx greedy IDs | mlx-vlm probe IDs | Match |
 | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| 1 | 256x256 | [1,16,16] | 82 | 836 ms (98.1 tok/s) | 61 ms/tok (16.3 tok/s) | `[32, 10876, 20169, 72094, 504]` | `[32, 10876, 20169, 72094, 504]` | exact, 5/5 |
-| 2 | 64x32 | [1,12,24] | 90 | 584 ms (153.9 tok/s) | 52 ms/tok (19.0 tok/s) | `[32, 32976, 20169, 4004, 72094]` | `[32, 32976, 20169, 4004, 72094]` | exact, 5/5 |
+| 1 | 256x256 | [1,16,16] | 82 | 293 ms (274–316) | 49 (47–59) | `[32, 10876, 20169, 72094, 504]` | `[32, 10876, 20169, 72094, 504]` | exact, 5/5 (asserted) |
+| 2 | 64x32 | [1,12,24] | 90 | 273 ms (254–340) | 47 (45–54) | `[32, 32976, 20169, 4004, 72094]` | `[32, 32976, 20169, 4004, 72094]` | exact, 5/5 (asserted) |
 
+That is ~280 and ~330 tokens/s median prefill, ~20 and ~21 tokens/s median decode.
 Decoded output (5 tokens, no stop): case 1 "A smooth gradient transitioning from", case
 2 "A vibrant gradient background transitioning". Minimum top-two logit gap across the
-five steps: 0.0521240234375 (case 1) and 0.8311653137207031 (case 2) — case 1's margin
-is the tighter of the two but the argmax sequences still agree with the independent
-runtime (BF16 native 4-bit Metal kernels) at every step, a stronger result than the plan
-requires (it does not claim ID parity).
+measured steps: 0.0521240234375 (case 1) and 0.8311653137207031 (case 2) — case 1's
+margin is the tighter of the two, but the argmax sequences still agree with the
+independent runtime (BF16 native 4-bit Metal kernels) at every step; the probe test
+asserts that equality (a stronger result than the plan requires, which does not claim
+ID parity), so a rerun that drifts fails the test.
 
 | Metric | Value |
 | --- | ---: |
-| Load wall (15-file run dir, warm page cache) | 975 ms |
-| Peak native allocator bytes (load + both cases) | 9,211,713,618 |
-| Active native bytes after both cases | 7,426,844,608 |
+| Load wall (15-file run dir, warm page cache) | 1,067 ms |
+| Peak native allocator bytes (load + both cases) | 9,211,709,010 |
+| Active native bytes after both cases | 7,426,840,000 |
 
-**Reproducibility tuple.** Base commit `f020006` (PR #61 merge) plus this PR's
-uncommitted-at-measurement changes; test
+**Reproducibility tuple.** Code state: commit `2ef40b8` (clean tree — the probe code
+and all its inputs in this PR, measured before the docs-only follow-up commit); test
 `JMLX_8B_PROBE_DIR=.tier-b/qwen3-vl-8b-instruct-4bit ./gradlew :jmlx-models:test --tests
 "se.alipsa.jmlx.models.Qwen3Vl8bManualProbeTest"`; snapshot verified file-by-file
 against `tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`'s 16 pinned

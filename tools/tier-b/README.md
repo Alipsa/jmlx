@@ -44,9 +44,10 @@ every expected history step are pinned as the binary golden
 generator and the binary are digest-pinned in `tools/hf-reference/provenance.json` and
 verified by `verifyHfReferenceGoldens`. Rendered/unexpanded/expanded prompt IDs, per-image
 processed-pixel hashes, the reference's own top-two gaps and the Java run's measured margins
-gate the exact greedy IDs. Measured local evidence (allocator peak 9,828,890,788 B, sampled
+gate the exact greedy IDs and the end-to-end `generate`'s exact decoded output
+(`expected_text`). Measured local evidence (allocator peak 9,828,890,788 B, sampled
 footprint peak 11,979,116,480 B, load ~843 ms, generation ~247 ms, 4.27 GB artifact disk)
-bounds the suite's assertions; macOS 26 acceptance is still pending.
+sizes the suite's bounds; macOS 26 acceptance is still pending.
 
 ```sh
 ./gradlew downloadTierBArtifact \
@@ -61,13 +62,14 @@ The test samples the test process's physical footprint (libproc's `ri_phys_footp
 the runner's RAM must actually hold, unlike `ps -o rss` which misses MLX/Metal allocations) every
 20 ms and reports the highest sample alongside the native allocator peak, asserting both stay
 below bounds sized from the manifest's recorded local evidence so a memory regression fails the
-suite instead of OOMing the runner. The workflow uploads JUnit numerical/memory evidence even when
+suite explicitly. The workflow uploads JUnit numerical/memory evidence even when
 the test fails.
 
 In CI, the SmolVLM and qwen3vl rows of the `tier-b` workflow run on `macos-26-xlarge`, a
 GitHub larger runner (the qwen3vl row needs the tier because the FLOAT32-up-cast 2B
 checkpoint's measured footprint peak is 11.16 GiB, past the standard runner's 7 GB; its
-13 GiB suite bound plus the Gradle daemon leaves little headroom under the tier's 14 GB, so
+suite footprint bound — 12,500,000,000 bytes, ~520 MB above the measured peak — detects
+a regression but is not a guarantee the tier's 14 GB survives a large regression, so
 the first hosted run is acceptance). GitHub's Actions billing docs state that larger
 runners are always charged per minute, even in public repositories, and that
 larger-runner usage is blocked until a payment method is set up on the account

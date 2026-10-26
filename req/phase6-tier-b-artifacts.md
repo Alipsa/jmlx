@@ -111,7 +111,7 @@ source hash is provenance-pinned) and `tools/tier-b/images/qwen3vl-square-96x96.
 `max_new_tokens: 8`. Both images are below the artifact's declared 65,536-pixel minimum, so the
 declared min-pixel clamp drives the grids: `[[1, 8, 36], [1, 16, 16]]` (merged-row counts 72 and
 64). The chat template is the artifact's own (`tokenizer_config.json` string form, verified
-byte-identical to `chat_template.json`); the recorded unexpanded prompt is 17 tokens and the
+byte-identical to `chat_template.json`); the recorded unexpanded prompt is 18 tokens and the
 expanded prompt is 152 tokens (RoPE delta −110).
 
 **Reference.** `tools/hf-reference/qwen3vl_tier_b.py` (hash-locked CPU float32, single-threaded
@@ -138,7 +138,9 @@ prompt, unexpanded IDs, expanded IDs, delta and per-image token runs, compares e
 decode/prefill logit vector against the reference binary under the recorded epsilon, re-derives
 the reference's own recorded gap/top-two from the reference vectors (pin of the reference's
 internal consistency), and applies the stability gate to both the reference vectors and the
-Java run's own measured margins before asserting the exact greedy IDs, decoded prompt positions,
+Java run's own measured margins before asserting the exact greedy IDs, the exact decoded
+output (the case's `expected_text`, the reference's
+`tokenizer.decode(target_ids, skip_special_tokens=True)`), the prompt positions,
 finish reason and the end-to-end `generate` result.
 
 **Measured local evidence** (manifest `local_evidence`; M5 Max / macOS 27.0.1, TF32 off, pinned
@@ -146,12 +148,15 @@ mlx-metal 0.31.2 / mlx-c fba4470): maximum Java-vs-reference absolute logit erro
 **1.0228157043457031e-4** (stable across repeated runs), hence the recorded
 ε = 2e-4 / margin = 1e-4 (eligibility bound 2ε + margin = 5e-4, two orders of magnitude below
 the 0.1028 minimum gap). MLX allocator peak 9,828,890,788 bytes (suite bound: peak + 500 MiB);
-sampled process footprint peak 11,979,116,480 bytes (suite bound: 13 GiB). Load wall
+sampled process footprint peak 11,979,116,480 bytes (suite bound: 12,500,000,000 bytes,
+~520 MB above the measured peak). Load wall
 ~843 ms; one-request generation wall ~247 ms.
 
 **CI status: pending, not verified.** A `qwen3vl` row was added to
 `.github/workflows/tier-b.yml` on the `macos-26-xlarge` tier (the standard 7 GB runner cannot
-hold the 11.98 GB measured footprint): the 13 GiB suite bound plus the Gradle daemon leaves
-little headroom under the 14 GB tier, and the local M5 Max measurement is the only runner-fit
-evidence so far — the first hosted run is acceptance. Like smolvlm, the larger-runner usage
+hold the 11.98 GB measured footprint). The suite's footprint bound fails the suite on a
+memory regression, but it is not a guarantee the tier's 14 GB survives a large regression
+(the OS and the Gradle daemon share that RAM, and macOS may swap or kill first), and the
+local M5 Max measurement is the only runner-fit evidence so far — the first hosted run is
+acceptance. Like smolvlm, the larger-runner usage
 requires a payment method on the account before it can bill (`tools/tier-b/README.md`).

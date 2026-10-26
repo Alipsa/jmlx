@@ -110,17 +110,25 @@ jobs:
             manifest: tools/tier-b/qwen3vl-2b-instruct.json
             runner: self-macos-xl
     env:
-      # Self-hosted arms only (matrix.runner set): a per-job temp Gradle home, so no
-      # account-level ~/.gradle (e.g. release credentials in gradle.properties) is ever
-      # loaded by a job, and the setup-gradle "already exists" fallback cannot pick up the
-      # runner user's home. Hosted arms keep their default behavior unchanged.
-      GRADLE_USER_HOME: ${{ matrix.runner && format('{0}/gradle-home', runner.temp) || '' }}
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}
       JMLX_TIER_B_SUITE: ${{ matrix.suite }}
       JMLX_TIER_B_MODEL_TYPE: ${{ matrix.model_type }}
       JMLX_TIER_B_MANIFEST: ${{ matrix.manifest }}
     steps:
+      - name: Isolate the Gradle home (self-hosted arms)
+        # matrix.runner is set only for the two self-hosted arms: export a per-job
+        # temp Gradle home to GITHUB_ENV for all later steps, so a CI job never
+        # loads an account-level ~/.gradle (e.g. release credentials in
+        # gradle.properties) and setup-gradle's "already exists" fallback cannot
+        # pick up the runner user's home. Hosted arms skip the step and keep
+        # their default behavior unchanged.
+        if: matrix.runner
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/gradle-home
+        run: |
+          mkdir -p "$GRADLE_USER_HOME"
+          echo "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:

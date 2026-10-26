@@ -769,7 +769,10 @@ in `req/phase6-golden-precision.md`. The model's test observer now emits one `de
 per injected level and the golden test pins that count after every step; the exact greedy-ID
 assertion is degenerate on this checkpoint (recorded in the golden's `greedy_id_note`) and the
 full logit-vector comparison is the binding gate. Local evidence and the shared-contract
-coverage decision are in the reference findings §11.8. Remaining WP8 work: the Tier-B manifest
-(multi-image prompt, measured peak/wall/disk on the pinned 2B artifact), the manual 8B 4-bit
-run with the locked mlx-vlm comparison, and the supported macOS 26 CI execution of the two new
-required suites. No native pin, generated binding or public API changed.
+coverage decision are in the reference findings §11.8. PR #61's macOS 26 CI run 321 executed
+both required suites with no skips or failures; both modes measured the identical
+`2.3245811e-6` there, so TF32 was not active on that runner and the `0.0025` default-mode
+bound is supported only by the local M5 Max measurement. Remaining WP8 work: the Tier-B
+manifest (multi-image prompt, measured peak/wall/disk on the pinned 2B artifact) and the
+manual 8B 4-bit run with the locked mlx-vlm comparison. No native pin, generated binding or
+public API changed.

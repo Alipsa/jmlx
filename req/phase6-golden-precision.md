@@ -159,8 +159,8 @@ absolute cached/full error is `5.662441e-7` with TF32 off under the strict `1e-4
 IDs agree. The latter bound includes margin for reduced-precision kernel variation and does
 not weaken the HF-reference gate. Independent WP6 HF goldens and their digests are
 unchanged. WP8's expanded independent HF/default-mode reference acceptance is recorded
-in the Phase 7.3b WP8 section below (local evidence 2026-10-26; the first supported
-macOS 26 CI execution remains pending).
+in the Phase 7.3b WP8 section below, including its macOS 26 CI execution (local
+evidence 2026-10-26).
 
 Host: macOS 27.0.1, Apple M5 Max, MLX 0.31.2, mlx-c fba4470. Request ownership, endpoint
 memory and reproduction commands are recorded in the reference findings §11.7. Supported
@@ -200,3 +200,11 @@ Host: macOS 27.0.1, Apple M5 Max, Java 25, MLX 0.31.2, mlx-c
 ./gradlew :jmlx-models:float32GoldenTest --tests "se.alipsa.jmlx.models.Qwen3VlGoldenTest"
 ./gradlew :jmlx-models:test --tests "se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest"
 ```
+
+PR #61's [macOS 26 CI run 321](https://github.com/Alipsa/jmlx/actions/runs/40294915661)
+executed `Qwen3VlGoldenTest` and `Qwen3VlDefaultPrecisionTest` with no skips or failures
+(uploaded `vision-language-native-results` artifact `12638440258`). Both modes measured the
+same maximum logit/feature error `2.3245811e-6` on that runner, so TF32 was not active there
+and the default-mode run was effectively full float32: the strict `1e-4` gate passed on a
+second host, while the `0.0025` default-mode bound is still supported only by the local
+M5 Max measurement. The run does not establish an error bound for every Apple GPU generation.

@@ -10,8 +10,9 @@
   WP7 implemented 2026-10-25 (request lifecycle/cache/memory evidence in findings §11.7;
   supported macOS 26 CI acceptance tracked in the implementation PR). WP8 Tier-A acceptance
   implemented 2026-10-26 (independent HF golden, default-mode bound, forced-marker and
-  injection evidence in findings §11.8); WP8's Tier-B manifest, manual 8B 4-bit run and
-  supported macOS 26 CI execution remain work below.
+  injection evidence in findings §11.8; the macOS 26 CI execution of both suites is recorded
+  in findings §11.8, where TF32 was not active on the runner). WP8's Tier-B manifest and
+  manual 8B 4-bit run remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,

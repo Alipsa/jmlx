@@ -2473,11 +2473,11 @@ asserts every forced step's cached logits against the reference's forced-history
 "one/many/zero new tokens, EOS/stop, sampling penalties/filtering, streaming/log probabilities
 and abort result IDs" is accepted from WP7's
 `Qwen3VlGenerationTest.eosStopSamplingStreamingAndAbortUseTheSharedContracts`, which exercises
-exactly those shared generation-loop contracts against the composed `Qwen3VlModel` (loaded from
-the WP6 checkpoint, not the WP8 one) (zero and one new token via stop/EOS, many via max-tokens,
-seeded sampling with repetition/
-frequency/presence penalties and top-k/top-p/min-p filtering, streamed events, log
-probabilities and abort prompt/generated IDs). Those contracts are model-agnostic shared-loop
+exactly those shared generation-loop contracts against the composed `Qwen3VlModel`, loaded
+from the WP6 checkpoint rather than the WP8 one (zero and one new token via stop/EOS, many
+via max-tokens, seeded sampling with repetition/frequency/presence penalties and top-k/
+min-p filtering, streamed events, log probabilities and abort prompt/generated IDs). Those
+contracts are model-agnostic shared-loop
 behavior, not Qwen3-VL-specific numerics, so the checkpoint identity is not load-bearing for
 them; the WP8 golden owns the model-specific reference gate, including the forced marker
 histories. Re-running the shared contracts against the WP8 reference was therefore not
@@ -2501,10 +2501,17 @@ skipped):
 ./gradlew verifyHfReferenceGoldens
 ```
 
+**macOS 26 CI execution (2026-10-26).** PR #61's
+[macOS 26 CI run 321](https://github.com/Alipsa/jmlx/actions/runs/40294915661) executed both
+required suites with no skips or failures (uploaded `vision-language-native-results`
+artifact `12638440258`). Both modes measured the same maximum logit/feature error
+`2.3245811e-6` on that runner, so TF32 was not active there and the default-mode run was
+effectively full float32: the strict `1e-4` gate passed on a second host, while the `0.0025`
+default-mode bound remains supported only by the local M5 Max measurement.
+
 Remaining WP8 scope (not closed by this work): the Tier-B manifest for the pinned 2B artifact
 (with a multi-image prompt, exact decoded output, top-logit margins and measured native peak
 memory/wall time/disk before a weekly job — a resource-blocked CI run is recorded as pending,
-not verified), the manual 8B 4-bit run with the locked `tools/qwen-vl-reference/` mlx-vlm
-comparison recorded in `req/phase6-4-benchmark.md`, and the first supported macOS 26 CI
-execution of the two new required suites. No native pin, generated binding or public API
-changed.
+not verified) and the manual 8B 4-bit run with the locked `tools/qwen-vl-reference/` mlx-vlm
+comparison recorded in `req/phase6-4-benchmark.md`. No native pin, generated binding or
+public API changed.

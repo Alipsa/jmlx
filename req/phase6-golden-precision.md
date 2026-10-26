@@ -159,8 +159,8 @@ absolute cached/full error is `5.662441e-7` with TF32 off under the strict `1e-4
 IDs agree. The latter bound includes margin for reduced-precision kernel variation and does
 not weaken the HF-reference gate. Independent WP6 HF goldens and their digests are
 unchanged. WP8's expanded independent HF/default-mode reference acceptance is recorded
-in the Phase 7.3b WP8 section below, including its macOS 26 CI execution (local
-evidence 2026-10-26).
+in the Phase 7.3b WP8 section below (local evidence 2026-10-26,
+plus its macOS 26 CI execution).
 
 Host: macOS 27.0.1, Apple M5 Max, MLX 0.31.2, mlx-c fba4470. Request ownership, endpoint
 memory and reproduction commands are recorded in the reference findings §11.7. Supported

@@ -2473,14 +2473,13 @@ asserts every forced step's cached logits against the reference's forced-history
 "one/many/zero new tokens, EOS/stop, sampling penalties/filtering, streaming/log probabilities
 and abort result IDs" is accepted from WP7's
 `Qwen3VlGenerationTest.eosStopSamplingStreamingAndAbortUseTheSharedContracts`, which exercises
-exactly those shared generation-loop contracts against the composed `Qwen3VlModel`, loaded
-from the WP6 checkpoint rather than the WP8 one (zero and one new token via stop/EOS, many
-via max-tokens, seeded sampling with repetition/frequency/presence penalties and top-k/
-min-p filtering, streamed events, log probabilities and abort prompt/generated IDs). Those
-contracts are model-agnostic shared-loop
-behavior, not Qwen3-VL-specific numerics, so the checkpoint identity is not load-bearing for
-them; the WP8 golden owns the model-specific reference gate, including the forced marker
-histories. Re-running the shared contracts against the WP8 reference was therefore not
+exactly those shared generation-loop contracts against the composed `Qwen3VlModel`, loaded from
+the WP6 checkpoint rather than the WP8 one (zero and one new token via stop/EOS, many via
+max-tokens, seeded sampling with repetition/frequency/presence penalties and top-k/top-p/min-p
+filtering, streamed events, log probabilities and abort prompt/generated IDs). Those contracts are
+model-agnostic shared-loop behavior, not Qwen3-VL-specific numerics, so the checkpoint identity is
+not load-bearing for them; the WP8 golden owns the model-specific reference gate, including the
+forced marker histories. Re-running the shared contracts against the WP8 reference was therefore not
 required.
 
 **Golden regeneration (2026-10-26).** The generator gained the `greedy_id_note` and a

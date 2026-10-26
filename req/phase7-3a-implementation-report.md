@@ -204,11 +204,14 @@ point.
   contracts, cleanup and the consumer smoke on the merged tree.
 - **macOS 26 CI acceptance (pending):** the first supported hosted execution of the WP6/WP7 native
   suites in the new-CI required-suite assertions, and the first Tier-B SmolVLM row execution on a
-  macOS 26 host. The row now targets the self-hosted `self-macos-xl` runner (macOS 27, the same
-  M5 Max host as the local evidence), whose first execution accepts the CI pipeline, not macOS 26
-  fit; a GitHub-hosted execution would additionally require the account's larger-runner billing to
-  be configured (`tools/tier-b/README.md`). Until both land, the compatibility-matrix row is local
-  eligibility evidence, never a hosted-verified claim.
+  macOS 26 host. The row targets the self-hosted `self-macos-xl` runner (macOS 27, the same
+  M5 Max host as the local evidence), whose first executions with persistent model storage
+  ran green on 2026-10-26 (runs 40403387275 and 40409087523, evidence in
+  `tools/tier-b/README.md`), accepting the
+  CI pipeline, not macOS 26 fit; a GitHub-hosted execution would additionally require the
+  account's larger-runner billing to be configured (`tools/tier-b/README.md`). Until the
+  macOS 26 hosted executions land, the compatibility-matrix row is local-eligibility plus
+  CI-pipeline evidence, never a hosted-verified claim.
 - **Deferred capabilities:** sliding image-prefill KV retention (rejected pending equivalence
   evidence), VLM batching/multimodal scheduler cohorts, Qwen3-VL (Phase 7.3b), LLaVA-style models
   (Phase 7.3c or a dated deferral), and the Phase 6 rows with pending artifact pins (Gemma v1,

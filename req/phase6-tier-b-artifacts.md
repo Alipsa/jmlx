@@ -94,3 +94,17 @@ the seven-artifact consumer and capability-documentation acceptance. The row rem
 eligibility evidence until the first supported macOS 26 hosted execution lands — the weekly
 `macos-26-xlarge` Tier-B row, whose larger-runner usage requires a payment method on the account
 (`tools/tier-b/README.md`).
+
+## Phase 7.3b Qwen3-VL Tier-B status (2026-10-26)
+
+No Qwen3-VL Tier-B manifest is pinned yet. Phase 7.3b WP8 closed the Tier-A acceptance (see
+`phase6-tier-a-fixtures.md` and `req/plans/phase7-3b-reference-findings.md` §11.8) but the
+plan's Tier-B gate is deliberately separate: before a weekly job is added, a multi-image prompt
+must be run on the pinned `Qwen/Qwen3-VL-2B-Instruct` artifact through the existing Java
+manifest/SHA download path, recording the processor/tokenizer/template/image hashes, original
+and expanded prompt IDs, image limits, cache/compute dtype, exact greedy IDs with measured
+top-logit margins, reference provenance, and the native peak memory, wall time and disk use of
+the FLOAT32-up-cast 2B model. The recorded 7 GB RAM / 14 GB disk runner is not assumed to fit
+that model; a resource-blocked CI run will be recorded as pending, not verified. The manual
+8B 4-bit run (with the locked `tools/qwen-vl-reference/` mlx-vlm comparison) is likewise
+recorded in `req/phase6-4-benchmark.md` when executed.

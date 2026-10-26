@@ -331,4 +331,11 @@ FULL or capacity-bounded FULL retention. Sliding retention is rejected for this 
 `Qwen3VlCacheEquivalenceTest` compares cached and fresh full-history logits in both precision
 modes, including generated special-token histories; generation/memory suites cover reuse and
 failure cleanup. See [WP7 evidence](../req/plans/phase7-3b-reference-findings.md#117-wp7-request-lifecycle-cache-equivalence-and-evaluated-memory-2026-10-25).
-Tier-B, expanded independent HF references and manual quantized 8B acceptance remain WP8 work.
+Tier-A acceptance is the WP8 independent HF reference: `Qwen3VlGoldenTest` (full float32, strict
+`1e-4`) and `Qwen3VlDefaultPrecisionTest` (default TF32 bound `0.0025`) run the pinned tiny WP8
+checkpoint's four plan cases and both forced generated-marker continuations against a fresh full
+uncached CPU float32 forward, including tower merged/DeepStack rows and per-step DeepStack
+injection counts; the measured maxima are recorded in `req/phase6-golden-precision.md`. See
+[WP8 evidence](../req/plans/phase7-3b-reference-findings.md#118-wp8-tier-a-acceptance-independent-hf-golden-and-default-mode-bound-2026-10-26).
+Tier-B acceptance for the pinned 2B artifact and the manual quantized 8B 4-bit run remain
+pending.

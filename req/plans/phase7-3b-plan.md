@@ -8,7 +8,11 @@
   (local acceptance evidence: the load/dispatch and strict suites and the seam one-off
   benchmark, recorded in the reference findings §11.6 and `req/phase6-4-benchmark.md`).
   WP7 implemented 2026-10-25 (request lifecycle/cache/memory evidence in findings §11.7;
-  supported macOS 26 CI acceptance tracked in the implementation PR). WP8 remains work below.
+  supported macOS 26 CI acceptance tracked in the implementation PR). WP8 Tier-A acceptance
+  implemented 2026-10-26 (independent HF golden, default-mode bound, forced-marker and
+  injection evidence in findings §11.8; the macOS 26 CI execution of both suites is recorded
+  in findings §11.8, where TF32 was not active on the runner). WP8's Tier-B manifest and
+  manual 8B 4-bit run remain work below.
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -654,7 +658,7 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [x] Old one-dimensional decoder path remains bit-identical in both precision modes.
 - [x] Qwen kernel matrix, delta-shifted decode tests and unchanged `RopeSpec` variants verified.
 - [ ] Vision/merger/DeepStack intermediate references and quantized synthetic tests pass.
-- [ ] All four Tier-A cases and forced generated-marker continuations pass strict/default cached/full-forward checks.
+- [x] All four Tier-A cases and forced generated-marker continuations pass strict/default cached/full-forward checks (WP8 Tier-A, local 2026-10-26; findings §11.8).
 - [x] Resource validation, request reuse, cancellation/failure cleanup and memory bounds pass locally (WP7; findings §11.7).
 - [x] Default per-image attention limit/peak and one-over rejection (WP5), plus post-prefill visual release (WP7), verified locally.
 - [ ] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded.

@@ -157,8 +157,10 @@ against a fresh full-history forward (images recomputed at every reference step)
 absolute cached/full error is `5.662441e-7` with TF32 off under the strict `1e-4` gate, and
 `0.0021870732` with TF32 on under a separate Qwen3-VL cached/full bound of `0.003`. All greedy
 IDs agree. The latter bound includes margin for reduced-precision kernel variation and does
-not weaken the HF-reference gate. Independent WP6 HF goldens and their digests are unchanged;
-WP8's expanded independent HF/default-mode reference acceptance remains pending.
+not weaken the HF-reference gate. Independent WP6 HF goldens and their digests are
+unchanged. WP8's expanded independent HF/default-mode reference acceptance is recorded
+in the Phase 7.3b WP8 section below (local evidence 2026-10-26,
+plus its macOS 26 CI execution).
 
 Host: macOS 27.0.1, Apple M5 Max, MLX 0.31.2, mlx-c fba4470. Request ownership, endpoint
 memory and reproduction commands are recorded in the reference findings §11.7. Supported
@@ -172,3 +174,37 @@ absolute cached/full error `5.364418e-7` on that runner, so TF32 was not active 
 default-mode run was effectively strict float32: the `1e-4` strict bound passed on a second
 host, while the `0.003` default-mode bound is still supported only by the local M5 Max
 measurement. The run does not establish an error bound for every Apple GPU generation.
+
+## Phase 7.3b WP8 local acceptance precision (2026-10-26)
+
+`Qwen3VlGoldenTest` (full float32, TF32 off) runs all six cases of the pinned WP8 acceptance
+golden — one image, two different-size images, image/text/image/text, text-only, and the two
+forced generated-marker continuations — through the Java processor, vision tower, prefill and
+cached decode, comparing every prefill, decode and forced-step logit vector and every merged/
+DeepStack feature row against the golden's fresh, full, uncached CPU-HF float32 reference. The
+measured maximum absolute error is `2.3245811e-6` under the strict `1e-4` gate. The exact
+greedy-ID assertion is degenerate on this 21-token tied checkpoint (token 7 at every base-case
+step; top-two margins 0.4851 to 1.1170, recorded in the golden's provenance), so the full
+logit-vector comparison is the binding gate.
+
+`Qwen3VlDefaultPrecisionTest` runs the same six cases in the default (TF32 on) JVM without the
+greedy-ID assertion (the reduced-precision margin is not pinned). The measured maximum absolute
+logit/feature error is `0.0019590855`, under the separately named Qwen3-VL WP8 TF32 bound
+`0.0025` with about 28% margin. This is local synthetic acceptance evidence against the CPU HF
+reference, not a real-checkpoint error bound, and the strict float32 gate was not weakened.
+
+Host: macOS 27.0.1, Apple M5 Max, Java 25, MLX 0.31.2, mlx-c
+`fba4470b89073180056c9ea46c443051375f7399`. Commands:
+
+```sh
+./gradlew :jmlx-models:float32GoldenTest --tests "se.alipsa.jmlx.models.Qwen3VlGoldenTest"
+./gradlew :jmlx-models:test --tests "se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest"
+```
+
+PR #61's [macOS 26 CI run 321](https://github.com/Alipsa/jmlx/actions/runs/40294915661)
+executed `Qwen3VlGoldenTest` and `Qwen3VlDefaultPrecisionTest` with no skips or failures
+(uploaded `vision-language-native-results` artifact `12638440258`). Both modes measured the
+same maximum logit/feature error `2.3245811e-6` on that runner, so TF32 was not active there
+and the default-mode run was effectively full float32: the strict `1e-4` gate passed on a
+second host, while the `0.0025` default-mode bound is still supported only by the local
+M5 Max measurement. The run does not establish an error bound for every Apple GPU generation.

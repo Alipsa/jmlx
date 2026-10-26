@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add the Phase 7.3b WP8 Tier-A acceptance suites: `Qwen3VlGoldenTest` (full float32, strict
+  `1e-4`) and `Qwen3VlDefaultPrecisionTest` (default TF32 bound `0.0025`) run the pinned tiny
+  WP8 Qwen3-VL checkpoint's four plan cases and both forced generated-marker continuations
+  against the golden's fresh full uncached CPU float32 reference, including expansion/grids/
+  pixel hashes, three-axis positions, tower merged/DeepStack rows and per-step DeepStack
+  injection counts. The tiny checkpoint, golden and generator are digest-pinned; the measured
+  maxima (`2.3245811e-6` strict, `0.0019590855` TF32) are recorded in
+  `req/phase6-golden-precision.md`.
+
 - Verify Qwen3-VL cached/full logits and continuation-axis consistency in both precision modes,
   including generated markers, and evaluated visual release/KV growth on cancellation and failure.
   Process images sequentially with cancellation checks between tower executions. FULL and bounded

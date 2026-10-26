@@ -65,9 +65,17 @@ final class TierBReferences {
   }
 
   void compare(JsonNode expected, float[] actual) {
-    assertEquals(expected.size(), actual.length);
+    float[] values = new float[expected.size()];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = (float) expected.get(i).asDouble();
+    }
+    compare(values, actual);
+  }
+
+  void compare(float[] expected, float[] actual) {
+    assertEquals(expected.length, actual.length);
     for (int i = 0; i < actual.length; i++) {
-      double error = Math.abs(expected.get(i).asDouble() - actual[i]);
+      double error = Math.abs((double) expected[i] - actual[i]);
       maximumError = Math.max(maximumError, error);
       assertTrue(
           Double.isFinite(error) && error <= epsilon,

@@ -147,10 +147,15 @@ jobs:
         # here that the manifest does not cover, so the step removes every file the
         # manifest does not list before the download step re-hashes the listed ones.
         # Hosted arms keep their per-run workspace directory and actions/cache.
+        # The path is built from $HOME inside the script (the job runs as the runner
+        # user, so $HOME is that user's home): the runner context has no home-dir
+        # property, and a shell-level expansion keeps the host-specific path out of
+        # this public workflow.
         if: matrix.runner
-        env:
-          MODEL_DIR: ${{ runner.homeDir }}/tier-b-models/${{ matrix.name }}
         run: |
+          : "${HOME:?the job environment must set HOME}"
+          MODEL_DIR="$HOME/tier-b-models/${{ matrix.name }}"
+          echo "Model dir: $MODEL_DIR"
           mkdir -p "$MODEL_DIR"
           python3 - "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST" <<'PY'
           import json, os, sys

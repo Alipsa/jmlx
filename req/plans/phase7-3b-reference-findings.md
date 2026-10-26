@@ -2582,4 +2582,13 @@ regression detectors; (f) `Qwen3VlProcessorConfig` used Jackson's deprecated
 `data_format: null` / `default_to_square: false` edges; (g) the probe's `Files.walk`
 stream is closed and hardlinks use `Files.createLink`.
 
+**Review round (PR #62 round 3, 2026-10-26).** The round-2 8B figures turned out to
+be host-contended (recorded with a concurrent build running) and did not reproduce:
+re-measured on an idle host (two back-to-back runs agreeing at every median — 91/95 ms
+prefill, 14/13 ms/tok decode, 698/705 ms load wall), with the idle figures now in
+`req/phase6-4-benchmark.md` and the contended ones recorded as non-reproducible; the
+same round reworded the `TierBQwen3VlTest` native-peak bound comment (a regression
+detector, not a guarantee the runner survives a large regression) and fixed a stray
+Javadoc space in the probe.
+
 No native pin or generated binding changed in the remainder.

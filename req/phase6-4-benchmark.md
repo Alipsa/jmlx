@@ -496,7 +496,7 @@ full-float32 mode. M5 Max, macOS 27.0.1, Java 25, `mlx-metal==0.31.2`, mlx-c `fb
 
 That is ~900 and ~950 tokens/s median prefill, ~71 and ~77 tokens/s median decode.
 The table is the first of two back-to-back runs on an idle host (no other builds or
-probes running, load average ~2.6 on the 12-core M5 Max); the second run agreed with
+probes running, load average ~2.6 on the 18-core (6 + 12) M5 Max); the second run agreed with
 it at every median (91/95 ms prefill, 14/13 ms/tok decode) and showed a 705 ms load
 wall. The round-2 recorded figures (293/273 ms median prefill, 1,067 ms load) were
 host-contended and do not reproduce.
@@ -516,7 +516,8 @@ ID parity), so a rerun that drifts fails the test.
 | Active native bytes after both cases | 7,426,848,608 |
 
 **Reproducibility tuple.** Code state: commit `7da9fcb` (clean tree — measured on
-exactly this commit; the diff against `44e8a46` is the round-3 Javadoc wording only); test
+exactly this commit; the diff against `44e8a46` is comment-only — the probe's Javadoc and the
+`TierBQwen3VlTest` native-peak bound comment); test
 `JMLX_8B_PROBE_DIR=.tier-b/qwen3-vl-8b-instruct-4bit ./gradlew :jmlx-models:test --tests
 "se.alipsa.jmlx.models.Qwen3Vl8bManualProbeTest"`; snapshot verified file-by-file
 against `tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`'s 16 pinned

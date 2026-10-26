@@ -81,8 +81,8 @@ hosted runner). If the account later sets up a payment method, a row can be poin
 at `macos-26-xlarge` by changing its `runner` matrix value.
 
 Security and evidence semantics. The runner executes as a dedicated non-privileged macOS
-user whose home holds no Gradle, SSH or release credentials, and file permissions keep it
-out of `/Users/per` (mode 700). The repository additionally requires manual approval for
+user whose home holds no Gradle, SSH or release credentials and which cannot read the
+other users' homes. The repository additionally requires manual approval for
 every external fork-PR run, because `pull_request`-triggered workflows run the PR's own
 files. The self-hosted jobs set a per-job temporary `GRADLE_USER_HOME`, so no
 account-level Gradle properties are ever loaded by a CI job. The runner is the same M5

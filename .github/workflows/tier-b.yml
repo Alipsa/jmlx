@@ -23,11 +23,12 @@ jobs:
     # repositories, and usage is blocked until a payment method is set up on the account
     # (GitHub larger-runners reference and GitHub Actions billing docs), so the arms run free
     # on the self-hosted runner (Apple Silicon, macOS 27, 128 GB RAM). The runner executes
-    # as a dedicated non-privileged macOS user with no Gradle, SSH or release credentials
-    # (its home is separate from /Users/per, which is mode 700), the repository requires
-    # manual approval for every external fork-PR run, and GRADLE_USER_HOME below keeps each
-    # self-hosted job's Gradle state in the per-job temp dir. While the runner is offline
-    # the two jobs wait and GitHub fails them after 24 hours; the other arms are
+    # as a dedicated non-privileged macOS user whose home holds no Gradle, SSH or release
+    # credentials and cannot read the other users' homes, the repository requires manual
+    # approval for every external fork-PR run, and a per-job GRADLE_USER_HOME kept in the
+    # job's temp dir keeps each self-hosted job's Gradle state out of the runner user's
+    # home. While the runner is offline the two jobs wait and GitHub fails them after 24
+    # hours; the other arms are
     # unaffected. The runner is the same M5 Max host (macOS 27.0.1) that produced the local
     # evidence, so the first self-hosted execution of an arm accepts the CI pipeline
     # (checkout, artifact download, native bootstrap, pinned suite), not independent host,

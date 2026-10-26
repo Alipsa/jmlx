@@ -88,9 +88,10 @@ files. The self-hosted jobs set a per-job temporary `GRADLE_USER_HOME`, so no
 account-level Gradle properties are ever loaded by a CI job. The self-hosted arms keep
 their model files in a persistent per-host directory and skip `actions/cache` (which would
 otherwise re-upload gigabytes of already-present files into the repository's cache budget
-each run); the workflow removes every file the manifest does not list before downloading,
-and the download step re-hashes every listed file against the pinned manifest, so a
-previous job cannot plant a file the loaders would read. The runner is the same M5
+each run); the workflow removes every unlisted file and every symlink (the downloader
+also refuses a symlink at any artifact path) and re-hashes every listed file against the
+pinned manifest, so a previous job cannot plant a file the loaders would read. The
+runner is the same M5
 Max host (macOS 27.0.1) that produced the local evidence: its first execution of a row
 accepts the CI pipeline (checkout, artifact download, native bootstrap, pinned suite),
 not independent host, OS or memory-fit evidence, and the supported macOS 26 hosted

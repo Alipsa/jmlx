@@ -144,9 +144,12 @@ jobs:
         # skip actions/cache (which would otherwise re-upload up to ~3.7 GB of
         # already-present files into the repository's 10 GB cache budget, evicting other
         # jobs' caches, while buying the host nothing). A previous job could plant files
-        # here that the manifest does not cover, so the step removes every file the
-        # manifest does not list before the download step re-hashes the listed ones.
-        # Hosted arms keep their per-run workspace directory and actions/cache.
+        # or symlinks here that the manifest does not cover; the download step refuses
+        # a symlink at any artifact path, so a symlink planted at a listed name would
+        # break the arm until someone cleaned it by hand. The step therefore removes
+        # every unlisted file and every symlink (and the empty directories they leave)
+        # before the download step re-hashes the listed ones. Hosted arms keep their
+        # per-run workspace directory and actions/cache.
         # The path is built from $HOME inside the script (the job runs as the runner
         # user, so $HOME is that user's home): the runner context has no home-dir
         # property, and a shell-level expansion keeps the host-specific path out of
@@ -163,9 +166,13 @@ jobs:
 
           root = Path(sys.argv[1])
           listed = {os.path.normpath(k) for k in json.load(open(sys.argv[2]))["files"]}
-          for path in root.rglob("*"):
-              if path.is_file() and os.path.normpath(str(path.relative_to(root))) not in listed:
+          # Deepest first, so a directory is visited after its contents.
+          for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+              rel = os.path.normpath(str(path.relative_to(root)))
+              if path.is_symlink() or (path.is_file() and rel not in listed):
                   path.unlink()
+              elif path.is_dir() and not any(path.iterdir()):
+                  path.rmdir()
           PY
           echo "JMLX_TIER_B_MODEL_DIR=$MODEL_DIR" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v6
@@ -200,7 +207,7 @@ jobs:
         run: ./scripts/bootstrap-native.sh
       - name: Run pinned smoke test
         run: ./gradlew --no-build-cache :jmlx-models:tierBTest
-      - name: Report observed output and assert test executed
+      - name: Report observed output and assert execution on the MLX GPU device
         run: |
           python3 - <<'PY'
           import os
@@ -213,7 +220,10 @@ jobs:
               raise SystemExit('Tier B smoke test did not execute')
           if int(suite.attrib.get('failures', 0)) or int(suite.attrib.get('errors', 0)):
               raise SystemExit('Tier B smoke test failed')
-          print(suite.findtext('system-out') or 'No Tier B observations recorded')
+          out = suite.findtext('system-out') or ''
+          if 'device=gpu' not in out:
+              raise SystemExit('Tier B suite did not run on the MLX GPU device')
+          print(out or 'No Tier B observations recorded')
           PY
       - name: Upload numerical and memory evidence
         if: always()

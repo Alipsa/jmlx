@@ -491,10 +491,16 @@ full-float32 mode. M5 Max, macOS 27.0.1, Java 25, `mlx-metal==0.31.2`, mlx-c `fb
 
 | Case | Image | Grid | Expanded | Prefill (median, min–max) | Decode ms/tok (median, min–max) | jmlx greedy IDs | mlx-vlm probe IDs | Match |
 | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| 1 | 256x256 | [1,16,16] | 82 | 293 ms (274–316) | 49 (47–59) | `[32, 10876, 20169, 72094, 504]` | `[32, 10876, 20169, 72094, 504]` | exact, 5/5 (asserted) |
-| 2 | 64x32 | [1,12,24] | 90 | 273 ms (254–340) | 47 (45–54) | `[32, 32976, 20169, 4004, 72094]` | `[32, 32976, 20169, 4004, 72094]` | exact, 5/5 (asserted) |
+| 1 | 256x256 | [1,16,16] | 82 | 91 ms (90–93) | 14 (13–15) | `[32, 10876, 20169, 72094, 504]` | `[32, 10876, 20169, 72094, 504]` | exact, 5/5 (asserted) |
+| 2 | 64x32 | [1,12,24] | 90 | 95 ms (94–95) | 13 (13–13) | `[32, 32976, 20169, 4004, 72094]` | `[32, 32976, 20169, 4004, 72094]` | exact, 5/5 (asserted) |
 
-That is ~280 and ~330 tokens/s median prefill, ~20 and ~21 tokens/s median decode.
+That is ~900 and ~950 tokens/s median prefill, ~71 and ~77 tokens/s median decode.
+The table is the first of two back-to-back runs on an idle host (no other builds or
+probes running, load average ~2.6 on the 12-core M5 Max); the second run agreed with
+it at every median (91/95 ms prefill, 14/13 ms/tok decode) and showed a 705 ms load
+wall. The round-2 recorded figures (293/273 ms median prefill, 1,067 ms load) were
+host-contended and do not reproduce.
+
 Decoded output (5 tokens, no stop): case 1 "A smooth gradient transitioning from", case
 2 "A vibrant gradient background transitioning". Minimum top-two logit gap across the
 measured steps: 0.0521240234375 (case 1) and 0.8311653137207031 (case 2) — case 1's
@@ -505,12 +511,12 @@ ID parity), so a rerun that drifts fails the test.
 
 | Metric | Value |
 | --- | ---: |
-| Load wall (15-file run dir, warm page cache) | 1,067 ms |
-| Peak native allocator bytes (load + both cases) | 9,211,709,010 |
-| Active native bytes after both cases | 7,426,840,000 |
+| Load wall (15-file run dir, warm page cache) | 698 ms |
+| Peak native allocator bytes (load + both cases) | 9,211,717,618 |
+| Active native bytes after both cases | 7,426,848,608 |
 
-**Reproducibility tuple.** Code state: commit `2ef40b8` (clean tree — the probe code
-and all its inputs in this PR, measured before the docs-only follow-up commit); test
+**Reproducibility tuple.** Code state: commit `7da9fcb` (clean tree — measured on
+exactly this commit; the diff against `44e8a46` is the round-3 Javadoc wording only); test
 `JMLX_8B_PROBE_DIR=.tier-b/qwen3-vl-8b-instruct-4bit ./gradlew :jmlx-models:test --tests
 "se.alipsa.jmlx.models.Qwen3Vl8bManualProbeTest"`; snapshot verified file-by-file
 against `tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`'s 16 pinned

@@ -782,7 +782,11 @@ on 2026-10-26 (findings §11.8): `tools/tier-b/qwen3vl-2b-instruct.json` pins th
 footprint peak 11,979,116,480 B / load ~843 ms / generation ~247 ms); the `tier-b.yml`
 qwen3vl row runs on the self-hosted `self-macos-xl` runner (GitHub's larger
 `macos-26-xlarge` tier is billed per minute even in public repos, so the row does not
-target it) and its first CI run is acceptance (pending, not verified). The manual 8B
+target it); the runner executes as a dedicated non-privileged macOS user with a per-job
+`GRADLE_USER_HOME`, the repo requires approval for every external fork-PR run, and the
+runner is the same M5 Max host (macOS 27.0.1) as the local evidence, so the row's first
+CI run accepts the CI pipeline — not independent host, OS or memory-fit evidence — and
+the macOS 26 hosted execution remains pending, not verified. The manual 8B
 4-bit run (`Qwen3Vl8bManualProbeTest`, opt-in via `JMLX_8B_PROBE_DIR`) recorded its
 image+text output, the artifact's stale-index finding, the full-dump
 `preprocessor_config.json` acceptance in `Qwen3VlProcessorConfig` and asserts the

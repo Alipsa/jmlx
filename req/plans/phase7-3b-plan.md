@@ -17,7 +17,11 @@
   locked `tools/qwen-vl-reference/` mlx-vlm comparison (`req/phase6-4-benchmark.md`). The
   first CI execution of the new `tier-b.yml` qwen3vl row remains pending, not verified
   (the row targets the self-hosted `self-macos-xl` runner; GitHub's larger `macos-26-xlarge`
-  tier is billed per minute even in public repos).
+  tier is billed per minute even in public repos). The runner is the same M5 Max host
+  (macOS 27.0.1) as the local evidence, so that first run accepts the CI pipeline, not
+  independent host, OS or memory-fit evidence; the supported macOS 26 execution evidence
+  remains pending (a macOS 26 hosted tier would require the account's larger-runner
+  billing to be configured).
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,

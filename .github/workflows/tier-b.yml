@@ -22,13 +22,21 @@ jobs:
     # reference) would fit, but larger runners are billed per minute even in public
     # repositories, and usage is blocked until a payment method is set up on the account
     # (GitHub larger-runners reference and GitHub Actions billing docs), so the arms run free
-    # on the self-hosted runner (Apple Silicon, macOS 27, 128 GB RAM); while it is offline the
-    # two jobs queue and the other arms are unaffected. Both arms' suites also assert upper
-    # bounds on the measured peaks as a regression detector: a memory regression that
-    # surfaces while the process still fits in the runner's RAM fails the suite explicitly
-    # rather than as an unattributable runner OOM, but the figures are read after the suite
-    # finishes, so a large enough regression can still OOM-kill the job before the assertion
-    # runs.
+    # on the self-hosted runner (Apple Silicon, macOS 27, 128 GB RAM). The runner executes
+    # as a dedicated non-privileged macOS user with no Gradle, SSH or release credentials
+    # (its home is separate from /Users/per, which is mode 700), the repository requires
+    # manual approval for every external fork-PR run, and GRADLE_USER_HOME below keeps each
+    # self-hosted job's Gradle state in the per-job temp dir. While the runner is offline
+    # the two jobs wait and GitHub fails them after 24 hours; the other arms are
+    # unaffected. The runner is the same M5 Max host (macOS 27.0.1) that produced the local
+    # evidence, so the first self-hosted execution of an arm accepts the CI pipeline
+    # (checkout, artifact download, native bootstrap, pinned suite), not independent host,
+    # OS or memory-fit evidence; the supported macOS 26 hosted execution remains pending.
+    # Both arms' suites also assert upper bounds on the measured peaks as a regression
+    # detector: a memory regression that surfaces while the process still fits in the
+    # runner's RAM fails the suite explicitly rather than as an unattributable runner OOM,
+    # but the figures are read after the suite finishes, so a large enough regression can
+    # still OOM-kill the job before the assertion runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
     strategy:
@@ -90,9 +98,10 @@ jobs:
           # standard 7 GB runner. TierBQwen3VlTest's footprint bound (12,500,000,000 bytes,
           # ~520 MB above the measured peak) fails the suite on a memory regression, but it is
           # not a guarantee the runner's RAM survives a large regression (the OS and the
-          # Gradle daemon share that RAM, and macOS may swap or kill first); the local M5 Max
-          # measurement is the only runner-fit evidence so far, so the first CI run is
-          # acceptance.
+          # Gradle daemon share that RAM, and macOS may swap or kill first). The runner is
+          # the same M5 Max host (128 GB, macOS 27.0.1) that produced the local evidence, so
+          # runner fit is not the open question: the first self-hosted CI run accepts the CI
+          # pipeline, and the supported macOS 26 hosted execution remains pending.
           - name: qwen3vl
             model_type: qwen3_vl
             task: qwen3-vl-generation
@@ -101,6 +110,11 @@ jobs:
             manifest: tools/tier-b/qwen3vl-2b-instruct.json
             runner: self-macos-xl
     env:
+      # Self-hosted arms only (matrix.runner set): a per-job temp Gradle home, so no
+      # account-level ~/.gradle (e.g. release credentials in gradle.properties) is ever
+      # loaded by a job, and the setup-gradle "already exists" fallback cannot pick up the
+      # runner user's home. Hosted arms keep their default behavior unchanged.
+      GRADLE_USER_HOME: ${{ matrix.runner && format('{0}/gradle-home', runner.temp) || '' }}
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}
       JMLX_TIER_B_SUITE: ${{ matrix.suite }}

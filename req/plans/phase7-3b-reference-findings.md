@@ -2542,9 +2542,13 @@ depend on remain pending, not verified.
   wall ~247 ms. The `qwen3vl` row in `.github/workflows/tier-b.yml` runs on the
   self-hosted `self-macos-xl` runner (the standard 7 GB runner cannot hold the measured
   11.16 GiB footprint, and GitHub's larger `macos-26-xlarge` tier is billed per minute
-  even in public repos, so the row does not target it); the local M5 Max measurement is
-  the only runner-fit evidence, so the first CI run is acceptance — recorded pending.
-  `verifyHfReferenceGoldens` now covers the qwen3vl
+  even in public repos, so the row does not target it). The runner is the same M5 Max
+  host (128 GB, macOS 27.0.1) that produced the local evidence, so runner fit is not the
+  open question: the row's first execution accepts the CI pipeline (checkout, artifact
+  download, native bootstrap, pinned suite), not independent host, OS or memory-fit
+  evidence — recorded pending. The macOS 26 hosted executions, which would also be
+  independent hardware, remain pending, not verified. `verifyHfReferenceGoldens` now
+  covers the qwen3vl
   manifest, generator, images and binary (union of the per-task provenance maps).
 - **Manual 8B 4-bit run.** Recorded in `req/phase6-4-benchmark.md` (the WP8 manual-run
   section): the pinned `mlx-community/Qwen3-VL-8B-Instruct-4bit` snapshot (revision

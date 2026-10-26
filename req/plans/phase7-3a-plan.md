@@ -5,8 +5,9 @@
   (2026-10-11) with local memory/precision/real-artifact evidence and merged via PR #46 (merge
   `0d648e1`). WP8 implemented on branch `phase7-3a-wp8` (2026-10-13) via PR #47: required final
   checks re-run on the merged tree and capability documentation finalized; the required macOS 26
-  CI acceptance (native suites and the Tier-B row, which now targets the self-hosted
-  `self-macos-xl` runner) remains pending.
+  CI acceptance (native suites and a Tier-B execution on a macOS 26 host) remains pending: the
+  Tier-B row now targets the self-hosted `self-macos-xl` runner (macOS 27, the same M5 Max host
+  as the local evidence), whose first execution accepts the CI pipeline, not macOS 26 fit.
 - **Parent:** `req/plans/phase7-plan.md` §7.3a, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Prerequisite:** 7.1 layer/oracle/inventory acceptance. 7.2 cross-attention and 7.0 are

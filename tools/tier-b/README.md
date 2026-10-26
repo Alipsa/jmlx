@@ -70,12 +70,23 @@ In CI, the SmolVLM and qwen3vl rows of the `tier-b` workflow run on the self-hos
 footprints exceed the standard runner's 7 GB (the qwen3vl row needs more because the
 FLOAT32-up-cast 2B checkpoint's measured footprint peak is 11.16 GiB; its suite footprint
 bound — 12,500,000,000 bytes, ~520 MB above the measured peak — detects a regression but
-is not a guarantee the runner's RAM survives a large regression, so the first CI run is
-acceptance). GitHub's larger `macos-26-xlarge` tier would fit, but GitHub's Actions
-billing docs state that larger runners are always charged per minute, even in public
-repositories, and that larger-runner usage is blocked until a payment method is set up on
-the account (https://docs.github.com/en/billing/concepts/product-billing/github-actions),
-so the rows run free on the self-hosted runner. While that runner is offline the two
-jobs queue and the other rows are unaffected (they run on the standard hosted runner);
-if the account later sets up a payment method, a row can be pointed back at
-`macos-26-xlarge` by changing its `runner` matrix value.
+is not a guarantee the runner's RAM survives a large regression). GitHub's larger
+`macos-26-xlarge` tier would fit, but GitHub's Actions billing docs state that larger
+runners are always charged per minute, even in public repositories, and that
+larger-runner usage is blocked until a payment method is set up on the account
+(https://docs.github.com/en/billing/concepts/product-billing/github-actions), so the rows
+run free on the self-hosted runner. While that runner is offline the two jobs wait and
+GitHub fails them after 24 hours; the other rows are unaffected (they run on the standard
+hosted runner). If the account later sets up a payment method, a row can be pointed back
+at `macos-26-xlarge` by changing its `runner` matrix value.
+
+Security and evidence semantics. The runner executes as a dedicated non-privileged macOS
+user whose home holds no Gradle, SSH or release credentials, and file permissions keep it
+out of `/Users/per` (mode 700). The repository additionally requires manual approval for
+every external fork-PR run, because `pull_request`-triggered workflows run the PR's own
+files. The self-hosted jobs set a per-job temporary `GRADLE_USER_HOME`, so no
+account-level Gradle properties are ever loaded by a CI job. The runner is the same M5
+Max host (macOS 27.0.1) that produced the local evidence: its first execution of a row
+accepts the CI pipeline (checkout, artifact download, native bootstrap, pinned suite),
+not independent host, OS or memory-fit evidence, and the supported macOS 26 hosted
+execution those rows require remains pending.

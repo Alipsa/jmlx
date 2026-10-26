@@ -27,12 +27,17 @@ jobs:
     # credentials and cannot read the other users' homes, the repository requires manual
     # approval for every external fork-PR run, and a per-job GRADLE_USER_HOME kept in the
     # job's temp dir keeps each self-hosted job's Gradle state out of the runner user's
-    # home. While the runner is offline the two jobs wait and GitHub fails them after 24
-    # hours; the other arms are
-    # unaffected. The runner is the same M5 Max host (macOS 27.0.1) that produced the local
-    # evidence, so the first self-hosted execution of an arm accepts the CI pipeline
-    # (checkout, artifact download, native bootstrap, pinned suite), not independent host,
-    # OS or memory-fit evidence; the supported macOS 26 hosted execution remains pending.
+    # home. The self-hosted arms also keep their model files in a persistent per-host
+    # directory (the manifest-pinned files survive between runs, so the arms skip
+    # actions/cache and do not re-upload gigabytes of already-present model files into the
+    # repository's cache budget); every file the manifest does not list is removed before
+    # the download step re-hashes and fills in the listed ones, so a previous job cannot
+    # plant a file the loaders would read. While the runner is offline the two jobs wait
+    # and GitHub fails them after 24 hours; the other arms are unaffected. The runner is
+    # the same M5 Max host (macOS 27.0.1) that produced the local evidence, so the first
+    # self-hosted execution of an arm accepts the CI pipeline (checkout, artifact download,
+    # native bootstrap, pinned suite), not independent host, OS or memory-fit evidence; the
+    # supported macOS 26 hosted execution remains pending.
     # Both arms' suites also assert upper bounds on the measured peaks as a regression
     # detector: a memory regression that surfaces while the process still fits in the
     # runner's RAM fails the suite explicitly rather than as an unattributable runner OOM,
@@ -111,6 +116,8 @@ jobs:
             manifest: tools/tier-b/qwen3vl-2b-instruct.json
             runner: self-macos-xl
     env:
+      # Self-hosted arms override this via GITHUB_ENV (persistent per-host model dir,
+      # see the step after checkout); hosted arms use the per-run workspace dir.
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}
       JMLX_TIER_B_SUITE: ${{ matrix.suite }}
@@ -131,6 +138,31 @@ jobs:
           mkdir -p "$GRADLE_USER_HOME"
           echo "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+      - name: Use persistent host storage for the model (self-hosted arms)
+        # matrix.runner is set only for the two self-hosted arms: this machine keeps its
+        # own disk, so the manifest-pinned model files survive between runs and the arms
+        # skip actions/cache (which would otherwise re-upload up to ~3.7 GB of
+        # already-present files into the repository's 10 GB cache budget, evicting other
+        # jobs' caches, while buying the host nothing). A previous job could plant files
+        # here that the manifest does not cover, so the step removes every file the
+        # manifest does not list before the download step re-hashes the listed ones.
+        # Hosted arms keep their per-run workspace directory and actions/cache.
+        if: matrix.runner
+        env:
+          MODEL_DIR: ${{ runner.homeDir }}/tier-b-models/${{ matrix.name }}
+        run: |
+          mkdir -p "$MODEL_DIR"
+          python3 - "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST" <<'PY'
+          import json, os, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          listed = {os.path.normpath(k) for k in json.load(open(sys.argv[2]))["files"]}
+          for path in root.rglob("*"):
+              if path.is_file() and os.path.normpath(str(path.relative_to(root))) not in listed:
+                  path.unlink()
+          PY
+          echo "JMLX_TIER_B_MODEL_DIR=$MODEL_DIR" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -149,7 +181,11 @@ jobs:
         with:
           python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
+      # Hosted arms only: the self-hosted arms use persistent host storage (see the step
+      # after checkout), so caching their model directory would only re-upload up to ~3.7 GB
+      # into the repository's 10 GB cache budget every run.
       - uses: actions/cache@v4
+        if: '!matrix.runner'
         with:
           path: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
           key: tier-b-${{ matrix.name }}-${{ matrix.revision }}

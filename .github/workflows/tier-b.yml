@@ -21,8 +21,10 @@ jobs:
     # runner: GitHub charges it per minute even in public repositories, and usage is blocked
     # until a payment method is set up on the account (GitHub larger-runners reference and
     # GitHub Actions billing docs). TierBVisionLanguageTest also asserts upper bounds on the
-    # measured peaks, so a memory regression fails the suite explicitly instead of killing
-    # the runner.
+    # measured peaks as a regression detector: a memory regression that surfaces while the
+    # process still fits in the tier's RAM fails the suite explicitly rather than as an
+    # unattributable runner OOM, but the figures are read after the suite finishes, so a large
+    # enough regression can still OOM-kill the job before the assertion runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
     strategy:

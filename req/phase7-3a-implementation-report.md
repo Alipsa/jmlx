@@ -121,12 +121,15 @@ footprint (which the hosted runner's RAM must actually hold) and gates both figu
 `MLXMemory.peakBytes() <= 6,261,704,464` (recorded peak plus 500 MiB, below one extra float32
 weight copy) and `footprint <= 8 GiB` (about 20% above the measured peak). Because the 7.1 GB
 measured footprint alone exceeds the standard `macos-26` arm64 hosted runner's 7 GB of RAM, the
-Tier-B smolvlm row runs on `macos-26-xlarge` (arm64 M2, 14 GB); a memory regression now fails the
-suite explicitly instead of OOM-killing the job. These measurements precede addition of the
-weekly/on-demand SmolVLM CI row. Hosted macOS 26 execution/fit remains pending. An earlier 17-tile
-square-input probe also passed, with maximum error `8.58306884765625e-5` and native peak
-5,739,185,936 bytes; the committed case uses the five-tile wide opaque RGB fixture. Neither
-existing golden values nor strict tolerances were changed to choose that case.
+Tier-B smolvlm row runs on `macos-26-xlarge` (arm64 M2, 14 GB); the bounds are a regression
+detector, not a guarantee the tier survives a large regression: a regression that surfaces while
+the process still fits in the RAM fails the suite explicitly, but the figures are read after the
+suite finishes, so a large enough regression still OOM-kills the job before the assertion runs.
+These measurements precede addition of the weekly/on-demand SmolVLM CI row. Hosted macOS 26
+execution/fit remains pending. An earlier 17-tile square-input probe also passed, with maximum
+error `8.58306884765625e-5` and native peak 5,739,185,936 bytes; the committed case uses the
+five-tile wide opaque RGB fixture. Neither existing golden values nor strict tolerances were
+changed to choose that case.
 
 The generate-only `vision_tier_b.py` uses the existing hash-locked CPython 3.12/Pillow 12.3.0/
 NumPy 2.5.3/Transformers 4.57.6/Torch 2.6.0 environment, raw PIL open/load and explicit slow

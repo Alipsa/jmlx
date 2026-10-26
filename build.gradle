@@ -623,9 +623,13 @@ tasks.register('verifyHfReferenceGoldens') {
     inputs.file(provenance)
     inputs.file(lock)
     inputs.files(fileTree(goldens))
-    // WP7's opt-in real-artifact reference inputs/outputs are committed and hash-pinned too.
-    inputs.files(fileTree('tools/tier-b') { include 'smolvlm-256m-instruct.json', 'images/**' })
+    // WP7's and Phase 7.3b WP8's opt-in real-artifact reference inputs/outputs are committed
+    // and hash-pinned too (the logits binary is covered by the goldens fileTree above).
+    inputs.files(fileTree('tools/tier-b') {
+        include 'smolvlm-256m-instruct.json', 'qwen3vl-2b-instruct.json', 'images/**'
+    })
     inputs.file('tools/hf-reference/vision_tier_b.py')
+    inputs.file('tools/hf-reference/qwen3vl_tier_b.py')
     inputs.file('tools/hf-reference/qwen3vl_model.py')
     inputs.file('tools/hf-reference/qwen3vl_wide_attention.py')
     inputs.file('tools/hf-reference/qwen3vl_wp8.py')
@@ -665,30 +669,41 @@ tasks.register('verifyHfReferenceGoldens') {
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no vision Tier-B hashes')
         }
+        def qwen3vlTierBFiles = metadata.qwen3vl_tier_b_files
+        if (!(qwen3vlTierBFiles instanceof Map) || qwen3vlTierBFiles.isEmpty()) {
+            throw new GradleException('Hugging Face provenance has no Qwen3-VL Tier-B hashes')
+        }
         def repositoryRoot = projectDir.toPath().toRealPath()
-        // The map must cover exactly the files declared as this task's inputs: the vision
-        // Tier-B manifest, the reference generator, and every file under images/ -- a
-        // removed entry or an unprovenanced new file both fail the build.
+        // The union of the per-task maps must cover exactly the files declared as this task's
+        // inputs: both Tier-B manifests, both reference generators, and every file under
+        // images/ -- a removed entry or an unprovenanced new file both fail the build.
         def actualVisionPaths = (['tools/tier-b/smolvlm-256m-instruct.json',
-                'tools/hf-reference/vision_tier_b.py'] + fileTree('tools/tier-b/images').files.collect {
+                'tools/tier-b/qwen3vl-2b-instruct.json',
+                'tools/hf-reference/vision_tier_b.py',
+                'tools/hf-reference/qwen3vl_tier_b.py'] + fileTree('tools/tier-b/images').files.collect {
             repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
         }).toSet()
-        if (visionFiles.keySet().toSet() != actualVisionPaths) {
+        def provenancedVisionPaths = (visionFiles.keySet() + qwen3vlTierBFiles.keySet()).toSet()
+        if (provenancedVisionPaths != actualVisionPaths) {
             throw new GradleException("Vision Tier-B provenance file set differs: " +
-                    "missing ${visionFiles.keySet() - actualVisionPaths}; " +
-                    "extra ${actualVisionPaths - visionFiles.keySet()}")
+                    "missing ${provenancedVisionPaths - actualVisionPaths}; " +
+                    "extra ${actualVisionPaths - provenancedVisionPaths}")
         }
-        visionFiles.each { relativePath, expectedHash ->
-            def path = repositoryRoot.resolve(relativePath.toString()).normalize()
-            if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
-                    !path.toRealPath().startsWith(repositoryRoot)) {
-                throw new GradleException("Invalid vision Tier-B reference path: ${relativePath}")
-            }
-            def actualHash = sha256File(path.toFile())
-            if (actualHash != expectedHash) {
-                throw new GradleException("Vision Tier-B reference SHA-256 differs: ${relativePath}")
+        def verifyVisionTierBHash = { String label, Map hashMap ->
+            hashMap.each { relativePath, expectedHash ->
+                def path = repositoryRoot.resolve(relativePath.toString()).normalize()
+                if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
+                        !path.toRealPath().startsWith(repositoryRoot)) {
+                    throw new GradleException("Invalid ${label} Tier-B reference path: ${relativePath}")
+                }
+                def actualHash = sha256File(path.toFile())
+                if (actualHash != expectedHash) {
+                    throw new GradleException("${label} Tier-B reference SHA-256 differs: ${relativePath}")
+                }
             }
         }
+        verifyVisionTierBHash('Vision', visionFiles)
+        verifyVisionTierBHash('Qwen3-VL', qwen3vlTierBFiles)
         def processedPatches = metadata.qwen3vl_processed_patches
         if (!(processedPatches instanceof Map) || processedPatches.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no Qwen3-VL processed-patch hashes')

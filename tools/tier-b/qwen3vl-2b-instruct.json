@@ -1,0 +1,417 @@
+{
+  "repository": "Qwen/Qwen3-VL-2B-Instruct",
+  "revision": "89644892e4d85e24eaac8bacfd4f463576704203",
+  "task": "qwen3-vl-generation",
+  "license": "Apache-2.0",
+  "license_evidence": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/blob/89644892e4d85e24eaac8bacfd4f463576704203/README.md",
+  "max_total_bytes": 4266647442,
+  "files": {
+    "model.safetensors": {
+      "sha256": "7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "max_bytes": 4255140312
+    },
+    "config.json": {
+      "sha256": "bec4b3d446efa05807365c9e1cec03ac590836879d02f3a6da879971154bdd3b",
+      "max_bytes": 1505
+    },
+    "tokenizer.json": {
+      "sha256": "a5d85b6dcc535e6b93115a9ef287e6132fdbf30270da6218194ba742261173c7",
+      "max_bytes": 7032403
+    },
+    "tokenizer_config.json": {
+      "sha256": "c2da771801886ad9ae98181793ffd3dfb7f1af30f6f7c6a4e15d7dbba52e2399",
+      "max_bytes": 10868
+    },
+    "vocab.json": {
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "max_bytes": 2776833
+    },
+    "merges.txt": {
+      "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+      "max_bytes": 1671839
+    },
+    "chat_template.json": {
+      "sha256": "6f8a6a55027e3da5160105556cda5dd69f6423f1c32645f6730d32de7773d0c4",
+      "max_bytes": 5502
+    },
+    "preprocessor_config.json": {
+      "sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "max_bytes": 390
+    },
+    "generation_config.json": {
+      "sha256": "1e241830b48b397cb0900101421df5450baddc7adf01e5fc86b5615865f3bae4",
+      "max_bytes": 269
+    },
+    "video_preprocessor_config.json": {
+      "sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+      "max_bytes": 385
+    },
+    "README.md": {
+      "sha256": "5fc5be1ca9a3910399bd6239ee5086ab5d82a2a59c5d2b00e887a8835cc110e4",
+      "max_bytes": 7136
+    }
+  },
+  "images": [
+    {
+      "path": "tools/tier-b/images/qwen3vl-wide-200x40.png",
+      "sha256": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
+      "license": "MIT",
+      "provenance": "Synthetic opaque RGB pattern copied unchanged from tools/image-oracle/fixtures/resize/wide-200x40.png, whose source hash is pinned in the image oracle provenance; project MIT license."
+    },
+    {
+      "path": "tools/tier-b/images/qwen3vl-square-96x96.png",
+      "sha256": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741",
+      "license": "MIT",
+      "provenance": "Synthetic opaque RGB pattern copied unchanged from tools/image-oracle/fixtures/resize/square-96x96.png, whose source hash is pinned in the image oracle provenance; project MIT license."
+    }
+  ],
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "image"
+            },
+            {
+              "type": "image"
+            },
+            {
+              "type": "text",
+              "text": "Describe both images."
+            }
+          ]
+        }
+      ],
+      "image_indices": [
+        0,
+        1
+      ],
+      "max_new_tokens": 8
+    }
+  ],
+  "image_limits": {
+    "min_pixels": 65536,
+    "max_pixels": 16777216,
+    "raw_row_budget": 4096,
+    "hard_cap_pixels": 1048576
+  },
+  "cache_compute_dtype": "float32 (stored bfloat16 up-cast in place; KV cache and compute float32, TF32 off in the Tier-B suite)",
+  "recorded_pin": "mlxMetalVersion=0.31.2\nmlxcCommit=fba4470b89073180056c9ea46c443051375f7399",
+  "reference": {
+    "status": "eligible after measured real-checkpoint error; local macOS 27 run passed; macOS 26 CI pending",
+    "epsilon": 0.0002,
+    "margin": 0.0001,
+    "precision": "CPU float32 eager; Java TF32 off",
+    "image_loading": "raw PIL.Image.open -> load -> slow Qwen2VLImageProcessor per image",
+    "versions": {
+      "python": "3.12.16",
+      "torch": "2.6.0",
+      "transformers": "4.57.6",
+      "pillow": "12.3.0",
+      "numpy": "2.5.3"
+    },
+    "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b",
+    "generator_sha256": "21c8c07ae3d3f92fa4d01fee3536a2703f17fd4b51f51eaba0ff301b3f70d8b0",
+    "source_sha256": {
+      "Qwen3VLProcessor": "efd8d64aaf608aad1ffb3e6d503d6a99e5227d007df95c1d9fa905d998cda4a9",
+      "Qwen2VLImageProcessor": "7820a0fcca107e75605e08d9b774285ca2b0316f857bc0225c779794705ecf4f",
+      "Qwen3VLForConditionalGeneration": "dd63ed3b124232735b3dca1bfa28f9d6b0d3f7182afcb75dde8f3e724b2b22da"
+    },
+    "logits_file": {
+      "path": "tools/hf-reference/goldens/qwen3vl-tier-b-logits.bin",
+      "sha256": "2b44f9f2984c8d9f6b0db67937d1777dd4641343936bbd70711a36559ae76afb",
+      "layout": "little-endian float32; per case, per greedy step, one full vocab-size vector per step"
+    },
+    "cases": [
+      {
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image"
+              },
+              {
+                "type": "image"
+              },
+              {
+                "type": "text",
+                "text": "Describe both images."
+              }
+            ]
+          }
+        ],
+        "image_indices": [
+          0,
+          1
+        ],
+        "max_new_tokens": 8,
+        "rendered_prompt": "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|><|vision_start|><|image_pad|><|vision_end|>Describe both images.<|im_end|>\n<|im_start|>assistant\n",
+        "unexpanded_ids": [
+          151644,
+          872,
+          198,
+          151652,
+          151655,
+          151653,
+          151652,
+          151655,
+          151653,
+          74785,
+          2176,
+          5335,
+          13,
+          151645,
+          198,
+          151644,
+          77091,
+          198
+        ],
+        "expanded_ids": [
+          151644,
+          872,
+          198,
+          151652,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151653,
+          151652,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151655,
+          151653,
+          74785,
+          2176,
+          5335,
+          13,
+          151645,
+          198,
+          151644,
+          77091,
+          198
+        ],
+        "grids": [
+          [
+            1,
+            8,
+            36
+          ],
+          [
+            1,
+            16,
+            16
+          ]
+        ],
+        "delta": -110,
+        "target_ids": [
+          785,
+          1378,
+          5335,
+          3897,
+          525,
+          19516,
+          13,
+          2379
+        ],
+        "gaps": [
+          0.9052238464355469,
+          1.6865882873535156,
+          6.978729248046875,
+          1.2394294738769531,
+          7.5912933349609375,
+          0.10282325744628906,
+          1.8856163024902344,
+          2.145343780517578
+        ],
+        "top_two_ids": [
+          [
+            785,
+            20629
+          ],
+          [
+            1378,
+            3897
+          ],
+          [
+            5335,
+            3897
+          ],
+          [
+            3897,
+            525
+          ],
+          [
+            525,
+            4994
+          ],
+          [
+            19516,
+            7009
+          ],
+          [
+            13,
+            11
+          ],
+          [
+            2379,
+            11733
+          ]
+        ],
+        "pixel_values_sha256": [
+          "7f0311e2bad2b621a53606c12f0e4266c3233a88e512b115251836bde393cc9f",
+          "53a995f4544376f4f66b67e285fa83ba64d69cfcc8055256975568ca6612f948"
+        ],
+        "expected_text": "The two images provided are identical. They",
+        "finish_reason": "MAX_TOKENS"
+      }
+    ]
+  },
+  "local_evidence": {
+    "date": "2026-10-26",
+    "host": "macOS 27.0.1 / Apple Silicon (M5 Max, 128 GB)",
+    "tf32": false,
+    "max_abs_logit_error": 0.00010228157043457031,
+    "native_peak_bytes": 9828890788,
+    "sampled_peak_phys_footprint_bytes": 11979116480,
+    "footprint_sample_interval_ms": 20,
+    "sampled_peak_jvm_rss_kib": 1779008,
+    "rss_sample_interval_ms": 20,
+    "load_wall_ms": 843,
+    "generate_wall_ms": 247,
+    "generate_scope": "one multi-image request: 152-token expanded prompt, 8 greedy steps",
+    "download_bytes": 4266647442
+  }
+}

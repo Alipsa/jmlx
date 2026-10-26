@@ -105,7 +105,8 @@
     "checkpoints/qwen3vl-wp8/preprocessor_config.json": "ad57fd445e3ffa746befc3c631b585d31b989554f9e7bb4725c934ccaac0bab7",
     "checkpoints/qwen3vl-wp8/tokenizer.json": "43434cb4048b6b40dacd4e25a4e65cad7c51f54e64a137323b377ddc8164024d",
     "checkpoints/qwen3vl-wp8/images/a.png": "3d783f94d701523644fc935bc4a62182b7783fc6cb7445bc9f9f775ca7627f30",
-    "checkpoints/qwen3vl-wp8/images/b.png": "7d39939c91fbc54bb76e749b42470e74cc95061e4f6e33762ce1fb713a40a5d4"
+    "checkpoints/qwen3vl-wp8/images/b.png": "7d39939c91fbc54bb76e749b42470e74cc95061e4f6e33762ce1fb713a40a5d4",
+    "qwen3vl-tier-b-logits.bin": "2b44f9f2984c8d9f6b0db67937d1777dd4641343936bbd70711a36559ae76afb"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -159,5 +160,11 @@
   },
   "qwen3vl_model_generator_sha256": "1677b82de22e2b7ab88da28d848a8635d26ec94e7b4fb4f6730738f0635ca409",
   "qwen3vl_wide_attention_generator_sha256": "3ffed6141f2180ea5fb70d4e78a32234550f08042e1564ffa13b704382216a64",
-  "qwen3vl_wp8_generator_sha256": "65ba377a83b848e788d8f5eb844c2cfcf29187a36f89b5f14c3c790185941e88"
+  "qwen3vl_wp8_generator_sha256": "65ba377a83b848e788d8f5eb844c2cfcf29187a36f89b5f14c3c790185941e88",
+  "qwen3vl_tier_b_files": {
+    "tools/tier-b/qwen3vl-2b-instruct.json": "5ebfaf7a2130e7a8e016c260a6be20831f986579b6f1bcc532240e188f898c8a",
+    "tools/hf-reference/qwen3vl_tier_b.py": "21c8c07ae3d3f92fa4d01fee3536a2703f17fd4b51f51eaba0ff301b3f70d8b0",
+    "tools/tier-b/images/qwen3vl-wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
+    "tools/tier-b/images/qwen3vl-square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741"
+  }
 }

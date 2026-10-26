@@ -95,16 +95,68 @@ eligibility evidence until the first supported macOS 26 hosted execution lands �
 `macos-26-xlarge` Tier-B row, whose larger-runner usage requires a payment method on the account
 (`tools/tier-b/README.md`).
 
-## Phase 7.3b Qwen3-VL Tier-B status (2026-10-26)
+## Phase 7.3b Qwen3-VL Tier-B (2026-10-26)
 
-No Qwen3-VL Tier-B manifest is pinned yet. Phase 7.3b WP8 closed the Tier-A acceptance (see
-`phase6-tier-a-fixtures.md` and `req/plans/phase7-3b-reference-findings.md` §11.8) but the
-plan's Tier-B gate is deliberately separate: before a weekly job is added, a multi-image prompt
-must be run on the pinned `Qwen/Qwen3-VL-2B-Instruct` artifact through the existing Java
-manifest/SHA download path, recording the processor/tokenizer/template/image hashes, original
-and expanded prompt IDs, image limits, cache/compute dtype, exact greedy IDs with measured
-top-logit margins, reference provenance, and the native peak memory, wall time and disk use of
-the FLOAT32-up-cast 2B model. The recorded 7 GB RAM / 14 GB disk runner is not assumed to fit
-that model; a resource-blocked CI run will be recorded as pending, not verified. The manual
-8B 4-bit run (with the locked `tools/qwen-vl-reference/` mlx-vlm comparison) is likewise
-recorded in `req/phase6-4-benchmark.md` when executed.
+`tools/tier-b/qwen3vl-2b-instruct.json` pins `Qwen/Qwen3-VL-2B-Instruct` at revision
+`89644892e4d85e24eaac8bacfd4f463576704203` (Apache-2.0, license evidence URL in the manifest):
+the 11-file WP0 inventory, 4,266,647,442 bytes in aggregate, each file SHA-256- and
+size-capped, downloaded through the Java `downloadTierBArtifact` manifest/SHA path (verified
+locally, 4,266,647,442 bytes).
+
+**Request.** One multi-image request (the plan's required multi-image prompt): a user message
+carrying two images — `tools/tier-b/images/qwen3vl-wide-200x40.png`
+(sha `61f3af15…`, copied unchanged from the image-oracle `resize/wide-200x40.png` fixture, whose
+source hash is provenance-pinned) and `tools/tier-b/images/qwen3vl-square-96x96.png`
+(sha `44d78692…`, same provenance) — with the text "Describe both images.",
+`max_new_tokens: 8`. Both images are below the artifact's declared 65,536-pixel minimum, so the
+declared min-pixel clamp drives the grids: `[[1, 8, 36], [1, 16, 16]]` (merged-row counts 72 and
+64). The chat template is the artifact's own (`tokenizer_config.json` string form, verified
+byte-identical to `chat_template.json`); the recorded unexpanded prompt is 18 tokens and the
+expanded prompt is 152 tokens (RoPE delta −110).
+
+**Reference.** `tools/hf-reference/qwen3vl_tier_b.py` (hash-locked CPU float32, single-threaded
+eager, transformers 4.57.6; the 4.57.6 slow-processor size-override bug compensated with
+explicit `min_pixels`/`max_pixels` exactly as the WP1 probe documents) renders the prompt,
+expands the two images, and records the full-vocabulary logit vector at every expected greedy
+history step. The vectors are stored as a little-endian float32 binary
+(`tools/hf-reference/goldens/qwen3vl-tier-b-logits.bin`, 4,861,952 bytes, sha
+`2b44f9f2…9ae76afb`; one full 151,936-vector per step — a documented size-driven deviation from
+the JSON logits goldens, following the shared Qwen3-VL patch-bin precedent). Provenance pins the
+manifest, generator, both images and the binary in
+`tools/hf-reference/provenance.json` (`qwen3vl_tier_b_files` + the `files` entry), verified by
+root `verifyHfReferenceGoldens`.
+
+Reference greedy IDs: `[785, 1378, 5335, 3897, 525, 19516, 13, 2379]` (finish MAX_TOKENS; no EOS
+in 8 steps). Measured minimum top-two logit gap across the eight steps: 0.10282325744628906
+(step 6, gap 19516 vs 7009).
+
+**Java suite.** `TierBQwen3VlTest` (selected by task `qwen3-vl-generation`, part of the
+`tierBTest` suites map): re-verifies the manifest's image digests, re-processes each image
+through `jmlx-vision`'s Qwen3-VL processor and asserts the reference's per-image
+`pixel_values_sha256` (byte-for-byte preprocessing on the real artifact), asserts the rendered
+prompt, unexpanded IDs, expanded IDs, delta and per-image token runs, compares every cached
+decode/prefill logit vector against the reference binary under the recorded epsilon, re-derives
+the reference's own recorded gap/top-two from the reference vectors (pin of the reference's
+internal consistency), and applies the stability gate to both the reference vectors and the
+Java run's own measured margins before asserting the exact greedy IDs, the exact decoded
+output (the case's `expected_text`, the reference's
+`tokenizer.decode(target_ids, skip_special_tokens=True)`), the prompt positions,
+finish reason and the end-to-end `generate` result.
+
+**Measured local evidence** (manifest `local_evidence`; M5 Max / macOS 27.0.1, TF32 off, pinned
+mlx-metal 0.31.2 / mlx-c fba4470): maximum Java-vs-reference absolute logit error
+**1.0228157043457031e-4** (stable across repeated runs), hence the recorded
+ε = 2e-4 / margin = 1e-4 (eligibility bound 2ε + margin = 5e-4, two orders of magnitude below
+the 0.1028 minimum gap). MLX allocator peak 9,828,890,788 bytes (suite bound: peak + 500 MiB);
+sampled process footprint peak 11,979,116,480 bytes (suite bound: 12,500,000,000 bytes,
+~520 MB above the measured peak). Load wall
+~843 ms; one-request generation wall ~247 ms.
+
+**CI status: pending, not verified.** A `qwen3vl` row was added to
+`.github/workflows/tier-b.yml` on the `macos-26-xlarge` tier (the standard 7 GB runner cannot
+hold the 11.98 GB measured footprint). The suite's footprint bound fails the suite on a
+memory regression, but it is not a guarantee the tier's 14 GB survives a large regression
+(the OS and the Gradle daemon share that RAM, and macOS may swap or kill first), and the
+local M5 Max measurement is the only runner-fit evidence so far — the first hosted run is
+acceptance. Like smolvlm, the larger-runner usage
+requires a payment method on the account before it can bill (`tools/tier-b/README.md`).

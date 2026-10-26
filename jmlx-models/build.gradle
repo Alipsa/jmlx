@@ -78,7 +78,8 @@ tasks.register('tierBTest', Test) {
         : 'generation'
     def suites = [generation: 'TierBSmokeTest', embedding: 'TierBEmbeddingTest',
                   classification: 'TierBClassificationTest', seq2seq: 'TierBSeq2SeqTest',
-                  'image-text-generation': 'TierBVisionLanguageTest']
+                  'image-text-generation': 'TierBVisionLanguageTest',
+                  'qwen3-vl-generation': 'TierBQwen3VlTest']
     if (!suites.containsKey(taskName)) { throw new GradleException("Unsupported Tier-B task: ${taskName}") }
     def assertedTask = System.getenv('JMLX_TIER_B_TASK')
     if (assertedTask && assertedTask != taskName) {

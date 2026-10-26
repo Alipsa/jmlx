@@ -78,6 +78,22 @@ jobs:
             revision: 7e3e67edbbed1bf9888184d9df282b700a323964
             manifest: tools/tier-b/smolvlm-256m-instruct.json
             runner: macos-26-xlarge
+          # The qwen3vl arm runs on the same macos-26-xlarge tier as smolvlm: the FLOAT32
+          # up-cast 2B checkpoint's test-process footprint peak measures 11,979,116,480 bytes
+          # (11.16 GiB; tools/tier-b/qwen3vl-2b-instruct.json local_evidence), far past the
+          # standard 7 GB runner. TierBQwen3VlTest's footprint bound (12,500,000,000 bytes,
+          # ~520 MB above the measured peak) fails the suite on a memory regression, but it is
+          # not a guarantee the tier's 14 GB survives a large regression (the OS and the
+          # Gradle daemon share that RAM, and macOS may swap or kill first); the local M5 Max
+          # measurement is the only runner-fit evidence so far, so the first hosted run is
+          # acceptance.
+          - name: qwen3vl
+            model_type: qwen3_vl
+            task: qwen3-vl-generation
+            suite: TierBQwen3VlTest
+            revision: 89644892e4d85e24eaac8bacfd4f463576704203
+            manifest: tools/tier-b/qwen3vl-2b-instruct.json
+            runner: macos-26-xlarge
     env:
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}

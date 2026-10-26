@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class Qwen3VlProcessorConfigTest {
@@ -173,6 +174,91 @@ class Qwen3VlProcessorConfigTest {
     expectRejection(
         BASE.replace("\"patch_size\": 16,", "\"patch_size\": 16,\n    \"bogus_option\": 1,"),
         "qwen3-vl preprocessor config has unrecognized key 'bogus_option'");
+  }
+
+  @Test
+  void fullDumpFormWithInertKeysParsesToTheSameConfig() {
+    // The pinned 8B 4-bit artifact dumps the image processor's complete field set; every inert
+    // key is null and default_to_square is a boolean. The effective config must equal the
+    // minimal form's.
+    String fullDump =
+        BASE.replace(
+            "\"patch_size\": 16,",
+            """
+            "crop_size": null,
+            "data_format": "channels_first",
+            "default_to_square": true,
+            "device": null,
+            "disable_grouping": null,
+            "do_center_crop": null,
+            "do_pad": null,
+            "input_data_format": null,
+            "max_pixels": null,
+            "min_pixels": null,
+            "pad_size": null,
+            "return_tensors": null,
+            "patch_size": 16,\
+            """);
+    Qwen3VlProcessorConfig full = parse(fullDump);
+    Qwen3VlProcessorConfig minimal = parse(BASE);
+    assertEquals(minimal.patchSize(), full.patchSize());
+    assertEquals(minimal.temporalPatchSize(), full.temporalPatchSize());
+    assertEquals(minimal.mergeSize(), full.mergeSize());
+    assertEquals(minimal.minPixels(), full.minPixels());
+    assertEquals(minimal.maxPixels(), full.maxPixels());
+    assertEquals(minimal.declaredMaxPixels(), full.declaredMaxPixels());
+    assertEquals(minimal.rawRowBudget(), full.rawRowBudget());
+  }
+
+  @Test
+  void fullDumpDataFormatAndSquareEdgesAreAccepted() {
+    // The documented accepted edges of the two optional full-dump keys: data_format null (the
+    // reference default) and default_to_square false, both inert for the planned pipeline.
+    String edges =
+        BASE.replace(
+            "\"patch_size\": 16,",
+            """
+            "data_format": null,
+            "default_to_square": false,
+            "patch_size": 16,\
+            """);
+    Qwen3VlProcessorConfig parsed = parse(edges);
+    Qwen3VlProcessorConfig minimal = parse(BASE);
+    assertEquals(minimal.patchSize(), parsed.patchSize());
+    assertEquals(minimal.temporalPatchSize(), parsed.temporalPatchSize());
+    assertEquals(minimal.mergeSize(), parsed.mergeSize());
+    assertEquals(minimal.minPixels(), parsed.minPixels());
+    assertEquals(minimal.maxPixels(), parsed.maxPixels());
+    assertEquals(minimal.declaredMaxPixels(), parsed.declaredMaxPixels());
+    assertEquals(minimal.rawRowBudget(), parsed.rawRowBudget());
+  }
+
+  @Test
+  void fullDumpInertKeysMustStayNull() {
+    for (String key :
+        List.of(
+            "crop_size",
+            "device",
+            "disable_grouping",
+            "do_center_crop",
+            "do_pad",
+            "input_data_format",
+            "pad_size",
+            "return_tensors")) {
+      expectRejection(
+          BASE.replace("\"patch_size\": 16,", "\"" + key + "\": 1,\n    \"patch_size\": 16,"),
+          "qwen3-vl preprocessor config full-dump key '"
+              + key
+              + "' must be null; a non-null value is an active processor setting this port"
+              + " does not implement");
+    }
+    expectRejection(
+        BASE.replace("\"patch_size\": 16,", "\"default_to_square\": 1,\n    \"patch_size\": 16,"),
+        "qwen3-vl preprocessor config default_to_square must be a boolean");
+    expectRejection(
+        BASE.replace(
+            "\"patch_size\": 16,", "\"data_format\": \"channels_last\",\n    \"patch_size\": 16,"),
+        "qwen3-vl preprocessor config data_format must be null or 'channels_first'");
   }
 
   @Test

@@ -499,9 +499,10 @@ The table is the first of two back-to-back runs on a host with no concurrent bui
 probes (load average ~2.6 on the 18-core (6 + 12) M5 Max); the oMLX server hosting the local
 coding agent (~61 GB resident) was loaded but not generating during the run. The second run
 agreed with it at every median (91/95 ms prefill, 14/13 ms/tok decode) and showed a 705 ms load
-wall; an independent rerun driven by a remote agent on the same host agreed within ~3% at every
-median. The round-2 recorded figures (293/273 ms median prefill, 1,067 ms load) were
-host-contended and do not reproduce.
+wall; an independent rerun driven by a remote agent on the same host agreed within ~3% on the
+prefill medians and load wall, and within 1 ms/tok on the (integer-ms) decode medians. The
+round-2 recorded figures (293/273 ms median prefill, 1,067 ms load) were host-contended and do
+not reproduce.
 
 Decoded output (5 tokens, no stop): case 1 "A smooth gradient transitioning from", case
 2 "A vibrant gradient background transitioning". Minimum top-two logit gap across the

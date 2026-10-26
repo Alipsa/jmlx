@@ -92,7 +92,9 @@ class TierBSmokeTest {
               + ", peak_test_jvm_rss_kib="
               + rss.peakKiB()
               + ", generated_ids="
-              + result.generatedTokenIds());
+              + result.generatedTokenIds()
+              + ", device="
+              + TierBReferences.deviceName());
 
       String recordedPin = manifest == null ? "" : manifest.path("recorded_pin").asString("");
       JsonNode expectedTokens = manifest == null ? null : manifest.path("expected_token_ids");

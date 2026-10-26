@@ -136,7 +136,7 @@ final class TierBReferences {
   }
 
   /** The MLX default device as a stable string: the same query MLXGpuVerificationTest asserts. */
-  private static String deviceName() {
+  static String deviceName() {
     try (Arena tmp = Arena.ofConfined()) {
       MemorySegment typeOut = tmp.allocate(ValueLayout.JAVA_INT);
       int status = mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice());

@@ -2508,9 +2508,51 @@ artifact `12638440258`). Both modes measured the same maximum logit/feature erro
 effectively full float32: the strict `1e-4` gate passed on a second host, while the `0.0025`
 default-mode bound remains supported only by the local M5 Max measurement.
 
-Remaining WP8 scope (not closed by this work): the Tier-B manifest for the pinned 2B artifact
-(with a multi-image prompt, exact decoded output, top-logit margins and measured native peak
-memory/wall time/disk before a weekly job — a resource-blocked CI run is recorded as pending,
-not verified) and the manual 8B 4-bit run with the locked `tools/qwen-vl-reference/` mlx-vlm
-comparison recorded in `req/phase6-4-benchmark.md`. No native pin, generated binding or
-public API changed.
+**WP8 remainder closed (2026-10-26).** Both items below landed locally on the
+`phase7-3b-wp8-tierb` branch (base `f020006`); the macOS 26 hosted executions they
+depend on remain pending, not verified.
+
+- **2B Tier-B.** `tools/tier-b/qwen3vl-2b-instruct.json` pins the 11-file WP0 inventory
+  (revision `89644892e4d85e24eaac8bacfd4f463576704203`; 4,266,647,442 bytes aggregate,
+  each file SHA-256- and size-capped, downloaded through the Java `downloadTierBArtifact`
+  manifest/SHA path). The required multi-image prompt (two image-oracle-derived images
+  plus "Describe both images.", `max_new_tokens: 8`) renders a 17-token prompt that
+  expands to 152 tokens (delta −110, grids `[[1,8,36],[1,16,16]]`).
+  `tools/hf-reference/qwen3vl_tier_b.py` (hash-locked CPU float32, transformers 4.57.6,
+  slow processor with the explicit min/max pixel override compensating the 4.57.6
+  size-override bug exactly as the WP1 probe documents) records the full-vocabulary
+  logit vector at every expected greedy history step, stored as the little-endian
+  float32 binary `goldens/qwen3vl-tier-b-logits.bin` (4,861,952 bytes, sha
+  `2b44f9f2...9ae76afb`; the shared Qwen3-VL patch-bin size-driven precedent).
+  `TierBQwen3VlTest` (task `qwen3-vl-generation`) asserts byte-exact preprocessing
+  against the reference's per-image pixel SHAs, the rendered prompt, unexpanded and
+  expanded IDs, the reference's own recorded gap/top-two, and the stability gate on
+  both the reference vectors and the Java run's measured margins before the exact
+  greedy IDs `[785, 1378, 5335, 3897, 525, 19516, 13, 2379]` (finish MAX_TOKENS).
+  Measured local evidence (M5 Max / macOS 27.0.1, TF32 off): maximum logit error
+  1.0228157043457031e-4 (stable across repeated runs) → ε = 2e-4, margin = 1e-4,
+  against a reference minimum top-two gap of 0.10282325744628906; MLX allocator peak
+  9,828,890,788 B (suite bound peak + 500 MiB); sampled process footprint peak
+  11,979,116,480 B (suite bound 13 GiB); load wall ~843 ms; one-request generation
+  wall ~247 ms. The `qwen3vl` row in `.github/workflows/tier-b.yml` runs on
+  `macos-26-xlarge` (the standard 7 GB runner cannot hold the measured 11.16 GiB
+  footprint); the 13 GiB bound plus the Gradle daemon leaves little headroom under the
+  14 GB tier, so the first hosted run is acceptance — recorded pending, gated on the
+  account's larger-runner billing. `verifyHfReferenceGoldens` now covers the qwen3vl
+  manifest, generator, images and binary (union of the per-task provenance maps).
+- **Manual 8B 4-bit run.** Recorded in `req/phase6-4-benchmark.md` (the WP8 manual-run
+  section): the pinned `mlx-community/Qwen3-VL-8B-Instruct-4bit` snapshot (revision
+  `defcdea7cc7a4b0858fea563cbbce171d328e457`, converter mlx-vlm 0.3.4, all 16 digests
+  re-verified) loaded through the full Qwen3-VL tensor plan (1,258 shard tensors, 254
+  U32-packed language leaves with BF16 sidecars, entirely-BF16 vision tower), with two
+  image cases whose jmlx greedy IDs match the independently re-run mlx-vlm probe
+  exactly (5/5 steps each; the re-run was byte-identical to the WP1 golden except the
+  venv's CPython micro version 3.12.15 → 3.12.16). The artifact's stale converter-remnant
+  `model.safetensors.index.json` (HF 4-shard index over MLX-layout shards) is correctly
+  refused by `CheckpointLoader` preflight; the probe loads a hardlink 15-file run
+  directory with the index excluded, no loader behavior weakened. The 8B's full-dump
+  `preprocessor_config.json` (transformers' complete field dump) is now accepted by
+  `jmlx-vision`'s `Qwen3VlProcessorConfig` under strict null/type checks — the single
+  public-behavior change of this scope (jmlx-vision `0.1.0-SNAPSHOT`, not yet released).
+
+No native pin or generated binding changed in the remainder.

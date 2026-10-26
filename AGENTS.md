@@ -772,7 +772,15 @@ full logit-vector comparison is the binding gate. Local evidence and the shared-
 coverage decision are in the reference findings §11.8. PR #61's macOS 26 CI run 321 executed
 both required suites with no skips or failures; both modes measured the identical
 `2.3245811e-6` there, so TF32 was not active on that runner and the `0.0025` default-mode
-bound is supported only by the local M5 Max measurement. Remaining WP8 work: the Tier-B
-manifest (multi-image prompt, measured peak/wall/disk on the pinned 2B artifact) and the
-manual 8B 4-bit run with the locked mlx-vlm comparison. No native pin, generated binding or
-public API changed.
+bound is supported only by the local M5 Max measurement. The remainder of WP8 closed locally
+on 2026-10-26 (findings §11.8): `tools/tier-b/qwen3vl-2b-instruct.json` pins the 2B Tier-B
+(the required multi-image prompt, the CPU float32 reference generator
+`tools/hf-reference/qwen3vl_tier_b.py` with its binary logits golden, `TierBQwen3VlTest`
+selected by task `qwen3-vl-generation`, measured allocator peak 9,828,890,788 B / sampled
+footprint peak 11,979,116,480 B / load ~843 ms / generation ~247 ms); the `tier-b.yml`
+qwen3vl row runs on `macos-26-xlarge` and its first hosted run is acceptance (pending, not
+verified). The manual 8B 4-bit run (`Qwen3Vl8bManualProbeTest`, opt-in via
+`JMLX_8B_PROBE_DIR`) recorded its image+text output, the artifact's stale-index finding, the
+full-dump `preprocessor_config.json` acceptance in `Qwen3VlProcessorConfig` and the exact
+greedy-ID match against the independently re-run mlx-vlm probe in
+`req/phase6-4-benchmark.md`. No native pin, generated binding or public API changed.

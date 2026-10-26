@@ -51,8 +51,8 @@ import tools.jackson.databind.ObjectMapper;
  * regression would have surfaced only as a runner OOM. Both bounds below are upper-bound gates on
  * the two measured figures, sized from the manifest's recorded local_evidence
  * (tools/tier-b/smolvlm-256m-instruct.json: native peak 5,737,416,464 bytes on macOS 27.0.1, TF32
- * off, pinned mlx-metal 0.31.2 / mlx-c fba4470) so a regression that still fits in the
- * runner's RAM fails this suite explicitly.
+ * off, pinned mlx-metal 0.31.2 / mlx-c fba4470) so a regression that still fits in the runner's RAM
+ * fails this suite explicitly.
  */
 @EnabledIfNativeAvailable
 class TierBVisionLanguageTest {

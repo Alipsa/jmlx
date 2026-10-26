@@ -135,7 +135,16 @@ jobs:
           distribution: temurin
           java-version: '25'
           architecture: aarch64
+      # Hosted arms only: setup-python@v6 hardcodes AGENT_TOOLSDIRECTORY to
+      # /Users/runner/hostedtoolcache on every darwin host (IS_MAC =
+      # process.platform === 'darwin'), which is the GitHub-hosted runner's
+      # tool cache, so on the self-hosted arm it dies with "mkdir: /Users/runner:
+      # Permission denied" before Python is even resolved. The self-hosted arm
+      # uses the machine's python3 instead (brew's, first on PATH); the only
+      # Python this job runs is a stdlib-only report heredoc, so no pinned
+      # toolchain is needed there.
       - uses: actions/setup-python@v6
+        if: '!matrix.runner'
         with:
           python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6

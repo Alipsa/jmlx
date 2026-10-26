@@ -4,13 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXMemory;
+import se.alipsa.jmlx.ffi.mlx_h;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -114,6 +119,8 @@ final class TierBReferences {
             + ", numerical comparison=passed; margin eligibility=passed"
             + ", reference_status="
             + reference.path("status").asString()
+            + ", device="
+            + deviceName()
             + ", host="
             + System.getProperty("os.version")
             + "/"
@@ -126,5 +133,18 @@ final class TierBReferences {
     List<Integer> result = new ArrayList<>();
     node.forEach(value -> result.add(value.intValue()));
     return result;
+  }
+
+  /** The MLX default device as a stable string: the same query MLXGpuVerificationTest asserts. */
+  private static String deviceName() {
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment typeOut = tmp.allocate(ValueLayout.JAVA_INT);
+      int status = mlx_h.mlx_device_get_type(typeOut, MLX.defaultDevice());
+      if (status != 0) {
+        throw new AssertionError("mlx_device_get_type failed with status " + status);
+      }
+      int type = typeOut.get(ValueLayout.JAVA_INT, 0);
+      return type == 1 ? "gpu" : type == 0 ? "cpu" : "unknown(" + type + ")";
+    }
   }
 }

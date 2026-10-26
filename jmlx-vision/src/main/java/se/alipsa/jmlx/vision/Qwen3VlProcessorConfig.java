@@ -75,6 +75,25 @@ public final class Qwen3VlProcessorConfig {
           "size",
           "temporal_patch_size");
 
+  /**
+   * The full-dump form of transformers' {@code preprocessor_config.json} carries the image
+   * processor's complete field set instead of the minimal effective subset (the pinned 8B 4-bit
+   * artifact dumps it; the pinned 2B artifact uses the minimal form). Every key in this set is
+   * inert for the planned pipeline: each must be JSON {@code null} when present — a non-null value
+   * would be an active processor setting this port does not implement, and is rejected rather than
+   * ignored.
+   */
+  private static final Set<String> INERT_NULL_KEYS =
+      Set.of(
+          "crop_size",
+          "device",
+          "disable_grouping",
+          "do_center_crop",
+          "do_pad",
+          "input_data_format",
+          "pad_size",
+          "return_tensors");
+
   private static final Set<String> SIZE_KEYS = Set.of("shortest_edge", "longest_edge");
 
   private static final String[] REQUIRED_KEYS = {
@@ -275,6 +294,38 @@ public final class Qwen3VlProcessorConfig {
     }
     for (String key : keys) {
       if (!KNOWN_KEYS.contains(key)) {
+        if (INERT_NULL_KEYS.contains(key)) {
+          if (!root.path(key).isNull()) {
+            throw new IllegalArgumentException(
+                "qwen3-vl preprocessor config full-dump key '"
+                    + key
+                    + "' must be null; a non-null value is an active processor setting this port"
+                    + " does not implement");
+          }
+          continue;
+        }
+        if ("default_to_square".equals(key)) {
+          // Inert while the size dict declares both edges (the only form this port plans):
+          // the reference's smart_resize consults it only to square a one-edge size.
+          if (!root.path(key).isBoolean()) {
+            throw new IllegalArgumentException(
+                "qwen3-vl preprocessor config default_to_square must be a boolean");
+          }
+          continue;
+        }
+        if ("data_format".equals(key)) {
+          // The storage layout the planned pipeline already uses; any other value (or a
+          // non-string) is an active setting this port does not implement.
+          JsonNode dataFormat = root.path(key);
+          boolean accepted =
+              dataFormat.isNull()
+                  || (dataFormat.isTextual() && "channels_first".equals(dataFormat.asString()));
+          if (!accepted) {
+            throw new IllegalArgumentException(
+                "qwen3-vl preprocessor config data_format must be null or 'channels_first'");
+          }
+          continue;
+        }
         throw new IllegalArgumentException(
             "qwen3-vl preprocessor config has unrecognized key '" + key + "'");
       }
@@ -409,9 +460,13 @@ public final class Qwen3VlProcessorConfig {
     return value;
   }
 
-  /** 0 when the key is absent, else the positive int. */
+  /**
+   * 0 when the key is absent or JSON {@code null} (the full-dump form dumps these legacy overrides
+   * as null when they were never set, which the reference treats as "use the size dict's edge"),
+   * else the positive int.
+   */
   private static int optionalPositiveInt(JsonNode root, String key) {
-    if (!root.has(key)) {
+    if (!root.has(key) || root.path(key).isNull()) {
       return 0;
     }
     return positiveInt(root, key);

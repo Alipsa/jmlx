@@ -58,9 +58,10 @@ class TierBQwen3VlTest {
   // Recorded in the manifest's local_evidence (macOS 27.0.1, TF32 off, pinned mlx-metal 0.31.2
   // / mlx-c fba4470): the suite's MLX allocator peak is 9,828,890,788 bytes. The bound adds 500
   // MiB, well above cross-host allocator variance (the peak is mlx's own byte accounting, not OS
-  // memory) yet far below one extra float32 copy of this checkpoint's weights (about 8.5 GB), so
-  // a regression that retains a second converted copy fails explicitly instead of OOMing the
-  // runner.
+  // memory). It is a regression detector, not a guarantee the macos-26-xlarge tier survives a
+  // large regression: peakBytes() is read only after generation finishes, and a regression
+  // retaining one extra float32 copy of this checkpoint's weights (about 8.5 GB) would push the
+  // process past the tier's RAM before the assertion runs.
   private static final long NATIVE_PEAK_BOUND_BYTES = 9_828_890_788L + 500L * 1024 * 1024;
   // The same local run's sampled process-footprint peak is 11,979,116,480 bytes (the ~9.2 GB MLX
   // pool plus the JVM). The bound adds ~520 MB of headroom above it for JVM/OS variance on the

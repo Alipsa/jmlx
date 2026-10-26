@@ -58,9 +58,9 @@ import tools.jackson.databind.ObjectMapper;
  * between the two runs is the execution stack (jmlx's float32 dequantized 4-bit on Metal vs the
  * probe's mlx-vlm 0.3.9 on its pinned mlx 0.31.2). The recorded run measured identical greedy
  * output IDs on both stacks, and that equality is asserted below: a stronger result than the plan
- * requires, and a drift detector for reruns. Timings are warm-up-then- repeated (one discarded
- * warm-up sequence, then five measured sequences per case) so the reported medians exclude
- * first-run Metal kernel compilation.
+ * requires, and a drift detector for reruns. Timings use a warm-up followed by repeated runs (one
+ * discarded warm-up sequence, then five measured sequences per case) so the reported medians
+ * exclude first-run Metal kernel compilation.
  */
 @EnabledIfNativeAvailable
 class Qwen3Vl8bManualProbeTest {

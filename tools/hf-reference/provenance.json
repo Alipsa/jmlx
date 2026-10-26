@@ -162,8 +162,8 @@
   "qwen3vl_wide_attention_generator_sha256": "3ffed6141f2180ea5fb70d4e78a32234550f08042e1564ffa13b704382216a64",
   "qwen3vl_wp8_generator_sha256": "65ba377a83b848e788d8f5eb844c2cfcf29187a36f89b5f14c3c790185941e88",
   "qwen3vl_tier_b_files": {
-    "tools/tier-b/qwen3vl-2b-instruct.json": "9842dfc26f578920c2c841c78ef9d73fa647accb0da021e95308750c3ab9c85e",
-    "tools/hf-reference/qwen3vl_tier_b.py": "564ac7250bdfb974c2698517338899a43d5e5591b707c85f59da30f855df0e17",
+    "tools/tier-b/qwen3vl-2b-instruct.json": "5ebfaf7a2130e7a8e016c260a6be20831f986579b6f1bcc532240e188f898c8a",
+    "tools/hf-reference/qwen3vl_tier_b.py": "21c8c07ae3d3f92fa4d01fee3536a2703f17fd4b51f51eaba0ff301b3f70d8b0",
     "tools/tier-b/images/qwen3vl-wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
     "tools/tier-b/images/qwen3vl-square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741"
   }

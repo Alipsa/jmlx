@@ -47,8 +47,10 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The memory gates mirror {@link TierBVisionLanguageTest}: upper-bound gates on the two measured
  * figures, sized from the manifest's recorded local_evidence
- * (tools/tier-b/qwen3vl-2b-instruct.json) so a regression fails this suite explicitly instead of
- * OOMing the runner. The bound must stay below what the CI runner tier the suite runs on holds (see
+ * (tools/tier-b/qwen3vl-2b-instruct.json) so a footprint or allocator regression fails this suite
+ * explicitly. The footprint bound is deliberately close to the measured peak: it is a regression
+ * detector, not a guarantee that the CI runner tier survives a large regression (the OS and the
+ * Gradle daemon share the tier's RAM, and macOS may swap or kill before the suite observes it; see
  * the workflow comment in .github/workflows/tier-b.yml).
  */
 @EnabledIfNativeAvailable
@@ -61,9 +63,11 @@ class TierBQwen3VlTest {
   // runner.
   private static final long NATIVE_PEAK_BOUND_BYTES = 9_828_890_788L + 500L * 1024 * 1024;
   // The same local run's sampled process-footprint peak is 11,979,116,480 bytes (the ~9.2 GB MLX
-  // pool plus the JVM). The bound is 13 GiB: about 16% headroom for JVM/OS variance on the hosted
-  // runner, still below the 14 GB of the macos-26-xlarge tier the suite runs on.
-  private static final long FOOTPRINT_BOUND_BYTES = 13L * 1024 * 1024 * 1024;
+  // pool plus the JVM). The bound adds ~520 MB of headroom above it for JVM/OS variance on the
+  // hosted runner: it fails the suite explicitly when the footprint regresses, but it is NOT a
+  // guarantee the macos-26-xlarge tier's 14 GB survives a large regression (the OS and the
+  // Gradle daemon share that RAM, and macOS may swap or kill before the suite observes it).
+  private static final long FOOTPRINT_BOUND_BYTES = 12_500_000_000L;
 
   @Test
   void multiImagePromptCachedLogitsAndStableGreedyIds() throws Exception {
@@ -211,6 +215,9 @@ class TierBQwen3VlTest {
         GenerationResult result = model.generate(request, ignored -> {});
         final long generateWallMs = (System.nanoTime() - generateStart) / 1_000_000;
         assertEquals(TierBReferences.ids(input.required("target_ids")), result.generatedTokenIds());
+        // The plan's exact decoded-output assertion: the end-to-end generate's decoded text must
+        // equal the reference's tokenizer.decode(target_ids, skip_special_tokens=True).
+        assertEquals(input.required("expected_text").asString(), result.generatedText());
         assertEquals(
             TierBReferences.ids(input.required("unexpanded_ids")), result.promptTokenIds());
         assertEquals(plan.expandedLength(), result.promptPositions());

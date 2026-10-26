@@ -156,6 +156,12 @@ def generate(directory, manifest_path):
                           'grids': grids, 'delta': delta, 'target_ids': target,
                           'gaps': logits_gaps, 'top_two_ids': top_ids,
                           'pixel_values_sha256': pixel_shas,
+                          # The exact decoded-output assertion the plan requires: the Java
+                          # suite's result.generatedText() (its incremental decoder runs with
+                          # skip_special_tokens=True on this same tokenizer.json) must equal
+                          # this string byte-for-byte.
+                          'expected_text': tokenizer.decode(
+                              target, skip_special_tokens=True),
                           'finish_reason': 'EOS' if target[-1] == eos else 'MAX_TOKENS'})
             step_blocks.append(blocks)
     logits_path = Path(__file__).with_name('goldens') / 'qwen3vl-tier-b-logits.bin'

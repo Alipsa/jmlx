@@ -113,7 +113,7 @@
       "numpy": "2.5.3"
     },
     "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b",
-    "generator_sha256": "19376a92f8ae1eaf88b973ae468845cf10399b823c74b33638972ab7ac930bbc",
+    "generator_sha256": "21c8c07ae3d3f92fa4d01fee3536a2703f17fd4b51f51eaba0ff301b3f70d8b0",
     "source_sha256": {
       "Qwen3VLProcessor": "efd8d64aaf608aad1ffb3e6d503d6a99e5227d007df95c1d9fa905d998cda4a9",
       "Qwen2VLImageProcessor": "7820a0fcca107e75605e08d9b774285ca2b0316f857bc0225c779794705ecf4f",
@@ -394,6 +394,7 @@
           "7f0311e2bad2b621a53606c12f0e4266c3233a88e512b115251836bde393cc9f",
           "53a995f4544376f4f66b67e285fa83ba64d69cfcc8055256975568ca6612f948"
         ],
+        "expected_text": "The two images provided are identical. They",
         "finish_reason": "MAX_TOKENS"
       }
     ]

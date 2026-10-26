@@ -211,6 +211,29 @@ class Qwen3VlProcessorConfigTest {
   }
 
   @Test
+  void fullDumpDataFormatAndSquareEdgesAreAccepted() {
+    // The documented accepted edges of the two optional full-dump keys: data_format null (the
+    // reference default) and default_to_square false, both inert for the planned pipeline.
+    String edges =
+        BASE.replace(
+            "\"patch_size\": 16,",
+            """
+            "data_format": null,
+            "default_to_square": false,
+            "patch_size": 16,\
+            """);
+    Qwen3VlProcessorConfig parsed = parse(edges);
+    Qwen3VlProcessorConfig minimal = parse(BASE);
+    assertEquals(minimal.patchSize(), parsed.patchSize());
+    assertEquals(minimal.temporalPatchSize(), parsed.temporalPatchSize());
+    assertEquals(minimal.mergeSize(), parsed.mergeSize());
+    assertEquals(minimal.minPixels(), parsed.minPixels());
+    assertEquals(minimal.maxPixels(), parsed.maxPixels());
+    assertEquals(minimal.declaredMaxPixels(), parsed.declaredMaxPixels());
+    assertEquals(minimal.rawRowBudget(), parsed.rawRowBudget());
+  }
+
+  @Test
   void fullDumpInertKeysMustStayNull() {
     for (String key :
         List.of(

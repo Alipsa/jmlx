@@ -319,7 +319,7 @@ public final class Qwen3VlProcessorConfig {
           JsonNode dataFormat = root.path(key);
           boolean accepted =
               dataFormat.isNull()
-                  || (dataFormat.isTextual() && "channels_first".equals(dataFormat.asString()));
+                  || (dataFormat.isString() && "channels_first".equals(dataFormat.asString()));
           if (!accepted) {
             throw new IllegalArgumentException(
                 "qwen3-vl preprocessor config data_format must be null or 'channels_first'");

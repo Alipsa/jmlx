@@ -10,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -34,9 +36,8 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Opt-in manual 8B 4-bit run (Phase 7.3b WP8, plan §9: "Pin and run a compatible public 8B 4-bit
  * artifact manually"). Never part of ordinary check: it runs only when {@code JMLX_8B_PROBE_DIR}
- * points at a local copy of the pinned {@code mlx-community/Qwen3-VL-8B-Instruct-4bit} snapshot,
- * and is evidence-only (no parity claim against the independent mlx-vlm probe; see {@code
- * req/phase6-4-benchmark.md}).
+ * points at a local copy of the pinned {@code mlx-community/Qwen3-VL-8B-Instruct-4bit} snapshot;
+ * see {@code req/phase6-4-benchmark.md} for the full run record.
  *
  * <p>The pinned artifact's {@code model.safetensors.index.json} is a stale converter remnant: it is
  * the original HF checkpoint's 4-shard index ({@code model-0000X-of-00004.safetensors}, HF tensor
@@ -51,16 +52,24 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Sequence and preprocessing facts are asserted against the independent mlx-vlm probe golden
  * (tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json), which consumed the same chat
- * template, tokenizer, fixtures and slow-processor pixels: expansion length, image-token span, RoPE
- * delta and the per-image processed-pixel SHA must agree on both runtimes. Greedy output IDs are
- * compared to the probe's but not asserted equal -- different runtime (jmlx float32 dequantized
- * 4-bit on Metal) and different checkpoint (8B vs the probe's own 8B 4-bit run) makes that a parity
- * question the plan deliberately does not claim.
+ * template, tokenizer, fixtures and slow-processor pixels and ran against this same pinned artifact
+ * (the probe's {@code --directory} pointed at the 8B snapshot): expansion length, image-token span,
+ * RoPE delta and the per-image processed-pixel SHA must agree on both runtimes. The only difference
+ * between the two runs is the execution stack (jmlx's float32 dequantized 4-bit on Metal vs the
+ * probe's mlx-vlm 0.3.9 on its pinned mlx 0.31.2). The recorded run measured identical greedy
+ * output IDs on both stacks, and that equality is asserted below: a stronger result than the plan
+ * requires, and a drift detector for reruns. Timings are warm-up-then- repeated (one discarded
+ * warm-up sequence, then five measured sequences per case) so the reported medians exclude
+ * first-run Metal kernel compilation.
  */
 @EnabledIfNativeAvailable
 class Qwen3Vl8bManualProbeTest {
   // How many greedy steps to run per image (the mlx-vlm probe recorded five).
   private static final int TOKENS = 5;
+  // One discarded warm-up sequence per case (first-run Metal kernel compilation and page-cache
+  // effects must not enter the timing), then the measured iterations whose medians are reported.
+  // Odd, so the median is a single observed sample.
+  private static final int MEASURED_ITERATIONS = 5;
   private static final List<String> PROBE_IMAGES =
       List.of("model-rgb-256x256.png", "model-rgb-64x32.png");
   private static final String PROBE_PROMPT_TEXT = "Describe the image in one short sentence.";
@@ -115,18 +124,16 @@ class Qwen3Vl8bManualProbeTest {
     // converter-remnant index).
     Path runDir = artifact.resolveSibling(artifact.getFileName() + "-jmlx-run");
     if (Files.isDirectory(runDir)) {
-      Files.walk(runDir).sorted(java.util.Comparator.reverseOrder()).forEach(this::deleteFile);
+      try (var walk = Files.walk(runDir)) {
+        walk.sorted(Comparator.reverseOrder()).forEach(this::deleteFile);
+      }
     }
     Files.createDirectories(runDir);
     for (String name : verified) {
       if ("model.safetensors.index.json".equals(name)) {
         continue;
       }
-      var link =
-          new ProcessBuilder(
-                  "ln", artifact.resolve(name).toString(), runDir.resolve(name).toString())
-              .start();
-      assertEquals(0, link.waitFor(), "hardlink failed: " + name);
+      Files.createLink(runDir.resolve(name), artifact.resolve(name));
     }
     long totalTensors = 0;
     long scalesTensors = 0;
@@ -226,6 +233,82 @@ class Qwen3Vl8bManualProbeTest {
         plan.positionDelta(),
         imageName + " rope delta");
 
+    List<Integer> probeIds = new ArrayList<>();
+    for (JsonNode id : c.required("greedy_ids")) {
+      probeIds.add(id.asInt());
+    }
+    // One discarded warm-up sequence: the first run of this case's shapes compiles the Metal
+    // kernels and touches cold caches, so its wall time must not enter the reported figures.
+    assertEquals(
+        probeIds,
+        runSequence(model, plan, image, root).ids(),
+        imageName + " warm-up greedy IDs drifted from the independent mlx-vlm probe");
+    double minimumGap = Double.MAX_VALUE;
+    long[] prefillNanos = new long[MEASURED_ITERATIONS];
+    long[] decodeNanos = new long[MEASURED_ITERATIONS];
+    List<Integer> ids = null;
+    for (int iteration = 0; iteration < MEASURED_ITERATIONS; iteration++) {
+      SequenceResult measured = runSequence(model, plan, image, root);
+      if (ids == null) {
+        ids = measured.ids();
+      } else {
+        assertEquals(
+            ids, measured.ids(), imageName + " greedy IDs are not stable across iterations");
+      }
+      prefillNanos[iteration] = measured.prefillNanos();
+      decodeNanos[iteration] = measured.decodeNanos();
+      minimumGap = Math.min(minimumGap, measured.minTopGap());
+    }
+    // The stronger-than-plan-required result: the recorded run's jmlx IDs equal the
+    // independently re-run mlx-vlm probe's IDs at every step, and a rerun that drifts fails here.
+    assertEquals(
+        probeIds, ids, imageName + " greedy IDs drifted from the independent mlx-vlm probe");
+    Arrays.sort(prefillNanos);
+    Arrays.sort(decodeNanos);
+    long medianPrefillNanos = prefillNanos[MEASURED_ITERATIONS / 2];
+    long medianDecodeNanos = decodeNanos[MEASURED_ITERATIONS / 2];
+    System.out.println(
+        "8B probe case="
+            + imageName
+            + " image_px="
+            + image.width()
+            + "x"
+            + image.height()
+            + " grid="
+            + c.required("grid").toString()
+            + " expanded_length="
+            + plan.expandedLength()
+            + " prefill_ms_median="
+            + (medianPrefillNanos / 1_000_000)
+            + " prefill_ms_min="
+            + (prefillNanos[0] / 1_000_000)
+            + " prefill_ms_max="
+            + (prefillNanos[prefillNanos.length - 1] / 1_000_000)
+            + " decode_ms_per_token_median="
+            + (medianDecodeNanos / (TOKENS - 1) / 1_000_000)
+            + " decode_ms_per_token_min="
+            + (decodeNanos[0] / (TOKENS - 1) / 1_000_000)
+            + " decode_ms_per_token_max="
+            + (decodeNanos[decodeNanos.length - 1] / (TOKENS - 1) / 1_000_000)
+            + " greedy_ids="
+            + ids
+            + " min_top_gap="
+            + minimumGap
+            + " mlx_vlm_probe_ids="
+            + probeIds
+            + " ids_match_probe="
+            + ids.equals(probeIds)
+            + " decoded_text="
+            + tokenizer.decode(ids, false));
+  }
+
+  /**
+   * One full prompt-prefill plus (TOKENS - 1) cached-decode sequence on fresh caches, with wall
+   * times for the prefill and the aggregate decode, the generated IDs and the sequence's minimum
+   * top-two logit gap.
+   */
+  private SequenceResult runSequence(
+      Qwen3VlModel model, Qwen3VlPromptPlan plan, RgbImage image, MLXScope root) {
     List<Integer> ids = new ArrayList<>();
     double minimumGap = Double.MAX_VALUE;
     long prefillNanos = 0;
@@ -260,40 +343,12 @@ class Qwen3Vl8bManualProbeTest {
         }
       }
     }
-    List<Integer> probeIds = new ArrayList<>();
-    for (JsonNode id : c.required("greedy_ids")) {
-      probeIds.add(id.asInt());
-    }
-    System.out.println(
-        "8B probe case="
-            + imageName
-            + " image_px="
-            + image.width()
-            + "x"
-            + image.height()
-            + " grid="
-            + c.required("grid").toString()
-            + " expanded_length="
-            + plan.expandedLength()
-            + " prefill_ms="
-            + (prefillNanos / 1_000_000)
-            + " prefill_tokens_per_s="
-            + (plan.expandedLength() * 1_000_000_000.0 / prefillNanos)
-            + " decode_ms_per_token="
-            + ((decodeNanos / (TOKENS - 1)) / 1_000_000)
-            + " decode_tokens_per_s="
-            + ((TOKENS - 1) * 1_000_000_000.0 / decodeNanos)
-            + " greedy_ids="
-            + ids
-            + " min_top_gap="
-            + minimumGap
-            + " mlx_vlm_probe_ids="
-            + probeIds
-            + " ids_match_probe="
-            + ids.equals(probeIds)
-            + " decoded_text="
-            + tokenizer.decode(ids, false));
+    return new SequenceResult(ids, prefillNanos, decodeNanos, minimumGap);
   }
+
+  /** One runSequence result. */
+  private record SequenceResult(
+      List<Integer> ids, long prefillNanos, long decodeNanos, double minTopGap) {}
 
   /** Streaming SHA-256: the shard files are multi-GB and must never be read all at once. */
   private static String sha256(Path path) throws Exception {

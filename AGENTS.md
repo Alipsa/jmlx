@@ -780,10 +780,12 @@ on 2026-10-26 (findings §11.8): `tools/tier-b/qwen3vl-2b-instruct.json` pins th
 `qwen3-vl-generation`, which asserts the exact greedy IDs **and** the end-to-end
 `generate`'s exact decoded output; measured allocator peak 9,828,890,788 B / sampled
 footprint peak 11,979,116,480 B / load ~843 ms / generation ~247 ms); the `tier-b.yml`
-qwen3vl row runs on `macos-26-xlarge` and its first hosted run is acceptance (pending, not
-verified). The manual 8B 4-bit run (`Qwen3Vl8bManualProbeTest`, opt-in via
-`JMLX_8B_PROBE_DIR`) recorded its image+text output, the artifact's stale-index finding, the
-full-dump `preprocessor_config.json` acceptance in `Qwen3VlProcessorConfig` and asserts the
-exact greedy-ID match against the independently re-run mlx-vlm probe (warm-up plus five
-measured sequences, medians with spread, on a clean committed SHA) in
+qwen3vl row runs on the self-hosted `self-macos-xl` runner (GitHub's larger
+`macos-26-xlarge` tier is billed per minute even in public repos, so the row does not
+target it) and its first CI run is acceptance (pending, not verified). The manual 8B
+4-bit run (`Qwen3Vl8bManualProbeTest`, opt-in via `JMLX_8B_PROBE_DIR`) recorded its
+image+text output, the artifact's stale-index finding, the full-dump
+`preprocessor_config.json` acceptance in `Qwen3VlProcessorConfig` and asserts the
+exact greedy-ID match against the independently re-run mlx-vlm probe (warm-up plus
+five measured sequences, medians with spread, on a clean committed SHA) in
 `req/phase6-4-benchmark.md`. No native pin, generated binding or public API changed.

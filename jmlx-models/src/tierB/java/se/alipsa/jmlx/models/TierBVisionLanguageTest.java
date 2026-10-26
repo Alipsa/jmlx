@@ -60,13 +60,13 @@ class TierBVisionLanguageTest {
   // / mlx-c fba4470): the suite's MLX allocator peak is 5,737,416,464 bytes. The bound adds 500
   // MiB, well above cross-host allocator variance (the peak is mlx's own byte accounting, not OS
   // memory) yet below one extra float32 copy of this checkpoint's weights (about 1 GB). It is
-  // a regression detector, not a guarantee the macos-26-xlarge tier survives a large
+  // a regression detector, not a guarantee the CI runner's RAM survives a large
   // regression: the figure is read only after generation finishes, so a regression big enough
-  // to push the process past the tier's RAM fails the job as an OOM, not as this assertion.
+  // to push the process past the runner's RAM fails the job as an OOM, not as this assertion.
   private static final long NATIVE_PEAK_BOUND_BYTES = 5_737_416_464L + 500L * 1024 * 1024;
   // The same local run's sampled process-footprint peak is 7,129,368,904 bytes (the 5.7 GB MLX
-  // pool plus the JVM). The bound is 8 GiB: about 20% headroom for JVM/OS variance on the hosted
-  // runner, still far below the 14 GB of the macos-26-xlarge tier the suite runs on. The ~1.36
+  // pool plus the JVM). The bound is 8 GiB: about 20% headroom for JVM/OS variance on the CI
+  // runner, still far below the RAM of the self-hosted runner the suite runs on. The ~1.36
   // GiB of headroom is deliberately not tight enough to catch one extra float32 weight copy
   // (about 1 GB plus rounding); catching that regression is the job of the tighter
   // NATIVE_PEAK_BOUND_BYTES gate above.

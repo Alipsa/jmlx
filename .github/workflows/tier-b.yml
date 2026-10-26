@@ -11,20 +11,24 @@ permissions:
 
 jobs:
   artifact:
-    # The smolvlm arm overrides its runner via the `runner` matrix variable below. It needs
-    # macos-26-xlarge because its suite's measured MLX allocator peak is 5.7 GB
-    # (tools/tier-b/smolvlm-256m-instruct.json) and the test JVM plus Gradle daemon push the
-    # process total past the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub
-    # hosted-runners reference), which would swap or OOM-kill the job. macos-26-xlarge is
-    # GitHub's larger macOS arm64 runner tier (5-core M2, 14 GB RAM; GitHub larger-runners
-    # reference) and remains arm64, which the native runtime requires. It is a billed larger
-    # runner: GitHub charges it per minute even in public repositories, and usage is blocked
-    # until a payment method is set up on the account (GitHub larger-runners reference and
-    # GitHub Actions billing docs). TierBVisionLanguageTest also asserts upper bounds on the
-    # measured peaks as a regression detector: a memory regression that surfaces while the
-    # process still fits in the tier's RAM fails the suite explicitly rather than as an
-    # unattributable runner OOM, but the figures are read after the suite finishes, so a large
-    # enough regression can still OOM-kill the job before the assertion runs.
+    # The smolvlm and qwen3vl arms override their runner via the `runner` matrix variable
+    # below onto the self-hosted `self-macos-xl` runner, because their measured footprints
+    # exceed the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub hosted-runners
+    # reference), which would swap or OOM-kill the job: smolvlm's suite MLX allocator peak is
+    # 5.7 GB plus the test JVM and Gradle daemon (tools/tier-b/smolvlm-256m-instruct.json),
+    # and qwen3vl's FLOAT32-up-cast 2B checkpoint footprint peaks at 11.16 GiB
+    # (tools/tier-b/qwen3vl-2b-instruct.json). GitHub's larger macos-26-xlarge tier (5-core
+    # M2, 14 GB RAM, still arm64 as the native runtime requires; GitHub larger-runners
+    # reference) would fit, but larger runners are billed per minute even in public
+    # repositories, and usage is blocked until a payment method is set up on the account
+    # (GitHub larger-runners reference and GitHub Actions billing docs), so the arms run free
+    # on the self-hosted runner (Apple Silicon, macOS 27, 128 GB RAM); while it is offline the
+    # two jobs queue and the other arms are unaffected. Both arms' suites also assert upper
+    # bounds on the measured peaks as a regression detector: a memory regression that
+    # surfaces while the process still fits in the runner's RAM fails the suite explicitly
+    # rather than as an unattributable runner OOM, but the figures are read after the suite
+    # finishes, so a large enough regression can still OOM-kill the job before the assertion
+    # runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
     strategy:
@@ -79,15 +83,15 @@ jobs:
             suite: TierBVisionLanguageTest
             revision: 7e3e67edbbed1bf9888184d9df282b700a323964
             manifest: tools/tier-b/smolvlm-256m-instruct.json
-            runner: macos-26-xlarge
-          # The qwen3vl arm runs on the same macos-26-xlarge tier as smolvlm: the FLOAT32
+            runner: self-macos-xl
+          # The qwen3vl arm runs on the same self-hosted runner as smolvlm: the FLOAT32
           # up-cast 2B checkpoint's test-process footprint peak measures 11,979,116,480 bytes
           # (11.16 GiB; tools/tier-b/qwen3vl-2b-instruct.json local_evidence), far past the
           # standard 7 GB runner. TierBQwen3VlTest's footprint bound (12,500,000,000 bytes,
           # ~520 MB above the measured peak) fails the suite on a memory regression, but it is
-          # not a guarantee the tier's 14 GB survives a large regression (the OS and the
+          # not a guarantee the runner's RAM survives a large regression (the OS and the
           # Gradle daemon share that RAM, and macOS may swap or kill first); the local M5 Max
-          # measurement is the only runner-fit evidence so far, so the first hosted run is
+          # measurement is the only runner-fit evidence so far, so the first CI run is
           # acceptance.
           - name: qwen3vl
             model_type: qwen3_vl
@@ -95,7 +99,7 @@ jobs:
             suite: TierBQwen3VlTest
             revision: 89644892e4d85e24eaac8bacfd4f463576704203
             manifest: tools/tier-b/qwen3vl-2b-instruct.json
-            runner: macos-26-xlarge
+            runner: self-macos-xl
     env:
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}

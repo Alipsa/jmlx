@@ -121,10 +121,12 @@ footprint (which the hosted runner's RAM must actually hold) and gates both figu
 `MLXMemory.peakBytes() <= 6,261,704,464` (recorded peak plus 500 MiB, below one extra float32
 weight copy) and `footprint <= 8 GiB` (about 20% above the measured peak). Because the 7.1 GB
 measured footprint alone exceeds the standard `macos-26` arm64 hosted runner's 7 GB of RAM, the
-Tier-B smolvlm row runs on `macos-26-xlarge` (arm64 M2, 14 GB); the bounds are a regression
-detector, not a guarantee the tier survives a large regression: a regression that surfaces while
-the process still fits in the RAM fails the suite explicitly, but the figures are read after the
-suite finishes, so a large enough regression still OOM-kills the job before the assertion runs.
+Tier-B smolvlm row runs on a runner with more RAM (originally the billed `macos-26-xlarge` tier,
+arm64 M2, 14 GB; since 2026-10-26 the self-hosted `self-macos-xl` runner, 128 GB — larger-runner
+usage is billed per minute even in public repos); the bounds are a regression detector, not a
+guarantee the runner survives a large regression: a regression that surfaces while the process
+still fits in the RAM fails the suite explicitly, but the figures are read after the suite
+finishes, so a large enough regression still OOM-kills the job before the assertion runs.
 These measurements precede addition of the weekly/on-demand SmolVLM CI row. Hosted macOS 26
 execution/fit remains pending. An earlier 17-tile square-input probe also passed, with maximum
 error `8.58306884765625e-5` and native peak 5,739,185,936 bytes; the committed case uses the
@@ -201,10 +203,10 @@ point.
   prefill/cached logits, real-artifact exact greedy output, unchanged text bits, request/result
   contracts, cleanup and the consumer smoke on the merged tree.
 - **macOS 26 CI acceptance (pending):** the first supported hosted execution of the WP6/WP7 native
-  suites in the new-CI required-suite assertions, and the first `macos-26-xlarge` Tier-B SmolVLM
-  row. The latter is additionally gated on the account's larger-runner billing being configured
-  (`tools/tier-b/README.md`); until both land, the compatibility-matrix row is local eligibility
-  evidence, never a hosted-verified claim.
+  suites in the new-CI required-suite assertions, and the first Tier-B SmolVLM row execution (the
+  row now targets the self-hosted `self-macos-xl` runner; a GitHub-hosted execution would require
+  the account's larger-runner billing to be configured — `tools/tier-b/README.md`). Until both
+  land, the compatibility-matrix row is local eligibility evidence, never a hosted-verified claim.
 - **Deferred capabilities:** sliding image-prefill KV retention (rejected pending equivalence
   evidence), VLM batching/multimodal scheduler cohorts, Qwen3-VL (Phase 7.3b), LLaVA-style models
   (Phase 7.3c or a dated deferral), and the Phase 6 rows with pending artifact pins (Gemma v1,

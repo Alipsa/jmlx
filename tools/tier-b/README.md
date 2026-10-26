@@ -65,14 +65,17 @@ below bounds sized from the manifest's recorded local evidence so a memory regre
 suite explicitly. The workflow uploads JUnit numerical/memory evidence even when
 the test fails.
 
-In CI, the SmolVLM and qwen3vl rows of the `tier-b` workflow run on `macos-26-xlarge`, a
-GitHub larger runner (the qwen3vl row needs the tier because the FLOAT32-up-cast 2B
-checkpoint's measured footprint peak is 11.16 GiB, past the standard runner's 7 GB; its
-suite footprint bound — 12,500,000,000 bytes, ~520 MB above the measured peak — detects
-a regression but is not a guarantee the tier's 14 GB survives a large regression, so
-the first hosted run is acceptance). GitHub's Actions billing docs state that larger
-runners are always charged per minute, even in public repositories, and that
-larger-runner usage is blocked until a payment method is set up on the account
-(https://docs.github.com/en/billing/concepts/product-billing/github-actions). If the
-repository's account has no billing configured, those rows fail to start while the other
-rows are unaffected; fixing it is an account/billing setting, not a repository change.
+In CI, the SmolVLM and qwen3vl rows of the `tier-b` workflow run on the self-hosted
+`self-macos-xl` runner (Apple Silicon, macOS 27, 128 GB RAM), because their measured
+footprints exceed the standard runner's 7 GB (the qwen3vl row needs more because the
+FLOAT32-up-cast 2B checkpoint's measured footprint peak is 11.16 GiB; its suite footprint
+bound — 12,500,000,000 bytes, ~520 MB above the measured peak — detects a regression but
+is not a guarantee the runner's RAM survives a large regression, so the first CI run is
+acceptance). GitHub's larger `macos-26-xlarge` tier would fit, but GitHub's Actions
+billing docs state that larger runners are always charged per minute, even in public
+repositories, and that larger-runner usage is blocked until a payment method is set up on
+the account (https://docs.github.com/en/billing/concepts/product-billing/github-actions),
+so the rows run free on the self-hosted runner. While that runner is offline the two
+jobs queue and the other rows are unaffected (they run on the standard hosted runner);
+if the account later sets up a payment method, a row can be pointed back at
+`macos-26-xlarge` by changing its `runner` matrix value.

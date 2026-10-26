@@ -91,9 +91,9 @@ the MLX/Metal allocations. This is local eligibility evidence.
 WP8 (2026-10-13, `phase7-3a-implementation-report.md`) re-ran this exact manifest on the merged
 tree: identical greedy IDs, identical maximum logit error, and a fresh margin-eligible run, closing
 the seven-artifact consumer and capability-documentation acceptance. The row remains local
-eligibility evidence until the first supported macOS 26 hosted execution lands — the weekly
-`macos-26-xlarge` Tier-B row, whose larger-runner usage requires a payment method on the account
-(`tools/tier-b/README.md`).
+eligibility evidence until the first CI execution lands — the weekly Tier-B row now targets
+the self-hosted `self-macos-xl` runner (GitHub's larger `macos-26-xlarge` tier is billed per
+minute even in public repos, so the row does not target it; `tools/tier-b/README.md`).
 
 ## Phase 7.3b Qwen3-VL Tier-B (2026-10-26)
 
@@ -153,10 +153,12 @@ sampled process footprint peak 11,979,116,480 bytes (suite bound: 12,500,000,000
 ~843 ms; one-request generation wall ~247 ms.
 
 **CI status: pending, not verified.** A `qwen3vl` row was added to
-`.github/workflows/tier-b.yml` on the `macos-26-xlarge` tier (the standard 7 GB runner cannot
-hold the 11.98 GB measured footprint). The suite's footprint bound fails the suite on a
-memory regression, but it is not a guarantee the tier's 14 GB survives a large regression
-(the OS and the Gradle daemon share that RAM, and macOS may swap or kill first), and the
-local M5 Max measurement is the only runner-fit evidence so far — the first hosted run is
-acceptance. Like smolvlm, the larger-runner usage
-requires a payment method on the account before it can bill (`tools/tier-b/README.md`).
+`.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner (the standard 7 GB
+runner cannot hold the 11.98 GB measured footprint, and GitHub's larger `macos-26-xlarge`
+tier is billed per minute even in public repos, so the row does not target it). The suite's
+footprint bound fails the suite on a memory regression, but it is not a guarantee the
+runner's RAM survives a large regression (the OS and the Gradle daemon share that RAM, and
+macOS may swap or kill first), and the local M5 Max measurement is the only runner-fit
+evidence so far — the first CI run is acceptance. While the self-hosted runner is offline
+the row's jobs queue; the other rows run on the standard hosted runner
+(`tools/tier-b/README.md`).

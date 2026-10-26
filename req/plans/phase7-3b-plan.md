@@ -15,8 +15,9 @@
   with its multi-image request, reference generator and measured local eligibility evidence
   (findings §11.8; `req/phase6-tier-b-artifacts.md`), and the manual 8B 4-bit run with the
   locked `tools/qwen-vl-reference/` mlx-vlm comparison (`req/phase6-4-benchmark.md`). The
-  first supported macOS 26 hosted execution of the new `tier-b.yml` qwen3vl row remains
-  pending, not verified (larger-runner billing).
+  first CI execution of the new `tier-b.yml` qwen3vl row remains pending, not verified
+  (the row targets the self-hosted `self-macos-xl` runner; GitHub's larger `macos-26-xlarge`
+  tier is billed per minute even in public repos).
 - **Parent:** `req/plans/phase7-plan.md` §7.3b, public decisions 1–4, 6–8 and
   Cross-cutting verification.
 - **Dependencies:** accepted 7.0 Qwen3 backbone and completed 7.3a multimodal contracts,
@@ -665,6 +666,6 @@ obtain supported macOS 26 execution evidence. Existing native skip gates remain 
 - [x] All four Tier-A cases and forced generated-marker continuations pass strict/default cached/full-forward checks (WP8 Tier-A, local 2026-10-26; findings §11.8).
 - [x] Resource validation, request reuse, cancellation/failure cleanup and memory bounds pass locally (WP7; findings §11.7).
 - [x] Default per-image attention limit/peak and one-over rejection (WP5), plus post-prefill visual release (WP7), verified locally.
-- [x] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded (2026-10-26, local: findings §11.8, `req/phase6-tier-b-artifacts.md`, `req/phase6-4-benchmark.md`; the hosted tier-b qwen3vl execution remains pending).
+- [x] Multi-image Tier-B exact output and manual 8B 4-bit benchmark recorded (2026-10-26, local: findings §11.8, `req/phase6-tier-b-artifacts.md`, `req/phase6-4-benchmark.md`; the first CI execution of the tier-b qwen3vl row remains pending).
 - [x] Required CI suites executed; matrix/docs state actual modality and verification limits (PR #61 macOS 26 run 321, no skips/failures; `req/phase6-compatibility.md` updated 2026-10-26).
 - [x] EXIF orientation policy decided; Qwen path matches the slow processor on rotated fixtures; SmolVLM decode unchanged.

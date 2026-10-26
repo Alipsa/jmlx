@@ -495,10 +495,12 @@ full-float32 mode. M5 Max, macOS 27.0.1, Java 25, `mlx-metal==0.31.2`, mlx-c `fb
 | 2 | 64x32 | [1,12,24] | 90 | 95 ms (94–95) | 13 (13–13) | `[32, 32976, 20169, 4004, 72094]` | `[32, 32976, 20169, 4004, 72094]` | exact, 5/5 (asserted) |
 
 That is ~900 and ~950 tokens/s median prefill, ~71 and ~77 tokens/s median decode.
-The table is the first of two back-to-back runs on an idle host (no other builds or
-probes running, load average ~2.6 on the 18-core (6 + 12) M5 Max); the second run agreed with
-it at every median (91/95 ms prefill, 14/13 ms/tok decode) and showed a 705 ms load
-wall. The round-2 recorded figures (293/273 ms median prefill, 1,067 ms load) were
+The table is the first of two back-to-back runs on a host with no concurrent builds or
+probes (load average ~2.6 on the 18-core (6 + 12) M5 Max); the oMLX server hosting the local
+coding agent (~61 GB resident) was loaded but not generating during the run. The second run
+agreed with it at every median (91/95 ms prefill, 14/13 ms/tok decode) and showed a 705 ms load
+wall; an independent rerun driven by a remote agent on the same host agreed within ~3% at every
+median. The round-2 recorded figures (293/273 ms median prefill, 1,067 ms load) were
 host-contended and do not reproduce.
 
 Decoded output (5 tokens, no stop): case 1 "A smooth gradient transitioning from", case

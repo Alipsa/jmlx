@@ -69,3 +69,17 @@ recorded runs used M5 Max/macOS 27.0.1 with TF32 disabled, and the first support
 execution (the weekly `macos-26-xlarge` Tier-B row) remains pending. See
 `phase7-3a-implementation-report.md` for pins, margins and measured resource use; the synthetic
 checks do not imply other vision families.
+
+## Phase 7.3b Qwen3-VL image+text (2026-10-26)
+
+| Task/family | Tier-A | Tier-B | Limits |
+| --- | --- | --- | --- |
+| Image+text → text, Qwen3-VL (dense) | WP8 tiny full-model checkpoint (three decoder layers, two DeepStack levels, `mrope_section [16, 8, 8]`, 21-token tied vocabulary, position-table interpolation beyond the learned 8x8 table): expansion, grids, processed-pixel hashes, three-axis positions/delta, tower merged/DeepStack rows, and prefill plus every cached and forced-marker step's logits against a fresh full uncached CPU float32 forward — strict `1e-4` in `Qwen3VlGoldenTest` (measured maximum `2.3245811e-6`) and default TF32 bound `0.0025` in `Qwen3VlDefaultPrecisionTest` (measured `0.0019590855`); shared EOS/stop/sampling/streaming/abort contracts verified on the same composed model (WP7) | Pending: the planned multi-image pin needs exact decoded output, top-logit margins and measured native peak memory/wall time/disk on the pinned 2B artifact before a weekly job; a resource-blocked CI run is recorded as pending, not verified | float safetensors (storage BF16/FP16 up-cast) plus MLX affine 4-bit text projections (synthetic verification; the manual quantized 8B 4-bit run is pending); per request: FULL or capacity-bounded FULL retention, sliding rejected; single request per thread, no scheduler cohorts; `qwen3_vl_moe` rejected by name |
+
+The Tier-A row is **local acceptance evidence**: the recorded runs used M5 Max/macOS 27.0.1
+(MLX 0.31.2, mlx-c fba4470), and the first supported macOS 26 hosted execution of the two
+required suites remains pending with the implementation PR. The exact greedy-ID assertion is
+degenerate on the 21-token checkpoint (recorded in the golden's provenance); the full
+logit-vector comparison is the binding gate. See the reference findings §11.8 for pins, the
+measured maxima (`req/phase6-golden-precision.md`) and the shared-contract coverage decision;
+the synthetic checks do not imply Tier-B support for the pinned 2B/8B artifacts.

@@ -714,6 +714,7 @@ public final class Qwen3VlModel implements TextGenerationModel {
                 if (layerIndex >= features.deepstackLevels().size()) {
                   return hiddenStates;
                 }
+                observer.accept("deepstack");
                 return VisualFeatureInjection.addMaskedFeatures(
                     hiddenStates.scope(),
                     hiddenStates,

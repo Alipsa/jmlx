@@ -2407,3 +2407,99 @@ Reported early/mid/late retention is 24576/65536/131072 bytes; cleanup baseline/
 30789656 bytes, peak 40520216. This confirms the allocator assumptions for the pinned fixture
 and runtime on macOS 26 as well as the local host. The test now explicitly guards
 `midStep > 1 && lateStep > midStep` so a future fixture that outgrows these tiers fails by name.
+
+
+### 11.8 WP8 Tier-A acceptance: independent HF golden and default-mode bound (2026-10-26)
+
+Implementation base: merged WP7 (PR #60, commit `815d10d`).
+
+**Reference and checkpoint.** `tools/hf-reference/qwen3vl_wp8.py` (never invoked by Gradle;
+digest-pinned in `tools/hf-reference/provenance.json` under
+`qwen3vl_wp8_generator_sha256`) generates the committed tiny full Qwen3-VL checkpoint under
+`tools/hf-reference/goldens/checkpoints/qwen3vl-wp8/` (a 16,483,496-byte `model.safetensors`
+with 104 bfloat16 tensors and the real artifact's `model.visual.` / `model.language_model.`
+key scheme, no `lm_head` key — the head is tied — plus the strict 10/18/14-key `config.json`,
+the 14-key `preprocessor_config.json`, the committed 21-token qwen3vl fixture tokenizer and two
+deterministic 192x128 / 128x192 PNGs) and the golden `qwen3vl-wp8.json` (schema
+`jmlx-phase7-3b-wp8-qwen3vl-model-v1`). The geometry deliberately exercises the WP6
+checkpoint's blind spots: three decoder layers with two DeepStack levels (injections after
+blocks 0 and 1, block 2 un-injected), `mrope_section [16, 8, 8]` (`2 * 32 = 64 = head_dim`, a
+strictly unequal split), an 8 x 8 learned position table (`num_position_embeddings` 64) with
+grids reaching 12 along one axis on both images so the bilinear
+`fast_pos_embed_interpolate` runs beyond the table, and 24 mutually distinct norm affines
+(11 vision LayerNorm + 13 text RMSNorm) drawn from a dedicated seed-20261025 generator so the
+strict golden discriminates the composite model's norm-to-key wiring. Every decode/forced
+step's logits come from a fresh, full, uncached forward through the explicit reference path —
+the tower runs once from the original pixels, image rows and DeepStack levels are applied only
+at the original prompt's destinations, and the positions are the recorded prefill axes followed
+by `logicalPosition + delta` — never through the processor's token-based placeholder path, and
+the explicit path is pinned against the standard processor forward at the zero-history point
+(1e-6).
+
+**Cases.** The six golden cases are the plan Section 9 set: one image; two different-size
+images; image, intervening text, second image and trailing text; text-only through the same
+model; and the two forced continuations (image-bearing and text-only) with the shared history
+`[7, 10, 11, 12, 13, 12, 10, 13, 6]` — it starts in the ordinary text token 7, then every
+image/video/vision-start/vision-end sentinel plus the complete wrapper-looking run 12, 10, 13;
+the trailing 6 is only the last golden step's `token_id` label and is never fed back as
+history. Each case records the unexpanded/expanded IDs, the grids, the processed-pixel
+SHA-256, the full three-axis prefill positions and delta, the tower's merged and DeepStack
+rows (base cases) and the prefill plus every step's logits.
+
+**Java suites.** `Qwen3VlGoldenTest` (`full-float32`; required by CI in the strict result
+directory) and `Qwen3VlDefaultPrecisionTest` (ordinary TF32 JVM; the greedy-ID assertion is
+skipped because the reduced-precision margin is not pinned) run all six cases through the Java
+processor, tower, prefill and cached decode. Measured maxima:
+
+| Mode | Observed maximum | Independent allowed bound |
+| --- | ---: | ---: |
+| Full FLOAT32, TF32 off | 2.3245811e-6 | 1e-4 |
+| Default, TF32 on | 0.0019590855 | 0.0025 |
+
+recorded in `req/phase6-golden-precision.md` with host, pins and commands. The exact
+greedy-ID assertion is degenerate on this 21-token tied checkpoint — the reference's argmax is
+token 7 at every base-case step (top-two margins 0.4851 to 1.1170), so a model stuck on token 7
+would pass it; this is recorded in the golden's `greedy_id_note` and the full logit-vector
+comparison is the binding gate. A produced-model observer now emits one `deepstack` event per
+injected level during the prefill, and the golden test asserts the exact count after every
+step, so an injection on a cached decode step fails by name; the per-image `preprocess`/`vision`
+counts keep pinning image consumption and tower runs to the prefill. The strict suite additionally
+asserts every forced step's cached logits against the reference's forced-history forward.
+
+**Shared-contract coverage decision (plan Section 9).** The per-case coverage of
+"one/many/zero new tokens, EOS/stop, sampling penalties/filtering, streaming/log probabilities
+and abort result IDs" is accepted from WP7's
+`Qwen3VlGenerationTest.eosStopSamplingStreamingAndAbortUseTheSharedContracts`, which exercises
+exactly those shared generation-loop contracts against the same composed `Qwen3VlModel` (zero
+and one new token via stop/EOS, many via max-tokens, seeded sampling with repetition/
+frequency/presence penalties and top-k/top-p/min-p filtering, streamed events, log
+probabilities and abort prompt/generated IDs). Those contracts are model-agnostic shared-loop
+behavior, not Qwen3-VL-specific numerics; the WP8 golden owns the model-specific reference
+gate, including the forced marker histories. Re-running the shared contracts against the WP8
+reference was therefore not required.
+
+**Golden regeneration (2026-10-26).** The generator gained the `greedy_id_note` and a
+corrected forced-history comment; the golden was regenerated under the same locked
+`tools/hf-reference/requirements.lock` (CPython 3.12 — the Homebrew `python@3.12` interpreter
+moved 3.12.15 to 3.12.16 since the original generation, with every pinned package unchanged).
+All five checkpoint artifacts regenerated byte-identical (their digests are unchanged); the
+golden differs only in the added note and the recorded Python patch version. Both new digests
+are pinned in `tools/hf-reference/provenance.json` and enforced by `verifyHfReferenceGoldens`.
+
+Host: Apple M5 Max, macOS 27.0.1/arm64, Java 25.0.4.1, `mlx-metal` 0.31.2, mlx-c
+`fba4470b89073180056c9ea46c443051375f7399`. Commands (all green locally, no native test
+skipped):
+
+```sh
+./gradlew :jmlx-models:float32GoldenTest --tests "se.alipsa.jmlx.models.Qwen3VlGoldenTest"
+./gradlew :jmlx-models:test --tests "se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest"
+./gradlew verifyHfReferenceGoldens
+```
+
+Remaining WP8 scope (not closed by this work): the Tier-B manifest for the pinned 2B artifact
+(with a multi-image prompt, exact decoded output, top-logit margins and measured native peak
+memory/wall time/disk before a weekly job — a resource-blocked CI run is recorded as pending,
+not verified), the manual 8B 4-bit run with the locked `tools/qwen-vl-reference/` mlx-vlm
+comparison recorded in `req/phase6-4-benchmark.md`, and the first supported macOS 26 CI
+execution of the two new required suites. No native pin, generated binding or public API
+changed.

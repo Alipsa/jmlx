@@ -59,3 +59,18 @@ SHA-256-pins the tiny checkpoint, the `idefics3.json` numerics, the Tier-B logit
 manifest, the licensed input image and the generator. The decoded-image fixtures exercise
 `jmlx-vision`'s pure-Java path (no native runtime needed); the tiny-checkpoint row exercises the
 native `SmolVlmModel` and runs only where the MLX runtime is available.
+
+## Phase 7.3b Qwen3-VL WP8 fixtures (2026-10-26)
+
+| Fixture | Input / seed | Golden | Test or verifier |
+| --- | --- | --- | --- |
+| Tiny WP8 full-model checkpoint | `tools/hf-reference/goldens/checkpoints/qwen3vl-wp8/` (strict 10/18/14-key `config.json`, 16,483,496-byte `model.safetensors` with 104 bf16 tensors and tied head, 14-key `preprocessor_config.json`, the committed 21-token qwen3vl fixture tokenizer, two deterministic 192x128 / 128x192 PNGs); generator seed 20261025 | `qwen3vl-wp8.json` (schema `jmlx-phase7-3b-wp8-qwen3vl-model-v1`): per-case unexpanded/expanded IDs, grids, processed-pixel SHA-256, full three-axis prefill positions and delta, tower merged/DeepStack rows, prefill and every step's fresh full uncached reference logits | `Qwen3VlGoldenTest` in `:jmlx-models:float32GoldenTest` (strict absolute `1e-4`; measured maximum `2.3245811e-6`) |
+| Default-precision WP8 evidence | the same six cases (four plan cases plus both forced generated-marker continuations) in the ordinary TF32 JVM | measured maximum absolute logit/feature error `0.0019590855` under the separately named bound `0.0025`, recorded in `req/phase6-golden-precision.md` | `Qwen3VlDefaultPrecisionTest` in the ordinary `:jmlx-models:test` |
+
+The generator `tools/hf-reference/qwen3vl_wp8.py` is never invoked by Gradle and is
+SHA-256-pinned, together with the golden and every checkpoint file, in
+`tools/hf-reference/provenance.json` (enforced by `verifyHfReferenceGoldens`, part of root
+`check`). The exact greedy-ID assertion is degenerate on this 21-token tied checkpoint (token 7
+at every base-case step; recorded in the golden's `greedy_id_note`); the binding gate is the
+full logit-vector comparison. See `req/plans/phase7-3b-reference-findings.md` §11.8 for the
+case inventory, the shared-contract coverage decision and the remaining Tier-B/8B scope.

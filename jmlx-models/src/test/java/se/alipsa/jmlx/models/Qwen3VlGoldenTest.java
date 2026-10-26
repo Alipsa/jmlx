@@ -35,7 +35,8 @@ import tools.jackson.databind.JsonNode;
  * forced-continuation step against the golden's fresh, full, uncached reference forward. The forced
  * continuations feed every image/video/vision-start/vision-end sentinel plus a complete
  * wrapper-looking generated run; the observer asserts that none of those steps consumes an image,
- * re-runs the tower, or receives DeepStack.
+ * re-runs the tower, re-preprocesses, or injects DeepStack -- the DeepStack injections fire exactly
+ * once per level, all during the prefill.
  */
 @Tag("full-float32")
 @EnabledIfNativeAvailable
@@ -235,6 +236,15 @@ class Qwen3VlGoldenTest {
     JsonNode decodeSteps = c.required("decode_steps");
     try (MLXScope generation = root.newChild()) {
       List<KVCache> caches = Qwen3VlTestSupport.caches(model, generation);
+      // The pinned checkpoint's decoder depth exceeds its DeepStack level count, so an
+      // image-bearing prefill injects one event per level, and no cached decode step carries a
+      // post-block hook at all.
+      int expectedInjections =
+          caseImages.isEmpty()
+              ? 0
+              : Math.min(
+                  model.metadata().numHiddenLayers(),
+                  model.towerForTest().deepstackIndexes().length);
       events.clear();
       for (int step = 0; step < decodeSteps.size(); step++) {
         JsonNode stepGolden = decodeSteps.get(step);
@@ -263,6 +273,12 @@ class Qwen3VlGoldenTest {
                     step,
                     bound,
                     assertGreedyTokens && !"forced".equals(c.required("type").asString())));
+        // Pins both the total injection count and its timing: all injections happen inside
+        // the prefill (step 0), so the count may never grow on a cached decode step.
+        assertEquals(
+            expectedInjections,
+            events.stream().filter("deepstack"::equals).count(),
+            name + " deepstack injections after step " + step);
       }
       // Step 0 is the prefill itself, so the final position is the prompt length plus one
       // decode step per remaining golden entry.

@@ -124,10 +124,12 @@ EXPECTED_GRIDS = {
 }
 
 # The four base prompts (plan Section 9 cases 1-4) and the shared forced
-# continuation (case 5, image-bearing and text-only): every sentinel
-# (image 10, video 11, vision start 12, vision end 13) plus the complete
-# wrapper-looking run 12, 10, 13, starting and ending in ordinary text
-# tokens.
+# continuation (case 5, image-bearing and text-only): it starts in the
+# ordinary text token 7, then every sentinel (image 10, video 11, vision
+# start 12, vision end 13) plus the complete wrapper-looking run 12, 10,
+# 13. The trailing 6 is only the last golden step's token_id label: every
+# sentinel and the whole 12, 10, 13 wrapper run is fed back as history,
+# but the label of the final step is never consumed.
 TEXT_PROMPT = [3, 4, 5, 6, 7, 3, 4, 5, 6, 3, 19, 7]
 ONE_IMAGE_PROMPT = [START_TOKEN, IMAGE_TOKEN, END_TOKEN, 3, 4, 5, 6, 7]
 TWO_IMAGE_PROMPT = [
@@ -957,6 +959,17 @@ def main() -> None:
                 "two DeepStack levels (vision extraction indices [1, 3]) are "
                 "injected after decoder blocks 0 and 1; the third decoder layer "
                 "is un-injected, so every injection position kind is exercised"
+            ),
+            "greedy_id_note": (
+                "in every base generation case the reference's greedy argmax is "
+                "token 7 at each recorded step (top-two margins 0.4851 to "
+                "1.1170), so the strict suite's exact-greedy-ID assertion is "
+                "degenerate on this 21-token tied checkpoint and a model stuck "
+                "on token 7 would pass it; the binding gate is the full "
+                "logit-vector comparison against this golden at 1e-4. The "
+                "forced steps' token_id fields are the forced-history labels, "
+                "not argmaxes -- the strict suite asserts greedy only on the "
+                "generation cases"
             ),
             "position_note": (
                 "num_position_embeddings is 64 (an 8 x 8 learned table) while "

@@ -108,7 +108,10 @@ Byte-exactness evidence: the `qwen3vl` family of the `tools/image-oracle` fixtur
 including the rotated eXIf fixtures with their stored-decode controls) plus the shared
 processed-patch bins under `tools/image-oracle/fixtures/qwen3vl/patches/`, byte-verified by
 `ImageOracleQwen3VlTest`; the reference findings behind them are §4 of
-`req/plans/phase7-3b-reference-findings.md` (§4.8 for the part-2 fixture set).
+`req/plans/phase7-3b-reference-findings.md` (§4.8 for the part-2 fixture set). End-to-end
+model-side acceptance of this preprocessing — the composed Qwen3-VL prefill and cached decode
+against a fresh, full, uncached CPU-HF float32 reference — is the Phase 7.3b WP8 golden suites
+(same findings, §11.8).
 
 ## Divergences from the reference's operation order
 

@@ -755,3 +755,21 @@ compares four layouts with greedy/forced-marker histories against recomputed ful
 (strict `1e-4`, separately measured TF32 `0.003`). All three suites are required by CI;
 findings §11.7 records local evidence and the remaining WP8 independent-reference/artifact
 acceptance gates. No native pin, generated binding, public API or golden changed.
+
+Phase 7.3b WP8 (2026-10-26) delivers the Tier-A acceptance: `tools/hf-reference/qwen3vl_wp8.py`
+(never Gradle-invoked, digest-pinned) generates a tiny full Qwen3-VL checkpoint (three decoder
+layers, two DeepStack levels, `mrope_section [16, 8, 8]`, 21-token tied vocabulary, position
+interpolation beyond the learned table, 24 distinct norm affines) and a six-case golden (the
+four plan cases plus two forced generated-marker continuations carrying every sentinel and a
+wrapper-looking run). `Qwen3VlGoldenTest` (`full-float32`, strict `1e-4`) and
+`Qwen3VlDefaultPrecisionTest` (separately named TF32 bound `0.0025`) compare every prefill,
+cached and forced step plus the tower's merged/DeepStack rows against the golden's fresh, full,
+uncached HF forward; measured maxima (`2.3245811e-6` strict / `0.0019590855` TF32) are recorded
+in `req/phase6-golden-precision.md`. The model's test observer now emits one `deepstack` event
+per injected level and the golden test pins that count after every step; the exact greedy-ID
+assertion is degenerate on this checkpoint (recorded in the golden's `greedy_id_note`) and the
+full logit-vector comparison is the binding gate. Local evidence and the shared-contract
+coverage decision are in the reference findings §11.8. Remaining WP8 work: the Tier-B manifest
+(multi-image prompt, measured peak/wall/disk on the pinned 2B artifact), the manual 8B 4-bit
+run with the locked mlx-vlm comparison, and the supported macOS 26 CI execution of the two new
+required suites. No native pin, generated binding or public API changed.

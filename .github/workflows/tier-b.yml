@@ -11,20 +11,38 @@ permissions:
 
 jobs:
   artifact:
-    # The smolvlm arm overrides its runner via the `runner` matrix variable below. It needs
-    # macos-26-xlarge because its suite's measured MLX allocator peak is 5.7 GB
-    # (tools/tier-b/smolvlm-256m-instruct.json) and the test JVM plus Gradle daemon push the
-    # process total past the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub
-    # hosted-runners reference), which would swap or OOM-kill the job. macos-26-xlarge is
-    # GitHub's larger macOS arm64 runner tier (5-core M2, 14 GB RAM; GitHub larger-runners
-    # reference) and remains arm64, which the native runtime requires. It is a billed larger
-    # runner: GitHub charges it per minute even in public repositories, and usage is blocked
-    # until a payment method is set up on the account (GitHub larger-runners reference and
-    # GitHub Actions billing docs). TierBVisionLanguageTest also asserts upper bounds on the
-    # measured peaks as a regression detector: a memory regression that surfaces while the
-    # process still fits in the tier's RAM fails the suite explicitly rather than as an
-    # unattributable runner OOM, but the figures are read after the suite finishes, so a large
-    # enough regression can still OOM-kill the job before the assertion runs.
+    # The smolvlm and qwen3vl arms override their runner via the `runner` matrix variable
+    # below onto the self-hosted `self-macos-xl` runner, because their measured footprints
+    # exceed the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub hosted-runners
+    # reference), which would swap or OOM-kill the job: smolvlm's suite MLX allocator peak is
+    # 5.7 GB plus the test JVM and Gradle daemon (tools/tier-b/smolvlm-256m-instruct.json),
+    # and qwen3vl's FLOAT32-up-cast 2B checkpoint footprint peaks at 11.16 GiB
+    # (tools/tier-b/qwen3vl-2b-instruct.json). GitHub's larger macos-26-xlarge tier (5-core
+    # M2, 14 GB RAM, still arm64 as the native runtime requires; GitHub larger-runners
+    # reference) would fit, but larger runners are billed per minute even in public
+    # repositories, and usage is blocked until a payment method is set up on the account
+    # (GitHub larger-runners reference and GitHub Actions billing docs), so the arms run free
+    # on the self-hosted runner (Apple Silicon, macOS 27, 128 GB RAM). The runner executes
+    # as a dedicated non-privileged macOS user whose home holds no Gradle, SSH or release
+    # credentials and cannot read the other users' homes, the repository requires manual
+    # approval for every external fork-PR run, and a per-job GRADLE_USER_HOME kept in the
+    # job's temp dir keeps each self-hosted job's Gradle state out of the runner user's
+    # home. The self-hosted arms also keep their model files in a persistent per-host
+    # directory (the manifest-pinned files survive between runs, so the arms skip
+    # actions/cache and do not re-upload gigabytes of already-present model files into the
+    # repository's cache budget); every file the manifest does not list is removed before
+    # the download step re-hashes and fills in the listed ones, so a previous job cannot
+    # plant a file the loaders would read. While the runner is offline the two jobs wait
+    # and GitHub fails them after 24 hours; the other arms are unaffected. The runner is
+    # the same M5 Max host (macOS 27.0.1) that produced the local evidence, so the first
+    # self-hosted execution of an arm accepts the CI pipeline (checkout, artifact download,
+    # native bootstrap, pinned suite), not independent host, OS or memory-fit evidence; the
+    # supported macOS 26 hosted execution remains pending.
+    # Both arms' suites also assert upper bounds on the measured peaks as a regression
+    # detector: a memory regression that surfaces while the process still fits in the
+    # runner's RAM fails the suite explicitly rather than as an unattributable runner OOM,
+    # but the figures are read after the suite finishes, so a large enough regression can
+    # still OOM-kill the job before the assertion runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
     strategy:
@@ -79,41 +97,107 @@ jobs:
             suite: TierBVisionLanguageTest
             revision: 7e3e67edbbed1bf9888184d9df282b700a323964
             manifest: tools/tier-b/smolvlm-256m-instruct.json
-            runner: macos-26-xlarge
-          # The qwen3vl arm runs on the same macos-26-xlarge tier as smolvlm: the FLOAT32
+            runner: self-macos-xl
+          # The qwen3vl arm runs on the same self-hosted runner as smolvlm: the FLOAT32
           # up-cast 2B checkpoint's test-process footprint peak measures 11,979,116,480 bytes
           # (11.16 GiB; tools/tier-b/qwen3vl-2b-instruct.json local_evidence), far past the
           # standard 7 GB runner. TierBQwen3VlTest's footprint bound (12,500,000,000 bytes,
           # ~520 MB above the measured peak) fails the suite on a memory regression, but it is
-          # not a guarantee the tier's 14 GB survives a large regression (the OS and the
-          # Gradle daemon share that RAM, and macOS may swap or kill first); the local M5 Max
-          # measurement is the only runner-fit evidence so far, so the first hosted run is
-          # acceptance.
+          # not a guarantee the runner's RAM survives a large regression (the OS and the
+          # Gradle daemon share that RAM, and macOS may swap or kill first). The runner is
+          # the same M5 Max host (128 GB, macOS 27.0.1) that produced the local evidence, so
+          # runner fit is not the open question: the first self-hosted CI run accepts the CI
+          # pipeline, and the supported macOS 26 hosted execution remains pending.
           - name: qwen3vl
             model_type: qwen3_vl
             task: qwen3-vl-generation
             suite: TierBQwen3VlTest
             revision: 89644892e4d85e24eaac8bacfd4f463576704203
             manifest: tools/tier-b/qwen3vl-2b-instruct.json
-            runner: macos-26-xlarge
+            runner: self-macos-xl
     env:
+      # Self-hosted arms override this via GITHUB_ENV (persistent per-host model dir,
+      # see the step after checkout); hosted arms use the per-run workspace dir.
       JMLX_TIER_B_MODEL_DIR: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
       JMLX_TIER_B_TASK: ${{ matrix.task }}
       JMLX_TIER_B_SUITE: ${{ matrix.suite }}
       JMLX_TIER_B_MODEL_TYPE: ${{ matrix.model_type }}
       JMLX_TIER_B_MANIFEST: ${{ matrix.manifest }}
     steps:
+      - name: Isolate the Gradle home (self-hosted arms)
+        # matrix.runner is set only for the two self-hosted arms: export a per-job
+        # temp Gradle home to GITHUB_ENV for all later steps, so a CI job never
+        # loads an account-level ~/.gradle (e.g. release credentials in
+        # gradle.properties) and setup-gradle's "already exists" fallback cannot
+        # pick up the runner user's home. Hosted arms skip the step and keep
+        # their default behavior unchanged.
+        if: matrix.runner
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/gradle-home
+        run: |
+          mkdir -p "$GRADLE_USER_HOME"
+          echo "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+      - name: Use persistent host storage for the model (self-hosted arms)
+        # matrix.runner is set only for the two self-hosted arms: this machine keeps its
+        # own disk, so the manifest-pinned model files survive between runs and the arms
+        # skip actions/cache (which would otherwise re-upload up to ~3.7 GB of
+        # already-present files into the repository's 10 GB cache budget, evicting other
+        # jobs' caches, while buying the host nothing). A previous job could plant files
+        # or symlinks here that the manifest does not cover; the download step refuses
+        # a symlink at any artifact path, so a symlink planted at a listed name would
+        # break the arm until someone cleaned it by hand. The step therefore removes
+        # every unlisted file and every symlink (and the empty directories they leave)
+        # before the download step re-hashes the listed ones. Hosted arms keep their
+        # per-run workspace directory and actions/cache.
+        # The path is built from $HOME inside the script (the job runs as the runner
+        # user, so $HOME is that user's home): the runner context has no home-dir
+        # property, and a shell-level expansion keeps the host-specific path out of
+        # this public workflow.
+        if: matrix.runner
+        run: |
+          : "${HOME:?the job environment must set HOME}"
+          MODEL_DIR="$HOME/tier-b-models/${{ matrix.name }}"
+          echo "Model dir: $MODEL_DIR"
+          mkdir -p "$MODEL_DIR"
+          python3 - "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST" <<'PY'
+          import json, os, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          listed = {os.path.normpath(k) for k in json.load(open(sys.argv[2]))["files"]}
+          # Deepest first, so a directory is visited after its contents.
+          for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+              rel = os.path.normpath(str(path.relative_to(root)))
+              if path.is_symlink() or (path.is_file() and rel not in listed):
+                  path.unlink()
+              elif path.is_dir() and not any(path.iterdir()):
+                  path.rmdir()
+          PY
+          echo "JMLX_TIER_B_MODEL_DIR=$MODEL_DIR" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
           architecture: aarch64
+      # Hosted arms only: setup-python@v6 hardcodes AGENT_TOOLSDIRECTORY to
+      # /Users/runner/hostedtoolcache on every darwin host (IS_MAC =
+      # process.platform === 'darwin'), which is the GitHub-hosted runner's
+      # tool cache, so on the self-hosted arm it dies with "mkdir: /Users/runner:
+      # Permission denied" before Python is even resolved. The self-hosted arm
+      # uses the machine's python3 instead (brew's, first on PATH); the only
+      # Python this job runs is a stdlib-only report heredoc, so no pinned
+      # toolchain is needed there.
       - uses: actions/setup-python@v6
+        if: '!matrix.runner'
         with:
           python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
+      # Hosted arms only: the self-hosted arms use persistent host storage (see the step
+      # after checkout), so caching their model directory would only re-upload up to ~3.7 GB
+      # into the repository's 10 GB cache budget every run.
       - uses: actions/cache@v4
+        if: '!matrix.runner'
         with:
           path: ${{ github.workspace }}/.tier-b/${{ matrix.name }}
           key: tier-b-${{ matrix.name }}-${{ matrix.revision }}
@@ -123,7 +207,7 @@ jobs:
         run: ./scripts/bootstrap-native.sh
       - name: Run pinned smoke test
         run: ./gradlew --no-build-cache :jmlx-models:tierBTest
-      - name: Report observed output and assert test executed
+      - name: Report observed output and assert execution on the MLX GPU device
         run: |
           python3 - <<'PY'
           import os
@@ -136,7 +220,10 @@ jobs:
               raise SystemExit('Tier B smoke test did not execute')
           if int(suite.attrib.get('failures', 0)) or int(suite.attrib.get('errors', 0)):
               raise SystemExit('Tier B smoke test failed')
-          print(suite.findtext('system-out') or 'No Tier B observations recorded')
+          out = suite.findtext('system-out') or ''
+          if 'device=gpu' not in out:
+              raise SystemExit('Tier B suite did not run on the MLX GPU device')
+          print(out or 'No Tier B observations recorded')
           PY
       - name: Upload numerical and memory evidence
         if: always()

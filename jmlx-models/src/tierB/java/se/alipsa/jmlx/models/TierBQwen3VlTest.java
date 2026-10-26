@@ -49,24 +49,24 @@ import tools.jackson.databind.ObjectMapper;
  * figures, sized from the manifest's recorded local_evidence
  * (tools/tier-b/qwen3vl-2b-instruct.json) so a footprint or allocator regression fails this suite
  * explicitly. The footprint bound is deliberately close to the measured peak: it is a regression
- * detector, not a guarantee that the CI runner tier survives a large regression (the OS and the
- * Gradle daemon share the tier's RAM, and macOS may swap or kill before the suite observes it; see
- * the workflow comment in .github/workflows/tier-b.yml).
+ * detector, not a guarantee that the CI runner survives a large regression (the OS and the Gradle
+ * daemon share the runner's RAM, and macOS may swap or kill before the suite observes it; see the
+ * workflow comment in .github/workflows/tier-b.yml).
  */
 @EnabledIfNativeAvailable
 class TierBQwen3VlTest {
   // Recorded in the manifest's local_evidence (macOS 27.0.1, TF32 off, pinned mlx-metal 0.31.2
   // / mlx-c fba4470): the suite's MLX allocator peak is 9,828,890,788 bytes. The bound adds 500
   // MiB, well above cross-host allocator variance (the peak is mlx's own byte accounting, not OS
-  // memory). It is a regression detector, not a guarantee the macos-26-xlarge tier survives a
+  // memory). It is a regression detector, not a guarantee the CI runner's RAM survives a
   // large regression: peakBytes() is read only after generation finishes, and a regression
   // retaining one extra float32 copy of this checkpoint's weights (about 8.5 GB) would push the
-  // process past the tier's RAM before the assertion runs.
+  // process past the runner's RAM before the assertion runs.
   private static final long NATIVE_PEAK_BOUND_BYTES = 9_828_890_788L + 500L * 1024 * 1024;
   // The same local run's sampled process-footprint peak is 11,979,116,480 bytes (the ~9.2 GB MLX
   // pool plus the JVM). The bound adds ~520 MB of headroom above it for JVM/OS variance on the
-  // hosted runner: it fails the suite explicitly when the footprint regresses, but it is NOT a
-  // guarantee the macos-26-xlarge tier's 14 GB survives a large regression (the OS and the
+  // CI runner: it fails the suite explicitly when the footprint regresses, but it is NOT a
+  // guarantee the self-hosted runner's RAM survives a large regression (the OS and the
   // Gradle daemon share that RAM, and macOS may swap or kill before the suite observes it).
   private static final long FOOTPRINT_BOUND_BYTES = 12_500_000_000L;
 

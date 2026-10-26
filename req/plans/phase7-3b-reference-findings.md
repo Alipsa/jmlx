@@ -2461,22 +2461,27 @@ greedy-ID assertion is degenerate on this 21-token tied checkpoint — the refer
 token 7 at every base-case step (top-two margins 0.4851 to 1.1170), so a model stuck on token 7
 would pass it; this is recorded in the golden's `greedy_id_note` and the full logit-vector
 comparison is the binding gate. A produced-model observer now emits one `deepstack` event per
-injected level during the prefill, and the golden test asserts the exact count after every
-step, so an injection on a cached decode step fails by name; the per-image `preprocess`/`vision`
-counts keep pinning image consumption and tower runs to the prefill. The strict suite additionally
+injected level during the prefill, and the golden test pins the exact count — derived from the
+golden's declared geometry (its provenance config), not the model's own view — after every
+step, so an injection through the prefill's post-block hook on a cached decode step fails by
+name (the decode step path currently passes no hook; a future decode-side injection through a
+new hook would be covered only by the logit gate); the per-image `preprocess`/`vision` counts
+keep pinning image consumption and tower runs to the prefill. The strict suite additionally
 asserts every forced step's cached logits against the reference's forced-history forward.
 
 **Shared-contract coverage decision (plan Section 9).** The per-case coverage of
 "one/many/zero new tokens, EOS/stop, sampling penalties/filtering, streaming/log probabilities
 and abort result IDs" is accepted from WP7's
 `Qwen3VlGenerationTest.eosStopSamplingStreamingAndAbortUseTheSharedContracts`, which exercises
-exactly those shared generation-loop contracts against the same composed `Qwen3VlModel` (zero
-and one new token via stop/EOS, many via max-tokens, seeded sampling with repetition/
+exactly those shared generation-loop contracts against the composed `Qwen3VlModel` (loaded from
+the WP6 checkpoint, not the WP8 one) (zero and one new token via stop/EOS, many via max-tokens,
+seeded sampling with repetition/
 frequency/presence penalties and top-k/top-p/min-p filtering, streamed events, log
 probabilities and abort prompt/generated IDs). Those contracts are model-agnostic shared-loop
-behavior, not Qwen3-VL-specific numerics; the WP8 golden owns the model-specific reference
-gate, including the forced marker histories. Re-running the shared contracts against the WP8
-reference was therefore not required.
+behavior, not Qwen3-VL-specific numerics, so the checkpoint identity is not load-bearing for
+them; the WP8 golden owns the model-specific reference gate, including the forced marker
+histories. Re-running the shared contracts against the WP8 reference was therefore not
+required.
 
 **Golden regeneration (2026-10-26).** The generator gained the `greedy_id_note` and a
 corrected forced-history comment; the golden was regenerated under the same locked

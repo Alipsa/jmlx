@@ -146,10 +146,20 @@ class Qwen3VlGoldenTest {
                   Files.readAllBytes(directory().resolve("preprocessor_config.json"))));
       List<String> events = new ArrayList<>();
       model.setObserverForTest(events::add);
+      // The golden's declared geometry, independent of the model's own view: an image-bearing
+      // prefill injects one DeepStack level per configured extraction index, capped at the
+      // declared decoder depth.
+      JsonNode geometry = golden().required("provenance").required("config");
+      int imageInjections =
+          Math.min(
+              geometry.required("text_config").required("num_hidden_layers").intValue(),
+              geometry.required("vision_config").required("deepstack_visual_indexes").size());
       for (JsonNode c : golden().required("cases")) {
         maximum =
             Math.max(
-                maximum, runCase(model, processor, events, c, bound, assertGreedyTokens, root));
+                maximum,
+                runCase(
+                    model, processor, events, c, bound, assertGreedyTokens, imageInjections, root));
       }
     }
     return maximum;
@@ -162,6 +172,7 @@ class Qwen3VlGoldenTest {
       JsonNode c,
       float bound,
       boolean assertGreedyTokens,
+      int imageInjections,
       MLXScope root)
       throws Exception {
     String name = c.required("name").asString();
@@ -236,15 +247,10 @@ class Qwen3VlGoldenTest {
     JsonNode decodeSteps = c.required("decode_steps");
     try (MLXScope generation = root.newChild()) {
       List<KVCache> caches = Qwen3VlTestSupport.caches(model, generation);
-      // The pinned checkpoint's decoder depth exceeds its DeepStack level count, so an
-      // image-bearing prefill injects one event per level, and no cached decode step carries a
-      // post-block hook at all.
-      int expectedInjections =
-          caseImages.isEmpty()
-              ? 0
-              : Math.min(
-                  model.metadata().numHiddenLayers(),
-                  model.towerForTest().deepstackIndexes().length);
+      // The per-level injection count, pinned against the golden's declared geometry (computed
+      // in runCases) rather than the model's own view. The current decode step path passes no
+      // post-block hook, so only the prefill can emit these events.
+      int expectedInjections = caseImages.isEmpty() ? 0 : imageInjections;
       events.clear();
       for (int step = 0; step < decodeSteps.size(); step++) {
         JsonNode stepGolden = decodeSteps.get(step);

@@ -784,9 +784,12 @@ qwen3vl row runs on the self-hosted `self-macos-xl` runner (GitHub's larger
 `macos-26-xlarge` tier is billed per minute even in public repos, so the row does not
 target it); the runner executes as a dedicated non-privileged macOS user with a per-job
 `GRADLE_USER_HOME`, the repo requires approval for every external fork-PR run, and the
-runner is the same M5 Max host (macOS 27.0.1) as the local evidence, so the row's first
-CI run accepts the CI pipeline — not independent host, OS or memory-fit evidence — and
-the macOS 26 hosted execution remains pending, not verified. The manual 8B
+runner is the same M5 Max host (macOS 27.0.1) as the local evidence; the row's first CI
+runs with persistent model storage completed 2026-10-26 (run 40403387275, merged-head
+confirmation 40409087523, `tools/tier-b/README.md`) with maximum logit error, native
+allocator peak, greedy IDs and decoded output matching the local runs (wall times differ),
+accepting the CI pipeline — not independent host, OS or memory-fit evidence — and the
+macOS 26 hosted execution remains pending, not verified. The manual 8B
 4-bit run (`Qwen3Vl8bManualProbeTest`, opt-in via `JMLX_8B_PROBE_DIR`) recorded its
 image+text output, the artifact's stale-index finding, the full-dump
 `preprocessor_config.json` acceptance in `Qwen3VlProcessorConfig` and asserts the

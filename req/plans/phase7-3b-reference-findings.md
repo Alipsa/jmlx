@@ -2544,9 +2544,14 @@ depend on remain pending, not verified.
   11.16 GiB footprint, and GitHub's larger `macos-26-xlarge` tier is billed per minute
   even in public repos, so the row does not target it). The runner is the same M5 Max
   host (128 GB, macOS 27.0.1) that produced the local evidence, so runner fit is not the
-  open question: the row's first execution accepts the CI pipeline (checkout, artifact
-  download, native bootstrap, pinned suite), not independent host, OS or memory-fit
-  evidence — recorded pending. The macOS 26 hosted executions, which would also be
+  open question. The row's first executions with persistent model storage ran green on
+  2026-10-26 (run 40403387275, first all-arms green run with persistent model storage;
+  merged-head confirmation 40409087523) with `tests=1 skipped=0` and
+  evidence identical to the local run (maximum logit error 1.0228157043457031e-4, native
+  allocator peak 9,828,890,788 bytes, exact greedy IDs and decoded output, `device=gpu`;
+  `tools/tier-b/README.md`): the first execution accepted the CI pipeline (checkout,
+  artifact download, native bootstrap, pinned suite), not independent host, OS or
+  memory-fit evidence. The macOS 26 hosted executions, which would also be
   independent hardware, remain pending, not verified. `verifyHfReferenceGoldens` now
   covers the qwen3vl
   manifest, generator, images and binary (union of the per-task provenance maps).

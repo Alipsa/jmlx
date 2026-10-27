@@ -95,3 +95,25 @@ runner is the same M5 Max host (macOS 27.0.1) that produced the local evidence: 
 first execution of a row accepts the CI pipeline (checkout, artifact download, native
 bootstrap, pinned suite), not independent host, OS or memory-fit evidence, and the
 supported macOS 26 hosted execution those rows require remains pending.
+
+First CI runs with the persistent storage (2026-10-26). The rows' first executions with
+the persistent storage ran green on the self-hosted runner: run 40403387275 (head
+`6b5f6b1`), the first all-nine-arm green run on the launchd-served daemon with the
+persistent storage, and run 40409087523 (head `e0dfb78`, the merged head), which
+re-confirmed all nine arms. Both arms reached their pinned suites with `tests=1 skipped=0`
+and evidence identical to the local GPU runs: qwen3vl
+`max_abs_error=1.0228157043457031e-4` (ε = 2e-4 / margin = 1e-4), native allocator peak
+9,828,890,788 bytes, the exact greedy IDs and decoded output; smolvlm
+`max_abs_error=5.2928924560546875e-5` (ε = 1e-4 / margin = 1e-4), native allocator peak
+5,737,416,464 bytes; both self-attesting `device=gpu, host=27.0.1/aarch64`. Run
+40403387275 downloaded every file with a per-file SHA-256-verified line on both arms
+(qwen3vl's `model.safetensors`: 4,255,140,312 bytes; the qwen3vl arm's download
+step took 2 m 31 s, including the Gradle distribution fetch and daemon start).
+Run 40409087523 behaved as designed: its download step re-hashed the present files
+and skipped them (zero per-file download lines in the job logs, the full `artifact
+total` from local verification only). Wall times differ from the local evidence:
+the qwen3vl load wall is 1116/1114 ms in the two runs against ~843 ms locally
+(about 32% above in both), and the one-request generation wall varies, 252 ms on
+run 40403387275 against 1298 ms on run 40409087523, about 5× the local ~247 ms.
+The acceptance semantics above are unchanged: these runs accept the CI pipeline
+only, and the supported macOS 26 hosted execution remains pending.

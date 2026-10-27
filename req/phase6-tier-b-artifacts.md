@@ -90,13 +90,17 @@ the MLX/Metal allocations. This is local eligibility evidence.
 
 WP8 (2026-10-13, `phase7-3a-implementation-report.md`) re-ran this exact manifest on the merged
 tree: identical greedy IDs, identical maximum logit error, and a fresh margin-eligible run, closing
-the seven-artifact consumer and capability-documentation acceptance. The row remains local
-eligibility evidence: the weekly Tier-B row now targets the self-hosted `self-macos-xl`
-runner (GitHub's larger `macos-26-xlarge` tier is billed per minute even in public repos,
-so the row does not target it), and that runner is the same M5 Max host (macOS 27.0.1)
-that produced the local evidence, so its first execution accepts the CI pipeline, not
-independent host, OS or memory-fit evidence; the supported macOS 26 hosted execution
-remains pending (`tools/tier-b/README.md`).
+the seven-artifact consumer and capability-documentation acceptance. The row's first CI
+executions with persistent model storage ran green on 2026-10-26 (run 40403387275, first
+all-arms green run with persistent model storage; merged-head confirmation 40409087523):
+`tests=1 skipped=0`, maximum logit error 5.2928924560546875e-5 and native allocator peak
+5,737,416,464 bytes — identical to the local run — with a `device=gpu` self-attestation.
+The weekly Tier-B row targets the self-hosted `self-macos-xl` runner (GitHub's larger
+`macos-26-xlarge` tier is billed per minute even in public repos, so the row does not
+target it), and that runner is the same M5 Max host (macOS 27.0.1) that produced the local
+evidence, so the row's first execution accepted the CI pipeline, not independent host, OS
+or memory-fit evidence; the supported macOS 26 hosted execution remains pending
+(`tools/tier-b/README.md`).
 
 ## Phase 7.3b Qwen3-VL Tier-B (2026-10-26)
 
@@ -155,15 +159,22 @@ sampled process footprint peak 11,979,116,480 bytes (suite bound: 12,500,000,000
 ~520 MB above the measured peak). Load wall
 ~843 ms; one-request generation wall ~247 ms.
 
-**CI status: pending, not verified.** A `qwen3vl` row was added to
-`.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner (the standard 7 GB
-runner cannot hold the 11.98 GB measured footprint, and GitHub's larger `macos-26-xlarge`
-tier is billed per minute even in public repos, so the row does not target it). The suite's
+**CI status: first self-hosted run with persistent model storage recorded 2026-10-26; the
+supported macOS 26 hosted execution remains pending, not verified.** A `qwen3vl` row was
+added to `.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner (the
+standard 7 GB runner cannot hold the 11.98 GB measured footprint, and GitHub's larger
+`macos-26-xlarge` tier is billed per minute even in public repos, so the row does not
+target it). The row's first executions with persistent model storage ran green (run
+40403387275 — the first all-arms green run with the persistent storage; merged-head
+confirmation 40409087523): `tests=1 skipped=0`, maximum logit error 1.0228157043457031e-4
+(ε = 2e-4 / margin = 1e-4), native allocator peak 9,828,890,788 bytes, the exact greedy
+IDs and decoded output — identical to the local run — with a `device=gpu` self-attestation
+(`tools/tier-b/README.md`). The suite's
 footprint bound fails the suite on a memory regression, but it is not a guarantee the
 runner's RAM survives a large regression (the OS and the Gradle daemon share that RAM, and
 macOS may swap or kill first). The runner is the same M5 Max host (128 GB, macOS 27.0.1)
 that produced the local evidence, so runner fit is not the open question: the row's first
-execution accepts the CI pipeline, not independent host, OS or memory-fit evidence, and
+execution accepted the CI pipeline, not independent host, OS or memory-fit evidence, and
 the supported macOS 26 hosted execution remains pending. While the self-hosted runner is
 offline the row's jobs wait and GitHub fails them after 24 hours; the other rows run on
 the standard hosted runner (`tools/tier-b/README.md`).

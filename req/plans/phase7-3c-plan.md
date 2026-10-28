@@ -3,10 +3,13 @@
 - **Status:** draft — review round 1 (16 findings plus low-priority notes, 2026-10-27),
   review round 2 (2026-10-28: the RoPE boundary-recompute policy, the stop-token correction,
   the marker-binding wording, the relative factor-length validation, the real tiny-tower size,
-  the `pre_layrnorm` key, and the low-priority items) and review round 3 (2026-10-28: the
-  stop-token identity — 32000 is `\n`, `<|end|>` is 32007 — the boundary-recompute
+  the `pre_layrnorm` key, and the low-priority items), review round 3 (2026-10-28: the
+  stop-token identity — 32000 is `
+`, `<|end|>` is 32007 — the boundary-recompute
   image-row retention, the 470-row Tier-A boundary config, the past-length semantics, and the
-  BF16-rounded reference ordering) applied; pending re-review. The 7.3c
+  BF16-rounded reference ordering) and review round 4 (2026-10-28: the stop token written as
+  the newline token, not the two-character `\n` string, and the WP6 golden cases pinned to
+  their side of the 470 boundary) applied; pending re-review. The 7.3c
   go/deferral discovery was performed on 2026-10-27:
   GO — https://huggingface.co/microsoft/Phi-3.5-vision-instruct
   (revision `12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT) is a small, fully licensed, public
@@ -125,9 +128,14 @@ reshape/permute) is already bound and facade'd from 7.1/7.2.
   template — they enter as `<|image_i|>` markers in message text (see §4 WP3). Verify the
   template renders through `jmlx-jinja` and that the marker strings are not special tokens.
   Special-token facts (from `tokenizer_config.json` and `special_tokens_map.json`): the eos
-  **and** pad token is `\n` (id 32000, `special: true`); `<|end|>` is id 32007 — the token the
-  chat template ends assistant turns with; `<s>` is 1; `</s>` is 2 and is **not** a special
-  token; `generation_config.json` carries `eos_token_id: 2` **and** `pad_token_id: 32000`.
+  **and** pad token is `
+` (id 32000, `special: true`) — a special added token, distinct from the `<0x0A>`
+  byte-fallback token (id 13) through which a newline in the text encodes and decodes; 32000
+  itself decodes to the empty string (pinned-venv probe), so the stop is on the token id
+  32000 and a newline in the output (13) does not stop generation. `<|end|>` is id 32007 —
+  the token the chat template ends assistant turns with; `<s>` is 1; `</s>` is 2 and is
+  **not** a special token; `generation_config.json` carries `eos_token_id: 2` **and**
+  `pad_token_id: 32000`.
   `<|image|>` (id 32044) is a special token the marker regex `<\|image_\d+\|>` never matches —
   it creates no image slot in the reference; user text containing it is passed through, not
   rejected (WP3 records the decision).
@@ -266,7 +274,8 @@ must:
     11). The `torchvision` install is precisely what makes the first two checkable.
 14. Pin the stop-token policy (answerable from the artifact; the WP1 probe only confirms):
     every `generate` call in `sample_inference.py` passes
-    `eos_token_id = processor.tokenizer.eos_token_id` — **32000** (`\n`, the tokenizer's
+    `eos_token_id = processor.tokenizer.eos_token_id` — **32000** (`
+`, the tokenizer's
     own eos, which is also its pad token — **not** `<|end|>`, which is id 32007) — overriding
     `generation_config.json`'s
     `eos_token_id: 2` (`</s>`, not a special token). Generation therefore stops on
@@ -496,19 +505,30 @@ rule.
   pinned scaling constant is `sqrt(1 + ln(2048/470) / ln(470))` (≈ 1.11321).
 - Cases (every prefill and every cached step compared against a fresh full **uncached**
   forward — the reference's `use_cache=False` execution mode, WP1 item 2 — with the manual
-  greedy loop, the 7.3b WP8 method): text-only (short table; **prompt + max_new_tokens ≤ 470**,
-  so the factor table is constant across the whole generation); a wide image (457 rows) plus
-  **short** text, chosen so the expanded prompt stays below 470 while prompt +
-  max_new_tokens exceeds it — the decode **crosses** the synthetic boundary after a few steps:
-  the WP5 re-prefill fires at the crossing step, re-injecting the retained image rows, and
-  from that step on both sides compute the long table over the full history, so the
-  fresh-uncached comparison stays valid; WP1 item 11, §5 — this is the golden test of the
-  boundary-recompute decision, including the image-row restoration; one 336×336 image
-  (**757** rows — long table from the first step, and the past length is already over the
-  boundary at prefill, so the recompute branch never fires during decode); a wide image (457
-  rows); a tall image through the transpose branch (469 rows); two images with text between.
-  The 4096/4097 table-selection boundary itself is covered by the WP4 unit test, and the
-  recompute trigger's non-firing case by the WP5 unit test, not here.
+  greedy loop, the 7.3b WP8 method); every case pins its expanded prompt length (the
+  prepended `<s>`, the template tokens, the text tokens and the image rows) and therefore
+  which side of 470 it starts on — the recompute pins (fired or not) are part of the case
+  spec, not accidental: text-only (short table; **prompt + max_new_tokens ≤ 470**, so the
+  factor table is constant across the whole generation and the recompute never fires); a
+  wide image (457 rows) plus **short** text, chosen so the expanded prompt stays below 470
+  while prompt + max_new_tokens exceeds it — the decode **crosses** the synthetic boundary
+  after a few steps: the WP5 re-prefill fires at the crossing step, re-injecting the
+  retained image rows, and from that step on both sides compute the long table over the
+  full history, so the fresh-uncached comparison stays valid; WP1 item 11, §5 — this is
+  the golden test of the boundary-recompute decision, including the image-row restoration;
+  one 336×336 image (**757** rows — the image rows alone are over the boundary, so the long
+  table is used from the first step and the recompute branch never fires during decode); a
+  wide image (457 rows) plus text pinned so the expanded prompt is over 470 — the image
+  rows alone are under the boundary, so this pins the table selection to the prompt length
+  rather than the image-row count: long table from the first step, recompute never fires;
+  a tall image through the transpose branch (469 rows) plus text pinned so the expanded
+  prompt is over 470 — 469 image rows plus the prepended `<s>` alone make 470, which would
+  be short at prefill with the recompute firing at the first decode step, so the text
+  length is pinned explicitly: long table from the first step, recompute never fires; two
+  images with text between (expanded prompt well over 470 — at least 457 + 457 image rows —
+  long table from the first step, recompute never fires). The 4096/4097 table-selection
+  boundary itself is covered by the WP4 unit test, and the recompute trigger's non-firing
+  case by the WP5 unit test, not here.
   `Phi3VGoldenTest` asserts strict `1e-4` in `float32GoldenTest` (`full-float32`);
   `Phi3VDefaultPrecisionTest` asserts a separately named default-mode bound derived from the
   locally measured TF32 error (recorded next to the Phase 6/7.3b measurements, never by golden
@@ -538,7 +558,8 @@ request level (7.3a/7.3b precedent).
   **prompt + max_new_tokens ≤ 4096** — the request stays on one side of the rope boundary, so
   the recompute path is exercised by the Tier-A golden case and the WP5 unit test, not the
   Tier-B run — and the `reference`/`recorded_pin`/`local_evidence` sections. The manifest pins
-  the exact stop-token set for the decoded-output assertion: **{32000}** (`\n`, the
+  the exact stop-token set for the decoded-output assertion: **{32000}** (`
+`, the
   tokenizer's own eos — **not** `<|end|>`, id 32007 — which the model typically emits before
   the 32000 stop), which every `sample_inference.py` `generate` call passes as `eos_token_id`,
   overriding `generation_config`'s `eos_token_id: 2` (WP1 item 14), and it states whether the
@@ -617,7 +638,8 @@ request level (7.3a/7.3b precedent).
 - **Stop tokens.** The caller supplies the stop set through the existing
   `GenerationConfig`/`generate` contract. The artifact-faithful default for `phi3_v` — used by
   the examples, the goldens and the Tier-B assertion — is **{32000}**: the tokenizer's own eos
-  (`\n`, also its pad token) — **not** `<|end|>`, which is id 32007, what the chat template
+  (`
+`, also its pad token) — **not** `<|end|>`, which is id 32007, what the chat template
   ends assistant turns with, and what the model typically emits just before the 32000 stop.
   Every `generate` call in the artifact's `sample_inference.py` passes 32000 as
   `eos_token_id` (WP1 item 14). `generation_config.json`'s

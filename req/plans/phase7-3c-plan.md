@@ -1,9 +1,12 @@
 # Phase 7.3c — LLaVA-style image+text inference (Phi-3.5-Vision)
 
-- **Status:** draft — review round 1 (16 findings plus low-priority notes, 2026-10-27) and
+- **Status:** draft — review round 1 (16 findings plus low-priority notes, 2026-10-27),
   review round 2 (2026-10-28: the RoPE boundary-recompute policy, the stop-token correction,
   the marker-binding wording, the relative factor-length validation, the real tiny-tower size,
-  the `pre_layrnorm` key, and the low-priority items) applied; pending re-review. The 7.3c
+  the `pre_layrnorm` key, and the low-priority items) and review round 3 (2026-10-28: the
+  stop-token identity — 32000 is `\n`, `<|end|>` is 32007 — the boundary-recompute
+  image-row retention, the 470-row Tier-A boundary config, the past-length semantics, and the
+  BF16-rounded reference ordering) applied; pending re-review. The 7.3c
   go/deferral discovery was performed on 2026-10-27:
   GO — https://huggingface.co/microsoft/Phi-3.5-vision-instruct
   (revision `12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT) is a small, fully licensed, public
@@ -122,9 +125,9 @@ reshape/permute) is already bound and facade'd from 7.1/7.2.
   template — they enter as `<|image_i|>` markers in message text (see §4 WP3). Verify the
   template renders through `jmlx-jinja` and that the marker strings are not special tokens.
   Special-token facts (from `tokenizer_config.json` and `special_tokens_map.json`): the eos
-  **and** pad token is `<|end|>` (id 32000, `special: true`) — the very token the chat template
-  ends assistant turns with; `<s>` is 1; `</s>` is 2 and is **not** a special token;
-  `generation_config.json` carries `eos_token_id: 2` **and** `pad_token_id: 32000`.
+  **and** pad token is `\n` (id 32000, `special: true`); `<|end|>` is id 32007 — the token the
+  chat template ends assistant turns with; `<s>` is 1; `</s>` is 2 and is **not** a special
+  token; `generation_config.json` carries `eos_token_id: 2` **and** `pad_token_id: 32000`.
   `<|image|>` (id 32044) is a special token the marker regex `<\|image_\d+\|>` never matches —
   it creates no image slot in the reference; user text containing it is passed through, not
   rejected (WP3 records the decision).
@@ -228,15 +231,24 @@ must:
     deliberately discards the cache and forces a full recompute the first time a sequence
     crosses the boundary — `modeling_phi3_v.py:1650`–`:1655` drops `past_key_values` to `None`
     when `input_ids.shape[1] >= original_max_position_embeddings + 1` and the past length is
-    `<= original_max_position_embeddings`. The reference therefore generates as if **every**
-    key uses the long table once the sequence passes the boundary — including the keys written
-    before it. The past length is read through the non-Cache fallback
-    `past_key_values[0][0].shape[2]` (`:1653`), since `seen_tokens` does not exist in
-    `transformers==4.57.6` (part of item 2's failure). A "cached keys keep the table that
-    wrote them" behavior — stale keys across the boundary — would be a jmlx-only divergence,
-    not reference behavior. The generator's per-step fresh forward of the full history
-    embodies the long-table-from-crossing semantics that jmlx's cached decode must reproduce;
-    §5 decides the policy and WP6 golden-tests it.
+    `<= original_max_position_embeddings`. Past length is the number of cached positions;
+    the reference therefore generates as if **every** key uses the long table once the
+    sequence passes the boundary — including the keys written before it — and a "cached
+    keys keep the table that wrote them" behavior would be a jmlx-only divergence, not
+    reference behavior. Under the pinned 4.57.6 the `:1653` past-length read takes the
+    `seen_tokens`/`get_max_length` branch, because `isinstance(past_key_values, Cache)` is
+    true (`DynamicCache` subclasses `Cache`, `cache_utils.py:910`) while `seen_tokens` does
+    not exist, so that branch raises `AttributeError` if executed — part of item 2's failure
+    — and the non-Cache `past_key_values[0][0].shape[2]` fallback never runs; under the
+    generator's uncached mode (`use_cache=False`) `past_key_values` is `None` and none of
+    `:1650`–`:1661` runs at all. The boundary flow is therefore a code-reading conclusion
+    plus the observed failure (item 13), not an executed path. The generator's per-step fresh
+    forward of the full history embodies the long-table-from-crossing semantics that jmlx's
+    cached decode must reproduce — including re-running the vision tower at the crossing,
+    since `prepare_inputs_for_generation` passes `pixel_values`/`image_sizes` on every step
+    (`:1699`–`:1707`) and `Phi3ImageEmbedding.forward` (`:228`–`:242`) re-injects the image
+    rows. §5 decides the policy, and WP6 golden-tests the recompute and the image-row
+    restoration.
 12. Split the resample risk: the HD resize is **PIL** — torchvision's `F.resize` on a PIL input
     delegates to `Image.resize(..., BILINEAR)` — so the existing Pillow-exact bilinear kernel
     applies **if** the hand-off is confirmed (item 13; torchvision is not yet in the venv, so
@@ -244,26 +256,34 @@ must:
     Both kernels' provenance is pinned in `jmlx-vision/NOTICE` exactly as the 7.3a LANCZOS port
     pins its Pillow sources.
 13. Confirm by execution what this plan marks unverified: the PIL hand-off (item 12), the
-    cache-API failure (item 2), the empty-chunk tokenization (item 9), and the item-11
-    boundary flow (which past-length read runs under 4.57.6 — the `seen_tokens` branch is dead
-    there — and how `sample_inference.py` feeds each step, so the recompute trigger
-    `input_ids.shape[1] >= original_max + 1` is recorded against the real loop). The
-    `torchvision` install is precisely what makes the first two checkable.
+    cache-API failure (item 2), and the empty-chunk tokenization (item 9). The item-11
+    boundary flow is recorded as a **code-reading conclusion** plus the failure observed when
+    it is executed: the `:1653` past-length read takes the `seen_tokens` branch (the
+    `isinstance(past_key_values, Cache)` check is true under 4.57.6) and raises
+    `AttributeError`, while `sample_inference.py`'s own `generate` cannot complete there at
+    all (item 2), so no successful cached decode exists in the pinned venv to record the flow
+    against; the semantics jmlx mirrors are "past length = number of cached positions" (item
+    11). The `torchvision` install is precisely what makes the first two checkable.
 14. Pin the stop-token policy (answerable from the artifact; the WP1 probe only confirms):
     every `generate` call in `sample_inference.py` passes
-    `eos_token_id = processor.tokenizer.eos_token_id` — **32000** (`<|end|>`, the tokenizer's
-    own eos, which is also its pad token) — overriding `generation_config.json`'s
+    `eos_token_id = processor.tokenizer.eos_token_id` — **32000** (`\n`, the tokenizer's
+    own eos, which is also its pad token — **not** `<|end|>`, which is id 32007) — overriding
+    `generation_config.json`'s
     `eos_token_id: 2` (`</s>`, not a special token). Generation therefore stops on
-    **{32000}** (or `max_new_tokens`). The Tier-B manifest pins stop = {32000} for the
-    decoded-output assertion (§4 WP8), and the probe records whether `sample_inference.py`
-    adds anything else. How `Phi3VModel` documents its own default stop set is decided in §5.
+    **{32000}** (or `max_new_tokens`); with that stop set the model typically emits
+    `<|end|>` (32007) **before** the stop, so the decoded output contains it unless special
+    tokens are stripped — the Tier-B manifest records which it does (§4 WP8). The manifest
+    pins stop = {32000} for the decoded-output assertion, and the probe records whether
+    `sample_inference.py` adds anything else. How `Phi3VModel` documents its own default
+    stop set is decided in §5.
 15. Record the `phi-3-vision-128k` config diff (rope factors, `sliding_window` 131072, null
     `pad_token_id`/dropout) if the artifact is accessible; its `num_crops` is **unverified**.
     No support claim is made for it (§1).
 
 **Gate:** the findings document exists, every claim above is recorded with its probe evidence,
 the `torchvision` pin and bundled-code hashes are in `provenance.json`, the four unverified
-claims (items 2, 9, 11, 12) are resolved, and no claim depends on unpinned remote state.
+claims (items 2, 9, 11, 12) are resolved (item 11 by code reading plus the observed failure,
+per item 13), and no claim depends on unpinned remote state.
 
 **Oracle provenance and fixture tiers.** The reference oracle is the pinned artifact revision's
 bundled code under the hash-locked `tools/hf-reference` venv (Torch 2.6.0 CPU + the WP1
@@ -290,8 +310,10 @@ rule.
   resized and padded sizes, crop counts, per-image token count, and explicit rejection of
   extreme aspect ratios in **both** orientations: with `scale = 4` the resized long edge is
   1344, so an aspect ratio above 1344 truncates `new_h` (`new_w` in the transpose branch) to
-  0 and the PIL resize would fail — the plan rejects the image before any resize, with a unit
-  test for each orientation), `Phi3VImageProcessor` (the full
+  0 (a zero-sized resize fails in PIL; whether the same failure surfaces through the
+  torchvision hand-off is unverified) — the plan rejects the image before any resize,
+  regardless of the reference's failure behavior, with a unit test for each orientation),
+  `Phi3VImageProcessor` (the full
   pipeline of WP1 item 4, from a decoded `RgbImage`), and `Phi3VImageProcessorResult` (per-slot
   pixel values — global first, then sub crops in h-major order, zero-padded to five slots —
   `image_sizes`, `num_img_tokens`).
@@ -405,20 +427,28 @@ rule.
   2×2 merge (pure reshape/permute), the newline/global separator addition, and the MLP
   projector (exact `GELU`). The tower forward runs per request in a private child scope of the
   request's prefill scope, evaluated and closed before decode (the 7.3a/7.3b per-image pattern);
-  per-image parts are released after the evaluated prefill logits and retained KV; zero-padded
-  crop slots are never computed.
+  per-image parts up to the projector are released after the
+  evaluated prefill logits and retained KV, but the **evaluated projection rows** — the rows
+  injected at the sentinel positions, at most 781 × 3072 × 4 B ≈ 9.6 MB per image — are hoisted
+  to the request scope (outliving the prefill child scope) and retained until the generation
+  ends, because the boundary recompute re-prefills the full history and must re-inject them
+  (WP1 item 11); zero-padded crop slots are never computed.
 - `Phi3VModel implements TextGenerationModel`: internal decoder assembled from the descriptor
   (phi3-shaped: pre-LN RMSNorm, MHA 32/32, SiLU 8192, fused qkv and gate/up projections,
   `RopeSpec.Su`), image rows injected at the decoder embedding entry point by row-replacement
   of the sentinel rows (the 7.3a/7.3b seam; when a request has no images the path is
   bit-identical to the plain decoder — unit-verified). The generation loop implements the
   boundary recompute (WP1 item 11, §5): at the first decode step whose ending position exceeds
-  `originalMaxPositions` while the accumulated past length is `<= originalMaxPositions` (read
-  from the past tensor shape — the 4.57.6 non-Cache fallback, since `seen_tokens` does not
-  exist), it discards the request's KV cache and re-prefills the full history with the long
-  factor table, mirroring `modeling_phi3_v.py:1650`–`:1655`; a unit test covers both the
-  trigger and the non-trigger (past length already over the boundary — e.g. any image request —
-  no recompute, the table never changes). `VisionLanguageMetadata` with
+  `originalMaxPositions` while the accumulated past length — the number of
+  cached positions, read from jmlx's own cache length — is `<= originalMaxPositions`, it
+  discards the request's KV cache and re-prefills the full history with the long
+  factor table, **re-injecting the retained per-image rows** at the sentinel positions (the
+  reference re-runs the tower at the crossing — `prepare_inputs_for_generation` passes
+  `pixel_values`/`image_sizes` on every step, `:1699`–`:1707`), mirroring
+  `modeling_phi3_v.py:1650`–`:1655`; a unit test covers both the
+  trigger (a text-only history crossing the boundary) and the non-trigger (past length already
+  over the boundary at the first decode step — e.g. the 757-row image case under the Tier-A
+  config — no recompute, the table never changes). `VisionLanguageMetadata` with
   `InputModality` TEXT+IMAGE; the scheduler's existing non-`DecoderModel` rejection applies
   unchanged.
 - Load guards: all floating weights up-cast in place to FLOAT32 and non-floating keys rejected
@@ -448,22 +478,32 @@ rule.
   (the largest existing tiny checkpoint is 17.7 MB; `goldens/` totals 67 MB). The generator
   therefore stores the tiny checkpoint as **BF16** (≈ 21 MB / ≈ 29.5 MB), halving the
   committed size and exercising the BF16→FLOAT32 in-place up-cast the 4.2B artifact's load
-  path performs.
+  path performs — and it computes every reference forward from those BF16-rounded weights: the
+  freshly initialized weights are rounded to BF16 **before** saving and before any golden is
+  computed, up-cast back to float32 in Torch, and only then are the forwards run, so the strict
+  1e-4 gate compares Java's load path (BF16 → FLOAT32) against a reference computed from the
+  identical rounded weights, not the pre-rounding float32; the ordering is recorded in the
+  findings and the digest pin.
   Decoder: hidden 128, 2 layers, 2 heads / 1 kv (GQA), head_dim 64, SiLU 256,
-  `rope_theta` 10000, `original_max_position_embeddings` 16, `max_position_embeddings` 2048,
+  `rope_theta` 10000, `original_max_position_embeddings` 470, `max_position_embeddings` 2048,
   untied vocab 21, plus short/long factor arrays sized for head_dim 64.
 - `max_position_embeddings` must be at least 2048: the 7.3a capacity pattern
   (`SmolVlmModel`) rejects an expanded prompt that exceeds the context length, and the
-  smallest image case is 457 rows — 128 would reject every image case. With `original_max = 16`
-  kept, the pinned scaling constant is `sqrt(1 + ln(2048/16) / ln(16)) = sqrt(11)/2`.
+  smallest image case is 457 rows — 128 would reject every image case. `original_max = 470` is
+  chosen just above the 457-row wide image, so one config covers all three regimes: a wide
+  image plus short text crosses the boundary a few decode steps after prefill, the 757-row
+  case starts on the long table, and text-only prompts stay on the short table. With it, the
+  pinned scaling constant is `sqrt(1 + ln(2048/470) / ln(470))` (≈ 1.11321).
 - Cases (every prefill and every cached step compared against a fresh full **uncached**
   forward — the reference's `use_cache=False` execution mode, WP1 item 2 — with the manual
-  greedy loop, the 7.3b WP8 method): text-only (short table; **prompt + max_new_tokens ≤ 16**,
-  so the factor table is constant across the whole generation); a text-only decode that
-  **crosses** the synthetic rope boundary (prompt under 16 rows, decode steps crossing 16 —
-  the WP5 re-prefill fires at the crossing step, and from that step on both sides compute the
-  long table over the full history, so the fresh-uncached comparison stays valid; WP1 item
-  11, §5 — this is the golden test of the boundary-recompute decision); one 336×336 image
+  greedy loop, the 7.3b WP8 method): text-only (short table; **prompt + max_new_tokens ≤ 470**,
+  so the factor table is constant across the whole generation); a wide image (457 rows) plus
+  **short** text, chosen so the expanded prompt stays below 470 while prompt +
+  max_new_tokens exceeds it — the decode **crosses** the synthetic boundary after a few steps:
+  the WP5 re-prefill fires at the crossing step, re-injecting the retained image rows, and
+  from that step on both sides compute the long table over the full history, so the
+  fresh-uncached comparison stays valid; WP1 item 11, §5 — this is the golden test of the
+  boundary-recompute decision, including the image-row restoration; one 336×336 image
   (**757** rows — long table from the first step, and the past length is already over the
   boundary at prefill, so the recompute branch never fires during decode); a wide image (457
   rows); a tall image through the transpose branch (469 rows); two images with text between.
@@ -476,12 +516,16 @@ rule.
 
 **WP7 — lifecycle, memory and cache accounting.** `jmlx-models` tests, following the 7.3b WP7
 scope: processing and tower execution sequential per image with cancellation checked between
-images; only evaluated rows hoisted to the request's prefill child scope; prefill evaluates
+images; only evaluated rows hoisted to the request's prefill child scope (the retained projection
+rows go to the request scope, WP5); prefill evaluates
 logits and every retained KV array before that scope closes; cached decode retains only
-request-owned KV. `Phi3VGenerationTest`: mixed request reuse, capacity rejection before native
-work, cancellation, failure cleanup, evaluated-visual release and bounded KV growth.
-`Phi3VMemoryTest`: per-image peak transient, flat active memory across repeated generations
-(same and different images), and a per-token decode slope bounded by a per-token budget derived
+request-owned KV and the retained projection rows. `Phi3VGenerationTest`: mixed request reuse,
+capacity rejection before native work, cancellation, failure cleanup, evaluated-visual release
+and bounded KV growth.
+`Phi3VMemoryTest`: per-image peak transient (plus the retained per-image projection rows,
+at most ≈ 9.6 MB each, held for the whole generation), flat active memory across repeated
+generations (same and different images, with the retained rows released at generation end),
+and a per-token decode slope bounded by a per-token budget derived
 from layers, KV heads, head size and dtype (the 7.3b WP7 budget method, not the legacy
 constant). FULL and capacity-bounded FULL retention only; sliding retention rejected at the
 request level (7.3a/7.3b precedent).
@@ -494,9 +538,12 @@ request level (7.3a/7.3b precedent).
   **prompt + max_new_tokens ≤ 4096** — the request stays on one side of the rope boundary, so
   the recompute path is exercised by the Tier-A golden case and the WP5 unit test, not the
   Tier-B run — and the `reference`/`recorded_pin`/`local_evidence` sections. The manifest pins
-  the exact stop-token set for the decoded-output assertion: **{32000}** (`<|end|>`, the
-  tokenizer's own eos, which every `sample_inference.py` `generate` call passes as
-  `eos_token_id`, overriding `generation_config`'s `eos_token_id: 2` — WP1 item 14).
+  the exact stop-token set for the decoded-output assertion: **{32000}** (`\n`, the
+  tokenizer's own eos — **not** `<|end|>`, id 32007 — which the model typically emits before
+  the 32000 stop), which every `sample_inference.py` `generate` call passes as `eos_token_id`,
+  overriding `generation_config`'s `eos_token_id: 2` (WP1 item 14), and it states whether the
+  decoded-output assertion strips special tokens, which decides whether `<|end|>` appears in
+  the recorded text.
 - The reference generator `tools/hf-reference/phi3v_tier_b.py` (manual, digest-pinned) records
   CPU float32 eager uncached logits and the greedy history; the manifest records the measured
   maximum logit error, the top-two gap with the acceptance `gap > 2 * epsilon + margin`
@@ -545,10 +592,16 @@ request level (7.3a/7.3b precedent).
   the short table, and a stale-key behavior would be a jmlx-only divergence, not "by design".
   jmlx mirrors that: `Phi3VModel` discards the request's KV cache and re-prefills the full
   history at the first decode step whose ending position exceeds `originalMaxPositions` while
-  the accumulated past length is `<= originalMaxPositions` (read from the past tensor shape —
-  `seen_tokens` does not exist in 4.57.6, WP1 item 2). The trigger's non-firing case (past
-  length already over the boundary — every image request) is unit-tested in WP5; the crossing
-  itself is golden-tested in WP6; the Tier-B request stays under the boundary.
+  the accumulated past length — the number of cached positions, read from jmlx's own cache
+  length — is `<= originalMaxPositions`, **re-injecting the retained per-image rows** at the
+  sentinel positions (WP5; the reference re-runs the tower at the crossing because
+  `prepare_inputs_for_generation` passes `pixel_values`/`image_sizes` on every step,
+  `:1699`–`:1707`). The trigger's non-firing case (past
+  length already over the boundary — e.g. the 757-row image case under the Tier-A config) is
+  unit-tested in WP5; an image request crossing the boundary is golden-tested in WP6 (the
+  wide-image case); under the real artifact (`original_max = 4096`) a single-image request
+  with a long generation does cross and fire, while the Tier-B request stays under the
+  boundary.
 - **Precision.** Weights are stored BF16 and up-cast to FLOAT32; all computation is FLOAT32,
   matching the 7.3a/7.3b vision-language rule. `RopeSpec` computes frequencies in `double` and
   casts to float32 (its existing convention), which is a stated tolerance against the
@@ -564,8 +617,10 @@ request level (7.3a/7.3b precedent).
 - **Stop tokens.** The caller supplies the stop set through the existing
   `GenerationConfig`/`generate` contract. The artifact-faithful default for `phi3_v` — used by
   the examples, the goldens and the Tier-B assertion — is **{32000}**: the tokenizer's own eos
-  (`<|end|>`, also its pad token), which every `generate` call in the artifact's
-  `sample_inference.py` passes as `eos_token_id` (WP1 item 14). `generation_config.json`'s
+  (`\n`, also its pad token) — **not** `<|end|>`, which is id 32007, what the chat template
+  ends assistant turns with, and what the model typically emits just before the 32000 stop.
+  Every `generate` call in the artifact's `sample_inference.py` passes 32000 as
+  `eos_token_id` (WP1 item 14). `generation_config.json`'s
   `eos_token_id: 2` (`</s>`, not a special token) is **not** the default stop: the reference
   script overrides it and the model is unlikely to emit it. This matches the repository
   convention where the Tier-B tests stop on `tokenizer.eosTokenId()`.

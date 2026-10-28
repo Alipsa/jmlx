@@ -19,6 +19,8 @@ Layout (all paths relative to tools/image-oracle/fixtures/):
   qwen3vl/  Qwen3-VL preprocessing oracle fixtures (Phase 7.3b WP2): byte copies of the
             WP1 fast-comparison model images and pinned preprocessor config, plus
             smart_resize geometry, flatten-order, alpha/tRNS and EXIF-orientation cases
+  phi3v/    Phi-3.5-Vision preprocessing oracle fixtures (Phase 7.3c WP2): the four
+            probe-seeded random images (seeds 101-104, same seeding as the WP1 probe)
 """
 import io
 import struct
@@ -682,6 +684,22 @@ def main() -> None:
         "qwen3vl/rotated-orient2-64x32.png",
         png_insert(base_rot, [(b"eXIf", tiff_block(2))]),
     )
+
+    # phi3v: Phi-3.5-Vision preprocessing oracle fixtures (Phase 7.3c WP2). The four
+    # images use the exact seeding of the WP1 probe (tools/hf-reference/phi3v_probe.py,
+    # p6.image_cases: np.random.default_rng(seed).integers(0, 256, size=(h, w, 3),
+    # dtype=np.uint8)), so the oracle pixel_values sha256s cross-check the provenance of
+    # the probe golden (tools/hf-reference/goldens/phi3v-wp1-probe.json).
+    import numpy as np
+
+    def phi3v_pil(w: int, h: int, seed: int) -> Image.Image:
+        arr = np.random.default_rng(seed).integers(0, 256, size=(h, w, 3), dtype=np.uint8)
+        return Image.fromarray(arr, "RGB")
+
+    save(phi3v_pil(336, 336, 101), "phi3v/square-336x336.png")
+    save(phi3v_pil(672, 336, 102), "phi3v/wide-672x336.png")
+    save(phi3v_pil(336, 672, 103), "phi3v/tall-336x672.png")
+    save(phi3v_pil(300, 301, 104), "phi3v/trunc-300x301.png")
 
     # resize: opaque RGB fixtures (shared by single-resize and full-chain cases)
     save(gradient_rgb(100, 80), "resize/gradient-100x80.png")

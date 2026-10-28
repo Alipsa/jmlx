@@ -645,9 +645,10 @@ tasks.register('verifyHfReferenceGoldens') {
     // Phase 7.3c WP1's probe golden generator (deterministic, re-verifies the pinned artifact
     // and bundle hashes before use).
     inputs.file('tools/hf-reference/phi3v_probe.py')
-    // Phase 7.3b WP2's shared Qwen3-VL processed-patch fixtures are image-oracle-owned but
-    // consumed on the HF side, so the root task pins their digests too.
+    // Phase 7.3b WP2's and Phase 7.3c WP2's shared processed-patch fixtures are
+    // image-oracle-owned but consumed on the HF side, so the root task pins their digests too.
     inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
+    inputs.files(fileTree('tools/image-oracle/fixtures/phi3v/patches'))
     doLast {
         def metadata = new JsonSlurper().parse(provenance.asFile)
         // The Phase 7.2 provenance block pins the tool's own hash-locked requirements lock,
@@ -725,28 +726,36 @@ tasks.register('verifyHfReferenceGoldens') {
         if (!(processedPatches instanceof Map) || processedPatches.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no Qwen3-VL processed-patch hashes')
         }
-        // The map must cover exactly the image-oracle-owned processed-patch fixtures: the
-        // manifest and both float32 bins -- a removed entry or an unprovenanced new file both
-        // fail the build.
-        def actualPatchPaths = fileTree('tools/image-oracle/fixtures/qwen3vl/patches').files.collect {
-            repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
-        }.toSet()
-        if (processedPatches.keySet().toSet() != actualPatchPaths) {
-            throw new GradleException("Qwen3-VL processed-patch provenance file set differs: " +
-                    "missing ${processedPatches.keySet() - actualPatchPaths}; " +
-                    "extra ${actualPatchPaths - processedPatches.keySet()}")
+        def phi3vProcessedPatches = metadata.phi3v_processed_patches
+        if (!(phi3vProcessedPatches instanceof Map) || phi3vProcessedPatches.isEmpty()) {
+            throw new GradleException('Hugging Face provenance has no Phi-3.5-Vision processed-patch hashes')
         }
-        processedPatches.each { relativePath, expectedHash ->
-            def path = repositoryRoot.resolve(relativePath.toString()).normalize()
-            if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
-                    !path.toRealPath().startsWith(repositoryRoot)) {
-                throw new GradleException("Invalid Qwen3-VL processed-patch reference path: ${relativePath}")
+        // Each family's map must cover exactly its image-oracle-owned processed-patch
+        // fixtures (the manifest and every float32 bin) -- a removed entry or an
+        // unprovenanced new file both fail the build.
+        def verifyProcessedPatches = { String label, Map hashMap, String patchDir ->
+            def actualPatchPaths = fileTree(patchDir).files.collect {
+                repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
+            }.toSet()
+            if (hashMap.keySet().toSet() != actualPatchPaths) {
+                throw new GradleException("${label} processed-patch provenance file set differs: " +
+                        "missing ${hashMap.keySet() - actualPatchPaths}; " +
+                        "extra ${actualPatchPaths - hashMap.keySet()}")
             }
-            def actualHash = sha256File(path.toFile())
-            if (actualHash != expectedHash) {
-                throw new GradleException("Qwen3-VL processed-patch SHA-256 differs: ${relativePath}")
+            hashMap.each { relativePath, expectedHash ->
+                def path = repositoryRoot.resolve(relativePath.toString()).normalize()
+                if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
+                        !path.toRealPath().startsWith(repositoryRoot)) {
+                    throw new GradleException("Invalid ${label} processed-patch reference path: ${relativePath}")
+                }
+                def actualHash = sha256File(path.toFile())
+                if (actualHash != expectedHash) {
+                    throw new GradleException("${label} processed-patch SHA-256 differs: ${relativePath}")
+                }
             }
         }
+        verifyProcessedPatches('Qwen3-VL', processedPatches, 'tools/image-oracle/fixtures/qwen3vl/patches')
+        verifyProcessedPatches('Phi-3.5-Vision', phi3vProcessedPatches, 'tools/image-oracle/fixtures/phi3v/patches')
         def expected = metadata.files
         if (!(expected instanceof Map) || expected.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no file hashes')

@@ -695,6 +695,192 @@ def run_qwen3vl(input_path: Path, provenance: dict) -> dict:
     }
 
 
+PHI3V_PATCH_CASES = ("square-336x336", "wide-672x336", "tall-336x672", "trunc-300x301")
+
+
+def run_phi3v(input_path: Path, provenance: dict) -> dict:
+    """Phi-3.5-Vision preprocessing oracle (Phase 7.3c WP2): the hash-pinned bundled
+    trust-remote-code processor under fixtures/phi3v/ (findings §6), loaded exactly as
+    the WP1 probe loads it (get_class_from_dynamic_module +
+    Phi3VImageProcessor.from_pretrained) and run with return_tensors="pt" on PIL images
+    generated with the probe's seeding, so the pixel_values sha256s cross-check the
+    probe golden (tools/hf-reference/goldens/phi3v-wp1-probe.json).
+
+    Each case feeds the processor a list of PIL images (the reference's preprocess path
+    never consults EXIF, so input mode cannot change the pixels) and records, per image:
+    the source dimensions, the padded image_sizes entry [height, width], the crop grid,
+    the slot count and the per-image token count, the full-row sha256 and deterministic
+    sample rows. The four single-image cases' full float32 rows are additionally
+    materialized as the committed processed-patch bins under phi3v/patches/ (written in
+    --generate-all mode, digest-verified otherwise; --verify-all never writes)."""
+    import sys
+
+    import numpy as np
+    from PIL import Image
+    from transformers.dynamic_module_utils import get_class_from_dynamic_module
+
+    generate = "--generate-all" in sys.argv
+    specification = json.loads(input_path.read_text(encoding="utf-8"))
+    root = input_path.parent.resolve()
+    # The pinned bundled sources; digest-checked here so a tampered copy fails before
+    # import (the runner is a Python entry point of the image oracle, not Gradle).
+    for rel in (
+        "phi3v/preprocessor_config.json",
+        "phi3v/processing_phi3_v.py",
+        "phi3v/configuration_phi3_v.py",
+        "phi3v/modeling_phi3_v.py",
+        "phi3v/sample_inference.py",
+    ):
+        verify_fixture(root, rel, provenance)
+
+    proc_path = str(root / "phi3v")
+    proc_cls = get_class_from_dynamic_module("processing_phi3_v.Phi3VProcessor", proc_path)
+    proc_mod = sys.modules[proc_cls.__module__]
+    image_processor = proc_mod.Phi3VImageProcessor.from_pretrained(proc_path)
+    if int(image_processor.num_crops) != 4:
+        raise SystemExit(
+            f"phi3v processor options drifted: num_crops={image_processor.num_crops}")
+    if list(image_processor.image_mean) != [0.48145466, 0.4578275, 0.40821073]:
+        raise SystemExit("phi3v processor options drifted: image_mean")
+    if list(image_processor.image_std) != [0.26862954, 0.26130258, 0.27577711]:
+        raise SystemExit("phi3v processor options drifted: image_std")
+    if not image_processor.do_convert_rgb:
+        raise SystemExit("phi3v processor options drifted: do_convert_rgb")
+
+    patch_blobs = {}
+    cases = []
+    for case in specification["cases"]:
+        image_rels = [case["image"]] if "image" in case else list(case["images"])
+        pil_images = []
+        for rel in image_rels:
+            fixture = verify_fixture(root, rel, provenance)
+            image = Image.open(fixture)
+            image.load()
+            if image.mode != "RGB":
+                raise SystemExit(f"phi3v fixture must be an RGB image: {rel} mode={image.mode}")
+            pil_images.append(image)
+        out = image_processor(images=pil_images, return_tensors="pt")
+        pv = np.ascontiguousarray(out["pixel_values"], dtype=np.float32)
+        image_sizes = [[int(x) for x in row] for row in out["image_sizes"]]
+        num_img_tokens = [int(x) for x in out["num_img_tokens"]]
+        if pv.ndim != 5 or pv.shape[0] != len(image_rels) or tuple(pv.shape[2:]) != (3, 336, 336):
+            raise SystemExit(f"phi3v pixel_values shape {pv.shape} unexpected: {case['name']}")
+        if len(image_sizes) != len(image_rels) or len(num_img_tokens) != len(image_rels):
+            raise SystemExit(f"phi3v per-image metadata count mismatch: {case['name']}")
+        image_records = []
+        for i, rel in enumerate(image_rels):
+            fixture = (root / rel).resolve()
+            image = Image.open(fixture)
+            image.load()
+            row = pv[i]
+            slots = int(row.shape[0])
+            if slots != 5:
+                raise SystemExit(f"phi3v slot count {slots} != 5 (num_crops=4): {rel}")
+            padded_height, padded_width = image_sizes[i]
+            grid_h = padded_height // 336
+            grid_w = padded_width // 336
+            tokens = num_img_tokens[i]
+            expected_tokens = (grid_h * grid_w + 1) * 144 + 1 + (grid_h + 1) * 12
+            if tokens != expected_tokens:
+                raise SystemExit(
+                    f"phi3v token count {tokens} != {expected_tokens} for {rel}")
+            sample_rows = sorted({0, slots // 2, slots - 1})
+            record = {
+                "cropBlocks": grid_h * grid_w,
+                "gridH": grid_h,
+                "gridW": grid_w,
+                "image": rel,
+                "imageSize": image_sizes[i],
+                "numImgTokens": tokens,
+                "pixelSha256": hashlib.sha256(row.tobytes()).hexdigest(),
+                "samples": [
+                    {"row": s, "valuesBase64": float32_be_base64(row[s])}
+                    for s in sample_rows
+                ],
+                "slotCount": slots,
+                "source": [image.width, image.height],
+            }
+            image_records.append(record)
+            if len(image_rels) == 1 and case["name"] in PHI3V_PATCH_CASES:
+                patch_blobs[case["name"]] = row.tobytes()
+        if len(image_rels) > 1:
+            # The combined call must reproduce the per-image rows in order: a reference
+            # version that padded or reordered images would change this batch layout
+            # without changing any single-image output.
+            per_image = np.concatenate(
+                [
+                    np.ascontiguousarray(
+                        image_processor(images=[p], return_tensors="pt")["pixel_values"],
+                        dtype=np.float32,
+                    )
+                    for p in pil_images
+                ],
+                axis=0,
+            )
+            if not np.array_equal(pv, per_image):
+                raise SystemExit(
+                    f"phi3v multi-image call disagrees with per-image concat: {case['name']}")
+        cases.append({"images": image_records, "name": case["name"]})
+
+    patches_dir = root / "phi3v" / "patches"
+    manifest_entries = {}
+    for name in PHI3V_PATCH_CASES:
+        if name not in patch_blobs:
+            raise SystemExit(f"phi3v patch case missing from input: {name}")
+        data = patch_blobs[name]
+        digest = hashlib.sha256(data).hexdigest()
+        bin_path = patches_dir / f"{name}.pixel-values.f32"
+        if generate:
+            patches_dir.mkdir(parents=True, exist_ok=True)
+            bin_path.write_bytes(data)
+        elif not bin_path.is_file() or source_digest(bin_path) != digest:
+            raise SystemExit(f"phi3v patch bin missing or stale: {bin_path}")
+        manifest_entries[f"{name}.pixel-values.f32"] = {
+            "rows": 5,
+            "sha256": digest,
+            "slotCount": 5,
+            "sourceImage": f"phi3v/{name}.png",
+            "sourceImageSha256": provenance["fixtureSources"][f"phi3v/{name}.png"],
+            "stride": 3 * 336 * 336,
+        }
+    manifest = {
+        "layout": (
+            "little-endian IEEE-754 float32, C order, [slotCount, 3, 336, 336] "
+            "(slot-major: global bicubic image first, then the h-major 336x336 crops, "
+            "zero-padded slots)"
+        ),
+        "patches": manifest_entries,
+        "processor": (
+            "Phi3VImageProcessor.from_pretrained(phi3v) (bundled trust-remote-code, "
+            "num_crops=4)"
+        ),
+        "schema": "jmlx-phase7-3c-wp2-phi3v-processed-patches-v1",
+    }
+    manifest_path = patches_dir / "manifest.json"
+    if generate:
+        manifest_path.write_text(canonical(manifest), encoding="utf-8")
+    else:
+        if not manifest_path.is_file():
+            raise SystemExit(f"phi3v patch manifest is missing: {manifest_path}")
+        committed = manifest_path.read_text(encoding="utf-8")
+        if canonical(json.loads(committed)) != committed:
+            raise SystemExit(f"phi3v patch manifest is not in canonical form: {manifest_path}")
+        if json.loads(committed) != manifest:
+            raise SystemExit(
+                f"phi3v patch manifest disagrees with recomputed patches: {manifest_path}")
+
+    return {
+        "cases": cases,
+        "config": {
+            "class": "Phi3VImageProcessor",
+            "construction": "Phi3VImageProcessor.from_pretrained(phi3v)",
+            "imageMean": list(image_processor.image_mean),
+            "imageStd": list(image_processor.image_std),
+            "numCrops": int(image_processor.num_crops),
+        },
+    }
+
+
 def stale_message(path: Path, expected: str, actual: str) -> str:
     try:
         expected_value = json.loads(expected)
@@ -727,6 +913,7 @@ RUNNERS = {
     "resize.input.json": run_resize,
     "chain.input.json": run_chain,
     "qwen3vl.input.json": run_qwen3vl,
+    "phi3v.input.json": run_phi3v,
 }
 
 

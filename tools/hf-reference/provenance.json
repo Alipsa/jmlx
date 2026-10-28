@@ -168,6 +168,13 @@
     "tools/tier-b/images/qwen3vl-wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
     "tools/tier-b/images/qwen3vl-square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741"
   },
+  "phi3v_processed_patches": {
+    "tools/image-oracle/fixtures/phi3v/patches/manifest.json": "155ba2a679c7dbfa7200b90a893fccee57fcaebd810d9ef2c8f32e21dd91fd71",
+    "tools/image-oracle/fixtures/phi3v/patches/square-336x336.pixel-values.f32": "0292f014488f681947391a5daf5d805c6900c2098d16e171b9228c199ee7f7e7",
+    "tools/image-oracle/fixtures/phi3v/patches/tall-336x672.pixel-values.f32": "3869d7af80146c160ce639a95a4ad34f831feee3177acd5e677c12848febe396",
+    "tools/image-oracle/fixtures/phi3v/patches/trunc-300x301.pixel-values.f32": "ca8760988fa296c40e768702c00d43894a02f1e6f8fc9fbf6738758263aa0375",
+    "tools/image-oracle/fixtures/phi3v/patches/wide-672x336.pixel-values.f32": "6cdac6a70c10c927b3345a5cd3fe683f96d8acd0a0e368854ca9ff257cc71732"
+  },
   "phi3v_probe_sha256": "122af2472e5cae11eb53ce20e58440f4608eb7edee02331ac405572edca4c1f9",
   "phi3v": {
     "repository": "microsoft/Phi-3.5-vision-instruct",

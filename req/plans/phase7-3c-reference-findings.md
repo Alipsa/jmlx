@@ -1,4 +1,4 @@
-# Phase 7.3c — Phi-3.5-Vision reference findings (WP0 + WP1)
+# Phase 7.3c — Phi-3.5-Vision reference findings (WP0 + WP1 + WP2 kernel arithmetic)
 
 - **Status:** WP0 and WP1 complete, 2026-10-28. Every number below was re-verified against
   the committed golden `tools/hf-reference/goldens/phi3v-wp1-probe.json`, the pinned artifact
@@ -412,6 +412,47 @@ reachable per-image counts are {457, 469, 601, 625, 745, 757, 781}, maximum 781 
 - The processor's `calc_num_image_tokens` (`:172`–`:194`, call site `:269`) computes the
   formula from the **padded** sizes, which is why `image_sizes` (the padded grid) is what the
   text expander consumes (§7, WP3).
+
+### 6.5 The torch bicubic kernel's real arithmetic — pinned-wheel FMA contraction (WP2)
+
+The global-image bicubic ported in WP2 is **not** a plain `*`/`+` transcription of the staged
+PyTorch v2.6.0 source. The pinned CPU wheels are compiled with floating-point contraction
+enabled (the C++ default), so every C subexpression of the form `a * b + c` in the kernel
+executes as a single-rounded hardware fused multiply-add (AArch64 `fmla s`): the product
+`a * b` is formed exactly and only the final sum is rounded to float32. Verified on the
+37×41 → 17×23 probe (1,173 output pixels, `RandomState(0)` input, bit-exact comparison
+against the pinned venv's `F.interpolate(mode='bicubic', align_corners=False,
+antialias=False)`); the winning model is fully specified in `TorchBicubic.java`:
+
+- **Real source index** (`area_pixel_compute_source_index`, align_corners=false):
+  `real = fmaf(scale, (float)(i + 0.5f), -0.5f)`; `input_index = min(floorf(real), in-1)`;
+  `lambda = clamp(real - input_index, 0, 1)`; `scale = (float)in / (float)out` plain.
+- **Cubic polynomials** (UpSample.h:400–407, `A = -0.75`; the constants `A+2 = 1.25`,
+  `A+3 = 2.25`, `-5A = 3.75`, `8A = -6.0`, `-4A = 3.0` are all exact in f32):
+  `cubic_convolution1(x)`: `t = fmaf(1.25f, x, -2.25f); t *= x; return fmaf(t, x, 1.0f)`;
+  `cubic_convolution2(x)`: `t = fmaf(-0.75f, x, 3.75f); t = fmaf(t, x, -6.0f);
+  return fmaf(t, x, 3.0f)`.
+- **Weights** (`get_cubic_upsample_coefficients`): `x1 = lambda`, `x2 = 1.0f - x1` (plain),
+  `[c2(x1 + 1.0f), c1(x1), c1(x2), c2(x2 + 1.0f)]`.
+- **Separable accumulation** (`Interpolate<2>`/`<1>`, height-outer/width-inner): the first
+  term is a bare product; each later term at both the width-row and height level is
+  `acc = fmaf(term, w, acc)`.
+
+A plain `*`/`+` transcription of the staged source deviates from the pinned wheels by up to
+~881 float ulps (max relative error ~8e-5) on the probe; the fused form matches bit-exactly
+(1173/1173). Java has no float FMA, so `TorchBicubic.fma32` emulates it bit-exactly (exact
+double product — a binary32×binary32 product has at most 48 significand bits — plus an
+error-free two-sum plus an exact adjacent-float midpoint comparison with ties-to-even).
+Edge cases verified against libm `fmaf`: `0 * inf → NaN`; `inf + same-sign inf = inf`,
+`inf + opposite-sign inf = NaN`; zero signs are read from raw sign bits because
+`-0.0f < 0.0f` is false in Java; `z + z` keeps the common sign when the two zeros agree,
+`+0` when they differ. `fma32` stress evidence: 600,034 cases (uniform, cancellation,
+extreme exponents, targeted) plus a 50,096-case zero-sign zoo, zero mismatches against
+libm; the 1,173-pixel Java probe is bit-exact against the venv's torch. The module's own
+`PillowResample` BICUBIC (Pillow's 8-bit fixed-point `a = -0.5` pipeline) is a different
+algorithm and is untouched. Earlier candidates (plain/FMA accumulation variants, f64
+tables, f64 accumulators, flat 16-term orders) were all falsified by the probe and are
+superseded by the model above.
 
 ## 7. Text path, tokenizer, stop tokens (WP1 items 8, 9, 14)
 

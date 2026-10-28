@@ -10,8 +10,10 @@
   (2026-10-28: the endoftext label for the stop token, and the WP6 golden cases pinned to
   their side of the 470 boundary) and review round 5 (2026-10-28: the stop token labelled
   the `endoftext` special token in a transport-surviving form at all five sites, the
-  conditional `skip_special_tokens` decode note, and the round-3/4 status-line correction)
-  applied; pending re-review. The 7.3c
+  conditional `skip_special_tokens` decode note, and the round-3/4 status-line correction),
+  and review round 6 (2026-10-28: 32000 placed in `GenerationConfig.eosTokenIds`, not
+  `stopTokenIds`, in the stop-token decision and the WP8 manifest wording, plus the WP0
+  newline sentence fix) applied; pending re-review. The 7.3c
   go/deferral discovery was performed on 2026-10-27:
   GO — https://huggingface.co/microsoft/Phi-3.5-vision-instruct
   (revision `12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT) is a small, fully licensed, public
@@ -135,10 +137,10 @@ reshape/permute) is already bound and facade'd from 7.1/7.2.
   `<0x0A>` byte-fallback token (id 13) through which a newline in the text encodes and
   decodes. The stop is on the token id 32000: it decodes to the endoftext literal with
   `skip_special_tokens=False` and to the empty string with `skip_special_tokens=True`
-  (pinned-venv probe), so a newline in the output (13) does not stop generation. `<|end|>`
-  is id 32007 — the token the chat template ends assistant turns with; `<s>` is 1; `</s>`
-  is 2 and is **not** a special token; `generation_config.json` carries `eos_token_id: 2`
-  **and** `pad_token_id: 32000`.
+  (pinned-venv probe). A newline in the output is id 13 and does not stop generation.
+  `<|end|>` is id 32007 — the token the chat template ends assistant turns with; `<s>` is 1;
+  `</s>` is 2 and is **not** a special token; `generation_config.json` carries
+  `eos_token_id: 2` **and** `pad_token_id: 32000`.
   `<|image|>` (id 32044) is a special token the marker regex `<\|image_\d+\|>` never matches —
   it creates no image slot in the reference; user text containing it is passed through, not
   rejected (WP3 records the decision).
@@ -565,9 +567,10 @@ request level (7.3a/7.3b precedent).
   special token, the tokenizer's own eos — **not** `<|end|>`, id 32007 — which the model
   typically emits before the 32000 stop), which every `sample_inference.py` `generate` call
   passes as `eos_token_id`,
-  overriding `generation_config`'s `eos_token_id: 2` (WP1 item 14), and it states whether the
-  decoded-output assertion strips special tokens, which decides whether `<|end|>` appears in
-  the recorded text.
+  overriding `generation_config`'s `eos_token_id: 2` (WP1 item 14). The config carries 32000
+  in `eosTokenIds`, **not** `stopTokenIds`, so the final token stays in the generated IDs
+  the way HF keeps it. The manifest states whether the decoded-output assertion strips
+  special tokens, which decides whether `<|end|>` appears in the recorded text.
 - The reference generator `tools/hf-reference/phi3v_tier_b.py` (manual, digest-pinned) records
   CPU float32 eager uncached logits and the greedy history; the manifest records the measured
   maximum logit error, the top-two gap with the acceptance `gap > 2 * epsilon + margin`
@@ -648,7 +651,14 @@ request level (7.3a/7.3b precedent).
   `eos_token_id` (WP1 item 14). `generation_config.json`'s
   `eos_token_id: 2` (`</s>`, not a special token) is **not** the default stop: the reference
   script overrides it and the model is unlikely to emit it. This matches the repository
-  convention where the Tier-B tests stop on `tokenizer.eosTokenId()`.
+  convention where the Tier-B tests stop on `tokenizer.eosTokenId()`. 32000 goes into
+  `GenerationConfig.eosTokenIds`, **not** `stopTokenIds`: an eos match stops generation with
+  the token kept in the generated IDs (the `GenerationResult` legacy-compatibility
+  contract), while a `stopTokenIds` match stops before the token is added — so a config that
+  put 32000 in `stopTokenIds` would drop the final 32000 and fail the exact greedy-ID
+  comparison, since HF `generate` keeps its eos. The existing Qwen3-VL Tier-B test
+  (`TierBQwen3VlTest`) configures its request the same way: `greedyDefaults` with
+  `tokenizer.eosTokenId()` in `eosTokenIds`.
 - **RoPE scoping.** `su` is the old name for `longrope`. The compatibility matrix's "Phi-3 …
   `longrope` rejected" row stays true for text `phi3`: the `su` branch in the rope parse is
   consumed only on the `phi3_v` family path, and a text `phi3` config with `rope_type: su` is

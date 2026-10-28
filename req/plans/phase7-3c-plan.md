@@ -13,7 +13,10 @@
   conditional `skip_special_tokens` decode note, and the round-3/4 status-line correction),
   and review round 6 (2026-10-28: 32000 placed in `GenerationConfig.eosTokenIds`, not
   `stopTokenIds`, in the stop-token decision and the WP8 manifest wording, plus the WP0
-  newline sentence fix) applied; pending re-review. The 7.3c
+  newline sentence fix) and review round 7 (2026-10-28: jmlx's hardcoded special-token
+  stripping — `tokenizer.newIncrementalDecoder(true)` in all three generation loops — stated
+  directly in WP1 item 14 and the WP8 manifest decode rule, and Phi3VModel's delegation to
+  the shared step loop made explicit) applied; pending re-review. The 7.3c
   go/deferral discovery was performed on 2026-10-27:
   GO — https://huggingface.co/microsoft/Phi-3.5-vision-instruct
   (revision `12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT) is a small, fully licensed, public
@@ -35,7 +38,10 @@ Deliver local Phi-3.5-Vision image+text generation through `TextGenerationModels
 cache-policy contracts. Support one or more images in prompt order, text between images, and
 text-only requests through the same model. The model is a `TextGenerationModel` composition —
 vision tower + projector + generic decoder — deliberately not a `DecoderModel`, so the existing
-scheduler non-`DecoderModel` rejection stays in force without a new check.
+scheduler non-`DecoderModel` rejection stays in force without a new check; its `generate`
+delegates text production to the internal decoder's shared step loop, as `SmolVlmModel` and
+`Qwen3VlModel` do, so sampling, cancellation and incremental decoding — including the
+hardcoded `tokenizer.newIncrementalDecoder(true)` special-token stripping — are shared.
 
 The candidate is `microsoft/Phi-3.5-vision-instruct` (4.2B, `model_type` `phi3_v`,
 `Phi3VForCausalLM`): a CLIP ViT-L/14@336 vision tower with an InternLM-XComposer2-4KHD-style
@@ -285,8 +291,11 @@ must:
     `generation_config.json`'s
     `eos_token_id: 2` (`</s>`, not a special token). Generation therefore stops on
     **{32000}** (or `max_new_tokens`); with that stop set the model typically emits
-    `<|end|>` (32007) **before** the stop, so the decoded output contains it unless special
-    tokens are stripped — the Tier-B manifest records which it does (§4 WP8). The manifest
+    `<|end|>` (32007) **before** the stop. The unstripped decoded text is probe evidence only:
+    jmlx strips special tokens unconditionally — all three generation loops hardcode
+    `tokenizer.newIncrementalDecoder(true)`, and 32007 is `special: true` in the pinned
+    `tokenizer.json`, so `generatedText()` never contains it (nor 32000, which stays in the
+    generated IDs). The manifest
     pins stop = {32000} for the decoded-output assertion, and the probe records whether
     `sample_inference.py` adds anything else. How `Phi3VModel` documents its own default
     stop set is decided in §5.
@@ -569,8 +578,11 @@ request level (7.3a/7.3b precedent).
   passes as `eos_token_id`,
   overriding `generation_config`'s `eos_token_id: 2` (WP1 item 14). The config carries 32000
   in `eosTokenIds`, **not** `stopTokenIds`, so the final token stays in the generated IDs
-  the way HF keeps it. The manifest states whether the decoded-output assertion strips
-  special tokens, which decides whether `<|end|>` appears in the recorded text.
+  the way HF keeps it. The decoded-output assertion strips special tokens unconditionally —
+  jmlx's generation loops hardcode `tokenizer.newIncrementalDecoder(true)`, and both 32000
+  and 32007 are `special: true` in the pinned `tokenizer.json` — so the manifest records
+  `expected_text = decode(greedy_ids, skip_special_tokens=True)`, matching `generatedText()`
+  byte-for-byte; neither token appears in the recorded text.
 - The reference generator `tools/hf-reference/phi3v_tier_b.py` (manual, digest-pinned) records
   CPU float32 eager uncached logits and the greedy history; the manifest records the measured
   maximum logit error, the top-two gap with the acceptance `gap > 2 * epsilon + margin`

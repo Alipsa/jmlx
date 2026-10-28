@@ -4,12 +4,14 @@
   review round 2 (2026-10-28: the RoPE boundary-recompute policy, the stop-token correction,
   the marker-binding wording, the relative factor-length validation, the real tiny-tower size,
   the `pre_layrnorm` key, and the low-priority items), review round 3 (2026-10-28: the
-  stop-token identity — 32000 is `
-`, `<|end|>` is 32007 — the boundary-recompute
-  image-row retention, the 470-row Tier-A boundary config, the past-length semantics, and the
-  BF16-rounded reference ordering) and review round 4 (2026-10-28: the stop token written as
-  the newline token, not the two-character `\n` string, and the WP6 golden cases pinned to
-  their side of the 470 boundary) applied; pending re-review. The 7.3c
+  stop-token identity — 32000 is the `endoftext` special token, `<|end|>` is 32007 — the
+  boundary-recompute image-row retention, the 470-row Tier-A boundary config, the
+  past-length semantics, and the BF16-rounded reference ordering), review round 4
+  (2026-10-28: the endoftext label for the stop token, and the WP6 golden cases pinned to
+  their side of the 470 boundary) and review round 5 (2026-10-28: the stop token labelled
+  the `endoftext` special token in a transport-surviving form at all five sites, the
+  conditional `skip_special_tokens` decode note, and the round-3/4 status-line correction)
+  applied; pending re-review. The 7.3c
   go/deferral discovery was performed on 2026-10-27:
   GO — https://huggingface.co/microsoft/Phi-3.5-vision-instruct
   (revision `12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT) is a small, fully licensed, public
@@ -128,14 +130,15 @@ reshape/permute) is already bound and facade'd from 7.1/7.2.
   template — they enter as `<|image_i|>` markers in message text (see §4 WP3). Verify the
   template renders through `jmlx-jinja` and that the marker strings are not special tokens.
   Special-token facts (from `tokenizer_config.json` and `special_tokens_map.json`): the eos
-  **and** pad token is `
-` (id 32000, `special: true`) — a special added token, distinct from the `<0x0A>`
-  byte-fallback token (id 13) through which a newline in the text encodes and decodes; 32000
-  itself decodes to the empty string (pinned-venv probe), so the stop is on the token id
-  32000 and a newline in the output (13) does not stop generation. `<|end|>` is id 32007 —
-  the token the chat template ends assistant turns with; `<s>` is 1; `</s>` is 2 and is
-  **not** a special token; `generation_config.json` carries `eos_token_id: 2` **and**
-  `pad_token_id: 32000`.
+  **and** pad token is the `endoftext` special token (`<|` + `endoftext` + `|>`, id 32000,
+  `special: true`) — the eos and pad tokens are the same special token, distinct from the
+  `<0x0A>` byte-fallback token (id 13) through which a newline in the text encodes and
+  decodes. The stop is on the token id 32000: it decodes to the endoftext literal with
+  `skip_special_tokens=False` and to the empty string with `skip_special_tokens=True`
+  (pinned-venv probe), so a newline in the output (13) does not stop generation. `<|end|>`
+  is id 32007 — the token the chat template ends assistant turns with; `<s>` is 1; `</s>`
+  is 2 and is **not** a special token; `generation_config.json` carries `eos_token_id: 2`
+  **and** `pad_token_id: 32000`.
   `<|image|>` (id 32044) is a special token the marker regex `<\|image_\d+\|>` never matches —
   it creates no image slot in the reference; user text containing it is passed through, not
   rejected (WP3 records the decision).
@@ -274,9 +277,9 @@ must:
     11). The `torchvision` install is precisely what makes the first two checkable.
 14. Pin the stop-token policy (answerable from the artifact; the WP1 probe only confirms):
     every `generate` call in `sample_inference.py` passes
-    `eos_token_id = processor.tokenizer.eos_token_id` — **32000** (`
-`, the tokenizer's
-    own eos, which is also its pad token — **not** `<|end|>`, which is id 32007) — overriding
+    `eos_token_id = processor.tokenizer.eos_token_id` — **32000** (the `endoftext`
+    special token, the tokenizer's own eos, which is also its pad token — **not** `<|end|>`,
+    which is id 32007) — overriding
     `generation_config.json`'s
     `eos_token_id: 2` (`</s>`, not a special token). Generation therefore stops on
     **{32000}** (or `max_new_tokens`); with that stop set the model typically emits
@@ -558,10 +561,10 @@ request level (7.3a/7.3b precedent).
   **prompt + max_new_tokens ≤ 4096** — the request stays on one side of the rope boundary, so
   the recompute path is exercised by the Tier-A golden case and the WP5 unit test, not the
   Tier-B run — and the `reference`/`recorded_pin`/`local_evidence` sections. The manifest pins
-  the exact stop-token set for the decoded-output assertion: **{32000}** (`
-`, the
-  tokenizer's own eos — **not** `<|end|>`, id 32007 — which the model typically emits before
-  the 32000 stop), which every `sample_inference.py` `generate` call passes as `eos_token_id`,
+  the exact stop-token set for the decoded-output assertion: **{32000}** (the `endoftext`
+  special token, the tokenizer's own eos — **not** `<|end|>`, id 32007 — which the model
+  typically emits before the 32000 stop), which every `sample_inference.py` `generate` call
+  passes as `eos_token_id`,
   overriding `generation_config`'s `eos_token_id: 2` (WP1 item 14), and it states whether the
   decoded-output assertion strips special tokens, which decides whether `<|end|>` appears in
   the recorded text.
@@ -637,10 +640,10 @@ request level (7.3a/7.3b precedent).
   expanded ID lists, including the per-chunk BOS.
 - **Stop tokens.** The caller supplies the stop set through the existing
   `GenerationConfig`/`generate` contract. The artifact-faithful default for `phi3_v` — used by
-  the examples, the goldens and the Tier-B assertion — is **{32000}**: the tokenizer's own eos
-  (`
-`, also its pad token) — **not** `<|end|>`, which is id 32007, what the chat template
-  ends assistant turns with, and what the model typically emits just before the 32000 stop.
+  the examples, the goldens and the Tier-B assertion — is **{32000}**: the tokenizer's own
+  eos (the `endoftext` special token, also its pad token) — **not** `<|end|>`, which is
+  id 32007, what the chat template ends assistant turns with, and what the model typically
+  emits just before the 32000 stop.
   Every `generate` call in the artifact's `sample_inference.py` passes 32000 as
   `eos_token_id` (WP1 item 14). `generation_config.json`'s
   `eos_token_id: 2` (`</s>`, not a special token) is **not** the default stop: the reference

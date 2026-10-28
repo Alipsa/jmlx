@@ -90,7 +90,12 @@
     "resize/small-96x64.png": "71bcf8f79e3f08afa3c1ce67ec974866170211b6849673d26faf36c92f54989c",
     "resize/solid-64x64.png": "842ff904e3479cc848e16a1d83fa325ba32e54f42f53d65f6a894095f6fc2eb1",
     "resize/square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741",
-    "resize/wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7"
+    "resize/wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
+    "phi3v/configuration_phi3_v.py": "18ff44c5c1f9a6523184fb2e580e03ebf722a65f37b9cc57cd1a6d620a0f2666",
+    "phi3v/modeling_phi3_v.py": "b223be7d7e9f01903dd8704e5da45c6030824134441aa2734c40c36597c3b41c",
+    "phi3v/preprocessor_config.json": "0f3d920fcec587bb425312d30b0660e1fabaf46a75961f2b75ddbb1ff92de01c",
+    "phi3v/processing_phi3_v.py": "990ef3d1f6b5cc61b44cf8ec8e8886b19721b7e01e8bae3ebea32781b0fcf598",
+    "phi3v/sample_inference.py": "49b1246f2a18d9b4a1e12892e50d19929e550263075d4c80cedeac2246546da4"
   },
   "networkPolicy": "Fixtures load committed local image files and the hash-pinned preprocessor config only; no Hub calls are permitted.",
   "numpy": "2.5.3",
@@ -110,5 +115,13 @@
     12
   ],
   "referencePath": "PIL.Image.open(path) -> load() keeping the original mode/palette/info (no exif_transpose, no ICC/gAMA color management); decode-level RGB conversion is the processor's do_convert_rgb math (RGBA/LA or P-with-tRNS composited over white, every other mode convert('RGB')); chain and resize run through Idefics3ImageProcessor built from the hash-pinned preprocessor_config.json with size.longest_edge=96 and max_image_size.longest_edge=32 and the per-case resample/do_image_splitting overrides, return_tensors=None; exif-orientation records getexif().get(274, 0) after the XMP fallback together with the stored and ImageOps.exif_transpose RGB decodes.",
-  "transformers": "4.57.6"
+  "transformers": "4.57.6",
+  "torch": "2.6.0",
+  "torchvision": "0.21.0",
+  "phi3v": {
+    "note": "Phase 7.3c WP1: the phi3v oracle family runs the hash-pinned bundled trust-remote-code processor under fixtures/phi3v/ (repository below) on the pinned torch/torchvision runtime (required by verify_environment.py; pins agreed across locks by verifyImageOracleDependencyPins). WP1 committed only the five bundled-code sources; the family's *.input.json/*.expected.json fixtures land in WP2.",
+    "repository": "microsoft/Phi-3.5-vision-instruct",
+    "revision": "12b77fb40b63a2c73c68243d3f767aab688a1b2a",
+    "license": "MIT"
+  }
 }

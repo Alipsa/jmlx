@@ -436,7 +436,8 @@ def sha256File = { File file ->
 tasks.register('verifyImageOracleDependencyPins') {
     group = 'verification'
     description = 'Verifies the image, fast-comparison, Qwen-VL and HF reference locks agree ' +
-            'on Pillow, NumPy and Transformers.'
+            'on Pillow, NumPy and Transformers, and image-oracle/hf-reference agree on ' +
+            'Torch and TorchVision (the phi3v family).'
     def imageLock = imageOracleDir.file('requirements.lock')
     def fastLock = imageOracleDir.file('fast-comparison/requirements.lock')
     def qwenVlLock = layout.projectDirectory.file('tools/qwen-vl-reference/requirements.lock')
@@ -463,15 +464,16 @@ tasks.register('verifyImageOracleDependencyPins') {
                 'qwen-vl-reference': parseLock(qwenVlLock.asFile),
                 'hf-reference': parseLock(referenceLock.asFile),
         ]
-        ['pillow', 'numpy', 'transformers'].each { packageName ->
+        def allLocks = locks.keySet().toList()
+        def checkPin = { String packageName, List<String> scope ->
             def byLock = [:]
-            locks.each { label, pins ->
-                if (!pins.containsKey(packageName)) {
+            scope.each { label ->
+                if (!locks[label].containsKey(packageName)) {
                     throw new GradleException("${label} lock is missing a pinned ${packageName} dependency")
                 }
-                byLock[label] = pins[packageName]
+                byLock[label] = locks[label][packageName]
             }
-            def baseline = locks.keySet().first()
+            def baseline = scope.first()
             byLock.each { label, pin ->
                 if (label == baseline) {
                     return
@@ -486,6 +488,13 @@ tasks.register('verifyImageOracleDependencyPins') {
                 }
             }
         }
+        checkPin('pillow', allLocks)
+        checkPin('numpy', allLocks)
+        checkPin('transformers', allLocks)
+        // Phase 7.3c: the phi3v oracle family runs the bundled trust-remote-code processor,
+        // which imports torch and torchvision; only image-oracle and hf-reference carry them.
+        checkPin('torch', ['image-oracle', 'hf-reference'])
+        checkPin('torchvision', ['image-oracle', 'hf-reference'])
     }
 }
 
@@ -633,6 +642,9 @@ tasks.register('verifyHfReferenceGoldens') {
     inputs.file('tools/hf-reference/qwen3vl_model.py')
     inputs.file('tools/hf-reference/qwen3vl_wide_attention.py')
     inputs.file('tools/hf-reference/qwen3vl_wp8.py')
+    // Phase 7.3c WP1's probe golden generator (deterministic, re-verifies the pinned artifact
+    // and bundle hashes before use).
+    inputs.file('tools/hf-reference/phi3v_probe.py')
     // Phase 7.3b WP2's shared Qwen3-VL processed-patch fixtures are image-oracle-owned but
     // consumed on the HF side, so the root task pins their digests too.
     inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
@@ -664,6 +676,11 @@ tasks.register('verifyHfReferenceGoldens') {
         if (wp8GeneratorHash == null ||
                 sha256File(file('tools/hf-reference/qwen3vl_wp8.py')) != wp8GeneratorHash) {
             throw new GradleException('Qwen3-VL WP8 acceptance generator SHA-256 differs or is missing')
+        }
+        def phi3vProbeHash = metadata.phi3v_probe_sha256
+        if (phi3vProbeHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_probe.py')) != phi3vProbeHash) {
+            throw new GradleException('Phi-3.5-Vision WP1 probe SHA-256 differs or is missing')
         }
         def visionFiles = metadata.vision_tier_b_files
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {

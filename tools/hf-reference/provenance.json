@@ -106,7 +106,8 @@
     "checkpoints/qwen3vl-wp8/tokenizer.json": "43434cb4048b6b40dacd4e25a4e65cad7c51f54e64a137323b377ddc8164024d",
     "checkpoints/qwen3vl-wp8/images/a.png": "3d783f94d701523644fc935bc4a62182b7783fc6cb7445bc9f9f775ca7627f30",
     "checkpoints/qwen3vl-wp8/images/b.png": "7d39939c91fbc54bb76e749b42470e74cc95061e4f6e33762ce1fb713a40a5d4",
-    "qwen3vl-tier-b-logits.bin": "2b44f9f2984c8d9f6b0db67937d1777dd4641343936bbd70711a36559ae76afb"
+    "qwen3vl-tier-b-logits.bin": "2b44f9f2984c8d9f6b0db67937d1777dd4641343936bbd70711a36559ae76afb",
+    "phi3v-wp1-probe.json": "06734b2207b8b418807ef178459366206ccda3307b150cc5f686f7467c753f73"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -146,7 +147,7 @@
       "t5": "q/k/v width heads*d_kv; float32 RMS accumulation without mean subtraction or bias; unscaled attention; pre-norm residuals; gated-gelu uses gelu_new; tied head scales hidden states by d_model**-0.5",
       "pooling": "attended special tokens included; CLS index 0; Mean/Max exclude padding; Normalize follows Pooling; artifact maximum sequence length enforced by tokenizer truncation upstream"
     },
-    "requirements_lock_sha256": "b3e1bf3521cfa4f841445ce13e034f15033f7e84a5bd6c7d3aeb1a5891bf261b"
+    "requirements_lock_sha256": "d370b90e337c1304aff7a858ea2a4546b49122368e7bdf2e034a275709bf9bc9"
   },
   "vision_tier_b_files": {
     "tools/tier-b/smolvlm-256m-instruct.json": "03d2c8213e30cceaee15d5f452dab3477a0c3339bd413b3fe040a26063ff69da",
@@ -166,5 +167,39 @@
     "tools/hf-reference/qwen3vl_tier_b.py": "21c8c07ae3d3f92fa4d01fee3536a2703f17fd4b51f51eaba0ff301b3f70d8b0",
     "tools/tier-b/images/qwen3vl-wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
     "tools/tier-b/images/qwen3vl-square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741"
+  },
+  "phi3v_probe_sha256": "122af2472e5cae11eb53ce20e58440f4608eb7edee02331ac405572edca4c1f9",
+  "phi3v": {
+    "repository": "microsoft/Phi-3.5-vision-instruct",
+    "revision": "12b77fb40b63a2c73c68243d3f767aab688a1b2a",
+    "license": "MIT",
+    "license_evidence": "https://huggingface.co/microsoft/Phi-3.5-vision-instruct/blob/12b77fb40b63a2c73c68243d3f767aab688a1b2a/LICENSE",
+    "bundled_code_fixture_dir": "tools/image-oracle/fixtures/phi3v",
+    "bundled_code_fixture_note": "The five trust-remote-code bundle files committed under tools/image-oracle/fixtures/phi3v/ are byte-identical to the artifact entries below; their digests are checked by verifyImageOracleFixtureDigests (image oracle fixtureSources) and re-verified by phi3v_probe.py and the phi3v oracle runner before import.",
+    "artifact_sha256": {
+      "LICENSE": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "config.json": "567e28c638a3e41aba1a304ae58b283845ad07e1c60e970643b0ad8fc229b382",
+      "configuration_phi3_v.py": "18ff44c5c1f9a6523184fb2e580e03ebf722a65f37b9cc57cd1a6d620a0f2666",
+      "generation_config.json": "bf86d2cd9250f89f09563b7f80e25e34663f673b836f531dc207362165051dc9",
+      "model-00001-of-00002.safetensors": "be7bdee601478b3560aeb7122fe87a7d68445bb21b5f1ca88a764e8530b3aab8",
+      "model-00002-of-00002.safetensors": "94621eca6936d7a2fb94bd90f37edb0e28850235e7ba2c5e20445d2fc56bcaed",
+      "model.safetensors.index.json": "72d628080d85b3a0e96eac71a47f7a04a666aabf8a91269100c99a8d543f345c",
+      "modeling_phi3_v.py": "b223be7d7e9f01903dd8704e5da45c6030824134441aa2734c40c36597c3b41c",
+      "preprocessor_config.json": "0f3d920fcec587bb425312d30b0660e1fabaf46a75961f2b75ddbb1ff92de01c",
+      "processing_phi3_v.py": "990ef3d1f6b5cc61b44cf8ec8e8886b19721b7e01e8bae3ebea32781b0fcf598",
+      "processor_config.json": "286a9e7fb58a489eae6825b79be69f62068c2028435c29ee52c3a485d071707b",
+      "sample_inference.py": "49b1246f2a18d9b4a1e12892e50d19929e550263075d4c80cedeac2246546da4",
+      "special_tokens_map.json": "f9535fada19315e0d8eb89521cebe111c008fee98d16e7c6744acfb50505d8c3",
+      "tokenizer.json": "493f8ad437be806d5ccdc57e91479bdbb0c656448c1b89ff70f7653530d78518",
+      "tokenizer_config.json": "581d4654c018fbcef2504b57a805dcad37126038137b5d25d22b5a02abc1ef29"
+    },
+    "torchvision": {
+      "version": "0.21.0",
+      "matches_torch": "2.6.0",
+      "wheel_sha256": {
+        "torchvision-0.21.0-cp312-cp312-macosx_11_0_arm64.whl": "97a5814a93c793aaf0179cfc7f916024f4b63218929aee977b645633d074a49f",
+        "torchvision-0.21.0+cpu-cp312-cp312-linux_x86_64.whl": "d6874431e678ba107b60a83f255c33f3755f06bad587b1b919aa514ec325dcd8"
+      }
+    }
   }
 }

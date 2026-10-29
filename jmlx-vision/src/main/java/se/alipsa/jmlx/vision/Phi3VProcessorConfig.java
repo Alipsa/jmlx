@@ -21,11 +21,13 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The reference {@code __init__} reads exactly {@code num_crops} (required here: the token
  * formula and the scale loop are defined in terms of it), {@code image_mean}, {@code image_std} and
- * {@code do_convert_rgb}; the legacy {@code num_img_tokens} key is accepted and ignored (the
- * reference processor never reads it). The decode policy is drop-alpha + EXIF-ignore: the reference
- * {@code convert("RGB")} step drops alpha, never composites, and the processor never calls {@code
- * exif_transpose} (findings §6), so a config with {@code do_convert_rgb: false} is rejected at
- * parse time because the ported decode path always delivers RGB.
+ * {@code do_convert_rgb}; the legacy {@code num_img_tokens} key is accepted and recorded via {@link
+ * #numImgTokens()} (the reference processor never reads it; the model cross-checks it against the
+ * checkpoint's {@code img_processor} block when present). The decode policy is drop-alpha +
+ * EXIF-ignore: the reference {@code convert("RGB")} step drops alpha, never composites, and the
+ * processor never calls {@code exif_transpose} (findings §6), so a config with {@code
+ * do_convert_rgb: false} is rejected at parse time because the ported decode path always delivers
+ * RGB.
  */
 public final class Phi3VProcessorConfig {
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -62,12 +64,17 @@ public final class Phi3VProcessorConfig {
   private static final String[] REQUIRED_KEYS = {"image_mean", "image_std", "num_crops"};
 
   private final int numCrops;
+  private final Integer numImgTokens;
   private final float[] imageMean;
   private final float[] imageStd;
   private final String processorClass;
 
   private Phi3VProcessorConfig(
-      int numCrops, float[] imageMean, float[] imageStd, String processorClass) {
+      int numCrops,
+      Integer numImgTokens,
+      float[] imageMean,
+      float[] imageStd,
+      String processorClass) {
     // Shared semantic validation for both construction paths: the JSON path has already checked
     // types, the builder has not checked anything, so both reach the same guards here.
     if (numCrops <= 0) {
@@ -90,6 +97,7 @@ public final class Phi3VProcessorConfig {
       }
     }
     this.numCrops = numCrops;
+    this.numImgTokens = numImgTokens;
     this.imageMean = imageMean.clone();
     this.imageStd = imageStd.clone();
     this.processorClass = processorClass;
@@ -153,12 +161,6 @@ public final class Phi3VProcessorConfig {
       throw new IllegalArgumentException(
           "phi3v preprocessor config image_processor_type must be 'Phi3VImageProcessor'");
     }
-    int numCrops = positiveInt(root, "num_crops");
-    // The legacy per-image-token-count hint: accepted and ignored (the reference processor never
-    // reads it from the image-processor config).
-    if (keys.contains("num_img_tokens")) {
-      optionalPositiveInt(root, "num_img_tokens");
-    }
     JsonNode autoMap = root.path("auto_map");
     if (keys.contains("auto_map") && !autoMap.isNull() && !autoMap.isObject()) {
       throw new IllegalArgumentException("auto_map must be a JSON object");
@@ -179,8 +181,14 @@ public final class Phi3VProcessorConfig {
           "do_convert_rgb must be true: the ported decoder always converts decoded input to "
               + "RGB, so a config that skips the conversion would be silently ignored");
     }
-    return new Phi3VProcessorConfig(
-        positiveInt(root, "num_crops"), imageMean, imageStd, processorClass);
+    int numCrops = positiveInt(root, "num_crops");
+    // The legacy per-image-token-count hint: accepted and recorded (the reference processor never
+    // reads it from the image-processor config; the model cross-checks it against config.json).
+    Integer numImgTokens =
+        keys.contains("num_img_tokens") && !root.path("num_img_tokens").isNull()
+            ? positiveInt(root, "num_img_tokens")
+            : null;
+    return new Phi3VProcessorConfig(numCrops, numImgTokens, imageMean, imageStd, processorClass);
   }
 
   private static int positiveInt(JsonNode root, String key) {
@@ -197,13 +205,6 @@ public final class Phi3VProcessorConfig {
       throw new IllegalArgumentException(key + " must be positive: " + value);
     }
     return value;
-  }
-
-  private static int optionalPositiveInt(JsonNode root, String key) {
-    if (root.path(key).isNull()) {
-      return 0;
-    }
-    return positiveInt(root, key);
   }
 
   private static boolean optionalBool(JsonNode root, String key, boolean defaultValue) {
@@ -295,13 +296,22 @@ public final class Phi3VProcessorConfig {
       if (imageStd == null) {
         throw new IllegalArgumentException("imageStd must be set");
       }
-      return new Phi3VProcessorConfig(numCrops, imageMean, imageStd, processorClass);
+      return new Phi3VProcessorConfig(numCrops, null, imageMean, imageStd, processorClass);
     }
   }
 
   /** The HD scale loop's crop budget (4 for the pinned artifact). */
   public int numCrops() {
     return numCrops;
+  }
+
+  /**
+   * The legacy {@code num_img_tokens} value when present and non-null in the JSON, or {@code null}
+   * when absent — the reference processor never reads it, so the model only cross-checks it against
+   * the checkpoint's {@code img_processor.num_img_tokens} when it is present.
+   */
+  public Integer numImgTokens() {
+    return numImgTokens;
   }
 
   /** A copy of the three per-channel float32 means (the CLIP defaults for the pinned artifact). */

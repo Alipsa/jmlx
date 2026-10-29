@@ -57,6 +57,7 @@ public final class ArchitectureMappings {
           "sliding_window",
           "max_window_layers",
           "max_position_embeddings",
+          "original_max_position_embeddings",
           "partial_rotary_factor",
           "quantization",
           "quantization_config");
@@ -103,6 +104,8 @@ public final class ArchitectureMappings {
           Family.builder(WindowPolicy.USE).build(),
           "phi3",
           Family.builder(WindowPolicy.USE).fusedProjections().build(),
+          "phi3_v",
+          Family.builder(WindowPolicy.IGNORE).fusedProjections().acceptsSuRope().build(),
           "gemma",
           Family.builder(WindowPolicy.REJECT)
               .gemma()
@@ -136,6 +139,10 @@ public final class ArchitectureMappings {
    *     field outright)
    * @param qkNorm per-head QK normalization: {@code self_attn.q_norm.weight}/{@code k_norm.weight}
    *     over {@code head_dim} are required, after projection and before RoPE
+   * @param acceptsSuRope whether the rope parse accepts {@code type = su} (NTK-Su short/long factor
+   *     tables); only phi3_v sets it. Other families keep rejecting {@code su} by name — for
+   *     instance the Phi-3-mini-128k configs (model_type {@code phi3}, {@code rope_scaling:
+   *     {rope_type: su, factor: …}}) must stay unsupported
    * @param window treatment of {@code sliding_window}
    */
   private record Family(
@@ -149,6 +156,7 @@ public final class ArchitectureMappings {
       boolean acceptsLayerTypes,
       boolean honorsExplicitHeadDim,
       boolean qkNorm,
+      boolean acceptsSuRope,
       WindowPolicy window) {
 
     /** Rejects capability combinations the tensor plan and assembler cannot express. */
@@ -179,6 +187,7 @@ public final class ArchitectureMappings {
       private boolean acceptsLayerTypes;
       private boolean honorsExplicitHeadDim;
       private boolean qkNorm;
+      private boolean acceptsSuRope;
 
       private Builder(WindowPolicy window) {
         this.window = window;
@@ -234,6 +243,11 @@ public final class ArchitectureMappings {
         return this;
       }
 
+      Builder acceptsSuRope() {
+        acceptsSuRope = true;
+        return this;
+      }
+
       Family build() {
         return new Family(
             qwen2Bias,
@@ -246,6 +260,7 @@ public final class ArchitectureMappings {
             acceptsLayerTypes,
             honorsExplicitHeadDim,
             qkNorm,
+            acceptsSuRope,
             window);
       }
     }
@@ -488,7 +503,7 @@ public final class ArchitectureMappings {
             .asDouble(
                 thetaSource == null ? 1 : thetaSource.path("partial_rotary_factor").asDouble(1));
     final int rotaryDims = (int) (headDim * partial);
-    final RopeSpec rope = parseRope(node, theta);
+    final RopeSpec rope = parseRope(node, theta, family);
     final float eps = (float) node.path("rms_norm_eps").asDouble(1e-6);
     // Hugging Face hardcodes bias=False in several families' projections and ignores the flag
     // there.
@@ -642,7 +657,7 @@ public final class ArchitectureMappings {
     return new Quantization(groupSize.intValue(), bits.intValue());
   }
 
-  private static RopeSpec parseRope(JsonNode config, float theta) {
+  private static RopeSpec parseRope(JsonNode config, float theta, Family family) {
     JsonNode scaling = config.get("rope_scaling");
     JsonNode parameters = config.get("rope_parameters");
     if (scaling != null && !scaling.isNull() && !scaling.isObject()) {
@@ -661,9 +676,30 @@ public final class ArchitectureMappings {
     }
     String prefix = source == scaling ? "rope_scaling" : "rope_parameters";
     String type = source.path("rope_type").asString(source.path("type").asString("default"));
+    if (family.acceptsSuRope()) {
+      // phi3_v supports only the NTK-Su variant this phase. Every other scaling — including
+      // yarn, which the reference configuration_phi3_v class also accepts — is rejected by name.
+      if (!"su".equals(type)) {
+        throw new IllegalArgumentException(
+            "config.json "
+                + prefix
+                + ".rope_type '"
+                + type
+                + "' is unsupported for "
+                + requiredText(config, "model_type"));
+      }
+    } else if ("su".equals(type)) {
+      throw new IllegalArgumentException(
+          "config.json "
+              + prefix
+              + ".rope_type 'su' is unsupported for "
+              + requiredText(config, "model_type"));
+    }
     Set<String> keys =
         switch (type) {
           case "default" -> Set.of("rope_type", "type", "rope_theta", "partial_rotary_factor");
+          // The reference reads only the "type" key for su (no "rope_type" alias).
+          case "su" -> Set.of("type", "short_factor", "long_factor");
           case "linear", "dynamic" ->
               Set.of(
                   "rope_type",
@@ -708,6 +744,14 @@ public final class ArchitectureMappings {
     }
     if ("default".equals(type)) {
       return new RopeSpec.Base(theta);
+    }
+    if ("su".equals(type)) {
+      return new RopeSpec.Su(
+          theta,
+          requiredInt(config, "max_position_embeddings"),
+          requiredInt(config, "original_max_position_embeddings"),
+          requiredFloatArray(source, "short_factor", prefix),
+          requiredFloatArray(source, "long_factor", prefix));
     }
     float factor =
         "yarn".equals(type) && source.has("factor") && source.get("factor").isNull()
@@ -782,6 +826,24 @@ public final class ArchitectureMappings {
           "config.json " + prefix + "." + key + " must be a finite number");
     }
     return value.floatValue();
+  }
+
+  private static float[] requiredFloatArray(JsonNode node, String key, String prefix) {
+    JsonNode value = node.get(key);
+    if (value == null || !value.isArray() || value.isEmpty()) {
+      throw new IllegalArgumentException(
+          "config.json " + prefix + "." + key + " must be a non-empty array of finite numbers");
+    }
+    float[] result = new float[value.size()];
+    for (int i = 0; i < value.size(); i++) {
+      JsonNode element = value.get(i);
+      if (element == null || !element.isNumber() || !Float.isFinite(element.floatValue())) {
+        throw new IllegalArgumentException(
+            "config.json " + prefix + "." + key + " must be a non-empty array of finite numbers");
+      }
+      result[i] = element.floatValue();
+    }
+    return result;
   }
 
   private static int requiredInt(JsonNode node, String name) {

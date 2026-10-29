@@ -15,6 +15,11 @@ import se.alipsa.jmlx.vision.RgbImage;
  * #withImages(java.util.List)}; the images are positional placeholders paired in order of
  * appearance with the {@code {"type": "image"}} parts of structured chat content (see {@link
  * HfTokenizer#renderChat}). Pixels never come from the chat messages themselves.
+ *
+ * <p>Tokenizer-backed requests (the {@link #text} and {@link #chat} factories) also retain the
+ * source text their IDs were encoded from — {@link #promptText()}. Pre-tokenized requests carry
+ * {@code null}. Vision models whose prompt expansion operates on text rather than on a special
+ * image token (Phi-3.5-Vision) require a tokenizer-backed request.
  */
 public final class GenerationRequest {
   private final int[] promptTokenIds;
@@ -24,6 +29,7 @@ public final class GenerationRequest {
   private final HfTokenizer tokenizer;
   private final GenerationCachePolicy cachePolicy;
   private final List<RgbImage> images;
+  private final String promptText;
 
   /** Creates a request from already-rendered prompt token IDs. */
   public GenerationRequest(
@@ -35,7 +41,8 @@ public final class GenerationRequest {
         PromptSpecialTokens.PRETOKENIZED,
         null,
         GenerationCachePolicy.full(),
-        List.of());
+        List.of(),
+        null);
   }
 
   private GenerationRequest(
@@ -45,7 +52,8 @@ public final class GenerationRequest {
       PromptSpecialTokens promptSpecialTokens,
       HfTokenizer tokenizer,
       GenerationCachePolicy cachePolicy,
-      List<RgbImage> images) {
+      List<RgbImage> images,
+      String promptText) {
     this.promptTokenIds =
         Arrays.copyOf(
             Objects.requireNonNull(promptTokenIds, "promptTokenIds"), promptTokenIds.length);
@@ -61,6 +69,7 @@ public final class GenerationRequest {
     for (int i = 0; i < this.images.size(); i++) {
       Objects.requireNonNull(this.images.get(i), "images must not contain null");
     }
+    this.promptText = promptText;
   }
 
   /**
@@ -86,7 +95,7 @@ public final class GenerationRequest {
       throw new IllegalArgumentException("text requests require ADD or OMIT special-token policy");
     }
     List<Integer> ids = tokenizer.encode(prompt, specialTokens == PromptSpecialTokens.ADD);
-    return tokenizerBacked(ids, config, cancellationToken, specialTokens, tokenizer);
+    return tokenizerBacked(ids, config, cancellationToken, specialTokens, tokenizer, prompt);
   }
 
   /**
@@ -115,7 +124,8 @@ public final class GenerationRequest {
     Objects.requireNonNull(tokenizer, "tokenizer");
     String prompt = tokenizer.renderChat(messages, options);
     List<Integer> ids = tokenizer.encode(prompt, false);
-    return tokenizerBacked(ids, config, cancellationToken, PromptSpecialTokens.OMIT, tokenizer);
+    return tokenizerBacked(
+        ids, config, cancellationToken, PromptSpecialTokens.OMIT, tokenizer, prompt);
   }
 
   private static GenerationRequest tokenizerBacked(
@@ -123,7 +133,8 @@ public final class GenerationRequest {
       GenerationConfig config,
       CancellationToken cancellationToken,
       PromptSpecialTokens specialTokens,
-      HfTokenizer tokenizer) {
+      HfTokenizer tokenizer,
+      String promptText) {
     return new GenerationRequest(
         ids.stream().mapToInt(Integer::intValue).toArray(),
         config,
@@ -131,13 +142,14 @@ public final class GenerationRequest {
         specialTokens,
         tokenizer,
         GenerationCachePolicy.full(),
-        List.of());
+        List.of(),
+        promptText);
   }
 
   /**
    * Returns a copy of this request that carries the given images, in order of appearance. Every
-   * other field — prompt, config, cancellation, prompt special tokens, tokenizer and cache policy —
-   * is retained.
+   * other field — prompt, prompt text, config, cancellation, prompt special tokens, tokenizer and
+   * cache policy — is retained.
    *
    * <p>The list is copied and {@link RgbImage} is itself an immutable value (its constructor copies
    * the pixel buffer), so later mutation of the caller's list does not affect the returned request.
@@ -155,7 +167,8 @@ public final class GenerationRequest {
         promptSpecialTokens,
         tokenizer,
         cachePolicy,
-        images);
+        images,
+        promptText);
   }
 
   /** Returns a copy of this request with an explicit cache policy. */
@@ -167,7 +180,8 @@ public final class GenerationRequest {
         promptSpecialTokens,
         tokenizer,
         Objects.requireNonNull(policy, "policy"),
-        images);
+        images,
+        promptText);
   }
 
   /** Returns this request's cache retention policy. */
@@ -186,6 +200,18 @@ public final class GenerationRequest {
   /** Returns a defensive copy of the prompt IDs. */
   public int[] promptTokenIds() {
     return Arrays.copyOf(promptTokenIds, promptTokenIds.length);
+  }
+
+  /**
+   * Returns the source text this request's IDs were encoded from — the prompt for a {@link #text}
+   * request, the rendered chat text for a {@link #chat} request — or {@code null} for a
+   * pre-tokenized request. Text is the ground truth for models whose prompt expansion operates on
+   * text (Phi-3.5-Vision's image markers are literal prompt text, not special tokens, and the
+   * tokenizer's decode is not the inverse of its encode at special-token boundaries, so the text
+   * cannot be recovered from the IDs); such models reject pre-tokenized requests.
+   */
+  public String promptText() {
+    return promptText;
   }
 
   /** Returns the immutable generation policy. */

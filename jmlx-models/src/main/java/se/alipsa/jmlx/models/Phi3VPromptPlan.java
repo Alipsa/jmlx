@@ -3,6 +3,7 @@ package se.alipsa.jmlx.models;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import se.alipsa.jmlx.nn.KVCachePolicy;
 
 /**
  * The result of expanding one rendered Phi-3.5-Vision prompt: the rendered text (the unexpanded
@@ -67,6 +68,41 @@ record Phi3VPromptPlan(String renderedText, int[] expandedIds, List<Phi3VImageDe
       }
     }
     return destinations;
+  }
+
+  /**
+   * The cache budget the expanded prompt needs: 0 when {@code maxNewTokens == 0}, otherwise {@code
+   * expandedLength + maxNewTokens - 1} — which also bounds the boundary re-prefill's width ({@code
+   * originalMax + 1} at its single trigger step, never more than the final occupancy).
+   *
+   * @throws ArithmeticException if the sum overflows a signed 64-bit integer
+   */
+  public long requiredCacheCapacity(int maxNewTokens) {
+    if (maxNewTokens < 0) {
+      throw new IllegalArgumentException("maxNewTokens must be non-negative: " + maxNewTokens);
+    }
+    if (maxNewTokens == 0) {
+      return 0L;
+    }
+    return Math.addExact(Math.addExact((long) expandedLength(), (long) maxNewTokens), -1L);
+  }
+
+  /**
+   * Validates this plan's cache budget against the policy; the capacity failure message names the
+   * expanded prompt length.
+   *
+   * @param policy the generation's KV cache policy; null is rejected
+   * @param maxNewTokens the configured maximum new tokens (0 = prompt only)
+   * @throws IllegalArgumentException when the budget is not retainable, naming the length
+   */
+  public void requireCacheCapacity(KVCachePolicy policy, int maxNewTokens) {
+    Objects.requireNonNull(policy, "policy");
+    long required = requiredCacheCapacity(maxNewTokens);
+    // Clamped: an effectively unbounded token budget is legal on unbounded and sliding caches;
+    // only a bounded FULL capacity can be exceeded up front.
+    policy.requireCapacity(
+        Math.min(required, Integer.MAX_VALUE),
+        "generation (expanded prompt " + expandedLength() + " tokens)");
   }
 
   private static void verifyDestinations(int expandedLength, List<Phi3VImageDestination> images) {

@@ -368,4 +368,173 @@ final class TinyCheckpoints {
       Map<String, MLXArray> tensors, MLXScope scope, String key, int... shape) {
     tensors.put(key, MLXRandom.normal(scope, shape, DType.BFLOAT16, 0f, 0.02f));
   }
+
+  // The tiny Phi-3.5-Vision geometry: a 21-token vocabulary (the hand-written
+  // phi3v-tiny-tokens fixture), a two-layer GQA text side (head_dim 64 derived from
+  // hidden/heads) with NTK-Su scaling (original max 470, max positions 2048, 32 short/long
+  // factors), and the CLIP tower at its fixed width 1024 with a small MLP (128) and three
+  // encoder layers (two executed, the third plan-optional).
+  static final int PHI3V_VOCAB = 21;
+  static final int PHI3V_TEXT_HIDDEN = 128;
+  static final int PHI3V_TEXT_LAYERS = 2;
+  static final int PHI3V_TEXT_HEADS = 2;
+  static final int PHI3V_TEXT_KV_HEADS = 1;
+  static final int PHI3V_TEXT_INTERMEDIATE = 256;
+  static final int PHI3V_CLIP_LAYERS = 3;
+  static final int PHI3V_CLIP_INTERMEDIATE = 128;
+  static final int PHI3V_CLIP_HIDDEN = 1024;
+  static final int PHI3V_ORIGINAL_MAX_POSITIONS = 470;
+  static final int PHI3V_MAX_POSITIONS = 2048;
+
+  /**
+   * A tiny HF float {@code phi3_v} checkpoint: the strict config (fused qkv and gate_up
+   * projections, NTK-Su rope), a matching {@code preprocessor_config.json}, the committed 21-token
+   * phi3v-tiny fixture tokenizer, and every weight stored BF16 (the 4.2B artifact's storage dtype).
+   * The optional last CLIP layer and {@code post_layernorm} are present, exercising the load path's
+   * accepted-and-discarded handling of them.
+   */
+  static void randomPhi3V(Path directory, long seed) throws IOException {
+    Files.createDirectories(directory);
+    Files.writeString(directory.resolve("config.json"), phi3VisionConfigJson());
+    Files.writeString(directory.resolve("preprocessor_config.json"), phi3VisionPreprocessorJson());
+    Files.copy(
+        Path.of(
+            System.getProperty("jmlx.repository.root"),
+            "jmlx-models/src/test/resources/phi3v-tiny-tokens/tokenizer.json"),
+        directory.resolve("tokenizer.json"));
+    int h = PHI3V_TEXT_HIDDEN;
+    int inter = PHI3V_TEXT_INTERMEDIATE;
+    int v = PHI3V_CLIP_HIDDEN;
+    int visionInter = PHI3V_CLIP_INTERMEDIATE;
+    int headDim = h / PHI3V_TEXT_HEADS;
+    int qkv = PHI3V_TEXT_HEADS * headDim + 2 * PHI3V_TEXT_KV_HEADS * headDim;
+    String clip = "model.vision_embed_tokens.img_processor.vision_model.";
+    try (MLXScope scope = new MLXScope()) {
+      MLXRandom.seed(seed);
+      Map<String, MLXArray> tensors = new LinkedHashMap<>();
+      putBf16(tensors, scope, "model.embed_tokens.weight", PHI3V_VOCAB, h);
+      putBf16(tensors, scope, "model.norm.weight", h);
+      putBf16(tensors, scope, "lm_head.weight", PHI3V_VOCAB, h);
+      for (int i = 0; i < PHI3V_TEXT_LAYERS; i++) {
+        String layer = "model.layers." + i + ".";
+        putBf16(tensors, scope, layer + "input_layernorm.weight", h);
+        putBf16(tensors, scope, layer + "self_attn.qkv_proj.weight", qkv, h);
+        putBf16(tensors, scope, layer + "self_attn.o_proj.weight", h, h);
+        putBf16(tensors, scope, layer + "post_attention_layernorm.weight", h);
+        putBf16(tensors, scope, layer + "mlp.gate_up_proj.weight", 2 * inter, h);
+        putBf16(tensors, scope, layer + "mlp.down_proj.weight", h, inter);
+      }
+      putBf16(tensors, scope, "model.vision_embed_tokens.glb_GN", 1, 1, 4 * v);
+      putBf16(tensors, scope, "model.vision_embed_tokens.sub_GN", 1, 1, 1, 4 * v);
+      putBf16(tensors, scope, clip + "embeddings.class_embedding", v);
+      // PyTorch OIHW channels-first conv weight; the model transposes it to channels-last.
+      putBf16(tensors, scope, clip + "embeddings.patch_embedding.weight", v, 3, 14, 14);
+      putBf16(tensors, scope, clip + "embeddings.position_embedding.weight", 577, v);
+      // The pinned checkpoint's real (typo'd) key name.
+      putBf16(tensors, scope, clip + "pre_layrnorm.weight", v);
+      putBf16(tensors, scope, clip + "pre_layrnorm.bias", v);
+      for (int i = 0; i < PHI3V_CLIP_LAYERS; i++) {
+        String block = clip + "encoder.layers." + i + ".";
+        for (String projection : new String[] {"q_proj", "k_proj", "v_proj", "out_proj"}) {
+          putBf16(tensors, scope, block + "self_attn." + projection + ".weight", v, v);
+          putBf16(tensors, scope, block + "self_attn." + projection + ".bias", v);
+        }
+        for (String norm : new String[] {"layer_norm1", "layer_norm2"}) {
+          putBf16(tensors, scope, block + norm + ".weight", v);
+          putBf16(tensors, scope, block + norm + ".bias", v);
+        }
+        putBf16(tensors, scope, block + "mlp.fc1.weight", visionInter, v);
+        putBf16(tensors, scope, block + "mlp.fc1.bias", visionInter);
+        putBf16(tensors, scope, block + "mlp.fc2.weight", v, visionInter);
+        putBf16(tensors, scope, block + "mlp.fc2.bias", v);
+      }
+      putBf16(tensors, scope, clip + "post_layernorm.weight", v);
+      putBf16(tensors, scope, clip + "post_layernorm.bias", v);
+      putBf16(tensors, scope, "model.vision_embed_tokens.img_projection.0.weight", h, 4 * v);
+      putBf16(tensors, scope, "model.vision_embed_tokens.img_projection.0.bias", h);
+      putBf16(tensors, scope, "model.vision_embed_tokens.img_projection.2.weight", h, h);
+      putBf16(tensors, scope, "model.vision_embed_tokens.img_projection.2.bias", h);
+      MLXIO.saveSafetensors(directory.resolve("model.safetensors").toString(), tensors, Map.of());
+    }
+  }
+
+  static String phi3VisionConfigJson() {
+    String shortFactors = factors(32, "1.0");
+    String longFactors = factors(32, "2.0");
+    String config =
+        """
+        {
+          "model_type": "phi3_v",
+          "architectures": ["Phi3VForCausalLM"],
+          "vocab_size": %d,
+          "hidden_size": %d,
+          "intermediate_size": %d,
+          "num_hidden_layers": %d,
+          "num_attention_heads": %d,
+          "num_key_value_heads": %d,
+          "rms_norm_eps": 0.000001,
+          "rope_theta": 10000,
+          "rope_scaling": {"type": "su", "short_factor": [%s], "long_factor": [%s]},
+          "original_max_position_embeddings": %d,
+          "max_position_embeddings": %d,
+          "hidden_act": "silu",
+          "attention_dropout": 0.0,
+          "tie_word_embeddings": false,
+          "bos_token_id": 1,
+          "eos_token_id": 2,
+          "img_processor": {
+            "name": "clip_vision_model",
+            "model_name": "openai/clip-vit-large-patch14-336",
+            "image_dim_out": %d,
+            "num_img_tokens": 144
+          },
+          "embd_layer": {
+            "projection_cls": "mlp",
+            "use_hd_transform": true,
+            "hd_transform_order": "sub_glb",
+            "with_learnable_separator": true,
+            "embedding_cls": "image"
+          }
+        }
+        """;
+    return config.formatted(
+        PHI3V_VOCAB,
+        PHI3V_TEXT_HIDDEN,
+        PHI3V_TEXT_INTERMEDIATE,
+        PHI3V_TEXT_LAYERS,
+        PHI3V_TEXT_HEADS,
+        PHI3V_TEXT_KV_HEADS,
+        shortFactors,
+        longFactors,
+        PHI3V_ORIGINAL_MAX_POSITIONS,
+        PHI3V_MAX_POSITIONS,
+        PHI3V_CLIP_HIDDEN);
+  }
+
+  static String phi3VisionPreprocessorJson() {
+    String preprocessor =
+        """
+        {
+          "do_convert_rgb": true,
+          "image_mean": [0.48145466, 0.4578275, 0.40821073],
+          "image_processor_type": "Phi3VImageProcessor",
+          "image_std": [0.26862954, 0.26130258, 0.27577711],
+          "num_crops": 4,
+          "num_img_tokens": 144,
+          "processor_class": "Phi3VProcessor"
+        }
+        """;
+    return preprocessor;
+  }
+
+  private static String factors(int count, String value) {
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < count; i++) {
+      if (i > 0) {
+        builder.append(',');
+      }
+      builder.append(value);
+    }
+    return builder.toString();
+  }
 }

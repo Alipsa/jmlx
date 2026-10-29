@@ -655,3 +655,71 @@ verification claims stay pinned to the 4.2B artifact (§1), and the descriptor (
 - **No `mlx_h` addition**; `generateMlxApiInventory` stays green unchanged. The
   length-dependent batch guard (`RopeSpec.apply`'s unequal-position path and `DecoderModel`'s
   batch cache check) is extended to `Su` alongside `DynamicNtk`.
+
+## 13. WP5 implementation evidence — `decode∘encode` is lossy: the prompt text is not recoverable from IDs
+
+- **Finding (a property of the pinned tokenizer, not a jmlx defect).** The reference
+  `tokenizers` encoder (jmlx's `HfTokenizer` reproduces its IDs exactly — differential below)
+  is lossy at `special: true` added-token boundaries:
+  - a whitespace flanking a special token is **duplicated**: `"mid <s> literal"` →
+    `[1, 7145, 29871, 1, 29871, 16333]` (the `29871` = `▁`-token appears once per side),
+    which decodes (`skip_special_tokens=false`) to `"mid <s>  literal"` — one extra space;
+  - a **trailing newline after the final special token is dropped**: `"<|assistant|>\n"` and
+    `"<|assistant|>"` encode to the identical `[1, 32001]` — the ID stream does not
+    distinguish them, so the rendered text is provably not recoverable from its IDs.
+    `"<|user|>\n…<|assistant|>\n"` (every rendered chat prompt of this artifact ends this way)
+    encodes to `[1, 32010, 29871, 13, …, 32007, 29871, 13, 32001]` with no token for the last
+    newline;
+  - the image markers are unaffected — `<|image_i|>` is ordinary BPE text, not an added
+    token: `"<|image_1|>\n"` decodes unchanged, `"A <|image_1|> B"` round-trips exactly.
+  A mid-string newline after a special token is recoverable (`"<|user|>\n"` →
+  `[1, 32010, 29871, 13]` vs `"<|user|> "` → `[1, 32010, 259]`); only the trailing one is
+  lost, but that one decides the last chunk's encoding, so per-chunk re-tokenization from
+  a recovered text could never match the reference's `expanded_ids` for a chat prompt.
+- **Differential (reference vs jmlx, WP3 fixture tokenizer).** For `"mid <s> literal"`,
+  `"<|user|>\n<|image_1|>\nWhat is shown in this image?<|end|>\n<|assistant|>\n"`,
+  `"<s>leading bos literal"` and `"A <|image_1|> B"`: jmlx `encode(text, addBos=true)`
+  equals the reference's IDs exactly and jmlx `decode(ids, skipSpecials=false)` equals the
+  reference's decoded string exactly — including the duplicated space and the dropped
+  trailing newline. jmlx is faithful; the round trip is lossy on both sides.
+- **Decision (plan §2 additive-public-change rule).** `decode∘encode` cannot carry the
+  rendered prompt, so `Phi3VModel` does not recover text from `request.promptTokenIds()`.
+  Instead `GenerationRequest` gains a nullable `promptText` accessor, additive: the
+  `text` factory retains its prompt, the `chat` factory retains its rendered text,
+  pre-tokenized requests retain `null` (and are rejected by `Phi3VModel`, whose marker
+  expansion needs the tokenizer's per-chunk encoding). The request's ID stream is still
+  validated and still what a CANCELLED result reports; the ADD/OMIT policy no longer
+  constrains expansion, because the text — not the IDs — is the expansion input.
+
+### WP5 native implementation evidence
+
+- **Frequency-seed sentinel wrap.** The reference keeps the `-i` sentinel rows in its
+  `input_ids` tensor for the whole run; torch's negative indexing wraps them to
+  `vocab_size - i` wherever a penalty gathers over that tensor. `Phi3VModel` therefore feeds
+  the step loop a frequency seed with the sentinels wrapped (`vocab_size + (-i)`), while the
+  *embedding* inputs clamp them to row 0 — the merge hook replaces those rows, so the clamp
+  value is inert. Greedy (no penalties) never reads the seed's sentinel counts; the wrap
+  matters for seeded and penalty requests and is the faithful reading of the reference.
+- **Tiny-tokenizer byte-level space.** The 21-token `phi3v-tiny-tokens` fixture stores the
+  space as the byte-level escape `Ġ` (U+0120), not a literal U+0020: the ByteLevel
+  pre-tokenizer maps byte 32 to `Ġ` before the BPE vocab lookup, so a literal-space key is
+  never matched and every space in an encoding is silently dropped (probed: `"toast "` →
+  `[t,o,a,s,t]`, 5 IDs instead of 6). With the escape key, `"toast "` encodes to 6 IDs and
+  the boundary/context arithmetic of `Phi3VModelTest` holds (456-token prompt at 76 × 6).
+- **Pinned-index typo.** The artifact's `model.safetensors.index.json` confirms the
+  typo'd `pre_layrnorm` key (`vision_model.pre_layrnorm.{weight,bias}`); the tiny
+  checkpoint fixture writes the same spelling.
+- **HD-transform reference alignment.** `add_image_newline` concatenates the `[n, h, w,
+  4096]` features with the `[n, h, 1, 4096]` newline along the **width axis** (torch
+  `dim=2`), appending one `sub_GN` column at the end of every row — not a trailing channel
+  slice. The `sub_glb` extend order is three **2D** row blocks (the per-image sub rows
+  `.squeeze(0)`, `glb_GN.squeeze(0)` = `[1, 4096]`, and the per-image global row indexed
+  from `[1, 156, 4096]`), concatenated along dim 0; `Phi3VVisionTower.hdRows` reproduces
+  that exactly and the projector therefore sees `[rows, 4096]` (the model reshapes the
+  concatenated per-image blocks to `[1, R, 4096]` for the row-replacement merge hook).
+- **Boundary recompute vs independent reference.** `Phi3VModelTest.boundaryStepRePrefillsUnderTheLongFactorTable`
+  (456 prompt tokens, maxNew 16 — decode step 15 first reaches total width 471) matches a
+  from-scratch per-step fresh-forward reference (fresh `KVCache`s, one full `stepLogits` per
+  step, greedy on the last row, short table ≤ 470 / long table > 470) exactly;
+  `promptBeyondOriginalMaxNeverRecomputes` (474 prompt tokens) confirms no re-prefill fires
+  when the prompt already exceeds 470.

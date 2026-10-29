@@ -9,8 +9,9 @@ native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The **v0.1 ve
 in `req/plans/initial-plan.md` (native bootstrap, generated bindings, memory management, a
 handful of tensor ops) is done, and two further phases are built on top of it:
 `req/plans/phase3-plan.md` (broadcast-compatible ops, relaxed matmul, `slice`, a batched `eval`)
-and `req/plans/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`, `Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
-cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/plans/phase5-m1-plan.md`
+and `req/plans/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`, `Linear`, `QuantizedLinear`,
+normalization/activation layers, `MultiHeadAttention` with RoPE and a KV cache, and reverse-mode
+autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/plans/phase5-m1-plan.md`
 (`MLXIO` -- safetensors/GGUF checkpoint I/O) and `req/plans/phase5-m2-plan.md` (`jmlx-tokenizer` --
 byte-level BPE tokenizer + `hfjinja` chat-template rendering) are also delivered. `jmlx-jinja` (the
 migrated former `hfjinja` project) is a dependency-free Java 21+ Hugging Face Jinja subset for

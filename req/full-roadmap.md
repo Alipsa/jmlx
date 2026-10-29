@@ -334,6 +334,28 @@ pins, and ships release notes.
   `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core` and `jmlx-models`.
 - **From 1.0.** Strict semantic versioning.
 
+### MLX upgrade policy
+
+The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded neither with every
+release nor only after full parity. An upgrade is costly: regenerated bindings, an inventory diff,
+regenerated Python MLX oracle fixtures, re-checked golden precision and re-run Tier-B suites. Each
+skipped MLX release also adds to the binding and behavior drift a later upgrade must absorb, and
+newer model families and checkpoint formats (for example the mxfp4, nvfp4 and mxfp8 variants) need
+a recent runtime.
+
+1. **Upgrade before Phase 7 milestone 5.** After 7.3c and before Qwen3.8 work starts, upgrade to
+   the newest paired release that `scripts/checkDependencies.zsh` reports. On 2026-10-29 that was
+   `mlx-metal` 0.32.4 (with a `macosx_26_0` wheel) and mlx-c v0.8.0
+   (`a26f2d584a14ec619ae8db9a09be03becd47598a`). Its oracle fixtures, goldens and Tier-B
+   evidence are then produced once, on the runtime that R2 ships.
+2. **Afterwards, upgrade when there is a concrete reason.** Reasons include a model family or
+   checkpoint format that needs a newer runtime, an upstream bug fix, or a measured performance
+   gain. In any case, upgrade at least once per completed roadmap phase, so the gap never spans
+   more than one phase. Each upgrade is its own PR via `scripts/updateMlx.zsh`, never bundled with
+   feature work, and is released as described under Native-pin upgrades.
+3. **Freeze for certification.** The pin is frozen from the start of Phase 13's parity
+   certification until 1.0 is released against it. Upgrades resume after 1.0, as minor releases.
+
 ### R1 — Pure-Java modules
 
 `jmlx-jinja` 0.6.0 (continuing `hfjinja` 0.5.0 on Central), `jmlx-tokenizer` 0.1.0 and

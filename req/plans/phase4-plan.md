@@ -1058,8 +1058,8 @@ nullables (§2's table).
   used for "thread-safe" rather than a bare checkmark — here, that the outline's `nn` layer sits on a
   public op surface in `core`, and that autograd shipped although the outline lists no autograd
   deliverable under Phase 4.
-* The outline's architecture diagram (`req/project-outline.md:13`) still advertises `Stream`, `Device`
-  and `Autograd` as `core` types. `Autograd` becomes real as `MLXGrad`; `Stream`/`Device` still do
+* The outline's architecture diagram (`req/project-outline.md:13`) still advertises `Stream`,
+  `Device` and `Autograd` as `core` types. `Autograd` becomes real as `MLXGrad`; `Stream`/`Device` still do
   not exist. Amend the line rather than leaving it aspirational.
 * `MLX.java`'s class javadoc cites `initial-plan.md §7` and `phase3-plan.md`; add this document, and
   give each split class from §1 a javadoc pointing back at the index in `MLX`.

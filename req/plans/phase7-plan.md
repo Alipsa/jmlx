@@ -723,12 +723,30 @@ Effect on this plan's verification:
     documents it, and the expected values are adjusted by the measured per-buffer amount.
   - If the probe is exact, the failure is a jmlx retention regression.
 
-  The other memory tests are unaffected:
-  - Margin-based checks absorb accounting changes: `VisionLanguageMemoryTest`'s `FIXED_MARGIN`,
-    and the 8 MiB and 64 KiB envelopes in `DecoderCacheLifecycleTest` and `Seq2SeqMemoryTest`.
-  - Checks that the counter does not change hold under any accounting, and stay regressions:
-    the `clearCache` checks in `MLXMemoryLeakTest`, and the rejected-call check in
-    `Qwen3VlVisionTowerValidationTest`.
+  No other memory test asserts exact equality with a tensor size. The list below is a complete
+  checklist for the upgrade PR, as of 2026-10-29. It covers every test that reads native memory
+  through `MLXMemory`, `NativeMemoryProbe` or `MLXMemoryTestSupport`.
+  - **Margin- or slope-based checks,** which absorb accounting changes:
+    - `VisionLanguageMemoryTest` (`FIXED_MARGIN`, a measured bound; see above);
+    - `DecoderCacheLifecycleTest` (8 MiB);
+    - `Seq2SeqMemoryTest` and `Phase71ContractsTest` (baseline + 64 KiB);
+    - `LlamaModelTest` (baseline + 4 KiB);
+    - `KVCacheMemoryPlateauTest` (3 × logical + 8 MiB);
+    - `BatchSchedulerMemoryTest` (`SLACK` 8 MiB, and its early-versus-late slope);
+    - `KVCacheTest` (×4 the linear growth, and one row + 1 MiB after a reorder);
+    - `MLXMemoryLeakTest`, `LinearTest` and `QuantizedLinearTest` (2,000,000 B leak thresholds);
+    - `SwitchGluTest` (2,000,000 B);
+    - `MLXScopeTest` (500,000 B freed-detection slack).
+  - **Checks that the counter does not change,** which hold under any accounting and stay
+    regressions:
+    - the `clearCache` checks in `MLXMemoryLeakTest`;
+    - the rejected-call checks in `Qwen3VlVisionTowerValidationTest` and
+      `VisualFeatureInjectionTest` ("rejection must not allocate").
+  - **Report-only probes,** which record peaks but assert no memory bound:
+    `KVCacheQuantizationProbeTest`, `PackedAttentionProbeTest` and the opt-in
+    `Qwen3Vl8bManualProbeTest`.
+
+  The measured and design bounds above (Tier-B, `Qwen3VlVisionPeakTest`) complete the set.
 - **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
   the procedure in `tools/mlx-oracle/README.md`:
   - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;

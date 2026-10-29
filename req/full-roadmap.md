@@ -15,7 +15,9 @@ features needed for MLX parity.
 **Amended 2026-10-29:** a product and integration track (P1–P5, after Phase 7) adds decode-speed
 parity with `mlx_lm`, a prompt prefix cache, an OpenAI/Anthropic-compatible HTTP server,
 Spring Boot/Quarkus integration and a Groovy API modeled on MLX's Python API. It may be
-interleaved with Phases 8–13.
+interleaved with Phases 8–13. The same amendment adds Phase 7 milestone 5 (hybrid
+linear-attention Qwen decoders, Qwen3.8) and a release plan (R1 pure-Java modules, R2 first native
+release, 1.0 at full parity).
 
 This ordering is priority, not a strict ban on dependencies: Phase 6 may implement the focused
 array, indexing, sort/selection, and random-key slices it needs from later groups. The inventory
@@ -267,9 +269,100 @@ Milestones, to plan in dependency order:
    projector layers, multimodal prompt/token conventions, and a tested vision-language model.
 4. **Audio/diffusion only after a capability decision:** add STFT/ISTFT or scheduler/UNet/VAE support
    only when the feature inventory and a concrete reference model justify it.
+5. **Hybrid linear-attention Qwen decoders (Qwen3.8)** *(added 2026-10-29, product priority, and
+   required by release R2 below):* Qwen3.8-27B, like Qwen3.5 and the dense Qwen3.6, uses
+   `model_type` `qwen3_5`. Its stack is hybrid: three of every four layers are Gated DeltaNet
+   linear attention (a causal short convolution with kernel 4 plus the gated delta-rule
+   recurrence). Every fourth layer is full attention with a sigmoid output gate
+   (`attn_output_gate`), partial rotary embedding (`partial_rotary_factor` 0.25) and interleaved
+   multi-axis RoPE (`mrope_section [11, 11, 10]`). The checkpoint includes a Qwen3-VL-style vision
+   tower (`qwen3_5`, patch 16, no DeepStack levels), so the milestone covers both text and
+   image+text generation. It reuses 7.3b's `MultiAxisRope` (which already supports a partial
+   rotary tail), vision tower and request lifecycle. The milestone plan must decide:
+   - **A recurrent-state cache beside the KV cache.** It holds the convolution state and the
+     delta-rule state. It cannot be truncated or slid, so its interaction with `KVCachePolicy`,
+     `BatchGenerationScheduler` cohorts and P2's prefix cache (whole-prefix reuse only) must be
+     defined.
+   - **The delta-rule implementation.** Start with a chunked prefill and per-token decode built
+     from existing ops. Pull forward custom Metal kernels (Phase 12 milestone 3, the 13
+     `mlx_fast_metal_kernel_*` bindings) only if a measured benchmark shows the ops path is
+     inadequate.
+   - **The reference environment.** The Qwen3.8 config records Transformers 5.8.0.dev0, while
+     `tools/hf-reference` pins 4.57.6. The milestone needs its own locked reference environment,
+     or a reviewed upgrade of the shared one.
+
+   Verification:
+   - a Tier-A synthetic hybrid checkpoint against strict float32 Hugging Face logits;
+   - Tier-B `Qwen/Qwen3.5-0.8B` (Apache-2.0, same `model_type`);
+   - a recorded manual `mlx-community/Qwen3.8-27B-4bit` run (Apache-2.0; plain affine 4-bit,
+     group size 64, a format jmlx already loads), with greedy IDs matching `mlx_lm` or `mlx-vlm`.
+
+   **Not included (follow-ups):**
+   - the shared-expert MoE variants (Qwen3.5/3.6-35B-A3B);
+   - Qwen3.8-Flash-Next (`qwen4_exp`, 512-expert MoE, about 180B parameters, non-Apache
+     license);
+   - multi-token-prediction heads (ignored at load; speculative decoding is separate);
+   - the mxfp4, nvfp4 and mxfp8 checkpoint variants.
+
+   `req/plans/phase7-plan.md` gets a step-0-style amendment adding the milestone before its plan
+   is written.
 
 **Phase 7 done:** supported non-text modalities are stated explicitly in the compatibility matrix;
 the `nn` API covers their required common layers without model packages bypassing core facades.
+
+## Release plan
+
+**Added 2026-10-29.** Releases are tied to exit gates, not to a calendar. Every release follows
+the existing manual procedure:
+- each module's `release.sh` in dependency order;
+- `jmlx-jinja/req/release-checklist.md` for jinja;
+- `tools/release-smoke/run.sh candidate` before publishing and `run.sh central` after;
+- the next `-SNAPSHOT` bump only once Central resolves.
+
+Every release also updates the compatibility matrix and the benchmark report, states its native
+pins, and ships release notes.
+
+### Versioning and compatibility policy
+
+- **Independent versions.** Modules keep independent version lines.
+- **Before 1.0.** A minor version may change public API incompatibly, but its release notes list
+  every break. Where it is cheap, a deprecated form is kept for one minor release first. A patch
+  version is a compatible fix. This supersedes the additive-only rule in
+  `req/plans/phase7-plan.md` (Baseline and constraints).
+- **Native-pin upgrades.** From R2 onward, a native-pin upgrade follows Phase 13 milestone 4's
+  procedure (regenerate, diff the inventory, migration note). It ships as a minor release of
+  `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core` and `jmlx-models`.
+- **From 1.0.** Strict semantic versioning.
+
+### R1 — Pure-Java modules
+
+`jmlx-jinja` 0.6.0 (continuing `hfjinja` 0.5.0 on Central), `jmlx-tokenizer` 0.1.0 and
+`jmlx-vision` 0.1.0. These modules have no native dependency, target Java 21 and are useful on
+their own. Released as soon as the release-smoke tooling can verify a partial module set:
+`candidate` and `central` modes currently assume all seven modules.
+
+### R2 — First native release (0.x preview)
+
+`jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi` 0.5.0, `jmlx-core` 0.5.0 and `jmlx-models` 0.1.0, plus
+new versions of any R1 module that changed. Gate:
+
+1. Phase 7 is done, including milestone 5 (Qwen3.8 text and image+text).
+2. P1 step 1's benchmark against `mlx_lm` is published, so decode speed is stated honestly even
+   before any optimization.
+3. P4's Spring AI and LangChain4j adapters are published with this release. The Spring Boot
+   starter and the Quarkus extension may follow in R3+.
+
+### R3+ — Further 0.x releases
+
+A release follows each completed P-milestone, and each completed Phase 8–12 milestone that adds
+public API. Small milestones may be batched into one release. New P-track modules join the release
+order at their first release.
+
+### 1.0 — Full parity
+
+The native chain (`jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`, `jmlx-models`) reaches 1.0
+at Phase 13's full-parity release gate. Pure-Java and P-track modules carry no parity claim. They
+may reach 1.0 earlier on their own stability criteria, but not before any module they depend on.
 
 ## Product and integration track (P1–P5, alongside Phases 8–13)
 

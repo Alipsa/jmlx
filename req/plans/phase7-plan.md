@@ -60,6 +60,8 @@ input, HTTP serving, and audio/diffusion implementation (7.4 only decides).
   `HfTokenizer.renderChat` rejects non-text message content, which multimodal templates need.
 - Nothing has been published to Maven Central yet. If the first release happens mid-phase, every
   later change to a released public type must be additive (no removals or signature changes).
+  *Superseded 2026-10-29* by the 0.x policy in `req/full-roadmap.md` § Release plan: incompatible
+  changes are allowed in a minor release when its release notes list them.
 
 Roadmap rules apply throughout. In particular: name exact mlx-c declarations, probe native
 uncertainty first, no `ffi` use outside `jmlx-core`, and `MLXScope` ownership and `MLXException`

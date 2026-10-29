@@ -12,6 +12,11 @@ verification style established by `initial-plan.md` and Phases 3–5.
 array/runtime surface, transformations and training, and finally the specialist/system
 features needed for MLX parity.
 
+**Amended 2026-10-29:** a product and integration track (P1–P5, after Phase 7) adds decode-speed
+parity with `mlx_lm`, a prompt prefix cache, an OpenAI/Anthropic-compatible HTTP server,
+Spring Boot/Quarkus integration and a Groovy API modeled on MLX's Python API. It may be
+interleaved with Phases 8–13.
+
 This ordering is priority, not a strict ban on dependencies: Phase 6 may implement the focused
 array, indexing, sort/selection, and random-key slices it needs from later groups. The inventory
 records those decisions, and later phases extend the established contract rather than re-deriving it.
@@ -266,6 +271,160 @@ Milestones, to plan in dependency order:
 **Phase 7 done:** supported non-text modalities are stated explicitly in the compatibility matrix;
 the `nn` API covers their required common layers without model packages bypassing core facades.
 
+## Product and integration track (P1–P5, alongside Phases 8–13)
+
+**Added 2026-10-29.** A survey of other JVM front-ends on Apple Silicon (mlx-scala on MLX through
+FFM; lightmetal on llama.cpp; jitLLM on TornadoVM; Jlama) showed gaps in jmlx's inference
+*product*, not in its MLX parity: decode speed relative to `mlx_lm`, reuse of prompt prefixes
+between requests, a network protocol that existing clients speak, framework integration, and a
+concise scripting API. This track closes those gaps. Its milestones are numbered P1–P5 so that
+Phases 8–13 and every plan referring to them keep their numbers. The milestones may be
+interleaved with Phases 8–13 in any order consistent with the dependencies listed below. Each
+milestone still needs its own plan under `req/plans/` (`product-p<N>-plan.md`) and is bound by
+the roadmap-wide rules.
+
+Native symbols pulled forward from later phases are permitted under the same conditions as the
+2026-10-04 Phase 7 amendment. Each slice is entered in `req/mlx-api-inventory.md` where it
+lands. The later phase then extends that contract rather than re-deriving it.
+
+New published modules (the server, the framework adapters and the Groovy API) each start their
+own `0.1.0-SNAPSHOT` line. They join `verifyReleaseScriptsMatch`, the release order and the
+release smoke. None of them is published before `jmlx-models` itself.
+
+### P1 — Decode performance parity with `mlx_lm`
+
+**Pulled forward:** `mlx_async_eval` (from Phase 12 milestone 1) and the *public* compile entry
+points in `mlx/c/compile.h` (`mlx_compile`, `mlx_enable_compile`, `mlx_disable_compile` and
+`mlx_set_compile_mode`, from Phase 12 milestone 2). The `mlx_detail_compile*` symbols remain
+under Phase 10 milestone 3's internal/unstable decision and are not pulled forward.
+
+1. **Baseline first.** Benchmark jmlx against `mlx_lm` on byte-identical weights (one dense
+   family, one MoE family and one 4-bit checkpoint). Measure prefill tokens/s, decode tokens/s,
+   time to first token and peak memory, using the existing benchmark harness and the
+   reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
+   including the native call count and FFM cost per decode step. No optimization starts before
+   this baseline is recorded.
+2. **Pipelined decode.** Build and `async_eval` step *n+1* while step *n* runs on the GPU. The
+   plan must first probe:
+   - stream and thread binding of in-flight arrays;
+   - `MLXScope` ownership of arrays that are still being evaluated;
+   - cancellation and scheduler cohort changes while a step is in flight;
+   - how asynchronous native failures surface as `MLXException`.
+3. **Compiled hot functions.** Compile the elementwise functions `mlx_lm` compiles (for example
+   SiLU/SwiGLU gating) through `mlx_compile`, reusing `MLXGrad`'s closure, upcall and arena
+   lifecycle. Callback-exception translation, compile-cache lifetime per thread, and shapeless
+   versus shaped compilation are probed before any consumer lands.
+
+**Exit gate:** the published benchmark reports jmlx/`mlx_lm` ratios for the families measured in
+step 1. Every existing golden, precision task and cache-equivalence suite passes unchanged in both
+TF32 modes, with tolerances unmodified. Each optimization is opt-out-able, and its effect is
+recorded separately in the benchmark.
+
+### P2 — Prompt prefix cache
+
+Reuse already-computed KV state for a shared token prefix across requests: a multi-turn chat, a
+fixed system prompt, or tool definitions. Build on `KVCache.fork`. The plan defines:
+
+- **Keying:** token IDs plus model identity, dtype/TF32 mode and RoPE configuration. For
+  multimodal requests, the key also includes image content digests and their expansion and
+  position plan, including the Qwen3-VL multi-axis RoPE delta.
+- **Marks:** which prefix boundaries are retained, for example message starts from the chat
+  template.
+- **Budget:** a bounded memory budget with LRU eviction, and ownership by the model's worker
+  thread and a long-lived scope. Thread confinement makes the cache per model thread, not
+  process-wide.
+- **Cache policies:** interaction with SLIDING and capacity-bounded policies, which cannot be
+  truncated and are reused whole or not at all.
+- **Scheduler integration:** integration with `BatchGenerationScheduler` cohorts.
+- **Persistence (optional, second step):** safetensors through `MLXIO`, with a versioned header
+  that rejects a cache from a different model, pin or configuration.
+
+**Exit gate:** logits with a cache hit match a full recompute within the existing
+cache-equivalence tolerances, for text and image prefixes. Memory stays within the configured
+budget under a soak test. A multi-turn chat benchmark records the time-to-first-token reduction.
+
+### P3 — OpenAI- and Anthropic-compatible HTTP server
+
+A published `jmlx-server` module, a deliberate amendment of Phase 6.5's "not an HTTP server"
+scope. It serves models through `BatchGenerationScheduler`:
+
+- **OpenAI:** `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` (backed by
+  `TextEncoderModels`) and `/v1/models`.
+- **Anthropic:** `/v1/messages`.
+
+Both protocols support:
+
+- SSE streaming in each protocol's own event format;
+- cancellation on client disconnect;
+- each protocol's own error schema;
+- stop sequences and seeds;
+- image content parts for the vision-language families.
+
+Tool definitions already reach chat templates through `ChatTemplateOptions.extraContext`. This
+milestone adds per-family tool-call *output* parsing into each protocol's structured tool-call
+form. The plan decides:
+
+- the HTTP stack (JDK `HttpServer` with zero dependencies versus a framework);
+- whether to support OpenAI's Responses API.
+
+**Security defaults:** bind to localhost; optional bearer/API-key authentication; request-size,
+`max_tokens` and concurrency limits; and no fetching of remote image URLs unless explicitly
+enabled.
+
+**Exit gate:** the official OpenAI and Anthropic SDK clients run a conformance suite against the
+server (plain, streaming, tool call, image, cancellation, error cases). Server overhead over
+in-process generation is benchmarked. P2's cache, when present, is used for multi-turn requests.
+
+### P4 — Spring Boot and Quarkus integration
+
+Published adapters that make a jmlx model an injectable, lifecycle-managed component:
+
+- **Spring Boot starter:** auto-configuration and typed configuration properties for the model
+  path, cache policy and scheduler limits; start and stop tied to the application context;
+  Actuator health and Micrometer metrics (tokens/s, queue depth, native memory).
+- **Spring AI:** `ChatModel`, `StreamingChatModel` and `EmbeddingModel` implementations.
+- **LangChain4j:** `ChatModel`, `StreamingChatModel` and `EmbeddingModel` implementations, which
+  also give Quarkus users the quarkus-langchain4j path.
+- **Quarkus extension:** configuration, CDI producers and dev-mode behavior. The extension runs in
+  JVM mode only; native-image support is out of scope until GraalVM's FFM support for this native
+  stack is probed.
+
+Callers may run on virtual threads. The scheduler's platform-thread worker keeps sole ownership
+of MLX, so the threading rule holds without framework cooperation. Current Spring Boot, Spring AI,
+LangChain4j and Quarkus releases support Java 25; the plan states the supported version matrix.
+The shared request/response mapping should
+be factored with P3's protocol layer rather than duplicated.
+
+**Exit gate:** a sample Spring Boot application and a sample Quarkus application, each built
+against the published-shape smoke repository, load a model, stream a chat completion and shut
+down with native memory released. Health and metrics endpoints report correctly.
+
+### P5 — Groovy API equivalent to MLX's Python API
+
+MLX's high-level Python API (`mlx.core`, `mlx.nn`, `mlx.optimizers`) is part of MLX itself and is
+built on its C++ core; mlx-c is a separate C binding. A published `jmlx-groovy` module gives
+Groovy users the same concise surface on top of jmlx's *public Java API only*. It adds no native
+calls and no `jmlx-ffi` dependency, so the core facades, scope and confinement rules apply
+unchanged.
+
+**Surface:**
+
+- a Python-named static facade (`mx.matmul`, `mx.zeros`, …);
+- operator overloading (`plus`, `minus`, `multiply`, `div`, `power`, `negative`, comparisons);
+- `getAt`/`putAt` indexing with ranges and negative indices;
+- closure-based `grad`/`valueAndGrad` and scope blocks;
+- extension methods on `MLXArray`;
+- `@CompileStatic` compatibility.
+
+**Staging:** coverage is staged with the Java surface. The first slice covers today's array,
+`nn` inference and grad API. Indexing, linalg/FFT and optimizers extend it as Phases 8–11 deliver
+their Java equivalents. A Python name with no Java equivalent yet is listed as pending, never
+emulated. Current Groovy releases support Java 25; the plan states the supported Groovy version.
+
+**Exit gate:** a generated table maps each covered Python name to its Groovy form. Representative
+examples from the MLX Python documentation, ported to Groovy, match the Python MLX oracle's
+output.
+
 ## Phase 8 — Fundamental array, dtype, and indexing parity
 
 **Objective:** make jmlx useful as a general lazy array library. The inventory already starts in
@@ -324,7 +483,9 @@ Milestones:
    arrays returned from callbacks and behavior if Java callbacks throw.
 3. Before planning vmap or compiled-function APIs, decide whether generated `mlx_detail_vmap_*` and
    `mlx_detail_compile_*` symbols are internal/unstable upstream API or supported public surface,
-   and record that decision in the inventory. Only if accepted, add vmap/custom VJP/custom JVP/custom
+   and record that decision in the inventory. This decision does not cover the public
+   `mlx_compile`, `mlx_enable_compile`, `mlx_disable_compile` and `mlx_set_compile_mode` in
+   `mlx/c/compile.h`; product milestone P1 may already have wrapped those. Only if accepted, add vmap/custom VJP/custom JVP/custom
    function wrappers after callback-upcall lifetime, exception translation, and thread/arena behavior
    are proven by native probes.
 4. Add graph inspection/export APIs that MLX exposes and a reusable differential gradient suite.

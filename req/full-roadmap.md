@@ -323,7 +323,8 @@ Milestones, to plan in dependency order:
      - 7.3b's float path (`Qwen3VlVisionTower.visionWeights`) maps only the HF `model.visual.`
        and `model.language_model.` keys. A float mlx-vlm artifact (for example `-bf16`) would
        therefore be rejected for missing keys; this is inferred from the code, not run.
-     - 7.3b's affine path assumes a channels-last patch embedding without checking it.
+     - 7.3b's affine path expects a channels-last patch embedding and rejects any other layout
+       (`validateVisionShapes`); it does not detect or convert the axis order.
 
      The `qwen3_5` loader must choose the prefix mapping from the keys and the patch-embedding
      axis order from the tensor shape, independently of quantization.

@@ -734,8 +734,8 @@ joint eval depending on the fixture used.)
 
   **Reconcile the "thread-safe" wording rather than silently marking it done.**
   `req/project-outline.md:68` says "**Thread-safe** `eval(MLXArray... arrays)` dispatchers".
-  Decision 4 plus §1 deliver something different: a *thread-confined* `eval` that throws on foreign-thread
-  access. That is a defensible reinterpretation — `MLXScope` is confined by construction
+  Decision 4 plus §1 deliver something different: a *thread-confined* `eval` that throws on
+  foreign-thread access. That is a defensible reinterpretation — `MLXScope` is confined by construction
   (`initial-plan.md` §6), so a genuinely thread-safe `eval` would contradict the memory model the
   project already committed to — but it is a substitution, not the literal deliverable. Amend that
   outline line to say "thread-confined, enforced" so a later reader does not score it as unmet.

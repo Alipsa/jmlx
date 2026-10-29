@@ -10,7 +10,12 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /** Immutable rotary-position specification with Hugging Face compatible scaling variants. */
 public sealed interface RopeSpec
-    permits RopeSpec.Base, RopeSpec.Linear, RopeSpec.DynamicNtk, RopeSpec.Llama3, RopeSpec.Yarn {
+    permits RopeSpec.Base,
+        RopeSpec.Linear,
+        RopeSpec.DynamicNtk,
+        RopeSpec.Llama3,
+        RopeSpec.Yarn,
+        RopeSpec.Su {
 
   /** Returns the base period used by this variant. */
   float theta();
@@ -60,6 +65,24 @@ public sealed interface RopeSpec
         double invFrequency =
             (1 - extrapolation) / (yarn.factor() * periods[i]) + extrapolation / periods[i];
         periods[i] = 1 / invFrequency;
+      }
+    } else if (this instanceof Su su) {
+      if (su.shortFactors().length != periods.length) {
+        throw new IllegalArgumentException(
+            "Su factor tables have "
+                + su.shortFactors().length
+                + " entries but rotaryDims "
+                + rotaryDims
+                + " requires "
+                + periods.length);
+      }
+      // The reference divides inv_freq by the per-dimension factor, which is a per-dimension
+      // multiplication of the period by that factor; the long table applies only beyond the
+      // original context length (strict >, so seq_len == originalMax still uses the short table).
+      float[] factors =
+          sequenceLength > su.originalMaxPositions() ? su.longFactors() : su.shortFactors();
+      for (int i = 0; i < periods.length; i++) {
+        periods[i] *= factors[i];
       }
     }
     return periods;
@@ -184,8 +207,9 @@ public sealed interface RopeSpec
     if (scalar) {
       return apply(x, rotaryDims, nextPositions[0], frequencies);
     }
-    if (this instanceof DynamicNtk) {
-      throw new IllegalArgumentException("DynamicNtk does not support unequal batch positions");
+    if (this instanceof DynamicNtk || this instanceof Su) {
+      throw new IllegalArgumentException(
+          "length-dependent RoPE does not support unequal batch positions");
     }
     MLXArray[] rows = new MLXArray[shape[0]];
     for (int row = 0; row < shape[0]; row++) {
@@ -238,6 +262,15 @@ public sealed interface RopeSpec
     if (!Float.isFinite(value) || value <= 0) {
       throw new IllegalArgumentException(key + " must be positive and finite");
     }
+  }
+
+  private static float[] positiveFactors(float[] factors, String key) {
+    Objects.requireNonNull(factors, key);
+    float[] copy = factors.clone();
+    for (float factor : copy) {
+      positive(factor, key);
+    }
+    return copy;
   }
 
   /** Standard RoPE with a fixed frequency base. */
@@ -313,6 +346,50 @@ public sealed interface RopeSpec
       if (attentionFactor != null) {
         positive(attentionFactor, "attention_factor");
       }
+    }
+  }
+
+  /**
+   * NTK-Su scaled RoPE (Phi-3.5-Vision): the per-dimension short/long factor tables and the static
+   * attention scaling of the reference {@code Phi3SuScaledRotaryEmbedding}. The long table applies
+   * only when the per-call sequence length is strictly greater than {@code originalMaxPositions};
+   * both cos and sin are multiplied by {@link #attentionScaling()}.
+   */
+  record Su(
+      float theta,
+      int maxPositions,
+      int originalMaxPositions,
+      float[] shortFactors,
+      float[] longFactors)
+      implements RopeSpec {
+    /** Validates the NTK-Su parameters and copies both factor tables. */
+    public Su {
+      positive(theta, "rope_theta");
+      if (maxPositions <= 0) {
+        throw new IllegalArgumentException("max_position_embeddings must be positive");
+      }
+      if (originalMaxPositions <= 0) {
+        throw new IllegalArgumentException("original_max_position_embeddings must be positive");
+      }
+      shortFactors = positiveFactors(shortFactors, "short_factor");
+      longFactors = positiveFactors(longFactors, "long_factor");
+      if (shortFactors.length != longFactors.length) {
+        throw new IllegalArgumentException("short_factor and long_factor must have equal length");
+      }
+    }
+
+    /** The factor table is re-selected per call by the sequence length. */
+    @Override
+    public boolean isStatic() {
+      return false;
+    }
+
+    /** The static multiplier on both cos and sin: 1 unless the context is extended. */
+    @Override
+    public float attentionScaling() {
+      double ratio = (double) maxPositions / originalMaxPositions;
+      return (float)
+          (ratio <= 1.0 ? 1.0 : Math.sqrt(1 + Math.log(ratio) / Math.log(originalMaxPositions)));
     }
   }
 }

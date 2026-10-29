@@ -108,7 +108,8 @@
     "checkpoints/qwen3vl-wp8/images/b.png": "7d39939c91fbc54bb76e749b42470e74cc95061e4f6e33762ce1fb713a40a5d4",
     "qwen3vl-tier-b-logits.bin": "2b44f9f2984c8d9f6b0db67937d1777dd4641343936bbd70711a36559ae76afb",
     "phi3v-wp1-probe.json": "06734b2207b8b418807ef178459366206ccda3307b150cc5f686f7467c753f73",
-    "phi3v-wp3-prompt.json": "7318db453c76a42066bb1f156584c647c4f508ade898fc575b4a63760dccb50d"
+    "phi3v-wp3-prompt.json": "7318db453c76a42066bb1f156584c647c4f508ade898fc575b4a63760dccb50d",
+    "phi3v-rope.json": "1aa800a7e4bf0a43437866454ddec988a070482dd9235df5fb1ab287be3fae75"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -214,5 +215,6 @@
   "phi3v_wp3_token_fixture": {
     "jmlx-models/src/test/resources/phi3v-tokens/tokenizer.json": "493f8ad437be806d5ccdc57e91479bdbb0c656448c1b89ff70f7653530d78518",
     "jmlx-models/src/test/resources/phi3v-tokens/tokenizer_config.json": "581d4654c018fbcef2504b57a805dcad37126038137b5d25d22b5a02abc1ef29"
-  }
+  },
+  "phi3v_wp4_generator_sha256": "b4f5c60729d13f797b0548deeb71ba6f4e1647c50f3ac30e14922cf6f22b3119"
 }

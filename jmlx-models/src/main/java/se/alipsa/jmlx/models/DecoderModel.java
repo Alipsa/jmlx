@@ -345,11 +345,13 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       }
       cache.policy().requireCapacity(layerWidth, "decoder padded cache width");
     }
-    if (descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk) {
+    if (descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk
+        || descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.Su) {
       int ending = positions[0] + validLengths[0];
       for (int row = 1; row < batch; row++) {
         if (positions[row] != positions[0] || positions[row] + validLengths[row] != ending) {
-          throw new IllegalArgumentException("DynamicNtk does not support unequal batch positions");
+          throw new IllegalArgumentException(
+              "length-dependent RoPE does not support unequal batch positions");
         }
       }
     }

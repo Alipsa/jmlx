@@ -3,6 +3,7 @@ package se.alipsa.jmlx.nn;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -47,5 +48,61 @@ class RopeSpecTest {
         1e-6f);
     assertEquals(
         1.5f, new RopeSpec.Yarn(10_000, 4, 4096, 32, 1, 0, 0, 1.5f, true).attentionScaling());
+  }
+
+  @Test
+  void suMultipliesTheBasePeriodsByTheShortTable() {
+    // Base periods for theta 10_000 over 8 dims are 10_000^(i/4): 1, 10, 100, 1000.
+    RopeSpec su =
+        new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3, 4, 5}, new float[] {1, 2, 4, 8});
+    assertArrayEquals(new double[] {2, 30, 400, 5000}, su.frequencies(8, 1), 1e-6);
+    assertEquals(1f, su.scale(), 0f);
+  }
+
+  @Test
+  void suSelectsTheLongTableOnlyStrictlyBeyondTheOriginalMax() {
+    RopeSpec su =
+        new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3, 4, 5}, new float[] {1, 2, 4, 8});
+    assertArrayEquals(new double[] {2, 30, 400, 5000}, su.frequencies(8, 4096), 1e-6);
+    assertArrayEquals(new double[] {1, 20, 400, 8000}, su.frequencies(8, 4097), 1e-6);
+    assertFalse(su.isStatic());
+  }
+
+  @Test
+  void suComputesTheStaticAttentionScaling() {
+    RopeSpec su =
+        new RopeSpec.Su(10_000, 8192, 1024, new float[] {2, 3, 4, 5}, new float[] {1, 2, 4, 8});
+    // 8192 / 1024 = 8 and ln(8) / ln(1024) = ln(2^3) / ln(2^10) = 3 / 10.
+    assertEquals((float) Math.sqrt(1 + 3 / 10.0), su.attentionScaling(), 1e-6f);
+  }
+
+  @Test
+  void suScalingIsOneWhenTheContextIsNotExtended() {
+    RopeSpec su =
+        new RopeSpec.Su(10_000, 4096, 4096, new float[] {2, 3, 4, 5}, new float[] {1, 2, 4, 8});
+    assertEquals(1f, su.attentionScaling(), 0f);
+  }
+
+  @Test
+  void suRejectsInvalidArguments() {
+    float[] factors = {2, 3, 4, 5};
+    assertThrows(
+        IllegalArgumentException.class, () -> new RopeSpec.Su(-1, 8192, 4096, factors, factors));
+    assertThrows(
+        IllegalArgumentException.class, () -> new RopeSpec.Su(10_000, 0, 4096, factors, factors));
+    assertThrows(
+        IllegalArgumentException.class, () -> new RopeSpec.Su(10_000, 8192, 0, factors, factors));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, -3, 4, 5}, factors));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new RopeSpec.Su(10_000, 8192, 4096, factors, new float[] {2, 3}));
+  }
+
+  @Test
+  void suRejectsAFactorTableThatDoesNotFitTheRotaryDims() {
+    RopeSpec su = new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3}, new float[] {1, 2});
+    assertThrows(IllegalArgumentException.class, () -> su.frequencies(8, 1));
   }
 }

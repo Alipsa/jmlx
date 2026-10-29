@@ -649,6 +649,9 @@ tasks.register('verifyHfReferenceGoldens') {
     // tokenizer files, digest-pinned in provenance.json as phi3v_wp3_token_fixture).
     inputs.file('tools/hf-reference/phi3v_wp3_prompt.py')
     inputs.files(fileTree('jmlx-models/src/test/resources/phi3v-tokens'))
+    // Phase 7.3c WP4's NTK-Su RoPE golden generator (deterministic, re-verifies the pinned
+    // artifact config and bundled module hashes before use).
+    inputs.file('tools/hf-reference/phi3v_rope.py')
     // Phase 7.3b WP2's and Phase 7.3c WP2's shared processed-patch fixtures are
     // image-oracle-owned but consumed on the HF side, so the root task pins their digests too.
     inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
@@ -691,6 +694,11 @@ tasks.register('verifyHfReferenceGoldens') {
         if (phi3vWp3GeneratorHash == null ||
                 sha256File(file('tools/hf-reference/phi3v_wp3_prompt.py')) != phi3vWp3GeneratorHash) {
             throw new GradleException('Phi-3.5-Vision WP3 prompt generator SHA-256 differs or is missing')
+        }
+        def phi3vWp4GeneratorHash = metadata.phi3v_wp4_generator_sha256
+        if (phi3vWp4GeneratorHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_rope.py')) != phi3vWp4GeneratorHash) {
+            throw new GradleException('Phi-3.5-Vision WP4 RoPE generator SHA-256 differs or is missing')
         }
         def visionFiles = metadata.vision_tier_b_files
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {

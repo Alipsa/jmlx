@@ -28,7 +28,7 @@ than any single design tension does — see Decisions below.
 
 ## Decisions taken
 
-**D1 — Checkpoint I/O is a thin FFM facade, not a parser (supersedes `project-outline.md`'s
+**D1 — Checkpoint I/O is a thin FFM facade, not a parser (supersedes `req/project-outline.md`'s
 wording).** `req/project-outline.md`'s Phase 5 section describes "a pure Java `.safetensors` parser
 converting raw memory segments directly into `MLXArray` tensors." That undersells what's already
 available: mlx-c's committed, generated bindings
@@ -479,7 +479,7 @@ in M1's own first task, not built ahead of time here.
   its own plan exists).
 - `LlamaModel`/`QwenModel` and any other reference model (M3, deferred — see D4).
 - Streaming/incremental text generation UX (console printing, sampling strategies beyond greedy
-  argmax) — not named in `project-outline.md`'s Phase 5 deliverables and not needed to prove
+  argmax) — not named in `req/project-outline.md`'s Phase 5 deliverables and not needed to prove
   checkpoint loading works.
 - Writing (`save`) support beyond exactly what M1's own round-trip tests need as a
   fixture-generation path. This is not conditional on whether the testing plan happens to exercise

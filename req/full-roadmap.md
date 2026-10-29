@@ -6,7 +6,7 @@ This is the long-range planning index for jmlx after Phases 1–5. It extends an
 forward-looking "Project Execution Plan" in `req/project-outline.md`, whose planned phases stop at
 Phase 5. It is deliberately a roadmap, not an implementation plan: each milestone below must get
 its own plan in `req/plans/` before code is started. Those plans should preserve the decisions and
-verification style established by `initial-plan.md` and Phases 3–5.
+verification style established by `req/plans/initial-plan.md` and Phases 3–5.
 
 **Priority order:** finish usable local inference first (Phase 6), then complete the
 array/runtime surface, transformations and training, and finally the specialist/system
@@ -287,18 +287,38 @@ Milestones, to plan in dependency order:
      version, including the inverse-frequency denominator (64 here, `2 * sum(mrope_section)`).
      7.3b's load guard `2 * sum(mrope_section) == head_dim` is specific to Qwen3-VL. The
      `qwen3_5` path checks `2 * sum(mrope_section) == head_dim * partial_rotary_factor` instead.
-   - **Both checkpoint layouts.** Hugging Face checkpoints and `mlx_lm`-converted ones (all
-     mlx-community artifacts) differ in four ways. `mlx_lm`'s `qwen3_5` sanitize step, verified
-     in its main-branch source on 2026-10-29, does the following:
-     - It changes the key prefixes (`model.language_model.` versus `language_model.model.`).
-     - It moves the `conv1d` axes (`[C, 1, K]` versus `[C, K, 1]`).
-     - It drops the MTP tensors.
-     - It adds `+1.0` to the zero-centered RMSNorm weights (`input_layernorm`,
-       `post_attention_layernorm`, the final norm, `q_norm` and `k_norm`; not `linear_attn.norm`),
-       which the HF model applies as `x * (1 + w)`.
+   - **Hugging Face and MLX-converted checkpoint layouts.** mlx-community artifacts come from
+     two converters, and the model card names which one was used. The image+text artifacts,
+     including `mlx-community/Qwen3.8-27B-4bit` (mlx-vlm 0.6.8), come from mlx-vlm. Text-only
+     ones come from `mlx_lm`. Both converters' `qwen3_5` sanitize steps (main-branch sources,
+     verified 2026-10-29) make the same four text-side changes:
+     - The key prefixes change (`model.language_model.` versus `language_model.model.`).
+     - The `conv1d` axes move (`[C, 1, K]` versus `[C, K, 1]`).
+     - The MTP tensors are dropped.
+     - `+1.0` is added to the zero-centered RMSNorm weights (`input_layernorm`,
+       `post_attention_layernorm`, the final norm, `q_norm` and `k_norm`; not
+       `linear_attn.norm`), which the HF model applies as `x * (1 + w)`.
 
-     The descriptor must detect the layout (the `conv1d` axis order is `mlx_lm`'s own marker)
-     and load both, with the norm offset applied exactly once.
+     The two converters differ on the vision side:
+     - `mlx_lm` discards every `vision_tower.*` and `model.visual.*` key, so its output is
+       text-only.
+     - mlx-vlm keeps the vision tower. It renames `model.visual.` to `vision_tower.` and
+       transposes the patch embedding from `[O, C, T, H, W]` to `[O, T, H, W, C]` (the 27B has
+       `vision_tower.patch_embed.proj.weight` `[1152, 2, 16, 16, 3]`).
+
+     The descriptor must detect the layout and load all three:
+     - HF;
+     - mlx-vlm;
+     - `mlx_lm`, which has no vision weights, so it loads as a text-only model whose metadata
+       reports TEXT and rejects image requests.
+
+     The norm offset must be applied exactly once. Detection must not rely on `conv1d` alone,
+     because mlx-vlm treats either MTP tensors or an unsanitized `conv1d` as the
+     still-unconverted marker. The vision side reuses 7.3b, which accepts the `vision_tower.`
+     prefix. But 7.3b does not detect the patch-embedding axis order: it assumes channels-last
+     whenever the artifact is affine-quantized (`Qwen3VlModel.affineVisionWeights`). The plan
+     must check the axis order from the tensor shape instead, so that a float mlx-vlm artifact
+     (for example `-bf16`) is not transposed a second time.
    - **A recurrent-state cache beside the KV cache.** It holds the convolution state and the
      delta-rule state. It cannot be truncated or slid, so its interaction with `KVCachePolicy`,
      `BatchGenerationScheduler` cohorts and P2's prefix cache (whole-prefix reuse only) must be
@@ -320,8 +340,11 @@ Milestones, to plan in dependency order:
      records its effect in the pinned reference before relying on it.
    - **Tier-B:** `Qwen/Qwen3.5-0.8B` (Apache-2.0, same `model_type`), in the HF layout.
    - **Manual run:** a recorded `mlx-community/Qwen3.8-27B-4bit` run (Apache-2.0), in the
-     `mlx_lm` layout, with greedy IDs matching `mlx_lm` or `mlx-vlm`. Its quantization (affine
-     4-bit, group size 64) is a format jmlx already loads. Its tensor layout is not (see above).
+     mlx-vlm layout, with text and image+text greedy IDs matching mlx-vlm. Its quantization
+     (affine 4-bit, group size 64) is a format jmlx already loads. Its tensor layout is not (see
+     above).
+   - **`mlx_lm` layout:** covered by a converted Tier-A fixture, so the text-only load path is
+     tested without another large artifact.
 
    **Not included (follow-ups):**
    - the shared-expert MoE variants (Qwen3.5/3.6-35B-A3B);
@@ -707,9 +730,10 @@ or documented as unavailable on the target runtime, never merely absent from the
    preserve minimized regressions as fixtures.
 3. Audit public API stability, resource ownership, exception taxonomy, documentation, examples,
    packaging, and native artifact compatibility.
-4. Establish the MLX-upgrade procedure: upgrade one pin at a time (one upgrade per PR), regenerate
-   bindings, diff the inventory, add compatibility tests, and publish a migration note before
-   claiming parity for that release. An upgrade may skip intermediate upstream releases. If it
+4. Establish the MLX-upgrade procedure: one paired pin upgrade (`mlx-metal` and its mlx-c
+   commit, which always move together per Decision 9) per PR. Regenerate bindings, diff the
+   inventory, add compatibility tests, and publish a migration note before claiming parity for
+   that release. An upgrade may skip intermediate upstream releases. If it
    does, the inventory diff is taken against the previous pin and the migration note covers every
    skipped release (see § Release plan, MLX upgrade policy).
 

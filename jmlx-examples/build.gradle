@@ -13,7 +13,7 @@ dependencies {
 application {
     mainClass = 'se.alipsa.jmlx.examples.HelloMLX'
     // applicationDefaultJvmArgs feeds both the `run` task and the generated
-    // installDist/distZip start scripts (req/initial-plan.md §4) -- the
+    // installDist/distZip start scripts (req/plans/initial-plan.md §4) -- the
     // Enable-Native-Access: ALL-UNNAMED manifest attribute is not an
     // alternative, since it only applies to a jar launched via `java -jar`.
     // Deliberately just this flag, not jmlx.library.path: see the `run` task

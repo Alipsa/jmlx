@@ -1,13 +1,13 @@
 # jmlx Phase 4 — M3 implementation plan (RoPE, MultiHeadAttention, KV cache)
 
-**Spec:** `req/phase4-plan.md` §7 (the op list this merge point adds), §2 (`scopeOf`/`innermost`, the
+**Spec:** `req/plans/phase4-plan.md` §7 (the op list this merge point adds), §2 (`scopeOf`/`innermost`, the
 `vectorOutOp` two-allocator shape, `hoist`'s "freeing a handle only decrements a refcount" safety
 proof), §3 (the six generic op-body helpers — this plan builds the three M3 actually needs), §5
 (`Module`/layer conventions, the "forward() must never allocate into `scope()`" rule), Decision 8 (test
 goldens; composition-identity fallback), Testing approach (the exact fixture size for layer tests: "1
 batch, 2 heads, dim 4, 3 tokens"). M4 (`QuantizedLinear`) and §9 (Documentation) are out of scope — §9
 covers the whole phase and stays `NOT STARTED` until M4 also lands (M1/M2 didn't touch it either; see
-`req/phase4-plan.md`'s Status table).
+`req/plans/phase4-plan.md`'s Status table).
 
 Branch: `worktree-phase4-m3`, off `main` at `8bb08ad` (PR #8 merged, M2 done). Native bootstrap staged
 in this worktree (`native/install/lib/mlx.metallib` exists) — `@EnabledIfNativeAvailable` tests run for
@@ -15,7 +15,7 @@ real, against real Apple Silicon GPU hardware.
 
 ## Findings from this plan's pre-work (Verification item 0e, resolved; three more facts settled beyond it)
 
-Per `req/phase4-plan.md`'s Verification item 0, RoPE and SDPA's exact behavior is not fully specified
+Per `req/plans/phase4-plan.md`'s Verification item 0, RoPE and SDPA's exact behavior is not fully specified
 by the header alone and was probed with scratch classes compiled and run against the real bindings
 (same precedent as Probes 0b/0f), then deleted. Findings, all confirmed against real hardware output:
 
@@ -138,7 +138,7 @@ Add next to `axis2Op`:
 ```java
 /**
  * Wraps the {@code (res, a, int, stream)} native shape shared by {@code mlx_expand_dims}, {@code
- * mlx_tril} and {@code mlx_triu} (req/phase4-plan.md §7's Native surface table). Unlike {@code
+ * mlx_tril} and {@code mlx_triu} (req/plans/phase4-plan.md §7's Native surface table). Unlike {@code
  * axis2Op}, this is a single caller-supplied int -- an axis for {@code expandDims}, a diagonal
  * offset {@code k} for {@code tril}/{@code triu} -- not necessarily an axis in every case, so the
  * parameter is named generically in the functional interface below.
@@ -166,7 +166,7 @@ not call `MLX.newVectorArray`):
  * Wraps an op taking an {@code mlx_vector_array} <em>input</em> by value (e.g. {@code
  * mlx_concatenate_axis}) plus a caller-supplied {@code axis}. Resolves the result's scope via {@link
  * #scopeOf} over every element of {@code xs} -- the ancestor rule generalized to N operands
- * (req/phase4-plan.md §3). Builds the {@code mlx_vector_array} itself via {@link #copyHandlesInto}
+ * (req/plans/phase4-plan.md §3). Builds the {@code mlx_vector_array} itself via {@link #copyHandlesInto}
  * rather than delegating to {@code MLX.newVectorArray}: this class depends on nothing else in this
  * package (see the class javadoc), and calling into {@code MLX} here would be the one exception.
  */
@@ -219,7 +219,7 @@ hazard: `tmp` for the intermediate vector, `target` for each unpacked element):
 /**
  * Wraps an op producing an {@code mlx_vector_array} <em>output</em> (e.g. {@code mlx_split}).
  * {@code target} is an explicit parameter, not inferred from an operand, purely for legibility
- * (req/phase4-plan.md §3: "its inputs may be none" was a false justification in an earlier draft of
+ * (req/plans/phase4-plan.md §3: "its inputs may be none" was a false justification in an earlier draft of
  * that document -- {@code mlx_split}'s {@code a} operand does exist -- the real reason is that this
  * helper's whole hazard is two allocators with opposite correct answers on adjacent lines, and
  * naming the target in the signature keeps that contrast visible at the call site).
@@ -260,7 +260,7 @@ Add next to `nullableHandle`:
 
 ```java
 /**
- * The native encoding of an {@code mlx_optional_float} by-value struct (req/phase4-plan.md §7's
+ * The native encoding of an {@code mlx_optional_float} by-value struct (req/plans/phase4-plan.md §7's
  * Native surface table: 8 bytes, {@code {float value; bool has_value;}}, no native constructor
  * function -- allocate and set both fields, the same shape spec §6 describes for the sibling {@code
  * mlx_optional_int}). {@code value == null} encodes "absent" ({@code has_value=false}); the {@code
@@ -278,7 +278,7 @@ static MemorySegment optFloat(Arena tmp, Float value) {
 /**
  * Allocates a NUL-terminated C string once, in {@link #FACADE_ARENA} -- for the closed-set {@code
  * const char*} parameters this facade's mlx-c surface uses (SDPA's {@code mask_mode}), which never
- * need per-call allocation (req/phase4-plan.md §7's Native surface table). Callers store the result
+ * need per-call allocation (req/plans/phase4-plan.md §7's Native surface table). Callers store the result
  * in a {@code private static final MemorySegment} field per distinct literal, exactly like {@link
  * #DEFAULT_STREAM} -- this method allocates on every call, so it must only ever be invoked from a
  * static initializer, never per-op.
@@ -805,16 +805,16 @@ that **must be an ancestor of every scope `k`/`v` are allocated in** when passed
 requirement `MLX.hoist` already enforces and reports clearly (`IllegalArgumentException: hoist: target
 must be a's own scope or an ancestor of it`), so this class adds no separate check for it.
 
-**The memory-growth hazard this class exists to avoid, stated explicitly (extends req/phase4-plan.md
+**The memory-growth hazard this class exists to avoid, stated explicitly (extends req/plans/phase4-plan.md
 §2's Research findings to a new case).** Each `append` must replace the accumulated `keys`/`values`
 with a freshly concatenated array — but if the *previous* generation's handle is never freed, active
 memory grows by one full copy of "everything appended so far" **every** step: after `N` appends, the
 still-alive handles alone would sum to `keys_1 + keys_2 + ... + keys_N` element counts, `O(N^2)` in
 total appended length, even though only the final `keys_N` is ever read. This is exactly the shape
-Context ¶2 opens `req/phase4-plan.md` with ("a 1000-token decode loop... retains ~300k arrays"), one
+Context ¶2 opens `req/plans/phase4-plan.md` with ("a 1000-token decode loop... retains ~300k arrays"), one
 level more concrete.
 
-**The fix is safe by the same proof `hoist` already relies on.** `req/phase4-plan.md` §2's Research
+**The fix is safe by the same proof `hoist` already relies on.** `req/plans/phase4-plan.md` §2's Research
 findings establish that an `ArrayDesc` owns its graph inputs *by value*, and each wrapper is a
 `shared_ptr<ArrayDesc>` — so after `concatenate([oldKeys, k], axis)` builds a new array whose graph
 holds its own copy of `oldKeys`'s wrapper (sharing the same `ArrayDesc`, refcount now 2), **closing the
@@ -843,11 +843,11 @@ import se.alipsa.jmlx.memory.MLXScope;
  *
  * <p>{@code append} explicitly closes the superseded {@code keys}/{@code values} handle after
  * hoisting each replacement -- safe because an mlx {@code ArrayDesc} owns its graph inputs by value
- * (req/phase4-plan.md §2, Research findings): the freshly concatenated array's graph holds its own
+ * (req/plans/phase4-plan.md §2, Research findings): the freshly concatenated array's graph holds its own
  * copy of the superseded array's wrapper, sharing the same descriptor, so closing this class's own
  * handle only decrements a refcount it does not solely own. Without this, active memory would grow by
  * one full copy of "everything appended so far" every step -- {@code O(N^2)} in total appended length
- * after {@code N} steps, not {@code O(N)} -- exactly the shape req/phase4-plan.md's Context section
+ * after {@code N} steps, not {@code O(N)} -- exactly the shape req/plans/phase4-plan.md's Context section
  * opens with.
  */
 public final class KVCache {
@@ -1081,7 +1081,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Multi-head self-attention with a fused QKV projection and optional KV caching: {@code x -> qkv ->
  * split -> per-head RoPE -> (optional cache append) -> causal-or-not SDPA -> merge heads -> output
- * projection}. See req/phase4-plan.md §7.
+ * projection}. See req/plans/phase4-plan.md §7.
  *
  * <p>Not a {@link UnaryModule}: {@link #forward} takes a {@link KVCache} and a causal flag in
  * addition to {@code x} -- {@code UnaryModule}'s own javadoc names this class as the reason that
@@ -1411,7 +1411,7 @@ runs checks and fixes anything they surface.
   confined `tmp`, never `target` or `scope`.
 - [ ] `grep -rn 'se\.alipsa\.jmlx\.nn' jmlx-core/src/main/java/se/alipsa/jmlx/{core,memory}` — zero
   matches (spec Verification #6a).
-- [ ] Update the Status table at the top of `req/phase4-plan.md`: mark M3 `Done`, with the commit hash
+- [ ] Update the Status table at the top of `req/plans/phase4-plan.md`: mark M3 `Done`, with the commit hash
   and a short findings note (matching M1/M2's own entries) summarizing this plan's empirically-confirmed
   RoPE/SDPA facts, so a later reader does not have to re-derive them.
 

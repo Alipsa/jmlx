@@ -1,6 +1,6 @@
 # jmlx Phase 4 — M4 implementation plan (`QuantizedLinear`)
 
-**Spec:** `req/phase4-plan.md` §8 (the three quantization entry points and their parameter-shape
+**Spec:** `req/plans/phase4-plan.md` §8 (the three quantization entry points and their parameter-shape
 table), §3 (the two remaining generic op-body helpers this plan builds: `optInt`, `optDtype` --
 `vectorOutOp` already exists, built in M3, and needs no change), §2 (`scopeOf`/`innermost`, and the
 rule that every multi-operand op -- including nullable operands -- resolves its target through it),
@@ -14,7 +14,7 @@ Branch: `worktree-phase4-m4`, off `main` at `59c9afe` (PR #10 merged, M3 done). 
 staged in this worktree (`native/install/lib/mlx.metallib` exists) -- `@EnabledIfNativeAvailable`
 tests run for real, against real Apple Silicon GPU hardware.
 
-**§9 (Documentation) is folded into this plan, not deferred again.** `req/phase4-plan.md`'s own
+**§9 (Documentation) is folded into this plan, not deferred again.** `req/plans/phase4-plan.md`'s own
 Status table note on §9 reads "stays `NOT STARTED` until M4 also lands" -- M1/M2/M3 each deferred it
 for that reason; M4 is the merge point the note is waiting for, so this plan's Task 3 does it rather
 than opening a fifth "not yet" entry. §10 (CI, self-hosted runner) is a separate, already-tracked
@@ -22,7 +22,7 @@ follow-up with no dependency on M4 and stays out of scope here, same as every pr
 
 ## Findings from this plan's pre-work (Verification item 0d, resolved)
 
-Per `req/phase4-plan.md`'s Verification item 0d, `mlx_quantize`'s exact output shapes/dtypes and
+Per `req/plans/phase4-plan.md`'s Verification item 0d, `mlx_quantize`'s exact output shapes/dtypes and
 `mlx_quantized_matmul`'s `transpose` semantics are not fully pinned down by the header alone. Probed
 with a scratch test class (`ScratchQuantizeProbe`, in `se.alipsa.jmlx.core` for package-private access
 to `NativeOps`/`nullableHandle`/`cstr`), compiled and run against this worktree's real bindings, then
@@ -74,7 +74,7 @@ deleted -- same precedent as M2/M3's probes. All findings below are measured out
   Metal-backend message regardless, so **this codebase's evidence does not establish which check runs
   first in general** -- only that on this Metal-only codebase, every mode tried is rejected the same
   way. Since this codebase only ever runs against the Metal backend (macOS/Apple Silicon only, per
-  `req/initial-plan.md`), **no test here can ever exercise a non-null `globalScale` on either method.**
+  `req/plans/initial-plan.md`), **no test here can ever exercise a non-null `globalScale` on either method.**
   Both `MLXQuant.quantize` and `MLXQuant.dequantize` still resolve their target via `scopeOf(..., 
   globalScale)` for API correctness (a future non-Metal backend, or a caller who passes one anyway,
   must still get the right scope before hitting the native error) -- but the cross-scope test proving
@@ -166,7 +166,7 @@ deleted -- same precedent as M2/M3's probes. All findings below are measured out
 * **Four `QuantizationMode` values exist upstream** (`wheel/mlx/include/mlx/primitives.h:155`:
   `Affine, Mxfp4, Mxfp8, Nvfp4`), all reachable through the same `const char* mode` parameter this
   plan's ops expose. Only `"affine"` is exercised by any test in this plan or used by
-  `QuantizedLinear` -- consistent with `req/phase4-plan.md`'s own Research findings ("`mlx_quantize`
+  `QuantizedLinear` -- consistent with `req/plans/phase4-plan.md`'s own Research findings ("`mlx_quantize`
   with `mode="affine"`" is the only mode that document's Decisions ever reference). The other three
   are unvalidated by this codebase; see Deliberately not covered.
 
@@ -291,7 +291,7 @@ Add next to `optFloat` (`NativeOps.java:250-255`), same shape:
 
 ```java
 /**
- * The native encoding of an {@code mlx_optional_int} by-value struct (req/phase4-plan.md §8's
+ * The native encoding of an {@code mlx_optional_int} by-value struct (req/plans/phase4-plan.md §8's
  * Native surface table: 8 bytes, {@code {int value; bool has_value;}}, no native constructor
  * function -- same shape as {@link #optFloat}, for {@code mlx_quantize}/{@code mlx_dequantize}/
  * {@code mlx_quantized_matmul}'s {@code group_size}/{@code bits} parameters). {@code value == null}
@@ -484,7 +484,7 @@ public static MLXArray dequantize(
  * {@code mode}.
  *
  * <p>Needs no explicit-target overload the way {@code Linear.forward}'s {@code transpose(W, x.scope())}
- * does (req/phase4-plan.md §2's fifth sub-hazard): {@code x} is always a genuine second array
+ * does (req/plans/phase4-plan.md §2's fifth sub-hazard): {@code x} is always a genuine second array
  * operand here, never absent, so {@link NativeOps#scopeOf} alone already resolves to the step scope
  * whenever {@code x} is an activation and {@code w}/{@code scales}/{@code biases} are model-scope
  * parameters (Global Constraint 6).
@@ -582,7 +582,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * A quantized fully-connected layer: {@code y = quantizedMatmul(x, weight, scales, biases,
  * transpose=true) + bias}, {@code mode} fixed to {@code "affine"} (the only mode with a documented
- * rationale in this codebase -- req/phase4-plan.md, Research findings). {@code weight} is the
+ * rationale in this codebase -- req/plans/phase4-plan.md, Research findings). {@code weight} is the
  * {@code UINT32}-packed form of a checkpoint-layout {@code [out, in]} weight -- see {@link
  * MLXQuant#quantize} to build one from a float weight, or load one directly from a quantized
  * checkpoint (Phase 5). Unlike {@link Linear}, {@code forward} needs no explicit-target overload for
@@ -1182,7 +1182,7 @@ runs checks and fixes anything they surface.
 - [ ] `scripts/regen-bindings.sh` then `git diff --exit-code jmlx-ffi/src/main/generated/java` -- must
   stay clean. This plan adds zero new mlx-c symbols (`mlx_quantize`/`mlx_dequantize`/
   `mlx_quantized_matmul` and `mlx_optional_dtype_` are all already bound, confirmed while researching
-  this plan) -- the last of `req/phase4-plan.md`'s four merge points to prove Phase 4 needed no
+  this plan) -- the last of `req/plans/phase4-plan.md`'s four merge points to prove Phase 4 needed no
   binding regeneration at all.
 - [ ] `grep -rn 'mlx_array_new(' jmlx-core/src/main` -- every call site's allocator is `scopeOf(...)`'s
   result, an explicit `MLXScope` parameter, or a confined `Arena` freed by a local `finally` (spec
@@ -1194,10 +1194,10 @@ runs checks and fixes anything they surface.
   call was already verified in M3.
 - [ ] `grep -rn 'se\.alipsa\.jmlx\.nn' jmlx-core/src/main/java/se/alipsa/jmlx/{core,memory}` -- zero
   matches (spec Verification #6a).
-- [ ] Update the Status table at the top of `req/phase4-plan.md`: mark M4 `Done` and §9 `Done`, each
+- [ ] Update the Status table at the top of `req/plans/phase4-plan.md`: mark M4 `Done` and §9 `Done`, each
   with a commit hash and a short findings note (matching M1-M3's own entries) summarizing this plan's
   empirically-confirmed quantization facts, so a later reader does not have to re-derive them.
-- [ ] Mark Verification item **0d** `DONE, confirmed` inline in `req/phase4-plan.md`'s own Verification
+- [ ] Mark Verification item **0d** `DONE, confirmed` inline in `req/plans/phase4-plan.md`'s own Verification
   section (`:1120`), the same way **0b** and **0f** already are there -- not just via the Status table
   update above. The Status table alone left 0b/0f's own Verification-section entries as the only place
   a reader would otherwise have to cross-reference to confirm they were actually resolved; 0d gets the
@@ -1219,6 +1219,6 @@ runs checks and fixes anything they surface.
 - **Quantization-aware training** (gradients through `quantizedMatmul`, or a `ModuleGrad` that treats
   quantized weights specially) -- `QuantizedLinear` is an inference-shaped layer; nothing in Phase 4's
   scope trains one.
-- **Safetensors/GGUF loading of real quantized checkpoints** -- Phase 5, per `req/phase4-plan.md`'s
+- **Safetensors/GGUF loading of real quantized checkpoints** -- Phase 5, per `req/plans/phase4-plan.md`'s
   own Out of scope section. `QuantizedLinear`'s components-based constructor (Task 2) is the hook Phase
   5 will load into, exactly as `Linear`'s own constructor already is.

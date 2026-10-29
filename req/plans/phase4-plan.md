@@ -154,7 +154,7 @@ caller besides that one test.
 `MultiHeadAttention` with KV caching. Phase 3 is delivered (`51fd5e5`); `MLX.java` is 607 lines with
 20 public ops.
 
-**`req/phase3-plan.md` addressed Java guards stricter than native. The risk this document addresses
+**`req/plans/phase3-plan.md` addressed Java guards stricter than native. The risk this document addresses
 is that the *memory model* — not the op surface — does not survive a transformer forward pass.** Two
 shipped invariants break on the outline's own `JMLXDemo` sample (`project-outline.md:108-138`):
 

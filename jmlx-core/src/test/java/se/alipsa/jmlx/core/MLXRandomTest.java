@@ -9,10 +9,10 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Numeric correctness". Unlike the other op classes,
- * {@code normal}/ {@code uniform}'s actual values are the RNG's own, not a formula's -- the only
- * meaningful assertions here are shape/ dtype, seeded determinism, and (for uniform) a range
- * property, not hand-computed goldens.
+ * See req/plans/initial-plan.md, Testing approach, "Numeric correctness". Unlike the other op
+ * classes, {@code normal}/ {@code uniform}'s actual values are the RNG's own, not a formula's --
+ * the only meaningful assertions here are shape/ dtype, seeded determinism, and (for uniform) a
+ * range property, not hand-computed goldens.
  *
  * <p>{@link #seedMakesNormalDeterministic} and {@link
  * #uniformEveryElementFallsWithinTheRequestedHalfOpenRange} both call {@link MLXRandom#seed}, which

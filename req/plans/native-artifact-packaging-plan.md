@@ -4,12 +4,12 @@
 
 ## Context
 
-Phase 5 (`req/phase5-plan.md`: checkpoint I/O, tokenizer, reference models) is functionally
+Phase 5 (`req/plans/phase5-plan.md`: checkpoint I/O, tokenizer, reference models) is functionally
 complete, but only `jmlx-jinja` and `jmlx-tokenizer` had a release path to Maven Central. CLAUDE.md
 stated plainly that `jmlx-core`/`jmlx-ffi` "would need native-artifact packaging designed first"
 before they could be published, and `jmlx-models` (also in the native chain) had the same gap.
 `req/project-outline.md`'s own "Packaging & Distribution Strategy" section had named the shape as
-aspirational since the very first plan (`req/initial-plan.md` explicitly listed "the
+aspirational since the very first plan (`req/plans/initial-plan.md` explicitly listed "the
 `jmlx-native-macos-arm64` classifier jar and its extract-from-classpath loader" as out of scope for
 v0.1) but nothing had ever implemented it.
 

@@ -12,10 +12,10 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Static facade over the mlx-c ops used by this slice. Every op here only builds the lazy
  * computation graph; nothing runs on the GPU/CPU until {@link #eval} (or the implicit eval inside
- * {@link MLXArray#toFloatArray()}) triggers it. See req/initial-plan.md §7, req/phase3-plan.md and
- * req/phase4-plan.md §1.
+ * {@link MLXArray#toFloatArray()}) triggers it. See req/plans/initial-plan.md §7,
+ * req/plans/phase3-plan.md and req/plans/phase4-plan.md §1.
  *
- * <p>req/phase4-plan.md M0a split this class: it keeps array creation ({@code array}; {@code
+ * <p>req/plans/phase4-plan.md M0a split this class: it keeps array creation ({@code array}; {@code
  * zeros}/{@code ones}/ {@code full}/{@code arange} added in M0d), {@code eval}, {@code astype}
  * (added in M0c) and the default device/stream accessors; every other op moved to a sibling in this
  * package, split by kind -- {@link MLXOps} (elementwise/comparisons/reductions/{@code
@@ -29,8 +29,8 @@ import se.alipsa.jmlx.memory.MLXScope;
  * evidence base and let one copy go stale.
  *
  * <p>Every op's result is allocated in the innermost scope among every non-null {@code MLXArray}
- * operand it's given, not just its first ({@link NativeOps#scopeOf}, req/phase4-plan.md §2) --
- * superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1. This
+ * operand it's given, not just its first ({@link NativeOps#scopeOf}, req/plans/phase4-plan.md §2)
+ * -- superseding this class's own earlier "same scope as its first operand" rule as of M0b/M1. This
  * rule only applies to ops that compute a result from one or more {@code MLXArray} operands; two
  * other categories take a scope directly instead, and are not exceptions to it so much as outside
  * its premise or purpose:
@@ -46,7 +46,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  *       DOES exist: {@link #hoist}, {@link MLXShape#transpose(MLXArray, MLXScope)}, and {@link
  *       MLXQuant#quantizedMatmul(MLXArray, MLXArray, MLXArray, MLXArray, boolean, Integer, Integer,
  *       String, MLXScope)}, which let a caller push a result toward an ancestor or descendant scope
- *       instead (req/phase4-plan.md §2 mitigation 1 -- see {@code Linear.forward}'s {@code
+ *       instead (req/plans/phase4-plan.md §2 mitigation 1 -- see {@code Linear.forward}'s {@code
  *       transpose(W, x.scope())} for why; {@code QuantizedLinear.forward}'s own {@code
  *       quantizedMatmul(..., x.scope())} call is the same mitigation for a multi-operand op, added
  *       after the innermost-of-all-operands rule was found to leak on an "inverted" scope layout --
@@ -178,12 +178,12 @@ public final class MLX {
 
   /**
    * Creates a {@code shape}-shaped {@code dtype} array filled with {@code value}, in {@code scope}.
-   * Not a pure creation op (req/phase4-plan.md §3): {@code mlx_full}'s fill value is itself an
-   * {@code mlx_array} (upstream {@code ops.h:437-443}), so {@code value} first becomes a throwaway
-   * scalar via mlx-c's own statusless {@code mlx_array_new_bool}/{@code _int}/{@code _float32}
-   * (picked by {@code dtype}) -- the same null-ctx-on-failure hazard {@link #array} already handles
-   * -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only reads it, it does
-   * not adopt it.
+   * Not a pure creation op (req/plans/phase4-plan.md §3): {@code mlx_full}'s fill value is itself
+   * an {@code mlx_array} (upstream {@code ops.h:437-443}), so {@code value} first becomes a
+   * throwaway scalar via mlx-c's own statusless {@code mlx_array_new_bool}/{@code _int}/{@code
+   * _float32} (picked by {@code dtype}) -- the same null-ctx-on-failure hazard {@link #array}
+   * already handles -- and that scalar is freed in a {@code finally}, since {@code mlx_full} only
+   * reads it, it does not adopt it.
    *
    * <p>Rejects a {@code value} unrepresentable in {@code dtype} when {@code dtype == UINT32}: that
    * branch funnels through {@code mlx_array_new_float32} and lets mlx narrow the float32 scalar to
@@ -261,7 +261,7 @@ public final class MLX {
    * owns its graph inputs <em>by value</em>, and each {@code array} is a {@code
    * shared_ptr<ArrayDesc>}, so the returned array holds a refcount on every input's descriptor.
    * Freeing {@code a}'s own handle only decrements a refcount; it cannot touch the graph the lifted
-   * output still references (req/phase4-plan.md §2, Research findings).
+   * output still references (req/plans/phase4-plan.md §2, Research findings).
    *
    * <p>{@code target == a.scope()} is legal and returns {@code a} itself -- {@code isAncestorOf} is
    * reflexive. Deliberately identity, not a copy, in that case: source and target are the same
@@ -285,7 +285,7 @@ public final class MLX {
 
   /**
    * Casts {@code a} to {@code dtype} (mlx-c's {@code mlx_astype}), allocating the result into
-   * {@code a}'s own scope. See req/phase4-plan.md §4: this is what lets {@link
+   * {@code a}'s own scope. See req/plans/phase4-plan.md §4: this is what lets {@link
    * MLXArray#toFloatArray()} read back {@code FLOAT16}/ {@code BFLOAT16} arrays, and what makes a
    * mixed inexact/exact {@link MLXOps#matmul} pair reachable rather than a case this facade could
    * only assert was impossible.
@@ -320,14 +320,15 @@ public final class MLX {
    * graphs before waiting on any of them, so all N sets of intermediates are live simultaneously,
    * in principle at the cost of peak memory relative to evaluating one array at a time (which would
    * let each graph's temporaries be released before the next begins). In practice, per
-   * req/phase3-plan.md §4, that effect was measured as unobservable through this facade's ownership
-   * model: every op result -- intermediate or final -- is registered with its {@link MLXScope} the
-   * instant the op is invoked and is only freed at scope close, regardless of eval strategy, so
-   * nothing this facade builds is ever eligible for differential early free. Two rounds of
-   * measurement (single-op and multi-op lazy chains, 6 trials total) found a delta of exactly 0
-   * bytes. The underlying native-level tradeoff remains real in principle for mlx-c graphs whose
-   * intermediates are <em>not</em> independently referenced by anything outside the graph, but that
-   * case wasn't -- and structurally couldn't be -- exercised by this facade's measurement.
+   * req/plans/phase3-plan.md §4, that effect was measured as unobservable through this facade's
+   * ownership model: every op result -- intermediate or final -- is registered with its {@link
+   * MLXScope} the instant the op is invoked and is only freed at scope close, regardless of eval
+   * strategy, so nothing this facade builds is ever eligible for differential early free. Two
+   * rounds of measurement (single-op and multi-op lazy chains, 6 trials total) found a delta of
+   * exactly 0 bytes. The underlying native-level tradeoff remains real in principle for mlx-c
+   * graphs whose intermediates are <em>not</em> independently referenced by anything outside the
+   * graph, but that case wasn't -- and structurally couldn't be -- exercised by this facade's
+   * measurement.
    *
    * <p>There is deliberately no same-scope check here (unlike {@code binaryOp}): {@code eval}
    * allocates no result, so there is no "which scope owns the output" question to settle, and
@@ -375,8 +376,8 @@ public final class MLX {
    * allocated from {@code allocator}. Factored out of {@link #eval} because {@code mlx_async_eval}
    * (upstream {@code transforms.h:31}) takes the same {@code mlx_vector_array} and would reuse this
    * verbatim; package-private (not {@code private}) since {@link MLXGrad#valueAndGrad} builds the
-   * same shape of input vector for {@code mlx_closure_value_and_grad_apply} (req/phase4-plan.md
-   * §6).
+   * same shape of input vector for {@code mlx_closure_value_and_grad_apply}
+   * (req/plans/phase4-plan.md §6).
    *
    * <p>{@code allocator} MUST be a confined {@link Arena} (never an {@link MLXScope}): the vector's
    * backing struct array is not an {@code mlx_array} this method's caller will ever hand to {@code

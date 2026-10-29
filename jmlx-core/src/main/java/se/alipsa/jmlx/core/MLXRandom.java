@@ -11,11 +11,11 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Home for {@code seed}, {@code normal} and {@code uniform} (req/phase4-plan.md §1, §5), landed in
- * M1 for weight initialization onto a class created empty during M0a's pure-motion facade split, so
- * M1 could add ops to an address that already existed rather than growing {@link MLX} past the
- * point §1 named as its split trigger. See {@link MLX}'s javadoc for the index of every sibling
- * this facade was split into.
+ * Home for {@code seed}, {@code normal} and {@code uniform} (req/plans/phase4-plan.md §1, §5),
+ * landed in M1 for weight initialization onto a class created empty during M0a's pure-motion facade
+ * split, so M1 could add ops to an address that already existed rather than growing {@link MLX}
+ * past the point §1 named as its split trigger. See {@link MLX}'s javadoc for the index of every
+ * sibling this facade was split into.
  */
 public final class MLXRandom {
 

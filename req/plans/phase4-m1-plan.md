@@ -1,6 +1,6 @@
 # jmlx Phase 4 — M1 implementation plan (`Module` and the simple layers)
 
-**Spec:** `req/phase4-plan.md` — specifically §2 (child scopes / `scopeOf` / explicit-target overloads),
+**Spec:** `req/plans/phase4-plan.md` — specifically §2 (child scopes / `scopeOf` / explicit-target overloads),
 §3 (op-helper shapes, deferred generic helpers), §4 (`DType`/`astype`), §5 (`Module` and the simple
 layers), Research findings (nullable-by-value-struct params, statusless scalar constructors), and
 Testing approach. This plan is the spec's argument for M1 only — M2 (`MLXGrad`/`ModuleGrad`), M3
@@ -32,7 +32,7 @@ against them.
    later task that needs a nullable array parameter uses it, never invents its own null-struct
    construction.
 5. **Do not add a generic op-body helper without a real consumer landing in the same task.** This is
-   the M0d precedent (`req/phase4-plan.md` Status section): `reduceOp`, `axis2Op`, `nullableHandle`, and
+   the M0d precedent (`req/plans/phase4-plan.md` Status section): `reduceOp`, `axis2Op`, `nullableHandle`, and
    the explicit-target `unaryOp` overload are each added in the task that first needs them, wired
    directly to that task's real op — never speculatively.
 6. **Style:** run `./gradlew spotlessApply` before finishing a task, then `./gradlew build` (Spotless
@@ -119,7 +119,7 @@ is true, or if `name` is already a key in `params`. Otherwise `params.put(name, 
 
 `scope()`: returns the `MLXScope` passed to the constructor.
 
-`parameters()`: depth-first, own params before children (matching `req/phase4-plan.md:632-634`'s
+`parameters()`: depth-first, own params before children (matching `req/plans/phase4-plan.md:632-634`'s
 "depth-first, own params before children, dotted paths, insertion-ordered, immutable snapshot"). Build a
 `LinkedHashMap<String, MLXArray>` via a private recursive `collectParameters(String prefix,
 SequencedMap<String, MLXArray> out)`: for each entry in `params` (insertion order), `out.put(prefix +
@@ -245,7 +245,7 @@ public static MLXArray power(MLXArray a, MLXArray b) {
 
 `sum`/`mean` with axes+keepdims need a new shape neither `unaryOp` nor `shapeOp` has: `(res, a, const
 int* axes, size_t axes_num, bool keepdims, stream)` — this is exactly `reduceOp`, the generic helper
-`req/phase4-plan.md` §3 named and deferred pending a real consumer. Add it to
+`req/plans/phase4-plan.md` §3 named and deferred pending a real consumer. Add it to
 `jmlx-core/src/main/java/se/alipsa/jmlx/core/NativeOps.java`, next to `shapeOp` (same shape plus one
 `boolean`):
 
@@ -364,7 +364,7 @@ specified axis"): result shape is `a.shape()[:axis] + indices.shape() + a.shape(
 the exact op `Embedding` (Task 5) needs: `weight` shape `[numEmbeddings, dim]`, `indices` any shape,
 `axis = 0`.
 
-**The explicit-target `transpose` overload** — required by `req/phase4-plan.md` §2 mitigation 1 for
+**The explicit-target `transpose` overload** — required by `req/plans/phase4-plan.md` §2 mitigation 1 for
 `Linear` (Task 5), independent of whether `Linear` lands in this same task. Add an explicit-target
 overload of `NativeOps.unaryOp` (the existing single-arg-target one becomes a one-line delegation to
 it — do not duplicate its body):
@@ -386,7 +386,7 @@ axes)`:
 
 ```java
 /** Reverses every axis, allocating the result into {@code target} instead of {@code a.scope()}. See
- *  req/phase4-plan.md §2 mitigation 1: lets a weight-derived view computed inside {@code forward()}
+ *  req/plans/phase4-plan.md §2 mitigation 1: lets a weight-derived view computed inside {@code forward()}
  *  land in the caller's (step) scope rather than leaking into {@code a}'s own (model) scope once per
  *  call. */
 public static MLXArray transpose(MLXArray a, MLXScope target) {
@@ -621,7 +621,7 @@ public final class Linear extends Module implements UnaryModule {
 `weight` is registered and stored in the checkpoint's `[out, in]` layout — never transposed before
 registration; `forward` transposes a fresh view per call via the Task 3 explicit-target overload,
 landing it in `x.scope()` (the step scope), not `weight`'s own (model) scope. This is
-`req/phase4-plan.md` §2's withdrawn-cache mitigation record — do not reintroduce a cached `W.T` field.
+`req/plans/phase4-plan.md` §2's withdrawn-cache mitigation record — do not reintroduce a cached `W.T` field.
 
 ### `Embedding`
 

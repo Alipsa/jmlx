@@ -19,8 +19,8 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/phase4-plan.md §5-6 for the design {@link Module} implements; the class javadoc there
- * explains why {@link Module#param(String, MLXArray)}'s return value must not be cached by a
+ * See req/plans/phase4-plan.md §5-6 for the design {@link Module} implements; the class javadoc
+ * there explains why {@link Module#param(String, MLXArray)}'s return value must not be cached by a
  * subclass.
  */
 @EnabledIfNativeAvailable

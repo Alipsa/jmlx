@@ -7,11 +7,11 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * A native {@code mlx_array} handle owned by an {@link MLXScope}. See req/initial-plan.md §6. Not
- * thread-safe: confined to the scope's owning thread, same as the scope itself. That confinement is
- * enforced, not just documented: every handle read goes through {@link #ensureOpen()}, which
- * delegates to {@link MLXScope#checkAccess()} and throws {@link IllegalStateException} on
- * foreign-thread or closed-scope access.
+ * A native {@code mlx_array} handle owned by an {@link MLXScope}. See req/plans/initial-plan.md §6.
+ * Not thread-safe: confined to the scope's owning thread, same as the scope itself. That
+ * confinement is enforced, not just documented: every handle read goes through {@link
+ * #ensureOpen()}, which delegates to {@link MLXScope#checkAccess()} and throws {@link
+ * IllegalStateException} on foreign-thread or closed-scope access.
  */
 public final class MLXArray implements AutoCloseable {
 
@@ -25,12 +25,12 @@ public final class MLXArray implements AutoCloseable {
   }
 
   /**
-   * This array's owning scope. Public (req/phase4-plan.md §2) so creation ops with no operand to
-   * infer a scope from (e.g. an RoPE positions array, a causal mask) and {@code nn}-package layers
-   * can target a specific scope explicitly, the same way {@code MLX.array} already takes one.
-   * {@code forward()} methods must never allocate here directly (they should target the
+   * This array's owning scope. Public (req/plans/phase4-plan.md §2) so creation ops with no operand
+   * to infer a scope from (e.g. an RoPE positions array, a causal mask) and {@code nn}-package
+   * layers can target a specific scope explicitly, the same way {@code MLX.array} already takes
+   * one. {@code forward()} methods must never allocate here directly (they should target the
    * activation's own scope, or an explicit-target overload for weight-derived views) -- nothing
-   * enforces that beyond this javadoc; see req/phase4-plan.md §2 and §5 for why, and {@code
+   * enforces that beyond this javadoc; see req/plans/phase4-plan.md §2 and §5 for why, and {@code
    * MLXMemoryLeakTest} for the only test that would notice a violation.
    */
   public MLXScope scope() {
@@ -76,12 +76,12 @@ public final class MLXArray implements AutoCloseable {
    * Evaluates this array (if not already evaluated) and reads it back as a flat, row-major {@code
    * float[]}.
    *
-   * <p>Requires an inexact dtype (req/phase4-plan.md §4): {@code FLOAT32} reads back directly;
-   * {@code FLOAT16}/ {@code BFLOAT16} go through an {@code mlx_astype(FLOAT32)} step first, since
-   * there is no {@code mlx_array_data_float16}/{@code _bfloat16} to read those natively. Exact
-   * dtypes ({@code INT32}, {@code UINT32}, {@code BOOL}) are rejected rather than silently cast --
-   * astype-ing an {@code INT32} array to float would hide the bug this check exists to surface. Use
-   * {@link #toIntArray()} for {@code INT32}.
+   * <p>Requires an inexact dtype (req/plans/phase4-plan.md §4): {@code FLOAT32} reads back
+   * directly; {@code FLOAT16}/ {@code BFLOAT16} go through an {@code mlx_astype(FLOAT32)} step
+   * first, since there is no {@code mlx_array_data_float16}/{@code _bfloat16} to read those
+   * natively. Exact dtypes ({@code INT32}, {@code UINT32}, {@code BOOL}) are rejected rather than
+   * silently cast -- astype-ing an {@code INT32} array to float would hide the bug this check
+   * exists to surface. Use {@link #toIntArray()} for {@code INT32}.
    *
    * <p>Forces a contiguous row-major copy (mlx-c's {@code mlx_contiguous}, {@code
    * allow_col_major=false}) before reading the data pointer. Lazy ops like transpose can yield a

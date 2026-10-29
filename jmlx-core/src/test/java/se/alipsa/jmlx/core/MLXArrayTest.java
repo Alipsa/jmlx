@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
-/** See req/initial-plan.md, Testing approach, "Memory lifecycle" (array half). */
+/** See req/plans/initial-plan.md, Testing approach, "Memory lifecycle" (array half). */
 @EnabledIfNativeAvailable
 class MLXArrayTest {
 

@@ -51,7 +51,7 @@
  * mlx_array_free}, and {@code MLXGrad.Fn} calls {@code mlx_closure_free} and {@code
  * mlx_closure_value_and_grad_free}. Whether freeing from another thread is safe is the unresolved
  * "Is {@code mlx_array_free} safe to call from the Cleaner thread?" question in {@code
- * req/initial-plan.md} (Open questions); the closure frees are a related, separate case that
+ * req/plans/initial-plan.md} (Open questions); the closure frees are a related, separate case that
  * question does not cover. Do not rely on either backstop: always close scopes and functions.
  */
 package se.alipsa.jmlx.core;

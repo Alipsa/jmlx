@@ -657,9 +657,10 @@ Effect on this plan's verification:
   investigate, following `req/phase6-golden-precision.md`, never a reason to regenerate.
 
   The SmolVLM and Qwen3-VL manifests also carry a `recorded_pin` (`mlxMetalVersion=0.31.2`, …).
-  Nothing compares against it; `TierBReferences` only logs it. The upgrade PR leaves both
-  values as they are, as the pin of the reference recording, and the manifests and their
-  digests in `tools/hf-reference/provenance.json` stay unchanged. The Tier-B log line prints
+  Nothing compares against it; `TierBReferences` only logs it. By default the upgrade PR leaves
+  both values as they are, as the pin of the reference recording, and the manifests and their
+  digests in `tools/hf-reference/provenance.json` stay unchanged. The exception is a manifest
+  whose `local_evidence` is re-measured (see the measured-bounds item below). The Tier-B log line prints
   only `recorded_pin`, not the running runtime's pin. The upgrade PR therefore also adds the
   running pin to that log line, so the log cannot be read as describing the new runtime.
 - **jmlx-recorded goldens are re-recorded only with evidence.** jmlx produced these by running
@@ -683,12 +684,32 @@ Effect on this plan's verification:
   A seeded stream that changes is re-recorded only after the upgrade PR shows the change follows
   MLX itself: the regenerated sampling oracle still passes (`SamplingOracleTest`). The diff is
   then reviewed in the PR.
-- **Measured default-mode bounds may need re-measuring.** The separately named TF32 bounds
-  (`req/phase6-golden-precision.md`, for example Qwen3-VL's `0.0025` and the cache-equivalence
-  `0.003`) were measured on the old pins. An exceedance is first a finding. A bound is raised
-  only once the cause is documented, for example an upstream kernel change named in the
-  migration note. The new measurement is recorded next to the old one. A strict `full-float32`
-  bound is never loosened.
+- **Bounds sized from old-pin measurements may need re-measuring.** These bounds were derived
+  from measurements on `mlx-metal` 0.31.2 / mlx-c `fba4470`:
+  - the separately named TF32 bounds (`req/phase6-golden-precision.md`, for example Qwen3-VL's
+    `0.0025` and the cache-equivalence `0.003`);
+  - the Tier-B native-memory gates:
+    - `TierBQwen3VlTest`: `NATIVE_PEAK_BOUND_BYTES` (measured 9,828,890,788 B + 500 MiB) and
+      `FOOTPRINT_BOUND_BYTES` (12.5 GB, against a sampled 11,979,116,480 B);
+    - `TierBVisionLanguageTest`: `NATIVE_PEAK_BOUND_BYTES` (5,737,416,464 B + 500 MiB) and
+      `FOOTPRINT_BOUND_BYTES` (8 GiB, against a sampled 7,129,368,904 B);
+    - the `local_evidence` blocks in their manifests, which those constants cite;
+  - `VisionLanguageMemoryTest`'s `FIXED_MARGIN` (16 KiB, sized from a measured warm overhead of
+    at most 11,264 B).
+
+  An exceedance is first a finding. A bound is raised only once the cause is documented, for
+  example an upstream kernel or allocator change named in the migration note. The new
+  measurement is recorded next to the old one. A strict `full-float32` bound is never loosened.
+  When a manifest's `local_evidence` is re-measured, the manifest changes. In that case its
+  `recorded_pin` and its digest in `tools/hf-reference/provenance.json` are updated in the same
+  commit, overriding the "leave unchanged" default above for that manifest.
+
+  These bounds are design bounds, not measurements, so they are never re-measured. An
+  exceedance is a regression:
+  - `Qwen3VlVisionPeakTest`'s `DEPTH_DELTA_BOUND` (64 MiB depth independence) and
+    `PLANNING_BOUND` (the plan's 5 GiB);
+  - the `CLEANUP_MARGIN` of 512 B in `VisionLanguageMemoryTest` and `Qwen3VlMemoryTest`, which
+    is held below the smallest feature tensor by construction.
 - **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
   the procedure in `tools/mlx-oracle/README.md`:
   - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;

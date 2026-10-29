@@ -657,26 +657,30 @@ Effect on this plan's verification:
   investigate, following `req/phase6-golden-precision.md`, never a reason to regenerate.
 
   The SmolVLM and Qwen3-VL manifests also carry a `recorded_pin` (`mlxMetalVersion=0.31.2`, …).
-  Nothing compares against it; `TierBReferences` only logs it. By default the upgrade PR leaves both
-  values as they are, as the pin of the reference recording, and the manifests and their digests in
-  `tools/hf-reference/provenance.json` stay unchanged. The exception is a manifest whose
-  `local_evidence` is re-measured (see the measured-bounds item below). The Tier-B log line prints
-  only `recorded_pin`, not the running runtime's pin. The upgrade PR therefore also adds the running
-  pin to that log line, so the log cannot be read as describing the new runtime. - **jmlx-recorded
-  goldens are re-recorded only with evidence.** jmlx produced these by running on MLX, so an upgrade
-  can legitimately change them: - **Seeded sampling streams:** -
-  `LlamaModelTest.seededSamplingRepeatsAcrossFreshJvmsAndRetainsPrefixes` (seeds 42 and 7); - the
-  release-smoke `tools/release-smoke/goldens/mistral-sampled.properties` (`run.sh ci --record`). -
-  **The pin-gated Phase 6 text Tier-B exact IDs:** the `expected_token_ids` of
-  `lite-mistral-150m-v2-instruct`, `qwen2.5-0.5b-instruct`, `qwen3-0.6b` and
-  `smollm2-135m-instruct`. They are recorded on CI, and `TierBSmokeTest` asserts them only while the
-  runtime matches the manifest's `recorded_pin` (device, macOS, both native pins). After an upgrade
-  it silently falls back to a "structural pass only". The upgrade PR must therefore re-record them,
-  as the 7.0 plan did: dispatch the Tier-B workflow, then set `recorded_pin`, `expected_token_ids`,
-  `observed_peak_test_jvm_rss_kib` and `observed_run`. Exact-ID coverage is not lost silently. -
-  **The 8B mlx-vlm probe** (`tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`). It
-  was produced by Python MLX, so it is re-run in the re-locked environment if the opt-in 8B manual
-  comparison is repeated.
+  Nothing compares against it; `TierBReferences` only logs it. By default the upgrade PR leaves
+  both values as they are, as the pin of the reference recording, and the manifests and their
+  digests in `tools/hf-reference/provenance.json` stay unchanged. The exception is a manifest
+  whose `local_evidence` is re-measured (see the measured-bounds item below). The Tier-B log
+  line prints only `recorded_pin`, not the running runtime's pin. The upgrade PR therefore also
+  adds the running pin to that log line, so the log cannot be read as describing the new
+  runtime.
+- **jmlx-recorded goldens are re-recorded only with evidence.** jmlx produced these by running
+  on MLX, so an upgrade can legitimately change them:
+  - **Seeded sampling streams:**
+    - `LlamaModelTest.seededSamplingRepeatsAcrossFreshJvmsAndRetainsPrefixes` (seeds 42 and 7);
+    - the release-smoke `tools/release-smoke/goldens/mistral-sampled.properties` (`run.sh ci
+      --record`).
+  - **The pin-gated Phase 6 text Tier-B exact IDs:** the `expected_token_ids` of
+    `lite-mistral-150m-v2-instruct`, `qwen2.5-0.5b-instruct`, `qwen3-0.6b` and
+    `smollm2-135m-instruct`. They are recorded on CI, and `TierBSmokeTest` asserts them only
+    while the runtime matches the manifest's `recorded_pin` (device, macOS, both native pins).
+    After an upgrade it silently falls back to a "structural pass only". The upgrade PR must
+    therefore re-record them, as the 7.0 plan did: dispatch the Tier-B workflow, then set
+    `recorded_pin`, `expected_token_ids`, `observed_peak_test_jvm_rss_kib` and `observed_run`.
+    Exact-ID coverage is not lost silently.
+  - **The 8B mlx-vlm probe** (`tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`).
+    It was produced by Python MLX, so it is re-run in the re-locked environment if the opt-in 8B
+    manual comparison is repeated.
 
   A seeded stream that changes is re-recorded only after the upgrade PR shows the change follows
   MLX itself: the regenerated sampling oracle still passes (`SamplingOracleTest`). The diff is

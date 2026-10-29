@@ -652,8 +652,16 @@ Effect on this plan's verification:
     expected values come from CPU Hugging Face or sentence-transformers reference runs, not
     from jmlx.
 
-  They must pass unchanged on the new pins, in both precision modes. A failure is a finding to
+  They must pass unchanged on the new pins. The goldens run in both precision modes; Tier-B
+  runs in strict mode only (`tierBTest` sets `MLX_ENABLE_TF32=0`). A failure is a finding to
   investigate, following `req/phase6-golden-precision.md`, never a reason to regenerate.
+
+  The SmolVLM and Qwen3-VL manifests also carry a `recorded_pin` (`mlxMetalVersion=0.31.2`, …).
+  Nothing compares against it; `TierBReferences` only logs it. The upgrade PR leaves both
+  values as they are, as the pin of the reference recording, and the manifests and their
+  digests in `tools/hf-reference/provenance.json` stay unchanged. The Tier-B log line prints
+  only `recorded_pin`, not the running runtime's pin. The upgrade PR therefore also adds the
+  running pin to that log line, so the log cannot be read as describing the new runtime.
 - **jmlx-recorded goldens are re-recorded only with evidence.** jmlx produced these by running
   on MLX, so an upgrade can legitimately change them:
   - **Seeded sampling streams:**
@@ -677,8 +685,10 @@ Effect on this plan's verification:
   then reviewed in the PR.
 - **Measured default-mode bounds may need re-measuring.** The separately named TF32 bounds
   (`req/phase6-golden-precision.md`, for example Qwen3-VL's `0.0025` and the cache-equivalence
-  `0.003`) were measured on the old pins. If one is exceeded, it is re-measured and the new
-  measurement recorded next to the old one. A strict `full-float32` bound is never loosened.
+  `0.003`) were measured on the old pins. An exceedance is first a finding. A bound is raised
+  only once the cause is documented, for example an upstream kernel change named in the
+  migration note. The new measurement is recorded next to the old one. A strict `full-float32`
+  bound is never loosened.
 - **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
   the procedure in `tools/mlx-oracle/README.md`:
   - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;

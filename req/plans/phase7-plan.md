@@ -645,10 +645,40 @@ oracle fixtures, goldens and Tier-B evidence are produced once, on the new runti
 
 Effect on this plan's verification:
 - **Independent references are not regenerated.** These are the evidence not produced by MLX:
-  the CPU Hugging Face goldens under `tools/hf-reference`, the image and tokenizer oracle
-  fixtures, the exact greedy-ID goldens and the Tier-B pins. They must pass unchanged on the new
-  pins, in both precision modes. A failure is a finding to investigate, following
-  `req/phase6-golden-precision.md`, never a reason to regenerate.
+  - the CPU Hugging Face goldens under `tools/hf-reference`;
+  - the image and tokenizer oracle fixtures;
+  - greedy IDs taken from those references, such as `mistral-window`;
+  - the HF-referenced Tier-B manifests (BERT SST-2, MiniLM, Flan-T5, SmolVLM, Qwen3-VL), whose
+    expected values come from CPU Hugging Face or sentence-transformers reference runs, not
+    from jmlx.
+
+  They must pass unchanged on the new pins, in both precision modes. A failure is a finding to
+  investigate, following `req/phase6-golden-precision.md`, never a reason to regenerate.
+- **jmlx-recorded goldens are re-recorded only with evidence.** jmlx produced these by running
+  on MLX, so an upgrade can legitimately change them:
+  - **Seeded sampling streams:**
+    - `LlamaModelTest.seededSamplingRepeatsAcrossFreshJvmsAndRetainsPrefixes` (seeds 42 and 7);
+    - the release-smoke `tools/release-smoke/goldens/mistral-sampled.properties` (`run.sh ci
+      --record`).
+  - **The pin-gated Phase 6 text Tier-B exact IDs:** the `expected_token_ids` of
+    `lite-mistral-150m-v2-instruct`, `qwen2.5-0.5b-instruct`, `qwen3-0.6b` and
+    `smollm2-135m-instruct`. They are recorded on CI, and `TierBSmokeTest` asserts them only
+    while the runtime matches the manifest's `recorded_pin` (device, macOS, both native pins).
+    After an upgrade it silently falls back to a "structural pass only". The upgrade PR must
+    therefore re-record them, as the 7.0 plan did: dispatch the Tier-B workflow, then set
+    `recorded_pin`, `expected_token_ids`, `observed_peak_test_jvm_rss_kib` and `observed_run`.
+    Exact-ID coverage is not lost silently.
+  - **The 8B mlx-vlm probe** (`tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`).
+    It was produced by Python MLX, so it is re-run in the re-locked environment if the opt-in 8B
+    manual comparison is repeated.
+
+  A seeded stream that changes is re-recorded only after the upgrade PR shows the change follows
+  MLX itself: the regenerated sampling oracle still passes (`SamplingOracleTest`). The diff is
+  then reviewed in the PR.
+- **Measured default-mode bounds may need re-measuring.** The separately named TF32 bounds
+  (`req/phase6-golden-precision.md`, for example Qwen3-VL's `0.0025` and the cache-equivalence
+  `0.003`) were measured on the old pins. If one is exceeded, it is re-measured and the new
+  measurement recorded next to the old one. A strict `full-float32` bound is never loosened.
 - **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
   the procedure in `tools/mlx-oracle/README.md`:
   - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;

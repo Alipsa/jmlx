@@ -403,12 +403,13 @@ pins, and ships release notes.
 
 ### MLX upgrade policy
 
-The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded neither with every
-release nor only after full parity. An upgrade is costly: regenerated bindings, an inventory diff,
-regenerated Python MLX oracle fixtures, re-checked golden precision and re-run Tier-B suites. Each
-skipped MLX release also adds to the binding and behavior drift a later upgrade must absorb, and
-newer model families and checkpoint formats (for example the mxfp4, nvfp4 and mxfp8 variants) need
-a recent runtime.
+The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded neither with every release
+nor only after full parity. An upgrade is costly: regenerated bindings, an inventory diff,
+regenerated Python MLX oracle fixtures, re-checked golden precision, re-run Tier-B suites, and
+re-recorded evidence that jmlx recorded on MLX (seeded sampling streams and pin-gated Tier-B IDs).
+Each skipped MLX release also adds to the binding and behavior drift a later upgrade must absorb,
+and newer model families and checkpoint formats (for example the mxfp4, nvfp4 and mxfp8 variants)
+need a recent runtime.
 
 An upgrade may skip intermediate upstream releases (see Phase 13 milestone 4). In that case:
 - the inventory diff is taken against the previous pin;

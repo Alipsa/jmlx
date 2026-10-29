@@ -9,8 +9,8 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * Elementwise unary/binary ops, comparisons, reductions, {@code matmul}, {@code inner}/{@code
- * outer}. Split out of {@link MLX} as pure motion in req/phase4-plan.md M0a -- see that class's
- * javadoc for the index of every sibling this facade was split into.
+ * outer}. Split out of {@link MLX} as pure motion in req/plans/phase4-plan.md M0a -- see that
+ * class's javadoc for the index of every sibling this facade was split into.
  */
 public final class MLXOps {
 
@@ -155,10 +155,11 @@ public final class MLXOps {
    * below). Both-exact is a provable <em>subset</em> of native's rejects: {@code
    * promote_types(exact, exact)} is always exact, so this can only under-reject relative to native
    * (for pairs this facade cannot even construct), never over-reject -- and over-rejecting, not
-   * under-rejecting, is the failure mode a Java-side guard exists to avoid. req/phase4-plan.md §4's
-   * {@code astype} is what makes a mixed exact/inexact pair (e.g. float32 x int32) reachable at
-   * all; before it, nothing in this facade could construct an {@code INT32} array, so this method
-   * could only ever be called with operands already both inexact or both exact.
+   * under-rejecting, is the failure mode a Java-side guard exists to avoid.
+   * req/plans/phase4-plan.md §4's {@code astype} is what makes a mixed exact/inexact pair (e.g.
+   * float32 x int32) reachable at all; before it, nothing in this facade could construct an {@code
+   * INT32} array, so this method could only ever be called with operands already both inexact or
+   * both exact.
    */
   private static void requireMatmulCompatible(MLXArray a, MLXArray b) {
     int[] sa = a.shape();
@@ -199,8 +200,9 @@ public final class MLXOps {
 
   /**
    * Skips the Java-side shape check {@link #add} otherwise applies before ever reaching native.
-   * Deliberate bypass (req/initial-plan.md, Testing approach) so a test can exercise a genuine
-   * native error path and prove it surfaces as {@link MLXException} rather than a process abort.
+   * Deliberate bypass (req/plans/initial-plan.md, Testing approach) so a test can exercise a
+   * genuine native error path and prove it surfaces as {@link MLXException} rather than a process
+   * abort.
    */
   static MLXArray addUnchecked(MLXArray a, MLXArray b) {
     return NativeOps.binaryOp("add", a, b, mlx_h::mlx_add);

@@ -3,7 +3,7 @@
 # Downloads, builds, and stages everything jmlx needs to talk to real MLX on
 # Apple Silicon: jextract, the mlx-metal wheel (headers + prebuilt dylibs +
 # metallib), and mlx-c (built from source against the wheel's MLX). Idempotent
-# -- safe to re-run. See req/initial-plan.md §3 for the full rationale; this
+# -- safe to re-run. See req/plans/initial-plan.md §3 for the full rationale; this
 # script is that section made executable.
 #
 # Prerequisites this script assumes are already installed (developer-machine
@@ -21,7 +21,7 @@ SCRATCH_DIR="$NATIVE_DIR/scratch"
 INSTALL_DIR="$NATIVE_DIR/install"
 
 # --- Pinned versions ---------------------------------------------------------
-# req/initial-plan.md Decision 9: this mlx-c commit and this mlx-metal wheel
+# req/plans/initial-plan.md Decision 9: this mlx-c commit and this mlx-metal wheel
 # version both track MLX v0.31.2 exactly, sidestepping the wheel/mlx-c version
 # mismatch (latest wheel is 0.32.0; mlx-c's CMakeLists.txt pins v0.31.2)
 # instead of gambling on newer headers compiling against older mlx-c source.
@@ -47,7 +47,7 @@ JEXTRACT_PIN_FILE="$REPO_ROOT/scripts/.jextract-sha256-pin"
 # when there is no pinned URL yet (first successful run).
 JEXTRACT_URL_PIN_FILE="$REPO_ROOT/scripts/.jextract-url-pin"
 
-# Real measured size (req/initial-plan.md) is 157,748,008 bytes; use a
+# Real measured size (req/plans/initial-plan.md) is 157,748,008 bytes; use a
 # generous floor so a minor MLX version bump doesn't false-positive here.
 METALLIB_MIN_BYTES=100000000
 
@@ -173,7 +173,7 @@ MLXC_PINNED_MLX_TAG="$(grep -oE 'GIT_TAG v[0-9.]+' "$MLXC_DIR/CMakeLists.txt" | 
 EXPECTED_TAG="v${MLX_METAL_VERSION}"
 if [[ "$MLXC_PINNED_MLX_TAG" != "$EXPECTED_TAG" ]]; then
   log "mlx-c at $MLX_C_COMMIT is written against MLX $MLXC_PINNED_MLX_TAG, but this script pins mlx-metal $MLX_METAL_VERSION."
-  log "This pairing was chosen deliberately once (req/initial-plan.md Decision 9); a mismatch here means that decision needs revisiting, not silently overriding."
+  log "This pairing was chosen deliberately once (req/plans/initial-plan.md Decision 9); a mismatch here means that decision needs revisiting, not silently overriding."
   die "version pairing assertion failed: mlx-c wants $MLXC_PINNED_MLX_TAG, wheel is $EXPECTED_TAG"
 fi
 log "Version pairing OK: mlx-c $MLX_C_COMMIT <-> mlx-metal $MLX_METAL_VERSION (both track $EXPECTED_TAG)"
@@ -219,7 +219,7 @@ log "Installing mlxc headers + library to $INSTALL_DIR"
 cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR"
 
 # --- 6. Assemble the flat runtime directory -----------------------------------
-# Runtime invariant (req/initial-plan.md): all four artifacts live in one flat
+# Runtime invariant (req/plans/initial-plan.md): all four artifacts live in one flat
 # directory. MLX finds mlx.metallib by colocation with its own image, and dyld
 # resolves the @rpath siblings the same way.
 mkdir -p "$RUNTIME_LIB_DIR"

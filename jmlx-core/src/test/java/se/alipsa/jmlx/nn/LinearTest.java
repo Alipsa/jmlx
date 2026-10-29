@@ -14,9 +14,9 @@ import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/phase4-plan.md §2 for the withdrawn-cache mitigation {@link Linear#forward} implements:
- * {@code weight} is registered in the checkpoint's {@code [out, in]} layout and transposed fresh,
- * into the caller's scope, on every call.
+ * See req/plans/phase4-plan.md §2 for the withdrawn-cache mitigation {@link Linear#forward}
+ * implements: {@code weight} is registered in the checkpoint's {@code [out, in]} layout and
+ * transposed fresh, into the caller's scope, on every call.
  */
 @EnabledIfNativeAvailable
 class LinearTest {

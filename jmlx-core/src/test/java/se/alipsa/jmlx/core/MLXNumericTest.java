@@ -10,7 +10,7 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
+ * See req/plans/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
  * hand-computed values. reshape/transpose additionally assert element values, not just shape -- the
  * only thing that catches the contiguity bug in {@link MLXArray#toFloatArray()}.
  */
@@ -29,11 +29,11 @@ class MLXNumericTest {
   }
 
   /**
-   * See req/phase4-plan.md §2: {@code binaryOp} now resolves its target via {@code scopeOf}/{@code
-   * innermost} rather than rejecting any pair of operands that are not from the exact same scope --
-   * this is "it stops rejecting parent/child pairs, which is the entire point" (§2), checked in
-   * both operand orders since picking "the first operand's scope" would silently pass one order and
-   * fail the other.
+   * See req/plans/phase4-plan.md §2: {@code binaryOp} now resolves its target via {@code
+   * scopeOf}/{@code innermost} rather than rejecting any pair of operands that are not from the
+   * exact same scope -- this is "it stops rejecting parent/child pairs, which is the entire point"
+   * (§2), checked in both operand orders since picking "the first operand's scope" would silently
+   * pass one order and fail the other.
    */
   @Test
   void addAcrossParentAndChildScopeAllocatesIntoTheChildRegardlessOfOperandOrder() {
@@ -224,7 +224,7 @@ class MLXNumericTest {
     try (MLXScope scope = new MLXScope()) {
       // promote_types(float32, int32) == float32, so native accepts this mixed pair even though
       // requireMatmulCompatible's Java guard only requires ONE operand to be inexact
-      // (req/phase4-plan.md §4).
+      // (req/plans/phase4-plan.md §4).
       MLXArray a = MLX.array(scope, new float[] {1, 2, 3, 4}, new int[] {2, 2});
       MLXArray identity =
           MLX.astype(MLX.array(scope, new float[] {1, 0, 0, 1}, new int[] {2, 2}), DType.INT32);

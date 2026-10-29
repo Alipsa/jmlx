@@ -8,9 +8,9 @@ import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.Linear;
 
 /**
- * See req/initial-plan.md §8: the outline's demo, reduced to this slice's ops. Also demonstrates a
- * Phase 4 {@code Linear} forward pass across a model/step scope split -- see req/phase4-plan.md §5
- * for the scoping rationale that pass exists to illustrate.
+ * See req/plans/initial-plan.md §8: the outline's demo, reduced to this slice's ops. Also
+ * demonstrates a Phase 4 {@code Linear} forward pass across a model/step scope split -- see
+ * req/plans/phase4-plan.md §5 for the scoping rationale that pass exists to illustrate.
  */
 public final class HelloMLX {
 

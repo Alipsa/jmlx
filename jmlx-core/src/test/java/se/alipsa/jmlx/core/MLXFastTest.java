@@ -9,7 +9,7 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
+ * See req/plans/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
  * hand-computed values.
  */
 @EnabledIfNativeAvailable

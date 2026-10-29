@@ -122,7 +122,7 @@ public final class SwitchGlu extends Module {
     int k = is[2];
     // gather_mm has no VJP with respect to its indices; routing is not differentiable anyway.
     MLXArray idx = MLXOps.stopGradient(indices);
-    // Weight views go into the caller's scope, never the model scope (req/phase4-plan.md §2).
+    // Weight views go into the caller's scope, never the model scope (req/plans/phase4-plan.md §2).
     MLXArray gateT = MLXShape.swapaxes(param("gateWeight"), s, -1, -2);
     MLXArray upT = MLXShape.swapaxes(param("upWeight"), s, -1, -2);
     MLXArray downT = MLXShape.swapaxes(param("downWeight"), s, -1, -2);

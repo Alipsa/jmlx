@@ -1,7 +1,7 @@
 # jmlx
 A pure, idiomatic Java 25 framework for Apple Silicon GPU tensor operations and LLM inference—wrapping Apple's native MLX core with zero-copy FFM bindings.
 
-The core (`req/initial-plan.md`) is a v0.1 vertical slice — native bootstrap, generated bindings, memory management, and a handful of tensor ops — proven end to end on real Apple Silicon GPU hardware. `se.alipsa.jmlx.nn` (`req/phase4-plan.md`) builds a small neural-network module system on top of it: `Module`/`Linear`/normalization/activation layers, `QuantizedLinear` for low-bit quantized weights, reverse-mode autograd (`MLXGrad`), and multi-head self-attention with RoPE and an incremental KV cache for decoding.
+The core (`req/plans/initial-plan.md`) is a v0.1 vertical slice — native bootstrap, generated bindings, memory management, and a handful of tensor ops — proven end to end on real Apple Silicon GPU hardware. `se.alipsa.jmlx.nn` (`req/plans/phase4-plan.md`) builds a small neural-network module system on top of it: `Module`/`Linear`/normalization/activation layers, `QuantizedLinear` for low-bit quantized weights, reverse-mode autograd (`MLXGrad`), and multi-head self-attention with RoPE and an incremental KV cache for decoding.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ device) is process-wide and its streams are bound to the OS thread that created 
 thread. To serve concurrent callers, funnel them through one MLX-owning worker
 (`BatchGenerationScheduler` in `jmlx-models`). The only known exception is the JVM `Cleaner` backstop,
 which frees native handles from its own thread if a scope or autograd function was never closed;
-whether that is safe is still an open question (`req/initial-plan.md`, Open questions), so always
+whether that is safe is still an open question (`req/plans/initial-plan.md`, Open questions), so always
 close scopes. See the `se.alipsa.jmlx.core` package Javadoc for the full contract.
 
 Every MLX-using thread carries one scheduler stream (about 60 KB measured), created by its first

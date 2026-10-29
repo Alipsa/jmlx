@@ -16,7 +16,7 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * Tests for {@link MLXGrad}, the primitive autograd wrapper (req/phase4-plan.md §6,
+ * Tests for {@link MLXGrad}, the primitive autograd wrapper (req/plans/phase4-plan.md §6,
  * req/plans/phase4-m2-plan.md Task 1).
  */
 @EnabledIfNativeAvailable

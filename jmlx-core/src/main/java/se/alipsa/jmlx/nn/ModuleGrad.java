@@ -17,9 +17,9 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Module-aware autograd: wraps {@link MLXGrad.Fn} and rebinds {@code tree}'s parameters to the
  * traced primals around each {@code loss} call, so the differentiated graph actually runs over the
- * model's own ops rather than over disconnected primal arrays (req/phase4-plan.md §6). Lives here,
- * not in {@code se.alipsa.jmlx.core}, so that package never has to import {@link Module} -- see the
- * class javadoc on {@link MLXGrad}.
+ * model's own ops rather than over disconnected primal arrays (req/plans/phase4-plan.md §6). Lives
+ * here, not in {@code se.alipsa.jmlx.core}, so that package never has to import {@link Module} --
+ * see the class javadoc on {@link MLXGrad}.
  *
  * <p>Differentiates with respect to every entry of {@code tree.parameters()} whose current value
  * has a floating dtype ({@link se.alipsa.jmlx.core.DType#isInexact()}) -- {@link Module} has no
@@ -100,7 +100,7 @@ public final class ModuleGrad implements AutoCloseable {
 
   /**
    * Freezes {@code tree} and captures the dotted paths of its floating-dtype parameters (see {@link
-   * #inexactParamPaths}) -- the ORDER only, not the values (req/phase4-plan.md §6: re-reading
+   * #inexactParamPaths}) -- the ORDER only, not the values (req/plans/phase4-plan.md §6: re-reading
    * values every {@link #apply} is what keeps grads current after an {@code update}). {@code loss}
    * receives {@code (params, inputs)} and must return a rank-0 loss as element 0 -- see {@link
    * MLXGrad.Fn#apply} for what happens if it does not.
@@ -194,8 +194,8 @@ public final class ModuleGrad implements AutoCloseable {
   /**
    * Per-iteration: {@code target} is this step's scope (grads and the returned loss value land
    * there), {@code inputs} is this batch. Re-reads {@code tree.parameters()}'s current VALUES on
-   * every call (req/phase4-plan.md §6: snapshotting them once in {@link #of} would differentiate
-   * against stale weights after the first {@code update}).
+   * every call (req/plans/phase4-plan.md §6: snapshotting them once in {@link #of} would
+   * differentiate against stale weights after the first {@code update}).
    *
    * <p>Key-set drift is impossible: {@link #of} freezes {@code tree} before returning, {@code
    * param}/{@code child} both throw once frozen, and {@code update}/{@code rebind} only ever write

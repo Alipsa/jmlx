@@ -1,6 +1,6 @@
 # jmlx Phase 4 — M2 implementation plan (`MLXGrad` / `ModuleGrad`)
 
-**Spec:** `req/phase4-plan.md` §6 (`MLXGrad`/`ModuleGrad` design, the exception-safety protocol, the
+**Spec:** `req/plans/phase4-plan.md` §6 (`MLXGrad`/`ModuleGrad` design, the exception-safety protocol, the
 rebinding mechanism), §3 (the `copyHandlesInto` shape this plan finally builds), Research findings
 (closure round-trip, `mlx_vector_array_set_data` vs `_new_data`), Status section (Probe 0b/0f findings
 this plan proceeds on). M3 (RoPE/attention/KV cache) and M4 (`QuantizedLinear`) are out of scope.
@@ -17,7 +17,7 @@ The spec's Verification item 0 asks for "one scratch class, compiled *and* run a
 bindings" before writing §6, to catch defects a header-reading pass cannot ("Java written but never
 compiled or run", `phase3-plan.md:838-843`). For M1's two hardest, least-header-derivable questions —
 upcall exception-safety threading (0b) and the rebinding mechanism itself (0f) — that scratch-class
-step was essential and was done, with findings recorded in `req/phase4-plan.md`'s Status section.
+step was essential and was done, with findings recorded in `req/plans/phase4-plan.md`'s Status section.
 
 0c (`mlx_value_and_grad` on `sum(x*x)`) is different in kind: every fact it would exercise —
 `mlx_closure_new_func`'s upcall shape, `mlx_value_and_grad`'s by-value `fun` parameter, ownership of
@@ -144,7 +144,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Primitive-only autograd over a flat primal vector: {@code mlx_value_and_grad} wrapped as a Java
  * closure. Deliberately has no {@code Module}-aware overload -- see {@code se.alipsa.jmlx.nn.ModuleGrad}
- * and req/phase4-plan.md §6 for why that lives in {@code nn} instead of here (this class would have to
+ * and req/plans/phase4-plan.md §6 for why that lives in {@code nn} instead of here (this class would have to
  * import {@code nn} to add one, inverting the one-way package dependency).
  */
 public final class MLXGrad {
@@ -158,7 +158,7 @@ public final class MLXGrad {
   /**
    * Stashes a {@link Throwable} that escaped the upcall body, so {@link Fn#apply} can re-surface the
    * ORIGINAL exception after mlx-c reports the resulting native failure as a generic {@link MLXException}
-   * (req/phase4-plan.md §6, the three-step exception-safety protocol). Thread-local, not a per-{@code Fn}
+   * (req/plans/phase4-plan.md §6, the three-step exception-safety protocol). Thread-local, not a per-{@code Fn}
    * field: cleared immediately before every {@code apply}, mirroring {@code NativeOps.checked}'s identical
    * clear-before-call rule for {@code NativeLoader}'s native-error thread-local, for the same reason -- a
    * stale value from a previous failure must never be misattributed to the next one.
@@ -193,7 +193,7 @@ public final class MLXGrad {
   /**
    * A live {@code mlx_closure_value_and_grad} plus the upcall stub backing it. Reusable across many
    * {@link #apply} calls -- {@code target} is a per-call argument, not bound at construction, because
-   * grads must land in the per-iteration step scope (req/phase4-plan.md §6: binding it at construction
+   * grads must land in the per-iteration step scope (req/plans/phase4-plan.md §6: binding it at construction
    * forces a choice between a closed target by iteration two, or one upcall stub per step).
    */
   public static final class Fn implements AutoCloseable {
@@ -284,7 +284,7 @@ public final class MLXGrad {
 
     /**
      * The upcall body: {@code int fun(mlx_vector_array* res, const mlx_vector_array in)}. Runs
-     * synchronously on the {@link #apply} caller's thread (confirmed: req/phase4-plan.md Probe 0b(c)),
+     * synchronously on the {@link #apply} caller's thread (confirmed: req/plans/phase4-plan.md Probe 0b(c)),
      * so the {@link MLXArray}s it builds are confined to that thread like any other. Never lets a
      * {@link Throwable} escape past this frame -- catches everything, stashes it on {@link #ESCAPED},
      * and returns {@code 1}, a supported non-leaking mlx-c error path (spec Research findings,
@@ -328,7 +328,7 @@ public final class MLXGrad {
 
     /**
      * Frees both closures, then the arena backing the upcall stub. Order is load-bearing
-     * (req/phase4-plan.md §6): both closures' underlying {@code std::function}s hold the raw stub
+     * (req/plans/phase4-plan.md §6): both closures' underlying {@code std::function}s hold the raw stub
      * pointer until freed, so closing the arena first would leave a dangling stub inside a live closure.
      */
     @Override
@@ -525,7 +525,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Module-aware autograd: wraps {@link MLXGrad.Fn} and rebinds {@code tree}'s parameters to the traced
  * primals around each {@code loss} call, so the differentiated graph actually runs over the model's own
- * ops rather than over disconnected primal arrays (req/phase4-plan.md §6). Lives here, not in
+ * ops rather than over disconnected primal arrays (req/plans/phase4-plan.md §6). Lives here, not in
  * {@code se.alipsa.jmlx.core}, so that package never has to import {@code Module} -- see the class
  * javadoc on {@link MLXGrad}.
  */
@@ -635,7 +635,7 @@ public final class ModuleGrad implements AutoCloseable {
 
 **On the negative rebinding-disabled test.** The spec's Testing table asks for grads matching hand-computed
 values with rebinding on, and NOT matching with rebinding disabled. That negative was already run as
-Probe 0f (req/phase4-plan.md Status section: "Rebinding off ... grads came back as exactly `0.0`/`0.0`")
+Probe 0f (req/plans/phase4-plan.md Status section: "Rebinding off ... grads came back as exactly `0.0`/`0.0`")
 against a hand-rolled toy model, and its finding is recorded permanently in the spec's prose. This plan
 does not re-derive it as a committed test, for the same reason M1 did not re-commit probes 0b/0f
 themselves: doing so would require shipping a second, rebinding-disabled code path in production
@@ -803,7 +803,7 @@ Run: `./gradlew :jmlx-core:test --tests '*ModuleGradTest*'`.
    plan's two new call sites).
 4. `./gradlew :jmlx-examples:run` — HelloMLX still runs (no `MLXGrad`/`ModuleGrad` demo added yet; this
    just confirms Task 1/2 did not regress the example).
-5. Update `req/phase4-plan.md`'s Status table: M2 done, commit hash, and a short findings note the same
+5. Update `req/plans/phase4-plan.md`'s Status table: M2 done, commit hash, and a short findings note the same
    shape as M0b/M1's entries if anything here diverged from the spec's assumptions.
 
 ## Deliberately not covered by this plan

@@ -17,9 +17,9 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Primitive-only autograd over a flat primal vector: {@code mlx_value_and_grad} wrapped as a Java
  * closure. Deliberately has no {@code Module}-aware overload -- see {@code ModuleGrad} in the
- * neural-network package and req/phase4-plan.md §6 for why that lives there instead of here (this
- * class would otherwise have to import that package, inverting its one-way dependency onto this
- * one). See {@link MLX}'s javadoc for the index of every sibling this facade was split into.
+ * neural-network package and req/plans/phase4-plan.md §6 for why that lives there instead of here
+ * (this class would otherwise have to import that package, inverting its one-way dependency onto
+ * this one). See {@link MLX}'s javadoc for the index of every sibling this facade was split into.
  */
 public final class MLXGrad {
 
@@ -32,11 +32,11 @@ public final class MLXGrad {
   /**
    * Stashes a {@link Throwable} that escaped the upcall body, so {@link Fn#apply} can re-surface
    * the ORIGINAL exception after mlx-c reports the resulting native failure as a generic {@link
-   * MLXException} (req/phase4-plan.md §6, the three-step exception-safety protocol). Thread-local,
-   * not a per-{@code Fn} field: cleared immediately before every {@code apply}, mirroring {@code
-   * NativeOps.checked}'s identical clear-before-call rule for {@code NativeLoader}'s native-error
-   * thread-local, and for the same reason -- a stale value from a previous failure must never be
-   * misattributed to the next one.
+   * MLXException} (req/plans/phase4-plan.md §6, the three-step exception-safety protocol).
+   * Thread-local, not a per-{@code Fn} field: cleared immediately before every {@code apply},
+   * mirroring {@code NativeOps.checked}'s identical clear-before-call rule for {@code
+   * NativeLoader}'s native-error thread-local, and for the same reason -- a stale value from a
+   * previous failure must never be misattributed to the next one.
    */
   private static final ThreadLocal<Throwable> ESCAPED = new ThreadLocal<>();
 
@@ -79,8 +79,8 @@ public final class MLXGrad {
   /**
    * A live {@code mlx_closure_value_and_grad} plus the upcall stub backing it. Reusable across many
    * {@link #apply} calls -- {@code target} is a per-call argument, not bound at construction,
-   * because grads must land in the per-iteration step scope (req/phase4-plan.md §6: binding it at
-   * construction forces a choice between a target closed by iteration two, or one upcall stub
+   * because grads must land in the per-iteration step scope (req/plans/phase4-plan.md §6: binding
+   * it at construction forces a choice between a target closed by iteration two, or one upcall stub
    * churned per step). Confined to its constructing thread, the same as {@link MLXScope}/{@link
    * MLXArray}: {@code Holder} and both closures it owns are only ever touched from that thread,
    * except for the {@link Cleaner} backstop below.
@@ -110,17 +110,17 @@ public final class MLXGrad {
 
       /**
        * Frees both closures, then the arena backing the upcall stub -- order is load-bearing
-       * (req/phase4-plan.md §6): both closures' underlying {@code std::function}s hold the raw stub
-       * pointer until freed, so closing the arena first would leave a dangling stub inside a live
-       * closure. Each step runs even if an earlier one throws, so a failure never abandons the
-       * later frees (or the arena) permanently. Synchronized and idempotent: the owning {@code
+       * (req/plans/phase4-plan.md §6): both closures' underlying {@code std::function}s hold the
+       * raw stub pointer until freed, so closing the arena first would leave a dangling stub inside
+       * a live closure. Each step runs even if an earlier one throws, so a failure never abandons
+       * the later frees (or the arena) permanently. Synchronized and idempotent: the owning {@code
        * Fn}'s explicit {@code close()} and the {@link Cleaner} backstop can both reach this method,
        * and must not double-free.
        *
-       * <p>Open question (req/initial-plan.md, Open questions), inherited unresolved from {@code
-       * MLXScope}'s own {@code Holder}: whether these native frees are safe to run from the Cleaner
-       * thread rather than {@code Fn}'s owning thread. Implemented as specified pending that
-       * determination.
+       * <p>Open question (req/plans/initial-plan.md, Open questions), inherited unresolved from
+       * {@code MLXScope}'s own {@code Holder}: whether these native frees are safe to run from the
+       * Cleaner thread rather than {@code Fn}'s owning thread. Implemented as specified pending
+       * that determination.
        */
       synchronized void closeAll() {
         if (closed) {
@@ -162,13 +162,13 @@ public final class MLXGrad {
 
       /**
        * The upcall body: {@code int fun(mlx_vector_array* res, const mlx_vector_array in)}. Runs
-       * synchronously on the {@link Fn#apply} caller's thread (confirmed: req/phase4-plan.md Probe
-       * 0b(c)), so the {@link MLXArray}s it builds are confined to that thread like any other, and
-       * {@code applyTarget} needs no synchronization despite {@code Fn} being reachable from the
-       * Cleaner thread too: nothing here is ever touched off {@code Fn}'s owning thread. Never lets
-       * a {@link Throwable} escape past this frame -- catches everything, stashes it on {@link
-       * #ESCAPED}, and returns {@code 1}, a supported non-leaking mlx-c error path
-       * (req/phase4-plan.md Research findings, {@code closure.cpp:44-51}).
+       * synchronously on the {@link Fn#apply} caller's thread (confirmed: req/plans/phase4-plan.md
+       * Probe 0b(c)), so the {@link MLXArray}s it builds are confined to that thread like any
+       * other, and {@code applyTarget} needs no synchronization despite {@code Fn} being reachable
+       * from the Cleaner thread too: nothing here is ever touched off {@code Fn}'s owning thread.
+       * Never lets a {@link Throwable} escape past this frame -- catches everything, stashes it on
+       * {@link #ESCAPED}, and returns {@code 1}, a supported non-leaking mlx-c error path
+       * (req/plans/phase4-plan.md Research findings, {@code closure.cpp:44-51}).
        */
       int onClosureInvoked(MemorySegment res, MemorySegment in) {
         try {

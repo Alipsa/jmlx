@@ -61,7 +61,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 #### Phase 3: Tensor Operations & Lazy Evaluation Engine
 
 * **Objective:** Expose NumPy/PyTorch-style array manipulations.
-* **Status:** Delivered. See `req/phase3-plan.md` for the detailed plan and decisions.
+* **Status:** Delivered. See `req/plans/phase3-plan.md` for the detailed plan and decisions.
 * **Deliverables:**
 * **Element-wise Ops:** `add`, `subtract`, `multiply`, `divide`, `exp`, `log`, `sin`, `cos`.
 * **Linear Algebra:** Matrix multiplication (`matmul`), transposed matrices, vector dot products, outer products.
@@ -73,7 +73,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 * **Evaluation Engine:** ~~Thread-safe~~ **Thread-confined, enforced** `eval(MLXArray... arrays)` dispatchers
   triggering native evaluation on Apple Silicon GPUs.
   *Note: this substitutes the literal "thread-safe" deliverable above. `MLXScope` is confined by construction (see
-  `req/initial-plan.md` §6), so a genuinely thread-safe `eval` would contradict the memory model the project already
+  `req/plans/initial-plan.md` §6), so a genuinely thread-safe `eval` would contradict the memory model the project already
   committed to. What was delivered instead is thread-confinement enforced at the API boundary: `eval` throws if
   called from a thread other than the one that owns the arrays' scope. This is a defensible reinterpretation, not
   the original wording — flagging it explicitly so it is not mistaken for the unmet literal deliverable.*
@@ -83,7 +83,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
 #### Phase 4: `se.alipsa.jmlx.nn` High-Level Neural Network Modules
 
 * **Objective:** Port PyTorch-style layers for building Transformer models directly in Java.
-* **Status:** Delivered. See `req/phase4-plan.md` for the detailed plan, milestones and decisions.
+* **Status:** Delivered. See `req/plans/phase4-plan.md` for the detailed plan, milestones and decisions.
 * **Deliverables:**
 * `Module` base class tracking trainable `MLXArray` weight parameters.
 * Core neural network layers: `Linear`, `Embedding`, `RMSNorm`, `LayerNorm`, `ROPE` (Rotary Position Embeddings), `SiLU`, `GELU`.
@@ -99,7 +99,7 @@ A project plan for **`jmlx`**—an idiomatic, zero-overhead Java 25+ framework t
   autograd item anywhere under Phase 4. `ROPE` shipped as `MLXFast.rope` — a `core` op landed in M3 — rather
   than as an `nn` module the way this list's own wording groups it alongside `SiLU`/`GELU`; this codebase has no
   `nn.Rope` type at all. Each milestone (M0a–M4) and the empirical findings behind the non-obvious decisions are
-  recorded in `req/phase4-plan.md`'s own Status table.*
+  recorded in `req/plans/phase4-plan.md`'s own Status table.*
 
 
 

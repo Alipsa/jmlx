@@ -17,7 +17,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Round-trip tests only (req/plans/phase5-m1-plan.md Task 4): every fixture here is written by
  * {@link MLXIO} itself, so this suite proves the facade is internally self-consistent, not interop
- * with a real HF/llama.cpp checkpoint -- that is deferred to M3 (req/phase5-plan.md's Testing
+ * with a real HF/llama.cpp checkpoint -- that is deferred to M3 (req/plans/phase5-plan.md's Testing
  * approach).
  */
 @EnabledIfNativeAvailable

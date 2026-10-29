@@ -14,7 +14,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * A quantized fully-connected layer: {@code y = quantizedMatmul(x, weight, scales, biases,
  * transpose=true) + bias}, {@code mode} fixed to {@code "affine"} (the only mode with a documented
- * rationale in this codebase -- req/phase4-plan.md, Research findings). {@code weight} is the
+ * rationale in this codebase -- req/plans/phase4-plan.md, Research findings). {@code weight} is the
  * {@code UINT32}-packed form of a checkpoint-layout {@code [out, in]} weight -- see {@link
  * MLXQuant#quantize} to build one from a float weight, or load one directly from a quantized
  * checkpoint (Phase 5). {@code forward} passes {@code x.scope()} explicitly to {@link

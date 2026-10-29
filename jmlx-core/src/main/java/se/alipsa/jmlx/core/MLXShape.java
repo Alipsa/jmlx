@@ -9,8 +9,8 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * Shape-manipulating ops: {@code reshape}, {@code broadcastTo}, {@code squeeze}, {@code transpose},
- * {@code slice}. Split out of {@link MLX} as pure motion in req/phase4-plan.md M0a -- see that
- * class's javadoc for the index of every sibling this facade was split into.
+ * {@code slice}. Split out of {@link MLX} as pure motion in req/plans/phase4-plan.md M0a -- see
+ * that class's javadoc for the index of every sibling this facade was split into.
  */
 public final class MLXShape {
 
@@ -123,7 +123,7 @@ public final class MLXShape {
 
   /**
    * Reverses every axis, allocating the result into {@code target} instead of {@code a.scope()}.
-   * See req/phase4-plan.md §2 mitigation 1: lets a weight-derived view computed inside {@code
+   * See req/plans/phase4-plan.md §2 mitigation 1: lets a weight-derived view computed inside {@code
    * forward()} land in the caller's (step) scope rather than leaking into {@code a}'s own (model)
    * scope once per call.
    */

@@ -23,7 +23,7 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 
 /**
- * See req/initial-plan.md, Testing approach, "Memory lifecycle" (scope half) and "Testing the
+ * See req/plans/initial-plan.md, Testing approach, "Memory lifecycle" (scope half) and "Testing the
  * Cleaner backstop".
  */
 @EnabledIfNativeAvailable
@@ -213,7 +213,7 @@ class MLXScopeTest {
     assertThrows(IllegalStateException.class, array::shape);
   }
 
-  // req/phase4-plan.md §2: child scopes, scopeOf/innermost, hoist/keep.
+  // req/plans/phase4-plan.md §2: child scopes, scopeOf/innermost, hoist/keep.
 
   @Test
   void newChildHasTheCorrectParentAndDepthAndAncestry() {
@@ -282,11 +282,11 @@ class MLXScopeTest {
   }
 
   /**
-   * The use-after-free the cascade introduces (req/phase4-plan.md §2). {@code parent.close()} frees
-   * {@code child}'s handles via the {@code Holder} cascade without ever touching {@code child}'s
-   * own {@code closed} field -- without {@code holder.isClosed()} in {@code MLXArray}/{@code
-   * MLXScope}'s {@code ensureOpen()}, {@code a.shape()} below would read freed memory instead of
-   * throwing.
+   * The use-after-free the cascade introduces (req/plans/phase4-plan.md §2). {@code parent.close()}
+   * frees {@code child}'s handles via the {@code Holder} cascade without ever touching {@code
+   * child}'s own {@code closed} field -- without {@code holder.isClosed()} in {@code
+   * MLXArray}/{@code MLXScope}'s {@code ensureOpen()}, {@code a.shape()} below would read freed
+   * memory instead of throwing.
    */
   @Test
   void parentCascadeThenChildAndItsArraysThrowInsteadOfReadingFreedMemory() {
@@ -371,12 +371,12 @@ class MLXScopeTest {
   }
 
   /**
-   * Asserts the {@code array.h}/{@code private/array.h} refcounting reasoning (req/phase4-plan.md
-   * §2, Research findings) rather than merely inferring it: builds {@code y = multiply(exp(x), x)}
-   * in a child scope, {@code keep}s {@code y} into the parent, closes the child (freeing {@code x}
-   * and the un-kept {@code exp(x)} intermediate), then evaluates {@code y} and checks its values
-   * against a hand-computed golden -- which only succeeds if mlx's own {@code ArrayDesc} kept the
-   * graph alive independently of this facade's handle bookkeeping.
+   * Asserts the {@code array.h}/{@code private/array.h} refcounting reasoning
+   * (req/plans/phase4-plan.md §2, Research findings) rather than merely inferring it: builds {@code
+   * y = multiply(exp(x), x)} in a child scope, {@code keep}s {@code y} into the parent, closes the
+   * child (freeing {@code x} and the un-kept {@code exp(x)} intermediate), then evaluates {@code y}
+   * and checks its values against a hand-computed golden -- which only succeeds if mlx's own {@code
+   * ArrayDesc} kept the graph alive independently of this facade's handle bookkeeping.
    */
   @Test
   void hoistSurvivesChildScopeCloseAndStillEvaluatesCorrectly() {

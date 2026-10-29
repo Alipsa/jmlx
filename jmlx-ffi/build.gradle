@@ -66,7 +66,7 @@ dependencies {
     extractionFixture project(':jmlx-native-macos-arm64')
 }
 
-// req/initial-plan.md, Testing approach, "Loader guard": NativeLoaderMissingMetallibTest
+// req/plans/initial-plan.md, Testing approach, "Loader guard": NativeLoaderMissingMetallibTest
 // needs its own JVM and its own directory, or the result depends on test
 // order within a shared JVM (ensureLoaded() caches its outcome) and risks
 // racing every other native test over the real staging directory. Same reasoning applies to

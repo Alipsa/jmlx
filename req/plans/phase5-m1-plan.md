@@ -1,10 +1,10 @@
 # jmlx Phase 5 — M1 implementation plan (`MLXIO`, safetensors + GGUF)
 
-Concrete task-by-task plan for `req/phase5-plan.md`'s M1: a new `se.alipsa.jmlx.core.MLXIO` facade
-exposing `loadSafetensors`/`saveSafetensors`/`loadGguf`/`saveGguf`. Written after `req/phase5-plan.md`
+Concrete task-by-task plan for `req/plans/phase5-plan.md`'s M1: a new `se.alipsa.jmlx.core.MLXIO` facade
+exposing `loadSafetensors`/`saveSafetensors`/`loadGguf`/`saveGguf`. Written after `req/plans/phase5-plan.md`
 itself settled every design question this plan depends on (D1 native surface, D2/D2a/D2b/D2c
 handle-ownership rules) across six review rounds -- this document does not re-derive those decisions,
-it only cites and applies them. Read `req/phase5-plan.md` first if the *why* behind any constraint
+it only cites and applies them. Read `req/plans/phase5-plan.md` first if the *why* behind any constraint
 below is unclear.
 
 ## Findings from this plan's pre-work
@@ -122,7 +122,7 @@ transient out-params -- never through `cstr`, and never through a new cache of i
 bounded literal set here to cache).
 
 **Reading a string back the other direction -- borrowed `const char*`/`char*` into a Java
-`String`** -- has no existing helper (`req/phase5-plan.md`'s Research findings already established
+`String`** -- has no existing helper (`req/plans/phase5-plan.md`'s Research findings already established
 this via repo-wide grep) and needs the standard FFM idiom for a native-owned, length-unknown,
 NUL-terminated pointer: `ptr.reinterpret(Long.MAX_VALUE).getString(0)`. `reinterpret` is required
 before `getString` because a raw pointer value read out of a struct field (e.g. `keySlot.get(ADDRESS,
@@ -130,14 +130,14 @@ before `getString` because a raw pointer value read out of a struct field (e.g. 
 it, `getString` throws `IndexOutOfBoundsException` rather than reading anything. Every accessor this
 plan uses this for -- `mlx_string_data`, `mlx_vector_string_get`, `mlx_map_string_to_array_iterator_next`'s
 `key`, `mlx_map_string_to_string_get`/`iterator_next` -- returns exactly this shape (all confirmed
-borrowed against the actual mlx-c `.cpp` sources, per `req/phase5-plan.md`'s Research findings; this
+borrowed against the actual mlx-c `.cpp` sources, per `req/plans/phase5-plan.md`'s Research findings; this
 plan does not re-verify what that document already settled).
 
 **Map iteration is a three-way status, not `NativeOps.checked`'s usual 0-or-throw.** Read directly from
 `native/scratch/mlx-c/mlx/c/map.cpp` (the pinned checkout, `fba4470b89073180056c9ea46c443051375f7399`):
 `mlx_map_string_to_array_iterator_next` returns `0` on a successful read, `1` on a genuine error (via
 `mlx_error`), and `2` once the iterator has already reached the map's `end()` -- a normal
-loop-termination signal. `req/phase5-plan.md`'s Research findings flagged this and left open whether
+loop-termination signal. `req/plans/phase5-plan.md`'s Research findings flagged this and left open whether
 `mlx_map_string_to_string_iterator_next` shares the identical convention; reading
 `map.cpp`'s `mlx_map_string_to_string_iterator_next` body directly (same file, the string-to-string
 half) confirms it does -- identical `0`/`1`/`2` structure, same `.end()` check. Both loops in this
@@ -161,7 +161,7 @@ verbatim; constraints below are the ones specific to this plan, in addition to t
 1. **`MLXIO` gets its own `NativeLoader.ensureLoaded()` static guard**, mirroring `MLXGrad`, not
    `MLXQuant` -- `MLXIO` calls `mlx_h.*` directly at every call site (D1: no `NativeOps` op-facade
    helper exists for any of these native functions), so it cannot rely on `NativeOps`'s guard the way
-   `MLXQuant` does (`req/phase5-plan.md` §1 already names this split explicitly).
+   `MLXQuant` does (`req/plans/phase5-plan.md` §1 already names this split explicitly).
 2. **Every one of the five non-`mlx_array` handle types (`mlx_io_gguf`, `mlx_map_string_to_array`,
    `mlx_map_string_to_string`, `mlx_vector_string`, `mlx_string`) is allocated via a confined
    `Arena.ofConfined()` inside a `try`-with-resources, never via an `MLXScope`** (D2a/D2b) -- and freed
@@ -241,7 +241,7 @@ verbatim; constraints below are the ones specific to this plan, in addition to t
 ## Task 1: `NativeOps` additions (`se.alipsa.jmlx.core`)
 
 Two small, narrowly-scoped helpers, added here because this is the first task that needs them (Findings
-above, same M0d discipline `req/phase4-plan.md` already established and `req/phase5-plan.md`'s Research
+above, same M0d discipline `req/plans/phase4-plan.md` already established and `req/plans/phase5-plan.md`'s Research
 findings already cite).
 
 ### Step 1a: `NativeOps.readCString`
@@ -251,7 +251,7 @@ findings already cite).
  * Reads a borrowed, NUL-terminated {@code const char*}/{@code char*} into a Java {@code String}.
  * {@code ptr} must outlive this call but is never freed by it -- every accessor this facade uses this
  * for ({@code mlx_string_data}, {@code mlx_vector_string_get}, the two map iterator/get families)
- * returns a pointer into storage some other handle already owns (req/phase5-plan.md's Research
+ * returns a pointer into storage some other handle already owns (req/plans/phase5-plan.md's Research
  * findings). {@code reinterpret} is required before {@code getString}: a raw pointer value read out of
  * a struct field or written into an out-param slot comes back as a zero-length segment with no
  * declared bounds, and {@code getString} on one throws {@code IndexOutOfBoundsException} rather than
@@ -306,7 +306,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * Checkpoint I/O: a thin facade over mlx-c's own safetensors/GGUF load and save, not a hand-rolled
- * parser (req/phase5-plan.md D1). Joins {@link MLXQuant}/{@link MLXRandom}/{@link MLXGrad} as another
+ * parser (req/plans/phase5-plan.md D1). Joins {@link MLXQuant}/{@link MLXRandom}/{@link MLXGrad} as another
  * native-facing facade inside {@code core} (D2) -- see {@link MLX}'s javadoc for the full sibling
  * index, updated by this plan's own documentation task to include this class.
  */
@@ -457,7 +457,7 @@ nothing is allocated until the status confirms there is something to allocate fo
 ## Task 3: `MLXIO` — GGUF (continues the same class)
 
 ```java
-  /** GGUF's three-way metadata split (Research findings, req/phase5-plan.md): unlike safetensors'
+  /** GGUF's three-way metadata split (Research findings, req/plans/phase5-plan.md): unlike safetensors'
    * single string-keyed metadata map, GGUF's on-disk format is a small typed-value union. */
   public record GgufResult(
       Map<String, MLXArray> tensors,
@@ -770,7 +770,7 @@ Per Global Constraint 7 (`req/plans/phase4-m1-plan.md`): `@EnabledIfNativeAvaila
 | `saveSafetensorsUnwritablePathThrowsMLXException` | Save to a path in a nonexistent/unwritable directory throws `MLXException` rather than crashing or silently no-op'ing -- the one test in this table that actually exercises D2c's swallow-on-`finally` cleanup path under a real in-flight failure (every other test's `finally` blocks run on a clean success path), not just the load-side failure `loadSafetensorsUnknownFileThrowsMLXException` already covers. |
 | `saveGgufUnwritablePathThrowsMLXException` | (Added post-implementation.) Same missing-subdir trick against `saveGguf` specifically, exercising the outer `mlx_io_gguf_free(io)` under a real in-flight `mlx_save_gguf` failure, not just a clean-success path -- coverage nothing else in this table gave GGUF's own top-level cleanup. Does *not* exercise the per-entry `mlx_vector_string_free(mvstr)` finally under a live exception: that loop runs to normal completion (freeing `mvstr` on its own success path) before `mlx_save_gguf` is ever called, so reaching `mvstr`'s `finally` under a real throw would need `mlx_vector_string_append_value`/`set_metadata_vector_string` itself to fail, which this test doesn't trigger. |
 
-**Real-checkpoint fixture gap (Testing approach in `req/phase5-plan.md`):** none of the tests above
+**Real-checkpoint fixture gap (Testing approach in `req/plans/phase5-plan.md`):** none of the tests above
 touch an externally-authored safetensors/GGUF file -- every fixture is written by `MLXIO` itself, so
 this suite proves internal round-trip consistency only. Per that document's own resolution, real-world
 interop (HF's vs. llama.cpp's differing metadata conventions, real quantized dtypes) is explicitly
@@ -786,9 +786,9 @@ task should try to close.
 - `MLX`'s own class javadoc (the "This class does not delegate to them" paragraph listing
   `MLXOps`/`MLXShape`/`MLXFast`/`MLXQuant`/`MLXRandom`/`MLXGrad`): add `MLXIO` to that list so the
   sibling index stays complete.
-- `req/phase5-plan.md`'s Status table: flip M1's row to `Done` (or `In progress`, if this plan is
+- `req/plans/phase5-plan.md`'s Status table: flip M1's row to `Done` (or `In progress`, if this plan is
   implemented across more than one sitting) once this plan's tasks land, same convention
-  `req/phase4-plan.md`'s own Status table already uses.
+  `req/plans/phase4-plan.md`'s own Status table already uses.
 
 ## Task 6: full verification pass
 
@@ -805,13 +805,13 @@ task should try to close.
 ## Deliberately not covered by this plan
 
 - Tokenizer integration (M2) and reference models (M3) — both explicitly out of scope for M1
-  (`req/phase5-plan.md` D3/D4).
+  (`req/plans/phase5-plan.md` D3/D4).
 - `mlx_load_safetensors_reader`/`mlx_save_safetensors_writer`/custom `mlx_io_reader`/`mlx_io_writer`
   vtables — this plan only binds the path-based load/save entry points; a caller-supplied stream
-  reader/writer has no named consumer yet (same YAGNI reasoning `req/phase5-plan.md`'s Out-of-scope
+  reader/writer has no named consumer yet (same YAGNI reasoning `req/plans/phase5-plan.md`'s Out-of-scope
   section already applies to save-beyond-round-trip).
 - Any general-purpose safetensors/GGUF *validation* (malformed-file diagnostics beyond whatever
   `MLXException` message mlx-c's own error handler produces) — this facade surfaces native errors, it
   does not add its own layer of file-format checking.
-- A real-checkpoint fixture file (Task 4's own note above) — left to M3 per `req/phase5-plan.md`'s
+- A real-checkpoint fixture file (Task 4's own note above) — left to M3 per `req/plans/phase5-plan.md`'s
   Testing approach resolution.

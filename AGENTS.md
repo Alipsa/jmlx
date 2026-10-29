@@ -6,9 +6,9 @@ This file provides guidance to AI agents when working with code in this reposito
 
 `jmlx` is a pure, idiomatic Java 25 framework for Apple Silicon GPU tensor operations, wrapping Apple's
 native MLX (`mlx-c`) with zero-copy FFM (Project Panama) bindings. The **v0.1 vertical slice** described
-in `req/initial-plan.md` (native bootstrap, generated bindings, memory management, a handful of tensor
-ops) is done, and two further phases are built on top of it: `req/phase3-plan.md` (broadcast-compatible
-ops, relaxed matmul, `slice`, a batched `eval`) and `req/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`,
+in `req/plans/initial-plan.md` (native bootstrap, generated bindings, memory management, a handful of tensor
+ops) is done, and two further phases are built on top of it: `req/plans/phase3-plan.md` (broadcast-compatible
+ops, relaxed matmul, `slice`, a batched `eval`) and `req/plans/phase4-plan.md` (`se.alipsa.jmlx.nn` -- `Module`,
 `Linear`, `QuantizedLinear`, normalization/activation layers, `MultiHeadAttention` with RoPE and a KV
 cache, and reverse-mode autograd via `MLXGrad`/`ModuleGrad`), both delivered. `req/plans/phase5-m1-plan.md`
 (`MLXIO` -- safetensors/GGUF checkpoint I/O) and `req/plans/phase5-m2-plan.md` (`jmlx-tokenizer` --
@@ -544,7 +544,7 @@ mlx-c is versioned independently of MLX itself (mlx-c's own `CMakeLists.txt` pin
 `GIT_TAG`), so a newer `mlx-metal` wheel does not imply any particular mlx-c commit works with it — the
 two are only bumped together, via `scripts/checkDependencies.zsh` (which cross-references mlx-c's tags
 against the wheel version) and `scripts/updateMlx.zsh`. Current pin: mlx-c `fba4470` (tracks `v0.6.0`)
-against `mlx-metal==0.31.2` (`macosx_26_0_arm64`) — see Decision 9 in `req/initial-plan.md` for why the
+against `mlx-metal==0.31.2` (`macosx_26_0_arm64`) — see Decision 9 in `req/plans/initial-plan.md` for why the
 latest 0.32.0 wheel was deliberately not used.
 
 `scripts/jextract-overrides/mlx/c/half.h` is a trimmed override copied over the staged header before
@@ -557,12 +557,16 @@ discovery pass, then a second pass restricted to symbols whose `--dump-includes`
 `mlx/c/` — both to trim Darwin system-header spillover and because (independently) an unfiltered
 whole-umbrella run silently drops `mlx_array_new`/`mlx_array_free`/`mlx_array_new_data`/
 `mlx_array_new_data_managed` from the generated Java with no warning. See Decision 10 in
-`req/initial-plan.md` for the full story if either script needs changing.
+`req/plans/initial-plan.md` for the full story if either script needs changing.
 
 ## Requirements docs
 
-`req/initial-plan.md`, `req/phase3-plan.md`, and `req/phase4-plan.md` are living design documents, not
-just history — they record the *why* behind non-obvious decisions (native library loading strategy,
+Layout: implementation plans, and the probe/reference findings that belong to them, go in
+`req/plans/`. `req/` itself holds the roadmaps (`full-roadmap.md`, `project-outline.md`), the
+living reports and generated inventories, and implementation reports.
+
+`req/plans/initial-plan.md`, `req/plans/phase3-plan.md`, and `req/plans/phase4-plan.md` are
+living design documents, not just history — they record the *why* behind non-obvious decisions (native library loading strategy,
 jextract's two-pass generation, memory confinement rules, the `se.alipsa.jmlx.nn` module framework and
 autograd design) that the code comments themselves point back to. `req/plans/phase4-m4-plan.md` is
 `QuantizedLinear`'s own implementation plan, and `req/plans/phase5-m1-plan.md` is `MLXIO`'s, each
@@ -570,14 +574,14 @@ amended in place (not rewritten) as post-merge/post-implementation review found 
 it. When touching `NativeLoader`, `MLXScope`, `MLX`, `NativeOps`, `MLXIO`, anything under
 `se.alipsa.jmlx.nn`, or the bootstrap/regen scripts, check whether the relevant decision is already
 recorded in one of these before re-deriving it. `req/project-outline.md` is the original,
-broader multi-phase vision; where it conflicts with `req/initial-plan.md` on scope or naming, the
+broader multi-phase vision; where it conflicts with `req/plans/initial-plan.md` on scope or naming, the
 latter is authoritative for what's actually being built now. `req/full-roadmap.md` extends that
 outline after Phase 5: use it to select future phase/milestone scope and exit gates, then write the
 corresponding detailed plan under `req/plans/` before implementation.
 
 Phase 5 and 6 documents:
 
-- `req/phase5-plan.md` and `req/plans/phase5-m3-retrospective.md`.
+- `req/plans/phase5-plan.md` and `req/plans/phase5-m3-retrospective.md`.
 - `req/plans/phase6-plan.md`, with one plan per milestone (`phase6-0b-plan.md` through
   `phase6-5-plan.md`) plus their probe findings, all under `req/plans/`.
 - Living reports:

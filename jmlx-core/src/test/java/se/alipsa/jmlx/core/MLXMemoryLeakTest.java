@@ -10,7 +10,7 @@ import se.alipsa.jmlx.ffi.NativeMemoryProbe;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Leak test, specified concretely".
+ * See req/plans/initial-plan.md, Testing approach, "Leak test, specified concretely".
  *
  * <p>"Memory does not grow monotonically" is unfalsifiable: MLX uses a caching allocator, so memory
  * legitimately grows then plateaus. This queries mlx-c's own <b>active</b> memory (not cached, not
@@ -62,7 +62,7 @@ class MLXMemoryLeakTest {
   }
 
   /**
-   * The variant that matters for req/phase3-plan.md §4's {@code mlx_vector_array}-based joint
+   * The variant that matters for req/plans/phase3-plan.md §4's {@code mlx_vector_array}-based joint
    * {@code eval}: a missing {@code mlx_vector_array_free} inside {@code MLX.eval} would show up
    * here as {@code activeMemoryBytes()} growth across iterations, and a double-free of the vector
    * (or of a handle copied into its backing buffer) would abort the JVM outright -- which is itself
@@ -74,10 +74,10 @@ class MLXMemoryLeakTest {
   }
 
   /**
-   * See req/phase4-plan.md §2's {@code Holder} cascade + {@code removeChild} machinery: unlike the
-   * variants above, each iteration here creates a genuine {@link MLXScope#newChild()} of one
-   * long-lived parent (not a fresh root) and does a cross-scope {@code add} against a weight living
-   * in that parent, matching the shape of a real per-step decode loop. A missing {@code
+   * See req/plans/phase4-plan.md §2's {@code Holder} cascade + {@code removeChild} machinery:
+   * unlike the variants above, each iteration here creates a genuine {@link MLXScope#newChild()} of
+   * one long-lived parent (not a fresh root) and does a cross-scope {@code add} against a weight
+   * living in that parent, matching the shape of a real per-step decode loop. A missing {@code
    * removeChild} call would accumulate dead {@code Holder} objects in the parent's children set --
    * a Java-heap leak this native-memory probe cannot see directly -- but a broken cascade or free
    * path in that same machinery would still show up here as active-memory growth.

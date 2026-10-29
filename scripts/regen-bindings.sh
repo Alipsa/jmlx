@@ -3,7 +3,7 @@
 # Regenerates jmlx-ffi's jextract bindings from the headers staged by
 # bootstrap-native.sh (native/install/include/mlx/c/mlx.h). Idempotent and
 # meant to be re-run whenever mlx-c's pinned commit changes; see
-# req/initial-plan.md §3 and Decisions 8/10 for the rationale behind each
+# req/plans/initial-plan.md §3 and Decisions 8/10 for the rationale behind each
 # non-obvious step below.
 #
 # jextract build pinned: 25-jextract+2-4 (2025-11-25), resolved and verified
@@ -68,7 +68,7 @@ log "Pass 1/2: discovering symbols (this run's generated Java is discarded; only
 [[ -s "$DUMP_FILE" ]] || die "--dump-includes produced an empty file -- did jextract fail silently?"
 
 # --- Filter: keep only symbols that came from mlx-c's own headers ----------
-# Two independent reasons this filter exists (req/initial-plan.md Decision
+# Two independent reasons this filter exists (req/plans/initial-plan.md Decision
 # 10): it trims the Darwin system-header spillover jextract pulls in
 # transitively (pthread/rusage/signal/etc. -- irrelevant noise in a generated
 # blob nobody should be reviewing line-by-line), and as a side effect it also
@@ -102,7 +102,7 @@ log "Generated $GENERATED_COUNT Java files into $PASS2_OUTPUT_DIR"
 # jextract/mlx-c upgrade that silently changes behavior fails loudly here
 # instead of surfacing later as a confusing NoSuchElementException.
 for fn in mlx_array_new mlx_array_free mlx_array_new_data mlx_get_default_device mlx_add; do
-  grep -rq "findOrThrow(\"$fn\")" "$PASS2_OUTPUT_DIR" || die "expected generated binding for $fn is missing -- see Decision 10 in req/initial-plan.md"
+  grep -rq "findOrThrow(\"$fn\")" "$PASS2_OUTPUT_DIR" || die "expected generated binding for $fn is missing -- see Decision 10 in req/plans/initial-plan.md"
 done
 log "Confirmed mlx_array_new/free/new_data and mlx_get_default_device/mlx_add are present."
 

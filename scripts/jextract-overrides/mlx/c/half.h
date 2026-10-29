@@ -1,6 +1,6 @@
 /* jextract-time override of mlx-c's mlx/c/half.h.
  *
- * v0.1 supports only float32/int32 (see req/initial-plan.md, "Out of scope for
+ * v0.1 supports only float32/int32 (see req/plans/initial-plan.md, "Out of scope for
  * v0.1"). The real half.h's HAS_BFLOAT16 block guards `typedef __bf16
  * bfloat16_t;` with `defined(__ARM_FEATURE_BF16) || defined(__aarch64__)` --
  * which is *always* true on this target -- and jextract's Clang frontend

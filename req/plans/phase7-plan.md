@@ -184,7 +184,7 @@ for every new op.
 | 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output |
 | 7.3c LLaVA-style (optional) | `jmlx-models` | 7.3a | Tier-B artifact, or a dated deferral |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record |
-| MLX upgrade (added 2026-10-29) | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c closed (delivered or deferred) | paired pin upgrade merged; committed goldens and Tier-B pass on the new pins |
+| MLX upgrade (added 2026-10-29) | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c closed (delivered or deferred) | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed |
 | 7.5 Hybrid linear-attention Qwen (Qwen3.8; added 2026-10-29) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, MLX upgrade | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded |
 
 Step 0 merges first. 7.0 and 7.1 can then proceed in parallel. 7.3a may start once 7.1's conv,
@@ -631,10 +631,9 @@ exists. Otherwise record a dated deferral. PaliGemma remains deferred because of
 access (the same Tier-B problem as Gemma v1).
 
 **Status (2026-10-29): GO, in progress.** The discovery on 2026-10-27 selected
-`microsoft/Phi-3.5-vision-instruct` (MIT). The implementation sub-plan is
-`req/plans/phase7-3c-plan.md`, with its reference findings in
-`req/plans/phase7-3c-reference-findings.md`. Both are on the `phase7-3c-plan` branch and reach
-`main` with that work.
+`microsoft/Phi-3.5-vision-instruct` (MIT). Its implementation sub-plan and reference findings
+exist only in local work that has not been pushed yet (the `phase7-3c-plan` branch). They reach
+`main` with that work, and this note gains their paths then.
 
 ## MLX upgrade before 7.5 (added 2026-10-29)
 
@@ -645,16 +644,22 @@ pairing was `mlx-metal` 0.32.4 and mlx-c v0.8.0. The upgrade runs before any 7.5
 oracle fixtures, goldens and Tier-B evidence are produced once, on the new runtime.
 
 Effect on this plan's verification:
-- **Committed evidence must still pass on the new pins.** That covers the tolerance goldens,
-  the exact greedy-ID goldens and the Tier-B rows, in both precision modes. The upgrade PR does
-  not regenerate goldens to make them pass. A golden that fails is a finding to investigate,
-  following `req/phase6-golden-precision.md`.
+- **Independent references are not regenerated.** These are the evidence not produced by MLX:
+  the CPU Hugging Face goldens under `tools/hf-reference`, the image and tokenizer oracle
+  fixtures, the exact greedy-ID goldens and the Tier-B pins. They must pass unchanged on the new
+  pins, in both precision modes. A failure is a finding to investigate, following
+  `req/phase6-golden-precision.md`, never a reason to regenerate.
+- **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
+  the procedure in `tools/mlx-oracle/README.md`:
+  - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;
+  - rewrite the expected JSON with `generateMlxOracleFixtures` on the new pins;
+  - review the resulting diff in the upgrade PR.
 - **Bit-identity recordings start over.** The exact before/after comparison refuses to compare
   across native pins, so recordings made before the upgrade are not reused. Any later
   bit-identity claim records a fresh baseline on the new pins.
-- **Tool environments are re-locked or confirmed.** The Python MLX oracle and the converter
-  environment pin the old MLX, so they are re-locked to the new pins or confirmed compatible.
-  Their fixture provenance is updated in the same PR.
+- **The converter environment is re-locked or confirmed.** `tools/qwen-vl-reference` pins the
+  old MLX, so it is re-locked to the new pins or confirmed compatible. Its provenance is
+  updated in the same PR.
 
 ## 7.5 — Hybrid linear-attention Qwen decoders (Qwen3.8) (added 2026-10-29)
 
@@ -677,7 +682,8 @@ must address each "the plan must decide" item in the roadmap's milestone 5.
   image+text and text-only-through-the-same-model cases, and cached decode agrees with the full
   forward.
 - Every converted-layout fixture loads and matches the HF-layout logits.
-- The Tier-B output is exact.
+- The Tier-B test asserts both the exact greedy IDs and the exact decoded output of the
+  end-to-end `generate`, as 7.3b's `TierBQwen3VlTest` does.
 - The 27B run is recorded with greedy IDs matching mlx-vlm.
 - The compatibility-matrix row is added.
 

@@ -277,8 +277,28 @@ Milestones, to plan in dependency order:
    (`attn_output_gate`), partial rotary embedding (`partial_rotary_factor` 0.25) and interleaved
    multi-axis RoPE (`mrope_section [11, 11, 10]`). The checkpoint includes a Qwen3-VL-style vision
    tower (`qwen3_5`, patch 16, no DeepStack levels), so the milestone covers both text and
-   image+text generation. It reuses 7.3b's `MultiAxisRope` (which already supports a partial
-   rotary tail), vision tower and request lifecycle. The milestone plan must decide:
+   image+text generation. It reuses 7.3b's vision tower and request lifecycle, and its
+   `MultiAxisRope`. The milestone plan must decide:
+   - **Partial rotary against the reference.** `MultiAxisRope` has a partial-rotary tail
+     passthrough, but its Javadoc calls that tail "a jmlx extension, not reference behaviour",
+     and it has never been tested against a reference. Transformers' `qwen3_5` code (main branch,
+     2026-10-29) rotates the first `rotary_dim = head_dim * partial_rotary_factor` dimensions and
+     concatenates the rest unchanged. The plan verifies the tail against the pinned reference
+     version, including the inverse-frequency denominator (64 here, `2 * sum(mrope_section)`).
+     7.3b's load guard `2 * sum(mrope_section) == head_dim` is specific to Qwen3-VL. The
+     `qwen3_5` path checks `2 * sum(mrope_section) == head_dim * partial_rotary_factor` instead.
+   - **Both checkpoint layouts.** Hugging Face checkpoints and `mlx_lm`-converted ones (all
+     mlx-community artifacts) differ in four ways. `mlx_lm`'s `qwen3_5` sanitize step, verified
+     in its main-branch source on 2026-10-29, does the following:
+     - It changes the key prefixes (`model.language_model.` versus `language_model.model.`).
+     - It moves the `conv1d` axes (`[C, 1, K]` versus `[C, K, 1]`).
+     - It drops the MTP tensors.
+     - It adds `+1.0` to the zero-centered RMSNorm weights (`input_layernorm`,
+       `post_attention_layernorm`, the final norm, `q_norm` and `k_norm`; not `linear_attn.norm`),
+       which the HF model applies as `x * (1 + w)`.
+
+     The descriptor must detect the layout (the `conv1d` axis order is `mlx_lm`'s own marker)
+     and load both, with the norm offset applied exactly once.
    - **A recurrent-state cache beside the KV cache.** It holds the convolution state and the
      delta-rule state. It cannot be truncated or slid, so its interaction with `KVCachePolicy`,
      `BatchGenerationScheduler` cohorts and P2's prefix cache (whole-prefix reuse only) must be
@@ -292,10 +312,16 @@ Milestones, to plan in dependency order:
      or a reviewed upgrade of the shared one.
 
    Verification:
-   - a Tier-A synthetic hybrid checkpoint against strict float32 Hugging Face logits;
-   - Tier-B `Qwen/Qwen3.5-0.8B` (Apache-2.0, same `model_type`);
-   - a recorded manual `mlx-community/Qwen3.8-27B-4bit` run (Apache-2.0; plain affine 4-bit,
-     group size 64, a format jmlx already loads), with greedy IDs matching `mlx_lm` or `mlx-vlm`.
+   - **Tier-A:** a synthetic hybrid checkpoint against strict float32 Hugging Face logits. Its
+     config must cover what the Tier-B artifact does not and Qwen3.8-27B uses: more linear value
+     heads than key heads (27B: 48 versus 16; 0.8B: 16 versus 16), an untied output head (27B is
+     untied, 0.8B is tied) and `output_gate_type`. The Qwen3.8 config sets `output_gate_type` to
+     `swish`, but Transformers' `qwen3_5` code on main does not read the key, so the plan
+     records its effect in the pinned reference before relying on it.
+   - **Tier-B:** `Qwen/Qwen3.5-0.8B` (Apache-2.0, same `model_type`), in the HF layout.
+   - **Manual run:** a recorded `mlx-community/Qwen3.8-27B-4bit` run (Apache-2.0), in the
+     `mlx_lm` layout, with greedy IDs matching `mlx_lm` or `mlx-vlm`. Its quantization (affine
+     4-bit, group size 64) is a format jmlx already loads. Its tensor layout is not (see above).
 
    **Not included (follow-ups):**
    - the shared-expert MoE variants (Qwen3.5/3.6-35B-A3B);
@@ -331,7 +357,9 @@ pins, and ships release notes.
   `req/plans/phase7-plan.md` (Baseline and constraints).
 - **Native-pin upgrades.** From R2 onward, a native-pin upgrade follows Phase 13 milestone 4's
   procedure (regenerate, diff the inventory, migration note). It ships as a minor release of
-  `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core` and `jmlx-models`.
+  `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core` and `jmlx-models`. Every published module
+  that depends on `jmlx-models` (the server, the framework adapters and `jmlx-groovy`) is
+  re-released against the new `jmlx-models` version in the same release.
 - **From 1.0.** Strict semantic versioning.
 
 ### MLX upgrade policy
@@ -343,11 +371,16 @@ skipped MLX release also adds to the binding and behavior drift a later upgrade 
 newer model families and checkpoint formats (for example the mxfp4, nvfp4 and mxfp8 variants) need
 a recent runtime.
 
-1. **Upgrade before Phase 7 milestone 5.** After 7.3c and before Qwen3.8 work starts, upgrade to
-   the newest paired release that `scripts/checkDependencies.zsh` reports. On 2026-10-29 that was
-   `mlx-metal` 0.32.4 (with a `macosx_26_0` wheel) and mlx-c v0.8.0
-   (`a26f2d584a14ec619ae8db9a09be03becd47598a`). Its oracle fixtures, goldens and Tier-B
-   evidence are then produced once, on the runtime that R2 ships.
+An upgrade may skip intermediate upstream releases (see Phase 13 milestone 4). In that case:
+- the inventory diff is taken against the previous pin;
+- the migration note covers the upstream changes of every skipped release.
+
+1. **Upgrade before Phase 7 milestone 5.** Upgrade once 7.3c has closed (delivered, or deferred
+   with a date) and before Qwen3.8 work starts. Move to the newest paired release that
+   `scripts/checkDependencies.zsh` reports. On 2026-10-29 that was `mlx-metal` 0.32.4 (with a
+   `macosx_26_0` wheel) and mlx-c v0.8.0 (`a26f2d584a14ec619ae8db9a09be03becd47598a`). This
+   skips `mlx-metal` 0.32.0–0.32.3 and mlx-c's v0.7.x tags. Its oracle fixtures, goldens and
+   Tier-B evidence are then produced once, on the runtime that R2 ships.
 2. **Afterwards, upgrade when there is a concrete reason.** Reasons include a model family or
    checkpoint format that needs a newer runtime, an upstream bug fix, or a measured performance
    gain. In any case, upgrade at least once per completed roadmap phase, so the gap never spans
@@ -371,8 +404,11 @@ new versions of any R1 module that changed. Gate:
 1. Phase 7 is done, including milestone 5 (Qwen3.8 text and image+text).
 2. P1 step 1's benchmark against `mlx_lm` is published, so decode speed is stated honestly even
    before any optimization.
-3. P4's Spring AI and LangChain4j adapters are published with this release. The Spring Boot
-   starter and the Quarkus extension may follow in R3+.
+3. P4's Spring AI and LangChain4j adapters are published with this release. Their own
+   adapter-level tests must pass against the release-smoke repository: chat, streaming and
+   embeddings through each library's interfaces, with native memory released on close. The
+   rest of P4's exit gate (the Spring Boot starter, the Quarkus extension and the two sample
+   applications) is not required for R2 and may follow in R3+.
 
 ### R3+ — Further 0.x releases
 
@@ -408,10 +444,14 @@ release smoke. None of them is published before `jmlx-models` itself.
 
 ### P1 — Decode performance parity with `mlx_lm`
 
-**Pulled forward:** `mlx_async_eval` (from Phase 12 milestone 1) and the *public* compile entry
-points in `mlx/c/compile.h` (`mlx_compile`, `mlx_enable_compile`, `mlx_disable_compile` and
-`mlx_set_compile_mode`, from Phase 12 milestone 2). The `mlx_detail_compile*` symbols remain
-under Phase 10 milestone 3's internal/unstable decision and are not pulled forward.
+**Pulled forward:**
+- `mlx_async_eval`, from Phase 12 milestone 1 (asynchronous evaluation);
+- the compile-mode controls in `mlx/c/compile.h` (`mlx_enable_compile`, `mlx_disable_compile`
+  and `mlx_set_compile_mode`), from Phase 12 milestone 1 (compile mode);
+- `mlx_compile` itself, from Phase 12 milestone 2.
+
+The `mlx_detail_compile*` symbols remain under Phase 10 milestone 3's internal/unstable decision
+and are not pulled forward.
 
 1. **Baseline first.** Benchmark jmlx against `mlx_lm` on byte-identical weights (one dense
    family, one MoE family and one 4-bit checkpoint). Measure prefill tokens/s, decode tokens/s,
@@ -472,8 +512,13 @@ Both protocols support:
 - SSE streaming in each protocol's own event format;
 - cancellation on client disconnect;
 - each protocol's own error schema;
-- stop sequences and seeds;
+- seeds;
+- string stop sequences (OpenAI `stop`, Anthropic `stop_sequences`);
 - image content parts for the vision-language families.
+
+String stop sequences are new work: `GenerationConfig` has only `stopTokenIds`. A string stop
+can span token boundaries, so streamed text must be held back until a partial match is ruled
+out. This belongs in `jmlx-models`, so that P3 and P4 share a single implementation.
 
 Tool definitions already reach chat templates through `ChatTemplateOptions.extraContext`. This
 milestone adds per-family tool-call *output* parsing into each protocol's structured tool-call
@@ -600,9 +645,9 @@ Milestones:
    `mlx_detail_compile_*` symbols are internal/unstable upstream API or supported public surface,
    and record that decision in the inventory. This decision does not cover the public
    `mlx_compile`, `mlx_enable_compile`, `mlx_disable_compile` and `mlx_set_compile_mode` in
-   `mlx/c/compile.h`; product milestone P1 may already have wrapped those. Only if accepted, add vmap/custom VJP/custom JVP/custom
-   function wrappers after callback-upcall lifetime, exception translation, and thread/arena behavior
-   are proven by native probes.
+   `mlx/c/compile.h`; product milestone P1 may already have wrapped those. Only if accepted,
+   add vmap/custom VJP/custom JVP/custom function wrappers after callback-upcall lifetime,
+   exception translation, and thread/arena behavior are proven by native probes.
 4. Add graph inspection/export APIs that MLX exposes and a reusable differential gradient suite.
 
 **Phase 10 done:** each pinned differentiation/transformation capability has an ergonomic Java
@@ -635,9 +680,11 @@ Milestones:
 
 1. `MLXRuntime`: device enumeration/selection, streams, synchronization, asynchronous evaluation,
    cache/memory limits and statistics, compile mode, and Metal availability/capture controls.
-2. After Phase 10's `mlx_detail_compile_*` scope decision, expose only accepted compiled-function
-   capabilities plus graph export/import and cache lifetime/error semantics. An
-   `internal/unstable-upstream` decision means documenting, not wrapping, those generated symbols.
+2. Complete the public `mlx_compile` API (which P1 may already have wrapped for its hot
+   functions) with graph export/import and cache lifetime/error semantics. This part does not
+   wait for Phase 10's decision. The `mlx_detail_compile_*` capabilities do wait for it: after
+   that decision, expose only the accepted ones. An `internal/unstable-upstream` decision means
+   documenting, not wrapping, those generated symbols.
 3. Custom Metal kernels: safe configuration builders, template/output arguments, asynchronous error
    reporting, and minimal kernel integration tests.  CUDA exposure follows only if it is supported by
    the pinned runtime and a CI-capable environment exists.
@@ -660,9 +707,11 @@ or documented as unavailable on the target runtime, never merely absent from the
    preserve minimized regressions as fixtures.
 3. Audit public API stability, resource ownership, exception taxonomy, documentation, examples,
    packaging, and native artifact compatibility.
-4. Establish the MLX-upgrade procedure: upgrade one pinned release at a time, regenerate bindings,
-   diff the inventory, add compatibility tests, and publish a migration note before claiming parity
-   for that release.
+4. Establish the MLX-upgrade procedure: upgrade one pin at a time (one upgrade per PR), regenerate
+   bindings, diff the inventory, add compatibility tests, and publish a migration note before
+   claiming parity for that release. An upgrade may skip intermediate upstream releases. If it
+   does, the inventory diff is taken against the previous pin and the migration note covers every
+   skipped release (see § Release plan, MLX upgrade policy).
 
 **Full-parity release gate:** 100% of the pinned public mlx-c API groups are represented in the
 inventory as implemented or as a verified native unavailability; all implemented entries have

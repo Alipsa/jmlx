@@ -711,6 +711,24 @@ Effect on this plan's verification:
     `PLANNING_BOUND` (the plan's 5 GiB);
   - the `CLEANUP_MARGIN` of 512 B in `VisionLanguageMemoryTest` and `Qwen3VlMemoryTest`, which
     is held below the smallest feature tensor by construction.
+
+  Exact-byte assertions rest on an accounting assumption: that MLX's active-byte counter grows
+  by exactly the tensor buffer size, with no rounding and no device-side metadata.
+  `Qwen3VlMemoryTest` asserts exact equality with the logical KV size (plus `4 * vocabSize`
+  for the returned logits) after prefill closes. It also asserts it at every cached-decode step
+  and on the per-position growth between steps. A failure of these assertions is not yet a
+  regression. Before classifying it, the upgrade PR runs a minimal probe: allocate one
+  evaluated array of known size and measure how much the active-byte counter grows.
+  - If the probe shows the same difference, the cause is MLX's accounting. The migration note
+    documents it, and the expected values are adjusted by the measured per-buffer amount.
+  - If the probe is exact, the failure is a jmlx retention regression.
+
+  The other memory tests are unaffected:
+  - Margin-based checks absorb accounting changes: `VisionLanguageMemoryTest`'s `FIXED_MARGIN`,
+    and the 8 MiB and 64 KiB envelopes in `DecoderCacheLifecycleTest` and `Seq2SeqMemoryTest`.
+  - Checks that the counter does not change hold under any accounting, and stay regressions:
+    the `clearCache` checks in `MLXMemoryLeakTest`, and the rejected-call check in
+    `Qwen3VlVisionTowerValidationTest`.
 - **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
   the procedure in `tools/mlx-oracle/README.md`:
   - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;

@@ -7,7 +7,8 @@
 Extend jmlx from decoder-only text generation to the Qwen3 text family, then to text encoders,
 encoder-decoder generation and image+text inference. Add the conventional `nn` layers those
 workloads need to `jmlx-core`, behind its existing facades. The primary product target is the Qwen
-family: Qwen3 text decoders (7.0) and Qwen3-VL (7.3b).
+family: Qwen3 text decoders (7.0), Qwen3-VL (7.3b) and, added 2026-10-29, the hybrid
+linear-attention Qwen3.8 (7.5).
 
 **Phase 7 done (roadmap gate):** supported non-text modalities are stated explicitly in the
 compatibility matrix; the `nn` API covers their required common layers without model packages
@@ -46,8 +47,9 @@ input, HTTP serving, and audio/diffusion implementation (7.4 only decides).
   `libmlx.dylib` (adjacent `constant`, `edge`, `Invalid padding mode (`, with no `reflect` or
   `symmetric`) and the `mlx_pad`/`mlx_pad_symmetric` declarations in the staged
   `mlx/c/ops.h`. The 7.1 probe will confirm the accepted modes at runtime.
-- The roadmap's permission to pull focused later-phase array slices forward is scoped to Phase 6
-  only (`full-roadmap.md` §Purpose). 7.1's array ops are Phase 8 scope: `abs`, `minimum`,
+- At plan time, the roadmap's permission to pull focused later-phase array slices forward was
+  scoped to Phase 6 only (`full-roadmap.md` §Purpose). Step 0 extended it to Phase 7 (roadmap
+  amendment of 2026-10-04). 7.1's array ops are Phase 8 scope: `abs`, `minimum`,
   `clip`, `floor` and `log1p` are milestone 2; `max_axes` and `var_axes` milestone 3; `pad`,
   `as_strided`, `tile` and `repeat_axis` milestone 4. The layers themselves (convolution and
   transpose convolution, pooling, padding, upsampling, normalization variants) are already
@@ -182,6 +184,8 @@ for every new op.
 | 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output |
 | 7.3c LLaVA-style (optional) | `jmlx-models` | 7.3a | Tier-B artifact, or a dated deferral |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record |
+| MLX upgrade (added 2026-10-29) | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c closed (delivered or deferred) | paired pin upgrade merged; committed goldens and Tier-B pass on the new pins |
+| 7.5 Hybrid linear-attention Qwen (Qwen3.8; added 2026-10-29) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, MLX upgrade | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded |
 
 Step 0 merges first. 7.0 and 7.1 can then proceed in parallel. 7.3a may start once 7.1's conv,
 normalization and activation layers land, even if 7.2 is still open. Each milestone is its own PR
@@ -440,8 +444,8 @@ modality rows.
 ## 7.3a — Vision foundation and SmolVLM-256M
 
 Implementation sub-plan: [phase7-3a-plan.md](phase7-3a-plan.md), proposed 2026-10-06. WP1–WP7
-merged via PRs #41–#46; WP8 is open as PR #47. The macOS 26 hosted acceptance of the WP6/WP7
-suites and the Tier-B row remains pending; see
+merged via PRs #41–#46; WP8 merged as PR #47 (2026-10-13). The macOS 26 hosted acceptance of
+the WP6/WP7 suites and the Tier-B row remains pending; see
 [phase7-3a-implementation-report.md](../phase7-3a-implementation-report.md).
 
 **Review amendments, 2026-10-06:**
@@ -582,6 +586,11 @@ immutability and decision 8 leak tests pass; the matrix gains an "image+text →
 
 ## 7.3b — Qwen3-VL
 
+**Delivered (2026-10-26).** Implementation sub-plan: [phase7-3b-plan.md](phase7-3b-plan.md).
+WP0–WP8 merged; WP8 via PRs #61 and #62. The local evidence and the CI evidence are in
+[phase7-3b-reference-findings.md](phase7-3b-reference-findings.md) §11.8. The macOS 26 hosted
+Tier-B execution remains pending.
+
 Prerequisites: 7.0 (Qwen3 text backbone) and 7.3a. The sub-plan must verify against
 `transformers`: the vision tower (2-D RoPE in the ViT, patch merger), dynamic-resolution
 preprocessing (`smart_resize`, min/max pixels), interleaved multimodal RoPE with 3-axis position
@@ -620,6 +629,59 @@ the matrix row is added.
 Reuses 7.3a (vision tower plus an MLP projector). Proceed only if a licensed small artifact
 exists. Otherwise record a dated deferral. PaliGemma remains deferred because of Gemma-terms
 access (the same Tier-B problem as Gemma v1).
+
+**Status (2026-10-29): GO, in progress.** The discovery on 2026-10-27 selected
+`microsoft/Phi-3.5-vision-instruct` (MIT). The implementation sub-plan is
+`req/plans/phase7-3c-plan.md`, with its reference findings in
+`req/plans/phase7-3c-reference-findings.md`. Both are on the `phase7-3c-plan` branch and reach
+`main` with that work.
+
+## MLX upgrade before 7.5 (added 2026-10-29)
+
+This step follows the roadmap's MLX upgrade policy (`req/full-roadmap.md` § Release plan). Once
+7.3c has closed, delivered or deferred with a date, upgrade the paired native pins, in their own
+PR, to the newest pairing that `scripts/checkDependencies.zsh` reports. On 2026-10-29 that
+pairing was `mlx-metal` 0.32.4 and mlx-c v0.8.0. The upgrade runs before any 7.5 code, so 7.5's
+oracle fixtures, goldens and Tier-B evidence are produced once, on the new runtime.
+
+Effect on this plan's verification:
+- **Committed evidence must still pass on the new pins.** That covers the tolerance goldens,
+  the exact greedy-ID goldens and the Tier-B rows, in both precision modes. The upgrade PR does
+  not regenerate goldens to make them pass. A golden that fails is a finding to investigate,
+  following `req/phase6-golden-precision.md`.
+- **Bit-identity recordings start over.** The exact before/after comparison refuses to compare
+  across native pins, so recordings made before the upgrade are not reused. Any later
+  bit-identity claim records a fresh baseline on the new pins.
+- **Tool environments are re-locked or confirmed.** The Python MLX oracle and the converter
+  environment pin the old MLX, so they are re-locked to the new pins or confirmed compatible.
+  Their fixture provenance is updated in the same PR.
+
+## 7.5 — Hybrid linear-attention Qwen decoders (Qwen3.8) (added 2026-10-29)
+
+`req/full-roadmap.md` §Phase 7, milestone 5, holds the scope and the facts it has verified, and
+this summary does not restate them. It covers:
+- `model_type` `qwen3_5` (Qwen3.5, the dense Qwen3.6 and Qwen3.8-27B), text and image+text;
+- Gated DeltaNet layers with a recurrent-state cache, plus gated full attention;
+- partial rotary embedding, verified against the reference;
+- the HF, mlx-vlm and `mlx_lm` checkpoint layouts;
+- a Tier-A HF golden plus converted-layout fixtures, Tier-B `Qwen/Qwen3.5-0.8B`, and a recorded
+  manual `mlx-community/Qwen3.8-27B-4bit` run.
+
+Prerequisites: 7.1 (the `conv1d` used by the short convolution), 7.3b (`MultiAxisRope`, the
+vision tower and the request lifecycle) and the MLX upgrade above. Its own sub-plan,
+`req/plans/phase7-5-plan.md`, is written and reviewed before code, as for every milestone. It
+must address each "the plan must decide" item in the roadmap's milestone 5.
+
+**Gate:**
+- Tier-A prefill and multi-step cached-decode logits match HF in `float32GoldenTest`, for text,
+  image+text and text-only-through-the-same-model cases, and cached decode agrees with the full
+  forward.
+- Every converted-layout fixture loads and matches the HF-layout logits.
+- The Tier-B output is exact.
+- The 27B run is recorded with greedy IDs matching mlx-vlm.
+- The compatibility-matrix row is added.
+
+Release R2 requires this milestone (`req/full-roadmap.md` § Release plan).
 
 ## 7.4 — Audio and diffusion capability decision
 
@@ -670,6 +732,11 @@ The outcome is go (which spawns its own `phase7-4-<x>-plan.md`) or a dated defer
 - Training-mode `Dropout`/`BatchNorm`, loss gradients and optimizers (Phase 11).
 - Bag/sparse embedding variants, and flattening `mlx_repeat`, until a workload needs them.
 - `qwen3_moe`, `qwen3_vl_moe`, video input, and parsing of `<think>` output.
+- From 7.5 (added 2026-10-29):
+  - the shared-expert MoE `qwen3_5` variants (Qwen3.5/3.6-35B-A3B);
+  - Qwen3.8-Flash-Next (`qwen4_exp`);
+  - multi-token-prediction heads, which are ignored at load (speculative decoding is separate);
+  - mxfp4, nvfp4 and mxfp8 checkpoints.
 - Batched scheduling of seq2seq and image requests.
 - PaliGemma, and audio/diffusion implementation (pending 7.4).
 - General indexing, FFT and linalg beyond the slices named in 7.1 (Phases 8–9).

@@ -368,8 +368,9 @@ Milestones, to plan in dependency order:
    - multi-token-prediction heads (ignored at load; speculative decoding is separate);
    - the mxfp4, nvfp4 and mxfp8 checkpoint variants.
 
-   `req/plans/phase7-plan.md` gets a step-0-style amendment adding the milestone before its plan
-   is written.
+   `req/plans/phase7-plan.md` carries the matching amendment: the 7.5 and MLX-upgrade rows in its
+   delivery order, its 7.5 section and its deferrals. The sub-plan `req/plans/phase7-5-plan.md`
+   is written and reviewed before code.
 
 **Phase 7 done:** supported non-text modalities are stated explicitly in the compatibility matrix;
 the `nn` API covers their required common layers without model packages bypassing core facades.

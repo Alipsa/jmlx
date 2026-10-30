@@ -87,17 +87,11 @@ final class Phi3VPromptExpander {
     }
     if (imageParts != geometries.size()) {
       throw new IllegalArgumentException(
-          imageParts > geometries.size()
-              ? "prompt contains "
-                  + imageParts
-                  + " image parts but only "
-                  + geometries.size()
-                  + " image(s) were provided"
-              : "prompt contains "
-                  + imageParts
-                  + " image part(s) but "
-                  + geometries.size()
-                  + " image(s) were provided");
+          "prompt contains "
+              + imageParts
+              + " image part(s) but "
+              + geometries.size()
+              + " image(s) were provided");
     }
     String rendered = tokenizer.renderChat(flatMessages, options);
     return expandRendered(tokenizer, rendered, geometries);
@@ -206,7 +200,7 @@ final class Phi3VPromptExpander {
    */
   private static void verifyMarkerOrder(List<Integer> markerIndices) {
     int expected = 1;
-    int previous = -1;
+    java.util.Set<Integer> seen = new java.util.HashSet<>();
     for (int i = 0; i < markerIndices.size(); i++) {
       int actual = markerIndices.get(i);
       if (actual < 1) {
@@ -214,8 +208,8 @@ final class Phi3VPromptExpander {
       }
       if (actual != expected) {
         String reason;
-        if (actual == previous) {
-          reason = "duplicates the previous marker";
+        if (seen.contains(actual)) {
+          reason = "duplicates marker " + actual + " (marker indices must be distinct)";
         } else if (actual < expected) {
           reason = "is out of prompt order (expected " + expected + ")";
         } else {
@@ -224,8 +218,8 @@ final class Phi3VPromptExpander {
         throw new IllegalArgumentException(
             "marker index " + actual + " at position " + i + " " + reason);
       }
+      seen.add(actual);
       expected++;
-      previous = actual;
     }
   }
 

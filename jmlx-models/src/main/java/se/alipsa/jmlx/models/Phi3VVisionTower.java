@@ -371,9 +371,7 @@ final class Phi3VVisionTower extends Module {
         new MLXArray[] {
           MLXShape.squeeze(subNewline, new int[] {0}),
           MLXShape.squeeze(param("glbGN"), new int[] {0}),
-          MLXShape.squeeze(
-              MLXShape.slice(globalNewline, new int[] {0, 0, 0}, new int[] {1, 12 * 13, MERGED}),
-              new int[] {0})
+          MLXShape.squeeze(globalNewline, new int[] {0})
         },
         0);
   }

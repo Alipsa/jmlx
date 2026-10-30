@@ -744,7 +744,15 @@ public final class ArchitectureMappings {
     for (Map.Entry<String, JsonNode> entry : source.properties()) {
       if (!keys.contains(entry.getKey())) {
         throw new IllegalArgumentException(
-            "config.json " + prefix + "." + entry.getKey() + " is unsupported");
+            "config.json "
+                + prefix
+                + "."
+                + entry.getKey()
+                + " is unsupported"
+                + ("su".equals(type) && "rope_type".equals(entry.getKey())
+                    ? " (rope_type marks a newer-transformers rope_parameters config form; only"
+                        + " the pinned 'type: su' form is supported)"
+                    : ""));
       }
     }
     if ("default".equals(type)) {

@@ -108,6 +108,7 @@ public final class Phi3VModel implements TextGenerationModel {
     Objects.requireNonNull(scope, "scope");
     Phi3VDescriptor d = Phi3VDescriptor.parse(root);
     int clipLayers = discoverClipLayers(directory);
+    requirePinnedClipDepth(clipLayers);
     Phi3VProcessorConfig preprocessor =
         Phi3VProcessorConfig.fromJson(
             Files.readAllBytes(directory.resolve("preprocessor_config.json")));
@@ -198,6 +199,26 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
+   * Requires the discovered CLIP depth to match the pinned ViT-L/14-336 depth: the last discovered
+   * layer is plan-optional and never executed, so a checkpoint that dropped it (for example a
+   * converter stripping the unused layer) would run the tower one block too few and corrupt every
+   * image feature with no load error. Real checkpoints carry all 24 layers; the tiny synthetic
+   * checkpoints opt out explicitly through the {@code jmlx.phi3v.expectedClipLayers} test property.
+   */
+  static void requirePinnedClipDepth(int clipLayers) {
+    int expected =
+        Integer.getInteger("jmlx.phi3v.expectedClipLayers", Phi3VDescriptor.PINNED_CLIP_LAYERS);
+    if (clipLayers != expected) {
+      throw new IllegalArgumentException(
+          "checkpoint has "
+              + clipLayers
+              + " CLIP encoder layers but the pinned img_processor has "
+              + expected
+              + "; a shallower checkpoint would run the tower one block too few");
+    }
+  }
+
+  /**
    * The checkpoint's CLIP encoder layer count, discovered from the shard tensor names without any
    * native work: the contiguous {@code encoder.layers.{i}.self_attn.q_proj.weight} run from layer
    * 0.
@@ -283,8 +304,12 @@ public final class Phi3VModel implements TextGenerationModel {
             plan.expandedLength(), request.config().maxNewTokens(), originalMaxPositions);
     // The re-prefill history: the clamped expanded prompt (sentinel rows embed as row 0; their
     // rows are replaced by the hook anyway) plus every generated token, appended by the decode
-    // step below.
-    List<Integer> history = new ArrayList<>();
+    // step below. Its final size is known up front; when the boundary cannot be reached the
+    // decode steps never touch it.
+    List<Integer> history =
+        boundaryPossible
+            ? new ArrayList<>(plan.expandedLength() + request.config().maxNewTokens())
+            : List.of();
     if (boundaryPossible) {
       for (int id : clampSentinels(plan.expandedIds())) {
         history.add(id);
@@ -598,10 +623,14 @@ public final class Phi3VModel implements TextGenerationModel {
       MLXArray fullIds = MLX.array(ids.scope(), full, new int[] {1, width});
       MLXArray logits =
           decoder.stepLogits(fullIds, caches, new int[] {width}, boundary.hook, null, null);
-      // Force the merge graph before releasing the rows it references: the sampler's later eval
-      // of these logits is then a no-op. Nothing after this step can fire again (the width only
-      // grows past the boundary), so the rows, the hook and the readback bookkeeping end here.
-      MLX.eval(logits);
+      // Force the merge graph before releasing the rows it references, and evaluate every retained
+      // K/V array like the regular prefill's contract does (the sampler's later eval of these
+      // logits is then a no-op). Nothing after this step can fire again (the width only grows past
+      // the boundary), so the rows, the hook and the readback bookkeeping end here.
+      MLXArray[] retained = DecoderModel.stepCacheArrays(caches);
+      MLXArray[] evaluated = Arrays.copyOf(retained, retained.length + 1);
+      evaluated[retained.length] = logits;
+      MLX.eval(evaluated);
       if (boundary.retainedRows != null) {
         boundary.retainedRows.close();
         boundary.retainedRows = null;

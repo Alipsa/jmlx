@@ -122,7 +122,7 @@ class Phi3VPromptExpanderTest {
     HfTokenizer tokenizer = fixtureTokenizer();
     ChatTemplateOptions options = ChatTemplateOptions.defaults(false);
     assertRejection(
-        "prompt contains 2 image parts but only 1 image(s) were provided",
+        "prompt contains 2 image part(s) but 1 image(s) were provided",
         () ->
             Phi3VPromptExpander.expand(
                 tokenizer,
@@ -185,12 +185,12 @@ class Phi3VPromptExpanderTest {
         "marker index 2 at position 0 skips 1",
         () -> Phi3VPromptExpander.expandRendered(tokenizer, marker(2), List.of(SQUARE)));
     assertRejection(
-        "marker index 1 at position 1 duplicates the previous marker",
+        "marker index 1 at position 1 duplicates marker 1 (marker indices must be distinct)",
         () ->
             Phi3VPromptExpander.expandRendered(
                 tokenizer, marker(1) + marker(1), List.of(SQUARE, WIDE)));
     assertRejection(
-        "marker index 1 at position 2 is out of prompt order (expected 3)",
+        "marker index 1 at position 2 duplicates marker 1 (marker indices must be distinct)",
         () ->
             Phi3VPromptExpander.expandRendered(
                 tokenizer, marker(1) + marker(2) + marker(1), List.of(SQUARE, WIDE, SQUARE)));

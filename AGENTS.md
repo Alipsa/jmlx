@@ -1034,3 +1034,17 @@ NullPointerException; `DecoderModel.DecodeStep` now receives the fed token as a 
 already holds it), so the Phi-3.5-Vision re-prefill history no longer reads the token back from a
 native array each step; and `RopeSpec.Su.toString` prints the factor tables with `Arrays.toString`
 instead of array identity hashes.
+
+A sixth PR #68 review round landed: `Phi3VModel.load` requires the discovered CLIP depth to equal
+the pinned ViT-L/14-336 depth (24) — a checkpoint that dropped the plan-optional final layer would
+otherwise run the tower one block too few with silently wrong image features — and the tiny
+synthetic checkpoints opt out explicitly via the `jmlx.phi3v.expectedClipLayers` test property set
+on `test`/`float32GoldenTest` in `jmlx-models/build.gradle` (tierB deliberately not covered). The
+boundary re-prefill now evaluates every retained K/V array like the regular prefill's contract, not
+just the logits. Smaller items: the no-op full-range slice in `Phi3VVisionTower.hdRows` is gone;
+the re-prefill history is pre-sized and immutable when unused; the expander's image-count mismatch
+has one message and a repeated marker (`1,2,1`) is reported as a duplicate; `GenerationRequest.chat`
+builds through `tokenizerBacked`; a `rope_type`-carrying su config names the
+newer-transformers form in its rejection. Deferred per the reviewer's own triage: precomputing the
+two Su frequency tables (performance only) and the vision-language models' shared helper
+extraction (follow-up PR).

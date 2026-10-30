@@ -70,6 +70,16 @@ record Phi3VDescriptor(ArchitectureDescriptor text, int numImgTokens, String emb
 
   private static final String CLIP_MODEL_NAME = "openai/clip-vit-large-patch14-336";
   private static final int CLIP_IMAGE_DIM_OUT = 1024;
+
+  /**
+   * The pinned ViT-L/14-336 encoder depth. The last discovered layer is plan-optional and never
+   * executed, so the loader requires the discovered depth to match this exactly: a checkpoint that
+   * dropped the final layer would run the tower one block too few and corrupt every image feature
+   * with no error. The tiny synthetic checkpoints carry fewer layers and opt out explicitly via the
+   * {@code jmlx.phi3v.expectedClipLayers} test property.
+   */
+  static final int PINNED_CLIP_LAYERS = 24;
+
   private static final String VISION_PREFIX = "model.vision_embed_tokens.";
 
   /**

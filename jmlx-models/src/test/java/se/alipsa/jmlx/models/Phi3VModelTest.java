@@ -70,6 +70,32 @@ class Phi3VModelTest {
   }
 
   @Test
+  void clipDepthMustMatchThePinnedArchitecture() {
+    // The test JVM opts the fixtures out to 3 layers; clearing the property restores the pinned
+    // production default for the duration of this check.
+    String key = "jmlx.phi3v.expectedClipLayers";
+    String original = System.getProperty(key);
+    System.clearProperty(key);
+    try {
+      Phi3VModel.requirePinnedClipDepth(24);
+      var error =
+          assertThrows(IllegalArgumentException.class, () -> Phi3VModel.requirePinnedClipDepth(23));
+      assertTrue(error.getMessage().contains("23"), error.getMessage());
+      assertTrue(error.getMessage().contains("24"), error.getMessage());
+      // The explicit allowance itself is honored.
+      System.setProperty(key, "3");
+      Phi3VModel.requirePinnedClipDepth(3);
+      assertThrows(IllegalArgumentException.class, () -> Phi3VModel.requirePinnedClipDepth(24));
+    } finally {
+      if (original == null) {
+        System.clearProperty(key);
+      } else {
+        System.setProperty(key, original);
+      }
+    }
+  }
+
+  @Test
   void dispatchLoadsPhi3VWithItsMetadata(@TempDir Path dir) throws Exception {
     try (MLXScope scope = new MLXScope()) {
       TinyCheckpoints.randomPhi3V(dir, SEED);

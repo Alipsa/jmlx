@@ -344,3 +344,12 @@ tasks.register('concurrentStreamProbe', Test) {
 tasks.named('check') {
     dependsOn tasks.named('threadProbeTest'), tasks.named('float32GoldenTest')
 }
+
+// The tiny phi3_v synthetic checkpoints carry three CLIP layers against the pinned 24; the depth
+// check requires the real depth by default, so the fixtures opt out explicitly here. The tierB
+// task is deliberately not covered: the real artifact must satisfy the pinned depth.
+['test', 'float32GoldenTest'].each { name ->
+    tasks.named(name, Test) {
+        systemProperty 'jmlx.phi3v.expectedClipLayers', '3'
+    }
+}

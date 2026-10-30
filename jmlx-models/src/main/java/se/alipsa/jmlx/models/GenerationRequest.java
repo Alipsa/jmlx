@@ -106,7 +106,8 @@ public final class GenerationRequest {
       throw new IllegalArgumentException("text requests require ADD or OMIT special-token policy");
     }
     List<Integer> ids = tokenizer.encode(prompt, specialTokens == PromptSpecialTokens.ADD);
-    return tokenizerBacked(ids, config, cancellationToken, specialTokens, tokenizer, prompt);
+    return tokenizerBacked(
+        ids, config, cancellationToken, specialTokens, tokenizer, prompt, null, null);
   }
 
   /**
@@ -137,14 +138,12 @@ public final class GenerationRequest {
     Objects.requireNonNull(tokenizer, "tokenizer");
     String prompt = tokenizer.renderChat(messages, options);
     List<Integer> ids = tokenizer.encode(prompt, false);
-    return new GenerationRequest(
-        ids.stream().mapToInt(Integer::intValue).toArray(),
+    return tokenizerBacked(
+        ids,
         config,
         cancellationToken,
         PromptSpecialTokens.OMIT,
         tokenizer,
-        GenerationCachePolicy.full(),
-        List.of(),
         prompt,
         deepCopyMessages(messages),
         Objects.requireNonNull(options, "options"));
@@ -201,7 +200,9 @@ public final class GenerationRequest {
       CancellationToken cancellationToken,
       PromptSpecialTokens specialTokens,
       HfTokenizer tokenizer,
-      String promptText) {
+      String promptText,
+      List<Map<String, Object>> chatMessages,
+      ChatTemplateOptions chatOptions) {
     return new GenerationRequest(
         ids.stream().mapToInt(Integer::intValue).toArray(),
         config,
@@ -211,8 +212,8 @@ public final class GenerationRequest {
         GenerationCachePolicy.full(),
         List.of(),
         promptText,
-        null,
-        null);
+        chatMessages,
+        chatOptions);
   }
 
   /**

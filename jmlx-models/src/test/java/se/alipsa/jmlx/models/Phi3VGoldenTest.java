@@ -249,12 +249,13 @@ class Phi3VGoldenTest {
           if (step == 0) {
             logits =
                 model
-                    .prefill(CancellationToken.NONE, caseImages, plan, activation, caches, hookRef)
+                    .prefill(
+                        CancellationToken.NONE, caseImages, plan, activation, caches, hookRef, true)
                     .logits();
           } else {
             int token = decodeSteps.get(step - 1).required("token_id").intValue();
             MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-            logits = model.decodeStep(ids, caches, history, hookRef);
+            logits = model.decodeStep(ids, caches, history, hookRef, true);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
           }
           stepLogits = logits.toFloatArray();

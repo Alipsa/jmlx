@@ -181,7 +181,7 @@ jobs:
                               'Qwen3VlGenerationTest', 'Qwen3VlMemoryTest', 'Qwen3VlCacheEquivalenceTest',
                               'Qwen3VlGoldenTest', 'Qwen3VlDefaultPrecisionTest',
                               'Phi3VModelTest', 'Phi3VGoldenTest', 'Phi3VDefaultPrecisionTest',
-                               'Phi3VGenerationTest', 'Phi3VMemoryTest'],
+                               'Phi3VRopeReferenceTest', 'Phi3VGenerationTest', 'Phi3VMemoryTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.

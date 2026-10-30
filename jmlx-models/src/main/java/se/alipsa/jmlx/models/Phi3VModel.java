@@ -34,7 +34,14 @@ import tools.jackson.databind.JsonNode;
  * weight memory). The reference's lossy reference-tokenizer prompt expansion is reproduced from the
  * request's retained source text (findings §13): generation requires a tokenizer-backed request and
  * re-expands {@link GenerationRequest#promptText()} against the images, so the request's own token
- * IDs are used only for event accounting.
+ * IDs are used only for event accounting. The expansion deliberately follows the pinned reference
+ * processor's tokenization exactly — every chunk is encoded with its per-encoding {@code <s>} (the
+ * reference hardcodes {@code add_special_tokens=True}) regardless of the request's {@link
+ * PromptSpecialTokens} policy: that is the behavior the Tier-B logits pin, and the alternative
+ * (feeding no {@code <s>} for an OMIT request) would run the model off its training distribution.
+ * {@link GenerationResult#promptTokenIds()} retains the request's original IDs per that contract,
+ * and {@link GenerationResult#promptPositions()} reports the expanded length the model actually
+ * consumed.
  *
  * <p>Images are processed once during prefill: per image, the CLIP tower runs over the real crop
  * slots in a private vision scope, the high-definition rows are hoisted to the prefill scope, and
@@ -156,18 +163,20 @@ public final class Phi3VModel implements TextGenerationModel {
       vision.put(entry.getValue(), weights.get(full));
     }
     // The plan-optional last layer and post_layernorm are loaded but never executed; release
-    // their handles now (the reference loads and discards them as well).
+    // their handles now (the reference loads and discards them as well). The intermediate size is
+    // read first: with a single CLIP layer, layer 0 is that plan-optional layer, and reading it
+    // after the release would touch a closed handle.
+    int intermediate =
+        weights.get(
+                Phi3VDescriptor.visionKey(
+                    "img_processor.vision_model.encoder.layers.0.mlp.fc1.weight"))
+            .shape()[0];
     for (var entry : weights.entrySet()) {
       if (entry.getKey().startsWith(Phi3VDescriptor.visionKey(""))
           && !extracted.contains(entry.getKey())) {
         entry.getValue().close();
       }
     }
-    int intermediate =
-        weights.get(
-                Phi3VDescriptor.visionKey(
-                    "img_processor.vision_model.encoder.layers.0.mlp.fc1.weight"))
-            .shape()[0];
     Phi3VVisionTower tower =
         new Phi3VVisionTower(
             scope, clipLayers, d.text().dimensions().hiddenSize(), intermediate, vision);
@@ -233,7 +242,7 @@ public final class Phi3VModel implements TextGenerationModel {
               + " exceeds checkpoint vocabulary size "
               + metadata.vocabSize());
     }
-    Phi3VPromptPlan plan = plan(promptText, request.images());
+    Phi3VPromptPlan plan = plan(request);
     // Before the decoder's own resolution, which would reject sliding modes with its own
     // checkpoint-window error: the boundary re-prefill is not proven equivalent under sliding
     // retention for phi3_v.
@@ -253,12 +262,21 @@ public final class Phi3VModel implements TextGenerationModel {
               + ", unexpanded "
               + original.length);
     }
+    // The boundary re-prefill fires only when some decode step's total width first reaches
+    // originalMaxPositions + 1; when no step can reach it, the projected rows and the re-prefill
+    // history serve nothing and are not retained (decode steps then skip the per-step native
+    // readback and boxed history too).
+    boolean boundaryPossible =
+        plan.expandedLength() <= originalMaxPositions
+            && plan.expandedLength() + request.config().maxNewTokens() - 1 >= originalMaxPositions;
     // The re-prefill history: the clamped expanded prompt (sentinel rows embed as row 0; their
     // rows are replaced by the hook anyway) plus every generated token, appended by the decode
     // step below.
     List<Integer> history = new ArrayList<>();
-    for (int id : clampSentinels(plan.expandedIds())) {
-      history.add(id);
+    if (boundaryPossible) {
+      for (int id : clampSentinels(plan.expandedIds())) {
+        history.add(id);
+      }
     }
     final DecoderModel.EmbeddingHook[] hookRef = {null};
     try {
@@ -272,8 +290,14 @@ public final class Phi3VModel implements TextGenerationModel {
           listener,
           (activation, caches) ->
               prefill(
-                  request.cancellationToken(), request.images(), plan, activation, caches, hookRef),
-          (ids, caches) -> decodeStep(ids, caches, history, hookRef));
+                  request.cancellationToken(),
+                  request.images(),
+                  plan,
+                  activation,
+                  caches,
+                  hookRef,
+                  boundaryPossible),
+          (ids, caches) -> decodeStep(ids, caches, history, hookRef, boundaryPossible));
     } catch (PreparationCancelled cancelled) {
       GenerationResult result =
           new GenerationResult(
@@ -297,17 +321,53 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
-   * The pure expansion of one unexpanded prompt against the request's images: per-image geometry
-   * and the aggregate slot budget from the configured processor (no pixels), the checkpoint
-   * tokenizer's wrapper-grammar expansion, and the expanded-prompt context bound. A pre-cancelled
-   * request is surfaced at the prefill's first boundary check instead, where the step loop converts
-   * it to a cancelled result (the 7.3b precedent).
+   * The pure expansion of one request against its images: per-image geometry and the aggregate slot
+   * budget from the configured processor (no pixels), then either the checkpoint tokenizer's
+   * wrapper-grammar expansion of the retained rendered text, or — when the request came from {@link
+   * GenerationRequest#chat} with structured content parts — the re-flattened messages (image parts
+   * become {@code <|image_i|>} markers before rendering, which the artifact's string-concatenating
+   * template cannot do itself), and the expanded-prompt context bound. A pre-cancelled request is
+   * surfaced at the prefill's first boundary check instead, where the step loop converts it to a
+   * cancelled result (the 7.3b precedent).
    *
    * <p>Package access lets the golden and lifecycle tests exercise this production boundary before
    * any native work.
    */
+  Phi3VPromptPlan plan(GenerationRequest request) {
+    List<Phi3VGeometryPlan> geometries = geometries(request.images());
+    if (request.chatMessages() != null && hasStructuredContent(request.chatMessages())) {
+      // The request's tokenizer owns the chat template that rendered the prompt (in production
+      // it is the checkpoint's own tokenizer); the artifact's string-concatenating template
+      // cannot carry structured image parts, so the messages are re-flattened to markers and
+      // re-rendered here.
+      return bounded(
+          Phi3VPromptExpander.expand(
+              request.tokenizer(), request.chatMessages(), request.chatOptions(), geometries));
+    }
+    return bounded(Phi3VPromptExpander.expandRendered(tokenizer, request.promptText(), geometries));
+  }
+
+  /**
+   * The pure expansion of one unexpanded prompt against the given images: per-image geometry and
+   * the aggregate slot budget from the configured processor (no pixels), the checkpoint tokenizer's
+   * wrapper-grammar expansion, and the expanded-prompt context bound. Package access lets the
+   * golden and lifecycle tests exercise this production boundary before any native work.
+   */
   Phi3VPromptPlan plan(String promptText, List<RgbImage> images) {
     Objects.requireNonNull(promptText, "promptText");
+    return bounded(Phi3VPromptExpander.expandRendered(tokenizer, promptText, geometries(images)));
+  }
+
+  private static boolean hasStructuredContent(List<Map<String, Object>> messages) {
+    for (Map<String, Object> message : messages) {
+      if (message.get("content") instanceof List) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private List<Phi3VGeometryPlan> geometries(List<RgbImage> images) {
     Objects.requireNonNull(images, "images");
     List<Phi3VGeometryPlan> geometries = new ArrayList<>(images.size());
     long slots = 0;
@@ -323,7 +383,10 @@ public final class Phi3VModel implements TextGenerationModel {
       }
       geometries.add(geometry);
     }
-    Phi3VPromptPlan plan = Phi3VPromptExpander.expandRendered(tokenizer, promptText, geometries);
+    return geometries;
+  }
+
+  private Phi3VPromptPlan bounded(Phi3VPromptPlan plan) {
     if (plan.expandedLength() > maxPositions) {
       throw new IllegalArgumentException(
           "expanded prompt " + plan.expandedLength() + " exceeds context length " + maxPositions);
@@ -336,10 +399,12 @@ public final class Phi3VModel implements TextGenerationModel {
    * Package access lets the golden and lifecycle tests exercise this production boundary with
    * caller-owned KV; the hook reference carries the projected rows to the boundary re-prefill.
    *
-   * <p>The caller must keep the activation scope's parent (the request's generation scope) open for
-   * the whole request: when images are present, the stored hook retains the projected rows there,
-   * since the boundary re-prefill re-injects them at a later decode step, after this step's
-   * activation scope is closed.
+   * <p>When {@code boundaryPossible} is true, the caller must keep the activation scope's parent
+   * (the request's generation scope) open for the whole request: the stored hook retains the
+   * projected rows there, since the boundary re-prefill re-injects them at a later decode step,
+   * after this step's activation scope is closed. When false (no decode step can reach the NTK-Su
+   * boundary), the rows die with this step's prefill scope instead and the hook reference is left
+   * null.
    */
   DecoderModel.FirstStepResult prefill(
       CancellationToken cancellation,
@@ -347,7 +412,8 @@ public final class Phi3VModel implements TextGenerationModel {
       Phi3VPromptPlan plan,
       MLXScope activation,
       List<KVCache> caches,
-      DecoderModel.EmbeddingHook[] hookRef) {
+      DecoderModel.EmbeddingHook[] hookRef,
+      boolean boundaryPossible) {
     checkCancellation(cancellation);
     Objects.requireNonNull(
         activation.parent(),
@@ -404,13 +470,19 @@ public final class Phi3VModel implements TextGenerationModel {
                 .projector()
                 .forward(MLXShape.reshape(hd, new int[] {1, hd.shape()[0], hd.shape()[1]}));
         MLX.eval(projected);
-        // Retained in the request's generation scope (the activation scope's parent), not this
-        // step's activation scope: the boundary re-prefill re-injects the rows at a later decode
-        // step, after the prefill step's activation scope has closed.
-        MLXArray features = MLX.hoist(projected, activation.parent());
-        hook = embedded -> merge(embedded, features, plan);
+        if (boundaryPossible) {
+          // Retained in the request's generation scope (the activation scope's parent), not this
+          // step's activation scope: the boundary re-prefill re-injects the rows at a later decode
+          // step, after the prefill step's activation scope has closed.
+          MLXArray features = MLX.hoist(projected, activation.parent());
+          hook = embedded -> merge(embedded, features, plan);
+        } else {
+          // No decode step can reach the boundary, so the rows are needed only by this step's
+          // merge; they die with the prefill scope and the hook reference stays null.
+          hook = embedded -> merge(embedded, projected, plan);
+        }
       }
-      hookRef[0] = hook;
+      hookRef[0] = boundaryPossible ? hook : null;
       observer.accept("before-prefill");
       checkCancellation(cancellation);
       MLXArray ids =
@@ -441,17 +513,23 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
-   * One cached decode step: appends the emitted token to the re-prefill history and re-runs the
-   * whole history as a fresh full prefill when that step first reaches {@code originalMaxPositions
-   * + 1} total width (the reference's boundary recompute, which thereby selects the long factor
-   * table), or otherwise decodes the single token. Package access lets the golden test drive the
-   * loop step by step against the fresh-forward reference.
+   * One cached decode step. When {@code boundaryPossible} is true, the emitted token is read back
+   * and appended to the re-prefill history, and the step that first reaches {@code
+   * originalMaxPositions + 1} total width re-runs the whole history as a fresh full prefill (the
+   * reference's boundary recompute, which thereby selects the long factor table); otherwise the
+   * single token decodes directly with no readback, boxing or history. Package access lets the
+   * golden test drive the loop step by step against the fresh-forward reference.
    */
   MLXArray decodeStep(
       MLXArray ids,
       List<KVCache> caches,
       List<Integer> history,
-      DecoderModel.EmbeddingHook[] hookRef) {
+      DecoderModel.EmbeddingHook[] hookRef,
+      boolean boundaryPossible) {
+    if (!boundaryPossible) {
+      observer.accept("decode");
+      return decoder.decode(ids, caches, null, null);
+    }
     int token = ids.toIntArray()[0];
     history.add(token);
     observer.accept("decode");
@@ -497,16 +575,20 @@ public final class Phi3VModel implements TextGenerationModel {
 
   /**
    * The CLIP tower input for one image's real slots: the contiguous real-slot prefix of the
-   * processor's slot-major CHW row, transposed to the tower's channels-last layout. Zero-padded
-   * slots are never computed (the reference computes them and slices their rows away — a recorded
+   * processor's slot-major CHW row, transposed to the tower's channels-last layout. The prefix is
+   * selected by a native row slice (not a Java-side copy of the padded buffer). Zero-padded slots
+   * are never computed (the reference computes them and slices their rows away — a recorded
    * bit-identical deviation).
    */
   private static MLXArray pixels(
       MLXScope scope, Phi3VImageProcessorResult prepared, int realSlots) {
+    float[] values = prepared.values();
     int plane = CLIP_IMAGE * CLIP_IMAGE;
-    float[] channelMajor =
-        Arrays.copyOf(prepared.values(), Math.multiplyExact(realSlots, 3 * plane));
-    MLXArray chw = MLX.array(scope, channelMajor, new int[] {realSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
+    int totalSlots = Math.floorDiv(values.length, 3 * plane);
+    MLXArray padded = MLX.array(scope, values, new int[] {totalSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
+    MLXArray chw =
+        MLXShape.slice(
+            padded, new int[] {0, 0, 0, 0}, new int[] {realSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
     return MLXShape.transpose(chw, new int[] {0, 2, 3, 1});
   }
 

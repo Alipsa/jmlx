@@ -30,6 +30,8 @@ public final class GenerationRequest {
   private final GenerationCachePolicy cachePolicy;
   private final List<RgbImage> images;
   private final String promptText;
+  private final List<Map<String, Object>> chatMessages;
+  private final ChatTemplateOptions chatOptions;
 
   /** Creates a request from already-rendered prompt token IDs. */
   public GenerationRequest(
@@ -42,6 +44,8 @@ public final class GenerationRequest {
         null,
         GenerationCachePolicy.full(),
         List.of(),
+        null,
+        null,
         null);
   }
 
@@ -53,7 +57,9 @@ public final class GenerationRequest {
       HfTokenizer tokenizer,
       GenerationCachePolicy cachePolicy,
       List<RgbImage> images,
-      String promptText) {
+      String promptText,
+      List<Map<String, Object>> chatMessages,
+      ChatTemplateOptions chatOptions) {
     this.promptTokenIds =
         Arrays.copyOf(
             Objects.requireNonNull(promptTokenIds, "promptTokenIds"), promptTokenIds.length);
@@ -70,6 +76,8 @@ public final class GenerationRequest {
       Objects.requireNonNull(this.images.get(i), "images must not contain null");
     }
     this.promptText = promptText;
+    this.chatMessages = chatMessages;
+    this.chatOptions = chatOptions;
   }
 
   /**
@@ -113,7 +121,9 @@ public final class GenerationRequest {
    * @param options chat-template options
    * @param config generation policy
    * @param cancellationToken request cancellation token
-   * @return tokenizer-backed request
+   * @return tokenizer-backed request retaining the messages and options, so a text-expanding vision
+   *     model (Phi-3.5-Vision) can re-flatten structured image parts that the rendered prompt text
+   *     cannot carry
    */
   public static GenerationRequest chat(
       HfTokenizer tokenizer,
@@ -124,8 +134,17 @@ public final class GenerationRequest {
     Objects.requireNonNull(tokenizer, "tokenizer");
     String prompt = tokenizer.renderChat(messages, options);
     List<Integer> ids = tokenizer.encode(prompt, false);
-    return tokenizerBacked(
-        ids, config, cancellationToken, PromptSpecialTokens.OMIT, tokenizer, prompt);
+    return new GenerationRequest(
+        ids.stream().mapToInt(Integer::intValue).toArray(),
+        config,
+        cancellationToken,
+        PromptSpecialTokens.OMIT,
+        tokenizer,
+        GenerationCachePolicy.full(),
+        List.of(),
+        prompt,
+        List.copyOf(Objects.requireNonNull(messages, "messages")),
+        Objects.requireNonNull(options, "options"));
   }
 
   private static GenerationRequest tokenizerBacked(
@@ -143,7 +162,9 @@ public final class GenerationRequest {
         tokenizer,
         GenerationCachePolicy.full(),
         List.of(),
-        promptText);
+        promptText,
+        null,
+        null);
   }
 
   /**
@@ -168,7 +189,9 @@ public final class GenerationRequest {
         tokenizer,
         cachePolicy,
         images,
-        promptText);
+        promptText,
+        chatMessages,
+        chatOptions);
   }
 
   /** Returns a copy of this request with an explicit cache policy. */
@@ -181,7 +204,9 @@ public final class GenerationRequest {
         tokenizer,
         Objects.requireNonNull(policy, "policy"),
         images,
-        promptText);
+        promptText,
+        chatMessages,
+        chatOptions);
   }
 
   /** Returns this request's cache retention policy. */
@@ -231,5 +256,23 @@ public final class GenerationRequest {
 
   HfTokenizer tokenizer() {
     return tokenizer;
+  }
+
+  /**
+   * Returns the chat messages this request was rendered from ({@link #chat}), or {@code null} for
+   * {@link #text} and pre-tokenized requests. A model whose prompt expansion operates on text
+   * rather than on a special image token (Phi-3.5-Vision) consults these when the rendered prompt
+   * text cannot carry the image structure: the artifact's chat template string-concatenates {@code
+   * message['content']}, so structured text/image content parts need the messages re-flattened to
+   * {@code <|image_i|>} markers before rendering; plain-string content renders as-is and needs only
+   * {@link #promptText()}.
+   */
+  List<Map<String, Object>> chatMessages() {
+    return chatMessages;
+  }
+
+  /** Returns the chat-template options {@link #chat} rendered with, or {@code null} elsewhere. */
+  ChatTemplateOptions chatOptions() {
+    return chatOptions;
   }
 }

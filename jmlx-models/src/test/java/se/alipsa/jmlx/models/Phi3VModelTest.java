@@ -148,13 +148,20 @@ class Phi3VModelTest {
         try (MLXScope activation = generation.newChild()) {
           MLXArray logits =
               model
-                  .prefill(CancellationToken.NONE, List.of(wide), plan, activation, caches, hookRef)
+                  .prefill(
+                      CancellationToken.NONE,
+                      List.of(wide),
+                      plan,
+                      activation,
+                      caches,
+                      hookRef,
+                      true)
                   .logits();
           viaSeam.add(argmax(logits.toFloatArray()));
           for (int step = 1; step < maxNew; step++) {
             MLXArray ids =
                 MLX.array(activation, new int[] {viaSeam.get(step - 1)}, new int[] {1, 1});
-            MLXArray stepLogits = model.decodeStep(ids, caches, history, hookRef);
+            MLXArray stepLogits = model.decodeStep(ids, caches, history, hookRef, true);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
             viaSeam.add(argmax(stepLogits.toFloatArray()));
           }

@@ -39,7 +39,7 @@
 // enabled (the C++ default), so every C subexpression of the form `a * b + c` in steps 2, 3
 // and 5 is executed by the hardware fused-multiply-add instruction: the product a * b is
 // formed exactly and only the final sum is rounded to float32. This port reproduces that
-// compiled arithmetic exactly: each such subexpression is evaluated with fma32, a bit-exact
+// compiled arithmetic exactly: each such subexpression is evaluated with Math.fma, the bit-exact
 // IEEE 754 binary32 fused multiply-add (single rounding, round-to-nearest-even), while the
 // bare products, subtractions and the scale division remain plain single-rounding float32
 // operations in the C source's order. A plain * and + transcription deviates from the wheels
@@ -210,75 +210,10 @@ final class TorchBicubic {
   /**
    * Bit-exact IEEE 754 binary32 fused multiply-add: the single rounding of the exact value {@code a
    * * b + c} to {@code float}, round-to-nearest-even, as the pinned wheels' AArch64 {@code fmla}
-   * instruction computes it. Java's {@code Math.fma} is double-only, and a plain {@code a * b + c}
-   * double-emulation double-rounds (product to double, sum to double, then to float), so the single
-   * rounding is reconstructed exactly instead: the product of two binary32 values has at most 48
-   * significand bits and is therefore exact in double; an error-free two-sum then recovers the
-   * exact sum of that product and {@code c}, and the comparison against the two adjacent-float
-   * midpoints (which are exact in double) selects the correctly rounded float, including exact ties
-   * and the denormal range.
+   * instruction computes it. {@link Math#fma(float, float, float)} is specified to be exactly that
+   * (single rounding, same NaN/infinity semantics), so it is used directly.
    */
   private static float fma32(float a, float b, float c) {
-    if (Float.isNaN(a) || Float.isNaN(b) || Float.isNaN(c)) {
-      return Float.NaN;
-    }
-    if (a == 0.0f || b == 0.0f) {
-      // 0 * infinity is NaN by IEEE; otherwise the product is an exact zero whose sign is
-      // the product of the operand signs.
-      if (Float.isInfinite(a) || Float.isInfinite(b)) {
-        return Float.NaN;
-      }
-      if (c != 0.0f) {
-        // Adding a zero to a nonzero c leaves c unchanged, sign included.
-        return c;
-      }
-      // z + z: the common sign when both zeros agree in sign, +0 when they differ.
-      boolean prodNeg =
-          ((Float.floatToRawIntBits(a) ^ Float.floatToRawIntBits(b)) & 0x80000000) != 0;
-      return prodNeg && (Float.floatToRawIntBits(c) & 0x80000000) != 0 ? -0.0f : 0.0f;
-    }
-    if (Float.isInfinite(a) || Float.isInfinite(b)) {
-      float prod = (a < 0.0f) ^ (b < 0.0f) ? Float.NEGATIVE_INFINITY : Float.POSITIVE_INFINITY;
-      // inf + same-sign inf stays inf; inf + opposite-sign inf is NaN.
-      return (Float.isInfinite(c) && (c < 0.0f) != (prod < 0.0f)) ? Float.NaN : prod;
-    }
-    if (Float.isInfinite(c)) {
-      // a finite product plus infinity stays infinity.
-      return c;
-    }
-    // Exact product (48 significand bits fit in double's 53).
-    double p = (double) a * (double) b;
-    double cd = (double) c;
-    double s = p + cd;
-    float r = (float) s;
-    if (Float.isInfinite(r)) {
-      // |s| is beyond the float range by more than the correction can reach.
-      return r;
-    }
-    // Error-free two-sum: s + e equals p + c in real arithmetic.
-    double e = (p - (s - cd)) + (cd - (s - p));
-    if (e == 0.0) {
-      return r;
-    }
-    // The exact result lies within one double ulp of s, so the answer is r or one of its two
-    // float neighbors. The midpoints between adjacent floats are exact in double, and the
-    // signs of (s - midpoint) + e are exact because |e| is ~2^-52 of the midpoint distance.
-    float hi = Math.nextAfter(r, Float.POSITIVE_INFINITY);
-    float lo = Math.nextAfter(r, Float.NEGATIVE_INFINITY);
-    double hiMidpoint = ((double) r + (double) hi) * 0.5;
-    double loMidpoint = ((double) r + (double) lo) * 0.5;
-    double aboveHi = (s - hiMidpoint) + e;
-    double belowLo = (s - loMidpoint) + e;
-    if (aboveHi > 0.0) {
-      return hi;
-    }
-    if (belowLo < 0.0) {
-      return lo;
-    }
-    // An exact tie at a midpoint rounds to even.
-    if (aboveHi == 0.0 || belowLo == 0.0) {
-      return (Float.floatToRawIntBits(r) & 1) == 0 ? r : aboveHi == 0.0 ? hi : lo;
-    }
-    return r;
+    return Math.fma(a, b, c);
   }
 }

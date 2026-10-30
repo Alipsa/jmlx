@@ -561,6 +561,36 @@ class ArchitectureMappingsTest {
   }
 
   @Test
+  void topLevelOriginalMaxPositionsReachesTheUnknownKeySinkOutsidePhi3v() {
+    // NTK-Su reads the top-level key, so only the phi3_v family consumes it; any other family
+    // carrying it must surface it as an unknown key instead of silently running plain RoPE.
+    for (String type : List.of("llama", "qwen2", "phi3", "mistral")) {
+      List<String> unknown = new ArrayList<>();
+      ArchitectureMappings.parse(
+          json(
+              """
+              {"model_type":"%s","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+               "num_hidden_layers":1,"num_attention_heads":2,"max_position_embeddings":8,
+               "original_max_position_embeddings":4}
+              """
+                  .formatted(type)),
+          unknown::add);
+      assertEquals(List.of("original_max_position_embeddings"), unknown, type);
+    }
+    List<String> phi3vUnknown = new ArrayList<>();
+    ArchitectureMappings.parse(
+        json(
+            """
+            {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+             "num_hidden_layers":1,"num_attention_heads":2,"max_position_embeddings":8,
+             "original_max_position_embeddings":4,
+             "rope_scaling":{"type":"su","short_factor":[1.0,1.0],"long_factor":[1.1,1.1]}}
+            """),
+        phi3vUnknown::add);
+    assertEquals(List.of(), phi3vUnknown);
+  }
+
+  @Test
   void phi3vRejectsNonSuRopeVariantsNamingTheType() {
     for (String type : List.of("yarn", "linear", "llama3")) {
       var error =

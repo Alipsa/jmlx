@@ -184,12 +184,18 @@ class TierBPhi3VTest {
                 logits =
                     model
                         .prefill(
-                            CancellationToken.NONE, selected, plan, activation, caches, hookRef)
+                            CancellationToken.NONE,
+                            selected,
+                            plan,
+                            activation,
+                            caches,
+                            hookRef,
+                            true)
                         .logits();
               } else {
                 int token = input.required("target_ids").get(step - 1).asInt();
                 MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-                logits = model.decodeStep(ids, caches, history, hookRef);
+                logits = model.decodeStep(ids, caches, history, hookRef, true);
                 MLX.eval(DecoderModel.stepCacheArrays(caches));
               }
               float[] actual = logits.toFloatArray();

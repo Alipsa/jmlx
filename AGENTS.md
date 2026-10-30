@@ -964,3 +964,29 @@ rejected, `phi3_v`'s NTK-Su being implemented as `RopeSpec.Su`), `req/phase6-inf
 report.md`, `req/phase6-tier-a-fixtures.md`, `req/phase6-tier-b-artifacts.md`,
 `tools/tier-b/README.md` and `req/plans/phase7-plan.md`. No native pin, generated binding
 or public API changed.
+
+The PR #68 review round (2026-10-30) landed: `Phi3VRopeReferenceTest` joined the CI
+required-suite list; `RopeSpec.Su` is defensive-copy immutable with value equality (the
+record default compared its factor arrays by identity); the top-level
+`original_max_position_embeddings` key left the shared `CONSUMED` list and is accepted
+only behind the phi3_v family's `acceptsSuRope` capability, so a llama/qwen2/phi3/mistral
+config carrying it reaches the unknown-key sink instead of silently running plain RoPE;
+`TorchBicubic`'s hand-written single-rounding `fma32` is `Math.fma` (Java 21's float
+overload is specified as the same single-rounding fused multiply-add, byte-exact on the
+`phi3v` oracle family); the WP5 load reads the CLIP intermediate size before releasing the
+plan-optional last layer's weights, so a one-layer CLIP checkpoint no longer fails on a
+closed handle; and `GenerationRequest.chat` retains its messages and options so
+`Phi3VModel` can re-flatten structured text/image content parts to `<|image_i|>` markers
+(the artifact's chat template string-concatenates `message['content']`, which structured
+parts cannot survive) — plain-string content keeps the rendered-text path, and the Tier-B
+manifest's literal-marker requests are unchanged. The model's re-tokenization still
+always applies the reference processor's per-chunk `<s>` regardless of the request's
+`PromptSpecialTokens` policy (the Tier-B logits pin; documented on the class), with
+`GenerationResult.promptTokenIds()` retaining the request's original IDs per that
+contract. The boundary re-prefill's projected rows, the re-prefill history and the
+per-step native token readback are now conditional on a decode step actually being able
+to reach `original_max_position_embeddings + 1` (`expandedLength <= original_max <=
+expandedLength + maxNewTokens - 1`): when unreachable, the rows die with the prefill
+scope, `hookRef` stays null and decode steps skip the readback and boxed history; and the
+pixel buffer's real-slot trim moved from a Java-side `Arrays.copyOf` to a native row
+slice. No native pin or generated binding changed.

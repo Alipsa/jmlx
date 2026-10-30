@@ -57,7 +57,6 @@ public final class ArchitectureMappings {
           "sliding_window",
           "max_window_layers",
           "max_position_embeddings",
-          "original_max_position_embeddings",
           "partial_rotary_factor",
           "quantization",
           "quantization_config");
@@ -399,7 +398,13 @@ public final class ArchitectureMappings {
     ArchitectureDescriptor descriptor = dense(config, family);
     for (Map.Entry<String, JsonNode> entry : config.properties()) {
       String key = entry.getKey();
-      if (!CONSUMED.contains(key) && !IGNORED.containsKey(key) && !key.endsWith("_pdrop")) {
+      if (!CONSUMED.contains(key)
+          && !IGNORED.containsKey(key)
+          && !key.endsWith("_pdrop")
+          // NTK-Su reads the top-level original_max_position_embeddings (parseRope's "su" case);
+          // only the phi3_v family accepts it, so any other family carrying the key reaches the
+          // unknown-key sink instead of silently running with plain RoPE.
+          && !(key.equals("original_max_position_embeddings") && family.acceptsSuRope())) {
         unknownKeySink.accept(key);
       }
     }

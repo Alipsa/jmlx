@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.Arrays;
 import java.util.Objects;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -382,6 +383,45 @@ public sealed interface RopeSpec
     @Override
     public boolean isStatic() {
       return false;
+    }
+
+    /**
+     * Defensive copies: the tables back every RoPE call, so a caller mutating a returned array
+     * would silently change this spec's math (the record stores the validated copies).
+     */
+    @Override
+    public float[] shortFactors() {
+      return shortFactors.clone();
+    }
+
+    /** Defensive copy; see {@link #shortFactors()}. */
+    @Override
+    public float[] longFactors() {
+      return longFactors.clone();
+    }
+
+    /** Value equality on the factor tables; the record default compares arrays by identity. */
+    @Override
+    public boolean equals(Object other) {
+      if (!(other instanceof Su that)) {
+        return false;
+      }
+      return Float.floatToIntBits(theta) == Float.floatToIntBits(that.theta)
+          && maxPositions == that.maxPositions
+          && originalMaxPositions == that.originalMaxPositions
+          && Arrays.equals(shortFactors, that.shortFactors)
+          && Arrays.equals(longFactors, that.longFactors);
+    }
+
+    /** Value hash on the factor tables; pairs with {@link #equals(Object)}. */
+    @Override
+    public int hashCode() {
+      return Objects.hash(
+          theta,
+          maxPositions,
+          originalMaxPositions,
+          Arrays.hashCode(shortFactors),
+          Arrays.hashCode(longFactors));
     }
 
     /** The static multiplier on both cos and sin: 1 unless the context is extended. */

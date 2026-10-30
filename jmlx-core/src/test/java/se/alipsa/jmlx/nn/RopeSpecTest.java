@@ -3,6 +3,7 @@ package se.alipsa.jmlx.nn;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -104,5 +105,30 @@ class RopeSpecTest {
   void suRejectsAFactorTableThatDoesNotFitTheRotaryDims() {
     RopeSpec su = new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3}, new float[] {1, 2});
     assertThrows(IllegalArgumentException.class, () -> su.frequencies(8, 1));
+  }
+
+  @Test
+  void suIsImmutableAndComparesByValue() {
+    float[] shorts = {2, 3, 4, 5};
+    float[] longs = {1, 2, 4, 8};
+    RopeSpec.Su su = new RopeSpec.Su(10_000, 8192, 4096, shorts, longs);
+    shorts[0] = 99;
+    longs[0] = 99;
+    assertArrayEquals(new float[] {2, 3, 4, 5}, su.shortFactors(), 0f);
+    assertArrayEquals(new float[] {1, 2, 4, 8}, su.longFactors(), 0f);
+    // Accessors hand out copies: mutating a returned table must not change the spec's math.
+    su.shortFactors()[1] = 99;
+    su.longFactors()[1] = 99;
+    assertArrayEquals(new double[] {2, 30, 400, 5000}, su.frequencies(8, 1), 1e-6);
+    assertEquals(
+        su,
+        new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3, 4, 5}, new float[] {1, 2, 4, 8}));
+    assertEquals(
+        su.hashCode(),
+        new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3, 4, 5}, new float[] {1, 2, 4, 8})
+            .hashCode());
+    assertNotEquals(
+        su,
+        new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3, 4, 6}, new float[] {1, 2, 4, 8}));
   }
 }

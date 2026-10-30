@@ -6,22 +6,31 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.tokenizer.ChatTemplateOptions;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.vision.RgbImage;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Public generation, request reuse, capacity, cancellation boundaries and failure contracts. */
 @EnabledIfNativeAvailable
 class Phi3VGenerationTest {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
   void mixedRequestsKeepTheirOwnCapacityAndSlidingIsRejected() throws Exception {
@@ -273,6 +282,65 @@ class Phi3VGenerationTest {
       assertEquals(Arrays.stream(base.promptTokenIds()).boxed().toList(), aborted.promptTokenIds());
       assertEquals(5, model.generate(base, ignored -> {}).generatedTokenIds().size());
     }
+  }
+
+  @Test
+  void structuredChatContentExpandsThroughTheRetainedMessages(@TempDir Path directory)
+      throws Exception {
+    try (MLXScope root = new MLXScope()) {
+      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      // The WP6 checkpoint ships no chat template; pair its tiny tokenizer with the artifact's
+      // string-concatenating template so the documented GenerationRequest.chat form is exercised.
+      HfTokenizer chatTokenizer = chatTokenizer(directory);
+      GenerationRequest structured =
+          GenerationRequest.chat(
+                  chatTokenizer,
+                  List.of(
+                      Map.of(
+                          "role",
+                          "user",
+                          "content",
+                          List.of(
+                              Map.of("type", "text", "text", "toast "),
+                              Map.of("type", "image"),
+                              Map.of("type", "text", "text", " toast")))),
+                  ChatTemplateOptions.defaults(true),
+                  GenerationConfig.greedyDefaults(5, Set.of()),
+                  CancellationToken.NONE)
+              .withImages(List.of(Phi3VTestSupport.square()));
+      // The artifact's template string-concatenates message['content'], so the request cannot
+      // retain proper markers in its rendered text; the model must re-flatten the retained
+      // messages. The equivalent literal-marker request must generate identically.
+      GenerationRequest marked =
+          Phi3VTestSupport.request(
+              Phi3VTestSupport.tokenizer(),
+              "<|user|>\ntoast <|image_1|> toast<|end|>\n<|assistant|>\n",
+              List.of(Phi3VTestSupport.square()),
+              5);
+      GenerationResult fromParts = model.generate(structured, ignored -> {});
+      GenerationResult fromMarkers = model.generate(marked, ignored -> {});
+      assertEquals(fromMarkers.generatedTokenIds(), fromParts.generatedTokenIds());
+      assertEquals(fromMarkers.promptPositions(), fromParts.promptPositions());
+    }
+  }
+
+  private static HfTokenizer chatTokenizer(Path directory) throws Exception {
+    Files.copy(
+        Phi3VTestSupport.directory().resolve("tokenizer.json"),
+        directory.resolve("tokenizer.json"));
+    ObjectNode config = MAPPER.createObjectNode();
+    config.put("chat_template", artifactChatTemplate());
+    Files.writeString(directory.resolve("tokenizer_config.json"), config.toString());
+    return HfTokenizer.fromDirectory(directory);
+  }
+
+  private static String artifactChatTemplate() throws Exception {
+    return JsonFiles.read(
+            Path.of(
+                System.getProperty("jmlx.repository.root"),
+                "jmlx-models/src/test/resources/phi3v-tokens/tokenizer_config.json"))
+        .required("chat_template")
+        .asString();
   }
 
   private static int expandedLength(Phi3VModel model, GenerationRequest request) {

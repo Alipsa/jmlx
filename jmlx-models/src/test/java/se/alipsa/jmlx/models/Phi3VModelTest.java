@@ -133,7 +133,7 @@ class Phi3VModelTest {
       assertEquals(1, events.stream().filter("re-prefill"::equals).count(), "re-prefill events");
       // The seam-driven reference: one caller-owned activation scope kept open for the whole
       // request, stepping the retained hook exactly as the production loop does.
-      Phi3VPromptPlan plan = model.plan(CancellationToken.NONE, prompt, List.of(wide));
+      Phi3VPromptPlan plan = model.plan(prompt, List.of(wide));
       List<Integer> history = new ArrayList<>();
       for (int id : plan.expandedIds()) {
         history.add(Math.max(id, 0));

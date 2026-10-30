@@ -169,8 +169,7 @@ class Phi3VGoldenTest {
       throws Exception {
     String name = c.required("name").asString();
     List<RgbImage> caseImages = images(c);
-    Phi3VPromptPlan plan =
-        model.plan(CancellationToken.NONE, c.required("prompt").asString(), caseImages);
+    Phi3VPromptPlan plan = model.plan(c.required("prompt").asString(), caseImages);
     assertArrayEquals(
         expandCompactIds(c.required("expanded_ids")), plan.expandedIds(), name + " expansion");
     assertEquals(

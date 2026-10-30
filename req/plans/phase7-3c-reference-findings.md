@@ -794,3 +794,93 @@ verification claims stay pinned to the 4.2B artifact (§1), and the descriptor (
   named bound `0.0012`) measured `9.266138e-4` — recorded in
   `req/phase6-golden-precision.md`. Both suites are registered in the macOS CI
   required-suite assertion and the result-XML upload.
+
+## 15. WP7 implementation evidence — lifecycle, memory and cache accounting
+
+- **`plan` is pure.** `Phi3VModel.plan(String, List<RgbImage>)` no longer calls
+  `checkCancellation` at its head: that call lived outside `generate`'s `try`, so a
+  request already cancelled before `generate` leaked `PreparationCancelled` as an
+  exception instead of a CANCELLED result (`Phi3VGenerationTest` failed at the
+  pre-cancelled-request assertion until the guard moved). Aligned with the 7.3b
+  precedent (Qwen3Vl's `plan` has no cancellation token; pre-cancellation surfaces at
+  the `prefill` lambda's first `checkCancellation`, inside the step loop, where
+  `generate` catches it and returns CANCELLED with the terminal listener event).
+- **Tower staged-evaluation fix (production change found by `Phi3VMemoryTest`).** The
+  original `Phi3VVisionTower.forward` built the whole per-image CLIP graph lazily in the
+  caller's scope, so the Java handles pinned every intermediate until the vision scope
+  closed: a throwaway probe measured **780,910,616 B** of active memory after the
+  evaluated features existed and only after the vision scope closed, and the memory
+  test's first-draft run measured a per-image peak of **787,398,705 B** (at the real
+  12-layer geometry this pins several GiB through prefill close). Restructured to the
+  7.3b WP5 per-stage evaluate-and-release pattern (findings 7.3b §11.4): the embedding
+  stage (conv → class concatenation → position add → pre-encoder norm) runs in a child
+  scope whose only survivor `x` is evaluated and hoisted before the stage closes, and
+  each executed CLIP block runs in its own child scope with the 7.3b
+  `MLXShape.broadcastTo(x, block, x.shape())` entry pin, evaluated, then hoisted.
+  Post-fix per-image peak: **407,175,193 B** (the remaining transient is the
+  intra-block attention, see below). Bit-identity of the change: `Phi3VGoldenTest`
+  (strict, TF32 off) still measures `1.5497208e-6` and `Phi3VDefaultPrecisionTest`
+  (TF32 on) still measures `9.266138e-4` — byte-identical to the WP6 measurements in
+  `req/phase6-golden-precision.md`, consistent with uncompiled MLX not fusing across
+  eval boundaries.
+- **Per-image peak bound, corrected.** The first-draft bound (178,845,188 B) counted a
+  single-head `577 × 577` score matrix; the real attention matrices are
+  `[S, 16, 577, 577]` = 64,277,760 B each, and `BidirectionalAttention`'s
+  matmul → scale → mask-fill → fused-softmax chain keeps five score-sized buffers alive
+  at once (matmul result, scaled scores, mask-filled scores, the softmax output and the
+  fused `mlx_softmax_axis` exp temporary). The committed bound is the pixel input +
+  twelve `[S, 577, 1024]`-sized activation arrays alive inside one block at a time
+  (entry row, broadcast pin, q/k/v projections, attention output, residual adds, FFN
+  output) + five score-sized buffers + a 64 MiB eval slack = **477,644,032 B** for the
+  wide image (S = 3); the measured peak 407,175,193 B sits inside it with 67,468,839 B
+  of margin.
+- **Tier accounting.** At the wide prompt's retained sizes (P = 465), each of the four
+  K/V buffers (119,040 B) sits in the allocator's 128 KiB tier and the retained
+  projection-row buffer (233,984 B) in the 256 KiB tier (7.3b findings §11.7 allocator
+  evidence), so `TIER_SLACK = 4 × 16384 + 32768 = 98,304 B` bounds every retained-vs-
+  logical assertion; `CLEANUP_MARGIN = 512 B`. `kvPerPosition = 2 × 2 layers × 1 KV
+  head × 64 head dim × 4 B = 1024 B`, derived from the model's own metadata, config and
+  descriptor (the 7.3b WP7 budget method), not a legacy constant.
+- **`Phi3VMemoryTest` evidence (2 tests, both passing).** Test 1 (per-image peak +
+  retention): baseline 43,922,944 B; per-image peak 407,175,193 B; prefill closure
+  releases the per-image feature buffers (the excess over the logical KV + retained
+  projection rows stays within `TIER_SLACK + CLEANUP_MARGIN` both before and after the
+  prefill scope closes, the evaluated `featureBytes` lower bound holding only before
+  the close, since the per-image eval already released pixels and encoder
+  intermediates); decode slope over 4 steps **0 B** — the four steps' 1024 B total
+  growth crosses no tier boundary, and the per-step lower-bound assertions
+  (`now >= kvPerPosition × (P + step) + projected`) are what pin the actual KV growth.
+  Test 2 (repeated generations, failures and cleanup): 3 repeats × (5 mixed requests +
+  EOS/STOP variants + a cancelled request + injected prefill faults) all return to the
+  baseline — measured `baseline=43,933,720 B, final=43,933,720 B` (flat), with a
+  whole-test peak of 729,669,681 B that includes the fault-injected prefills; the
+  two re-prefill failure paths (observer fault before `cache.reset()`, and a boundary
+  evaluator fault at index 6 after the reset) both clean up to the baseline, and the
+  output-decoder failure-token case (vocab entry of the wide greedy first token 8
+  removed from a `@TempDir` tokenizer copy) aborts at stage `output decoder` and
+  cleans up.
+- **`Phi3VGenerationTest` evidence (4 tests, all passing, ~1.2 s).** (1) Capacity and
+  sliding: demand `expandedLength + maxNew − 1` — `full(L+4)` fits and `full(L+3)`
+  rejects for maxNew 5 with the `IllegalArgumentException` naming the expanded prompt
+  length and the capacity; sliding retention is rejected at the request level before
+  any native work. (2) Boundary re-prefill: wide P = 465, maxNew 8 — decode step 6
+  (entry `nextPosition` 470) fires exactly one `re-prefill` event (before the
+  `cache.reset()`), yielding 7 decode events + 1 `re-prefill`; the re-prefill's full
+  width 471 fits `full(472)` and is rejected by `full(471)`. (3) Cancellation
+  boundaries on the two-image request (768 expanded): `image-closed` → 1 `vision` +
+  1 `image-closed`, 0 tokens; `before-prefill` → 2 `vision` + 2 `image-closed` + 1
+  `project`, 0 tokens; `prefill-closed` and `listener` → exactly 1 token; `decode` →
+  exactly 2 tokens; `initial`/`preprocess` → no stage events at all. (4) Finish
+  reasons: EOS, stop-token, sampled-output and aborted requests each finish with the
+  right reason and event count `maxNew + 1` (token events plus the terminal
+  `finished`).
+- **Observer vocabulary.** The test observer's committed event order: `preprocess`,
+  then per image `vision` and `image-closed`, then `project`, `before-prefill`,
+  `prefill-evaluated`, `prefill-closed`, then `decode` per step and `re-prefill`
+  before the boundary `cache.reset()`; documented on `setObserverForTest`. The
+  golden tests are unaffected (the observer is inert when unset, and their
+  filtered-count assertions filter by name).
+- **CI.** Both WP7 suites are ordinary `test`-task suites (not `full-float32`);
+  `Phi3VGenerationTest` and `Phi3VMemoryTest` are registered in the macOS
+  CI required-suite assertion (`suites['jmlx-models']`, default `test` results
+  directory) and in the result-XML upload.

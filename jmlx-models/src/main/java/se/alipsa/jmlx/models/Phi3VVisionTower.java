@@ -51,8 +51,9 @@ import se.alipsa.jmlx.nn.Sequential;
  * removed); {@link #hdRows} then runs the reference's high-definition transform — the global slot's
  * 2x2 merge and newline, the sub-crop 2x2 merge and newline, and the per-image {@code [sub,
  * separator, global]} row order with the learnable {@code glb_GN} separator — into the one {@code
- * [numImgTokens, 4096]} block the projector consumes. Both methods allocate every activation into
- * the input's scope.
+ * [numImgTokens, 4096]} block the projector consumes. Each forward stage (the embedding stage, then
+ * one per CLIP block) is evaluated and released as it completes; only the stage's surviving
+ * activation is hoisted into the input's scope ({@code pixels.scope()}).
  */
 final class Phi3VVisionTower extends Module {
 
@@ -264,8 +265,8 @@ final class Phi3VVisionTower extends Module {
    *
    * <p>{@code pixels} is {@code [S, 336, 336, 3]} channels-last float (slot 0 the global image,
    * slots 1..S-1 the real sub-crops — zero-padded slots are never computed, since the reference
-   * computes them but slices their rows away); every activation is allocated into {@code
-   * pixels.scope()}.
+   * computes them but slices their rows away); each stage's intermediates are released as its scope
+   * closes, and only the stage's surviving activation is hoisted into {@code pixels.scope()}.
    *
    * @return the per-slot patch features {@code [S, 576, 1024]}, the class row removed
    * @throws IllegalArgumentException if the pixel shape or dtype is invalid
@@ -283,21 +284,44 @@ final class Phi3VVisionTower extends Module {
     }
     int slots = shape[0];
     MLXScope scope = pixels.scope();
-    // HF applies its channels-first convolution then flatten(2).transpose(1, 2); for the
-    // contiguous channels-last layout the reshape alone yields the same [S, 576, hidden]
-    // row-major patch order.
-    MLXArray patches =
-        MLXShape.reshape(patchEmbedding.forward(pixels), new int[] {slots, PATCHES, HIDDEN});
-    MLXArray cls = MLXShape.broadcastTo(param("classToken"), new int[] {slots, 1, HIDDEN});
-    MLXArray x = MLXShape.concatenate(new MLXArray[] {cls, patches}, 1);
-    x =
-        MLXOps.add(
-            x, MLXShape.broadcastTo(param("positionTable"), new int[] {slots, POSITIONS, HIDDEN}));
-    x = preLayernorm.forward(x);
+    // The embedding stage (conv -> class concatenation -> position add -> pre-encoder norm) runs
+    // in its own child scope: only x is needed after it, so evaluate it and hoist it to the
+    // caller's scope before the stage's scope closes, releasing every other stage intermediate
+    // before block 0 starts (the 7.3b WP5 per-stage evaluate-and-release pattern, findings 7.3b
+    // §11.4).
+    MLXArray x;
+    try (MLXScope embed = scope.newChild()) {
+      // HF applies its channels-first convolution then flatten(2).transpose(1, 2); for the
+      // contiguous channels-last layout the reshape alone yields the same [S, 576, hidden]
+      // row-major patch order.
+      MLXArray patches =
+          MLXShape.reshape(patchEmbedding.forward(pixels), new int[] {slots, PATCHES, HIDDEN});
+      MLXArray cls = MLXShape.broadcastTo(param("classToken"), new int[] {slots, 1, HIDDEN});
+      x =
+          MLXOps.add(
+              MLXShape.concatenate(new MLXArray[] {cls, patches}, 1),
+              MLXShape.broadcastTo(param("positionTable"), new int[] {slots, POSITIONS, HIDDEN}));
+      x = preLayernorm.forward(x);
+      MLX.eval(x);
+      x = MLX.hoist(x, scope);
+    }
     // An explicitly all-true mask is numerically identical to HF passing None.
     MLXArray mask = MLX.full(scope, new int[] {slots, 1, POSITIONS, POSITIONS}, 1f, DType.BOOL);
     for (EncoderBlock layer : layers) {
-      x = layer.forward(x, mask, null);
+      try (MLXScope block = scope.newChild()) {
+        // Pin this block's entry row into the block scope the way Qwen3VlVisionTower does: the
+        // same-shape broadcast view is a no-op that allocates a handle into `block`, so every
+        // op result of the block resolves into it (the weights live in an ancestor scope).
+        MLXArray in = MLXShape.broadcastTo(x, block, x.shape());
+        MLXArray out = layer.forward(in, mask, null);
+        // Evaluate this block before the next one starts: closing the block scope below frees
+        // every intermediate of this block (the peak does not accumulate across blocks), while
+        // `out` is hoisted out first, so the computation is unchanged (uncompiled MLX does not
+        // fuse across eval boundaries; findings 7.3b §11.4).
+        MLX.eval(out);
+        x.close();
+        x = MLX.hoist(out, scope);
+      }
     }
     // hidden_states[-2] is the state after the last executed block; type_feature "patch" drops
     // the class row.

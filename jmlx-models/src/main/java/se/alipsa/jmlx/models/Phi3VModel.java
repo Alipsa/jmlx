@@ -233,7 +233,7 @@ public final class Phi3VModel implements TextGenerationModel {
               + " exceeds checkpoint vocabulary size "
               + metadata.vocabSize());
     }
-    Phi3VPromptPlan plan = plan(request.cancellationToken(), promptText, request.images());
+    Phi3VPromptPlan plan = plan(promptText, request.images());
     // Before the decoder's own resolution, which would reject sliding modes with its own
     // checkpoint-window error: the boundary re-prefill is not proven equivalent under sliding
     // retention for phi3_v.
@@ -299,13 +299,14 @@ public final class Phi3VModel implements TextGenerationModel {
   /**
    * The pure expansion of one unexpanded prompt against the request's images: per-image geometry
    * and the aggregate slot budget from the configured processor (no pixels), the checkpoint
-   * tokenizer's wrapper-grammar expansion, and the expanded-prompt context bound.
+   * tokenizer's wrapper-grammar expansion, and the expanded-prompt context bound. A pre-cancelled
+   * request is surfaced at the prefill's first boundary check instead, where the step loop converts
+   * it to a cancelled result (the 7.3b precedent).
    *
    * <p>Package access lets the golden and lifecycle tests exercise this production boundary before
    * any native work.
    */
-  Phi3VPromptPlan plan(CancellationToken cancellation, String promptText, List<RgbImage> images) {
-    checkCancellation(cancellation);
+  Phi3VPromptPlan plan(String promptText, List<RgbImage> images) {
     Objects.requireNonNull(promptText, "promptText");
     Objects.requireNonNull(images, "images");
     List<Phi3VGeometryPlan> geometries = new ArrayList<>(images.size());
@@ -382,6 +383,7 @@ public final class Phi3VModel implements TextGenerationModel {
           MLX.eval(features);
           featureBlocks.add(MLX.hoist(features, prefill));
         }
+        observer.accept("image-closed");
       }
       checkCancellation(cancellation);
       DecoderModel.EmbeddingHook hook = null;
@@ -409,6 +411,8 @@ public final class Phi3VModel implements TextGenerationModel {
         hook = embedded -> merge(embedded, features, plan);
       }
       hookRef[0] = hook;
+      observer.accept("before-prefill");
+      checkCancellation(cancellation);
       MLXArray ids =
           MLX.array(
               prefill, clampSentinels(plan.expandedIds()), new int[] {1, plan.expandedLength()});
@@ -418,6 +422,7 @@ public final class Phi3VModel implements TextGenerationModel {
       evaluated.add(logits);
       evaluated.addAll(Arrays.asList(DecoderModel.stepCacheArrays(caches)));
       MLX.eval(evaluated.toArray(MLXArray[]::new));
+      observer.accept("prefill-evaluated");
       result =
           new DecoderModel.FirstStepResult(
               MLX.hoist(logits, activation),
@@ -449,6 +454,7 @@ public final class Phi3VModel implements TextGenerationModel {
       DecoderModel.EmbeddingHook[] hookRef) {
     int token = ids.toIntArray()[0];
     history.add(token);
+    observer.accept("decode");
     if (caches.get(0).nextPosition() == originalMaxPositions) {
       // The reference's boundary recompute: the step that first reaches original_max + 1
       // total width is re-run as a full prefill of the whole history, which selects the
@@ -525,6 +531,16 @@ public final class Phi3VModel implements TextGenerationModel {
     return wrapped;
   }
 
+  /**
+   * The lifecycle observer the generation tests use to observe (and fail at) each stage boundary.
+   * Per request the events fire in order: per image {@code preprocess} (before any pixel or native
+   * work), {@code vision} (inside the image's private child scope), {@code image-closed} (after it
+   * closes); then, when any image was present, {@code project} (the shared high-definition
+   * transform and projection); then {@code before-prefill} (before the decoder step), {@code
+   * prefill-evaluated} (after the logits and every retained KV array are evaluated, before the
+   * prefill scope closes) and {@code prefill-closed}; and per cached decode step {@code decode},
+   * plus {@code re-prefill} at the single step that crosses the NTK-Su boundary.
+   */
   void setObserverForTest(Consumer<String> observer) {
     this.observer = Objects.requireNonNull(observer);
   }

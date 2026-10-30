@@ -180,7 +180,8 @@ jobs:
                               'Qwen3VlModelLoadTest', 'Qwen3VlModelAffineLoadTest',
                               'Qwen3VlGenerationTest', 'Qwen3VlMemoryTest', 'Qwen3VlCacheEquivalenceTest',
                               'Qwen3VlGoldenTest', 'Qwen3VlDefaultPrecisionTest',
-                              'Phi3VModelTest', 'Phi3VGoldenTest', 'Phi3VDefaultPrecisionTest'],
+                              'Phi3VModelTest', 'Phi3VGoldenTest', 'Phi3VDefaultPrecisionTest',
+                               'Phi3VGenerationTest', 'Phi3VMemoryTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
@@ -267,6 +268,8 @@ jobs:
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VModelTest.xml
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3VGoldenTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VGenerationTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VMemoryTest.xml
           if-no-files-found: warn
 
       - name: Upload packed attention probe

@@ -579,7 +579,8 @@ recorded in one of these before re-deriving it. `req/project-outline.md` is the 
 broader multi-phase vision; where it conflicts with `req/plans/initial-plan.md` on scope or naming,
 the latter is authoritative for what's actually being built now. `req/full-roadmap.md` extends that
 outline after Phase 5: use it to select future phase/milestone scope and exit gates, then write the
-corresponding detailed plan under `req/plans/` before implementation.
+corresponding detailed plan under `req/plans/` before implementation. Its phases are sequential,
+and its phase overview table states each phase's MLX upgrade and release.
 
 Phase 5 and 6 documents:
 

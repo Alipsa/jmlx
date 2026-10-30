@@ -8,30 +8,10 @@ Phase 5. It is deliberately a roadmap, not an implementation plan: each mileston
 its own plan in `req/plans/` before code is started. Those plans should preserve the decisions and
 verification style established by `req/plans/initial-plan.md` and Phases 3–5.
 
-**Priority order:** finish usable local inference first (Phase 6), then complete the
-array/runtime surface, transformations and training, and finally the specialist/system
-features needed for MLX parity.
-
-**Amended 2026-10-29:** a product and integration track (P1–P5, after Phase 7) adds decode-speed
-parity with `mlx_lm`, a prompt prefix cache, an OpenAI/Anthropic-compatible HTTP server,
-Spring Boot/Quarkus integration and a Groovy API modeled on MLX's Python API. It may be
-interleaved with Phases 8–13. The same amendment adds Phase 7 milestone 5 (hybrid
-linear-attention Qwen decoders, Qwen3.8) and a release plan (R1 pure-Java modules, R2 first native
-release, 1.0 at full parity).
-
-This ordering is priority, not a strict ban on dependencies: Phase 6 may implement the focused
-array, indexing, sort/selection, and random-key slices it needs from later groups. The inventory
-records those decisions, and later phases extend the established contract rather than re-deriving it.
-
-**Amended 2026-10-04 (Phase 7):** this permission is extended to Phase 7 for the focused Phase 8
-array slices its milestones need, as enumerated in `req/plans/phase7-plan.md`: `abs`, `minimum`,
-`clip`, `floor` and `log1p` (Phase 8 milestone 2); `max_axes` and `var_axes` (milestone 3);
-`pad`, `as_strided`, `tile` and `repeat_axis` (milestone 4). The Phase 7 milestone 1 layer families
-themselves (convolution, pooling, padding, upsampling, normalization variants, containers, dropout,
-activations) need no permission because §Phase 7 milestone 1 already names them. Each pulled-forward
-slice is entered in `req/mlx-api-inventory.md` where it lands, and Phase 8 and Phase 11 milestone 2
-("Complete standard layers required by the pinned MLX `nn` scope") extend this work rather than
-re-deriving it.
+**The phases are sequential.** Work on a phase starts only when the previous phase is done (its
+"done" condition is met and its release, if it has one, is published). Within a phase, milestones
+run in the listed order unless the phase plan states that two may overlap. Each phase states up
+front whether it upgrades MLX and what it releases; the overview table below collects both.
 
 "Full parity" means that, for the version of MLX pinned by `scripts/bootstrap-native.sh`, a
 Java caller can use every supported public mlx-c capability through a safe, idiomatic Java API
@@ -45,8 +25,27 @@ The target consists of independently pinned `mlx-metal` and `mlx-c` revisions de
 bindings, inventory newly added or changed symbols, and add them to the appropriate unfinished or
 maintenance phase. Do not silently claim parity with a newer upstream release.
 
-Once Phase 6.0b creates it, `req/mlx-api-inventory.md` is the single readable record of the current
-two-pin target and coverage; the bootstrap script remains the source of truth for the pin values.
+`req/mlx-api-inventory.md` is the single readable record of the current two-pin target and
+coverage; the bootstrap script remains the source of truth for the pin values.
+
+## Phase overview
+
+| Phase | Content | MLX upgrade | Release at the end | Status |
+| --- | --- | --- | --- | --- |
+| 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
+| 6 | Complete local text-LLM inference | none | none | delivered |
+| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.3c) |
+| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | R1 (pure-Java modules, milestone 8.1) and R2 (first native release) | not started |
+| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API | 9.0 | 0.x release | not started |
+| 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
+| 11 | Numerical, random and specialized compute parity | 11.0 | 0.x release | not started |
+| 12 | Autodiff and function-transformation parity | 12.0 | 0.x release | not started |
+| 13 | Training-ready `nn` and optimizer parity | 13.0 | 0.x release | not started |
+| 14 | Runtime, compilation, custom-kernel and distributed parity | 14.0 | 0.x release | not started |
+| 15 | Parity certification | 15.0, then frozen until 1.0 | 1.0 of the native chain | not started |
+
+The rules behind the "MLX upgrade" and "Release" columns are in § Release and MLX upgrade plan.
+Phases 10–15 were numbered 8–13 before 2026-10-30; § Revision history has the mapping.
 
 ## Current baseline (Phases 1–5)
 
@@ -55,10 +54,9 @@ surface; dtypes needed for model inference; selected fast, random, quantization 
 operations; primitive reverse-mode `valueAndGrad`; a small decoder-oriented `nn` layer set; pure-Java
 HF BPE tokenization and chat templates; and Llama/Qwen greedy decoding.
 
-Phase 5 M3 (`jmlx-models`) shipped without a standalone implementation plan. Before Phase 6 adds
-to that code, Phase 6.0 must create a short retrospective design record for its model-loading,
-weight-mapping, generation, scope-ownership, and test contracts. It is a prerequisite, not a
-request to rewrite delivered code.
+Phase 5 M3 (`jmlx-models`) shipped without a standalone implementation plan. Phase 6.0 created the
+retrospective design record for its model-loading, weight-mapping, generation, scope-ownership and
+test contracts (`req/plans/phase5-m3-retrospective.md`).
 
 This is sufficient to prove end-to-end decoder inference, but not to act as a general MLX replacement.
 The binding contains far more capabilities than the public Java facade exposes.  In particular,
@@ -69,17 +67,17 @@ network modules remain outstanding.
 ## Roadmap-wide rules
 
 1. **One native inventory from Phase 6.0 onward.** Generate and maintain
-   `req/mlx-api-inventory.md` from the committed bindings now, before Phases 6–7 add more public
-   surface. It records every public mlx-c symbol/group, its Java facade location, status
-   (`unplanned`, `planned`, `implemented`, `unsupported-by-runtime`, `derived-java-api`,
-   `internal/unstable-upstream`), tests, and *both* independent native pins (`mlx-metal` version and
-   `mlx-c` commit). A derived API (such as Java `grad` built from `mlx_value_and_grad`) is not a
-   bound-symbol parity entry; `internal/unstable-upstream` records a generated `mlx_detail_*` binding
-   intentionally excluded from the public supported surface. Add a check that fails when handwritten
-   code reaches an unrecorded native type or symbol: it must cover `mlx_h` downcalls, generated struct
-   layout/accessor types, and generated upcall functional interfaces, not just `mlx_h.*` text. The
-   inventory is the quantitative source of the final parity claim and its per-group counts must
-   inform later prioritization.
+   `req/mlx-api-inventory.md` from the committed bindings. It records every public mlx-c
+   symbol/group, its Java facade location, status (`unplanned`, `planned`, `implemented`,
+   `unsupported-by-runtime`, `derived-java-api`, `internal/unstable-upstream`), tests, and *both*
+   independent native pins (`mlx-metal` version and `mlx-c` commit). A derived API (such as Java
+   `grad` built from `mlx_value_and_grad`) is not a bound-symbol parity entry;
+   `internal/unstable-upstream` records a generated `mlx_detail_*` binding intentionally excluded
+   from the public supported surface. A check fails when handwritten code reaches an unrecorded
+   native type or symbol: it covers `mlx_h` downcalls, generated struct layout/accessor types, and
+   generated upcall functional interfaces, not just `mlx_h.*` text. The inventory is the
+   quantitative source of the final parity claim and its per-group counts must inform later
+   prioritization.
 2. **Plan native uncertainty first.** A milestone plan must name the exact mlx-c declarations it
    uses and include a small Apple-Silicon probe whenever ownership, callback lifetime, error
    conventions, lazy behavior, stream behavior, or struct layout is uncertain.
@@ -97,25 +95,36 @@ network modules remain outstanding.
    Java-side validation may improve error messages but must not reject valid MLX input.
 6. **Test at three levels.** Add small hand-computed Java tests; differential tests against a
    pinned Python MLX oracle where practical; and integration tests using real artifacts/models when
-   a feature’s value is interoperability or performance. The oracle is infrastructure with an
-   explicit Phase 6.0 owner, not an assumed future dependency. Hardware-required tests retain the
-   existing native-availability guard; the existing `native` job in
-   `.github/workflows/ci.yml` already exercises native modules on the `macos-26` ARM64
-   runner and must be extended as new native tests land.
+   a feature’s value is interoperability or performance. Hardware-required tests retain the
+   existing native-availability guard; the `native` job in `.github/workflows/ci.yml` exercises
+   native modules on the `macos-26` ARM64 runner and must be extended as new native tests land.
 7. **No unbounded model promise.** “Model support” is capability based, not a list of marketing
    names.  A family is supported only when a published artifact, tokenizer/template, generation
    result, and defined compatibility test all pass.
 8. **Parity is a direction with product milestones.** Full pinned-surface parity is expected to be
-   multi-year work, not a prerequisite for useful releases. Phase 6 alone is a defensible local
-   text-LLM product and Phases 6–8 a defensible general-inference/array product. Re-evaluate later
-   phase order and estimates from the inventory's per-group counts rather than treating the final
-   certification gate as a near-term delivery commitment.
+   multi-year work, not a prerequisite for useful releases. Phases 6–9 are a defensible local
+   inference product and Phases 6–10 a defensible general-inference/array product. Re-evaluate
+   the scope and estimates of later phases from the inventory's per-group counts rather than
+   treating the final certification gate as a near-term delivery commitment.
+9. **Pulling a focused slice forward.** Sequential phases do not forbid a milestone from
+   implementing a focused slice of a later phase's API when the milestone needs it (for example
+   Phase 6's sampling selection ops, Phase 7.1's array ops, Phase 9.1's `mlx_async_eval` and
+   `mlx_compile`). The milestone plan lists each pulled-forward symbol, the inventory records it
+   where it lands, and the later phase extends that contract rather than re-deriving it. This
+   pulls API forward, never a whole later milestone.
+10. **The Groovy API follows the Java API.** Once Phase 9.5 publishes `jmlx-groovy`, every later
+    phase that adds public Java API also adds its Groovy form, or lists the name as pending, as
+    part of that phase's done condition.
 
 ## Phase 6 — Complete local text-LLM inference
 
+**Status: delivered.** `req/phase6-inference-report.md` summarizes the result and
+`req/phase6-compatibility.md` is the supported-family matrix. **MLX upgrade:** none.
+**Release:** none; the remaining release steps it lists moved to Phase 8.
+
 **Objective:** turn the current Llama/Qwen greedy proof into a stable, efficient, user-facing local
-text-generation stack.  This phase is the first priority.  Its done condition is *text* inference;
-vision, audio and diffusion inference are Phase 7 so that they cannot delay a dependable LLM path.
+text-generation stack.  Its done condition is *text* inference; vision, audio and diffusion
+inference are Phase 7 so that they cannot delay a dependable LLM path.
 
 ### 6.0 — Inference contract and Phase 5 M3 design record
 
@@ -155,7 +164,7 @@ appropriate and define numerical corner cases (zero temperature, empty candidate
 
 Before policy code, expose and inventory the necessary focused native slice: top-k/top-p selection
 (`topk`/sort/argsort/partition as the chosen algorithm needs), categorical sampling, and explicit
-random key/split semantics. Phase 6 owns the resulting per-request RNG contract; Phase 9 extends it.
+random key/split semantics. Phase 6 owns the resulting per-request RNG contract; Phase 11 extends it.
 
 **Exit gate:** greedy generation remains bit-for-bit deterministic for the same jmlx binary, pinned
 MLX runtime, device, and batch configuration; bit-exactness is not claimed across changed batch
@@ -209,30 +218,20 @@ is correct; the benchmark reports tokens/s and peak memory reproducibly for ever
 **Status (2026-10-01): deferred pending a new attention design.** The step 1 prototype stopped:
 four-bit packed attention misses its accuracy criterion because of 4-bit affine rounding of K/V, which
 no attention kernel can avoid (`req/phase6-4-benchmark.md`). The unsupported-capability rejection
-stays and 6.5 proceeds.
+stays. Reopening it is a dated amendment to `req/plans/phase6-4-1-plan.md`, scheduled into a
+later phase by a roadmap amendment.
 
-After closing 6.4, implement an opt-in packed-KV attention path that attends to compressed keys
-and values without materializing the entire float cache per decode step. The pinned runtime's SDPA
-rejects packed K/V, so this requires a separately measured attention implementation (for example,
-a fused native kernel or bounded-block streaming attention). Support the 16-dimensional heads used
-by the synthetic family fixtures, preserve the existing FULL and SLIDING cache contracts, and leave
-float retention as the default. Follow `req/plans/phase6-4-1-plan.md`.
-
-**Exit gate:** the opt-in mode passes accuracy and cache lifecycle tests across supported families,
-has lower steady and peak native memory than float retention at a documented long context, and
-publishes decode throughput alongside the float baseline. 6.4.1 is time-boxed: 6.5 may start once
-the plan's step 1 prototype records a proceed/stop decision (or its decision date passes, which
-counts as stop) and, on a proceed, the small float-only cache-accessor refactor (step 1b) has
-merged or its deadline (decision date + 14 days) has passed. The remaining 6.4.1 steps do not block
-6.5 or the first Central release. A stop keeps the explicit unsupported-capability rejection and is
-reopened only by a dated amendment to the plan.
+The planned scope was an opt-in packed-KV attention path that attends to compressed keys and
+values without materializing the entire float cache per decode step, with lower steady and peak
+native memory than float retention at a documented long context.
 
 ### 6.5 — Batched serving primitives and release hardening
 
 Provide bounded multi-request batching primitives suitable for embedding in an application (not an
-HTTP server): prompt batches, heterogeneous decode lengths, cancellation isolation, back-pressure,
-and per-request deterministic RNG.  Add model download/cache guidance or a deliberately separate
-artifact resolver, package smoke tests, examples, and an inference compatibility report.
+HTTP server; Phase 9.3 adds that): prompt batches, heterogeneous decode lengths, cancellation
+isolation, back-pressure, and per-request deterministic RNG.  Add model download/cache guidance or
+a deliberately separate artifact resolver, package smoke tests, examples, and an inference
+compatibility report.
 
 **Phase 6 done:** a Java application can load a documented set of modern local text LLMs, render a
 chat prompt, stream reproducible sampled output, run bounded batched generation, and close all
@@ -241,264 +240,108 @@ resources safely.  No claim is made yet for multimodal or diffusion models.
 ## Phase 7 — Inference breadth and conventional neural-network execution
 
 **Objective:** cover inference workloads outside decoder-only text generation and add the missing
-neural modules they require.
+neural modules they require. The primary product target is the Qwen family: Qwen3 text decoders,
+Qwen3-VL and the hybrid linear-attention Qwen3.8.
 
-**Amended 2026-10-04:** milestone 7.0 is inserted ahead of the listed order for product priority.
-The primary product target of Phase 7 is the Qwen family — Qwen3 text decoders first, then
-Qwen3-VL — and Qwen3 support is a decoder-only capability of the kind Phase 6.3 established, so it
-unblocks the flagship use case (running Qwen3 locally through the existing `TextGenerationModel`
-contract) without waiting on the layer work the other milestones require. It also verifies the
-per-head QK-normalization capability the later milestones' model families reuse. The existing
-milestone numbering below is unchanged; 7.0 slots in before it. See `req/plans/phase7-plan.md` §7.0.
+**MLX upgrade:** once, as milestone 7.5, after 7.4 and before 7.6. **Release:** none. The first
+releases are Phase 8, so they ship a runtime that every Phase 7 family was verified on.
 
-Milestones, to plan in dependency order:
+`req/plans/phase7-plan.md` is the phase plan: it holds each milestone's scope, the public-contract
+decisions, the focused Phase 10 array slices pulled forward under rule 9, and the gates. Each
+milestone also has its own sub-plan, `req/plans/phase7-<n>-plan.md`, written and reviewed before
+code.
 
-0. **Qwen3 text decoders** *(added 2026-10-04, first for product priority):* map `model_type`
-   `qwen3` in `ArchitectureMappings`, add the per-head QK-normalization capability
-   (`q_norm`/`k_norm` over `head_dim`, after projection and before RoPE) to `DecoderAttention`,
-   honor explicit `head_dim`, extend affine-quantized loading to the family, and land the full
-   fixture tier (synthetic logits goldens, tokenizer/chat-template goldens through the real Qwen3
-   template, a pinned Qwen3-0.6B Tier-B artifact, and a recorded manual Qwen3-8B 4-bit run).
+Milestones, in order:
 
-1. **Core inference modules:** `Sequential`/containers, dropout evaluation semantics, softmax and
-   common losses/activations, convolution and transpose convolution, pooling, padding, upsampling,
-   normalization variants, and embedding variants.
-2. **Encoder and encoder-decoder models:** BERT-style encoders, cross-attention, encoder-decoder
-   generation, and classification/token-classification APIs.
-3. **Vision and multimodal:** image preprocessing contract, vision transformer/CLIP-style encoders,
-   projector layers, multimodal prompt/token conventions, and a tested vision-language model.
-4. **Audio/diffusion only after a capability decision:** add STFT/ISTFT or scheduler/UNet/VAE support
-   only when the feature inventory and a concrete reference model justify it.
-5. **Hybrid linear-attention Qwen decoders (Qwen3.8)** *(added 2026-10-29, product priority, and
-   required by release R2 below):* Qwen3.8-27B, like Qwen3.5 and the dense Qwen3.6, uses
-   `model_type` `qwen3_5`. Its stack is hybrid: three of every four layers are Gated DeltaNet
-   linear attention (a causal short convolution with kernel 4 plus the gated delta-rule
-   recurrence). Every fourth layer is full attention with a sigmoid output gate
-   (`attn_output_gate`), partial rotary embedding (`partial_rotary_factor` 0.25) and interleaved
-   multi-axis RoPE (`mrope_section [11, 11, 10]`). The checkpoint includes a Qwen3-VL-style vision
-   tower (`qwen3_5`, patch 16, no DeepStack levels), so the milestone covers both text and
-   image+text generation. It reuses 7.3b's vision tower and request lifecycle, and its
-   `MultiAxisRope`. The milestone plan must decide:
-   - **Partial rotary against the reference.** `MultiAxisRope` has a partial-rotary tail
-     passthrough, but its Javadoc calls that tail "a jmlx extension, not reference behaviour",
-     and it has never been tested against a reference. Transformers' `qwen3_5` code (main branch,
-     2026-10-29) rotates the first `rotary_dim = head_dim * partial_rotary_factor` dimensions and
-     concatenates the rest unchanged. The plan verifies the tail against the pinned reference
-     version, including the inverse-frequency denominator (64 here, `2 * sum(mrope_section)`).
-     7.3b's load guard `2 * sum(mrope_section) == head_dim` is specific to Qwen3-VL. The
-     `qwen3_5` path checks `2 * sum(mrope_section) == head_dim * partial_rotary_factor` instead.
-   - **Hugging Face and MLX-converted checkpoint layouts.** mlx-community artifacts come from
-     two converters, and the model card names which one was used. The image+text artifacts,
-     including `mlx-community/Qwen3.8-27B-4bit` (mlx-vlm 0.6.8), come from mlx-vlm. Text-only
-     ones come from `mlx_lm`. Both converters' `qwen3_5` sanitize steps (main-branch sources,
-     verified 2026-10-29) make the same four text-side changes:
-     - The key prefixes change (`model.language_model.` versus `language_model.model.`).
-     - The `conv1d` axes move (`[C, 1, K]` versus `[C, K, 1]`).
-     - The MTP tensors are dropped.
-     - `+1.0` is added to the zero-centered RMSNorm weights (`input_layernorm`,
-       `post_attention_layernorm`, the final norm, `q_norm` and `k_norm`; not
-       `linear_attn.norm`), which the HF model applies as `x * (1 + w)`.
+| Milestone | Scope | Status (2026-10-30) |
+| --- | --- | --- |
+| 7.0 Qwen3 text decoders | `qwen3` mapping, per-head QK normalization, affine-quantized loading, Qwen3 chat template; Tier-B Qwen3-0.6B, manual Qwen3-8B 4-bit run | delivered |
+| 7.1 Core inference modules | containers, dropout (eval), activations, convolution and transpose convolution, pooling, padding, upsampling, normalization variants, positional encodings, evaluation losses | implemented; acceptance pending (oracle drift, cross-host CPU fixtures) |
+| 7.2 Encoders and encoder-decoder | BERT-style encoders, cross-attention, T5/Flan-T5 generation, classification and token-classification APIs | implemented; macOS 26 CI acceptance pending |
+| 7.3a Vision foundation + SmolVLM | `jmlx-vision` image preprocessing, SigLIP-style tower, Idefics3 connector, multimodal prompts | delivered; macOS 26 hosted acceptance pending |
+| 7.3b Qwen3-VL | dynamic-resolution preprocessing, multi-axis RoPE, vision tower, DeepStack | delivered; macOS 26 hosted Tier-B pending |
+| 7.3c LLaVA-style connector | `microsoft/Phi-3.5-vision-instruct` (MIT), selected 2026-10-27 | in progress |
+| 7.4 Audio/diffusion decision | a reviewed decision record, not code | not started |
+| 7.5 MLX upgrade | paired pin upgrade to the newest release (see § Release and MLX upgrade plan) | not started |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | not started |
 
-     The two converters differ on the vision side:
-     - `mlx_lm` discards every `vision_tower.*` and `model.visual.*` key, so its output is
-       text-only.
-     - mlx-vlm keeps the vision tower. It renames `model.visual.` to `vision_tower.` and
-       transposes the patch embedding from `[O, C, T, H, W]` to `[O, T, H, W, C]` (the 27B has
-       `vision_tower.patch_embed.proj.weight` `[1152, 2, 16, 16, 3]`).
+7.4 decides only. A "go" for audio or diffusion schedules its implementation into a later phase
+by a dated roadmap amendment; it does not extend Phase 7.
 
-     The descriptor must detect the layout and load all three:
-     - HF;
-     - mlx-vlm;
-     - `mlx_lm`, which has no vision weights, so it loads as a text-only model whose metadata
-       reports TEXT and rejects image requests.
+**Phase 7 done:** every milestone above is delivered, or deferred with a date; every pending
+acceptance gate listed above (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
+for 7.2, 7.3a and 7.3b) has passed or carries a dated, recorded waiver; supported non-text
+modalities are stated explicitly in the compatibility matrix; and the `nn` API covers their
+required common layers without model packages bypassing core facades.
 
-     The norm offset must be applied exactly once. mlx-vlm drops MTP tensors *before* it checks
-     whether to apply the offset. It then adds the offset to a norm weight when the checkpoint
-     still has an unconverted `conv1d`, or when that weight's original key does not start with
-     `language_model.`. So a key with the HF prefix always gets the offset. The key prefix
-     (`model.language_model.` versus `language_model.model.`) is therefore the signal for
-     whether the offset is already in the stored weights.
+## Phase 8 — First releases and framework adapters
 
-     The vision side reuses 7.3b's tower, but not its loader routing:
-     - 7.3b's float path (`Qwen3VlVisionTower.visionWeights`) maps only the HF `model.visual.`
-       and `model.language_model.` keys. A float mlx-vlm artifact (for example `-bf16`) would
-       therefore be rejected for missing keys; this is inferred from the code, not run.
-     - 7.3b's affine path expects a channels-last patch embedding and rejects any other layout
-       (`validateVisionShapes`); it does not detect or convert the axis order.
+**Objective:** publish jmlx to Maven Central for the first time, with an honest performance
+statement and an integration path into the two main Java AI libraries.
 
-     The `qwen3_5` loader must choose the prefix mapping from the keys and the patch-embedding
-     axis order from the tensor shape, independently of quantization.
-   - **A recurrent-state cache beside the KV cache.** It holds the convolution state and the
-     delta-rule state. It cannot be truncated or slid, so its interaction with `KVCachePolicy`,
-     `BatchGenerationScheduler` cohorts and P2's prefix cache (whole-prefix reuse only) must be
-     defined.
-   - **The delta-rule implementation.** Start with a chunked prefill and per-token decode built
-     from existing ops. Pull forward custom Metal kernels (Phase 12 milestone 3, the 13
-     `mlx_fast_metal_kernel_*` bindings) only if a measured benchmark shows the ops path is
-     inadequate.
-   - **The reference environment.** The Qwen3.8 config records Transformers 5.8.0.dev0, while
-     `tools/hf-reference` pins 4.57.6. The milestone needs its own locked reference environment,
-     or a reviewed upgrade of the shared one.
+**MLX upgrade:** none. R2 ships the runtime that 7.5 installed and 7.6 was verified on.
+**Release:** R1 (milestone 8.1) and R2 (milestone 8.4, which ends the phase).
 
-   Verification:
-   - **Tier-A:** a synthetic hybrid checkpoint against strict float32 Hugging Face logits. Its
-     config must cover what the Tier-B artifact does not and Qwen3.8-27B uses: more linear value
-     heads than key heads (27B: 48 versus 16; 0.8B: 16 versus 16), an untied output head (27B is
-     untied, 0.8B is tied) and `output_gate_type`. The Qwen3.8 config sets `output_gate_type` to
-     `swish`, but Transformers' `qwen3_5` code on main does not read the key, so the plan
-     records its effect in the pinned reference before relying on it.
-   - **Tier-B:** `Qwen/Qwen3.5-0.8B` (Apache-2.0, same `model_type`), in the HF layout.
-   - **Manual run:** a recorded `mlx-community/Qwen3.8-27B-4bit` run (Apache-2.0), in the
-     mlx-vlm layout, with text and image+text greedy IDs matching mlx-vlm. Its quantization
-     (affine 4-bit, group size 64) is a format jmlx already loads. Its tensor layout is not (see
-     above).
-   - **Converted layouts:** Tier-A fixtures converted from the HF-layout synthetic checkpoint
-     cover `mlx_lm` (text-only) and float mlx-vlm (the case the shape-based detection exists
-     for). The conversion runs the real converters, not a Java-side conversion, so the layout is
-     tested independently. They run in a hash-locked environment with recorded provenance, like
-     the other reference tools. `tools/qwen-vl-reference` already locks `mlx-vlm` 0.3.9 and
-     `mlx-lm` 0.29.1 for 7.3b, but those versions predate `qwen3_5`. The plan either re-locks
-     that tool at converter versions that support `qwen3_5` (the 27B was converted with mlx-vlm
-     0.6.8) or adds a separate tool, and records the converter versions with each fixture.
+New published modules (here the adapters, later the server, the Spring Boot/Quarkus integration
+and the Groovy API) each start their own `0.1.0-SNAPSHOT` line. They join
+`verifyReleaseScriptsMatch`, the release order and the release smoke, and none of them is
+published before `jmlx-models` itself.
 
-   **Not included (follow-ups):**
-   - the shared-expert MoE variants (Qwen3.5/3.6-35B-A3B);
-   - Qwen3.8-Flash-Next (`qwen4_exp`, 512-expert MoE, about 180B parameters, non-Apache
-     license);
-   - multi-token-prediction heads (ignored at load; speculative decoding is separate);
-   - the mxfp4, nvfp4 and mxfp8 checkpoint variants.
+1. **8.1 R1 — pure-Java modules.** Extend `tools/release-smoke` so its `candidate` and `central`
+   modes can verify a partial module set (they currently assume all seven). Then release
+   `jmlx-jinja` 0.6.0 (continuing `hfjinja` 0.5.0 on Central), `jmlx-tokenizer` 0.1.0 and
+   `jmlx-vision` 0.1.0. These modules have no native dependency, target Java 21 and are useful on
+   their own. R1 also proves the release procedure on low-risk modules before the native release.
+2. **8.2 Decode baseline against `mlx_lm`.** Benchmark jmlx against `mlx_lm` on byte-identical
+   weights (one dense family, one MoE family and one 4-bit checkpoint). Measure prefill tokens/s,
+   decode tokens/s, time to first token and peak memory, using the existing benchmark harness and
+   the reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
+   including the native call count and FFM cost per decode step. This is a measurement only;
+   optimization is Phase 9.1, and R2 states decode speed honestly before any optimization.
+3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
+   `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
+   the quarkus-langchain4j path). Callers may run on virtual threads: the
+   `BatchGenerationScheduler` worker keeps sole ownership of MLX, so the threading rule holds
+   without framework cooperation. The plan states the supported version matrix (current
+   Spring AI and LangChain4j releases support Java 25) and factors the request/response mapping
+   so that Phase 9.3's server reuses it. **Gate:** adapter-level tests pass against the
+   release-smoke repository: chat, streaming and embeddings through each library's interfaces,
+   with native memory released on close.
+4. **8.4 R2 — first native release (0.x preview).** `jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi`
+   0.5.0, `jmlx-core` 0.5.0, `jmlx-models` 0.1.0, the two adapters at 0.1.0, plus new versions of
+   any R1 module that changed. Run `tools/release-smoke/run.sh candidate` before publishing and
+   `run.sh central` after.
 
-   `req/plans/phase7-plan.md` carries the matching amendment: the 7.5 and MLX-upgrade rows in its
-   delivery order, its 7.5 section and its deferrals. The sub-plan `req/plans/phase7-5-plan.md`
-   is written and reviewed before code.
+**Phase 8 done:** R1 and R2 resolve from Maven Central, and the R2 release notes include the 8.2
+benchmark, the compatibility matrix and the native pins.
 
-**Phase 7 done:** supported non-text modalities are stated explicitly in the compatibility matrix;
-the `nn` API covers their required common layers without model packages bypassing core facades.
+## Phase 9 — Inference product
 
-## Release plan
+**Objective:** close the gaps in jmlx's inference *product*, not its MLX parity. A survey of
+other JVM front-ends on Apple Silicon (mlx-scala on MLX through FFM; lightmetal on llama.cpp;
+jitLLM on TornadoVM; Jlama) showed them: decode speed relative to `mlx_lm`, reuse of prompt
+prefixes between requests, a network protocol that existing clients speak, framework integration,
+and a concise scripting API.
 
-**Added 2026-10-29.** Releases are tied to exit gates, not to a calendar. Every release follows
-the existing manual procedure:
-- each module's `release.sh` in dependency order;
-- `jmlx-jinja/req/release-checklist.md` for jinja;
-- `tools/release-smoke/run.sh candidate` before publishing and `run.sh central` after;
-- the next `-SNAPSHOT` bump only once Central resolves.
+**MLX upgrade:** 9.0. **Release:** a 0.x release at the end of the phase, including the first
+release of `jmlx-server`, the Spring Boot starter, the Quarkus extension and `jmlx-groovy`.
 
-Every release also updates the compatibility matrix and the benchmark report, states its native
-pins, and ships release notes.
+### 9.0 — MLX upgrade
 
-### Versioning and compatibility policy
+As defined in § Release and MLX upgrade plan.
 
-- **Independent versions.** Modules keep independent version lines.
-- **Before 1.0.** A minor version may change public API incompatibly, but its release notes list
-  every break. Where it is cheap, a deprecated form is kept for one minor release first. A patch
-  version is a compatible fix. This supersedes the additive-only rule in
-  `req/plans/phase7-plan.md` (Baseline and constraints).
-- **Native-pin upgrades.** From R2 onward, a native-pin upgrade follows Phase 13 milestone 4's
-  procedure (regenerate, diff the inventory, migration note). It ships as a minor release of
-  `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core` and `jmlx-models`. Every published module
-  that depends on `jmlx-models` (the server, the framework adapters and `jmlx-groovy`) is
-  re-released against the new `jmlx-models` version in the same release.
-- **From 1.0.** Strict semantic versioning.
+### 9.1 — Decode performance parity with `mlx_lm`
 
-### MLX upgrade policy
-
-The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded neither with every release
-nor only after full parity. An upgrade is costly: regenerated bindings, an inventory diff,
-regenerated Python MLX oracle fixtures, re-checked golden precision, re-run Tier-B suites, and
-re-recorded evidence that jmlx recorded on MLX (seeded sampling streams and pin-gated Tier-B IDs).
-Each skipped MLX release also adds to the binding and behavior drift a later upgrade must absorb,
-and newer model families and checkpoint formats (for example the mxfp4, nvfp4 and mxfp8 variants)
-need a recent runtime.
-
-An upgrade may skip intermediate upstream releases (see Phase 13 milestone 4). In that case:
-- the inventory diff is taken against the previous pin;
-- the migration note covers the upstream changes of every skipped release.
-
-1. **Upgrade before Phase 7 milestone 5.** Upgrade once 7.3c has closed (delivered, or deferred
-   with a date) and before Qwen3.8 work starts. Move to the newest paired release that
-   `scripts/checkDependencies.zsh` reports. On 2026-10-29 that was `mlx-metal` 0.32.4 (with a
-   `macosx_26_0` wheel) and mlx-c v0.8.0 (`a26f2d584a14ec619ae8db9a09be03becd47598a`). This
-   skips `mlx-metal` 0.32.0–0.32.3 and mlx-c's v0.7.x tags. Its oracle fixtures, goldens and
-   Tier-B evidence are then produced once, on the runtime that R2 ships.
-2. **Afterwards, upgrade when there is a concrete reason.** Reasons include a model family or
-   checkpoint format that needs a newer runtime, an upstream bug fix, or a measured performance
-   gain. In any case, upgrade at least once per completed roadmap phase, so the gap never spans
-   more than one phase. Each upgrade is its own PR via `scripts/updateMlx.zsh`, never bundled with
-   feature work, and is released as described under Native-pin upgrades.
-3. **Freeze for certification.** The pin is frozen from the start of Phase 13's parity
-   certification until 1.0 is released against it. Upgrades resume after 1.0, as minor releases.
-
-### R1 — Pure-Java modules
-
-`jmlx-jinja` 0.6.0 (continuing `hfjinja` 0.5.0 on Central), `jmlx-tokenizer` 0.1.0 and
-`jmlx-vision` 0.1.0. These modules have no native dependency, target Java 21 and are useful on
-their own. Released as soon as the release-smoke tooling can verify a partial module set:
-`candidate` and `central` modes currently assume all seven modules.
-
-### R2 — First native release (0.x preview)
-
-`jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi` 0.5.0, `jmlx-core` 0.5.0 and `jmlx-models` 0.1.0, plus
-new versions of any R1 module that changed. Gate:
-
-1. Phase 7 is done, including milestone 5 (Qwen3.8 text and image+text).
-2. P1 step 1's benchmark against `mlx_lm` is published, so decode speed is stated honestly even
-   before any optimization.
-3. P4's Spring AI and LangChain4j adapters are published with this release. Their own
-   adapter-level tests must pass against the release-smoke repository: chat, streaming and
-   embeddings through each library's interfaces, with native memory released on close. The
-   rest of P4's exit gate (the Spring Boot starter, the Quarkus extension and the two sample
-   applications) is not required for R2 and may follow in R3+.
-
-### R3+ — Further 0.x releases
-
-A release follows each completed P-milestone, and each completed Phase 8–12 milestone that adds
-public API. Small milestones may be batched into one release. New P-track modules join the release
-order at their first release.
-
-### 1.0 — Full parity
-
-The native chain (`jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`, `jmlx-models`) reaches 1.0
-at Phase 13's full-parity release gate. Pure-Java and P-track modules carry no parity claim. They
-may reach 1.0 earlier on their own stability criteria, but not before any module they depend on.
-
-## Product and integration track (P1–P5, alongside Phases 8–13)
-
-**Added 2026-10-29.** A survey of other JVM front-ends on Apple Silicon (mlx-scala on MLX through
-FFM; lightmetal on llama.cpp; jitLLM on TornadoVM; Jlama) showed gaps in jmlx's inference
-*product*, not in its MLX parity: decode speed relative to `mlx_lm`, reuse of prompt prefixes
-between requests, a network protocol that existing clients speak, framework integration, and a
-concise scripting API. This track closes those gaps. Its milestones are numbered P1–P5 so that
-Phases 8–13 and every plan referring to them keep their numbers. The milestones may be
-interleaved with Phases 8–13 in any order consistent with the dependencies listed below. Each
-milestone still needs its own plan under `req/plans/` (`product-p<N>-plan.md`) and is bound by
-the roadmap-wide rules.
-
-Native symbols pulled forward from later phases are permitted under the same conditions as the
-2026-10-04 Phase 7 amendment. Each slice is entered in `req/mlx-api-inventory.md` where it
-lands. The later phase then extends that contract rather than re-deriving it.
-
-New published modules (the server, the framework adapters and the Groovy API) each start their
-own `0.1.0-SNAPSHOT` line. They join `verifyReleaseScriptsMatch`, the release order and the
-release smoke. None of them is published before `jmlx-models` itself.
-
-### P1 — Decode performance parity with `mlx_lm`
-
-**Pulled forward:**
-- `mlx_async_eval`, from Phase 12 milestone 1 (asynchronous evaluation);
+Pulled forward under rule 9:
+- `mlx_async_eval`, from Phase 14 milestone 1 (asynchronous evaluation);
 - the compile-mode controls in `mlx/c/compile.h` (`mlx_enable_compile`, `mlx_disable_compile`
-  and `mlx_set_compile_mode`), from Phase 12 milestone 1 (compile mode);
-- `mlx_compile` itself, from Phase 12 milestone 2.
+  and `mlx_set_compile_mode`), from Phase 14 milestone 1 (compile mode);
+- `mlx_compile` itself, from Phase 14 milestone 2.
 
-The `mlx_detail_compile*` symbols remain under Phase 10 milestone 3's internal/unstable decision
+The `mlx_detail_compile*` symbols remain under Phase 12 milestone 3's internal/unstable decision
 and are not pulled forward.
 
-1. **Baseline first.** Benchmark jmlx against `mlx_lm` on byte-identical weights (one dense
-   family, one MoE family and one 4-bit checkpoint). Measure prefill tokens/s, decode tokens/s,
-   time to first token and peak memory, using the existing benchmark harness and the
-   reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
-   including the native call count and FFM cost per decode step. No optimization starts before
-   this baseline is recorded.
+1. **Re-baseline.** Re-run 8.2's benchmark on the 9.0 runtime before any optimization.
 2. **Pipelined decode.** Build and `async_eval` step *n+1* while step *n* runs on the GPU. The
    plan must first probe:
    - stream and thread binding of in-flight arrays;
@@ -511,11 +354,11 @@ and are not pulled forward.
    versus shaped compilation are probed before any consumer lands.
 
 **Exit gate:** the published benchmark reports jmlx/`mlx_lm` ratios for the families measured in
-step 1. Every existing golden, precision task and cache-equivalence suite passes unchanged in both
+8.2. Every existing golden, precision task and cache-equivalence suite passes unchanged in both
 TF32 modes, with tolerances unmodified. Each optimization is opt-out-able, and its effect is
 recorded separately in the benchmark.
 
-### P2 — Prompt prefix cache
+### 9.2 — Prompt prefix cache
 
 Reuse already-computed KV state for a shared token prefix across requests: a multi-turn chat, a
 fixed system prompt, or tool definitions. Build on `KVCache.fork`. The plan defines:
@@ -529,7 +372,8 @@ fixed system prompt, or tool definitions. Build on `KVCache.fork`. The plan defi
   thread and a long-lived scope. Thread confinement makes the cache per model thread, not
   process-wide.
 - **Cache policies:** interaction with SLIDING and capacity-bounded policies, which cannot be
-  truncated and are reused whole or not at all.
+  truncated and are reused whole or not at all, and with 7.6's recurrent-state cache (whole-prefix
+  reuse only).
 - **Scheduler integration:** integration with `BatchGenerationScheduler` cohorts.
 - **Persistence (optional, second step):** safetensors through `MLXIO`, with a versioned header
   that rejects a cache from a different model, pin or configuration.
@@ -538,10 +382,9 @@ fixed system prompt, or tool definitions. Build on `KVCache.fork`. The plan defi
 cache-equivalence tolerances, for text and image prefixes. Memory stays within the configured
 budget under a soak test. A multi-turn chat benchmark records the time-to-first-token reduction.
 
-### P3 — OpenAI- and Anthropic-compatible HTTP server
+### 9.3 — OpenAI- and Anthropic-compatible HTTP server
 
-A published `jmlx-server` module, a deliberate amendment of Phase 6.5's "not an HTTP server"
-scope. It serves models through `BatchGenerationScheduler`:
+A published `jmlx-server` module. It serves models through `BatchGenerationScheduler`:
 
 - **OpenAI:** `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` (backed by
   `TextEncoderModels`) and `/v1/models`.
@@ -558,7 +401,8 @@ Both protocols support:
 
 String stop sequences are new work: `GenerationConfig` has only `stopTokenIds`. A string stop
 can span token boundaries, so streamed text must be held back until a partial match is ruled
-out. This belongs in `jmlx-models`, so that P3 and P4 share a single implementation.
+out. This belongs in `jmlx-models`, so that the server and the 8.3 adapters share a single
+implementation.
 
 Tool definitions already reach chat templates through `ChatTemplateOptions.extraContext`. This
 milestone adds per-family tool-call *output* parsing into each protocol's structured tool-call
@@ -573,33 +417,25 @@ enabled.
 
 **Exit gate:** the official OpenAI and Anthropic SDK clients run a conformance suite against the
 server (plain, streaming, tool call, image, cancellation, error cases). Server overhead over
-in-process generation is benchmarked. P2's cache, when present, is used for multi-turn requests.
+in-process generation is benchmarked. 9.2's cache is used for multi-turn requests.
 
-### P4 — Spring Boot and Quarkus integration
+### 9.4 — Spring Boot and Quarkus integration
 
-Published adapters that make a jmlx model an injectable, lifecycle-managed component:
+Published integration that makes a jmlx model an injectable, lifecycle-managed component, built
+on the 8.3 adapters:
 
 - **Spring Boot starter:** auto-configuration and typed configuration properties for the model
   path, cache policy and scheduler limits; start and stop tied to the application context;
   Actuator health and Micrometer metrics (tokens/s, queue depth, native memory).
-- **Spring AI:** `ChatModel`, `StreamingChatModel` and `EmbeddingModel` implementations.
-- **LangChain4j:** `ChatModel`, `StreamingChatModel` and `EmbeddingModel` implementations, which
-  also give Quarkus users the quarkus-langchain4j path.
 - **Quarkus extension:** configuration, CDI producers and dev-mode behavior. The extension runs in
   JVM mode only; native-image support is out of scope until GraalVM's FFM support for this native
   stack is probed.
-
-Callers may run on virtual threads. The scheduler's platform-thread worker keeps sole ownership
-of MLX, so the threading rule holds without framework cooperation. Current Spring Boot, Spring AI,
-LangChain4j and Quarkus releases support Java 25; the plan states the supported version matrix.
-The shared request/response mapping should
-be factored with P3's protocol layer rather than duplicated.
 
 **Exit gate:** a sample Spring Boot application and a sample Quarkus application, each built
 against the published-shape smoke repository, load a model, stream a chat completion and shut
 down with native memory released. Health and metrics endpoints report correctly.
 
-### P5 — Groovy API equivalent to MLX's Python API
+### 9.5 — Groovy API equivalent to MLX's Python API
 
 MLX's high-level Python API (`mlx.core`, `mlx.nn`, `mlx.optimizers`) is part of MLX itself and is
 built on its C++ core; mlx-c is a separate C binding. A published `jmlx-groovy` module gives
@@ -616,23 +452,29 @@ unchanged.
 - extension methods on `MLXArray`;
 - `@CompileStatic` compatibility.
 
-**Staging:** coverage is staged with the Java surface. The first slice covers today's array,
-`nn` inference and grad API. Indexing, linalg/FFT and optimizers extend it as Phases 8–11 deliver
-their Java equivalents. A Python name with no Java equivalent yet is listed as pending, never
-emulated. Current Groovy releases support Java 25; the plan states the supported Groovy version.
+This milestone covers today's array, `nn` inference and grad API. Phases 10–14 extend it under
+rule 10. A Python name with no Java equivalent yet is listed as pending, never emulated. Current
+Groovy releases support Java 25; the plan states the supported Groovy version.
 
 **Exit gate:** a generated table maps each covered Python name to its Groovy form. Representative
 examples from the MLX Python documentation, ported to Groovy, match the Python MLX oracle's
 output.
 
-## Phase 8 — Fundamental array, dtype, and indexing parity
+**Phase 9 done:** every milestone's exit gate passes and the phase release is published.
 
-**Objective:** make jmlx useful as a general lazy array library. The inventory already starts in
-Phase 6.0; this phase completes its core-array groups before advanced linalg/FFT so all later work
-shares correct dtype, axis, view, and indexing rules.
+## Phase 10 — Fundamental array, dtype, and indexing parity
+
+**Objective:** make jmlx useful as a general lazy array library. This phase completes the
+inventory's core-array groups before advanced linalg/FFT so all later work shares correct dtype,
+axis, view, and indexing rules. Phase 7.1 already pulled forward `abs`, `minimum`, `clip`,
+`floor`, `log1p`, `max_axes`, `var_axes`, `pad`, `as_strided`, `tile` and `repeat_axis`
+(milestones 2–4 below); this phase extends them.
+
+**MLX upgrade:** 10.0. **Release:** a 0.x release at the end of the phase.
 
 Milestones:
 
+0. MLX upgrade (§ Release and MLX upgrade plan).
 1. Complete array construction and host transfer: all native dtypes supported by the pinned MLX,
    scalar/complex construction, typed read-back, safe zero-copy entry points where ownership permits,
    `copy`, `contiguous`, and layout/stride inspection. Any zero-copy construction plan must probe and
@@ -646,15 +488,18 @@ Milestones:
 5. Complete indexing/update: slice forms including dynamic and update operations; take-along-axis,
    put-along-axis, gather/scatter and masked operations.
 
-**Phase 8 done:** all core-array entries in the inventory have Java APIs and differential coverage,
+**Phase 10 done:** all core-array entries in the inventory have Java APIs and differential coverage,
 or are recorded as a native-runtime limitation with a tested, documented failure.
 
-## Phase 9 — Numerical, random, and specialized compute parity
+## Phase 11 — Numerical, random, and specialized compute parity
 
 **Objective:** expose MLX’s non-neural numerical computation families on the stable array foundation.
 
+**MLX upgrade:** 11.0. **Release:** a 0.x release at the end of the phase.
+
 Milestones:
 
+0. MLX upgrade (§ Release and MLX upgrade plan).
 1. `MLXLinalg`: tensordot/einsum/kron/addmm and the complete pinned linalg decomposition/solve API,
    including result records and batched semantics.
 2. `MLXFFT`: complex dtype policy, one- and multi-dimensional FFT family, shifts and normalization.
@@ -664,16 +509,19 @@ Milestones:
    quantization variants, block/segmented matrix operations, and sparse-related APIs if present in the
    pinned C surface.
 
-**Phase 9 done:** every linalg, FFT, random and specialized-compute inventory group is complete and
+**Phase 11 done:** every linalg, FFT, random and specialized-compute inventory group is complete and
 differentially tested for representative shapes, dtypes, and error cases.
 
-## Phase 10 — Autodiff and function-transformation parity
+## Phase 12 — Autodiff and function-transformation parity
 
 **Objective:** make composition, differentiation, vectorization and compilation-grade function
 objects safe from Java.
 
+**MLX upgrade:** 12.0. **Release:** a 0.x release at the end of the phase.
+
 Milestones:
 
+0. MLX upgrade (§ Release and MLX upgrade plan).
 1. Extend the shipped multi-argument `valueAndGrad` and `ModuleGrad` path-keyed parameter-gradient
    support with auxiliary outputs and nested/non-flat Java pytree representations. Probe whether
    `mlx_value_and_grad` composes safely through jmlx's closure/holder/arena lifecycle before planning
@@ -685,46 +533,53 @@ Milestones:
    `mlx_detail_compile_*` symbols are internal/unstable upstream API or supported public surface,
    and record that decision in the inventory. This decision does not cover the public
    `mlx_compile`, `mlx_enable_compile`, `mlx_disable_compile` and `mlx_set_compile_mode` in
-   `mlx/c/compile.h`; product milestone P1 may already have wrapped those. Only if accepted,
-   add vmap/custom VJP/custom JVP/custom function wrappers after callback-upcall lifetime,
-   exception translation, and thread/arena behavior are proven by native probes.
+   `mlx/c/compile.h`, which Phase 9.1 wrapped. Only if accepted, add vmap/custom VJP/custom
+   JVP/custom function wrappers after callback-upcall lifetime, exception translation, and
+   thread/arena behavior are proven by native probes.
 4. Add graph inspection/export APIs that MLX exposes and a reusable differential gradient suite.
 
-**Phase 10 done:** each pinned differentiation/transformation capability has an ergonomic Java
+**Phase 12 done:** each pinned differentiation/transformation capability has an ergonomic Java
 equivalent, with numerical-gradient and Python-MLX differential tests plus callback-lifetime tests.
 
-## Phase 11 — Training-ready `nn` and optimizer parity
+## Phase 13 — Training-ready `nn` and optimizer parity
 
-**Objective:** build the high-level layers and training loop facilities needed to use Phase 10 in
+**Objective:** build the high-level layers and training loop facilities needed to use Phase 12 in
 ordinary Java model development.
+
+**MLX upgrade:** 13.0. **Release:** a 0.x release at the end of the phase.
 
 Milestones:
 
+0. MLX upgrade (§ Release and MLX upgrade plan).
 1. Complete module traversal, serialization, train/eval mode, parameter freezing, state dictionaries,
-   reusable containers, initialization, and loss APIs.
+   reusable containers, initialization, and loss APIs. This includes training-mode `Dropout` and
+   `BatchNorm`, which Phase 7.1 deliberately left throwing.
 2. Complete standard layers required by the pinned MLX `nn` scope: convolution/pooling, normalization,
    recurrent or attention variants if provided, embeddings, positional encodings, dropout, and common
-   activation families.
+   activation families. This extends the Phase 7.1 layers rather than re-deriving them.
 3. Add optimizer families and schedulers with explicit state ownership and checkpoint round trips.
 4. Provide a reference fine-tuning/training example with deterministic resume, gradient validation,
    memory-bound tests and documented limits.
 
-**Phase 11 done:** a documented model can train, checkpoint, resume, and evaluate entirely from the
+**Phase 13 done:** a documented model can train, checkpoint, resume, and evaluate entirely from the
 public Java API; all claimed MLX `nn`/optimizer equivalents are in the inventory.
 
-## Phase 12 — Runtime, compilation, custom-kernel, and distributed parity
+## Phase 14 — Runtime, compilation, custom-kernel, and distributed parity
 
 **Objective:** surface system-level MLX facilities without compromising Java lifecycle guarantees.
 
+**MLX upgrade:** 14.0. **Release:** a 0.x release at the end of the phase.
+
 Milestones:
 
+0. MLX upgrade (§ Release and MLX upgrade plan).
 1. `MLXRuntime`: device enumeration/selection, streams, synchronization, asynchronous evaluation,
    cache/memory limits and statistics, compile mode, and Metal availability/capture controls.
-2. Complete the public `mlx_compile` API (which P1 may already have wrapped for its hot
-   functions) with graph export/import and cache lifetime/error semantics. This part does not
-   wait for Phase 10's decision. The `mlx_detail_compile_*` capabilities do wait for it: after
-   that decision, expose only the accepted ones. An `internal/unstable-upstream` decision means
-   documenting, not wrapping, those generated symbols.
+   Phase 9.1 already wrapped `mlx_async_eval` and the compile-mode controls.
+2. Complete the public `mlx_compile` API (which Phase 9.1 wrapped for its hot functions) with
+   graph export/import and cache lifetime/error semantics. Of the `mlx_detail_compile_*`
+   capabilities, expose only those Phase 12 milestone 3 accepted. An `internal/unstable-upstream`
+   decision means documenting, not wrapping, those generated symbols.
 3. Custom Metal kernels: safe configuration builders, template/output arguments, asynchronous error
    reporting, and minimal kernel integration tests.  CUDA exposure follows only if it is supported by
    the pinned runtime and a CI-capable environment exists.
@@ -734,33 +589,99 @@ Milestones:
    multi-process CI environment exists, rather than assuming one can be built on the hosted
    single-Mac runner.
 
-**Phase 12 done:** all pinned runtime/system groups are either safely exposed and integration-tested
+**Phase 14 done:** all pinned runtime/system groups are either safely exposed and integration-tested
 or documented as unavailable on the target runtime, never merely absent from the Java facade.
 
-## Phase 13 — Parity certification and ongoing compatibility
+## Phase 15 — Parity certification and ongoing compatibility
 
 **Objective:** turn feature completeness into a maintained claim rather than a one-time assertion.
 
+**MLX upgrade:** 15.0 is the last upgrade before 1.0; the pin is then frozen until 1.0 is
+released. **Release:** 1.0 of the native chain.
+
+0. MLX upgrade (§ Release and MLX upgrade plan), then freeze the pin.
 1. Close every remaining inventory entry and publish a generated coverage report by API group; use
    its counts and effort data to publish an updated scope/estimate for any remaining work.
 2. Run the full Java and Python-MLX differential suite on the pinned macOS/arm64 environment;
    preserve minimized regressions as fixtures.
 3. Audit public API stability, resource ownership, exception taxonomy, documentation, examples,
    packaging, and native artifact compatibility.
-4. Establish the MLX-upgrade procedure: one paired pin upgrade (`mlx-metal` and its mlx-c
-   commit, which always move together per Decision 9 in `req/plans/initial-plan.md`) per PR.
-   Regenerate bindings, diff the inventory, add compatibility tests, and publish a migration
-   note before claiming parity for that release. An upgrade may skip intermediate upstream
-   releases. If it does, the inventory diff is taken against the previous pin and the migration
-   note covers every skipped release (see § Release plan, MLX upgrade policy).
+4. Document the MLX-upgrade procedure (§ Release and MLX upgrade plan) as the maintained
+   post-1.0 compatibility process.
 
 **Full-parity release gate:** 100% of the pinned public mlx-c API groups are represented in the
 inventory as implemented or as a verified native unavailability; all implemented entries have
 semantic tests; supported platform limits are published; and the release passes macOS/arm64 CI.
 
+## Release and MLX upgrade plan
+
+### When releases happen
+
+- **Phases 1–7:** nothing is released.
+- **Phase 8:** R1 (pure-Java modules) in milestone 8.1 and R2 (first native release) in 8.4.
+- **Phases 9–14:** every phase ends with one 0.x release of every published module it changed.
+  A milestone that adds public API may also be released on its own, mid-phase; that is optional.
+- **Phase 15:** 1.0 of the native chain (`jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`,
+  `jmlx-models`). Pure-Java modules and the Phase 8/9 integration modules carry no parity claim.
+  They may reach 1.0 earlier on their own stability criteria, but not before any module they
+  depend on.
+- A bug-fix patch release is allowed at any time.
+
+Every release follows the existing manual procedure:
+- each module's `release.sh` in dependency order;
+- `jmlx-jinja/req/release-checklist.md` for jinja;
+- `tools/release-smoke/run.sh candidate` before publishing and `run.sh central` after;
+- the next `-SNAPSHOT` bump only once Central resolves.
+
+Every release also updates the compatibility matrix and the benchmark report, states its native
+pins, and ships release notes.
+
+### Versioning and compatibility policy
+
+- **Independent versions.** Modules keep independent version lines.
+- **Before 1.0.** A minor version may change public API incompatibly, but its release notes list
+  every break. Where it is cheap, a deprecated form is kept for one minor release first. A patch
+  version is a compatible fix.
+- **Native-pin changes.** A release that contains an MLX upgrade is a minor release of
+  `jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core` and `jmlx-models`. Every published module
+  that depends on `jmlx-models` (the adapters, the server, the Spring Boot/Quarkus integration and
+  `jmlx-groovy`) is re-released against the new `jmlx-models` version in the same release.
+- **From 1.0.** Strict semantic versioning.
+
+### When MLX is upgraded
+
+The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded at fixed points:
+
+- **Phases 1–6:** never upgraded; the pin is `mlx-metal` 0.31.2 / mlx-c `fba4470`.
+- **Phase 7:** once, as milestone 7.5, after 7.4 and before 7.6 (Qwen3.8), so 7.6's oracle
+  fixtures, goldens and Tier-B evidence are produced once, on the runtime that R2 ships. On
+  2026-10-29 the newest pairing was `mlx-metal` 0.32.4 (with a `macosx_26_0` wheel) and mlx-c
+  v0.8.0 (`a26f2d584a14ec619ae8db9a09be03becd47598a`).
+- **Phase 8:** no upgrade.
+- **Phases 9–14:** milestone 0 of each phase upgrades to the newest pairing that
+  `scripts/checkDependencies.zsh` reports, before any other work of the phase. If there is no
+  newer pairing, the milestone records that, with the date, and is done. Because the phase's
+  release ships the upgrade, the gap to upstream never spans more than one phase.
+- **Phase 15:** milestone 15.0 is the last upgrade. The pin is then frozen until 1.0 is
+  released. Upgrades resume after 1.0, as minor releases.
+
+An extra upgrade mid-phase is allowed only for a concrete reason: a model family or checkpoint
+format that needs a newer runtime (for example the mxfp4, nvfp4 and mxfp8 variants), an upstream
+bug fix, or a measured performance gain. It is planned as its own milestone of the current phase.
+
+**Procedure.** Every upgrade is one paired pin upgrade (`mlx-metal` and its mlx-c commit, which
+always move together per Decision 9 in `req/plans/initial-plan.md`) in its own PR via
+`scripts/updateMlx.zsh`, never bundled with feature work. The PR regenerates the bindings, diffs
+the inventory, regenerates the Python MLX oracle fixtures, re-checks golden precision, re-runs the
+Tier-B suites, re-records the evidence jmlx recorded on MLX (seeded sampling streams and
+pin-gated Tier-B IDs), and adds a migration note. An upgrade may skip intermediate upstream
+releases; the inventory diff is then taken against the previous pin, and the migration note
+covers the upstream changes of every skipped release. `req/plans/phase7-plan.md` § 7.5 is the
+detailed checklist of what the first upgrade must re-verify; later upgrades reuse and update it.
+
 ## Template for every follow-on implementation plan
 
-Each `req/plans/phase<N>-m<M>-plan.md` should contain:
+Each milestone plan, `req/plans/phase<N>-<M>-plan.md`, should contain:
 
 1. Goal, non-goals, prerequisites, and the roadmap milestone/exit gate it satisfies.
 2. Exact public Java API proposed, affected modules/files, and exact mlx-c declarations.
@@ -777,3 +698,28 @@ Each `req/plans/phase<N>-m<M>-plan.md` should contain:
 
 No milestone is complete merely because its methods compile.  It is complete only when its exit gate,
 tests, documentation and inventory changes are all delivered.
+
+## Revision history
+
+- **2026-10-04:** milestone 7.0 (Qwen3 text decoders) inserted first in Phase 7 for product
+  priority, and the permission to pull focused later-phase array slices forward extended from
+  Phase 6 to Phase 7 (now rule 9).
+- **2026-10-29:** a product and integration track (P1–P5), Phase 7 milestone 5 (Qwen3.8), a
+  release plan (R1, R2, 1.0) and an MLX upgrade policy added.
+- **2026-10-30:** made sequential. The product track became Phases 8 and 9, the old Phases 8–13
+  became Phases 10–15, the Phase 7 MLX upgrade became milestone 7.5 and Qwen3.8 became 7.6, and
+  each phase now states its MLX upgrade and release. Old to new:
+
+  | Before 2026-10-30 | Now |
+  | --- | --- |
+  | 7.5 Qwen3.8; the MLX upgrade before it | 7.6; 7.5 |
+  | R1 | 8.1 |
+  | P1 step 1 (baseline against `mlx_lm`) | 8.2 |
+  | P4 Spring AI and LangChain4j adapters | 8.3 |
+  | R2 | 8.4 |
+  | P1 steps 2–3 (pipelined decode, compiled functions) | 9.1 |
+  | P2 prefix cache | 9.2 |
+  | P3 HTTP server | 9.3 |
+  | P4 Spring Boot starter and Quarkus extension | 9.4 |
+  | P5 Groovy API | 9.5 |
+  | Phases 8, 9, 10, 11, 12, 13 | Phases 10, 11, 12, 13, 14, 15 |

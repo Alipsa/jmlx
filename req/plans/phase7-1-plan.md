@@ -13,7 +13,7 @@ activation work below passes its gates.
 
 Include every operation, layer and evaluation loss listed in the parent §7.1. Keep model loaders,
 checkpoint layout conversion, image preprocessing, cross-attention, T5 relative-position bias,
-training dropout, optimizer/loss-gradient guarantees and broad Phase 8 parity out of scope. No
+training dropout, optimizer/loss-gradient guarantees and broad Phase 10 parity out of scope. No
 native pin change or generated-binding regeneration is planned. An upstream limitation must be
 documented explicitly rather than worked around by silently changing the promised semantics.
 
@@ -151,7 +151,7 @@ operation. Both register decimal child names (`0`, `1`, ...), reject null childr
 parameter-path ordering. Fixed membership avoids changing frozen parameter trees.
 
 `Dropout` validates its probability against the pinned MLX contract. Eval returns the input;
-training throws `UnsupportedOperationException` naming Phase 11, including probability zero.
+training throws `UnsupportedOperationException` naming Phase 13, including probability zero.
 `BatchNorm` also rejects training before allocating temporaries. Document jmlx's deliberate eval
 default instead of MLX's training default.
 
@@ -221,7 +221,7 @@ before mutation. Document the resulting limitation explicitly: `ModuleGrad.of(ba
 includes registered floating running_mean/running_var in its differentiated paths because Module has
 no buffer or per-key freeze facility. Add a test proving those paths and gradients are included, and
 retain update/rebind behavior. Eval mode and whole-module `freeze()` do not exclude statistics from
-differentiation. Non-trainable buffers/per-key freezing are deferred to Phase 11; no momentum update
+differentiation. Non-trainable buffers/per-key freezing are deferred to Phase 13; no momentum update
 or training BatchNorm claim is made here.
 
 `SinusoidalPositionalEncoding` follows the pinned MLX implementation's dimensions, frequency, scale

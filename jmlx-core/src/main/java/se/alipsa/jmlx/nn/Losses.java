@@ -8,7 +8,7 @@ import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
 
-/** Evaluation losses matching pinned MLX 0.31.2; gradient guarantees are deferred to Phase 11. */
+/** Evaluation losses matching pinned MLX 0.31.2; gradient guarantees are deferred to Phase 13. */
 public final class Losses {
   /** Output reduction over every remaining element. */
   public enum Reduction {

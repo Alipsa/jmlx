@@ -3,7 +3,7 @@ package se.alipsa.jmlx.nn;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.memory.MLXScope;
 
-/** Inference-only dropout. Eval is identity; training is deferred to Phase 11. */
+/** Inference-only dropout. Eval is identity; training is deferred to Phase 13. */
 public final class Dropout extends UnaryLayer {
   private final float probability;
 
@@ -29,7 +29,7 @@ public final class Dropout extends UnaryLayer {
   @Override
   public MLXArray forward(MLXArray x) {
     if (isTraining()) {
-      throw new UnsupportedOperationException("Dropout training requires Phase 11");
+      throw new UnsupportedOperationException("Dropout training requires Phase 13");
     }
     x.scope();
     return x;

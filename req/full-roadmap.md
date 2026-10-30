@@ -35,7 +35,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.3c) |
-| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | R1 (pure-Java modules, milestone 8.1) and R2 (first native release) | not started |
+| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity | 11.0 | 0.x release | not started |
@@ -279,25 +279,29 @@ required common layers without model packages bypassing core facades.
 **Objective:** publish jmlx to Maven Central for the first time, with an honest performance
 statement and an integration path into the two main Java AI libraries.
 
-**MLX upgrade:** none. R2 ships the runtime that 7.5 installed and 7.6 was verified on.
-**Release:** R1 (milestone 8.1) and R2 (milestone 8.4, which ends the phase).
+**MLX upgrade:** none. The first native release ships the runtime that 7.5 installed and 7.6 was
+verified on. **Release:** the pure-Java modules in milestone 8.1, and the first native release in
+milestone 8.4, which ends the phase. Every module keeps its own version line (§ Versioning and
+compatibility policy), so the versions below differ between modules.
 
 New published modules (here the adapters, later the server, the Spring Boot/Quarkus integration
 and the Groovy API) each start their own `0.1.0-SNAPSHOT` line. They join
 `verifyReleaseScriptsMatch`, the release order and the release smoke, and none of them is
 published before `jmlx-models` itself.
 
-1. **8.1 R1 — pure-Java modules.** Extend `tools/release-smoke` so its `candidate` and `central`
+1. **8.1 Pure-Java release.** Extend `tools/release-smoke` so its `candidate` and `central`
    modes can verify a partial module set (they currently assume all seven). Then release
    `jmlx-jinja` 0.6.0 (continuing `hfjinja` 0.5.0 on Central), `jmlx-tokenizer` 0.1.0 and
    `jmlx-vision` 0.1.0. These modules have no native dependency, target Java 21 and are useful on
-   their own. R1 also proves the release procedure on low-risk modules before the native release.
+   their own. This release also proves the release procedure on low-risk modules before the native
+   release.
 2. **8.2 Decode baseline against `mlx_lm`.** Benchmark jmlx against `mlx_lm` on byte-identical
    weights (one dense family, one MoE family and one 4-bit checkpoint). Measure prefill tokens/s,
    decode tokens/s, time to first token and peak memory, using the existing benchmark harness and
    the reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
    including the native call count and FFM cost per decode step. This is a measurement only;
-   optimization is Phase 9.1, and R2 states decode speed honestly before any optimization.
+   optimization is Phase 9.1, so the first native release states decode speed honestly before any
+   optimization.
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
    the quarkus-langchain4j path). Callers may run on virtual threads: the
@@ -307,13 +311,13 @@ published before `jmlx-models` itself.
    so that Phase 9.3's server reuses it. **Gate:** adapter-level tests pass against the
    release-smoke repository: chat, streaming and embeddings through each library's interfaces,
    with native memory released on close.
-4. **8.4 R2 — first native release (0.x preview).** `jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi`
-   0.5.0, `jmlx-core` 0.5.0, `jmlx-models` 0.1.0, the two adapters at 0.1.0, plus new versions of
-   any R1 module that changed. Run `tools/release-smoke/run.sh candidate` before publishing and
-   `run.sh central` after.
+4. **8.4 First native release.** `jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi` 0.5.0, `jmlx-core`
+   0.5.0, `jmlx-models` 0.1.0 and the two adapters at 0.1.0, plus a new version of any pure-Java
+   module that changed since 8.1. Run `tools/release-smoke/run.sh candidate` before publishing
+   and `run.sh central` after.
 
-**Phase 8 done:** R1 and R2 resolve from Maven Central, and the R2 release notes include the 8.2
-benchmark, the compatibility matrix and the native pins.
+**Phase 8 done:** the 8.1 and 8.4 releases resolve from Maven Central, and the 8.4 release notes
+include the 8.2 benchmark, the compatibility matrix and the native pins.
 
 ## Phase 9 — Inference product
 
@@ -618,8 +622,9 @@ semantic tests; supported platform limits are published; and the release passes 
 ### When releases happen
 
 - **Phases 1–7:** nothing is released.
-- **Phase 8:** R1 (pure-Java modules) in milestone 8.1 and R2 (first native release) in 8.4.
-- **Phases 9–14:** every phase ends with one 0.x release of every published module it changed.
+- **Phase 8:** the pure-Java modules in milestone 8.1 and the first native release in 8.4.
+- **Phases 9–14:** every phase ends with a release: the next 0.x minor version of every published
+  module the phase changed.
   A milestone that adds public API may also be released on its own, mid-phase; that is optional.
 - **Phase 15:** 1.0 of the native chain (`jmlx-native-macos-arm64`, `jmlx-ffi`, `jmlx-core`,
   `jmlx-models`). Pure-Java modules and the Phase 8/9 integration modules carry no parity claim.
@@ -638,7 +643,11 @@ pins, and ships release notes.
 
 ### Versioning and compatibility policy
 
-- **Independent versions.** Modules keep independent version lines.
+- **Independent versions.** Every module keeps its own version line, and a release raises the
+  version of each module it contains, not one project-wide version. Releases are named by phase
+  and milestone ("the Phase 9 release"), not by a version number. The first versions are:
+  `jmlx-jinja` 0.6.0 (continuing `hfjinja` 0.5.0), `jmlx-ffi` and `jmlx-core` 0.5.0, and 0.1.0
+  for every other module.
 - **Before 1.0.** A minor version may change public API incompatibly, but its release notes list
   every break. Where it is cheap, a deprecated form is kept for one minor release first. A patch
   version is a compatible fix.
@@ -654,9 +663,9 @@ The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded at fixed
 
 - **Phases 1–6:** never upgraded; the pin is `mlx-metal` 0.31.2 / mlx-c `fba4470`.
 - **Phase 7:** once, as milestone 7.5, after 7.4 and before 7.6 (Qwen3.8), so 7.6's oracle
-  fixtures, goldens and Tier-B evidence are produced once, on the runtime that R2 ships. On
-  2026-10-29 the newest pairing was `mlx-metal` 0.32.4 (with a `macosx_26_0` wheel) and mlx-c
-  v0.8.0 (`a26f2d584a14ec619ae8db9a09be03becd47598a`).
+  fixtures, goldens and Tier-B evidence are produced once, on the runtime that the first native
+  release (8.4) ships. On 2026-10-29 the newest pairing was `mlx-metal` 0.32.4 (with a
+  `macosx_26_0` wheel) and mlx-c v0.8.0 (`a26f2d584a14ec619ae8db9a09be03becd47598a`).
 - **Phase 8:** no upgrade.
 - **Phases 9–14:** milestone 0 of each phase upgrades to the newest pairing that
   `scripts/checkDependencies.zsh` reports, before any other work of the phase. If there is no
@@ -705,7 +714,7 @@ tests, documentation and inventory changes are all delivered.
   priority, and the permission to pull focused later-phase array slices forward extended from
   Phase 6 to Phase 7 (now rule 9).
 - **2026-10-29:** a product and integration track (P1–P5), Phase 7 milestone 5 (Qwen3.8), a
-  release plan (R1, R2, 1.0) and an MLX upgrade policy added.
+  release plan and an MLX upgrade policy added.
 - **2026-10-30:** made sequential. The product track became Phases 8 and 9, the old Phases 8–13
   became Phases 10–15, the Phase 7 MLX upgrade became milestone 7.5 and Qwen3.8 became 7.6, and
   each phase now states its MLX upgrade and release. Old to new:
@@ -713,10 +722,8 @@ tests, documentation and inventory changes are all delivered.
   | Before 2026-10-30 | Now |
   | --- | --- |
   | 7.5 Qwen3.8; the MLX upgrade before it | 7.6; 7.5 |
-  | R1 | 8.1 |
   | P1 step 1 (baseline against `mlx_lm`) | 8.2 |
   | P4 Spring AI and LangChain4j adapters | 8.3 |
-  | R2 | 8.4 |
   | P1 steps 2–3 (pipelined decode, compiled functions) | 9.1 |
   | P2 prefix cache | 9.2 |
   | P3 HTTP server | 9.3 |

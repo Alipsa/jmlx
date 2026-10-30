@@ -11,7 +11,7 @@ workloads need to `jmlx-core`, behind its existing facades. The primary product 
 family: Qwen3 text decoders (7.0), Qwen3-VL (7.3b) and the hybrid linear-attention Qwen3.8 (7.6).
 
 **MLX upgrade:** once, as milestone 7.5, after 7.4 and before 7.6. **Release:** none. Nothing is
-published during Phase 7; R1 and R2 are Phase 8 and follow Phase 7 done.
+published during Phase 7; the first releases are Phase 8 and follow Phase 7 done.
 
 **Phase 7 done (roadmap gate):** every milestone below is delivered, or deferred with a date;
 every pending acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
@@ -664,8 +664,8 @@ upgrade plan). Once 7.3c and 7.4 have closed, delivered or deferred with a date,
 paired native pins, in their own PR, to the newest pairing that `scripts/checkDependencies.zsh`
 reports. On 2026-10-29 that pairing was `mlx-metal` 0.32.4 and mlx-c v0.8.0. The upgrade runs
 before any 7.6 code, so 7.6's oracle fixtures, goldens and Tier-B evidence are produced once, on
-the new runtime, and R2 (Phase 8) ships that runtime. This section is also the checklist later
-upgrades (milestone 0 of Phases 9–15) reuse and update.
+the new runtime, and the first native release (Phase 8) ships that runtime. This section is also
+the checklist later upgrades (milestone 0 of Phases 9–15) reuse and update.
 
 Effect on this plan's verification:
 - **Independent references are not regenerated.** These are the evidence not produced by MLX:
@@ -894,8 +894,8 @@ tower, request lifecycle and `MultiAxisRope`.
 Not included (see Explicit deferrals): the shared-expert MoE variants, Qwen3.8-Flash-Next,
 multi-token-prediction heads and the mxfp4/nvfp4/mxfp8 checkpoints.
 
-7.6 is the last Phase 7 milestone. Phase 8's releases (R2 in particular) follow once Phase 7 is
-done, so they ship the runtime 7.6 was verified on.
+7.6 is the last Phase 7 milestone. Phase 8's releases follow once Phase 7 is done, so the first
+native release ships the runtime 7.6 was verified on.
 
 ## Cross-cutting verification
 

@@ -58,8 +58,10 @@ public final class Phi3VModel implements TextGenerationModel {
   private final TextDecoder decoder;
   private final Phi3VVisionTower tower;
   private final Phi3VImageProcessor processor;
+  private final HfTokenizer tokenizer;
   private final int clipLayers;
   private final int originalMaxPositions;
+  private final int maxPositions;
   private final ModelMetadata metadata;
   private Consumer<String> observer = ignored -> {};
 
@@ -74,13 +76,17 @@ public final class Phi3VModel implements TextGenerationModel {
       TextDecoder decoder,
       Phi3VVisionTower tower,
       Phi3VImageProcessor processor,
+      HfTokenizer tokenizer,
       int clipLayers) {
     this.descriptor = descriptor;
     this.decoder = decoder;
     this.tower = tower;
     this.processor = processor;
+    this.tokenizer = tokenizer;
     this.clipLayers = clipLayers;
-    this.originalMaxPositions = ((RopeSpec.Su) descriptor.text().rope()).originalMaxPositions();
+    RopeSpec.Su rope = (RopeSpec.Su) descriptor.text().rope();
+    this.originalMaxPositions = rope.originalMaxPositions();
+    this.maxPositions = rope.maxPositions();
     metadata =
         new VisionLanguageMetadata(
             "phi3_v", decoder.config().vocabSize(), decoder.config().numHiddenLayers(), clipLayers);
@@ -170,6 +176,7 @@ public final class Phi3VModel implements TextGenerationModel {
         new TextDecoder(scope, d.text(), textWeights),
         tower,
         new Phi3VImageProcessor(preprocessor),
+        tokenizer,
         clipLayers);
   }
 
@@ -226,22 +233,7 @@ public final class Phi3VModel implements TextGenerationModel {
               + " exceeds checkpoint vocabulary size "
               + metadata.vocabSize());
     }
-    List<Phi3VGeometryPlan> geometries = new ArrayList<>();
-    long slots = 0;
-    for (RgbImage image : request.images()) {
-      if (geometries.size() >= MAX_IMAGES) {
-        throw new IllegalArgumentException("at most " + MAX_IMAGES + " images per request");
-      }
-      Phi3VGeometryPlan geometry = processor.geometry(image.width(), image.height());
-      slots = Math.addExact(slots, geometry.cropBlocks() + 1L);
-      if (slots > MAX_TOTAL_SLOTS) {
-        throw new IllegalArgumentException(
-            "request exceeds the aggregate image slot budget of " + MAX_TOTAL_SLOTS);
-      }
-      geometries.add(geometry);
-    }
-    Phi3VPromptPlan plan =
-        Phi3VPromptExpander.expandRendered(request.tokenizer(), promptText, geometries);
+    Phi3VPromptPlan plan = plan(request.cancellationToken(), promptText, request.images());
     // Before the decoder's own resolution, which would reject sliding modes with its own
     // checkpoint-window error: the boundary re-prefill is not proven equivalent under sliding
     // retention for phi3_v.
@@ -252,8 +244,9 @@ public final class Phi3VModel implements TextGenerationModel {
     }
     KVCachePolicy cachePolicy = decoder.resolveCachePolicy(request.cachePolicy());
     plan.requireCacheCapacity(cachePolicy, request.config().maxNewTokens());
-    if (plan.requiredCacheCapacity(request.config().maxNewTokens())
-        > ((RopeSpec.Su) descriptor.text().rope()).maxPositions()) {
+    // plan() bounds the expanded prompt alone; this additionally bounds the whole generation
+    // (prompt plus the maximum new tokens), which is what the context window must hold.
+    if (plan.requiredCacheCapacity(request.config().maxNewTokens()) > maxPositions) {
       throw new IllegalArgumentException(
           "generation exceeds context length: expanded prompt "
               + plan.expandedLength()
@@ -268,27 +261,6 @@ public final class Phi3VModel implements TextGenerationModel {
       history.add(id);
     }
     final DecoderModel.EmbeddingHook[] hookRef = {null};
-    DecoderModel.DecodeStep decodeStep =
-        (ids, caches) -> {
-          int token = ids.toIntArray()[0];
-          history.add(token);
-          if (caches.get(0).nextPosition() == originalMaxPositions) {
-            // The reference's boundary recompute: the step that first reaches original_max + 1
-            // total width is re-run as a full prefill of the whole history, which selects the
-            // long factor table (its width is strictly greater than original_max).
-            for (KVCache cache : caches) {
-              cache.reset();
-            }
-            int width = history.size();
-            int[] full = new int[width];
-            for (int i = 0; i < width; i++) {
-              full[i] = history.get(i);
-            }
-            MLXArray fullIds = MLX.array(ids.scope(), full, new int[] {1, width});
-            return decoder.stepLogits(fullIds, caches, new int[] {width}, hookRef[0], null, null);
-          }
-          return decoder.decode(ids, caches, null, null);
-        };
     try {
       return decoder.runStepLoop(
           request,
@@ -298,8 +270,10 @@ public final class Phi3VModel implements TextGenerationModel {
           plan.expandedLength(),
           cachePolicy,
           listener,
-          (activation, caches) -> prefill(request, plan, geometries, activation, caches, hookRef),
-          decodeStep);
+          (activation, caches) ->
+              prefill(
+                  request.cancellationToken(), request.images(), plan, activation, caches, hookRef),
+          (ids, caches) -> decodeStep(ids, caches, history, hookRef));
     } catch (PreparationCancelled cancelled) {
       GenerationResult result =
           new GenerationResult(
@@ -322,25 +296,76 @@ public final class Phi3VModel implements TextGenerationModel {
     }
   }
 
-  private DecoderModel.FirstStepResult prefill(
-      GenerationRequest request,
+  /**
+   * The pure expansion of one unexpanded prompt against the request's images: per-image geometry
+   * and the aggregate slot budget from the configured processor (no pixels), the checkpoint
+   * tokenizer's wrapper-grammar expansion, and the expanded-prompt context bound.
+   *
+   * <p>Package access lets the golden and lifecycle tests exercise this production boundary before
+   * any native work.
+   */
+  Phi3VPromptPlan plan(CancellationToken cancellation, String promptText, List<RgbImage> images) {
+    checkCancellation(cancellation);
+    Objects.requireNonNull(promptText, "promptText");
+    Objects.requireNonNull(images, "images");
+    List<Phi3VGeometryPlan> geometries = new ArrayList<>(images.size());
+    long slots = 0;
+    for (RgbImage image : images) {
+      if (geometries.size() >= MAX_IMAGES) {
+        throw new IllegalArgumentException("at most " + MAX_IMAGES + " images per request");
+      }
+      Phi3VGeometryPlan geometry = processor.geometry(image.width(), image.height());
+      slots = Math.addExact(slots, geometry.cropBlocks() + 1L);
+      if (slots > MAX_TOTAL_SLOTS) {
+        throw new IllegalArgumentException(
+            "request exceeds the aggregate image slot budget of " + MAX_TOTAL_SLOTS);
+      }
+      geometries.add(geometry);
+    }
+    Phi3VPromptPlan plan = Phi3VPromptExpander.expandRendered(tokenizer, promptText, geometries);
+    if (plan.expandedLength() > maxPositions) {
+      throw new IllegalArgumentException(
+          "expanded prompt " + plan.expandedLength() + " exceeds context length " + maxPositions);
+    }
+    return plan;
+  }
+
+  /**
+   * Runs and evaluates the request's first step, releasing all visual work before returning.
+   * Package access lets the golden and lifecycle tests exercise this production boundary with
+   * caller-owned KV; the hook reference carries the projected rows to the boundary re-prefill.
+   *
+   * <p>The caller must keep the activation scope's parent (the request's generation scope) open for
+   * the whole request: when images are present, the stored hook retains the projected rows there,
+   * since the boundary re-prefill re-injects them at a later decode step, after this step's
+   * activation scope is closed.
+   */
+  DecoderModel.FirstStepResult prefill(
+      CancellationToken cancellation,
+      List<RgbImage> images,
       Phi3VPromptPlan plan,
-      List<Phi3VGeometryPlan> geometries,
       MLXScope activation,
       List<KVCache> caches,
       DecoderModel.EmbeddingHook[] hookRef) {
-    checkCancellation(request);
+    checkCancellation(cancellation);
+    Objects.requireNonNull(
+        activation.parent(),
+        "the prefill activation scope must be a child of the request's generation scope");
     int[][] before =
         decoder.preflightBatch(1, plan.expandedLength(), caches, new int[] {plan.expandedLength()});
+    List<Phi3VGeometryPlan> geometries = new ArrayList<>(images.size());
+    for (RgbImage image : images) {
+      geometries.add(processor.geometry(image.width(), image.height()));
+    }
     DecoderModel.FirstStepResult result;
     try (MLXScope prefill = activation.newChild()) {
       List<MLXArray> featureBlocks = new ArrayList<>();
-      for (int i = 0; i < request.images().size(); i++) {
-        checkCancellation(request);
+      for (int i = 0; i < images.size(); i++) {
+        checkCancellation(cancellation);
         observer.accept("preprocess");
-        checkCancellation(request);
-        Phi3VImageProcessorResult prepared = processor.process(request.images().get(i));
-        checkCancellation(request);
+        checkCancellation(cancellation);
+        Phi3VImageProcessorResult prepared = processor.process(images.get(i));
+        checkCancellation(cancellation);
         Phi3VGeometryPlan geometry = prepared.plan();
         Phi3VGeometryPlan planned = geometries.get(i);
         if (geometry.cropBlocks() != planned.cropBlocks()
@@ -358,7 +383,7 @@ public final class Phi3VModel implements TextGenerationModel {
           featureBlocks.add(MLX.hoist(features, prefill));
         }
       }
-      checkCancellation(request);
+      checkCancellation(cancellation);
       DecoderModel.EmbeddingHook hook = null;
       if (!featureBlocks.isEmpty()) {
         observer.accept("project");
@@ -377,9 +402,10 @@ public final class Phi3VModel implements TextGenerationModel {
                 .projector()
                 .forward(MLXShape.reshape(hd, new int[] {1, hd.shape()[0], hd.shape()[1]}));
         MLX.eval(projected);
-        // Hoisted to the generation scope: the rows must outlive the prefill scope for the
-        // boundary re-prefill's re-injection.
-        MLXArray features = MLX.hoist(projected, activation);
+        // Retained in the request's generation scope (the activation scope's parent), not this
+        // step's activation scope: the boundary re-prefill re-injects the rows at a later decode
+        // step, after the prefill step's activation scope has closed.
+        MLXArray features = MLX.hoist(projected, activation.parent());
         hook = embedded -> merge(embedded, features, plan);
       }
       hookRef[0] = hook;
@@ -407,6 +433,39 @@ public final class Phi3VModel implements TextGenerationModel {
       throw failure;
     }
     return result;
+  }
+
+  /**
+   * One cached decode step: appends the emitted token to the re-prefill history and re-runs the
+   * whole history as a fresh full prefill when that step first reaches {@code originalMaxPositions
+   * + 1} total width (the reference's boundary recompute, which thereby selects the long factor
+   * table), or otherwise decodes the single token. Package access lets the golden test drive the
+   * loop step by step against the fresh-forward reference.
+   */
+  MLXArray decodeStep(
+      MLXArray ids,
+      List<KVCache> caches,
+      List<Integer> history,
+      DecoderModel.EmbeddingHook[] hookRef) {
+    int token = ids.toIntArray()[0];
+    history.add(token);
+    if (caches.get(0).nextPosition() == originalMaxPositions) {
+      // The reference's boundary recompute: the step that first reaches original_max + 1
+      // total width is re-run as a full prefill of the whole history, which selects the
+      // long factor table (its width is strictly greater than original_max).
+      observer.accept("re-prefill");
+      for (KVCache cache : caches) {
+        cache.reset();
+      }
+      int width = history.size();
+      int[] full = new int[width];
+      for (int i = 0; i < width; i++) {
+        full[i] = history.get(i);
+      }
+      MLXArray fullIds = MLX.array(ids.scope(), full, new int[] {1, width});
+      return decoder.stepLogits(fullIds, caches, new int[] {width}, hookRef[0], null, null);
+    }
+    return decoder.decode(ids, caches, null, null);
   }
 
   static MLXArray merge(MLXArray embedded, MLXArray features, Phi3VPromptPlan plan) {
@@ -484,8 +543,8 @@ public final class Phi3VModel implements TextGenerationModel {
 
   private static final class PreparationCancelled extends RuntimeException {}
 
-  private static void checkCancellation(GenerationRequest request) {
-    if (request.cancellationToken().isCancelled()) {
+  private static void checkCancellation(CancellationToken cancellation) {
+    if (cancellation.isCancelled()) {
       throw new PreparationCancelled();
     }
   }

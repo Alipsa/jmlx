@@ -180,7 +180,7 @@ jobs:
                               'Qwen3VlModelLoadTest', 'Qwen3VlModelAffineLoadTest',
                               'Qwen3VlGenerationTest', 'Qwen3VlMemoryTest', 'Qwen3VlCacheEquivalenceTest',
                               'Qwen3VlGoldenTest', 'Qwen3VlDefaultPrecisionTest',
-                              'Phi3VModelTest'],
+                              'Phi3VModelTest', 'Phi3VGoldenTest', 'Phi3VDefaultPrecisionTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
@@ -189,7 +189,7 @@ jobs:
                             'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest',
                             'Qwen3VlVisionTowerGoldenTest',
                             'Qwen3VlTextOnlyEquivalenceTest', 'Qwen3VlModelFloatGoldenTest',
-                            'Qwen3VlGoldenTest']
+                            'Qwen3VlGoldenTest', 'Phi3VGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['Qwen3VlCacheEquivalenceTest'] = ['test', 'float32GoldenTest']
@@ -265,6 +265,8 @@ jobs:
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlGoldenTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VModelTest.xml
+            jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3VGoldenTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest.xml
           if-no-files-found: warn
 
       - name: Upload packed attention probe

@@ -723,3 +723,74 @@ verification claims stay pinned to the 4.2B artifact (§1), and the descriptor (
   step, greedy on the last row, short table ≤ 470 / long table > 470) exactly;
   `promptBeyondOriginalMaxNeverRecomputes` (474 prompt tokens) confirms no re-prefill fires
   when the prompt already exceeds 470.
+
+## 14. WP6 implementation evidence — Tier-A synthetic golden
+
+- **Shared embedding, 77 keys / 76 tensors.** The bundled `Phi3VModel.__init__` (line 1351)
+  builds `Phi3ImageEmbedding(config, wte=self.embed_tokens, ...)`, so a fresh model's
+  `state_dict()` reports 77 keys for 76 unique tensors: `model.embed_tokens.weight` and
+  `model.vision_embed_tokens.wte.weight` are two keys sharing one storage (the commented-out
+  weight-copy at lines 1352–1353 confirms the intent). The generator asserts the 77-key set
+  equals the expected 76 plus the duplicate key, asserts `data_ptr()` equality, stores only 76
+  tensors (the shared embedding once, under `model.embed_tokens.weight`, matching the
+  `TinyCheckpoints` layout), and the reference's strict `load_state_dict` re-supplies the
+  duplicate key from the same tensor. Every text row in every forward — including the image
+  path's own `self.wte(input_ids)` — embeds from `model.embed_tokens`, so Java's
+  single-lookup path is the reference's own path. Recorded in the golden provenance
+  `shared_embedding_note`.
+- **`pad_token_id` and Dropout.** The bundled `Phi3VModel.__init__` (line 1341) builds
+  `nn.Embedding(vocab, hidden, padding_idx=config.pad_token_id)` with the config default
+  32000, which crashes on vocab 21; the checkpoint `config.json` therefore pins
+  `pad_token_id: 0`. Its `__init__` also builds `self.dropout = nn.Dropout(0.0)`, the
+  identity in both eval and train modes, so no generator-side dropout handling is needed.
+- **Encoding pins (no BOS).** The tiny tokenizer has no added tokens, so no `<s>`/BOS is ever
+  prepended — the plan's "prepended `<s>`" wording is stale and the final prompt lengths are
+  computed without it. Verified encodings: `"toast "` → `[20,18,13,19,20,12]`, `"toast"` →
+  `[20,18,13,19,20]`, `"code"` → `[15,18,16,17]` (an earlier note said `[15,16,17,14]`; the
+  generator pins were corrected against the venv before the first run), `"toast code"` →
+  `[20,18,13,19,20,12,15,18,16,17]`, `"c d "` → `[15,12,16,12]`, `" e s"` → `[12,17,12,19]`.
+- **BF16 ordering.** Every stored weight is rounded to BF16 before saving; the reference is a
+  fresh model build with `_attn_implementation="eager"` (bundled
+  `Phi3VPreTrainedModel._supports_sdpa = False`, so it is set explicitly and asserted on
+  `model.config` and `img_processor.config` after loading) plus strict
+  `load_state_dict({k: v.float()})`. The load spot-check probes the **row-1 slice** of
+  `model.embed_tokens.weight` (row 0 is the zeroed pad row; a first-draft `flatten()[5:9]`
+  probe hit row 0 and its non-zero guard fired) plus a non-zero guard.
+- **Determinism.** `SEED = 20261025`, `torch.set_num_threads(1)`,
+  `torch.use_deterministic_algorithms(True)`, `torch.manual_seed(SEED)` before the init-model
+  build; a dedicated `torch.Generator(SEED)` perturbs, in `model.modules()` order, the 8
+  `nn.LayerNorm`s (weight N(1,0.1), bias N(0,0.05)) and 5 bundled `Phi3RMSNorm`s (weight
+  N(1,0.1)), with the counts asserted `{"layer_norm": 8, "phi3_rms_norm": 5}`, then draws the
+  `glb_GN` and `sub_GN` tokens N(0,1) from the same generator. Two consecutive runs produced
+  byte-identical golden and checkpoint (diffed full SHA lists).
+- **`hd_feature_transform` applies `img_projection` internally** (bundled lines 295–297, one
+  call over the `torch.cat` of the per-image `[sub, glb_GN, global]` blocks), returning
+  `(R, text_hidden)`. The generator asserts `rows.shape == (sum(num_img_tokens), 128)` before
+  flattening; Java's per-image `hdRows` concat plus one `projector().forward` call equals the
+  reference's single call because the projection is a row-independent `Linear`.
+- **Reference forwards are fresh, full, uncached**:
+  `ref(input_ids=[expanded + history incl. negative sentinels], pixel_values (n,5,3,336,336)
+  or None, image_sizes (n,2) long or None, attention_mask=ones(1,L,long), use_cache=False)`;
+  logits = `out.logits[0, -1]`. The bundled boundary recompute (lines 1650–1655) is never
+  exercised by the golden — it only justifies Java's re-prefill design. The all-ones mask is
+  correct because every row of every forward is a real token (sentinels stay in the tensor as
+  clamped IDs, never masked).
+- **Scope-lifetime fix (found while writing the golden, before any run).** `Phi3VModel`'s
+  `prefill` originally hoisted the projected rows into the prefill **activation** scope, which
+  is closed at the end of prefill — so the single re-prefill crossing would read freed rows
+  after `activation.close()`. Fixed by hoisting to `activation.parent()` (the request's
+  generation scope) with a `requireNonNull` guard and updated javadoc; the regression
+  `Phi3VModelTest.imageBoundaryGenerateRetainsTheProjectedRowsForTheRePrefill` drives a full
+  `generate` across the boundary and passes.
+- **Cases and measured evidence.** Six cases (P = expanded length, no BOS): text-only
+  (P=120, maxNew 10, greedy all 0), wide-cross-boundary (P=465, maxNew 8, **recompute step
+  6** = 471−465, greedy all 8), square (P=768, maxNew 6, greedy 13,20,13,20,13,20),
+  wide-long-prompt (P=473, maxNew 6, greedy all 3 — images alone are 457 < 470, so prompt
+  length pins the table selection), tall (P=481, maxNew 6, greedy all 8), two-image
+  (P=1231, maxNew 4, greedy 13,20,13,20; wide then square). The observed greedy token set
+  {0,3,8,13,20} varies across cases, so the golden's non-degenerate `greedy_id_note` branch
+  was taken. Java side: `Phi3VGoldenTest` (strict `full-float32`, bound `1e-4`) measured
+  maximum logit/projected-row error `1.5497208e-6`; `Phi3VDefaultPrecisionTest` (TF32 on,
+  named bound `0.0012`) measured `9.266138e-4` — recorded in
+  `req/phase6-golden-precision.md`. Both suites are registered in the macOS CI
+  required-suite assertion and the result-XML upload.

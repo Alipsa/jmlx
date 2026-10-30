@@ -96,6 +96,75 @@ class Phi3VModelTest {
   }
 
   @Test
+  void imageBoundaryGenerateRetainsTheProjectedRowsForTheRePrefill(@TempDir Path dir)
+      throws Exception {
+    try (MLXScope scope = new MLXScope()) {
+      Phi3VModel model = load(dir, scope);
+      HfTokenizer tokenizer = HfTokenizer.fromDirectory(dir);
+      byte[] pixels = new byte[672 * 336 * 3];
+      for (int i = 0; i < pixels.length; i++) {
+        pixels[i] = (byte) (i % 251);
+      }
+      RgbImage wide = new RgbImage(672, 336, pixels);
+      // The wide image is 457 rows; "c d " (4) + 457 + " e s" (4) = 465 < 470, so the prefill
+      // runs the short table and decode step 6 first reaches total width 471: the boundary
+      // re-prefill re-injects the projected rows retained from step 0, whose activation scope
+      // runStepLoop closes after the step -- the rows must live in the request's generation
+      // scope or this generate() dies with "MLXScope is closed" at the re-prefill.
+      String prompt = "c d <|image_1|> e s";
+      int maxNew = 8;
+      List<String> events = new ArrayList<>();
+      model.setObserverForTest(events::add);
+      // The generate() result must be retained until the seam-driven reference below has built
+      // its own list; the distance in between is the seam itself, not avoidable storage.
+      // CHECKSTYLE.SUPPRESS: VariableDeclarationUsageDistance
+      List<Integer> viaModel =
+          model
+              .generate(
+                  GenerationRequest.text(
+                          tokenizer,
+                          prompt,
+                          PromptSpecialTokens.ADD,
+                          GenerationConfig.greedyDefaults(maxNew, Set.of()),
+                          CancellationToken.NONE)
+                      .withImages(List.of(wide)),
+                  ignored -> {})
+              .generatedTokenIds();
+      assertEquals(1, events.stream().filter("re-prefill"::equals).count(), "re-prefill events");
+      // The seam-driven reference: one caller-owned activation scope kept open for the whole
+      // request, stepping the retained hook exactly as the production loop does.
+      Phi3VPromptPlan plan = model.plan(CancellationToken.NONE, prompt, List.of(wide));
+      List<Integer> history = new ArrayList<>();
+      for (int id : plan.expandedIds()) {
+        history.add(Math.max(id, 0));
+      }
+      List<Integer> viaSeam = new ArrayList<>();
+      try (MLXScope generation = scope.newChild()) {
+        List<KVCache> caches = new ArrayList<>();
+        for (int i = 0; i < model.metadata().numHiddenLayers(); i++) {
+          caches.add(new KVCache(generation));
+        }
+        DecoderModel.EmbeddingHook[] hookRef = {null};
+        try (MLXScope activation = generation.newChild()) {
+          MLXArray logits =
+              model
+                  .prefill(CancellationToken.NONE, List.of(wide), plan, activation, caches, hookRef)
+                  .logits();
+          viaSeam.add(argmax(logits.toFloatArray()));
+          for (int step = 1; step < maxNew; step++) {
+            MLXArray ids =
+                MLX.array(activation, new int[] {viaSeam.get(step - 1)}, new int[] {1, 1});
+            MLXArray stepLogits = model.decodeStep(ids, caches, history, hookRef);
+            MLX.eval(DecoderModel.stepCacheArrays(caches));
+            viaSeam.add(argmax(stepLogits.toFloatArray()));
+          }
+        }
+      }
+      assertEquals(viaSeam, viaModel, "generate() must survive the image boundary re-prefill");
+    }
+  }
+
+  @Test
   void promptBeyondOriginalMaxNeverRecomputes(@TempDir Path dir) throws Exception {
     try (MLXScope scope = new MLXScope()) {
       Phi3VModel model = load(dir, scope);
@@ -278,5 +347,15 @@ class Phi3VModelTest {
       }
     }
     return generated;
+  }
+
+  private static int argmax(float[] values) {
+    int best = 0;
+    for (int i = 1; i < values.length; i++) {
+      if (values[i] > values[best]) {
+        best = i;
+      }
+    }
+    return best;
   }
 }

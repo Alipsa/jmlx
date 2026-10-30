@@ -109,7 +109,15 @@
     "qwen3vl-tier-b-logits.bin": "2b44f9f2984c8d9f6b0db67937d1777dd4641343936bbd70711a36559ae76afb",
     "phi3v-wp1-probe.json": "06734b2207b8b418807ef178459366206ccda3307b150cc5f686f7467c753f73",
     "phi3v-wp3-prompt.json": "7318db453c76a42066bb1f156584c647c4f508ade898fc575b4a63760dccb50d",
-    "phi3v-rope.json": "1aa800a7e4bf0a43437866454ddec988a070482dd9235df5fb1ab287be3fae75"
+    "phi3v-rope.json": "1aa800a7e4bf0a43437866454ddec988a070482dd9235df5fb1ab287be3fae75",
+    "phi3v-wp6.json": "e8d19c59f1226a94ea0db0e5bb3a365481ba046d9773209d9cff6b87c552b54d",
+    "checkpoints/phi3v-wp6/config.json": "c0554907dfb4829ddf9603821583dc63b51faaf7d4fb0b5a4ba1a7be0ca10be4",
+    "checkpoints/phi3v-wp6/model.safetensors": "b1fda723e57118a34438a8c33603f80f46ad62ac3048a18a8fa2c1fe62a10b44",
+    "checkpoints/phi3v-wp6/preprocessor_config.json": "f151df211c8d1e175038e9564a522153824070cfae348d537b64a1702fa26897",
+    "checkpoints/phi3v-wp6/tokenizer.json": "cfb9e05ab721163bd6de2f0dcc552dae7c410fd23b0e5ceddb5791b01a9da99b",
+    "checkpoints/phi3v-wp6/images/square-336x336.png": "40734e8e0fbc8fe651c65d4b789082dc8d2ca833f59b9473bb17d54ecabfc2d8",
+    "checkpoints/phi3v-wp6/images/wide-672x336.png": "702955febf85bce110b16120cd3a71dfd568cabbce04f29b78561a1260df7efc",
+    "checkpoints/phi3v-wp6/images/tall-336x672.png": "30703c484d9681bdbf7a6f1cfb147eadd87d73afa901fc2134257e40900575a5"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -216,5 +224,6 @@
     "jmlx-models/src/test/resources/phi3v-tokens/tokenizer.json": "493f8ad437be806d5ccdc57e91479bdbb0c656448c1b89ff70f7653530d78518",
     "jmlx-models/src/test/resources/phi3v-tokens/tokenizer_config.json": "581d4654c018fbcef2504b57a805dcad37126038137b5d25d22b5a02abc1ef29"
   },
-  "phi3v_wp4_generator_sha256": "b4f5c60729d13f797b0548deeb71ba6f4e1647c50f3ac30e14922cf6f22b3119"
+  "phi3v_wp4_generator_sha256": "b4f5c60729d13f797b0548deeb71ba6f4e1647c50f3ac30e14922cf6f22b3119",
+  "phi3v_wp6_generator_sha256": "47bbb22876c35ae630f68316b076798055ec744a15a240f320572814e2203b58"
 }

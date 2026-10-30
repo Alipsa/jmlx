@@ -652,6 +652,9 @@ tasks.register('verifyHfReferenceGoldens') {
     // Phase 7.3c WP4's NTK-Su RoPE golden generator (deterministic, re-verifies the pinned
     // artifact config and bundled module hashes before use).
     inputs.file('tools/hf-reference/phi3v_rope.py')
+    // Phase 7.3c WP6's acceptance golden generator (deterministic, re-verifies the pinned
+    // bundled fixtures, the WP2 processed-patch bins and the tiny tokenizer before use).
+    inputs.file('tools/hf-reference/phi3v_wp6.py')
     // Phase 7.3b WP2's and Phase 7.3c WP2's shared processed-patch fixtures are
     // image-oracle-owned but consumed on the HF side, so the root task pins their digests too.
     inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
@@ -699,6 +702,11 @@ tasks.register('verifyHfReferenceGoldens') {
         if (phi3vWp4GeneratorHash == null ||
                 sha256File(file('tools/hf-reference/phi3v_rope.py')) != phi3vWp4GeneratorHash) {
             throw new GradleException('Phi-3.5-Vision WP4 RoPE generator SHA-256 differs or is missing')
+        }
+        def phi3vWp6GeneratorHash = metadata.phi3v_wp6_generator_sha256
+        if (phi3vWp6GeneratorHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_wp6.py')) != phi3vWp6GeneratorHash) {
+            throw new GradleException('Phi-3.5-Vision WP6 acceptance generator SHA-256 differs or is missing')
         }
         def visionFiles = metadata.vision_tier_b_files
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {

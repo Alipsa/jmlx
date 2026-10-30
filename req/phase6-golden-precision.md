@@ -208,3 +208,28 @@ same maximum logit/feature error `2.3245811e-6` on that runner, so TF32 was not 
 and the default-mode run was effectively full float32: the strict `1e-4` gate passed on a
 second host, while the `0.0025` default-mode bound is still supported only by the local
 M5 Max measurement. The run does not establish an error bound for every Apple GPU generation.
+
+## Phase 7.3c WP6 local acceptance precision (2026-10-30)
+
+`Phi3VGoldenTest` (full float32, TF32 off) runs all six cases of the pinned WP6 acceptance
+golden `tools/hf-reference/goldens/phi3v-wp6.json` (tiny synthetic `Phi3VModel` checkpoint at
+`goldens/checkpoints/phi3v-wp6/`, 76 BF16 tensors with the single shared
+`embed_tokens`/`vision_embed_tokens.wte` embedding stored once): prefill and every cached
+decode step's logits, the per-image projected rows, and the single re-prefill crossing in the
+wide-cross-boundary case. The strict maximum logit/projected-row error is `1.5497208e-6`,
+under the strict `1e-4` bound.
+
+`Phi3VDefaultPrecisionTest` runs the same six cases in the default (TF32 on) JVM without the
+greedy-token assertion; the measured maximum logit/projected-row error is `9.266138e-4`,
+under the separately named Phi-3.5-Vision WP6 TF32 bound `0.0012` (about 30% margin).
+
+Host: macOS 27.0.1, Apple M5 Max, Java 25, MLX 0.31.2, mlx-c
+`fba4470b89073180056c9ea46c443051375f7399`. Commands:
+
+```sh
+./gradlew :jmlx-models:float32GoldenTest --tests "se.alipsa.jmlx.models.Phi3VGoldenTest"
+./gradlew :jmlx-models:test --tests "se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest"
+```
+
+The local `0.0012` default-mode bound is supported only by the M5 Max measurement; CI
+registration of both suites rides the single Phase 7.3c PR.

@@ -166,11 +166,19 @@ public final class Phi3VModel implements TextGenerationModel {
     // their handles now (the reference loads and discards them as well). The intermediate size is
     // read first: with a single CLIP layer, layer 0 is that plan-optional layer, and reading it
     // after the release would touch a closed handle.
-    int intermediate =
+    MLXArray layerZeroFc1 =
         weights.get(
-                Phi3VDescriptor.visionKey(
-                    "img_processor.vision_model.encoder.layers.0.mlp.fc1.weight"))
-            .shape()[0];
+            Phi3VDescriptor.visionKey(
+                "img_processor.vision_model.encoder.layers.0.mlp.fc1.weight"));
+    if (layerZeroFc1 == null) {
+      // Only reachable for a checkpoint whose single CLIP layer is the plan-optional one and
+      // omits its tensors: real checkpoints are unaffected, and the tower cannot run zero
+      // encoder blocks, so fail here with the reason instead of an opaque NullPointerException.
+      throw new IllegalArgumentException(
+          "checkpoint has no img_processor.vision_model.encoder.layers.0.mlp.fc1 tensor to"
+              + " derive the CLIP intermediate size from");
+    }
+    int intermediate = layerZeroFc1.shape()[0];
     for (var entry : weights.entrySet()) {
       if (entry.getKey().startsWith(Phi3VDescriptor.visionKey(""))
           && !extracted.contains(entry.getKey())) {
@@ -301,7 +309,7 @@ public final class Phi3VModel implements TextGenerationModel {
                   activation,
                   caches,
                   boundary),
-          (ids, caches) -> decodeStep(ids, caches, history, boundary));
+          (ids, caches, token) -> decodeStep(ids, caches, history, boundary, token));
     } catch (PreparationCancelled cancelled) {
       GenerationResult result =
           new GenerationResult(
@@ -553,21 +561,25 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
-   * One cached decode step. While the boundary state is active, the emitted token is read back and
-   * appended to the re-prefill history, and the step that first reaches {@code originalMaxPositions
-   * + 1} total width re-runs the whole history as a fresh full prefill (the reference's boundary
-   * recompute, which thereby selects the long factor table) — after which the retained image rows
-   * are closed, the hook dropped and the state deactivated, since the re-prefill can fire at most
-   * once and later steps owe it nothing. Package access lets the golden test drive the loop step by
-   * step against the fresh-forward reference.
+   * One cached decode step. While the boundary state is active, the fed token — supplied by the
+   * step loop as the Java ID its {@code ids} array was built from, so no native readback is needed
+   * — is appended to the re-prefill history, and the step that first reaches {@code
+   * originalMaxPositions + 1} total width re-runs the whole history as a fresh full prefill (the
+   * reference's boundary recompute, which thereby selects the long factor table) — after which the
+   * retained image rows are closed, the hook dropped and the state deactivated, since the
+   * re-prefill can fire at most once and later steps owe it nothing. Package access lets the golden
+   * test drive the loop step by step against the fresh-forward reference.
    */
   MLXArray decodeStep(
-      MLXArray ids, List<KVCache> caches, List<Integer> history, BoundaryState boundary) {
+      MLXArray ids,
+      List<KVCache> caches,
+      List<Integer> history,
+      BoundaryState boundary,
+      int token) {
     if (!boundary.active) {
       observer.accept("decode");
       return decoder.decode(ids, caches, null, null);
     }
-    int token = ids.toIntArray()[0];
     history.add(token);
     observer.accept("decode");
     if (caches.get(0).nextPosition() == originalMaxPositions) {

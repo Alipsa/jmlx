@@ -426,6 +426,22 @@ public sealed interface RopeSpec
           Arrays.hashCode(longFactors));
     }
 
+    /** Readable tables; the record default prints array identity hashes. */
+    @Override
+    public String toString() {
+      return "Su[theta="
+          + theta
+          + ", maxPositions="
+          + maxPositions
+          + ", originalMaxPositions="
+          + originalMaxPositions
+          + ", shortFactors="
+          + Arrays.toString(shortFactors)
+          + ", longFactors="
+          + Arrays.toString(longFactors)
+          + "]";
+    }
+
     /** The static multiplier on both cos and sin: 1 unless the context is extended. */
     @Override
     public float attentionScaling() {

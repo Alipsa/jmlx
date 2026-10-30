@@ -194,7 +194,7 @@ class Phi3VMemoryTest {
           }
           try (MLXScope activation = generation.newChild()) {
             MLXArray ids = MLX.array(activation, new int[] {next[0]}, new int[] {1, 1});
-            MLXArray logits = model.decodeStep(ids, caches, history, boundary);
+            MLXArray logits = model.decodeStep(ids, caches, history, boundary, next[0]);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
             next[0] = argmax(logits.toFloatArray());
           }

@@ -189,7 +189,7 @@ class TierBPhi3VTest {
               } else {
                 int token = input.required("target_ids").get(step - 1).asInt();
                 MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-                logits = model.decodeStep(ids, caches, history, boundary);
+                logits = model.decodeStep(ids, caches, history, boundary, token);
                 MLX.eval(DecoderModel.stepCacheArrays(caches));
               }
               float[] actual = logits.toFloatArray();

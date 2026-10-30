@@ -1027,3 +1027,10 @@ they are (no String cast — tool-call payloads with non-string keys never fail 
 ClassCastException; today's jinja renderer rejects them at the render boundary first), and
 `RopeSpec.apply`'s batched unequal-position check uses `!isStatic()` like `DecoderModel`'s batch
 preflight instead of an `instanceof DynamicNtk || instanceof Su` list.
+
+A fifth small PR #68 follow-up landed: a checkpoint whose single plan-optional CLIP layer omits its
+tensors fails `Phi3VModel.load` with a descriptive `IllegalArgumentException` rather than an opaque
+NullPointerException; `DecoderModel.DecodeStep` now receives the fed token as a Java `int` (the loop
+already holds it), so the Phi-3.5-Vision re-prefill history no longer reads the token back from a
+native array each step; and `RopeSpec.Su.toString` prints the factor tables with `Arrays.toString`
+instead of array identity hashes.

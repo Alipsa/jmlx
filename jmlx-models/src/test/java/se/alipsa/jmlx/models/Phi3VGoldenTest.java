@@ -254,7 +254,7 @@ class Phi3VGoldenTest {
           } else {
             int token = decodeSteps.get(step - 1).required("token_id").intValue();
             MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-            logits = model.decodeStep(ids, caches, history, boundary);
+            logits = model.decodeStep(ids, caches, history, boundary, token);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
           }
           stepLogits = logits.toFloatArray();

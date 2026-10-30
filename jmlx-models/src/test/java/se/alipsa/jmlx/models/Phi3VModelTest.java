@@ -174,7 +174,8 @@ class Phi3VModelTest {
           for (int step = 1; step < maxNew; step++) {
             MLXArray ids =
                 MLX.array(activation, new int[] {viaSeam.get(step - 1)}, new int[] {1, 1});
-            MLXArray stepLogits = model.decodeStep(ids, caches, history, boundary);
+            MLXArray stepLogits =
+                model.decodeStep(ids, caches, history, boundary, viaSeam.get(step - 1));
             MLX.eval(DecoderModel.stepCacheArrays(caches));
             viaSeam.add(argmax(stepLogits.toFloatArray()));
           }

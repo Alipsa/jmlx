@@ -130,5 +130,8 @@ class RopeSpecTest {
     assertNotEquals(
         su,
         new RopeSpec.Su(10_000, 8192, 4096, new float[] {2, 3, 4, 6}, new float[] {1, 2, 4, 8}));
+    // Readable tables, not array identity hashes.
+    assertTrue(su.toString().contains("shortFactors=[2.0, 3.0, 4.0, 5.0]"));
+    assertTrue(su.toString().contains("longFactors=[1.0, 2.0, 4.0, 8.0]"));
   }
 }

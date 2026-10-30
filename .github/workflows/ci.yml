@@ -266,6 +266,7 @@ jobs:
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlGoldenTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VModelTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VRopeReferenceTest.xml
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3VGoldenTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VGenerationTest.xml

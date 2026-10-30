@@ -1009,3 +1009,15 @@ gained a `(scope, float[], offset, length, shape)` overload uploading a right-si
 the scheduler cohort key and the batch preflight, covering Su and future length-dependent variants.
 The dead `request.tokenizer() == null` branches in the cancellation path are gone, and the
 ASCII-only `\d` deviation from Python's Unicode `\d` is recorded on `Phi3VPromptTokens.MARKER_PATTERN`.
+
+The third PR #68 review round (2026-10-30) landed: the chat-message deep copy wraps in
+insertion-order `Collections.unmodifiableMap(new LinkedHashMap<>(...))` /
+`Collections.unmodifiableList(new ArrayList<>(...))` — `Map.copyOf`/`List.copyOf` rejected the
+null values chat fields legitimately carry and lost key order; `RopeSpec.Su.frequencies` reads the
+factor-table fields directly (the cloning accessors are for callers, not the per-step hot path);
+`MLX.array`'s offset overload allocates with the `JAVA_FLOAT` element layout so the alignment is
+explicit; `pixels()`'s comment now states that the one Java-heap copy happens inside
+`Phi3VImageProcessorResult.values()`'s documented defensive contract; the release smoke's
+`requiredNotice` also pins PyTorch's `UpSampleKernel.cpp`/`UpSample.h` SHA-256s and the BSD
+3-Clause text in the three vision jars; and `ci.yml` uploads `Phi3VRopeReferenceTest`'s JUnit XML
+with the other Phi3V suites.

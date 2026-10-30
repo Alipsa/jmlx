@@ -68,10 +68,13 @@ public sealed interface RopeSpec
         periods[i] = 1 / invFrequency;
       }
     } else if (this instanceof Su su) {
-      if (su.shortFactors().length != periods.length) {
+      // Direct field access, not the cloning accessors: this runs on every non-static step, and
+      // the defensive copies exist to protect callers, not to tax the hot path.
+      float[] shortFactors = su.shortFactors;
+      if (shortFactors.length != periods.length) {
         throw new IllegalArgumentException(
             "Su factor tables have "
-                + su.shortFactors().length
+                + shortFactors.length
                 + " entries but rotaryDims "
                 + rotaryDims
                 + " requires "
@@ -80,8 +83,7 @@ public sealed interface RopeSpec
       // The reference divides inv_freq by the per-dimension factor, which is a per-dimension
       // multiplication of the period by that factor; the long table applies only beyond the
       // original context length (strict >, so seq_len == originalMax still uses the short table).
-      float[] factors =
-          sequenceLength > su.originalMaxPositions() ? su.longFactors() : su.shortFactors();
+      float[] factors = sequenceLength > su.originalMaxPositions ? su.longFactors : shortFactors;
       for (int i = 0; i < periods.length; i++) {
         periods[i] *= factors[i];
       }

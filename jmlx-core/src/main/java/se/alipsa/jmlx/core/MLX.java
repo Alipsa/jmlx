@@ -110,7 +110,8 @@ public final class MLX {
     }
     java.util.Objects.checkFromIndexSize(offset, length, data.length);
     try (Arena tmp = Arena.ofConfined()) {
-      MemorySegment nativeData = tmp.allocate((long) length * ValueLayout.JAVA_FLOAT.byteSize());
+      // The element-layout allocation guarantees the alignment the JAVA_FLOAT copy requires.
+      MemorySegment nativeData = tmp.allocate(ValueLayout.JAVA_FLOAT, length);
       MemorySegment.copy(data, offset, nativeData, ValueLayout.JAVA_FLOAT, 0, length);
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
       // mlx_array_new_data has no status return: on failure it calls

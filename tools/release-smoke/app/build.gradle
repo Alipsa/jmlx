@@ -126,16 +126,23 @@ tasks.register('verifyPublishedArtifacts') {
             def names = entries(jar)
             if (!names.contains('META-INF/LICENSE')) throw new GradleException("${jar.name}: no META-INF/LICENSE")
         }
-        // The vision jars port Pillow's C resampling and alpha-composite code, so their NOTICE must
-        // pin both source files by SHA-256 and carry the Pillow MIT-CMU license text -- in the main
-        // jar and in the sources and javadoc jars a consumer downloads to read that provenance.
+        // The vision jars port Pillow's C resampling and alpha-composite code and PyTorch's CPU
+        // upsampling kernels (the Phi-3-vision bicubic), so their NOTICE must pin every ported
+        // source file by SHA-256 and carry both license texts -- in the main jar and in the
+        // sources and javadoc jars a consumer downloads to read that provenance.
         def requiredNotice = [
                 'src/libImaging/Resample.c',
                 '808c212d03289b9ab70fad67168da1b14ed8dd74f1607c7a7278c50cbc1ae0ab',
                 'src/libImaging/AlphaComposite.c',
                 '0063c136b8bb2be51e2fb76fac222a7ae96b438f3c09706834862d9c1ac62c93',
                 'MIT-CMU License',
-                'Secret Labs AB']
+                'Secret Labs AB',
+                'aten/src/ATen/native/cpu/UpSampleKernel.cpp',
+                'e3b7bf13fecd1af33e1c6d7dfb441d97590b71075194d040c5ad325814fdac1f',
+                'aten/src/ATen/native/UpSample.h',
+                'd49801938b31a544d2f55d616eea5db4cbd611ba691dca128ccd6aa870d008ba',
+                'BSD 3-Clause',
+                'Facebook, Inc']
         def visionJars = [
                 jmlxJars.find { it.name.startsWith('jmlx-vision-') },
                 javadocs.files.find { it.name.startsWith('jmlx-vision-') },

@@ -624,9 +624,11 @@ public final class Phi3VModel implements TextGenerationModel {
 
   /**
    * The CLIP tower input for one image's real slots: the contiguous real-slot prefix of the
-   * processor's slot-major CHW row, uploaded at its exact size (no Java-side copy of the padded
-   * buffer, no padded slots crossing to native memory), then transposed to the tower's
-   * channels-last layout. Zero-padded slots are never computed (the reference computes them and
+   * processor's slot-major CHW row, transposed to the tower's channels-last layout. {@link
+   * Phi3VImageProcessorResult#values()} hands out a defensive copy (that class's public contract,
+   * so the unavoidable Java-heap copy happens there), and the {@code offset}/{@code length}
+   * overload uploads just the real slots — the padded buffer never crosses to native memory and no
+   * second trim copy is made. Zero-padded slots are never computed (the reference computes them and
    * slices their rows away — a recorded bit-identical deviation).
    */
   private static MLXArray pixels(

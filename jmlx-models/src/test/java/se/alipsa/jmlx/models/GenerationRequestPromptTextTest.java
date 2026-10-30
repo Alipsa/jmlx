@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +56,32 @@ class GenerationRequestPromptTextTest {
             CancellationToken.NONE);
     assertEquals(
         tokenizer.renderChat(messages, ChatTemplateOptions.defaults(true)), request.promptText());
+  }
+
+  @Test
+  void chatRequestsDeepCopyMessagesWithoutRejectingNullsOrReorderingKeys() {
+    HfTokenizer tokenizer = mistralTokenizer();
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("role", "user");
+    message.put("name", null);
+    message.put("content", "hello");
+    List<Map<String, Object>> messages = new ArrayList<>(List.of(message));
+    GenerationRequest request =
+        GenerationRequest.chat(
+            tokenizer,
+            messages,
+            ChatTemplateOptions.defaults(true),
+            config(),
+            CancellationToken.NONE);
+    // The request owns its copy: a later caller mutation changes nothing.
+    message.put("role", "sabotage");
+    Map<String, Object> retained = request.chatMessages().get(0);
+    assertEquals("user", retained.get("role"));
+    // Null values (legal in chat fields other than content) survive the copy ...
+    assertNull(retained.get("name"));
+    // ... and the insertion order a template iterating the message can observe is preserved
+    // (Map.copyOf would reorder and reject the null; the copy must do neither).
+    assertEquals(List.of("role", "name", "content"), List.copyOf(retained.keySet()));
   }
 
   @Test

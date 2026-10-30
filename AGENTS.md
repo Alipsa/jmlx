@@ -1021,3 +1021,9 @@ explicit; `pixels()`'s comment now states that the one Java-heap copy happens in
 `requiredNotice` also pins PyTorch's `UpSampleKernel.cpp`/`UpSample.h` SHA-256s and the BSD
 3-Clause text in the three vision jars; and `ci.yml` uploads `Phi3VRopeReferenceTest`'s JUnit XML
 with the other Phi3V suites.
+
+A fourth small PR #68 follow-up landed: the chat-message deep copy preserves nested-map keys as
+they are (no String cast — tool-call payloads with non-string keys never fail with a
+ClassCastException; today's jinja renderer rejects them at the render boundary first), and
+`RopeSpec.apply`'s batched unequal-position check uses `!isStatic()` like `DecoderModel`'s batch
+preflight instead of an `instanceof DynamicNtk || instanceof Su` list.

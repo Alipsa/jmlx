@@ -210,7 +210,7 @@ public sealed interface RopeSpec
     if (scalar) {
       return apply(x, rotaryDims, nextPositions[0], frequencies);
     }
-    if (this instanceof DynamicNtk || this instanceof Su) {
+    if (!isStatic()) {
       throw new IllegalArgumentException(
           "length-dependent RoPE does not support unequal batch positions");
     }

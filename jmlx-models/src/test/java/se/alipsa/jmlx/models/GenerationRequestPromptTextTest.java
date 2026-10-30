@@ -1,7 +1,9 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -12,6 +14,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import se.alipsa.jmlx.tokenizer.ChatTemplateOptions;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
+import se.alipsa.jmlx.tokenizer.TokenizerException;
 import se.alipsa.jmlx.vision.RgbImage;
 
 /**
@@ -82,6 +85,31 @@ class GenerationRequestPromptTextTest {
     // ... and the insertion order a template iterating the message can observe is preserved
     // (Map.copyOf would reorder and reject the null; the copy must do neither).
     assertEquals(List.of("role", "name", "content"), List.copyOf(retained.keySet()));
+  }
+
+  @Test
+  void nonStringNestedMapKeysFailAtTheRendererNotAtTheRequestCopy() {
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("role", "user");
+    message.put("content", "hello");
+    // Tool-call-style payloads can nest non-string-keyed maps. Today's renderer rejects them at
+    // the render boundary (before the request copies anything); the deep copy must preserve keys
+    // as they are rather than fail first with an opaque ClassCastException, so any renderer that
+    // tolerates them keeps working.
+    Map<Object, Object> payload = new LinkedHashMap<>();
+    payload.put(7, "seven");
+    message.put("tool_payload", payload);
+    TokenizerException failure =
+        assertThrows(
+            TokenizerException.class,
+            () ->
+                GenerationRequest.chat(
+                    mistralTokenizer(),
+                    List.of(message),
+                    ChatTemplateOptions.defaults(true),
+                    config(),
+                    CancellationToken.NONE));
+    assertFalse(failure.getCause() instanceof ClassCastException);
   }
 
   @Test

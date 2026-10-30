@@ -176,9 +176,12 @@ public final class GenerationRequest {
 
   private static Object deepCopyValue(Object value) {
     if (value instanceof Map<?, ?> map) {
-      Map<String, Object> typed = new LinkedHashMap<>(map.size());
+      // Nested maps (tool-call payloads and the like) keep their key types: only the top-level
+      // message maps are declared String-keyed, and a non-String nested key must survive the copy
+      // exactly as it would the render.
+      Map<Object, Object> typed = new LinkedHashMap<>(map.size());
       for (Map.Entry<?, ?> entry : map.entrySet()) {
-        typed.put((String) entry.getKey(), deepCopyValue(entry.getValue()));
+        typed.put(entry.getKey(), deepCopyValue(entry.getValue()));
       }
       return Collections.unmodifiableMap(typed);
     }

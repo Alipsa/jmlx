@@ -242,7 +242,8 @@ public final class Phi3VModel implements TextGenerationModel {
               + " exceeds checkpoint vocabulary size "
               + metadata.vocabSize());
     }
-    Phi3VPromptPlan plan = plan(request);
+    List<Phi3VGeometryPlan> geometries = geometries(request.images());
+    Phi3VPromptPlan plan = plan(request, geometries);
     // Before the decoder's own resolution, which would reject sliding modes with its own
     // checkpoint-window error: the boundary re-prefill is not proven equivalent under sliding
     // retention for phi3_v.
@@ -263,12 +264,15 @@ public final class Phi3VModel implements TextGenerationModel {
               + original.length);
     }
     // The boundary re-prefill fires only when some decode step's total width first reaches
-    // originalMaxPositions + 1; when no step can reach it, the projected rows and the re-prefill
+    // originalMaxPositions + 1. Step 0 is the prefill, so only maxNewTokens - 1 decode steps
+    // exist: at decode step j (1-based) the cache position is expandedLength + j - 1, and the
+    // fire condition is j <= maxNewTokens - 1, i.e. expandedLength + maxNewTokens - 2 >=
+    // originalMaxPositions. When no step can reach it, the projected rows and the re-prefill
     // history serve nothing and are not retained (decode steps then skip the per-step native
     // readback and boxed history too).
     boolean boundaryPossible =
-        plan.expandedLength() <= originalMaxPositions
-            && plan.expandedLength() + request.config().maxNewTokens() - 1 >= originalMaxPositions;
+        boundaryCrossable(
+            plan.expandedLength(), request.config().maxNewTokens(), originalMaxPositions);
     // The re-prefill history: the clamped expanded prompt (sentinel rows embed as row 0; their
     // rows are replaced by the hook anyway) plus every generated token, appended by the decode
     // step below.
@@ -278,7 +282,7 @@ public final class Phi3VModel implements TextGenerationModel {
         history.add(id);
       }
     }
-    final DecoderModel.EmbeddingHook[] hookRef = {null};
+    BoundaryState boundary = new BoundaryState(boundaryPossible);
     try {
       return decoder.runStepLoop(
           request,
@@ -293,11 +297,11 @@ public final class Phi3VModel implements TextGenerationModel {
                   request.cancellationToken(),
                   request.images(),
                   plan,
+                  geometries,
                   activation,
                   caches,
-                  hookRef,
-                  boundaryPossible),
-          (ids, caches) -> decodeStep(ids, caches, history, hookRef, boundaryPossible));
+                  boundary),
+          (ids, caches) -> decodeStep(ids, caches, history, boundary));
     } catch (PreparationCancelled cancelled) {
       GenerationResult result =
           new GenerationResult(
@@ -305,13 +309,10 @@ public final class Phi3VModel implements TextGenerationModel {
               List.of(),
               FinishReason.CANCELLED,
               List.of(),
-              request.tokenizer() == null ? null : "",
+              "",
               plan.expandedLength());
       try {
-        listener.accept(
-            request.tokenizer() == null
-                ? GenerationEvent.finished(FinishReason.CANCELLED)
-                : GenerationEvent.finished(FinishReason.CANCELLED, ""));
+        listener.accept(GenerationEvent.finished(FinishReason.CANCELLED, ""));
       } catch (RuntimeException failure) {
         System.getLogger(Phi3VModel.class.getName())
             .log(System.Logger.Level.WARNING, "generation terminal listener failed", failure);
@@ -334,15 +335,19 @@ public final class Phi3VModel implements TextGenerationModel {
    * any native work.
    */
   Phi3VPromptPlan plan(GenerationRequest request) {
-    List<Phi3VGeometryPlan> geometries = geometries(request.images());
+    return plan(request, geometries(request.images()));
+  }
+
+  private Phi3VPromptPlan plan(GenerationRequest request, List<Phi3VGeometryPlan> geometries) {
     if (request.chatMessages() != null && hasStructuredContent(request.chatMessages())) {
-      // The request's tokenizer owns the chat template that rendered the prompt (in production
-      // it is the checkpoint's own tokenizer); the artifact's string-concatenating template
-      // cannot carry structured image parts, so the messages are re-flattened to markers and
-      // re-rendered here.
+      // The checkpoint's own tokenizer renders and encodes, exactly like the text paths, so one
+      // prompt form never tokenizes differently from another; its configured chat template is
+      // the artifact's (the same template the request rendered with in production, where both
+      // come from one directory). The artifact's string-concatenating template cannot carry
+      // structured image parts, so the messages are re-flattened to markers and re-rendered here.
       return bounded(
           Phi3VPromptExpander.expand(
-              request.tokenizer(), request.chatMessages(), request.chatOptions(), geometries));
+              tokenizer, request.chatMessages(), request.chatOptions(), geometries));
     }
     return bounded(Phi3VPromptExpander.expandRendered(tokenizer, request.promptText(), geometries));
   }
@@ -356,6 +361,23 @@ public final class Phi3VModel implements TextGenerationModel {
   Phi3VPromptPlan plan(String promptText, List<RgbImage> images) {
     Objects.requireNonNull(promptText, "promptText");
     return bounded(Phi3VPromptExpander.expandRendered(tokenizer, promptText, geometries(images)));
+  }
+
+  /**
+   * The boundary re-prefill's mutable per-request state, shared between prefill and the decode
+   * steps. {@code active} gates the per-step token readback and history bookkeeping; {@code hook}
+   * and {@code retainedRows} exist only while the rows must survive for the re-prefill, and are
+   * released the moment it fires (it can fire at most once: the total width only grows past the
+   * boundary afterwards).
+   */
+  static final class BoundaryState {
+    private boolean active;
+    private DecoderModel.EmbeddingHook hook;
+    private MLXArray retainedRows;
+
+    BoundaryState(boolean active) {
+      this.active = active;
+    }
   }
 
   private static boolean hasStructuredContent(List<Map<String, Object>> messages) {
@@ -386,6 +408,18 @@ public final class Phi3VModel implements TextGenerationModel {
     return geometries;
   }
 
+  /**
+   * Whether some decode step can reach the boundary re-prefill: the step that first brings the
+   * total width to {@code originalMaxPositions + 1}. Step 0 is the prefill, so only {@code
+   * maxNewTokens - 1} decode steps exist, and at decode step j (1-based) the cache position is
+   * {@code expandedLength + j - 1}; the fire condition is therefore {@code expandedLength <=
+   * originalMaxPositions <= expandedLength + maxNewTokens - 2}.
+   */
+  static boolean boundaryCrossable(int expandedLength, int maxNewTokens, int originalMaxPositions) {
+    return expandedLength <= originalMaxPositions
+        && expandedLength + maxNewTokens - 2 >= originalMaxPositions;
+  }
+
   private Phi3VPromptPlan bounded(Phi3VPromptPlan plan) {
     if (plan.expandedLength() > maxPositions) {
       throw new IllegalArgumentException(
@@ -397,14 +431,13 @@ public final class Phi3VModel implements TextGenerationModel {
   /**
    * Runs and evaluates the request's first step, releasing all visual work before returning.
    * Package access lets the golden and lifecycle tests exercise this production boundary with
-   * caller-owned KV; the hook reference carries the projected rows to the boundary re-prefill.
+   * caller-owned KV; the boundary state carries the projected rows to the boundary re-prefill.
    *
-   * <p>When {@code boundaryPossible} is true, the caller must keep the activation scope's parent
-   * (the request's generation scope) open for the whole request: the stored hook retains the
-   * projected rows there, since the boundary re-prefill re-injects them at a later decode step,
-   * after this step's activation scope is closed. When false (no decode step can reach the NTK-Su
-   * boundary), the rows die with this step's prefill scope instead and the hook reference is left
-   * null.
+   * <p>When the boundary state is active, the caller must keep the activation scope's parent (the
+   * request's generation scope) open for the whole request: the retained rows live there, since the
+   * boundary re-prefill re-injects them at a later decode step, after this step's activation scope
+   * is closed. When the boundary cannot be reached, the rows die with this step's prefill scope
+   * instead and the state carries no hook.
    */
   DecoderModel.FirstStepResult prefill(
       CancellationToken cancellation,
@@ -412,18 +445,24 @@ public final class Phi3VModel implements TextGenerationModel {
       Phi3VPromptPlan plan,
       MLXScope activation,
       List<KVCache> caches,
-      DecoderModel.EmbeddingHook[] hookRef,
-      boolean boundaryPossible) {
+      BoundaryState boundary) {
+    return prefill(cancellation, images, plan, geometries(images), activation, caches, boundary);
+  }
+
+  DecoderModel.FirstStepResult prefill(
+      CancellationToken cancellation,
+      List<RgbImage> images,
+      Phi3VPromptPlan plan,
+      List<Phi3VGeometryPlan> geometries,
+      MLXScope activation,
+      List<KVCache> caches,
+      BoundaryState boundary) {
     checkCancellation(cancellation);
     Objects.requireNonNull(
         activation.parent(),
         "the prefill activation scope must be a child of the request's generation scope");
     int[][] before =
         decoder.preflightBatch(1, plan.expandedLength(), caches, new int[] {plan.expandedLength()});
-    List<Phi3VGeometryPlan> geometries = new ArrayList<>(images.size());
-    for (RgbImage image : images) {
-      geometries.add(processor.geometry(image.width(), image.height()));
-    }
     DecoderModel.FirstStepResult result;
     try (MLXScope prefill = activation.newChild()) {
       List<MLXArray> featureBlocks = new ArrayList<>();
@@ -470,19 +509,20 @@ public final class Phi3VModel implements TextGenerationModel {
                 .projector()
                 .forward(MLXShape.reshape(hd, new int[] {1, hd.shape()[0], hd.shape()[1]}));
         MLX.eval(projected);
-        if (boundaryPossible) {
+        if (boundary.active) {
           // Retained in the request's generation scope (the activation scope's parent), not this
           // step's activation scope: the boundary re-prefill re-injects the rows at a later decode
           // step, after the prefill step's activation scope has closed.
           MLXArray features = MLX.hoist(projected, activation.parent());
           hook = embedded -> merge(embedded, features, plan);
+          boundary.hook = hook;
+          boundary.retainedRows = features;
         } else {
           // No decode step can reach the boundary, so the rows are needed only by this step's
-          // merge; they die with the prefill scope and the hook reference stays null.
+          // merge and die with the prefill scope.
           hook = embedded -> merge(embedded, projected, plan);
         }
       }
-      hookRef[0] = boundaryPossible ? hook : null;
       observer.accept("before-prefill");
       checkCancellation(cancellation);
       MLXArray ids =
@@ -513,20 +553,17 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
-   * One cached decode step. When {@code boundaryPossible} is true, the emitted token is read back
-   * and appended to the re-prefill history, and the step that first reaches {@code
-   * originalMaxPositions + 1} total width re-runs the whole history as a fresh full prefill (the
-   * reference's boundary recompute, which thereby selects the long factor table); otherwise the
-   * single token decodes directly with no readback, boxing or history. Package access lets the
-   * golden test drive the loop step by step against the fresh-forward reference.
+   * One cached decode step. While the boundary state is active, the emitted token is read back and
+   * appended to the re-prefill history, and the step that first reaches {@code originalMaxPositions
+   * + 1} total width re-runs the whole history as a fresh full prefill (the reference's boundary
+   * recompute, which thereby selects the long factor table) — after which the retained image rows
+   * are closed, the hook dropped and the state deactivated, since the re-prefill can fire at most
+   * once and later steps owe it nothing. Package access lets the golden test drive the loop step by
+   * step against the fresh-forward reference.
    */
   MLXArray decodeStep(
-      MLXArray ids,
-      List<KVCache> caches,
-      List<Integer> history,
-      DecoderModel.EmbeddingHook[] hookRef,
-      boolean boundaryPossible) {
-    if (!boundaryPossible) {
+      MLXArray ids, List<KVCache> caches, List<Integer> history, BoundaryState boundary) {
+    if (!boundary.active) {
       observer.accept("decode");
       return decoder.decode(ids, caches, null, null);
     }
@@ -547,7 +584,19 @@ public final class Phi3VModel implements TextGenerationModel {
         full[i] = history.get(i);
       }
       MLXArray fullIds = MLX.array(ids.scope(), full, new int[] {1, width});
-      return decoder.stepLogits(fullIds, caches, new int[] {width}, hookRef[0], null, null);
+      MLXArray logits =
+          decoder.stepLogits(fullIds, caches, new int[] {width}, boundary.hook, null, null);
+      // Force the merge graph before releasing the rows it references: the sampler's later eval
+      // of these logits is then a no-op. Nothing after this step can fire again (the width only
+      // grows past the boundary), so the rows, the hook and the readback bookkeeping end here.
+      MLX.eval(logits);
+      if (boundary.retainedRows != null) {
+        boundary.retainedRows.close();
+        boundary.retainedRows = null;
+      }
+      boundary.hook = null;
+      boundary.active = false;
+      return logits;
     }
     return decoder.decode(ids, caches, null, null);
   }
@@ -575,20 +624,22 @@ public final class Phi3VModel implements TextGenerationModel {
 
   /**
    * The CLIP tower input for one image's real slots: the contiguous real-slot prefix of the
-   * processor's slot-major CHW row, transposed to the tower's channels-last layout. The prefix is
-   * selected by a native row slice (not a Java-side copy of the padded buffer). Zero-padded slots
-   * are never computed (the reference computes them and slices their rows away — a recorded
-   * bit-identical deviation).
+   * processor's slot-major CHW row, uploaded at its exact size (no Java-side copy of the padded
+   * buffer, no padded slots crossing to native memory), then transposed to the tower's
+   * channels-last layout. Zero-padded slots are never computed (the reference computes them and
+   * slices their rows away — a recorded bit-identical deviation).
    */
   private static MLXArray pixels(
       MLXScope scope, Phi3VImageProcessorResult prepared, int realSlots) {
-    float[] values = prepared.values();
     int plane = CLIP_IMAGE * CLIP_IMAGE;
-    int totalSlots = Math.floorDiv(values.length, 3 * plane);
-    MLXArray padded = MLX.array(scope, values, new int[] {totalSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
+    int elements = Math.multiplyExact(realSlots, 3 * plane);
     MLXArray chw =
-        MLXShape.slice(
-            padded, new int[] {0, 0, 0, 0}, new int[] {realSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
+        MLX.array(
+            scope,
+            prepared.values(),
+            0,
+            elements,
+            new int[] {realSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
     return MLXShape.transpose(chw, new int[] {0, 2, 3, 1});
   }
 

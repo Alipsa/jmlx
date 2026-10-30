@@ -146,7 +146,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       String modelType,
       int vocabSize,
       Integer slidingWindow,
-      boolean dynamicNtk,
+      boolean lengthDependentRope,
       int layerCount,
       boolean tiedOutput) {}
 
@@ -155,7 +155,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
         config.modelType(),
         config.vocabSize(),
         descriptor.attention().slidingWindow(),
-        descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk,
+        // Any sequence-length-dependent RoPE (DynamicNtk, Su, and future variants) forbids
+        // unequal batch positions; isStatic() is the one predicate that covers them all.
+        !descriptor.rope().isStatic(),
         layers.size(),
         tiedOutput);
   }
@@ -345,8 +347,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       }
       cache.policy().requireCapacity(layerWidth, "decoder padded cache width");
     }
-    if (descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk
-        || descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.Su) {
+    if (!descriptor.rope().isStatic()) {
       int ending = positions[0] + validLengths[0];
       for (int row = 1; row < batch; row++) {
         if (positions[row] != positions[0] || positions[row] + validLengths[row] != ending) {

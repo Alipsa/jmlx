@@ -116,7 +116,7 @@ class Phi3VMemoryTest {
           });
       try (MLXScope generation = root.newChild()) {
         var caches = Phi3VTestSupport.caches(model, generation);
-        DecoderModel.EmbeddingHook[] hookRef = {null};
+        Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
         int[] next = {0};
         try (MLXScope activation = generation.newChild()) {
           next[0] =
@@ -128,8 +128,7 @@ class Phi3VMemoryTest {
                           plan,
                           activation,
                           caches,
-                          hookRef,
-                          true)
+                          boundary)
                       .logits()
                       .toFloatArray());
         }
@@ -195,7 +194,7 @@ class Phi3VMemoryTest {
           }
           try (MLXScope activation = generation.newChild()) {
             MLXArray ids = MLX.array(activation, new int[] {next[0]}, new int[] {1, 1});
-            MLXArray logits = model.decodeStep(ids, caches, history, hookRef, true);
+            MLXArray logits = model.decodeStep(ids, caches, history, boundary);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
             next[0] = argmax(logits.toFloatArray());
           }

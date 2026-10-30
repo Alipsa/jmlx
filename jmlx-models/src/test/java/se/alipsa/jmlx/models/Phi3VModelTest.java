@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,6 +49,24 @@ class Phi3VModelTest {
         PromptSpecialTokens.ADD,
         GenerationConfig.greedyDefaults(maxNewTokens, Set.of()),
         CancellationToken.NONE);
+  }
+
+  @Test
+  void boundaryCrossingAccountsForThePrefillStep() {
+    // originalMax 470, prompt 465: decode step j holds cache position 465 + j - 1, and only
+    // maxNewTokens - 1 decode steps exist (step 0 is the prefill). Budget 8 fires at step 6 of
+    // 7; budget 7 fires at step 6 of 6; budget 6 ends at position 469 and never fires.
+    assertTrue(Phi3VModel.boundaryCrossable(465, 8, 470));
+    assertTrue(Phi3VModel.boundaryCrossable(465, 7, 470));
+    assertFalse(Phi3VModel.boundaryCrossable(465, 6, 470));
+    // A prompt already exactly at the boundary ran the short table in prefill; the first decode
+    // step crosses it, so it still fires. A prompt beyond it never fires.
+    assertTrue(Phi3VModel.boundaryCrossable(470, 8, 470));
+    assertFalse(Phi3VModel.boundaryCrossable(471, 8, 470));
+    // One step of slack in either direction moves the answer, pinning the -2 exactly.
+    assertTrue(Phi3VModel.boundaryCrossable(465, 8, 471));
+    assertFalse(Phi3VModel.boundaryCrossable(465, 7, 471));
+    assertFalse(Phi3VModel.boundaryCrossable(10, 0, 470));
   }
 
   @Test
@@ -144,24 +163,18 @@ class Phi3VModelTest {
         for (int i = 0; i < model.metadata().numHiddenLayers(); i++) {
           caches.add(new KVCache(generation));
         }
-        DecoderModel.EmbeddingHook[] hookRef = {null};
+        Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
         try (MLXScope activation = generation.newChild()) {
           MLXArray logits =
               model
                   .prefill(
-                      CancellationToken.NONE,
-                      List.of(wide),
-                      plan,
-                      activation,
-                      caches,
-                      hookRef,
-                      true)
+                      CancellationToken.NONE, List.of(wide), plan, activation, caches, boundary)
                   .logits();
           viaSeam.add(argmax(logits.toFloatArray()));
           for (int step = 1; step < maxNew; step++) {
             MLXArray ids =
                 MLX.array(activation, new int[] {viaSeam.get(step - 1)}, new int[] {1, 1});
-            MLXArray stepLogits = model.decodeStep(ids, caches, history, hookRef, true);
+            MLXArray stepLogits = model.decodeStep(ids, caches, history, boundary);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
             viaSeam.add(argmax(stepLogits.toFloatArray()));
           }

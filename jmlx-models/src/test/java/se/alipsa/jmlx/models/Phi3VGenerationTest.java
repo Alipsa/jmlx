@@ -287,27 +287,31 @@ class Phi3VGenerationTest {
   @Test
   void structuredChatContentExpandsThroughTheRetainedMessages(@TempDir Path directory)
       throws Exception {
+    // The WP6 checkpoint ships no chat template; load the model from a copy that adds the
+    // artifact's string-concatenating template to the checkpoint's own tokenizer, the shape a
+    // real phi3_v directory has.
+    Path checkpoint = directory.resolve("checkpoint");
+    Files.createDirectory(checkpoint);
+    for (String file :
+        new String[] {
+          "config.json", "model.safetensors", "tokenizer.json", "preprocessor_config.json"
+        }) {
+      Files.copy(Phi3VTestSupport.directory().resolve(file), checkpoint.resolve(file));
+    }
+    ObjectNode config = MAPPER.createObjectNode();
+    config.put("chat_template", artifactChatTemplate());
+    Files.writeString(checkpoint.resolve("tokenizer_config.json"), config.toString());
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
-      // The WP6 checkpoint ships no chat template; pair its tiny tokenizer with the artifact's
-      // string-concatenating template so the documented GenerationRequest.chat form is exercised.
-      HfTokenizer chatTokenizer = chatTokenizer(directory);
-      GenerationRequest structured =
-          GenerationRequest.chat(
-                  chatTokenizer,
-                  List.of(
-                      Map.of(
-                          "role",
-                          "user",
-                          "content",
-                          List.of(
-                              Map.of("type", "text", "text", "toast "),
-                              Map.of("type", "image"),
-                              Map.of("type", "text", "text", " toast")))),
-                  ChatTemplateOptions.defaults(true),
-                  GenerationConfig.greedyDefaults(5, Set.of()),
-                  CancellationToken.NONE)
-              .withImages(List.of(Phi3VTestSupport.square()));
+      // Mutable caller-side collections: the request must own its messages (like the images, whose
+      // pixel buffers RgbImage copies), so a later caller mutation cannot change the expansion.
+      Map<String, Object> before =
+          new java.util.HashMap<>(Map.of("type", "text", "text", "toast "));
+      Map<String, Object> imagePart = new java.util.HashMap<>(Map.of("type", "image"));
+      Map<String, Object> after = new java.util.HashMap<>(Map.of("type", "text", "text", " toast"));
+      List<Map<String, Object>> content = new ArrayList<>(List.of(before, imagePart, after));
+      Map<String, Object> message = new java.util.HashMap<>(Map.of("role", "user"));
+      message.put("content", content);
+      List<Map<String, Object>> messages = new ArrayList<>(List.of(message));
       // The artifact's template string-concatenates message['content'], so the request cannot
       // retain proper markers in its rendered text; the model must re-flatten the retained
       // messages. The equivalent literal-marker request must generate identically.
@@ -317,6 +321,17 @@ class Phi3VGenerationTest {
               "<|user|>\ntoast <|image_1|> toast<|end|>\n<|assistant|>\n",
               List.of(Phi3VTestSupport.square()),
               5);
+      var model = Phi3VModel.load(root, checkpoint);
+      GenerationRequest structured =
+          GenerationRequest.chat(
+                  HfTokenizer.fromDirectory(checkpoint),
+                  messages,
+                  ChatTemplateOptions.defaults(true),
+                  GenerationConfig.greedyDefaults(5, Set.of()),
+                  CancellationToken.NONE)
+              .withImages(List.of(Phi3VTestSupport.square()));
+      // Mutating the caller's structures after the request is built must change nothing.
+      sabotage(before, imagePart, content, message);
       GenerationResult fromParts = model.generate(structured, ignored -> {});
       GenerationResult fromMarkers = model.generate(marked, ignored -> {});
       assertEquals(fromMarkers.generatedTokenIds(), fromParts.generatedTokenIds());
@@ -324,14 +339,14 @@ class Phi3VGenerationTest {
     }
   }
 
-  private static HfTokenizer chatTokenizer(Path directory) throws Exception {
-    Files.copy(
-        Phi3VTestSupport.directory().resolve("tokenizer.json"),
-        directory.resolve("tokenizer.json"));
-    ObjectNode config = MAPPER.createObjectNode();
-    config.put("chat_template", artifactChatTemplate());
-    Files.writeString(directory.resolve("tokenizer_config.json"), config.toString());
-    return HfTokenizer.fromDirectory(directory);
+  private static void sabotage(
+      Map<String, Object> before,
+      Map<String, Object> imagePart,
+      List<Map<String, Object>> content,
+      Map<String, Object> message) {
+    before.put("text", "sabotage ");
+    content.remove(imagePart);
+    message.put("role", "assistant");
   }
 
   private static String artifactChatTemplate() throws Exception {

@@ -176,7 +176,7 @@ class TierBPhi3VTest {
           for (int id : plan.expandedIds()) {
             history.add(Math.max(id, 0));
           }
-          DecoderModel.EmbeddingHook[] hookRef = {null};
+          Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
           for (int step = 0; step < steps; step++) {
             try (MLXScope activation = generation.newChild()) {
               MLXArray logits;
@@ -184,18 +184,12 @@ class TierBPhi3VTest {
                 logits =
                     model
                         .prefill(
-                            CancellationToken.NONE,
-                            selected,
-                            plan,
-                            activation,
-                            caches,
-                            hookRef,
-                            true)
+                            CancellationToken.NONE, selected, plan, activation, caches, boundary)
                         .logits();
               } else {
                 int token = input.required("target_ids").get(step - 1).asInt();
                 MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-                logits = model.decodeStep(ids, caches, history, hookRef, true);
+                logits = model.decodeStep(ids, caches, history, boundary);
                 MLX.eval(DecoderModel.stepCacheArrays(caches));
               }
               float[] actual = logits.toFloatArray();

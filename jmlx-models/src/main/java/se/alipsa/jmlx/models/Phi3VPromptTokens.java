@@ -23,7 +23,12 @@ import java.util.regex.Pattern;
  */
 final class Phi3VPromptTokens {
 
-  /** The reference's marker pattern: {@code <|image_} + one or more decimal digits + {@code |>}. */
+  /**
+   * The reference's marker pattern: {@code <|image_} + one or more decimal digits + {@code |>}.
+   * Java's {@code \d} matches ASCII digits only while Python's (the reference's engine) matches any
+   * Unicode digit; for a non-ASCII digit run the two split differently — a deviation that only
+   * matters for adversarial prompts, recorded here rather than worked around.
+   */
   static final Pattern MARKER_PATTERN = Pattern.compile("<\\|image_(\\d+)\\|>");
 
   private Phi3VPromptTokens() {}

@@ -1,6 +1,8 @@
 package se.alipsa.jmlx.models;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -143,8 +145,47 @@ public final class GenerationRequest {
         GenerationCachePolicy.full(),
         List.of(),
         prompt,
-        List.copyOf(Objects.requireNonNull(messages, "messages")),
+        deepCopyMessages(messages),
         Objects.requireNonNull(options, "options"));
+  }
+
+  /**
+   * Deep-copies the chat messages so a later caller mutation cannot change what the model expands:
+   * like the images (whose pixel buffers {@link RgbImage} copies), the request must own its source
+   * text. Maps and lists are copied recursively; scalar leaves are immutable values.
+   */
+  private static List<Map<String, Object>> deepCopyMessages(List<Map<String, Object>> messages) {
+    List<Map<String, Object>> copy = new ArrayList<>(messages.size());
+    for (Map<String, Object> message : messages) {
+      copy.add(deepCopyMap(message));
+    }
+    return List.copyOf(copy);
+  }
+
+  private static Map<String, Object> deepCopyMap(Map<String, Object> map) {
+    Map<String, Object> copy = new LinkedHashMap<>(map.size());
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      copy.put(entry.getKey(), deepCopyValue(entry.getValue()));
+    }
+    return Map.copyOf(copy);
+  }
+
+  private static Object deepCopyValue(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> typed = new LinkedHashMap<>(map.size());
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+        typed.put((String) entry.getKey(), deepCopyValue(entry.getValue()));
+      }
+      return Map.copyOf(typed);
+    }
+    if (value instanceof List<?> list) {
+      List<Object> copy = new ArrayList<>(list.size());
+      for (Object element : list) {
+        copy.add(deepCopyValue(element));
+      }
+      return List.copyOf(copy);
+    }
+    return value;
   }
 
   private static GenerationRequest tokenizerBacked(

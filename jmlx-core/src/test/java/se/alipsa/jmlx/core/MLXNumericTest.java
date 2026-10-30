@@ -28,6 +28,19 @@ class MLXNumericTest {
     }
   }
 
+  @Test
+  void arrayFromAnArrayPrefixCopiesOnlyTheRequestedElements() {
+    try (MLXScope scope = new MLXScope()) {
+      float[] data = {1, 2, 3, 4, 5, 6};
+      MLXArray prefix = MLX.array(scope, data, 2, 3, new int[] {3});
+      assertArrayEquals(new float[] {3, 4, 5}, prefix.toFloatArray(), EPS);
+      assertThrows(
+          IndexOutOfBoundsException.class, () -> MLX.array(scope, data, 4, 3, new int[] {3}));
+      assertThrows(
+          IllegalArgumentException.class, () -> MLX.array(scope, data, 0, 2, new int[] {3}));
+    }
+  }
+
   /**
    * See req/phase4-plan.md §2: {@code binaryOp} now resolves its target via {@code scopeOf}/{@code
    * innermost} rather than rejecting any pair of operands that are not from the exact same scope --

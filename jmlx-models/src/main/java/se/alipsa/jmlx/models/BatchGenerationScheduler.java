@@ -933,7 +933,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   }
 
   private CohortKey keyOf(Req r) {
-    return new CohortKey(r.cachePolicy, facts.dynamicNtk() ? r.prompt.length : -1);
+    return new CohortKey(r.cachePolicy, facts.lengthDependentRope() ? r.prompt.length : -1);
   }
 
   // ---------------------------------------------------------------------------------- cohort

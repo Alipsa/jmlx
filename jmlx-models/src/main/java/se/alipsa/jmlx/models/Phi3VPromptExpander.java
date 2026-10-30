@@ -2,7 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -79,8 +79,9 @@ final class Phi3VPromptExpander {
       Objects.requireNonNull(message, "messages entries");
       StringBuilder text = new StringBuilder();
       imageParts = flattenedMessage(text, message, imageParts);
-      Map<String, Object> flatMessage = new HashMap<>(2);
-      flatMessage.put("role", message.get("role"));
+      // Pass every field through (role, name, ...): a template that reads another field must see
+      // the same message the request rendered, or the re-rendered prompt silently differs.
+      Map<String, Object> flatMessage = new LinkedHashMap<>(message);
       flatMessage.put("content", text.toString());
       flatMessages.add(flatMessage);
     }

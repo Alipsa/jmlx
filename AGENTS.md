@@ -990,3 +990,22 @@ expandedLength + maxNewTokens - 1`): when unreachable, the rows die with the pre
 scope, `hookRef` stays null and decode steps skip the readback and boxed history; and the
 pixel buffer's real-slot trim moved from a Java-side `Arrays.copyOf` to a native row
 slice. No native pin or generated binding changed.
+
+The second PR #68 review round (2026-10-30) landed on the same branch: `GenerationRequest.chat`
+deep-copies its messages (maps and content lists recursively, like the images' pixel buffers), the
+re-flattened messages pass every message field through to the re-render (not just role/content),
+and the messages path renders and encodes with the checkpoint's own tokenizer — the same tokenizer
+as every other expansion path, so one prompt can never tokenize two ways; the structured-chat test
+loads the model from a checkpoint copy carrying the artifact's template, mutates the caller's
+message structures after request creation and still expects the unchanged expansion. The boundary
+re-prefill's `BoundaryState` (active/hook/retainedRows) replaced the hook-reference array: the
+crossable predicate `boundaryCrossable` is extracted and off-by-one-fixed (only `maxNewTokens - 1`
+decode steps exist, so the fire condition is `expandedLength <= original_max <= expandedLength +
+maxNewTokens - 2`), and the moment the re-prefill fires its retained rows are closed, the hook
+dropped and the state deactivated — later steps skip the readback and boxed history. `MLX.array`
+gained a `(scope, float[], offset, length, shape)` overload uploading a right-sized prefix view via
+`MemorySegment.copy` (the pixel path uploads only the real slots, not the padded buffer), and
+`pixels()` uses it. `BatchFacts.dynamicNtk` became `lengthDependentRope = !rope.isStatic()` in both
+the scheduler cohort key and the batch preflight, covering Su and future length-dependent variants.
+The dead `request.tokenizer() == null` branches in the cancellation path are gone, and the
+ASCII-only `\d` deviation from Python's Unicode `\d` is recorded on `Phi3VPromptTokens.MARKER_PATTERN`.

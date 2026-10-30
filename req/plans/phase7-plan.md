@@ -178,7 +178,7 @@ for every new op.
 | 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models`, `jmlx-tokenizer`, reference/Tier-B tools | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens |
 | 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B |
 | 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output |
-| 7.3c LLaVA-style (optional) | `jmlx-models` | 7.3a | Tier-B artifact, or a dated deferral |
+| 7.3c LLaVA-style (optional) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | delivered 2026-10-30: Phi-3.5-Vision Tier-A logits and Tier-B image+text output |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record |
 
 Step 0 merges first. 7.0 and 7.1 can then proceed in parallel. 7.3a may start once 7.1's conv,
@@ -618,6 +618,19 @@ the matrix row is added.
 Reuses 7.3a (vision tower plus an MLP projector). Proceed only if a licensed small artifact
 exists. Otherwise record a dated deferral. PaliGemma remains deferred because of Gemma-terms
 access (the same Tier-B problem as Gemma v1).
+
+**Implementation update, 2026-10-30:** delivered as the Phi-3.5-Vision milestone
+(`req/plans/phase7-3c-plan.md`, findings in `req/plans/phase7-3c-reference-findings.md`):
+`microsoft/Phi-3.5-vision-instruct` (MIT) pinned as a Tier-B artifact with a required
+multi-image prompt; the LLaVA-style connector is the artifact's own HD-transform + CLIP
+tower + MLP projector (`Phi3VVisionTower`, sentinel-row injection at the decoder embedding
+entry point), plus the new `RopeSpec.Su` NTK-Su variant and its 4096-boundary re-prefill.
+Tier-A (`phi3v-wp6.json`, six cases including the boundary crossing) and Tier-B (exact 24
+greedy IDs and decoded output, allocator peak 31.1 GB, sampled footprint peak 51.4 GB) are
+recorded; the compatibility matrix gains a per-phase 7.3c section (VLMs get per-phase
+sections, not matrix rows). The Tier-B CI row runs on the self-hosted `self-macos-xl`
+runner; its first self-hosted run and the macOS 26 hosted execution remain pending.
+PaliGemma remains deferred.
 
 ## 7.4 — Audio and diffusion capability decision
 

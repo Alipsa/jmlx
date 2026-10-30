@@ -117,7 +117,8 @@
     "checkpoints/phi3v-wp6/tokenizer.json": "cfb9e05ab721163bd6de2f0dcc552dae7c410fd23b0e5ceddb5791b01a9da99b",
     "checkpoints/phi3v-wp6/images/square-336x336.png": "40734e8e0fbc8fe651c65d4b789082dc8d2ca833f59b9473bb17d54ecabfc2d8",
     "checkpoints/phi3v-wp6/images/wide-672x336.png": "702955febf85bce110b16120cd3a71dfd568cabbce04f29b78561a1260df7efc",
-    "checkpoints/phi3v-wp6/images/tall-336x672.png": "30703c484d9681bdbf7a6f1cfb147eadd87d73afa901fc2134257e40900575a5"
+    "checkpoints/phi3v-wp6/images/tall-336x672.png": "30703c484d9681bdbf7a6f1cfb147eadd87d73afa901fc2134257e40900575a5",
+    "phi3v-tier-b-logits.bin": "1c641ba6bc26a90b752af1d47632549c9a5935a071a15fe53528c97fac28b234"
   },
   "chat_sources": {
     "mistral/tokenizer.json": "f86c748546561371bca6bb8577e8e504d4022d611612a6af91d08e39d424c63f",
@@ -225,5 +226,11 @@
     "jmlx-models/src/test/resources/phi3v-tokens/tokenizer_config.json": "581d4654c018fbcef2504b57a805dcad37126038137b5d25d22b5a02abc1ef29"
   },
   "phi3v_wp4_generator_sha256": "b4f5c60729d13f797b0548deeb71ba6f4e1647c50f3ac30e14922cf6f22b3119",
-  "phi3v_wp6_generator_sha256": "47bbb22876c35ae630f68316b076798055ec744a15a240f320572814e2203b58"
+  "phi3v_wp6_generator_sha256": "47bbb22876c35ae630f68316b076798055ec744a15a240f320572814e2203b58",
+  "phi3v_tier_b_files": {
+    "tools/tier-b/phi3v-4b-instruct.json": "faeae7ad6288656032a549ea93b53e7a12775d0550721740db15b26e864903f1",
+    "tools/hf-reference/phi3v_tier_b.py": "22d4a8e060a65c2ef2964202b4f580b8ddfc67914ae0861caf1abc067f627501",
+    "tools/tier-b/images/phi3v-wide-672x336.png": "702955febf85bce110b16120cd3a71dfd568cabbce04f29b78561a1260df7efc",
+    "tools/tier-b/images/phi3v-square-336x336.png": "40734e8e0fbc8fe651c65d4b789082dc8d2ca833f59b9473bb17d54ecabfc2d8"
+  }
 }

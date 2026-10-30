@@ -884,3 +884,84 @@ verification claims stay pinned to the 4.2B artifact (§1), and the descriptor (
   `Phi3VGenerationTest` and `Phi3VMemoryTest` are registered in the macOS
   CI required-suite assertion (`suites['jmlx-models']`, default `test` results
   directory) and in the result-XML upload.
+
+## 16. WP8 acceptance — Tier-B real artifact, CI row and documentation (2026-10-30)
+
+**Reference generator and determinism.** `tools/hf-reference/phi3v_tier_b.py` (never
+invoked by Gradle; digest-pinned in `tools/hf-reference/provenance.json` under
+`phi3v_tier_b_files`, generator sha `22d4a8e0…`) loads the pinned 15-file artifact
+(revision `12b77fb…`, 8,295,395,355 bytes, 592 stored BF16 tensors), runs the bundled
+trust-remote-code processor (HD transform: 672x336 → 336x672 1x2 grid, 457 image tokens;
+336x336 → 672x672 2x2 grid, 757 image tokens), up-casts every stored weight to float32
+(exactly the Java loader's path), renders the required multi-image prompt (35 unexpanded
+/ 1241 expanded tokens), and records the full 32,064-vocabulary float32 logit vector at
+every expected greedy history step — each step a fresh, full, uncached forward (the
+bundled modeling cannot run a cached forward under 4.57.6, §4) — into the little-endian
+binary golden `tools/hf-reference/goldens/phi3v-tier-b-logits.bin` (3,078,144 B, one
+vector per step; a documented size-driven deviation from the JSON logits goldens,
+following the Qwen3-VL patch-bin precedent). Determinism was proven with a triple run:
+the provisional run and the two final-constant runs (A and B) all produced the
+byte-identical blob sha `1c641ba6bc26a90b752af1d47632549c9a5935a071a15fe53528c97fac28b234`
+(the blob content is independent of the ε/margin/status constants), and runs A/B produced the
+byte-identical manifest, sha `171ad7df52f64e416938e62ae6709758b259d157c0e00a15c7e393838935ea32`;
+the final sha is `faeae7ad6288656032a549ea93b53e7a12775d0550721740db15b26e864903f1`, re-pinned
+in `provenance.json`'s `phi3v_tier_b_files` after the hand-added `local_evidence` block.
+
+**Final reference constants.** `epsilon = 2e-4` — 2× the measured Java-vs-reference
+max_abs_error `1.02996826171875e-4` (one significant figure, the qwen3vl precedent) —
+`margin = 1e-4`, status `eligible after measured real-checkpoint error; local macOS 27
+run passed; macOS 26 CI pending`. The generator comment cites the measured error and the
+recorded minimum top-two gap 0.00316619873046875, about 6× the `2*epsilon + margin =
+5e-4` eligibility bound. The 24 reference greedy IDs are `[9134, 4558, 526, 15526, 630,
+322, 4682, 263, 20619, 1409, 310, 2319, 29892, 1773, 5283, 4395, 270, 1862, 29889, 450,
+270, 1862, 526, 1584]`, finish MAX_TOKENS (the stop token 32000 never appears within the
+24 steps), and `expected_text` is the reference's
+`tokenizer.decode(target_ids, skip_special_tokens=True)` = "Both images are pixelated and
+feature a dense array of small, multicolored dots. The dots are even".
+
+**Local acceptance runs (final constants; M5 Max / macOS 27.0.1, TF32 off, pinned
+mlx-metal 0.31.2 / mlx-c fba4470).** `TierBPhi3VTest` (task `phi3v-generation`) is
+green: max_abs_error `1.02996826171875e-4` (identical across the provisional and final
+runs), allowed_epsilon `2.0e-4`, margin eligibility passed, exact greedy IDs and exact
+decoded output, expanded length 1241, `device=gpu, host=27.0.1/aarch64`. Native
+allocator peak `31,100,376,165` B on the final runs (the provisional run measured
+`31,100,378,213` — deterministic to ~2 KB); sampled process-footprint peak
+`51,410,538,000` B on the final run (intermediate runs measured `51,413,356,168` and
+`51,421,089,584` — stable to ~8 MB); load wall 1133–1562 ms, one-request generation wall
+3960–5423 ms across runs. The suite bounds are sized from the manifest's
+`local_evidence` (peak + 500 MiB for the native allocator; 52,000,000,000 B for the
+footprint, ~552 MB above the measured peak) with the same
+regression-detector-not-guarantee semantics as the qwen3vl row.
+
+**Build wiring.** `verifyHfReferenceGoldens` (root `build.gradle`) initially gained a
+top-level `phi3v_tier_b_generator_sha256` provenance key and a matching check; the
+qwen3vl Tier-B pattern has no top-level generator key — the generator's SHA lives only
+in the `*_tier_b_files` map, which the files check re-hashes. The top-level check (and
+its absent provenance key) were removed; instead the manifest and generator were added to
+the task's declared inputs (`phi3v-4b-instruct.json` to the `tools/tier-b` fileTree
+include, `tools/hf-reference/phi3v_tier_b.py` as an explicit input), matching the
+qwen3vl wiring. The generator's sha is verified through `phi3v_tier_b_files` alone.
+
+**CI row.** A `phi3v` arm was added to `.github/workflows/tier-b.yml` on the self-hosted
+`self-macos-xl` runner (`model_type: phi3_v`, `task: phi3v-generation`, `suite:
+TierBPhi3VTest`, revision `12b77fb…`): the 8.3 GB artifact and the 51.4 GB measured
+footprint exceed the standard 7 GB hosted runner, and GitHub's larger `macos-26-xlarge`
+tier is billed per minute even in public repos, so the row does not target it. The
+header comments now name the three self-hosted arms (smolvlm, qwen3vl, phi3v). The row's
+first self-hosted run accepts the CI pipeline (checkout, artifact download, native
+bootstrap, pinned suite) — not independent host, OS or memory-fit evidence — and the
+supported macOS 26 hosted execution remains pending, not verified. No `ci.yml` change is
+needed for the Tier-B suite (it runs only in `tier-b.yml`); the WP6/WP7 suites are
+already in the macOS native required-suite list.
+
+**Documentation.** `req/phase6-compatibility.md` (a new per-phase 7.3c section appended
+after the 7.3b section; the line-16 "planned" row is unchanged — `longrope` is a
+rope_type still rejected, and VLMs get per-phase sections, not matrix rows),
+`req/phase6-inference-report.md` (the stale "Qwen3-VL, LLaVA-style vision models | not
+implemented" row replaced with the MoE-VLM-variants rejection row),
+`req/phase6-tier-a-fixtures.md` (a new 7.3c WP6 fixtures section),
+`req/phase6-tier-b-artifacts.md` (a new 7.3c Tier-B section mirroring the qwen3vl one),
+`tools/tier-b/README.md` (phi3v paragraph and command block; the CI-rows paragraph
+updated to three arms), `AGENTS.md` (a new "Phase 7.3c additions" section) and
+`req/plans/phase7-plan.md` (delivery-table row and the §7.3c implementation note). No
+native pin, generated binding or public API changed in WP8.

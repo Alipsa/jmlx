@@ -1062,3 +1062,52 @@ result construction, and `Phi3VPromptExpander.flattenedContentPart` repeating
 records; round 6 asked only that it stay tracked.
 
 No native pin, generated binding or golden changed in this round.
+
+## 18. PR #68 eighth review round (2026-10-31)
+
+**The phi3v gate now matches the exact recording platform.** Round 7's `is_arm64()` matched
+`platform.machine() in ("arm64", "aarch64")`, which also admits a Linux aarch64 machine — but
+that host installs the pinned `torch==2.6.0+cpu` build (the `requirements.in` pin
+`sys_platform != "darwin"`), whose FMA contraction is unverified, and the committed bins were
+recorded on the macOS arm64 wheel. Moving the Java job to `ubuntu-24.04-arm` would have let the
+family run against the `+cpu` build and brought back the "patch bin missing or stale" failure if
+that kernel differs. `runner.py` now gates on the recording platform, not the architecture:
+`is_reference_platform()` returns `sys.platform == "darwin" and platform.machine() == "arm64"`,
+and `run_phi3v` raises `SkipFamily("phi3v (macOS-arm64-only reference bytes)")` elsewhere. The
+gate is deliberately not widened until the pinned Linux aarch64 `+cpu` wheel's bicubic bytes are
+checked against the committed bins (a local Ubuntu ARM64 container can do that; it is not
+required for this round). `jmlx-vision/README.md` and the macOS 26 native CI job comment both
+reworded from "arm64-only" to "recording-platform-only".
+
+**The `expectedClipLayersForTest` Javadoc no longer overstates the static.** The field is a
+mutable static in production code — process-wide in reach, narrower than the old system
+property only because only same-package code can set it. The reviewer confirmed there is no
+functional bug (no parallel JUnit configuration; the dispatch test clears it in `finally`).
+The Javadoc now says what it is — "a mutable static, so process-wide in reach, but production
+code never sets it" — rather than claiming no process-wide switch reaches the depth check.
+The alternative (removing the static by adding a `TextGenerationModels` dispatch overload that
+takes the expected depth) was rejected because it would pollute the generic dispatch API with a
+phi3v-specific parameter.
+
+**`ChatTemplateOptions` now copies arrays, and the renderer's value domain is verified.** The
+round-7 recursive copy handled only `Map` and `List`; the reviewer flagged that any other nested
+mutable value (a `Set`, another `Collection`, an array) was still shared, not the full snapshot
+the Javadoc promised. Verified against `jmlx-jinja`'s `Values.fromHostValue`: the renderer
+accepts `String`, `Boolean`, `Number`, object arrays, `List` and `Map` (map keys must be
+`String`), and rejects everything else — including `Set` and other collections — at the render
+boundary with "Unsupported host value type". So `Set`/collection context values were never
+renderable, and only arrays were both accepted and mutable. `deepCopyContextValue` now copies
+object arrays element-wise and clones all eight primitive array types, so every renderer-accepted
+context value is snapshot. The compact-constructor Javadoc states the resulting contract
+explicitly: maps/lists are unmodifiable copies, arrays are copied, scalars are immutable and
+shared, and `Set`/other collections fail at the render boundary. The behavior change that nested
+maps/lists returned by `extraContext()` are now unmodifiable is a note only — `jmlx-tokenizer`
+is unpublished. `ChatTemplateRenderOptionsTest.extraContextIsDeepCopiedAtConstruction` gained a
+nested-object-array mutation case to pin the new array copy.
+
+**Wrong round label dropped from the public Javadoc.** `GenerationRequest.chat`'s Javadoc
+carried "(round-6 design review)" — but that finding actually came from the review this commit
+series calls the seventh round, and review-round references don't belong in public API docs.
+The parenthetical is removed.
+
+No native pin, generated binding or golden changed in this round.

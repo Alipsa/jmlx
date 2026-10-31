@@ -132,9 +132,10 @@ jobs:
         shell: bash
         run: ./tools/mlx-oracle/install.sh
 
-      # The phi3v image-oracle family reproduces only on arm64 (the pinned torch wheel's
-      # FMA-contracted bicubic arithmetic); the Java job's runner skips it there, so the
-      # reference verification of that family lives on this Apple-Silicon runner instead.
+      # The phi3v image-oracle family reproduces only on the macOS arm64 platform the bins
+      # were recorded on (the pinned torch wheel's FMA-contracted bicubic arithmetic; the
+      # pinned Linux wheels are known to differ or are unverified); the Java job's runner
+      # skips it, so the reference verification of that family lives on this runner instead.
       - name: Install hash-locked image oracle
         shell: bash
         run: ./tools/image-oracle/install.sh

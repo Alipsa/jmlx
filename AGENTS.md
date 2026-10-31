@@ -1070,3 +1070,18 @@ Checkstyle suppression); and the `embd_layer.embedding_cls` presence-only check 
 against the digest-pinned bundled modeling (the value is indexed but never read). The
 vision-language shared-helper extraction remains a deferred follow-up. No native pin, generated
 binding or golden changed.
+
+An eighth PR #68 review round landed: the `phi3v` image-oracle gate in `runner.py` now matches the
+exact recording platform — `is_reference_platform()` is `sys.platform == "darwin" and
+platform.machine() == "arm64"` — because round 7's `is_arm64()` also matched a Linux aarch64 host,
+which installs the pinned `torch==2.6.0+cpu` build (unverified for FMA contraction) rather than the
+macOS arm64 wheel the committed bins were recorded with; widening the gate past the recording
+platform is deferred until that Linux `+cpu` build is checked against the committed bins.
+`Phi3VModel.expectedClipLayersForTest`'s Javadoc was reworded to acknowledge it is a mutable
+process-wide static that production never sets (the finding was an overstatement, not a bug).
+`ChatTemplateOptions` deep-copies object arrays element-wise and clones the eight primitive array
+types (verified against `jmlx-jinja`'s `Values.fromHostValue`: the renderer accepts
+String/Boolean/Number/array/List/Map and rejects `Set`/other collections at the render boundary),
+and its Javadoc states the resulting snapshot contract; `ChatTemplateRenderOptionsTest` gained a
+nested-array mutation case. `GenerationRequest.chat`'s Javadoc dropped a wrong "(round-6 design
+review)" label. No native pin, generated binding or golden changed.

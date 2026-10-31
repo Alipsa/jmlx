@@ -126,8 +126,7 @@ public final class GenerationRequest {
    * change that. The deep copy therefore happens eagerly here — deferring it to the model's first
    * read would capture mutations made between request creation and generation and could silently
    * diverge the re-expansion from the retained IDs. It is paid by every chat request, including
-   * ones a text-only model consumes; that is the deliberate cost of the build-time snapshot
-   * (round-6 design review).
+   * ones a text-only model consumes; that is the deliberate cost of the build-time snapshot.
    *
    * <p>Phi-3.5-Vision re-flattens the messages whenever any one carries structured content, and on
    * that path a literal image marker ({@code <|image_i|>}) inside a plain-string message is

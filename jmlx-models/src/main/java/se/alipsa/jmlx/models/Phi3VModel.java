@@ -225,11 +225,12 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
-   * The single seam that can check a depth other than the pinned one, and it is package-private: no
-   * system property, flag or other process-wide switch reaches the depth check. Production entry
-   * points (the public load and {@code TextGenerationModels}' dispatch) always require the pinned
-   * ViT-L/14-336 depth, and only the in-repo dispatch suite — whose tiny checkpoint cannot carry 24
-   * random CLIP layers — installs an override around the single load it exercises.
+   * The only code that can check a depth other than the pinned one is this package-private test
+   * seam — a mutable static, so process-wide in reach, but production code never sets it: the
+   * public load and {@code TextGenerationModels}' dispatch always require the pinned ViT-L/14-336
+   * depth, and only the in-repo dispatch suite (whose tiny checkpoint cannot carry 24 random CLIP
+   * layers) installs an override around its single load, clearing it in a finally block. No system
+   * property or flag reaches the depth check.
    */
   private static volatile Integer expectedClipLayersForTest;
 

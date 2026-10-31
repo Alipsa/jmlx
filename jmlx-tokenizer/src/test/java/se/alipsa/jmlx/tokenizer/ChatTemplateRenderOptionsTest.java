@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -122,6 +123,16 @@ class ChatTemplateRenderOptionsTest {
     tools.remove("search");
     context.put("tools", "sabotage");
     assertEquals(List.of("search"), options.extraContext().get("tools"));
+
+    // Arrays are copied too: the renderer accepts them as context values, and a caller mutation
+    // of the original array must not reach a later render.
+    String[] categories = {"weather", "news"};
+    Map<String, Object> arrayContext = new java.util.LinkedHashMap<>();
+    arrayContext.put("categories", categories);
+    ChatTemplateOptions arrayOptions = new ChatTemplateOptions("", false, arrayContext);
+    categories[0] = "sabotage";
+    assertArrayEquals(
+        new String[] {"weather", "news"}, (String[]) arrayOptions.extraContext().get("categories"));
   }
 
   private static RenderOptions fixedClock(ZoneId zone) {

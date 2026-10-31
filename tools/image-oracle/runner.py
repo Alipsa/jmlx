@@ -15,16 +15,22 @@ import json
 import math
 import os
 import platform
+import sys
 from pathlib import Path
 
 
 class SkipFamily(Exception):
-    """A family whose reference bytes only reproduce on one architecture (the phi3v
-    torch bicubic kernels are FMA-contracted on the pinned AArch64 wheel)."""
+    """A family whose reference bytes only reproduce on the platform they were recorded
+    on (the phi3v torch bicubic kernels are FMA-contracted in the pinned macOS arm64
+    wheel; the pinned Linux wheels are known to differ or are unverified)."""
 
 
-def is_arm64() -> bool:
-    return platform.machine() in ("arm64", "aarch64")
+def is_reference_platform() -> bool:
+    # The committed phi3v bins were recorded on the macOS arm64 torch wheel. The pinned
+    # Linux x86 CPU wheel is known to emit different bicubic bytes, and the pinned Linux
+    # aarch64 CPU wheel's FMA contraction is unverified, so the family runs only on the
+    # recording platform until that build is checked against the committed bins.
+    return sys.platform == "darwin" and platform.machine() == "arm64"
 
 
 def canonical(value: object) -> str:
@@ -724,14 +730,13 @@ def run_phi3v(input_path: Path, provenance: dict) -> dict:
     materialized as the committed processed-patch bins under phi3v/patches/ (written in
     --generate-all mode, digest-verified otherwise; --verify-all never writes).
 
-    The committed rows reproduce only on arm64: the pinned torch wheel's FMA-contracted
-    bicubic arithmetic is architecture-specific, so on any other machine this family is
-    skipped (logged by main) rather than compared or regenerated against different bytes.
-    The Java side still verifies its port against the committed bins on every
-    architecture (jmlx-vision ImageOraclePhi3VTest)."""
-    if not is_arm64():
-        raise SkipFamily("phi3v (arm64-only reference bytes)")
-    import sys
+    The committed rows reproduce only on the recording platform: the pinned macOS arm64
+    torch wheel's FMA-contracted bicubic arithmetic, so on any other platform this family
+    is skipped (logged by main) rather than compared or regenerated against different
+    bytes (see is_reference_platform). The Java side still verifies its port against the
+    committed bins on every architecture (jmlx-vision ImageOraclePhi3VTest)."""
+    if not is_reference_platform():
+        raise SkipFamily("phi3v (macOS-arm64-only reference bytes)")
 
     import numpy as np
     from PIL import Image

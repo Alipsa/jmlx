@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.tokenizer;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -50,9 +51,13 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Validates and defensively copies the caller context, recursively: a later caller mutation of a
-   * nested value (a tools list and the like) cannot change what a render — including a model's
-   * later re-render of the same options — sees. Empty template name means default selection.
+   * Validates and defensively copies the caller context: maps and lists are copied recursively into
+   * unmodifiable wrappers, arrays are copied, and the remaining values (strings, booleans, numbers)
+   * are immutable and shared — so a later caller mutation of a nested value (a tools list, a nested
+   * array) cannot change what a render, including a model's later re-render of the same options,
+   * sees. The nested maps and lists {@link #extraContext()} returns are therefore unmodifiable
+   * copies. Sets and other collections are not accepted by the renderer as context values and fail
+   * at the render boundary. Empty template name means default selection.
    */
   public ChatTemplateOptions {
     templateName = Objects.requireNonNull(templateName, "templateName");
@@ -71,9 +76,11 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Copies one context value: maps and lists are copied into insertion-order unmodifiable wrappers,
-   * nested map keys are preserved as they are (the renderer rejects non-String keys at the render
-   * boundary, not here), and scalars are shared by reference.
+   * Copies one context value: maps and lists are copied into insertion-order unmodifiable wrappers
+   * (nested map keys are preserved as they are — the renderer rejects non-String keys at the render
+   * boundary, not here), object arrays are copied element-wise with their runtime component type
+   * preserved, primitive arrays are cloned, and the remaining values (strings, booleans, numbers)
+   * are immutable and shared by reference.
    */
   private static Object deepCopyContextValue(Object value) {
     if (value instanceof Map<?, ?> map) {
@@ -89,6 +96,38 @@ public record ChatTemplateOptions(
         copy.add(deepCopyContextValue(element));
       }
       return Collections.unmodifiableList(copy);
+    }
+    if (value instanceof Object[] array) {
+      Object[] copy =
+          (Object[]) Array.newInstance(array.getClass().getComponentType(), array.length);
+      for (int i = 0; i < array.length; i++) {
+        copy[i] = deepCopyContextValue(array[i]);
+      }
+      return copy;
+    }
+    if (value instanceof boolean[] array) {
+      return array.clone();
+    }
+    if (value instanceof byte[] array) {
+      return array.clone();
+    }
+    if (value instanceof char[] array) {
+      return array.clone();
+    }
+    if (value instanceof double[] array) {
+      return array.clone();
+    }
+    if (value instanceof float[] array) {
+      return array.clone();
+    }
+    if (value instanceof int[] array) {
+      return array.clone();
+    }
+    if (value instanceof long[] array) {
+      return array.clone();
+    }
+    if (value instanceof short[] array) {
+      return array.clone();
     }
     return value;
   }

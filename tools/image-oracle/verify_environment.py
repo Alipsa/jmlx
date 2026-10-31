@@ -20,11 +20,16 @@ def main() -> None:
         "pillow": importlib.metadata.version("Pillow"),
         "numpy": importlib.metadata.version("numpy"),
         "transformers": importlib.metadata.version("transformers"),
+        # torch/torchvision carry a +cpu local version on Linux wheels only.
+        "torch": importlib.metadata.version("torch").replace("+cpu", ""),
+        "torchvision": importlib.metadata.version("torchvision").replace("+cpu", ""),
     }
     for name, expected in (
         ("pillow", provenance["pillow"]),
         ("numpy", provenance["numpy"]),
         ("transformers", provenance["transformers"]),
+        ("torch", provenance["torch"]),
+        ("torchvision", provenance["torchvision"]),
     ):
         actual = versions[name]
         if actual != expected:

@@ -1,0 +1,793 @@
+{
+  "deferred_128k": {
+    "status": "not accessible (gated); num_crops unverified; no support claim"
+  },
+  "env": {
+    "numpy": "2.5.3",
+    "pillow": "12.3.0",
+    "platform": {
+      "machine": "arm64",
+      "system": "Darwin"
+    },
+    "python": "3.12.16",
+    "torch": "2.6.0",
+    "torch_threads": 6,
+    "torchvision": "0.21.0",
+    "transformers": "4.57.6"
+  },
+  "p1": {
+    "exception": {
+      "frames": [
+        {
+          "file": "modeling_phi3_v.py",
+          "line": "outputs = self.model(",
+          "lineno": 1603
+        },
+        {
+          "file": "modeling_phi3_v.py",
+          "line": "past_key_values_length = past_key_values.get_usable_length(seq_length)",
+          "lineno": 1417
+        }
+      ],
+      "message": "'DynamicCache' object has no attribute 'get_usable_length'",
+      "type": "AttributeError"
+    },
+    "raised": "fresh-prefill"
+  },
+  "p2": {
+    "exception": {
+      "frames": [
+        {
+          "file": "modeling_phi3_v.py",
+          "line": "past_length = past_key_values.seen_tokens if isinstance(past_key_values, Cache) else past_key_values[0][0].shape[2]",
+          "lineno": 1653
+        }
+      ],
+      "message": "'DynamicCache' object has no attribute 'seen_tokens'",
+      "type": "AttributeError"
+    },
+    "raised": "boundary-prepare"
+  },
+  "p3": {
+    "empty": [
+      1
+    ],
+    "leading_space": [
+      1,
+      29871,
+      22172
+    ],
+    "no_leading_space": [
+      1,
+      22172
+    ]
+  },
+  "p4": {
+    "artifact_config_attn_implementation": "flash_attention_2",
+    "bare_clipvisionconfig_attn_implementation": null,
+    "bundled_clip_constant_attn_implementation": null,
+    "clipvisionmodel_default_attn_implementation": null,
+    "eager_construction": {
+      "decoder_self_attn_class": "Phi3Attention",
+      "failed": false,
+      "model_config_attn_after_build": "eager",
+      "tower_config_attn_after_build": "eager",
+      "tower_self_attn_class": "CLIPAttention"
+    },
+    "tower_attn_internal_after_build": "sdpa",
+    "tower_config_attn_after_build": "sdpa",
+    "tower_default_self_attn_class": "CLIPAttention"
+  },
+  "p5": {
+    "cases": [
+      {
+        "identical_bytes": true,
+        "pil_sha256": "113037972fae8df3aafe6a68c172fcaf896d7e78e329095a9ad951a99dadc234",
+        "resize": [
+          669,
+          672
+        ],
+        "source": [
+          301,
+          300
+        ],
+        "torchvision_sha256": "113037972fae8df3aafe6a68c172fcaf896d7e78e329095a9ad951a99dadc234"
+      },
+      {
+        "identical_bytes": true,
+        "pil_sha256": "4095791ee73a67fd202e01ff05499619cee1d1e8de7255441ab66248d4964d91",
+        "resize": [
+          672,
+          672
+        ],
+        "source": [
+          336,
+          336
+        ],
+        "torchvision_sha256": "4095791ee73a67fd202e01ff05499619cee1d1e8de7255441ab66248d4964d91"
+      },
+      {
+        "identical_bytes": true,
+        "pil_sha256": "874d49685db0774d91fc6082997c81db5fd558c95e3318feb0b02439b85c8712",
+        "resize": [
+          336,
+          672
+        ],
+        "source": [
+          672,
+          336
+        ],
+        "torchvision_sha256": "874d49685db0774d91fc6082997c81db5fd558c95e3318feb0b02439b85c8712"
+      },
+      {
+        "identical_bytes": true,
+        "pil_sha256": "da995981c7198228ad2a084034fd3340793f5161a4ea9844a23141469c7a8486",
+        "resize": [
+          784,
+          168
+        ],
+        "source": [
+          251,
+          137
+        ],
+        "torchvision_sha256": "da995981c7198228ad2a084034fd3340793f5161a4ea9844a23141469c7a8486"
+      },
+      {
+        "identical_bytes": true,
+        "pil_sha256": "60c73bd560e1ebb7d2dcff7ca04d29efdebf3d16304348fbeac095f5a2ba9c6f",
+        "resize": [
+          400,
+          909
+        ],
+        "source": [
+          511,
+          223
+        ],
+        "torchvision_sha256": "60c73bd560e1ebb7d2dcff7ca04d29efdebf3d16304348fbeac095f5a2ba9c6f"
+      }
+    ],
+    "torchvision_default_interpolation": "BILINEAR"
+  },
+  "p6": {
+    "image_cases": [
+      {
+        "image_sizes": [
+          [
+            672,
+            672
+          ]
+        ],
+        "name": "square-336x336",
+        "num_img_tokens": [
+          757
+        ],
+        "pixel_values_dtype": "torch.float32",
+        "pixel_values_sha256": "0292f014488f681947391a5daf5d805c6900c2098d16e171b9228c199ee7f7e7",
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "slot_sha256": [
+          "9dab55437927e4344b2e910b2f4179e3702f3d0c4089881e7e5874de8e3751d0",
+          "ec9bf9ee4fd83cb19ab90499aa8ca883f2d51abf1e24b72d9b6af4a570b80b81",
+          "6c6bd0473a2694506723f1a8dc1240641deaf99cfefdb1e1094d54f0fea80e57",
+          "ca33b248a26a312342a4a1e58350e9d3b52ad6e3d7bcf045f8f4da90054e6bdc",
+          "bf6b8d4fec100cf38eef3e7f5bc789d38addb6df97a2f81b7c38c9c725898f0d"
+        ]
+      },
+      {
+        "image_sizes": [
+          [
+            336,
+            672
+          ]
+        ],
+        "name": "wide-672x336",
+        "num_img_tokens": [
+          457
+        ],
+        "pixel_values_dtype": "torch.float32",
+        "pixel_values_sha256": "6cdac6a70c10c927b3345a5cd3fe683f96d8acd0a0e368854ca9ff257cc71732",
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "slot_sha256": [
+          "3a4b4b58d5bd85858f68e2680e93fc1a8a8fbdd6823998c7917327367c6b8cb5",
+          "8fcb705eec1b920eb629cffb1e0ab79726be58e19619c11119c2b731cf54e5b5",
+          "a708fe53adb48fc07b03677339117ff3fa0c45b1d047519515138471e50c4f2c",
+          "90ef90f5e407dee7383f0cbcf712dee990ed52e1621df372b49432db66231fd2",
+          "90ef90f5e407dee7383f0cbcf712dee990ed52e1621df372b49432db66231fd2"
+        ]
+      },
+      {
+        "image_sizes": [
+          [
+            672,
+            336
+          ]
+        ],
+        "name": "tall-336x672",
+        "num_img_tokens": [
+          469
+        ],
+        "pixel_values_dtype": "torch.float32",
+        "pixel_values_sha256": "3869d7af80146c160ce639a95a4ad34f831feee3177acd5e677c12848febe396",
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "slot_sha256": [
+          "fecbbcd6837acf2e2d5c37931af876601556ac3ae93737f10add92b6f3229045",
+          "30b318cba91fe4405f7b40888964c5321dc4ef271fe530c5f0212702c954c6aa",
+          "220c8bfeaf7e2d0a67abbf9e653145dfa643467b2a9e5e8d32cdc16f437e9eed",
+          "90ef90f5e407dee7383f0cbcf712dee990ed52e1621df372b49432db66231fd2",
+          "90ef90f5e407dee7383f0cbcf712dee990ed52e1621df372b49432db66231fd2"
+        ]
+      },
+      {
+        "image_sizes": [
+          [
+            672,
+            672
+          ]
+        ],
+        "name": "trunc-300x301",
+        "num_img_tokens": [
+          757
+        ],
+        "pixel_values_dtype": "torch.float32",
+        "pixel_values_sha256": "ca8760988fa296c40e768702c00d43894a02f1e6f8fc9fbf6738758263aa0375",
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "slot_sha256": [
+          "65485bb84931c3fa854567219e695a4efcba6780c719a7d35edab0eb6542e1f8",
+          "16dfaf303df28bc4d14c19e1221589834de873643aa74590c85e93276a85be93",
+          "7bfbb2762dba38c7b9a43dc9b4d02c2dfbba1d4af4b368ba18bf240ff07d1fc1",
+          "7158d35eff265e1dc6ff43c6cde10429a541d6f03536254f562217c340acc290",
+          "db585850d8b1cea46a2dab890ec74a9eb647bc8ec7a123a245b350a924139fbb"
+        ]
+      },
+      {
+        "image_sizes": [
+          [
+            672,
+            672
+          ],
+          [
+            336,
+            672
+          ]
+        ],
+        "name": "two-image-square+wide",
+        "num_img_tokens": [
+          757,
+          457
+        ],
+        "pixel_values_dtype": "torch.float32",
+        "pixel_values_sha256": "546e53f45a5e79fd9f7bf6a4cf5dc047133d7e879e26903c5db11ef69a6233a5",
+        "pixel_values_shape": [
+          2,
+          5,
+          3,
+          336,
+          336
+        ],
+        "slot_sha256": [
+          "9dab55437927e4344b2e910b2f4179e3702f3d0c4089881e7e5874de8e3751d0",
+          "ec9bf9ee4fd83cb19ab90499aa8ca883f2d51abf1e24b72d9b6af4a570b80b81",
+          "6c6bd0473a2694506723f1a8dc1240641deaf99cfefdb1e1094d54f0fea80e57",
+          "ca33b248a26a312342a4a1e58350e9d3b52ad6e3d7bcf045f8f4da90054e6bdc",
+          "bf6b8d4fec100cf38eef3e7f5bc789d38addb6df97a2f81b7c38c9c725898f0d",
+          "3a4b4b58d5bd85858f68e2680e93fc1a8a8fbdd6823998c7917327367c6b8cb5",
+          "8fcb705eec1b920eb629cffb1e0ab79726be58e19619c11119c2b731cf54e5b5",
+          "a708fe53adb48fc07b03677339117ff3fa0c45b1d047519515138471e50c4f2c",
+          "90ef90f5e407dee7383f0cbcf712dee990ed52e1621df372b49432db66231fd2",
+          "90ef90f5e407dee7383f0cbcf712dee990ed52e1621df372b49432db66231fd2"
+        ]
+      }
+    ],
+    "text_cases": [
+      {
+        "attention_mask_max": 1,
+        "attention_mask_min": 1,
+        "input_ids": [
+          1,
+          319,
+          {
+            "count": 757,
+            "neg_run": -1
+          },
+          1,
+          350
+        ],
+        "name": "mid-marker",
+        "num_negatives": 757,
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "text": "A<|image_1|>B",
+        "total_len": 761
+      },
+      {
+        "attention_mask_max": 1,
+        "attention_mask_min": 1,
+        "input_ids": [
+          1,
+          {
+            "count": 757,
+            "neg_run": -1
+          },
+          1,
+          12464
+        ],
+        "name": "leading-marker",
+        "num_negatives": 757,
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "text": "<|image_1|>tail",
+        "total_len": 760
+      },
+      {
+        "attention_mask_max": 1,
+        "attention_mask_min": 1,
+        "input_ids": [
+          1,
+          7145,
+          {
+            "count": 757,
+            "neg_run": -1
+          },
+          1
+        ],
+        "name": "trailing-marker",
+        "num_negatives": 757,
+        "pixel_values_shape": [
+          1,
+          5,
+          3,
+          336,
+          336
+        ],
+        "text": "mid<|image_1|>",
+        "total_len": 760
+      },
+      {
+        "attention_mask_max": 1,
+        "attention_mask_min": 1,
+        "input_ids": [
+          1,
+          {
+            "count": 757,
+            "neg_run": -1
+          },
+          1,
+          {
+            "count": 457,
+            "neg_run": -2
+          },
+          1
+        ],
+        "name": "adjacent-markers",
+        "num_negatives": 1214,
+        "pixel_values_shape": [
+          2,
+          5,
+          3,
+          336,
+          336
+        ],
+        "text": "<|image_1|><|image_2|>",
+        "total_len": 1217
+      }
+    ]
+  },
+  "pins": {
+    "LICENSE": {
+      "ok": true,
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "size": 1141
+    },
+    "config.json": {
+      "ok": true,
+      "sha256": "567e28c638a3e41aba1a304ae58b283845ad07e1c60e970643b0ad8fc229b382",
+      "size": 3778
+    },
+    "configuration_phi3_v.py": {
+      "ok": true,
+      "sha256": "18ff44c5c1f9a6523184fb2e580e03ebf722a65f37b9cc57cd1a6d620a0f2666",
+      "size": 10712
+    },
+    "generation_config.json": {
+      "ok": true,
+      "sha256": "bf86d2cd9250f89f09563b7f80e25e34663f673b836f531dc207362165051dc9",
+      "size": 136
+    },
+    "model.safetensors.index.json": {
+      "ok": true,
+      "sha256": "72d628080d85b3a0e96eac71a47f7a04a666aabf8a91269100c99a8d543f345c",
+      "size": 68901
+    },
+    "modeling_phi3_v.py": {
+      "ok": true,
+      "sha256": "b223be7d7e9f01903dd8704e5da45c6030824134441aa2734c40c36597c3b41c",
+      "size": 88866
+    },
+    "preprocessor_config.json": {
+      "ok": true,
+      "sha256": "0f3d920fcec587bb425312d30b0660e1fabaf46a75961f2b75ddbb1ff92de01c",
+      "size": 442
+    },
+    "processing_phi3_v.py": {
+      "ok": true,
+      "sha256": "990ef3d1f6b5cc61b44cf8ec8e8886b19721b7e01e8bae3ebea32781b0fcf598",
+      "size": 22045
+    },
+    "processor_config.json": {
+      "ok": true,
+      "sha256": "286a9e7fb58a489eae6825b79be69f62068c2028435c29ee52c3a485d071707b",
+      "size": 119
+    },
+    "sample_inference.py": {
+      "ok": true,
+      "sha256": "49b1246f2a18d9b4a1e12892e50d19929e550263075d4c80cedeac2246546da4",
+      "size": 6778
+    },
+    "special_tokens_map.json": {
+      "ok": true,
+      "sha256": "f9535fada19315e0d8eb89521cebe111c008fee98d16e7c6744acfb50505d8c3",
+      "size": 670
+    },
+    "tokenizer.json": {
+      "ok": true,
+      "sha256": "493f8ad437be806d5ccdc57e91479bdbb0c656448c1b89ff70f7653530d78518",
+      "size": 1851360
+    },
+    "tokenizer_config.json": {
+      "ok": true,
+      "sha256": "581d4654c018fbcef2504b57a805dcad37126038137b5d25d22b5a02abc1ef29",
+      "size": 9519
+    }
+  },
+  "revision": "12b77fb40b63a2c73c68243d3f767aab688a1b2a",
+  "stop": {
+    "decode_end_of_s": {
+      "text": "</s>",
+      "text_ords": [
+        60,
+        47,
+        115,
+        62
+      ]
+    },
+    "decode_end_turn": {
+      "skip_false": {
+        "text": "<|end|>",
+        "text_ords": [
+          60,
+          124,
+          101,
+          110,
+          100,
+          124,
+          62
+        ]
+      },
+      "skip_true": {
+        "text": "",
+        "text_ords": []
+      }
+    },
+    "decode_endoftext": {
+      "skip_false": {
+        "text": "<|endoftext|>",
+        "text_ords": [
+          60,
+          124,
+          101,
+          110,
+          100,
+          111,
+          102,
+          116,
+          101,
+          120,
+          116,
+          124,
+          62
+        ]
+      },
+      "skip_true": {
+        "text": "",
+        "text_ords": []
+      }
+    },
+    "decode_newline_byte": {
+      "text": "\n",
+      "text_ords": [
+        10
+      ]
+    },
+    "generation_config": {
+      "_from_model_config": true,
+      "bos_token_id": 1,
+      "eos_token_id": 2,
+      "pad_token_id": 32000,
+      "transformers_version": "4.38.1"
+    },
+    "ids": {
+      "end_of_s": 2,
+      "end_turn": 32007,
+      "endoftext": 32000,
+      "image": 32044,
+      "s": 1
+    },
+    "sample_inference_eos_lines": [
+      "generate_ids = model.generate(**inputs,",
+      "eos_token_id=processor.tokenizer.eos_token_id,",
+      "generate_ids = model.generate(**inputs,",
+      "eos_token_id=processor.tokenizer.eos_token_id,",
+      "generate_ids = model.generate(**inputs,",
+      "eos_token_id=processor.tokenizer.eos_token_id,",
+      "generate_ids = model.generate(**inputs,",
+      "eos_token_id=processor.tokenizer.eos_token_id,",
+      "generate_ids = model.generate(**inputs,",
+      "eos_token_id=processor.tokenizer.eos_token_id,",
+      "generate_ids = model.generate(**inputs, eos_token_id=processor.tokenizer.eos_token_id, **generation_args)"
+    ],
+    "tok_bos_token_id": 1,
+    "tok_eos_token_id": 32000,
+    "tok_pad_token_id": 32000
+  },
+  "tok": {
+    "added_tokens_count": 48,
+    "added_tokens_max_id": 32044,
+    "decoder": {
+      "decoders": [
+        {
+          "content": " ",
+          "pattern": {
+            "String": "\u2581"
+          },
+          "type": "Replace"
+        },
+        {
+          "type": "ByteFallback"
+        },
+        {
+          "type": "Fuse"
+        },
+        {
+          "content": " ",
+          "start": 1,
+          "stop": 0,
+          "type": "Strip"
+        }
+      ],
+      "type": "Sequence"
+    },
+    "merges_count": 61249,
+    "model": {
+      "byte_fallback": true,
+      "continuing_subword_prefix": null,
+      "dropout": null,
+      "end_of_word_suffix": null,
+      "fuse_unk": true,
+      "type": "BPE",
+      "unk_token": "<unk>"
+    },
+    "model_vocab_size": 32000,
+    "normalizer": {
+      "normalizers": [
+        {
+          "prepend": "\u2581",
+          "type": "Prepend"
+        },
+        {
+          "content": "\u2581",
+          "pattern": {
+            "String": " "
+          },
+          "type": "Replace"
+        }
+      ],
+      "type": "Sequence"
+    },
+    "post_processor": {
+      "pair": [
+        {
+          "SpecialToken": {
+            "id": "<s>",
+            "type_id": 0
+          }
+        },
+        {
+          "Sequence": {
+            "id": "A",
+            "type_id": 0
+          }
+        },
+        {
+          "SpecialToken": {
+            "id": "<s>",
+            "type_id": 1
+          }
+        },
+        {
+          "Sequence": {
+            "id": "B",
+            "type_id": 1
+          }
+        }
+      ],
+      "single": [
+        {
+          "SpecialToken": {
+            "id": "<s>",
+            "type_id": 0
+          }
+        },
+        {
+          "Sequence": {
+            "id": "A",
+            "type_id": 0
+          }
+        }
+      ],
+      "special_tokens": {
+        "<s>": {
+          "id": "<s>",
+          "ids": [
+            1
+          ],
+          "tokens": [
+            "<s>"
+          ]
+        }
+      },
+      "type": "TemplateProcessing"
+    },
+    "pre_tokenizer": null,
+    "special_tokens_map": {
+      "additional_special_tokens": [
+        "<|system|>",
+        "<|end|>",
+        "<|user|>",
+        "<|end|>"
+      ],
+      "bos_token": {
+        "content": "<s>",
+        "lstrip": false,
+        "normalized": false,
+        "rstrip": false,
+        "single_word": false
+      },
+      "eos_token": {
+        "content": "<|endoftext|>",
+        "lstrip": false,
+        "normalized": false,
+        "rstrip": false,
+        "single_word": false
+      },
+      "pad_token": {
+        "content": "<|endoftext|>",
+        "lstrip": false,
+        "normalized": false,
+        "rstrip": false,
+        "single_word": false
+      },
+      "unk_token": {
+        "content": "<unk>",
+        "lstrip": false,
+        "normalized": false,
+        "rstrip": false,
+        "single_word": false
+      }
+    },
+    "specials": {
+      "1": {
+        "content": "<s>",
+        "content_ords": [
+          60,
+          115,
+          62
+        ],
+        "special": true
+      },
+      "2": {
+        "content": "</s>",
+        "content_ords": [
+          60,
+          47,
+          115,
+          62
+        ],
+        "special": false
+      },
+      "32000": {
+        "content": "<|endoftext|>",
+        "content_ords": [
+          60,
+          124,
+          101,
+          110,
+          100,
+          111,
+          102,
+          116,
+          101,
+          120,
+          116,
+          124,
+          62
+        ],
+        "special": true
+      },
+      "32007": {
+        "content": "<|end|>",
+        "content_ords": [
+          60,
+          124,
+          101,
+          110,
+          100,
+          124,
+          62
+        ],
+        "special": true
+      },
+      "32044": {
+        "content": "<|image|>",
+        "content_ords": [
+          60,
+          124,
+          105,
+          109,
+          97,
+          103,
+          101,
+          124,
+          62
+        ],
+        "special": true
+      }
+    },
+    "tokenizer_config": {
+      "add_bos_token": true,
+      "add_prefix_space": null,
+      "additional_special_tokens": [
+        "<|system|>",
+        "<|end|>",
+        "<|user|>",
+        "<|end|>"
+      ],
+      "chat_template": "{% for message in messages %}{{'<|' + message['role'] + '|>' + '\n' + message['content'] + '<|end|>\n' }}{% endfor %}{% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{- '<|assistant|>\n' -}}{% endif %}",
+      "extra_ids": null,
+      "model_max_length": 131072,
+      "tokenizer_class": "LlamaTokenizer"
+    }
+  }
+}

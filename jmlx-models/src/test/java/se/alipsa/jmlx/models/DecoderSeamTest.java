@@ -228,7 +228,7 @@ class DecoderSeamTest {
             model.resolveCachePolicy(request.cachePolicy()),
             ignored -> {},
             firstStep,
-            (ids, caches) -> model.decode(ids, caches, null, null));
+            (ids, caches, token) -> model.decode(ids, caches, null, null));
     assertEquals(baseline.finishReason(), explicit.finishReason());
     assertEquals(baseline.generatedTokenIds(), explicit.generatedTokenIds());
   }

@@ -1,7 +1,5 @@
 package se.alipsa.jmlx.tokenizer;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -48,13 +46,18 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Validates and defensively copies caller context. Empty template name means default selection.
+   * Validates and defensively copies the caller context (see {@link
+   * ChatContextCopies#copyContext(Map)}): a later caller mutation of a nested value (a tools list,
+   * a nested array) cannot change what a render, including a model's later re-render of the same
+   * options, sees. The nested maps and lists {@link #extraContext()} returns are therefore
+   * unmodifiable copies, and a cyclic structure is rejected here with a clear error. Sets and other
+   * collections are not accepted by the renderer as context values and fail at the render boundary.
+   * Empty template name means default selection.
    */
   public ChatTemplateOptions {
     templateName = Objects.requireNonNull(templateName, "templateName");
     extraContext =
-        Collections.unmodifiableMap(
-            new LinkedHashMap<>(Objects.requireNonNull(extraContext, "extraContext")));
+        ChatContextCopies.copyContext(Objects.requireNonNull(extraContext, "extraContext"));
     for (String key : extraContext.keySet()) {
       if (RESERVED.contains(key)) {
         throw new IllegalArgumentException(

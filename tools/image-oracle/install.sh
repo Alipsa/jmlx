@@ -15,4 +15,6 @@ command -v "$PYTHON_BIN" >/dev/null || {
 }
 
 "$PYTHON_BIN" -m venv --clear "$VENV"
-"$VENV/bin/python" -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r "$SCRIPT_DIR/requirements.lock"
+"$VENV/bin/python" -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: \
+  --extra-index-url https://download.pytorch.org/whl/cpu \
+  -r "$SCRIPT_DIR/requirements.lock"

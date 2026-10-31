@@ -436,7 +436,8 @@ def sha256File = { File file ->
 tasks.register('verifyImageOracleDependencyPins') {
     group = 'verification'
     description = 'Verifies the image, fast-comparison, Qwen-VL and HF reference locks agree ' +
-            'on Pillow, NumPy and Transformers.'
+            'on Pillow, NumPy and Transformers, and image-oracle/hf-reference agree on ' +
+            'Torch and TorchVision (the phi3v family).'
     def imageLock = imageOracleDir.file('requirements.lock')
     def fastLock = imageOracleDir.file('fast-comparison/requirements.lock')
     def qwenVlLock = layout.projectDirectory.file('tools/qwen-vl-reference/requirements.lock')
@@ -463,15 +464,16 @@ tasks.register('verifyImageOracleDependencyPins') {
                 'qwen-vl-reference': parseLock(qwenVlLock.asFile),
                 'hf-reference': parseLock(referenceLock.asFile),
         ]
-        ['pillow', 'numpy', 'transformers'].each { packageName ->
+        def allLocks = locks.keySet().toList()
+        def checkPin = { String packageName, List<String> scope ->
             def byLock = [:]
-            locks.each { label, pins ->
-                if (!pins.containsKey(packageName)) {
+            scope.each { label ->
+                if (!locks[label].containsKey(packageName)) {
                     throw new GradleException("${label} lock is missing a pinned ${packageName} dependency")
                 }
-                byLock[label] = pins[packageName]
+                byLock[label] = locks[label][packageName]
             }
-            def baseline = locks.keySet().first()
+            def baseline = scope.first()
             byLock.each { label, pin ->
                 if (label == baseline) {
                     return
@@ -486,6 +488,13 @@ tasks.register('verifyImageOracleDependencyPins') {
                 }
             }
         }
+        checkPin('pillow', allLocks)
+        checkPin('numpy', allLocks)
+        checkPin('transformers', allLocks)
+        // Phase 7.3c: the phi3v oracle family runs the bundled trust-remote-code processor,
+        // which imports torch and torchvision; only image-oracle and hf-reference carry them.
+        checkPin('torch', ['image-oracle', 'hf-reference'])
+        checkPin('torchvision', ['image-oracle', 'hf-reference'])
     }
 }
 
@@ -626,16 +635,31 @@ tasks.register('verifyHfReferenceGoldens') {
     // WP7's and Phase 7.3b WP8's opt-in real-artifact reference inputs/outputs are committed
     // and hash-pinned too (the logits binary is covered by the goldens fileTree above).
     inputs.files(fileTree('tools/tier-b') {
-        include 'smolvlm-256m-instruct.json', 'qwen3vl-2b-instruct.json', 'images/**'
+        include 'smolvlm-256m-instruct.json', 'qwen3vl-2b-instruct.json', 'phi3v-4b-instruct.json', 'images/**'
     })
     inputs.file('tools/hf-reference/vision_tier_b.py')
     inputs.file('tools/hf-reference/qwen3vl_tier_b.py')
+    inputs.file('tools/hf-reference/phi3v_tier_b.py')
     inputs.file('tools/hf-reference/qwen3vl_model.py')
     inputs.file('tools/hf-reference/qwen3vl_wide_attention.py')
     inputs.file('tools/hf-reference/qwen3vl_wp8.py')
-    // Phase 7.3b WP2's shared Qwen3-VL processed-patch fixtures are image-oracle-owned but
-    // consumed on the HF side, so the root task pins their digests too.
+    // Phase 7.3c WP1's probe golden generator (deterministic, re-verifies the pinned artifact
+    // and bundle hashes before use).
+    inputs.file('tools/hf-reference/phi3v_probe.py')
+    // Phase 7.3c WP3's prompt golden generator and its tokenizer fixture (the real artifact's
+    // tokenizer files, digest-pinned in provenance.json as phi3v_wp3_token_fixture).
+    inputs.file('tools/hf-reference/phi3v_wp3_prompt.py')
+    inputs.files(fileTree('jmlx-models/src/test/resources/phi3v-tokens'))
+    // Phase 7.3c WP4's NTK-Su RoPE golden generator (deterministic, re-verifies the pinned
+    // artifact config and bundled module hashes before use).
+    inputs.file('tools/hf-reference/phi3v_rope.py')
+    // Phase 7.3c WP6's acceptance golden generator (deterministic, re-verifies the pinned
+    // bundled fixtures, the WP2 processed-patch bins and the tiny tokenizer before use).
+    inputs.file('tools/hf-reference/phi3v_wp6.py')
+    // Phase 7.3b WP2's and Phase 7.3c WP2's shared processed-patch fixtures are
+    // image-oracle-owned but consumed on the HF side, so the root task pins their digests too.
     inputs.files(fileTree('tools/image-oracle/fixtures/qwen3vl/patches'))
+    inputs.files(fileTree('tools/image-oracle/fixtures/phi3v/patches'))
     doLast {
         def metadata = new JsonSlurper().parse(provenance.asFile)
         // The Phase 7.2 provenance block pins the tool's own hash-locked requirements lock,
@@ -665,6 +689,26 @@ tasks.register('verifyHfReferenceGoldens') {
                 sha256File(file('tools/hf-reference/qwen3vl_wp8.py')) != wp8GeneratorHash) {
             throw new GradleException('Qwen3-VL WP8 acceptance generator SHA-256 differs or is missing')
         }
+        def phi3vProbeHash = metadata.phi3v_probe_sha256
+        if (phi3vProbeHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_probe.py')) != phi3vProbeHash) {
+            throw new GradleException('Phi-3.5-Vision WP1 probe SHA-256 differs or is missing')
+        }
+        def phi3vWp3GeneratorHash = metadata.phi3v_wp3_generator_sha256
+        if (phi3vWp3GeneratorHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_wp3_prompt.py')) != phi3vWp3GeneratorHash) {
+            throw new GradleException('Phi-3.5-Vision WP3 prompt generator SHA-256 differs or is missing')
+        }
+        def phi3vWp4GeneratorHash = metadata.phi3v_wp4_generator_sha256
+        if (phi3vWp4GeneratorHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_rope.py')) != phi3vWp4GeneratorHash) {
+            throw new GradleException('Phi-3.5-Vision WP4 RoPE generator SHA-256 differs or is missing')
+        }
+        def phi3vWp6GeneratorHash = metadata.phi3v_wp6_generator_sha256
+        if (phi3vWp6GeneratorHash == null ||
+                sha256File(file('tools/hf-reference/phi3v_wp6.py')) != phi3vWp6GeneratorHash) {
+            throw new GradleException('Phi-3.5-Vision WP6 acceptance generator SHA-256 differs or is missing')
+        }
         def visionFiles = metadata.vision_tier_b_files
         if (!(visionFiles instanceof Map) || visionFiles.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no vision Tier-B hashes')
@@ -673,17 +717,24 @@ tasks.register('verifyHfReferenceGoldens') {
         if (!(qwen3vlTierBFiles instanceof Map) || qwen3vlTierBFiles.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no Qwen3-VL Tier-B hashes')
         }
+        def phi3vTierBFiles = metadata.phi3v_tier_b_files
+        if (!(phi3vTierBFiles instanceof Map) || phi3vTierBFiles.isEmpty()) {
+            throw new GradleException('Hugging Face provenance has no Phi-3.5-Vision Tier-B hashes')
+        }
         def repositoryRoot = projectDir.toPath().toRealPath()
         // The union of the per-task maps must cover exactly the files declared as this task's
-        // inputs: both Tier-B manifests, both reference generators, and every file under
-        // images/ -- a removed entry or an unprovenanced new file both fail the build.
+        // inputs: the three Tier-B manifests, the three reference generators, and every file
+        // under images/ -- a removed entry or an unprovenanced new file both fail the build.
         def actualVisionPaths = (['tools/tier-b/smolvlm-256m-instruct.json',
                 'tools/tier-b/qwen3vl-2b-instruct.json',
+                'tools/tier-b/phi3v-4b-instruct.json',
                 'tools/hf-reference/vision_tier_b.py',
-                'tools/hf-reference/qwen3vl_tier_b.py'] + fileTree('tools/tier-b/images').files.collect {
+                'tools/hf-reference/qwen3vl_tier_b.py',
+                'tools/hf-reference/phi3v_tier_b.py'] + fileTree('tools/tier-b/images').files.collect {
             repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
         }).toSet()
-        def provenancedVisionPaths = (visionFiles.keySet() + qwen3vlTierBFiles.keySet()).toSet()
+        def provenancedVisionPaths = (visionFiles.keySet() + qwen3vlTierBFiles.keySet() +
+                phi3vTierBFiles.keySet()).toSet()
         if (provenancedVisionPaths != actualVisionPaths) {
             throw new GradleException("Vision Tier-B provenance file set differs: " +
                     "missing ${provenancedVisionPaths - actualVisionPaths}; " +
@@ -704,32 +755,46 @@ tasks.register('verifyHfReferenceGoldens') {
         }
         verifyVisionTierBHash('Vision', visionFiles)
         verifyVisionTierBHash('Qwen3-VL', qwen3vlTierBFiles)
+        verifyVisionTierBHash('Phi-3.5-Vision', phi3vTierBFiles)
+        def phi3vWp3Fixture = metadata.phi3v_wp3_token_fixture
+        if (!(phi3vWp3Fixture instanceof Map) || phi3vWp3Fixture.isEmpty()) {
+            throw new GradleException('Hugging Face provenance has no Phi-3.5-Vision WP3 tokenizer fixture hashes')
+        }
+        verifyVisionTierBHash('Phi-3.5-Vision WP3 tokenizer fixture', phi3vWp3Fixture)
         def processedPatches = metadata.qwen3vl_processed_patches
         if (!(processedPatches instanceof Map) || processedPatches.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no Qwen3-VL processed-patch hashes')
         }
-        // The map must cover exactly the image-oracle-owned processed-patch fixtures: the
-        // manifest and both float32 bins -- a removed entry or an unprovenanced new file both
-        // fail the build.
-        def actualPatchPaths = fileTree('tools/image-oracle/fixtures/qwen3vl/patches').files.collect {
-            repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
-        }.toSet()
-        if (processedPatches.keySet().toSet() != actualPatchPaths) {
-            throw new GradleException("Qwen3-VL processed-patch provenance file set differs: " +
-                    "missing ${processedPatches.keySet() - actualPatchPaths}; " +
-                    "extra ${actualPatchPaths - processedPatches.keySet()}")
+        def phi3vProcessedPatches = metadata.phi3v_processed_patches
+        if (!(phi3vProcessedPatches instanceof Map) || phi3vProcessedPatches.isEmpty()) {
+            throw new GradleException('Hugging Face provenance has no Phi-3.5-Vision processed-patch hashes')
         }
-        processedPatches.each { relativePath, expectedHash ->
-            def path = repositoryRoot.resolve(relativePath.toString()).normalize()
-            if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
-                    !path.toRealPath().startsWith(repositoryRoot)) {
-                throw new GradleException("Invalid Qwen3-VL processed-patch reference path: ${relativePath}")
+        // Each family's map must cover exactly its image-oracle-owned processed-patch
+        // fixtures (the manifest and every float32 bin) -- a removed entry or an
+        // unprovenanced new file both fail the build.
+        def verifyProcessedPatches = { String label, Map hashMap, String patchDir ->
+            def actualPatchPaths = fileTree(patchDir).files.collect {
+                repositoryRoot.relativize(it.toPath().toRealPath()).toString().replace('\\', '/')
+            }.toSet()
+            if (hashMap.keySet().toSet() != actualPatchPaths) {
+                throw new GradleException("${label} processed-patch provenance file set differs: " +
+                        "missing ${hashMap.keySet() - actualPatchPaths}; " +
+                        "extra ${actualPatchPaths - hashMap.keySet()}")
             }
-            def actualHash = sha256File(path.toFile())
-            if (actualHash != expectedHash) {
-                throw new GradleException("Qwen3-VL processed-patch SHA-256 differs: ${relativePath}")
+            hashMap.each { relativePath, expectedHash ->
+                def path = repositoryRoot.resolve(relativePath.toString()).normalize()
+                if (!path.startsWith(repositoryRoot) || !java.nio.file.Files.isRegularFile(path) ||
+                        !path.toRealPath().startsWith(repositoryRoot)) {
+                    throw new GradleException("Invalid ${label} processed-patch reference path: ${relativePath}")
+                }
+                def actualHash = sha256File(path.toFile())
+                if (actualHash != expectedHash) {
+                    throw new GradleException("${label} processed-patch SHA-256 differs: ${relativePath}")
+                }
             }
         }
+        verifyProcessedPatches('Qwen3-VL', processedPatches, 'tools/image-oracle/fixtures/qwen3vl/patches')
+        verifyProcessedPatches('Phi-3.5-Vision', phi3vProcessedPatches, 'tools/image-oracle/fixtures/phi3v/patches')
         def expected = metadata.files
         if (!(expected instanceof Map) || expected.isEmpty()) {
             throw new GradleException('Hugging Face provenance has no file hashes')

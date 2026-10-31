@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {"name": "square-336x336", "image": "phi3v/square-336x336.png"},
+    {"name": "wide-672x336", "image": "phi3v/wide-672x336.png"},
+    {"name": "tall-336x672", "image": "phi3v/tall-336x672.png"},
+    {"name": "trunc-300x301", "image": "phi3v/trunc-300x301.png"},
+    {"name": "two-image-square+wide", "images": ["phi3v/square-336x336.png", "phi3v/wide-672x336.png"]}
+  ]
+}

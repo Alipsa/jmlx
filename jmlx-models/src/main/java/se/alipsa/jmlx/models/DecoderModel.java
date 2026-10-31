@@ -146,7 +146,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       String modelType,
       int vocabSize,
       Integer slidingWindow,
-      boolean dynamicNtk,
+      boolean lengthDependentRope,
       int layerCount,
       boolean tiedOutput) {}
 
@@ -155,7 +155,9 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
         config.modelType(),
         config.vocabSize(),
         descriptor.attention().slidingWindow(),
-        descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk,
+        // Any sequence-length-dependent RoPE (DynamicNtk, Su, and future variants) forbids
+        // unequal batch positions; isStatic() is the one predicate that covers them all.
+        !descriptor.rope().isStatic(),
         layers.size(),
         tiedOutput);
   }
@@ -345,11 +347,12 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       }
       cache.policy().requireCapacity(layerWidth, "decoder padded cache width");
     }
-    if (descriptor.rope() instanceof se.alipsa.jmlx.nn.RopeSpec.DynamicNtk) {
+    if (!descriptor.rope().isStatic()) {
       int ending = positions[0] + validLengths[0];
       for (int row = 1; row < batch; row++) {
         if (positions[row] != positions[0] || positions[row] + validLengths[row] != ending) {
-          throw new IllegalArgumentException("DynamicNtk does not support unequal batch positions");
+          throw new IllegalArgumentException(
+              "length-dependent RoPE does not support unequal batch positions");
         }
       }
     }
@@ -808,11 +811,14 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
    * {@code [1,1,V]} logits of the new token. The 8-argument entry's shared default is this model's
    * own single-row {@code decode} path; a composing model (the Qwen3-VL work, WP6/WP7, this
    * package) passes a step that calls the seam-carrying {@code decode} overload with its request's
-   * rotary state. The loop's own preflight, poisoning and evaluation ordering stay around the call.
+   * rotary state. {@code token} is the Java ID the {@code ids} array was built from — the loop
+   * already holds it, so steps that would otherwise read it back from native memory (the
+   * Phi-3.5-Vision re-prefill history) get it for free. The loop's own preflight, poisoning and
+   * evaluation ordering stay around the call.
    */
   @FunctionalInterface
   interface DecodeStep {
-    MLXArray apply(MLXArray ids, List<KVCache> caches);
+    MLXArray apply(MLXArray ids, List<KVCache> caches, int token);
   }
 
   /**
@@ -847,14 +853,15 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
         cachePolicy,
         listener,
         firstStep,
-        this::decode);
+        (ids, caches, token) -> decode(ids, caches));
   }
 
   /**
    * The seam-carrying form of {@link #runStepLoop(GenerationRequest, GenerationConfig, int[],
    * int[], int, KVCachePolicy, Consumer, FirstStep)}: steps at 1 or higher call {@code
-   * decodeStep.apply(ids, caches)} where the 8-argument entry calls the model's own single-row
-   * {@code decode}. Everything else -- the per-step activation scope, the first step, the sampler,
+   * decodeStep.apply(ids, caches, token)} where the 8-argument entry calls the model's own
+   * single-row {@code decode}; {@code token} is the Java ID the step's {@code ids} array was built
+   * from. Everything else -- the per-step activation scope, the first step, the sampler,
    * cancellation, token and terminal events, the preflight, poisoning, evaluation ordering and the
    * result construction -- is the identical loop body. The existing 8-argument entry delegates with
    * {@code this::decode}, so its path is unchanged.
@@ -904,7 +911,7 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
               } else {
                 MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
                 before = preflight(ids, caches);
-                lastLogits = decodeStep.apply(ids, caches);
+                lastLogits = decodeStep.apply(ids, caches, input[0]);
               }
               selection =
                   sampler.select(

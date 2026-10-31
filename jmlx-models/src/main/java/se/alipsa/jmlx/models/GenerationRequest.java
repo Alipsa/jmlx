@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import se.alipsa.jmlx.tokenizer.ChatContextCopies;
 import se.alipsa.jmlx.tokenizer.ChatTemplateOptions;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.vision.RgbImage;
@@ -15,6 +16,11 @@ import se.alipsa.jmlx.vision.RgbImage;
  * #withImages(java.util.List)}; the images are positional placeholders paired in order of
  * appearance with the {@code {"type": "image"}} parts of structured chat content (see {@link
  * HfTokenizer#renderChat}). Pixels never come from the chat messages themselves.
+ *
+ * <p>Tokenizer-backed requests (the {@link #text} and {@link #chat} factories) also retain the
+ * source text their IDs were encoded from — {@link #promptText()}. Pre-tokenized requests carry
+ * {@code null}. Vision models whose prompt expansion operates on text rather than on a special
+ * image token (Phi-3.5-Vision) require a tokenizer-backed request.
  */
 public final class GenerationRequest {
   private final int[] promptTokenIds;
@@ -24,6 +30,9 @@ public final class GenerationRequest {
   private final HfTokenizer tokenizer;
   private final GenerationCachePolicy cachePolicy;
   private final List<RgbImage> images;
+  private final String promptText;
+  private final List<Map<String, Object>> chatMessages;
+  private final ChatTemplateOptions chatOptions;
 
   /** Creates a request from already-rendered prompt token IDs. */
   public GenerationRequest(
@@ -35,7 +44,10 @@ public final class GenerationRequest {
         PromptSpecialTokens.PRETOKENIZED,
         null,
         GenerationCachePolicy.full(),
-        List.of());
+        List.of(),
+        null,
+        null,
+        null);
   }
 
   private GenerationRequest(
@@ -45,7 +57,10 @@ public final class GenerationRequest {
       PromptSpecialTokens promptSpecialTokens,
       HfTokenizer tokenizer,
       GenerationCachePolicy cachePolicy,
-      List<RgbImage> images) {
+      List<RgbImage> images,
+      String promptText,
+      List<Map<String, Object>> chatMessages,
+      ChatTemplateOptions chatOptions) {
     this.promptTokenIds =
         Arrays.copyOf(
             Objects.requireNonNull(promptTokenIds, "promptTokenIds"), promptTokenIds.length);
@@ -61,6 +76,9 @@ public final class GenerationRequest {
     for (int i = 0; i < this.images.size(); i++) {
       Objects.requireNonNull(this.images.get(i), "images must not contain null");
     }
+    this.promptText = promptText;
+    this.chatMessages = chatMessages;
+    this.chatOptions = chatOptions;
   }
 
   /**
@@ -86,7 +104,8 @@ public final class GenerationRequest {
       throw new IllegalArgumentException("text requests require ADD or OMIT special-token policy");
     }
     List<Integer> ids = tokenizer.encode(prompt, specialTokens == PromptSpecialTokens.ADD);
-    return tokenizerBacked(ids, config, cancellationToken, specialTokens, tokenizer);
+    return tokenizerBacked(
+        ids, config, cancellationToken, specialTokens, tokenizer, prompt, null, null);
   }
 
   /**
@@ -99,12 +118,33 @@ public final class GenerationRequest {
    * fetching any URL or path. Pixels belong on the returned request via {@link
    * #withImages(java.util.List)}, paired with the image parts in order of appearance.
    *
+   * <p>The retained messages and options are the request's snapshot, taken when the request is
+   * built: a model whose prompt expansion re-renders them (Phi-3.5-Vision) must expand exactly what
+   * {@link #promptTokenIds()} was encoded from, and a caller mutation after the build must not
+   * change that. The deep copy therefore happens eagerly here — deferring it to the model's first
+   * read would capture mutations made between request creation and generation and could silently
+   * diverge the re-expansion from the retained IDs. It is paid by every chat request, including
+   * ones a text-only model consumes; that is the deliberate cost of the build-time snapshot. The
+   * snapshot uses the same copy as the options' extraContext, so an array value inside a message is
+   * copied (into an unmodifiable list) rather than shared by reference, and a cyclic message
+   * structure is rejected with a clear error — though the render above the copy rejects cycles
+   * first, so the copy's own check is only a backstop.
+   *
+   * <p>Phi-3.5-Vision re-flattens the messages whenever any one carries structured content, and on
+   * that path a literal image marker ({@code <|image_i|>}) inside a plain-string message is
+   * rejected: image markers are produced by image parts only. The same literal text is accepted
+   * when every message is a plain string, since the rendered text is expanded as-is (the
+   * marker-in-text prompt API); the rule is per path, and the two paths differ only by the content
+   * shape of the other messages (see {@code Phi3VModel}).
+   *
    * @param tokenizer tokenizer and template bundle paired with the checkpoint
    * @param messages ordered role/content messages; content is text or structured content parts
    * @param options chat-template options
    * @param config generation policy
    * @param cancellationToken request cancellation token
-   * @return tokenizer-backed request
+   * @return tokenizer-backed request retaining the messages and options, so a text-expanding vision
+   *     model (Phi-3.5-Vision) can re-flatten structured image parts that the rendered prompt text
+   *     cannot carry
    */
   public static GenerationRequest chat(
       HfTokenizer tokenizer,
@@ -115,7 +155,29 @@ public final class GenerationRequest {
     Objects.requireNonNull(tokenizer, "tokenizer");
     String prompt = tokenizer.renderChat(messages, options);
     List<Integer> ids = tokenizer.encode(prompt, false);
-    return tokenizerBacked(ids, config, cancellationToken, PromptSpecialTokens.OMIT, tokenizer);
+    return tokenizerBacked(
+        ids,
+        config,
+        cancellationToken,
+        PromptSpecialTokens.OMIT,
+        tokenizer,
+        prompt,
+        deepCopyMessages(messages),
+        Objects.requireNonNull(options, "options"));
+  }
+
+  /**
+   * Deep-copies the chat messages so a later caller mutation cannot change what the model expands:
+   * like the images (whose pixel buffers {@link RgbImage} copies), the request must own its source
+   * text. Delegates to {@link ChatContextCopies#copyMessages(List)}, the one shared snapshot copy
+   * that the options' own extraContext uses (through {@link ChatContextCopies#copyContext(Map)}),
+   * so the two snapshots cannot drift apart: insertion-order unmodifiable wrappers (null values and
+   * non-String nested keys survive exactly as they would the render), unmodifiable list copies of
+   * arrays, shared scalars, one shared copy for a nested value referenced several times, and a
+   * cycle rejected with a clear error.
+   */
+  private static List<Map<String, Object>> deepCopyMessages(List<Map<String, Object>> messages) {
+    return ChatContextCopies.copyMessages(messages);
   }
 
   private static GenerationRequest tokenizerBacked(
@@ -123,7 +185,10 @@ public final class GenerationRequest {
       GenerationConfig config,
       CancellationToken cancellationToken,
       PromptSpecialTokens specialTokens,
-      HfTokenizer tokenizer) {
+      HfTokenizer tokenizer,
+      String promptText,
+      List<Map<String, Object>> chatMessages,
+      ChatTemplateOptions chatOptions) {
     return new GenerationRequest(
         ids.stream().mapToInt(Integer::intValue).toArray(),
         config,
@@ -131,13 +196,16 @@ public final class GenerationRequest {
         specialTokens,
         tokenizer,
         GenerationCachePolicy.full(),
-        List.of());
+        List.of(),
+        promptText,
+        chatMessages,
+        chatOptions);
   }
 
   /**
    * Returns a copy of this request that carries the given images, in order of appearance. Every
-   * other field — prompt, config, cancellation, prompt special tokens, tokenizer and cache policy —
-   * is retained.
+   * other field — prompt, prompt text, config, cancellation, prompt special tokens, tokenizer and
+   * cache policy — is retained.
    *
    * <p>The list is copied and {@link RgbImage} is itself an immutable value (its constructor copies
    * the pixel buffer), so later mutation of the caller's list does not affect the returned request.
@@ -155,7 +223,10 @@ public final class GenerationRequest {
         promptSpecialTokens,
         tokenizer,
         cachePolicy,
-        images);
+        images,
+        promptText,
+        chatMessages,
+        chatOptions);
   }
 
   /** Returns a copy of this request with an explicit cache policy. */
@@ -167,7 +238,10 @@ public final class GenerationRequest {
         promptSpecialTokens,
         tokenizer,
         Objects.requireNonNull(policy, "policy"),
-        images);
+        images,
+        promptText,
+        chatMessages,
+        chatOptions);
   }
 
   /** Returns this request's cache retention policy. */
@@ -188,6 +262,18 @@ public final class GenerationRequest {
     return Arrays.copyOf(promptTokenIds, promptTokenIds.length);
   }
 
+  /**
+   * Returns the source text this request's IDs were encoded from — the prompt for a {@link #text}
+   * request, the rendered chat text for a {@link #chat} request — or {@code null} for a
+   * pre-tokenized request. Text is the ground truth for models whose prompt expansion operates on
+   * text (Phi-3.5-Vision's image markers are literal prompt text, not special tokens, and the
+   * tokenizer's decode is not the inverse of its encode at special-token boundaries, so the text
+   * cannot be recovered from the IDs); such models reject pre-tokenized requests.
+   */
+  public String promptText() {
+    return promptText;
+  }
+
   /** Returns the immutable generation policy. */
   public GenerationConfig config() {
     return config;
@@ -205,5 +291,23 @@ public final class GenerationRequest {
 
   HfTokenizer tokenizer() {
     return tokenizer;
+  }
+
+  /**
+   * Returns the chat messages this request was rendered from ({@link #chat}), or {@code null} for
+   * {@link #text} and pre-tokenized requests. A model whose prompt expansion operates on text
+   * rather than on a special image token (Phi-3.5-Vision) consults these when the rendered prompt
+   * text cannot carry the image structure: the artifact's chat template string-concatenates {@code
+   * message['content']}, so structured text/image content parts need the messages re-flattened to
+   * {@code <|image_i|>} markers before rendering; plain-string content renders as-is and needs only
+   * {@link #promptText()}.
+   */
+  List<Map<String, Object>> chatMessages() {
+    return chatMessages;
+  }
+
+  /** Returns the chat-template options {@link #chat} rendered with, or {@code null} elsewhere. */
+  ChatTemplateOptions chatOptions() {
+    return chatOptions;
   }
 }

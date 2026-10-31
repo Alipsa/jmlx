@@ -360,9 +360,10 @@ jmlx-native-macos-arm64  se/alipsa/jmlx/native/macos-aarch64/  the same 4 binari
 jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, IncrementalTokenDecoder,
                                                     TokenizerEncoding/EncodingOptions/Padding/
                                                     Truncation, ChatTemplateRenderer/
-                                                    ChatTemplateOptions, TokenizerJson/
-                                                    TokenizerJsonLoader, TokenizerMetadata,
-                                                    Vocabulary, BpeMerger, ByteLevel* components,
+                                                    ChatTemplateOptions/ChatContextCopies,
+                                                    TokenizerJson/TokenizerJsonLoader,
+                                                    TokenizerMetadata, Vocabulary, BpeMerger,
+                                                    ByteLevel* components,
                                                     AddedTokenSplitter, TextNormalizer,
                                                     PostProcessorApplier, TokenizerException
                                                     (byte-level BPE, Metaspace BPE, Unigram,
@@ -796,3 +797,257 @@ image+text output, the artifact's stale-index finding, the full-dump
 exact greedy-ID match against the independently re-run mlx-vlm probe (warm-up plus
 five measured sequences, medians with spread, on a clean committed SHA) in
 `req/phase6-4-benchmark.md`. No native pin, generated binding or public API changed.
+
+## Phase 7.3c additions
+
+Phase 7.3c is the Phi-3.5-Vision image+text milestone; `req/plans/phase7-3c-plan.md` and
+`req/plans/phase7-3c-reference-findings.md` are the authoritative records for this section.
+WP0 pinned `microsoft/Phi-3.5-vision-instruct` at revision
+`12b77fb40b63a2c73c68243d3f767aab688a1b2a` (MIT, 15 files, 8,295,395,355 bytes, 592 stored
+BF16 tensors — including the artifact's bundled trust-remote-code
+`configuration/modeling/processing_phi3_v.py`, which transformers 4.57.6 has no native
+`phi3_v` for, so the reference runs the bundled code). WP1 recorded the executable reference
+probes: the `use_cache=False` uncached execution-mode gate (findings §4), the eager-attention
+assertion on both the decoder and the CLIP tower (§5), the HD-transform preprocessing pipeline
+including the pinned-wheel torch bicubic kernel's real FMA-contracted arithmetic (§6.5), the
+per-chunk marker-split tokenization (§7.1), the stop-token facts (the tokenizer's own eos
+32000, not `<|end|>` 32007, overriding `generation_config`'s `eos_token_id: 2`, §7.3), the
+48-entry short/long NTK-Su factor tables and the 4096-boundary recompute semantics (§8), and
+the `phi-3-vision-128k` shape (§9). No native pin or generated binding changed in any WP.
+
+Phase 7.3c WP2 landed the pure-Java `Phi3V*` preprocessing port in `jmlx-vision`
+(`Phi3VProcessorConfig`, `Phi3VGeometryPlan` — HD transform math with explicit rejection of
+extreme aspect ratios in both orientations — `Phi3VImageProcessor` (decode `DROP_ALPHA` +
+`ExifOrientationPolicy.IGNORE`), `Phi3VImageProcessorResult`), with one new Torch-exact
+kernel: float32 bicubic (`F.interpolate` semantics: `align_corners=false`, no antialias,
+`A=-0.75`), its provenance pinned in `jmlx-vision/NOTICE` exactly as the 7.3a LANCZOS port
+pins its sources; the HD bilinear reuses the existing Pillow-exact kernel. The `phi3v`
+image-oracle family (`tools/image-oracle/fixtures/phi3v/`, `run_phi3v` in `runner.py`; square
+757 rows, wide 457, tall 469 through the transpose branch, and a two-image case) is
+byte-exact, with the shared processed-pixel bins digest-pinned in both
+`tools/image-oracle/provenance.json` and `tools/hf-reference/provenance.json`; no new Gradle
+tasks were added — the existing `verifyImageOracleFixtureDigests` and
+`verifyHfReferenceGoldens` guards pick the family up, and `ImageOraclePhi3VTest` (part of
+`:jmlx-vision:test`) is the Java-side byte verification. WP3 landed the prompt-expansion
+contract in `jmlx-models` (`Phi3VPromptTokens`/`Phi3VPromptExpander`/`Phi3VPromptPlan`): each
+image part renders as `<|image_i|>` (i assigned in prompt order from 1), the rendered text is
+split on the marker pattern and each chunk is tokenized separately through `HfTokenizer` (no
+BPE merge crosses a marker; the reference's `offset = 0` strips nothing, so the goldens pin
+the mid-sequence `<s>` start), and marker `i` is replaced with `num_img_tokens(i)` sentinel
+rows, plus the jmlx-side hardening rejections (non-continuous marker indices, marker/image
+count mismatch, duplicate or out-of-order markers, a user-literal `<|image_\d+|>`, a part
+with no geometry, expanded-length overflow); a literal `<|image|>` is passed through as an
+ordinary token (the marker regex never matches it). The artifact's tokenizer shape
+(BPE with `byte_fallback`/`fuse_unk`, `Replace`+`ByteFallback`+`Fuse`+`Strip(start=1)`
+decoder, no pre-tokenizer, `Prepend(▁)+Replace` normalizer, `TemplateProcessing` BOS) is
+verified byte-for-byte against it.
+
+Phase 7.3c WP4 landed the sealed `RopeSpec.Su` variant in `jmlx-core`'s `se.alipsa.jmlx.nn`
+(per-call factor-table selection against `originalMaxPositions`, the per-dimension factor
+product, the cos/sin multiplier through the existing `attentionScaling()` hook,
+`isStatic() = false` so the table is re-selected per call rather than shared once;
+`frequencies()` computes in `double` and casts to float32 — a stated tolerance, not
+bit-exactness). Core unit tests are hand-computed at several positions plus the 4096/4097
+boundary with a differential case against a regenerated `tools/hf-reference` golden (never
+Gradle-invoked). Adding the sealed variant is the one source-compatibility exception in the
+milestone (the `permits` clause and the default-method `instanceof` chains; no in-repo
+exhaustive `switch` over `RopeSpec` exists). No `mlx_h` addition, no inventory status change.
+
+Phase 7.3c WP5 landed `Phi3VDescriptor` (the 31-key strict top-level allow-list with the
+quantization keys rejected by name through it, the pinned `img_processor` and `embd_layer`
+block validation, the five-key strip and re-parse through `ArchitectureMappings` with a
+throwing unknown-key sink, the `su`-rope requirement behind a `phi3_v`-only family gate
+— `parseRope` is shared by all families and older Phi-3-mini-128k configs really did use
+`type: su` —, the relative-key visionKeys mapping to the tower parameter paths, and the
+tensor plan: 11 fixed + executed-layer keys required, the final layer and `post_layernorm`
+optional, `patch_embedding.bias` forbidden), `Phi3VVisionTower` (composed from existing core
+facades only: bias-free conv2d patch embed, the class token and the 577×1024 learned position
+table, the `pre_layrnorm` pre-encoder norm (HF's typo), 23 pre-LN `BidirectionalAttention`
+blocks with `QUICK_GELU`, the `hidden_states[-2]` slice, the 2×2 merge, the newline/global
+separator addition, and the exact-`GELU` MLP projector; the per-image staged evaluate-and-
+release loop of WP7), and `Phi3VModel` (a `TextGenerationModel`, not a `DecoderModel`, so the
+scheduler's existing non-`DecoderModel` rejection applies; image rows are injected at the
+decoder embedding entry point by row-replacement of the sentinel rows — the 7.3a/7.3b seam,
+bit-identical to the plain decoder when a request has no images). The generation loop
+implements the 4096-boundary recompute (mirroring `modeling_phi3_v.py:1650`–`:1655`): at the
+first decode step whose ending position exceeds `originalMaxPositions` while the accumulated
+past length (jmlx's own cache length) is `<= originalMaxPositions`, it discards the request's
+KV cache and re-prefills the full history with the long factor table, re-injecting the
+retained per-image projection rows (the reference re-runs the tower at the crossing; the
+evaluated rows, at most ≈ 9.6 MB per image, are hoisted to the request scope and retained
+until generation ends because of this). Load guards: all floating weights up-cast in place to
+FLOAT32, non-floating keys rejected, the unused 24th-block and `post_layernorm` weights
+accepted-and-ignored by name, `TextGenerationModels.load` strict `phi3_v` dispatch before the
+generic mapping (no sibling-name rejection — no other model type claims this architecture).
+
+Phase 7.3c WP6 (2026-10-28) landed the Tier-A synthetic golden: `tools/hf-reference/
+phi3v_wp6.py` (never Gradle-invoked, digest-pinned, seed 20261025) builds the tiny
+`Phi3VModel` checkpoint with the bundled modeling code (the module-level CLIP config
+constant reassigned to a small `CLIPVisionConfig`, leaving every bundled code path — asserts
+included — the one the artifact runs; the tower keeps hidden 1024 at shallow depth because
+the bundled `reshape_hd_patches_2x2merge` asserts `L == 24 × 24 and C == 1024`; decoder
+hidden 128, 2 layers, 2 heads / 1 KV, head_dim 64, `original_max_position_embeddings` 470,
+`max_position_embeddings` 2048, untied vocab 21): 21-key `config.json`, 76 BF16 tensors
+(77 state-dict keys under the single shared `embed_tokens`/`vision_embed_tokens.wte`
+storage), `pad_token_id: 0` (the bundled default 32000 crashes on vocab 21). Every stored
+weight is rounded to BF16 before saving and before any golden is computed, up-cast back to
+float32 in Torch before the forwards run, so the strict gate compares Java's load path
+against a reference computed from the identical rounded weights; the six-case golden
+`phi3v-wp6.json` (schema `jmlx-phase7-3c-wp6-phi3v-model-v1`: text-only, wide-cross-boundary,
+square, wide-long-prompt, tall, two-image — every prefill and every cached step compared
+against a fresh, full, uncached forward) pins which side of 470 each case starts on, and the
+wide-cross-boundary case (P = 465) exercises the WP5 re-prefill at decode step 6, including
+image-row restoration. `Phi3VGoldenTest` (`full-float32`, strict `1e-4`, measured maximum
+`1.5497208e-6`) and `Phi3VDefaultPrecisionTest` (default TF32, measured `9.266138e-4` under
+the separately named bound `0.0012`) are both required by the macOS CI assertion, recorded in
+`req/phase6-golden-precision.md`.
+
+Phase 7.3c WP7 verifies request ownership and full-cache accounting in the 7.3b WP7 pattern
+(per-image sequential processing and tower execution with cancellation checked between
+images; only evaluated rows hoisted to the request's prefill child scope, the retained
+projection rows to the request scope; prefill evaluates logits and every retained KV array
+before that scope closes; cached decode retains only request-owned KV and the retained rows;
+FULL and capacity-bounded retention only, sliding rejected at the request level). It found
+and fixed a production bug: the tower originally built the whole per-image CLIP graph lazily
+in the caller's scope, pinning every intermediate (787,398,705 B per-image peak); restructured
+to the 7.3b WP5 per-stage evaluate-and-release pattern (per-image peak 407,175,193 B, inside
+its committed 477,644,032 B bound), byte-identical in both precision modes.
+`Phi3VGenerationTest` (capacity/sliding rejection, the boundary re-prefill event with its
+exact width, cancellation boundaries, finish reasons) and `Phi3VMemoryTest` (per-image peak +
+retention, flat active memory across repeated generations and fault-injected failures,
+per-token decode slope under the 7.3b budget method) are both required by the macOS CI
+assertion. No native pin, generated binding or golden changed.
+
+Phase 7.3c WP8 (2026-10-30) delivers the Tier-B acceptance: `tools/tier-b/
+phi3v-4b-instruct.json` pins the 4B artifact (the required multi-image prompt: the committed
+672x336 and 336x336 images under `tools/tier-b/images/` — derived from the hash-pinned
+image-oracle `phi3v` fixtures — with text between the two markers, 24 greedy tokens; the HD
+grids are 457 and 757 image tokens, 35 unexpanded / 1241 expanded tokens, under the 4096
+original max so the NTK-Su boundary re-prefill never fires in the Tier-B run — it is
+exercised by the WP6 golden case and the WP5 unit test), with the exact stop-token set
+{32000} carried in `eosTokenIds` (not `stopTokenIds`, so the final token stays in the
+generated IDs the way HF keeps it) and `expected_text = decode(greedy_ids,
+skip_special_tokens=True)` (both 32000 and 32007 are `special: true` in the pinned
+`tokenizer.json`, and jmlx's generation loops hardcode `newIncrementalDecoder(true)`). The
+CPU float32 reference generator `tools/hf-reference/phi3v_tier_b.py` (manual, digest-pinned)
+loads the artifact's bundled trust-remote-code processor and model, up-casts the 592 stored
+BF16 tensors to float32 (exactly the Java loader's path), and records the full-vocabulary
+logit vector at every expected greedy history step as the little-endian float32 binary
+golden `tools/hf-reference/goldens/phi3v-tier-b-logits.bin` (3,078,144 bytes, one full
+32,064-vector per step — a documented size-driven deviation from the JSON logits goldens,
+following the Qwen3-VL patch-bin precedent); every greedy step is a fresh, full, uncached
+forward (the bundled modeling cannot run a cached forward under 4.57.6, findings §4).
+Measured local evidence (M5 Max / macOS 27.0.1, TF32 off, pinned mlx-metal 0.31.2 / mlx-c
+fba4470): maximum Java-vs-reference logit error 1.02996826171875e-4 (stable across repeated
+runs), hence the recorded ε = 2e-4 / margin = 1e-4 (eligibility bound 2ε + margin = 5e-4,
+about 6× below the recorded minimum top-two gap 0.003166); MLX allocator peak 31,100,376,165
+B (deterministic across runs; suite bound peak + 500 MiB); sampled process footprint peak
+51,421,089,584 B (suite bound 52,000,000,000 B, ~552 MB above the measured peak); load
+~1133 ms, one-request generation ~5423 ms. `TierBPhi3VTest` (selected by task
+`phi3v-generation`) re-verifies the manifest's image digests, re-processes each image through
+`jmlx-vision`'s Phi-3.5-Vision processor and asserts the reference's per-image
+`pixel_values_sha256`, the HD geometry, the rendered prompt, unexpanded and expanded IDs,
+compares every cached decode/prefill logit vector under the recorded ε, re-derives the
+reference's own recorded gaps and applies the stability gate to both the reference vectors
+and the Java run's own measured margins, and asserts the exact greedy IDs **and** the
+end-to-end `generate`'s exact decoded output. The `tier-b.yml` phi3v row runs on the
+self-hosted `self-macos-xl` runner (the 8.3 GB artifact and the 51.4 GB measured footprint
+exceed the standard 7 GB hosted runner, and GitHub's larger `macos-26-xlarge` tier is billed
+per minute even in public repos, so the row does not target it); the runner executes as a
+dedicated non-privileged macOS user with a per-job `GRADLE_USER_HOME`, the repo requires
+approval for every external fork-PR run, and the runner is the same M5 Max host (macOS
+27.0.1) as the local evidence. The row's first self-hosted run accepts the CI pipeline — not
+independent host, OS or memory-fit evidence — and the macOS 26 hosted execution remains
+pending, not verified. The documentation pass updated `req/phase6-compatibility.md` (a
+per-phase 7.3c section — VLMs get per-phase sections, not matrix rows — while the text
+`phi3` row's `longrope rejected` wording stays true: `longrope` is a rope_type still
+rejected, `phi3_v`'s NTK-Su being implemented as `RopeSpec.Su`), `req/phase6-inference-
+report.md`, `req/phase6-tier-a-fixtures.md`, `req/phase6-tier-b-artifacts.md`,
+`tools/tier-b/README.md` and `req/plans/phase7-plan.md`. No native pin, generated binding
+or public API changed.
+
+The PR #68 (Phase 7.3c) review ran several rounds before merge. Their
+round-by-round history lives in `req/plans/phase7-3c-reference-findings.md`
+(one section per review round from the seventh; the first six rounds'
+detail is in their per-round commit messages on this branch). The rules from
+those rounds that still apply:
+
+- `ChatContextCopies` (jmlx-tokenizer) is the single snapshot copy shared by
+  `ChatTemplateOptions.extraContext` and `GenerationRequest.chat`'s message
+  snapshot, so the two cannot drift apart: maps and lists become
+  insertion-order unmodifiable wrappers, every array (object and primitive
+  alike) becomes an unmodifiable list (a concretely typed array copy would
+  throw `ArrayStoreException`), scalars are shared by reference, a nested
+  value referenced several times is copied once and shared (the top-level
+  map itself is not part of that sharing), a cycle is rejected with a clear
+  `IllegalArgumentException`, and nulls fail with named parameters. Do not
+  duplicate this logic elsewhere or expose a generic identity-copy signature
+  on public API.
+- Phi-3.5-Vision production loads (the public `Phi3VModel.load` and the
+  `TextGenerationModels` dispatch) always require the pinned ViT-L/14-336 CLIP
+  depth of 24; the tiny three-layer test checkpoints load through the
+  package-private `load(scope, dir, expectedClipLayers)` overload, and the one
+  dispatch test installs the package-private `setExpectedClipLayersForTest`
+  override (a mutable process-wide static that production never sets).
+- The `phi3v` image-oracle family runs only on the exact recording platform:
+  `runner.py`'s `is_reference_platform()` is `sys.platform == "darwin" and
+  platform.machine() == "arm64"`, because the committed bins come from the
+  macOS arm64 torch wheel whose bicubic kernel is FMA-contracted
+  (AArch64-specific). Widening the gate past the recording platform is
+  deferred until the pinned Linux `torch==2.6.0+cpu` build is checked against
+  the committed bins. `TorchBicubic` uses `Math.fma` for the same reason
+  (byte-exact on the `phi3v` family), and the macOS 26 native CI job runs
+  `verifyImageOracle`/`verifyImageOracleFixtures` so the family stays
+  reference-verified in CI.
+- `GenerationRequest.chat` keeps its eager build-time deep copy of messages —
+  it is the snapshot `promptTokenIds` were encoded from, and deferring it
+  breaks the pinned mutation tests — and renders and encodes with the
+  checkpoint's own tokenizer, the same tokenizer as every other expansion
+  path, so one prompt can never tokenize two ways. Structured text/image
+  content parts are re-flattened to `<|image_i|>` markers for the re-render
+  (the artifact's chat template string-concatenates `message['content']`,
+  which structured parts cannot survive); plain-string content keeps the
+  rendered-text path, and the marker-text-in-a-plain-string rule is per-path
+  (documented on `GenerationRequest.chat` and `Phi3VModel`). The
+  re-tokenization always applies the reference processor's per-chunk `<s>`
+  regardless of the request's `PromptSpecialTokens` policy, with
+  `GenerationResult.promptTokenIds()` retaining the request's original IDs.
+- The Phi-3.5-Vision boundary re-prefill fires only when a decode step can
+  actually reach `original_max_position_embeddings + 1`: `boundaryCrossable`
+  is `expandedLength <= original_max <= expandedLength + maxNewTokens - 2`
+  (only `maxNewTokens - 1` decode steps exist). When the boundary is
+  unreachable, the retained projection rows die with the prefill scope and
+  decode steps skip appending to the re-prefill history; when it fires,
+  every retained K/V array is evaluated like the regular prefill's contract
+  (not just the logits), after which the rows are closed, the hook dropped
+  and the `BoundaryState` deactivated. The re-prefill history is a pre-sized
+  `int[]` plus a length counter, and `DecoderModel.DecodeStep` receives the
+  fed token as a Java `int` rather than reading it back from a native array.
+- `RopeSpec.Su` is defensive-copy immutable with value equality and computes
+  in `double`, casting to float32 (a stated tolerance, not bit-exactness).
+  The top-level `original_max_position_embeddings` config key is accepted
+  only behind the phi3_v family's `acceptsSuRope` capability — an older
+  family's config carrying it reaches the unknown-key sink instead of
+  silently running plain RoPE. Length-dependent RoPE is detected as
+  `!rope.isStatic()` (not an `instanceof` list) in `RopeSpec.apply`'s batched
+  unequal-position check and in `BatchFacts.lengthDependentRope` (the
+  scheduler cohort key and the batch preflight), covering Su and future
+  variants.
+- `MLX.array(scope, float[], offset, length, shape)` uploads a right-sized
+  prefix view via `MemorySegment.copy` with an explicit `JAVA_FLOAT` element
+  layout; the three-argument `MLX.array` delegates to it. The
+  Phi-3.5-Vision pixel path copies only the real slots via the ranged
+  `Phi3VImageProcessorResult.copyValuesTo` and uploads that right-sized
+  array, so the padded tail never reaches native memory.
+- `Phi3VPromptTokens.MARKER_PATTERN` uses ASCII-only `\d` (a recorded
+  deviation from Python's Unicode `\d`), and the chat snapshot copy preserves
+  nested-map keys as they are — the renderer rejects non-String keys at the
+  render boundary, not the copy.
+- The release smoke's `requiredNotice` also pins PyTorch's
+  `UpSampleKernel.cpp`/`UpSample.h` SHA-256s and the BSD 3-Clause text in the
+  three vision jars.
+- Still deferred per the reviewer's own triage: precomputing the two Su
+  frequency tables (performance only) and extracting the vision-language
+  models' shared helper.
+- Review-round labels do not belong in public API Javadoc, and upstream API
+  docs don't name their downstream consumers.

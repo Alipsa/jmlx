@@ -178,6 +178,30 @@ charset-normalizer==3.5.1 \
     --hash=sha256:fd0a274c0e5f9a21565cd9d3dd749b61f96b7aa1e20a93aa1ba4029518f2e5c0 \
     --hash=sha256:fdb8a068947befafba9952162645dc2fecaeb400e64584829ed5e9b2fbe21a7f
     # via requests
+torchvision==0.21.0 ; (python_full_version < '3.14' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or sys_platform == 'darwin' \
+    --hash=sha256:044ea420b8c6c3162a234cada8e2025b9076fa82504758cd11ec5d0f8cd9fa37 \
+    --hash=sha256:110d115333524d60e9e474d53c7d20f096dbd8a080232f88dddb90566f90064c \
+    --hash=sha256:5045a3a5f21ec3eea6962fa5f2fa2d4283f854caec25ada493fcf4aab2925467 \
+    --hash=sha256:5083a5b1fec2351bf5ea9900a741d54086db75baec4b1d21e39451e00977f1b1 \
+    --hash=sha256:54454923a50104c66a9ab6bd8b73a11c2fc218c964b1006d5d1fe5b442c3dcb6 \
+    --hash=sha256:54815e0a56dde95cc6ec952577f67e0dc151eadd928e8d9f6a7f821d69a4a734 \
+    --hash=sha256:5c22caeaae8b3c36d93459f1a5294e6f43306cff856ed243189a229331a404b4 \
+    --hash=sha256:659b76c86757cb2ee4ca2db245e0740cfc3081fef46f0f1064d11adb4a8cee31 \
+    --hash=sha256:6bdce3890fa949219de129e85e4f6d544598af3c073afe5c44e14aed15bdcbb2 \
+    --hash=sha256:97a5814a93c793aaf0179cfc7f916024f4b63218929aee977b645633d074a49f
+    # via -r tools/hf-reference/requirements.in
+torchvision==0.21.0+cpu ; (python_full_version >= '3.14' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux') \
+    --hash=sha256:45736c703050019f158f34ab1d031a313fe91412aef00e3f0d242251ec32a7aa \
+    --hash=sha256:4ed0a1be50676a7c589ba83b62c9dc0267a87e852b8cd9b7d6db27ab36c6d552 \
+    --hash=sha256:554ca0f5948ac89911299f8bfb6f23936d867387ea213ab235adc2814b510d0c \
+    --hash=sha256:667f3d983240f41eaff5a3f78bdcbc144473978a37cd15a4db6dad92b1e8b6f0 \
+    --hash=sha256:852b96738a68592223f01a04e4bcc1b3906bef7eee41c99f27f3be5706046862 \
+    --hash=sha256:883f8668b923781f1152a20d75e75ad94a4f1016328d86a7b889006a9156fb14 \
+    --hash=sha256:9f369668a2c08b085a8797ea830d62bc009d73d3775cfb6c721567a61d5bcfb9 \
+    --hash=sha256:a76478c0f547e032116282d61a5a7d943142cf040f6c7d97941d7e96813c4c14 \
+    --hash=sha256:d67081026aad9642c46d3b14035f8ae69117468c09a07d628f3eafc7ae74841f \
+    --hash=sha256:d6874431e678ba107b60a83f255c33f3755f06bad587b1b919aa514ec325dcd8
+    # via -r tools/hf-reference/requirements.in
 cloudpickle==3.1.2 \
     --hash=sha256:7fda9eb655c9c230dab534f1983763de5835249750e85fbcef43aaa30a9a2414 \
     --hash=sha256:9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a

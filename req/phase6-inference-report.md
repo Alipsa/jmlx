@@ -84,7 +84,7 @@ Each is rejected with a named error at config parsing or load time, not silently
 | Any quantized Idefics3/SmolVLM checkpoint (affine, non-affine or per-layer) | Rejected at load ("quantized vision-language checkpoints are unsupported" for a plain affine block; malformed, per-layer or root-level blocks name the key); float safetensors only, storage FP16/BF16 up-cast |
 | Sliding KV retention for image-prefill (vision-language models) | Rejected pending image-prefill equivalence evidence; FULL and capacity-bounded retention only |
 | VLM batching and multimodal scheduler cohorts | Not supported; `BatchGenerationScheduler` admission rejects images before native work |
-| Qwen3-VL, LLaVA-style vision models | Phase 7.3b / 7.3c, not implemented |
+| `qwen3_vl_moe` and other MoE vision-language variants | Rejected at load with the `model_type` named; only the dense `qwen3_vl` and `phi3_v` decoders load (Phases 7.3b / 7.3c) |
 | Malformed SentencePiece `Precompiled` charsmap binary tables | Rejected at tokenizer load with a named `Precompiled: malformed ...` error; well-formed charsmaps decode (Phase 7.2) |
 | Multi-GPU, non-Apple platforms | No native artifact |
 | Concurrent MLX use from several threads | Unsupported; use the scheduler's single worker. The `Cleaner` backstops are the one known exception (see the `se.alipsa.jmlx.core` package Javadoc) |

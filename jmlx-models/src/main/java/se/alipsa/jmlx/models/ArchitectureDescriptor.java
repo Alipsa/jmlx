@@ -34,6 +34,12 @@ public record ArchitectureDescriptor(
     if (rope instanceof RopeSpec.DynamicNtk && rotaryDims <= 2) {
       throw new IllegalArgumentException("dynamic rope_scaling requires rotary dimensions > 2");
     }
+    if (rope instanceof RopeSpec.Su su
+        && (su.shortFactors().length != rotaryDims / 2
+            || su.longFactors().length != rotaryDims / 2)) {
+      throw new IllegalArgumentException(
+          "su rope_scaling short_factor/long_factor must have rotaryDims / 2 entries");
+    }
   }
 
   /** Returns the model type represented by the common dimensions. */

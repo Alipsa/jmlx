@@ -341,8 +341,8 @@ public final class Phi3VModel implements TextGenerationModel {
     // exist: at decode step j (1-based) the cache position is expandedLength + j - 1, and the
     // fire condition is j <= maxNewTokens - 1, i.e. expandedLength + maxNewTokens - 2 >=
     // originalMaxPositions. When no step can reach it, the projected rows and the re-prefill
-    // history serve nothing and are not retained (decode steps then skip the per-step native
-    // readback and boxed history too).
+    // history serve nothing and are not retained (decode steps then skip the
+    // history append too).
     boolean boundaryPossible =
         boundaryCrossable(
             plan.expandedLength(), request.config().maxNewTokens(), originalMaxPositions);
@@ -441,12 +441,12 @@ public final class Phi3VModel implements TextGenerationModel {
 
   /**
    * The boundary re-prefill's mutable per-request state, shared between prefill and the decode
-   * steps. {@code active} gates the per-step token readback and history bookkeeping; {@code hook}
-   * and {@code retainedRows} exist only while the rows must survive for the re-prefill, and are
-   * released the moment it fires (it can fire at most once: the total width only grows past the
-   * boundary afterwards). {@code history}/{@code historyLength} is the re-prefill's pre-sized
-   * history (the clamped expanded prompt, then the generated tokens) and its current length;
-   * package-private so the seam-driven test suites drive the decode steps directly.
+   * steps. {@code active} gates the re-prefill history bookkeeping; {@code hook} and {@code
+   * retainedRows} exist only while the rows must survive for the re-prefill, and are released the
+   * moment it fires (it can fire at most once: the total width only grows past the boundary
+   * afterwards). {@code history}/{@code historyLength} is the re-prefill's pre-sized history (the
+   * clamped expanded prompt, then the generated tokens) and its current length; package-private so
+   * the seam-driven test suites drive the decode steps directly.
    */
   static final class BoundaryState {
     private boolean active;

@@ -968,7 +968,7 @@ or public API changed.
 
 The PR #68 (Phase 7.3c) review landed twelve rounds before merge. Their
 round-by-round history lives in `req/plans/phase7-3c-reference-findings.md`
-(§17–§22 cover the seventh through twelfth rounds; the first six rounds'
+(one section per review round from the seventh; the first six rounds'
 detail is in their per-round commit messages on this branch). The rules from
 those rounds that still apply:
 
@@ -1017,12 +1017,12 @@ those rounds that still apply:
   is `expandedLength <= original_max <= expandedLength + maxNewTokens - 2`
   (only `maxNewTokens - 1` decode steps exist). When the boundary is
   unreachable, the retained projection rows die with the prefill scope and
-  decode steps skip the readback and boxed history; when it fires, every
-  retained K/V array is evaluated like the regular prefill's contract (not
-  just the logits), after which the rows are closed, the hook dropped and the
-  `BoundaryState` deactivated. The re-prefill history is a pre-sized `int[]`
-  plus a length counter, and `DecoderModel.DecodeStep` receives the fed token
-  as a Java `int` rather than reading it back from a native array.
+  decode steps skip appending to the re-prefill history; when it fires,
+  every retained K/V array is evaluated like the regular prefill's contract
+  (not just the logits), after which the rows are closed, the hook dropped
+  and the `BoundaryState` deactivated. The re-prefill history is a pre-sized
+  `int[]` plus a length counter, and `DecoderModel.DecodeStep` receives the
+  fed token as a Java `int` rather than reading it back from a native array.
 - `RopeSpec.Su` is defensive-copy immutable with value equality and computes
   in `double`, casting to float32 (a stated tolerance, not bit-exactness).
   The top-level `original_max_position_embeddings` config key is accepted
@@ -1035,8 +1035,10 @@ those rounds that still apply:
   variants.
 - `MLX.array(scope, float[], offset, length, shape)` uploads a right-sized
   prefix view via `MemorySegment.copy` with an explicit `JAVA_FLOAT` element
-  layout: the Phi-3.5-Vision pixel path uploads only the real slots, not the
-  padded row.
+  layout; the three-argument `MLX.array` delegates to it. The
+  Phi-3.5-Vision pixel path copies only the real slots via the ranged
+  `Phi3VImageProcessorResult.copyValuesTo` and uploads that right-sized
+  array, so the padded tail never reaches native memory.
 - `Phi3VPromptTokens.MARKER_PATTERN` uses ASCII-only `\d` (a recorded
   deviation from Python's Unicode `\d`), and the chat snapshot copy preserves
   nested-map keys as they are — the renderer rejects non-String keys at the

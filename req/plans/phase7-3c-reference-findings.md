@@ -1253,3 +1253,47 @@ so it never matters in practice, but a for-each with a separate counter keeps th
 `"messages[i]"` null message at the same cost for any `List` type.
 
 No native pin, generated binding or golden changed in this round.
+
+## 23. PR #68 thirteenth review round (2026-10-31)
+
+**The AGENTS.md review-round history was condensed (documentation only, no code impact).**
+AGENTS.md is loaded in full through CLAUDE.md at the start of every agent session, and the
+twelve per-round paragraphs (168 lines) recorded history rather than lasting guidance. They were
+replaced by a short intro — pointing at this document's review-round sections (one per round
+from the seventh; the first six rounds exist only in their per-round commit messages) — and a
+bullet list of the rules that still apply: `ChatContextCopies` as the single snapshot copy, the
+pinned CLIP depth of 24 with its package-private test seam, the phi3v oracle's
+exact-recording-platform gate and `Math.fma`, the `GenerationRequest.chat`
+eager-copy/tokenizer/marker rules, the `boundaryCrossable` fire condition and `BoundaryState`
+lifecycle, `RopeSpec.Su` immutability and the `acceptsSuRope`/`!isStatic()` detection family, the
+`MLX.array` offset overload, the ASCII-only `\d` marker deviation, the release-smoke PyTorch
+UpSample pins, the still-deferred items, and the no-round-labels-in-public-Javadoc convention.
+AGENTS.md shrank from 1136 to 1051 lines. Lesson: per-round history belongs in this findings
+document, not in AGENTS.md.
+
+No native pin, generated binding or golden changed in this round.
+
+## 24. PR #68 fourteenth review round (2026-10-31)
+
+**The condensed `MLX.array` bullet described a pixel path that stopped existing in round 7
+(confirmed, low).** The bullet claimed the Phi-3.5-Vision pixel path "uploads only the real
+slots, not the padded row" through the offset overload, but round 7 changed `pixels()` to trim
+the row in Java via the ranged `Phi3VImageProcessorResult.copyValuesTo` and then use the
+three-argument `MLX.array(scope, float[], int[])` form — the three-argument form still delegates
+to the offset overload, but the real-slot trimming happens in the ranged copy, not in the offset
+argument. The bullet now states that the pixel path copies only the real slots via the ranged
+`copyValuesTo` and uploads that right-sized array, so the padded tail never reaches native
+memory, and notes the three-argument form's delegation.
+
+**The phrase "readback and boxed history" was stale in three places (confirmed, low).** The
+per-step native token readback was removed in round 5 (the fed token is passed through
+`DecodeStep` as a Java `int`) and the history has been a pre-sized `int[]` plus a counter since
+round 7, so "decode steps skip the readback and boxed history" was doubly false. It appeared in
+the AGENTS.md bullet and in two `Phi3VModel` code comments (the `boundaryPossible` comment and
+the `BoundaryState` Javadoc); all three now say decode steps skip appending to the re-prefill
+history (the Javadoc's `active` "gates the re-prefill history bookkeeping"). A repo-wide grep
+confirmed no other "readback"/"boxed history" references remain; the single surviving `DecodeStep`
+Javadoc sentence ("so no native readback is needed") is accurate — it explains why the `int`
+parameter exists.
+
+No native pin, generated binding or golden changed in this round.

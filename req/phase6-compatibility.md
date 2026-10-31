@@ -103,3 +103,20 @@ assertion; the Tier-B row's first self-hosted execution remains pending, and the
 execution of all four WP6/WP7/WP8 suites remains pending. See
 `phase7-3c-reference-findings.md` §16 for the WP8 acceptance evidence and
 `phase6-tier-b-artifacts.md` for the pin and the reference-generator contract.
+
+## Phase 7.4 audio/diffusion decision (2026-10-31)
+
+Phase 7 ships **no audio or diffusion support**; this matrix makes no claim for either
+modality. The 7.4 decision record (`req/plans/phase7-4-decision.md`, reviewed via its PR)
+schedules both by dated roadmap amendment: **audio inference** (`openai/whisper-tiny`, the
+license the artifact declares: apache-2.0) as Phase 11 milestone 11.5 — a Java 21
+native-free `jmlx-audio` module (WAV decode, Slaney filterbank), a forward-STFT facade in
+`jmlx-core` on 11.2's `MLXFFT` (no ISTFT exists in Whisper), and the Whisper model in
+`jmlx-models`; `jmlx-audio` is published, growing the published modules to eight — and
+**diffusion inference** (SD 1.5-class text-to-image in `jmlx-models`, new surface entirely
+pure-Java: schedulers, VAE, CLIP text encoder; a CLIP slow-tokenizer loader for the
+artifact's own vocab.json + merges.txt in `jmlx-tokenizer` — the artifact ships no
+`tokenizer.json`) as Phase 9 milestone 9.6. The diffusion Tier-B artifact
+(`stable-diffusion-v1-5/stable-diffusion-v1-5`, CreativeML OpenRAIL-M) is accepted in the
+decision record for a pinned read-only test artifact. Until those milestones deliver, audio
+and diffusion remain unsupported and unverified.

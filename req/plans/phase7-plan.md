@@ -189,7 +189,7 @@ for every new op.
 | 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B | delivered; macOS 26 hosted acceptance pending |
 | 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output | delivered; macOS 26 hosted Tier-B pending |
 | 7.3c LLaVA-style (Phi-3.5-Vision) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | Phi-3.5-Vision Tier-A logits and Tier-B image+text output | delivered 2026-10-30 |
-| 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | not started |
+| 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`); reviewed via its PR: go — audio → Phase 11 milestone 11.5, diffusion → Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | not started |
 | 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | not started |
 

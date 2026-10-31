@@ -10,8 +10,8 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/phase3-plan.md §4, Testing approach rows for the {@code mlx_vector_array}-based joint
- * {@link MLX#eval}.
+ * See req/plans/phase3-plan.md §4, Testing approach rows for the {@code mlx_vector_array}-based
+ * joint {@link MLX#eval}.
  */
 @EnabledIfNativeAvailable
 class MLXEvalTest {

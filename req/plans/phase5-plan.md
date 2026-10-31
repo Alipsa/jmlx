@@ -4,7 +4,7 @@
 
 **Branch:** this phase started on `phase5-plan`, off `main` at `f28a327` (PR #11, Phase 4 M4
 `QuantizedLinear`, merged); M1 has since merged to `main` via PR #12 (`5c85f8c`) and that branch is
-deleted. Phase 4 (`req/phase4-plan.md`) has every milestone M0a–M4, §9 documentation, and §10's
+deleted. Phase 4 (`req/plans/phase4-plan.md`) has every milestone M0a–M4, §9 documentation, and §10's
 hosted ARM64 CI workflow plus required-check ruleset **Done**. (M0d is also `Done` only in a scoped-down sense — six generic op-body helpers
 deliberately deferred past their original merge point, per that table's own M0d note; this document's
 Research findings section below leans on that same precedent for M1's own C-string helper.)
@@ -28,7 +28,7 @@ than any single design tension does — see Decisions below.
 
 ## Decisions taken
 
-**D1 — Checkpoint I/O is a thin FFM facade, not a parser (supersedes `project-outline.md`'s
+**D1 — Checkpoint I/O is a thin FFM facade, not a parser (supersedes `req/project-outline.md`'s
 wording).** `req/project-outline.md`'s Phase 5 section describes "a pure Java `.safetensors` parser
 converting raw memory segments directly into `MLXArray` tensors." That undersells what's already
 available: mlx-c's committed, generated bindings
@@ -131,7 +131,7 @@ via `Throwable.addSuppressed`.
 **D3 — Tokenizer integration (M2) is deliberately left unplanned here.** Unlike checkpoint I/O,
 there is no existing binding to lean on: mlx-c has no tokenizer API at all. Whether the right move
 is FFM-binding Hugging Face's `tokenizers` Rust crate's C API (mirroring how `mlx-c` itself was
-bootstrapped from a pinned wheel — see `req/initial-plan.md`) or a pure-Java BPE/SentencePiece
+bootstrapped from a pinned wheel — see `req/plans/initial-plan.md`) or a pure-Java BPE/SentencePiece
 implementation is a genuinely open architectural question this document does not resolve. M2 needs
 its own research spike (probing whether `tokenizers` exposes a usable C ABI, checking license
 compatibility, and prototyping load-time cost) before a plan for it can be written the way M1's plan
@@ -405,7 +405,7 @@ pure-Java decision.
 `LlamaModel`/`QwenModel` need nothing new at the tensor/module level: `se.alipsa.jmlx.nn` already
 has `Linear`, `QuantizedLinear`, `RMSNorm`, `MultiHeadAttention`, `KVCache`, and RoPE (via
 `MLXFast.rope`, per `req/project-outline.md`'s own Phase 4 reconciliation note, not
-`req/phase4-plan.md` §7 -- §7 is only RoPE's signature spec, the reconciliation of RoPE shipping as
+`req/plans/phase4-plan.md` §7 -- §7 is only RoPE's signature spec, the reconciliation of RoPE shipping as
 a `core` op rather than an `nn` module lives in the outline). What M3 adds is a checkpoint →
 `Module` tree mapping (naming convention translation from HF/GGUF tensor names to this project's
 `Module` field names) and an autoregressive generation loop built on `KVCache`. Both depend on M1's
@@ -469,7 +469,7 @@ shares the identical `0`/`1`/`2` convention -- likely, given the parallel design
 should verify against its own `map.cpp` body before assuming it rather than citing this paragraph as
 proof for both map types.
 
-Per the M0d precedent in `req/phase4-plan.md` (add a generic helper only in the task that first needs
+Per the M0d precedent in `req/plans/phase4-plan.md` (add a generic helper only in the task that first needs
 it, wired to a real consumer, never speculatively), the resulting helper(s) are added to `NativeOps`
 in M1's own first task, not built ahead of time here.
 
@@ -479,7 +479,7 @@ in M1's own first task, not built ahead of time here.
   its own plan exists).
 - `LlamaModel`/`QwenModel` and any other reference model (M3, deferred — see D4).
 - Streaming/incremental text generation UX (console printing, sampling strategies beyond greedy
-  argmax) — not named in `project-outline.md`'s Phase 5 deliverables and not needed to prove
+  argmax) — not named in `req/project-outline.md`'s Phase 5 deliverables and not needed to prove
   checkpoint loading works.
 - Writing (`save`) support beyond exactly what M1's own round-trip tests need as a
   fixture-generation path. This is not conditional on whether the testing plan happens to exercise

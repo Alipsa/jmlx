@@ -11,10 +11,10 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * {@code quantize}, {@code dequantize} and {@code quantizedMatmul} (req/phase4-plan.md §8): affine
- * weight quantization and the fused matmul {@code QuantizedLinear}, in the neural-network package,
- * is built on (same "package named in prose, not a qualified {@code @link}" convention {@link
- * MLXGrad}'s own javadoc already uses for {@code ModuleGrad}, for the same reason: spec
+ * {@code quantize}, {@code dequantize} and {@code quantizedMatmul} (req/plans/phase4-plan.md §8):
+ * affine weight quantization and the fused matmul {@code QuantizedLinear}, in the neural-network
+ * package, is built on (same "package named in prose, not a qualified {@code @link}" convention
+ * {@link MLXGrad}'s own javadoc already uses for {@code ModuleGrad}, for the same reason: spec
  * Verification #6a's grep must never match a core class's source). See {@link MLX}'s javadoc for
  * the index of every sibling class in this package's split.
  */

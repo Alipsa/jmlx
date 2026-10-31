@@ -13,7 +13,7 @@ is rejected for the same defect. See [probe findings](../req/plans/phase7-1-prob
 `Sequential` applies fixed unary children; `ModuleList` stores arbitrary fixed modules. Both use
 ordered decimal parameter paths. Modules default to eval. `train(boolean)` propagates recursively
 and newly registered children inherit the mode. Mode is independent of `freeze()`. Dropout is
-identity in eval; Dropout and BatchNorm training throw until Phase 11. Cycles/shared-parent trees
+identity in eval; Dropout and BatchNorm training throw until Phase 13. Cycles/shared-parent trees
 retain the existing unsupported behavior.
 
 ```java
@@ -33,7 +33,7 @@ GroupNorm defaults to MLX interleaved grouping. PyTorch checkpoint loaders must 
 ranks 2–4 and loaded running statistics, or computes batch statistics in eval when tracking is
 false. Optional affine parameters are a weight/bias pair. Running mean/variance are registered
 floating parameters: `ModuleGrad` differentiates them even after freezing; non-trainable buffers
-are deferred to Phase 11.
+are deferred to Phase 13.
 
 Pool sizes use floor division. Negative extents are rejected before creating windows; max pooling
 preserves the native error for empty outputs. Average padding counts zero-padded samples in its
@@ -57,7 +57,7 @@ weights. Label validation synchronizes INT32 tensors before gathering; invalid i
 native. BCE accepts logits (default) or probabilities, same-shaped targets/weights, and clips
 probability logarithms at -100. MSE/L1/smooth-L1 require equal shapes. KL takes **log probabilities
 for both inputs and targets**. Cosine returns similarity, axis 1 by default, clipping the product
-of norms by epsilon. These compositions have no Phase 11 gradient guarantee.
+of norms by epsilon. These compositions have no Phase 13 gradient guarantee.
 
 Strict CPU oracle references run against Java GPU in `float32GoldenTest`, with separate default-mode
 coverage. The reader is an internal Gradle test fixture; both fixture publication variants are

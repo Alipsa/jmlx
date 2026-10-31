@@ -154,9 +154,9 @@ caller besides that one test.
 `MultiHeadAttention` with KV caching. Phase 3 is delivered (`51fd5e5`); `MLX.java` is 607 lines with
 20 public ops.
 
-**`req/phase3-plan.md` addressed Java guards stricter than native. The risk this document addresses
+**`req/plans/phase3-plan.md` addressed Java guards stricter than native. The risk this document addresses
 is that the *memory model* — not the op surface — does not survive a transformer forward pass.** Two
-shipped invariants break on the outline's own `JMLXDemo` sample (`project-outline.md:108-138`):
+shipped invariants break on the outline's own `JMLXDemo` sample (`req/project-outline.md:108-138`):
 
 1. **`binaryOp` rejects operands from different scopes** (`MLX.java:247`). `Linear.forward(x)` is
    `matmul(x, W)` with `x` in a per-step scope and `W` in the model scope. That throws today.
@@ -1058,9 +1058,9 @@ nullables (§2's table).
   used for "thread-safe" rather than a bare checkmark — here, that the outline's `nn` layer sits on a
   public op surface in `core`, and that autograd shipped although the outline lists no autograd
   deliverable under Phase 4.
-* The outline's architecture diagram (`project-outline.md:13`) still advertises `Stream`, `Device`
-  and `Autograd` as `core` types. `Autograd` becomes real as `MLXGrad`; `Stream`/`Device` still do
-  not exist. Amend the line rather than leaving it aspirational.
+* The outline's architecture diagram (`req/project-outline.md:13`) still advertises `Stream`,
+  `Device` and `Autograd` as `core` types. `Autograd` becomes real as `MLXGrad`;
+  `Stream`/`Device` still do not exist. Amend the line rather than leaving it aspirational.
 * `MLX.java`'s class javadoc cites `initial-plan.md §7` and `phase3-plan.md`; add this document, and
   give each split class from §1 a javadoc pointing back at the index in `MLX`.
 * `jmlx-examples/HelloMLX`: add a `Linear` forward pass inside a child scope, so the two behavioural

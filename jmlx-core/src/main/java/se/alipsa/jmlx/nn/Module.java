@@ -15,7 +15,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Base class for neural-network layers: a tree of named parameters ({@link MLXArray}s) and named
  * submodules, built up by a subclass's constructor via {@link #param(String, MLXArray)} and {@link
- * #child(String, Module)}. See req/phase4-plan.md §5-6 for the design this class implements.
+ * #child(String, Module)}. See req/plans/phase4-plan.md §5-6 for the design this class implements.
  *
  * <p>{@link #param(String, MLXArray)} registers a value and returns it, but subclasses must NOT
  * cache that return value into a field for later use in {@code forward()} -- they must call {@link
@@ -297,8 +297,8 @@ public abstract class Module {
    * primals around a loss call and restore them afterward without notifying this hook, so a cached
    * view here would either leak (recomputed once per step in a scope that never closes, if the hook
    * fired on restore) or dangle (if the recompute were suppressed). Read the current value fresh
-   * via {@link #param(String)} instead -- see this class's javadoc and req/phase4-plan.md §2 for
-   * the full analysis.
+   * via {@link #param(String)} instead -- see this class's javadoc and req/plans/phase4-plan.md §2
+   * for the full analysis.
    */
   protected void onParametersUpdated(Set<String> names) {}
 

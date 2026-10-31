@@ -1,21 +1,28 @@
 # jmlx Phase 7 — Inference Breadth and Conventional Neural-Network Execution
 
-**Roadmap:** `req/full-roadmap.md` §Phase 7, as amended by step 0 below
+**Roadmap:** `req/full-roadmap.md` §Phase 7. The roadmap's milestone table and this plan's
+delivery order list the same milestones in the same order.
 
 ## Goal
 
 Extend jmlx from decoder-only text generation to the Qwen3 text family, then to text encoders,
 encoder-decoder generation and image+text inference. Add the conventional `nn` layers those
 workloads need to `jmlx-core`, behind its existing facades. The primary product target is the Qwen
-family: Qwen3 text decoders (7.0) and Qwen3-VL (7.3b).
+family: Qwen3 text decoders (7.0), Qwen3-VL (7.3b) and the hybrid linear-attention Qwen3.8 (7.6).
 
-**Phase 7 done (roadmap gate):** supported non-text modalities are stated explicitly in the
-compatibility matrix; the `nn` API covers their required common layers without model packages
-bypassing core facades.
+**MLX upgrade:** once, as milestone 7.5, after 7.4 and before 7.6. **Release:** none. Nothing is
+published during Phase 7; the first releases are Phase 8 and follow Phase 7 done.
 
-Non-goals: training (dropout in training mode, optimizers, loss gradients: Phase 11), general
-array/indexing parity beyond the focused slices named below (Phase 8), FFT/linalg (Phase 9), video
-input, HTTP serving, and audio/diffusion implementation (7.4 only decides).
+**Phase 7 done (roadmap gate):** every milestone below is delivered, or deferred with a date;
+every pending acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
+for 7.2, 7.3a and 7.3b) has passed or carries a dated, recorded waiver; supported non-text
+modalities are stated explicitly in the compatibility matrix; and the `nn` API covers their
+required common layers without model packages bypassing core facades.
+
+Non-goals: training (dropout in training mode, optimizers, loss gradients: Phase 13), general
+array/indexing parity beyond the focused slices named below (Phase 10), FFT/linalg (Phase 11),
+video input, HTTP serving (Phase 9.3), releases (Phase 8), and audio/diffusion implementation
+(7.4 only decides).
 
 ## Baseline and constraints
 
@@ -46,20 +53,23 @@ input, HTTP serving, and audio/diffusion implementation (7.4 only decides).
   `libmlx.dylib` (adjacent `constant`, `edge`, `Invalid padding mode (`, with no `reflect` or
   `symmetric`) and the `mlx_pad`/`mlx_pad_symmetric` declarations in the staged
   `mlx/c/ops.h`. The 7.1 probe will confirm the accepted modes at runtime.
-- The roadmap's permission to pull focused later-phase array slices forward is scoped to Phase 6
-  only (`full-roadmap.md` §Purpose). 7.1's array ops are Phase 8 scope: `abs`, `minimum`,
-  `clip`, `floor` and `log1p` are milestone 2; `max_axes` and `var_axes` milestone 3; `pad`,
-  `as_strided`, `tile` and `repeat_axis` milestone 4. The layers themselves (convolution and
-  transpose convolution, pooling, padding, upsampling, normalization variants) are already
-  Phase 7 milestone 1 scope (`full-roadmap.md` §Phase 7), so they need no permission. Only the
-  Phase 8 array slices they depend on are pulled forward. The `mlx_conv*` bindings (`MLXConv`)
-  appear in no Phase 8 milestone. They are part of the convolution layers' Phase 7 scope, and
-  Phase 11 milestone 2 ("Complete standard layers required by the pinned MLX `nn` scope", which
+- At plan time, the roadmap's permission to pull focused later-phase array slices forward was
+  scoped to Phase 6 only. Step 0 extended it to Phase 7 (roadmap amendment of 2026-10-04; now
+  roadmap rule 9). 7.1's array ops are Phase 10 scope (numbered Phase 8 before 2026-10-30):
+  `abs`, `minimum`, `clip`, `floor` and `log1p` are milestone 2; `max_axes` and `var_axes`
+  milestone 3; `pad`, `as_strided`, `tile` and `repeat_axis` milestone 4. The layers themselves
+  (convolution and transpose convolution, pooling, padding, upsampling, normalization variants)
+  are already 7.1 scope (`full-roadmap.md` §Phase 7), so they need no permission. Only the
+  Phase 10 array slices they depend on are pulled forward. The `mlx_conv*` bindings (`MLXConv`)
+  appear in no Phase 10 milestone. They are part of the convolution layers' Phase 7 scope, and
+  Phase 13 milestone 2 ("Complete standard layers required by the pinned MLX `nn` scope", which
   also covers `Upsample`) later extends them rather than re-deriving them.
 - `jmlx-tokenizer` already supports WordPiece (BERT) and SentencePiece Unigram (T5).
   `HfTokenizer.renderChat` rejects non-text message content, which multimodal templates need.
-- Nothing has been published to Maven Central yet. If the first release happens mid-phase, every
-  later change to a released public type must be additive (no removals or signature changes).
+- Nothing has been published to Maven Central yet, and nothing is published during Phase 7.
+  The first releases are Phase 8, under the pre-1.0 policy in `req/full-roadmap.md` § Release
+  and MLX upgrade plan (a minor release may change public API incompatibly when its release
+  notes list every break). This replaces the earlier additive-only rule for a mid-phase release.
 
 Roadmap rules apply throughout. In particular: name exact mlx-c declarations, probe native
 uncertainty first, no `ffi` use outside `jmlx-core`, and `MLXScope` ownership and `MLXException`
@@ -118,7 +128,7 @@ for every new op.
 5. **Train/eval state.** `Module` gains `train(boolean)`/`isTraining()`, applied recursively.
    jmlx's default is **eval**, a deliberate deviation from MLX's `training=True` default because
    jmlx is inference-first. Record this in javadoc and the core README. `Dropout` is the
-   identity in eval. In training mode it throws `UnsupportedOperationException` naming Phase 11,
+   identity in eval. In training mode it throws `UnsupportedOperationException` naming Phase 13,
    rather than silently skipping dropout.
 6. **Layout.** jmlx `nn` follows MLX: channels-last (`NHWC`) activations, with conv weights shaped
    `[out, kH, kW, in]`. Checkpoint loaders own the conversion from PyTorch layout (`[out, in, kH,
@@ -170,30 +180,34 @@ for every new op.
 
 ## Delivery order
 
-| Milestone | Primary modules | Depends on | Exit evidence |
-| --- | --- | --- | --- |
-| Step 0 Roadmap amendment | docs | — | amended roadmap merged |
-| 7.0 Qwen3 text decoders | `jmlx-core`, `jmlx-models`, `jmlx-jinja` | step 0 | Qwen3 Tier-A logits; Qwen3-0.6B Tier-B; Qwen3-8B 4-bit run recorded |
-| 7.1 Core inference modules | `jmlx-core`, `tools/mlx-oracle` | step 0 | every layer oracle-tested; inventory updated |
-| 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models`, `jmlx-tokenizer`, reference/Tier-B tools | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens |
-| 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B |
-| 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output |
-| 7.3c LLaVA-style (optional) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | delivered 2026-10-30: Phi-3.5-Vision Tier-A logits and Tier-B image+text output |
-| 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record |
+| Milestone | Primary modules | Depends on | Exit evidence | Status (2026-10-30) |
+| --- | --- | --- | --- | --- |
+| Step 0 Roadmap amendment | docs | — | amended roadmap merged | delivered |
+| 7.0 Qwen3 text decoders | `jmlx-core`, `jmlx-models`, `jmlx-jinja` | step 0 | Qwen3 Tier-A logits; Qwen3-0.6B Tier-B; Qwen3-8B 4-bit run recorded | delivered |
+| 7.1 Core inference modules | `jmlx-core`, `tools/mlx-oracle` | step 0 | every layer oracle-tested; inventory updated | implemented; acceptance pending |
+| 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models`, `jmlx-tokenizer`, reference/Tier-B tools | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens | implemented; macOS 26 CI acceptance pending |
+| 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B | delivered; macOS 26 hosted acceptance pending |
+| 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output | delivered; macOS 26 hosted Tier-B pending |
+| 7.3c LLaVA-style (Phi-3.5-Vision) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | Phi-3.5-Vision Tier-A logits and Tier-B image+text output | delivered 2026-10-30 |
+| 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | not started |
+| 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | not started |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | not started |
 
-Step 0 merges first. 7.0 and 7.1 can then proceed in parallel. 7.3a may start once 7.1's conv,
-normalization and activation layers land, even if 7.2 is still open. Each milestone is its own PR
-series and its own `req/plans/phase7-<n>-plan.md`, written and reviewed before code.
+Step 0 merged first. 7.0 and 7.1 then proceeded in parallel, and 7.3a started once 7.1's conv,
+normalization and activation layers landed, while 7.2 was still open. From 7.3c on, the
+milestones run strictly in table order: 7.3c, 7.4, 7.5, 7.6. Each milestone is its own PR
+series and its own `req/plans/phase7-<n>-plan.md`, written and reviewed before code. 7.5 and
+7.6 were numbered "MLX upgrade" and 7.5 before 2026-10-30.
 
-## Step 0 — Roadmap amendment (its own small PR, before 7.0 or 7.1 code)
+## Step 0 — Roadmap amendment (delivered; its own small PR, before 7.0 or 7.1 code)
 
 Amend `req/full-roadmap.md` with a dated note:
 - add milestone 7.0 (Qwen3 text decoders) to §Phase 7 and explain the product-priority reason;
 - extend the §Purpose permission ("Phase 6 may implement the focused array, indexing,
-  sort/selection, and random-key slices it needs from later groups") to Phase 7, for the Phase 8
+  sort/selection, and random-key slices it needs from later groups") to Phase 7, for the Phase 10
   milestone 2–4 array slices listed in the baseline. The 7.1 layers need no permission, because
   §Phase 7 milestone 1 already names them. Record that each slice is entered in the inventory,
-  and that Phase 8 and Phase 11 milestone 2 ("Complete standard layers required by the pinned MLX
+  and that Phase 10 and Phase 13 milestone 2 ("Complete standard layers required by the pinned MLX
   `nn` scope") extend this work rather than re-deriving it.
 
 No 7.0 or 7.1 code merges before this PR.
@@ -268,7 +282,7 @@ instead of returning NaNs. KL takes log-probability targets, and empty max-pool 
 the native reduction error. Acceptance remains pending legacy Phase 6 byte-exact oracle drift and
 cross-host CPU fixture verification; implementation is not marked milestone-complete.
 
-Focused Phase 8 slices land here under the permission step 0 adds, each recorded in the inventory.
+Focused Phase 10 slices land here under the permission step 0 adds, each recorded in the inventory.
 
 1. **Probe first** (`req/plans/phase7-1-probe-findings.md`):
    - `mlx_conv2d`/`mlx_conv_general` weight layout, `groups`, dilation and output shape;
@@ -349,7 +363,7 @@ Focused Phase 8 slices land here under the permission step 0 adds, each recorded
      linear-on-patches (7.3a). Bag or sparse embeddings are deferred until a workload needs them.
 4. **Losses (evaluation use):** `cross_entropy` (with label smoothing), `binary_cross_entropy`,
    `nll`, `mse`, `l1`, `smooth_l1`, `kl_div` and `cosine_similarity`, as pure Java compositions.
-   Their gradients are Phase 11's concern.
+   Their gradients are Phase 13's concern.
 
 **Tests:** hand-computed cases per layer; `tools/mlx-oracle` fixtures generated from the matching
 MLX Python `nn` layers (conv strides/padding/groups/dilation, pooling edges, every pad mode, every
@@ -438,8 +452,8 @@ modality rows.
 ## 7.3a — Vision foundation and SmolVLM-256M
 
 Implementation sub-plan: [phase7-3a-plan.md](phase7-3a-plan.md), proposed 2026-10-06. WP1–WP7
-merged via PRs #41–#46; WP8 is open as PR #47. The macOS 26 hosted acceptance of the WP6/WP7
-suites and the Tier-B row remains pending; see
+merged via PRs #41–#46; WP8 merged as PR #47 (2026-10-13). The macOS 26 hosted acceptance of
+the WP6/WP7 suites and the Tier-B row remains pending; see
 [phase7-3a-implementation-report.md](../phase7-3a-implementation-report.md).
 
 **Review amendments, 2026-10-06:**
@@ -580,6 +594,11 @@ immutability and decision 8 leak tests pass; the matrix gains an "image+text →
 
 ## 7.3b — Qwen3-VL
 
+**Delivered (2026-10-26).** Implementation sub-plan: [phase7-3b-plan.md](phase7-3b-plan.md).
+WP0–WP8 merged; WP8 via PRs #61 and #62. The local evidence and the CI evidence are in
+[phase7-3b-reference-findings.md](phase7-3b-reference-findings.md) §11.8. The macOS 26 hosted
+Tier-B execution remains pending.
+
 Prerequisites: 7.0 (Qwen3 text backbone) and 7.3a. The sub-plan must verify against
 `transformers`: the vision tower (2-D RoPE in the ViT, patch merger), dynamic-resolution
 preprocessing (`smart_resize`, min/max pixels), interleaved multimodal RoPE with 3-axis position
@@ -637,12 +656,254 @@ PaliGemma remains deferred.
 Deliver `req/plans/phase7-4-decision.md`, not code. It covers:
 - inventory counts for the relevant groups (`mlx_fft_*`, conv/upsample coverage after 7.1);
 - one candidate reference model per modality (for example Whisper-tiny; a small UNet/VAE pipeline);
-- required new surface (STFT/ISTFT, mel filterbanks, schedulers) and its Phase 9 overlap;
+- required new surface (STFT/ISTFT, mel filterbanks, schedulers) and its Phase 11 overlap;
 - Tier-B feasibility, licenses, and an estimate.
 
-The outcome is go (which spawns its own `phase7-4-<x>-plan.md`) or a dated deferral.
+The outcome is go or a dated deferral. A go schedules the implementation, with its own plan, into a
+later phase by a dated roadmap amendment; it does not extend Phase 7, so 7.5 can follow 7.4
+directly.
 
 **Gate:** the decision is reviewed and the roadmap is updated to match.
+
+## 7.5 — MLX upgrade
+
+This milestone follows the roadmap's MLX upgrade policy (`req/full-roadmap.md` § Release and MLX
+upgrade plan). Once 7.3c and 7.4 have closed, delivered or deferred with a date, upgrade the
+paired native pins, in their own PR, to the newest pairing that `scripts/checkDependencies.zsh`
+reports. On 2026-10-29 that pairing was `mlx-metal` 0.32.4 and mlx-c v0.8.0. The upgrade runs
+before any 7.6 code, so 7.6's oracle fixtures, goldens and Tier-B evidence are produced once, on
+the new runtime, and the first native release (Phase 8) ships that runtime. This section is also
+the checklist later upgrades (milestone 0 of Phases 9–15) reuse and update.
+
+Effect on this plan's verification:
+- **Independent references are not regenerated.** These are the evidence not produced by MLX:
+  - the CPU Hugging Face goldens under `tools/hf-reference`;
+  - the image and tokenizer oracle fixtures;
+  - greedy IDs taken from those references, such as `mistral-window`;
+  - the HF-referenced Tier-B manifests (BERT SST-2, MiniLM, Flan-T5, SmolVLM, Qwen3-VL), whose
+    expected values come from CPU Hugging Face or sentence-transformers reference runs, not
+    from jmlx.
+
+  They must pass unchanged on the new pins. The goldens run in both precision modes; Tier-B
+  runs in strict mode only (`tierBTest` sets `MLX_ENABLE_TF32=0`). A failure is a finding to
+  investigate, following `req/phase6-golden-precision.md`, never a reason to regenerate.
+
+  The SmolVLM and Qwen3-VL manifests also carry a `recorded_pin` (`mlxMetalVersion=0.31.2`, …).
+  Nothing compares against it; `TierBReferences` only logs it. By default the upgrade PR leaves
+  both values as they are, as the pin of the reference recording, and the manifests and their
+  digests in `tools/hf-reference/provenance.json` stay unchanged. The exception is a manifest
+  whose `local_evidence` is re-measured (see the measured-bounds item below). The Tier-B log
+  line prints only `recorded_pin`, not the running runtime's pin. The upgrade PR therefore also
+  adds the running pin to that log line, so the log cannot be read as describing the new
+  runtime.
+- **jmlx-recorded goldens are re-recorded only with evidence.** jmlx produced these by running
+  on MLX, so an upgrade can legitimately change them:
+  - **Seeded sampling streams:**
+    - `LlamaModelTest.seededSamplingRepeatsAcrossFreshJvmsAndRetainsPrefixes` (seeds 42 and 7);
+    - the release-smoke `tools/release-smoke/goldens/mistral-sampled.properties` (`run.sh ci
+      --record`).
+  - **The pin-gated Phase 6 text Tier-B exact IDs:** the `expected_token_ids` of
+    `lite-mistral-150m-v2-instruct`, `qwen2.5-0.5b-instruct`, `qwen3-0.6b` and
+    `smollm2-135m-instruct`. They are recorded on CI, and `TierBSmokeTest` asserts them only
+    while the runtime matches the manifest's `recorded_pin` (device, macOS, both native pins).
+    After an upgrade it silently falls back to a "structural pass only". The upgrade PR must
+    therefore re-record them, as the 7.0 plan did: dispatch the Tier-B workflow, then set
+    `recorded_pin`, `expected_token_ids`, `observed_peak_test_jvm_rss_kib` and `observed_run`.
+    Exact-ID coverage is not lost silently.
+  - **The 8B mlx-vlm probe** (`tools/qwen-vl-reference/goldens/qwen3-vl-8b-wp1-mlx-probe.json`).
+    It was produced by Python MLX, so it is re-run in the re-locked environment if the opt-in 8B
+    manual comparison is repeated.
+
+  A seeded stream that changes is re-recorded only after the upgrade PR shows the change follows
+  MLX itself: the regenerated sampling oracle still passes (`SamplingOracleTest`). The diff is
+  then reviewed in the PR.
+- **Bounds sized from old-pin measurements may need re-measuring.** These bounds were derived
+  from measurements on `mlx-metal` 0.31.2 / mlx-c `fba4470`:
+  - the separately named TF32 bounds (`req/phase6-golden-precision.md`, for example Qwen3-VL's
+    `0.0025` and the cache-equivalence `0.003`);
+  - the Tier-B native-memory gates:
+    - `TierBQwen3VlTest`: `NATIVE_PEAK_BOUND_BYTES` (measured 9,828,890,788 B + 500 MiB) and
+      `FOOTPRINT_BOUND_BYTES` (12.5 GB, against a sampled 11,979,116,480 B);
+    - `TierBVisionLanguageTest`: `NATIVE_PEAK_BOUND_BYTES` (5,737,416,464 B + 500 MiB) and
+      `FOOTPRINT_BOUND_BYTES` (8 GiB, against a sampled 7,129,368,904 B);
+    - the `local_evidence` blocks in their manifests, which those constants cite;
+  - `VisionLanguageMemoryTest`'s `FIXED_MARGIN` (16 KiB, sized from a measured warm overhead of
+    at most 11,264 B).
+
+  An exceedance is first a finding. A bound is raised only once the cause is documented, for
+  example an upstream kernel or allocator change named in the migration note. The new
+  measurement is recorded next to the old one. A strict `full-float32` bound is never loosened.
+  When a manifest's `local_evidence` is re-measured, the manifest changes. In that case its
+  `recorded_pin` and its digest in `tools/hf-reference/provenance.json` are updated in the same
+  commit, overriding the "leave unchanged" default above for that manifest.
+
+  These bounds are design bounds, not measurements, so they are never re-measured. An
+  exceedance is a regression:
+  - `Qwen3VlVisionPeakTest`'s `DEPTH_DELTA_BOUND` (64 MiB depth independence) and
+    `PLANNING_BOUND` (the plan's 5 GiB);
+  - the `CLEANUP_MARGIN` of 512 B in `VisionLanguageMemoryTest` and `Qwen3VlMemoryTest`, which
+    is held below the smallest feature tensor by construction.
+
+  Exact-byte assertions rest on an accounting assumption: that MLX's active-byte counter grows
+  by exactly the tensor buffer size, with no rounding and no device-side metadata.
+  `Qwen3VlMemoryTest` asserts exact equality with the logical KV size (plus `4 * vocabSize`
+  for the returned logits) after prefill closes. It also asserts it at every cached-decode step
+  and on the per-position growth between steps. A failure of these assertions is not yet a
+  regression. Before classifying it, the upgrade PR runs a minimal probe: allocate one
+  evaluated array of known size and measure how much the active-byte counter grows.
+  - If the probe shows the same difference, the cause is MLX's accounting. The migration note
+    documents it, and the expected values are adjusted by the measured per-buffer amount.
+  - If the probe is exact, the failure is a jmlx retention regression.
+
+  No other memory test asserts exact equality with a tensor size. The list below is a complete
+  checklist for the upgrade PR, as of 2026-10-29. It covers every test that reads native memory
+  through `MLXMemory`, `NativeMemoryProbe` or `MLXMemoryTestSupport`.
+  - **Margin- or slope-based checks,** which absorb accounting changes:
+    - `VisionLanguageMemoryTest` (`FIXED_MARGIN`, a measured bound; see above);
+    - `DecoderCacheLifecycleTest` (8 MiB);
+    - `Seq2SeqMemoryTest` and `Phase71ContractsTest` (baseline + 64 KiB);
+    - `LlamaModelTest` (baseline + 4 KiB);
+    - `KVCacheMemoryPlateauTest` (3 × logical + 8 MiB);
+    - `BatchSchedulerMemoryTest` (`SLACK` 8 MiB, and its early-versus-late slope);
+    - `KVCacheTest` (×4 the linear growth, and one row + 1 MiB after a reorder);
+    - `MLXMemoryLeakTest`, `LinearTest` and `QuantizedLinearTest` (2,000,000 B leak thresholds);
+    - `SwitchGluTest` (2,000,000 B);
+    - `MLXScopeTest` (500,000 B freed-detection slack).
+  - **Checks that the counter does not change,** which hold under any accounting and stay
+    regressions:
+    - the `clearCache` checks in `MLXMemoryLeakTest`;
+    - the rejected-call checks in `Qwen3VlVisionTowerValidationTest` and
+      `VisualFeatureInjectionTest` ("rejection must not allocate").
+  - **Report-only probes,** which record peaks but assert no memory bound:
+    `KVCacheQuantizationProbeTest`, `PackedAttentionProbeTest` and the opt-in
+    `Qwen3Vl8bManualProbeTest`.
+
+  The measured and design bounds above (Tier-B, `Qwen3VlVisionPeakTest`) complete the set.
+- **The Python MLX oracle fixtures are regenerated.** MLX itself produces them, so they follow
+  the procedure in `tools/mlx-oracle/README.md`:
+  - update `provenance.json` and `requirements.lock`, then rerun `install.sh`;
+  - rewrite the expected JSON with `generateMlxOracleFixtures` on the new pins;
+  - review the resulting diff in the upgrade PR.
+- **Bit-identity recordings start over.** The exact before/after comparison refuses to compare
+  across native pins, so recordings made before the upgrade are not reused. Any later
+  bit-identity claim records a fresh baseline on the new pins.
+- **The converter environment is re-locked or confirmed.** `tools/qwen-vl-reference` pins the
+  old MLX, so it is re-locked to the new pins or confirmed compatible. Its provenance is
+  updated in the same PR.
+
+## 7.6 — Hybrid linear-attention Qwen decoders (Qwen3.8)
+
+Added 2026-10-29 (numbered 7.5 until 2026-10-30). Prerequisites: 7.1 (the `conv1d` used by the
+short convolution), 7.3b (`MultiAxisRope`, the vision tower and the request lifecycle) and 7.5
+(the MLX upgrade). Its own sub-plan, `req/plans/phase7-6-plan.md`, is written and reviewed before
+code, and must decide every item under "Decisions for the sub-plan" below.
+
+**Scope.** Qwen3.8-27B, like Qwen3.5 and the dense Qwen3.6, uses `model_type` `qwen3_5`. Its
+stack is hybrid: three of every four layers are Gated DeltaNet linear attention (a causal short
+convolution with kernel 4 plus the gated delta-rule recurrence). Every fourth layer is full
+attention with a sigmoid output gate (`attn_output_gate`), partial rotary embedding
+(`partial_rotary_factor` 0.25) and interleaved multi-axis RoPE (`mrope_section [11, 11, 10]`).
+The checkpoint includes a Qwen3-VL-style vision tower (`qwen3_5`, patch 16, no DeepStack
+levels), so the milestone covers both text and image+text generation. It reuses 7.3b's vision
+tower, request lifecycle and `MultiAxisRope`.
+
+**Decisions for the sub-plan:**
+- **Partial rotary against the reference.** `MultiAxisRope` has a partial-rotary tail
+  passthrough, but its Javadoc calls that tail "a jmlx extension, not reference behaviour", and it
+  has never been tested against a reference. Transformers' `qwen3_5` code (main branch,
+  2026-10-29) rotates the first `rotary_dim = head_dim * partial_rotary_factor` dimensions and
+  concatenates the rest unchanged. The sub-plan verifies the tail against the pinned reference
+  version, including the inverse-frequency denominator (64 here, `2 * sum(mrope_section)`).
+  7.3b's load guard `2 * sum(mrope_section) == head_dim` is specific to Qwen3-VL. The `qwen3_5`
+  path checks `2 * sum(mrope_section) == head_dim * partial_rotary_factor` instead.
+- **Hugging Face and MLX-converted checkpoint layouts.** mlx-community artifacts come from two
+  converters, and the model card names which one was used. The image+text artifacts, including
+  `mlx-community/Qwen3.8-27B-4bit` (mlx-vlm 0.6.8), come from mlx-vlm. Text-only ones come from
+  `mlx_lm`. Both converters' `qwen3_5` sanitize steps (main-branch sources, verified 2026-10-29)
+  make the same four text-side changes:
+  - The key prefixes change (`model.language_model.` versus `language_model.model.`).
+  - The `conv1d` axes move (`[C, 1, K]` versus `[C, K, 1]`).
+  - The MTP tensors are dropped.
+  - `+1.0` is added to the zero-centered RMSNorm weights (`input_layernorm`,
+    `post_attention_layernorm`, the final norm, `q_norm` and `k_norm`; not `linear_attn.norm`),
+    which the HF model applies as `x * (1 + w)`.
+
+  The two converters differ on the vision side:
+  - `mlx_lm` discards every `vision_tower.*` and `model.visual.*` key, so its output is
+    text-only.
+  - mlx-vlm keeps the vision tower. It renames `model.visual.` to `vision_tower.` and transposes
+    the patch embedding from `[O, C, T, H, W]` to `[O, T, H, W, C]` (the 27B has
+    `vision_tower.patch_embed.proj.weight` `[1152, 2, 16, 16, 3]`).
+
+  The descriptor must detect the layout and load all three:
+  - HF;
+  - mlx-vlm;
+  - `mlx_lm`, which has no vision weights, so it loads as a text-only model whose metadata
+    reports TEXT and rejects image requests.
+
+  The norm offset must be applied exactly once. mlx-vlm drops MTP tensors *before* it checks
+  whether to apply the offset. It then adds the offset to a norm weight when the checkpoint still
+  has an unconverted `conv1d`, or when that weight's original key does not start with
+  `language_model.`. So a key with the HF prefix always gets the offset. The key prefix
+  (`model.language_model.` versus `language_model.model.`) is therefore the signal for whether
+  the offset is already in the stored weights.
+
+  The vision side reuses 7.3b's tower, but not its loader routing:
+  - 7.3b's float path (`Qwen3VlVisionTower.visionWeights`) maps only the HF `model.visual.` and
+    `model.language_model.` keys. A float mlx-vlm artifact (for example `-bf16`) would therefore
+    be rejected for missing keys; this is inferred from the code, not run.
+  - 7.3b's affine path expects a channels-last patch embedding and rejects any other layout
+    (`validateVisionShapes`); it does not detect or convert the axis order.
+
+  The `qwen3_5` loader must choose the prefix mapping from the keys and the patch-embedding axis
+  order from the tensor shape, independently of quantization.
+- **A recurrent-state cache beside the KV cache.** It holds the convolution state and the
+  delta-rule state. It cannot be truncated or slid, so its interaction with `KVCachePolicy` and
+  `BatchGenerationScheduler` cohorts must be defined, and recorded so that Phase 9.2's prefix
+  cache can reuse it (whole-prefix reuse only).
+- **The delta-rule implementation.** Start with a chunked prefill and per-token decode built from
+  existing ops. Pull forward custom Metal kernels (Phase 14 milestone 3, the 13
+  `mlx_fast_metal_kernel_*` bindings) only if a measured benchmark shows the ops path is
+  inadequate.
+- **The reference environment.** The Qwen3.8 config records Transformers 5.8.0.dev0, while
+  `tools/hf-reference` pins 4.57.6. The milestone needs its own locked reference environment, or
+  a reviewed upgrade of the shared one.
+
+**Verification:**
+- **Tier-A:** a synthetic hybrid checkpoint against strict float32 Hugging Face logits. Its config
+  must cover what the Tier-B artifact does not and Qwen3.8-27B uses: more linear value heads than
+  key heads (27B: 48 versus 16; 0.8B: 16 versus 16), an untied output head (27B is untied, 0.8B is
+  tied) and `output_gate_type`. The Qwen3.8 config sets `output_gate_type` to `swish`, but
+  Transformers' `qwen3_5` code on main does not read the key, so the sub-plan records its effect
+  in the pinned reference before relying on it.
+- **Tier-B:** `Qwen/Qwen3.5-0.8B` (Apache-2.0, same `model_type`), in the HF layout.
+- **Manual run:** a recorded `mlx-community/Qwen3.8-27B-4bit` run (Apache-2.0), in the mlx-vlm
+  layout, with text and image+text greedy IDs matching mlx-vlm. Its quantization (affine 4-bit,
+  group size 64) is a format jmlx already loads. Its tensor layout is not (see above).
+- **Converted layouts:** Tier-A fixtures converted from the HF-layout synthetic checkpoint cover
+  `mlx_lm` (text-only) and float mlx-vlm (the case the shape-based detection exists for). The
+  conversion runs the real converters, not a Java-side conversion, so the layout is tested
+  independently. They run in a hash-locked environment with recorded provenance, like the other
+  reference tools. `tools/qwen-vl-reference` already locks `mlx-vlm` 0.3.9 and `mlx-lm` 0.29.1
+  for 7.3b, but those versions predate `qwen3_5`. The sub-plan either re-locks that tool at
+  converter versions that support `qwen3_5` (the 27B was converted with mlx-vlm 0.6.8) or adds a
+  separate tool, and records the converter versions with each fixture.
+
+**Gate:**
+- Tier-A prefill and multi-step cached-decode logits match HF in `float32GoldenTest`, for text,
+  image+text and text-only-through-the-same-model cases, and cached decode agrees with the full
+  forward.
+- Every converted-layout fixture loads and matches the HF-layout logits.
+- The Tier-B test asserts both the exact greedy IDs and the exact decoded output of the
+  end-to-end `generate`, as 7.3b's `TierBQwen3VlTest` does.
+- The 27B run is recorded with greedy IDs matching mlx-vlm.
+- The compatibility-matrix row is added.
+
+Not included (see Explicit deferrals): the shared-expert MoE variants, Qwen3.8-Flash-Next,
+multi-token-prediction heads and the mxfp4/nvfp4/mxfp8 checkpoints.
+
+7.6 is the last Phase 7 milestone. Phase 8's releases follow once Phase 7 is done, so the first
+native release ships the runtime 7.6 was verified on.
 
 ## Cross-cutting verification
 
@@ -678,9 +939,14 @@ The outcome is go (which spawns its own `phase7-4-<x>-plan.md`) or a dated defer
 
 ## Explicit deferrals
 
-- Training-mode `Dropout`/`BatchNorm`, loss gradients and optimizers (Phase 11).
+- Training-mode `Dropout`/`BatchNorm`, loss gradients and optimizers (Phase 13).
 - Bag/sparse embedding variants, and flattening `mlx_repeat`, until a workload needs them.
 - `qwen3_moe`, `qwen3_vl_moe`, video input, and parsing of `<think>` output.
+- From 7.6 (added 2026-10-29):
+  - the shared-expert MoE `qwen3_5` variants (Qwen3.5/3.6-35B-A3B);
+  - Qwen3.8-Flash-Next (`qwen4_exp`);
+  - multi-token-prediction heads, which are ignored at load (speculative decoding is separate);
+  - mxfp4, nvfp4 and mxfp8 checkpoints.
 - Batched scheduling of seq2seq and image requests.
 - PaliGemma, and audio/diffusion implementation (pending 7.4).
-- General indexing, FFT and linalg beyond the slices named in 7.1 (Phases 8–9).
+- General indexing, FFT and linalg beyond the slices named in 7.1 (Phases 10–11).

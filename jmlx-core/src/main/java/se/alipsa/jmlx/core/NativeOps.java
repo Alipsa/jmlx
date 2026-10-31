@@ -21,7 +21,7 @@ import se.alipsa.jmlx.memory.MLXScope;
  * Package-private plumbing shared by every op class in {@code se.alipsa.jmlx.core}: the resolved
  * default device/stream, the status-checking helpers, and the {@code (res, operand..., stream)}
  * op-body shapes ({@link #binaryOp}, {@link #unaryOp}, {@link #shapeOp}) that {@link MLXOps} and
- * {@link MLXShape} build every op on. See req/phase4-plan.md §1 -- this class is the split's
+ * {@link MLXShape} build every op on. See req/plans/phase4-plan.md §1 -- this class is the split's
  * foundation layer: every other class in this package may depend on it, but it depends on nothing
  * else here.
  */
@@ -96,9 +96,9 @@ final class NativeOps {
   }
 
   /**
-   * Innermost scope among all non-null {@code operands} (req/phase4-plan.md §2). Touches every
-   * non-null operand's {@link MLXArray#scope()}, so each one's {@code checkAccess()} runs -- this
-   * is what stops a multi-operand op from silently bypassing {@link MLXScope}'s confinement
+   * Innermost scope among all non-null {@code operands} (req/plans/phase4-plan.md §2). Touches
+   * every non-null operand's {@link MLXArray#scope()}, so each one's {@code checkAccess()} runs --
+   * this is what stops a multi-operand op from silently bypassing {@link MLXScope}'s confinement
    * contract for every operand but the one its target happens to be picked from.
    *
    * <p>Precondition: at least one operand is non-null -- the caller always passes the primary input
@@ -133,7 +133,7 @@ final class NativeOps {
   /**
    * Allocates the result into {@code target} instead of {@code a.scope()} -- e.g. {@code
    * Linear.forward} computing {@code transpose(W, x.scope())} so the view lands in the step scope
-   * rather than leaking into the model scope (req/phase4-plan.md §5). {@code target} must be
+   * rather than leaking into the model scope (req/plans/phase4-plan.md §5). {@code target} must be
    * related to {@code a.scope()} -- either an ancestor OR a descendant of it -- checked via {@link
    * MLXScope#innermost}, not {@link MLXScope#isAncestorOf} alone: unlike {@link MLX#hoist}, which
    * only ever narrows toward an ancestor, this overload is also used to push a result INTO a
@@ -245,10 +245,10 @@ final class NativeOps {
 
   /**
    * Wraps the {@code (res, a, int, stream)} native shape shared by {@code mlx_expand_dims}, {@code
-   * mlx_tril} and {@code mlx_triu} (req/phase4-plan.md §7's Native surface table). Unlike {@code
-   * axis2Op}, this is a single caller-supplied int -- an axis for {@code expandDims}, a diagonal
-   * offset {@code k} for {@code tril}/{@code triu} -- not necessarily an axis in every case, so the
-   * parameter is named generically in the functional interface below.
+   * mlx_tril} and {@code mlx_triu} (req/plans/phase4-plan.md §7's Native surface table). Unlike
+   * {@code axis2Op}, this is a single caller-supplied int -- an axis for {@code expandDims}, a
+   * diagonal offset {@code k} for {@code tril}/{@code triu} -- not necessarily an axis in every
+   * case, so the parameter is named generically in the functional interface below.
    */
   static MLXArray axisOp(String opName, MLXArray a, int param, AxisOp op) {
     return axisOp(opName, a, a.scope(), param, op);
@@ -272,7 +272,7 @@ final class NativeOps {
    * The native "null" for a by-value nullable {@code mlx_array} parameter (e.g. {@code
    * mlx_fast_rms_norm}'s {@code weight}, {@code mlx_random_normal}'s {@code key}): a zero-{@code
    * ctx} struct, never {@link MemorySegment#NULL} -- passing {@code MemorySegment.NULL} where mlx-c
-   * expects a by-value struct is a segfault, not an exception (req/phase4-plan.md, Research
+   * expects a by-value struct is a segfault, not an exception (req/plans/phase4-plan.md, Research
    * findings). {@link SegmentAllocator#allocate}'s contract makes no zero-fill guarantee (only
    * {@link Arena#ofConfined()}/{@code ofShared()} document zero-initialization, and {@code
    * SegmentAllocator.slicingAllocator} explicitly hands back reused, non-zeroed slices), so the
@@ -286,13 +286,13 @@ final class NativeOps {
   }
 
   /**
-   * The native encoding of an {@code mlx_optional_float} by-value struct (req/phase4-plan.md §7's
-   * Native surface table: 8 bytes, {@code {float value; bool has_value;}}, no native constructor
-   * function -- allocate and set both fields, the same shape spec §6 describes for the sibling
-   * {@code mlx_optional_int}). {@code value == null} encodes "absent" ({@code has_value=false});
-   * the {@code value} field is left at {@code 0f} in that case, which mlx-c never reads (see {@code
-   * mlx_optional_float_.value}'s getter contract -- it is caller-supplied storage, not itself
-   * consulted for validity).
+   * The native encoding of an {@code mlx_optional_float} by-value struct (req/plans/phase4-plan.md
+   * §7's Native surface table: 8 bytes, {@code {float value; bool has_value;}}, no native
+   * constructor function -- allocate and set both fields, the same shape spec §6 describes for the
+   * sibling {@code mlx_optional_int}). {@code value == null} encodes "absent" ({@code
+   * has_value=false}); the {@code value} field is left at {@code 0f} in that case, which mlx-c
+   * never reads (see {@code mlx_optional_float_.value}'s getter contract -- it is caller-supplied
+   * storage, not itself consulted for validity).
    */
   static MemorySegment optFloat(Arena tmp, Float value) {
     MemorySegment seg = mlx_optional_float_.allocate(tmp);
@@ -302,8 +302,8 @@ final class NativeOps {
   }
 
   /**
-   * The native encoding of an {@code mlx_optional_int} by-value struct (req/phase4-plan.md §8's
-   * Native surface table: 8 bytes, {@code {int value; bool has_value;}}, no native constructor
+   * The native encoding of an {@code mlx_optional_int} by-value struct (req/plans/phase4-plan.md
+   * §8's Native surface table: 8 bytes, {@code {int value; bool has_value;}}, no native constructor
    * function -- same shape as {@link #optFloat}, for {@code mlx_quantize}/{@code mlx_dequantize}/
    * {@code mlx_quantized_matmul}'s {@code group_size}/{@code bits} parameters). {@code value ==
    * null} encodes "absent" ({@code has_value=false}); native applies its own default in that case
@@ -342,8 +342,8 @@ final class NativeOps {
    * Returns a NUL-terminated C string for {@code s}, allocated in {@link #FACADE_ARENA} at most
    * once per distinct literal -- for the closed-set {@code const char*} parameters this facade's
    * mlx-c surface uses (SDPA's {@code mask_mode}), which never need per-call allocation
-   * (req/phase4-plan.md §7's Native surface table). Callers store the result in a {@code private
-   * static final MemorySegment} field per distinct literal, exactly like {@link
+   * (req/plans/phase4-plan.md §7's Native surface table). Callers store the result in a {@code
+   * private static final MemorySegment} field per distinct literal, exactly like {@link
    * #DEFAULT_CPU_STREAM}. Backed by an intern cache keyed on {@code s} so that even an accidental
    * per-call use never grows {@link #FACADE_ARENA} beyond one segment per distinct literal ever
    * seen -- the intended static-initializer-only discipline is structural, not just documented.
@@ -381,7 +381,7 @@ final class NativeOps {
    * Wraps an op taking an {@code mlx_vector_array} <em>input</em> by value (e.g. {@code
    * mlx_concatenate_axis}) plus a caller-supplied {@code axis}. Resolves the result's scope via
    * {@link #scopeOf} over every element of {@code xs} -- the ancestor rule generalized to N
-   * operands (req/phase4-plan.md §3). Builds the {@code mlx_vector_array} itself via {@link
+   * operands (req/plans/phase4-plan.md §3). Builds the {@code mlx_vector_array} itself via {@link
    * #copyHandlesInto} rather than delegating to {@code MLX.newVectorArray}: this class depends on
    * nothing else in this package (see the class javadoc), and calling into {@code MLX} here would
    * be the one exception. {@code vec} must be freed after the call: its backing {@code
@@ -421,10 +421,10 @@ final class NativeOps {
   /**
    * Wraps an op producing an {@code mlx_vector_array} <em>output</em> (e.g. {@code mlx_split}).
    * {@code target} is an explicit parameter, not inferred from an operand, purely for legibility
-   * (req/phase4-plan.md §3: "its inputs may be none" was a false justification in an earlier draft
-   * of that document -- {@code mlx_split}'s {@code a} operand does exist -- the real reason is that
-   * this helper's whole hazard is two allocators with opposite correct answers on adjacent lines,
-   * and naming the target in the signature keeps that contrast visible at the call site).
+   * (req/plans/phase4-plan.md §3: "its inputs may be none" was a false justification in an earlier
+   * draft of that document -- {@code mlx_split}'s {@code a} operand does exist -- the real reason
+   * is that this helper's whole hazard is two allocators with opposite correct answers on adjacent
+   * lines, and naming the target in the signature keeps that contrast visible at the call site).
    *
    * <p>{@code op} is invoked with only {@code (vec, stream)}; any other native parameters (the
    * source array, {@code num_splits}, an axis, ...) are captured by the caller's lambda, the same
@@ -491,11 +491,11 @@ final class NativeOps {
    * Reads a borrowed, NUL-terminated {@code const char*}/{@code char*} into a Java {@code String}.
    * {@code ptr} must outlive this call but is never freed by it -- every accessor {@link MLXIO}
    * uses this for ({@code mlx_string_data}, {@code mlx_vector_string_get}, the two map iterator/get
-   * families) returns a pointer into storage some other handle already owns (req/phase5-plan.md's
-   * Research findings). {@code reinterpret} is required before {@code getString}: a raw pointer
-   * value read out of a struct field or written into an out-param slot comes back as a zero-length
-   * segment with no declared bounds, and {@code getString} on one throws {@code
-   * IndexOutOfBoundsException} rather than reading anything.
+   * families) returns a pointer into storage some other handle already owns
+   * (req/plans/phase5-plan.md's Research findings). {@code reinterpret} is required before {@code
+   * getString}: a raw pointer value read out of a struct field or written into an out-param slot
+   * comes back as a zero-length segment with no declared bounds, and {@code getString} on one
+   * throws {@code IndexOutOfBoundsException} rather than reading anything.
    */
   static String readNativeString(MemorySegment ptr) {
     return ptr.reinterpret(Long.MAX_VALUE).getString(0);

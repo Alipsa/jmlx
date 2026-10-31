@@ -2,10 +2,10 @@
 
 ## Context
 
-`req/project-outline.md` describes Phase 3 in four bullets. `req/initial-plan.md` covered Phases 1+2
+`req/project-outline.md` describes Phase 3 in four bullets. `req/plans/initial-plan.md` covered Phases 1+2
 plus a thin op slice and is merged (`dd4fddf`). This document covers the rest of Phase 3.
 
-**It addresses a different kind of risk from `req/initial-plan.md`, and is long for a different
+**It addresses a different kind of risk from `req/plans/initial-plan.md`, and is long for a different
 reason.** `initial-plan.md` ran 568 lines because v0.1's unknowns were *native*: whether jextract
 could consume `mlx/c/mlx.h` at all, whether mlx-c's by-value structs survive the FFM boundary,
 whether `mlx.metallib` could be found at runtime. Length there bought **de-risking** — probes and
@@ -739,7 +739,7 @@ joint eval depending on the fixture used.)
   (`initial-plan.md` §6), so a genuinely thread-safe `eval` would contradict the memory model the
   project already committed to — but it is a substitution, not the literal deliverable. Amend that
   outline line to say "thread-confined, enforced" so a later reader does not score it as unmet.
-* `MLX.java`'s class javadoc cites `req/initial-plan.md §7`; add this document.
+* `MLX.java`'s class javadoc cites `req/plans/initial-plan.md §7`; add this document.
 * `jmlx-examples/HelloMLX`: add one broadcast `add` and one multi-array `eval`, so the two behavioural
   changes in this phase are visible in the demo rather than only in tests.
 

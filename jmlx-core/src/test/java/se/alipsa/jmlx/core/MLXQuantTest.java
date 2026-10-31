@@ -10,7 +10,7 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
+ * See req/plans/initial-plan.md, Testing approach, "Numeric correctness": every facade op against
  * hand-computed values. Fixture (this file's default, unless a row is specifically testing a
  * different value): {@code w[i] = i * 0.1f - 3.2f} for {@code i} in {@code 0..63}, shape {@code
  * [1,64]}, {@code group_size=32}, {@code bits=4}, {@code mode="affine"} -- pinned to the exact

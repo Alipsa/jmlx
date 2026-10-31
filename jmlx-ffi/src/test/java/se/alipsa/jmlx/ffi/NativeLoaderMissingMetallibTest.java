@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * See req/initial-plan.md, Testing approach, "Loader guard".
+ * See req/plans/initial-plan.md, Testing approach, "Loader guard".
  *
  * <p>Runs ONLY via the {@code :jmlx-ffi:loaderGuardTest} Gradle task, which forks its own JVM with
  * {@code jmlx.library.path} pointed at a disposable copy of {@code native/install/lib} with {@code

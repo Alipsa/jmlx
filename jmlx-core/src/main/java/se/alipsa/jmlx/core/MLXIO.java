@@ -15,7 +15,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /**
  * Checkpoint I/O: a thin facade over mlx-c's own safetensors/GGUF load and save, not a hand-rolled
- * parser (req/phase5-plan.md D1). Joins {@link MLXQuant}/{@link MLXRandom}/{@link MLXGrad} as
+ * parser (req/plans/phase5-plan.md D1). Joins {@link MLXQuant}/{@link MLXRandom}/{@link MLXGrad} as
  * another native-facing facade inside {@code core} (D2) -- see {@link MLX}'s javadoc for the full
  * sibling index.
  */

@@ -9,7 +9,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Multi-head self-attention with a fused QKV projection and optional KV caching: {@code x -> qkv ->
  * split -> per-head RoPE -> (optional cache append) -> causal-or-not SDPA -> merge heads -> output
- * projection}. See req/phase4-plan.md §7.
+ * projection}. See req/plans/phase4-plan.md §7.
  *
  * <p>Not a {@link UnaryModule}: {@link #forward} takes a {@link KVCache} and a causal flag in
  * addition to {@code x} -- this class is exactly the kind of composite module that motivates {@code

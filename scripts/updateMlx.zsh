@@ -7,7 +7,7 @@
 #
 # Deliberately does NOT touch MLX_METAL_VERSION/URL/SHA256: mlx-c is
 # versioned independently of MLX, and bootstrap-native.sh's own
-# version-pairing assertion (req/initial-plan.md Decision 9) already checks
+# version-pairing assertion (req/plans/initial-plan.md Decision 9) already checks
 # the new commit's CMakeLists.txt GIT_TAG against the currently pinned
 # mlx-metal version and fails loudly on a mismatch -- this script does not
 # need to duplicate that check. scripts/checkDependencies.zsh's mlx-metal
@@ -112,4 +112,4 @@ log "     Java build, native coverage evidence, and oracle fixture against the n
 log "  4. git diff --exit-code jmlx-ffi/src/main/generated/java -- if this is non-empty, the bindings actually changed; review the diff."
 log "  5. git diff req/mlx-api-inventory.md req/mlx-api-header-coverage.md -- review both regenerated API reports."
 log "  6. git diff scripts/bootstrap-native.sh tools/mlx-oracle/provenance.json tools/mlx-oracle/requirements.lock -- review every repinned source of truth."
-log "  7. req/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."
+log "  7. req/plans/initial-plan.md's Decision 9 and its research findings still name the old commit ($OLD_COMMIT) and version in prose -- this script does not edit markdown; update that text by hand if this repin is meant to stick."

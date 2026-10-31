@@ -12,7 +12,7 @@ import se.alipsa.jmlx.ffi.mlx_h;
 import se.alipsa.jmlx.memory.MLXScope;
 
 /**
- * See req/initial-plan.md, Verification, item 9: a device query alone succeeds even with the
+ * See req/plans/initial-plan.md, Verification, item 9: a device query alone succeeds even with the
  * metallib missing (mlx-c can report a device type without ever dispatching a kernel); only a
  * kernel dispatch proves the stack. Combines a real kernel dispatch (matmul, already covered
  * elementwise by {@link MLXNumericTest}) with an explicit assertion that the default device is GPU,

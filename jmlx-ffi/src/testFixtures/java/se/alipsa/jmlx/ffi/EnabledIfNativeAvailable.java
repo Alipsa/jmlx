@@ -13,9 +13,9 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * Skips a test unless {@link NativeLoader#ensureLoaded()} succeeds.
  *
  * <p>Delegates to {@code NativeLoader}'s own resolution rather than probing for a directory
- * independently (req/initial-plan.md, Testing approach): divergent logic between the skip gate and
- * the loader produces false skips (library present via system property, tests silently do not run)
- * and false failures (directory present, dylib wrong arch).
+ * independently (req/plans/initial-plan.md, Testing approach): divergent logic between the skip
+ * gate and the loader produces false skips (library present via system property, tests silently do
+ * not run) and false failures (directory present, dylib wrong arch).
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})

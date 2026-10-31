@@ -10,8 +10,8 @@ import se.alipsa.jmlx.memory.MLXScope;
  * and stored in the checkpoint's {@code [out, in]} layout -- never transposed before registration;
  * {@link #forward} transposes a fresh view per call via {@link MLXShape#transpose(MLXArray,
  * MLXScope)}'s explicit-target overload, landing it in {@code x.scope()} (the step scope), not
- * {@code weight}'s own (model) scope. This is req/phase4-plan.md §2's withdrawn-cache mitigation
- * record -- do not reintroduce a cached {@code W.T} field.
+ * {@code weight}'s own (model) scope. This is req/plans/phase4-plan.md §2's withdrawn-cache
+ * mitigation record -- do not reintroduce a cached {@code W.T} field.
  */
 public final class Linear extends UnaryLayer {
 

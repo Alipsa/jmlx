@@ -50,7 +50,7 @@ which was added in that commit. Check before starting:
   (6-token prompt × top-2 = 12 slots). The sorted path and half precision are anchored by
   Task 3's closed-form tests, not by the golden.
 - Memory model: every per-call view of a model-scope weight (the `swapaxes` feeding `gather_mm`)
-  is allocated into `x.scope()`, never into the weight's model scope (req/phase4-plan.md §2,
+  is allocated into `x.scope()`, never into the weight's model scope (req/plans/phase4-plan.md §2,
   mitigation 1 — the same rule `Linear.forward` follows with `transpose(W, x.scope())`).
 - Autograd must keep working through `MoeMlp` (`ModuleGrad`): routing indices go through
   `MLXOps.stopGradient` before `gather_mm` (see Verified facts, item 4).
@@ -202,7 +202,7 @@ under that path. Task 1 Step 4 and the acceptance gate both depend on this task.
 
 Excluding the directory is the durable fix: any Claude Code worktree recreates the same
 problem. Removing this particular worktree is optional cleanup. It has an untracked
-`req/phase5-plan.md` that differs from the main checkout's copy, so don't run `git worktree
+`req/plans/phase5-plan.md` that differs from the main checkout's copy, so don't run `git worktree
 remove --force` without the user's say-so.
 
 **Files:**
@@ -925,7 +925,7 @@ public final class SwitchGlu extends Module {
     MLXScope s = x.scope();
     // gather_mm has no VJP with respect to its indices; routing is not differentiable anyway.
     MLXArray idx = MLXOps.stopGradient(indices);
-    // Weight views go into the caller's scope, never the model scope (req/phase4-plan.md §2).
+    // Weight views go into the caller's scope, never the model scope (req/plans/phase4-plan.md §2).
     MLXArray gateT = MLXShape.swapaxes(param("gateWeight"), s, -1, -2);
     MLXArray upT = MLXShape.swapaxes(param("upWeight"), s, -1, -2);
     MLXArray downT = MLXShape.swapaxes(param("downWeight"), s, -1, -2);

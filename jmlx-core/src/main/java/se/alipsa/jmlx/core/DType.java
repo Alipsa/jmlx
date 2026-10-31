@@ -3,8 +3,8 @@ package se.alipsa.jmlx.core;
 import se.alipsa.jmlx.ffi.mlx_h;
 
 /**
- * The mlx-c dtype constants supported by this slice. See req/initial-plan.md, Out of scope, and
- * req/phase4-plan.md §4.
+ * The mlx-c dtype constants supported by this slice. See req/plans/initial-plan.md, Out of scope,
+ * and req/plans/phase4-plan.md §4.
  */
 public enum DType {
   FLOAT32(mlx_h.MLX_FLOAT32(), true),

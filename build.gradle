@@ -1,7 +1,7 @@
 /*
  * Root build script. Config shared by jmlx-ffi, jmlx-core, jmlx-tokenizer,
  * jmlx-jinja, jmlx-vision, jmlx-models, jmlx-examples and jmlx-benchmarks lives here; each module's build.gradle
- * declares its plugin and dependencies. See req/initial-plan.md §4 for the
+ * declares its plugin and dependencies. See req/plans/initial-plan.md §4 for the
  * rationale behind the native-access flags and the native-directory system
  * property below.
  */
@@ -890,7 +890,7 @@ subprojects {
 
     // jmlx-ffi/src/main/generated/java is committed jextract output, not
     // hand-written -- scripts/regen-bindings.sh is the only thing allowed to
-    // touch it, and req/initial-plan.md's bindings-drift check asserts it
+    // touch it, and req/plans/initial-plan.md's bindings-drift check asserts it
     // stays byte-identical to that output. Spotless never sees it because
     // its `target` below only globs src/main/java, not .../generated/java;
     // jmlx-ffi/build.gradle does the equivalent for checkstyleMain, since
@@ -939,7 +939,7 @@ subprojects {
         testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitJupiterVersion}"
     }
 
-    // req/initial-plan.md §4: an absolute path, since native/install/lib is
+    // req/plans/initial-plan.md §4: an absolute path, since native/install/lib is
     // CWD-relative and resolves differently under :jmlx-core:test, an IDE
     // run, and :jmlx-examples:run. Computing the path string here touches no
     // filesystem state (no exists() check), so it stays safe if

@@ -7,7 +7,7 @@
 #
 # For mlx-metal specifically: mlx-c is versioned independently of MLX (mlx-c
 # v0.6.0 pins MLX v0.31.2 via its own CMakeLists.txt GIT_TAG -- see
-# req/initial-plan.md Decision 9), so a newer mlx-metal wheel does not imply
+# req/plans/initial-plan.md Decision 9), so a newer mlx-metal wheel does not imply
 # any particular mlx-c tag. When a newer mlx-metal version is found, this
 # script also searches mlx-c's tags (newest first) for the one whose
 # CMakeLists.txt pins that exact version, and prints the matching commit --
@@ -218,7 +218,7 @@ elif [[ "$MLX_METAL_CURRENT" == "$MLX_METAL_LATEST" ]]; then
 else
   log "mlx-metal: $MLX_METAL_CURRENT -> $MLX_METAL_LATEST available"
   UPDATES_FOUND=1
-  log "Looking for the mlx-c tag that pins MLX v$MLX_METAL_LATEST (mlx-c's own CMakeLists.txt GIT_TAG, req/initial-plan.md Decision 9)..."
+  log "Looking for the mlx-c tag that pins MLX v$MLX_METAL_LATEST (mlx-c's own CMakeLists.txt GIT_TAG, req/plans/initial-plan.md Decision 9)..."
 
   MATCH="$(find_mlx_c_commit_for_mlx_version "$MLX_METAL_LATEST")"
   FIND_STATUS=$?

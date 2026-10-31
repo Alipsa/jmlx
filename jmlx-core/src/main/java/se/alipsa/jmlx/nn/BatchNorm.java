@@ -9,7 +9,7 @@ import se.alipsa.jmlx.memory.MLXScope;
 /**
  * Eval-only channels-last batch normalization for ranks 2-4. Without tracking, eval recomputes
  * batch statistics. Registered running statistics are floating parameters: ModuleGrad includes them
- * even after freeze(), since per-key freezing/buffers are deferred to Phase 11.
+ * even after freeze(), since per-key freezing/buffers are deferred to Phase 13.
  */
 public final class BatchNorm extends Normalization {
   private final boolean trackRunningStats;
@@ -51,7 +51,7 @@ public final class BatchNorm extends Normalization {
   @Override
   public MLXArray forward(MLXArray x) {
     if (isTraining()) {
-      throw new UnsupportedOperationException("BatchNorm training requires Phase 11");
+      throw new UnsupportedOperationException("BatchNorm training requires Phase 13");
     }
     validate(x, 2, 4);
     int[] axes = IntStream.range(0, x.ndim() - 1).toArray();

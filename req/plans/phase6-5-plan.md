@@ -270,7 +270,7 @@ constraint covers all of `jmlx-core`, not just the scheduler, it is a public-con
 backstops in `MLXScope` (`mlx_array_free`) and `MLXGrad.Fn`
 (`mlx_closure_free`/`mlx_closure_value_and_grad_free`, plus its upcall arena) run on the JVM Cleaner
 thread when a scope or function is never closed. The array free is the unresolved cross-thread-free
-question in `req/initial-plan.md` (Open questions); the closure frees are a related but separate
+question in `req/plans/initial-plan.md` (Open questions); the closure frees are a related but separate
 case that question does not cover. The Javadoc and README name both paths and link the question
 rather than claim the rule holds absolutely; callers avoid them by always closing scopes and
 functions, which the scheduler's worker does. If probe (b) shows any instability, add probe (c),

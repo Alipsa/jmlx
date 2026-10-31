@@ -19,12 +19,12 @@ import se.alipsa.jmlx.memory.MLXScope;
  *
  * <p>{@code append} explicitly closes the superseded {@code keys}/{@code values} handle after
  * hoisting each replacement -- safe because an mlx {@code ArrayDesc} owns its graph inputs by value
- * (req/phase4-plan.md §2, Research findings): the freshly concatenated array's graph holds its own
- * copy of the superseded array's wrapper, sharing the same descriptor, so closing this class's own
- * handle only decrements a refcount it does not solely own. Without this, active memory would grow
- * by one full copy of "everything appended so far" every step -- {@code O(N^2)} in total appended
- * length after {@code N} steps, not {@code O(N)} -- exactly the shape req/phase4-plan.md's Context
- * section opens with.
+ * (req/plans/phase4-plan.md §2, Research findings): the freshly concatenated array's graph holds
+ * its own copy of the superseded array's wrapper, sharing the same descriptor, so closing this
+ * class's own handle only decrements a refcount it does not solely own. Without this, active memory
+ * would grow by one full copy of "everything appended so far" every step -- {@code O(N^2)} in total
+ * appended length after {@code N} steps, not {@code O(N)} -- exactly the shape
+ * req/plans/phase4-plan.md's Context section opens with.
  *
  * <p>The {@code O(N)} guarantee above is for retained <em>data</em>, not for the work a caller who
  * never forces evaluation defers: if {@code N} {@code append}s happen with no intervening {@link

@@ -11,19 +11,19 @@ import se.alipsa.jmlx.ffi.mlx_stream_;
 
 /**
  * Owns the {@code mlx_array} native handles allocated on it and frees them in reverse insertion
- * order on {@link #close()}. See req/initial-plan.md §6 and req/phase4-plan.md §2.
+ * order on {@link #close()}. See req/plans/initial-plan.md §6 and req/plans/phase4-plan.md §2.
  *
  * <p>Thread-safety contract: an {@code MLXScope} and the {@code MLXArray}s it owns are confined to
  * the thread that created the scope. The sole exception is the JVM's {@link Cleaner} thread
  * invoking the backstop below, which is why the backstop touches only {@link Holder} and never the
  * scope itself.
  *
- * <p>req/phase4-plan.md §2: a scope may have a {@link #parent()}, formed via {@link #newChild()}.
- * {@link #newChild()} calls {@link #checkAccess()} on the parent first, so a child always has the
- * same owner thread as its parent, by construction -- ancestor-related scopes are therefore
- * same-thread automatically, which is why the ancestor rule used by op helpers (see {@code
- * NativeOps.scopeOf} in {@code se.alipsa.jmlx.core}) is an ownership-comprehensibility invariant,
- * not a confinement guard.
+ * <p>req/plans/phase4-plan.md §2: a scope may have a {@link #parent()}, formed via {@link
+ * #newChild()}. {@link #newChild()} calls {@link #checkAccess()} on the parent first, so a child
+ * always has the same owner thread as its parent, by construction -- ancestor-related scopes are
+ * therefore same-thread automatically, which is why the ancestor rule used by op helpers (see
+ * {@code NativeOps.scopeOf} in {@code se.alipsa.jmlx.core}) is an ownership-comprehensibility
+ * invariant, not a confinement guard.
  *
  * <p>Streams: MLX streams are bound to the operating-system thread that created them -- a stream
  * created on one thread cannot run ops from another ("There is no Stream(gpu, N) in current
@@ -114,7 +114,7 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
     // O(n) scan -- an explicit close of n arrays would otherwise be O(n^2).
     // Insertion order is preserved for closeAll()'s reverse-order free.
     private final LinkedHashSet<MemorySegment> handles = new LinkedHashSet<>();
-    // req/phase4-plan.md §2: a child scope's Holder is added here by the
+    // req/plans/phase4-plan.md §2: a child scope's Holder is added here by the
     // child's constructor (capturing only the child's Holder, never its
     // MLXScope -- same capture rule as `cleanable` below). closeAll()
     // cascades these in reverse insertion order before freeing this
@@ -181,7 +181,7 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
       // ArrayDesc owns its graph inputs by value (std::vector<array>), and
       // each array is a shared_ptr<ArrayDesc>, so freeing a child's handles
       // only decrements a refcount -- it cannot touch a graph a hoisted
-      // output still references (req/phase4-plan.md §2, Research findings).
+      // output still references (req/plans/phase4-plan.md §2, Research findings).
       // Order relative to this Holder's own handles is otherwise immaterial
       // for that reason, but children-first is what makes a Cleaner-driven
       // cascade of an unreachable parent free every still-reachable child's
@@ -191,7 +191,7 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
         toClose[i].closeAll();
       }
       children.clear();
-      // Open question (req/initial-plan.md, Open questions): whether
+      // Open question (req/plans/initial-plan.md, Open questions): whether
       // mlx_array_free is safe to call from the Cleaner thread rather
       // than the scope's owning thread. Not resolved by the §2 probe;
       // implemented as specified pending that determination -- see the

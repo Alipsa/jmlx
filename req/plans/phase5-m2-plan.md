@@ -1,6 +1,6 @@
 # jmlx Phase 5 — M2 implementation plan (`jmlx-tokenizer`, byte-level BPE + chat templates)
 
-Concrete task-by-task plan for `req/phase5-plan.md`'s M2. The architecture question that document's
+Concrete task-by-task plan for `req/plans/phase5-plan.md`'s M2. The architecture question that document's
 own D3 left open is now resolved by explicit decision, not desk research: **pure-Java port**, as a new
 `jmlx-tokenizer` Gradle module (sibling to `jmlx-ffi`/`jmlx-core`/`jmlx-examples`, not a package inside
 `jmlx-core`) — chosen over a standalone repo because it has no external reuse target yet and over the
@@ -12,7 +12,7 @@ considered.
 **Amendment: `hfjinja` was migrated into this repository as `jmlx-jinja`.** Every reference below to
 `se.alipsa:hfjinja:0.5.0`, its resolution from Maven Central/`mavenLocal()`, the `hfjinja` version
 catalog alias, and `implementation libs.hfjinja` describes the design as of this plan's original
-spike and is no longer how the shipped module resolves the dependency — see `req/phase5-plan.md`'s
+spike and is no longer how the shipped module resolves the dependency — see `req/plans/phase5-plan.md`'s
 own "the Jinja port now lives in this repository" amendment for the current shape. `jmlx-tokenizer`
 now declares `api project(':jmlx-jinja')` and imports `se.alipsa.jmlx.jinja.Template` /
 `se.alipsa.jmlx.jinja.JinjaException`, not the `se.alipsa.hfjinja` package this document's examples
@@ -20,7 +20,7 @@ still show. [Amended further: `HfJinjaException` was itself renamed to `JinjaExc
 migration, since the package move was already a breaking change for every consumer -- the rest of
 the exception hierarchy (`TemplateSyntaxException`/`TemplateRenderException`) is unchanged.]
 
-**Scope is deliberately narrower than "port swift-transformers."** `req/phase5-plan.md`'s own
+**Scope is deliberately narrower than "port swift-transformers."** `req/plans/phase5-plan.md`'s own
 "ship exactly what's needed" precedent applies: M3's actual named targets are Llama-3-Instruct and
 Qwen2.5-Instruct, and both declare `"tokenizer_class": "PreTrainedTokenizerFast"` backed by a
 byte-level BPE `model.type: "BPE"` in their `tokenizer.json` — not `LlamaTokenizer`'s legacy
@@ -2440,16 +2440,16 @@ git commit -m "Add tokenizer test fixtures (synthetic tokenizer.json + real chat
   `HfTokenizer`, `ChatTemplateRenderer`, and the byte-level-BPE pipeline classes), noting it has **no**
   native dependency and does not participate in the "loading order matters" native-guard discussion at
   all — the first pure-Java module in this codebase.
-- `req/phase5-plan.md`'s Status table: flip M2's row from "Desk-research spike done... architecture
+- `req/plans/phase5-plan.md`'s Status table: flip M2's row from "Desk-research spike done... architecture
   choice still open" to `Done` (or `In progress` if implemented across multiple sittings), recording
   the module (`jmlx-tokenizer`), the chosen architecture (pure-Java, not FFM), and the dependencies
   added (Jackson 3.1.2, hfjinja 0.5.0, both resolved via `mavenLocal()` \[Amended, PR #14 review
   round 4, finding 11: both actually resolve from `mavenCentral()` directly -- `mavenLocal()` is
   enabled alongside it only because `jmlx`'s own project version is a `-SNAPSHOT`; see Task 1's
-  Step 1c amendment above and `req/phase5-plan.md`'s own corrected Status row\]), same convention
-  `req/phase4-plan.md`'s and `req/phase5-plan.md`'s
+  Step 1c amendment above and `req/plans/phase5-plan.md`'s own corrected Status row\]), same convention
+  `req/plans/phase4-plan.md`'s and `req/plans/phase5-plan.md`'s
   own M1 row already use.
-- `req/phase5-plan.md`'s D3 finding about "no official Java equivalent of `swift-jinja` exists" and
+- `req/plans/phase5-plan.md`'s D3 finding about "no official Java equivalent of `swift-jinja` exists" and
   the onig/fancy-regex FFM-path analysis both become historical context once M2 ships via the
   pure-Java path — leave them in place (this document's own convention is to amend, not delete,
   superseded research) but note in the Status table that D3's FFM-vs-pure-Java question is now

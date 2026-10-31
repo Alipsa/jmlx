@@ -36,9 +36,9 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.3c) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
-| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API | 9.0 | 0.x release | not started |
+| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
-| 11 | Numerical, random and specialized compute parity | 11.0 | 0.x release | not started |
+| 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
 | 12 | Autodiff and function-transformation parity | 12.0 | 0.x release | not started |
 | 13 | Training-ready `nn` and optimizer parity | 13.0 | 0.x release | not started |
 | 14 | Runtime, compilation, custom-kernel and distributed parity | 14.0 | 0.x release | not started |
@@ -253,20 +253,33 @@ code.
 
 Milestones, in order:
 
-| Milestone | Scope | Status (2026-10-30) |
+| Milestone | Scope | Status (2026-10-31) |
 | --- | --- | --- |
 | 7.0 Qwen3 text decoders | `qwen3` mapping, per-head QK normalization, affine-quantized loading, Qwen3 chat template; Tier-B Qwen3-0.6B, manual Qwen3-8B 4-bit run | delivered |
 | 7.1 Core inference modules | containers, dropout (eval), activations, convolution and transpose convolution, pooling, padding, upsampling, normalization variants, positional encodings, evaluation losses | implemented; acceptance pending (oracle drift, cross-host CPU fixtures) |
 | 7.2 Encoders and encoder-decoder | BERT-style encoders, cross-attention, T5/Flan-T5 generation, classification and token-classification APIs | implemented; macOS 26 CI acceptance pending |
 | 7.3a Vision foundation + SmolVLM | `jmlx-vision` image preprocessing, SigLIP-style tower, Idefics3 connector, multimodal prompts | delivered; macOS 26 hosted acceptance pending |
 | 7.3b Qwen3-VL | dynamic-resolution preprocessing, multi-axis RoPE, vision tower, DeepStack | delivered; macOS 26 hosted Tier-B pending |
-| 7.3c LLaVA-style connector | `microsoft/Phi-3.5-vision-instruct` (MIT), selected 2026-10-27 | in progress |
-| 7.4 Audio/diffusion decision | a reviewed decision record, not code | not started |
+| 7.3c LLaVA-style connector | `microsoft/Phi-3.5-vision-instruct` (MIT), selected 2026-10-27 | delivered 2026-10-30 |
+| 7.4 Audio/diffusion decision | a reviewed decision record, not code | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`), reviewed via its PR: go — audio scheduled as Phase 11 milestone 11.5, diffusion as Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | paired pin upgrade to the newest release (see § Release and MLX upgrade plan) | not started |
 | 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | not started |
 
 7.4 decides only. A "go" for audio or diffusion schedules its implementation into a later phase
 by a dated roadmap amendment; it does not extend Phase 7.
+
+**Amendment (2026-10-31, from the 7.4 decision record `req/plans/phase7-4-decision.md`):**
+"go" for both modalities. Phase 9 gains milestone **9.6 — Diffusion inference** (SD 1.5-class
+text-to-image in `jmlx-models`; new surface is pure-Java — noise schedulers with PNDM first, the
+artifact's default, then DDPM/DDIM/Euler — plus a sampler loop, VAE wrapper, CLIP text encoder,
+CLIP slow-tokenizer loader and a hash-locked diffusers reference dependency; Tier-B is
+`stable-diffusion-v1-5/stable-diffusion-v1-5` under CreativeML OpenRAIL-M, **accepted in the
+decision record** for a pinned read-only test artifact). Phase 11 gains milestone **11.5 —
+Audio inference** (`openai/whisper-tiny`, apache-2.0; a Java 21 native-free `jmlx-audio` module
+for WAV decode and the Slaney filterbank, a forward-STFT facade in `jmlx-core` on 11.2's
+`MLXFFT`, and the Whisper encoder-decoder in `jmlx-models`; `jmlx-audio` is published, growing
+the published-module invariants to eight). Both milestones carry their
+own exit gates (9.6 and 11.5). Neither extends Phase 7; 7.5 follows 7.4 directly.
 
 **Phase 7 done:** every milestone above is delivered, or deferred with a date; every pending
 acceptance gate listed above (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
@@ -464,6 +477,41 @@ Groovy releases support Java 25; the plan states the supported Groovy version.
 examples from the MLX Python documentation, ported to Groovy, match the Python MLX oracle's
 output.
 
+### 9.6 — Diffusion inference
+
+Scheduled by the 2026-10-31 Phase 7.4 decision (`req/plans/phase7-4-decision.md`):
+SD 1.5-class text-to-image on the delivered 7.1/7.2 surface, in `jmlx-models`
+(the inference-family module home; no new published module). All new surface
+is pure-Java — noise schedulers (**PNDM first** — the artifact's
+`model_index.json` default — then DDPM/DDIM/Euler), the sampler loop, the VAE
+decoder wrapper and the CLIP text encoder — so no new native bindings or
+inventory changes are expected; the 9.6 loader additionally performs the
+legacy attention-key remap (`query`/`key`/`value`/`proj_attn` →
+`to_q`/`to_k`/`to_v`/`to_out.0`) that diffusers does at load time. The
+`model_index.json` default scheduler is pinned for the Tier-B reference, so
+the per-step noise-prediction comparison is meaningful. `jmlx-tokenizer`
+gains a CLIP slow-tokenizer loader over the artifact's own `vocab.json` +
+`merges.txt` (the artifact ships no `tokenizer.json`), reproducing the pinned
+normalization oracle: the reference venv has no ftfy, so the slow tokenizer's
+`BasicTokenizer` fallback (control-character cleaning, CJK splitting, NFC
+normalization, lowercasing, and the whitespace re-collapse after the split)
+is the branch to port, plus the IGNORECASE pre-tokenizer regex, byte encoder
+and `</w>` suffix. The Tier-B reference generator adds
+**diffusers** to the `tools/hf-reference` hash lock (absent today), checked
+against `verifyImageOracleDependencyPins`' shared Pillow/NumPy/Transformers
+pins. The Tier-B artifact is
+`stable-diffusion-v1-5/stable-diffusion-v1-5` (the canonical id; the
+`runwayml/` id redirects to it) under CreativeML OpenRAIL-M, **accepted in the
+7.4 decision record for a pinned read-only test artifact** — the milestone plan
+re-records that acceptance and does not re-open it; the strict Tier-A
+synthetic golden is the binding gate. Scope is text-to-image only (no
+ControlNet/img2img/inpainting).
+
+**Exit gate:** the synthetic Tier-A golden passes at strict tolerance; the
+pinned Tier-B artifact's prompt embedding, per-step noise prediction under
+the pinned PNDM schedule and decoded image match the CPU float32 reference
+within the recorded ε.
+
 **Phase 9 done:** every milestone's exit gate passes and the phase release is published.
 
 ## Phase 10 — Fundamental array, dtype, and indexing parity
@@ -497,9 +545,13 @@ or are recorded as a native-runtime limitation with a tested, documented failure
 
 ## Phase 11 — Numerical, random, and specialized compute parity
 
-**Objective:** expose MLX’s non-neural numerical computation families on the stable array foundation.
+**Objective:** expose MLX’s non-neural numerical computation families on the stable array
+foundation. Milestone 11.5 is the phase’s one non-parity milestone — audio inference,
+scheduled by the 2026-10-31 Phase 7.4 decision (`req/plans/phase7-4-decision.md`) — riding
+milestone 2’s `MLXFFT`.
 
-**MLX upgrade:** 11.0. **Release:** a 0.x release at the end of the phase.
+**MLX upgrade:** 11.0. **Release:** a 0.x release at the end of the phase, including the first
+release of `jmlx-audio`.
 
 Milestones:
 
@@ -512,9 +564,34 @@ Milestones:
 4. Add remaining specialized primitives: segment/reduction operations, sorting/partition/top-k,
    quantization variants, block/segmented matrix operations, and sparse-related APIs if present in the
    pinned C surface.
+5. Audio inference (`openai/whisper-tiny`, the license the artifact declares:
+   apache-2.0), scheduled by the 2026-10-31 Phase 7.4 decision
+   (`req/plans/phase7-4-decision.md`), in three parts:
+   - a new **`jmlx-audio` module (Java 21, native-free, no `jmlx-core`
+     dependency — the `jmlx-vision` precedent):** 16 kHz WAV decode,
+     resampling, window functions, the Slaney filterbank and log scaling. A
+     Java 21 module cannot depend on Java 25 `jmlx-core` class files, so the
+     native-facing half lives elsewhere.
+   - a forward-STFT composition facade in `jmlx-core`, built with milestone 2's
+     `MLXFFT` (forward only; no ISTFT exists in Whisper).
+   - the Whisper encoder-decoder in `jmlx-models`, `api`-depending on
+     `jmlx-audio` (the vision pattern), reusing the Phase 7.2 seq2seq surface
+     plus the decision record's generation controls (forced decoder prefix,
+     suppress tokens, 448-position cap).
+   **`jmlx-audio` is published** — the project's eighth published module
+   (fresh `0.1.0-SNAPSHOT` line): `verifyReleaseScriptsMatch`, its own
+   byte-identical `release.sh`, release order before `jmlx-models` (alongside
+   `jmlx-vision`), and the release smoke's consumer resolution all grow. Scope
+   is the single fixed 30 s window; chunked long-form transcription is out of
+   scope. **Exit gate:** log-mel fixtures within a recorded tolerance against
+   the pinned torch-STFT oracle path (a float32 FFT through MLX is not
+   expected bit-exact; the numpy branch is a different code path and not the
+   oracle), a synthetic Tier-A logits golden at strict tolerance, and exact
+   greedy transcript IDs on the pinned Tier-B artifact.
 
 **Phase 11 done:** every linalg, FFT, random and specialized-compute inventory group is complete and
-differentially tested for representative shapes, dtypes, and error cases.
+differentially tested for representative shapes, dtypes, and error cases, and milestone 11.5's exit
+gate passes (it is the phase's only non-parity milestone).
 
 ## Phase 12 — Autodiff and function-transformation parity
 
@@ -730,3 +807,6 @@ tests, documentation and inventory changes are all delivered.
   | P4 Spring Boot starter and Quarkus extension | 9.4 |
   | P5 Groovy API | 9.5 |
   | Phases 8, 9, 10, 11, 12, 13 | Phases 10, 11, 12, 13, 14, 15 |
+- **2026-10-31:** the Phase 7.4 decision (`req/plans/phase7-4-decision.md`) scheduled audio
+  inference as Phase 11 milestone 11.5 and diffusion inference as Phase 9 milestone 9.6, both
+  gated by their own exit gates.

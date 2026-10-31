@@ -189,3 +189,22 @@ Regenerate manually in the locked environment and review the golden/pin diff:
 ```sh
 tools/hf-reference/.venv/bin/python tools/hf-reference/qwen3vl_wide_attention.py
 ```
+
+### Phase 7.4 audio/diffusion decision probes
+
+`whisper_logmel_probe.py` and `diffusion_unet_probe.py` back the Phase 7.4
+capability decision (`req/plans/phase7-4-decision.md`). They are opt-in, never
+invoked by Gradle, and write no golden: the audio probe synthesizes a
+deterministic 30 s 16 kHz waveform and runs the Whisper log-mel front end
+through the locked transformers 4.57.6; the diffusion probe forwards a tiny
+SD-shaped UNet and VAE decoder in torch and maps every exercised primitive to
+jmlx's surface. Each prints a JSON findings document that the decision record
+pastes verbatim. Both scripts are digest-pinned in `provenance.json` and enforced by
+root `verifyHfReferenceGoldens`, so an edit to a probe fails the build rather than silently
+invalidating the decision record's evidence; the universal hash lock is unchanged and no new
+dependency was added. Run manually from the repository root:
+
+```sh
+tools/hf-reference/.venv/bin/python tools/hf-reference/whisper_logmel_probe.py
+tools/hf-reference/.venv/bin/python tools/hf-reference/diffusion_unet_probe.py
+```

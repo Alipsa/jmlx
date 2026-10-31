@@ -52,7 +52,7 @@ class ChatContextCopiesTest {
   }
 
   @Test
-  void nestedRepeatedReferencesAreSharedButTopLevelMessagesAreNot() {
+  void nestedReferencesAreSharedAndTopLevelMessagesAreCopiedSeparately() {
     // A nested value referenced several times is copied once and shared ...
     Map<String, Object> nested = new LinkedHashMap<>();
     nested.put("k", "v");
@@ -64,7 +64,10 @@ class ChatContextCopiesTest {
     assertSame(one.get(0).get("a"), one.get(0).get("b"));
 
     // ... but a message map that is also referenced inside another message is a top-level element
-    // of the messages list, and the Javadoc promises sharing for nested values only.
+    // of the messages list, which the Javadoc does not promise to share. The assertion below
+    // records today's behavior (top-level elements get separate copies), not the contract: if a
+    // future change records top-level maps in the copy state and shares them, that is a harmless
+    // improvement and this line should be updated to assertSame, not treated as a regression.
     Map<String, Object> a = new LinkedHashMap<>();
     a.put("role", "user");
     Map<String, Object> b = new LinkedHashMap<>();

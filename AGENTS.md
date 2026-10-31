@@ -1125,3 +1125,12 @@ publication, both copy methods moved out of the record into a new `final` utilit
 `se.alipsa.jmlx.tokenizer.ChatContextCopies` (the record's constructor and
 `GenerationRequest.deepCopyMessages` call it; the upstream Javadoc no longer names its
 downstream consumer). No native pin, generated binding or golden changed.
+
+A twelfth PR #68 review round landed: the `ChatContextCopiesTest` top-level `assertNotSame` kept
+its assertion but now carries a comment stating it records today's behavior (top-level message
+elements get separate copies), not the contract — if a future change records the top-level maps
+in the copy state and shares them, the line becomes `assertSame`, not a regression — and the
+test was renamed `nestedReferencesAreSharedAndTopLevelMessagesAreCopiedSeparately`; and
+`copyMessages` iterates with a for-each plus a counter (the indexed `messages.get(i)` loop was
+quadratic on a `LinkedList`) so the `"messages[i]"` null message is kept at the same cost for any
+`List` type. No native pin, generated binding or golden changed.

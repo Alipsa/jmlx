@@ -56,10 +56,11 @@ public final class ChatContextCopies {
     Objects.requireNonNull(messages, "messages");
     CopyState state = new CopyState();
     List<Map<String, Object>> copy = new ArrayList<>(messages.size());
-    for (int i = 0; i < messages.size(); i++) {
+    int index = 0;
+    for (Map<String, ?> message : messages) {
       copy.add(
-          copyStringKeyedMap(
-              Objects.requireNonNull(messages.get(i), "messages[" + i + "]"), state));
+          copyStringKeyedMap(Objects.requireNonNull(message, "messages[" + index + "]"), state));
+      index++;
     }
     return Collections.unmodifiableList(copy);
   }

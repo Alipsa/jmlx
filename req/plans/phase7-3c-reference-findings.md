@@ -1234,3 +1234,22 @@ shouldn't refer to its consumers; the delegation is documented on the consumer s
 `IdentityHashMap`, `LinkedHashMap`, `List`, `AtomicInteger`).
 
 No native pin, generated binding or golden changed in this round.
+
+## 22. PR #68 twelfth review round (2026-10-31)
+
+**The top-level `assertNotSame` test locked in more than the Javadoc promises (confirmed).**
+`ChatContextCopiesTest`'s `assertNotSame(two.get(0), two.get(1).get("ref"))` made "top-level
+elements are never shared" a hard requirement, but the Javadoc only says they are not guaranteed
+to be shared — a future change that records the top-level maps in the copy state would be a
+harmless improvement yet fail the test for no good reason. The assertion was kept (it is a useful
+regression guard on today's structure) but the comment now states explicitly that it records
+today's behavior rather than the contract, and that if a future change shares top-level elements
+the line should be updated to `assertSame` rather than treated as a regression; the test was
+renamed accordingly (`nestedReferencesAreSharedAndTopLevelMessagesAreCopiedSeparately`).
+
+**`copyMessages` uses a for-each loop with a counter instead of index `get(i)` (confirmed).**
+`messages.get(i)` in an index-based loop is quadratic on a `LinkedList`; chat histories are small
+so it never matters in practice, but a for-each with a separate counter keeps the indexed
+`"messages[i]"` null message at the same cost for any `List` type.
+
+No native pin, generated binding or golden changed in this round.

@@ -1198,3 +1198,39 @@ unmodifiable lists, a cycle rejected with a clear error, with the render reachin
 first). Nothing in jmlx-models reads the retained messages back as arrays.
 
 No native pin, generated binding or golden changed in this round.
+
+## 21. PR #68 eleventh review round (2026-10-31)
+
+**Top-level maps are not part of the copy-once sharing — Javadoc narrowed to "nested"
+(confirmed).** `copyStringKeyedMap` copies the top-level context/message maps without recording
+them in `CopyState.converted`, so a message that is also referenced inside another message gets
+two separate copies (`copy.get(0) == copy.get(1).get("ref")` is `false`). The alternative fix —
+sending the top-level maps through `copyValue` — was rejected: `copyValue`'s map branch produces
+a `Map<Object, Object>`, and the typed entry points must return `Map<String, Object>`, so it would
+reintroduce exactly the unchecked cast round 10 removed. The Javadoc now says "a **nested** value
+referenced several times is copied once and shared ... (the top-level map itself is not part of
+that sharing)"; the behavior is harmless in practice (templates cannot observe identity without
+mutation) and is pinned both ways by `ChatContextCopiesTest` — `assertSame` for a nested value
+referenced twice, `assertNotSame` for the reviewer's message-inside-message probe.
+
+**The public entry points now reject null with a named parameter (nit, confirmed).**
+`ChatContextCopies.copyContext(null)` used to NPE inside `map.size()` without naming the
+parameter. Both entry points now `Objects.requireNonNull` first — `copyContext` with
+`"context"`, `copyMessages` with `"messages"` — and a null message element fails with
+`"messages[" + i + "]"` rather than the same unhelpful NPE one frame deeper (the render that runs
+before the copy in `GenerationRequest.chat` probably rejects such a request first, but the entry
+point no longer depends on that). Pinned by `ChatContextCopiesTest.nullArgumentsAreRejectedWithANamedParameter`.
+
+**The copy methods moved out of the record, before first publication (design suggestion).** A
+message copy has nothing to do with template options, and `jmlx-tokenizer` is not published yet —
+a public method on the record would become API to keep supporting. Both methods (plus `CopyState`,
+`copyStringKeyedMap`, `copyValue`) moved into a new small `final` utility class
+`se.alipsa.jmlx.tokenizer.ChatContextCopies` (private constructor); the record's compact
+constructor now calls `ChatContextCopies.copyContext`, and `GenerationRequest.deepCopyMessages`
+calls `ChatContextCopies.copyMessages`. On the same point, the `copyContext` Javadoc no longer
+names its downstream consumer (`GenerationRequest.chat` in jmlx-models) — an upstream API doc
+shouldn't refer to its consumers; the delegation is documented on the consumer side instead.
+`ChatTemplateOptions` lost all copy-related imports (`Array`, `ArrayList`, `Collections`,
+`IdentityHashMap`, `LinkedHashMap`, `List`, `AtomicInteger`).
+
+No native pin, generated binding or golden changed in this round.

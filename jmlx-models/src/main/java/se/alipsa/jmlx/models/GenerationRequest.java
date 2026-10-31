@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import se.alipsa.jmlx.tokenizer.ChatContextCopies;
 import se.alipsa.jmlx.tokenizer.ChatTemplateOptions;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import se.alipsa.jmlx.vision.RgbImage;
@@ -168,15 +169,15 @@ public final class GenerationRequest {
   /**
    * Deep-copies the chat messages so a later caller mutation cannot change what the model expands:
    * like the images (whose pixel buffers {@link RgbImage} copies), the request must own its source
-   * text. Delegates to {@link ChatTemplateOptions#copyMessages(List)}, the one shared snapshot copy
-   * that the options' own extraContext uses (through {@code copyContext}), so the two snapshots
-   * cannot drift apart: insertion-order unmodifiable wrappers (null values and non-String nested
-   * keys survive exactly as they would the render), unmodifiable list copies of arrays, shared
-   * scalars, one shared copy for a value referenced several times, and a cycle rejected with a
-   * clear error.
+   * text. Delegates to {@link ChatContextCopies#copyMessages(List)}, the one shared snapshot copy
+   * that the options' own extraContext uses (through {@link ChatContextCopies#copyContext(Map)}),
+   * so the two snapshots cannot drift apart: insertion-order unmodifiable wrappers (null values and
+   * non-String nested keys survive exactly as they would the render), unmodifiable list copies of
+   * arrays, shared scalars, one shared copy for a nested value referenced several times, and a
+   * cycle rejected with a clear error.
    */
   private static List<Map<String, Object>> deepCopyMessages(List<Map<String, Object>> messages) {
-    return ChatTemplateOptions.copyMessages(messages);
+    return ChatContextCopies.copyMessages(messages);
   }
 
   private static GenerationRequest tokenizerBacked(

@@ -360,9 +360,10 @@ jmlx-native-macos-arm64  se/alipsa/jmlx/native/macos-aarch64/  the same 4 binari
 jmlx-tokenizer   se.alipsa.jmlx.tokenizer           HfTokenizer, IncrementalTokenDecoder,
                                                     TokenizerEncoding/EncodingOptions/Padding/
                                                     Truncation, ChatTemplateRenderer/
-                                                    ChatTemplateOptions, TokenizerJson/
-                                                    TokenizerJsonLoader, TokenizerMetadata,
-                                                    Vocabulary, BpeMerger, ByteLevel* components,
+                                                    ChatTemplateOptions/ChatContextCopies,
+                                                    TokenizerJson/TokenizerJsonLoader,
+                                                    TokenizerMetadata, Vocabulary, BpeMerger,
+                                                    ByteLevel* components,
                                                     AddedTokenSplitter, TextNormalizer,
                                                     PostProcessorApplier, TokenizerException
                                                     (byte-level BPE, Metaspace BPE, Unigram,
@@ -1112,3 +1113,15 @@ probes now fail to compile against the published jars. The public `GenerationReq
 Javadoc gained a sentence recording that the message snapshot now copies arrays into unmodifiable
 lists and rejects cycles (a backstop — the render above the copy reaches that check first). No
 native pin, generated binding or golden changed.
+
+An eleventh PR #68 review round landed: the copy-once sharing now reads "a **nested** value
+referenced several times is copied once and shared" — the top-level map is not recorded in the
+copy state, so a message referenced inside another message gets two copies (sending the top-level
+maps through the generic copy was rejected: it would reintroduce the unchecked cast the typed
+signatures exist to avoid), and the new `ChatContextCopiesTest` pins both sides (`assertSame`
+nested / `assertNotSame` top-level). `copyContext(null)`/`copyMessages(null)` now fail with named
+parameters (`"context"`, `"messages"`, and `"messages[i]"` for a null element). Before first
+publication, both copy methods moved out of the record into a new `final` utility class
+`se.alipsa.jmlx.tokenizer.ChatContextCopies` (the record's constructor and
+`GenerationRequest.deepCopyMessages` call it; the upstream Javadoc no longer names its
+downstream consumer). No native pin, generated binding or golden changed.

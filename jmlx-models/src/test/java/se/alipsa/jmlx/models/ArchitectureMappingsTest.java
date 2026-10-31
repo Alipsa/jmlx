@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -365,6 +366,7 @@ class ArchitectureMappingsTest {
             "qwen3", "accepted",
             "mistral", "rejected",
             "phi3", "rejected",
+            "phi3_v", "rejected",
             "gemma", "accepted",
             "mixtral", "accepted"));
   }
@@ -380,6 +382,7 @@ class ArchitectureMappingsTest {
             "qwen3", "accepted",
             "mistral", "rejected",
             "phi3", "rejected",
+            "phi3_v", "rejected",
             "gemma", "rejected",
             "mixtral", "rejected"));
   }
@@ -395,6 +398,7 @@ class ArchitectureMappingsTest {
             "qwen3", "null",
             "mistral", "4",
             "phi3", "4",
+            "phi3_v", "null",
             "gemma", "rejected",
             "mixtral", "4"));
   }
@@ -410,6 +414,7 @@ class ArchitectureMappingsTest {
             "qwen3", "qkv=true out=true",
             "mistral", "qkv=false out=false",
             "phi3", "qkv=false out=false",
+            "phi3_v", "qkv=false out=false",
             "gemma", "rejected",
             "mixtral", "qkv=false out=false"));
   }
@@ -425,6 +430,7 @@ class ArchitectureMappingsTest {
             "qwen3", "false",
             "mistral", "false",
             "phi3", "false",
+            "phi3_v", "false",
             "gemma", "false",
             "mixtral", "false"));
   }
@@ -458,6 +464,8 @@ class ArchitectureMappingsTest {
             "mistral",
             "qkv=false fused=false moe=false qk=false offset=false scaled=false tied=false",
             "phi3",
+            "qkv=false fused=true moe=false qk=false offset=false scaled=false tied=false",
+            "phi3_v",
             "qkv=false fused=true moe=false qk=false offset=false scaled=false tied=false",
             "gemma",
             "qkv=false fused=false moe=false qk=false offset=true scaled=true tied=true",
@@ -507,6 +515,153 @@ class ArchitectureMappingsTest {
                         """)));
     assertTrue(error.getMessage().contains("rope_scaling.rope_type"));
     assertTrue(error.getMessage().contains("longrope"));
+  }
+
+  @Test
+  void phi3vAcceptsSuRopeWithBothFactorTables() {
+    ArchitectureDescriptor d =
+        ArchitectureMappings.parse(
+            json(
+                """
+                {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,
+                 "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                 "rope_theta":10000,"max_position_embeddings":8,
+                 "original_max_position_embeddings":4,
+                 "rope_scaling":{"type":"su","short_factor":[1.0,1.0],"long_factor":[1.1,1.1]}}
+                """));
+    RopeSpec.Su su = (RopeSpec.Su) d.rope();
+    assertEquals(10000f, su.theta());
+    assertEquals(8, su.maxPositions());
+    assertEquals(4, su.originalMaxPositions());
+    assertArrayEquals(new float[] {1.0f, 1.0f}, su.shortFactors());
+    assertArrayEquals(new float[] {1.1f, 1.1f}, su.longFactors());
+    assertFalse(su.isStatic());
+  }
+
+  @Test
+  void phi3AndLlamaRejectSuRopeNamingTheirFamily() {
+    for (String type : List.of("phi3", "llama")) {
+      var error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ArchitectureMappings.parse(
+                      json(
+                          """
+                          {"model_type":"%s","vocab_size":16,"hidden_size":8,
+                           "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                           "max_position_embeddings":8,"original_max_position_embeddings":4,
+                           "rope_scaling":{"type":"su","short_factor":[1.0,1.0],
+                           "long_factor":[1.0,1.0]}}
+                          """
+                              .formatted(type))));
+      assertTrue(error.getMessage().contains("su"), error.getMessage());
+      assertTrue(error.getMessage().contains(type), error.getMessage());
+    }
+  }
+
+  @Test
+  void topLevelOriginalMaxPositionsReachesTheUnknownKeySinkOutsidePhi3v() {
+    // NTK-Su reads the top-level key, so only the phi3_v family consumes it; any other family
+    // carrying it must surface it as an unknown key instead of silently running plain RoPE.
+    for (String type : List.of("llama", "qwen2", "phi3", "mistral")) {
+      List<String> unknown = new ArrayList<>();
+      ArchitectureMappings.parse(
+          json(
+              """
+              {"model_type":"%s","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+               "num_hidden_layers":1,"num_attention_heads":2,"max_position_embeddings":8,
+               "original_max_position_embeddings":4}
+              """
+                  .formatted(type)),
+          unknown::add);
+      assertEquals(List.of("original_max_position_embeddings"), unknown, type);
+    }
+    List<String> phi3vUnknown = new ArrayList<>();
+    ArchitectureMappings.parse(
+        json(
+            """
+            {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,"intermediate_size":16,
+             "num_hidden_layers":1,"num_attention_heads":2,"max_position_embeddings":8,
+             "original_max_position_embeddings":4,
+             "rope_scaling":{"type":"su","short_factor":[1.0,1.0],"long_factor":[1.1,1.1]}}
+            """),
+        phi3vUnknown::add);
+    assertEquals(List.of(), phi3vUnknown);
+  }
+
+  @Test
+  void phi3vRejectsNonSuRopeVariantsNamingTheType() {
+    for (String type : List.of("yarn", "linear", "llama3")) {
+      var error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ArchitectureMappings.parse(
+                      json(
+                          """
+                          {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,
+                           "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                           "max_position_embeddings":8,"original_max_position_embeddings":4,
+                           "rope_scaling":{"type":"%s","factor":2}}
+                          """
+                              .formatted(type))));
+      assertTrue(error.getMessage().contains(type), error.getMessage());
+      assertTrue(error.getMessage().contains("phi3_v"), error.getMessage());
+    }
+  }
+
+  @Test
+  void phi3vSuRopeRejectsMissingFactorTables() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                         "max_position_embeddings":8,"original_max_position_embeddings":4,
+                         "rope_scaling":{"type":"su"}}
+                        """)));
+    assertTrue(error.getMessage().contains("short_factor"), error.getMessage());
+  }
+
+  @Test
+  void phi3vSuRopeRejectsFactorTablesWithWrongLength() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                         "max_position_embeddings":8,"original_max_position_embeddings":4,
+                         "rope_scaling":{"type":"su","short_factor":[1.0],"long_factor":[1.0]}}
+                        """)));
+    assertTrue(error.getMessage().contains("rotaryDims / 2"), error.getMessage());
+  }
+
+  @Test
+  void phi3vSuRopeRejectsLoneRopeTypeKey() {
+    var error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ArchitectureMappings.parse(
+                    json(
+                        """
+                        {"model_type":"phi3_v","vocab_size":16,"hidden_size":8,
+                         "intermediate_size":16,"num_hidden_layers":1,"num_attention_heads":2,
+                         "max_position_embeddings":8,"original_max_position_embeddings":4,
+                         "rope_scaling":{"rope_type":"su","short_factor":[1.0,1.0],
+                         "long_factor":[1.0,1.0]}}
+                        """)));
+    assertTrue(error.getMessage().contains("rope_type"), error.getMessage());
+    assertTrue(error.getMessage().contains("unsupported"), error.getMessage());
   }
 
   @Test

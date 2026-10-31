@@ -1,5 +1,6 @@
 package se.alipsa.jmlx.nn;
 
+import java.util.Arrays;
 import java.util.Objects;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -10,7 +11,12 @@ import se.alipsa.jmlx.memory.MLXScope;
 
 /** Immutable rotary-position specification with Hugging Face compatible scaling variants. */
 public sealed interface RopeSpec
-    permits RopeSpec.Base, RopeSpec.Linear, RopeSpec.DynamicNtk, RopeSpec.Llama3, RopeSpec.Yarn {
+    permits RopeSpec.Base,
+        RopeSpec.Linear,
+        RopeSpec.DynamicNtk,
+        RopeSpec.Llama3,
+        RopeSpec.Yarn,
+        RopeSpec.Su {
 
   /** Returns the base period used by this variant. */
   float theta();
@@ -60,6 +66,26 @@ public sealed interface RopeSpec
         double invFrequency =
             (1 - extrapolation) / (yarn.factor() * periods[i]) + extrapolation / periods[i];
         periods[i] = 1 / invFrequency;
+      }
+    } else if (this instanceof Su su) {
+      // Direct field access, not the cloning accessors: this runs on every non-static step, and
+      // the defensive copies exist to protect callers, not to tax the hot path.
+      float[] shortFactors = su.shortFactors;
+      if (shortFactors.length != periods.length) {
+        throw new IllegalArgumentException(
+            "Su factor tables have "
+                + shortFactors.length
+                + " entries but rotaryDims "
+                + rotaryDims
+                + " requires "
+                + periods.length);
+      }
+      // The reference divides inv_freq by the per-dimension factor, which is a per-dimension
+      // multiplication of the period by that factor; the long table applies only beyond the
+      // original context length (strict >, so seq_len == originalMax still uses the short table).
+      float[] factors = sequenceLength > su.originalMaxPositions ? su.longFactors : shortFactors;
+      for (int i = 0; i < periods.length; i++) {
+        periods[i] *= factors[i];
       }
     }
     return periods;
@@ -184,8 +210,9 @@ public sealed interface RopeSpec
     if (scalar) {
       return apply(x, rotaryDims, nextPositions[0], frequencies);
     }
-    if (this instanceof DynamicNtk) {
-      throw new IllegalArgumentException("DynamicNtk does not support unequal batch positions");
+    if (!isStatic()) {
+      throw new IllegalArgumentException(
+          "length-dependent RoPE does not support unequal batch positions");
     }
     MLXArray[] rows = new MLXArray[shape[0]];
     for (int row = 0; row < shape[0]; row++) {
@@ -238,6 +265,15 @@ public sealed interface RopeSpec
     if (!Float.isFinite(value) || value <= 0) {
       throw new IllegalArgumentException(key + " must be positive and finite");
     }
+  }
+
+  private static float[] positiveFactors(float[] factors, String key) {
+    Objects.requireNonNull(factors, key);
+    float[] copy = factors.clone();
+    for (float factor : copy) {
+      positive(factor, key);
+    }
+    return copy;
   }
 
   /** Standard RoPE with a fixed frequency base. */
@@ -313,6 +349,105 @@ public sealed interface RopeSpec
       if (attentionFactor != null) {
         positive(attentionFactor, "attention_factor");
       }
+    }
+  }
+
+  /**
+   * NTK-Su scaled RoPE (Phi-3.5-Vision): the per-dimension short/long factor tables and the static
+   * attention scaling of the reference {@code Phi3SuScaledRotaryEmbedding}. The long table applies
+   * only when the per-call sequence length is strictly greater than {@code originalMaxPositions};
+   * both cos and sin are multiplied by {@link #attentionScaling()}.
+   */
+  record Su(
+      float theta,
+      int maxPositions,
+      int originalMaxPositions,
+      float[] shortFactors,
+      float[] longFactors)
+      implements RopeSpec {
+    /** Validates the NTK-Su parameters and copies both factor tables. */
+    public Su {
+      positive(theta, "rope_theta");
+      if (maxPositions <= 0) {
+        throw new IllegalArgumentException("max_position_embeddings must be positive");
+      }
+      if (originalMaxPositions <= 0) {
+        throw new IllegalArgumentException("original_max_position_embeddings must be positive");
+      }
+      shortFactors = positiveFactors(shortFactors, "short_factor");
+      longFactors = positiveFactors(longFactors, "long_factor");
+      if (shortFactors.length != longFactors.length) {
+        throw new IllegalArgumentException("short_factor and long_factor must have equal length");
+      }
+    }
+
+    /** The factor table is re-selected per call by the sequence length. */
+    @Override
+    public boolean isStatic() {
+      return false;
+    }
+
+    /**
+     * Defensive copies: the tables back every RoPE call, so a caller mutating a returned array
+     * would silently change this spec's math (the record stores the validated copies).
+     */
+    @Override
+    public float[] shortFactors() {
+      return shortFactors.clone();
+    }
+
+    /** Defensive copy; see {@link #shortFactors()}. */
+    @Override
+    public float[] longFactors() {
+      return longFactors.clone();
+    }
+
+    /** Value equality on the factor tables; the record default compares arrays by identity. */
+    @Override
+    public boolean equals(Object other) {
+      if (!(other instanceof Su that)) {
+        return false;
+      }
+      return Float.floatToIntBits(theta) == Float.floatToIntBits(that.theta)
+          && maxPositions == that.maxPositions
+          && originalMaxPositions == that.originalMaxPositions
+          && Arrays.equals(shortFactors, that.shortFactors)
+          && Arrays.equals(longFactors, that.longFactors);
+    }
+
+    /** Value hash on the factor tables; pairs with {@link #equals(Object)}. */
+    @Override
+    public int hashCode() {
+      return Objects.hash(
+          theta,
+          maxPositions,
+          originalMaxPositions,
+          Arrays.hashCode(shortFactors),
+          Arrays.hashCode(longFactors));
+    }
+
+    /** Readable tables; the record default prints array identity hashes. */
+    @Override
+    public String toString() {
+      return "Su[theta="
+          + theta
+          + ", maxPositions="
+          + maxPositions
+          + ", originalMaxPositions="
+          + originalMaxPositions
+          + ", shortFactors="
+          + Arrays.toString(shortFactors)
+          + ", longFactors="
+          + Arrays.toString(longFactors)
+          + "]";
+    }
+
+    /** The static multiplier on both cos and sin: 1 unless the context is extended. */
+    @Override
+    public float attentionScaling() {
+      double ratio = (double) maxPositions / originalMaxPositions;
+      return (float)
+          (ratio <= 1.0 ? 1.0 : Math.sqrt(1 + Math.log(ratio) / Math.log(originalMaxPositions)));
     }
   }
 }

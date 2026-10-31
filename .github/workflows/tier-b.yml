@@ -11,13 +11,15 @@ permissions:
 
 jobs:
   artifact:
-    # The smolvlm and qwen3vl arms override their runner via the `runner` matrix variable
-    # below onto the self-hosted `self-macos-xl` runner, because their measured footprints
-    # exceed the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub hosted-runners
-    # reference), which would swap or OOM-kill the job: smolvlm's suite MLX allocator peak is
-    # 5.7 GB plus the test JVM and Gradle daemon (tools/tier-b/smolvlm-256m-instruct.json),
-    # and qwen3vl's FLOAT32-up-cast 2B checkpoint footprint peaks at 11.16 GiB
-    # (tools/tier-b/qwen3vl-2b-instruct.json). GitHub's larger macos-26-xlarge tier (5-core
+    # The smolvlm, qwen3vl and phi3v arms override their runner via the `runner` matrix
+    # variable below onto the self-hosted `self-macos-xl` runner, because their measured
+    # footprints exceed the standard macos-26 arm64 hosted runner's 7 GB of RAM (GitHub
+    # hosted-runners reference), which would swap or OOM-kill the job: smolvlm's suite MLX
+    # allocator peak is 5.7 GB plus the test JVM and Gradle daemon
+    # (tools/tier-b/smolvlm-256m-instruct.json), qwen3vl's FLOAT32-up-cast 2B checkpoint
+    # footprint peaks at 11.16 GiB (tools/tier-b/qwen3vl-2b-instruct.json), and phi3v's
+    # FLOAT32-up-cast 4B checkpoint footprint peaks at 51,421,089,584 bytes
+    # (tools/tier-b/phi3v-4b-instruct.json). GitHub's larger macos-26-xlarge tier (5-core
     # M2, 14 GB RAM, still arm64 as the native runtime requires; GitHub larger-runners
     # reference) would fit, but larger runners are billed per minute even in public
     # repositories, and usage is blocked until a payment method is set up on the account
@@ -32,13 +34,13 @@ jobs:
     # actions/cache and do not re-upload gigabytes of already-present model files into the
     # repository's cache budget); every file the manifest does not list is removed before
     # the download step re-hashes and fills in the listed ones, so a previous job cannot
-    # plant a file the loaders would read. While the runner is offline the two jobs wait
+    # plant a file the loaders would read. While the runner is offline the three jobs wait
     # and GitHub fails them after 24 hours; the other arms are unaffected. The runner is
     # the same M5 Max host (macOS 27.0.1) that produced the local evidence, so the first
     # self-hosted execution of an arm accepts the CI pipeline (checkout, artifact download,
     # native bootstrap, pinned suite), not independent host, OS or memory-fit evidence; the
     # supported macOS 26 hosted execution remains pending.
-    # Both arms' suites also assert upper bounds on the measured peaks as a regression
+    # All three arms' suites also assert upper bounds on the measured peaks as a regression
     # detector: a memory regression that surfaces while the process still fits in the
     # runner's RAM fails the suite explicitly rather than as an unattributable runner OOM,
     # but the figures are read after the suite finishes, so a large enough regression can
@@ -115,6 +117,24 @@ jobs:
             revision: 89644892e4d85e24eaac8bacfd4f463576704203
             manifest: tools/tier-b/qwen3vl-2b-instruct.json
             runner: self-macos-xl
+          # The phi3v arm runs on the same self-hosted runner as smolvlm and qwen3vl: the
+          # FLOAT32-up-cast 4B checkpoint's test-process footprint peak measures
+          # 51,421,089,584 bytes (tools/tier-b/phi3v-4b-instruct.json local_evidence), far
+          # past the standard 7 GB runner. TierBPhi3VTest's footprint bound (52,000,000,000
+          # bytes, ~552 MB above the measured peak) fails the suite on a memory regression,
+          # but it is not a guarantee the runner's RAM survives a large regression (the OS
+          # and the Gradle daemon share that RAM, and macOS may swap or kill first). The
+          # runner is the same M5 Max host (128 GB, macOS 27.0.1) that produced the local
+          # evidence, so runner fit is not the open question: the first self-hosted CI run
+          # accepts the CI pipeline, and the supported macOS 26 hosted execution remains
+          # pending.
+          - name: phi3v
+            model_type: phi3_v
+            task: phi3v-generation
+            suite: TierBPhi3VTest
+            revision: 12b77fb40b63a2c73c68243d3f767aab688a1b2a
+            manifest: tools/tier-b/phi3v-4b-instruct.json
+            runner: self-macos-xl
     env:
       # Self-hosted arms override this via GITHUB_ENV (persistent per-host model dir,
       # see the step after checkout); hosted arms use the per-run workspace dir.
@@ -125,7 +145,7 @@ jobs:
       JMLX_TIER_B_MANIFEST: ${{ matrix.manifest }}
     steps:
       - name: Isolate the Gradle home (self-hosted arms)
-        # matrix.runner is set only for the two self-hosted arms: export a per-job
+        # matrix.runner is set only for the three self-hosted arms: export a per-job
         # temp Gradle home to GITHUB_ENV for all later steps, so a CI job never
         # loads an account-level ~/.gradle (e.g. release credentials in
         # gradle.properties) and setup-gradle's "already exists" fallback cannot
@@ -139,9 +159,9 @@ jobs:
           echo "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
       - name: Use persistent host storage for the model (self-hosted arms)
-        # matrix.runner is set only for the two self-hosted arms: this machine keeps its
+        # matrix.runner is set only for the three self-hosted arms: this machine keeps its
         # own disk, so the manifest-pinned model files survive between runs and the arms
-        # skip actions/cache (which would otherwise re-upload up to ~3.7 GB of
+        # skip actions/cache (which would otherwise re-upload up to ~8.3 GB of
         # already-present files into the repository's 10 GB cache budget, evicting other
         # jobs' caches, while buying the host nothing). A previous job could plant files
         # or symlinks here that the manifest does not cover; the download step refuses
@@ -194,7 +214,7 @@ jobs:
           python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
       # Hosted arms only: the self-hosted arms use persistent host storage (see the step
-      # after checkout), so caching their model directory would only re-upload up to ~3.7 GB
+      # after checkout), so caching their model directory would only re-upload up to ~8.3 GB
       # into the repository's 10 GB cache budget every run.
       - uses: actions/cache@v4
         if: '!matrix.runner'

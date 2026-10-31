@@ -5,3 +5,10 @@
 Pillow==12.3.0
 numpy==2.5.3
 transformers==4.57.6
+# Phase 7.3c: the bundled Phi-3.5-Vision processor (trust-remote-code, hash-pinned under
+# fixtures/phi3v/) executes the phi3v oracle family; it imports torch and torchvision.
+# The pins match tools/hf-reference's lock (verifyImageOracleDependencyPins fails a build
+# if the two locks ever disagree on torch or torchvision).
+torch==2.6.0+cpu ; sys_platform != "darwin"
+torch==2.6.0 ; sys_platform == "darwin"
+torchvision==0.21.0

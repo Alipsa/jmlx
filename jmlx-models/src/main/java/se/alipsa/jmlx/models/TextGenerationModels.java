@@ -37,6 +37,12 @@ public final class TextGenerationModels {
       }
       return Qwen3VlModel.load(scope, directory, root);
     }
+    if ("phi3_v".equals(root.path("model_type").asString())) {
+      // The composite loader owns its own strict config parse (the phi3_v decoder fields plus the
+      // embedded img_processor/embd_layer blocks), so dispatch on the raw model_type before the
+      // generic decoder mapping, which cannot build the vision tower.
+      return Phi3VModel.load(scope, directory, root);
+    }
     return loadDecoder(scope, directory, ArchitectureMappings.parse(root));
   }
 

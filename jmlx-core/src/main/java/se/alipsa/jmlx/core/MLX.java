@@ -86,21 +86,33 @@ public final class MLX {
    * Creates a FLOAT32 array in {@code scope} from row-major {@code data} laid out as {@code shape}.
    */
   public static MLXArray array(MLXScope scope, float[] data, int[] shape) {
+    return array(scope, data, 0, data.length, shape);
+  }
+
+  /**
+   * Creates a FLOAT32 array in {@code scope} from the {@code length} elements of {@code data}
+   * starting at {@code offset} (a contiguous prefix view, copied without building an intermediate
+   * Java array), laid out as {@code shape}.
+   */
+  public static MLXArray array(MLXScope scope, float[] data, int offset, int length, int[] shape) {
     long expected = 1;
     for (int dim : shape) {
       expected *= dim;
     }
-    if (expected != data.length) {
+    if (expected != length) {
       throw new IllegalArgumentException(
           "shape "
               + java.util.Arrays.toString(shape)
               + " (size "
               + expected
               + ") does not match data length "
-              + data.length);
+              + length);
     }
+    java.util.Objects.checkFromIndexSize(offset, length, data.length);
     try (Arena tmp = Arena.ofConfined()) {
-      MemorySegment nativeData = tmp.allocateFrom(ValueLayout.JAVA_FLOAT, data);
+      // The element-layout allocation guarantees the alignment the JAVA_FLOAT copy requires.
+      MemorySegment nativeData = tmp.allocate(ValueLayout.JAVA_FLOAT, length);
+      MemorySegment.copy(data, offset, nativeData, ValueLayout.JAVA_FLOAT, 0, length);
       MemorySegment nativeShape = tmp.allocateFrom(ValueLayout.JAVA_INT, shape);
       // mlx_array_new_data has no status return: on failure it calls
       // the error handler and hands back a struct with a null ctx

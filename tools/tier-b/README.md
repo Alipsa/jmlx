@@ -58,6 +58,31 @@ JMLX_TIER_B_MODEL_DIR=.tier-b/qwen3vl-2b \
   JMLX_TIER_B_MODEL_TYPE=qwen3_vl ./gradlew :jmlx-models:tierBTest
 ```
 
+Phi-3.5-Vision uses `phi3v-4b-instruct.json` and task `phi3v-generation`, selecting
+`TierBPhi3VTest` in the TF32-off JVM. The request is the required multi-image prompt: a 672x336
+and a 336x336 image (both committed under `images/`, derived from the hash-pinned image-oracle
+`phi3v` fixtures) with text between the two markers, 24 greedy tokens. The reference is
+`tools/hf-reference/phi3v_tier_b.py` (CPU float32), which loads the artifact's bundled
+trust-remote-code processor and model (transformers 4.57.6 has no native `phi3_v`) and records
+the full-vocabulary logit vector at every expected history step as the binary golden
+`tools/hf-reference/goldens/phi3v-tier-b-logits.bin`; both images, the manifest, the generator
+and the binary are digest-pinned in `tools/hf-reference/provenance.json` and verified by
+`verifyHfReferenceGoldens`. Rendered/unexpanded/expanded prompt IDs, per-image processed-pixel
+hashes, the HD geometry and the reference's own top-two gaps, alongside the Java run's measured
+margins, gate the exact greedy IDs and the end-to-end `generate`'s exact decoded output
+(`expected_text`). Measured local evidence (allocator peak 31.1 GB, sampled footprint peak
+51.4 GB, load ~1133 ms, generation ~5423 ms, 8.3 GB artifact disk) sizes the suite's bounds;
+macOS 26 acceptance is still pending.
+
+```sh
+./gradlew downloadTierBArtifact \
+  -PtierBManifest=tools/tier-b/phi3v-4b-instruct.json -PtierBTarget=.tier-b/phi3v
+JMLX_TIER_B_MODEL_DIR=.tier-b/phi3v \
+  JMLX_TIER_B_MANIFEST=tools/tier-b/phi3v-4b-instruct.json \
+  JMLX_TIER_B_TASK=phi3v-generation \
+  JMLX_TIER_B_MODEL_TYPE=phi3_v ./gradlew :jmlx-models:tierBTest
+```
+
 The test samples the test process's physical footprint (libproc's `ri_phys_footprint`, the figure
 the runner's RAM must actually hold, unlike `ps -o rss` which misses MLX/Metal allocations) every
 20 ms and reports the highest sample alongside the native allocator peak, asserting both stay
@@ -65,17 +90,20 @@ below bounds sized from the manifest's recorded local evidence so a memory regre
 suite explicitly. The workflow uploads JUnit numerical/memory evidence even when
 the test fails.
 
-In CI, the SmolVLM and qwen3vl rows of the `tier-b` workflow run on the self-hosted
+In CI, the SmolVLM, qwen3vl and phi3v rows of the `tier-b` workflow run on the self-hosted
 `self-macos-xl` runner (Apple Silicon, macOS 27, 128 GB RAM), because their measured
 footprints exceed the standard runner's 7 GB (the qwen3vl row needs more because the
 FLOAT32-up-cast 2B checkpoint's measured footprint peak is 11.16 GiB; its suite footprint
 bound — 12,500,000,000 bytes, ~520 MB above the measured peak — detects a regression but
-is not a guarantee the runner's RAM survives a large regression). GitHub's larger
-`macos-26-xlarge` tier would fit, but GitHub's Actions billing docs state that larger
-runners are always charged per minute, even in public repositories, and that
-larger-runner usage is blocked until a payment method is set up on the account
+is not a guarantee the runner's RAM survives a large regression; the phi3v row's
+FLOAT32-up-cast 4B checkpoint's measured footprint peak is 51,421,089,584 bytes — its suite
+footprint bound, 52,000,000,000 bytes, ~552 MB above the measured peak — is the same
+regression-detector-not-guarantee). GitHub's larger `macos-26-xlarge` tier would fit, but
+GitHub's Actions billing docs state that larger runners are always charged per minute, even
+in public repositories, and that larger-runner usage is blocked until a payment method is
+set up on the account
 (https://docs.github.com/en/billing/concepts/product-billing/github-actions), so the rows
-run free on the self-hosted runner. While that runner is offline the two jobs wait and
+run free on the self-hosted runner. While that runner is offline the three jobs wait and
 GitHub fails them after 24 hours; the other rows are unaffected (they run on the standard
 hosted runner). If the account later sets up a payment method, a row can be pointed back
 at `macos-26-xlarge` by changing its `runner` matrix value.

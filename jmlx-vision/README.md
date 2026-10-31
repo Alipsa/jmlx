@@ -2,8 +2,10 @@
 
 Pure-Java image preprocessing for `jmlx-models`: PNG/JPEG decoding, RGB conversion,
 Pillow-exact resampling, rescale/normalize, the SmolVLM/Idefics3 image processor (tile
-splitting, padding masks, grid/order metadata) and the Qwen3-VL image preprocessing port
-(smart_resize, BICUBIC resize, rescale/normalize, merge-block patch flatten). No native
+splitting, padding masks, grid/order metadata), the Qwen3-VL image preprocessing port
+(smart_resize, BICUBIC resize, rescale/normalize, merge-block patch flatten) and the
+Phi-3.5-Vision (LLaVA-style) image preprocessing port (HD_transform, white padding,
+torch-exact bicubic global image, sub-crop slots). No native
 dependency; Java 21+.
 
 ## Public surface
@@ -25,6 +27,10 @@ dependency; Java 21+.
 | `Qwen3VlGeometryPlan` | Pure per-image geometry (resized size, `grid_thw`, raw/merged row counts) from dimensions alone, with the aspect and raw-row-budget checks, shared with the zero-token path. |
 | `Qwen3VlImageProcessor` | `process(RgbImage)` runs the ported chain; `processFile(Path, ImageDecodeLimits)` reads a PNG/JPEG from disk and `processEncoded(byte[], ImageDecodeLimits)` decodes in-memory bytes — both are the file-to-processor entry points applying the Qwen file policy (decode `DROP_ALPHA` + `APPLY`, then process). |
 | `Qwen3VlImageProcessorResult` | The flattened merge-block patch tensor (`grid_h*grid_w` rows of 1,536 floats at the pinned geometry — not an image layout) with grid/order metadata; defensive buffer accessors. |
+| `Phi3VProcessorConfig` | Parsed, validated bundled-processor config of the pinned `microsoft/Phi-3.5-vision-instruct` artifact (`image_mean`/`image_std`/`num_crops`); `do_convert_rgb: false` is rejected because the ported decode path always delivers RGB. |
+| `Phi3VGeometryPlan` | Pure per-image geometry (HD resize and 336-multiple padding targets, crop grid, slot count, per-image image-token count) computed from dimensions alone, with no pixel work. |
+| `Phi3VImageProcessor` | The LLaVA-style preprocessing chain (`process(RgbImage)`, `processFile(Path, ImageDecodeLimits)`, `processEncoded(byte[], ImageDecodeLimits)`), including the torch-exact global-image bicubic resize. |
+| `Phi3VImageProcessorResult` | The reference's one `pixel_values` batch row: `slotCount()` slots of `3*336*336` floats, slot-major then CHW, with the geometry plan; defensive buffer accessors. |
 
 `SmolVlmImageProcessor.geometry(height, width)` returns the `SmolVlmGeometryPlan` for an image's
 dimensions; the processor's pixel chain uses that same plan for its resize targets and split
@@ -113,7 +119,59 @@ model-side acceptance of this preprocessing — the composed Qwen3-VL prefill an
 against a fresh, full, uncached CPU-HF float32 reference — is the Phase 7.3b WP8 golden suites
 (same findings, §11.8).
 
+## Phi-3.5-Vision preprocessing
+
+Phase 7.3c WP2 port of the bundled trust-remote-code `Phi3VImageProcessor.preprocess` of the
+pinned `microsoft/Phi-3.5-vision-instruct` artifact (findings §6 of
+`req/plans/phase7-3c-reference-findings.md`): `HD_transform` (portrait transposition, the
+double-precision scale-selection loop, BILINEAR resize, 336-multiple white padding),
+`ToTensor()` (`float32(pixel / 255)`) and `Normalize(mean, std)` in float32, the global-image
+step, the h-major sub-crop split (pure copies, no resampling) and the slot assembly
+(`[global] + crops`, zero-padded to `num_crops + 1` slots). The output of
+`Phi3VImageProcessor.process` is one reference `pixel_values` batch row of
+`slotCount() * 3 * 336 * 336` float32 values, slot-major then CHW.
+
+The file/bytes entry points decode with the Phi-3.5-Vision policy: `ImageDecoder` with
+`AlphaPolicy.DROP_ALPHA` + `ExifOrientationPolicy.IGNORE` — the reference's `convert("RGB")`
+on its string load path, no `exif_transpose` — then `process`.
+
+**The global-image resize is torch-exact, not Pillow-exact.** The reference runs
+`F.interpolate(x, size=(336, 336), mode='bicubic')` on the *normalized* float32 tensor — a
+PyTorch CPU path, not a Pillow kernel. `TorchBicubic` (package-private) is a port of the
+pinned PyTorch **v2.6.0** CPU upsampling source (`aten/src/ATen/native/cpu/UpSampleKernel.cpp`
+and `aten/src/ATen/native/UpSample.h` — URLs, SHA-256s and the BSD 3-Clause license text are
+recorded in `NOTICE` and in the file header). The pinned wheels are compiled with
+floating-point contraction enabled, so every C subexpression `a * b + c` in the kernel (the
+real-source-index computation, both cubic convolution polynomials, and the separable
+height-outer/width-inner accumulations, where the first term is a bare product) executes as a
+single-rounded hardware fused-multiply-add. The port reproduces that compiled arithmetic
+exactly with `fma32`, a bit-exact IEEE 754 binary32 fused multiply-add implemented in pure
+Java (Java's `Math.fma` is double-only, and a plain double-emulation would double-round):
+a plain `*`/`+` transcription of the staged source deviates from the pinned wheels by up to
+~881 float ulps, while the fused form is bit-identical on the fixtures. This is a
+*different algorithm* from the module's `PillowResample` BICUBIC kernel (Pillow's 8-bit
+fixed-point `a = -0.5` pipeline, ported for the SmolVLM and Qwen3-VL uint8 paths) and is not
+used by them.
+
+Byte-exactness evidence: the `phi3v` family of the `tools/image-oracle` fixtures (5 cases
+plus the shared processed-slot bins under `phi3v/patches/`), byte-verified by
+`ImageOraclePhi3VTest`; the `fma32` core was stress-verified against libm's `fmaf`
+(~650,000 cases, zero mismatches) before the family was generated.
+
+The reference side of that verification is recording-platform-only: the committed bins
+reproduce the pinned **macOS arm64** torch wheel's FMA-contracted bicubic arithmetic, the
+pinned Linux x86 CPU wheel is known to emit different bytes for the same kernel, and the
+pinned Linux aarch64 CPU wheel's FMA contraction is unverified. `runner.py` therefore
+skips the `phi3v` family (with a logged `Image oracle fixture skipped` line) on every
+platform other than the exact recording platform — `sys.platform == "darwin"` and
+`platform.machine() == "arm64"` — instead of comparing or regenerating against different
+bytes; the
+pure-Java digest guards (`verifyImageOracleFixtureDigests`) and `ImageOraclePhi3VTest`
+still run on every architecture, and CI verifies the family on the macOS arm64 (native)
+runner.
+
 ## Divergences from the reference's operation order
+
 
 The reference pipeline (the pinned `transformers` 4.57.6 `Idefics3ImageProcessor.preprocess`)
 resizes **and splits before** `convert_to_rgb`; this port decodes straight to RGB (compositing
@@ -142,5 +200,6 @@ ICC/gAMA, which the port matches (see "Decode policy" above).
 
 ## License
 
-MIT (root `LICENSE`). The resampling kernels port Pillow source under its MIT-CMU license; see
-`NOTICE` for the full text and the pinned source hashes.
+MIT (root `LICENSE`). The resampling kernels port Pillow source under its MIT-CMU license;
+the torch-exact bicubic resize (`TorchBicubic`) ports PyTorch source under its BSD 3-Clause
+license; see `NOTICE` for the full texts and the pinned source hashes.

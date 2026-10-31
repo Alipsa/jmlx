@@ -178,3 +178,72 @@ execution accepted the CI pipeline, not independent host, OS or memory-fit evide
 the supported macOS 26 hosted execution remains pending. While the self-hosted runner is
 offline the row's jobs wait and GitHub fails them after 24 hours; the other rows run on
 the standard hosted runner (`tools/tier-b/README.md`).
+
+## Phase 7.3c Phi-3.5-Vision Tier-B (2026-10-30)
+
+`tools/tier-b/phi3v-4b-instruct.json` pins `microsoft/Phi-3.5-vision-instruct` at revision
+`12b77fb40b63a2c73c68243d3f767aab688a1b2a` (MIT, license evidence URL in the manifest): the 15-file
+WP0 inventory, 8,295,395,355 bytes in aggregate (two safetensors shards plus 13 small files, including
+the artifact's bundled trust-remote-code `configuration_phi3_v.py`, `modeling_phi3_v.py` and
+`processing_phi3_v.py`), each file SHA-256- and size-capped, downloaded through the Java
+`downloadTierBArtifact` manifest/SHA path.
+
+**Request.** One multi-image request (the plan's required multi-image prompt): a user message carrying
+two images — `tools/tier-b/images/phi3v-wide-672x336.png` (sha `702955fe…`, copied unchanged from the
+image-oracle `phi3v/wide-672x336.png` fixture, whose source hash is provenance-pinned) and
+`tools/tier-b/images/phi3v-square-336x336.png` (sha `40734e8e…`, same provenance) — with the text
+"<\|image_1\|> Describe this image. <\|image_2\|> Now describe both images in detail.",
+`max_new_tokens: 24`. The artifact's HD transform drives the grids: the 672x336 image pads to 336x672
+(1x2, 457 image tokens) and the 336x336 image pads to 672x672 (2x2, 757 image tokens). The chat
+template is the artifact's own (`tokenizer_config.json`); the recorded unexpanded prompt is 35 tokens
+and the expanded prompt is 1241 tokens — under the 4096 original max, so the NTK-Su boundary re-prefill
+never fires for this request.
+
+**Reference.** `tools/hf-reference/phi3v_tier_b.py` (hash-locked CPU float32, single-threaded eager,
+transformers 4.57.6) loads the artifact's bundled trust-remote-code processor and model (4.57.6 has no
+native `phi3_v`), up-casts the 592 stored bfloat16 tensors to float32 (exactly the Java loader's
+stored-bf16 → float32 path), renders the prompt, expands the two images, and records the full-vocabulary
+logit vector at every expected greedy history step. Every greedy step is a fresh, full, uncached forward
+(`use_cache=False`; findings §4 — the bundled modeling cannot run a cached forward under 4.57.6), and
+eager attention is asserted on both the model and the CLIP tower (findings §5). The vectors are stored as
+a little-endian float32 binary (`tools/hf-reference/goldens/phi3v-tier-b-logits.bin`, 3,078,144 bytes,
+sha `1c641ba6…`; one full 32,064-vector per step — a documented size-driven deviation from the JSON logits
+goldens, following the shared Qwen3-VL patch-bin precedent). Provenance pins the manifest, generator,
+both images and the binary in `tools/hf-reference/provenance.json` (`phi3v_tier_b_files` + the `files`
+entry), verified by root `verifyHfReferenceGoldens`.
+
+Reference greedy IDs: `[9134, 4558, 526, 15526, 630, 322, 4682, 263, 20619, 1409, 310, 2319, 29892, 1773,
+5283, 4395, 270, 1862, 29889, 450, 270, 1862, 526, 1584]` (finish MAX_TOKENS; no stop token 32000 in 24
+steps). Measured minimum top-two logit gap across the 24 steps: 0.00316619873046875.
+
+**Java suite.** `TierBPhi3VTest` (selected by task `phi3v-generation`, part of the `tierBTest` suites
+map): re-verifies the manifest's image digests, re-processes each image through `jmlx-vision`'s
+Phi-3.5-Vision processor and asserts the reference's per-image `pixel_values_sha256` (byte-for-byte
+preprocessing on the real artifact), the HD geometry (`image_sizes`, `num_img_tokens`), the rendered
+prompt, unexpanded IDs and expanded IDs, compares every cached decode/prefill logit vector against the
+reference binary under the recorded epsilon, re-derives the reference's own recorded gap/top-two from the
+reference vectors (a pin of the reference's internal consistency), and applies the stability gate to both
+the reference vectors and the Java run's own measured margins before asserting the exact greedy IDs, the
+exact decoded output (the case's `expected_text`, the reference's
+`tokenizer.decode(target_ids, skip_special_tokens=True)`), the prompt positions, finish reason and the
+end-to-end `generate` result.
+
+**Measured local evidence** (manifest `local_evidence`; M5 Max / macOS 27.0.1, TF32 off, pinned
+mlx-metal 0.31.2 / mlx-c fba4470): maximum Java-vs-reference absolute logit error
+**1.02996826171875e-4** (stable across repeated runs), hence the recorded ε = 2e-4 / margin = 1e-4
+(eligibility bound 2ε + margin = 5e-4, about 6.3x below the 0.003166 minimum gap). MLX allocator peak
+31,100,376,165 bytes (deterministic across runs; suite bound: peak + 500 MiB); sampled process footprint
+peak 51,421,089,584 bytes (suite bound: 52,000,000,000 bytes, ~552 MB above the measured peak). Load wall
+~1133 ms; one-request generation wall ~5423 ms.
+
+**CI status: first self-hosted run pending.** A `phi3v` row was added to
+`.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner (the standard 7 GB runner cannot
+hold the 51.4 GB measured footprint, and GitHub's larger `macos-26-xlarge` tier is billed per minute even
+in public repos, so the row does not target it). The row's first execution accepts the CI pipeline
+(checkout, artifact download, native bootstrap, pinned suite), not independent host, OS or memory-fit
+evidence, and the supported macOS 26 hosted execution remains pending. The suite's footprint bound fails
+the suite on a memory regression, but it is not a guarantee the runner's RAM survives a large regression
+(the OS and the Gradle daemon share that RAM, and macOS may swap or kill first). The runner is the same
+M5 Max host (128 GB, macOS 27.0.1) that produced the local evidence, so runner fit is not the open
+question. While the self-hosted runner is offline the row's jobs wait and GitHub fails them after 24
+hours; the other rows run on the standard hosted runner (`tools/tier-b/README.md`).

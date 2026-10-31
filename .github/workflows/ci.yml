@@ -132,9 +132,17 @@ jobs:
         shell: bash
         run: ./tools/mlx-oracle/install.sh
 
+      # The phi3v image-oracle family reproduces only on the macOS arm64 platform the bins
+      # were recorded on (the pinned torch wheel's FMA-contracted bicubic arithmetic; the
+      # pinned Linux wheels are known to differ or are unverified); the Java job's runner
+      # skips it, so the reference verification of that family lives on this runner instead.
+      - name: Install hash-locked image oracle
+        shell: bash
+        run: ./tools/image-oracle/install.sh
+
       - name: Run root verification
         # Runs the repository-wide source guards after native bootstrap and oracle setup.
-        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures -PmlxOracleRequireAllProfiles=true
+        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures verifyImageOracle verifyImageOracleFixtures -PmlxOracleRequireAllProfiles=true
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use
       # Gradle's build cache here: a cached test result would not demonstrate
@@ -179,7 +187,9 @@ jobs:
                               'Qwen3VlVisionTowerValidationTest',
                               'Qwen3VlModelLoadTest', 'Qwen3VlModelAffineLoadTest',
                               'Qwen3VlGenerationTest', 'Qwen3VlMemoryTest', 'Qwen3VlCacheEquivalenceTest',
-                              'Qwen3VlGoldenTest', 'Qwen3VlDefaultPrecisionTest'],
+                              'Qwen3VlGoldenTest', 'Qwen3VlDefaultPrecisionTest',
+                              'Phi3VModelTest', 'Phi3VGoldenTest', 'Phi3VDefaultPrecisionTest',
+                               'Phi3VRopeReferenceTest', 'Phi3VGenerationTest', 'Phi3VMemoryTest'],
           }
           # Golden references run in their own full-float32 JVM. Batch equivalence must
           # execute in both precision modes. Probe (b) remains evidence only.
@@ -188,7 +198,7 @@ jobs:
                             'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest',
                             'Qwen3VlVisionTowerGoldenTest',
                             'Qwen3VlTextOnlyEquivalenceTest', 'Qwen3VlModelFloatGoldenTest',
-                            'Qwen3VlGoldenTest']
+                            'Qwen3VlGoldenTest', 'Phi3VGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['Qwen3VlCacheEquivalenceTest'] = ['test', 'float32GoldenTest']
@@ -263,6 +273,12 @@ jobs:
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.SmolVlmGoldenTest.xml
             jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlGoldenTest.xml
             jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VModelTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VRopeReferenceTest.xml
+            jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3VGoldenTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VGenerationTest.xml
+            jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VMemoryTest.xml
           if-no-files-found: warn
 
       - name: Upload packed attention probe

@@ -2,7 +2,9 @@
 
 This directory pins the slow PIL image processor (`Idefics3ImageProcessor`,
 transformers 4.57.6 over Pillow 12.3.0 and numpy 2.5.3) that is the reference for
-`jmlx-vision`'s decode, resize and preprocessing ports. It loads only committed local
+`jmlx-vision`'s decode, resize and preprocessing ports. Phase 7.3c adds torch 2.6.0 and
+torchvision 0.21.0 to the lock for the hash-pinned Phi-3.5-Vision trust-remote-code bundle
+under `fixtures/phi3v/` (the `phi3v` oracle family, WP2). It loads only committed local
 image files plus the hash-pinned `preprocessor_config.json`; generation and verification
 never download images or models from the Hub.
 

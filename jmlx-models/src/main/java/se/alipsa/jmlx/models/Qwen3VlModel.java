@@ -617,7 +617,7 @@ public final class Qwen3VlModel implements TextGenerationModel {
           listener,
           (activation, caches) ->
               prefill(request.cancellationToken(), request.images(), plan, activation, caches),
-          (ids, caches) -> {
+          (ids, caches, token) -> {
             observer.accept("decode");
             int position = plan.ropePositionAt(caches.get(0).nextPosition());
             return decoder.decode(

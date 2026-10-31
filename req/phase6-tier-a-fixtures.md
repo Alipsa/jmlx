@@ -74,3 +74,16 @@ SHA-256-pinned, together with the golden and every checkpoint file, in
 at every base-case step; recorded in the golden's `greedy_id_note`); the binding gate is the
 full logit-vector comparison. See `req/plans/phase7-3b-reference-findings.md` §11.8 for the
 case inventory, the shared-contract coverage decision and the remaining Tier-B/8B scope.
+
+## Phase 7.3c Phi-3.5-Vision WP6 fixtures (2026-10-28)
+
+| Fixture | Input / seed | Golden | Test or verifier |
+| --- | --- | --- | --- |
+| Tiny WP6 `Phi3VModel` checkpoint | `tools/hf-reference/goldens/checkpoints/phi3v-wp6/` (21-key `config.json`, 76 BF16 tensors with the single shared `embed_tokens` / `vision_embed_tokens.wte` embedding stored once, 14-key `preprocessor_config.json`, the committed 21-token phi3v fixture tokenizer, deterministic PNGs); generator seed 20261025 | `phi3v-wp6.json` (schema `jmlx-phase7-3c-wp6-phi3v-model-v1`): per-case unexpanded/expanded IDs with the sentinel marker runs, per-image HD geometry and processed-pixel SHA-256, the CLIP tower's merged hd-transform rows, and prefill plus every cached step's fresh full uncached CPU float32 logits; six cases (text-only, wide-cross-boundary, square, wide-long-prompt, tall, two-image) | `Phi3VGoldenTest` in `:jmlx-models:float32GoldenTest` (strict absolute `1e-4`; measured maximum `1.5497208e-6`) |
+| Default-precision WP6 evidence | the same six cases in the ordinary TF32 JVM | measured maximum logit/projected-row error `9.266138e-4` under the separately named bound `0.0012`, recorded in `req/phase6-golden-precision.md` | `Phi3VDefaultPrecisionTest` in the ordinary `:jmlx-models:test` |
+
+The generator `tools/hf-reference/phi3v_wp6.py` is never invoked by Gradle and is SHA-256-pinned,
+together with the golden and every checkpoint file, in `tools/hf-reference/provenance.json`
+(enforced by `verifyHfReferenceGoldens`, part of root `check`). The Tier-B acceptance of the
+pinned real 4B artifact is documented in `req/phase6-tier-b-artifacts.md`; the WP6 and WP8
+evidence are in `req/plans/phase7-3c-reference-findings.md` §14 and §16.

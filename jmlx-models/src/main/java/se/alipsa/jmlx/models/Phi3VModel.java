@@ -43,6 +43,16 @@ import tools.jackson.databind.JsonNode;
  * and {@link GenerationResult#promptPositions()} reports the expanded length the model actually
  * consumed.
  *
+ * <p>Chat requests in which any message carries structured content parts are re-flattened to
+ * markers and re-rendered from the request's retained messages ({@link #plan(GenerationRequest)});
+ * on that path a literal {@code <|image_i|>} inside a plain-string message is rejected — image
+ * markers are produced by image parts only, and the reference processor never accepts them in text.
+ * The same literal text is accepted on the rendered-text path (text requests, and chat requests
+ * whose messages are all plain strings), where literal markers are the documented prompt API.
+ * Whether marker text in a plain-string message is accepted therefore depends on the content shape
+ * of the other messages: accepted when every message is a string, rejected when any is structured
+ * (see also {@link GenerationRequest#chat}).
+ *
  * <p>Images are processed once during prefill: per image, the CLIP tower runs over the real crop
  * slots in a private vision scope, the high-definition rows are hoisted to the prefill scope, and
  * the shared projector runs once over all images' concatenated rows. The projected rows replace the
@@ -105,10 +115,26 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   static Phi3VModel load(MLXScope scope, Path directory, JsonNode root) throws IOException {
+    return load(scope, directory, root, expectedClipLayers());
+  }
+
+  /**
+   * Test-only load with an explicit expected CLIP depth: the tiny synthetic checkpoints carry three
+   * layers against the pinned ViT-L/14-336 depth, so the in-repo suites load through this overload
+   * instead of the pinned production guard (see {@link #expectedClipLayers()}).
+   */
+  static Phi3VModel load(MLXScope scope, Path directory, int expectedClipLayers)
+      throws IOException {
+    return load(
+        scope, directory, JsonFiles.read(directory.resolve("config.json")), expectedClipLayers);
+  }
+
+  private static Phi3VModel load(
+      MLXScope scope, Path directory, JsonNode root, int expectedClipLayers) throws IOException {
     Objects.requireNonNull(scope, "scope");
     Phi3VDescriptor d = Phi3VDescriptor.parse(root);
     int clipLayers = discoverClipLayers(directory);
-    requirePinnedClipDepth(clipLayers);
+    requirePinnedClipDepth(clipLayers, expectedClipLayers);
     Phi3VProcessorConfig preprocessor =
         Phi3VProcessorConfig.fromJson(
             Files.readAllBytes(directory.resolve("preprocessor_config.json")));
@@ -199,21 +225,38 @@ public final class Phi3VModel implements TextGenerationModel {
   }
 
   /**
-   * Requires the discovered CLIP depth to match the pinned ViT-L/14-336 depth: the last discovered
-   * layer is plan-optional and never executed, so a checkpoint that dropped it (for example a
-   * converter stripping the unused layer) would run the tower one block too few and corrupt every
-   * image feature with no load error. Real checkpoints carry all 24 layers; the tiny synthetic
-   * checkpoints opt out explicitly through the {@code jmlx.phi3v.expectedClipLayers} test property.
+   * The single seam that can check a depth other than the pinned one, and it is package-private: no
+   * system property, flag or other process-wide switch reaches the depth check. Production entry
+   * points (the public load and {@code TextGenerationModels}' dispatch) always require the pinned
+   * ViT-L/14-336 depth, and only the in-repo dispatch suite — whose tiny checkpoint cannot carry 24
+   * random CLIP layers — installs an override around the single load it exercises.
    */
-  static void requirePinnedClipDepth(int clipLayers) {
-    int expected =
-        Integer.getInteger("jmlx.phi3v.expectedClipLayers", Phi3VDescriptor.PINNED_CLIP_LAYERS);
-    if (clipLayers != expected) {
+  private static volatile Integer expectedClipLayersForTest;
+
+  /** Installs (or clears, with null) the test-only expected CLIP depth. Package-private. */
+  static void setExpectedClipLayersForTest(Integer expectedClipLayers) {
+    expectedClipLayersForTest = expectedClipLayers;
+  }
+
+  private static int expectedClipLayers() {
+    Integer override = expectedClipLayersForTest;
+    return override != null ? override : Phi3VDescriptor.PINNED_CLIP_LAYERS;
+  }
+
+  /**
+   * Requires the discovered CLIP depth to match the expected depth: the last discovered layer is
+   * plan-optional and never executed, so a checkpoint that dropped it (for example a converter
+   * stripping the unused layer) would run the tower one block too few and corrupt every image
+   * feature with no load error. Real checkpoints carry all 24 layers; production always checks
+   * against the pinned depth of 24 (see {@link #expectedClipLayers()}).
+   */
+  static void requirePinnedClipDepth(int clipLayers, int expectedClipLayers) {
+    if (clipLayers != expectedClipLayers) {
       throw new IllegalArgumentException(
           "checkpoint has "
               + clipLayers
-              + " CLIP encoder layers but the pinned img_processor has "
-              + expected
+              + " CLIP encoder layers but the expected img_processor has "
+              + expectedClipLayers
               + "; a shallower checkpoint would run the tower one block too few");
     }
   }
@@ -304,18 +347,17 @@ public final class Phi3VModel implements TextGenerationModel {
             plan.expandedLength(), request.config().maxNewTokens(), originalMaxPositions);
     // The re-prefill history: the clamped expanded prompt (sentinel rows embed as row 0; their
     // rows are replaced by the hook anyway) plus every generated token, appended by the decode
-    // step below. Its final size is known up front; when the boundary cannot be reached the
+    // step below. It is a pre-sized int[] with a length counter on the boundary state — no
+    // boxing, no conversion loop at the boundary; when the boundary cannot be reached the
     // decode steps never touch it.
-    List<Integer> history =
-        boundaryPossible
-            ? new ArrayList<>(plan.expandedLength() + request.config().maxNewTokens())
-            : List.of();
-    if (boundaryPossible) {
-      for (int id : clampSentinels(plan.expandedIds())) {
-        history.add(id);
-      }
-    }
     BoundaryState boundary = new BoundaryState(boundaryPossible);
+    if (boundaryPossible) {
+      int[] clamped = clampSentinels(plan.expandedIds());
+      int[] history = new int[plan.expandedLength() + request.config().maxNewTokens()];
+      System.arraycopy(clamped, 0, history, 0, clamped.length);
+      boundary.history = history;
+      boundary.historyLength = clamped.length;
+    }
     try {
       return decoder.runStepLoop(
           request,
@@ -334,7 +376,7 @@ public final class Phi3VModel implements TextGenerationModel {
                   activation,
                   caches,
                   boundary),
-          (ids, caches, token) -> decodeStep(ids, caches, history, boundary, token));
+          (ids, caches, token) -> decodeStep(ids, caches, boundary, token));
     } catch (PreparationCancelled cancelled) {
       GenerationResult result =
           new GenerationResult(
@@ -401,12 +443,16 @@ public final class Phi3VModel implements TextGenerationModel {
    * steps. {@code active} gates the per-step token readback and history bookkeeping; {@code hook}
    * and {@code retainedRows} exist only while the rows must survive for the re-prefill, and are
    * released the moment it fires (it can fire at most once: the total width only grows past the
-   * boundary afterwards).
+   * boundary afterwards). {@code history}/{@code historyLength} is the re-prefill's pre-sized
+   * history (the clamped expanded prompt, then the generated tokens) and its current length;
+   * package-private so the seam-driven test suites drive the decode steps directly.
    */
   static final class BoundaryState {
     private boolean active;
     private DecoderModel.EmbeddingHook hook;
     private MLXArray retainedRows;
+    int[] history;
+    int historyLength;
 
     BoundaryState(boolean active) {
       this.active = active;
@@ -595,17 +641,13 @@ public final class Phi3VModel implements TextGenerationModel {
    * re-prefill can fire at most once and later steps owe it nothing. Package access lets the golden
    * test drive the loop step by step against the fresh-forward reference.
    */
-  MLXArray decodeStep(
-      MLXArray ids,
-      List<KVCache> caches,
-      List<Integer> history,
-      BoundaryState boundary,
-      int token) {
+  MLXArray decodeStep(MLXArray ids, List<KVCache> caches, BoundaryState boundary, int token) {
     if (!boundary.active) {
       observer.accept("decode");
       return decoder.decode(ids, caches, null, null);
     }
-    history.add(token);
+    boundary.history[boundary.historyLength] = token;
+    boundary.historyLength++;
     observer.accept("decode");
     if (caches.get(0).nextPosition() == originalMaxPositions) {
       // The reference's boundary recompute: the step that first reaches original_max + 1
@@ -615,11 +657,8 @@ public final class Phi3VModel implements TextGenerationModel {
       for (KVCache cache : caches) {
         cache.reset();
       }
-      int width = history.size();
-      int[] full = new int[width];
-      for (int i = 0; i < width; i++) {
-        full[i] = history.get(i);
-      }
+      int width = boundary.historyLength;
+      int[] full = Arrays.copyOf(boundary.history, width);
       MLXArray fullIds = MLX.array(ids.scope(), full, new int[] {1, width});
       MLXArray logits =
           decoder.stepLogits(fullIds, caches, new int[] {width}, boundary.hook, null, null);
@@ -665,24 +704,19 @@ public final class Phi3VModel implements TextGenerationModel {
 
   /**
    * The CLIP tower input for one image's real slots: the contiguous real-slot prefix of the
-   * processor's slot-major CHW row, transposed to the tower's channels-last layout. {@link
-   * Phi3VImageProcessorResult#values()} hands out a defensive copy (that class's public contract,
-   * so the unavoidable Java-heap copy happens there), and the {@code offset}/{@code length}
-   * overload uploads just the real slots — the padded buffer never crosses to native memory and no
-   * second trim copy is made. Zero-padded slots are never computed (the reference computes them and
+   * processor's slot-major CHW row, transposed to the tower's channels-last layout. The ranged copy
+   * uploads only the real slots — the padded tail of the row never crosses to native memory and the
+   * one unavoidable Java-heap copy (the result's defensive contract) is of the real-slot prefix,
+   * not the whole padded row. Zero-padded slots are never computed (the reference computes them and
    * slices their rows away — a recorded bit-identical deviation).
    */
   private static MLXArray pixels(
       MLXScope scope, Phi3VImageProcessorResult prepared, int realSlots) {
     int plane = CLIP_IMAGE * CLIP_IMAGE;
     int elements = Math.multiplyExact(realSlots, 3 * plane);
-    MLXArray chw =
-        MLX.array(
-            scope,
-            prepared.values(),
-            0,
-            elements,
-            new int[] {realSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
+    float[] real = new float[elements];
+    prepared.copyValuesTo(real, 0, 0, elements);
+    MLXArray chw = MLX.array(scope, real, new int[] {realSlots, 3, CLIP_IMAGE, CLIP_IMAGE});
     return MLXShape.transpose(chw, new int[] {0, 2, 3, 1});
   }
 

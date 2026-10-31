@@ -38,7 +38,7 @@ class Phi3VModelTest {
 
   private static Phi3VModel load(Path dir, MLXScope scope) throws Exception {
     TinyCheckpoints.randomPhi3V(dir, SEED);
-    return Phi3VModel.load(scope, dir);
+    return Phi3VModel.load(scope, dir, TinyCheckpoints.PHI3V_CLIP_LAYERS);
   }
 
   private static GenerationRequest textRequest(
@@ -70,33 +70,35 @@ class Phi3VModelTest {
   }
 
   @Test
-  void clipDepthMustMatchThePinnedArchitecture() {
-    // The test JVM opts the fixtures out to 3 layers; clearing the property restores the pinned
-    // production default for the duration of this check.
-    String key = "jmlx.phi3v.expectedClipLayers";
-    String original = System.getProperty(key);
-    System.clearProperty(key);
-    try {
-      Phi3VModel.requirePinnedClipDepth(24);
-      var error =
-          assertThrows(IllegalArgumentException.class, () -> Phi3VModel.requirePinnedClipDepth(23));
-      assertTrue(error.getMessage().contains("23"), error.getMessage());
+  void clipDepthMustMatchTheExpectedArchitecture() {
+    Phi3VModel.requirePinnedClipDepth(24, 24);
+    var error =
+        assertThrows(
+            IllegalArgumentException.class, () -> Phi3VModel.requirePinnedClipDepth(23, 24));
+    assertTrue(error.getMessage().contains("23"), error.getMessage());
+    assertTrue(error.getMessage().contains("24"), error.getMessage());
+    // The explicit allowance itself is honored.
+    Phi3VModel.requirePinnedClipDepth(3, 3);
+    assertThrows(IllegalArgumentException.class, () -> Phi3VModel.requirePinnedClipDepth(24, 3));
+  }
+
+  @Test
+  void thePublicLoadRejectsTheTinyCheckpointDepth(@TempDir Path dir) throws Exception {
+    // The production entry points always check against the pinned depth of 24 (no test property
+    // or flag reaches the guard), so a checkpoint that dropped CLIP layers is rejected here.
+    TinyCheckpoints.randomPhi3V(dir, SEED);
+    try (MLXScope scope = new MLXScope()) {
+      var error = assertThrows(IllegalArgumentException.class, () -> Phi3VModel.load(scope, dir));
       assertTrue(error.getMessage().contains("24"), error.getMessage());
-      // The explicit allowance itself is honored.
-      System.setProperty(key, "3");
-      Phi3VModel.requirePinnedClipDepth(3);
-      assertThrows(IllegalArgumentException.class, () -> Phi3VModel.requirePinnedClipDepth(24));
-    } finally {
-      if (original == null) {
-        System.clearProperty(key);
-      } else {
-        System.setProperty(key, original);
-      }
+      assertTrue(error.getMessage().contains("3"), error.getMessage());
     }
   }
 
   @Test
   void dispatchLoadsPhi3VWithItsMetadata(@TempDir Path dir) throws Exception {
+    // The dispatch entry point is production: it always requires the pinned depth, so the tiny
+    // checkpoint installs the package-private test override around this single load.
+    Phi3VModel.setExpectedClipLayersForTest(TinyCheckpoints.PHI3V_CLIP_LAYERS);
     try (MLXScope scope = new MLXScope()) {
       TinyCheckpoints.randomPhi3V(dir, SEED);
       TextGenerationModel loaded = TextGenerationModels.load(scope, dir);
@@ -107,6 +109,8 @@ class Phi3VModelTest {
       assertEquals(TinyCheckpoints.PHI3V_TEXT_LAYERS, metadata.numHiddenLayers());
       assertEquals(TinyCheckpoints.PHI3V_CLIP_LAYERS, metadata.numEncoderLayers());
       assertEquals(Set.of(InputModality.TEXT, InputModality.IMAGE), metadata.inputModalities());
+    } finally {
+      Phi3VModel.setExpectedClipLayersForTest(null);
     }
   }
 
@@ -145,7 +149,6 @@ class Phi3VModelTest {
       throws Exception {
     try (MLXScope scope = new MLXScope()) {
       Phi3VModel model = load(dir, scope);
-      HfTokenizer tokenizer = HfTokenizer.fromDirectory(dir);
       byte[] pixels = new byte[672 * 336 * 3];
       for (int i = 0; i < pixels.length; i++) {
         pixels[i] = (byte) (i % 251);
@@ -160,9 +163,43 @@ class Phi3VModelTest {
       int maxNew = 8;
       List<String> events = new ArrayList<>();
       model.setObserverForTest(events::add);
-      // The generate() result must be retained until the seam-driven reference below has built
-      // its own list; the distance in between is the seam itself, not avoidable storage.
-      // CHECKSTYLE.SUPPRESS: VariableDeclarationUsageDistance
+      // The seam-driven reference runs first, so the generate() call and its assertions stay
+      // adjacent below: one caller-owned activation scope kept open for the whole request,
+      // stepping the retained hook exactly as the production loop does.
+      Phi3VPromptPlan plan = model.plan(prompt, List.of(wide));
+      int[] history = new int[plan.expandedLength() + maxNew];
+      int historyLength = 0;
+      for (int id : plan.expandedIds()) {
+        history[historyLength++] = Math.max(id, 0);
+      }
+      List<Integer> viaSeam = new ArrayList<>();
+      try (MLXScope generation = scope.newChild()) {
+        List<KVCache> caches = new ArrayList<>();
+        for (int i = 0; i < model.metadata().numHiddenLayers(); i++) {
+          caches.add(new KVCache(generation));
+        }
+        Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
+        boundary.history = history;
+        boundary.historyLength = historyLength;
+        try (MLXScope activation = generation.newChild()) {
+          MLXArray logits =
+              model
+                  .prefill(
+                      CancellationToken.NONE, List.of(wide), plan, activation, caches, boundary)
+                  .logits();
+          viaSeam.add(argmax(logits.toFloatArray()));
+          for (int step = 1; step < maxNew; step++) {
+            MLXArray ids =
+                MLX.array(activation, new int[] {viaSeam.get(step - 1)}, new int[] {1, 1});
+            MLXArray stepLogits = model.decodeStep(ids, caches, boundary, viaSeam.get(step - 1));
+            MLX.eval(DecoderModel.stepCacheArrays(caches));
+            viaSeam.add(argmax(stepLogits.toFloatArray()));
+          }
+        }
+      }
+      // The seam fired its one re-prefill; generate() must fire its own, exactly once.
+      assertEquals(1, events.stream().filter("re-prefill"::equals).count(), "seam re-prefill");
+      HfTokenizer tokenizer = HfTokenizer.fromDirectory(dir);
       List<Integer> viaModel =
           model
               .generate(
@@ -175,38 +212,7 @@ class Phi3VModelTest {
                       .withImages(List.of(wide)),
                   ignored -> {})
               .generatedTokenIds();
-      assertEquals(1, events.stream().filter("re-prefill"::equals).count(), "re-prefill events");
-      // The seam-driven reference: one caller-owned activation scope kept open for the whole
-      // request, stepping the retained hook exactly as the production loop does.
-      Phi3VPromptPlan plan = model.plan(prompt, List.of(wide));
-      List<Integer> history = new ArrayList<>();
-      for (int id : plan.expandedIds()) {
-        history.add(Math.max(id, 0));
-      }
-      List<Integer> viaSeam = new ArrayList<>();
-      try (MLXScope generation = scope.newChild()) {
-        List<KVCache> caches = new ArrayList<>();
-        for (int i = 0; i < model.metadata().numHiddenLayers(); i++) {
-          caches.add(new KVCache(generation));
-        }
-        Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
-        try (MLXScope activation = generation.newChild()) {
-          MLXArray logits =
-              model
-                  .prefill(
-                      CancellationToken.NONE, List.of(wide), plan, activation, caches, boundary)
-                  .logits();
-          viaSeam.add(argmax(logits.toFloatArray()));
-          for (int step = 1; step < maxNew; step++) {
-            MLXArray ids =
-                MLX.array(activation, new int[] {viaSeam.get(step - 1)}, new int[] {1, 1});
-            MLXArray stepLogits =
-                model.decodeStep(ids, caches, history, boundary, viaSeam.get(step - 1));
-            MLX.eval(DecoderModel.stepCacheArrays(caches));
-            viaSeam.add(argmax(stepLogits.toFloatArray()));
-          }
-        }
-      }
+      assertEquals(2, events.stream().filter("re-prefill"::equals).count(), "generate re-prefill");
       assertEquals(viaSeam, viaModel, "generate() must survive the image boundary re-prefill");
     }
   }
@@ -303,7 +309,9 @@ class Phi3VModelTest {
           java.nio.file.Files.readString(config)
               .replace("\"vocab_size\": 21", "\"vocab_size\": 20"));
       IllegalArgumentException failure =
-          assertThrows(IllegalArgumentException.class, () -> Phi3VModel.load(scope, dir));
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Phi3VModel.load(scope, dir, TinyCheckpoints.PHI3V_CLIP_LAYERS));
       assertEquals("tokenizer vocabulary exceeds checkpoint vocabulary", failure.getMessage());
     }
   }
@@ -318,7 +326,9 @@ class Phi3VModelTest {
           java.nio.file.Files.readString(preprocessor)
               .replace("\"num_img_tokens\": 144", "\"num_img_tokens\": 143"));
       IllegalArgumentException failure =
-          assertThrows(IllegalArgumentException.class, () -> Phi3VModel.load(scope, dir));
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> Phi3VModel.load(scope, dir, TinyCheckpoints.PHI3V_CLIP_LAYERS));
       assertEquals(
           "preprocessor num_img_tokens 143 disagrees with config img_processor num_img_tokens 144",
           failure.getMessage());

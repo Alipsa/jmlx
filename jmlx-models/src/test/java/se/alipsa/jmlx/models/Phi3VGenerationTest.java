@@ -35,7 +35,8 @@ class Phi3VGenerationTest {
   @Test
   void mixedRequestsKeepTheirOwnCapacityAndSlidingIsRejected() throws Exception {
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      var model =
+          Phi3VModel.load(root, Phi3VTestSupport.directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       var requests = Phi3VTestSupport.requests(5);
       List<GenerationResult> expected = new ArrayList<>();
       for (var request : requests) {
@@ -99,7 +100,8 @@ class Phi3VGenerationTest {
   @Test
   void capacityBoundedFullRetentionFitsTheBoundaryRePrefill() throws Exception {
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      var model =
+          Phi3VModel.load(root, Phi3VTestSupport.directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       HfTokenizer tokenizer = Phi3VTestSupport.tokenizer();
       List<RgbImage> wide = List.of(Phi3VTestSupport.wide());
       // 465 prompt tokens, budget 8: the demand is 472 and decode step 6 first reaches total
@@ -135,7 +137,8 @@ class Phi3VGenerationTest {
   @Test
   void cancellationStopsAtEveryBoundary() throws Exception {
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      var model =
+          Phi3VModel.load(root, Phi3VTestSupport.directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       var base = Phi3VTestSupport.requests(5).get(4); // two-image: wide then square
       for (String boundary :
           List.of(
@@ -212,7 +215,8 @@ class Phi3VGenerationTest {
   @Test
   void eosStopSamplingStreamingAndAbortUseTheSharedContracts() throws Exception {
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      var model =
+          Phi3VModel.load(root, Phi3VTestSupport.directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       var base =
           Phi3VTestSupport.request(
               Phi3VTestSupport.tokenizer(),
@@ -321,7 +325,7 @@ class Phi3VGenerationTest {
               "<|user|>\ntoast <|image_1|> toast<|end|>\n<|assistant|>\n",
               List.of(Phi3VTestSupport.square()),
               5);
-      var model = Phi3VModel.load(root, checkpoint);
+      var model = Phi3VModel.load(root, checkpoint, TinyCheckpoints.PHI3V_CLIP_LAYERS);
       GenerationRequest structured =
           GenerationRequest.chat(
                   HfTokenizer.fromDirectory(checkpoint),

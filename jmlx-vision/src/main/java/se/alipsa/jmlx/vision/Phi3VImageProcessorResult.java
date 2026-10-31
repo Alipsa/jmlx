@@ -71,18 +71,51 @@ public final class Phi3VImageProcessorResult {
    *     destination capacity
    */
   public void copyValuesTo(float[] destination, int offset) {
+    copyValuesTo(destination, offset, 0, values.length);
+  }
+
+  /**
+   * Copies a range of the slot-major row into {@code destination} without touching the rest of the
+   * row: the caller that only consumes the image's real slots ({@code geometry.cropBlocks() + 1}
+   * leading slots — the reference computes the zero-padded slots and slices their rows away) copies
+   * only those, not the padded tail.
+   *
+   * @param destination destination array; must have room for {@code length} values at {@code
+   *     destOffset}
+   * @param destOffset starting index in {@code destination}
+   * @param srcOffset starting slot-major float index in this row, in [0, slotCount * 3 * 336 * 336)
+   * @param length number of floats to copy; the range must not run past the end of the row
+   * @throws IllegalArgumentException if {@code destination} is null, or {@code srcOffset} or {@code
+   *     length} is negative
+   * @throws IndexOutOfBoundsException if either range exceeds its array
+   */
+  public void copyValuesTo(float[] destination, int destOffset, int srcOffset, int length) {
     if (destination == null) {
       throw new IllegalArgumentException("destination must not be null");
     }
-    if (offset < 0 || offset > destination.length - values.length) {
+    if (srcOffset < 0 || length < 0) {
+      throw new IllegalArgumentException(
+          "srcOffset " + srcOffset + " and length " + length + " must be non-negative");
+    }
+    if (destOffset < 0 || destOffset > destination.length - length) {
       throw new IndexOutOfBoundsException(
-          "offset "
-              + offset
+          "destOffset "
+              + destOffset
               + " cannot copy "
-              + values.length
+              + length
               + " floats into a destination of length "
               + destination.length);
     }
-    System.arraycopy(values, 0, destination, offset, values.length);
+    if (srcOffset > values.length - length) {
+      throw new IndexOutOfBoundsException(
+          "srcOffset "
+              + srcOffset
+              + " cannot copy "
+              + length
+              + " floats from a row of "
+              + values.length
+              + " floats");
+    }
+    System.arraycopy(values, srcOffset, destination, destOffset, length);
   }
 }

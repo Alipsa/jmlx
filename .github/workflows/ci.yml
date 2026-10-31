@@ -132,9 +132,16 @@ jobs:
         shell: bash
         run: ./tools/mlx-oracle/install.sh
 
+      # The phi3v image-oracle family reproduces only on arm64 (the pinned torch wheel's
+      # FMA-contracted bicubic arithmetic); the Java job's runner skips it there, so the
+      # reference verification of that family lives on this Apple-Silicon runner instead.
+      - name: Install hash-locked image oracle
+        shell: bash
+        run: ./tools/image-oracle/install.sh
+
       - name: Run root verification
         # Runs the repository-wide source guards after native bootstrap and oracle setup.
-        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures -PmlxOracleRequireAllProfiles=true
+        run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures verifyImageOracle verifyImageOracleFixtures -PmlxOracleRequireAllProfiles=true
 
       # The Java job already verifies jmlx-jinja/jmlx-tokenizer. Do not use
       # Gradle's build cache here: a cached test result would not demonstrate

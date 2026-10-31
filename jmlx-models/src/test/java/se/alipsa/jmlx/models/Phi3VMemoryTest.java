@@ -55,7 +55,8 @@ class Phi3VMemoryTest {
   @Test
   void visualWorkDiesAtPrefillRetainedRowsOutliveItAndOnlyKvGrowsDuringDecode() throws Exception {
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      var model =
+          Phi3VModel.load(root, Phi3VTestSupport.directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       int hidden = model.decoderForTest().config().hiddenSize();
       var request =
           Phi3VTestSupport.request(
@@ -184,17 +185,20 @@ class Phi3VMemoryTest {
         }
         // Decode steps 1..5 stay at or below the boundary (entry positions 465..469), so the
         // retained rows are never consumed and only KV grows.
-        List<Integer> history = new java.util.ArrayList<>();
+        int[] history = new int[plan.expandedLength() + 5];
+        int historyLength = 0;
         for (int id : plan.expandedIds()) {
-          history.add(Math.max(id, 0));
+          history[historyLength++] = Math.max(id, 0);
         }
+        boundary.history = history;
+        boundary.historyLength = historyLength;
         for (int step = 1; step <= 5; step++) {
           if (step == 1 || step == 5) {
             MLXMemory.clearCache();
           }
           try (MLXScope activation = generation.newChild()) {
             MLXArray ids = MLX.array(activation, new int[] {next[0]}, new int[] {1, 1});
-            MLXArray logits = model.decodeStep(ids, caches, history, boundary, next[0]);
+            MLXArray logits = model.decodeStep(ids, caches, boundary, next[0]);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
             next[0] = argmax(logits.toFloatArray());
           }
@@ -274,7 +278,8 @@ class Phi3VMemoryTest {
   @Test
   void repeatedMixedRequestsAndFailuresReturnToBaseline(@TempDir Path directory) throws Exception {
     try (MLXScope root = new MLXScope()) {
-      var model = Phi3VModel.load(root, Phi3VTestSupport.directory());
+      var model =
+          Phi3VModel.load(root, Phi3VTestSupport.directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       var requests = Phi3VTestSupport.requests(5);
       for (var request : requests) {
         model.generate(request, ignored -> {});

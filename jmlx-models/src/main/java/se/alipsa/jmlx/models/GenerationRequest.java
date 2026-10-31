@@ -120,6 +120,22 @@ public final class GenerationRequest {
    * fetching any URL or path. Pixels belong on the returned request via {@link
    * #withImages(java.util.List)}, paired with the image parts in order of appearance.
    *
+   * <p>The retained messages and options are the request's snapshot, taken when the request is
+   * built: a model whose prompt expansion re-renders them (Phi-3.5-Vision) must expand exactly what
+   * {@link #promptTokenIds()} was encoded from, and a caller mutation after the build must not
+   * change that. The deep copy therefore happens eagerly here — deferring it to the model's first
+   * read would capture mutations made between request creation and generation and could silently
+   * diverge the re-expansion from the retained IDs. It is paid by every chat request, including
+   * ones a text-only model consumes; that is the deliberate cost of the build-time snapshot
+   * (round-6 design review).
+   *
+   * <p>Phi-3.5-Vision re-flattens the messages whenever any one carries structured content, and on
+   * that path a literal image marker ({@code <|image_i|>}) inside a plain-string message is
+   * rejected: image markers are produced by image parts only. The same literal text is accepted
+   * when every message is a plain string, since the rendered text is expanded as-is (the
+   * marker-in-text prompt API); the rule is per path, and the two paths differ only by the content
+   * shape of the other messages (see {@code Phi3VModel}).
+   *
    * @param tokenizer tokenizer and template bundle paired with the checkpoint
    * @param messages ordered role/content messages; content is text or structured content parts
    * @param options chat-template options

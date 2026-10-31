@@ -142,7 +142,7 @@ class Phi3VGoldenTest {
   static float runCases(float bound, boolean assertGreedyTokens) throws Exception {
     float maximum = 0;
     try (MLXScope root = new MLXScope()) {
-      Phi3VModel model = Phi3VModel.load(root, directory());
+      Phi3VModel model = Phi3VModel.load(root, directory(), TinyCheckpoints.PHI3V_CLIP_LAYERS);
       Phi3VImageProcessor processor =
           new Phi3VImageProcessor(
               Phi3VProcessorConfig.fromJson(
@@ -230,9 +230,10 @@ class Phi3VGoldenTest {
             : c.get("recompute_step").intValue();
     // The re-prefill history: the clamped expanded prompt (sentinel rows embed as row 0; their
     // rows are replaced by the hook anyway), exactly as the production request seeds it.
-    List<Integer> history = new ArrayList<>();
+    int[] history = new int[plan.expandedLength() + decodeSteps.size()];
+    int historyLength = 0;
     for (int id : plan.expandedIds()) {
-      history.add(Math.max(id, 0));
+      history[historyLength++] = Math.max(id, 0);
     }
     try (MLXScope generation = root.newChild()) {
       List<KVCache> caches = new ArrayList<>();
@@ -240,6 +241,8 @@ class Phi3VGoldenTest {
         caches.add(new KVCache(generation));
       }
       Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
+      boundary.history = history;
+      boundary.historyLength = historyLength;
       events.clear();
       for (int step = 0; step < decodeSteps.size(); step++) {
         JsonNode stepGolden = decodeSteps.get(step);
@@ -254,7 +257,7 @@ class Phi3VGoldenTest {
           } else {
             int token = decodeSteps.get(step - 1).required("token_id").intValue();
             MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-            logits = model.decodeStep(ids, caches, history, boundary, token);
+            logits = model.decodeStep(ids, caches, boundary, token);
             MLX.eval(DecoderModel.stepCacheArrays(caches));
           }
           stepLogits = logits.toFloatArray();

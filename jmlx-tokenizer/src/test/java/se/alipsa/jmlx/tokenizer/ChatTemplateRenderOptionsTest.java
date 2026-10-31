@@ -110,6 +110,20 @@ class ChatTemplateRenderOptionsTest {
     assertNull(ChatTemplateOptions.defaults(true).renderOptions());
   }
 
+  @Test
+  void extraContextIsDeepCopiedAtConstruction() {
+    // A caller mutation of a nested value (a tools list) after construction must not change what
+    // a later render sees: the request's retained options are part of its build-time snapshot.
+    List<String> tools = new java.util.ArrayList<>(List.of("search"));
+    Map<String, Object> context = new java.util.LinkedHashMap<>();
+    context.put("tools", tools);
+    final ChatTemplateOptions options = new ChatTemplateOptions("", false, context);
+    tools.add("sabotage");
+    tools.remove("search");
+    context.put("tools", "sabotage");
+    assertEquals(List.of("search"), options.extraContext().get("tools"));
+  }
+
   private static RenderOptions fixedClock(ZoneId zone) {
     return RenderOptions.builder()
         .clock(Clock.fixed(Instant.parse("2024-01-01T00:30:00Z"), ZoneOffset.UTC))

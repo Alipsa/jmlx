@@ -1048,3 +1048,25 @@ builds through `tokenizerBacked`; a `rope_type`-carrying su config names the
 newer-transformers form in its rejection. Deferred per the reviewer's own triage: precomputing the
 two Su frequency tables (performance only) and the vision-language models' shared helper
 extraction (follow-up PR).
+
+A seventh PR #68 review round landed: the `jmlx.phi3v.expectedClipLayers` system property is gone —
+production loads (the public `Phi3VModel.load` and the `TextGenerationModels` dispatch) always
+require the pinned 24; the tiny three-layer checkpoints load through a package-private
+`load(scope, dir, expectedClipLayers)` overload, and the one dispatch test installs a package-private
+`setExpectedClipLayersForTest` override around its single load. `runner.py` skips the arm64-only
+`phi3v` image-oracle family with a logged skip on other architectures (the pinned torch wheel's
+FMA-contracted bicubic bytes are AArch64-specific), and the macOS 26 native CI job now also runs
+`verifyImageOracle`/`verifyImageOracleFixtures` so the family stays reference-verified in CI on
+arm64. `ChatTemplateOptions` deep-copies `extraContext` recursively (it was one level deep, so a
+nested tools-list mutation after the request was built could diverge the Phi-3V re-expansion from
+`promptTokenIds`); `GenerationRequest.chat` keeps its eager build-time message deep copy — it is
+the snapshot `promptTokenIds` were encoded from, and deferring it breaks the pinned mutation tests —
+with the rationale documented on the method. `Phi3VImageProcessorResult` gained a ranged
+`copyValuesTo` and the prefill uploads only the real-slot prefix (~2.7 MB, not the ~23 MB padded
+row); the re-prefill history is a pre-sized `int[]` + length counter on `BoundaryState` (no
+boxing); the marker-text-in-plain-string rule is documented as per-path on `GenerationRequest.chat`
+and `Phi3VModel`; the `Phi3VModelTest` boundary test is restructured (seam reference first, no
+Checkstyle suppression); and the `embd_layer.embedding_cls` presence-only check was verified
+against the digest-pinned bundled modeling (the value is indexed but never read). The
+vision-language shared-helper extraction remains a deferred follow-up. No native pin, generated
+binding or golden changed.

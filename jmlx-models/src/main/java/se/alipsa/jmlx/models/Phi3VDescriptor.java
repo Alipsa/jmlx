@@ -75,8 +75,9 @@ record Phi3VDescriptor(ArchitectureDescriptor text, int numImgTokens, String emb
    * The pinned ViT-L/14-336 encoder depth. The last discovered layer is plan-optional and never
    * executed, so the loader requires the discovered depth to match this exactly: a checkpoint that
    * dropped the final layer would run the tower one block too few and corrupt every image feature
-   * with no error. The tiny synthetic checkpoints carry fewer layers and opt out explicitly via the
-   * {@code jmlx.phi3v.expectedClipLayers} test property.
+   * with no error. Production loads always check against this depth; the tiny synthetic checkpoints
+   * carry fewer layers and load through the package-private explicit-depth overload instead (see
+   * {@code Phi3VModel}).
    */
   static final int PINNED_CLIP_LAYERS = 24;
 
@@ -271,8 +272,11 @@ record Phi3VDescriptor(ArchitectureDescriptor text, int numImgTokens, String emb
     if (!node.path("with_learnable_separator").asBoolean(false)) {
       throw new IllegalArgumentException("embd_layer.with_learnable_separator must be true");
     }
-    // The bundled code indexes this key directly, but never reads the value: required textual,
-    // recorded and inert.
+    // The bundled code indexes this key directly (a missing key would KeyError), but never
+    // reads the value: Phi3ImageEmbedding consumes only use_hd_transform, with_learnable_separator
+    // and hd_transform_order from the same kwargs (verified against the digest-pinned bundled
+    // modeling_phi3_v.py, tools/image-oracle/fixtures/phi3v/). Required textual, recorded and
+    // inert — a value such as "linear" loads and runs the HD path exactly as "image" does.
     String embeddingCls = node.path("embedding_cls").asString();
     if (embeddingCls.isEmpty()) {
       throw new IllegalArgumentException("embd_layer.embedding_cls must be a non-empty string");

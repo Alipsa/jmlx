@@ -965,3 +965,100 @@ implemented" row replaced with the MoE-VLM-variants rejection row),
 updated to three arms), `AGENTS.md` (a new "Phase 7.3c additions" section) and
 `req/plans/phase7-plan.md` (delivery-table row and the §7.3c implementation note). No
 native pin, generated binding or public API changed in WP8.
+
+## 17. PR #68 seventh review round (2026-10-31)
+
+**phi3v image-oracle family is arm64-only (CI-blocking).** The committed `phi3v/patches/`
+bins reproduce the pinned **AArch64** torch wheel's FMA-contracted bicubic arithmetic only;
+the pinned x86 CPU wheel emits different bytes, so `verifyImageOracleFixtures` failed on the
+ubuntu (x86_64) Java job. `runner.py` now gates the `phi3v` family: on a non-arm64 machine
+`run_phi3v` raises `SkipFamily` and `main` logs `Image oracle fixture skipped: ...
+(phi3v (arm64-only reference bytes))` in both verify and generate modes (a generate run on
+x86 must not silently rewrite the bins with x86 bytes). The pure-Java digest guards
+(`verifyImageOracleFixtureDigests`, part of root `check`) and `ImageOraclePhi3VTest` (which
+verifies Java's `TorchBicubic` against the committed arm64 bins on every architecture) are
+unaffected and still run on x86. The macOS 26 native CI job now also installs the image
+oracle and runs `verifyImageOracle verifyImageOracleFixtures`, so the family stays
+end-to-end reference-verified in CI on arm64. `jmlx-vision/README.md` records the gate.
+
+**`ChatTemplateOptions.extraContext` was copied one level deep.** The compact constructor
+copied only the top-level map, so a caller mutation of a nested value (a tools list) after
+the request was built changed what `Phi3VModel.plan`'s re-render saw, diverging the
+expansion from `promptTokenIds` — the exact leak the message deep copy was added to
+prevent. The compact constructor now copies the values recursively (insertion-order
+unmodifiable wrappers; nested map keys preserved as-is, scalars by reference), matching the
+documented "defensively copies caller context" contract. No caller relied on aliasing
+(grep: no test passes a mutable nested context and asserts the alias).
+
+**`embd_layer.embedding_cls` presence-only check verified.** The comment's claim was checked
+against the digest-pinned bundled `modeling_phi3_v.py`
+(`tools/image-oracle/fixtures/phi3v/`): `Phi3VModel.__init__` indexes
+`config.embd_layer['embedding_cls']` directly (a missing key would KeyError), but
+`Phi3ImageEmbedding.__init__` consumes only `use_hd_transform`, `with_learnable_separator`
+and `hd_transform_order` from the same `**kwargs`; the value itself is never read, so the
+descriptor keeps presence + non-empty string and any value (e.g. `"linear"`) loads and runs
+the HD path. No code change beyond the verification note.
+
+**Marker text in plain-string messages: per-path rule documented.** When any message carries
+structured content, `Phi3VModel.plan` takes the re-flatten path, which rejects a literal
+`<|image_i|>` inside plain-string messages (markers are produced by image parts only; the
+reference never accepts them in text). The same literal text is accepted when every message
+is a plain string, where the rendered text is expanded as-is — the marker-in-text prompt API
+that text requests (and the Tier-B manifest's literal-marker request) rely on. The rules
+cannot be unified without breaking that API, so the behavior is documented on
+`GenerationRequest.chat` and the `Phi3VModel` class Javadoc.
+
+**The CLIP-depth load guard no longer has a process-wide switch.**
+`Integer.getInteger("jmlx.phi3v.expectedClipLayers", 24)` let any JVM relax the guard
+(silently wrong image features). Production always checks against `PINNED_CLIP_LAYERS`:
+`Phi3VModel.load(scope, dir)` (public) and the dispatch `load(scope, dir, root)` do. The
+tiny three-layer checkpoints load through a package-private
+`load(scope, dir, expectedClipLayers)` overload, and `TextGenerationModels.load` dispatch in
+the one in-repo test that exercises it installs a package-private
+`setExpectedClipLayersForTest` override around that single load (try/finally cleared).
+`requirePinnedClipDepth(clipLayers, expectedClipLayers)` takes the depth explicitly; the
+Gradle `systemProperty` block is gone. New test: the public load rejects the tiny
+checkpoint's depth with the pinned-24 message.
+
+**Prefill uploads only the real slots.** `Phi3VImageProcessorResult` gained
+`copyValuesTo(dest, destOffset, srcOffset, length)` (the two-argument overload delegates);
+`Phi3VModel.pixels` allocates the right-sized buffer and copies just the
+`cropBlocks() + 1` real-slot prefix — with `num_crops=4` and a 336×336 image the per-image
+per-request copy drops from ~23 MB (whole 5-slot padded row clone) to ~2.7 MB.
+
+**`GenerationRequest.chat` keeps the eager build-time deep copy (design decision).** The
+round-6 feedback asked to make the recursive message copy lazy or move it to the Phi3V
+request path. The copy is the build-time snapshot: `promptTokenIds` are encoded from the
+caller's messages/options at `chat()` time, and the model's later re-expansion must match
+them, so the snapshot can only be taken at build time — a copy deferred to the model's first
+read would capture caller mutations made between request creation and generation. The
+pinned tests require exactly this: `GenerationRequestPromptTextTest.chatRequestsDeepCopy-
+MessagesWithoutRejectingNullsOrReorderingKeys` (top-level mutation after the build) and
+`Phi3VGenerationTest`'s structured-chat test (`sabotage(...)` removes the image part and
+flips the role after request creation; the expansion must be unchanged). Both pass
+unchanged. The cost — one deep copy per chat request, also for text-only models — is the
+deliberate price of the invariant; it is documented on `GenerationRequest.chat`.
+`ChatTemplateOptions`' own extraContext snapshot is built when the caller constructs the
+options (before or with the `chat()` call), so both halves of the snapshot are build-time.
+
+**The re-prefill history is a pre-sized `int[]`.** `BoundaryState` now carries
+`history`/`historyLength` (package-private fields; the seam-driven suites seed them);
+`decodeStep(ids, caches, boundary, token)` appends by index and the boundary copies
+`Arrays.copyOf(history, width)` — no boxing, no conversion loop. Call sites updated:
+`Phi3VGoldenTest`, `Phi3VMemoryTest`, `Phi3VModelTest`, `TierBPhi3VTest`.
+
+**Test restructure instead of a Checkstyle suppression.**
+`Phi3VModelTest.imageBoundaryGenerateRetainsTheProjectedRowsForTheRePrefill` now runs the
+seam-driven reference first and keeps the `generate()` call adjacent to its assertions (the
+`CHECKSTYLE.SUPPRESS: VariableDeclarationUsageDistance` comment is gone; the re-prefill
+event count is asserted per phase: 1 after the seam, 2 after `generate()`). The same check
+surfaced two further distances introduced by the history rework (`tokenizer` in
+`Phi3VModelTest`, `caches` in `TierBPhi3VTest`); both were restructured, none suppressed.
+
+**Still deferred (tracked).** The shared-helper extraction across the three vision-language
+models (the FLOAT32 up-cast loop, `PreparationCancelled`/`checkCancellation`, cancelled-
+result construction, and `Phi3VPromptExpander.flattenedContentPart` repeating
+`HfTokenizer.validatedContentPart`'s key checks) remains a follow-up PR, as AGENTS.md
+records; round 6 asked only that it stay tracked.
+
+No native pin, generated binding or golden changed in this round.

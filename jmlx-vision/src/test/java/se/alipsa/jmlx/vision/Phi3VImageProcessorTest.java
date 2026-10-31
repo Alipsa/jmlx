@@ -201,6 +201,47 @@ class Phi3VImageProcessorTest {
   }
 
   @Test
+  void rangedCopyCopiesOnlyTheRequestedRange() {
+    Phi3VImageProcessorResult result = clipProcessor().process(solid(CROP, CROP, 123));
+    int slots = result.plan().slotCount();
+    int slotLength = 3 * PLANE;
+    float[] whole = result.values();
+    // Per-slot ranges reassemble the whole row, and the real-slot prefix a prefill uploads is a
+    // prefix of it: no padded tail, no allocation of one.
+    float[] rebuilt = new float[whole.length];
+    for (int slot = 0; slot < slots; slot++) {
+      result.copyValuesTo(rebuilt, slot * slotLength, slot * slotLength, slotLength);
+    }
+    assertTrue(java.util.Arrays.equals(whole, rebuilt), "per-slot ranges must reassemble the row");
+    float[] prefix = new float[slotLength];
+    result.copyValuesTo(prefix, 0, 0, slotLength);
+    assertTrue(
+        java.util.Arrays.equals(whole, 0, slotLength, prefix, 0, slotLength),
+        "the real-slot prefix must be a prefix of the row");
+    // The two-argument overload still copies the entire row.
+    float[] bulk = new float[whole.length];
+    result.copyValuesTo(bulk, 0);
+    assertTrue(java.util.Arrays.equals(whole, bulk), "the two-argument copy must copy the row");
+  }
+
+  @Test
+  void rangedCopyRejectsInvalidRanges() {
+    Phi3VImageProcessorResult result = clipProcessor().process(solid(CROP, CROP, 123));
+    float[] destination = new float[2];
+    assertThrows(IllegalArgumentException.class, () -> result.copyValuesTo(null, 0, 0, 1));
+    assertThrows(IllegalArgumentException.class, () -> result.copyValuesTo(destination, 0, -1, 1));
+    assertThrows(IllegalArgumentException.class, () -> result.copyValuesTo(destination, 0, 0, -1));
+    assertThrows(IndexOutOfBoundsException.class, () -> result.copyValuesTo(destination, 2, 0, 1));
+    assertThrows(IndexOutOfBoundsException.class, () -> result.copyValuesTo(destination, 1, 0, 2));
+    int rowLength = result.plan().slotCount() * 3 * PLANE;
+    assertThrows(
+        IndexOutOfBoundsException.class, () -> result.copyValuesTo(destination, 0, rowLength, 1));
+    assertThrows(
+        IndexOutOfBoundsException.class,
+        () -> result.copyValuesTo(destination, 0, rowLength - 1, 2));
+  }
+
+  @Test
   void torchBicubicRejectsInvalidArguments() {
     assertThrows(IllegalArgumentException.class, () -> TorchBicubic.resizeChw(null, 4, 5, 6, 7));
     assertThrows(

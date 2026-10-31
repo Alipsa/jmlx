@@ -14,7 +14,17 @@ import hashlib
 import json
 import math
 import os
+import platform
 from pathlib import Path
+
+
+class SkipFamily(Exception):
+    """A family whose reference bytes only reproduce on one architecture (the phi3v
+    torch bicubic kernels are FMA-contracted on the pinned AArch64 wheel)."""
+
+
+def is_arm64() -> bool:
+    return platform.machine() in ("arm64", "aarch64")
 
 
 def canonical(value: object) -> str:
@@ -712,7 +722,15 @@ def run_phi3v(input_path: Path, provenance: dict) -> dict:
     the slot count and the per-image token count, the full-row sha256 and deterministic
     sample rows. The four single-image cases' full float32 rows are additionally
     materialized as the committed processed-patch bins under phi3v/patches/ (written in
-    --generate-all mode, digest-verified otherwise; --verify-all never writes)."""
+    --generate-all mode, digest-verified otherwise; --verify-all never writes).
+
+    The committed rows reproduce only on arm64: the pinned torch wheel's FMA-contracted
+    bicubic arithmetic is architecture-specific, so on any other machine this family is
+    skipped (logged by main) rather than compared or regenerated against different bytes.
+    The Java side still verifies its port against the committed bins on every
+    architecture (jmlx-vision ImageOraclePhi3VTest)."""
+    if not is_arm64():
+        raise SkipFamily("phi3v (arm64-only reference bytes)")
     import sys
 
     import numpy as np
@@ -945,7 +963,11 @@ def main() -> None:
         expected_path = input_path.with_name(
             input_path.name.replace(".input.json", ".expected.json")
         )
-        actual = canonical(RUNNERS[input_path.name](input_path, provenance))
+        try:
+            actual = canonical(RUNNERS[input_path.name](input_path, provenance))
+        except SkipFamily as skip:
+            print(f"Image oracle fixture skipped: {expected_path} ({skip})")
+            continue
         if args.generate_all:
             expected_path.write_text(actual, encoding="utf-8")
             print(f"Image oracle fixture generated: {expected_path}")

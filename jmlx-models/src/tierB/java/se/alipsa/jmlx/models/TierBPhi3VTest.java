@@ -168,15 +168,18 @@ class TierBPhi3VTest {
             TierBReferences.ids(input.required("expanded_ids")),
             Arrays.stream(plan.expandedIds()).boxed().toList());
         try (MLXScope generation = root.newChild()) {
-          List<KVCache> caches = Phi3VTestSupport.caches(model, generation);
           // The re-prefill history: the clamped expanded prompt (sentinel rows embed as row 0;
           // their projected rows are re-injected by the hook at their original positions), as
           // the production step loop seeds it.
-          List<Integer> history = new ArrayList<>();
+          int[] history = new int[plan.expandedLength() + steps];
+          int historyLength = 0;
           for (int id : plan.expandedIds()) {
-            history.add(Math.max(id, 0));
+            history[historyLength++] = Math.max(id, 0);
           }
           Phi3VModel.BoundaryState boundary = new Phi3VModel.BoundaryState(true);
+          boundary.history = history;
+          boundary.historyLength = historyLength;
+          List<KVCache> caches = Phi3VTestSupport.caches(model, generation);
           for (int step = 0; step < steps; step++) {
             try (MLXScope activation = generation.newChild()) {
               MLXArray logits;
@@ -189,7 +192,7 @@ class TierBPhi3VTest {
               } else {
                 int token = input.required("target_ids").get(step - 1).asInt();
                 MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
-                logits = model.decodeStep(ids, caches, history, boundary, token);
+                logits = model.decodeStep(ids, caches, boundary, token);
                 MLX.eval(DecoderModel.stepCacheArrays(caches));
               }
               float[] actual = logits.toFloatArray();

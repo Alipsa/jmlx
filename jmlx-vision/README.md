@@ -158,6 +158,14 @@ plus the shared processed-slot bins under `phi3v/patches/`), byte-verified by
 `ImageOraclePhi3VTest`; the `fma32` core was stress-verified against libm's `fmaf`
 (~650,000 cases, zero mismatches) before the family was generated.
 
+The reference side of that verification is arm64-only: the committed bins reproduce the
+pinned **AArch64** torch wheel's FMA-contracted bicubic arithmetic, and the pinned x86
+CPU wheel emits different bytes for the same kernel. `runner.py` therefore skips the
+`phi3v` family (with a logged `Image oracle fixture skipped` line) on non-arm64
+machines instead of comparing or regenerating against different bytes; the pure-Java
+digest guards (`verifyImageOracleFixtureDigests`) and `ImageOraclePhi3VTest` still run
+on every architecture, and CI verifies the family on the macOS arm64 (native) runner.
+
 ## Divergences from the reference's operation order
 
 

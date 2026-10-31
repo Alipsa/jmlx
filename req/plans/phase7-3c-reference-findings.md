@@ -1291,9 +1291,38 @@ per-step native token readback was removed in round 5 (the fed token is passed t
 round 7, so "decode steps skip the readback and boxed history" was doubly false. It appeared in
 the AGENTS.md bullet and in two `Phi3VModel` code comments (the `boundaryPossible` comment and
 the `BoundaryState` Javadoc); all three now say decode steps skip appending to the re-prefill
-history (the Javadoc's `active` "gates the re-prefill history bookkeeping"). A repo-wide grep
-confirmed no other "readback"/"boxed history" references remain; the single surviving `DecodeStep`
-Javadoc sentence ("so no native readback is needed") is accurate — it explains why the `int`
-parameter exists.
+history (the Javadoc's `active` "gates the re-prefill history bookkeeping"). Correction from the
+fifteenth round: the round-14 grep pattern (`boxed history`, `native readback`, `token readback`)
+missed a fourth stale use — the re-prefill's "so the rows, the hook and the readback
+bookkeeping end here" comment at the deactivation site — which the fifteenth round reworded to
+"... the history bookkeeping end here". A case-insensitive `readback` grep then shows the only
+remaining Phi3V use is the accurate `DecodeStep` Javadoc sentence ("so no native readback is
+needed" — it explains why the `int` parameter exists); all other repo matches are the genuine
+batched readback (`SamplingPipeline.readBack`, `BatchGenerationScheduler`) or the memory tests.
+
+No native pin, generated binding or golden changed in this round.
+
+## 25. PR #68 fifteenth review round (2026-10-31)
+
+**One stale "readback" comment survived the round-14 grep (confirmed, low).** The round-14
+verification grepped for `boxed history`, `native readback` and `token readback` — a too-narrow
+pattern — and §24 recorded "no other references remain" on its strength. A bare case-insensitive
+`readback` grep on the PR head found the re-prefill deactivation comment
+(`Phi3VModel.java`, "so the rows, the hook and the readback bookkeeping end here"): there has
+been no per-step readback since round 5, and what stops here is the history bookkeeping
+(`boundary.active` goes false, so later decode steps skip the history append). Reworded to
+"so the rows, the hook and the history bookkeeping end here", and §24's grep sentence corrected
+to record the miss. Lesson: when a verification claim is "a grep found no other X", grep for the
+bare word case-insensitively, not for the compound phrases being removed.
+
+**The round count in the condensed AGENTS.md intro went stale on the second round after it
+(confirmed, nit).** "The PR #68 ... review landed twelve rounds before merge" was written for the
+twelfth and became wrong when §23/§24 landed; the section pointer had already been made
+number-independent, but the count had not. It now reads "ran several rounds before merge".
+
+**Comment wrap (cosmetic).** Spotless does not rewrap comments, so the round-14 edit left the
+`boundaryPossible` comment breaking early at
+"history serve nothing and are not retained (decode steps then skip the / history append too).";
+the two lines are joined (97 columns).
 
 No native pin, generated binding or golden changed in this round.

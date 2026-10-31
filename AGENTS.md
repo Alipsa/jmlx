@@ -966,7 +966,7 @@ report.md`, `req/phase6-tier-a-fixtures.md`, `req/phase6-tier-b-artifacts.md`,
 `tools/tier-b/README.md` and `req/plans/phase7-plan.md`. No native pin, generated binding
 or public API changed.
 
-The PR #68 (Phase 7.3c) review landed twelve rounds before merge. Their
+The PR #68 (Phase 7.3c) review ran several rounds before merge. Their
 round-by-round history lives in `req/plans/phase7-3c-reference-findings.md`
 (one section per review round from the seventh; the first six rounds'
 detail is in their per-round commit messages on this branch). The rules from

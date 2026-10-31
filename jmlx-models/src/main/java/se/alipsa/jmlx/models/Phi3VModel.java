@@ -341,8 +341,7 @@ public final class Phi3VModel implements TextGenerationModel {
     // exist: at decode step j (1-based) the cache position is expandedLength + j - 1, and the
     // fire condition is j <= maxNewTokens - 1, i.e. expandedLength + maxNewTokens - 2 >=
     // originalMaxPositions. When no step can reach it, the projected rows and the re-prefill
-    // history serve nothing and are not retained (decode steps then skip the
-    // history append too).
+    // history serve nothing and are not retained (decode steps then skip the history append too).
     boolean boundaryPossible =
         boundaryCrossable(
             plan.expandedLength(), request.config().maxNewTokens(), originalMaxPositions);
@@ -666,7 +665,7 @@ public final class Phi3VModel implements TextGenerationModel {
       // Force the merge graph before releasing the rows it references, and evaluate every retained
       // K/V array like the regular prefill's contract does (the sampler's later eval of these
       // logits is then a no-op). Nothing after this step can fire again (the width only grows past
-      // the boundary), so the rows, the hook and the readback bookkeeping end here.
+      // the boundary), so the rows, the hook and the history bookkeeping end here.
       MLXArray[] retained = DecoderModel.stepCacheArrays(caches);
       MLXArray[] evaluated = Arrays.copyOf(retained, retained.length + 1);
       evaluated[retained.length] = logits;

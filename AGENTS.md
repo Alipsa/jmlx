@@ -966,171 +966,86 @@ report.md`, `req/phase6-tier-a-fixtures.md`, `req/phase6-tier-b-artifacts.md`,
 `tools/tier-b/README.md` and `req/plans/phase7-plan.md`. No native pin, generated binding
 or public API changed.
 
-The PR #68 review round (2026-10-30) landed: `Phi3VRopeReferenceTest` joined the CI
-required-suite list; `RopeSpec.Su` is defensive-copy immutable with value equality (the
-record default compared its factor arrays by identity); the top-level
-`original_max_position_embeddings` key left the shared `CONSUMED` list and is accepted
-only behind the phi3_v family's `acceptsSuRope` capability, so a llama/qwen2/phi3/mistral
-config carrying it reaches the unknown-key sink instead of silently running plain RoPE;
-`TorchBicubic`'s hand-written single-rounding `fma32` is `Math.fma` (Java 21's float
-overload is specified as the same single-rounding fused multiply-add, byte-exact on the
-`phi3v` oracle family); the WP5 load reads the CLIP intermediate size before releasing the
-plan-optional last layer's weights, so a one-layer CLIP checkpoint no longer fails on a
-closed handle; and `GenerationRequest.chat` retains its messages and options so
-`Phi3VModel` can re-flatten structured text/image content parts to `<|image_i|>` markers
-(the artifact's chat template string-concatenates `message['content']`, which structured
-parts cannot survive) — plain-string content keeps the rendered-text path, and the Tier-B
-manifest's literal-marker requests are unchanged. The model's re-tokenization still
-always applies the reference processor's per-chunk `<s>` regardless of the request's
-`PromptSpecialTokens` policy (the Tier-B logits pin; documented on the class), with
-`GenerationResult.promptTokenIds()` retaining the request's original IDs per that
-contract. The boundary re-prefill's projected rows, the re-prefill history and the
-per-step native token readback are now conditional on a decode step actually being able
-to reach `original_max_position_embeddings + 1` (`expandedLength <= original_max <=
-expandedLength + maxNewTokens - 1`): when unreachable, the rows die with the prefill
-scope, `hookRef` stays null and decode steps skip the readback and boxed history; and the
-pixel buffer's real-slot trim moved from a Java-side `Arrays.copyOf` to a native row
-slice. No native pin or generated binding changed.
+The PR #68 (Phase 7.3c) review landed twelve rounds before merge. Their
+round-by-round history lives in `req/plans/phase7-3c-reference-findings.md`
+(§17–§22 cover the seventh through twelfth rounds; the first six rounds'
+detail is in their per-round commit messages on this branch). The rules from
+those rounds that still apply:
 
-The second PR #68 review round (2026-10-30) landed on the same branch: `GenerationRequest.chat`
-deep-copies its messages (maps and content lists recursively, like the images' pixel buffers), the
-re-flattened messages pass every message field through to the re-render (not just role/content),
-and the messages path renders and encodes with the checkpoint's own tokenizer — the same tokenizer
-as every other expansion path, so one prompt can never tokenize two ways; the structured-chat test
-loads the model from a checkpoint copy carrying the artifact's template, mutates the caller's
-message structures after request creation and still expects the unchanged expansion. The boundary
-re-prefill's `BoundaryState` (active/hook/retainedRows) replaced the hook-reference array: the
-crossable predicate `boundaryCrossable` is extracted and off-by-one-fixed (only `maxNewTokens - 1`
-decode steps exist, so the fire condition is `expandedLength <= original_max <= expandedLength +
-maxNewTokens - 2`), and the moment the re-prefill fires its retained rows are closed, the hook
-dropped and the state deactivated — later steps skip the readback and boxed history. `MLX.array`
-gained a `(scope, float[], offset, length, shape)` overload uploading a right-sized prefix view via
-`MemorySegment.copy` (the pixel path uploads only the real slots, not the padded buffer), and
-`pixels()` uses it. `BatchFacts.dynamicNtk` became `lengthDependentRope = !rope.isStatic()` in both
-the scheduler cohort key and the batch preflight, covering Su and future length-dependent variants.
-The dead `request.tokenizer() == null` branches in the cancellation path are gone, and the
-ASCII-only `\d` deviation from Python's Unicode `\d` is recorded on `Phi3VPromptTokens.MARKER_PATTERN`.
-
-The third PR #68 review round (2026-10-30) landed: the chat-message deep copy wraps in
-insertion-order `Collections.unmodifiableMap(new LinkedHashMap<>(...))` /
-`Collections.unmodifiableList(new ArrayList<>(...))` — `Map.copyOf`/`List.copyOf` rejected the
-null values chat fields legitimately carry and lost key order; `RopeSpec.Su.frequencies` reads the
-factor-table fields directly (the cloning accessors are for callers, not the per-step hot path);
-`MLX.array`'s offset overload allocates with the `JAVA_FLOAT` element layout so the alignment is
-explicit; `pixels()`'s comment now states that the one Java-heap copy happens inside
-`Phi3VImageProcessorResult.values()`'s documented defensive contract; the release smoke's
-`requiredNotice` also pins PyTorch's `UpSampleKernel.cpp`/`UpSample.h` SHA-256s and the BSD
-3-Clause text in the three vision jars; and `ci.yml` uploads `Phi3VRopeReferenceTest`'s JUnit XML
-with the other Phi3V suites.
-
-A fourth small PR #68 follow-up landed: the chat-message deep copy preserves nested-map keys as
-they are (no String cast — tool-call payloads with non-string keys never fail with a
-ClassCastException; today's jinja renderer rejects them at the render boundary first), and
-`RopeSpec.apply`'s batched unequal-position check uses `!isStatic()` like `DecoderModel`'s batch
-preflight instead of an `instanceof DynamicNtk || instanceof Su` list.
-
-A fifth small PR #68 follow-up landed: a checkpoint whose single plan-optional CLIP layer omits its
-tensors fails `Phi3VModel.load` with a descriptive `IllegalArgumentException` rather than an opaque
-NullPointerException; `DecoderModel.DecodeStep` now receives the fed token as a Java `int` (the loop
-already holds it), so the Phi-3.5-Vision re-prefill history no longer reads the token back from a
-native array each step; and `RopeSpec.Su.toString` prints the factor tables with `Arrays.toString`
-instead of array identity hashes.
-
-A sixth PR #68 review round landed: `Phi3VModel.load` requires the discovered CLIP depth to equal
-the pinned ViT-L/14-336 depth (24) — a checkpoint that dropped the plan-optional final layer would
-otherwise run the tower one block too few with silently wrong image features — and the tiny
-synthetic checkpoints opt out explicitly via the `jmlx.phi3v.expectedClipLayers` test property set
-on `test`/`float32GoldenTest` in `jmlx-models/build.gradle` (tierB deliberately not covered). The
-boundary re-prefill now evaluates every retained K/V array like the regular prefill's contract, not
-just the logits. Smaller items: the no-op full-range slice in `Phi3VVisionTower.hdRows` is gone;
-the re-prefill history is pre-sized and immutable when unused; the expander's image-count mismatch
-has one message and a repeated marker (`1,2,1`) is reported as a duplicate; `GenerationRequest.chat`
-builds through `tokenizerBacked`; a `rope_type`-carrying su config names the
-newer-transformers form in its rejection. Deferred per the reviewer's own triage: precomputing the
-two Su frequency tables (performance only) and the vision-language models' shared helper
-extraction (follow-up PR).
-
-A seventh PR #68 review round landed: the `jmlx.phi3v.expectedClipLayers` system property is gone —
-production loads (the public `Phi3VModel.load` and the `TextGenerationModels` dispatch) always
-require the pinned 24; the tiny three-layer checkpoints load through a package-private
-`load(scope, dir, expectedClipLayers)` overload, and the one dispatch test installs a package-private
-`setExpectedClipLayersForTest` override around its single load. `runner.py` skips the arm64-only
-`phi3v` image-oracle family with a logged skip on other architectures (the pinned torch wheel's
-FMA-contracted bicubic bytes are AArch64-specific), and the macOS 26 native CI job now also runs
-`verifyImageOracle`/`verifyImageOracleFixtures` so the family stays reference-verified in CI on
-arm64. `ChatTemplateOptions` deep-copies `extraContext` recursively (it was one level deep, so a
-nested tools-list mutation after the request was built could diverge the Phi-3V re-expansion from
-`promptTokenIds`); `GenerationRequest.chat` keeps its eager build-time message deep copy — it is
-the snapshot `promptTokenIds` were encoded from, and deferring it breaks the pinned mutation tests —
-with the rationale documented on the method. `Phi3VImageProcessorResult` gained a ranged
-`copyValuesTo` and the prefill uploads only the real-slot prefix (~2.7 MB, not the ~23 MB padded
-row); the re-prefill history is a pre-sized `int[]` + length counter on `BoundaryState` (no
-boxing); the marker-text-in-plain-string rule is documented as per-path on `GenerationRequest.chat`
-and `Phi3VModel`; the `Phi3VModelTest` boundary test is restructured (seam reference first, no
-Checkstyle suppression); and the `embd_layer.embedding_cls` presence-only check was verified
-against the digest-pinned bundled modeling (the value is indexed but never read). The
-vision-language shared-helper extraction remains a deferred follow-up. No native pin, generated
-binding or golden changed.
-
-An eighth PR #68 review round landed: the `phi3v` image-oracle gate in `runner.py` now matches the
-exact recording platform — `is_reference_platform()` is `sys.platform == "darwin" and
-platform.machine() == "arm64"` — because round 7's `is_arm64()` also matched a Linux aarch64 host,
-which installs the pinned `torch==2.6.0+cpu` build (unverified for FMA contraction) rather than the
-macOS arm64 wheel the committed bins were recorded with; widening the gate past the recording
-platform is deferred until that Linux `+cpu` build is checked against the committed bins.
-`Phi3VModel.expectedClipLayersForTest`'s Javadoc was reworded to acknowledge it is a mutable
-process-wide static that production never sets (the finding was an overstatement, not a bug).
-`ChatTemplateOptions` deep-copies object arrays element-wise and clones the eight primitive array
-types (verified against `jmlx-jinja`'s `Values.fromHostValue`: the renderer accepts
-String/Boolean/Number/array/List/Map and rejects `Set`/other collections at the render boundary),
-and its Javadoc states the resulting snapshot contract; `ChatTemplateRenderOptionsTest` gained a
-nested-array mutation case. `GenerationRequest.chat`'s Javadoc dropped a wrong "(round-6 design
-review)" label. No native pin, generated binding or golden changed.
-
-A ninth PR #68 review round landed: round 8's type-preserving object-array copy threw
-`ArrayStoreException` for a concretely typed array (an `ArrayList[]` can't hold the unmodifiable
-wrapper copy of its elements), so `ChatTemplateOptions` now converts every array — object and
-primitive alike — into an unmodifiable list (the renderer converts both to the same array value),
-which also stops the copy being mutable through `extraContext()`'s accessor; the recursive copy
-gained an identity cycle check throwing `IllegalArgumentException("chat context value contains a
-cycle")` (it previously `StackOverflowError`'d before the renderer's clear error) and an
-original→copy map so a repeated reference is copied once and shared, matching the renderer's
-per-render conversion. The duplicated copy logic in `GenerationRequest` was removed in favor of a
-single public `ChatTemplateOptions.copyContextValue` shared by both snapshots (the message copy's
-pinned null/order/non-String-key/mutation behavior is unchanged); the Javadoc dropped the wrong
-"immutable" for the shared scalars, since `Number` also covers mutable types such as
-`AtomicInteger`, which the renderer accepts. No native pin, generated binding or golden changed.
-
-A tenth PR #68 review round landed: the round-9 generic `copyContextValue` (an unchecked `(T)`
-cast whose "container shape" justification no longer held, since arrays come back as lists and
-concrete container types as unmodifiable wrappers) was unsafe — the compiler accepted call sites
-like `String[] s = copyContextValue(new String[]{...})` that then threw `ClassCastException`. It
-is replaced by two typed public methods whose return type is always true, `copyContext(Map<String,
-?>) -> Map<String, Object>` and `copyMessages(List<? extends Map<String, ?>>) ->
-List<Map<String, Object>>`, both delegating to one package-private `copyValue` (cycle/dedup/shape
-logic unchanged), so no unchecked cast or `@SuppressWarnings` remains; the reviewer's unsafe
-probes now fail to compile against the published jars. The public `GenerationRequest.chat`
-Javadoc gained a sentence recording that the message snapshot now copies arrays into unmodifiable
-lists and rejects cycles (a backstop — the render above the copy reaches that check first). No
-native pin, generated binding or golden changed.
-
-An eleventh PR #68 review round landed: the copy-once sharing now reads "a **nested** value
-referenced several times is copied once and shared" — the top-level map is not recorded in the
-copy state, so a message referenced inside another message gets two copies (sending the top-level
-maps through the generic copy was rejected: it would reintroduce the unchecked cast the typed
-signatures exist to avoid), and the new `ChatContextCopiesTest` pins both sides (`assertSame`
-nested / `assertNotSame` top-level). `copyContext(null)`/`copyMessages(null)` now fail with named
-parameters (`"context"`, `"messages"`, and `"messages[i]"` for a null element). Before first
-publication, both copy methods moved out of the record into a new `final` utility class
-`se.alipsa.jmlx.tokenizer.ChatContextCopies` (the record's constructor and
-`GenerationRequest.deepCopyMessages` call it; the upstream Javadoc no longer names its
-downstream consumer). No native pin, generated binding or golden changed.
-
-A twelfth PR #68 review round landed: the `ChatContextCopiesTest` top-level `assertNotSame` kept
-its assertion but now carries a comment stating it records today's behavior (top-level message
-elements get separate copies), not the contract — if a future change records the top-level maps
-in the copy state and shares them, the line becomes `assertSame`, not a regression — and the
-test was renamed `nestedReferencesAreSharedAndTopLevelMessagesAreCopiedSeparately`; and
-`copyMessages` iterates with a for-each plus a counter (the indexed `messages.get(i)` loop was
-quadratic on a `LinkedList`) so the `"messages[i]"` null message is kept at the same cost for any
-`List` type. No native pin, generated binding or golden changed.
+- `ChatContextCopies` (jmlx-tokenizer) is the single snapshot copy shared by
+  `ChatTemplateOptions.extraContext` and `GenerationRequest.chat`'s message
+  snapshot, so the two cannot drift apart: maps and lists become
+  insertion-order unmodifiable wrappers, every array (object and primitive
+  alike) becomes an unmodifiable list (a concretely typed array copy would
+  throw `ArrayStoreException`), scalars are shared by reference, a nested
+  value referenced several times is copied once and shared (the top-level
+  map itself is not part of that sharing), a cycle is rejected with a clear
+  `IllegalArgumentException`, and nulls fail with named parameters. Do not
+  duplicate this logic elsewhere or expose a generic identity-copy signature
+  on public API.
+- Phi-3.5-Vision production loads (the public `Phi3VModel.load` and the
+  `TextGenerationModels` dispatch) always require the pinned ViT-L/14-336 CLIP
+  depth of 24; the tiny three-layer test checkpoints load through the
+  package-private `load(scope, dir, expectedClipLayers)` overload, and the one
+  dispatch test installs the package-private `setExpectedClipLayersForTest`
+  override (a mutable process-wide static that production never sets).
+- The `phi3v` image-oracle family runs only on the exact recording platform:
+  `runner.py`'s `is_reference_platform()` is `sys.platform == "darwin" and
+  platform.machine() == "arm64"`, because the committed bins come from the
+  macOS arm64 torch wheel whose bicubic kernel is FMA-contracted
+  (AArch64-specific). Widening the gate past the recording platform is
+  deferred until the pinned Linux `torch==2.6.0+cpu` build is checked against
+  the committed bins. `TorchBicubic` uses `Math.fma` for the same reason
+  (byte-exact on the `phi3v` family), and the macOS 26 native CI job runs
+  `verifyImageOracle`/`verifyImageOracleFixtures` so the family stays
+  reference-verified in CI.
+- `GenerationRequest.chat` keeps its eager build-time deep copy of messages —
+  it is the snapshot `promptTokenIds` were encoded from, and deferring it
+  breaks the pinned mutation tests — and renders and encodes with the
+  checkpoint's own tokenizer, the same tokenizer as every other expansion
+  path, so one prompt can never tokenize two ways. Structured text/image
+  content parts are re-flattened to `<|image_i|>` markers for the re-render
+  (the artifact's chat template string-concatenates `message['content']`,
+  which structured parts cannot survive); plain-string content keeps the
+  rendered-text path, and the marker-text-in-a-plain-string rule is per-path
+  (documented on `GenerationRequest.chat` and `Phi3VModel`). The
+  re-tokenization always applies the reference processor's per-chunk `<s>`
+  regardless of the request's `PromptSpecialTokens` policy, with
+  `GenerationResult.promptTokenIds()` retaining the request's original IDs.
+- The Phi-3.5-Vision boundary re-prefill fires only when a decode step can
+  actually reach `original_max_position_embeddings + 1`: `boundaryCrossable`
+  is `expandedLength <= original_max <= expandedLength + maxNewTokens - 2`
+  (only `maxNewTokens - 1` decode steps exist). When the boundary is
+  unreachable, the retained projection rows die with the prefill scope and
+  decode steps skip the readback and boxed history; when it fires, every
+  retained K/V array is evaluated like the regular prefill's contract (not
+  just the logits), after which the rows are closed, the hook dropped and the
+  `BoundaryState` deactivated. The re-prefill history is a pre-sized `int[]`
+  plus a length counter, and `DecoderModel.DecodeStep` receives the fed token
+  as a Java `int` rather than reading it back from a native array.
+- `RopeSpec.Su` is defensive-copy immutable with value equality and computes
+  in `double`, casting to float32 (a stated tolerance, not bit-exactness).
+  The top-level `original_max_position_embeddings` config key is accepted
+  only behind the phi3_v family's `acceptsSuRope` capability — an older
+  family's config carrying it reaches the unknown-key sink instead of
+  silently running plain RoPE. Length-dependent RoPE is detected as
+  `!rope.isStatic()` (not an `instanceof` list) in `RopeSpec.apply`'s batched
+  unequal-position check and in `BatchFacts.lengthDependentRope` (the
+  scheduler cohort key and the batch preflight), covering Su and future
+  variants.
+- `MLX.array(scope, float[], offset, length, shape)` uploads a right-sized
+  prefix view via `MemorySegment.copy` with an explicit `JAVA_FLOAT` element
+  layout: the Phi-3.5-Vision pixel path uploads only the real slots, not the
+  padded row.
+- `Phi3VPromptTokens.MARKER_PATTERN` uses ASCII-only `\d` (a recorded
+  deviation from Python's Unicode `\d`), and the chat snapshot copy preserves
+  nested-map keys as they are — the renderer rejects non-String keys at the
+  render boundary, not the copy.
+- The release smoke's `requiredNotice` also pins PyTorch's
+  `UpSampleKernel.cpp`/`UpSample.h` SHA-256s and the BSD 3-Clause text in the
+  three vision jars.
+- Still deferred per the reviewer's own triage: precomputing the two Su
+  frequency tables (performance only) and extracting the vision-language
+  models' shared helper.
+- Review-round labels do not belong in public API Javadoc, and upstream API
+  docs don't name their downstream consumers.

@@ -123,7 +123,11 @@ public final class GenerationRequest {
    * change that. The deep copy therefore happens eagerly here — deferring it to the model's first
    * read would capture mutations made between request creation and generation and could silently
    * diverge the re-expansion from the retained IDs. It is paid by every chat request, including
-   * ones a text-only model consumes; that is the deliberate cost of the build-time snapshot.
+   * ones a text-only model consumes; that is the deliberate cost of the build-time snapshot. The
+   * snapshot uses the same copy as the options' extraContext, so an array value inside a message is
+   * copied (into an unmodifiable list) rather than shared by reference, and a cyclic message
+   * structure is rejected with a clear error — though the render above the copy rejects cycles
+   * first, so the copy's own check is only a backstop.
    *
    * <p>Phi-3.5-Vision re-flattens the messages whenever any one carries structured content, and on
    * that path a literal image marker ({@code <|image_i|>}) inside a plain-string message is
@@ -164,14 +168,15 @@ public final class GenerationRequest {
   /**
    * Deep-copies the chat messages so a later caller mutation cannot change what the model expands:
    * like the images (whose pixel buffers {@link RgbImage} copies), the request must own its source
-   * text. Delegates to {@link ChatTemplateOptions#copyContextValue(Object)}, the one shared
-   * snapshot copy that the options' own extraContext uses, so the two snapshots cannot drift apart:
-   * insertion-order unmodifiable wrappers (null values and non-String nested keys survive exactly
-   * as they would the render), unmodifiable list copies of arrays, shared scalars, one shared copy
-   * for a value referenced several times, and a cycle rejected with a clear error.
+   * text. Delegates to {@link ChatTemplateOptions#copyMessages(List)}, the one shared snapshot copy
+   * that the options' own extraContext uses (through {@code copyContext}), so the two snapshots
+   * cannot drift apart: insertion-order unmodifiable wrappers (null values and non-String nested
+   * keys survive exactly as they would the render), unmodifiable list copies of arrays, shared
+   * scalars, one shared copy for a value referenced several times, and a cycle rejected with a
+   * clear error.
    */
   private static List<Map<String, Object>> deepCopyMessages(List<Map<String, Object>> messages) {
-    return ChatTemplateOptions.copyContextValue(messages);
+    return ChatTemplateOptions.copyMessages(messages);
   }
 
   private static GenerationRequest tokenizerBacked(

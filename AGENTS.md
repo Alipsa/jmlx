@@ -1099,3 +1099,16 @@ single public `ChatTemplateOptions.copyContextValue` shared by both snapshots (t
 pinned null/order/non-String-key/mutation behavior is unchanged); the Javadoc dropped the wrong
 "immutable" for the shared scalars, since `Number` also covers mutable types such as
 `AtomicInteger`, which the renderer accepts. No native pin, generated binding or golden changed.
+
+A tenth PR #68 review round landed: the round-9 generic `copyContextValue` (an unchecked `(T)`
+cast whose "container shape" justification no longer held, since arrays come back as lists and
+concrete container types as unmodifiable wrappers) was unsafe — the compiler accepted call sites
+like `String[] s = copyContextValue(new String[]{...})` that then threw `ClassCastException`. It
+is replaced by two typed public methods whose return type is always true, `copyContext(Map<String,
+?>) -> Map<String, Object>` and `copyMessages(List<? extends Map<String, ?>>) ->
+List<Map<String, Object>>`, both delegating to one package-private `copyValue` (cycle/dedup/shape
+logic unchanged), so no unchecked cast or `@SuppressWarnings` remains; the reviewer's unsafe
+probes now fail to compile against the published jars. The public `GenerationRequest.chat`
+Javadoc gained a sentence recording that the message snapshot now copies arrays into unmodifiable
+lists and rejects cycles (a backstop — the render above the copy reaches that check first). No
+native pin, generated binding or golden changed.

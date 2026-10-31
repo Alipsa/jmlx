@@ -53,7 +53,7 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Validates and defensively copies the caller context (see {@link #copyContextValue}): a later
+   * Validates and defensively copies the caller context (see {@link #copyContext(Map)}): a later
    * caller mutation of a nested value (a tools list, a nested array) cannot change what a render,
    * including a model's later re-render of the same options, sees. The nested maps and lists {@link
    * #extraContext()} returns are therefore unmodifiable copies, and a cyclic structure is rejected
@@ -62,7 +62,7 @@ public record ChatTemplateOptions(
    */
   public ChatTemplateOptions {
     templateName = Objects.requireNonNull(templateName, "templateName");
-    extraContext = copyContextValue(Objects.requireNonNull(extraContext, "extraContext"));
+    extraContext = copyContext(Objects.requireNonNull(extraContext, "extraContext"));
     for (String key : extraContext.keySet()) {
       if (RESERVED.contains(key)) {
         throw new IllegalArgumentException(
@@ -72,10 +72,10 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Deep-copies one chat context value so a later caller mutation cannot change what a render —
-   * including a model's later re-render of the same options — sees. This record's compact
-   * constructor and {@code GenerationRequest.chat}'s message snapshot (jmlx-models) share this one
-   * copy implementation, so the two snapshots cannot drift apart.
+   * Deep-copies a chat-template context so a later caller mutation cannot change what a render —
+   * including a model's later re-render of the same options — sees. Shared by this record's compact
+   * constructor and (through {@link #copyMessages(List)}) by {@code GenerationRequest.chat}'s
+   * message snapshot (jmlx-models), so the two snapshots cannot drift apart.
    *
    * <p>Maps and lists are copied into insertion-order unmodifiable wrappers (nested map keys are
    * preserved as they are — the renderer rejects non-String keys at the render boundary, not here).
@@ -88,40 +88,66 @@ public record ChatTemplateOptions(
    * per-render conversion of each host object; a cycle is rejected with an {@link
    * IllegalArgumentException} rather than a {@link StackOverflowError}.
    *
-   * @param value the context value to copy; null is passed through
-   * @param <T> the static type of the value
-   * @return the copy (or the value itself when it is not a container)
+   * @param context the context to copy
+   * @return the copy; maps and lists are unmodifiable, and any array value has become a list
    */
-  @SuppressWarnings(
-      "unchecked") // the copy preserves the container shape (a map stays a map, a list a list)
-  public static <T> T copyContextValue(T value) {
-    return (T)
-        copyValue(
-            value, new IdentityHashMap<>(), Collections.newSetFromMap(new IdentityHashMap<>()));
+  public static Map<String, Object> copyContext(Map<String, ?> context) {
+    return copyStringKeyedMap(context, new CopyState());
   }
 
-  private static Object copyValue(
-      Object value, IdentityHashMap<Object, Object> converted, Set<Object> visiting) {
+  /**
+   * Deep-copies chat messages with the semantics of {@link #copyContext(Map)}: the message maps and
+   * their values become unmodifiable (an array value within them becomes a list), a value
+   * referenced several times is copied once and shared, and a cycle is rejected with a clear error.
+   *
+   * @param messages the messages to copy
+   * @return the copy; unmodifiable, with unmodifiable message maps
+   */
+  public static List<Map<String, Object>> copyMessages(List<? extends Map<String, ?>> messages) {
+    CopyState state = new CopyState();
+    List<Map<String, Object>> copy = new ArrayList<>(messages.size());
+    for (Map<String, ?> message : messages) {
+      copy.add(copyStringKeyedMap(message, state));
+    }
+    return Collections.unmodifiableList(copy);
+  }
+
+  /** The per-call state of one {@link #copyContext(Map)}/{@link #copyMessages(List)} copy. */
+  private static final class CopyState {
+    final IdentityHashMap<Object, Object> converted = new IdentityHashMap<>();
+
+    final Set<Object> visiting = Collections.newSetFromMap(new IdentityHashMap<>());
+  }
+
+  private static Map<String, Object> copyStringKeyedMap(Map<String, ?> map, CopyState state) {
+    Map<String, Object> copy = new LinkedHashMap<>(map.size());
+    for (Map.Entry<String, ?> entry : map.entrySet()) {
+      copy.put(entry.getKey(), copyValue(entry.getValue(), state));
+    }
+    return Collections.unmodifiableMap(copy);
+  }
+
+  private static Object copyValue(Object value, CopyState state) {
     if (value == null
         || !(value instanceof Map<?, ?>
             || value instanceof List<?>
             || value.getClass().isArray())) {
       return value;
     }
-    if (visiting.contains(value)) {
+    if (state.visiting.contains(value)) {
       throw new IllegalArgumentException("chat context value contains a cycle");
     }
-    Object existing = converted.get(value);
+    Object existing = state.converted.get(value);
     if (existing != null) {
       return existing;
     }
-    visiting.add(value);
+    state.visiting.add(value);
     try {
       Object copy;
       if (value instanceof Map<?, ?> map) {
         Map<Object, Object> typed = new LinkedHashMap<>(map.size());
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-          typed.put(entry.getKey(), copyValue(entry.getValue(), converted, visiting));
+          typed.put(entry.getKey(), copyValue(entry.getValue(), state));
         }
         copy = Collections.unmodifiableMap(typed);
       } else {
@@ -129,19 +155,19 @@ public record ChatTemplateOptions(
         List<Object> elements = new ArrayList<>(length);
         if (value instanceof List<?> list) {
           for (Object element : list) {
-            elements.add(copyValue(element, converted, visiting));
+            elements.add(copyValue(element, state));
           }
         } else {
           for (int i = 0; i < length; i++) {
-            elements.add(copyValue(Array.get(value, i), converted, visiting));
+            elements.add(copyValue(Array.get(value, i), state));
           }
         }
         copy = Collections.unmodifiableList(elements);
       }
-      converted.put(value, copy);
+      state.converted.put(value, copy);
       return copy;
     } finally {
-      visiting.remove(value);
+      state.visiting.remove(value);
     }
   }
 

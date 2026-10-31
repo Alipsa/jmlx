@@ -1165,3 +1165,36 @@ Tests: `ChatTemplateRenderOptionsTest` pins the round-8 regression (a concretely
 accessor (a `String[]` copy is a list and `UnsupportedOperationException` on `add`), a self-
 referencing `List` rejected with a clear "cycle" error, and a repeated reference copied once
 (`assertSame`). No native pin, generated binding or golden changed.
+
+## 20. PR #68 tenth review round (2026-10-31)
+
+**The generic `copyContextValue` signature was unsafe (confirmed).** Round 9's
+`public static <T> T copyContextValue(T value)` carried an unchecked `(T)` cast with a
+`@SuppressWarnings("unchecked")` whose justification ("the copy preserves the container shape")
+no longer held: arrays come back as lists, and concrete container types come back as
+unmodifiable wrappers. The cast let the compiler accept call sites that then fail at runtime —
+`String[] s = copyContextValue(new String[]{"a"})` and
+`ArrayList<String> l = copyContextValue(new ArrayList<>(...))` both throw `ClassCastException`.
+The two in-repo callers were safe only because they pass the interface types
+(`Map<String, Object>` / `List<Map<String, Object>>`). Since this is new public API in
+`jmlx-tokenizer`, a module about to be published, the generic method was replaced with signatures
+whose return type is always true: `copyContext(Map<String, ?>)` returns `Map<String, Object>` and
+`copyMessages(List<? extends Map<String, ?>>)` returns `List<Map<String, Object>>`. Both delegate
+to a shared package-private `copyValue(Object, CopyState)` (the cycle/dedup/shape logic is
+unchanged), so there is no unsafe cast anywhere and the `@SuppressWarnings` is gone. Verified
+against the published jars: both of the reviewer's unsafe probes now fail to **compile**
+(`incompatible types`), and the intended interface-typed usage compiles and behaves (arrays →
+unmodifiable lists). The internal `CopyState` holds the two identity structures per call.
+
+**Documented the message-snapshot representation change in the public `chat` Javadoc
+(informational).** Round 9's shared copy means `GenerationRequest.chat`'s message snapshot now
+turns arrays inside messages into unmodifiable lists and rejects cycles, whereas before it shared
+arrays by reference. That is fine for templates (the renderer treats arrays and lists the same),
+and the cycle check is only a backstop in practice — `tokenizer.renderChat(messages, options)`
+runs before the copy and already rejects cycles. The private `deepCopyMessages` Javadoc covered
+this, but the public `chat` Javadoc only talked about mutation isolation; a sentence now records
+that the snapshot uses the same copy as the options' extraContext (arrays copied into
+unmodifiable lists, a cycle rejected with a clear error, with the render reaching that check
+first). Nothing in jmlx-models reads the retained messages back as arrays.
+
+No native pin, generated binding or golden changed in this round.

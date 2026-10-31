@@ -234,5 +234,5 @@
     "tools/tier-b/images/phi3v-square-336x336.png": "40734e8e0fbc8fe651c65d4b789082dc8d2ca833f59b9473bb17d54ecabfc2d8"
   },
   "phase74_audio_probe_sha256": "70ed655161738a98a86b58e24d92b78c175982876ef14c275d449c52d18802e6",
-  "phase74_diffusion_probe_sha256": "04ac14c91b4d0aa7c018c3b78db24588af14a6cc85a5c7de4ec657d4c46a1a16"
+  "phase74_diffusion_probe_sha256": "2d612a6796d627f21f6d6d7e45a59675fb5729bac3c53a78a9424b4000650efc"
 }

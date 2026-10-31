@@ -2,7 +2,7 @@
 
 Status: decision record (reviewed via PR; the PR review is the decision gate)
 Date: 2026-10-31
-Base commit: `8cc938c` (main after PR #66), record revised same day after review round 1
+Base commit: `8cc938c` (main after PR #66), record revised same day after review rounds 1–4
 Decides only. A "go" schedules implementation into a later phase by a dated
 roadmap amendment (`req/full-roadmap.md` § Phase 7); it does not extend Phase 7
 and does not start code. 7.5 (MLX pin upgrade) follows 7.4 directly.
@@ -94,6 +94,15 @@ From `req/mlx-api-inventory.md` at the base commit:
     ISTFT). Being core code it is Java 25 like the rest of the native chain.
   - **`jmlx-models`:** the Whisper model itself, `api`-depending on
     `jmlx-audio` (the vision pattern) and composing the two halves.
+  **STFT-to-mel hand-off (added in review round 4):** the `jmlx-core`
+  facade computes the power spectrum on MLX — the pinned torch branch's
+  `stft[..., :-1].abs() ** 2`, i.e. the last frame is dropped on the complex
+  STFT output *before* the power — and that evaluated power spectrum (a
+  Java `float[]`) is the single MLX→Java hand-off; `jmlx-audio` then does
+  the mel matmul and the log scaling in pure Java. The consequence is
+  recorded, not optional: the end-to-end log-mel tolerance fixture lives in
+  `jmlx-models` (native-free `jmlx-audio` cannot run the STFT), and
+  `jmlx-audio`'s own tests start from oracle power spectra.
   This keeps `jmlx-audio` compilable on the Java 21 toolchain — a Java 21
   module cannot depend on Java 25 `jmlx-core` class files.
   **Publishing:** `jmlx-audio` **is published** (a fresh `0.1.0-SNAPSHOT`
@@ -111,18 +120,28 @@ From `req/mlx-api-inventory.md` at the base commit:
 - **Diffusion.** New and **entirely pure-Java**: noise schedulers, the sampler
   loop, the VAE decoder wrapper (scaling constant 0.18215 is a literal), and
   the CLIP text encoder stack. **No Phase 11 overlap: the pipeline exercises
-  zero FFT/linalg family members.** Scheduler (corrected in review round 3):
-  the artifact's `model_index.json` (sha `451f4fe`) names
-  **`PNDMScheduler`** as the default, so PNDM (PLMS-style multistep with
-  warm-up steps — a real state machine, not a one-line step update) heads the
-  list, with DDPM/DDIM/Euler as the common alternatives. The 9.6 Tier-B
-  reference **pins the artifact's default scheduler**, so the exit gate's
-  per-step noise-prediction comparison is meaningful. Checkpoint layout
-  (verified): the pinned VAE and UNet store attention under the **legacy key
-  names `query`/`key`/`value`/`proj_attn`**, which diffusers remaps to
-  `to_q`/`to_k`/`to_v`/`to_out.0` at load — the 9.6 loader must implement the
-  same remap; the mid-block weights are stored as **2-D Linear** tensors
-  (`[512, 512]`), math-equivalent to the 1×1 convs the architecture implies.
+  zero FFT/linalg family members.** Scheduler (corrected in review round 3,
+  narrowed in review round 4): the artifact's `model_index.json` (sha
+  `451f4fe`) names **`PNDMScheduler`** as the default, so PNDM heads the list
+  with DDPM/DDIM/Euler as the common alternatives. The pinned
+  `scheduler/scheduler_config.json` (same sha) sets `skip_prk_steps: true` —
+  the Runge–Kutta warm-up **never runs**, so the 9.6 port needs only the PLMS
+  path with its lower-order first steps (there is no PRK phase to scope or
+  estimate) — plus `steps_offset: 1`, `set_alpha_to_one: false`,
+  `beta_schedule: "scaled_linear"`, `beta_start: 0.00085` and
+  `beta_end: 0.012`, which the 9.6 scheduler must port (steps_offset and
+  set_alpha_to_one change the timestep grid and the final alpha). The 9.6
+  Tier-B reference **pins the artifact's default scheduler**, so the exit
+  gate's per-step noise-prediction comparison is meaningful. Checkpoint
+  layout (verified; the remap scope was corrected in review round 4): the
+  pinned **VAE** stores its mid-block AttentionBlock attention under the
+  **legacy key names `query`/`key`/`value`/`proj_attn`**, which diffusers
+  remaps to `to_q`/`to_k`/`to_v`/`to_out.0` at load — the 9.6 loader
+  implements that **VAE-only** remap (the UNet's attention already uses the
+  current `to_q`/`to_k`/`to_v`/`to_out.0` names: 0 of its 687 keys end in
+  `.query.weight` at that sha); the VAE mid-block weights are stored as
+  **2-D Linear** tensors (`[512, 512]`), math-equivalent to the 1×1 convs the
+  architecture implies.
   Tier-B reference tooling: the CPU float32 reference for the real UNet/VAE/
   pipeline needs **diffusers**, which is not in `tools/hf-reference`'s hash
   lock — 9.6 adds it as a hash-locked dependency, checked against
@@ -156,11 +175,17 @@ From `req/mlx-api-inventory.md` at the base commit:
   `BasicTokenizer(strip_accents=False, do_split_on_punc=False)`). The
   `tools/hf-reference` lock has **no ftfy** (verified), so the reference takes
   the BasicTokenizer fallback — **that fallback is the pinned oracle branch**,
-  and the Java port must reproduce it: control-character cleaning, CJK
-  character splitting, lowercasing, then the IGNORECASE
+  and the Java port must reproduce its full 4.57.6 step order (added in
+  review round 4): control-character cleaning (`_clean_text`), CJK character
+  splitting (`_tokenize_chinese_chars`), **NFC Unicode normalization**
+  (`unicodedata.normalize("NFC", text)` — without it, decomposed input
+  tokenizes differently from the oracle), whitespace tokenization,
+  lowercasing (no accent stripping, `strip_accents=False`), the IGNORECASE
   `'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+` pre-tokenizer,
-  the byte encoder, and the `</w>` end-of-word suffix (already supported in
-  jmlx-tokenizer's `TokenizerModels`/`TokenizerDefinition`). BOS 49406 / EOS
+  the whitespace re-collapse after the split
+  (`whitespace_tokenize(" ".join(split_tokens))`), the byte encoder, and the
+  `</w>` end-of-word suffix (already supported in jmlx-tokenizer's
+  `TokenizerModels`/`TokenizerDefinition`). BOS 49406 / EOS
   49407 and the 77-token pad/truncate remain wrapper logic. This
   normalization port is counted in the 9.6 tokenizer work package.
 
@@ -193,9 +218,10 @@ upsampling (SD's Upsample2D **and** all three VAE decode stages use this — no
 feed-forward, per diffusers `AttentionBlock`) are all implemented. Gaps: the
 pure-Java schedulers (**PNDM first** — the artifact's default — then
 DDPM/DDIM/Euler) and sampler loop, the VAE wrapper, the CLIP text stack with
-its causal masking question, the legacy attention-key remap
-(`query`/`key`/`value`/`proj_attn` → `to_q`/`to_k`/`to_v`/`to_out.0`) in the
-9.6 loader, and the CLIP slow-tokenizer loader with its pinned BasicTokenizer
+its causal masking question, the VAE's legacy attention-key remap
+(`query`/`key`/`value`/`proj_attn` → `to_q`/`to_k`/`to_v`/`to_out.0`; the
+UNet uses the current names) in the 9.6 loader, and the CLIP slow-tokenizer
+loader with its pinned BasicTokenizer
 normalization port (§3).
 
 ## 5. Tier-B feasibility, licenses, estimate (mandate)
@@ -415,13 +441,13 @@ normalization port (§3).
   },
   "checkpoint_layout_note": {
     "model_index": "scheduler: diffusers PNDMScheduler; text_encoder: transformers CLIPTextModel; tokenizer: transformers CLIPTokenizer (verified from model_index.json at artifact sha 451f4fe)",
-    "scheduler_pinning": "PNDM (PLMS-style multistep with warm-up steps) is the artifact's default \u2014 the 9.6 Tier-B reference must pin it for the per-step noise-prediction comparison to be meaningful",
-    "vae_attention_keys": "the pinned VAE (and UNet) store attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time \u2014 the 9.6 loader must implement the same remap",
+    "scheduler_pinning": "PNDM is the artifact's default \u2014 the 9.6 Tier-B reference must pin the artifact's default scheduler for the per-step noise-prediction comparison to be meaningful; its pinned scheduler/scheduler_config.json has skip_prk_steps: true (the Runge-Kutta warm-up never runs \u2014 only the PLMS path with its lower-order first steps) plus steps_offset: 1, set_alpha_to_one: false, beta_schedule 'scaled_linear', beta_start 0.00085, beta_end 0.012, which the 9.6 scheduler must port (steps_offset and set_alpha_to_one change the timestep grid and the final alpha)",
+    "vae_attention_keys": "VAE-ONLY: the pinned VAE stores its mid-block AttentionBlock attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time \u2014 the 9.6 loader must implement that remap (the UNet's attention already uses the current to_q/to_k/to_v/to_out.0 names: 0 of its 687 keys end in .query.weight at sha 451f4fe)",
     "vae_attention_weight_shapes": "stored as 2-D Linear weights ([512, 512] in the mid block), math-equivalent to the 1x1 convs the architecture implies \u2014 a loader expectation, not a primitive gap"
   },
   "note_on_convtranspose": "an earlier draft of this probe used ConvTranspose2d; SD 1.5's actual VAE decoder and UNet Upsample2D use nearest interpolation plus conv, which the probe now mirrors \u2014 convTranspose remains available in MLXConv either way",
   "scheduler_gap": {
-    "finding": "no scheduler surface exists anywhere in jmlx; the artifact's default is PNDM (PLMS-style multistep with warm-up steps), with DDPM/DDIM/Euler the common alternatives \u2014 all are small pure-Java state machines (alphas_cumprod table + step update + sigma conversion); PNDM's multistep history makes it a real state machine, not a one-line step update",
+    "finding": "no scheduler surface exists anywhere in jmlx; the artifact's default is PNDM \u2014 with its pinned skip_prk_steps: true the Runge-Kutta warm-up never runs, so the port needs only the PLMS path with its lower-order first steps \u2014 with DDPM/DDIM/Euler the common alternatives; all are small pure-Java state machines (alphas_cumprod table + step update + sigma conversion); PNDM's multistep history makes it a real state machine, not a one-line step update",
     "native_dependency": "none"
   },
   "text_encoder_gap": {
@@ -517,7 +543,9 @@ effective on this record's merge (applied in the same PR):
   vision pattern) with the §3 generation controls. **`jmlx-audio` is
   published** — the project's eighth published module: `verifyReleaseScriptsMatch`,
   its own `release.sh`, release order before `jmlx-models` (alongside
-  `jmlx-vision`), and the release smoke all grow accordingly. Tier-B:
+  `jmlx-vision`), and the release smoke all grow accordingly; Phase 11's
+  release line names `jmlx-audio`'s first release, like Phase 9's line names
+  `jmlx-server`'s (applied in the same PR). Tier-B:
   `openai/whisper-tiny` (apache-2.0). Exit gate: log-mel fixtures within a
   recorded tolerance against the pinned torch-STFT oracle path (§3), a
   synthetic Tier-A logits golden at strict tolerance, and exact greedy

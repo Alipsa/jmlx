@@ -260,13 +260,13 @@ def main():
         },
         "checkpoint_layout_note": {
             "model_index": "scheduler: diffusers PNDMScheduler; text_encoder: transformers CLIPTextModel; tokenizer: transformers CLIPTokenizer (verified from model_index.json at artifact sha 451f4fe)",
-            "scheduler_pinning": "PNDM (PLMS-style multistep with warm-up steps) is the artifact's default — the 9.6 Tier-B reference must pin it for the per-step noise-prediction comparison to be meaningful",
-            "vae_attention_keys": "the pinned VAE (and UNet) store attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time — the 9.6 loader must implement the same remap",
+            "scheduler_pinning": "PNDM is the artifact's default — the 9.6 Tier-B reference must pin the artifact's default scheduler for the per-step noise-prediction comparison to be meaningful; its pinned scheduler/scheduler_config.json has skip_prk_steps: true (the Runge-Kutta warm-up never runs — only the PLMS path with its lower-order first steps) plus steps_offset: 1, set_alpha_to_one: false, beta_schedule 'scaled_linear', beta_start 0.00085, beta_end 0.012, which the 9.6 scheduler must port (steps_offset and set_alpha_to_one change the timestep grid and the final alpha)",
+            "vae_attention_keys": "VAE-ONLY: the pinned VAE stores its mid-block AttentionBlock attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time — the 9.6 loader must implement that remap (the UNet's attention already uses the current to_q/to_k/to_v/to_out.0 names: 0 of its 687 keys end in .query.weight at sha 451f4fe)",
             "vae_attention_weight_shapes": "stored as 2-D Linear weights ([512, 512] in the mid block), math-equivalent to the 1x1 convs the architecture implies — a loader expectation, not a primitive gap",
         },
         "note_on_convtranspose": "an earlier draft of this probe used ConvTranspose2d; SD 1.5's actual VAE decoder and UNet Upsample2D use nearest interpolation plus conv, which the probe now mirrors — convTranspose remains available in MLXConv either way",
         "scheduler_gap": {
-            "finding": "no scheduler surface exists anywhere in jmlx; the artifact's default is PNDM (PLMS-style multistep with warm-up steps), with DDPM/DDIM/Euler the common alternatives — all are small pure-Java state machines (alphas_cumprod table + step update + sigma conversion); PNDM's multistep history makes it a real state machine, not a one-line step update",
+            "finding": "no scheduler surface exists anywhere in jmlx; the artifact's default is PNDM — with its pinned skip_prk_steps: true the Runge-Kutta warm-up never runs, so the port needs only the PLMS path with its lower-order first steps — with DDPM/DDIM/Euler the common alternatives; all are small pure-Java state machines (alphas_cumprod table + step update + sigma conversion); PNDM's multistep history makes it a real state machine, not a one-line step update",
             "native_dependency": "none",
         },
         "text_encoder_gap": {

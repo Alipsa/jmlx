@@ -493,9 +493,10 @@ the per-step noise-prediction comparison is meaningful. `jmlx-tokenizer`
 gains a CLIP slow-tokenizer loader over the artifact's own `vocab.json` +
 `merges.txt` (the artifact ships no `tokenizer.json`), reproducing the pinned
 normalization oracle: the reference venv has no ftfy, so the slow tokenizer's
-`BasicTokenizer` fallback (control-character cleaning, CJK splitting,
-lowercasing) is the branch to port, plus the IGNORECASE pre-tokenizer regex,
-byte encoder and `</w>` suffix. The Tier-B reference generator adds
+`BasicTokenizer` fallback (control-character cleaning, CJK splitting, NFC
+normalization, lowercasing, and the whitespace re-collapse after the split)
+is the branch to port, plus the IGNORECASE pre-tokenizer regex, byte encoder
+and `</w>` suffix. The Tier-B reference generator adds
 **diffusers** to the `tools/hf-reference` hash lock (absent today), checked
 against `verifyImageOracleDependencyPins`' shared Pillow/NumPy/Transformers
 pins. The Tier-B artifact is
@@ -549,7 +550,8 @@ foundation. Milestone 11.5 is the phase’s one non-parity milestone — audio i
 scheduled by the 2026-10-31 Phase 7.4 decision (`req/plans/phase7-4-decision.md`) — riding
 milestone 2’s `MLXFFT`.
 
-**MLX upgrade:** 11.0. **Release:** a 0.x release at the end of the phase.
+**MLX upgrade:** 11.0. **Release:** a 0.x release at the end of the phase, including the first
+release of `jmlx-audio`.
 
 Milestones:
 

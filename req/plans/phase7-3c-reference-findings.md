@@ -1111,3 +1111,57 @@ series calls the seventh round, and review-round references don't belong in publ
 The parenthetical is removed.
 
 No native pin, generated binding or golden changed in this round.
+
+## 19. PR #68 ninth review round (2026-10-31)
+
+**Round 8's type-preserving object-array copy threw `ArrayStoreException` (confirmed).** The
+round-8 copy allocated `Array.newInstance(array.getClass().getComponentType(), n)` so a
+`String[]` stayed a `String[]`. But the element copy of a `List`/`Map` comes back as an
+unmodifiable wrapper, and a concretely typed object array (an `ArrayList[]`, a `HashMap[]`)
+cannot hold one, so `copy[i] = deepCopyContextValue(array[i])` threw
+`ArrayStoreException: java.util.Collections$Unmod...`. The array is a context value the renderer
+accepts (it converts *any* array), so the constructor rejected a legal input. The copy now
+converts **every** array — object and primitive alike — into an unmodifiable `List`, which the
+renderer converts to the same `ArrayValue` as a list, so templates see nothing different. This
+also fixes the companion finding below. The `Array.newInstance` branch and the eight primitive
+`clone()` branches are gone.
+
+**Copied arrays were mutable through the accessor (confirmed).** Round 8's primitive `clone()`
+(and the object array) came back as the internal copy itself, so
+`((String[]) o.extraContext().get("arr"))[0] = "mutated"` rewrote the snapshot; `Phi3VModel`
+re-renders from `request.chatOptions()`, so a second render would have seen the mutation and the
+Javadoc's snapshot guarantee didn't hold for arrays. The array→unmodifiable-`List` conversion
+closes this for both object and primitive arrays.
+
+**A cyclic context threw `StackOverflowError` instead of a clear error (confirmed, introduced
+round 7).** The recursive copy (round 7's map/list, round 8's array) has no cycle check, so
+`List cyc; cyc.add(cyc)` overflowed the stack in the constructor, before the renderer's clear
+"cycle" conversion error (`Values.fromHostValue`'s `requireAcyclic`) could be reached. The copy
+now tracks the objects currently being copied in an identity `Set` and throws
+`IllegalArgumentException("chat context value contains a cycle")`. It also keeps an original→copy
+identity `Map`, so a value referenced several times is copied **once** and shared, matching the
+renderer (which converts each host object once, under a copy budget) instead of once per
+reference.
+
+**One shared copy helper (reviewer's "better still").** The duplicated copy logic in
+`GenerationRequest.deepCopyValue` (jmlx-models) is removed; both snapshots now delegate to a single
+public `ChatTemplateOptions.copyContextValue(Object)` (jmlx-tokenizer), so the two can't drift
+apart. `GenerationRequest.deepCopyMessages` is now a one-line delegation, and its unused
+`ArrayList`/`Collections`/`LinkedHashMap` imports are dropped. The pinned behavior the message
+copy guaranteed is preserved and re-asserted by `GenerationRequestPromptTextTest`: null values
+survive (a `null` is passed through, unlike `Map.copyOf`), insertion order is kept (a
+`LinkedHashMap`), non-`String` nested keys survive as-is (the renderer rejects them at the render
+boundary, not the copy), and a later caller mutation changes nothing.
+
+**The Javadoc's "immutable" was wrong for `Number` (nit, confirmed).** The Javadoc called the
+shared scalars "immutable", but `Number` also covers mutable types such as `AtomicInteger` and
+`AtomicLong`, which the renderer accepts (`Values.numberValue` accepts any `Number` with a
+finite decimal `toString()`). The Javadoc now says the remaining values (strings, booleans,
+numbers) are shared by reference and notes that `Number` also covers mutable types the renderer
+accepts.
+
+Tests: `ChatTemplateRenderOptionsTest` pins the round-8 regression (a concretely typed
+`ArrayList[]` copies without `ArrayStoreException` and comes back as a list), the array→list
+accessor (a `String[]` copy is a list and `UnsupportedOperationException` on `add`), a self-
+referencing `List` rejected with a clear "cycle" error, and a repeated reference copied once
+(`assertSame`). No native pin, generated binding or golden changed.

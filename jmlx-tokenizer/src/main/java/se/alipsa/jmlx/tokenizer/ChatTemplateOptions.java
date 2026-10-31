@@ -3,11 +3,13 @@ package se.alipsa.jmlx.tokenizer;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import se.alipsa.jmlx.jinja.RenderOptions;
 
 /**
@@ -51,22 +53,16 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Validates and defensively copies the caller context: maps and lists are copied recursively into
-   * unmodifiable wrappers, arrays are copied, and the remaining values (strings, booleans, numbers)
-   * are immutable and shared — so a later caller mutation of a nested value (a tools list, a nested
-   * array) cannot change what a render, including a model's later re-render of the same options,
-   * sees. The nested maps and lists {@link #extraContext()} returns are therefore unmodifiable
-   * copies. Sets and other collections are not accepted by the renderer as context values and fail
-   * at the render boundary. Empty template name means default selection.
+   * Validates and defensively copies the caller context (see {@link #copyContextValue}): a later
+   * caller mutation of a nested value (a tools list, a nested array) cannot change what a render,
+   * including a model's later re-render of the same options, sees. The nested maps and lists {@link
+   * #extraContext()} returns are therefore unmodifiable copies, and a cyclic structure is rejected
+   * here with a clear error. Sets and other collections are not accepted by the renderer as context
+   * values and fail at the render boundary. Empty template name means default selection.
    */
   public ChatTemplateOptions {
     templateName = Objects.requireNonNull(templateName, "templateName");
-    Map<String, Object> deep =
-        new LinkedHashMap<>(Objects.requireNonNull(extraContext, "extraContext").size());
-    for (Map.Entry<String, Object> entry : extraContext.entrySet()) {
-      deep.put(entry.getKey(), deepCopyContextValue(entry.getValue()));
-    }
-    extraContext = Collections.unmodifiableMap(deep);
+    extraContext = copyContextValue(Objects.requireNonNull(extraContext, "extraContext"));
     for (String key : extraContext.keySet()) {
       if (RESERVED.contains(key)) {
         throw new IllegalArgumentException(
@@ -76,60 +72,77 @@ public record ChatTemplateOptions(
   }
 
   /**
-   * Copies one context value: maps and lists are copied into insertion-order unmodifiable wrappers
-   * (nested map keys are preserved as they are — the renderer rejects non-String keys at the render
-   * boundary, not here), object arrays are copied element-wise with their runtime component type
-   * preserved, primitive arrays are cloned, and the remaining values (strings, booleans, numbers)
-   * are immutable and shared by reference.
+   * Deep-copies one chat context value so a later caller mutation cannot change what a render —
+   * including a model's later re-render of the same options — sees. This record's compact
+   * constructor and {@code GenerationRequest.chat}'s message snapshot (jmlx-models) share this one
+   * copy implementation, so the two snapshots cannot drift apart.
+   *
+   * <p>Maps and lists are copied into insertion-order unmodifiable wrappers (nested map keys are
+   * preserved as they are — the renderer rejects non-String keys at the render boundary, not here).
+   * Arrays, object and primitive alike, are copied into unmodifiable lists: the renderer converts
+   * both to the same array value, and an element-wise copy into a concretely typed object array (an
+   * {@code ArrayList[]}) would throw {@link ArrayStoreException}, since the elements come back as
+   * unmodifiable wrappers. The remaining values (strings, booleans, numbers — {@code Number} also
+   * covers mutable types such as {@link AtomicInteger}, which the renderer accepts) are shared by
+   * reference. A value referenced several times is copied once and shared, matching the renderer's
+   * per-render conversion of each host object; a cycle is rejected with an {@link
+   * IllegalArgumentException} rather than a {@link StackOverflowError}.
+   *
+   * @param value the context value to copy; null is passed through
+   * @param <T> the static type of the value
+   * @return the copy (or the value itself when it is not a container)
    */
-  private static Object deepCopyContextValue(Object value) {
-    if (value instanceof Map<?, ?> map) {
-      Map<Object, Object> typed = new LinkedHashMap<>(map.size());
-      for (Map.Entry<?, ?> entry : map.entrySet()) {
-        typed.put(entry.getKey(), deepCopyContextValue(entry.getValue()));
-      }
-      return Collections.unmodifiableMap(typed);
+  @SuppressWarnings(
+      "unchecked") // the copy preserves the container shape (a map stays a map, a list a list)
+  public static <T> T copyContextValue(T value) {
+    return (T)
+        copyValue(
+            value, new IdentityHashMap<>(), Collections.newSetFromMap(new IdentityHashMap<>()));
+  }
+
+  private static Object copyValue(
+      Object value, IdentityHashMap<Object, Object> converted, Set<Object> visiting) {
+    if (value == null
+        || !(value instanceof Map<?, ?>
+            || value instanceof List<?>
+            || value.getClass().isArray())) {
+      return value;
     }
-    if (value instanceof List<?> list) {
-      List<Object> copy = new ArrayList<>(list.size());
-      for (Object element : list) {
-        copy.add(deepCopyContextValue(element));
-      }
-      return Collections.unmodifiableList(copy);
+    if (visiting.contains(value)) {
+      throw new IllegalArgumentException("chat context value contains a cycle");
     }
-    if (value instanceof Object[] array) {
-      Object[] copy =
-          (Object[]) Array.newInstance(array.getClass().getComponentType(), array.length);
-      for (int i = 0; i < array.length; i++) {
-        copy[i] = deepCopyContextValue(array[i]);
+    Object existing = converted.get(value);
+    if (existing != null) {
+      return existing;
+    }
+    visiting.add(value);
+    try {
+      Object copy;
+      if (value instanceof Map<?, ?> map) {
+        Map<Object, Object> typed = new LinkedHashMap<>(map.size());
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+          typed.put(entry.getKey(), copyValue(entry.getValue(), converted, visiting));
+        }
+        copy = Collections.unmodifiableMap(typed);
+      } else {
+        int length = value instanceof List<?> list ? list.size() : Array.getLength(value);
+        List<Object> elements = new ArrayList<>(length);
+        if (value instanceof List<?> list) {
+          for (Object element : list) {
+            elements.add(copyValue(element, converted, visiting));
+          }
+        } else {
+          for (int i = 0; i < length; i++) {
+            elements.add(copyValue(Array.get(value, i), converted, visiting));
+          }
+        }
+        copy = Collections.unmodifiableList(elements);
       }
+      converted.put(value, copy);
       return copy;
+    } finally {
+      visiting.remove(value);
     }
-    if (value instanceof boolean[] array) {
-      return array.clone();
-    }
-    if (value instanceof byte[] array) {
-      return array.clone();
-    }
-    if (value instanceof char[] array) {
-      return array.clone();
-    }
-    if (value instanceof double[] array) {
-      return array.clone();
-    }
-    if (value instanceof float[] array) {
-      return array.clone();
-    }
-    if (value instanceof int[] array) {
-      return array.clone();
-    }
-    if (value instanceof long[] array) {
-      return array.clone();
-    }
-    if (value instanceof short[] array) {
-      return array.clone();
-    }
-    return value;
   }
 
   /**

@@ -1,8 +1,9 @@
 package se.alipsa.jmlx.tokenizer;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -124,15 +125,59 @@ class ChatTemplateRenderOptionsTest {
     context.put("tools", "sabotage");
     assertEquals(List.of("search"), options.extraContext().get("tools"));
 
-    // Arrays are copied too: the renderer accepts them as context values, and a caller mutation
-    // of the original array must not reach a later render.
+    // Arrays are copied into unmodifiable lists (the renderer converts both arrays and lists to
+    // the same array value), so a caller mutation of the original array must not reach a later
+    // render, and the retained copy cannot itself be mutated through the accessor.
     String[] categories = {"weather", "news"};
     Map<String, Object> arrayContext = new java.util.LinkedHashMap<>();
     arrayContext.put("categories", categories);
     ChatTemplateOptions arrayOptions = new ChatTemplateOptions("", false, arrayContext);
     categories[0] = "sabotage";
-    assertArrayEquals(
-        new String[] {"weather", "news"}, (String[]) arrayOptions.extraContext().get("categories"));
+    assertEquals(List.of("weather", "news"), arrayOptions.extraContext().get("categories"));
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> ((List<String>) arrayOptions.extraContext().get("categories")).add("sabotage"));
+  }
+
+  @Test
+  void concretelyTypedObjectArrayIsCopiedWithoutArrayStoreException() {
+    // A concretely typed object array (an ArrayList[]) is a context value the renderer accepts
+    // (it converts any array), and its element copy comes back as an unmodifiable wrapper, which
+    // the original element type cannot hold — so the copy converts the array to a list rather
+    // than storing elements back into the typed array (which would throw ArrayStoreException).
+    java.util.ArrayList<String> inner = new java.util.ArrayList<>(List.of("a"));
+    Object[] typed = new java.util.ArrayList[] {inner};
+    Map<String, Object> context = new java.util.LinkedHashMap<>();
+    context.put("t", typed);
+    ChatTemplateOptions options = new ChatTemplateOptions("", false, context);
+    assertEquals(List.of(List.of("a")), options.extraContext().get("t"));
+  }
+
+  @Test
+  void cyclicContextIsRejectedWithAClearError() {
+    // The recursive copy runs before the render, so without a cycle check a self-referencing
+    // value would overflow the stack here; the renderer rejects cycles with a clear error, and
+    // the copy must do the same rather than never reach it.
+    List<Object> cycle = new java.util.ArrayList<>();
+    cycle.add(cycle);
+    Map<String, Object> context = new java.util.LinkedHashMap<>();
+    context.put("c", cycle);
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class, () -> new ChatTemplateOptions("", false, context));
+    assertTrue(error.getMessage().contains("cycle"), "unexpected: " + error.getMessage());
+  }
+
+  @Test
+  void repeatedReferencesAreCopiedOnceAndShared() {
+    // The renderer converts each host object only once; the copy must match that, so a value
+    // referenced several times is copied once and the references stay the same object.
+    List<String> shared = new java.util.ArrayList<>(List.of("x"));
+    Map<String, Object> context = new java.util.LinkedHashMap<>();
+    context.put("a", shared);
+    context.put("b", shared);
+    ChatTemplateOptions options = new ChatTemplateOptions("", false, context);
+    assertSame(options.extraContext().get("a"), options.extraContext().get("b"));
   }
 
   private static RenderOptions fixedClock(ZoneId zone) {

@@ -1,9 +1,6 @@
 package se.alipsa.jmlx.models;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -167,46 +164,14 @@ public final class GenerationRequest {
   /**
    * Deep-copies the chat messages so a later caller mutation cannot change what the model expands:
    * like the images (whose pixel buffers {@link RgbImage} copies), the request must own its source
-   * text. Maps and lists are copied recursively into insertion-order unmodifiable wrappers — {@code
-   * Map.copyOf}/{@code List.copyOf} are deliberately not used: they reject null values, which chat
-   * fields such as {@code "name": null} legitimately carry, and they do not preserve key order,
-   * which templates iterating the message can observe.
+   * text. Delegates to {@link ChatTemplateOptions#copyContextValue(Object)}, the one shared
+   * snapshot copy that the options' own extraContext uses, so the two snapshots cannot drift apart:
+   * insertion-order unmodifiable wrappers (null values and non-String nested keys survive exactly
+   * as they would the render), unmodifiable list copies of arrays, shared scalars, one shared copy
+   * for a value referenced several times, and a cycle rejected with a clear error.
    */
   private static List<Map<String, Object>> deepCopyMessages(List<Map<String, Object>> messages) {
-    List<Map<String, Object>> copy = new ArrayList<>(messages.size());
-    for (Map<String, Object> message : messages) {
-      copy.add(deepCopyMap(message));
-    }
-    return Collections.unmodifiableList(copy);
-  }
-
-  private static Map<String, Object> deepCopyMap(Map<String, Object> map) {
-    Map<String, Object> copy = new LinkedHashMap<>(map.size());
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
-      copy.put(entry.getKey(), deepCopyValue(entry.getValue()));
-    }
-    return Collections.unmodifiableMap(copy);
-  }
-
-  private static Object deepCopyValue(Object value) {
-    if (value instanceof Map<?, ?> map) {
-      // Nested maps (tool-call payloads and the like) keep their key types: only the top-level
-      // message maps are declared String-keyed, and a non-String nested key must survive the copy
-      // exactly as it would the render.
-      Map<Object, Object> typed = new LinkedHashMap<>(map.size());
-      for (Map.Entry<?, ?> entry : map.entrySet()) {
-        typed.put(entry.getKey(), deepCopyValue(entry.getValue()));
-      }
-      return Collections.unmodifiableMap(typed);
-    }
-    if (value instanceof List<?> list) {
-      List<Object> copy = new ArrayList<>(list.size());
-      for (Object element : list) {
-        copy.add(deepCopyValue(element));
-      }
-      return Collections.unmodifiableList(copy);
-    }
-    return value;
+    return ChatTemplateOptions.copyContextValue(messages);
   }
 
   private static GenerationRequest tokenizerBacked(

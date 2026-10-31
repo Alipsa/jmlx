@@ -1085,3 +1085,17 @@ String/Boolean/Number/array/List/Map and rejects `Set`/other collections at the 
 and its Javadoc states the resulting snapshot contract; `ChatTemplateRenderOptionsTest` gained a
 nested-array mutation case. `GenerationRequest.chat`'s Javadoc dropped a wrong "(round-6 design
 review)" label. No native pin, generated binding or golden changed.
+
+A ninth PR #68 review round landed: round 8's type-preserving object-array copy threw
+`ArrayStoreException` for a concretely typed array (an `ArrayList[]` can't hold the unmodifiable
+wrapper copy of its elements), so `ChatTemplateOptions` now converts every array — object and
+primitive alike — into an unmodifiable list (the renderer converts both to the same array value),
+which also stops the copy being mutable through `extraContext()`'s accessor; the recursive copy
+gained an identity cycle check throwing `IllegalArgumentException("chat context value contains a
+cycle")` (it previously `StackOverflowError`'d before the renderer's clear error) and an
+original→copy map so a repeated reference is copied once and shared, matching the renderer's
+per-render conversion. The duplicated copy logic in `GenerationRequest` was removed in favor of a
+single public `ChatTemplateOptions.copyContextValue` shared by both snapshots (the message copy's
+pinned null/order/non-String-key/mutation behavior is unchanged); the Javadoc dropped the wrong
+"immutable" for the shared scalars, since `Number` also covers mutable types such as
+`AtomicInteger`, which the renderer accepts. No native pin, generated binding or golden changed.

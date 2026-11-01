@@ -134,7 +134,7 @@ untied). Text-to-image conditioning uses neither. `embed_tokens` (about 0.62B) c
 existing `QuantizedEmbedding`. The full-checkpoint row is the conservative bound.
 
 **On the 24 GB target:**
-- **BF16 resident doesn't fit.** It needs about 30–33 GB.
+- **BF16 resident doesn't fit.** It needs about 31–33 GB.
 - **Q4 for both large components fits.** About 9.75 GB of weights (text-only encoder, F32 VAE)
   can stay resident together, so the target depends on Q4 (IMG-008).
 - **Staging is a memory-budget policy, not a requirement.** The policy is set on the loaded

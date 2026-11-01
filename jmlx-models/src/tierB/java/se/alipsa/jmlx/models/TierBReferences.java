@@ -13,6 +13,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Properties;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.ffi.mlx_h;
@@ -126,13 +127,46 @@ final class TierBReferences {
             + "/"
             + System.getProperty("os.arch")
             + ", recorded_pin="
-            + manifest.path("recorded_pin").asString("unrecorded"));
+            + manifest.path("recorded_pin").asString("unrecorded")
+            + ", runtime_pin="
+            + runtimePin());
   }
 
   static List<Integer> ids(JsonNode node) {
     List<Integer> result = new ArrayList<>();
     node.forEach(value -> result.add(value.intValue()));
     return result;
+  }
+
+  /**
+   * The runtime pin tuple: the same string {@code TierBSmokeTest} compares the manifest's {@code
+   * recorded_pin} against, so a report line never misattributes IDs to a different device/macOS/MLX
+   * runtime than the one that produced them.
+   */
+  static String runtimePin() throws Exception {
+    Path file =
+        Path.of(
+            System.getProperty("jmlx.repository.root"), "native/install/lib/native-pin.properties");
+    Properties nativePin = new Properties();
+    try (var input = Files.newInputStream(file)) {
+      nativePin.load(input);
+    }
+    Process device =
+        new ProcessBuilder("/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string").start();
+    String hardware = new String(device.getInputStream().readAllBytes()).trim();
+    if (device.waitFor() != 0 || hardware.isBlank()) {
+      throw new IllegalStateException("cannot identify Tier B Apple Silicon device");
+    }
+    return hardware
+        + "|macOS="
+        + System.getProperty("os.version")
+        + "|arch="
+        + System.getProperty("os.arch")
+        + "|mlx-metal="
+        + nativePin.getProperty("mlxMetalVersion")
+        + "|mlx-c="
+        + nativePin.getProperty("mlxcCommit")
+        + "|batch=1";
   }
 
   /** The MLX default device as a stable string: the same query MLXGpuVerificationTest asserts. */

@@ -96,8 +96,10 @@ These facts change what jmlx must build, and some differ from what the model car
   can be pinned. 0.41.0 is not identical (its transformer differs, as noted under Method).
 - **Tokenizer files.** The artifact's `processor/vocab.json` is the same blob as the Apache-2.0
   `Qwen/Qwen3-VL-2B-Instruct` tokenizer (revision `8964489`) that 7.3b uses. Its `merges.txt`
-  and `tokenizer.json` are different blobs. *Unverified:* whether the two tokenize identically;
-  that is a WP1 probe.
+  and `tokenizer.json` are different blobs. No gate relies on the 2B tokenizer: Tier-B loads the
+  artifact's own `tokenizer.json`, and Tier-A uses a committed fixture tokenizer (§5). The WP1
+  probe checks jmlx's `HfTokenizer` against the reference processor on the artifact's tokenizer,
+  including the raw template and `_drop_idx`.
 
 ## 3. What exists versus the gaps
 
@@ -105,7 +107,7 @@ These facts change what jmlx must build, and some differ from what the model car
 | --- | --- | --- |
 | Conv, norm, upsample | `conv1d/2d/3d`, `convTranspose1d/2d/3d`, `pad`, `GroupNorm`, `Upsample` (`NEAREST`/`LINEAR`), all 7.1 | none for upsampling: when upscaling, `Upsample` `NEAREST` uses `rint((i + 0.5)·n/m − 0.5)` (`Upsample.java:77`). That can differ from `nearest-exact`'s `floor((i + 0.5)·n/m)` only when `(i + 0.5)/s` is an integer, which never happens for an integer scale `s`. So the two agree at the VAE's 2× stages. A unit test pins this. |
 | Text encoder | `Qwen3VlModel` (7.3b), `qwen3_vl` dispatch, interleaved `MultiAxisRope` | Pre-norm last-hidden-state output seam; raw template and `_drop_idx`; text-only load that skips the vision tower and `lm_head`; BF16- and Q4-resident loading next to today's FLOAT32 up-cast (§4) |
-| Tokenizer | `HfTokenizer` over Qwen `tokenizer.json` (7.3b) | none expected. Tier-B loads the artifact's own `tokenizer.json` from the download at run time. Tier-A uses the Apache-2.0 Qwen3-VL tokenizer (§5). |
+| Tokenizer | `HfTokenizer` over Qwen `tokenizer.json` (7.3b) | none expected. Tier-B loads the artifact's own `tokenizer.json` from the download at run time. Tier-A uses a committed fixture tokenizer (§5). |
 | Transformer | `DecoderAttention` with explicit masks; MLX `scaled_dot_product_attention` | Single-stream block, block-causal mask builder, `causal_condition` timestep modulation, three-axis RoPE with `axes_dims_rope` [16, 56, 56] (a different layout from the Qwen3-VL text rotary, to verify), latent pack/unpack |
 | Scheduler and sampler | 9.6 contracts (PNDM first; not yet delivered) | `FlowMatchEulerDiscreteScheduler` with exponential dynamic shift and `shift_terminal` |
 | VAE decoder | 9.6 VAE-wrapper contract | Wan-style residual decoder (`base_dim` 96, `decoder_base_dim` 144, `dim_mult` [1, 2, 4, 8, 8]); de-normalization; RGBA output |
@@ -132,25 +134,39 @@ untied). Text-to-image conditioning uses neither. `embed_tokens` (about 0.62B) c
 existing `QuantizedEmbedding`. The full-checkpoint row is the conservative bound.
 
 **On the 24 GB target:**
-- **BF16 doesn't fit.** BF16 resident needs about 30–33 GB.
-- **Q4 for both large components fits.** About 9–10 GB of weights (including the F32 VAE) can
-  stay resident together, so the target depends on Q4 (IMG-008).
+- **BF16 resident doesn't fit.** It needs about 30–33 GB.
+- **Q4 for both large components fits.** About 9.75 GB of weights (text-only encoder, F32 VAE)
+  can stay resident together, so the target depends on Q4 (IMG-008).
 - **Staging is a memory-budget policy, not a requirement.** The policy is set on the loaded
   model object, and a request always runs against that object (IMG-007):
   - `RESIDENT` (the default): every component stays loaded between jobs.
-  - `STAGED`: the encoder loads per job and is released after conditioning, while the
-    transformer and VAE stay loaded. Each job then re-reads the encoder, about 4.4–4.9 GB at
-    Q4. This is for tighter budgets, or for BF16 on a larger machine.
+  - `STAGED`: the encoder and the transformer are **never resident together**. Each job loads
+    the encoder, encodes, and releases it; then it loads the transformer and denoises. The VAE
+    (1.35 GB) stays loaded. The transformer stays loaded after the job until the next job's
+    encode starts.
+    
+    The peak is therefore the larger of the two plus the VAE, and every job re-reads both large
+    components.
+
+  | Path | `RESIDENT` peak weights | `STAGED` peak weights | `STAGED` re-read per job |
+  | --- | --- | --- | --- |
+  | FLOAT32 | ~60.9 GB | ~32.4 GB (encode stage) | ~29.7 GB of BF16 files, up-cast |
+  | BF16 | ~30.4 GB | ~16.2 GB | ~29.7 GB |
+  | Q4 | ~9.75 GB | ~5.75 GB | ~8.4 GB |
+  
+  BF16 `STAGED` is not assumed to fit the 24 GB target with activations and a desktop session;
+  it is measured only on the M5 Max. The 24 GB path is Q4.
 
 **Three weight-residency paths, all measured against one CPU float32 reference:**
 - **FLOAT32**, the existing up-cast pattern. It runs the strict gates:
-  - The Tier-A synthetic checkpoint stores BF16-rounded weights as F32, so its strict float32
-    gate needs no up-cast (the 7.3c WP6 pattern).
-  - The Tier-B tight-ε run uses this path on the M5 Max, staged. Its largest Java stage is the
-    text-only encoder at about 31 GB.
-- **BF16 resident** and **Q4 resident**: the paths for the 24 GB target. Each has a separately
-  named bound against the same reference, following the 7.3c precedent of strict and TF32
-  bounds side by side.
+  - The Tier-A synthetic checkpoint stores its weights as BF16, as 7.3b WP8 (104 BF16 tensors)
+    and 7.3c WP6 (76 BF16 tensors) do. The strict gate runs through the FLOAT32 up-cast at
+    load, and the same checkpoint also exercises BF16-resident loading.
+  - The Tier-B tight-ε run uses this path with `STAGED` on the M5 Max, peaking at about 32.4 GB
+    of weights in the encode stage.
+- **BF16 resident** and **Q4 resident**: Q4 is the path for the 24 GB target. Each has a
+  separately named bound against the same reference, following the 7.3c precedent of strict and
+  TF32 bounds side by side.
 
 **Reference memory.** The CPU float32 reference runs component by component; its largest stage
 holds about 35 GB of encoder weights (full checkpoint). It is planned on the M5 Max host.
@@ -196,9 +212,17 @@ which the PR review accepts or overrides:
 - **Committed Tier-B goldens are model outputs, not Materials**: conditioning tensors, per-step
   denoiser outputs and the VAE decode. §4.b's attribution duty applies only when outputs are
   used to create or improve a distributed AI model, which a test golden does not.
-- **Tier-A fixtures use no artifact file.** The synthetic checkpoint is generated, and its
-  tokenizer is the Apache-2.0 `Qwen/Qwen3-VL-2B-Instruct` tokenizer at revision
-  `89644892e4d85e24eaac8bacfd4f463576704203`, the one 7.3b already pins.
+- **Tier-A fixtures use no artifact file.** The synthetic checkpoint is generated. Its tokenizer
+  is a committed, hand-written tiny fixture tokenizer, the same pattern as the 2,031-byte
+  21-token tokenizers of 7.3b WP8 and 7.3c WP6. It carries the template's special tokens
+  (`<|im_start|>`, `<|im_end|>`) and the system/user/assistant role markers. It comes with a
+  minimal hand-written chat template that renders the system message the way the artifact's
+  does, so the raw template and `_drop_idx` are still exercised.
+  
+  WP1 checks that rendering against the artifact's own template, which is not committed. The
+  real 151,936-token tokenizer would add a 7 MB `tokenizer.json` and a 151,936-row embedding to
+  the synthetic checkpoint, and it would still not match Tier-B, which runs the artifact's own,
+  different tokenizer.
 - **Size budget for committed Tier-B goldens: at most 10 MiB**, as little-endian float32. At
   512×512, one latent tensor is 1,024 tokens × 64 channels, which is 256 KiB. The budget covers:
   - the conditioning tensor (under 1 MiB for a short prompt);
@@ -296,12 +320,12 @@ need. Either is recorded as a later decision, not assumed.
 | WP | Content |
 | --- | --- |
 | WP0 | Pin the artifact; re-record the license acceptance; fix the golden step set |
-| WP1 | Reference environment and digest task, plus probes: pre-norm hook, `_drop_idx` and template tokenization, tokenizer equivalence with the Apache-2.0 Qwen3-VL tokenizer, block-causal mask, sigma schedule, three-axis RoPE layout |
+| WP1 | Reference environment and digest task, plus probes: pre-norm hook; `HfTokenizer` vs the reference processor on the artifact's tokenizer, with the raw template and `_drop_idx`; the fixture chat template's system-message rendering; block-causal mask; sigma schedule; three-axis RoPE layout |
 | WP2 | Flow-match scheduler and sampler on the 9.6 contract |
 | WP3 | Conditioning seam on `Qwen3VlModel`: text-only load, FLOAT32 and resident BF16 weights |
 | WP4 | Transformer: blocks, mask, modulation, RoPE |
 | WP5 | VAE decoder and RGBA output; the `NEAREST`/`nearest-exact` unit test |
-| WP6 | Tier-A synthetic golden (strict, BF16-rounded weights stored as F32) |
+| WP6 | Tier-A synthetic golden: BF16-stored weights; strict via the FLOAT32 up-cast; BF16-resident load under its named bound; fixture tokenizer |
 | WP7 | Public API with the `RESIDENT`/`STAGED` policy, PNG output, Q4 path and memory bounds, Tier-B |
 | WP8 | Asynchronous jobs and cancellation on a single platform worker thread; the release-smoke synthetic case; benchmarks; the recorded manual M4 Air run |
 

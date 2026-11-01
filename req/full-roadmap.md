@@ -531,8 +531,9 @@ IMG-001 to IMG-016 are this milestone's requirements source.
    the documentation says so.
    
    No artifact file (weights, configs, processor or tokenizer files, converted weights) enters
-   the repository. Committed Tier-B goldens are model outputs, capped at 10 MiB. Tier-A uses the
-   Apache-2.0 Qwen3-VL tokenizer that 7.3b pins.
+   the repository. Committed Tier-B goldens are model outputs, capped at 10 MiB. Tier-A uses a
+   committed tiny fixture tokenizer carrying the template's special tokens (the 7.3b/7.3c
+   pattern).
 2. **Module home: `jmlx-models`, no new published module.** 9.7 extends 9.6's scheduler, sampler
    and VAE contracts. The two pipelines are the first two users of the model-independent
    interfaces. The decision is reopened if an external consumer needs diffusion without the
@@ -571,12 +572,18 @@ masks, further model families, Turbo/LoRA/ControlNet) is deferred to later miles
 **Settled at milestone start:**
 
 - **Three weight-residency paths**, all measured against one CPU float32 reference:
-  - FLOAT32 (the existing up-cast) for the strict Tier-A gate and the Tier-B tight-ε run, staged
-    on the M5 Max. The Tier-A synthetic checkpoint stores BF16-rounded weights as F32.
-  - BF16 resident and Q4 resident for the 24 GB target, each with a separately named bound.
-- **Staging is a memory-budget policy** (`RESIDENT` by default, or `STAGED` to release the
-  encoder after conditioning), set on the loaded model object. At Q4, both large components fit
-  resident together on 24 GB.
+  - FLOAT32 (the existing up-cast) for the strict Tier-A gate and for the Tier-B tight-ε run on
+    the M5 Max under `STAGED`, peaking at about 32.4 GB of weights. The Tier-A synthetic
+    checkpoint stores BF16 weights, like the 7.3b WP8 and 7.3c WP6 checkpoints, so the same
+    checkpoint also exercises BF16-resident loading.
+  - BF16 resident and Q4 resident, each with a separately named bound. Q4 is the 24 GB path.
+- **Staging is a memory-budget policy** set on the loaded model object:
+  - `RESIDENT` (the default) keeps every component loaded.
+  - `STAGED` never holds the encoder and the transformer together. It encodes, releases the
+    encoder, then loads the transformer, so every job re-reads both. Peak weights become the
+    larger component plus the VAE.
+  
+  At Q4, both large components fit resident together on 24 GB.
 - **The 4-channel (RGBA) VAE decode is the native output path**, not a P2 addition.
 - **Transformer parity is teacher-forced per step**, starting from the reference's injected
   initial latent: a torch-seeded trajectory cannot be reproduced with MLX random. A
@@ -591,19 +598,29 @@ masks, further model families, Turbo/LoRA/ControlNet) is deferred to later miles
 
 **Exit gate:**
 
-- **IMG-001 to IMG-007:** the strict Tier-A synthetic golden passes on the FLOAT32 path.
-- **Pinned-artifact parity**, on the staged FLOAT32 path: the conditioning tensors, the
-  teacher-forced per-step denoiser outputs under the pinned flow-match schedule and the VAE
-  decode of the reference's final latent match the reference within the recorded ε. The BF16
-  and Q4 paths stay within their separately named, recorded bounds.
+- **IMG-001, IMG-004 to IMG-007:** the strict Tier-A synthetic golden passes through the
+  FLOAT32 up-cast of its BF16-stored checkpoint. The BF16-resident load of the same checkpoint
+  stays within its named bound.
+- **IMG-002 to IMG-006, pinned-artifact parity:**
+  - The pinned artifact loads without Python, with deterministic diagnostics for the IMG-002
+    failure cases.
+  - On the `STAGED` FLOAT32 path, the conditioning tensors, the teacher-forced per-step
+    denoiser outputs under the pinned flow-match schedule and the VAE decode of the reference's
+    final latent all match the reference within the recorded ε.
+  - The BF16 and Q4 paths stay within their separately named, recorded bounds.
 - **IMG-008, IMG-009:** a seeded 512×512 text-to-image run on the Q4 path completes in-process
   in Java. Its measured process footprint stays under a recorded bound consistent with the
   24 GB M4 Air target, and one manual run on that hardware is recorded.
 - **IMG-010:** cancelling during denoising, then generating again in the same JVM, returns active
   memory to its baseline.
-- **IMG-011:** the benchmark matrix (512², 768² and 1024²; Q4 and BF16) is recorded under the
-  `req/phase6-4-benchmark.md` conventions. Recording it is gating; the quality thresholds it
-  defines gate the next release, not this milestone.
+- **IMG-011:** the benchmark matrix is recorded under the `req/phase6-4-benchmark.md`
+  conventions, and recording it is gating:
+  - The M5 Max host records every cell: 512², 768² and 1024², for both Q4 and BF16.
+  - The 24 GB M4 Air records the Q4 cells. Its 512² cell is the IMG-009 manual run. Larger cells
+    are recorded where they complete, or else their failure and measured peak are recorded.
+  - BF16 is not run on the M4 Air.
+  
+  The quality thresholds the matrix defines gate the next release, not this milestone.
 - **IMG-012:** the release smoke generates an image from a synthetic Tier-A checkpoint (like its
   synthetic Mistral case) through the published-shape modules, on the hosted native CI job.
 

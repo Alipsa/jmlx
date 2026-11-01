@@ -152,7 +152,8 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
   object.
 - **The loaded model object owns the components under a memory policy:**
   - `RESIDENT` (default): all components stay loaded between requests.
-  - `STAGED`: the encoder is loaded per request and released after conditioning (IMG-009).
+  - `STAGED`: the encoder and the transformer are never loaded together. Each request encodes,
+    releases the encoder, then loads the transformer (IMG-009).
   
   Either way, the caller holds one object.
 - A result carrying image pixels plus complete generation metadata.
@@ -182,7 +183,11 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 - **Staging is a memory-budget policy, not a requirement.**
   - At Q4, the transformer (~4.0 GB), encoder (~4.4–4.9 GB) and VAE fit resident together on
     24 GB.
-  - `STAGED` releases the encoder after conditioning, at the cost of re-reading it every job.
+  - `STAGED` never holds the encoder and the transformer at the same time. It encodes, releases
+    the encoder, then loads the transformer, while the VAE stays loaded. This lowers peak
+    weights to the larger component plus the VAE: about 5.75 GB at Q4, 16.2 GB at BF16, and
+    32.4 GB on the FLOAT32 Tier-B run. The cost is re-reading both large components every job
+    (decision record §4).
 - Also: optional VAE tiling, no retained intermediate history, and deterministic disposal of
   temporaries.
 - Provide explicit memory-budget options and actionable out-of-memory errors.
@@ -211,6 +216,12 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
   - 512×512 and 768×768 first, then 1024×1024;
   - fixed prompts and seeds;
   - Q4 and BF16 outputs.
+- **Hosts:**
+  - The M5 Max development host records every cell, Q4 and BF16.
+  - The 24 GB M4 Air records only the Q4 cells. Its 512² cell is the IMG-009 manual run. Larger
+    cells are recorded where they complete, or else their failure and measured peak are
+    recorded.
+  - BF16 does not fit the 24 GB target and is not run there.
 - **Measure:** cold load, warm load, conditioning, seconds per step, VAE decoding, total
   latency, peak memory, and output quality against the reference.
 - Compare with MFLUX or Diffusers on the same model and device where practical.
@@ -284,8 +295,11 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 - **Determinism:** store enough metadata to reproduce a run. Document allowable numerical drift
   across MLX versions and hardware.
 - **Testing:**
-  - A strict Tier-A synthetic golden is the binding gate. Its generated weights are BF16-rounded
-    and stored as F32, and its tokenizer is the Apache-2.0 Qwen3-VL tokenizer.
+  - A strict Tier-A synthetic golden is the binding gate:
+    - Its generated weights are stored as BF16, as in 7.3b WP8 and 7.3c WP6. The strict gate
+      runs through the FLOAT32 up-cast, and the same checkpoint covers BF16-resident loading.
+    - Its tokenizer is a committed tiny fixture tokenizer with the template's special tokens and
+      a minimal chat template, so the raw template and `_drop_idx` are exercised.
   - The real artifact is a pinned, opt-in Tier-B suite. Its goldens are capped at 10 MiB.
   - Strict float32 references use the `full-float32` tag; BF16 and Q4 comparisons carry
     separately named bounds.

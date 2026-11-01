@@ -64,7 +64,10 @@ final class DenseMoeReference extends UnaryLayer {
     for (int i = 0; i < topK; i++) {
       // argmax uses the lowest index on ties. Mask each selected index before the next pass.
       indices[i] = MLXOps.argmaxAxis(remaining, -1, true);
-      selectedProbabilities[i] = MLXShape.takeAlongAxis(probabilities, indices[i], -1);
+      // MLX 0.32.4 rejects a gather_axis VJP with respect to computed indices; stop the
+      // integer index channel (it carries no meaningful derivative). Same guard as MoeMlp.
+      selectedProbabilities[i] =
+          MLXShape.takeAlongAxis(probabilities, MLXOps.stopGradient(indices[i]), -1);
       selectedSum =
           selectedSum == null
               ? selectedProbabilities[i]

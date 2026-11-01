@@ -59,7 +59,12 @@ public final class MoeMlp extends UnaryLayer {
     for (int i = 0; i < topK; i++) {
       // argmax uses the lowest index on ties. Mask each selected index before the next pass.
       indices[i] = MLXOps.argmaxAxis(remaining, -1, true);
-      selectedProbabilities[i] = MLXShape.takeAlongAxis(probabilities, indices[i], -1);
+      // gather_axis has no VJP with respect to its indices and the pinned MLX 0.32.4
+      // rejects computing one (SwitchGlu's gather_mm guard is the same requirement).
+      // Router gradients reach the router through the gathered probabilities, not
+      // through the integer indices.
+      selectedProbabilities[i] =
+          MLXShape.takeAlongAxis(probabilities, MLXOps.stopGradient(indices[i]), -1);
       selectedSum =
           selectedSum == null
               ? selectedProbabilities[i]

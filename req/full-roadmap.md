@@ -505,12 +505,15 @@ pins. The Tier-B artifact is
 7.4 decision record for a pinned read-only test artifact** — the milestone plan
 re-records that acceptance and does not re-open it; the strict Tier-A
 synthetic golden is the binding gate. Scope is text-to-image only (no
-ControlNet/img2img/inpainting).
+ControlNet/img2img/inpainting); the `safety_checker` and config-only
+`feature_extractor` components named in the same `model_index.json` are not
+ported, and the Tier-B reference compares the raw VAE decode with the safety
+checker disabled (7.4 record §5).
 
 **Exit gate:** the synthetic Tier-A golden passes at strict tolerance; the
 pinned Tier-B artifact's prompt embedding, per-step noise prediction under
-the pinned PNDM schedule and decoded image match the CPU float32 reference
-within the recorded ε.
+the pinned PNDM schedule and the raw VAE decode (safety checker disabled)
+match the CPU float32 reference within the recorded ε.
 
 **Phase 9 done:** every milestone's exit gate passes and the phase release is published.
 

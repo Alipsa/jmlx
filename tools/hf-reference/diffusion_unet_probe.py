@@ -168,9 +168,9 @@ class MidAttention(nn.Module):
     def forward(self, x):
         b, c, ih, iw = x.shape
         q, k, v = self.qkv(self.norm(x)).chunk(3, dim=1)
-        # reshape, not view: the channel-chunked q/k/v are non-contiguous for
-        # batch > 1, and view would reject them (the probe runs batch 1, but a
-        # reuse with a larger batch should not silently break).
+        # reshape is used defensively: the channel-chunked q/k/v are
+        # non-contiguous for batch > 1, though view also works here (the
+        # merged h/w dimensions stay contiguous with each other).
         q = q.reshape(b, c, ih * iw).transpose(1, 2)
         k = k.reshape(b, c, ih * iw).transpose(1, 2)
         v = v.reshape(b, c, ih * iw).transpose(1, 2)

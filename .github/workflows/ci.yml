@@ -140,26 +140,6 @@ jobs:
         shell: bash
         run: ./tools/image-oracle/install.sh
 
-      # TEMPORARY (req/plans/phase7-5-plan.md WP2.4): regenerates the three MLX oracle
-      # fixtures on macos-26 — the only host satisfying the phase6 GPU profile — and
-      # uploads them for the (2b) fixture commit. The regenerated files are restored to
-      # their committed state before this step ends, so "Run root verification" still
-      # verifies the committed fixtures and stays red until the regenerated fixtures
-      # land. Removed in the final review round (phase7-5-plan.md §9).
-      - name: Regenerate MLX oracle fixtures for download (temporary)
-        shell: bash
-        run: |
-          ./gradlew generateMlxOracleFixtures -PmlxOracleRequireAllProfiles=true
-          mkdir -p "$RUNNER_TEMP/oracle"
-          cp tools/mlx-oracle/fixtures/*.expected.json "$RUNNER_TEMP/oracle/"
-          git checkout -- tools/mlx-oracle/fixtures/
-
-      - name: Upload regenerated MLX oracle fixtures (temporary)
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlx-oracle-fixtures-regenerated
-          path: ${{ runner.temp }}/oracle/
-
       - name: Run root verification
         # Runs the repository-wide source guards after native bootstrap and oracle setup.
         run: ./gradlew :check verifyMlxApiHeaderCoverage verifyMlxOracle verifyMlxOracleFixtures verifyImageOracle verifyImageOracleFixtures -PmlxOracleRequireAllProfiles=true

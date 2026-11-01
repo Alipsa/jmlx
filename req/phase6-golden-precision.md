@@ -41,13 +41,16 @@ the full-float32 maximum is below the original `1e-4` golden bound.
 ## Native mechanism
 
 The pinned version's
-[matmul dispatch](https://github.com/ml-explore/mlx/blob/v0.31.2/mlx/backend/metal/matmul.cpp)
+[matmul dispatch](https://github.com/ml-explore/mlx/blob/v0.32.4/mlx/backend/metal/matmul.cpp)
 selects NAX kernels for float32 when NAX hardware is available and
 `env::enable_tf32()` is true. Its
-[full-attention dispatch](https://github.com/ml-explore/mlx/blob/v0.31.2/mlx/backend/metal/scaled_dot_product_attention.cpp)
+[full-attention dispatch](https://github.com/ml-explore/mlx/blob/v0.32.4/mlx/backend/metal/scaled_dot_product_attention.cpp)
 uses the same precision switch. Matmul shapes and sorted gather paths can select
 different kernels, explaining both prefill-vs-decode and sorted-vs-unsorted
-precision differences. The experiment disables both native reduced-precision
+precision differences. The pinned runtime moved to MLX 0.32.4 / mlx-c v0.8.0 at the
+Phase 7.5 milestone (2026-11-01, see the migration record in
+`req/phase6-inference-report.md`); the measurements above and below are dated to the runtime
+named beside them. The experiment disables both native reduced-precision
 paths; it does not isolate their individual contributions.
 
 ## Enforced test policy
@@ -233,3 +236,14 @@ Host: macOS 27.0.1, Apple M5 Max, Java 25, MLX 0.31.2, mlx-c
 
 The local `0.0012` default-mode bound is supported only by the M5 Max measurement; CI
 registration of both suites rides the single Phase 7.3c PR.
+
+## Phase 7.5 (pin upgrade to MLX 0.32.4, 2026-11-01)
+
+The paired native pin moved 0.31.2 / `fba4470` → 0.32.4 / mlx-c v0.8.0 (`a26f2d5`). The
+default-mode-versus-strict split this document describes is unchanged: every strict
+`full-float32` reference passed **unchanged** under the new pins in both result directories
+(`:jmlx-core:float32GoldenTest` 30/30, `:jmlx-models:float32GoldenTest` 56/56 on the M5 Max),
+no bound was loosened or re-derived for the upgrade, and the regenerated oracle/Tier-A
+fixtures are byte-identical in value to the 0.31.2 recordings (the migration record in
+`req/phase6-inference-report.md` lists the evidence). The measurement sections above remain
+dated to the runtime each names.

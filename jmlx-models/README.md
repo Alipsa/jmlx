@@ -149,7 +149,7 @@ Choose the precision mode when launching the application's process. MLX's
 operations on supported hardware; arrays still have the `FLOAT32` dtype.
 The pinned MLX runtime defaults to `1` and caches this setting on first use.
 See the [MLX precision guide](https://ml-explore.github.io/mlx/build/html/usage/precision.html)
-and the [pinned environment implementation](https://github.com/ml-explore/mlx/blob/v0.31.2/mlx/utils.h).
+and the [pinned environment implementation](https://github.com/ml-explore/mlx/blob/v0.32.4/mlx/utils.h).
 
 For normal inference, start with the default performance mode and validate it
 against representative prompts and your quality requirements. For comparisons

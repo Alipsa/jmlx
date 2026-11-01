@@ -36,7 +36,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.5) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
-| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision) | 9.0 | 0.x release | not started |
+| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, gated by its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
 | 12 | Autodiff and function-transformation parity | 12.0 | 0.x release | not started |
@@ -515,6 +515,70 @@ pinned Tier-B artifact's prompt embedding, per-step noise prediction under
 the pinned PNDM schedule and the raw VAE decode (safety checker disabled)
 match the CPU float32 reference within the recorded ε.
 
+### 9.7 — Qwen-Image-2.1 image generation
+
+Proposed on 2026-11-01 in `req/jmlx-image-generation-roadmap.md`, whose requirements
+IMG-001 to IMG-016 are this milestone's requirements source.
+
+**Gated by a decision record.** Before the milestone plan, the decision record
+`req/plans/phase9-7-decision.md` (drafted 2026-11-01, in the style of
+`req/plans/phase7-4-decision.md`; its PR review is the gate) settles three things:
+
+1. **License.** `Qwen/Qwen-Image-2.1` is under the Qwen Research License Agreement:
+   non-commercial use only, a notice requirement on redistribution (§3) and an attribution
+   requirement (§4.b). The record accepts or declines it for a pinned, read-only Tier-B test
+   artifact and states what it means for downstream consumers. jmlx sources and binaries never
+   bundle the weights.
+2. **Module home.** Either extend 9.6's scheduler, sampler and VAE contracts in `jmlx-models`
+   (the 7.4 default), or reopen 7.4's "no new published module" decision with a recorded reason
+   for a `jmlx-diffusion` module.
+3. **Reference toolchain.** The model card requires `transformers>=5.17` and diffusers from git
+   main, although released diffusers 0.41.0 and later ship the identical pipeline.
+   `tools/hf-reference` pins Transformers 4.57.6, and `verifyImageOracleDependencyPins` keeps
+   the image and HF reference locks in agreement, so the reference needs its own hash lock. The
+   record also sets the reference precision.
+
+If the record declines or defers, a dated amendment moves or removes 9.7, and Phase 9's done
+condition does not wait for it.
+
+**Scope.** Requirements P0 and P1 (IMG-001 to IMG-012): text-to-image at artifact revision
+`d26bb61231c349cf6b7896fa83353113880e1ba3`. P2 (IMG-013 to IMG-016: reference-image editing,
+masks, further model families, Turbo/LoRA/ControlNet) is deferred to later milestones.
+
+**Builds on:**
+
+- 9.6's scheduler, sampler-loop and VAE-wrapper contracts, extended rather than re-derived.
+  `FlowMatchEulerDiscreteScheduler` with its dynamic exponential shift is added beside PNDM.
+- 7.1's conv and conv-transpose (1-D to 3-D), `GroupNorm`, `Upsample` and `pad`. IMG-001 is
+  therefore a gap audit against `req/mlx-api-inventory.md`, not a fresh build.
+- 7.3b's `Qwen3VlModel` as the conditioning encoder. The artifact's encoder has the
+  Qwen3-VL-8B shape. A seam that returns the last decoder layer's hidden states *before* the
+  final RMSNorm (what the pinned pipeline feeds the transformer) is new work.
+
+**Settled at milestone start:**
+
+- Weights stay resident as BF16 or Q4, unlike the 7.3b/7.3c FLOAT32 up-cast. Each gets a
+  separately named tolerance beside the strict float32 gate.
+- The 4-channel (RGBA) VAE decode is the native output path, not a P2 addition.
+- Parity tests inject the reference's initial latent, because a torch-seeded trajectory cannot be
+  reproduced with MLX random. Seeded reproducibility is a separate, Java-only check.
+- Generation runs on one platform worker thread, per the threading rule.
+- The transformer's block-causal mask (causal text, bidirectional within each image block, as
+  in the pinned diffusers source) is built from existing attention facades.
+
+**Overlaps:** IMG-012 packaging rides 8.4's native artifact, and prompt-embedding caching follows
+9.2's design.
+
+**Exit gate:**
+
+- The strict Tier-A synthetic golden passes.
+- For the pinned artifact, the conditioning tensors, the per-step denoiser output under the
+  pinned flow-match schedule (with an injected initial latent) and the VAE decode match the
+  reference within the recorded ε.
+- A seeded 512×512 text-to-image run completes in-process in Java, with its measured process
+  footprint under a recorded bound consistent with the 24 GB M4 Air target (IMG-008, IMG-009).
+- One manual run on that hardware is recorded.
+
 **Phase 9 done:** every milestone's exit gate passes and the phase release is published.
 
 ## Phase 10 — Fundamental array, dtype, and indexing parity
@@ -814,3 +878,6 @@ tests, documentation and inventory changes are all delivered.
 - **2026-10-31:** the Phase 7.4 decision (`req/plans/phase7-4-decision.md`) scheduled audio
   inference as Phase 11 milestone 11.5 and diffusion inference as Phase 9 milestone 9.6, both
   gated by their own exit gates.
+- **2026-11-01:** Phase 9 milestone 9.7 (Qwen-Image-2.1 image generation, requirements P0/P1
+  of `req/jmlx-image-generation-roadmap.md`) added after 9.6, gated by its own decision record
+  (license, module home, reference toolchain).

@@ -127,7 +127,7 @@ Weights only; activations are measured during the milestone. Q4 is affine group 
 | transformer (7.12B) | 14.2 GB | 28.5 GB | ~4.0 GB |
 | text encoder, full checkpoint (~8.77B) | 17.5 GB | 35.1 GB | ~4.9 GB |
 | text encoder, text-only load (~7.75B) | ~15.5 GB | ~31.0 GB | ~4.4 GB |
-| VAE (~0.34B, stored F32) | 0.68 GB | 1.35 GB | not quantized |
+| VAE (~0.34B, stored F32) | 1.35 GB (kept F32, as stored) | 1.35 GB | not quantized (1.35 GB) |
 
 The text-only row drops the vision tower (about 0.4B) and the unused `lm_head` (about 0.62B,
 untied). Text-to-image conditioning uses neither. `embed_tokens` (about 0.62B) can use the
@@ -151,7 +151,7 @@ existing `QuantizedEmbedding`. The full-checkpoint row is the conservative bound
   | Path | `RESIDENT` peak weights | `STAGED` peak weights | `STAGED` re-read per job |
   | --- | --- | --- | --- |
   | FLOAT32 | ~60.9 GB | ~32.4 GB (encode stage) | ~29.7 GB of BF16 files, up-cast |
-  | BF16 | ~30.4 GB | ~16.2 GB | ~29.7 GB |
+  | BF16 | ~31.1 GB | ~16.9 GB | ~29.7 GB |
   | Q4 | ~9.75 GB | ~5.75 GB | ~8.4 GB |
   
   BF16 `STAGED` is not assumed to fit the 24 GB target with activations and a desktop session;
@@ -169,9 +169,15 @@ existing `QuantizedEmbedding`. The full-checkpoint row is the conservative bound
   TF32 bounds side by side.
 
 **Reference memory.** The CPU float32 reference runs component by component; its largest stage
-holds about 35 GB of encoder weights (full checkpoint). It is planned on the M5 Max host.
-*Unverified:* that host's installed memory is not recorded in the repo. The largest run so far
-had a 51.4 GB footprint (Phi-3.5-Vision Tier-B).
+holds about 35 GB of encoder weights (full checkpoint). It is planned on the M5 Max host. That
+host has 128 GiB (137,438,953,472 B), per `sysctl hw.memsize` on 2026-11-01 (Apple M5 Max,
+macOS 27.0.1). It is the local development host, which is also the self-hosted `self-macos-xl`
+runner.
+
+That leaves room for the about 35 GB reference stage and for the about 32.4 GB Java `STAGED`
+FLOAT32 stage, each with its activations. The largest run so far had a 51.4 GB footprint
+(Phi-3.5-Vision Tier-B). WP0 re-records the host's memory at milestone start, because the
+Tier-B gate depends on it.
 
 ## 5. Decision 1 — license
 
@@ -213,8 +219,8 @@ which the PR review accepts or overrides:
   denoiser outputs and the VAE decode. §4.b's attribution duty applies only when outputs are
   used to create or improve a distributed AI model, which a test golden does not.
 - **Tier-A fixtures use no artifact file.** The synthetic checkpoint is generated. Its tokenizer
-  is a committed, hand-written tiny fixture tokenizer, the same pattern as the 2,031-byte
-  21-token tokenizers of 7.3b WP8 and 7.3c WP6. It carries the template's special tokens
+  is a committed, hand-written tiny fixture tokenizer, the same pattern as the 21-token fixture
+  tokenizers of 7.3b WP8 (2,031 B) and 7.3c WP6 (1,229 B). It carries the template's special tokens
   (`<|im_start|>`, `<|im_end|>`) and the system/user/assistant role markers. It comes with a
   minimal hand-written chat template that renders the system message the way the artifact's
   does, so the raw template and `_drop_idx` are still exercised.
@@ -319,7 +325,7 @@ need. Either is recorded as a later decision, not assumed.
 
 | WP | Content |
 | --- | --- |
-| WP0 | Pin the artifact; re-record the license acceptance; fix the golden step set |
+| WP0 | Pin the artifact; re-record the license acceptance; fix the golden step set; re-record the M5 Max host's installed memory |
 | WP1 | Reference environment and digest task, plus probes: pre-norm hook; `HfTokenizer` vs the reference processor on the artifact's tokenizer, with the raw template and `_drop_idx`; the fixture chat template's system-message rendering; block-causal mask; sigma schedule; three-axis RoPE layout |
 | WP2 | Flow-match scheduler and sampler on the 9.6 contract |
 | WP3 | Conditioning seam on `Qwen3VlModel`: text-only load, FLOAT32 and resident BF16 weights |

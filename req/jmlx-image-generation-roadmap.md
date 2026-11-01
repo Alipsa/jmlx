@@ -185,7 +185,7 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
     24 GB.
   - `STAGED` never holds the encoder and the transformer at the same time. It encodes, releases
     the encoder, then loads the transformer, while the VAE stays loaded. This lowers peak
-    weights to the larger component plus the VAE: about 5.75 GB at Q4, 16.2 GB at BF16, and
+    weights to the larger component plus the VAE: about 5.75 GB at Q4, 16.9 GB at BF16, and
     32.4 GB on the FLOAT32 Tier-B run. The cost is re-reading both large components every job
     (decision record §4).
 - Also: optional VAE tiling, no retained intermediate history, and deterministic disposal of

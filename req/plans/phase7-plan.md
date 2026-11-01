@@ -667,6 +667,8 @@ directly.
 
 ## 7.5 — MLX upgrade
 
+**Sub-plan:** `req/plans/phase7-5-plan.md` — the detailed, reusable checklist this section describes.
+
 This milestone follows the roadmap's MLX upgrade policy (`req/full-roadmap.md` § Release and MLX
 upgrade plan). Once 7.3c and 7.4 have closed, delivered or deferred with a date, upgrade the
 paired native pins, in their own PR, to the newest pairing that `scripts/checkDependencies.zsh`

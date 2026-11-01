@@ -9,8 +9,11 @@ Synthesizes a deterministic 16 kHz mono waveform (no network, no fixture files),
 computes the Whisper log-mel front end with transformers 4.57.6 (the same
 computation openai/whisper-tiny uses), and records the pipeline contract: shapes,
 dtypes, window/STFT parameters and which primitives jmlx already has versus the
-gaps a Whisper-class model would need. Output is a JSON document printed to stdout;
-the Phase 7.4 decision record pastes it verbatim as its audio findings.
+gaps a Whisper-class model would need. It also verifies at runtime that the
+extractor took the torch STFT branch (a bit-identical re-run of the branch on the
+same input) so the record's torch-branch claims rest on the probe's own output.
+Output is a JSON document printed to stdout; the Phase 7.4 decision record
+pastes it verbatim as its audio findings.
 """
 
 import json
@@ -23,6 +26,7 @@ import torch
 import transformers
 from transformers import WhisperFeatureExtractor
 from transformers.audio_utils import mel_filter_bank
+from transformers.utils import is_torch_available
 
 SEED = 20261031
 DURATION_S = 30.0
@@ -45,14 +49,14 @@ def main():
     waveform = synth_waveform()
 
     # Whisper-tiny's published processor defaults, set explicitly so the probe
-    # needs no network or Hub cache.
+    # needs no network or Hub cache. (No n_samples kwarg: the constructor
+    # overwrites it with chunk_length * sampling_rate regardless.)
     extractor = WhisperFeatureExtractor(
         feature_size=80,
         sampling_rate=SAMPLE_RATE,
         hop_length=160,
         n_fft=400,
         chunk_length=30,
-        n_samples=SAMPLES,
         padding_value=0.0,
         dither=0.0,
         return_attention_mask=False,
@@ -72,9 +76,24 @@ def main():
         mel_scale="slaney",
     )
 
+    # Verify the record's torch-branch claims from the probe's own output, not
+    # just from the installed source (review round 5): transformers 4.57.6's
+    # WhisperFeatureExtractor.__call__ selects _torch_extract_fbank_features
+    # whenever torch is importable, so re-run that branch on the same input and
+    # require a bit-identical result to the public __call__ output. The
+    # waveform is exactly 30 s, so __call__'s pad/truncate to n_samples is an
+    # identity on it.
+    assert is_torch_available(), "the locked venv always has torch; the torch branch is the pinned oracle"
+    assert waveform.size == extractor.n_samples, "the identity argument relies on an exact 30 s input"
+    branch = extractor._torch_extract_fbank_features(waveform, "cpu")
+    branch_identical = bool(torch.equal(torch.from_numpy(branch), features[0]))
+    mel_identical = bool(np.array_equal(extractor.mel_filters, fb))
+    assert branch_identical, "the public __call__ output must be the torch branch's own output"
+    assert mel_identical, "the probe's rebuilt filterbank must be the extractor's own"
+
     findings = {
         "probe": "phase7-4-audio-whisper-logmel",
-        "measured_vs_desk": "the frontend_contract and sample_values_checksum blocks are computed by this probe; jmlx_surface_mapping and loader_details are desk mappings checked against the installed transformers 4.57.6 modeling source, not executed",
+        "measured_vs_desk": "measured by this probe: waveform, the numeric frontend_contract keys, stft_branch_check and sample_values_checksum; the mel_basis_source, stft_path_measured, stft_path_not_measured, log_scaling and fixed_chunk strings are desk descriptions of that measured torch path (stft_path_measured is backed by stft_branch_check); jmlx_surface_mapping and loader_details are desk mappings checked against the installed transformers 4.57.6 modeling source, not executed",
         "environment": {
             "python": platform.python_version(),
             "torch": torch.__version__,
@@ -103,6 +122,12 @@ def main():
             "stft_path_not_measured": "numpy branch (pocketfft, no torch installed): log_spec[:, :-1] drops the last frame AFTER log10 — a different code path with different floating-point results; a Java port must pin which branch is the oracle",
             "log_scaling": "torch path: clamp(mel, min=1e-10).log10(); dynamic-range compress to max-8: mel = max(mel, mel.max() - 8.0); normalize: mel = (mel + 4.0) / 4.0",
             "fixed_chunk": "30 s -> fixed (1, 80, 3000) float32 feature tensor regardless of audio length (pad/truncate)",
+            "stft_branch_check": {
+                "torch_available": is_torch_available(),
+                "branch_input_identity": bool(waveform.size == extractor.n_samples),
+                "branch_output_bit_identical_to_call": branch_identical,
+                "mel_filters_bit_identical_to_rebuilt": mel_identical,
+            },
         },
         "sample_values_checksum": {
             "input_features_sum": float(features.double().sum()),
@@ -118,7 +143,7 @@ def main():
             },
             "gaps": {
                 "audio_decode": "no audio module exists (jmlx-vision is image-only); 16 kHz mono PCM/WAV decode is pure-Java surface (a jmlx-audio or jmlx-vision extension)",
-                "stft": "needs mlx_fft_* (all 16 downcalls + MLX_COMPLEX64 unplanned in req/mlx-api-inventory.md; MLXFFT is Phase 11 milestone 2). Whisper is FORWARD STFT only — spectrogram, mel matmul, then the [:, :-1] frame drop — no ISTFT anywhere in the pipeline",
+                "stft": "needs mlx_fft_* (all 16 downcalls + MLX_COMPLEX64 unplanned in req/mlx-api-inventory.md; MLXFFT is Phase 11 milestone 2). Whisper is FORWARD STFT only — the pinned torch branch drops the last frame stft[..., :-1] on the complex STFT output BEFORE the power, then the mel matmul and the log scaling — no ISTFT anywhere in the pipeline",
                 "mel_filterbank": "pure-Java port (Slaney mel scale + triangular filters); depends on the STFT magnitude output, not on FFT directly for the filterbank math",
                 "resample": "arbitrary sample-rate resampling to 16 kHz is pure-Java surface if non-16 kHz input is accepted (whisper requires 16 kHz)",
             },

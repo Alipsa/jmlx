@@ -2,7 +2,8 @@
 
 Status: decision record (reviewed via PR; the PR review is the decision gate)
 Date: 2026-10-31
-Base commit: `8cc938c` (main after PR #66), record revised same day after review rounds 1–4
+Base commit: `8cc938c` (main after PR #66), record revised after review rounds 1–5
+(rounds 1–4 on 2026-10-31, round 5 on 2026-11-01)
 Decides only. A "go" schedules implementation into a later phase by a dated
 roadmap amendment (`req/full-roadmap.md` § Phase 7); it does not extend Phase 7
 and does not start code. 7.5 (MLX pin upgrade) follows 7.4 directly.
@@ -49,17 +50,23 @@ From `req/mlx-api-inventory.md` at the base commit:
   4+4 layers, vocab 51 865. Encoder-decoder, reusing the Phase 7.2 seq2seq
   findings (`CrossAttention`, `StaticKVCache`, T5 generation loop). The probe
   (§6.1) computes the log-mel front end: a small fixed contract — 16 kHz mono
-  in, fixed (1, 80, 3000) float32 out (25 ms window, 10 ms hop, Slaney 80-band
-  mel, clamp/log10, drop the last frame `[:, :-1]`, dynamic-range compress,
-  normalize).
+  in, fixed (1, 80, 3000) float32 out (25 ms window, 10 ms hop; the pinned
+  torch branch drops the last frame `stft[..., :-1]` on the complex STFT
+  output before the power, then Slaney 80-band mel matmul, clamp/log10,
+  dynamic-range compress, normalize — corrected in review round 5 to match
+  §3; the numpy branch's after-log10 `[:, :-1]` drop is a different path, §3).
 - **Diffusion: a small SD-class UNet/VAE pipeline.** Canonical artifact
   `stable-diffusion-v1-5/stable-diffusion-v1-5` (the `runwayml/` id now
   307-redirects there; the milestone WP0 pins the canonical id and a revision).
   fp32 safetensors component sizes, verified via the HF API on 2026-10-31:
   UNet 3,438,167,540 B + VAE 334,643,276 B + text encoder 492,265,874 B =
-  **4,265,076,690 B**. License: **CreativeML OpenRAIL-M** — decided in §7, not
-  deferred. The strict Tier-A gate needs no external artifact at all: a tiny
-  synthetic checkpoint, the pattern every 7.3x milestone used.
+  **4,265,076,690 B**. The same `model_index.json` (verified via the HF API
+  on 2026-11-01) also names a `safety_checker` (`StableDiffusionSafetyChecker`,
+  1,215,981,830 B fp32) and a config-only `feature_extractor`
+  (`CLIPImageProcessor`) — neither is counted in that total (§5). License:
+  **CreativeML OpenRAIL-M** — decided in §7, not deferred. The strict Tier-A
+  gate needs no external artifact at all: a tiny synthetic checkpoint, the
+  pattern every 7.3x milestone used.
 
 ## 3. Required new surface and Phase 11 overlap (mandate)
 
@@ -106,11 +113,11 @@ From `req/mlx-api-inventory.md` at the base commit:
   This keeps `jmlx-audio` compilable on the Java 21 toolchain — a Java 21
   module cannot depend on Java 25 `jmlx-core` class files.
   **Publishing:** `jmlx-audio` **is published** (a fresh `0.1.0-SNAPSHOT`
-  line, like vision): the project goes from seven to eight published
-  modules, and the invariants grow with it — `verifyReleaseScriptsMatch`, its
-  own byte-identical `release.sh`, a place in the release order (before
-  `jmlx-models`, alongside `jmlx-vision`), and the release smoke's consumer
-  resolution.
+  line, like vision): it joins the published set, and the release-script,
+  release-order and release-smoke invariants grow with it —
+  `verifyReleaseScriptsMatch`, its own byte-identical `release.sh`, a place
+  in the release order (before `jmlx-models`, alongside `jmlx-vision`), and
+  the release smoke's consumer resolution.
   Tokenizer: whisper's `tokenizer.json` (no normalizer, ByteLevel pre-tokenizer,
   BPE, TemplateProcessing) fits jmlx-tokenizer's existing components. The
   generation-side controls are model-level, not tokenizer-level: the forced
@@ -138,10 +145,11 @@ From `req/mlx-api-inventory.md` at the base commit:
   **legacy key names `query`/`key`/`value`/`proj_attn`**, which diffusers
   remaps to `to_q`/`to_k`/`to_v`/`to_out.0` at load — the 9.6 loader
   implements that **VAE-only** remap (the UNet's attention already uses the
-  current `to_q`/`to_k`/`to_v`/`to_out.0` names: 0 of its 687 keys end in
-  `.query.weight` at that sha); the VAE mid-block weights are stored as
-  **2-D Linear** tensors (`[512, 512]`), math-equivalent to the 1×1 convs the
-  architecture implies.
+  current `to_q`/`to_k`/`to_v`/`to_out.0` names: 0 of its 686 tensors end in
+  `.query.weight` at that sha — the safetensors header's 687th entry is
+  `__metadata__`, corrected in review round 5); the VAE mid-block weights are
+  stored as **2-D Linear** tensors (`[512, 512]`), math-equivalent to the 1×1
+  convs the architecture implies.
   Tier-B reference tooling: the CPU float32 reference for the real UNet/VAE/
   pipeline needs **diffusers**, which is not in `tools/hf-reference`'s hash
   lock — 9.6 adds it as a hash-locked dependency, checked against
@@ -237,9 +245,18 @@ normalization port (§3).
   Tier-A golden, Tier-B pin. Effort concentrates in the front end and its
   precision evidence (the pinned torch-STFT oracle path and the `stft[...,
   :-1]` frame drop).
-- **Diffusion / SD-class.** Artifact 4.27 GB fp32 total — below the largest
-  existing Tier-B run; fits the self-hosted runner. **License, decided here
-  (not deferred):** the Tier-B pin accepts CreativeML OpenRAIL-M for a pinned,
+- **Diffusion / SD-class.** Artifact 4.27 GB fp32 total (the UNet + VAE +
+  text encoder only — the `model_index.json` at that sha also names a
+  `safety_checker`, 1,215,981,830 B fp32, and a config-only
+  `feature_extractor`, §2) — below the largest existing Tier-B run; fits the
+  self-hosted runner. **The "decoded image" gate compares the raw VAE decode
+  (added in review round 5):** a default diffusers pipeline runs the safety
+  checker and blacks out any output it flags, so the 9.6 Tier-B reference
+  must run the pipeline with the safety checker disabled — or compare before
+  postprocessing — and state so in the exit gate (§8); an as-is pipeline
+  output could be a blanked image, which the gate must never compare.
+  **License, decided here (not deferred):** the Tier-B pin accepts CreativeML
+  OpenRAIL-M for a pinned,
   read-only test artifact — no jmlx code or shipped artifact carries the
   license; the strict Tier-A synthetic golden remains the binding gate. If the
   review disagrees, the fallback is synthetic-only Tier-B, which keeps the
@@ -258,7 +275,7 @@ normalization port (§3).
 ```json
 {
   "probe": "phase7-4-audio-whisper-logmel",
-  "measured_vs_desk": "the frontend_contract and sample_values_checksum blocks are computed by this probe; jmlx_surface_mapping and loader_details are desk mappings checked against the installed transformers 4.57.6 modeling source, not executed",
+  "measured_vs_desk": "measured by this probe: waveform, the numeric frontend_contract keys, stft_branch_check and sample_values_checksum; the mel_basis_source, stft_path_measured, stft_path_not_measured, log_scaling and fixed_chunk strings are desk descriptions of that measured torch path (stft_path_measured is backed by stft_branch_check); jmlx_surface_mapping and loader_details are desk mappings checked against the installed transformers 4.57.6 modeling source, not executed",
   "environment": {
     "python": "3.12.16",
     "torch": "2.6.0",
@@ -290,7 +307,13 @@ normalization port (§3).
     "stft_path_measured": "torch branch: torch.stft(...) then stft[..., :-1].abs() ** 2 \u2014 the last frame is dropped on the complex STFT output BEFORE the power, then the mel matmul, clamp(1e-10), log10",
     "stft_path_not_measured": "numpy branch (pocketfft, no torch installed): log_spec[:, :-1] drops the last frame AFTER log10 \u2014 a different code path with different floating-point results; a Java port must pin which branch is the oracle",
     "log_scaling": "torch path: clamp(mel, min=1e-10).log10(); dynamic-range compress to max-8: mel = max(mel, mel.max() - 8.0); normalize: mel = (mel + 4.0) / 4.0",
-    "fixed_chunk": "30 s -> fixed (1, 80, 3000) float32 feature tensor regardless of audio length (pad/truncate)"
+    "fixed_chunk": "30 s -> fixed (1, 80, 3000) float32 feature tensor regardless of audio length (pad/truncate)",
+    "stft_branch_check": {
+      "torch_available": true,
+      "branch_input_identity": true,
+      "branch_output_bit_identical_to_call": true,
+      "mel_filters_bit_identical_to_rebuilt": true
+    }
   },
   "sample_values_checksum": {
     "input_features_sum": 33672.32073581219,
@@ -306,7 +329,7 @@ normalization port (§3).
     },
     "gaps": {
       "audio_decode": "no audio module exists (jmlx-vision is image-only); 16 kHz mono PCM/WAV decode is pure-Java surface (a jmlx-audio or jmlx-vision extension)",
-      "stft": "needs mlx_fft_* (all 16 downcalls + MLX_COMPLEX64 unplanned in req/mlx-api-inventory.md; MLXFFT is Phase 11 milestone 2). Whisper is FORWARD STFT only \u2014 spectrogram, mel matmul, then the [:, :-1] frame drop \u2014 no ISTFT anywhere in the pipeline",
+      "stft": "needs mlx_fft_* (all 16 downcalls + MLX_COMPLEX64 unplanned in req/mlx-api-inventory.md; MLXFFT is Phase 11 milestone 2). Whisper is FORWARD STFT only \u2014 the pinned torch branch drops the last frame stft[..., :-1] on the complex STFT output BEFORE the power, then the mel matmul and the log scaling \u2014 no ISTFT anywhere in the pipeline",
       "mel_filterbank": "pure-Java port (Slaney mel scale + triangular filters); depends on the STFT magnitude output, not on FFT directly for the filterbank math",
       "resample": "arbitrary sample-rate resampling to 16 kHz is pure-Java surface if non-16 kHz input is accepted (whisper requires 16 kHz)"
     },
@@ -441,8 +464,9 @@ normalization port (§3).
   },
   "checkpoint_layout_note": {
     "model_index": "scheduler: diffusers PNDMScheduler; text_encoder: transformers CLIPTextModel; tokenizer: transformers CLIPTokenizer (verified from model_index.json at artifact sha 451f4fe)",
+    "safety_checker": "the same model_index.json also names safety_checker (stable_diffusion StableDiffusionSafetyChecker; model.safetensors 1,215,981,830 B fp32) and feature_extractor (transformers CLIPImageProcessor, config only, no weights) \u2014 both verified via the HF API at sha 451f4fe; a default diffusers pipeline runs the checker and blacks out flagged output, so the 9.6 Tier-B reference must compare the RAW VAE decode with the safety checker disabled, and the reference_model_candidates size total counts UNet + VAE + text encoder only, excluding it",
     "scheduler_pinning": "PNDM is the artifact's default \u2014 the 9.6 Tier-B reference must pin the artifact's default scheduler for the per-step noise-prediction comparison to be meaningful; its pinned scheduler/scheduler_config.json has skip_prk_steps: true (the Runge-Kutta warm-up never runs \u2014 only the PLMS path with its lower-order first steps) plus steps_offset: 1, set_alpha_to_one: false, beta_schedule 'scaled_linear', beta_start 0.00085, beta_end 0.012, which the 9.6 scheduler must port (steps_offset and set_alpha_to_one change the timestep grid and the final alpha)",
-    "vae_attention_keys": "VAE-ONLY: the pinned VAE stores its mid-block AttentionBlock attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time \u2014 the 9.6 loader must implement that remap (the UNet's attention already uses the current to_q/to_k/to_v/to_out.0 names: 0 of its 687 keys end in .query.weight at sha 451f4fe)",
+    "vae_attention_keys": "VAE-ONLY: the pinned VAE stores its mid-block AttentionBlock attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time \u2014 the 9.6 loader must implement that remap (the UNet's attention already uses the current to_q/to_k/to_v/to_out.0 names: 0 of its 686 tensors end in .query.weight at sha 451f4fe; the safetensors header's 687th entry is __metadata__)",
     "vae_attention_weight_shapes": "stored as 2-D Linear weights ([512, 512] in the mid block), math-equivalent to the 1x1 convs the architecture implies \u2014 a loader expectation, not a primitive gap"
   },
   "note_on_convtranspose": "an earlier draft of this probe used ConvTranspose2d; SD 1.5's actual VAE decoder and UNet Upsample2D use nearest interpolation plus conv, which the probe now mirrors \u2014 convTranspose remains available in MLXConv either way",
@@ -494,7 +518,7 @@ pulling `MLXFFT` into a pre-Phase-11 audio milestone — with the stated cost.
 architecture takes. Chunked long-form transcription (windowing with
 conditioning on previous text) is **out of scope** for 11.5 — a possible
 follow-up milestone, recorded here so the boundary is explicit.
-**Publishing:** `jmlx-audio` is published (eighth module; §3) — the
+**Publishing:** `jmlx-audio` is published (§3) — the release-script,
 release-order and release-smoke invariants grow with it.
 
 **Diffusion — go, scheduled as Phase 9 milestone 9.6** (new milestone after
@@ -533,15 +557,15 @@ effective on this record's merge (applied in the same PR):
   golden is the binding gate.
   Exit gate: the synthetic golden passes at strict tolerance; the pinned
   Tier-B artifact's prompt embedding, per-step noise prediction under the
-  pinned PNDM schedule and decoded image match the CPU float32 reference
-  within the recorded ε.
+  pinned PNDM schedule and the raw VAE decode (safety checker disabled, per
+  §5) match the CPU float32 reference within the recorded ε.
 - Phase 11 gains milestone **11.5 — Audio inference**, in three parts per §3:
   a new **`jmlx-audio` module (Java 21, native-free)** holding WAV decode,
   resampling, window functions, the Slaney filterbank and log scaling; a
   forward-STFT facade in `jmlx-core` built with milestone 2's `MLXFFT`; and
   the Whisper model in `jmlx-models` (`api`-depending on `jmlx-audio`, the
   vision pattern) with the §3 generation controls. **`jmlx-audio` is
-  published** — the project's eighth published module: `verifyReleaseScriptsMatch`,
+  published** — it joins the published set: `verifyReleaseScriptsMatch`,
   its own `release.sh`, release order before `jmlx-models` (alongside
   `jmlx-vision`), and the release smoke all grow accordingly; Phase 11's
   release line names `jmlx-audio`'s first release, like Phase 9's line names

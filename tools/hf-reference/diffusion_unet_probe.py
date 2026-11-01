@@ -123,11 +123,8 @@ class Transformer2D(nn.Module):
         self.proj_out = nn.Conv2d(dim, dim, 1)
 
     def forward(self, x, context):
-        b, c, ih, iw = x.shape
         h = self.proj_in(self.norm(x))
-        seq = h.permute(0, 2, 3, 1).reshape(b, ih * iw, c)
-        seq = self.block.forward_sequence(seq, context)
-        h = seq.reshape(b, ih, iw, c).permute(0, 3, 1, 2)
+        h = self.block(h, context)
         return x + self.proj_out(h)
 
 
@@ -171,13 +168,16 @@ class MidAttention(nn.Module):
     def forward(self, x):
         b, c, ih, iw = x.shape
         q, k, v = self.qkv(self.norm(x)).chunk(3, dim=1)
-        q = q.view(b, c, ih * iw).transpose(1, 2)
-        k = k.view(b, c, ih * iw).transpose(1, 2)
-        v = v.view(b, c, ih * iw).transpose(1, 2)
+        # reshape, not view: the channel-chunked q/k/v are non-contiguous for
+        # batch > 1, and view would reject them (the probe runs batch 1, but a
+        # reuse with a larger batch should not silently break).
+        q = q.reshape(b, c, ih * iw).transpose(1, 2)
+        k = k.reshape(b, c, ih * iw).transpose(1, 2)
+        v = v.reshape(b, c, ih * iw).transpose(1, 2)
         att = F.scaled_dot_product_attention(
-            q.view(b, ih * iw, 1, c).transpose(1, 2),
-            k.view(b, ih * iw, 1, c).transpose(1, 2),
-            v.view(b, ih * iw, 1, c).transpose(1, 2))
+            q.reshape(b, ih * iw, 1, c).transpose(1, 2),
+            k.reshape(b, ih * iw, 1, c).transpose(1, 2),
+            v.reshape(b, ih * iw, 1, c).transpose(1, 2))
         att = att.transpose(1, 2).reshape(b, c, ih, iw)
         return x + self.proj(att)
 
@@ -260,8 +260,9 @@ def main():
         },
         "checkpoint_layout_note": {
             "model_index": "scheduler: diffusers PNDMScheduler; text_encoder: transformers CLIPTextModel; tokenizer: transformers CLIPTokenizer (verified from model_index.json at artifact sha 451f4fe)",
+            "safety_checker": "the same model_index.json also names safety_checker (stable_diffusion StableDiffusionSafetyChecker; model.safetensors 1,215,981,830 B fp32) and feature_extractor (transformers CLIPImageProcessor, config only, no weights) — both verified via the HF API at sha 451f4fe; a default diffusers pipeline runs the checker and blacks out flagged output, so the 9.6 Tier-B reference must compare the RAW VAE decode with the safety checker disabled, and the reference_model_candidates size total counts UNet + VAE + text encoder only, excluding it",
             "scheduler_pinning": "PNDM is the artifact's default — the 9.6 Tier-B reference must pin the artifact's default scheduler for the per-step noise-prediction comparison to be meaningful; its pinned scheduler/scheduler_config.json has skip_prk_steps: true (the Runge-Kutta warm-up never runs — only the PLMS path with its lower-order first steps) plus steps_offset: 1, set_alpha_to_one: false, beta_schedule 'scaled_linear', beta_start 0.00085, beta_end 0.012, which the 9.6 scheduler must port (steps_offset and set_alpha_to_one change the timestep grid and the final alpha)",
-            "vae_attention_keys": "VAE-ONLY: the pinned VAE stores its mid-block AttentionBlock attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time — the 9.6 loader must implement that remap (the UNet's attention already uses the current to_q/to_k/to_v/to_out.0 names: 0 of its 687 keys end in .query.weight at sha 451f4fe)",
+            "vae_attention_keys": "VAE-ONLY: the pinned VAE stores its mid-block AttentionBlock attention under the LEGACY names query/key/value/proj_attn, which diffusers remaps to to_q/to_k/to_v/to_out.0 at load time — the 9.6 loader must implement that remap (the UNet's attention already uses the current to_q/to_k/to_v/to_out.0 names: 0 of its 686 tensors end in .query.weight at sha 451f4fe; the safetensors header's 687th entry is __metadata__)",
             "vae_attention_weight_shapes": "stored as 2-D Linear weights ([512, 512] in the mid block), math-equivalent to the 1x1 convs the architecture implies — a loader expectation, not a primitive gap",
         },
         "note_on_convtranspose": "an earlier draft of this probe used ConvTranspose2d; SD 1.5's actual VAE decoder and UNet Upsample2D use nearest interpolation plus conv, which the probe now mirrors — convTranspose remains available in MLXConv either way",

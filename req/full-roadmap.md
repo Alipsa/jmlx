@@ -34,7 +34,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | --- | --- | --- | --- | --- |
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
-| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.3c) |
+| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.5) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
@@ -277,9 +277,9 @@ CLIP slow-tokenizer loader and a hash-locked diffusers reference dependency; Tie
 decision record** for a pinned read-only test artifact). Phase 11 gains milestone **11.5 —
 Audio inference** (`openai/whisper-tiny`, apache-2.0; a Java 21 native-free `jmlx-audio` module
 for WAV decode and the Slaney filterbank, a forward-STFT facade in `jmlx-core` on 11.2's
-`MLXFFT`, and the Whisper encoder-decoder in `jmlx-models`; `jmlx-audio` is published, growing
-the published-module invariants to eight). Both milestones carry their
-own exit gates (9.6 and 11.5). Neither extends Phase 7; 7.5 follows 7.4 directly.
+`MLXFFT`, and the Whisper encoder-decoder in `jmlx-models`; `jmlx-audio` joins the published set
+and the release-script, release-order and release-smoke invariants grow with it). Both milestones
+carry their own exit gates (9.6 and 11.5). Neither extends Phase 7; 7.5 follows 7.4 directly.
 
 **Phase 7 done:** every milestone above is delivered, or deferred with a date; every pending
 acceptance gate listed above (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
@@ -578,10 +578,11 @@ Milestones:
      `jmlx-audio` (the vision pattern), reusing the Phase 7.2 seq2seq surface
      plus the decision record's generation controls (forced decoder prefix,
      suppress tokens, 448-position cap).
-   **`jmlx-audio` is published** — the project's eighth published module
-   (fresh `0.1.0-SNAPSHOT` line): `verifyReleaseScriptsMatch`, its own
-   byte-identical `release.sh`, release order before `jmlx-models` (alongside
-   `jmlx-vision`), and the release smoke's consumer resolution all grow. Scope
+   **`jmlx-audio` is published** — it joins the published set (a fresh
+   `0.1.0-SNAPSHOT` line, like `jmlx-vision`): `verifyReleaseScriptsMatch`,
+   its own byte-identical `release.sh`, release order before `jmlx-models`
+   (alongside `jmlx-vision`), and the release smoke's consumer resolution
+   all grow. Scope
    is the single fixed 30 s window; chunked long-form transcription is out of
    scope. **Exit gate:** log-mel fixtures within a recorded tolerance against
    the pinned torch-STFT oracle path (a float32 FFT through MLX is not

@@ -112,7 +112,8 @@ schedules both by dated roadmap amendment: **audio inference** (`openai/whisper-
 license the artifact declares: apache-2.0) as Phase 11 milestone 11.5 — a Java 21
 native-free `jmlx-audio` module (WAV decode, Slaney filterbank), a forward-STFT facade in
 `jmlx-core` on 11.2's `MLXFFT` (no ISTFT exists in Whisper), and the Whisper model in
-`jmlx-models`; `jmlx-audio` is published, growing the published modules to eight — and
+`jmlx-models`; `jmlx-audio` joins the published set, and the release-script, release-order
+and release-smoke invariants grow with it — and
 **diffusion inference** (SD 1.5-class text-to-image in `jmlx-models`, new surface entirely
 pure-Java: schedulers, VAE, CLIP text encoder; a CLIP slow-tokenizer loader for the
 artifact's own vocab.json + merges.txt in `jmlx-tokenizer` — the artifact ships no

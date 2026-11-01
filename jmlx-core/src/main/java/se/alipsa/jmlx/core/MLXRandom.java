@@ -81,7 +81,17 @@ public final class MLXRandom {
     MLXArray input = logits;
     int inputAxis = normalizedAxis;
     if (logits.ndim() > 1 && logits.size() == (long) logits.shape()[normalizedAxis]) {
-      input = MLXShape.reshape(logits, new int[] {logits.shape()[normalizedAxis]});
+      // The 1-D view is a per-call temporary: allocate it into the resolved scope (the innermost
+      // of the operands' scopes), not logits.scope() -- the no-target MLXShape.reshape would
+      // register one handle per draw in a long-lived logits scope when the key lives in a
+      // per-draw child scope (PR #71 review finding).
+      input =
+          NativeOps.shapeOp(
+              "reshape",
+              logits,
+              scope,
+              new int[] {logits.shape()[normalizedAxis]},
+              mlx_h::mlx_reshape);
       inputAxis = 0;
     }
     MLXArray drawInput = input;

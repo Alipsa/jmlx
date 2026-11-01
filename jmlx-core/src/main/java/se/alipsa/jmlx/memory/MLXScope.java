@@ -214,6 +214,12 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
       }
     }
 
+    // Test-only hook (package-private through MLXScope): leak regressions such as the
+    // categorical 1-D-view pin assert that per-call temporaries do not accumulate here.
+    synchronized int handleCount() {
+      return handles.size();
+    }
+
     // Unsynchronized on purpose -- see the field javadoc above.
     boolean isClosed() {
       return closed;
@@ -341,6 +347,15 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   public void free(MemorySegment handle) {
     checkThread();
     holder.freeOne(handle);
+  }
+
+  /**
+   * Live native-handle count registered directly in this scope, descendants excluded. Test hook
+   * only: package-private because the only callers are leak-regression tests in this package that
+   * need to observe whether per-call temporaries land here.
+   */
+  int handleCount() {
+    return holder.handleCount();
   }
 
   /**

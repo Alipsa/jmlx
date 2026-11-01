@@ -3,7 +3,7 @@
 Status: requirements · 2026-11-01
 
 **Where this is scheduled.** P0 and P1 (IMG-001 to IMG-012) are Phase 9 milestone 9.7 in
-`req/full-roadmap.md`. That milestone is gated by `req/plans/phase9-7-decision.md` and follows
+`req/full-roadmap.md`. That milestone is decided by `req/plans/phase9-7-decision.md` and follows
 9.6 (SD 1.5-class diffusion). P2 (IMG-013 to IMG-016) is deferred to later milestones.
 
 **Which document wins.** Where this document and the roadmap or the decision record differ, the
@@ -39,9 +39,10 @@ The decision record §6 decides where the code lives:
 - **`jmlx-core`, `jmlx-ffi`:** existing infrastructure, plus any generally useful tensor or
   native additions.
 - **`jmlx-models`:** the Qwen-Image-2.1 pipeline, built on the scheduler, sampler and
-  VAE-wrapper contracts that 9.6 introduces. No new published module is created. The scheduler
-  and sampler interfaces stay model-independent, so splitting them into their own module later
-  (when IMG-015 brings a second family) is a mechanical move.
+  VAE-wrapper contracts that 9.6 introduces. No new published module is created. 9.6 and 9.7
+  are the first two users of the model-independent scheduler and sampler interfaces. Splitting
+  them into their own module later is a mechanical move, reconsidered when an external consumer
+  needs diffusion without the model families, or a third family arrives (decision record §6).
 - **UI front ends:** external consumers. JMLX has no JavaFX or Groovy dependency for this.
 
 Do not couple the generic diffusion API to a particular Qwen checkpoint or to a UI.
@@ -54,8 +55,8 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
   implementation against `req/mlx-api-inventory.md`. These already exist from 7.1: conv and
   conv-transpose 1-D to 3-D, `pad`, `GroupNorm`, `Upsample` (nearest/linear) and masked
   attention.
-- **Check:** confirm that `Upsample` `NEAREST` matches the VAE's `nearest-exact` interpolation at
-  its scale factors.
+- **Already settled:** `Upsample` `NEAREST` equals the VAE's `nearest-exact` interpolation at
+  integer scale factors (decision record §3). A unit test pins this.
 - **Fill gaps** through tested mlx-c/FFM bindings, or narrowly scoped native kernels. Do not
   emulate large GPU operations with Java-side tensor copies.
 - **Acceptance:** shape, dtype and numerical parity tests for every newly added or changed
@@ -66,9 +67,14 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 
 - Load the Hugging Face-style component configurations, safetensors shards and tensor indexes of
   the transformer (BF16), the Qwen3-VL text encoder (BF16) and the VAE (stored F32).
-- **Keep weights resident as stored (BF16) or as Q4**, not up-cast to FLOAT32 as the
-  7.3b/7.3c loaders do. Support a text-only encoder load that skips the vision tower, which
-  text-to-image does not use.
+- **Support three weight-residency paths:**
+  - FLOAT32, the existing up-cast, for the strict gates;
+  - BF16 resident as stored;
+  - Q4 resident.
+  
+  Decision record §4 explains the choice.
+- **Text-only encoder load.** Skip the vision tower and the unused `lm_head`, which
+  text-to-image never uses.
 - Validate tensor names, shapes, dtypes, quantization metadata and architecture version. Report
   unsupported checkpoints clearly.
 - Load from local model directories only. Downloading stays an explicit step (the existing
@@ -117,10 +123,13 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 - **Seeded latent initialization uses MLX random.** The reference's torch-generated noise cannot
   be reproduced, so the two are checked separately.
 - **Acceptance:**
-  - With the reference's initial latent *injected*, the latent trajectory matches the
-    reference's intermediate checkpoints within the stated tolerance.
-  - Separately, repeated Java runs with the same seed are reproducible on a pinned runtime and
-    hardware configuration.
+  - **Teacher-forced per step:** starting from the reference's injected initial latent, each
+    compared step is fed the reference's own latent at that step. The denoiser output matches
+    the reference within the recorded ε (FLOAT32 path) or within the separately named BF16 and Q4
+    bounds. Errors therefore don't accumulate across steps.
+  - A free-running 40-step trajectory is reported, not gated.
+  - Repeated Java runs with the same seed are reproducible on a pinned runtime and hardware
+    configuration.
 
 ### IMG-006 — VAE decoder and image output
 
@@ -141,6 +150,11 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 
 - An immutable request (prompt, width, height, steps, seed, guidance) against a loaded model
   object.
+- **The loaded model object owns the components under a memory policy:**
+  - `RESIDENT` (default): all components stay loaded between requests.
+  - `STAGED`: the encoder is loaded per request and released after conditioning (IMG-009).
+  
+  Either way, the caller holds one object.
 - A result carrying image pixels plus complete generation metadata.
 - Manage native resources deterministically (`AutoCloseable` and `MLXScope` ownership). Surface
   failures without leaking native allocations.
@@ -157,18 +171,20 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
   the pinned BF16 artifact. GGUF K-quants and custom packed formats are out of scope. Converted
   weights are never published by JMLX (decision record §5).
 - **Acceptance:**
-  - The Q4 path matches the BF16 path within a separately named, recorded bound.
+  - The Q4 path matches the CPU float32 reference within its separately named, recorded bound,
+    under the same teacher-forced comparison as IMG-005.
   - It completes on the 24 GB target (IMG-009).
 
 ### IMG-009 — Bounded peak memory and lifecycle
 
 - Measure peak process memory across loading, encoding, denoising and decoding, including the
   MLX allocator's cache and temporaries, in the existing Tier-B memory-test style.
-- Stage the work:
-  - release the encoder after conditioning, before loading the transformer;
-  - use optional VAE tiling;
-  - keep no intermediate history;
-  - dispose temporaries deterministically.
+- **Staging is a memory-budget policy, not a requirement.**
+  - At Q4, the transformer (~4.0 GB), encoder (~4.4–4.9 GB) and VAE fit resident together on
+    24 GB.
+  - `STAGED` releases the encoder after conditioning, at the cost of re-reading it every job.
+- Also: optional VAE tiling, no retained intermediate history, and deterministic disposal of
+  temporaries.
 - Provide explicit memory-budget options and actionable out-of-memory errors.
 - **Acceptance:**
   - On the project's runner, a 512×512 run's measured process footprint stays under a recorded
@@ -206,8 +222,9 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 
 - The native runtime, packaging and code signing ride Phase 8.4's `jmlx-native-macos-arm64`
   artifact. This milestone adds only what image generation needs beyond that.
-- **Acceptance:** the release smoke, or an equivalent external consumer, resolves the published
-  modules and generates an image on a clean supported Mac without a Python environment.
+- **Acceptance:** `tools/release-smoke` resolves the published-shape modules and generates an
+  image from a **synthetic Tier-A checkpoint** (like its existing synthetic Mistral case) without
+  a Python environment, on the hosted native CI job. The 33 GB real artifact cannot run there.
 
 ## P2 — editing, broader model support and ergonomics (deferred)
 
@@ -235,16 +252,17 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 - Separate the scheduler, denoiser, conditioning, VAE and postprocessor interfaces so that
   further image models fit without pretending their tokenization, attention or schedulers are
   identical. The 9.6 and 9.7 pipelines are the first two users.
-- **Acceptance:** one additional, architecturally distinct image model is integrated without
-  changing the public request/result contract. This is also the trigger to revisit the module
-  home (decision record §6).
+- **Acceptance:** a third, architecturally distinct image model is integrated without changing
+  the public request/result contract. That is one of the triggers to revisit the module home
+  (decision record §6).
 
 ### IMG-016 — Optional fast and advanced inference
 
 - **Evaluate:**
   - Qwen-Image-2.1-Turbo (`fc13ba1`, also under the Qwen Research License, a few-step schedule
     shipped in its config);
-  - quantized attention kernels, LoRA, warm model reuse, decode tiling and ControlNet.
+  - quantized attention kernels, LoRA, decode tiling and ControlNet. Warm model reuse is
+    already P1 (the `RESIDENT` policy, IMG-007).
   
   Prompt-embedding caching follows 9.2's prefix-cache design.
 - Treat Turbo schedules and checkpoints as model-specific, not interchangeable with base
@@ -266,19 +284,24 @@ Do not couple the generic diffusion API to a particular Qwen checkpoint or to a 
 - **Determinism:** store enough metadata to reproduce a run. Document allowable numerical drift
   across MLX versions and hardware.
 - **Testing:**
-  - A strict Tier-A synthetic golden (generated weights) is the binding gate.
-  - The real artifact is a pinned, opt-in Tier-B suite.
+  - A strict Tier-A synthetic golden is the binding gate. Its generated weights are BF16-rounded
+    and stored as F32, and its tokenizer is the Apache-2.0 Qwen3-VL tokenizer.
+  - The real artifact is a pinned, opt-in Tier-B suite. Its goldens are capped at 10 MiB.
   - Strict float32 references use the `full-float32` tag; BF16 and Q4 comparisons carry
     separately named bounds.
 - **Licensing:** Qwen-Image-2.1 is under the Qwen Research License Agreement (non-commercial
-  research and evaluation only; notice on redistribution; attribution under §4.b). JMLX never
-  bundles, publishes or redistributes the weights or converted weights. A downstream application
-  needs to clear its own use, including any commercial license (decision record §5).
+  research and evaluation only; notice on redistribution; attribution under §4.b).
+  - Unlike SD 1.5's license, it forbids commercial use outright. The verified checkpoint
+    therefore needs a separate license from the model owner for any commercial use, and the
+    documentation says so.
+  - No file from the artifact is committed: weights, configs, processor or tokenizer files, or
+    converted weights. JMLX never bundles, publishes or redistributes them (decision record
+    §5).
 
 ## Dependency order and gates
 
 1. **Decision record** (`req/plans/phase9-7-decision.md`): license, module home, reference
-   toolchain. Merged before the milestone plan.
+   toolchain. Decided before the milestone plan.
 2. **9.6 delivered:** the scheduler, sampler and VAE contracts that 9.7 extends.
 3. **Reference and probes:** the reference environment, plus the probes listed in the decision
    record §8 (WP1).
@@ -300,8 +323,9 @@ and reference-parity checks.
 - Model and license, pinned at `d26bb61231c349cf6b7896fa83353113880e1ba3`:
   https://huggingface.co/Qwen/Qwen-Image-2.1
 - Diffusers pipeline docs: https://huggingface.co/docs/diffusers/en/api/pipelines/qwenimage21.
-  Pinned source: `diffusers==0.42.1`, identical for this pipeline to commit
-  `86ef420b17363c28e36ebad6b58555e9aa8feda2`.
+  Pinned source: `diffusers==0.42.1`, identical to commit
+  `86ef420b17363c28e36ebad6b58555e9aa8feda2` for the Qwen-Image-2.1 pipeline, transformer and
+  VAE files. 0.41.0's transformer differs.
 - MFLUX Qwen 2.1 implementation: https://github.com/mflux-community/mflux/tree/main/src/mflux/models/qwen21
   (not checked; pin a commit before use).
 - Community packed-Q4 prototype (custom runner, not drop-in; provenance and revision unpinned,

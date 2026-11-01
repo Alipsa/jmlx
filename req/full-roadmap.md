@@ -36,7 +36,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.5) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
-| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, gated by its own decision record) | 9.0 | 0.x release | not started |
+| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
 | 12 | Autodiff and function-transformation parity | 12.0 | 0.x release | not started |
@@ -520,26 +520,37 @@ match the CPU float32 reference within the recorded ε.
 Proposed on 2026-11-01 in `req/jmlx-image-generation-roadmap.md`, whose requirements
 IMG-001 to IMG-016 are this milestone's requirements source.
 
-**Gated by a decision record.** Before the milestone plan, the decision record
-`req/plans/phase9-7-decision.md` (drafted 2026-11-01, in the style of
-`req/plans/phase7-4-decision.md`; its PR review is the gate) settles three things:
+**Decided by** `req/plans/phase9-7-decision.md` (2026-11-01, in the style of
+`req/plans/phase7-4-decision.md`; its PR review was the gate):
 
-1. **License.** `Qwen/Qwen-Image-2.1` is under the Qwen Research License Agreement:
-   non-commercial use only, a notice requirement on redistribution (§3) and an attribution
-   requirement (§4.b). The record accepts or declines it for a pinned, read-only Tier-B test
-   artifact and states what it means for downstream consumers. jmlx sources and binaries never
-   bundle the weights.
-2. **Module home.** Either extend 9.6's scheduler, sampler and VAE contracts in `jmlx-models`
-   (the 7.4 default), or reopen 7.4's "no new published module" decision with a recorded reason
-   for a `jmlx-diffusion` module.
-3. **Reference toolchain.** The model card requires `transformers>=5.17` and diffusers from git
-   main, although released diffusers 0.41.0 and later ship the identical pipeline.
-   `tools/hf-reference` pins Transformers 4.57.6, and `verifyImageOracleDependencyPins` keeps
-   the image and HF reference locks in agreement, so the reference needs its own hash lock. The
-   record also sets the reference precision.
+1. **License: accepted for a pinned, read-only Tier-B test artifact only.** `Qwen/Qwen-Image-2.1`
+   is under the Qwen Research License Agreement: non-commercial use only, a notice requirement on
+   redistribution (§3) and an attribution requirement (§4.b). Unlike the SD 1.5 license that 7.4
+   accepted, it forbids commercial use outright. The published MIT API's only verified
+   checkpoint therefore needs a separate license from the model owner for commercial use, and
+   the documentation says so.
+   
+   No artifact file (weights, configs, processor or tokenizer files, converted weights) enters
+   the repository. Committed Tier-B goldens are model outputs, capped at 10 MiB. Tier-A uses the
+   Apache-2.0 Qwen3-VL tokenizer that 7.3b pins.
+2. **Module home: `jmlx-models`, no new published module.** 9.7 extends 9.6's scheduler, sampler
+   and VAE contracts. The two pipelines are the first two users of the model-independent
+   interfaces. The decision is reopened if an external consumer needs diffusion without the
+   model families, or if a third family would make `jmlx-models` carry diffusion code most of
+   its users don't need.
+3. **Reference toolchain: a new hash-locked `tools/image-gen-reference/`.** It pins
+   `diffusers==0.42.1`, which is identical to the pinned main commit for the Qwen-Image-2.1
+   pipeline, transformer and VAE files. The model card asks for git main, and 0.41.0's
+   transformer differs. It also pins one exact Transformers 5.x release and one exact torch
+   release, both chosen in WP1.
+   
+   This is separate from `tools/hf-reference` (Transformers 4.57.6). The lock is outside
+   `verifyImageOracleDependencyPins`' explicit lock list, and its digests are verified by a new
+   root-`check` task, `verifyImageGenReferenceGoldens`. The reference is CPU float32, run per
+   component, with teacher-forced per-step comparison.
 
-If the record declines or defers, a dated amendment moves or removes 9.7, and Phase 9's done
-condition does not wait for it.
+If a later review reverses a decision, a dated amendment moves or removes 9.7, and Phase 9's
+done condition does not wait for it.
 
 **Scope.** Requirements P0 and P1 (IMG-001 to IMG-012): text-to-image at artifact revision
 `d26bb61231c349cf6b7896fa83353113880e1ba3`. P2 (IMG-013 to IMG-016: reference-image editing,
@@ -550,34 +561,51 @@ masks, further model families, Turbo/LoRA/ControlNet) is deferred to later miles
 - 9.6's scheduler, sampler-loop and VAE-wrapper contracts, extended rather than re-derived.
   `FlowMatchEulerDiscreteScheduler` with its dynamic exponential shift is added beside PNDM.
 - 7.1's conv and conv-transpose (1-D to 3-D), `GroupNorm`, `Upsample` and `pad`. IMG-001 is
-  therefore a gap audit against `req/mlx-api-inventory.md`, not a fresh build.
+  therefore a gap audit against `req/mlx-api-inventory.md`, not a fresh build. `Upsample`'s
+  `NEAREST` already equals the VAE's `nearest-exact` at integer scales.
 - 7.3b's `Qwen3VlModel` as the conditioning encoder. The artifact's encoder has the
   Qwen3-VL-8B shape. A seam that returns the last decoder layer's hidden states *before* the
-  final RMSNorm (what the pinned pipeline feeds the transformer) is new work.
+  final RMSNorm (what the pinned pipeline feeds the transformer) is new work, as is a text-only
+  load.
 
 **Settled at milestone start:**
 
-- Weights stay resident as BF16 or Q4, unlike the 7.3b/7.3c FLOAT32 up-cast. Each gets a
-  separately named tolerance beside the strict float32 gate.
-- The 4-channel (RGBA) VAE decode is the native output path, not a P2 addition.
-- Parity tests inject the reference's initial latent, because a torch-seeded trajectory cannot be
-  reproduced with MLX random. Seeded reproducibility is a separate, Java-only check.
-- Generation runs on one platform worker thread, per the threading rule.
-- The transformer's block-causal mask (causal text, bidirectional within each image block, as
-  in the pinned diffusers source) is built from existing attention facades.
+- **Three weight-residency paths**, all measured against one CPU float32 reference:
+  - FLOAT32 (the existing up-cast) for the strict Tier-A gate and the Tier-B tight-ε run, staged
+    on the M5 Max. The Tier-A synthetic checkpoint stores BF16-rounded weights as F32.
+  - BF16 resident and Q4 resident for the 24 GB target, each with a separately named bound.
+- **Staging is a memory-budget policy** (`RESIDENT` by default, or `STAGED` to release the
+  encoder after conditioning), set on the loaded model object. At Q4, both large components fit
+  resident together on 24 GB.
+- **The 4-channel (RGBA) VAE decode is the native output path**, not a P2 addition.
+- **Transformer parity is teacher-forced per step**, starting from the reference's injected
+  initial latent: a torch-seeded trajectory cannot be reproduced with MLX random. A
+  free-running 40-step trajectory is reported, not gated. Seeded reproducibility is a separate,
+  Java-only check.
+- **Generation runs on one platform worker thread**, per the threading rule.
+- **The transformer's block-causal mask** (causal text, bidirectional within each image block,
+  as in the pinned diffusers source) is built from existing attention facades.
 
 **Overlaps:** IMG-012 packaging rides 8.4's native artifact, and prompt-embedding caching follows
 9.2's design.
 
 **Exit gate:**
 
-- The strict Tier-A synthetic golden passes.
-- For the pinned artifact, the conditioning tensors, the per-step denoiser output under the
-  pinned flow-match schedule (with an injected initial latent) and the VAE decode match the
-  reference within the recorded ε.
-- A seeded 512×512 text-to-image run completes in-process in Java, with its measured process
-  footprint under a recorded bound consistent with the 24 GB M4 Air target (IMG-008, IMG-009).
-- One manual run on that hardware is recorded.
+- **IMG-001 to IMG-007:** the strict Tier-A synthetic golden passes on the FLOAT32 path.
+- **Pinned-artifact parity**, on the staged FLOAT32 path: the conditioning tensors, the
+  teacher-forced per-step denoiser outputs under the pinned flow-match schedule and the VAE
+  decode of the reference's final latent match the reference within the recorded ε. The BF16
+  and Q4 paths stay within their separately named, recorded bounds.
+- **IMG-008, IMG-009:** a seeded 512×512 text-to-image run on the Q4 path completes in-process
+  in Java. Its measured process footprint stays under a recorded bound consistent with the
+  24 GB M4 Air target, and one manual run on that hardware is recorded.
+- **IMG-010:** cancelling during denoising, then generating again in the same JVM, returns active
+  memory to its baseline.
+- **IMG-011:** the benchmark matrix (512², 768² and 1024²; Q4 and BF16) is recorded under the
+  `req/phase6-4-benchmark.md` conventions. Recording it is gating; the quality thresholds it
+  defines gate the next release, not this milestone.
+- **IMG-012:** the release smoke generates an image from a synthetic Tier-A checkpoint (like its
+  synthetic Mistral case) through the published-shape modules, on the hosted native CI job.
 
 **Phase 9 done:** every milestone's exit gate passes and the phase release is published.
 
@@ -879,5 +907,5 @@ tests, documentation and inventory changes are all delivered.
   inference as Phase 11 milestone 11.5 and diffusion inference as Phase 9 milestone 9.6, both
   gated by their own exit gates.
 - **2026-11-01:** Phase 9 milestone 9.7 (Qwen-Image-2.1 image generation, requirements P0/P1
-  of `req/jmlx-image-generation-roadmap.md`) added after 9.6, gated by its own decision record
-  (license, module home, reference toolchain).
+  of `req/jmlx-image-generation-roadmap.md`) added after 9.6, decided by
+  `req/plans/phase9-7-decision.md` (license, module home, reference toolchain).

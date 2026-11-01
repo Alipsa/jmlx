@@ -56,7 +56,17 @@ public final class MLXRandom {
     return new MLXArray(target, res);
   }
 
-  /** Draws one categorical index along {@code axis} with an explicit key, returning INT32. */
+  /**
+   * Draws one categorical index along {@code axis} with an explicit key, returning INT32.
+   *
+   * <p>Sampler pin: the pinned MLX 0.32.4 selects its new inverse-CDF sampler for any input whose
+   * total size equals the axis size (every non-axis extent is one) whenever the output shape is
+   * non-trivial; 0.31.2 ran its gumbel-max sampler for every shape, and 0.32.4 still runs it for
+   * 1-D inputs. The pinned sampling streams (the phase6-1-sampling oracle fixture and {@code
+   * LlamaModelTest}'s seeded goldens) are gumbel-max streams, so single-row inputs are routed
+   * through the 1-D view -- bit-identical to 0.31.2 for these shapes -- and the result is reshaped
+   * back to the axis-reduced shape.
+   */
   public static MLXArray categorical(MLXArray logits, int axis, MLXArray key) {
     Objects.requireNonNull(logits, "logits");
     requireKey(key, "categorical");
@@ -68,13 +78,33 @@ public final class MLXRandom {
       throw new IllegalArgumentException("categorical: axis out of range: " + axis);
     }
     MLXScope scope = NativeOps.scopeOf("categorical", logits, key);
+    MLXArray input = logits;
+    int inputAxis = normalizedAxis;
+    if (logits.ndim() > 1 && logits.size() == (long) logits.shape()[normalizedAxis]) {
+      input = MLXShape.reshape(logits, new int[] {logits.shape()[normalizedAxis]});
+      inputAxis = 0;
+    }
+    MLXArray drawInput = input;
+    int drawAxis = inputAxis;
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "categorical",
         () ->
             mlx_h.mlx_random_categorical(
-                res, logits.handle(), normalizedAxis, key.handle(), scope.stream()));
-    return MLX.astype(new MLXArray(scope, res), DType.INT32);
+                res, drawInput.handle(), drawAxis, key.handle(), scope.stream()));
+    MLXArray selected = MLX.astype(new MLXArray(scope, res), DType.INT32);
+    if (input != logits) {
+      int[] reduced = new int[logits.ndim() - 1];
+      System.arraycopy(logits.shape(), 0, reduced, 0, normalizedAxis);
+      System.arraycopy(
+          logits.shape(),
+          normalizedAxis + 1,
+          reduced,
+          normalizedAxis,
+          logits.ndim() - 1 - normalizedAxis);
+      selected = MLXShape.reshape(selected, reduced);
+    }
+    return selected;
   }
 
   private static void requireKey(MLXArray key, String operation) {

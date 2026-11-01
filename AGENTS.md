@@ -545,9 +545,10 @@ the `se.alipsa.jmlx.core` package Javadoc (`package-info.java`).
 mlx-c is versioned independently of MLX itself (mlx-c's own `CMakeLists.txt` pins an exact MLX tag via
 `GIT_TAG`), so a newer `mlx-metal` wheel does not imply any particular mlx-c commit works with it — the
 two are only bumped together, via `scripts/checkDependencies.zsh` (which cross-references mlx-c's tags
-against the wheel version) and `scripts/updateMlx.zsh`. Current pin: mlx-c `fba4470` (tracks `v0.6.0`)
-against `mlx-metal==0.31.2` (`macosx_26_0_arm64`) — see Decision 9 in `req/plans/initial-plan.md`
-for why the latest 0.32.0 wheel was deliberately not used.
+against the wheel version) and `scripts/updateMlx.zsh`. Current pin: mlx-c `a26f2d5` (tag
+`v0.8.0`, pins MLX `v0.32.4`) against `mlx-metal==0.32.4` (`macosx_26_0_arm64`) — see Decision 9 in
+`req/plans/initial-plan.md` for the original pairing rationale; the 0.32.4 repin is
+`req/plans/phase7-5-plan.md`.
 
 `scripts/jextract-overrides/mlx/c/half.h` is a trimmed override copied over the staged header before
 running jextract: the real header's `__bf16` typedef (the raw C half-precision arithmetic type) is a

@@ -21,16 +21,16 @@ SCRATCH_DIR="$NATIVE_DIR/scratch"
 INSTALL_DIR="$NATIVE_DIR/install"
 
 # --- Pinned versions ---------------------------------------------------------
-# req/plans/initial-plan.md Decision 9: this mlx-c commit and this mlx-metal wheel
-# version both track MLX v0.31.2 exactly, sidestepping the wheel/mlx-c version
-# mismatch (latest wheel is 0.32.0; mlx-c's CMakeLists.txt pins v0.31.2)
-# instead of gambling on newer headers compiling against older mlx-c source.
-MLX_METAL_VERSION="0.31.2"
-MLX_METAL_WHEEL_URL="https://files.pythonhosted.org/packages/99/82/11fd62a8d7a3e96e5c43220b17de0151e3f10101f8bb3b865f5bd9cdd074/mlx_metal-${MLX_METAL_VERSION}-py3-none-macosx_26_0_arm64.whl"
-MLX_METAL_WHEEL_SHA256="84ffb60ee503f03eb684f5fb168d5cff31e2a16b7f27c1731eaf7662bd6e9b46"
+# req/plans/initial-plan.md Decision 9, re-pinned per req/plans/phase7-5-plan.md
+# (Phase 7.5): this mlx-c commit (v0.8.0) and this mlx-metal wheel version both
+# track MLX v0.32.4 exactly; the step-4 version-pairing assertion below compares
+# the mlx-c commit's CMakeLists.txt GIT_TAG against this wheel version.
+MLX_METAL_VERSION="0.32.4"
+MLX_METAL_WHEEL_URL="https://files.pythonhosted.org/packages/2a/d6/4340ed6e184f71693d7f531c9ae55d677451351245760d71f8dd714dcbe5/mlx_metal-${MLX_METAL_VERSION}-py3-none-macosx_26_0_arm64.whl"
+MLX_METAL_WHEEL_SHA256="514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936"
 
 MLX_C_REPO="https://github.com/ml-explore/mlx-c.git"
-MLX_C_COMMIT="fba4470b89073180056c9ea46c443051375f7399"
+MLX_C_COMMIT="a26f2d584a14ec619ae8db9a09be03becd47598a"
 
 JEXTRACT_PAGE="https://jdk.java.net/jextract/"
 # Trust-on-first-use: jextract's own .sha256 comes from the same origin as the

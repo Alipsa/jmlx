@@ -18,10 +18,10 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     bool (*is_open)(void *);
  *     bool (*good)(void *);
  *     size_t (*tell)(void *);
- *     void (*seek)(void *, int64_t, int);
- *     void (*read)(void *, char *, size_t);
- *     void (*read_at_offset)(void *, char *, size_t, size_t);
- *     void (*write)(void *, const char *, size_t);
+ *     int (*seek)(void *, int64_t, int);
+ *     size_t (*read)(void *, char *, size_t);
+ *     size_t (*read_at_offset)(void *, char *, size_t, size_t);
+ *     size_t (*write)(void *, const char *, size_t);
  *     const char *(*label)(void *);
  *     void (*free)(void *);
  * }
@@ -354,7 +354,7 @@ public class mlx_io_vtable_ {
 
     /**
      * {@snippet lang=c :
-     * void (*seek)(void *, int64_t, int)
+     * int (*seek)(void *, int64_t, int)
      * }
      */
     public final static class seek {
@@ -367,10 +367,11 @@ public class mlx_io_vtable_ {
          * The function pointer signature, expressed as a functional interface
          */
         public interface Function {
-            void apply(MemorySegment _x0, long _x1, int _x2);
+            int apply(MemorySegment _x0, long _x1, int _x2);
         }
 
-        private static final FunctionDescriptor $DESC = FunctionDescriptor.ofVoid(
+        private static final FunctionDescriptor $DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_h.C_LONG_LONG,
             mlx_h.C_INT
@@ -398,9 +399,9 @@ public class mlx_io_vtable_ {
         /**
          * Invoke the upcall stub {@code funcPtr}, with given parameters
          */
-        public static void invoke(MemorySegment funcPtr, MemorySegment _x0, long _x1, int _x2) {
+        public static int invoke(MemorySegment funcPtr, MemorySegment _x0, long _x1, int _x2) {
             try {
-                 DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2);
+                return (int) DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2);
             } catch (Error | RuntimeException ex) {
                 throw ex;
             } catch (Throwable ex$) {
@@ -414,7 +415,7 @@ public class mlx_io_vtable_ {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void (*seek)(void *, int64_t, int)
+     * int (*seek)(void *, int64_t, int)
      * }
      */
     public static final AddressLayout seek$layout() {
@@ -426,7 +427,7 @@ public class mlx_io_vtable_ {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void (*seek)(void *, int64_t, int)
+     * int (*seek)(void *, int64_t, int)
      * }
      */
     public static final long seek$offset() {
@@ -436,7 +437,7 @@ public class mlx_io_vtable_ {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void (*seek)(void *, int64_t, int)
+     * int (*seek)(void *, int64_t, int)
      * }
      */
     public static MemorySegment seek(MemorySegment struct) {
@@ -446,7 +447,7 @@ public class mlx_io_vtable_ {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void (*seek)(void *, int64_t, int)
+     * int (*seek)(void *, int64_t, int)
      * }
      */
     public static void seek(MemorySegment struct, MemorySegment fieldValue) {
@@ -455,7 +456,7 @@ public class mlx_io_vtable_ {
 
     /**
      * {@snippet lang=c :
-     * void (*read)(void *, char *, size_t)
+     * size_t (*read)(void *, char *, size_t)
      * }
      */
     public final static class read {
@@ -468,10 +469,11 @@ public class mlx_io_vtable_ {
          * The function pointer signature, expressed as a functional interface
          */
         public interface Function {
-            void apply(MemorySegment _x0, MemorySegment _x1, long _x2);
+            long apply(MemorySegment _x0, MemorySegment _x1, long _x2);
         }
 
-        private static final FunctionDescriptor $DESC = FunctionDescriptor.ofVoid(
+        private static final FunctionDescriptor $DESC = FunctionDescriptor.of(
+            mlx_h.C_LONG,
             mlx_h.C_POINTER,
             mlx_h.C_POINTER,
             mlx_h.C_LONG
@@ -499,9 +501,9 @@ public class mlx_io_vtable_ {
         /**
          * Invoke the upcall stub {@code funcPtr}, with given parameters
          */
-        public static void invoke(MemorySegment funcPtr, MemorySegment _x0, MemorySegment _x1, long _x2) {
+        public static long invoke(MemorySegment funcPtr, MemorySegment _x0, MemorySegment _x1, long _x2) {
             try {
-                 DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2);
+                return (long) DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2);
             } catch (Error | RuntimeException ex) {
                 throw ex;
             } catch (Throwable ex$) {
@@ -515,7 +517,7 @@ public class mlx_io_vtable_ {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void (*read)(void *, char *, size_t)
+     * size_t (*read)(void *, char *, size_t)
      * }
      */
     public static final AddressLayout read$layout() {
@@ -527,7 +529,7 @@ public class mlx_io_vtable_ {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void (*read)(void *, char *, size_t)
+     * size_t (*read)(void *, char *, size_t)
      * }
      */
     public static final long read$offset() {
@@ -537,7 +539,7 @@ public class mlx_io_vtable_ {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void (*read)(void *, char *, size_t)
+     * size_t (*read)(void *, char *, size_t)
      * }
      */
     public static MemorySegment read(MemorySegment struct) {
@@ -547,7 +549,7 @@ public class mlx_io_vtable_ {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void (*read)(void *, char *, size_t)
+     * size_t (*read)(void *, char *, size_t)
      * }
      */
     public static void read(MemorySegment struct, MemorySegment fieldValue) {
@@ -556,7 +558,7 @@ public class mlx_io_vtable_ {
 
     /**
      * {@snippet lang=c :
-     * void (*read_at_offset)(void *, char *, size_t, size_t)
+     * size_t (*read_at_offset)(void *, char *, size_t, size_t)
      * }
      */
     public final static class read_at_offset {
@@ -569,10 +571,11 @@ public class mlx_io_vtable_ {
          * The function pointer signature, expressed as a functional interface
          */
         public interface Function {
-            void apply(MemorySegment _x0, MemorySegment _x1, long _x2, long _x3);
+            long apply(MemorySegment _x0, MemorySegment _x1, long _x2, long _x3);
         }
 
-        private static final FunctionDescriptor $DESC = FunctionDescriptor.ofVoid(
+        private static final FunctionDescriptor $DESC = FunctionDescriptor.of(
+            mlx_h.C_LONG,
             mlx_h.C_POINTER,
             mlx_h.C_POINTER,
             mlx_h.C_LONG,
@@ -601,9 +604,9 @@ public class mlx_io_vtable_ {
         /**
          * Invoke the upcall stub {@code funcPtr}, with given parameters
          */
-        public static void invoke(MemorySegment funcPtr, MemorySegment _x0, MemorySegment _x1, long _x2, long _x3) {
+        public static long invoke(MemorySegment funcPtr, MemorySegment _x0, MemorySegment _x1, long _x2, long _x3) {
             try {
-                 DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2, _x3);
+                return (long) DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2, _x3);
             } catch (Error | RuntimeException ex) {
                 throw ex;
             } catch (Throwable ex$) {
@@ -617,7 +620,7 @@ public class mlx_io_vtable_ {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void (*read_at_offset)(void *, char *, size_t, size_t)
+     * size_t (*read_at_offset)(void *, char *, size_t, size_t)
      * }
      */
     public static final AddressLayout read_at_offset$layout() {
@@ -629,7 +632,7 @@ public class mlx_io_vtable_ {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void (*read_at_offset)(void *, char *, size_t, size_t)
+     * size_t (*read_at_offset)(void *, char *, size_t, size_t)
      * }
      */
     public static final long read_at_offset$offset() {
@@ -639,7 +642,7 @@ public class mlx_io_vtable_ {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void (*read_at_offset)(void *, char *, size_t, size_t)
+     * size_t (*read_at_offset)(void *, char *, size_t, size_t)
      * }
      */
     public static MemorySegment read_at_offset(MemorySegment struct) {
@@ -649,7 +652,7 @@ public class mlx_io_vtable_ {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void (*read_at_offset)(void *, char *, size_t, size_t)
+     * size_t (*read_at_offset)(void *, char *, size_t, size_t)
      * }
      */
     public static void read_at_offset(MemorySegment struct, MemorySegment fieldValue) {
@@ -658,7 +661,7 @@ public class mlx_io_vtable_ {
 
     /**
      * {@snippet lang=c :
-     * void (*write)(void *, const char *, size_t)
+     * size_t (*write)(void *, const char *, size_t)
      * }
      */
     public final static class write {
@@ -671,10 +674,11 @@ public class mlx_io_vtable_ {
          * The function pointer signature, expressed as a functional interface
          */
         public interface Function {
-            void apply(MemorySegment _x0, MemorySegment _x1, long _x2);
+            long apply(MemorySegment _x0, MemorySegment _x1, long _x2);
         }
 
-        private static final FunctionDescriptor $DESC = FunctionDescriptor.ofVoid(
+        private static final FunctionDescriptor $DESC = FunctionDescriptor.of(
+            mlx_h.C_LONG,
             mlx_h.C_POINTER,
             mlx_h.C_POINTER,
             mlx_h.C_LONG
@@ -702,9 +706,9 @@ public class mlx_io_vtable_ {
         /**
          * Invoke the upcall stub {@code funcPtr}, with given parameters
          */
-        public static void invoke(MemorySegment funcPtr, MemorySegment _x0, MemorySegment _x1, long _x2) {
+        public static long invoke(MemorySegment funcPtr, MemorySegment _x0, MemorySegment _x1, long _x2) {
             try {
-                 DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2);
+                return (long) DOWN$MH.invokeExact(funcPtr, _x0, _x1, _x2);
             } catch (Error | RuntimeException ex) {
                 throw ex;
             } catch (Throwable ex$) {
@@ -718,7 +722,7 @@ public class mlx_io_vtable_ {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void (*write)(void *, const char *, size_t)
+     * size_t (*write)(void *, const char *, size_t)
      * }
      */
     public static final AddressLayout write$layout() {
@@ -730,7 +734,7 @@ public class mlx_io_vtable_ {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void (*write)(void *, const char *, size_t)
+     * size_t (*write)(void *, const char *, size_t)
      * }
      */
     public static final long write$offset() {
@@ -740,7 +744,7 @@ public class mlx_io_vtable_ {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void (*write)(void *, const char *, size_t)
+     * size_t (*write)(void *, const char *, size_t)
      * }
      */
     public static MemorySegment write(MemorySegment struct) {
@@ -750,7 +754,7 @@ public class mlx_io_vtable_ {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void (*write)(void *, const char *, size_t)
+     * size_t (*write)(void *, const char *, size_t)
      * }
      */
     public static void write(MemorySegment struct, MemorySegment fieldValue) {

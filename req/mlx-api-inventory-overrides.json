@@ -5,14 +5,15 @@
         "mlx_h.mlx_add", "mlx_h.mlx_arange", "mlx_h.mlx_array_new", "mlx_h.mlx_array_new_bool",
         "mlx_h.mlx_array_new_data", "mlx_h.mlx_array_new_float32", "mlx_h.mlx_array_new_int",
         "mlx_h.mlx_contiguous",
-        "mlx_h.mlx_default_cpu_stream_new", "mlx_h.mlx_default_gpu_stream_new",
+        "mlx_h.mlx_default_gpu_stream_new",
         "mlx_h.mlx_dequantize", "mlx_h.mlx_device_free", "mlx_h.mlx_device_get_type",
         "mlx_h.mlx_device_new", "mlx_h.mlx_device_new_type", "mlx_h.mlx_eval",
         "mlx_h.mlx_full", "mlx_h.mlx_get_active_memory",
         "mlx_h.mlx_get_default_device", "mlx_h.mlx_ones",
         "mlx_h.mlx_set_default_device", "mlx_h.mlx_set_error_handler",
         "mlx_h.mlx_sort_axis",
-        "mlx_h.mlx_stream_new_device", "mlx_h.mlx_string_data", "mlx_h.mlx_string_free",
+        "mlx_h.mlx_stream_new_device", "mlx_h.mlx_stream_new_thread_unsafe",
+        "mlx_h.mlx_string_data", "mlx_h.mlx_string_free",
         "mlx_h.mlx_string_new", "mlx_h.mlx_sum",
         "mlx_h.mlx_vector_array_free", "mlx_h.mlx_vector_array_get", "mlx_h.mlx_vector_array_new",
         "mlx_h.mlx_vector_array_new_data", "mlx_h.mlx_vector_array_set_data",
@@ -157,7 +158,7 @@
         "mlx_h.mlx_negative", "mlx_h.mlx_sum_axes", "mlx_h.mlx_mean_axes", "mlx_h.mlx_inner",
         "mlx_h.mlx_outer", "mlx_h.mlx_less", "mlx_h.mlx_less_equal", "mlx_h.mlx_greater",
         "mlx_h.mlx_greater_equal", "mlx_h.mlx_equal", "mlx_h.mlx_all",
-        "mlx_h.mlx_argsort_axis", "mlx_h.mlx_cumsum", "mlx_h.mlx_isfinite",
+        "mlx_h.mlx_argsort_axis", "mlx_h.mlx_cumsum_axis", "mlx_h.mlx_isfinite",
         "mlx_h.mlx_logsumexp_axis"
       ],
       "category": "downcall",
@@ -230,6 +231,13 @@
       "status": "implemented",
       "facadeOrReason": "MLX default device support",
       "tests": "MLXGpuVerificationTest"
+    },
+    {
+      "bindings": ["mlx_h.MLX_CPU"],
+      "category": "constant",
+      "status": "implemented",
+      "facadeOrReason": "NativeOps DEFAULT_CPU_STREAM (the MLXIO loader stream)",
+      "tests": "MLXIOTest"
     },
     {
       "bindings": [

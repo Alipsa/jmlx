@@ -18,10 +18,10 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     bool (*is_open)(void *);
  *     bool (*good)(void *);
  *     size_t (*tell)(void *);
- *     void (*seek)(void *, int64_t, int);
- *     void (*read)(void *, char *, size_t);
- *     void (*read_at_offset)(void *, char *, size_t, size_t);
- *     void (*write)(void *, const char *, size_t);
+ *     int (*seek)(void *, int64_t, int);
+ *     size_t (*read)(void *, char *, size_t);
+ *     size_t (*read_at_offset)(void *, char *, size_t, size_t);
+ *     size_t (*write)(void *, const char *, size_t);
  *     const char *(*label)(void *);
  *     void (*free)(void *);
  * } mlx_io_vtable

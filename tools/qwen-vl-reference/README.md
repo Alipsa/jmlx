@@ -26,17 +26,21 @@ and a different checkpoint (8B) than the pinned HF reference (CPU float32,
 
 ## Pin selection
 
-`requirements.lock` pins `mlx-vlm==0.3.9` with `mlx==0.31.2` /
-`mlx-metal==0.31.2` (matching the current native and MLX-oracle pins),
+`requirements.lock` pins `mlx-vlm==0.3.9` with `mlx==0.32.4` /
+`mlx-metal==0.32.4` (matching the current native and MLX-oracle pins),
 `transformers==4.57.6` (matching the HF reference), Pillow 12.3.0 and NumPy
 2.5.3 (matching the other image/HF locks; the root
 `verifyImageOracleDependencyPins` guard compares these pins across all four
 locks: image-oracle, fast-comparison, this lock and hf-reference).
-mlx-vlm 0.3.9 is the newest release in the transformers-4.57 /
-mlx-0.31.2 generation (0.3.4 added Qwen3-VL; 0.3.6/0.3.8/0.3.9 fixed
-attention, position ids, mrope and image-feature/token matching). Releases
-0.3.10+ require transformers 5 and a newer MLX and were rejected for this
-probe. The lock was resolved host-natively for macOS arm64
+mlx-vlm 0.3.9 is the newest release in the transformers-4.57 generation
+(0.3.4 added Qwen3-VL; 0.3.6/0.3.8/0.3.9 fixed attention, position ids,
+mrope and image-feature/token matching). Releases 0.3.10+ require
+transformers 5 and were rejected for this probe. Phase 7.5 re-locked only
+`mlx`/`mlx-metal` to 0.32.4 (the two blocks resolved with the command
+below, spliced in so the other held pins and their transitive resolutions
+stay untouched); mlx-vlm 0.3.9 and its transitive mlx-lm 0.29.1 re-lock
+cleanly against it, so both are held. The lock was resolved host-natively
+for macOS arm64
 (`uv pip compile --generate-hashes --python-version 3.12`); the venv is
 Apple-Silicon-only.
 

@@ -232,5 +232,7 @@
     "tools/hf-reference/phi3v_tier_b.py": "22d4a8e060a65c2ef2964202b4f580b8ddfc67914ae0861caf1abc067f627501",
     "tools/tier-b/images/phi3v-wide-672x336.png": "702955febf85bce110b16120cd3a71dfd568cabbce04f29b78561a1260df7efc",
     "tools/tier-b/images/phi3v-square-336x336.png": "40734e8e0fbc8fe651c65d4b789082dc8d2ca833f59b9473bb17d54ecabfc2d8"
-  }
+  },
+  "phase74_audio_probe_sha256": "792e0630c944ebde3cc9ab8f21e77ea4185d5db9aa280ef13f3669f392ca6fb5",
+  "phase74_diffusion_probe_sha256": "701741237d4c04cbbe018b0c18e299dc7a315f5e4d77b3a65c2c672faefd15a7"
 }

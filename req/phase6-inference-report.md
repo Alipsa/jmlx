@@ -217,14 +217,15 @@ to the old value, is the subsection below.
 Every bound WP6 lists was re-measured on the new pins on 2026-11-02, on the Apple M5 Max host
 (macOS 27.2 — the 0.31.2 recordings are dated to macOS 27.0.1, the host having updated in
 between), on the final tree under `mlx-metal` 0.32.4 / mlx-c `a26f2d5`: each Tier-B suite in its
-own fresh `:jmlx-models:tierBTest` JVM, and the precision/memory suites —
-`se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest`, `se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest`,
-`se.alipsa.jmlx.models.SmolVlmDefaultPrecisionTest`, `se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest`,
-`se.alipsa.jmlx.models.EncoderDefaultPrecisionTest` and `se.alipsa.jmlx.models.VisionLanguageMemoryTest`,
-selected by their `--tests` filters — in one fresh `:jmlx-models:test` JVM. No bound was adjusted;
-the strict `full-float32` bounds were not touched. The VLM manifests' `local_evidence`/`recorded_pin`
-blocks remain the dated 0.31.2 recordings — no manifest was re-measured, so the WP6 manifest
-re-measure rule does not trigger — and this subsection is the new-pin record.
+own fresh `:jmlx-models:tierBTest` JVM, and the precision/memory suites (all in
+`se.alipsa.jmlx.models`) — `Qwen3VlDefaultPrecisionTest`, `Phi3VDefaultPrecisionTest`,
+`SmolVlmDefaultPrecisionTest`, `Qwen3VlCacheEquivalenceTest`, `EncoderDefaultPrecisionTest`
+and `VisionLanguageMemoryTest` — selected by their `--tests` filters, in one fresh
+`:jmlx-models:test` JVM. No bound was adjusted;
+the strict `full-float32` bounds were not touched. The VLM manifests'
+`local_evidence`/`recorded_pin` blocks remain the dated 0.31.2 recordings — no manifest
+was re-measured, so the WP6 manifest re-measure rule does not trigger — and this
+subsection is the new-pin record.
 
 **Default-mode (TF32) maxima.** Every maximum is bit-identical to its 0.31.2 recording in
 `req/phase6-golden-precision.md`; each named bound held.
@@ -267,18 +268,27 @@ its max logit error shrank from `1.02996826171875e-4` to `8.0108642578125e-5`.
 **Wall times (not gated).** The 0.32.4 Tier-B generation wall times sit above the 0.31.2
 recordings — Qwen3-VL 247 → 855 ms (batched run), 953 and 584 ms (isolated re-runs);
 Phi-3.5-Vision 5423 → 31,673 ms (batched), 20,427 and 15,338 ms (isolated re-runs); loads
-843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255 ms — and the cause is not pinned down: the
-pin and the OS changed together, and the isolated re-runs did not return to the 27.0.1 level.
-The controlled same-host comparison (plan §7) — `:jmlx-examples:benchmarkDecode` on the same
-259 MB llama checkpoint (`model.safetensors` SHA-256
+843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255 ms. A pin-isolated control run settled
+the attribution: the pre-Phase-7.5 tree (`46cb325`, without the `dims==2` work, a no-op for
+these decoders) with the 0.31.2 pin staged, re-run on the same macOS 27.2 host against the
+same checkpoints — Qwen3-VL 243 ms (recorded 247 ms; native peak and logit error identical
+to the recorded run) and Phi-3.5-Vision 2,121 ms (recorded 5,423 ms; native peak and logit
+error identical) — while the new pin stays 2.4–3.9× (Qwen3-VL) and 7.2–14.9×
+(Phi-3.5-Vision) above it. The gap is attributable to the 0.32.4 runtime, not the macOS
+27.2 update. Small-model decode is unaffected: the controlled same-host decode benchmark
+(plan §7) — `:jmlx-examples:benchmarkDecode` on the 259 MB llama checkpoint
+(`model.safetensors` SHA-256
 `5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c`), prompt `1,7,42,3,19,5`,
-32 tokens, 7 samples, 2 warm-ups, FULL policy, old pin in a scratch worktree at `46cb325` with
-its 0.31.2 native staged — shows no 0.32.4 decode regression: new pin 385.1 tok/s median
-(2.32 ms/token, p90 2.51) against 62.1 and 284.2 tok/s (3.16 and 10.9 ms/token median) for two
-old-pin runs. Both pins show intermittent per-step stalls on today's host (old-pin per-token
-p10/p90 2.70/19.25 ms in the first run, 2.49/30.57 ms in the second; the old pin's fastest steps
-are within ~16% of the new pin's median). Treat the wall-time delta as unexplained host/OS-state
-evidence for a Phase 8 follow-up, not as a pin regression; nothing gates on it.
+32 tokens, 7 samples, 2 warm-ups, FULL policy, new-pin commit `dcd6960` against the old-pin
+tree `46cb325`; the three JSON reports, which record commit, git status and pins, are
+committed under `req/benchmarks/` — shows the new pin at 385.1 tok/s median sustained
+throughput (median one-step decode 2.32 ms, max 2.51 ms over the 7 samples) against 62.1
+and 284.2 tok/s for two old-pin runs (median one-step decode 10.9 and 3.16 ms; min/max
+2.70/19.25 and 2.49/30.57 ms). This shows no evidence of a 0.32.4 regression on
+small-model decode; the old-pin runs are too noisy (62.1 vs 284.2 tok/s) to bound one,
+and the benchmark does not exercise the VLM prefill/vision path where the Tier-B gap
+appears. The large-workload gap's cause remains open for a Phase 8 follow-up; nothing is
+gated on wall time.
 
 **`VisionLanguageMemoryTest`'s `FIXED_MARGIN`.** The 16 KiB margin is unchanged; the
 retained-minus-logical overhead it was sized from measured 0 B on 0.32.4 — `VLM retention:

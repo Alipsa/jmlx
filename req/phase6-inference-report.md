@@ -265,25 +265,37 @@ The tightest bound — Phi-3.5-Vision's footprint, ~552 MiB above the 0.31.2 mea
 margin: 52,000,000,000 − 50,465,672,648 = 1,534,327,352 B (~1.43 GiB) above the new peak, and
 its max logit error shrank from `1.02996826171875e-4` to `8.0108642578125e-5`.
 
-**Wall times (not gated).** The 0.32.4 Tier-B generation wall times sit above the 0.31.2
-recordings — Qwen3-VL 247 → 855 ms (batched run), 953 and 584 ms (isolated re-runs);
-Phi-3.5-Vision 5423 → 31,673 ms (batched), 20,427 and 15,338 ms (isolated re-runs); loads
-843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255 ms. Three pin-isolated control runs
-attribute the gap to the 0.32.4 runtime: the pre-Phase-7.5 tree (`46cb325`, without the
-`dims==2` work, a no-op for these decoders) with the 0.31.2 pin staged, re-run three times
-per model on the same macOS 27.2 host against the same checkpoints — Qwen3-VL 243/248/253 ms
-(recorded 247 ms) and Phi-3.5-Vision 2,121/2,165/2,161 ms (recorded 5,423 ms) — while the
-new pin stays 2.3–3.9× (Qwen3-VL) and 7.1–14.9× (Phi-3.5-Vision) above every control, the
-old-pin spread (~2–4%) being far smaller than the pin gap. Every control's native peak and
-logit error is identical to its recorded run; the `46cb325` test predates the `runtime_pin`
-report field (added by PR #71) and only echoes the manifest's `recorded_pin`, so the
-running pin of these XMLs rests on the (since removed) worktree's staged
-`native-pin.properties` (0.31.2 / `fba4470`) and is corroborated by the peaks and errors
-being byte-identical to the 0.31.2 recordings. The two pins were measured in separate
-time windows, and the new-pin runs vary 33–63% from their per-model minimum, so a
-back-to-back alternating session (new, old, new, old) is part of issue #73's first step
-to rule out a host-state confounder. Small-model decode shows no
-evidence of a regression: the controlled same-host decode benchmark (plan §7) —
+**Wall times (not gated).** During re-measurement the 0.32.4 Tier-B generation
+wall times sat above the 0.31.2 recordings — Qwen3-VL 247 → 855 ms (batched run), 953
+and 584 ms (isolated re-runs); Phi-3.5-Vision 5423 → 31,673 ms (batched), 20,427 and
+15,338 ms (isolated re-runs); loads 843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255
+ms — and three 0.31.2 pin-isolated controls (the pre-Phase-7.5 tree `46cb325`, the
+`dims==2` work a no-op for these decoders, with the 0.31.2 pin staged, re-run three
+times per model on the same macOS 27.2 host against the same checkpoints) sat at the
+recorded level (Qwen3-VL 243/248/253 ms against a recorded 247; Phi-3.5-Vision
+2,121/2,165/2,161 against a recorded 5,423), which at the time looked like a
+2.3–3.9× / 7.1–14.9× pin effect. It did not reproduce: all the 0.32.4 runs fell in a
+single 10:53–11:29 UTC window, all the 0.31.2 controls in a clean 12:23 /
+13:10–13:11 UTC window, and a back-to-back alternating session (new, old, new, old,
+both models, 14:10–14:12 UTC, `main` @ `801e11a` against the `46cb325` worktree)
+shows no measurable difference — Qwen3-VL 261/247 ms new vs. 243/248 old,
+Phi-3.5-Vision 2,175/2,118 ms new vs. 2,324/2,145 old, i.e. ratios of 0.94–1.07,
+with logit errors and native peaks at their normal values in all eight runs. The
+most likely cause is host state during the 10:53–11:29 UTC window (unmeasured — no
+thermal, load, memory or process records exist for it; the Φ3V new-pin runs' gradual
+recovery across it, 31,673 → 20,427 → 15,338, is consistent with that), not the pin;
+whether 0.32.4 nonetheless degrades disproportionately under a degraded host state —
+the only prediction a pin×host interaction would make — and whether a per-pin
+first-use warm-up cost after the macOS 27.2 update instead explains the window,
+remain open as issue #73, whose first step is an intentionally degraded-state
+alternating session.
+Every control's native peak and logit error is identical to its recorded run; the
+`46cb325` test predates the `runtime_pin` report field (added by PR #71) and only
+echoes the manifest's `recorded_pin`, so the running pin of these XMLs rests on the
+(since removed) worktree's staged `native-pin.properties` (0.31.2 / `fba4470`) and is
+corroborated by the peaks and errors being byte-identical to the 0.31.2 recordings.
+Small-model decode likewise shows no evidence of a regression: the controlled
+same-host decode benchmark (plan §7) —
 `:jmlx-examples:benchmarkDecode` on the 259 MB llama checkpoint (`model.safetensors`
 SHA-256 `5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c`), prompt
 `1,7,42,3,19,5`, 32 tokens, 7 samples, 2 warm-ups, FULL policy, new-pin commit `dcd6960`
@@ -293,10 +305,14 @@ median sustained throughput (median one-step decode 2.32 ms, max 2.51 ms over th
 samples) against 62.1 and 284.2 tok/s for two old-pin runs (median one-step decode 10.9
 and 3.16 ms; min/max 2.70/19.25 and 2.49/30.57 ms); the old-pin runs are too noisy (62.1
 vs 284.2 tok/s) to bound a regression, and the benchmark does not exercise the VLM
-prefill/vision path where the Tier-B gap appears. All twelve Tier-B run XMLs are committed
-alongside the JSONs — the six old-pin controls and, per model, the batched re-measurement
-run and the two isolated re-runs of the new pin — so both sides of the gap are backed by
-raw records.
+prefill/vision path. Both decode benchmarks ran inside the 10:53–11:29 UTC window
+(new pin 11:24, old pin 11:26 / 11:29 UTC, by the local output-file mtimes — the
+JSONs carry no timestamps): the old pin stalled there too, on this light workload,
+while the new-pin small decode ran clean — see issue #73 for what this implies for
+the host-state and first-use explanations. All twenty Tier-B run XMLs are committed
+alongside the JSONs —
+the six old-pin controls, the six new-pin re-measurement runs and the eight
+alternating-session runs — so every figure above is backed by a raw record.
 The new-pin XMLs' file names state a commit provenance that is consistent with the
 timestamps: the isolated runs (11:17–11:29 UTC) fall between the `dcd6960` (11:07 UTC)
 and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
@@ -304,9 +320,12 @@ and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
 (10:53–10:54 UTC) predate `dcd6960` and ran on `2e553c4`, which differs from it only
 in `req/` documents. The committed evidence files are as produced except the XML `hostname`
 attribute (recorded as `M5-Max` rather than the local machine name) and the old-pin
-JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). The gap is
-tracked as issue #73 for a Phase 8 follow-up (the roadmap's 8.2 baseline must resolve it);
-nothing is gated on wall time.
+JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). Nothing is gated
+on wall time; issue #73 (now: the unexplained delta between the two measurement
+windows — most likely host state, not a pin effect, with the pin×host and first-use
+questions open) is the only follow-up, and the roadmap's 8.2 baseline must measure
+in a quiet host state and use the alternating methodology before attributing a VLM
+prefill figure to the runtime.
 
 **`VisionLanguageMemoryTest`'s `FIXED_MARGIN`.** The 16 KiB margin is unchanged; the
 retained-minus-logical overhead it was sized from measured 0 B on 0.32.4 — `VLM retention:

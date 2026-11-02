@@ -43,6 +43,8 @@ The decision record §6 decides where the code lives:
   are the first two users of the model-independent scheduler and sampler interfaces. Splitting
   them into their own module later is a mechanical move, reconsidered when an external consumer
   needs diffusion without the model families, or a third family arrives (decision record §6).
+  *Reopened 2026-11-02:* the 9.8 decision record (`req/plans/phase9-8-decision.md` §6) moves
+  this code to a new `jmlx-diffusion` module at 9.8's start.
 - **UI front ends:** external consumers. JMLX has no JavaFX or Groovy dependency for this.
 
 Do not couple the generic diffusion API to a particular Qwen checkpoint or to a UI.

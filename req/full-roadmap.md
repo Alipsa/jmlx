@@ -34,7 +34,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | --- | --- | --- | --- | --- |
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
-| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.5) |
+| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.6 planning; 7.5 delivered) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
@@ -253,7 +253,7 @@ code.
 
 Milestones, in order:
 
-| Milestone | Scope | Status (2026-10-31) |
+| Milestone | Scope | Status |
 | --- | --- | --- |
 | 7.0 Qwen3 text decoders | `qwen3` mapping, per-head QK normalization, affine-quantized loading, Qwen3 chat template; Tier-B Qwen3-0.6B, manual Qwen3-8B 4-bit run | delivered |
 | 7.1 Core inference modules | containers, dropout (eval), activations, convolution and transpose convolution, pooling, padding, upsampling, normalization variants, positional encodings, evaluation losses | implemented; acceptance pending (oracle drift, cross-host CPU fixtures) |
@@ -262,8 +262,8 @@ Milestones, in order:
 | 7.3b Qwen3-VL | dynamic-resolution preprocessing, multi-axis RoPE, vision tower, DeepStack | delivered; macOS 26 hosted Tier-B pending |
 | 7.3c LLaVA-style connector | `microsoft/Phi-3.5-vision-instruct` (MIT), selected 2026-10-27 | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | a reviewed decision record, not code | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`), reviewed via its PR: go — audio scheduled as Phase 11 milestone 11.5, diffusion as Phase 9 milestone 9.6 |
-| 7.5 MLX upgrade | paired pin upgrade to the newest release (see § Release and MLX upgrade plan) | not started |
-| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | not started |
+| 7.5 MLX upgrade | paired pin upgrade to the newest release (see § Release and MLX upgrade plan) | delivered 2026-11-01 (PR #71, follow-up #72); timing investigation recorded in merged PR #76 on 2026-11-02, with measurement limits owned by Phase 8.2 |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | planning 2026-11-02: detailed plan in `req/plans/phase7-6-plan.md` proposed for review; implementation not started |
 
 7.4 decides only. A "go" for audio or diffusion schedules its implementation into a later phase
 by a dated roadmap amendment; it does not extend Phase 7.

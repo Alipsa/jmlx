@@ -268,27 +268,33 @@ its max logit error shrank from `1.02996826171875e-4` to `8.0108642578125e-5`.
 **Wall times (not gated).** The 0.32.4 Tier-B generation wall times sit above the 0.31.2
 recordings — Qwen3-VL 247 → 855 ms (batched run), 953 and 584 ms (isolated re-runs);
 Phi-3.5-Vision 5423 → 31,673 ms (batched), 20,427 and 15,338 ms (isolated re-runs); loads
-843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255 ms. A pin-isolated control run settled
-the attribution: the pre-Phase-7.5 tree (`46cb325`, without the `dims==2` work, a no-op for
-these decoders) with the 0.31.2 pin staged, re-run on the same macOS 27.2 host against the
-same checkpoints — Qwen3-VL 243 ms (recorded 247 ms; native peak and logit error identical
-to the recorded run) and Phi-3.5-Vision 2,121 ms (recorded 5,423 ms; native peak and logit
-error identical) — while the new pin stays 2.4–3.9× (Qwen3-VL) and 7.2–14.9×
-(Phi-3.5-Vision) above it. The gap is attributable to the 0.32.4 runtime, not the macOS
-27.2 update. Small-model decode is unaffected: the controlled same-host decode benchmark
-(plan §7) — `:jmlx-examples:benchmarkDecode` on the 259 MB llama checkpoint
-(`model.safetensors` SHA-256
-`5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c`), prompt `1,7,42,3,19,5`,
-32 tokens, 7 samples, 2 warm-ups, FULL policy, new-pin commit `dcd6960` against the old-pin
-tree `46cb325`; the three JSON reports, which record commit, git status and pins, are
-committed under `req/benchmarks/` — shows the new pin at 385.1 tok/s median sustained
-throughput (median one-step decode 2.32 ms, max 2.51 ms over the 7 samples) against 62.1
-and 284.2 tok/s for two old-pin runs (median one-step decode 10.9 and 3.16 ms; min/max
-2.70/19.25 and 2.49/30.57 ms). This shows no evidence of a 0.32.4 regression on
-small-model decode; the old-pin runs are too noisy (62.1 vs 284.2 tok/s) to bound one,
-and the benchmark does not exercise the VLM prefill/vision path where the Tier-B gap
-appears. The large-workload gap's cause remains open for a Phase 8 follow-up; nothing is
-gated on wall time.
+843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255 ms. Three pin-isolated control runs
+attribute the gap to the 0.32.4 runtime: the pre-Phase-7.5 tree (`46cb325`, without the
+`dims==2` work, a no-op for these decoders) with the 0.31.2 pin staged, re-run three times
+per model on the same macOS 27.2 host against the same checkpoints — Qwen3-VL 243/248/253 ms
+(recorded 247 ms) and Phi-3.5-Vision 2,121/2,165/2,161 ms (recorded 5,423 ms) — while the
+new pin stays 2.3–3.9× (Qwen3-VL) and 7.1–14.9× (Phi-3.5-Vision) above every control, the
+old-pin spread (~2–4%) being far smaller than the pin gap. Every control's native peak and
+logit error is identical to its recorded run; the `46cb325` test predates the `runtime_pin`
+report field (added by PR #71) and only echoes the manifest's `recorded_pin`, so the
+running pin of these XMLs is proven by the worktree's staged `native-pin.properties`
+(0.31.2 / `fba4470`) and the identical peaks and errors. Small-model decode shows no
+evidence of a regression: the controlled same-host decode benchmark (plan §7) —
+`:jmlx-examples:benchmarkDecode` on the 259 MB llama checkpoint (`model.safetensors`
+SHA-256 `5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c`), prompt
+`1,7,42,3,19,5`, 32 tokens, 7 samples, 2 warm-ups, FULL policy, new-pin commit `dcd6960`
+against the old-pin tree `46cb325`; the three JSON reports, which record commit, git
+status and pins, are committed under `req/benchmarks/` — shows the new pin at 385.1 tok/s
+median sustained throughput (median one-step decode 2.32 ms, max 2.51 ms over the 7
+samples) against 62.1 and 284.2 tok/s for two old-pin runs (median one-step decode 10.9
+and 3.16 ms; min/max 2.70/19.25 and 2.49/30.57 ms); the old-pin runs are too noisy (62.1
+vs 284.2 tok/s) to bound a regression, and the benchmark does not exercise the VLM
+prefill/vision path where the Tier-B gap appears. The six control-run XMLs are committed
+alongside the JSONs; the committed evidence files are as produced except the XML
+`hostname` attribute (recorded as `M5-Max` rather than the local machine name) and the
+old-pin JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). The gap is
+tracked as issue #73 for a Phase 8 follow-up (the roadmap's 8.2 baseline must resolve it);
+nothing is gated on wall time.
 
 **`VisionLanguageMemoryTest`'s `FIXED_MARGIN`.** The 16 KiB margin is unchanged; the
 retained-minus-logical overhead it was sized from measured 0 B on 0.32.4 — `VLM retention:

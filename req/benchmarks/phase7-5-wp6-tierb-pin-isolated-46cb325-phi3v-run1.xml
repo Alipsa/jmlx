@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="se.alipsa.jmlx.models.TierBPhi3VTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-02T12:23:53.388Z" hostname="Permac.local" time="9.206">
+<testsuite name="se.alipsa.jmlx.models.TierBPhi3VTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-02T12:23:53.388Z" hostname="M5-Max" time="9.206">
   <properties/>
   <testcase name="multiImagePromptCachedLogitsAndStableGreedyIds()" classname="se.alipsa.jmlx.models.TierBPhi3VTest" time="9.201"/>
   <system-out><![CDATA[Tier B phi3v load_wall_ms=775

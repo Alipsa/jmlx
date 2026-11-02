@@ -314,7 +314,11 @@ published before `jmlx-models` itself.
    the reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
    including the native call count and FFM cost per decode step. This is a measurement only;
    optimization is Phase 9.1, so the first native release states decode speed honestly before any
-   optimization.
+   optimization. It must also resolve the Phase 7.5 open item, issue #73 (VLM generation
+   wall-time regression on the 0.32.4 pin, measured 2.3–3.9× on Qwen3-VL 2B and 7.1–14.9× on
+   Phi-3.5-Vision 4B against three 0.31.2 pin-isolated controls): the baseline includes the same
+   VLM prefill/decode workloads against the 0.31.2 pin, and the 8.4 release notes state the
+   outcome.
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
    the quarkus-langchain4j path). Callers may run on virtual threads: the

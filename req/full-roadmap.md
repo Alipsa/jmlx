@@ -997,8 +997,9 @@ Every release follows the existing manual procedure:
 - the next `-SNAPSHOT` bump only once Central resolves.
 
 Every release also updates the compatibility matrix and the benchmark report, states its native
-pins, and ships release notes recording the commit SHA the release was cut from (main only
-changes through PRs, so the version-change commit is on main and locatable with `git log -S`).
+pins, and ships release notes recording the commit SHA (and branch) the release was cut from —
+normal releases from `main`, urgent patches from their pushed patch branch. The recorded SHA is
+the record; it is not recoverable from `main` after the fact for patch branches.
 
 ### Versioning and compatibility policy
 

@@ -22,9 +22,20 @@ import Foundation
 //      BURN_DRAIN_BEFORE_SLEEP (default 1; 0 for historical behavior),
 //      BURN_SECONDS (optional; run for this many seconds and exit).
 
-let onMs = ProcessInfo.processInfo.environment["BURN_ON_MS"].flatMap { Int($0) } ?? 100
-let offMs = ProcessInfo.processInfo.environment["BURN_OFF_MS"].flatMap { Int($0) } ?? 25
-let maxSeconds = ProcessInfo.processInfo.environment["BURN_SECONDS"].flatMap { Double($0) }
+// Defaults apply only to absent settings. A typo in a requested time limit
+// must never turn a bounded run into an endless one.
+func readSetting<T>(_ name: String, parse: (String) -> T?) -> T? {
+    guard let raw = ProcessInfo.processInfo.environment[name] else { return nil }
+    guard let value = parse(raw) else {
+        FileHandle.standardError.write("invalid numeric value for \(name)\n".data(using: .utf8)!)
+        exit(1)
+    }
+    return value
+}
+
+let onMs = readSetting("BURN_ON_MS", parse: { Int($0) }) ?? 100
+let offMs = readSetting("BURN_OFF_MS", parse: { Int($0) }) ?? 25
+let maxSeconds = readSetting("BURN_SECONDS", parse: { Double($0) })
 let drainSetting = ProcessInfo.processInfo.environment["BURN_DRAIN_BEFORE_SLEEP"] ?? "1"
 guard drainSetting == "0" || drainSetting == "1" else {
     FileHandle.standardError.write("BURN_DRAIN_BEFORE_SLEEP must be 0 or 1\n".data(using: .utf8)!)

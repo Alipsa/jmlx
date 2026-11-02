@@ -4,7 +4,7 @@ Host: M5 Max, macOS 27.2 (26B123), AC power. Local time = UTC+1.
 Session: 2026-11-02 16:07-16:19 UTC (17:07-17:19 local).
 This file and the companion phase7-5-wp6-issue73-metal-cache-forensics.txt
 are the raw records behind the host-state and forensics figures in the
-"Issue #73 resolution" paragraph of req/phase6-inference-report.md.
+"Issue #73 investigation record" paragraph of req/phase6-inference-report.md.
 Machine identifiers (host name, user, per-user cache path) are scrubbed.
 
 --- machine (recorded 17:25 UTC) ---
@@ -61,7 +61,8 @@ $ pmset -g therm
 
 (The clean-phase runs of 16:07-16:08 UTC have no per-run lines: the recording
 script had a quoting bug until before the loaded phase; the session-start line
-bounds them. Label mapping to the committed XMLs: loaded-qwen3vl-old1/new2/old2
+is context only and cannot establish their state. Label mapping to the committed
+XMLs: loaded-qwen3vl-old1/new2/old2
 and loaded-phi3v-new1/old1/new2/old2 are the phase7-5-wp6-tierb-degraded-loaded-*
 runs in timestamp order; loaded-calib is phase7-5-wp6-tierb-degraded-loaded-
 new-65e5306-qwen3vl-1.xml.)

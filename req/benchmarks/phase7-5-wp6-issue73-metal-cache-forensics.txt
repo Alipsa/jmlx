@@ -49,10 +49,11 @@ windows):
   been written inside it without showing it, and four of the seventeen
   pre-A/B files were last modified after the window (functions.data,
   libraries.data, functions.list, libraries.list). Access times were not
-  recorded. Of the four, the two .list index files were created at
-  17:15:39/43 local — after the window — so only the two pipeline-data
-  files (born Oct 2, before the update) keep an in-window write open;
-  nothing in the record decides it either way.
+  recorded. The two .list index files' birth times of 17:15:39/43 local
+  record their last recreation: cache writes recreate those files, so
+  these birth times cannot exclude earlier writes at the same paths.
+  All four files can conceal an in-window write; nothing in the record
+  decides it either way.
 - Only post-update first-use artifact: the <fe-hash-2> monolithic_metal.pcm
   + modules.idx pair (17,991,272 + 147,968 B, ~18 MB), birth 09:48:40 local
   (08:48:40 UTC), mtime 09:48:41 — created 2 h 05 m before the bad window,

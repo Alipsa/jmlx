@@ -26,6 +26,11 @@ Environment variables:
 | `BURN_DRAIN_BEFORE_SLEEP` | `1` | accepts only `0` or `1`; `0` preserves the issue #73 loop |
 | `BURN_SECONDS` | (unset) | optional; exit after this many seconds |
 
+Defaults apply only when a variable is unset. Malformed numeric settings
+(including empty strings) print an error and exit with status 1. `BURN_ON_MS`
+must be a positive integer, `BURN_OFF_MS` a nonnegative integer, and
+`BURN_SECONDS` a finite positive number.
+
 The default allows only one command buffer in flight and waits for it before
 submitting another. This limits drain overshoot to one dispatch rather than
 a backlog of 63 buffers. It waits for all submitted work before starting the

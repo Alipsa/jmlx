@@ -283,7 +283,7 @@ Phi-3.5-Vision 2,175/2,118 ms new vs. 2,324/2,145 old, i.e. ratios of 0.94–1.0
 with logit errors and native peaks at their normal values in all eight runs. The
 most likely cause is host state during the 10:53–11:29 UTC window (unmeasured — no
 thermal, load, memory or process records exist for it; the Φ3V new-pin runs' gradual
-recovery across it, 31,673 → 20,427 → 15,338, is consistent with that), not the pin;
+recovery across it, 31,673 → 20,427 → 15,338, is consistent with that), not the pin.
 The same-day follow-up below found similar pin behavior under one induced GPU
 compute load and measured a cold-cache Qwen3-VL test on the new pin. Neither
 experiment rules out a pin×host interaction under the unrecorded original
@@ -324,12 +324,12 @@ and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
 in `req/` documents. The committed evidence files are as produced except the XML `hostname`
 attribute (recorded as `M5-Max` rather than the local machine name) and the old-pin
 JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). Nothing is gated
-on wall time. Issue #73 is resolved by the record below; the roadmap's 8.2 baseline
+on wall time. Issue #73's investigation is recorded below; the roadmap's 8.2 baseline
 must still measure in a quiet host state, record the host state with the numbers,
 and use the alternating methodology before attributing a VLM prefill figure to the
 runtime.
 
-**Issue #73 resolution (2026-11-02, 16:07–16:19 UTC, same M5 Max host).** A Swift/Metal
+**Issue #73 investigation record (2026-11-02, 16:07–16:19 UTC, same M5 Max host).** A Swift/Metal
 compute kernel — now committed under `tools/gpu-burn/` for the Phase 8.2 methodology —
 sustained GPU load while both pins alternated on both models, with pre-run load,
 thermal-warning counts, free memory and omlx-server CPU observations for each loaded and
@@ -369,8 +369,9 @@ and APFS birth times: `req/benchmarks/phase7-5-wp6-issue73-metal-cache-forensics
 file in the JDK-keyed Metal pipeline cache (`net.java.openjdk.java/com.apple.metal{,fe}`
 in the per-user cache path) was last modified inside the 10:53–11:29 UTC window — mtime
 alone cannot exclude a write to a file also written later (four of the seventeen pre-A/B
-files were last modified after the window; only the two Oct 2-era pipeline-data files keep
-an in-window write open, and access times were not recorded) — and the only post-update
+files were last modified after the window; all four can conceal an in-window write.
+The two .list files' birth times record their last recreation, not the first write
+at those paths, and access times were not recorded) — and the only post-update
 first-use artifact, an ~18 MB `metalfe` PCM in a fresh FE-hash directory, was created
 (birth 08:48:40 UTC) two hours before the window by some JDK-based process; the specific
 writer is not recoverable from the records, and it was not the resident omlx-server, which

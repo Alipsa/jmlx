@@ -72,7 +72,9 @@ hashes, the HD geometry and the reference's own top-two gaps, alongside the Java
 margins, gate the exact greedy IDs and the end-to-end `generate`'s exact decoded output
 (`expected_text`). Measured local evidence (allocator peak 31.1 GB, sampled footprint peak
 51.4 GB, load ~1133 ms, generation ~5423 ms, 8.3 GB artifact disk) sizes the suite's bounds;
-macOS 26 acceptance is still pending.
+the ~5423 ms generation wall is a dated macOS 27.0.1 point, not a baseline (the same 0.31.2
+pin measured 2,121–2,324 ms on macOS 27.2 — see `req/phase6-tier-b-artifacts.md`); macOS 26
+acceptance is still pending.
 
 ```sh
 ./gradlew downloadTierBArtifact \

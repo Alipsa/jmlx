@@ -21,9 +21,10 @@ public final class SinusoidalPositionalEncoding extends UnaryLayer {
   }
 
   /**
-   * Dims below four or odd dims are rejected: the pinned MLX 0.32.4 requires the embedding
-   * dimension to be positive and even, and dims below four divide by the undefined {@code half - 1}
-   * frequency denominator.
+   * Odd or non-positive dims are rejected: the pinned MLX 0.32.4 requires the embedding dimension
+   * to be positive and even. For {@code dims == 2} (one frequency pair) the {@code half - 1}
+   * frequency denominator is zero, and 0.32.4 defines the single frequency to be the maximum
+   * frequency, the {@code i == 0} limit of the general {@code 1 - i / (half - 1)} schedule.
    */
   public SinusoidalPositionalEncoding(
       MLXScope scope,
@@ -34,9 +35,9 @@ public final class SinusoidalPositionalEncoding extends UnaryLayer {
       boolean cosFirst,
       boolean fullTurns) {
     super(scope);
-    if (dims < 4 || dims % 2 != 0 || !(minFrequency > 0) || !(maxFrequency > 0)) {
+    if (dims <= 0 || dims % 2 != 0 || !(minFrequency > 0) || !(maxFrequency > 0)) {
       throw new IllegalArgumentException(
-          "SinusoidalPositionalEncoding: even dims >= 4 and positive frequencies required");
+          "SinusoidalPositionalEncoding: even positive dims and positive frequencies required");
     }
     this.dims = dims;
     this.minFrequency = minFrequency;
@@ -51,7 +52,7 @@ public final class SinusoidalPositionalEncoding extends UnaryLayer {
     int half = dims / 2;
     float[] frequencies = new float[half];
     for (int i = 0; i < half; i++) {
-      double fraction = 1 - (double) i / (half - 1);
+      double fraction = half == 1 ? 1.0 : 1 - (double) i / (half - 1);
       frequencies[i] =
           (float)
               (Math.exp(

@@ -155,11 +155,16 @@ All preserve the public API; all but the last preserve the pre-upgrade observabl
 6. **`SinusoidalPositionalEncoding`** rejects odd dims at construction. 0.32.4's
    `nn.SinusoidalPositionalEncoding` requires the dims to be "positive and even"; 0.31.2 — and
    jmlx until this change — returned `dims - 1` features for odd dims. The constructor guard gains
-   `dims % 2 != 0` (the message is now `SinusoidalPositionalEncoding: even dims >= 4 and positive
-   frequencies required`), and `Phase71ContractsTest` asserts the odd-dims rejection next to the
-   existing dims-2 one. jmlx still rejects `dims == 2` on purpose (0.32.4 special-cases it; the
-   pre-upgrade reference returned NaNs and the Phase 7.1 probe rejected it deliberately), so the
-   remaining divergence from 0.32.4 is jmlx being stricter, never looser.
+   `dims % 2 != 0`, and `Phase71ContractsTest` asserts the odd-dims rejection next to the existing
+   dims-2 one. jmlx kept the pre-upgrade `dims == 2` rejection at merge time (0.31.2 returned NaNs
+   there and the Phase 7.1 probe rejected them deliberately). The post-merge follow-up (2026-11-02)
+   relaxed that to 0.32.4's special case, where the one frequency pair's single frequency is the
+   maximum frequency (the `i == 0` limit of the `1 - i / (half - 1)` schedule): the guard now
+   rejects only odd or non-positive dims (message
+   `SinusoidalPositionalEncoding: even positive dims and positive frequencies required`), the
+   dims-2 `assertThrows` became a value assertion (position 1 with the default max frequency 1 has
+   angle exactly 1.0 rad), and the oracle gained case `sinusoidal-60` (dims 2, min 0.01 / max 2)
+   pinning the frequency choice — jmlx's validation is now exactly 0.32.4's.
 
 ### Oracle fixture input changes
 
@@ -167,6 +172,8 @@ Two `phase7-1-core.input.json` cases needed input-level edits:
 
 - **`sinusoidal-60`** (dims 5) removed: 0.32.4 rejects odd-dimension
   `SinusoidalPositionalEncoding` inputs; jmlx's constructor now matches (hand-written change 6).
+  Post-merge, the number was re-used for a dims-2 case pinning 0.32.4's single-frequency special
+  case (the follow-up recorded in change 6).
 - **`repeat_axis-105`** shape moves `[0]` → `[0,3]`: 0.32.4 keeps the untouched axis's extent in
   the repeat result (no Java change).
 

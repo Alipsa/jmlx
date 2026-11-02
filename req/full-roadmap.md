@@ -655,11 +655,15 @@ substituted silently for another.
    FLUX.2 Klein are the third and fourth image families, the trigger 9.7's record §6 set for
    reopening its "`jmlx-models`, no new published module" decision. 9.6's and 9.7's diffusion
    code moves into the new module before any 9.8 code lands. Nothing is published before Phase
-   9's release, so the move breaks no published coordinate. `jmlx-diffusion` depends on
-   `jmlx-models` through `implementation` (no `jmlx-models` type is on its public API), and the
-   conditioning encoders and their now-public seams stay in `jmlx-models`. WP0 adds a check task
-   asserting `jmlx-models`' runtime classpath contains no `:jmlx-diffusion`, so the one-way
-   dependency cannot silently invert.
+   9's release, so the move breaks no published coordinate. `jmlx-diffusion` declares
+   `api project(':jmlx-core')` — its public scheduler/sampler/VAE contracts take and return
+   `MLXArray` and IMG-007 puts `MLXScope` ownership on the API — and
+   `implementation project(':jmlx-models')`, the conditioning encoders being consumed
+   internally with no `jmlx-models` type on the surface (cancellation included:
+   `jmlx-diffusion` defines its own token rather than promote `jmlx-models` to `api`). The
+   conditioning encoders and their now-public seams stay in `jmlx-models`. WP0 adds a check
+   task asserting `jmlx-models`' runtime classpath contains no `:jmlx-diffusion`, so the
+   one-way dependency cannot silently invert.
 3. **Reference toolchain: 9.7's `tools/image-gen-reference/`, extended.** Its pinned
    `diffusers==0.42.1` contains both pipelines. The reference is CPU float32, per component,
    teacher-forced. MFLUX runs on MLX, so it is a debugging cross-check, never a reference.

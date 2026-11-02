@@ -318,7 +318,7 @@ output. The conditioning seams stay in `jmlx-models` and become public API there
 | Component | Module |
 | --- | --- |
 | MLX arrays and native operations | `jmlx-core` / `jmlx-ffi` |
-| Conditioning encoders — CLIP (9.6), Qwen3-VL (7.3b/WP5 tower), Qwen3 — and their now-public seams | `jmlx-models` |
+| Conditioning encoders — CLIP (9.6), Qwen3-VL (`Qwen3VlModel`, 7.3b; text-only load per 9.7), Qwen3 — and their now-public seams | `jmlx-models` |
 | Generic diffusion schedulers and samplers | `jmlx-diffusion` |
 | Denoiser models: SD 1.5's UNet, Qwen-Image's, and the Z-Image and FLUX.2 DiTs | `jmlx-diffusion` |
 | VAE implementations: SD 1.5's, Qwen-Image's, Z-Image's and FLUX.2's | `jmlx-diffusion` |
@@ -326,10 +326,22 @@ output. The conditioning seams stay in `jmlx-models` and become public API there
 | Public image-generation API | `jmlx-diffusion` |
 | LoRA application for diffusion models | `jmlx-diffusion` |
 
-**Dependency direction.** `jmlx-diffusion` depends on `jmlx-models` with `implementation`,
-not `api`: the pipelines consume the conditioning encoders internally, and no `jmlx-models`
-type is part of `jmlx-diffusion`'s public API, so `implementation` keeps `jmlx-models` (and,
-through it, core, tokenizer and vision) off diffusion consumers' compile classpaths.
+**Dependency direction.** `jmlx-diffusion` declares `api project(':jmlx-core')` and
+`implementation project(':jmlx-models')`.
+
+- **`jmlx-core` is `api`**: the public scheduler, sampler and VAE contracts that
+  `jmlx-diffusion` owns take and return tensors (`MLXArray`), and IMG-007's staging policy
+  puts `AutoCloseable`/`MLXScope` ownership on the public API, so `jmlx-core` types are on
+  the surface and must be visible to consumers.
+- **`jmlx-models` is `implementation`**: the pipelines consume the conditioning encoders
+  internally, and no `jmlx-models` type is part of `jmlx-diffusion`'s public API. The one
+  candidate, cancellation, is settled below.
+- **Cancellation is its own type.** DIFF-008/IMG-010 need a cancellation token and the
+  existing one is `se.alipsa.jmlx.models.CancellationToken`; `jmlx-diffusion` defines its own
+  rather than promote `jmlx-models` to `api` for a value type, and a job bridges the two
+  internally. (The 9.6/9.7 contracts this infers from are not written yet; if they land with
+  a genuine `jmlx-models` type on the surface, the milestone plan amends this paragraph.)
+
 **`jmlx-models` must never depend on `jmlx-diffusion` — not at compile time, not at runtime.**
 Gradle already fails a compile-time project cycle; WP0 adds the missing runtime guard, a check
 task asserting that `jmlx-models`' runtime classpath contains no `:jmlx-diffusion`, so the

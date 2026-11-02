@@ -277,8 +277,12 @@ new pin stays 2.3–3.9× (Qwen3-VL) and 7.1–14.9× (Phi-3.5-Vision) above eve
 old-pin spread (~2–4%) being far smaller than the pin gap. Every control's native peak and
 logit error is identical to its recorded run; the `46cb325` test predates the `runtime_pin`
 report field (added by PR #71) and only echoes the manifest's `recorded_pin`, so the
-running pin of these XMLs is proven by the worktree's staged `native-pin.properties`
-(0.31.2 / `fba4470`) and the identical peaks and errors. Small-model decode shows no
+running pin of these XMLs rests on the (since removed) worktree's staged
+`native-pin.properties` (0.31.2 / `fba4470`) and is corroborated by the peaks and errors
+being byte-identical to the 0.31.2 recordings. The two pins were measured in separate
+time windows, and the new-pin runs vary 33–63% from their per-model minimum, so a
+back-to-back alternating session (new, old, new, old) is part of issue #73's first step
+to rule out a host-state confounder. Small-model decode shows no
 evidence of a regression: the controlled same-host decode benchmark (plan §7) —
 `:jmlx-examples:benchmarkDecode` on the 259 MB llama checkpoint (`model.safetensors`
 SHA-256 `5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c`), prompt
@@ -289,10 +293,17 @@ median sustained throughput (median one-step decode 2.32 ms, max 2.51 ms over th
 samples) against 62.1 and 284.2 tok/s for two old-pin runs (median one-step decode 10.9
 and 3.16 ms; min/max 2.70/19.25 and 2.49/30.57 ms); the old-pin runs are too noisy (62.1
 vs 284.2 tok/s) to bound a regression, and the benchmark does not exercise the VLM
-prefill/vision path where the Tier-B gap appears. The six control-run XMLs are committed
-alongside the JSONs; the committed evidence files are as produced except the XML
-`hostname` attribute (recorded as `M5-Max` rather than the local machine name) and the
-old-pin JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). The gap is
+prefill/vision path where the Tier-B gap appears. All twelve Tier-B run XMLs are committed
+alongside the JSONs — the six old-pin controls and, per model, the batched re-measurement
+run and the two isolated re-runs of the new pin — so both sides of the gap are backed by
+raw records.
+The new-pin XMLs' commit provenance is in their file names: the isolated runs'
+timestamps fall between the `dcd6960` and `596c2b2` commits (the same session's
+benchmark JSON records `dcd6960` with an empty git status), while the batched runs
+predate `dcd6960` and ran on `2e553c4`, which differs from it only in `req/`
+documents. The committed evidence files are as produced except the XML `hostname`
+attribute (recorded as `M5-Max` rather than the local machine name) and the old-pin
+JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). The gap is
 tracked as issue #73 for a Phase 8 follow-up (the roadmap's 8.2 baseline must resolve it);
 nothing is gated on wall time.
 

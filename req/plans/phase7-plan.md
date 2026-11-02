@@ -278,10 +278,11 @@ reconciled with the MLX affine support recorded below the matrix, which landed i
 Implementation evidence (2026-10-05) is in `phase7-1-probe-findings.md`. Pinned limitations:
 constant/edge padding only; native 3-D grouped convolution unsupported; grouped transpose2d with
 non-unit stride explicitly rejected for a CPU/GPU correctness defect; sinusoidal dims<4 rejected
-instead of returning NaNs (the dims == 2 half lifted post-7.5, see migration note change 6). KL
-takes log-probability targets, and empty max-pool outputs preserve the native reduction error.
-Acceptance remains pending legacy Phase 6 byte-exact oracle drift and
-cross-host CPU fixture verification; implementation is not marked milestone-complete.
+instead of returning NaNs (the dims == 2 case lifted post-7.5; see change 6 in the Phase 7.5 pin
+upgrade section of `req/phase6-inference-report.md`). KL takes log-probability targets, and empty
+max-pool outputs preserve the native reduction error. Acceptance remains pending legacy Phase 6
+byte-exact oracle drift and cross-host CPU fixture verification; implementation is not marked
+milestone-complete.
 
 Focused Phase 10 slices land here under the permission step 0 adds, each recorded in the inventory.
 

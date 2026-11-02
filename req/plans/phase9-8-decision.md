@@ -340,11 +340,13 @@ output. The conditioning seams stay in `jmlx-models` and become public API there
   existing one is `se.alipsa.jmlx.models.CancellationToken`; `jmlx-diffusion` defines its own
   rather than promote `jmlx-models` to `api` for one interface, and a job bridges the two
   internally.
-- **`jmlx-vision` follows the image result.** If 9.7's or 9.8's image result reuses
-  `jmlx-vision`'s `RgbImage`, `jmlx-vision` is `api` too (`implementation` on `jmlx-models`
-  would not put it on consumers' compile classpath); if the result carries its own pixel
-  type, `jmlx-vision` stays `implementation`. WP0 decides this with the first image-result
-  code.
+- **`jmlx-vision` follows the image result.** 9.7's public API with PNG output is delivered by
+  9.7 WP7 and gated by 9.7's exit gate, so the image-result code already exists before 9.8:
+  if its result type reuses `jmlx-vision`'s `RgbImage`, `jmlx-vision` is `api` (`implementation`
+  on `jmlx-models` would not put it on consumers' compile classpath); if the result carries
+  its own pixel type, no `jmlx-vision` declaration is needed at all — it is still reached
+  transitively through `jmlx-models`. WP0 records which of the two applies when moving 9.7's
+  image-result code, and the WP0 row in §9 lists it.
 - (The 9.6/9.7 contracts these bullets infer from are not written yet; if they land with a
   genuine `jmlx-models`, `jmlx-vision` or `jmlx-tokenizer` type on the surface, the
   milestone plan amends this paragraph.)
@@ -458,7 +460,7 @@ amended; nothing else in this record depends on the module boundary.
 
 | WP | Content |
 | --- | --- |
-| WP0 | Pin both artifacts; re-record the license acceptance; create `jmlx-diffusion` (release script, release order, smoke stub, the runtime-classpath direction check of §6) and move 9.6's and 9.7's diffusion code; download Qwen3-4B (revision `1cfa9a7`, at least shard 3) and compare the two encoders' per-tensor digests; select the two LoRA adapters; fix the golden step and row sets; re-record the host's memory |
+| WP0 | Pin both artifacts; re-record the license acceptance; create `jmlx-diffusion` (release script, release order, smoke stub, the runtime-classpath direction check of §6) and move 9.6's and 9.7's diffusion code, recording the `jmlx-vision` scope (§6: `api` if 9.7's image result reuses `RgbImage`, otherwise no declaration); download Qwen3-4B (revision `1cfa9a7`, at least shard 3) and compare the two encoders' per-tensor digests; select the two LoRA adapters; fix the golden step and row sets; re-record the host's memory |
 | WP1 | Reference scripts and probes: hidden-state indexing, FLUX.2 padding rows, both `enable_thinking` renderings against `HfTokenizer`, both sigma schedules, both guidance formulas, both RoPE layouts. The FLUX.2 padding-row probe is an explicit, independently reviewed checkpoint that must pass before WP4 starts: because FLUX.2 conditions on the padded positions' hidden-state values themselves (not just a mask), a wrong answer here would contaminate every later FLUX.2 numerical comparison |
 | WP2 | The public conditioning seam on the Qwen3 decoder: truncated encoder-only load, layer capture, right padding with the padding mask. The truncated loads are validated per §1: the 27-layer FLUX.2 load reproduces a full forward's `hidden_states[9/18/27]` (all 512 rows), the 35-layer Z-Image load reproduces `hidden_states[-2]` (real-token rows) |
 | WP3 | Scheduler extensions: static shift, empirical `mu`, per-model guidance |

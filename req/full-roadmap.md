@@ -661,8 +661,10 @@ substituted silently for another.
    `implementation project(':jmlx-models')`, the conditioning encoders being consumed
    internally with no `jmlx-models` type on the surface (cancellation included:
    `jmlx-diffusion` defines its own token rather than promote `jmlx-models` to `api`), and
-   `jmlx-vision` following the image result (`api` if it reuses `RgbImage`, `implementation`
-   otherwise). The conditioning encoders and their now-public seams stay in `jmlx-models`.
+   `jmlx-vision` following the image result (`api` if it reuses `RgbImage` — 9.7's
+   image-result code already exists by 9.8, so WP0 records which applies while moving it —
+   otherwise no `jmlx-vision` declaration at all, it being reached through `jmlx-models`). The
+   conditioning encoders and their now-public seams stay in `jmlx-models`.
    WP0 adds a check task asserting `jmlx-models`' runtime classpath contains no
    `:jmlx-diffusion`, so the one-way dependency cannot silently invert.
 3. **Reference toolchain: 9.7's `tools/image-gen-reference/`, extended.** Its pinned

@@ -209,7 +209,59 @@ Two `phase7-1-core.input.json` cases needed input-level edits:
 
 The allocator-tier size sweep is **byte-identical** between pins (exact ≤ 16 KiB, rounding up to
 the next 16 KiB tier above, exact cleanup), so no memory-suite or memory-bound adjustment was
-needed (WP6 closed with no commit).
+needed (WP6 closed with no commit). The WP6 re-measurement of every measured bound, recorded next
+to the old value, is the subsection below.
+
+### Re-measured bounds (WP6 gate)
+
+Every measured bound was re-measured on the new pins on 2026-11-02, on the Apple M5 Max host
+(macOS 27.2 — the 0.31.2 recordings are dated to macOS 27.0.1, the host having updated in
+between), on the final tree under `mlx-metal` 0.32.4 / mlx-c `a26f2d5`: each Tier-B suite in its
+own fresh `:jmlx-models:tierBTest` JVM, the six precision/memory suites in one fresh
+`:jmlx-models:test` JVM. No bound was adjusted; the strict `full-float32` bounds were not
+touched. The VLM manifests' `local_evidence`/`recorded_pin` blocks remain the dated 0.31.2
+recordings — no manifest was re-measured, so the WP6 manifest re-measure rule does not trigger —
+and this subsection is the new-pin record.
+
+**Default-mode (TF32) maxima.** Every maximum is bit-identical to its 0.31.2 recording in
+`req/phase6-golden-precision.md`; each named bound held.
+
+| Suite | Named bound | 0.31.2 (macOS 27.0.1) | 0.32.4 (macOS 27.2) |
+| --- | --- | ---: | ---: |
+| `Qwen3VlDefaultPrecisionTest` | `0.0025` | `0.0019590855` | `0.0019590855` |
+| `Qwen3VlCacheEquivalenceTest` (TF32) | `0.003` | `0.0021870732` | `0.0021870732` |
+| `SmolVlmDefaultPrecisionTest` | `0.002` | `9.0524554e-4` | `9.0524554e-4` |
+| `Phi3VDefaultPrecisionTest` | `0.0012` | `9.266138e-4` | `9.266138e-4` |
+| `EncoderDefaultPrecisionTest` — BERT | `0.03` (shared) | `1.4835596084594727e-4` | `1.4835596084594727e-4` |
+| `EncoderDefaultPrecisionTest` — T5 ReLU | | `0.006804823875427246` | `0.006804823875427246` |
+| `EncoderDefaultPrecisionTest` — T5 gated | | `0.020420074462890625` | `0.020420074462890625` |
+
+**Tier-B native-memory gates.** All three suites pass in full (numerical comparison, margin
+eligibility, exact greedy IDs and decoded output); every bound held.
+
+| Suite | Measured | 0.31.2 (macOS 27.0.1) | 0.32.4 (macOS 27.2) | Bound |
+| --- | --- | ---: | ---: | --- |
+| `TierBQwen3VlTest` (Qwen3-VL 2B) | native allocator peak | 9,828,890,788 B | 9,828,892,732 B | peak + 500 MiB |
+| | sampled process footprint | 11,979,116,480 B | 11,962,879,864 B | 12,500,000,000 B |
+| | max logit error | `1.0228157043457031e-4` | `1.0228157043457031e-4` | ε 2e-4, margin 1e-4 |
+| `TierBVisionLanguageTest` (SmolVLM 256M) | native allocator peak | 5,737,416,464 B | 5,737,416,464 B | peak + 500 MiB |
+| | sampled process footprint | 7,129,368,904 B | 7,197,411,704 B | 8 GiB |
+| | max logit error | `5.2928924560546875e-5` | `5.2928924560546875e-5` | ε 1e-4, margin 1e-4 |
+| `TierBPhi3VTest` (Phi-3.5-Vision 4B) | native allocator peak | 31,100,376,165 B | 30,202,745,961 B | peak + 500 MiB |
+| | sampled process footprint | 51,421,089,584 B | 50,465,672,648 B | 52,000,000,000 B |
+| | max logit error | `1.02996826171875e-4` | `8.0108642578125e-5` | ε 2e-4, margin 1e-4 |
+
+The tightest bound — Phi-3.5-Vision's footprint, ~552 MiB above the 0.31.2 measurement — gained
+margin: 52,000,000,000 − 50,465,672,648 = 1,534,327,352 B (~1.43 GiB) above the new peak, and
+its max logit error shrank from `1.02996826171875e-4` to `8.0108642578125e-5`. Wall times are
+wall-clock, not gated: Qwen3-VL load 843 → 1326 ms, generation 247 → 855 ms; Phi-3.5-Vision
+load 1133 → 1311 ms, generation 5423 → 31,673 ms (that run followed the other two suites
+back-to-back on the freshly updated host).
+
+**`VisionLanguageMemoryTest`'s `FIXED_MARGIN`.** The 16 KiB margin is unchanged; the warm
+overhead it was sized from measured 0 B on 0.32.4 (`VLM requests: baseline=907136,
+peak=2973652, late_growth=0`) against at most 11,264 B on the 0.31.2 recordings, and the exact
+KV-accounting equalities (512 B per position, visual release, prefill retention) pass unchanged.
 
 ### Verification
 

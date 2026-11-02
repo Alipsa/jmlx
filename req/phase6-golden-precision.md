@@ -246,4 +246,7 @@ default-mode-versus-strict split this document describes is unchanged: every str
 no bound was loosened or re-derived for the upgrade, and the regenerated oracle/Tier-A
 fixtures are byte-identical in value to the 0.31.2 recordings (the migration record in
 `req/phase6-inference-report.md` lists the evidence). The measurement sections above remain
-dated to the runtime each names.
+dated to the runtime each names. The named default-mode bounds were re-measured on the new pins
+for the WP6 gate: every maximum is bit-identical to its 0.31.2 recording, each recorded next to
+the old value in the migration note's re-measured-bounds subsection in
+`req/phase6-inference-report.md`.

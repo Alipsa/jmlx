@@ -1,0 +1,90 @@
+phase7-5-wp6 issue #73 — JDK Metal pipeline cache forensics
+
+Recorded 2026-11-02 17:25 UTC (local = UTC+1) on the M5 Max / macOS 27.2
+host; birth times and the omlx-server identity re-verified 18:10 UTC.
+Cache: <per-user cache path>/net.java.openjdk.java/com.apple.metal{,fe}/ —
+the JDK-keyed Metal pipeline cache; only JDK-based processes write here
+(the resident omlx-server is a Python process, not a JVM — companion
+host-state log). The *bak-1793636336 side-caches (moved aside 16:18:57 UTC
+for the cold A/B, left in place) are included so the pre-A/B state is
+preserved. Paths abbreviated: the per-user cache prefix and the two
+frontend-hash directory names are replaced by placeholders.
+
+$ find <cache> -type f   (birth local | mtime local | bytes | path)
+
+Oct  2 22:26:28|Nov  1 20:41:20|0|com.apple.metalfe.bak-1793636336/modules.timestamp
+Nov  1 20:41:21|Nov  1 20:41:21|147968|com.apple.metalfe.bak-1793636336/<fe-hash-1>/modules.idx
+Nov  1 20:41:20|Nov  1 20:41:21|17991272|com.apple.metalfe.bak-1793636336/<fe-hash-1>/monolithic_metal.pcm
+Oct  2 22:26:36|Nov  1 21:28:24|327680|com.apple.metal.bak-1793636336/16777235_355/functions2.data
+Nov  1 21:28:24|Nov  1 21:28:24|380|com.apple.metal.bak-1793636336/32024/libraries2.list
+Oct  2 22:26:36|Nov  1 21:28:24|81920|com.apple.metal.bak-1793636336/32024/libraries2.data
+Nov  1 21:28:24|Nov  1 21:28:24|9788|com.apple.metal.bak-1793636336/16777235_355/functions2.list
+Oct  2 22:26:28|Nov  1 21:32:54|2588672|com.apple.metal.bak-1793636336/32024/libraries1.data
+Nov  1 23:14:16|Nov  1 23:14:16|6428|com.apple.metal.bak-1793636336/32024/libraries1.list
+Oct  2 22:26:26|Nov  1 23:14:25|4046848|com.apple.metal.bak-1793636336/16777235_355/functions1.data
+Nov  1 23:14:16|Nov  1 23:14:25|71724|com.apple.metal.bak-1793636336/16777235_355/functions1.list
+Nov  2 09:48:41|Nov  2 09:48:41|147968|com.apple.metalfe.bak-1793636336/<fe-hash-2>/modules.idx
+Nov  2 09:48:40|Nov  2 09:48:41|17991272|com.apple.metalfe.bak-1793636336/<fe-hash-2>/monolithic_metal.pcm
+Oct  2 22:26:23|Nov  2 14:10:45|2916352|com.apple.metal.bak-1793636336/16777235_355/functions.data
+Oct  2 22:26:23|Nov  2 14:10:46|1851392|com.apple.metal.bak-1793636336/32024/libraries.data
+Nov  2 17:15:39|Nov  2 17:15:39|52572|com.apple.metal.bak-1793636336/16777235_355/functions.list
+Nov  2 17:15:43|Nov  2 17:15:43|5588|com.apple.metal.bak-1793636336/32024/libraries.list
+Nov  2 17:19:00|Nov  2 17:19:00|0|com.apple.metalfe/modules.timestamp
+Nov  2 17:19:00|Nov  2 17:19:00|147968|com.apple.metalfe/<fe-hash-2>/modules.idx
+Nov  2 17:19:00|Nov  2 17:19:00|17991272|com.apple.metalfe/<fe-hash-2>/monolithic_metal.pcm
+Nov  2 17:18:59|Nov  2 17:19:05|294912|com.apple.metal/16777235_355/functions.data
+Nov  2 17:19:05|Nov  2 17:19:05|436|com.apple.metal/32024/libraries.list
+Nov  2 17:19:05|Nov  2 17:19:05|6988|com.apple.metal/16777235_355/functions.list
+Nov  2 17:19:00|Nov  2 17:19:05|81920|com.apple.metal/32024/libraries.data
+
+(birth = APFS creation time, stat -f '%SB'; mtimes unchanged since the
+17:19:05 local session write, so the inventory is stable)
+
+Derived facts (window file counts via find -newermt on the local-time
+windows):
+
+- 10:53-11:29 UTC bad window (local 11:53-12:29): no file in the cache was
+  last modified inside the window. Limit of the evidence: mtime records
+  only the last write — a file also written after the window could have
+  been written inside it without showing it, and four of the seventeen
+  pre-A/B files were last modified after the window (functions.data,
+  libraries.data, functions.list, libraries.list). Access times were not
+  recorded. The two .list index files' birth times of 17:15:39/43 local
+  are after the window. The birth-time pattern indicates that cache writes
+  recreate those files; recreation was not directly observed. These birth
+  times therefore cannot exclude earlier writes at the same paths.
+  All four files can conceal an in-window write; nothing in the record
+  decides it either way.
+- Only post-update first-use artifact: the <fe-hash-2> monolithic_metal.pcm
+  + modules.idx pair (17,991,272 + 147,968 B, ~18 MB), birth 09:48:40 local
+  (08:48:40 UTC), mtime 09:48:41 — created 2 h 05 m before the bad window,
+  not appended to it later. Its pre-update counterpart is <fe-hash-1>
+  (Nov 1 20:41 local); the different frontend-hash directories are
+  consistent with the 27.2 update changing the frontend. The cache is
+  JDK-keyed, so the writer was a JDK-based process. The specific writer is
+  not recoverable from the records (no timestamped process list was kept),
+  and it was not the long-lived resident omlx-server (started 08:43:59
+  local, 46 s after the 08:43:13 boot): that is a Python process, not a
+  JVM (companion host-state log).
+- 13:10-13:11 UTC 0.31.2 controls: the two pipeline-data files —
+  functions.data 2,916,352 B, mtime 14:10:45 local; libraries.data
+  1,851,392 B, mtime 14:10:46 local; 4,767,744 B (~4.8 MB) total; both
+  born Oct 2, so rewritten, not created — were rewritten during the 0.31.2
+  Qwen3-VL control phase7-5-wp6-tierb-pin-isolated-46cb325-qwen3vl-run2.xml,
+  which ran 13:10:43.187-13:10:46.9 UTC and completed at baseline (248 ms
+  generate, 839 ms load vs. 817 ms load in the 12:22:50 UTC control). The
+  Phi-3.5-Vision controls (13:11:00/13:11:10 UTC, 2,165/2,161 ms) started
+  after the writes.
+- Session activity: 17:15:39/43 local (index lists created during the last
+  loaded run, 16:15:35-16:16:12 UTC) and 17:19:00/05 local
+  (re-materialization by the cold/warm A/B runs after the 16:18:57 UTC
+  side-move of both cache dirs).
+- All remaining files are dated Nov 1, no later than 23:14 local, i.e.
+  before the estimated update time (Nov 2 00:09:06 local).
+
+Timeline (UTC): 27.2 update ≈ Nov 1 23:09 (estimate) | boot 07:43:13 |
+omlx-server 07:43:59 | first-use PCM created 08:48:40 | bad window
+10:53-11:29 (no last modification in window) | 0.31.2 controls 12:22-12:24
+and 13:10-13:11 (4.8 MB rewritten at 13:10:45/46 by the Qwen3-VL control,
+which ran at baseline) | 14:10-14:12 alternating session | degraded session
+16:07-16:19 | cold A/B 16:18:57/16:19:02.

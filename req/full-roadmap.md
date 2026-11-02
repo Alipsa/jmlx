@@ -314,12 +314,20 @@ published before `jmlx-models` itself.
    the reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
    including the native call count and FFM cost per decode step. This is a measurement only;
    optimization is Phase 9.1, so the first native release states decode speed honestly before any
-   optimization. It must also close out the Phase 7.5 open item, issue #73 (the
-   re-measurement's VLM wall-time delta, initially attributed to the 0.32.4 pin, was
-   retracted by a back-to-back alternating session — no measurable pin effect in a clean
-   host state; the remaining question is whether 0.32.4 degrades disproportionately under
-   a degraded host state): the baseline measures in a quiet host state, records the host
-   state with the numbers, and re-runs any surprising VLM prefill figure as a back-to-back
+   optimization. The Phase 7.5 open item, issue #73 (the re-measurement's VLM wall-time
+   delta, initially attributed to the 0.32.4 pin), is resolved: a back-to-back
+   alternating session showed no measurable pin effect in a clean host state, a
+   deliberately degraded-state alternating session showed similar slowdown on both
+   pins under the tested sustained compute load (new/old within ±7 %). This
+   does not exclude a pin×host interaction under the unrecorded original state;
+   host-state attribution remains an inference. The new-pin Qwen3-VL cold-cache
+   test timed generation after prefill/decode comparisons had warmed the model,
+   so it cannot bound first-inference cost or rule out a per-pin first-use effect.
+   Issue #73 closes as an investigation record with these limits. 8.2 owns the
+   follow-up methodology: measure actual first inference and warmed generation
+   separately on both pins and workloads, with per-run host observations. The
+   baseline measures in a quiet host state, records the host state with the
+   numbers, and re-runs any surprising VLM prefill figure as a back-to-back
    alternating session before attributing it to the runtime.
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users

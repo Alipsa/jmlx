@@ -283,12 +283,13 @@ Phi-3.5-Vision 2,175/2,118 ms new vs. 2,324/2,145 old, i.e. ratios of 0.94–1.0
 with logit errors and native peaks at their normal values in all eight runs. The
 most likely cause is host state during the 10:53–11:29 UTC window (unmeasured — no
 thermal, load, memory or process records exist for it; the Φ3V new-pin runs' gradual
-recovery across it, 31,673 → 20,427 → 15,338, is consistent with that), not the pin;
-whether 0.32.4 nonetheless degrades disproportionately under a degraded host state —
-the only prediction a pin×host interaction would make — and whether a per-pin
-first-use warm-up cost after the macOS 27.2 update instead explains the window,
-remain open as issue #73, whose first step is an intentionally degraded-state
-alternating session.
+recovery across it, 31,673 → 20,427 → 15,338, is consistent with that), not the pin.
+The same-day follow-up below found similar pin behavior under one induced GPU
+compute load and measured a cold-cache Qwen3-VL test on the new pin. Neither
+experiment rules out a pin×host interaction under the unrecorded original
+conditions or a per-pin first-use effect across both models. Host-state
+attribution remains an inference; issue #73 closes as an investigation record,
+with these limits carried into Phase 8.2.
 Every control's native peak and logit error is identical to its recorded run; the
 `46cb325` test predates the `runtime_pin` report field (added by PR #71) and only
 echoes the manifest's `recorded_pin`, so the running pin of these XMLs rests on the
@@ -309,10 +310,12 @@ prefill/vision path. Both decode benchmarks ran inside the 10:53–11:29 UTC win
 (new pin 11:24, old pin 11:26 / 11:29 UTC, by the local output-file mtimes — the
 JSONs carry no timestamps): the old pin stalled there too, on this light workload,
 while the new-pin small decode ran clean — see issue #73 for what this implies for
-the host-state and first-use explanations. All twenty Tier-B run XMLs are committed
-alongside the JSONs —
-the six old-pin controls, the six new-pin re-measurement runs and the eight
-alternating-session runs — so every figure above is backed by a raw record.
+the host-state and first-use explanations. All thirty-four Tier-B run XMLs and
+the two issue-#73 log files (host state, Metal-cache forensics) are committed
+alongside the JSONs — the six old-pin controls, the six new-pin re-measurement
+runs, the eight alternating-session runs, the twelve degraded-session runs
+(four clean, eight under the GPU burner) and the two cold-cache A/B runs — so
+every figure above is backed by a raw record.
 The new-pin XMLs' file names state a commit provenance that is consistent with the
 timestamps: the isolated runs (11:17–11:29 UTC) fall between the `dcd6960` (11:07 UTC)
 and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
@@ -321,11 +324,99 @@ and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
 in `req/` documents. The committed evidence files are as produced except the XML `hostname`
 attribute (recorded as `M5-Max` rather than the local machine name) and the old-pin
 JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). Nothing is gated
-on wall time; issue #73 (now: the unexplained delta between the two measurement
-windows — most likely host state, not a pin effect, with the pin×host and first-use
-questions open) is the only follow-up, and the roadmap's 8.2 baseline must measure
-in a quiet host state and use the alternating methodology before attributing a VLM
-prefill figure to the runtime.
+on wall time. Issue #73's investigation is recorded below; the roadmap's 8.2 baseline
+must still measure in a quiet host state, record the host state with the numbers,
+and use the alternating methodology before attributing a VLM prefill figure to the
+runtime.
+
+**Issue #73 investigation record (2026-11-02, 16:07–16:19 UTC, same M5 Max host).** A Swift/Metal
+compute kernel — now committed under `tools/gpu-burn/` for the Phase 8.2 methodology —
+sustained GPU load while both pins alternated on both models, with pre-run load,
+thermal-warning counts, free memory and omlx-server CPU observations for each loaded and
+cold/warm-cache run, plus a session process snapshot. The four clean runs lack individual
+observations because the recorder initially had a quoting bug; the 16:07 session-start
+snapshot is context only, not evidence of each clean run's state. These records were
+absent from the original window (the scrubbed per-run record, the machine/process context
+and the burner continuity note are committed as
+`req/benchmarks/phase7-5-wp6-issue73-host-state.txt`).
+
+The recorded burner allowed up to
+63 command buffers to remain queued during each 25 ms CPU sleep, so it did not establish a
+GPU idle interval or an 80 % duty cycle. It is treated as sustained compute contention;
+hardware utilization was not measured. The current tool drains before sleeping by default;
+`BURN_DRAIN_BEFORE_SLEEP=0` reproduces the recorded behavior. Under that recorded load
+both pins degrade similarly — Qwen3-VL 243/245 ms clean → 2,145/2,057 ms new vs.
+2,064/2,011 ms old (8.2–8.8×, new/old 1.00–1.07); Phi-3.5-Vision 3,538/3,658 ms clean →
+13,526/13,587 ms new vs. 14,555/14,273 ms old (3.8–4.0×, new/old 0.93–0.95) — the observed
+new/old ratios were within ±7 % under this compute load. These few runs do not exclude a
+pin×host interaction under a different contention mix, including the unrecorded original
+conditions. The burner was one process with unchanged settings from the 16:09:19 UTC
+calibration run through the last loaded run (ended ~16:16:12 UTC, the session-end
+recording line), so the calibration run is part of the same loaded regime. The available
+thermal samples show no recorded thermal or performance warning; these are pre-run
+samples, not continuous monitoring. The process snapshot shows resident omlx-server and
+Chrome GPU processes, but cannot establish their activity throughout this session or the
+original window. The per-run counting method and the committed recording script are
+documented in the host-state record and `tools/gpu-burn/hostrec.sh`. Even without the
+burner the clean phase's heavy Phi-3.5-Vision workload ran 1.5–1.7× its 14:10 baseline on
+both pins (3,538/3,658 ms vs. 2,118–2,324 ms, new/old ratio 0.97) while the light Qwen3-VL
+workload sat at baseline. This is consistent with ambient host effects on the heavier
+workload; the missing per-clean-run host samples prevent a direct attribution. All
+fourteen runs' logit errors and native peaks are at their normal values.
+
+The first-use investigation has two limited observations. First, forensics (raw record with file mtimes
+and APFS birth times: `req/benchmarks/phase7-5-wp6-issue73-metal-cache-forensics.txt`): no
+file in the JDK-keyed Metal pipeline cache (`net.java.openjdk.java/com.apple.metal{,fe}`
+in the per-user cache path) was last modified inside the 10:53–11:29 UTC window — mtime
+alone cannot exclude a write to a file also written later (four of the seventeen pre-A/B
+files were last modified after the window; all four can conceal an in-window write.
+The birth-time pattern indicates that cache writes recreate the two .list files;
+recreation was not directly observed, and the birth times cannot exclude earlier
+writes at those paths. Access times were not recorded) — and the only post-update
+first-use artifact, an ~18 MB `metalfe` PCM in a fresh FE-hash directory, was created
+(birth 08:48:40 UTC) two hours before the window by some JDK-based process; the specific
+writer is not recoverable from the records, and it was not the resident omlx-server, which
+is a Python process, not a JVM. The 0.31.2 Qwen3-VL control at 13:10:43 UTC — which
+rewrote 4.8 MB of the two existing pipeline-data files (mtime 13:10:45/46 UTC) during the
+run — completed at baseline (248 ms generate, 839 ms load vs. 817 ms load for the 12:23
+control). Second, a new-pin Qwen3-VL cold/warm-cache comparison measures this test's
+behavior after moving aside the JDK's two Metal caches (system-level shader caches were
+not inspected). Total test time was 5.081 s cold against 3.802 s warm; load_wall_ms was
+959 vs. 873 and generate_wall_ms was 299 vs. 245. The remaining ≈1.1 s difference is
+outside those two timers; its attribution to pipeline compilation was not measured
+directly. `TierBQwen3VlTest` runs full image prefill and cached decode comparisons before
+timing `generate`, so 54 ms is a difference between already-warmed generation calls, not a
+bound on first-inference cost. Prior execution may warm the same decoder paths, but does
+not prove every pipeline used by timed generation was compiled. No cold-cache old-pin or
+Phi-3.5-Vision comparison was recorded. These results and cache timestamps cannot rule out
+a per-pin first-use explanation for the original window. Phase 8.2 must time actual first
+inference separately from warmed generation on both pins and workloads before drawing that
+conclusion.
+
+Question 1 — what degraded the host in the original window — is not
+recoverable retroactively (nothing was recorded). The leading candidate is GPU contention
+from the live host's own activity (the resident omlx-server serving, started at the 07:43
+UTC reboot): the burner shows similar large slowdowns on both pins under its compute load
+and reaches the window's severity on the lighter workload. This supports host contention
+as a plausible explanation, not a demonstrated attribution; the burner's per-model pattern
+is inverted relative to the window (Qwen3-VL 8.2–8.8× vs. Phi-3.5-Vision 3.8–4.0×; the
+window showed 2.3–3.9× vs. 7.1–14.9×), a constant compute stream against an unknown real
+contention mix, so it does not identify omlx-server specifically as the cause.
+
+The allocator-peak note is recharacterized: on 0.31.2 the native peak is byte-identical per
+model across every run; on 0.32.4 the Qwen3-VL peak takes three values ~2 KB apart
+(9,828,890,684 / 9,828,892,732 / 9,828,892,836 B) and the Phi-3.5-Vision peak moves ±2 KB,
+the new-pin values differing from run to run without tracking cache state or load (in this
+session the clean and burner-loaded Qwen3-VL runs all landed on 9,828,890,684 while the
+A/B's "warm" re-run landed on 9,828,892,732) — cause unknown, a ~0.00003 %
+planning/allocator marker, not a performance concern. The macOS 27.2 update itself is
+estimated from `/System/Volumes/Data`'s mtime at ≈ 2026-11-01 23:09 UTC (the sealed System
+volume's mtimes are build times and unusable). The fourteen runs are committed under
+`req/benchmarks/` (hostname scrubbed) as
+`phase7-5-wp6-tierb-degraded-clean-{new-65e5306,old-46cb325}-{qwen3vl,phi3v}.xml` (four),
+`phase7-5-wp6-tierb-degraded-loaded-{new-65e5306,old-46cb325}-{qwen3vl,phi3v}-{1,2}.xml`
+(eight; the loaded Qwen3-VL new-pin run 1 is the burner calibration) and
+`phase7-5-wp6-tierb-coldcache-new-65e5306-qwen3vl-{cold,warm}.xml` (two).
 
 **`VisionLanguageMemoryTest`'s `FIXED_MARGIN`.** The 16 KiB margin is unchanged; the
 retained-minus-logical overhead it was sized from measured 0 B on 0.32.4 — `VLM retention:

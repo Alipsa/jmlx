@@ -17,7 +17,7 @@ import se.alipsa.jmlx.ffi.EnabledIfNativeAvailable;
 import se.alipsa.jmlx.memory.MLXScope;
 import tools.jackson.databind.JsonNode;
 
-/** Differential evidence against CPU/full-float32 MLX 0.31.2. */
+/** Differential evidence against CPU/full-float32 MLX 0.32.4. */
 @EnabledIfNativeAvailable
 @Tag("full-float32")
 class Phase71OracleTest {

@@ -190,7 +190,7 @@ for every new op.
 | 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output | delivered; macOS 26 hosted Tier-B pending |
 | 7.3c LLaVA-style (Phi-3.5-Vision) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | Phi-3.5-Vision Tier-A logits and Tier-B image+text output | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`); reviewed via its PR: go — audio → Phase 11 milestone 11.5, diffusion → Phase 9 milestone 9.6 |
-| 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | not started |
+| 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | delivered 2026-11-01 (PR #71; dims == 2 follow-up PR #72); open: VLM generation wall-time regression on 0.32.4 (issue #73 — see the migration note in `req/phase6-inference-report.md`; Phase 8.2/8.4 must deal with it) |
 | 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | not started |
 
 Step 0 merged first. 7.0 and 7.1 then proceeded in parallel, and 7.3a started once 7.1's conv,
@@ -278,9 +278,11 @@ reconciled with the MLX affine support recorded below the matrix, which landed i
 Implementation evidence (2026-10-05) is in `phase7-1-probe-findings.md`. Pinned limitations:
 constant/edge padding only; native 3-D grouped convolution unsupported; grouped transpose2d with
 non-unit stride explicitly rejected for a CPU/GPU correctness defect; sinusoidal dims<4 rejected
-instead of returning NaNs. KL takes log-probability targets, and empty max-pool outputs preserve
-the native reduction error. Acceptance remains pending legacy Phase 6 byte-exact oracle drift and
-cross-host CPU fixture verification; implementation is not marked milestone-complete.
+instead of returning NaNs (the dims == 2 case lifted post-7.5; see change 6 in the Phase 7.5 pin
+upgrade section of `req/phase6-inference-report.md`). KL takes log-probability targets, and empty
+max-pool outputs preserve the native reduction error. Acceptance remains pending legacy Phase 6
+byte-exact oracle drift and cross-host CPU fixture verification; implementation is not marked
+milestone-complete.
 
 Focused Phase 10 slices land here under the permission step 0 adds, each recorded in the inventory.
 

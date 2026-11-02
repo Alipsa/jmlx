@@ -155,11 +155,16 @@ All preserve the public API; all but the last preserve the pre-upgrade observabl
 6. **`SinusoidalPositionalEncoding`** rejects odd dims at construction. 0.32.4's
    `nn.SinusoidalPositionalEncoding` requires the dims to be "positive and even"; 0.31.2 — and
    jmlx until this change — returned `dims - 1` features for odd dims. The constructor guard gains
-   `dims % 2 != 0` (the message is now `SinusoidalPositionalEncoding: even dims >= 4 and positive
-   frequencies required`), and `Phase71ContractsTest` asserts the odd-dims rejection next to the
-   existing dims-2 one. jmlx still rejects `dims == 2` on purpose (0.32.4 special-cases it; the
-   pre-upgrade reference returned NaNs and the Phase 7.1 probe rejected it deliberately), so the
-   remaining divergence from 0.32.4 is jmlx being stricter, never looser.
+   `dims % 2 != 0`, and `Phase71ContractsTest` asserts the odd-dims rejection next to the existing
+   dims-2 one. jmlx kept the pre-upgrade `dims == 2` rejection at merge time (0.31.2 returned NaNs
+   there and the Phase 7.1 probe rejected them deliberately). The post-merge follow-up (2026-11-02)
+   relaxed that to 0.32.4's special case, where the one frequency pair's single frequency is the
+   maximum frequency (the `i == 0` limit of the `1 - i / (half - 1)` schedule): the guard now
+   rejects only odd or non-positive dims (message
+   `SinusoidalPositionalEncoding: even positive dims and positive frequencies required`), the
+   dims-2 `assertThrows` became a value assertion (position 1 with the default max frequency 1 has
+   angle exactly 1.0 rad), and the oracle gained case `sinusoidal-60` (dims 2, min 0.01 / max 2)
+   pinning the frequency choice — jmlx's dims validation is now exactly 0.32.4's.
 
 ### Oracle fixture input changes
 
@@ -167,6 +172,8 @@ Two `phase7-1-core.input.json` cases needed input-level edits:
 
 - **`sinusoidal-60`** (dims 5) removed: 0.32.4 rejects odd-dimension
   `SinusoidalPositionalEncoding` inputs; jmlx's constructor now matches (hand-written change 6).
+  Post-merge, the number was re-used for a dims-2 case pinning 0.32.4's single-frequency special
+  case (the follow-up recorded in change 6).
 - **`repeat_axis-105`** shape moves `[0]` → `[0,3]`: 0.32.4 keeps the untouched axis's extent in
   the repeat result (no Java change).
 
@@ -202,7 +209,110 @@ Two `phase7-1-core.input.json` cases needed input-level edits:
 
 The allocator-tier size sweep is **byte-identical** between pins (exact ≤ 16 KiB, rounding up to
 the next 16 KiB tier above, exact cleanup), so no memory-suite or memory-bound adjustment was
-needed (WP6 closed with no commit).
+needed (WP6 closed with no commit). The WP6 re-measurement of every measured bound, recorded next
+to the old value, is the subsection below.
+
+### Re-measured bounds (WP6 gate)
+
+Every bound WP6 lists was re-measured on the new pins on 2026-11-02, on the Apple M5 Max host
+(macOS 27.2 — the 0.31.2 recordings are dated to macOS 27.0.1, the host having updated in
+between), on the final tree under `mlx-metal` 0.32.4 / mlx-c `a26f2d5`: each Tier-B suite in its
+own fresh `:jmlx-models:tierBTest` JVM, and the precision/memory suites (all in
+`se.alipsa.jmlx.models`) — `Qwen3VlDefaultPrecisionTest`, `Phi3VDefaultPrecisionTest`,
+`SmolVlmDefaultPrecisionTest`, `Qwen3VlCacheEquivalenceTest`, `EncoderDefaultPrecisionTest`
+and `VisionLanguageMemoryTest` — selected by their `--tests` filters, in one fresh
+`:jmlx-models:test` JVM. No bound was adjusted;
+the strict `full-float32` bounds were not touched. The VLM manifests'
+`local_evidence`/`recorded_pin` blocks remain the dated 0.31.2 recordings — no manifest
+was re-measured, so the WP6 manifest re-measure rule does not trigger — and this
+subsection is the new-pin record.
+
+**Default-mode (TF32) maxima.** Every maximum is bit-identical to its 0.31.2 recording in
+`req/phase6-golden-precision.md`; each named bound held.
+
+| Suite | Named bound | 0.31.2 (macOS 27.0.1) | 0.32.4 (macOS 27.2) |
+| --- | --- | ---: | ---: |
+| `Qwen3VlDefaultPrecisionTest` | `0.0025` | `0.0019590855` | `0.0019590855` |
+| `Qwen3VlCacheEquivalenceTest` (TF32) | `0.003` | `0.0021870732` | `0.0021870732` |
+| `SmolVlmDefaultPrecisionTest` | `0.002` | `9.0524554e-4` | `9.0524554e-4` |
+| `Phi3VDefaultPrecisionTest` | `0.0012` | `9.266138e-4` | `9.266138e-4` |
+| `EncoderDefaultPrecisionTest` — BERT | `0.03` (shared) | `1.4835596084594727e-4` | `1.4835596084594727e-4` |
+| `EncoderDefaultPrecisionTest` — T5 ReLU | | `0.006804823875427246` | `0.006804823875427246` |
+| `EncoderDefaultPrecisionTest` — T5 gated | | `0.020420074462890625` | `0.020420074462890625` |
+
+The controlled-measurement default-mode decoder-family maxima in
+`req/phase6-golden-precision.md` (which sized `BatchStepEquivalenceTest`'s default-mode `2e-3`)
+are not re-recorded here: those suites print pass/fail only — their maxima came from a temporary
+diagnostic removed after measurement — so for them this re-measurement is pass/fail, green in both
+precision modes on the new pins (see Verification), not a re-recorded maximum.
+
+**Tier-B native-memory gates.** All three suites pass in full (numerical comparison, margin
+eligibility, exact greedy IDs and decoded output); every bound held.
+
+| Suite | Measured | 0.31.2 (macOS 27.0.1) | 0.32.4 (macOS 27.2) | Bound |
+| --- | --- | ---: | ---: | --- |
+| `TierBQwen3VlTest` (Qwen3-VL 2B) | native allocator peak | 9,828,890,788 B | 9,828,892,732 B | peak + 500 MiB |
+| | sampled process footprint | 11,979,116,480 B | 11,962,879,864 B | 12,500,000,000 B |
+| | max logit error | `1.0228157043457031e-4` | `1.0228157043457031e-4` | ε 2e-4, margin 1e-4 |
+| `TierBVisionLanguageTest` (SmolVLM 256M) | native allocator peak | 5,737,416,464 B | 5,737,416,464 B | peak + 500 MiB |
+| | sampled process footprint | 7,129,368,904 B | 7,197,411,704 B | 8 GiB |
+| | max logit error | `5.2928924560546875e-5` | `5.2928924560546875e-5` | ε 1e-4, margin 1e-4 |
+| `TierBPhi3VTest` (Phi-3.5-Vision 4B) | native allocator peak | 31,100,376,165 B | 30,202,745,961 B | peak + 500 MiB |
+| | sampled process footprint | 51,421,089,584 B | 50,465,672,648 B | 52,000,000,000 B |
+| | max logit error | `1.02996826171875e-4` | `8.0108642578125e-5` | ε 2e-4, margin 1e-4 |
+
+The tightest bound — Phi-3.5-Vision's footprint, ~552 MiB above the 0.31.2 measurement — gained
+margin: 52,000,000,000 − 50,465,672,648 = 1,534,327,352 B (~1.43 GiB) above the new peak, and
+its max logit error shrank from `1.02996826171875e-4` to `8.0108642578125e-5`.
+
+**Wall times (not gated).** The 0.32.4 Tier-B generation wall times sit above the 0.31.2
+recordings — Qwen3-VL 247 → 855 ms (batched run), 953 and 584 ms (isolated re-runs);
+Phi-3.5-Vision 5423 → 31,673 ms (batched), 20,427 and 15,338 ms (isolated re-runs); loads
+843 → 1326/1311/1111 ms and 1133 → 1311/1370/1255 ms. Three pin-isolated control runs
+attribute the gap to the 0.32.4 runtime: the pre-Phase-7.5 tree (`46cb325`, without the
+`dims==2` work, a no-op for these decoders) with the 0.31.2 pin staged, re-run three times
+per model on the same macOS 27.2 host against the same checkpoints — Qwen3-VL 243/248/253 ms
+(recorded 247 ms) and Phi-3.5-Vision 2,121/2,165/2,161 ms (recorded 5,423 ms) — while the
+new pin stays 2.3–3.9× (Qwen3-VL) and 7.1–14.9× (Phi-3.5-Vision) above every control, the
+old-pin spread (~2–4%) being far smaller than the pin gap. Every control's native peak and
+logit error is identical to its recorded run; the `46cb325` test predates the `runtime_pin`
+report field (added by PR #71) and only echoes the manifest's `recorded_pin`, so the
+running pin of these XMLs rests on the (since removed) worktree's staged
+`native-pin.properties` (0.31.2 / `fba4470`) and is corroborated by the peaks and errors
+being byte-identical to the 0.31.2 recordings. The two pins were measured in separate
+time windows, and the new-pin runs vary 33–63% from their per-model minimum, so a
+back-to-back alternating session (new, old, new, old) is part of issue #73's first step
+to rule out a host-state confounder. Small-model decode shows no
+evidence of a regression: the controlled same-host decode benchmark (plan §7) —
+`:jmlx-examples:benchmarkDecode` on the 259 MB llama checkpoint (`model.safetensors`
+SHA-256 `5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c`), prompt
+`1,7,42,3,19,5`, 32 tokens, 7 samples, 2 warm-ups, FULL policy, new-pin commit `dcd6960`
+against the old-pin tree `46cb325`; the three JSON reports, which record commit, git
+status and pins, are committed under `req/benchmarks/` — shows the new pin at 385.1 tok/s
+median sustained throughput (median one-step decode 2.32 ms, max 2.51 ms over the 7
+samples) against 62.1 and 284.2 tok/s for two old-pin runs (median one-step decode 10.9
+and 3.16 ms; min/max 2.70/19.25 and 2.49/30.57 ms); the old-pin runs are too noisy (62.1
+vs 284.2 tok/s) to bound a regression, and the benchmark does not exercise the VLM
+prefill/vision path where the Tier-B gap appears. All twelve Tier-B run XMLs are committed
+alongside the JSONs — the six old-pin controls and, per model, the batched re-measurement
+run and the two isolated re-runs of the new pin — so both sides of the gap are backed by
+raw records.
+The new-pin XMLs' file names state a commit provenance that is consistent with the
+timestamps: the isolated runs (11:17–11:29 UTC) fall between the `dcd6960` (11:07 UTC)
+and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
+`dcd6960` with an empty git status at its own run time, while the batched runs
+(10:53–10:54 UTC) predate `dcd6960` and ran on `2e553c4`, which differs from it only
+in `req/` documents. The committed evidence files are as produced except the XML `hostname`
+attribute (recorded as `M5-Max` rather than the local machine name) and the old-pin
+JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). The gap is
+tracked as issue #73 for a Phase 8 follow-up (the roadmap's 8.2 baseline must resolve it);
+nothing is gated on wall time.
+
+**`VisionLanguageMemoryTest`'s `FIXED_MARGIN`.** The 16 KiB margin is unchanged; the
+retained-minus-logical overhead it was sized from measured 0 B on 0.32.4 — `VLM retention:
+KV_bytes_per_position=512, features_bytes=5120, visual_release=709210, prefill_retained=23552,
+early=24064, mid=47104, late=56320`, exactly 512 B × positions (46/47/92/110) at every endpoint —
+against at most 11,264 B on the 0.31.2 recordings.
 
 ### Verification
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="se.alipsa.jmlx.models.TierBQwen3VlTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-02T12:22:50.457Z" hostname="M5-Max" time="3.724">
+  <properties/>
+  <testcase name="multiImagePromptCachedLogitsAndStableGreedyIds()" classname="se.alipsa.jmlx.models.TierBQwen3VlTest" time="3.719"/>
+  <system-out><![CDATA[Tier B qwen3-vl load_wall_ms=817
+Tier B qwen3-vl case=1 expanded_length=152 generate_wall_ms=243
+Tier B task=qwen3-vl-generation, max_abs_error=1.0228157043457031E-4, allowed_epsilon=2.0E-4, margin=1.0E-4, jvm_rss_kib=1776032, native_peak_bytes=9828890788, numerical comparison=passed; margin eligibility=passed, reference_status=eligible after measured real-checkpoint error; local macOS 27 run passed; macOS 26 CI pending, device=gpu, host=27.2/aarch64, recorded_pin=mlxMetalVersion=0.31.2
+mlxcCommit=fba4470b89073180056c9ea46c443051375f7399
+Tier B sampled_peak_phys_footprint_bytes=11968433992
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -3946,6 +3946,25 @@
       }
     },
     {
+      "name": "sinusoidal-60",
+      "op": "sinusoidal",
+      "x": {
+        "shape": [
+          3
+        ],
+        "values": [
+          0,
+          1,
+          5
+        ]
+      },
+      "options": {
+        "dims": 2,
+        "min_freq": 0.01,
+        "max_freq": 2
+      }
+    },
+    {
       "name": "sinusoidal-61",
       "op": "sinusoidal",
       "x": {

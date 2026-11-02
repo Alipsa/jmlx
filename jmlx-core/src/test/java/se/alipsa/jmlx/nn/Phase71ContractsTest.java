@@ -182,7 +182,6 @@ class Phase71ContractsTest {
           assertThrows(
               IllegalArgumentException.class, () -> new MaxPool1d(s, 4, 1, 0).forward(tiny));
       assertTrue(error.getMessage().contains("window 4"));
-      assertThrows(IllegalArgumentException.class, () -> new SinusoidalPositionalEncoding(s, 2));
       assertThrows(IllegalArgumentException.class, () -> new SinusoidalPositionalEncoding(s, 5));
       BatchNorm bn = new BatchNorm(s, 3, 1e-5f, false, null, null, null, null);
       assertThrows(
@@ -412,6 +411,13 @@ class Phase71ContractsTest {
           new float[] {0, 0, (float) Math.sqrt(0.5), (float) Math.sqrt(0.5)},
           new SinusoidalPositionalEncoding(scope, 4).forward(zero).toFloatArray(),
           1e-6f);
+      MLXArray one = MLX.ones(scope, new int[] {1}, DType.FLOAT32);
+      // dims == 2: 0.32.4's single frequency is the maximum (1 by default), so position 1 has
+      // angle exactly 1.0 rad.
+      assertArrayEquals(
+          new float[] {(float) Math.sin(1), (float) Math.cos(1)},
+          new SinusoidalPositionalEncoding(scope, 2).forward(one).toFloatArray(),
+          1e-6f);
       MLXArray logits = MLX.zeros(scope, new int[] {1, 2}, DType.FLOAT32);
       MLXArray label = MLX.array(scope, new int[] {0}, new int[] {1});
       float logTwo = (float) Math.log(2);
@@ -421,7 +427,6 @@ class Phase71ContractsTest {
           new float[] {logTwo},
           Losses.nll(MLXOps.logSoftmax(logits, -1), label).toFloatArray(),
           1e-6f);
-      MLXArray one = MLX.ones(scope, new int[] {1}, DType.FLOAT32);
       assertArrayEquals(
           new float[] {logTwo}, Losses.binaryCrossEntropy(zero, one).toFloatArray(), 1e-6f);
       assertArrayEquals(new float[] {1}, Losses.mse(one, zero).toFloatArray());

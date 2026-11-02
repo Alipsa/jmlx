@@ -95,9 +95,9 @@ fixture and `128e-6` in both real artifacts. Its numerical impact has not been m
 For the tiny float/packed fixtures and both 27B prompt cases, run paired unmodified mlx-vlm and
 an explicitly labeled normalization-only diagnostic with RMSNorm epsilon `1e-6 / Dk`, retaining
 the same Q/K scale multipliers. Preserve the diagnostic diff/source hash and exact argument
-settings separately from the unmodified source; this is an attribution experiment, not a patch
-to canonical goldens. Use identical stored weights, precision, processed patches and explicit
-teacher-forced token histories, in fresh sessions with other execution paths held fixed.
+settings separately from the unmodified source. This attribution experiment must never produce
+goldens or acceptance results. Use identical stored weights, precision, processed patches and
+explicit teacher-forced token histories, in fresh sessions with other execution paths held fixed.
 Record changes in normalized Q/K, recurrent outputs/final state and per-step logits, plus
 Java-vs-stock and Java-vs-aligned logit errors and each run's greedy choices/margins. Account
 for that convention contribution separately from remaining implementation/kernel differences.
@@ -109,8 +109,10 @@ recorded stock comparison cannot satisfy its declared bound or exact-ID gate, st
 with the paired evidence rather than replacing the reference or assuming BF16 hides the effect.
 
 If a lock cannot resolve or the reference cannot execute, record the failure and revise the
-proposed pin in this plan before producing fixtures. Do not silently upgrade MLX, patch the
-reference math or replace converter output with hand-written Java-layout files.
+proposed pin in this plan before producing fixtures. Do not silently upgrade MLX. Do not patch
+the reference math, except for the separately labeled, source-hashed normalization diagnostic
+above, which must never produce goldens or acceptance results. Do not replace converter output
+with hand-written Java-layout files.
 
 Use seed 20261102 and a four-layer hybrid model with three linear layers and one full-attention
 layer: hidden width 128, MLP width 256, two full-attention heads / one KV head, head width 64,

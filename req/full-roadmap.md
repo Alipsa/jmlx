@@ -491,7 +491,9 @@ SD 1.5-class text-to-image on the delivered 7.1/7.2 surface, in `jmlx-models`
 (the inference-family module home; no new published module; the 9.8 decision moves the
 diffusion code to `jmlx-diffusion` at 9.8's start, before the diffusion API is released —
 until the move, no `jmlx-models` release, mid-phase or patch, is cut from a commit carrying
-9.6's diffusion code). All new surface
+9.6's diffusion code; urgent patches branch off the last release tag, which carries none, and
+a release-time check wired in this milestone fails any release while diffusion classes are
+present). All new surface
 is pure-Java — noise schedulers (**PNDM first** — the artifact's
 `model_index.json` default — then DDPM/DDIM/Euler), the sampler loop, the VAE
 decoder wrapper and the CLIP text encoder — so no new native bindings or
@@ -661,9 +663,10 @@ substituted silently for another.
    code moves into the new module before any 9.8 code lands. `jmlx-models` itself is published
    by 8.4, but the diffusion API is new surface and Phase 9 releases at the phase's end, so the
    move breaks no published coordinate — provided no `jmlx-models` release, mid-phase or
-   patch, is cut from a commit carrying that API before the move (if one is wanted, it waits
-   for the move; delegating stubs in `jmlx-models` are not an option, as they would invert the
-   dependency rule below). `jmlx-diffusion` declares
+   patch, is cut from a commit carrying that API before the move (urgent patches branch off
+   the last release tag, which carries none; a release-time check wired in 9.6 fails any
+   `jmlx-models` release while diffusion classes are present; delegating stubs in `jmlx-models`
+   are not an option, as they would invert the dependency rule below). `jmlx-diffusion` declares
    `api project(':jmlx-core')` — its public scheduler/sampler/VAE contracts take and return
    `MLXArray` and IMG-007 puts `MLXScope` ownership on the API — and
    `implementation project(':jmlx-models')`, the conditioning encoders being consumed

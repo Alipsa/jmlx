@@ -30,10 +30,12 @@ Completion requires all of the following:
 1. Strict HF float32 Tier-A prefill and cached-decode logits for text and image inputs; cached
    execution also agrees with fresh full forwards, including convolution and recurrent state.
 2. Actual converter-produced float mlx-vlm and mlx-lm fixtures match the HF-layout fixture;
-   affine fixtures separately match their MLX reference with identical packed weights.
+   affine fixtures separately match their unmodified MLX reference with identical packed
+   weights, with the Q/K normalization discrepancy isolated and reported as specified in WP0.
 3. Tier-B 0.8B exact greedy IDs and decoded output, with per-step logit and stability checks.
 4. The pinned 27B affine artifact loads and matches mlx-vlm greedy IDs for text and image+text,
-   with precision, prompt, pixels, resource use and host state recorded.
+   with precision, prompt, pixels, resource use, host state and the measured normalization
+   contribution recorded. A normalization-aligned diagnostic is not a replacement reference.
 5. Request cleanup, bounded state retention and cancellation/failure tests pass in native CI;
    the compatibility report describes the evidence for each supported layout.
 
@@ -66,12 +68,45 @@ dispatcher selects `gated_delta_chunked` for multi-token scalar gating, otherwis
 `gated_delta_ops`. Record the selected path for prefill and decode separately; a CPU/ops run
 cannot be reported as evidence for the default GPU kernel. Probe these dispatch choices in WP0.
 
+Extend each prefill/decode record to its convolution and gated-norm callables, source hashes,
+input/weight/accumulation dtypes and casts. In the inspected mlx-vlm code, eligible single-token
+decode with BF16/FP16 convolution weights uses `_qwen3_5_decode_depthwise_conv` with float32
+accumulation; prefill and other cases use `nn.Conv1d`. Record which condition actually applies,
+including the FLOAT32-weight comparison path, rather than assuming every decode uses the helper.
+The gated RMSNorm uses `_precise_swiglu`, evaluating SiLU and multiplication in float32 before
+casting back; record its use in both phases. These records support attribution of per-step
+differences even when the gated-delta kernel is the same. Batch-one greedy runs have no
+left-padding or speculative verification: ragged left-padded attention and target-verify
+kernels are excluded from this reference matrix.
+
 Separately inspect and probe MLX 0.32.4's built-in `mx.fast.gated_delta_update` (the C binding
 is `mlx_fast_gated_delta_update`). Record its own supported head widths/grouping, sequence
 lengths, dtypes, initial-state orientation and mask/device requirements, with accepted/rejected
 boundary cases. Its limits have not been checked; do not transfer mlx-vlm's custom-kernel
 constraints to it. A shape it rejects is recorded as ineligible for that benchmark candidate,
 not silently switched to another implementation under the native-op label.
+
+WP0 must isolate the Q/K normalization convention difference before setting MLX comparison
+tolerances. Java and HF retain `x / sqrt(sum(x*x) + 1e-6)` (plus query head scaling).
+mlx-lm 0.32.2 rescales its RMSNorm epsilon to match that formula; mlx-vlm 0.6.8 instead passes
+`1e-6` directly, giving effective sum-space epsilon `Dk * 1e-6`. That is `32e-6` in the tiny
+fixture and `128e-6` in both real artifacts. Its numerical impact has not been measured.
+
+For the tiny float/packed fixtures and both 27B prompt cases, run paired unmodified mlx-vlm and
+an explicitly labeled normalization-only diagnostic with RMSNorm epsilon `1e-6 / Dk`, retaining
+the same Q/K scale multipliers. Preserve the diagnostic diff/source hash and exact argument
+settings separately from the unmodified source; this is an attribution experiment, not a patch
+to canonical goldens. Use identical stored weights, precision, processed patches and explicit
+teacher-forced token histories, in fresh sessions with other execution paths held fixed.
+Record changes in normalized Q/K, recurrent outputs/final state and per-step logits, plus
+Java-vs-stock and Java-vs-aligned logit errors and each run's greedy choices/margins. Account
+for that convention contribution separately from remaining implementation/kernel differences.
+
+The unmodified reference still owns the packed-fixture and 27B acceptance gates. Do not
+silently absorb this known mathematical difference into a generic epsilon, loosen HF bounds,
+change Java normalization, or report the diagnostic's IDs as stock mlx-vlm parity. If the
+recorded stock comparison cannot satisfy its declared bound or exact-ID gate, stop for review
+with the paired evidence rather than replacing the reference or assuming BF16 hides the effect.
 
 If a lock cannot resolve or the reference cannot execute, record the failure and revise the
 proposed pin in this plan before producing fixtures. Do not silently upgrade MLX, patch the
@@ -128,6 +163,8 @@ conv1d followed by SiLU acts on Q/K/V only, before their head reshape. Preserve 
 `kernelSize - 1` real projected input positions; convolution padding is not real history.
 Repeat each key/query head contiguously to its value-head group. L2 normalization is
 `x / sqrt(sum(x*x) + 1e-6)`, followed by query scaling `1/sqrt(keyHeadDim)`.
+This HF convention remains authoritative for Java. The mlx-vlm sum-space epsilon is larger;
+the WP0 paired diagnostic measures that discrepancy independently of kernel selection.
 
 Use float32 state and compute `beta = sigmoid(b)` and
 `g = -exp(A_log) * softplus(a + dt_bias)`, with stable softplus composed from existing ops.
@@ -312,14 +349,14 @@ text path. Public video and remote-image fetching stay rejected.
 
 | WP | Deliverable and commit boundary | Gate before the next package |
 | --- | --- | --- |
-| 0 | Isolated locks, artifact/header inventories, reference/config/converter and dispatch/shape probes | references execute; actual MLX paths and built-in-op shape limits recorded alongside partial rotary, gates, norm offsets, state orientation and preprocessing |
+| 0 | Isolated locks, artifact/header inventories, reference/config/converter, dispatch/shape and normalization-attribution probes | references execute; normalization contribution measured; convolution/gated-norm/delta paths, built-in-op limits, rotary/gates, norm offsets, state orientation and preprocessing recorded |
 | 1 | Core recurrent cache, token recurrence and chunked DeltaNet prototypes; custom-kernel and built-in-op comparisons | outputs/state match independent references; graphs bounded; four-path prefill benchmark and proposed default reviewed before selection |
 | 2 | Gated full attention, partial-MRoPE tests and hybrid blocks | strict component goldens; existing decoder paths unchanged |
-| 3 | Pure descriptor, tensor-plan and layout classifier; actual converted tiny fixtures | all three float layouts agree; malformed/mixed layouts fail before allocation; packed fixture matches MLX |
+| 3 | Pure descriptor, tensor-plan and layout classifier; actual converted tiny fixtures | float layouts agree; malformed layouts fail before allocation; packed fixture matches stock MLX with normalization-only diagnostic reported separately |
 | 4 | Separate generation-loop extraction, hybrid text loader/generation | both-mode old-path exact-bit checks; text Tier-A prefill/cached/fresh-forward equality |
 | 5 | Vision composition, prompt expansion and text-only converted capability | multi-image and text-only Tier-A; processor/patch goldens; capacity and metadata contracts |
 | 6 | Ownership, cancellation/failure injection, memory and benchmark evidence | retained-state accounting, repeated-request cleanup, bounded temporary/chunk graphs |
-| 7 | 0.8B Tier-B and manual 27B affine text/image acceptance | exact IDs/output, logit stability, precision/resource/host provenance |
+| 7 | 0.8B Tier-B and manual 27B affine text/image acceptance | exact IDs/output, logit stability, precision/resource/host/path provenance; stock-vs-aligned normalization evidence kept distinct |
 | 8 | Compatibility/docs and final native CI | required native suites really execute; all completion gates above met |
 
 For WP0 commit complete Hub file digests/header shapes and downloaded-source hashes under the
@@ -336,6 +373,8 @@ using absolute tolerance `1e-4` for strict HF logits. Preserve all existing boun
 TF32 separately with a named, measured bound; never regenerate goldens to accommodate Java.
 Converted affine comparison and real-artifact tolerances are recorded independently before
 their Java acceptance run, with reference margin eligibility (`gap > 2*epsilon + margin`).
+Those records must identify the normalization convention, its measured contribution and
+remaining Java/reference error separately; the diagnostic never silently replaces stock MLX.
 An ineligible prompt is not a passing exact-ID test; preserve the failed measurement and select
 a documented eligible case before acceptance.
 

@@ -121,3 +121,28 @@ The detailed plan owns the choices and the executable stop conditions.
   per chunk can incur many dispatches. No cost was measured: WP1 now requires comparison of
   chunked ops, token recurrence, mlx-vlm's custom GPU kernel and MLX's built-in native update
   before selecting a default, with unsupported native shapes explicitly recorded.
+
+### Normalization and per-step path clarification
+
+The inspected HF formula is `x / sqrt(sum(x*x) + 1e-6)` before query scaling. The pinned
+[mlx-lm normalization helper](https://github.com/ml-explore/mlx-lm/blob/v0.32.2/mlx_lm/models/gated_delta.py)
+passes `eps * inv_scale**2` to RMSNorm, preserving that sum-space epsilon. By contrast, the
+inspected mlx-vlm 0.6.8 `language.py` passes an unscaled `1e-6`. Algebraically, its key is
+`k / sqrt(sum(k*k) + Dk*1e-6)`; its query has the same denominator plus the usual
+`1/sqrt(Dk)` multiplier. Thus its effective epsilon is `32e-6` for the revised tiny fixture
+and `128e-6` for both real artifacts. This is a source-derived convention difference, not a
+measured error or a claim that BF16 makes it irrelevant.
+
+WP0 must quantify it with paired stock mlx-vlm and a separately labeled normalization-only
+diagnostic using `1e-6 / Dk` in RMSNorm. Record identical-weight/history per-step Q/K, state and
+logit differences, remaining Java/reference error and greedy margins. Java keeps the HF formula;
+stock MLX remains the acceptance reference. Diagnostic source changes and outputs are separate
+evidence, never silently substituted goldens or a reason to loosen strict HF bounds.
+
+The inspected mlx-vlm convolution dispatcher uses `_qwen3_5_decode_depthwise_conv` with
+float32 accumulation for eligible single-token BF16/FP16-weight decode; other cases, including
+prefill, use `nn.Conv1d`. The gated RMSNorm's `_precise_swiglu` computes its SiLU gate and
+product in float32 before casting back. WP0 records convolution, gated norm and delta callables
+and dtypes for each phase, including when FLOAT32 weights disable the decode helper. Ragged
+left-padded attention and speculative target-verify paths are outside the batch-one greedy
+reference matrix, not additional required comparison modes.

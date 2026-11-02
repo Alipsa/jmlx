@@ -489,7 +489,8 @@ output.
 Scheduled by the 2026-10-31 Phase 7.4 decision (`req/plans/phase7-4-decision.md`):
 SD 1.5-class text-to-image on the delivered 7.1/7.2 surface, in `jmlx-models`
 (the inference-family module home; no new published module; the 9.8 decision moves the
-diffusion code to `jmlx-diffusion` at 9.8's start, before any release). All new surface
+diffusion code to `jmlx-diffusion` at 9.8's start, before the diffusion API is released —
+9.6 must not take the roadmap's optional mid-phase release of it). All new surface
 is pure-Java — noise schedulers (**PNDM first** — the artifact's
 `model_index.json` default — then DDPM/DDIM/Euler), the sampler loop, the VAE
 decoder wrapper and the CLIP text encoder — so no new native bindings or
@@ -654,8 +655,11 @@ substituted silently for another.
 2. **Module home: a new published `jmlx-diffusion` module, created at 9.8's start.** Z-Image and
    FLUX.2 Klein are the third and fourth image families, the trigger 9.7's record §6 set for
    reopening its "`jmlx-models`, no new published module" decision. 9.6's and 9.7's diffusion
-   code moves into the new module before any 9.8 code lands. Nothing is published before Phase
-   9's release, so the move breaks no published coordinate. `jmlx-diffusion` declares
+   code moves into the new module before any 9.8 code lands. `jmlx-models` itself is published
+   by 8.4, but the diffusion API is new surface and Phase 9 releases at the phase's end, so the
+   move breaks no published coordinate — provided neither 9.6 nor 9.7 takes the roadmap's
+   optional mid-phase release of that API before the move (if one is wanted, it waits for the
+   move or ships deprecated delegating stubs in `jmlx-models` for one release). `jmlx-diffusion` declares
    `api project(':jmlx-core')` — its public scheduler/sampler/VAE contracts take and return
    `MLXArray` and IMG-007 puts `MLXScope` ownership on the API — and
    `implementation project(':jmlx-models')`, the conditioning encoders being consumed

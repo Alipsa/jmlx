@@ -363,8 +363,13 @@ third and fourth families, and the condition now holds:
 - The interfaces have two in-module users, which is the validation 9.7 wanted.
 - Most diffusion code is still to come: two transformers, LoRA, jobs and metadata. Without a
   split, every text-generation consumer of `jmlx-models` would carry it.
-- **Nothing has been published.** Phase 9 releases once, at its end, so moving 9.6's and 9.7's
-  code at 9.8's start breaks no published coordinate.
+- **The diffusion surface is not yet published — and must stay so until the move.**
+  `jmlx-models` itself publishes in Phase 8 (8.4's native chain), but 9.6's and 9.7's
+  diffusion API is new surface, and Phase 9 releases at the phase's end, so moving it at 9.8's
+  start breaks no published coordinate. The roadmap's optional mid-phase per-milestone
+  releases (its "When releases happen" rule) must not be taken for 9.6's or 9.7's diffusion
+  API before the move: if a mid-phase release is wanted, it waits for 9.8's move, or it ships
+  deprecated delegating stubs in `jmlx-models` for one release as the compatibility migration.
 - The requirements suggest this split (their §2 is explicitly "subject to JMLX's existing
   module conventions" and would also allow the pipelines in `jmlx-models` or an adapter
   module); this record adopts the `jmlx-diffusion` home rather than that alternative, for the

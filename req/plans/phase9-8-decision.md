@@ -366,10 +366,12 @@ third and fourth families, and the condition now holds:
 - **The diffusion surface is not yet published — and must stay so until the move.**
   `jmlx-models` itself publishes in Phase 8 (8.4's native chain), but 9.6's and 9.7's
   diffusion API is new surface, and Phase 9 releases at the phase's end, so moving it at 9.8's
-  start breaks no published coordinate. The roadmap's optional mid-phase per-milestone
-  releases (its "When releases happen" rule) must not be taken for 9.6's or 9.7's diffusion
-  API before the move: if a mid-phase release is wanted, it waits for 9.8's move, or it ships
-  deprecated delegating stubs in `jmlx-models` for one release as the compatibility migration.
+  start breaks no published coordinate. Until the move, **no `jmlx-models` release — mid-phase,
+  per-milestone or bug-fix patch — is cut from a commit carrying 9.6's or 9.7's diffusion
+  code**; if a release is wanted earlier, it waits for 9.8's move. A delegating-stub migration
+  is not an alternative: stubs in `jmlx-models` that delegate to the moved code would make
+  `jmlx-models` depend on `jmlx-diffusion`, which this §6 forbids, Gradle's cycle check
+  rejects, and WP0's runtime-classpath check would fail.
 - The requirements suggest this split (their §2 is explicitly "subject to JMLX's existing
   module conventions" and would also allow the pipelines in `jmlx-models` or an adapter
   module); this record adopts the `jmlx-diffusion` home rather than that alternative, for the

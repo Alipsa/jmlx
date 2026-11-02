@@ -490,7 +490,8 @@ Scheduled by the 2026-10-31 Phase 7.4 decision (`req/plans/phase7-4-decision.md`
 SD 1.5-class text-to-image on the delivered 7.1/7.2 surface, in `jmlx-models`
 (the inference-family module home; no new published module; the 9.8 decision moves the
 diffusion code to `jmlx-diffusion` at 9.8's start, before the diffusion API is released —
-9.6 must not take the roadmap's optional mid-phase release of it). All new surface
+until the move, no `jmlx-models` release, mid-phase or patch, is cut from a commit carrying
+9.6's diffusion code). All new surface
 is pure-Java — noise schedulers (**PNDM first** — the artifact's
 `model_index.json` default — then DDPM/DDIM/Euler), the sampler loop, the VAE
 decoder wrapper and the CLIP text encoder — so no new native bindings or
@@ -548,7 +549,9 @@ IMG-001 to IMG-016 are this milestone's requirements source.
    interfaces. The decision is reopened if an external consumer needs diffusion without the
    model families, or if a third family would make `jmlx-models` carry diffusion code most of
    its users don't need. *Reopened 2026-11-02* by the 9.8 decision record: the diffusion code
-   moves to a new `jmlx-diffusion` module at 9.8's start (§ 9.8).
+   moves to a new `jmlx-diffusion` module at 9.8's start (§ 9.8) — and until that move, no
+   `jmlx-models` release, mid-phase or patch, is cut from a commit carrying 9.7's diffusion
+   code.
 3. **Reference toolchain: a new hash-locked `tools/image-gen-reference/`.** It pins
    `diffusers==0.42.1`, which is identical to the pinned main commit for the Qwen-Image-2.1
    pipeline, transformer and VAE files. The model card asks for git main, and 0.41.0's
@@ -657,9 +660,10 @@ substituted silently for another.
    reopening its "`jmlx-models`, no new published module" decision. 9.6's and 9.7's diffusion
    code moves into the new module before any 9.8 code lands. `jmlx-models` itself is published
    by 8.4, but the diffusion API is new surface and Phase 9 releases at the phase's end, so the
-   move breaks no published coordinate — provided neither 9.6 nor 9.7 takes the roadmap's
-   optional mid-phase release of that API before the move (if one is wanted, it waits for the
-   move or ships deprecated delegating stubs in `jmlx-models` for one release). `jmlx-diffusion` declares
+   move breaks no published coordinate — provided no `jmlx-models` release, mid-phase or
+   patch, is cut from a commit carrying that API before the move (if one is wanted, it waits
+   for the move; delegating stubs in `jmlx-models` are not an option, as they would invert the
+   dependency rule below). `jmlx-diffusion` declares
    `api project(':jmlx-core')` — its public scheduler/sampler/VAE contracts take and return
    `MLXArray` and IMG-007 puts `MLXScope` ownership on the API — and
    `implementation project(':jmlx-models')`, the conditioning encoders being consumed

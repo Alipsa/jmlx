@@ -684,8 +684,10 @@ ART-003 style presets and ART-004 model extensibility) is deferred to later mile
   integrate without changing the public request/result contract.
 - 7.0's Qwen3 text decoders for the conditioning (DIFF-003). Both encoders are Qwen3-4B-shaped
   `qwen3` models, but conditioning is per model. Z-Image uses `hidden_states[-2]`, real tokens
-  only. FLUX.2 stacks layers 9, 18 and 27 over all 512 padded positions, so its padding rows
-  must match a right-padded reference. Next-token LLM inference is not reused as conditioning.
+  only. FLUX.2 stacks `hidden_states[9/18/27]` — in Transformers' convention `hidden_states[0]`
+  is the embedding output, so these are the outputs of blocks 8, 17 and 26 — over all 512 padded
+  positions, so its padding rows must match a right-padded reference; 27 encoder layers are
+  loaded, not 28. Next-token LLM inference is not reused as conditioning.
 - 9.6's VAE decoder: both VAEs use the same diffusers `Decoder` topology as SD 1.5's, with
   latent widths 16 (Z-Image) and 32 (FLUX.2, plus BatchNorm-statistics de-normalization and a
   2×2 unpatchify).
@@ -699,6 +701,10 @@ ART-003 style presets and ART-004 model extensibility) is deferred to later mile
   pinned pipeline code (Z-Image 50 steps, guidance 5.0, static shift 6.0; FLUX.2 50 steps,
   guidance 4.0, exponential dynamic shift). A capability descriptor exposes them, never as a
   cross-model constant. Turbo's and distilled Klein's few-step schedules are never applied.
+- **Sizes that are not multiples of 16 are rejected for both models.** Z-Image's reference
+  raises; FLUX.2's only warns and rounds down (`pipeline_flux2_klein.py:558-566`). DIFF-005
+  requires validating rather than silently changing dimensions, so jmlx deliberately does not
+  copy FLUX.2's round-down.
 - **Guidance values are not portable between the models.** Z-Image computes
   `pos + g·(pos − neg)` and FLUX.2 `neg + g·(pos − neg)`, so the descriptor carries each model's
   formula. Guidance is part of both base workflows, and the memory and benchmark bounds include
@@ -724,20 +730,35 @@ in jmlx, and Qwen-Image LoRA (IMG-016) reuses it later.
     denoiser outputs under the checkpoint's guided schedule, and the VAE decode of the
     reference's final latent all match the CPU float32 reference within the recorded ε.
   - A seeded PNG at the base workflow's nominal step count is generated in Java.
+  - Z-Image additionally forwards at the latent lengths corresponding to 512, 768 and 1024 px,
+    with its selected internal layers compared against the reference (ZIMG-001's criteria in
+    full). FLUX.2 additionally compares per-block parity, not only the assembled forward
+    (FKB-001's criterion in full).
 - **DIFF-007:** for both models, a Q4 512×512 run completes on the 24 GB M4 Air without sustained
-  swapping. Its peak resident and allocator memory are recorded under a named bound. 768² is
-  recorded where it completes; 1024² does not block the milestone.
+  swapping. Its peak resident and allocator memory are recorded under a named bound, confirming
+  or refuting the decision record's desk-estimated fit. 768² is recorded where it completes;
+  1024² does not block the milestone.
 - **DIFF-006, DIFF-008, DIFF-010, ART-002:**
   - An external Java 25 example generates PNGs from both models and closes every native resource.
   - Cancelling during denoising, then generating again in the same JVM, returns active memory
-    to its baseline.
-  - The recorded metadata reconstructs the request.
+    to its baseline; a seed list interrupted by a failed or cancelled job resumes and produces
+    the remaining traceable images (ART-002's resume criterion in full).
+  - The recorded metadata reconstructs the request and produces a clear warning when the exact
+    model revision is unavailable (DIFF-010's criterion in full).
   - Four seeds give four traceable images.
 - **ART-001:** one verified style LoRA per model changes the output comparably to the reference,
-  and at scale 0 it matches the unmodified base within the deterministic tolerance.
+  and at scale 0 the adapter branch is skipped so the base output is reproduced exactly. *Dated
+  deviation 2026-11-02 (PR #75 review):* ART-001's "one or more adapters with individually
+  configurable weights" is narrowed to one adapter at a time; multi-adapter composition waits,
+  per the decision record §8, until single-adapter correctness is proven.
 - **DIFF-009, ZIMG-003:** the benchmark report is recorded under the `req/phase6-4-benchmark.md`
-  conventions. The ZIMG-003 gallery and review protocol are recorded too; they stay separate
-  from numerical parity and gate release validation, not this milestone.
+  conventions. ZIMG-003's full gallery and review protocol stay separate from numerical parity
+  and gate release validation, not this milestone — but a small visual acceptance suite gates
+  the milestone itself: one archived, human-reviewed sample per prompt family (shanshui ink
+  painting; blue-green Chinese landscape; visionary landscape; fantasy landscape), generated on
+  the Q4 path, establishing that the implementation produces plausible, artistically useful
+  output with no visible quantization regression. This is an acceptance floor, not a subjective
+  quality competition between models; numerical parity alone cannot establish artistic fitness.
 - **DIFF-011:** the release smoke generates an image from a synthetic Tier-A checkpoint of each
   family through the published-shape modules.
 

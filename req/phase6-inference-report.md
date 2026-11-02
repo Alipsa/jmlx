@@ -297,11 +297,12 @@ prefill/vision path where the Tier-B gap appears. All twelve Tier-B run XMLs are
 alongside the JSONs — the six old-pin controls and, per model, the batched re-measurement
 run and the two isolated re-runs of the new pin — so both sides of the gap are backed by
 raw records.
-The new-pin XMLs' commit provenance is in their file names: the isolated runs'
-timestamps fall between the `dcd6960` and `596c2b2` commits (the same session's
-benchmark JSON records `dcd6960` with an empty git status), while the batched runs
-predate `dcd6960` and ran on `2e553c4`, which differs from it only in `req/`
-documents. The committed evidence files are as produced except the XML `hostname`
+The new-pin XMLs' file names state a commit provenance that is consistent with the
+timestamps: the isolated runs (11:17–11:29 UTC) fall between the `dcd6960` (11:07 UTC)
+and `596c2b2` (11:36 UTC) commits, and the same session's benchmark JSON records
+`dcd6960` with an empty git status at its own run time, while the batched runs
+(10:53–10:54 UTC) predate `dcd6960` and ran on `2e553c4`, which differs from it only
+in `req/` documents. The committed evidence files are as produced except the XML `hostname`
 attribute (recorded as `M5-Max` rather than the local machine name) and the old-pin
 JSONs' `checkpoint` path (recorded as the relative `.tier-b/llama`). The gap is
 tracked as issue #73 for a Phase 8 follow-up (the roadmap's 8.2 baseline must resolve it);

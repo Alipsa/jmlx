@@ -88,15 +88,25 @@ The detailed plan owns the choices and the executable stop conditions.
 
 ## 2026-11-02 plan-review amendments
 
-- The pinned [mlx-vlm delta kernel](https://github.com/Blaizzy/mlx-vlm/blob/v0.6.8/mlx_vlm/models/qwen3_5/gated_delta.py)
+- The pinned [mlx-vlm custom delta kernel](https://github.com/Blaizzy/mlx-vlm/blob/v0.6.8/mlx_vlm/models/qwen3_5/gated_delta.py)
   divides the key width by 32 in its per-thread loops. The tiny fixture now proposes key width
   32 / value width 64; width 16 is unsuitable for its default GPU reference path. This is a
-  source-derived constraint, not a completed fixture run.
+  source-derived constraint, not a completed fixture run or a verified constraint on MLX's
+  separate built-in `mx.fast.gated_delta_update` / `mlx_fast_gated_delta_update`.
+- mlx-vlm's default GPU dispatcher uses its own `gated_delta_kernel`, built with
+  `mx.fast.metal_kernel`, rather than the built-in native update. Off GPU or with
+  `use_kernel=False`, it selects `gated_delta_chunked` for multi-token scalar gating, otherwise
+  `gated_delta_ops`. WP0 must record device, `use_kernel` and the actual path per prefill/decode
+  reference run, and separately establish the built-in op's shape limits. Those limits remain
+  unverified; the custom kernel's width rule cannot stand in for them.
 - `Qwen3VlVisionTower` currently rejects empty DeepStack indices in its constructor. Planned
   reuse therefore requires allowing empty indices in the shared tower while retaining the
   Qwen3-VL descriptor guard and enforcing the same requirement at its model loader. The new
-  Qwen3.5 descriptor requires empty indices. Both real learned grids are 2304 positions; only
-  the synthetic fixture uses 64.
+  Qwen3.5 descriptor requires empty indices. The existing empty-array rejection assertion in
+  `Qwen3VlVisionTowerValidationTest.constructorRejectsInvalidDeepstackIndexes` moves to
+  descriptor/loader tests; the shared-tower case becomes a positive empty-levels test, with its
+  other invalid-index cases retained. Both real learned grids are 2304 positions; only the
+  synthetic fixture uses 64.
 - The inspected config/index JSON does not identify a converter. Shard `__metadata__` remains
   uninspected. Loader classification is specified from the complete prefix/conv-axis/MTP
   inventory; reference-tool converter provenance is not a required runtime input.
@@ -109,4 +119,5 @@ The detailed plan owns the choices and the executable stop conditions.
 - The inspected HF normal path uses `solve_triangular`; its export fallback iterates 63 rows
   for chunk size 64, with the chunk dimension batched. A Java ops implementation that does this
   per chunk can incur many dispatches. No cost was measured: WP1 now requires comparison of
-  chunked ops, token recurrence and the pinned native update before selecting a default.
+  chunked ops, token recurrence, mlx-vlm's custom GPU kernel and MLX's built-in native update
+  before selecting a default, with unsupported native shapes explicitly recorded.

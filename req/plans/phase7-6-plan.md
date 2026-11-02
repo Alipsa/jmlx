@@ -57,6 +57,22 @@ disable optional FLA/causal-conv/hub kernel substitutions, use CPU float32, eval
 seeds. Record actual classes/functions used. In particular, exercise the config's legacy fields
 under Transformers 5.22.1 rather than trusting `transformers_version` in a model JSON.
 
+For every MLX packed-fixture and 27B reference run, record the device/stream, Metal availability,
+eval/training mode, explicit `use_kernel` setting, sequence length, compute/state dtypes and
+actual selected gated-delta callable with its source hash. mlx-vlm 0.6.8's default GPU route
+uses its own `gated_delta_kernel`, constructed through `mx.fast.metal_kernel`; it does not
+call MLX's built-in `mx.fast.gated_delta_update`. Off GPU or with `use_kernel=False`, its
+dispatcher selects `gated_delta_chunked` for multi-token scalar gating, otherwise
+`gated_delta_ops`. Record the selected path for prefill and decode separately; a CPU/ops run
+cannot be reported as evidence for the default GPU kernel. Probe these dispatch choices in WP0.
+
+Separately inspect and probe MLX 0.32.4's built-in `mx.fast.gated_delta_update` (the C binding
+is `mlx_fast_gated_delta_update`). Record its own supported head widths/grouping, sequence
+lengths, dtypes, initial-state orientation and mask/device requirements, with accepted/rejected
+boundary cases. Its limits have not been checked; do not transfer mlx-vlm's custom-kernel
+constraints to it. A shape it rejects is recorded as ineligible for that benchmark candidate,
+not silently switched to another implementation under the native-op label.
+
 If a lock cannot resolve or the reference cannot execute, record the failure and revise the
 proposed pin in this plan before producing fixtures. Do not silently upgrade MLX, patch the
 reference math or replace converter output with hand-written Java-layout files.
@@ -65,9 +81,10 @@ Use seed 20261102 and a four-layer hybrid model with three linear layers and one
 layer: hidden width 128, MLP width 256, two full-attention heads / one KV head, head width 64,
 partial rotary width 16, MRoPE sections `[3,3,2]`, two linear key heads / six value heads,
 linear key width 32 and value width 64, and an untied 128-token output vocabulary. The key
-width must be at least 32 and divisible by 32 for the pinned mlx-vlm GPU delta kernel;
+width must be at least 32 and divisible by 32 for the pinned mlx-vlm custom GPU delta kernel;
 the previous 16-wide proposal would leave its `Dk / 32` loops empty. Keep unequal key/value
-widths so the fixture still tests that distinction. Add an
+widths so the fixture still tests that distinction. This is not a verified shape rule for
+MLX's separate built-in op. Add an
 equal-head/tied-output variant and an eight-layer variant to test state indexing. A tiny
 vision config uses two layers, width 64, four heads, intermediate width 128, patch 16,
 temporal size 2, merge 2, no DeepStack and 64 learned positions, projecting to text width 128.
@@ -136,9 +153,12 @@ scope, so a prompt does not retain every earlier chunk's graph.
 
 Compare chunked outputs/final state to both HF and a simple token recurrence, for lengths
 1, 3, 4, 5, 63, 64, 65, 127, 128 and 129, including nonzero initial state and split prefills.
-WP1 must compare three candidates before selecting the production prefill default: chunked
-ops, token recurrence, and the pinned native `mlx_fast_gated_delta_update` (initially measured
-through its Python MLX entry point in the isolated reference tool). Compare identical prepared
+WP1 must compare four separately named paths before selecting the production prefill default:
+chunked ops, token recurrence, mlx-vlm 0.6.8's custom `gated_delta_kernel` (the default GPU
+reference path), and MLX 0.32.4's built-in `mlx_fast_gated_delta_update` (initially measured
+through `mx.fast.gated_delta_update` in the isolated reference tool, where WP0 verified shape
+support). Label mlx-vlm's off-GPU/`use_kernel=False` chunked/ops fallback separately from
+its custom kernel; neither is an alias for the built-in native op. Compare identical prepared
 Q/K/V, decay, beta and initial state, accounting explicitly for native gate convention and
 state orientation; all candidates must pass output/final-state checks first. Run tiny shapes
 and the real 0.8B/27B head dimensions at lengths 64, 256, 1024 and 1280, including the 27B's
@@ -272,7 +292,11 @@ array with no DeepStack merger subtrees and an empty feature-level list. Keep no
 index-range/order and exact weight-inventory checks. Preserve the existing non-empty guard in
 `Qwen3VlDescriptor.parseDeepstackIndexes` and explicitly enforce it in every `Qwen3VlModel.load`
 path before constructing the shared tower. `Qwen35Descriptor` instead requires an empty array.
-Add tests for both family guards, shared-tower empty levels and zero-iteration feature handling;
+Move the empty-array rejection currently asserted by
+`Qwen3VlVisionTowerValidationTest.constructorRejectsInvalidDeepstackIndexes` to Qwen3-VL
+descriptor/loader rejection tests. Replace that constructor assertion with a positive shared-tower
+empty-levels case using weights with no DeepStack merger subtrees; leave its non-empty invalid
+index/range/order cases intact. Add tests for both family guards and zero-iteration feature handling;
 existing Qwen3-VL captures, logits and generation must remain unchanged.
 
 Both real artifacts have 2304 learned positions (48×48), the same grid size as Qwen3-VL-2B;
@@ -288,8 +312,8 @@ text path. Public video and remote-image fetching stay rejected.
 
 | WP | Deliverable and commit boundary | Gate before the next package |
 | --- | --- | --- |
-| 0 | Isolated locks, artifact/header inventories, reference/config/converter probes and findings | references execute; partial rotary, gate metadata, norm offsets, state orientation and preprocessing are recorded |
-| 1 | Core recurrent cache, token recurrence and chunked DeltaNet prototypes; native comparison | outputs/state match independent references; graphs bounded; three-way prefill benchmark and proposed default reviewed before selection |
+| 0 | Isolated locks, artifact/header inventories, reference/config/converter and dispatch/shape probes | references execute; actual MLX paths and built-in-op shape limits recorded alongside partial rotary, gates, norm offsets, state orientation and preprocessing |
+| 1 | Core recurrent cache, token recurrence and chunked DeltaNet prototypes; custom-kernel and built-in-op comparisons | outputs/state match independent references; graphs bounded; four-path prefill benchmark and proposed default reviewed before selection |
 | 2 | Gated full attention, partial-MRoPE tests and hybrid blocks | strict component goldens; existing decoder paths unchanged |
 | 3 | Pure descriptor, tensor-plan and layout classifier; actual converted tiny fixtures | all three float layouts agree; malformed/mixed layouts fail before allocation; packed fixture matches MLX |
 | 4 | Separate generation-loop extraction, hybrid text loader/generation | both-mode old-path exact-bit checks; text Tier-A prefill/cached/fresh-forward equality |

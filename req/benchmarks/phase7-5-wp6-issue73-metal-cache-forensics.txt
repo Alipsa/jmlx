@@ -1,0 +1,67 @@
+phase7-5-wp6 issue #73 — JDK Metal pipeline cache forensics
+
+Recorded 2026-11-02 17:25 UTC (local = UTC+1) on the M5 Max / macOS 27.2 host.
+Cache: <per-user cache path>/net.java.openjdk.java/com.apple.metal{,fe}/ —
+the JDK-keyed Metal pipeline cache the jmlx test JVMs write to. The
+*bak-1793636336 side-caches (moved aside 16:18:57 UTC for the cold A/B, left
+in place) are included so the pre-A/B state is preserved. Paths abbreviated:
+the per-user cache prefix and the two frontend-hash directory names are
+replaced by placeholders.
+
+$ find <cache> -type f   (mtime local | bytes | path)
+
+Nov  1 20:41:20|0|com.apple.metalfe.bak-1793636336/modules.timestamp
+Nov  1 20:41:21|147968|com.apple.metalfe.bak-1793636336/<fe-hash-1>/modules.idx
+Nov  1 20:41:21|17991272|com.apple.metalfe.bak-1793636336/<fe-hash-1>/monolithic_metal.pcm
+Nov  1 21:28:24|327680|com.apple.metal.bak-1793636336/16777235_355/functions2.data
+Nov  1 21:28:24|380|com.apple.metal.bak-1793636336/32024/libraries2.list
+Nov  1 21:28:24|81920|com.apple.metal.bak-1793636336/32024/libraries2.data
+Nov  1 21:28:24|9788|com.apple.metal.bak-1793636336/16777235_355/functions2.list
+Nov  1 21:32:54|2588672|com.apple.metal.bak-1793636336/32024/libraries1.data
+Nov  1 23:14:16|6428|com.apple.metal.bak-1793636336/32024/libraries1.list
+Nov  1 23:14:25|4046848|com.apple.metal.bak-1793636336/16777235_355/functions1.data
+Nov  1 23:14:25|71724|com.apple.metal.bak-1793636336/16777235_355/functions1.list
+Nov  2 09:48:41|147968|com.apple.metalfe.bak-1793636336/<fe-hash-2>/modules.idx
+Nov  2 09:48:41|17991272|com.apple.metalfe.bak-1793636336/<fe-hash-2>/monolithic_metal.pcm
+Nov  2 14:10:45|2916352|com.apple.metal.bak-1793636336/16777235_355/functions.data
+Nov  2 14:10:46|1851392|com.apple.metal.bak-1793636336/32024/libraries.data
+Nov  2 17:15:39|52572|com.apple.metal.bak-1793636336/16777235_355/functions.list
+Nov  2 17:15:43|5588|com.apple.metal.bak-1793636336/32024/libraries.list
+Nov  2 17:19:00|0|com.apple.metalfe/modules.timestamp
+Nov  2 17:19:00|147968|com.apple.metalfe/<fe-hash-2>/modules.idx
+Nov  2 17:19:00|17991272|com.apple.metalfe/<fe-hash-2>/monolithic_metal.pcm
+Nov  2 17:19:05|294912|com.apple.metal/16777235_355/functions.data
+Nov  2 17:19:05|436|com.apple.metal/32024/libraries.list
+Nov  2 17:19:05|6988|com.apple.metal/16777235_355/functions.list
+Nov  2 17:19:05|81920|com.apple.metal/32024/libraries.data
+
+Derived facts (window file counts via find -newermt on the local-time windows):
+
+- 10:53-11:29 UTC bad window (local 11:53-12:29): 0 files. No pipeline data
+  was written or touched by any run inside the window (the 0.32.4 batched and
+  isolated Tier-B runs and the decode benchmarks of that window).
+- Only post-update first-use artifact: the <fe-hash-2> monolithic_metal.pcm +
+  modules.idx pair (17,991,272 + 147,968 B, ~18 MB), mtime 09:48:41 local
+  (08:48:41 UTC) — 2 h 05 m before the bad window. Its pre-update counterpart
+  is <fe-hash-1> (Nov 1 20:41 local); the different frontend-hash directories
+  are consistent with the 27.2 update changing the frontend. The cache is
+  JDK-keyed; the only long-lived resident Java process on the host is
+  omlx-server (started 08:43:59 local, 46 s after the 08:43:13 boot; see the
+  companion host-state log), so the PCM is attributed to it.
+- 13:10-13:11 UTC 0.31.2 controls (phase7-5-wp6-tierb-pin-isolated-46cb325-
+  phi3v-run2.xml 13:11:00 UTC / 2,165 ms; run3.xml 13:11:10 UTC / 2,161 ms):
+  two fresh pipeline-data files, 2,916,352 + 1,851,392 = 4,767,744 B (~4.8 MB),
+  mtime 14:10:45/46 local (13:10:45/46 UTC) — a fresh pipeline materialization
+  written during that control window, while both controls completed at
+  baseline.
+- Session activity: 17:15:39/43 local (index lists written during the last
+  loaded run, 16:15:36 UTC) and 17:19:00/05 local (re-materialization by the
+  cold/warm A/B runs after the 16:18:57 UTC side-move of both cache dirs).
+- All remaining files are dated Nov 1, no later than 23:14 local, i.e. before
+  the estimated update time (Nov 2 00:09:06 local).
+
+Timeline (UTC): 27.2 update ≈ Nov 1 23:09 (estimate) | boot 07:43:13 |
+omlx-server 07:43:59 | first-use PCM 08:48:41 | bad window 10:53-11:29
+(0 writes) | 0.31.2 controls 12:23 and 13:10-13:11 (4.8 MB written at
+13:10:45) | 14:10-14:12 alternating session | degraded session 16:07-16:19 |
+cold A/B 16:18:57/16:19:02.

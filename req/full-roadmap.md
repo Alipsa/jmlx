@@ -318,12 +318,13 @@ published before `jmlx-models` itself.
    delta, initially attributed to the 0.32.4 pin), is resolved: a back-to-back
    alternating session showed no measurable pin effect in a clean host state, a
    deliberately degraded-state alternating session showed both pins degrading by the
-   same factor under a controlled GPU load (pin×host interaction ruled out), and
-   Metal-cache forensics plus a cold-cache A/B ruled out a per-pin first-use cost —
-   the delta was a host-state artifact of the measurement window. 8.2 is the
-   methodology owner going forward: the baseline measures in a quiet host state,
-   records the host state with the numbers, and re-runs any surprising VLM prefill
-   figure as a back-to-back alternating session before attributing it to the runtime.
+   same factor under a saturating GPU compute load (no pin×host interaction under
+   that regime, new/old within ±7 %), and Metal-cache forensics plus a cold-cache
+   A/B ruled out a per-pin first-use cost — the delta was a host-state artifact of
+   the measurement window. 8.2 is the methodology owner going forward: the
+   baseline measures in a quiet host state, records the host state with the
+   numbers, and re-runs any surprising VLM prefill figure as a back-to-back
+   alternating session before attributing it to the runtime.
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
    the quarkus-langchain4j path). Callers may run on virtual threads: the

@@ -2,16 +2,23 @@ import Metal
 import Foundation
 
 // GPU load generator for controlled-degradation timing methodology (Phase 8.2).
-// Sustains a duty-cycled stream of compute work on the default GPU so that
-// concurrently running MLX workloads contend for GPU time, reproducing a
-// degraded host state on demand. First used to settle issue #73 (the 10:53-11:29
-// UTC 2026-11-02 wall-time window was a host artifact: both MLX pins degraded
-// by the same factor under this burner).
+// Sustains a stream of compute work on the default GPU so that concurrently
+// running MLX workloads contend for GPU time, reproducing a degraded host
+// state on demand. First used to settle issue #73 (the 10:53-11:29 UTC
+// 2026-11-02 wall-time window was a host artifact: both MLX pins degraded by
+// the same factor under this burner).
+//
+// NOTE: the GPU stays saturated (~100% duty) for the default settings. Each
+// buffer is a 262,144-thread dispatch of 200,000 dependent FMAs; with 64
+// buffers held in flight, the ~63 still queued when each BURN_OFF_MS sleep
+// starts cannot drain inside 25 ms (that would need >1e14 FMA/s).
+// BURN_ON_MS / BURN_OFF_MS shape the CPU submission pattern, not the GPU
+// utilization.
 //
 // Build:  xcrun swiftc -O burn.swift -o burn -framework Metal
 // Run:    ./burn            (forever; stop with SIGTERM/SIGINT)
 //
-// Env: BURN_ON_MS (default 100), BURN_OFF_MS (default 25, i.e. ~80% duty),
+// Env: BURN_ON_MS (default 100), BURN_OFF_MS (default 25),
 //      BURN_SECONDS (optional; run for this many seconds and exit).
 
 let onMs = ProcessInfo.processInfo.environment["BURN_ON_MS"].flatMap { Int($0) } ?? 100

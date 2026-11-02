@@ -1,0 +1,69 @@
+phase7-5-wp6 issue #73 degraded-state session — host-state record
+
+Host: M5 Max, macOS 27.2 (26B123), AC power. Local time = UTC+1.
+Session: 2026-11-02 16:07-16:19 UTC (17:07-17:19 local).
+This file and the companion phase7-5-wp6-issue73-metal-cache-forensics.txt
+are the raw records behind the host-state and forensics figures in the
+"Issue #73 resolution" paragraph of req/phase6-inference-report.md.
+Machine identifiers (host name, user, per-user cache path) are scrubbed.
+
+--- machine (recorded 17:25 UTC) ---
+
+$ sysctl -n kern.boottime
+  { sec = 1793605393, usec = 676398 } Mon Nov  2 08:43:13 2026
+  (boot 07:43:13 UTC)
+
+$ stat -f '%Sm' /System/Volumes/Data
+  Nov  2 00:09:06 2026
+  (Nov 1 23:09:06 UTC; best estimate of the 27.2 update time — the sealed
+  System volume's mtimes are build times and unusable)
+
+$ pmset -g therm
+  Note: No thermal warning level has been recorded
+  Note: No performance warning level has been recorded
+  Note: No CPU power status has been recorded
+  (identical output at session start 15:49 UTC; the "therm-warnings=2" in the
+  per-run lines below counts the two "No ... recorded" note lines, i.e. zero
+  recorded warnings)
+
+--- resident GPU-relevant processes at session start (15:49 UTC, from ps -r; user column omitted) ---
+
+  WindowServer                  PID 427   43.2% CPU   106,704 KB RSS     started 08:43 local
+  omlx-server (local GPU model) PID 862   24.0% CPU   57,422,848 KB RSS (~55 GiB)  started 08:43 local (46 s after boot)
+  Chrome GPU process            PID 2617  16.4% CPU   156,032 KB RSS     started 08:51 local
+  ScreensharingAgent            PID 1258  30.0% CPU    90,832 KB RSS     started 08:49 local
+  Terminal                      PID 1310  17.4% CPU   109,552 KB RSS     started 08:49 local
+
+--- per-run host state (one line recorded before each run; UTC time | label | load 1/5/15 min | therm-warnings | omlx-server %CPU | free memory %) ---
+
+16:07:00 | session-start     | load 2.34 2.95 3.18 | therm-warnings=2 | omlx=8.2%  | memfree=71%
+16:09:18 | loaded-calib      | load 2.05 2.62 3.01 | therm-warnings=2 | omlx=2.4%  | memfree=61%
+16:13:20 | loaded-qwen3vl-old1 | load 1.39 2.15 2.71 | therm-warnings=2 | omlx=15.7% | memfree=41%
+16:13:30 | loaded-qwen3vl-new2 | load 1.28 2.11 2.69 | therm-warnings=2 | omlx=2.2%  | memfree=61%
+16:13:39 | loaded-qwen3vl-old2 | load 1.70 2.18 2.71 | therm-warnings=2 | omlx=8.0%  | memfree=61%
+16:13:49 | loaded-phi3v-new1  | load 2.18 2.27 2.73 | therm-warnings=2 | omlx=3.4%  | memfree=61%
+16:14:23 | loaded-phi3v-old1  | load 1.81 2.18 2.68 | therm-warnings=2 | omlx=3.4%  | memfree=59%
+16:15:00 | loaded-phi3v-new2  | load 1.42 2.03 2.61 | therm-warnings=2 | omlx=7.8%  | memfree=53%
+16:15:35 | loaded-phi3v-old2  | load 1.48 1.98 2.56 | therm-warnings=2 | omlx=5.2%  | memfree=57%
+16:16:12 | session-end        | load 1.69 1.98 2.54 | therm-warnings=2 | omlx=7.9%  | memfree=56%
+16:18:56 | cold-qwen3vl-new1  | load 2.55 2.26 2.55 | therm-warnings=2 | omlx=21.6% | memfree=42%
+16:19:02 | cold-qwen3vl-new2  | load 2.50 2.25 2.54 | therm-warnings=2 | omlx=5.7%  | memfree=62%
+
+(The clean-phase runs of 16:07-16:08 UTC have no per-run lines: the recording
+script had a quoting bug until before the loaded phase; the session-start line
+bounds them. Label mapping to the committed XMLs: loaded-qwen3vl-old1/new2/old2
+and loaded-phi3v-new1/old1/new2/old2 are the phase7-5-wp6-tierb-degraded-loaded-*
+runs in timestamp order; loaded-calib is phase7-5-wp6-tierb-degraded-loaded-
+new-65e5306-qwen3vl-1.xml.)
+
+--- burner ---
+
+tools/gpu-burn/burn.swift, default settings (BURN_ON_MS=100, BURN_OFF_MS=25),
+one process: started 16:09:15 UTC before the calibration run, killed after the
+last loaded run (16:15:36 UTC), settings unchanged throughout — the
+calibration run is therefore part of the same loaded regime as the paired
+alternation. The GPU stays saturated (~100% duty) for these settings: each
+command buffer is a 262,144-thread dispatch of 200,000 dependent FMAs, and
+with 64 buffers held in flight the ~63 still queued when each 25 ms sleep
+starts cannot drain inside it (over 1e14 FMA/s would be needed); the ON/OFF
+variables shape the CPU submission pattern, not the GPU utilization.

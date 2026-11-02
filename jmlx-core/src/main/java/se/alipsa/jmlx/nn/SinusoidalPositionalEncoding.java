@@ -36,7 +36,7 @@ public final class SinusoidalPositionalEncoding extends UnaryLayer {
     super(scope);
     if (dims < 4 || dims % 2 != 0 || !(minFrequency > 0) || !(maxFrequency > 0)) {
       throw new IllegalArgumentException(
-          "SinusoidalPositionalEncoding: dims >= 4 and even, positive frequencies required");
+          "SinusoidalPositionalEncoding: even dims >= 4 and positive frequencies required");
     }
     this.dims = dims;
     this.minFrequency = minFrequency;

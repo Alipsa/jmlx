@@ -155,7 +155,7 @@ All preserve the public API; all but the last preserve the pre-upgrade observabl
 6. **`SinusoidalPositionalEncoding`** rejects odd dims at construction. 0.32.4's
    `nn.SinusoidalPositionalEncoding` requires the dims to be "positive and even"; 0.31.2 — and
    jmlx until this change — returned `dims - 1` features for odd dims. The constructor guard gains
-   `dims % 2 != 0` (the message is now `SinusoidalPositionalEncoding: dims >= 4 and even, positive
+   `dims % 2 != 0` (the message is now `SinusoidalPositionalEncoding: even dims >= 4 and positive
    frequencies required`), and `Phase71ContractsTest` asserts the odd-dims rejection next to the
    existing dims-2 one. jmlx still rejects `dims == 2` on purpose (0.32.4 special-cases it; the
    pre-upgrade reference returned NaNs and the Phase 7.1 probe rejected it deliberately), so the

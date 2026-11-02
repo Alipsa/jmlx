@@ -429,15 +429,27 @@ public final class MLXOps {
     return MLX.astype(new MLXArray(scope, res), DType.INT32);
   }
 
-  /** Cumulative sum along {@code axis}, with native reverse and inclusive semantics exposed. */
+  /**
+   * Cumulative sum along {@code axis}, with native reverse and inclusive semantics exposed.
+   *
+   * <p>Targets {@code mlx_cumsum_axis}: mlx-c v0.8.0 changed the same-named {@code mlx_cumsum} to a
+   * no-axis scan with an input-inferred-dtype parameter, moving the per-axis behaviour to the
+   * {@code _axis} variant (req/plans/phase7-5-plan.md §3). The absent optional dtype reproduces the
+   * old input-inferred dtype.
+   */
   public static MLXArray cumulativeSumAxis(
       MLXArray a, int axis, boolean reverse, boolean inclusive) {
     MLXScope scope = a.scope();
-    MemorySegment res = mlx_h.mlx_array_new(scope);
-    NativeOps.checked(
-        "cumulativeSumAxis",
-        () -> mlx_h.mlx_cumsum(res, a.handle(), axis, reverse, inclusive, scope.stream()));
-    return new MLXArray(scope, res);
+    try (Arena tmp = Arena.ofConfined()) {
+      MemorySegment dtypeStruct = NativeOps.optDtype(tmp, null);
+      MemorySegment res = mlx_h.mlx_array_new(scope);
+      NativeOps.checked(
+          "cumulativeSumAxis",
+          () ->
+              mlx_h.mlx_cumsum_axis(
+                  res, a.handle(), axis, reverse, inclusive, dtypeStruct, scope.stream()));
+      return new MLXArray(scope, res);
+    }
   }
 
   /** Elementwise finite predicate. The result dtype is BOOL. */

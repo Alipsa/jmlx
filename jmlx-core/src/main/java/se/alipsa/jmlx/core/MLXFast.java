@@ -170,6 +170,10 @@ public final class MLXFast {
    * own {@code sinks} parameter (verified against the mlx-c header's parameter order) but is not
    * yet exercised with a non-null value by any test in this codebase.
    *
+   * <p>The {@code force_fused} parameter added in mlx-c v0.8.0 is always passed as {@code false},
+   * its C default, reproducing the pre-v0.8.0 call exactly (v0.31.2's signature had no such
+   * parameter; req/plans/phase7-5-plan.md §1).
+   *
    * @throws IllegalArgumentException if both {@code causal} and a non-null {@code maskArr} are
    *     given
    */
@@ -205,6 +209,7 @@ public final class MLXFast {
                   maskMode,
                   maskHandle,
                   sinksHandle,
+                  false,
                   scope.stream()));
       return new MLXArray(scope, res);
     }

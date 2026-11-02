@@ -4,8 +4,8 @@
   "runtime": {
     "python": "3.12.15",
     "host": "Darwin arm64",
-    "mlx": "0.31.2",
-    "mlx_metal": "0.31.2",
+    "mlx": "0.32.4",
+    "mlx_metal": "0.32.4",
     "mlx_lm": "0.29.1",
     "mlx_vlm": "0.3.9",
     "transformers": "4.57.6",
@@ -15,7 +15,7 @@
     "numpy": "2.5.3",
     "pillow": "12.3.0"
   },
-  "requirements_lock_sha256": "451c7a9fb8053d25b466da7103e2f92a2fd7af48baccce5117a6d57a4c210e6c",
+  "requirements_lock_sha256": "23eea786c2906355799b48f27496e4c04f0af412fde16b51ea0d7373073a8c65",
   "probe": {
     "runner": "tools/qwen-vl-reference/run_qwen3vl_mlx_probe.py",
     "golden": "goldens/qwen3-vl-8b-wp1-mlx-probe.json",

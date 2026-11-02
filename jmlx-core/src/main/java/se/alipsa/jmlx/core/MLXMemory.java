@@ -12,13 +12,13 @@ import se.alipsa.jmlx.ffi.mlx_h;
  * using the same native runtime; concurrent work can change them between calls. Counters are
  * sampled synchronously but do not themselves evaluate pending lazy MLX graphs. Callers measuring a
  * phase must evaluate its outputs before sampling. On the Metal backend the counters can also be
- * momentarily high right after an {@code eval} returns. Verified against the pinned mlx-metal
- * 0.31.2 source: {@code gpu::eval} (mlx/backend/metal/eval.cpp) captures each kernel's input and
- * sibling buffers into the command buffer's completion handler, and the CPU-side wait ({@code
- * Event::wait}, mlx/backend/metal/event.cpp) is not ordered after that handler's teardown on
- * Metal's dispatch thread, so the corresponding frees can land microseconds to milliseconds later.
- * When a post-eval steady-state value is needed, sample {@code activeBytes()} repeatedly until the
- * value stops changing before asserting on it. Native errors throw {@link MLXException}.
+ * momentarily high right after an {@code eval} returns. Verified against the pinned MLX 0.32.4
+ * source: {@code gpu::eval} (mlx/backend/metal/eval.cpp) captures each kernel's input and sibling
+ * buffers into the command buffer's completion handler, and the CPU-side wait ({@code Event::wait},
+ * mlx/backend/metal/event.cpp) is not ordered after that handler's teardown on Metal's dispatch
+ * thread, so the corresponding frees can land microseconds to milliseconds later. When a post-eval
+ * steady-state value is needed, sample {@code activeBytes()} repeatedly until the value stops
+ * changing before asserting on it. Native errors throw {@link MLXException}.
  */
 public final class MLXMemory {
   static {

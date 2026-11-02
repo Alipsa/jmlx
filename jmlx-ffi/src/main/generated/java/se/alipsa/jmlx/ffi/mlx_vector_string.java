@@ -14,9 +14,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * typedef struct mlx_vector_string_ {
- *     void *ctx;
- * } mlx_vector_string
+ * typedef struct mlx_vector_string_ mlx_vector_string
  * }
  */
 public class mlx_vector_string extends mlx_vector_string_ {

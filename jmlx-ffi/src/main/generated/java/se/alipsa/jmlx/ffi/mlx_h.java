@@ -5241,6 +5241,2556 @@ public class mlx_h extends mlx_h$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
+    private static final int MLX_CPU = (int)0L;
+    /**
+     * {@snippet lang=c :
+     * enum mlx_device_type_.MLX_CPU = 0
+     * }
+     */
+    public static int MLX_CPU() {
+        return MLX_CPU;
+    }
+    private static final int MLX_GPU = (int)1L;
+    /**
+     * {@snippet lang=c :
+     * enum mlx_device_type_.MLX_GPU = 1
+     * }
+     */
+    public static int MLX_GPU() {
+        return MLX_GPU;
+    }
+
+    private static class mlx_device_new {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_device_.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_new");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new()
+     * }
+     */
+    public static FunctionDescriptor mlx_device_new$descriptor() {
+        return mlx_device_new.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new()
+     * }
+     */
+    public static MethodHandle mlx_device_new$handle() {
+        return mlx_device_new.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new()
+     * }
+     */
+    public static MemorySegment mlx_device_new$address() {
+        return mlx_device_new.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new()
+     * }
+     */
+    public static MemorySegment mlx_device_new(SegmentAllocator allocator) {
+        var mh$ = mlx_device_new.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_new", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_new_type {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_device_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_INT
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_new_type");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_new_type$descriptor() {
+        return mlx_device_new_type.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
+     * }
+     */
+    public static MethodHandle mlx_device_new_type$handle() {
+        return mlx_device_new_type.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
+     * }
+     */
+    public static MemorySegment mlx_device_new_type$address() {
+        return mlx_device_new_type.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
+     * }
+     */
+    public static MemorySegment mlx_device_new_type(SegmentAllocator allocator, int type, int index) {
+        var mh$ = mlx_device_new_type.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_new_type", allocator, type, index);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator, type, index);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_free {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_free");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_free(mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_free$descriptor() {
+        return mlx_device_free.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_free(mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_device_free$handle() {
+        return mlx_device_free.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_free(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_device_free$address() {
+        return mlx_device_free.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_free(mlx_device dev)
+     * }
+     */
+    public static int mlx_device_free(MemorySegment dev) {
+        var mh$ = mlx_device_free.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_free", dev);
+            }
+            return (int)mh$.invokeExact(dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_set {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_set");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_set$descriptor() {
+        return mlx_device_set.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * }
+     */
+    public static MethodHandle mlx_device_set$handle() {
+        return mlx_device_set.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * }
+     */
+    public static MemorySegment mlx_device_set$address() {
+        return mlx_device_set.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * }
+     */
+    public static int mlx_device_set(MemorySegment dev, MemorySegment src) {
+        var mh$ = mlx_device_set.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_set", dev, src);
+            }
+            return (int)mh$.invokeExact(dev, src);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_tostring {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_tostring");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_tostring$descriptor() {
+        return mlx_device_tostring.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_device_tostring$handle() {
+        return mlx_device_tostring.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_device_tostring$address() {
+        return mlx_device_tostring.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
+     * }
+     */
+    public static int mlx_device_tostring(MemorySegment str, MemorySegment dev) {
+        var mh$ = mlx_device_tostring.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_tostring", str, dev);
+            }
+            return (int)mh$.invokeExact(str, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_equal {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_BOOL,
+            mlx_device_.layout(),
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_equal");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_equal$descriptor() {
+        return mlx_device_equal.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
+     * }
+     */
+    public static MethodHandle mlx_device_equal$handle() {
+        return mlx_device_equal.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
+     * }
+     */
+    public static MemorySegment mlx_device_equal$address() {
+        return mlx_device_equal.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
+     * }
+     */
+    public static boolean mlx_device_equal(MemorySegment lhs, MemorySegment rhs) {
+        var mh$ = mlx_device_equal.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_equal", lhs, rhs);
+            }
+            return (boolean)mh$.invokeExact(lhs, rhs);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_get_index {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_get_index");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_get_index(int *index, mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_get_index$descriptor() {
+        return mlx_device_get_index.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_get_index(int *index, mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_device_get_index$handle() {
+        return mlx_device_get_index.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_get_index(int *index, mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_device_get_index$address() {
+        return mlx_device_get_index.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_get_index(int *index, mlx_device dev)
+     * }
+     */
+    public static int mlx_device_get_index(MemorySegment index, MemorySegment dev) {
+        var mh$ = mlx_device_get_index.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_get_index", index, dev);
+            }
+            return (int)mh$.invokeExact(index, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_get_type {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_get_type");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_get_type$descriptor() {
+        return mlx_device_get_type.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_device_get_type$handle() {
+        return mlx_device_get_type.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_device_get_type$address() {
+        return mlx_device_get_type.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
+     * }
+     */
+    public static int mlx_device_get_type(MemorySegment type, MemorySegment dev) {
+        var mh$ = mlx_device_get_type.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_get_type", type, dev);
+            }
+            return (int)mh$.invokeExact(type, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_get_default_device {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_get_default_device");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_get_default_device(mlx_device *dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_get_default_device$descriptor() {
+        return mlx_get_default_device.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_get_default_device(mlx_device *dev)
+     * }
+     */
+    public static MethodHandle mlx_get_default_device$handle() {
+        return mlx_get_default_device.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_get_default_device(mlx_device *dev)
+     * }
+     */
+    public static MemorySegment mlx_get_default_device$address() {
+        return mlx_get_default_device.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_get_default_device(mlx_device *dev)
+     * }
+     */
+    public static int mlx_get_default_device(MemorySegment dev) {
+        var mh$ = mlx_get_default_device.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_get_default_device", dev);
+            }
+            return (int)mh$.invokeExact(dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_set_default_device {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_set_default_device");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_set_default_device(mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_set_default_device$descriptor() {
+        return mlx_set_default_device.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_set_default_device(mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_set_default_device$handle() {
+        return mlx_set_default_device.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_set_default_device(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_set_default_device$address() {
+        return mlx_set_default_device.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_set_default_device(mlx_device dev)
+     * }
+     */
+    public static int mlx_set_default_device(MemorySegment dev) {
+        var mh$ = mlx_set_default_device.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_set_default_device", dev);
+            }
+            return (int)mh$.invokeExact(dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_is_available {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_is_available");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_is_available(bool *avail, mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_is_available$descriptor() {
+        return mlx_device_is_available.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_is_available(bool *avail, mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_device_is_available$handle() {
+        return mlx_device_is_available.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_is_available(bool *avail, mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_device_is_available$address() {
+        return mlx_device_is_available.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_is_available(bool *avail, mlx_device dev)
+     * }
+     */
+    public static int mlx_device_is_available(MemorySegment avail, MemorySegment dev) {
+        var mh$ = mlx_device_is_available.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_is_available", avail, dev);
+            }
+            return (int)mh$.invokeExact(avail, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_count {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_h.C_INT
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_count");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_count(int *count, mlx_device_type type)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_count$descriptor() {
+        return mlx_device_count.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_count(int *count, mlx_device_type type)
+     * }
+     */
+    public static MethodHandle mlx_device_count$handle() {
+        return mlx_device_count.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_count(int *count, mlx_device_type type)
+     * }
+     */
+    public static MemorySegment mlx_device_count$address() {
+        return mlx_device_count.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_count(int *count, mlx_device_type type)
+     * }
+     */
+    public static int mlx_device_count(MemorySegment count, int type) {
+        var mh$ = mlx_device_count.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_count", count, type);
+            }
+            return (int)mh$.invokeExact(count, type);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_new {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_device_info_.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_new");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_device_info mlx_device_info_new()
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_new$descriptor() {
+        return mlx_device_info_new.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_device_info mlx_device_info_new()
+     * }
+     */
+    public static MethodHandle mlx_device_info_new$handle() {
+        return mlx_device_info_new.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_device_info mlx_device_info_new()
+     * }
+     */
+    public static MemorySegment mlx_device_info_new$address() {
+        return mlx_device_info_new.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_device_info mlx_device_info_new()
+     * }
+     */
+    public static MemorySegment mlx_device_info_new(SegmentAllocator allocator) {
+        var mh$ = mlx_device_info_new.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_new", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_get {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_get$descriptor() {
+        return mlx_device_info_get.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_device_info_get$handle() {
+        return mlx_device_info_get.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_device_info_get$address() {
+        return mlx_device_info_get.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
+     * }
+     */
+    public static int mlx_device_info_get(MemorySegment info, MemorySegment dev) {
+        var mh$ = mlx_device_info_get.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_get", info, dev);
+            }
+            return (int)mh$.invokeExact(info, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_free {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_device_info_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_free");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_free(mlx_device_info info)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_free$descriptor() {
+        return mlx_device_info_free.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_free(mlx_device_info info)
+     * }
+     */
+    public static MethodHandle mlx_device_info_free$handle() {
+        return mlx_device_info_free.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_free(mlx_device_info info)
+     * }
+     */
+    public static MemorySegment mlx_device_info_free$address() {
+        return mlx_device_info_free.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_free(mlx_device_info info)
+     * }
+     */
+    public static int mlx_device_info_free(MemorySegment info) {
+        var mh$ = mlx_device_info_free.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_free", info);
+            }
+            return (int)mh$.invokeExact(info);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_has_key {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_info_.layout(),
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_has_key");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_has_key$descriptor() {
+        return mlx_device_info_has_key.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MethodHandle mlx_device_info_has_key$handle() {
+        return mlx_device_info_has_key.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MemorySegment mlx_device_info_has_key$address() {
+        return mlx_device_info_has_key.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
+     * }
+     */
+    public static int mlx_device_info_has_key(MemorySegment exists, MemorySegment info, MemorySegment key) {
+        var mh$ = mlx_device_info_has_key.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_has_key", exists, info, key);
+            }
+            return (int)mh$.invokeExact(exists, info, key);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_is_string {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_info_.layout(),
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_is_string");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_is_string$descriptor() {
+        return mlx_device_info_is_string.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MethodHandle mlx_device_info_is_string$handle() {
+        return mlx_device_info_is_string.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MemorySegment mlx_device_info_is_string$address() {
+        return mlx_device_info_is_string.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
+     * }
+     */
+    public static int mlx_device_info_is_string(MemorySegment is_string, MemorySegment info, MemorySegment key) {
+        var mh$ = mlx_device_info_is_string.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_is_string", is_string, info, key);
+            }
+            return (int)mh$.invokeExact(is_string, info, key);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_get_string {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_info_.layout(),
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get_string");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_get_string$descriptor() {
+        return mlx_device_info_get_string.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MethodHandle mlx_device_info_get_string$handle() {
+        return mlx_device_info_get_string.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MemorySegment mlx_device_info_get_string$address() {
+        return mlx_device_info_get_string.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static int mlx_device_info_get_string(MemorySegment value, MemorySegment info, MemorySegment key) {
+        var mh$ = mlx_device_info_get_string.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_get_string", value, info, key);
+            }
+            return (int)mh$.invokeExact(value, info, key);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_get_size {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_info_.layout(),
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get_size");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_get_size$descriptor() {
+        return mlx_device_info_get_size.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MethodHandle mlx_device_info_get_size$handle() {
+        return mlx_device_info_get_size.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static MemorySegment mlx_device_info_get_size$address() {
+        return mlx_device_info_get_size.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
+     * }
+     */
+    public static int mlx_device_info_get_size(MemorySegment value, MemorySegment info, MemorySegment key) {
+        var mh$ = mlx_device_info_get_size.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_get_size", value, info, key);
+            }
+            return (int)mh$.invokeExact(value, info, key);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_device_info_get_keys {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_info_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get_keys");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
+     * }
+     */
+    public static FunctionDescriptor mlx_device_info_get_keys$descriptor() {
+        return mlx_device_info_get_keys.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
+     * }
+     */
+    public static MethodHandle mlx_device_info_get_keys$handle() {
+        return mlx_device_info_get_keys.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
+     * }
+     */
+    public static MemorySegment mlx_device_info_get_keys$address() {
+        return mlx_device_info_get_keys.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
+     * }
+     */
+    public static int mlx_device_info_get_keys(MemorySegment keys, MemorySegment info) {
+        var mh$ = mlx_device_info_get_keys.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_device_info_get_keys", keys, info);
+            }
+            return (int)mh$.invokeExact(keys, info);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_new {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_stream_.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_new");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new()
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_new$descriptor() {
+        return mlx_stream_new.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new()
+     * }
+     */
+    public static MethodHandle mlx_stream_new$handle() {
+        return mlx_stream_new.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new()
+     * }
+     */
+    public static MemorySegment mlx_stream_new$address() {
+        return mlx_stream_new.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new()
+     * }
+     */
+    public static MemorySegment mlx_stream_new(SegmentAllocator allocator) {
+        var mh$ = mlx_stream_new.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_new", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_new_device {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_stream_.layout(),
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_new_device");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_device(mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_new_device$descriptor() {
+        return mlx_stream_new_device.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_device(mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_stream_new_device$handle() {
+        return mlx_stream_new_device.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_device(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_stream_new_device$address() {
+        return mlx_stream_new_device.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_device(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_stream_new_device(SegmentAllocator allocator, MemorySegment dev) {
+        var mh$ = mlx_stream_new_device.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_new_device", allocator, dev);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_new_thread_unsafe {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_stream_.layout(),
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_new_thread_unsafe");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_thread_unsafe(mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_new_thread_unsafe$descriptor() {
+        return mlx_stream_new_thread_unsafe.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_thread_unsafe(mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_stream_new_thread_unsafe$handle() {
+        return mlx_stream_new_thread_unsafe.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_thread_unsafe(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_stream_new_thread_unsafe$address() {
+        return mlx_stream_new_thread_unsafe.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_stream mlx_stream_new_thread_unsafe(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_stream_new_thread_unsafe(SegmentAllocator allocator, MemorySegment dev) {
+        var mh$ = mlx_stream_new_thread_unsafe.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_new_thread_unsafe", allocator, dev);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_thread_local_new {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_stream_thread_local_.layout(),
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_thread_local_new");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_stream_thread_local mlx_stream_thread_local_new(mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_thread_local_new$descriptor() {
+        return mlx_stream_thread_local_new.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_stream_thread_local mlx_stream_thread_local_new(mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_stream_thread_local_new$handle() {
+        return mlx_stream_thread_local_new.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_stream_thread_local mlx_stream_thread_local_new(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_stream_thread_local_new$address() {
+        return mlx_stream_thread_local_new.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_stream_thread_local mlx_stream_thread_local_new(mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_stream_thread_local_new(SegmentAllocator allocator, MemorySegment dev) {
+        var mh$ = mlx_stream_thread_local_new.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_thread_local_new", allocator, dev);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_thread_local_set {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_stream_thread_local_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_thread_local_set");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_set(mlx_stream_thread_local *tls, const mlx_stream_thread_local src)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_thread_local_set$descriptor() {
+        return mlx_stream_thread_local_set.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_set(mlx_stream_thread_local *tls, const mlx_stream_thread_local src)
+     * }
+     */
+    public static MethodHandle mlx_stream_thread_local_set$handle() {
+        return mlx_stream_thread_local_set.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_set(mlx_stream_thread_local *tls, const mlx_stream_thread_local src)
+     * }
+     */
+    public static MemorySegment mlx_stream_thread_local_set$address() {
+        return mlx_stream_thread_local_set.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_set(mlx_stream_thread_local *tls, const mlx_stream_thread_local src)
+     * }
+     */
+    public static int mlx_stream_thread_local_set(MemorySegment tls, MemorySegment src) {
+        var mh$ = mlx_stream_thread_local_set.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_thread_local_set", tls, src);
+            }
+            return (int)mh$.invokeExact(tls, src);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_thread_local_free {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_stream_thread_local_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_thread_local_free");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_free(mlx_stream_thread_local tls)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_thread_local_free$descriptor() {
+        return mlx_stream_thread_local_free.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_free(mlx_stream_thread_local tls)
+     * }
+     */
+    public static MethodHandle mlx_stream_thread_local_free$handle() {
+        return mlx_stream_thread_local_free.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_free(mlx_stream_thread_local tls)
+     * }
+     */
+    public static MemorySegment mlx_stream_thread_local_free$address() {
+        return mlx_stream_thread_local_free.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_thread_local_free(mlx_stream_thread_local tls)
+     * }
+     */
+    public static int mlx_stream_thread_local_free(MemorySegment tls) {
+        var mh$ = mlx_stream_thread_local_free.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_thread_local_free", tls);
+            }
+            return (int)mh$.invokeExact(tls);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_from_thread_local {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_stream_thread_local_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_from_thread_local");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_from_thread_local(mlx_stream *res, const mlx_stream_thread_local tls)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_from_thread_local$descriptor() {
+        return mlx_stream_from_thread_local.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_from_thread_local(mlx_stream *res, const mlx_stream_thread_local tls)
+     * }
+     */
+    public static MethodHandle mlx_stream_from_thread_local$handle() {
+        return mlx_stream_from_thread_local.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_from_thread_local(mlx_stream *res, const mlx_stream_thread_local tls)
+     * }
+     */
+    public static MemorySegment mlx_stream_from_thread_local$address() {
+        return mlx_stream_from_thread_local.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_from_thread_local(mlx_stream *res, const mlx_stream_thread_local tls)
+     * }
+     */
+    public static int mlx_stream_from_thread_local(MemorySegment res, MemorySegment tls) {
+        var mh$ = mlx_stream_from_thread_local.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_from_thread_local", res, tls);
+            }
+            return (int)mh$.invokeExact(res, tls);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_get_streams {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_get_streams");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_get_streams(mlx_vector_stream *res)
+     * }
+     */
+    public static FunctionDescriptor mlx_get_streams$descriptor() {
+        return mlx_get_streams.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_get_streams(mlx_vector_stream *res)
+     * }
+     */
+    public static MethodHandle mlx_get_streams$handle() {
+        return mlx_get_streams.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_get_streams(mlx_vector_stream *res)
+     * }
+     */
+    public static MemorySegment mlx_get_streams$address() {
+        return mlx_get_streams.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_get_streams(mlx_vector_stream *res)
+     * }
+     */
+    public static int mlx_get_streams(MemorySegment res) {
+        var mh$ = mlx_get_streams.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_get_streams", res);
+            }
+            return (int)mh$.invokeExact(res);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_set {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_set");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_set$descriptor() {
+        return mlx_stream_set.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * }
+     */
+    public static MethodHandle mlx_stream_set$handle() {
+        return mlx_stream_set.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * }
+     */
+    public static MemorySegment mlx_stream_set$address() {
+        return mlx_stream_set.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * }
+     */
+    public static int mlx_stream_set(MemorySegment stream, MemorySegment src) {
+        var mh$ = mlx_stream_set.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_set", stream, src);
+            }
+            return (int)mh$.invokeExact(stream, src);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_free {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_free");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_free(mlx_stream stream)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_free$descriptor() {
+        return mlx_stream_free.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_free(mlx_stream stream)
+     * }
+     */
+    public static MethodHandle mlx_stream_free$handle() {
+        return mlx_stream_free.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_free(mlx_stream stream)
+     * }
+     */
+    public static MemorySegment mlx_stream_free$address() {
+        return mlx_stream_free.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_free(mlx_stream stream)
+     * }
+     */
+    public static int mlx_stream_free(MemorySegment stream) {
+        var mh$ = mlx_stream_free.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_free", stream);
+            }
+            return (int)mh$.invokeExact(stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_tostring {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_tostring");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_tostring$descriptor() {
+        return mlx_stream_tostring.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * }
+     */
+    public static MethodHandle mlx_stream_tostring$handle() {
+        return mlx_stream_tostring.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * }
+     */
+    public static MemorySegment mlx_stream_tostring$address() {
+        return mlx_stream_tostring.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * }
+     */
+    public static int mlx_stream_tostring(MemorySegment str, MemorySegment stream) {
+        var mh$ = mlx_stream_tostring.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_tostring", str, stream);
+            }
+            return (int)mh$.invokeExact(str, stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_equal {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_BOOL,
+            mlx_stream_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_equal");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_equal$descriptor() {
+        return mlx_stream_equal.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
+     * }
+     */
+    public static MethodHandle mlx_stream_equal$handle() {
+        return mlx_stream_equal.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
+     * }
+     */
+    public static MemorySegment mlx_stream_equal$address() {
+        return mlx_stream_equal.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
+     * }
+     */
+    public static boolean mlx_stream_equal(MemorySegment lhs, MemorySegment rhs) {
+        var mh$ = mlx_stream_equal.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_equal", lhs, rhs);
+            }
+            return (boolean)mh$.invokeExact(lhs, rhs);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_get_device {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_get_device");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_get_device$descriptor() {
+        return mlx_stream_get_device.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
+     * }
+     */
+    public static MethodHandle mlx_stream_get_device$handle() {
+        return mlx_stream_get_device.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
+     * }
+     */
+    public static MemorySegment mlx_stream_get_device$address() {
+        return mlx_stream_get_device.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
+     * }
+     */
+    public static int mlx_stream_get_device(MemorySegment dev, MemorySegment stream) {
+        var mh$ = mlx_stream_get_device.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_get_device", dev, stream);
+            }
+            return (int)mh$.invokeExact(dev, stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_stream_get_index {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_get_index");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_stream_get_index(int *index, mlx_stream stream)
+     * }
+     */
+    public static FunctionDescriptor mlx_stream_get_index$descriptor() {
+        return mlx_stream_get_index.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_stream_get_index(int *index, mlx_stream stream)
+     * }
+     */
+    public static MethodHandle mlx_stream_get_index$handle() {
+        return mlx_stream_get_index.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_stream_get_index(int *index, mlx_stream stream)
+     * }
+     */
+    public static MemorySegment mlx_stream_get_index$address() {
+        return mlx_stream_get_index.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_stream_get_index(int *index, mlx_stream stream)
+     * }
+     */
+    public static int mlx_stream_get_index(MemorySegment index, MemorySegment stream) {
+        var mh$ = mlx_stream_get_index.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_stream_get_index", index, stream);
+            }
+            return (int)mh$.invokeExact(index, stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_synchronize {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_synchronize");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_synchronize(mlx_stream stream)
+     * }
+     */
+    public static FunctionDescriptor mlx_synchronize$descriptor() {
+        return mlx_synchronize.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_synchronize(mlx_stream stream)
+     * }
+     */
+    public static MethodHandle mlx_synchronize$handle() {
+        return mlx_synchronize.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_synchronize(mlx_stream stream)
+     * }
+     */
+    public static MemorySegment mlx_synchronize$address() {
+        return mlx_synchronize.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_synchronize(mlx_stream stream)
+     * }
+     */
+    public static int mlx_synchronize(MemorySegment stream) {
+        var mh$ = mlx_synchronize.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_synchronize", stream);
+            }
+            return (int)mh$.invokeExact(stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_synchronize_default {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_synchronize_default");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_synchronize_default()
+     * }
+     */
+    public static FunctionDescriptor mlx_synchronize_default$descriptor() {
+        return mlx_synchronize_default.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_synchronize_default()
+     * }
+     */
+    public static MethodHandle mlx_synchronize_default$handle() {
+        return mlx_synchronize_default.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_synchronize_default()
+     * }
+     */
+    public static MemorySegment mlx_synchronize_default$address() {
+        return mlx_synchronize_default.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_synchronize_default()
+     * }
+     */
+    public static int mlx_synchronize_default() {
+        var mh$ = mlx_synchronize_default.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_synchronize_default");
+            }
+            return (int)mh$.invokeExact();
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_synchronize_thread_local {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_stream_thread_local_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_synchronize_thread_local");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_synchronize_thread_local(mlx_stream_thread_local tls)
+     * }
+     */
+    public static FunctionDescriptor mlx_synchronize_thread_local$descriptor() {
+        return mlx_synchronize_thread_local.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_synchronize_thread_local(mlx_stream_thread_local tls)
+     * }
+     */
+    public static MethodHandle mlx_synchronize_thread_local$handle() {
+        return mlx_synchronize_thread_local.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_synchronize_thread_local(mlx_stream_thread_local tls)
+     * }
+     */
+    public static MemorySegment mlx_synchronize_thread_local$address() {
+        return mlx_synchronize_thread_local.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_synchronize_thread_local(mlx_stream_thread_local tls)
+     * }
+     */
+    public static int mlx_synchronize_thread_local(MemorySegment tls) {
+        var mh$ = mlx_synchronize_thread_local.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_synchronize_thread_local", tls);
+            }
+            return (int)mh$.invokeExact(tls);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_clear_streams {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_clear_streams");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_clear_streams()
+     * }
+     */
+    public static FunctionDescriptor mlx_clear_streams$descriptor() {
+        return mlx_clear_streams.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_clear_streams()
+     * }
+     */
+    public static MethodHandle mlx_clear_streams$handle() {
+        return mlx_clear_streams.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_clear_streams()
+     * }
+     */
+    public static MemorySegment mlx_clear_streams$address() {
+        return mlx_clear_streams.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_clear_streams()
+     * }
+     */
+    public static int mlx_clear_streams() {
+        var mh$ = mlx_clear_streams.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_clear_streams");
+            }
+            return (int)mh$.invokeExact();
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_get_default_stream {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_device_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_get_default_stream");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
+     * }
+     */
+    public static FunctionDescriptor mlx_get_default_stream$descriptor() {
+        return mlx_get_default_stream.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
+     * }
+     */
+    public static MethodHandle mlx_get_default_stream$handle() {
+        return mlx_get_default_stream.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
+     * }
+     */
+    public static MemorySegment mlx_get_default_stream$address() {
+        return mlx_get_default_stream.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
+     * }
+     */
+    public static int mlx_get_default_stream(MemorySegment stream, MemorySegment dev) {
+        var mh$ = mlx_get_default_stream.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_get_default_stream", stream, dev);
+            }
+            return (int)mh$.invokeExact(stream, dev);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_set_default_stream {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_set_default_stream");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_set_default_stream(mlx_stream stream)
+     * }
+     */
+    public static FunctionDescriptor mlx_set_default_stream$descriptor() {
+        return mlx_set_default_stream.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_set_default_stream(mlx_stream stream)
+     * }
+     */
+    public static MethodHandle mlx_set_default_stream$handle() {
+        return mlx_set_default_stream.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_set_default_stream(mlx_stream stream)
+     * }
+     */
+    public static MemorySegment mlx_set_default_stream$address() {
+        return mlx_set_default_stream.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_set_default_stream(mlx_stream stream)
+     * }
+     */
+    public static int mlx_set_default_stream(MemorySegment stream) {
+        var mh$ = mlx_set_default_stream.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_set_default_stream", stream);
+            }
+            return (int)mh$.invokeExact(stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_default_cpu_stream_new {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_stream_.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_default_cpu_stream_new");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_cpu_stream_new()
+     * }
+     */
+    public static FunctionDescriptor mlx_default_cpu_stream_new$descriptor() {
+        return mlx_default_cpu_stream_new.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_cpu_stream_new()
+     * }
+     */
+    public static MethodHandle mlx_default_cpu_stream_new$handle() {
+        return mlx_default_cpu_stream_new.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_cpu_stream_new()
+     * }
+     */
+    public static MemorySegment mlx_default_cpu_stream_new$address() {
+        return mlx_default_cpu_stream_new.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_cpu_stream_new()
+     * }
+     */
+    public static MemorySegment mlx_default_cpu_stream_new(SegmentAllocator allocator) {
+        var mh$ = mlx_default_cpu_stream_new.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_default_cpu_stream_new", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_default_gpu_stream_new {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_stream_.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_default_gpu_stream_new");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_gpu_stream_new()
+     * }
+     */
+    public static FunctionDescriptor mlx_default_gpu_stream_new$descriptor() {
+        return mlx_default_gpu_stream_new.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_gpu_stream_new()
+     * }
+     */
+    public static MethodHandle mlx_default_gpu_stream_new$handle() {
+        return mlx_default_gpu_stream_new.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_gpu_stream_new()
+     * }
+     */
+    public static MemorySegment mlx_default_gpu_stream_new$address() {
+        return mlx_default_gpu_stream_new.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_stream mlx_default_gpu_stream_new()
+     * }
+     */
+    public static MemorySegment mlx_default_gpu_stream_new(SegmentAllocator allocator) {
+        var mh$ = mlx_default_gpu_stream_new.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_default_gpu_stream_new", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
 
     private static class mlx_vector_array_new {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
@@ -7913,30 +10463,12 @@ public class mlx_h extends mlx_h$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
-    private static final int MLX_CPU = (int)0L;
-    /**
-     * {@snippet lang=c :
-     * enum mlx_device_type_.MLX_CPU = 0
-     * }
-     */
-    public static int MLX_CPU() {
-        return MLX_CPU;
-    }
-    private static final int MLX_GPU = (int)1L;
-    /**
-     * {@snippet lang=c :
-     * enum mlx_device_type_.MLX_GPU = 1
-     * }
-     */
-    public static int MLX_GPU() {
-        return MLX_GPU;
-    }
 
-    private static class mlx_device_new {
+    private static class mlx_vector_stream_new {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_device_.layout()    );
+            mlx_vector_stream_.layout()    );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_new");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_new");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -7944,43 +10476,43 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mlx_device mlx_device_new()
+     * mlx_vector_stream mlx_vector_stream_new()
      * }
      */
-    public static FunctionDescriptor mlx_device_new$descriptor() {
-        return mlx_device_new.DESC;
+    public static FunctionDescriptor mlx_vector_stream_new$descriptor() {
+        return mlx_vector_stream_new.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mlx_device mlx_device_new()
+     * mlx_vector_stream mlx_vector_stream_new()
      * }
      */
-    public static MethodHandle mlx_device_new$handle() {
-        return mlx_device_new.HANDLE;
+    public static MethodHandle mlx_vector_stream_new$handle() {
+        return mlx_vector_stream_new.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mlx_device mlx_device_new()
+     * mlx_vector_stream mlx_vector_stream_new()
      * }
      */
-    public static MemorySegment mlx_device_new$address() {
-        return mlx_device_new.ADDR;
+    public static MemorySegment mlx_vector_stream_new$address() {
+        return mlx_vector_stream_new.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mlx_device mlx_device_new()
+     * mlx_vector_stream mlx_vector_stream_new()
      * }
      */
-    public static MemorySegment mlx_device_new(SegmentAllocator allocator) {
-        var mh$ = mlx_device_new.HANDLE;
+    public static MemorySegment mlx_vector_stream_new(SegmentAllocator allocator) {
+        var mh$ = mlx_vector_stream_new.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_new", allocator);
+                traceDowncall("mlx_vector_stream_new", allocator);
             }
             return (MemorySegment)mh$.invokeExact(allocator);
         } catch (Error | RuntimeException ex) {
@@ -7990,135 +10522,14 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_device_new_type {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_device_.layout(),
-            mlx_h.C_INT,
-            mlx_h.C_INT
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_new_type");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_new_type$descriptor() {
-        return mlx_device_new_type.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
-     * }
-     */
-    public static MethodHandle mlx_device_new_type$handle() {
-        return mlx_device_new_type.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
-     * }
-     */
-    public static MemorySegment mlx_device_new_type$address() {
-        return mlx_device_new_type.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mlx_device mlx_device_new_type(mlx_device_type type, int index)
-     * }
-     */
-    public static MemorySegment mlx_device_new_type(SegmentAllocator allocator, int type, int index) {
-        var mh$ = mlx_device_new_type.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_new_type", allocator, type, index);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator, type, index);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_free {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_free");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_free(mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_free$descriptor() {
-        return mlx_device_free.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_free(mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_device_free$handle() {
-        return mlx_device_free.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_free(mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_device_free$address() {
-        return mlx_device_free.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_free(mlx_device dev)
-     * }
-     */
-    public static int mlx_device_free(MemorySegment dev) {
-        var mh$ = mlx_device_free.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_free", dev);
-            }
-            return (int)mh$.invokeExact(dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_set {
+    private static class mlx_vector_stream_set {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
-            mlx_device_.layout()
+            mlx_vector_stream_.layout()
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_set");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_set");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -8126,45 +10537,45 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * int mlx_vector_stream_set(mlx_vector_stream *vec, const mlx_vector_stream src)
      * }
      */
-    public static FunctionDescriptor mlx_device_set$descriptor() {
-        return mlx_device_set.DESC;
+    public static FunctionDescriptor mlx_vector_stream_set$descriptor() {
+        return mlx_vector_stream_set.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * int mlx_vector_stream_set(mlx_vector_stream *vec, const mlx_vector_stream src)
      * }
      */
-    public static MethodHandle mlx_device_set$handle() {
-        return mlx_device_set.HANDLE;
+    public static MethodHandle mlx_vector_stream_set$handle() {
+        return mlx_vector_stream_set.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * int mlx_vector_stream_set(mlx_vector_stream *vec, const mlx_vector_stream src)
      * }
      */
-    public static MemorySegment mlx_device_set$address() {
-        return mlx_device_set.ADDR;
+    public static MemorySegment mlx_vector_stream_set$address() {
+        return mlx_vector_stream_set.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_device_set(mlx_device *dev, const mlx_device src)
+     * int mlx_vector_stream_set(mlx_vector_stream *vec, const mlx_vector_stream src)
      * }
      */
-    public static int mlx_device_set(MemorySegment dev, MemorySegment src) {
-        var mh$ = mlx_device_set.HANDLE;
+    public static int mlx_vector_stream_set(MemorySegment vec, MemorySegment src) {
+        var mh$ = mlx_vector_stream_set.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_set", dev, src);
+                traceDowncall("mlx_vector_stream_set", vec, src);
             }
-            return (int)mh$.invokeExact(dev, src);
+            return (int)mh$.invokeExact(vec, src);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8172,136 +10583,196 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_device_tostring {
+    private static class mlx_vector_stream_free {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_vector_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_free");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_vector_stream_free(mlx_vector_stream vec)
+     * }
+     */
+    public static FunctionDescriptor mlx_vector_stream_free$descriptor() {
+        return mlx_vector_stream_free.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_vector_stream_free(mlx_vector_stream vec)
+     * }
+     */
+    public static MethodHandle mlx_vector_stream_free$handle() {
+        return mlx_vector_stream_free.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_vector_stream_free(mlx_vector_stream vec)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_free$address() {
+        return mlx_vector_stream_free.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_vector_stream_free(mlx_vector_stream vec)
+     * }
+     */
+    public static int mlx_vector_stream_free(MemorySegment vec) {
+        var mh$ = mlx_vector_stream_free.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_vector_stream_free", vec);
+            }
+            return (int)mh$.invokeExact(vec);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_vector_stream_new_data {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_vector_stream_.layout(),
+            mlx_h.C_POINTER,
+            mlx_h.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_new_data");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_data(const mlx_stream *data, size_t size)
+     * }
+     */
+    public static FunctionDescriptor mlx_vector_stream_new_data$descriptor() {
+        return mlx_vector_stream_new_data.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_data(const mlx_stream *data, size_t size)
+     * }
+     */
+    public static MethodHandle mlx_vector_stream_new_data$handle() {
+        return mlx_vector_stream_new_data.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_data(const mlx_stream *data, size_t size)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_new_data$address() {
+        return mlx_vector_stream_new_data.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_data(const mlx_stream *data, size_t size)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_new_data(SegmentAllocator allocator, MemorySegment data, long size) {
+        var mh$ = mlx_vector_stream_new_data.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_vector_stream_new_data", allocator, data, size);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator, data, size);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_vector_stream_new_value {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_vector_stream_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_new_value");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_value(const mlx_stream val)
+     * }
+     */
+    public static FunctionDescriptor mlx_vector_stream_new_value$descriptor() {
+        return mlx_vector_stream_new_value.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_value(const mlx_stream val)
+     * }
+     */
+    public static MethodHandle mlx_vector_stream_new_value$handle() {
+        return mlx_vector_stream_new_value.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_value(const mlx_stream val)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_new_value$address() {
+        return mlx_vector_stream_new_value.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mlx_vector_stream mlx_vector_stream_new_value(const mlx_stream val)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_new_value(SegmentAllocator allocator, MemorySegment val) {
+        var mh$ = mlx_vector_stream_new_value.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_vector_stream_new_value", allocator, val);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator, val);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_vector_stream_set_data {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_tostring");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_tostring$descriptor() {
-        return mlx_device_tostring.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_device_tostring$handle() {
-        return mlx_device_tostring.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_device_tostring$address() {
-        return mlx_device_tostring.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_tostring(mlx_string *str, mlx_device dev)
-     * }
-     */
-    public static int mlx_device_tostring(MemorySegment str, MemorySegment dev) {
-        var mh$ = mlx_device_tostring.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_tostring", str, dev);
-            }
-            return (int)mh$.invokeExact(str, dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_equal {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_BOOL,
-            mlx_device_.layout(),
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_equal");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_equal$descriptor() {
-        return mlx_device_equal.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
-     * }
-     */
-    public static MethodHandle mlx_device_equal$handle() {
-        return mlx_device_equal.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
-     * }
-     */
-    public static MemorySegment mlx_device_equal$address() {
-        return mlx_device_equal.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * bool mlx_device_equal(mlx_device lhs, mlx_device rhs)
-     * }
-     */
-    public static boolean mlx_device_equal(MemorySegment lhs, MemorySegment rhs) {
-        var mh$ = mlx_device_equal.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_equal", lhs, rhs);
-            }
-            return (boolean)mh$.invokeExact(lhs, rhs);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_get_index {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
             mlx_h.C_POINTER,
-            mlx_device_.layout()
+            mlx_h.C_LONG
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_get_index");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_set_data");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -8309,45 +10780,45 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_device_get_index(int *index, mlx_device dev)
+     * int mlx_vector_stream_set_data(mlx_vector_stream *vec, const mlx_stream *data, size_t size)
      * }
      */
-    public static FunctionDescriptor mlx_device_get_index$descriptor() {
-        return mlx_device_get_index.DESC;
+    public static FunctionDescriptor mlx_vector_stream_set_data$descriptor() {
+        return mlx_vector_stream_set_data.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_device_get_index(int *index, mlx_device dev)
+     * int mlx_vector_stream_set_data(mlx_vector_stream *vec, const mlx_stream *data, size_t size)
      * }
      */
-    public static MethodHandle mlx_device_get_index$handle() {
-        return mlx_device_get_index.HANDLE;
+    public static MethodHandle mlx_vector_stream_set_data$handle() {
+        return mlx_vector_stream_set_data.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_device_get_index(int *index, mlx_device dev)
+     * int mlx_vector_stream_set_data(mlx_vector_stream *vec, const mlx_stream *data, size_t size)
      * }
      */
-    public static MemorySegment mlx_device_get_index$address() {
-        return mlx_device_get_index.ADDR;
+    public static MemorySegment mlx_vector_stream_set_data$address() {
+        return mlx_vector_stream_set_data.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_device_get_index(int *index, mlx_device dev)
+     * int mlx_vector_stream_set_data(mlx_vector_stream *vec, const mlx_stream *data, size_t size)
      * }
      */
-    public static int mlx_device_get_index(MemorySegment index, MemorySegment dev) {
-        var mh$ = mlx_device_get_index.HANDLE;
+    public static int mlx_vector_stream_set_data(MemorySegment vec, MemorySegment data, long size) {
+        var mh$ = mlx_vector_stream_set_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_get_index", index, dev);
+                traceDowncall("mlx_vector_stream_set_data", vec, data, size);
             }
-            return (int)mh$.invokeExact(index, dev);
+            return (int)mh$.invokeExact(vec, data, size);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8355,923 +10826,14 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_device_get_type {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_get_type");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_get_type$descriptor() {
-        return mlx_device_get_type.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_device_get_type$handle() {
-        return mlx_device_get_type.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_device_get_type$address() {
-        return mlx_device_get_type.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_get_type(mlx_device_type *type, mlx_device dev)
-     * }
-     */
-    public static int mlx_device_get_type(MemorySegment type, MemorySegment dev) {
-        var mh$ = mlx_device_get_type.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_get_type", type, dev);
-            }
-            return (int)mh$.invokeExact(type, dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_get_default_device {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_get_default_device");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_get_default_device(mlx_device *dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_get_default_device$descriptor() {
-        return mlx_get_default_device.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_get_default_device(mlx_device *dev)
-     * }
-     */
-    public static MethodHandle mlx_get_default_device$handle() {
-        return mlx_get_default_device.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_get_default_device(mlx_device *dev)
-     * }
-     */
-    public static MemorySegment mlx_get_default_device$address() {
-        return mlx_get_default_device.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_get_default_device(mlx_device *dev)
-     * }
-     */
-    public static int mlx_get_default_device(MemorySegment dev) {
-        var mh$ = mlx_get_default_device.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_get_default_device", dev);
-            }
-            return (int)mh$.invokeExact(dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_set_default_device {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_set_default_device");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_set_default_device(mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_set_default_device$descriptor() {
-        return mlx_set_default_device.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_set_default_device(mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_set_default_device$handle() {
-        return mlx_set_default_device.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_set_default_device(mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_set_default_device$address() {
-        return mlx_set_default_device.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_set_default_device(mlx_device dev)
-     * }
-     */
-    public static int mlx_set_default_device(MemorySegment dev) {
-        var mh$ = mlx_set_default_device.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_set_default_device", dev);
-            }
-            return (int)mh$.invokeExact(dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_is_available {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_is_available");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_is_available(bool *avail, mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_is_available$descriptor() {
-        return mlx_device_is_available.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_is_available(bool *avail, mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_device_is_available$handle() {
-        return mlx_device_is_available.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_is_available(bool *avail, mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_device_is_available$address() {
-        return mlx_device_is_available.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_is_available(bool *avail, mlx_device dev)
-     * }
-     */
-    public static int mlx_device_is_available(MemorySegment avail, MemorySegment dev) {
-        var mh$ = mlx_device_is_available.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_is_available", avail, dev);
-            }
-            return (int)mh$.invokeExact(avail, dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_count {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_h.C_INT
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_count");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_count(int *count, mlx_device_type type)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_count$descriptor() {
-        return mlx_device_count.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_count(int *count, mlx_device_type type)
-     * }
-     */
-    public static MethodHandle mlx_device_count$handle() {
-        return mlx_device_count.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_count(int *count, mlx_device_type type)
-     * }
-     */
-    public static MemorySegment mlx_device_count$address() {
-        return mlx_device_count.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_count(int *count, mlx_device_type type)
-     * }
-     */
-    public static int mlx_device_count(MemorySegment count, int type) {
-        var mh$ = mlx_device_count.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_count", count, type);
-            }
-            return (int)mh$.invokeExact(count, type);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_new {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_device_info_.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_new");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mlx_device_info mlx_device_info_new()
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_new$descriptor() {
-        return mlx_device_info_new.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mlx_device_info mlx_device_info_new()
-     * }
-     */
-    public static MethodHandle mlx_device_info_new$handle() {
-        return mlx_device_info_new.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mlx_device_info mlx_device_info_new()
-     * }
-     */
-    public static MemorySegment mlx_device_info_new$address() {
-        return mlx_device_info_new.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mlx_device_info mlx_device_info_new()
-     * }
-     */
-    public static MemorySegment mlx_device_info_new(SegmentAllocator allocator) {
-        var mh$ = mlx_device_info_new.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_new", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_get$descriptor() {
-        return mlx_device_info_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_device_info_get$handle() {
-        return mlx_device_info_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_device_info_get$address() {
-        return mlx_device_info_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_get(mlx_device_info *info, mlx_device dev)
-     * }
-     */
-    public static int mlx_device_info_get(MemorySegment info, MemorySegment dev) {
-        var mh$ = mlx_device_info_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_get", info, dev);
-            }
-            return (int)mh$.invokeExact(info, dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_free {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_device_info_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_free");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_free(mlx_device_info info)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_free$descriptor() {
-        return mlx_device_info_free.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_free(mlx_device_info info)
-     * }
-     */
-    public static MethodHandle mlx_device_info_free$handle() {
-        return mlx_device_info_free.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_free(mlx_device_info info)
-     * }
-     */
-    public static MemorySegment mlx_device_info_free$address() {
-        return mlx_device_info_free.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_free(mlx_device_info info)
-     * }
-     */
-    public static int mlx_device_info_free(MemorySegment info) {
-        var mh$ = mlx_device_info_free.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_free", info);
-            }
-            return (int)mh$.invokeExact(info);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_has_key {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_info_.layout(),
-            mlx_h.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_has_key");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_has_key$descriptor() {
-        return mlx_device_info_has_key.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MethodHandle mlx_device_info_has_key$handle() {
-        return mlx_device_info_has_key.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MemorySegment mlx_device_info_has_key$address() {
-        return mlx_device_info_has_key.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_has_key(bool *exists, mlx_device_info info, const char *key)
-     * }
-     */
-    public static int mlx_device_info_has_key(MemorySegment exists, MemorySegment info, MemorySegment key) {
-        var mh$ = mlx_device_info_has_key.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_has_key", exists, info, key);
-            }
-            return (int)mh$.invokeExact(exists, info, key);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_is_string {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_info_.layout(),
-            mlx_h.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_is_string");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_is_string$descriptor() {
-        return mlx_device_info_is_string.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MethodHandle mlx_device_info_is_string$handle() {
-        return mlx_device_info_is_string.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MemorySegment mlx_device_info_is_string$address() {
-        return mlx_device_info_is_string.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_is_string(bool *is_string, mlx_device_info info, const char *key)
-     * }
-     */
-    public static int mlx_device_info_is_string(MemorySegment is_string, MemorySegment info, MemorySegment key) {
-        var mh$ = mlx_device_info_is_string.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_is_string", is_string, info, key);
-            }
-            return (int)mh$.invokeExact(is_string, info, key);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_get_string {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_info_.layout(),
-            mlx_h.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get_string");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_get_string$descriptor() {
-        return mlx_device_info_get_string.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MethodHandle mlx_device_info_get_string$handle() {
-        return mlx_device_info_get_string.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MemorySegment mlx_device_info_get_string$address() {
-        return mlx_device_info_get_string.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_get_string(const char **value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static int mlx_device_info_get_string(MemorySegment value, MemorySegment info, MemorySegment key) {
-        var mh$ = mlx_device_info_get_string.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_get_string", value, info, key);
-            }
-            return (int)mh$.invokeExact(value, info, key);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_get_size {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_info_.layout(),
-            mlx_h.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get_size");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_get_size$descriptor() {
-        return mlx_device_info_get_size.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MethodHandle mlx_device_info_get_size$handle() {
-        return mlx_device_info_get_size.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static MemorySegment mlx_device_info_get_size$address() {
-        return mlx_device_info_get_size.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_get_size(size_t *value, mlx_device_info info, const char *key)
-     * }
-     */
-    public static int mlx_device_info_get_size(MemorySegment value, MemorySegment info, MemorySegment key) {
-        var mh$ = mlx_device_info_get_size.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_get_size", value, info, key);
-            }
-            return (int)mh$.invokeExact(value, info, key);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_device_info_get_keys {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_info_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_device_info_get_keys");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
-     * }
-     */
-    public static FunctionDescriptor mlx_device_info_get_keys$descriptor() {
-        return mlx_device_info_get_keys.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
-     * }
-     */
-    public static MethodHandle mlx_device_info_get_keys$handle() {
-        return mlx_device_info_get_keys.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
-     * }
-     */
-    public static MemorySegment mlx_device_info_get_keys$address() {
-        return mlx_device_info_get_keys.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_device_info_get_keys(mlx_vector_string *keys, mlx_device_info info)
-     * }
-     */
-    public static int mlx_device_info_get_keys(MemorySegment keys, MemorySegment info) {
-        var mh$ = mlx_device_info_get_keys.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_device_info_get_keys", keys, info);
-            }
-            return (int)mh$.invokeExact(keys, info);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_stream_new {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_stream_.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_new");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new()
-     * }
-     */
-    public static FunctionDescriptor mlx_stream_new$descriptor() {
-        return mlx_stream_new.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new()
-     * }
-     */
-    public static MethodHandle mlx_stream_new$handle() {
-        return mlx_stream_new.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new()
-     * }
-     */
-    public static MemorySegment mlx_stream_new$address() {
-        return mlx_stream_new.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new()
-     * }
-     */
-    public static MemorySegment mlx_stream_new(SegmentAllocator allocator) {
-        var mh$ = mlx_stream_new.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_new", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_stream_new_device {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_stream_.layout(),
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_new_device");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new_device(mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_stream_new_device$descriptor() {
-        return mlx_stream_new_device.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new_device(mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_stream_new_device$handle() {
-        return mlx_stream_new_device.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new_device(mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_stream_new_device$address() {
-        return mlx_stream_new_device.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mlx_stream mlx_stream_new_device(mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_stream_new_device(SegmentAllocator allocator, MemorySegment dev) {
-        var mh$ = mlx_stream_new_device.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_new_device", allocator, dev);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator, dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_stream_set {
+    private static class mlx_vector_stream_set_value {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_stream_.layout()
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_set");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_set_value");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -9279,45 +10841,45 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * int mlx_vector_stream_set_value(mlx_vector_stream *vec, const mlx_stream val)
      * }
      */
-    public static FunctionDescriptor mlx_stream_set$descriptor() {
-        return mlx_stream_set.DESC;
+    public static FunctionDescriptor mlx_vector_stream_set_value$descriptor() {
+        return mlx_vector_stream_set_value.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * int mlx_vector_stream_set_value(mlx_vector_stream *vec, const mlx_stream val)
      * }
      */
-    public static MethodHandle mlx_stream_set$handle() {
-        return mlx_stream_set.HANDLE;
+    public static MethodHandle mlx_vector_stream_set_value$handle() {
+        return mlx_vector_stream_set_value.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * int mlx_vector_stream_set_value(mlx_vector_stream *vec, const mlx_stream val)
      * }
      */
-    public static MemorySegment mlx_stream_set$address() {
-        return mlx_stream_set.ADDR;
+    public static MemorySegment mlx_vector_stream_set_value$address() {
+        return mlx_vector_stream_set_value.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_stream_set(mlx_stream *stream, const mlx_stream src)
+     * int mlx_vector_stream_set_value(mlx_vector_stream *vec, const mlx_stream val)
      * }
      */
-    public static int mlx_stream_set(MemorySegment stream, MemorySegment src) {
-        var mh$ = mlx_stream_set.HANDLE;
+    public static int mlx_vector_stream_set_value(MemorySegment vec, MemorySegment val) {
+        var mh$ = mlx_vector_stream_set_value.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_set", stream, src);
+                traceDowncall("mlx_vector_stream_set_value", vec, val);
             }
-            return (int)mh$.invokeExact(stream, src);
+            return (int)mh$.invokeExact(vec, val);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9325,13 +10887,76 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_stream_free {
+    private static class mlx_vector_stream_append_data {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
+            mlx_vector_stream_.layout(),
+            mlx_h.C_POINTER,
+            mlx_h.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_append_data");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_vector_stream_append_data(mlx_vector_stream vec, const mlx_stream *data, size_t size)
+     * }
+     */
+    public static FunctionDescriptor mlx_vector_stream_append_data$descriptor() {
+        return mlx_vector_stream_append_data.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_vector_stream_append_data(mlx_vector_stream vec, const mlx_stream *data, size_t size)
+     * }
+     */
+    public static MethodHandle mlx_vector_stream_append_data$handle() {
+        return mlx_vector_stream_append_data.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_vector_stream_append_data(mlx_vector_stream vec, const mlx_stream *data, size_t size)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_append_data$address() {
+        return mlx_vector_stream_append_data.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_vector_stream_append_data(mlx_vector_stream vec, const mlx_stream *data, size_t size)
+     * }
+     */
+    public static int mlx_vector_stream_append_data(MemorySegment vec, MemorySegment data, long size) {
+        var mh$ = mlx_vector_stream_append_data.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_vector_stream_append_data", vec, data, size);
+            }
+            return (int)mh$.invokeExact(vec, data, size);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_vector_stream_append_value {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_vector_stream_.layout(),
             mlx_stream_.layout()
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_free");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_append_value");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -9339,45 +10964,45 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_stream_free(mlx_stream stream)
+     * int mlx_vector_stream_append_value(mlx_vector_stream vec, const mlx_stream val)
      * }
      */
-    public static FunctionDescriptor mlx_stream_free$descriptor() {
-        return mlx_stream_free.DESC;
+    public static FunctionDescriptor mlx_vector_stream_append_value$descriptor() {
+        return mlx_vector_stream_append_value.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_stream_free(mlx_stream stream)
+     * int mlx_vector_stream_append_value(mlx_vector_stream vec, const mlx_stream val)
      * }
      */
-    public static MethodHandle mlx_stream_free$handle() {
-        return mlx_stream_free.HANDLE;
+    public static MethodHandle mlx_vector_stream_append_value$handle() {
+        return mlx_vector_stream_append_value.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_stream_free(mlx_stream stream)
+     * int mlx_vector_stream_append_value(mlx_vector_stream vec, const mlx_stream val)
      * }
      */
-    public static MemorySegment mlx_stream_free$address() {
-        return mlx_stream_free.ADDR;
+    public static MemorySegment mlx_vector_stream_append_value$address() {
+        return mlx_vector_stream_append_value.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_stream_free(mlx_stream stream)
+     * int mlx_vector_stream_append_value(mlx_vector_stream vec, const mlx_stream val)
      * }
      */
-    public static int mlx_stream_free(MemorySegment stream) {
-        var mh$ = mlx_stream_free.HANDLE;
+    public static int mlx_vector_stream_append_value(MemorySegment vec, MemorySegment val) {
+        var mh$ = mlx_vector_stream_append_value.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_free", stream);
+                traceDowncall("mlx_vector_stream_append_value", vec, val);
             }
-            return (int)mh$.invokeExact(stream);
+            return (int)mh$.invokeExact(vec, val);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9385,14 +11010,75 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_stream_tostring {
+    private static class mlx_vector_stream_size {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_LONG,
+            mlx_vector_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_size");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * size_t mlx_vector_stream_size(mlx_vector_stream vec)
+     * }
+     */
+    public static FunctionDescriptor mlx_vector_stream_size$descriptor() {
+        return mlx_vector_stream_size.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * size_t mlx_vector_stream_size(mlx_vector_stream vec)
+     * }
+     */
+    public static MethodHandle mlx_vector_stream_size$handle() {
+        return mlx_vector_stream_size.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * size_t mlx_vector_stream_size(mlx_vector_stream vec)
+     * }
+     */
+    public static MemorySegment mlx_vector_stream_size$address() {
+        return mlx_vector_stream_size.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * size_t mlx_vector_stream_size(mlx_vector_stream vec)
+     * }
+     */
+    public static long mlx_vector_stream_size(MemorySegment vec) {
+        var mh$ = mlx_vector_stream_size.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_vector_stream_size", vec);
+            }
+            return (long)mh$.invokeExact(vec);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_vector_stream_get {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
-            mlx_stream_.layout()
+            mlx_vector_stream_.layout(),
+            mlx_h.C_LONG
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_tostring");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vector_stream_get");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -9400,525 +11086,45 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * int mlx_vector_stream_get(mlx_stream *res, const mlx_vector_stream vec, size_t idx)
      * }
      */
-    public static FunctionDescriptor mlx_stream_tostring$descriptor() {
-        return mlx_stream_tostring.DESC;
+    public static FunctionDescriptor mlx_vector_stream_get$descriptor() {
+        return mlx_vector_stream_get.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * int mlx_vector_stream_get(mlx_stream *res, const mlx_vector_stream vec, size_t idx)
      * }
      */
-    public static MethodHandle mlx_stream_tostring$handle() {
-        return mlx_stream_tostring.HANDLE;
+    public static MethodHandle mlx_vector_stream_get$handle() {
+        return mlx_vector_stream_get.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * int mlx_vector_stream_get(mlx_stream *res, const mlx_vector_stream vec, size_t idx)
      * }
      */
-    public static MemorySegment mlx_stream_tostring$address() {
-        return mlx_stream_tostring.ADDR;
+    public static MemorySegment mlx_vector_stream_get$address() {
+        return mlx_vector_stream_get.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_stream_tostring(mlx_string *str, mlx_stream stream)
+     * int mlx_vector_stream_get(mlx_stream *res, const mlx_vector_stream vec, size_t idx)
      * }
      */
-    public static int mlx_stream_tostring(MemorySegment str, MemorySegment stream) {
-        var mh$ = mlx_stream_tostring.HANDLE;
+    public static int mlx_vector_stream_get(MemorySegment res, MemorySegment vec, long idx) {
+        var mh$ = mlx_vector_stream_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_tostring", str, stream);
+                traceDowncall("mlx_vector_stream_get", res, vec, idx);
             }
-            return (int)mh$.invokeExact(str, stream);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_stream_equal {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_BOOL,
-            mlx_stream_.layout(),
-            mlx_stream_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_equal");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
-     * }
-     */
-    public static FunctionDescriptor mlx_stream_equal$descriptor() {
-        return mlx_stream_equal.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
-     * }
-     */
-    public static MethodHandle mlx_stream_equal$handle() {
-        return mlx_stream_equal.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
-     * }
-     */
-    public static MemorySegment mlx_stream_equal$address() {
-        return mlx_stream_equal.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * bool mlx_stream_equal(mlx_stream lhs, mlx_stream rhs)
-     * }
-     */
-    public static boolean mlx_stream_equal(MemorySegment lhs, MemorySegment rhs) {
-        var mh$ = mlx_stream_equal.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_equal", lhs, rhs);
-            }
-            return (boolean)mh$.invokeExact(lhs, rhs);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_stream_get_device {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_stream_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_get_device");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
-     * }
-     */
-    public static FunctionDescriptor mlx_stream_get_device$descriptor() {
-        return mlx_stream_get_device.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
-     * }
-     */
-    public static MethodHandle mlx_stream_get_device$handle() {
-        return mlx_stream_get_device.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
-     * }
-     */
-    public static MemorySegment mlx_stream_get_device$address() {
-        return mlx_stream_get_device.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_stream_get_device(mlx_device *dev, mlx_stream stream)
-     * }
-     */
-    public static int mlx_stream_get_device(MemorySegment dev, MemorySegment stream) {
-        var mh$ = mlx_stream_get_device.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_get_device", dev, stream);
-            }
-            return (int)mh$.invokeExact(dev, stream);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_stream_get_index {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_stream_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_stream_get_index");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_stream_get_index(int *index, mlx_stream stream)
-     * }
-     */
-    public static FunctionDescriptor mlx_stream_get_index$descriptor() {
-        return mlx_stream_get_index.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_stream_get_index(int *index, mlx_stream stream)
-     * }
-     */
-    public static MethodHandle mlx_stream_get_index$handle() {
-        return mlx_stream_get_index.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_stream_get_index(int *index, mlx_stream stream)
-     * }
-     */
-    public static MemorySegment mlx_stream_get_index$address() {
-        return mlx_stream_get_index.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_stream_get_index(int *index, mlx_stream stream)
-     * }
-     */
-    public static int mlx_stream_get_index(MemorySegment index, MemorySegment stream) {
-        var mh$ = mlx_stream_get_index.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_stream_get_index", index, stream);
-            }
-            return (int)mh$.invokeExact(index, stream);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_synchronize {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_stream_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_synchronize");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_synchronize(mlx_stream stream)
-     * }
-     */
-    public static FunctionDescriptor mlx_synchronize$descriptor() {
-        return mlx_synchronize.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_synchronize(mlx_stream stream)
-     * }
-     */
-    public static MethodHandle mlx_synchronize$handle() {
-        return mlx_synchronize.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_synchronize(mlx_stream stream)
-     * }
-     */
-    public static MemorySegment mlx_synchronize$address() {
-        return mlx_synchronize.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_synchronize(mlx_stream stream)
-     * }
-     */
-    public static int mlx_synchronize(MemorySegment stream) {
-        var mh$ = mlx_synchronize.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_synchronize", stream);
-            }
-            return (int)mh$.invokeExact(stream);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_get_default_stream {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_h.C_POINTER,
-            mlx_device_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_get_default_stream");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
-     * }
-     */
-    public static FunctionDescriptor mlx_get_default_stream$descriptor() {
-        return mlx_get_default_stream.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
-     * }
-     */
-    public static MethodHandle mlx_get_default_stream$handle() {
-        return mlx_get_default_stream.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
-     * }
-     */
-    public static MemorySegment mlx_get_default_stream$address() {
-        return mlx_get_default_stream.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_get_default_stream(mlx_stream *stream, mlx_device dev)
-     * }
-     */
-    public static int mlx_get_default_stream(MemorySegment stream, MemorySegment dev) {
-        var mh$ = mlx_get_default_stream.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_get_default_stream", stream, dev);
-            }
-            return (int)mh$.invokeExact(stream, dev);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_set_default_stream {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_stream_.layout()
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_set_default_stream");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * int mlx_set_default_stream(mlx_stream stream)
-     * }
-     */
-    public static FunctionDescriptor mlx_set_default_stream$descriptor() {
-        return mlx_set_default_stream.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * int mlx_set_default_stream(mlx_stream stream)
-     * }
-     */
-    public static MethodHandle mlx_set_default_stream$handle() {
-        return mlx_set_default_stream.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * int mlx_set_default_stream(mlx_stream stream)
-     * }
-     */
-    public static MemorySegment mlx_set_default_stream$address() {
-        return mlx_set_default_stream.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * int mlx_set_default_stream(mlx_stream stream)
-     * }
-     */
-    public static int mlx_set_default_stream(MemorySegment stream) {
-        var mh$ = mlx_set_default_stream.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_set_default_stream", stream);
-            }
-            return (int)mh$.invokeExact(stream);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_default_cpu_stream_new {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_stream_.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_default_cpu_stream_new");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_cpu_stream_new()
-     * }
-     */
-    public static FunctionDescriptor mlx_default_cpu_stream_new$descriptor() {
-        return mlx_default_cpu_stream_new.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_cpu_stream_new()
-     * }
-     */
-    public static MethodHandle mlx_default_cpu_stream_new$handle() {
-        return mlx_default_cpu_stream_new.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_cpu_stream_new()
-     * }
-     */
-    public static MemorySegment mlx_default_cpu_stream_new$address() {
-        return mlx_default_cpu_stream_new.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_cpu_stream_new()
-     * }
-     */
-    public static MemorySegment mlx_default_cpu_stream_new(SegmentAllocator allocator) {
-        var mh$ = mlx_default_cpu_stream_new.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_default_cpu_stream_new", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mlx_default_gpu_stream_new {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_stream_.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_default_gpu_stream_new");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_gpu_stream_new()
-     * }
-     */
-    public static FunctionDescriptor mlx_default_gpu_stream_new$descriptor() {
-        return mlx_default_gpu_stream_new.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_gpu_stream_new()
-     * }
-     */
-    public static MethodHandle mlx_default_gpu_stream_new$handle() {
-        return mlx_default_gpu_stream_new.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_gpu_stream_new()
-     * }
-     */
-    public static MemorySegment mlx_default_gpu_stream_new$address() {
-        return mlx_default_gpu_stream_new.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mlx_stream mlx_default_gpu_stream_new()
-     * }
-     */
-    public static MemorySegment mlx_default_gpu_stream_new(SegmentAllocator allocator) {
-        var mh$ = mlx_default_gpu_stream_new.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_default_gpu_stream_new", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
+            return (int)mh$.invokeExact(res, vec, idx);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12354,13 +13560,18 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_distributed_group_rank {
+    private static class mlx_distributed_init_with_all_gather {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
-            mlx_distributed_group_.layout()
+            mlx_h.C_POINTER,
+            mlx_h.C_BOOL,
+            mlx_h.C_POINTER,
+            mlx_h.C_POINTER,
+            mlx_h.C_POINTER,
+            mlx_h.C_POINTER
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_distributed_group_rank");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_distributed_init_with_all_gather");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -12368,45 +13579,45 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_distributed_group_rank(mlx_distributed_group group)
+     * int mlx_distributed_init_with_all_gather(mlx_distributed_group *res, bool strict, const char *bk, mlx_distributed_all_gather_fn all_gather, void *payload, void (*dtor)(void *))
      * }
      */
-    public static FunctionDescriptor mlx_distributed_group_rank$descriptor() {
-        return mlx_distributed_group_rank.DESC;
+    public static FunctionDescriptor mlx_distributed_init_with_all_gather$descriptor() {
+        return mlx_distributed_init_with_all_gather.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_distributed_group_rank(mlx_distributed_group group)
+     * int mlx_distributed_init_with_all_gather(mlx_distributed_group *res, bool strict, const char *bk, mlx_distributed_all_gather_fn all_gather, void *payload, void (*dtor)(void *))
      * }
      */
-    public static MethodHandle mlx_distributed_group_rank$handle() {
-        return mlx_distributed_group_rank.HANDLE;
+    public static MethodHandle mlx_distributed_init_with_all_gather$handle() {
+        return mlx_distributed_init_with_all_gather.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_distributed_group_rank(mlx_distributed_group group)
+     * int mlx_distributed_init_with_all_gather(mlx_distributed_group *res, bool strict, const char *bk, mlx_distributed_all_gather_fn all_gather, void *payload, void (*dtor)(void *))
      * }
      */
-    public static MemorySegment mlx_distributed_group_rank$address() {
-        return mlx_distributed_group_rank.ADDR;
+    public static MemorySegment mlx_distributed_init_with_all_gather$address() {
+        return mlx_distributed_init_with_all_gather.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_distributed_group_rank(mlx_distributed_group group)
+     * int mlx_distributed_init_with_all_gather(mlx_distributed_group *res, bool strict, const char *bk, mlx_distributed_all_gather_fn all_gather, void *payload, void (*dtor)(void *))
      * }
      */
-    public static int mlx_distributed_group_rank(MemorySegment group) {
-        var mh$ = mlx_distributed_group_rank.HANDLE;
+    public static int mlx_distributed_init_with_all_gather(MemorySegment res, boolean strict, MemorySegment bk, MemorySegment all_gather, MemorySegment payload, MemorySegment dtor) {
+        var mh$ = mlx_distributed_init_with_all_gather.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_distributed_group_rank", group);
+                traceDowncall("mlx_distributed_init_with_all_gather", res, strict, bk, all_gather, payload, dtor);
             }
-            return (int)mh$.invokeExact(group);
+            return (int)mh$.invokeExact(res, strict, bk, all_gather, payload, dtor);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12414,13 +13625,11 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_distributed_group_size {
+    private static class mlx_distributed_clear_backends {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT,
-            mlx_distributed_group_.layout()
-        );
+            mlx_h.C_INT    );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_distributed_group_size");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_distributed_clear_backends");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -12428,45 +13637,167 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_distributed_group_size(mlx_distributed_group group)
+     * int mlx_distributed_clear_backends()
      * }
      */
-    public static FunctionDescriptor mlx_distributed_group_size$descriptor() {
-        return mlx_distributed_group_size.DESC;
+    public static FunctionDescriptor mlx_distributed_clear_backends$descriptor() {
+        return mlx_distributed_clear_backends.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_distributed_group_size(mlx_distributed_group group)
+     * int mlx_distributed_clear_backends()
      * }
      */
-    public static MethodHandle mlx_distributed_group_size$handle() {
-        return mlx_distributed_group_size.HANDLE;
+    public static MethodHandle mlx_distributed_clear_backends$handle() {
+        return mlx_distributed_clear_backends.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_distributed_group_size(mlx_distributed_group group)
+     * int mlx_distributed_clear_backends()
      * }
      */
-    public static MemorySegment mlx_distributed_group_size$address() {
-        return mlx_distributed_group_size.ADDR;
+    public static MemorySegment mlx_distributed_clear_backends$address() {
+        return mlx_distributed_clear_backends.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * int mlx_distributed_group_size(mlx_distributed_group group)
+     * int mlx_distributed_clear_backends()
      * }
      */
-    public static int mlx_distributed_group_size(MemorySegment group) {
-        var mh$ = mlx_distributed_group_size.HANDLE;
+    public static int mlx_distributed_clear_backends() {
+        var mh$ = mlx_distributed_clear_backends.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_distributed_group_size", group);
+                traceDowncall("mlx_distributed_clear_backends");
             }
-            return (int)mh$.invokeExact(group);
+            return (int)mh$.invokeExact();
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_distributed_group_get_rank {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_distributed_group_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_distributed_group_get_rank");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_rank(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static FunctionDescriptor mlx_distributed_group_get_rank$descriptor() {
+        return mlx_distributed_group_get_rank.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_rank(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static MethodHandle mlx_distributed_group_get_rank$handle() {
+        return mlx_distributed_group_get_rank.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_rank(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static MemorySegment mlx_distributed_group_get_rank$address() {
+        return mlx_distributed_group_get_rank.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_rank(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static int mlx_distributed_group_get_rank(MemorySegment res, MemorySegment group) {
+        var mh$ = mlx_distributed_group_get_rank.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_distributed_group_get_rank", res, group);
+            }
+            return (int)mh$.invokeExact(res, group);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_distributed_group_get_size {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_distributed_group_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_distributed_group_get_size");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_size(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static FunctionDescriptor mlx_distributed_group_get_size$descriptor() {
+        return mlx_distributed_group_get_size.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_size(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static MethodHandle mlx_distributed_group_get_size$handle() {
+        return mlx_distributed_group_get_size.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_size(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static MemorySegment mlx_distributed_group_get_size$address() {
+        return mlx_distributed_group_get_size.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_distributed_group_get_size(int *res, mlx_distributed_group group)
+     * }
+     */
+    public static int mlx_distributed_group_get_size(MemorySegment res, MemorySegment group) {
+        var mh$ = mlx_distributed_group_get_size.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_distributed_group_get_size", res, group);
+            }
+            return (int)mh$.invokeExact(res, group);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13980,6 +15311,136 @@ public class mlx_h extends mlx_h$shared {
         return MLX_COMPILE_MODE_ENABLED;
     }
 
+    /**
+     * Variadic invoker class for:
+     * {@snippet lang=c :
+     * mlx_compile_cache mlx_compile_cache_new()
+     * }
+     */
+    public static class mlx_compile_cache_new {
+        private static final FunctionDescriptor BASE_DESC = FunctionDescriptor.of(
+                mlx_compile_cache_.layout()        );
+        private static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_compile_cache_new");
+
+        private final MethodHandle handle;
+        private final FunctionDescriptor descriptor;
+        private final MethodHandle spreader;
+
+        private mlx_compile_cache_new(MethodHandle handle, FunctionDescriptor descriptor, MethodHandle spreader) {
+            this.handle = handle;
+            this.descriptor = descriptor;
+            this.spreader = spreader;
+        }
+
+        /**
+         * Variadic invoker factory for:
+         * {@snippet lang=c :
+         * mlx_compile_cache mlx_compile_cache_new()
+         * }
+         */
+        public static mlx_compile_cache_new makeInvoker(MemoryLayout... layouts) {
+            FunctionDescriptor desc$ = BASE_DESC.appendArgumentLayouts(layouts);
+            Linker.Option fva$ = Linker.Option.firstVariadicArg(BASE_DESC.argumentLayouts().size());
+            var mh$ = Linker.nativeLinker().downcallHandle(ADDR, desc$, fva$);
+            var spreader$ = mh$.asSpreader(Object[].class, layouts.length);
+            return new mlx_compile_cache_new(mh$, desc$, spreader$);
+        }
+
+        /**
+         * {@return the address}
+         */
+        public static MemorySegment address() {
+            return ADDR;
+        }
+
+        /**
+         * {@return the specialized method handle}
+         */
+        public MethodHandle handle() {
+            return handle;
+        }
+
+        /**
+         * {@return the specialized descriptor}
+         */
+        public FunctionDescriptor descriptor() {
+            return descriptor;
+        }
+
+        public MemorySegment apply(SegmentAllocator allocator, Object... x0) {
+            try {
+                if (TRACE_DOWNCALLS) {
+                    traceDowncall("mlx_compile_cache_new", allocator, x0);
+                }
+                return (MemorySegment) spreader.invokeExact(allocator, x0);
+            } catch(IllegalArgumentException | ClassCastException ex$)  {
+                throw ex$; // rethrow IAE from passing wrong number/type of args
+            } catch (Throwable ex$) {
+               throw new AssertionError("should not reach here", ex$);
+            }
+        }
+    }
+
+    private static class mlx_compile_cache_free {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_compile_cache_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_compile_cache_free");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_compile_cache_free(mlx_compile_cache cache)
+     * }
+     */
+    public static FunctionDescriptor mlx_compile_cache_free$descriptor() {
+        return mlx_compile_cache_free.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_compile_cache_free(mlx_compile_cache cache)
+     * }
+     */
+    public static MethodHandle mlx_compile_cache_free$handle() {
+        return mlx_compile_cache_free.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_compile_cache_free(mlx_compile_cache cache)
+     * }
+     */
+    public static MemorySegment mlx_compile_cache_free$address() {
+        return mlx_compile_cache_free.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_compile_cache_free(mlx_compile_cache cache)
+     * }
+     */
+    public static int mlx_compile_cache_free(MemorySegment cache) {
+        var mh$ = mlx_compile_cache_free.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_compile_cache_free", cache);
+            }
+            return (int)mh$.invokeExact(cache);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_compile {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -14107,9 +15568,71 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_detail_compile_cache {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_detail_compile_cache");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_detail_compile_cache(mlx_compile_cache *res)
+     * }
+     */
+    public static FunctionDescriptor mlx_detail_compile_cache$descriptor() {
+        return mlx_detail_compile_cache.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_detail_compile_cache(mlx_compile_cache *res)
+     * }
+     */
+    public static MethodHandle mlx_detail_compile_cache$handle() {
+        return mlx_detail_compile_cache.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_detail_compile_cache(mlx_compile_cache *res)
+     * }
+     */
+    public static MemorySegment mlx_detail_compile_cache$address() {
+        return mlx_detail_compile_cache.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_detail_compile_cache(mlx_compile_cache *res)
+     * }
+     */
+    public static int mlx_detail_compile_cache(MemorySegment res) {
+        var mh$ = mlx_detail_compile_cache.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_detail_compile_cache", res);
+            }
+            return (int)mh$.invokeExact(res);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_detail_compile_clear_cache {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mlx_h.C_INT    );
+            mlx_h.C_INT,
+            mlx_compile_cache_.layout()
+        );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_detail_compile_clear_cache");
 
@@ -14119,7 +15642,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_detail_compile_clear_cache()
+     * int mlx_detail_compile_clear_cache(const mlx_compile_cache cache)
      * }
      */
     public static FunctionDescriptor mlx_detail_compile_clear_cache$descriptor() {
@@ -14129,7 +15652,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_detail_compile_clear_cache()
+     * int mlx_detail_compile_clear_cache(const mlx_compile_cache cache)
      * }
      */
     public static MethodHandle mlx_detail_compile_clear_cache$handle() {
@@ -14139,7 +15662,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_detail_compile_clear_cache()
+     * int mlx_detail_compile_clear_cache(const mlx_compile_cache cache)
      * }
      */
     public static MemorySegment mlx_detail_compile_clear_cache$address() {
@@ -14148,16 +15671,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_detail_compile_clear_cache()
+     * int mlx_detail_compile_clear_cache(const mlx_compile_cache cache)
      * }
      */
-    public static int mlx_detail_compile_clear_cache() {
+    public static int mlx_detail_compile_clear_cache(MemorySegment cache) {
         var mh$ = mlx_detail_compile_clear_cache.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_detail_compile_clear_cache");
+                traceDowncall("mlx_detail_compile_clear_cache", cache);
             }
-            return (int)mh$.invokeExact();
+            return (int)mh$.invokeExact(cache);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14168,6 +15691,7 @@ public class mlx_h extends mlx_h$shared {
     private static class mlx_detail_compile_erase {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
+            mlx_compile_cache_.layout(),
             mlx_h.C_LONG
         );
 
@@ -14179,7 +15703,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_detail_compile_erase(uintptr_t fun_id)
+     * int mlx_detail_compile_erase(const mlx_compile_cache cache, uintptr_t fun_id)
      * }
      */
     public static FunctionDescriptor mlx_detail_compile_erase$descriptor() {
@@ -14189,7 +15713,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_detail_compile_erase(uintptr_t fun_id)
+     * int mlx_detail_compile_erase(const mlx_compile_cache cache, uintptr_t fun_id)
      * }
      */
     public static MethodHandle mlx_detail_compile_erase$handle() {
@@ -14199,7 +15723,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_detail_compile_erase(uintptr_t fun_id)
+     * int mlx_detail_compile_erase(const mlx_compile_cache cache, uintptr_t fun_id)
      * }
      */
     public static MemorySegment mlx_detail_compile_erase$address() {
@@ -14208,16 +15732,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_detail_compile_erase(uintptr_t fun_id)
+     * int mlx_detail_compile_erase(const mlx_compile_cache cache, uintptr_t fun_id)
      * }
      */
-    public static int mlx_detail_compile_erase(long fun_id) {
+    public static int mlx_detail_compile_erase(MemorySegment cache, long fun_id) {
         var mh$ = mlx_detail_compile_erase.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_detail_compile_erase", fun_id);
+                traceDowncall("mlx_detail_compile_erase", cache, fun_id);
             }
-            return (int)mh$.invokeExact(fun_id);
+            return (int)mh$.invokeExact(cache, fun_id);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15721,6 +17245,69 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_fast_cross_entropy {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_fast_cross_entropy");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_fast_cross_entropy(mlx_array *res, const mlx_array logits, const mlx_array targets, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_fast_cross_entropy$descriptor() {
+        return mlx_fast_cross_entropy.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_fast_cross_entropy(mlx_array *res, const mlx_array logits, const mlx_array targets, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_fast_cross_entropy$handle() {
+        return mlx_fast_cross_entropy.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_fast_cross_entropy(mlx_array *res, const mlx_array logits, const mlx_array targets, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_fast_cross_entropy$address() {
+        return mlx_fast_cross_entropy.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_fast_cross_entropy(mlx_array *res, const mlx_array logits, const mlx_array targets, const mlx_stream s)
+     * }
+     */
+    public static int mlx_fast_cross_entropy(MemorySegment res, MemorySegment logits, MemorySegment targets, MemorySegment s) {
+        var mh$ = mlx_fast_cross_entropy.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_fast_cross_entropy", res, logits, targets, s);
+            }
+            return (int)mh$.invokeExact(res, logits, targets, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_fast_cuda_kernel_config_new {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_fast_cuda_kernel_config_.layout()    );
@@ -16517,6 +18104,74 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_fast_cuda_kernel_apply", outputs, cls, inputs, config, stream);
             }
             return (int)mh$.invokeExact(outputs, cls, inputs, config, stream);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_fast_gated_delta_update {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_fast_gated_delta_update");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_fast_gated_delta_update(mlx_vector_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, const mlx_array gates, const mlx_array beta_, const mlx_array initial_state, const mlx_array mask, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_fast_gated_delta_update$descriptor() {
+        return mlx_fast_gated_delta_update.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_fast_gated_delta_update(mlx_vector_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, const mlx_array gates, const mlx_array beta_, const mlx_array initial_state, const mlx_array mask, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_fast_gated_delta_update$handle() {
+        return mlx_fast_gated_delta_update.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_fast_gated_delta_update(mlx_vector_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, const mlx_array gates, const mlx_array beta_, const mlx_array initial_state, const mlx_array mask, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_fast_gated_delta_update$address() {
+        return mlx_fast_gated_delta_update.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_fast_gated_delta_update(mlx_vector_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, const mlx_array gates, const mlx_array beta_, const mlx_array initial_state, const mlx_array mask, const mlx_stream s)
+     * }
+     */
+    public static int mlx_fast_gated_delta_update(MemorySegment res, MemorySegment queries, MemorySegment keys, MemorySegment values, MemorySegment gates, MemorySegment beta_, MemorySegment initial_state, MemorySegment mask, MemorySegment s) {
+        var mh$ = mlx_fast_gated_delta_update.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_fast_gated_delta_update", res, queries, keys, values, gates, beta_, initial_state, mask, s);
+            }
+            return (int)mh$.invokeExact(res, queries, keys, values, gates, beta_, initial_state, mask, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17603,6 +19258,7 @@ public class mlx_h extends mlx_h$shared {
             mlx_h.C_POINTER,
             mlx_array_.layout(),
             mlx_array_.layout(),
+            mlx_h.C_BOOL,
             mlx_stream_.layout()
         );
 
@@ -17614,7 +19270,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, const mlx_stream s)
+     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, bool force_fused, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_fast_scaled_dot_product_attention$descriptor() {
@@ -17624,7 +19280,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, const mlx_stream s)
+     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, bool force_fused, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_fast_scaled_dot_product_attention$handle() {
@@ -17634,7 +19290,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, const mlx_stream s)
+     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, bool force_fused, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_fast_scaled_dot_product_attention$address() {
@@ -17643,16 +19299,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, const mlx_stream s)
+     * int mlx_fast_scaled_dot_product_attention(mlx_array *res, const mlx_array queries, const mlx_array keys, const mlx_array values, float scale, const char *mask_mode, const mlx_array mask_arr, const mlx_array sinks, bool force_fused, const mlx_stream s)
      * }
      */
-    public static int mlx_fast_scaled_dot_product_attention(MemorySegment res, MemorySegment queries, MemorySegment keys, MemorySegment values, float scale, MemorySegment mask_mode, MemorySegment mask_arr, MemorySegment sinks, MemorySegment s) {
+    public static int mlx_fast_scaled_dot_product_attention(MemorySegment res, MemorySegment queries, MemorySegment keys, MemorySegment values, float scale, MemorySegment mask_mode, MemorySegment mask_arr, MemorySegment sinks, boolean force_fused, MemorySegment s) {
         var mh$ = mlx_fast_scaled_dot_product_attention.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_fast_scaled_dot_product_attention", res, queries, keys, values, scale, mask_mode, mask_arr, sinks, s);
+                traceDowncall("mlx_fast_scaled_dot_product_attention", res, queries, keys, values, scale, mask_mode, mask_arr, sinks, force_fused, s);
             }
-            return (int)mh$.invokeExact(res, queries, keys, values, scale, mask_mode, mask_arr, sinks, s);
+            return (int)mh$.invokeExact(res, queries, keys, values, scale, mask_mode, mask_arr, sinks, force_fused, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19924,6 +21580,68 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_linalg_det {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_linalg_det");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_linalg_det(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_linalg_det$descriptor() {
+        return mlx_linalg_det.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_linalg_det(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_linalg_det$handle() {
+        return mlx_linalg_det.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_linalg_det(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_linalg_det$address() {
+        return mlx_linalg_det.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_linalg_det(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_linalg_det(MemorySegment res, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_linalg_det.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_linalg_det", res, a, s);
+            }
+            return (int)mh$.invokeExact(res, a, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_linalg_eig {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -20685,6 +22403,69 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_linalg_slogdet {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_linalg_slogdet");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_linalg_slogdet(mlx_array *res_0, mlx_array *res_1, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_linalg_slogdet$descriptor() {
+        return mlx_linalg_slogdet.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_linalg_slogdet(mlx_array *res_0, mlx_array *res_1, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_linalg_slogdet$handle() {
+        return mlx_linalg_slogdet.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_linalg_slogdet(mlx_array *res_0, mlx_array *res_1, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_linalg_slogdet$address() {
+        return mlx_linalg_slogdet.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_linalg_slogdet(mlx_array *res_0, mlx_array *res_1, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_linalg_slogdet(MemorySegment res_0, MemorySegment res_1, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_linalg_slogdet.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_linalg_slogdet", res_0, res_1, a, s);
+            }
+            return (int)mh$.invokeExact(res_0, res_1, a, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_linalg_solve {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -21049,6 +22830,67 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_get_active_memory", res);
             }
             return (int)mh$.invokeExact(res);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_get_array_buffer_size {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_vector_array_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_get_array_buffer_size");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_get_array_buffer_size(size_t *res, const mlx_vector_array arrays)
+     * }
+     */
+    public static FunctionDescriptor mlx_get_array_buffer_size$descriptor() {
+        return mlx_get_array_buffer_size.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_get_array_buffer_size(size_t *res, const mlx_vector_array arrays)
+     * }
+     */
+    public static MethodHandle mlx_get_array_buffer_size$handle() {
+        return mlx_get_array_buffer_size.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_get_array_buffer_size(size_t *res, const mlx_vector_array arrays)
+     * }
+     */
+    public static MemorySegment mlx_get_array_buffer_size$address() {
+        return mlx_get_array_buffer_size.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_get_array_buffer_size(size_t *res, const mlx_vector_array arrays)
+     * }
+     */
+    public static int mlx_get_array_buffer_size(MemorySegment res, MemorySegment arrays) {
+        var mh$ = mlx_get_array_buffer_size.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_get_array_buffer_size", res, arrays);
+            }
+            return (int)mh$.invokeExact(res, arrays);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -21477,6 +23319,66 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_metal_get_metallib_path {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_metal_get_metallib_path");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_metal_get_metallib_path(mlx_string *res)
+     * }
+     */
+    public static FunctionDescriptor mlx_metal_get_metallib_path$descriptor() {
+        return mlx_metal_get_metallib_path.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_metal_get_metallib_path(mlx_string *res)
+     * }
+     */
+    public static MethodHandle mlx_metal_get_metallib_path$handle() {
+        return mlx_metal_get_metallib_path.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_metal_get_metallib_path(mlx_string *res)
+     * }
+     */
+    public static MemorySegment mlx_metal_get_metallib_path$address() {
+        return mlx_metal_get_metallib_path.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_metal_get_metallib_path(mlx_string *res)
+     * }
+     */
+    public static int mlx_metal_get_metallib_path(MemorySegment res) {
+        var mh$ = mlx_metal_get_metallib_path.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_metal_get_metallib_path", res);
+            }
+            return (int)mh$.invokeExact(res);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_metal_is_available {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -21530,6 +23432,66 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_metal_is_available", res);
             }
             return (int)mh$.invokeExact(res);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_metal_set_metallib_path {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_metal_set_metallib_path");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_metal_set_metallib_path(const char *path)
+     * }
+     */
+    public static FunctionDescriptor mlx_metal_set_metallib_path$descriptor() {
+        return mlx_metal_set_metallib_path.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_metal_set_metallib_path(const char *path)
+     * }
+     */
+    public static MethodHandle mlx_metal_set_metallib_path$handle() {
+        return mlx_metal_set_metallib_path.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_metal_set_metallib_path(const char *path)
+     * }
+     */
+    public static MemorySegment mlx_metal_set_metallib_path$address() {
+        return mlx_metal_set_metallib_path.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_metal_set_metallib_path(const char *path)
+     * }
+     */
+    public static int mlx_metal_set_metallib_path(MemorySegment path) {
+        var mh$ = mlx_metal_set_metallib_path.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_metal_set_metallib_path", path);
+            }
+            return (int)mh$.invokeExact(path);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -25313,12 +27275,268 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_cummax {
+    private static class mlx_count_nonzero_axis {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_array_.layout(),
             mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_count_nonzero_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_count_nonzero_axis$descriptor() {
+        return mlx_count_nonzero_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_count_nonzero_axis$handle() {
+        return mlx_count_nonzero_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_count_nonzero_axis$address() {
+        return mlx_count_nonzero_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static int mlx_count_nonzero_axis(MemorySegment res, MemorySegment a, int axis, boolean keepdims, MemorySegment s) {
+        var mh$ = mlx_count_nonzero_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_count_nonzero_axis", res, a, axis, keepdims, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, keepdims, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_count_nonzero_axes {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_POINTER,
+            mlx_h.C_LONG,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_count_nonzero_axes");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_count_nonzero_axes$descriptor() {
+        return mlx_count_nonzero_axes.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_count_nonzero_axes$handle() {
+        return mlx_count_nonzero_axes.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_count_nonzero_axes$address() {
+        return mlx_count_nonzero_axes.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_count_nonzero_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static int mlx_count_nonzero_axes(MemorySegment res, MemorySegment a, MemorySegment axes, long axes_num, boolean keepdims, MemorySegment s) {
+        var mh$ = mlx_count_nonzero_axes.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_count_nonzero_axes", res, a, axes, axes_num, keepdims, s);
+            }
+            return (int)mh$.invokeExact(res, a, axes, axes_num, keepdims, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_count_nonzero {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_count_nonzero");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_count_nonzero$descriptor() {
+        return mlx_count_nonzero.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_count_nonzero$handle() {
+        return mlx_count_nonzero.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_count_nonzero(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_count_nonzero$address() {
+        return mlx_count_nonzero.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_count_nonzero(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static int mlx_count_nonzero(MemorySegment res, MemorySegment a, boolean keepdims, MemorySegment s) {
+        var mh$ = mlx_count_nonzero.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_count_nonzero", res, a, keepdims, s);
+            }
+            return (int)mh$.invokeExact(res, a, keepdims, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_cummax_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_cummax_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_cummax_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_cummax_axis$descriptor() {
+        return mlx_cummax_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_cummax_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_cummax_axis$handle() {
+        return mlx_cummax_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_cummax_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_cummax_axis$address() {
+        return mlx_cummax_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_cummax_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static int mlx_cummax_axis(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+        var mh$ = mlx_cummax_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_cummax_axis", res, a, axis, reverse, inclusive, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_cummax {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
             mlx_h.C_BOOL,
             mlx_h.C_BOOL,
             mlx_stream_.layout()
@@ -25332,7 +27550,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_cummax(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummax(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_cummax$descriptor() {
@@ -25342,7 +27560,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_cummax(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummax(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_cummax$handle() {
@@ -25352,7 +27570,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_cummax(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummax(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_cummax$address() {
@@ -25361,14 +27579,79 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_cummax(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummax(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
-    public static int mlx_cummax(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+    public static int mlx_cummax(MemorySegment res, MemorySegment a, boolean reverse, boolean inclusive, MemorySegment s) {
         var mh$ = mlx_cummax.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_cummax", res, a, axis, reverse, inclusive, s);
+                traceDowncall("mlx_cummax", res, a, reverse, inclusive, s);
+            }
+            return (int)mh$.invokeExact(res, a, reverse, inclusive, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_cummin_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_cummin_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_cummin_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_cummin_axis$descriptor() {
+        return mlx_cummin_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_cummin_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_cummin_axis$handle() {
+        return mlx_cummin_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_cummin_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_cummin_axis$address() {
+        return mlx_cummin_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_cummin_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static int mlx_cummin_axis(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+        var mh$ = mlx_cummin_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_cummin_axis", res, a, axis, reverse, inclusive, s);
             }
             return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
         } catch (Error | RuntimeException ex) {
@@ -25383,7 +27666,6 @@ public class mlx_h extends mlx_h$shared {
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_array_.layout(),
-            mlx_h.C_INT,
             mlx_h.C_BOOL,
             mlx_h.C_BOOL,
             mlx_stream_.layout()
@@ -25397,7 +27679,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_cummin(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummin(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_cummin$descriptor() {
@@ -25407,7 +27689,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_cummin(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummin(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_cummin$handle() {
@@ -25417,7 +27699,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_cummin(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummin(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_cummin$address() {
@@ -25426,16 +27708,82 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_cummin(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cummin(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
-    public static int mlx_cummin(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+    public static int mlx_cummin(MemorySegment res, MemorySegment a, boolean reverse, boolean inclusive, MemorySegment s) {
         var mh$ = mlx_cummin.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_cummin", res, a, axis, reverse, inclusive, s);
+                traceDowncall("mlx_cummin", res, a, reverse, inclusive, s);
             }
-            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
+            return (int)mh$.invokeExact(res, a, reverse, inclusive, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_cumprod_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_optional_dtype_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_cumprod_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_cumprod_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_cumprod_axis$descriptor() {
+        return mlx_cumprod_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_cumprod_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_cumprod_axis$handle() {
+        return mlx_cumprod_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_cumprod_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_cumprod_axis$address() {
+        return mlx_cumprod_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_cumprod_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static int mlx_cumprod_axis(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment dtype, MemorySegment s) {
+        var mh$ = mlx_cumprod_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_cumprod_axis", res, a, axis, reverse, inclusive, dtype, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, dtype, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -25448,9 +27796,9 @@ public class mlx_h extends mlx_h$shared {
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_array_.layout(),
-            mlx_h.C_INT,
             mlx_h.C_BOOL,
             mlx_h.C_BOOL,
+            mlx_optional_dtype_.layout(),
             mlx_stream_.layout()
         );
 
@@ -25462,7 +27810,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_cumprod(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumprod(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_cumprod$descriptor() {
@@ -25472,7 +27820,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_cumprod(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumprod(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_cumprod$handle() {
@@ -25482,7 +27830,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_cumprod(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumprod(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_cumprod$address() {
@@ -25491,16 +27839,82 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_cumprod(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumprod(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
-    public static int mlx_cumprod(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+    public static int mlx_cumprod(MemorySegment res, MemorySegment a, boolean reverse, boolean inclusive, MemorySegment dtype, MemorySegment s) {
         var mh$ = mlx_cumprod.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_cumprod", res, a, axis, reverse, inclusive, s);
+                traceDowncall("mlx_cumprod", res, a, reverse, inclusive, dtype, s);
             }
-            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
+            return (int)mh$.invokeExact(res, a, reverse, inclusive, dtype, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_cumsum_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_optional_dtype_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_cumsum_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_cumsum_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_cumsum_axis$descriptor() {
+        return mlx_cumsum_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_cumsum_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_cumsum_axis$handle() {
+        return mlx_cumsum_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_cumsum_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_cumsum_axis$address() {
+        return mlx_cumsum_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_cumsum_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static int mlx_cumsum_axis(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment dtype, MemorySegment s) {
+        var mh$ = mlx_cumsum_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_cumsum_axis", res, a, axis, reverse, inclusive, dtype, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, dtype, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -25513,9 +27927,9 @@ public class mlx_h extends mlx_h$shared {
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_array_.layout(),
-            mlx_h.C_INT,
             mlx_h.C_BOOL,
             mlx_h.C_BOOL,
+            mlx_optional_dtype_.layout(),
             mlx_stream_.layout()
         );
 
@@ -25527,7 +27941,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_cumsum(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumsum(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_cumsum$descriptor() {
@@ -25537,7 +27951,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_cumsum(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumsum(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_cumsum$handle() {
@@ -25547,7 +27961,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_cumsum(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumsum(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_cumsum$address() {
@@ -25556,16 +27970,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_cumsum(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_cumsum(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, mlx_optional_dtype dtype, const mlx_stream s)
      * }
      */
-    public static int mlx_cumsum(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+    public static int mlx_cumsum(MemorySegment res, MemorySegment a, boolean reverse, boolean inclusive, MemorySegment dtype, MemorySegment s) {
         var mh$ = mlx_cumsum.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_cumsum", res, a, axis, reverse, inclusive, s);
+                traceDowncall("mlx_cumsum", res, a, reverse, inclusive, dtype, s);
             }
-            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
+            return (int)mh$.invokeExact(res, a, reverse, inclusive, dtype, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -25887,6 +28301,70 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_diagonal", res, a, offset, axis1, axis2, s);
             }
             return (int)mh$.invokeExact(res, a, offset, axis1, axis2, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_diff {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_diff");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_diff(mlx_array *res, const mlx_array a, int n, int axis, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_diff$descriptor() {
+        return mlx_diff.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_diff(mlx_array *res, const mlx_array a, int n, int axis, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_diff$handle() {
+        return mlx_diff.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_diff(mlx_array *res, const mlx_array a, int n, int axis, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_diff$address() {
+        return mlx_diff.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_diff(mlx_array *res, const mlx_array a, int n, int axis, const mlx_stream s)
+     * }
+     */
+    public static int mlx_diff(MemorySegment res, MemorySegment a, int n, int axis, MemorySegment s) {
+        var mh$ = mlx_diff.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_diff", res, a, n, axis, s);
+            }
+            return (int)mh$.invokeExact(res, a, n, axis, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -26650,6 +29128,195 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_flip_axes {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_POINTER,
+            mlx_h.C_LONG,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_flip_axes");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_flip_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_flip_axes$descriptor() {
+        return mlx_flip_axes.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_flip_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_flip_axes$handle() {
+        return mlx_flip_axes.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_flip_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_flip_axes$address() {
+        return mlx_flip_axes.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_flip_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, const mlx_stream s)
+     * }
+     */
+    public static int mlx_flip_axes(MemorySegment res, MemorySegment a, MemorySegment axes, long axes_num, MemorySegment s) {
+        var mh$ = mlx_flip_axes.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_flip_axes", res, a, axes, axes_num, s);
+            }
+            return (int)mh$.invokeExact(res, a, axes, axes_num, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_flip_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_flip_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_flip_axis(mlx_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_flip_axis$descriptor() {
+        return mlx_flip_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_flip_axis(mlx_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_flip_axis$handle() {
+        return mlx_flip_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_flip_axis(mlx_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_flip_axis$address() {
+        return mlx_flip_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_flip_axis(mlx_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static int mlx_flip_axis(MemorySegment res, MemorySegment a, int axis, MemorySegment s) {
+        var mh$ = mlx_flip_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_flip_axis", res, a, axis, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_flip {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_flip");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_flip(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_flip$descriptor() {
+        return mlx_flip.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_flip(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_flip$handle() {
+        return mlx_flip.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_flip(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_flip$address() {
+        return mlx_flip.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_flip(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_flip(MemorySegment res, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_flip.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_flip", res, a, s);
+            }
+            return (int)mh$.invokeExact(res, a, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_floor {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -27180,6 +29847,7 @@ public class mlx_h extends mlx_h$shared {
             mlx_optional_int_.layout(),
             mlx_optional_int_.layout(),
             mlx_h.C_POINTER,
+            mlx_array_.layout(),
             mlx_h.C_BOOL,
             mlx_stream_.layout()
         );
@@ -27192,7 +29860,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, bool sorted_indices, const mlx_stream s)
+     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale, bool sorted_indices, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_gather_qmm$descriptor() {
@@ -27202,7 +29870,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, bool sorted_indices, const mlx_stream s)
+     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale, bool sorted_indices, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_gather_qmm$handle() {
@@ -27212,7 +29880,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, bool sorted_indices, const mlx_stream s)
+     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale, bool sorted_indices, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_gather_qmm$address() {
@@ -27221,16 +29889,88 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, bool sorted_indices, const mlx_stream s)
+     * int mlx_gather_qmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales, const mlx_array biases, const mlx_array lhs_indices, const mlx_array rhs_indices, bool transpose, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale, bool sorted_indices, const mlx_stream s)
      * }
      */
-    public static int mlx_gather_qmm(MemorySegment res, MemorySegment x, MemorySegment w, MemorySegment scales, MemorySegment biases, MemorySegment lhs_indices, MemorySegment rhs_indices, boolean transpose, MemorySegment group_size, MemorySegment bits, MemorySegment mode, boolean sorted_indices, MemorySegment s) {
+    public static int mlx_gather_qmm(MemorySegment res, MemorySegment x, MemorySegment w, MemorySegment scales, MemorySegment biases, MemorySegment lhs_indices, MemorySegment rhs_indices, boolean transpose, MemorySegment group_size, MemorySegment bits, MemorySegment mode, MemorySegment global_scale, boolean sorted_indices, MemorySegment s) {
         var mh$ = mlx_gather_qmm.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_gather_qmm", res, x, w, scales, biases, lhs_indices, rhs_indices, transpose, group_size, bits, mode, sorted_indices, s);
+                traceDowncall("mlx_gather_qmm", res, x, w, scales, biases, lhs_indices, rhs_indices, transpose, group_size, bits, mode, global_scale, sorted_indices, s);
             }
-            return (int)mh$.invokeExact(res, x, w, scales, biases, lhs_indices, rhs_indices, transpose, group_size, bits, mode, sorted_indices, s);
+            return (int)mh$.invokeExact(res, x, w, scales, biases, lhs_indices, rhs_indices, transpose, group_size, bits, mode, global_scale, sorted_indices, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_gather_qqmm {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_optional_int_.layout(),
+            mlx_optional_int_.layout(),
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_gather_qqmm");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_gather_qqmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales_w, const mlx_array lhs_indices, const mlx_array rhs_indices, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale_x, const mlx_array global_scale_w, bool sorted_indices, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_gather_qqmm$descriptor() {
+        return mlx_gather_qqmm.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_gather_qqmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales_w, const mlx_array lhs_indices, const mlx_array rhs_indices, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale_x, const mlx_array global_scale_w, bool sorted_indices, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_gather_qqmm$handle() {
+        return mlx_gather_qqmm.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_gather_qqmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales_w, const mlx_array lhs_indices, const mlx_array rhs_indices, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale_x, const mlx_array global_scale_w, bool sorted_indices, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_gather_qqmm$address() {
+        return mlx_gather_qqmm.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_gather_qqmm(mlx_array *res, const mlx_array x, const mlx_array w, const mlx_array scales_w, const mlx_array lhs_indices, const mlx_array rhs_indices, mlx_optional_int group_size, mlx_optional_int bits, const char *mode, const mlx_array global_scale_x, const mlx_array global_scale_w, bool sorted_indices, const mlx_stream s)
+     * }
+     */
+    public static int mlx_gather_qqmm(MemorySegment res, MemorySegment x, MemorySegment w, MemorySegment scales_w, MemorySegment lhs_indices, MemorySegment rhs_indices, MemorySegment group_size, MemorySegment bits, MemorySegment mode, MemorySegment global_scale_x, MemorySegment global_scale_w, boolean sorted_indices, MemorySegment s) {
+        var mh$ = mlx_gather_qqmm.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_gather_qqmm", res, x, w, scales_w, lhs_indices, rhs_indices, group_size, bits, mode, global_scale_x, global_scale_w, sorted_indices, s);
+            }
+            return (int)mh$.invokeExact(res, x, w, scales_w, lhs_indices, rhs_indices, group_size, bits, mode, global_scale_x, global_scale_w, sorted_indices, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -28367,6 +31107,72 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_linspace_endpoint {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_h.C_DOUBLE,
+            mlx_h.C_DOUBLE,
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_linspace_endpoint");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_linspace_endpoint(mlx_array *res, double start, double stop, int num, bool endpoint, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_linspace_endpoint$descriptor() {
+        return mlx_linspace_endpoint.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_linspace_endpoint(mlx_array *res, double start, double stop, int num, bool endpoint, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_linspace_endpoint$handle() {
+        return mlx_linspace_endpoint.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_linspace_endpoint(mlx_array *res, double start, double stop, int num, bool endpoint, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_linspace_endpoint$address() {
+        return mlx_linspace_endpoint.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_linspace_endpoint(mlx_array *res, double start, double stop, int num, bool endpoint, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static int mlx_linspace_endpoint(MemorySegment res, double start, double stop, int num, boolean endpoint, int dtype, MemorySegment s) {
+        var mh$ = mlx_linspace_endpoint.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_linspace_endpoint", res, start, stop, num, endpoint, dtype, s);
+            }
+            return (int)mh$.invokeExact(res, start, stop, num, endpoint, dtype, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_linspace {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -28743,12 +31549,76 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_logcumsumexp {
+    private static class mlx_logcumsumexp_axis {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_array_.layout(),
             mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_logcumsumexp_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_logcumsumexp_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_logcumsumexp_axis$descriptor() {
+        return mlx_logcumsumexp_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_logcumsumexp_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_logcumsumexp_axis$handle() {
+        return mlx_logcumsumexp_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_logcumsumexp_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_logcumsumexp_axis$address() {
+        return mlx_logcumsumexp_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_logcumsumexp_axis(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * }
+     */
+    public static int mlx_logcumsumexp_axis(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+        var mh$ = mlx_logcumsumexp_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_logcumsumexp_axis", res, a, axis, reverse, inclusive, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_logcumsumexp {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
             mlx_h.C_BOOL,
             mlx_h.C_BOOL,
             mlx_stream_.layout()
@@ -28762,7 +31632,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_logcumsumexp$descriptor() {
@@ -28772,7 +31642,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_logcumsumexp$handle() {
@@ -28782,7 +31652,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_logcumsumexp$address() {
@@ -28791,16 +31661,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, int axis, bool reverse, bool inclusive, const mlx_stream s)
+     * int mlx_logcumsumexp(mlx_array *res, const mlx_array a, bool reverse, bool inclusive, const mlx_stream s)
      * }
      */
-    public static int mlx_logcumsumexp(MemorySegment res, MemorySegment a, int axis, boolean reverse, boolean inclusive, MemorySegment s) {
+    public static int mlx_logcumsumexp(MemorySegment res, MemorySegment a, boolean reverse, boolean inclusive, MemorySegment s) {
         var mh$ = mlx_logcumsumexp.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_logcumsumexp", res, a, axis, reverse, inclusive, s);
+                traceDowncall("mlx_logcumsumexp", res, a, reverse, inclusive, s);
             }
-            return (int)mh$.invokeExact(res, a, axis, reverse, inclusive, s);
+            return (int)mh$.invokeExact(res, a, reverse, inclusive, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -28987,6 +31857,69 @@ public class mlx_h extends mlx_h$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mlx_logical_or", res, a, b, s);
+            }
+            return (int)mh$.invokeExact(res, a, b, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_logical_xor {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_logical_xor");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_logical_xor(mlx_array *res, const mlx_array a, const mlx_array b, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_logical_xor$descriptor() {
+        return mlx_logical_xor.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_logical_xor(mlx_array *res, const mlx_array a, const mlx_array b, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_logical_xor$handle() {
+        return mlx_logical_xor.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_logical_xor(mlx_array *res, const mlx_array a, const mlx_array b, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_logical_xor$address() {
+        return mlx_logical_xor.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_logical_xor(mlx_array *res, const mlx_array a, const mlx_array b, const mlx_stream s)
+     * }
+     */
+    public static int mlx_logical_xor(MemorySegment res, MemorySegment a, MemorySegment b, MemorySegment s) {
+        var mh$ = mlx_logical_xor.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_logical_xor", res, a, b, s);
             }
             return (int)mh$.invokeExact(res, a, b, s);
         } catch (Error | RuntimeException ex) {
@@ -29308,6 +32241,68 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_matmul", res, a, b, s);
             }
             return (int)mh$.invokeExact(res, a, b, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_matrix_transpose {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_matrix_transpose");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_matrix_transpose(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_matrix_transpose$descriptor() {
+        return mlx_matrix_transpose.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_matrix_transpose(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_matrix_transpose$handle() {
+        return mlx_matrix_transpose.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_matrix_transpose(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_matrix_transpose$address() {
+        return mlx_matrix_transpose.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_matrix_transpose(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_matrix_transpose(MemorySegment res, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_matrix_transpose.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_matrix_transpose", res, a, s);
+            }
+            return (int)mh$.invokeExact(res, a, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -29762,13 +32757,140 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_median {
+    private static class mlx_median_axes {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
             mlx_array_.layout(),
             mlx_h.C_POINTER,
             mlx_h.C_LONG,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_median_axes");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_median_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_median_axes$descriptor() {
+        return mlx_median_axes.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_median_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_median_axes$handle() {
+        return mlx_median_axes.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_median_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_median_axes$address() {
+        return mlx_median_axes.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_median_axes(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static int mlx_median_axes(MemorySegment res, MemorySegment a, MemorySegment axes, long axes_num, boolean keepdims, MemorySegment s) {
+        var mh$ = mlx_median_axes.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_median_axes", res, a, axes, axes_num, keepdims, s);
+            }
+            return (int)mh$.invokeExact(res, a, axes, axes_num, keepdims, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_median_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_median_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_median_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_median_axis$descriptor() {
+        return mlx_median_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_median_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_median_axis$handle() {
+        return mlx_median_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_median_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_median_axis$address() {
+        return mlx_median_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_median_axis(mlx_array *res, const mlx_array a, int axis, bool keepdims, const mlx_stream s)
+     * }
+     */
+    public static int mlx_median_axis(MemorySegment res, MemorySegment a, int axis, boolean keepdims, MemorySegment s) {
+        var mh$ = mlx_median_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_median_axis", res, a, axis, keepdims, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, keepdims, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_median {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
             mlx_h.C_BOOL,
             mlx_stream_.layout()
         );
@@ -29781,7 +32903,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_median(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * int mlx_median(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_median$descriptor() {
@@ -29791,7 +32913,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_median(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * int mlx_median(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_median$handle() {
@@ -29801,7 +32923,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_median(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * int mlx_median(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_median$address() {
@@ -29810,16 +32932,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_median(mlx_array *res, const mlx_array a, const int *axes, size_t axes_num, bool keepdims, const mlx_stream s)
+     * int mlx_median(mlx_array *res, const mlx_array a, bool keepdims, const mlx_stream s)
      * }
      */
-    public static int mlx_median(MemorySegment res, MemorySegment a, MemorySegment axes, long axes_num, boolean keepdims, MemorySegment s) {
+    public static int mlx_median(MemorySegment res, MemorySegment a, boolean keepdims, MemorySegment s) {
         var mh$ = mlx_median.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_median", res, a, axes, axes_num, keepdims, s);
+                traceDowncall("mlx_median", res, a, keepdims, s);
             }
-            return (int)mh$.invokeExact(res, a, axes, axes_num, keepdims, s);
+            return (int)mh$.invokeExact(res, a, keepdims, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -30593,6 +33715,69 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_ones_like_dtype {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_ones_like_dtype");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_ones_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_ones_like_dtype$descriptor() {
+        return mlx_ones_like_dtype.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_ones_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_ones_like_dtype$handle() {
+        return mlx_ones_like_dtype.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_ones_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_ones_like_dtype$address() {
+        return mlx_ones_like_dtype.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_ones_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static int mlx_ones_like_dtype(MemorySegment res, MemorySegment a, int dtype, MemorySegment s) {
+        var mh$ = mlx_ones_like_dtype.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_ones_like_dtype", res, a, dtype, s);
+            }
+            return (int)mh$.invokeExact(res, a, dtype, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_ones_like {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -30973,6 +34158,68 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_partition", res, a, kth, s);
             }
             return (int)mh$.invokeExact(res, a, kth, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_positive {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_positive");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_positive(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_positive$descriptor() {
+        return mlx_positive.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_positive(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_positive$handle() {
+        return mlx_positive.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_positive(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_positive$address() {
+        return mlx_positive.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_positive(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_positive(MemorySegment res, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_positive.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_positive", res, a, s);
+            }
+            return (int)mh$.invokeExact(res, a, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -33040,6 +36287,70 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_scatter_prod_single", res, a, indices, updates, axis, s);
             }
             return (int)mh$.invokeExact(res, a, indices, updates, axis, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_searchsorted {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_h.C_POINTER,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_searchsorted");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_searchsorted(mlx_array *res, const mlx_array sorted_sequence, const mlx_array values, const char *side, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_searchsorted$descriptor() {
+        return mlx_searchsorted.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_searchsorted(mlx_array *res, const mlx_array sorted_sequence, const mlx_array values, const char *side, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_searchsorted$handle() {
+        return mlx_searchsorted.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_searchsorted(mlx_array *res, const mlx_array sorted_sequence, const mlx_array values, const char *side, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_searchsorted$address() {
+        return mlx_searchsorted.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_searchsorted(mlx_array *res, const mlx_array sorted_sequence, const mlx_array values, const char *side, const mlx_stream s)
+     * }
+     */
+    public static int mlx_searchsorted(MemorySegment res, MemorySegment sorted_sequence, MemorySegment values, MemorySegment side, MemorySegment s) {
+        var mh$ = mlx_searchsorted.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_searchsorted", res, sorted_sequence, values, side, s);
+            }
+            return (int)mh$.invokeExact(res, sorted_sequence, values, side, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -36064,7 +39375,7 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
-    private static class mlx_trace {
+    private static class mlx_trace_axes {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
             mlx_h.C_POINTER,
@@ -36076,6 +39387,68 @@ public class mlx_h extends mlx_h$shared {
             mlx_stream_.layout()
         );
 
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_trace_axes");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_trace_axes(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_trace_axes$descriptor() {
+        return mlx_trace_axes.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_trace_axes(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_trace_axes$handle() {
+        return mlx_trace_axes.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_trace_axes(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_trace_axes$address() {
+        return mlx_trace_axes.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_trace_axes(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static int mlx_trace_axes(MemorySegment res, MemorySegment a, int offset, int axis1, int axis2, int dtype, MemorySegment s) {
+        var mh$ = mlx_trace_axes.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_trace_axes", res, a, offset, axis1, axis2, dtype, s);
+            }
+            return (int)mh$.invokeExact(res, a, offset, axis1, axis2, dtype, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_trace {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_trace");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
@@ -36084,7 +39457,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * int mlx_trace(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * int mlx_trace(mlx_array *res, const mlx_array a, const mlx_stream s)
      * }
      */
     public static FunctionDescriptor mlx_trace$descriptor() {
@@ -36094,7 +39467,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * int mlx_trace(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * int mlx_trace(mlx_array *res, const mlx_array a, const mlx_stream s)
      * }
      */
     public static MethodHandle mlx_trace$handle() {
@@ -36104,7 +39477,7 @@ public class mlx_h extends mlx_h$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * int mlx_trace(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * int mlx_trace(mlx_array *res, const mlx_array a, const mlx_stream s)
      * }
      */
     public static MemorySegment mlx_trace$address() {
@@ -36113,16 +39486,16 @@ public class mlx_h extends mlx_h$shared {
 
     /**
      * {@snippet lang=c :
-     * int mlx_trace(mlx_array *res, const mlx_array a, int offset, int axis1, int axis2, mlx_dtype dtype, const mlx_stream s)
+     * int mlx_trace(mlx_array *res, const mlx_array a, const mlx_stream s)
      * }
      */
-    public static int mlx_trace(MemorySegment res, MemorySegment a, int offset, int axis1, int axis2, int dtype, MemorySegment s) {
+    public static int mlx_trace(MemorySegment res, MemorySegment a, MemorySegment s) {
         var mh$ = mlx_trace.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mlx_trace", res, a, offset, axis1, axis2, dtype, s);
+                traceDowncall("mlx_trace", res, a, s);
             }
-            return (int)mh$.invokeExact(res, a, offset, axis1, axis2, dtype, s);
+            return (int)mh$.invokeExact(res, a, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -36447,6 +39820,68 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_trunc {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_trunc");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_trunc(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_trunc$descriptor() {
+        return mlx_trunc.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_trunc(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_trunc$handle() {
+        return mlx_trunc.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_trunc(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_trunc$address() {
+        return mlx_trunc.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_trunc(mlx_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_trunc(MemorySegment res, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_trunc.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_trunc", res, a, s);
+            }
+            return (int)mh$.invokeExact(res, a, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_unflatten {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -36505,6 +39940,198 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_unflatten", res, a, axis, shape, shape_num, s);
             }
             return (int)mh$.invokeExact(res, a, axis, shape, shape_num, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_unique {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_h.C_BOOL,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_unique");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_unique(mlx_vector_array *res, const mlx_array a, int size, bool return_index, bool return_inverse, bool return_counts, const mlx_array fill_value, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_unique$descriptor() {
+        return mlx_unique.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_unique(mlx_vector_array *res, const mlx_array a, int size, bool return_index, bool return_inverse, bool return_counts, const mlx_array fill_value, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_unique$handle() {
+        return mlx_unique.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_unique(mlx_vector_array *res, const mlx_array a, int size, bool return_index, bool return_inverse, bool return_counts, const mlx_array fill_value, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_unique$address() {
+        return mlx_unique.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_unique(mlx_vector_array *res, const mlx_array a, int size, bool return_index, bool return_inverse, bool return_counts, const mlx_array fill_value, const mlx_stream s)
+     * }
+     */
+    public static int mlx_unique(MemorySegment res, MemorySegment a, int size, boolean return_index, boolean return_inverse, boolean return_counts, MemorySegment fill_value, MemorySegment s) {
+        var mh$ = mlx_unique.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_unique", res, a, size, return_index, return_inverse, return_counts, fill_value, s);
+            }
+            return (int)mh$.invokeExact(res, a, size, return_index, return_inverse, return_counts, fill_value, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_unstack_axis {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_unstack_axis");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_unstack_axis(mlx_vector_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_unstack_axis$descriptor() {
+        return mlx_unstack_axis.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_unstack_axis(mlx_vector_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_unstack_axis$handle() {
+        return mlx_unstack_axis.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_unstack_axis(mlx_vector_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_unstack_axis$address() {
+        return mlx_unstack_axis.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_unstack_axis(mlx_vector_array *res, const mlx_array a, int axis, const mlx_stream s)
+     * }
+     */
+    public static int mlx_unstack_axis(MemorySegment res, MemorySegment a, int axis, MemorySegment s) {
+        var mh$ = mlx_unstack_axis.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_unstack_axis", res, a, axis, s);
+            }
+            return (int)mh$.invokeExact(res, a, axis, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_unstack {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_unstack");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_unstack(mlx_vector_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_unstack$descriptor() {
+        return mlx_unstack.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_unstack(mlx_vector_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_unstack$handle() {
+        return mlx_unstack.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_unstack(mlx_vector_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_unstack$address() {
+        return mlx_unstack.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_unstack(mlx_vector_array *res, const mlx_array a, const mlx_stream s)
+     * }
+     */
+    public static int mlx_unstack(MemorySegment res, MemorySegment a, MemorySegment s) {
+        var mh$ = mlx_unstack.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_unstack", res, a, s);
+            }
+            return (int)mh$.invokeExact(res, a, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -36707,6 +40334,70 @@ public class mlx_h extends mlx_h$shared {
         }
     }
 
+    private static class mlx_vecdot {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_vecdot");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_vecdot(mlx_array *res, const mlx_array a, const mlx_array b, int axis, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_vecdot$descriptor() {
+        return mlx_vecdot.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_vecdot(mlx_array *res, const mlx_array a, const mlx_array b, int axis, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_vecdot$handle() {
+        return mlx_vecdot.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_vecdot(mlx_array *res, const mlx_array a, const mlx_array b, int axis, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_vecdot$address() {
+        return mlx_vecdot.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_vecdot(mlx_array *res, const mlx_array a, const mlx_array b, int axis, const mlx_stream s)
+     * }
+     */
+    public static int mlx_vecdot(MemorySegment res, MemorySegment a, MemorySegment b, int axis, MemorySegment s) {
+        var mh$ = mlx_vecdot.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_vecdot", res, a, b, axis, s);
+            }
+            return (int)mh$.invokeExact(res, a, b, axis, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mlx_view {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mlx_h.C_INT,
@@ -36891,6 +40582,69 @@ public class mlx_h extends mlx_h$shared {
                 traceDowncall("mlx_zeros", res, shape, shape_num, dtype, s);
             }
             return (int)mh$.invokeExact(res, shape, shape_num, dtype, s);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mlx_zeros_like_dtype {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mlx_h.C_INT,
+            mlx_h.C_POINTER,
+            mlx_array_.layout(),
+            mlx_h.C_INT,
+            mlx_stream_.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mlx_zeros_like_dtype");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * int mlx_zeros_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static FunctionDescriptor mlx_zeros_like_dtype$descriptor() {
+        return mlx_zeros_like_dtype.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * int mlx_zeros_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MethodHandle mlx_zeros_like_dtype$handle() {
+        return mlx_zeros_like_dtype.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * int mlx_zeros_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static MemorySegment mlx_zeros_like_dtype$address() {
+        return mlx_zeros_like_dtype.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * int mlx_zeros_like_dtype(mlx_array *res, const mlx_array a, mlx_dtype dtype, const mlx_stream s)
+     * }
+     */
+    public static int mlx_zeros_like_dtype(MemorySegment res, MemorySegment a, int dtype, MemorySegment s) {
+        var mh$ = mlx_zeros_like_dtype.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mlx_zeros_like_dtype", res, a, dtype, s);
+            }
+            return (int)mh$.invokeExact(res, a, dtype, s);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

@@ -155,7 +155,8 @@ public final class MLXShape {
 
   /**
    * Takes array slices at the given indices of the specified axis. Result shape is {@code
-   * a.shape()[:axis] + indices.shape() + a.shape()[axis+1:]}.
+   * a.shape()[:axis] + indices.shape() + a.shape()[axis+1:]}. Same 0.32.4 gradient constraint on
+   * the indices operand as {@link #takeAlongAxis}.
    */
   public static MLXArray takeAxis(MLXArray a, MLXArray indices, int axis) {
     MLXScope scope = NativeOps.scopeOf("takeAxis", a, indices);
@@ -185,6 +186,11 @@ public final class MLXShape {
    * Takes values elementwise along {@code axis}. Unlike {@link #takeAxis}, this does not insert the
    * full indices shape: {@code indices} must be broadcast-compatible with {@code a} outside the
    * selected axis.
+   *
+   * <p>Gradients: the pinned MLX 0.32.4 rejects a VJP with respect to the {@code indices} operand
+   * ("Cannot calculate VJP with respect to indices"), so a differentiable caller whose indices are
+   * computed in the graph must pass {@code MLXOps.stopGradient(indices)} -- the integer index
+   * channel carries no meaningful derivative.
    */
   public static MLXArray takeAlongAxis(MLXArray a, MLXArray indices, int axis) {
     MLXScope scope = NativeOps.scopeOf("takeAlongAxis", a, indices);

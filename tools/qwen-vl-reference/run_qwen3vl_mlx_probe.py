@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Phase 7.3b WP1 item 5: quantized 8B candidate probe (MLX-affine runtime).
 
-Runs under tools/qwen-vl-reference/.venv (CPython 3.12, mlx 0.31.2,
-mlx-metal 0.31.2, mlx-vlm 0.3.9, transformers 4.57.6) on an Apple Silicon
+Runs under tools/qwen-vl-reference/.venv (CPython 3.12, mlx 0.32.4,
+mlx-metal 0.32.4, mlx-vlm 0.3.9, transformers 4.57.6) on an Apple Silicon
 GPU. It is never invoked by Gradle; it is a manual, opt-in evidence tool.
 Its output JSON is SHA-256-pinned in tools/qwen-vl-reference/provenance.json.
 
@@ -133,8 +133,8 @@ def gate_versions() -> dict:
     }
     required = {
         "python": platform.python_version_tuple()[:2] == ("3", "12"),
-        "mlx": environment["mlx"] == "0.31.2",
-        "mlx_metal": environment["mlx_metal"] == "0.31.2",
+        "mlx": environment["mlx"] == "0.32.4",
+        "mlx_metal": environment["mlx_metal"] == "0.32.4",
         "mlx_lm": environment["mlx_lm"] == "0.29.1",
         "mlx_vlm": environment["mlx_vlm"] == "0.3.9",
         "transformers": environment["transformers"] == "4.57.6",

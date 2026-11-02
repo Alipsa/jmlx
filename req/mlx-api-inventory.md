@@ -6,11 +6,11 @@ This inventory covers committed generated `mlx_h` downcalls and constants, plus
 generated layout/accessor types and upcall interfaces. An auto-rendered `unplanned`
 row is reporting only: handwritten use requires an explicit mapping record.
 
-- mlx-metal: `0.31.2`
-- mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
-- generated entries: 733
-- by category: downcall=618, constant=23, layout/accessor=68, upcall interface=23, jextract infrastructure=1
-- by status: implemented=195, planned=9, unplanned=529
+- mlx-metal: `0.32.4`
+- mlx-c: `a26f2d584a14ec619ae8db9a09be03becd47598a`
+- generated entries: 801
+- by category: downcall=678, constant=23, layout/accessor=75, upcall interface=24, jextract infrastructure=1
+- by status: implemented=196, planned=9, unplanned=596
 
 | Generated binding | Category | Status | Facade / reason | Tests | Probe | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -49,12 +49,16 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_closure_value_and_grad_new_func$fun` | upcall interface | unplanned | — | — | — | — |
 | `mlx_closure_value_and_grad_new_func_payload$dtor` | upcall interface | unplanned | — | — | — | — |
 | `mlx_closure_value_and_grad_new_func_payload$fun` | upcall interface | unplanned | — | — | — | — |
+| `mlx_compile_cache` | layout/accessor | unplanned | — | — | — | — |
+| `mlx_compile_cache_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_device` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_device_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_device_info` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_device_info_` | layout/accessor | unplanned | — | — | — | — |
+| `mlx_distributed_all_gather_fn` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_distributed_group` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_distributed_group_` | layout/accessor | unplanned | — | — | — | — |
+| `mlx_distributed_init_with_all_gather$dtor` | upcall interface | unplanned | — | — | — | — |
 | `mlx_error_handler_func` | upcall interface | implemented | NativeLoader error-handler installation | MLXNativeErrorTest | — | all handwritten source |
 | `mlx_fast_cuda_kernel` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_fast_cuda_kernel_` | layout/accessor | unplanned | — | — | — | — |
@@ -74,7 +78,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.MLX_COMPILE_MODE_NO_FUSE` | constant | unplanned | — | — | — | — |
 | `mlx_h.MLX_COMPILE_MODE_NO_SIMPLIFY` | constant | unplanned | — | — | — | — |
 | `mlx_h.MLX_COMPLEX64` | constant | unplanned | — | — | — | — |
-| `mlx_h.MLX_CPU` | constant | unplanned | — | — | — | — |
+| `mlx_h.MLX_CPU` | constant | implemented | NativeOps DEFAULT_CPU_STREAM (the MLXIO loader stream) | MLXIOTest | — | all handwritten source |
 | `mlx_h.MLX_FFT_NORM_BACKWARD` | constant | unplanned | — | — | — | — |
 | `mlx_h.MLX_FFT_NORM_FORWARD` | constant | unplanned | — | — | — | — |
 | `mlx_h.MLX_FFT_NORM_ORTHO` | constant | unplanned | — | — | — | — |
@@ -198,6 +202,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_ceil` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_checkpoint` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_clear_cache` | downcall | implemented | MLXMemory | MLXMemoryLeakTest; VisionLanguageMemoryTest | — | all handwritten source |
+| `mlx_h.mlx_clear_streams` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_clip` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_closure_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_closure_custom_apply` | downcall | unplanned | — | — | — | — |
@@ -237,6 +242,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_closure_value_and_grad_new_func_payload` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_closure_value_and_grad_set` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_compile` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_compile_cache_free` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_compile_cache_new` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_concatenate` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_concatenate_axis` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_conjugate` | downcall | unplanned | — | — | — | — |
@@ -251,19 +258,27 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_copy` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cos` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_cosh` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_count_nonzero` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_count_nonzero_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_count_nonzero_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cuda_is_available` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cummax` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_cummax_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cummin` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_cummin_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_cumprod` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_cumsum` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
+| `mlx_h.mlx_cumprod_axis` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_cumsum` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_cumsum_axis` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_custom_function` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_custom_vjp` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_default_cpu_stream_new` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
-| `mlx_h.mlx_default_gpu_stream_new` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
+| `mlx_h.mlx_default_cpu_stream_new` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_default_gpu_stream_new` | downcall | implemented | Loader validation only: jmlx-ffi's extraction-fallback test forces a GPU kernel through this stream to prove the extracted layout includes mlx.metallib; no production facade uses it | NativeLoaderExtractionFallbackTest | — | jmlx-ffi/src/test/java/se/alipsa/jmlx/ffi/NativeLoaderExtractionFallbackTest.java |
 | `mlx_h.mlx_degrees` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_depends` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_dequantize` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_detail_compile` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_detail_compile_cache` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_detail_compile_clear_cache` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_detail_compile_erase` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_detail_vmap_replace` | downcall | unplanned | — | — | — | — |
@@ -288,17 +303,20 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_device_tostring` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_diag` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_diagonal` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_diff` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_disable_compile` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_all_gather` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_all_max` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_all_min` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_all_sum` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_distributed_clear_backends` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_group_free` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_distributed_group_get_rank` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_distributed_group_get_size` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_group_new` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_distributed_group_rank` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_distributed_group_size` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_group_split` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_init` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_distributed_init_with_all_gather` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_is_available` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_recv` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_distributed_recv_like` | downcall | unplanned | — | — | — | — |
@@ -321,6 +339,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_export_function_kwargs` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_export_to_dot` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_eye` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_fast_cross_entropy` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_config_add_output_arg` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_config_add_template_arg_bool` | downcall | unplanned | — | — | — | — |
@@ -334,6 +353,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fast_cuda_kernel_config_set_verbose` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_free` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_cuda_kernel_new` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_fast_gated_delta_update` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_layer_norm` | downcall | implemented | MLXFast | MLXFastTest | — | all handwritten source |
 | `mlx_h.mlx_fast_metal_kernel_apply` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fast_metal_kernel_config_add_output_arg` | downcall | unplanned | — | — | — | — |
@@ -369,6 +389,9 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_fft_rfftfreq` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_fft_rfftn` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_flatten` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
+| `mlx_h.mlx_flip` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_flip_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_flip_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_floor` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_floor_divide` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_from_fp8` | downcall | unplanned | — | — | — | — |
@@ -381,13 +404,16 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_gather` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather_mm` | downcall | implemented | MLXOps.gatherMatmul | MLXGatherOpsTest | — | all handwritten source |
 | `mlx_h.mlx_gather_qmm` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_gather_qqmm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_gather_single` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_active_memory` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
+| `mlx_h.mlx_get_array_buffer_size` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_cache_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
 | `mlx_h.mlx_get_default_device` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_get_default_stream` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_memory_limit` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_get_peak_memory` | downcall | implemented | MLXMemory | KVCacheMemoryPlateauTest | — | all handwritten source |
+| `mlx_h.mlx_get_streams` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_greater` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_greater_equal` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_hadamard_transform` | downcall | unplanned | — | — | — | — |
@@ -436,6 +462,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_linalg_cholesky` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_cholesky_inv` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_cross` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_linalg_det` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_eig` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_eigh` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_eigvals` | downcall | unplanned | — | — | — | — |
@@ -448,11 +475,13 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_linalg_norm_matrix` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_pinv` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_qr` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_linalg_slogdet` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_solve` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_solve_triangular` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_svd` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linalg_tri_inv` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_linspace` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_linspace_endpoint` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_load` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_load_gguf` | downcall | implemented | MLXIO | MLXIOTest | — | all handwritten source |
 | `mlx_h.mlx_load_reader` | downcall | unplanned | — | — | — | — |
@@ -464,9 +493,11 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_log2` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logaddexp` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logcumsumexp` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_logcumsumexp_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logical_and` | downcall | implemented | MLXOps.logicalAnd | AttentionMaskTest | — | all handwritten source |
 | `mlx_h.mlx_logical_not` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logical_or` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_logical_xor` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logsumexp` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logsumexp_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_logsumexp_axis` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
@@ -488,6 +519,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_map_string_to_string_set` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_masked_scatter` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_matmul` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
+| `mlx_h.mlx_matrix_transpose` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_max` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_max_axes` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_max_axis` | downcall | unplanned | — | — | — | — |
@@ -496,8 +528,12 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_mean_axes` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_mean_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_median` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_median_axes` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_median_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_meshgrid` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_metal_get_metallib_path` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_metal_is_available` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_metal_set_metallib_path` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_metal_start_capture` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_metal_stop_capture` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_min` | downcall | unplanned | — | — | — | — |
@@ -516,11 +552,13 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_number_of_elements` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_ones` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_ones_like` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_ones_like_dtype` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_outer` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_pad` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
 | `mlx_h.mlx_pad_symmetric` | downcall | implemented | MLXShape | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXShape.java |
 | `mlx_h.mlx_partition` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_partition_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
+| `mlx_h.mlx_positive` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_power` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_print_graph` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_prod` | downcall | unplanned | — | — | — | — |
@@ -579,6 +617,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_scatter_prod` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_scatter_prod_single` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_scatter_single` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_searchsorted` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_segmented_mm` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_set_cache_limit` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_set_compile_mode` | downcall | unplanned | — | — | — | — |
@@ -619,11 +658,16 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_stop_gradient` | downcall | implemented | MLXOps | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_stream_equal` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_free` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stream_from_thread_local` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_get_device` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_get_index` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_new` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_new_device` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
+| `mlx_h.mlx_stream_new_thread_unsafe` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_stream_set` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stream_thread_local_free` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stream_thread_local_new` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_stream_thread_local_set` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_stream_tostring` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_string_data` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_string_free` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
@@ -636,6 +680,8 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_sum_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_swapaxes` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_synchronize` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_synchronize_default` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_synchronize_thread_local` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_take` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_take_along_axis` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_take_axis` | downcall | implemented | MLXShape | MLXNumericTest | — | all handwritten source |
@@ -648,16 +694,22 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_topk` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_topk_axis` | downcall | planned | Phase 6.1 selection/random candidate; direct use is probe-only | SelectionAndRandomProbeTest | req/plans/phase6-0b-probe-findings.md | jmlx-core/src/test/java/se/alipsa/jmlx/core/SelectionAndRandomProbeTest.java |
 | `mlx_h.mlx_trace` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_trace_axes` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_transpose` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_transpose_axes` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_tri` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_tril` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
 | `mlx_h.mlx_triu` | downcall | implemented | MLXShape | MLXArrayTest; MLXSamplingOpsTest | — | all handwritten source |
+| `mlx_h.mlx_trunc` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_unflatten` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_unique` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_unstack` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_unstack_axis` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_value_and_grad` | downcall | implemented | MLXGrad | MLXGradTest | — | all handwritten source |
 | `mlx_h.mlx_var` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_var_axes` | downcall | implemented | MLXOps | Phase71OracleTest; StridedViewSafetyTest; Phase71ContractsTest | — | jmlx-core/src/main/java/se/alipsa/jmlx/core/MLXOps.java |
 | `mlx_h.mlx_var_axis` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vecdot` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_array_append_data` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_array_append_value` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_array_free` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
@@ -680,6 +732,17 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_vector_int_set_data` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_int_set_value` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_int_size` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_append_data` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_append_value` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_free` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_get` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_new` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_new_data` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_new_value` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_set` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_set_data` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_set_value` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_vector_stream_size` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_string_append_data` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_vector_string_append_value` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_vector_string_free` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
@@ -708,6 +771,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_where` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_zeros` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
 | `mlx_h.mlx_zeros_like` | downcall | unplanned | — | — | — | — |
+| `mlx_h.mlx_zeros_like_dtype` | downcall | unplanned | — | — | — | — |
 | `mlx_imported_function` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_imported_function_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_io_gguf` | layout/accessor | unplanned | — | — | — | — |
@@ -737,12 +801,16 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_set_error_handler$dtor` | upcall interface | unplanned | — | — | — | — |
 | `mlx_stream` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_stream_` | layout/accessor | implemented | NativeOps implementation infrastructure | MLXNumericTest; MLXQuantTest | — | all handwritten source |
+| `mlx_stream_thread_local` | layout/accessor | unplanned | — | — | — | — |
+| `mlx_stream_thread_local_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_string` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_string_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_vector_array` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_vector_array_` | layout/accessor | implemented | NativeOps implementation infrastructure | MLXNumericTest; MLXQuantTest | — | all handwritten source |
 | `mlx_vector_int` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_vector_int_` | layout/accessor | unplanned | — | — | — | — |
+| `mlx_vector_stream` | layout/accessor | unplanned | — | — | — | — |
+| `mlx_vector_stream_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_vector_string` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_vector_string_` | layout/accessor | unplanned | — | — | — | — |
 | `mlx_vector_vector_array` | layout/accessor | unplanned | — | — | — | — |

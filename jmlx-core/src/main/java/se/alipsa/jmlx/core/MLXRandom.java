@@ -56,7 +56,18 @@ public final class MLXRandom {
     return new MLXArray(target, res);
   }
 
-  /** Draws one categorical index along {@code axis} with an explicit key, returning INT32. */
+  /**
+   * Draws one categorical index along {@code axis} with an explicit key, returning INT32.
+   *
+   * <p>Sampler pin: the pinned MLX 0.32.4 selects its inverse-CDF sampler for any input whose total
+   * size equals the axis size (every non-axis extent is one) whenever the axis size is positive and
+   * the output shape is non-trivial; 0.31.2 ran its gumbel-max sampler for every shape, and 0.32.4
+   * still runs gumbel-max for 1-D inputs. The inverse-CDF path may draw a different token than
+   * gumbel-max for identical values and key, so single-row inputs (ndim &gt; 1 with every non-axis
+   * extent one) are routed through a 1-D view instead -- bit-identical to 0.31.2 for these shapes,
+   * and a single-row draw keeps the gumbel-max stream that 1-D inputs use -- and the result is
+   * reshaped back to the axis-reduced shape.
+   */
   public static MLXArray categorical(MLXArray logits, int axis, MLXArray key) {
     Objects.requireNonNull(logits, "logits");
     requireKey(key, "categorical");
@@ -68,13 +79,38 @@ public final class MLXRandom {
       throw new IllegalArgumentException("categorical: axis out of range: " + axis);
     }
     MLXScope scope = NativeOps.scopeOf("categorical", logits, key);
+    MLXArray input = logits;
+    int inputAxis = normalizedAxis;
+    int n = logits.shape()[normalizedAxis];
+    if (logits.ndim() > 1 && n > 0 && logits.size() == (long) n) {
+      // The 1-D view is a per-call temporary: allocate it into the resolved scope (the innermost
+      // of the operands' scopes), not logits.scope() -- the no-target MLXShape.reshape would
+      // register one handle per draw in a long-lived logits scope when the key lives in a
+      // per-draw child scope.
+      input = NativeOps.shapeOp("reshape", logits, scope, new int[] {n}, mlx_h::mlx_reshape);
+      inputAxis = 0;
+    }
+    MLXArray drawInput = input;
+    int drawAxis = inputAxis;
     MemorySegment res = mlx_h.mlx_array_new(scope);
     NativeOps.checked(
         "categorical",
         () ->
             mlx_h.mlx_random_categorical(
-                res, logits.handle(), normalizedAxis, key.handle(), scope.stream()));
-    return MLX.astype(new MLXArray(scope, res), DType.INT32);
+                res, drawInput.handle(), drawAxis, key.handle(), scope.stream()));
+    MLXArray selected = MLX.astype(new MLXArray(scope, res), DType.INT32);
+    if (input != logits) {
+      int[] reduced = new int[logits.ndim() - 1];
+      System.arraycopy(logits.shape(), 0, reduced, 0, normalizedAxis);
+      System.arraycopy(
+          logits.shape(),
+          normalizedAxis + 1,
+          reduced,
+          normalizedAxis,
+          logits.ndim() - 1 - normalizedAxis);
+      selected = MLXShape.reshape(selected, reduced);
+    }
+    return selected;
   }
 
   private static void requireKey(MLXArray key, String operation) {

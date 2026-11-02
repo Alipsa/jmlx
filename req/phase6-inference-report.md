@@ -51,9 +51,169 @@ Tier-B-size run is outstanding. No speed threshold is enforced in CI.
 
 | Component | Pin |
 | --- | --- |
-| `mlx-metal` wheel | 0.31.2 (`macosx_26_0_arm64`) |
-| mlx-c | `fba4470b89073180056c9ea46c443051375f7399` (tracks v0.6.0) |
+| `mlx-metal` wheel | 0.32.4 (`macosx_26_0_arm64`), SHA-256 `514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936` |
+| mlx-c | `a26f2d584a14ec619ae8db9a09be03becd47598a` (tag v0.8.0, tracks MLX v0.32.4) |
 | Platform | macOS 26+ on Apple Silicon, Java 25 |
+
+Upgraded at the Phase 7.5 milestone (2026-11-01, `req/plans/phase7-5-plan.md`); the full
+migration record is in [Phase 7.5 pin upgrade](#phase-75-pin-upgrade-2026-11-01) below.
+
+## Phase 7.5 pin upgrade (2026-11-01)
+
+The paired native pin moved from `mlx-metal` 0.31.2 / mlx-c `fba4470b89073180056c9ea46c443051375f7399`
+(tracking MLX v0.31.2 / mlx-c v0.6.0) to `mlx-metal` 0.32.4 / mlx-c
+`a26f2d584a14ec619ae8db9a09be03becd47598a` (tag v0.8.0, whose CMakeLists.txt pins MLX v0.32.4).
+Wheel `mlx_metal-0.32.4-py3-none-macosx_26_0_arm64.whl`, SHA-256
+`514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936`; the oracle's paired wheel is
+`mlx-0.32.4-cp312-cp312-macosx_26_0_arm64.whl`, SHA-256
+`7928869076db6267ab3ebdb253b2c80be1e738b3032c783170bd1d59d460c578`. The regenerated committed
+jextract bindings, the API inventory and the header-coverage report moved with it in the same step.
+
+### Skipped upstream releases
+
+There is no MLX 0.31.3 or 0.31.4 release: the tags jump from v0.31.2 straight to v0.32.0. The
+skipped MLX releases, and the changes that matter to jmlx:
+
+- **v0.32.0** — the thread-local stream approach was applied to the CPU too (#3537): streams are
+  now per-thread, `mlx_default_cpu_stream_new` returns the calling thread's default stream, and
+  the `new_thread_unsafe_stream` API was added (#3578). NAX kernels require
+  `MACOSX_DEPLOYMENT_TARGET=26.2`.
+- **v0.32.1** — an inverse-CDF path was added to `categorical` sampling (#4177), selected for
+  inputs whose total size equals the axis size (every non-axis extent 1, ndim > 1); 1-D inputs
+  still run the gumbel-max path. The NAX attention Q@K.T loop gained `unroll_count(4)` (#3843).
+- **v0.32.2** — a `force_fused` option was added to `scaled_dot_product_attention` (#4185).
+- **v0.32.3** — Gated DeltaNet Metal kernels (#4020) and SDPA dispatch changes (head-dim-256
+  fused path, NAX attention for long unmasked D72/D80 inputs).
+- **v0.32.4** — SDPA VJP (#4563), gated delta net VJP (#4565), and the cumsum fix for a
+  non-contiguous bool input (#4590) — the cumsum path jmlx calls.
+
+mlx-c moved v0.6.0 → v0.7.0 → v0.8.0. The complete, authoritative symbol list is the regenerated
+`req/mlx-api-inventory.md` (733 → 801 entries; implemented 195 → 196, the recorded `MLX_CPU`
+constant) and
+`req/mlx-api-header-coverage.md` (721 → 788 declarations; declared-and-bound 710 → 777). The
+changes besides jmlx's two retargets (jmlx calls none of these today — the hazard is a later
+milestone calling an old name that still compiles but now means a different operation):
+
+- **Removed symbols:** `mlx_distributed_group_rank` → `mlx_distributed_group_get_rank`;
+  `mlx_distributed_group_size` → `mlx_distributed_group_get_size`.
+- **Same name, different semantics** (the old name still compiles but now means a no-axis /
+  flattened scan; the new `_axis`/`_axes` variant carries the old per-axis behaviour):
+  `mlx_cumsum` (+`mlx_cumsum_axis`), `mlx_cummax` (+`mlx_cummax_axis`), `mlx_cummin`
+  (+`mlx_cummin_axis`), `mlx_cumprod` (+`mlx_cumprod_axis`), `mlx_logcumsumexp`
+  (+`mlx_logcumsumexp_axis`), `mlx_median` (+`mlx_median_axes`), `mlx_trace` (+`mlx_trace_axes`).
+- **Same name, new parameters:** `mlx_gather_qmm` gains `const mlx_array global_scale` before
+  `sorted_indices` (matters for later quantized-MoE work); `mlx_detail_compile_clear_cache` and
+  `mlx_detail_compile_erase` gain parameters; `mlx_fast_scaled_dot_product_attention` gains
+  `force_fused` (this one is called — retargeted below).
+- **Changed in place:** the `mlx_io_vtable` function pointers in `io_types.h`.
+- **Added and unused (later-milestone candidates):** e.g. `mlx_cummax_axis`, `mlx_cummin_axis`,
+  `mlx_cumprod_axis`, `mlx_logcumsumexp_axis`, `mlx_median_axes`, `mlx_trace_axes`, and
+  `mlx_fast_gated_delta_update` (the Qwen3.8 Gated DeltaNet kernel — relevant to 7.6, not wired
+  in here). The v0.8.0 regenerated headers add many further symbols (the header diff counts 61
+  new function names).
+
+Also upstream and Python-side: 0.32.4's `mx.random.uniform` now takes
+`(low, high, shape, ...)` instead of `(shape, ...)` — jmlx calls the C API and is unaffected;
+only the re-locked Python environments (`tools/mlx-oracle`, `tools/qwen-vl-reference`) needed to
+account for it.
+
+### Hand-written Java changes (six)
+
+The plan anticipated the two call-site retargets; the migration ended at six hand-written changes.
+All preserve the public API; all but the last preserve the pre-upgrade observable behaviour:
+
+1. **`MLXOps.cumulativeSumAxis`** retargeted to `mlx_cumsum_axis` with the optional dtype
+   parameter absent, reproducing the previous input-inferred dtype (the same-named
+   `mlx_cumsum` is now a no-axis scan).
+2. **`MLXFast.scaledDotProductAttention`** passes the new `force_fused` parameter as `false` —
+   its C default — reproducing the pre-v0.8.0 call exactly; upstream's fused full-attention path
+   is opt-in and must not silently change jmlx's SDPA bits.
+3. **`NativeOps.resolveDefaultCpuStream`** now builds the `(cpu, 0)` device with
+   `mlx_device_new_type` and creates the stream with `mlx_stream_new_thread_unsafe`. Because
+   0.32.4 streams are per-thread (v0.32.0, #3537), the previous
+   `mlx_default_cpu_stream_new`-sourced, process-wide cached loader stream threw "There is no
+   Stream(cpu, N) in current thread" when used from any thread other than its creating one; the
+   thread-unsafe stream is registered in MLX's global table, usable from any thread, and safe on
+   CPU (no per-thread Metal state) under jmlx's one-MLX-thread-at-a-time rule.
+4. **`MoeMlp`** (and its test-only `DenseMoeReference`) wrap the route's `takeAlongAxis`
+   indices in `MLXOps.stopGradient`: 0.32.4's `GatherAxis::vjp` throws "Cannot calculate VJP
+   with respect to indices" for in-graph indices, where 0.31.2 tolerated them. This is the same
+   guard `SwitchGlu` already applies; the router gradient reaches the indices only through the
+   gathered probabilities, so the change is numerically neutral (`MoeMlpTest`'s
+   `gradientsFlowOnlyToSelectedExperts` passes unchanged in both precision modes).
+   `MLXShape.takeAlongAxis`/`takeAxis` Javadoc documents the 0.32.4 constraint.
+5. **`MLXRandom.categorical`** routes single-row inputs (ndim > 1 with `size == shape[axis]`)
+   through a 1-D view and reshapes the result back to the axis-reduced shape. 0.32.1's
+   inverse-CDF sampler (#4177) is selected for exactly those shapes and draws a *different
+   token* from gumbel-max for identical values and key (probe on the identical 0.32.4 dylib:
+   logits `[1, 3, 2, -inf]`, draw key `(255383827, 267815257)` selects 1 in 1-D and 2 in
+   `[1,1,4]`). jmlx's decode rows are `[1,1,V]`, so they would have moved to the new sampler,
+   while the 1-D oracle reference inputs stayed on gumbel-max; 0.31.2 had only the gumbel-max
+   path, which is why the two agreed until now. Routing through the 1-D view reproduces the
+   pre-upgrade call exactly — the same principle as change 2 — bit-identical for these shapes.
+
+6. **`SinusoidalPositionalEncoding`** rejects odd dims at construction. 0.32.4's
+   `nn.SinusoidalPositionalEncoding` requires the dims to be "positive and even"; 0.31.2 — and
+   jmlx until this change — returned `dims - 1` features for odd dims. The constructor guard gains
+   `dims % 2 != 0` (the message is now `SinusoidalPositionalEncoding: even dims >= 4 and positive
+   frequencies required`), and `Phase71ContractsTest` asserts the odd-dims rejection next to the
+   existing dims-2 one. jmlx still rejects `dims == 2` on purpose (0.32.4 special-cases it; the
+   pre-upgrade reference returned NaNs and the Phase 7.1 probe rejected it deliberately), so the
+   remaining divergence from 0.32.4 is jmlx being stricter, never looser.
+
+### Oracle fixture input changes
+
+Two `phase7-1-core.input.json` cases needed input-level edits:
+
+- **`sinusoidal-60`** (dims 5) removed: 0.32.4 rejects odd-dimension
+  `SinusoidalPositionalEncoding` inputs; jmlx's constructor now matches (hand-written change 6).
+- **`repeat_axis-105`** shape moves `[0]` → `[0,3]`: 0.32.4 keeps the untouched axis's extent in
+  the repeat result (no Java change).
+
+### Re-recorded goldens — pin lines and host measurements only
+
+**No golden value moved.** The seeded sampling stream is bit-identical across pins, so every
+"re-record" below changes only pin lines and host measurements:
+
+- `phase6-1-sampling` and `phase6-tier-a-array` oracle fixtures: regenerated on the `macos-26`
+  native job (run 41347355181, the only host satisfying the GPU profile) with the re-locked
+  0.32.4 oracle — **byte-identical** to the committed 0.31.2 fixtures. MLX reproduced the GPU
+  sampling and Tier-A array outputs bit-for-bit on that host.
+- `phase7-1-core.expected.json`: regenerated on the 26 runner; carries only the two
+  input-driven changes above (byte-identical to a local macOS 27 regeneration — the CPU
+  full-float32 fixture is host-reproducible).
+- `LlamaModelTest`'s seeded constants (`EXPECTED_SEED_42` / `EXPECTED_SEED_7`): **unchanged**;
+  the test passes with the committed values.
+- `tools/release-smoke/goldens/mistral-sampled.properties`: `run.sh ci --record` under the new
+  pins rewrote only the `native.*` pin lines; `generatedIds` is bit-identical.
+- The four text Tier-B manifests (qwen2.5-0.5b, smollm2-135m, lite-mistral-150m-v2,
+  qwen3-0.6b): `recorded_pin` re-recorded from the `macos-26` tier-B dispatch (run 41352378744,
+  all ten arms green) to
+  `Apple M1 (Virtual)|macOS=26.6.2|arch=aarch64|mlx-metal=0.32.4|mlx-c=a26f2d584a14ec619ae8db9a09be03becd47598a|batch=1`,
+  with that run's `observed_peak_test_jvm_rss_kib` and `observed_run`. The run's
+  `generated_ids` were identical to the recorded `expected_token_ids` — **no ID moved**, and the
+  exact-ID gate re-arms on the new pin.
+- The VLM Tier-B manifests' `recorded_pin` sits beside their dated `local_evidence` blocks and
+  stays 0.31.2 evidence; `TierBReferences.report` now appends `runtime_pin` (the same tuple
+  `TierBSmokeTest` compares, now shared) so a report line can no longer be misread as
+  describing a different runtime.
+
+### Memory bounds and accounting
+
+The allocator-tier size sweep is **byte-identical** between pins (exact ≤ 16 KiB, rounding up to
+the next 16 KiB tier above, exact cleanup), so no memory-suite or memory-bound adjustment was
+needed (WP6 closed with no commit).
+
+### Verification
+
+Local (M5 Max / macOS 27.0.1, both precision modes): `:jmlx-core:test` 444/444,
+`:jmlx-models:test` 581/581, `:jmlx-core:float32GoldenTest` 30/30,
+`:jmlx-models:float32GoldenTest` 56/56 — zero failures. The tokenizer and image oracle
+fixtures pass unchanged; all six strict HF-referenced Tier-B runs (MiniLM, BERT, Flan-T5,
+SmolVLM, Qwen3-VL, Phi-3.5-Vision) pass unchanged locally; the `macos-26` dispatch run
+41352378744 ran all ten tier-B arms green on the new pin. The final gate is the `macos-26`
+native CI run of `ci.yml` on the final tree (`-PmlxOracleRequireAllProfiles=true`,
+required-native-suites assertion, no skips); see the PR description for the run link.
 
 ## Notices and licenses
 

@@ -27,16 +27,18 @@ import se.alipsa.jmlx.ffi.mlx_stream_;
  *
  * <p>Streams: MLX streams are bound to the operating-system thread that created them -- a stream
  * created on one thread cannot run ops from another ("There is no Stream(gpu, N) in current
- * thread", verified in the pinned mlx-metal 0.31.2 source: each stream's Metal command state lives
- * in a {@code static thread_local} map in {@code mlx/backend/metal/device.cpp}, and each device's
- * default stream in a {@code static thread_local} in {@code mlx/stream.cpp}) -- and MLX's
- * process-wide default stream is only usable by the first thread that touches it. So every scope
- * carries the {@linkplain #stream() stream} of its owner thread: a root scope takes the calling
- * thread's own stream (created once per thread, on first use, and never freed -- see the {@code
- * se.alipsa.jmlx.core} package Javadoc for the per-thread cost), and a child inherits its parent's,
- * which is the same thread by construction. Ops read the stream from the result scope, so a worker
- * thread that creates its own root scope runs entirely on its own stream regardless of which thread
- * used MLX first.
+ * thread", verified in the pinned MLX 0.32.4 source: each stream's Metal command encoder is
+ * registered in a per-thread table in {@code mlx/backend/metal/device.cpp} -- a static map on the
+ * main thread, a {@code static thread_local} map on every other thread -- and each device's default
+ * stream in a {@code static thread_local} in {@code mlx/stream.cpp}) -- so there is no process-wide
+ * default stream another thread could borrow. The one exception is the I/O loaders' CPU stream, a
+ * thread-unsafe stream registered in MLX's global table (see the {@code se.alipsa.jmlx.core}
+ * package Javadoc). So every scope carries the {@linkplain #stream() stream} of its owner thread: a
+ * root scope takes the calling thread's own stream (created once per thread, on first use, and
+ * never freed -- see the {@code se.alipsa.jmlx.core} package Javadoc for the per-thread cost), and
+ * a child inherits its parent's, which is the same thread by construction. Ops read the stream from
+ * the result scope, so a worker thread that creates its own root scope runs entirely on its own
+ * stream regardless of which thread used MLX first.
  *
  * <p>Because the binding is to the OS thread, a Java virtual thread is not a usable MLX thread: it
  * migrates between carrier OS threads between calls, so the stream it created on one carrier is not
@@ -214,6 +216,12 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
       }
     }
 
+    // Test-only hook (package-private through MLXScope): leak regressions such as the
+    // categorical 1-D-view pin assert that per-call temporaries do not accumulate here.
+    synchronized int handleCount() {
+      return handles.size();
+    }
+
     // Unsynchronized on purpose -- see the field javadoc above.
     boolean isClosed() {
       return closed;
@@ -341,6 +349,15 @@ public final class MLXScope implements AutoCloseable, SegmentAllocator {
   public void free(MemorySegment handle) {
     checkThread();
     holder.freeOne(handle);
+  }
+
+  /**
+   * Live native-handle count registered directly in this scope, descendants excluded. Test hook
+   * only: package-private because the only callers are leak-regression tests in this package that
+   * need to observe whether per-call temporaries land here.
+   */
+  int handleCount() {
+    return holder.handleCount();
   }
 
   /**

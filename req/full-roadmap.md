@@ -851,7 +851,8 @@ pins, and ships release notes.
 
 The native pins (`mlx-metal` plus its paired mlx-c commit) are upgraded at fixed points:
 
-- **Phases 1–6:** never upgraded; the pin is `mlx-metal` 0.31.2 / mlx-c `fba4470`.
+- **Phases 1–6:** never upgraded; the pin remained `mlx-metal` 0.31.2 / mlx-c `fba4470`
+  throughout these phases (upgraded once at 7.5, above).
 - **Phase 7:** once, as milestone 7.5, after 7.4 and before 7.6 (Qwen3.8), so 7.6's oracle
   fixtures, goldens and Tier-B evidence are produced once, on the runtime that the first native
   release (8.4) ships. On 2026-10-29 the newest pairing was `mlx-metal` 0.32.4 (with a

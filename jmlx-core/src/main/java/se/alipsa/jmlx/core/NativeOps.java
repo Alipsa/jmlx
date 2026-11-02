@@ -45,16 +45,21 @@ final class NativeOps {
   private static final MemorySegment DEFAULT_DEVICE = resolveDefaultDevice();
 
   /**
-   * The process-wide default CPU stream, resolved once and never freed. Unlike a GPU stream (see
-   * {@link MLXScope#stream()}), MLX lets every thread use it, verified on the pinned runtime.
-   * {@code mlx_default_cpu_stream_new} returns MLX's *existing* default CPU stream (a stable
-   * scheduler index across every call) rather than minting a new one -- {@code
-   * mlx_stream_new_device} would instead register a fresh scheduler stream on every call, leaking
-   * one per invocation since nothing would ever free it. {@link MLXIO#loadSafetensors}/ {@link
-   * MLXIO#loadGguf} need this instead of the owner thread's GPU stream specifically because both
-   * loaders' arrays are backed by a lazy {@code Load} primitive whose {@code eval_gpu} is
-   * unimplemented in the pinned {@code mlx-metal==0.31.2} wheel (req/plans/phase5-m1-plan.md's
-   * amendment).
+   * The process-wide CPU stream used by the I/O loaders, resolved once and never freed. {@link
+   * MLXIO#loadSafetensors}/ {@link MLXIO#loadGguf} run on this stream instead of the owner thread's
+   * stream because both loaders' arrays are backed by a lazy {@code Load} primitive whose {@code
+   * eval_gpu} was unimplemented in the 0.31.2 wheel on which this design was based (see
+   * req/plans/phase5-m1-plan.md's amendment).
+   *
+   * <p>On the pinned mlx-c v0.8.0 (MLX 0.32.4) it is a <em>thread-unsafe</em> stream ({@code
+   * mlx_stream_new_thread_unsafe}), not the old {@code mlx_default_cpu_stream_new} handle: that
+   * call now returns the <em>calling thread's</em> lazily created default stream, and MLX's
+   * per-thread command-encoder table (v0.32.4's {@code get_command_encoder}) throws {@code "There
+   * is no Stream(cpu, N) in current thread"} when such a stream is used from any other thread. The
+   * thread-unsafe variant registers in MLX's global table, so this one cached stream stays usable
+   * from every thread exactly as the old default-CPU stream was; CPU evaluation keeps no per-thread
+   * Metal state, so the "thread-unsafe" label costs nothing while jmlx's one-MLX-thread-at-a-time
+   * rule holds (req/plans/phase7-5-plan.md's migration note).
    */
   static final MemorySegment DEFAULT_CPU_STREAM = resolveDefaultCpuStream();
 
@@ -65,17 +70,20 @@ final class NativeOps {
   }
 
   /**
-   * {@code mlx_default_cpu_stream_new} has no status return: on failure it fires the error handler
-   * and hands back {@code mlx_stream_new_()} (a null-{@code ctx} struct), the same statusless shape
-   * {@link MLX#array(MLXScope, float[], int[])} already guards for {@code mlx_array_new_data}
-   * (confirmed against {@code stream.cpp}'s {@code catch} branch) -- {@code checked()} would never
-   * see the failure, so it is detected explicitly instead, exactly like that site.
+   * {@code mlx_stream_new_thread_unsafe} has no status return: on failure it fires the error
+   * handler and hands back {@code mlx_stream_new_()} (a null-{@code ctx} struct), the same
+   * statusless shape {@link MLX#array(MLXScope, float[], int[])} already guards for {@code
+   * mlx_array_new_data} (confirmed against v0.8.0's {@code stream.cpp} {@code catch} branch) --
+   * {@code checked()} would never see the failure, so it is detected explicitly instead, exactly
+   * like that site. The (cpu, 0) device construction cannot fail for the same reason it is
+   * unguarded in {@link #resolveDefaultDevice()}.
    */
   private static MemorySegment resolveDefaultCpuStream() {
+    MemorySegment cpuDevice = mlx_h.mlx_device_new_type(FACADE_ARENA, mlx_h.MLX_CPU(), 0);
     NativeLoader.clearLastNativeError();
-    MemorySegment stream = mlx_h.mlx_default_cpu_stream_new(FACADE_ARENA);
+    MemorySegment stream = mlx_h.mlx_stream_new_thread_unsafe(FACADE_ARENA, cpuDevice);
     if (mlx_stream_.ctx(stream).address() == 0) {
-      throw nativeFailure("mlx_default_cpu_stream_new");
+      throw nativeFailure("mlx_stream_new_thread_unsafe");
     }
     return stream;
   }

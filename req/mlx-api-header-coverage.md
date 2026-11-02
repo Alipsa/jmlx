@@ -6,23 +6,23 @@ This native-only evidence compares public staged mlx-c function, enum-constant, 
 type declarations with committed jextract identities. Mismatches are reported for review;
 they do not assert that every header declaration belongs in the Java facade.
 
-- mlx-metal: `0.31.2`
-- mlx-c: `fba4470b89073180056c9ea46c443051375f7399`
+- mlx-metal: `0.32.4`
+- mlx-c: `a26f2d584a14ec619ae8db9a09be03becd47598a`
 - public header files: 29
-- header tree SHA-256: `4abe156b7ab962304ada96fd079843399bdb597a56fa7809192336364821453d`
-- header declarations: 721
-- comparable generated bindings: 732
-- declared-and-bound: 710
+- header tree SHA-256: `f1924caefffd359ef886a9e8ae37690ca008b864f8de94ea86e79bed3682a34f`
+- header declarations: 788
+- comparable generated bindings: 800
+- declared-and-bound: 777
 - declared-but-not-bound: 11
-- bound-without-header-match: 22
+- bound-without-header-match: 23
 
 ## Summary by declaration kind
 
 | Kind | Declared | Declared and bound | Declared but not bound | Bound without header match |
 | --- | ---: | ---: | ---: | ---: |
-| function | 620 | 618 | 2 | 0 |
+| function | 680 | 678 | 2 | 0 |
 | enum constant | 23 | 23 | 0 | 0 |
-| named type | 78 | 69 | 9 | 22 |
+| named type | 85 | 76 | 9 | 23 |
 
 ## Declared but not bound
 
@@ -69,4 +69,5 @@ Anonymous callback adapters generated from function parameters have no stable na
 | `mlx_closure_value_and_grad_new_func$fun` | upcall interface |
 | `mlx_closure_value_and_grad_new_func_payload$dtor` | upcall interface |
 | `mlx_closure_value_and_grad_new_func_payload$fun` | upcall interface |
+| `mlx_distributed_init_with_all_gather$dtor` | upcall interface |
 | `mlx_set_error_handler$dtor` | upcall interface |

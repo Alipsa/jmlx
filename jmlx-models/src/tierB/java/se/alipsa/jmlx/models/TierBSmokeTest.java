@@ -6,12 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
@@ -81,7 +79,7 @@ class TierBSmokeTest {
       assertEquals(16, result.generatedTokenIds().size());
       assertFalse(result.generatedText().isBlank());
       assertFalse(tokenizer.decode(result.generatedTokenIds(), false).isBlank());
-      String pin = runtimePin();
+      String pin = TierBReferences.runtimePin();
       System.out.println(
           "Tier B observed: model_type="
               + model.metadata().modelType()
@@ -118,32 +116,6 @@ class TierBSmokeTest {
       result.add(value.asInt());
     }
     return result;
-  }
-
-  private static String runtimePin() throws Exception {
-    Path file =
-        Path.of(
-            System.getProperty("jmlx.repository.root"), "native/install/lib/native-pin.properties");
-    Properties nativePin = new Properties();
-    try (var input = Files.newInputStream(file)) {
-      nativePin.load(input);
-    }
-    Process device =
-        new ProcessBuilder("/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string").start();
-    String hardware = new String(device.getInputStream().readAllBytes()).trim();
-    if (device.waitFor() != 0 || hardware.isBlank()) {
-      throw new IllegalStateException("cannot identify Tier B Apple Silicon device");
-    }
-    return hardware
-        + "|macOS="
-        + System.getProperty("os.version")
-        + "|arch="
-        + System.getProperty("os.arch")
-        + "|mlx-metal="
-        + nativePin.getProperty("mlxMetalVersion")
-        + "|mlx-c="
-        + nativePin.getProperty("mlxcCommit")
-        + "|batch=1";
   }
 
   private static final class RssSampler implements AutoCloseable {

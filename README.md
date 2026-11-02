@@ -65,7 +65,7 @@ Thread-per-request servers that call direct `generate`, and scheduler close-then
 therefore accumulate one stream per thread for the process's life — prefer one long-lived
 MLX-owning thread (the scheduler's worker) over many short-lived ones. Virtual threads cannot be
 MLX threads: the stream binding is to the OS thread (a C++ `thread_local` in the pinned
-mlx-metal 0.31.2) while a virtual thread migrates between carriers, so a root `MLXScope` created
+mlx-metal 0.32.4) while a virtual thread migrates between carriers, so a root `MLXScope` created
 on a virtual thread is rejected.
 
 ## Code style

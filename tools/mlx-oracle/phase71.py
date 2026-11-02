@@ -1,4 +1,4 @@
-"""CPU/full-float32 references using the installed, hash-locked MLX 0.31.2."""
+"""CPU/full-float32 references using the installed, hash-locked MLX 0.32.4."""
 import mlx.core as mx
 import mlx.nn as nn
 

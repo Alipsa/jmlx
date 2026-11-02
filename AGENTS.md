@@ -516,13 +516,14 @@ that step would return plausible-looking values in the wrong order instead of cr
 Shape is plain `int[]`; there is no `Shape` type in this slice. `DType` covers `FLOAT32`, `INT32`,
 `BOOL`, `UINT32` (the packed-weight dtype `QuantizedLinear` validates against), `FLOAT16` and
 `BFLOAT16`. `defaultDevice()` is resolved once from mlx-c's own default and cached for the process
-lifetime — this slice doesn't expose device switching. Streams are **not** process-wide: MLX streams
-are thread-bound ("There is no Stream(gpu, N) in current thread"; MLX's default GPU stream only
-worked on the first thread to use it), so each `MLXScope` carries its owner thread's own stream
-(`MLXScope.stream()`, created once per thread by the first root scope, inherited by children), and
-every op runs on its result scope's stream. Arrays must therefore be evaluated on the thread that
-built them. The default CPU stream (`NativeOps.DEFAULT_CPU_STREAM`, used by `MLXIO`) works from any
-thread.
+lifetime — this slice doesn't expose device switching. Streams are **thread-bound**: in the pinned
+runtime a stream's command encoder is registered to the thread that created it ("There is no
+Stream(gpu, N) in current thread" when used from another), and each device's default stream is
+per-thread, so each `MLXScope` carries its owner thread's own stream (`MLXScope.stream()`, created
+once per thread by the first root scope, inherited by children), and every op runs on its result
+scope's stream. Arrays must therefore be evaluated on the thread that built them. The one exception
+is the default CPU stream (`NativeOps.DEFAULT_CPU_STREAM`, used by `MLXIO`): a thread-unsafe stream
+usable from any thread, but MLX applies no synchronization to it — at most one thread at a time.
 
 **Threading rule:** use MLX from at most one thread at a time per process. The full contract is in
 the `se.alipsa.jmlx.core` package Javadoc (`package-info.java`).
@@ -545,9 +546,10 @@ the `se.alipsa.jmlx.core` package Javadoc (`package-info.java`).
 mlx-c is versioned independently of MLX itself (mlx-c's own `CMakeLists.txt` pins an exact MLX tag via
 `GIT_TAG`), so a newer `mlx-metal` wheel does not imply any particular mlx-c commit works with it — the
 two are only bumped together, via `scripts/checkDependencies.zsh` (which cross-references mlx-c's tags
-against the wheel version) and `scripts/updateMlx.zsh`. Current pin: mlx-c `fba4470` (tracks `v0.6.0`)
-against `mlx-metal==0.31.2` (`macosx_26_0_arm64`) — see Decision 9 in `req/plans/initial-plan.md`
-for why the latest 0.32.0 wheel was deliberately not used.
+against the wheel version) and `scripts/updateMlx.zsh`. Current pin: mlx-c `a26f2d5` (tag
+`v0.8.0`, pins MLX `v0.32.4`) against `mlx-metal==0.32.4` (`macosx_26_0_arm64`) — see Decision 9 in
+`req/plans/initial-plan.md` for the original pairing rationale; the 0.32.4 repin is
+`req/plans/phase7-5-plan.md`.
 
 `scripts/jextract-overrides/mlx/c/half.h` is a trimmed override copied over the staged header before
 running jextract: the real header's `__bf16` typedef (the raw C half-precision arithmetic type) is a

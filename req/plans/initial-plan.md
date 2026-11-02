@@ -94,7 +94,12 @@ the op surface and adding `se.alipsa.jmlx.nn` become mechanical rather than spec
    `install_name_tool`/re-signing needed. sha256 of the wheel
    (`mlx_metal-0.31.2-py3-none-macosx_26_0_arm64.whl`, 55,792,151 bytes):
    `84ffb60ee503f03eb684f5fb168d5cff31e2a16b7f27c1731eaf7662bd6e9b46`. mlx-c commit pinned:
-   `fba4470b89073180056c9ea46c443051375f7399`.
+   `fba4470b89073180056c9ea46c443051375f7399`. **Re-pinned in Phase 7.5**
+   (`req/plans/phase7-5-plan.md`): mlx-c `a26f2d584a14ec619ae8db9a09be03becd47598a` (tag
+   `v0.8.0`, whose `CMakeLists.txt` pins MLX `v0.32.4`) with `mlx-metal==0.32.4`
+   (`mlx_metal-0.32.4-py3-none-macosx_26_0_arm64.whl`, sha256
+   `514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936`); the pairing above is
+   retained as the historical record of how the original choice was made.
 10. **jextract needs a patched `half.h`, and the §3 two-pass filter turned out to fix a second,
     independent bug as a side effect.** Two jextract findings from the §2 probe, both bearing on
     `regen-bindings.sh`:
@@ -555,7 +560,9 @@ are flagged where they bite.
   `NativeLoader` compose with it?~~ **Answered — Decision 8**: no `-l` flag, `NativeLoader` uses
   `System.load(absolutePath)`.
 - ~~Which mlx-c commit SHA pairs with which `mlx-metal` wheel version?~~ **Answered — Decision 9**:
-  mlx-c `fba4470` with `mlx-metal==0.31.2`, sidestepping the mismatch rather than resolving it.
+  originally mlx-c `fba4470` with `mlx-metal==0.31.2`, sidestepping the mismatch rather than
+  resolving it; re-pinned in Phase 7.5 to mlx-c `a26f2d5` (tag `v0.8.0`) with
+  `mlx-metal==0.32.4` (`req/plans/phase7-5-plan.md`).
 - **Is `mlx_array_free` safe to call from the `Cleaner` thread?** MLX may have thread affinity for
   stream or device operations. If not, the backstop must enqueue onto an owning thread instead.
   Determine before relying on the backstop. Not covered by the §2 probe (needs a

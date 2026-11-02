@@ -363,8 +363,26 @@ third and fourth families, and the condition now holds:
 - The interfaces have two in-module users, which is the validation 9.7 wanted.
 - Most diffusion code is still to come: two transformers, LoRA, jobs and metadata. Without a
   split, every text-generation consumer of `jmlx-models` would carry it.
-- **Nothing has been published.** Phase 9 releases once, at its end, so moving 9.6's and 9.7's
-  code at 9.8's start breaks no published coordinate.
+- **The diffusion surface is not yet published — and must stay so until the move.**
+  `jmlx-models` itself publishes in Phase 8 (8.4's native chain), but 9.6's and 9.7's
+  diffusion API is new surface, and Phase 9 releases at the phase's end, so moving it at 9.8's
+  start breaks no published coordinate. Until the move, **no `jmlx-models` release — mid-phase,
+  per-milestone or bug-fix patch — is cut from a commit carrying 9.6's or 9.7's diffusion
+  code**. Urgent fixes are not stuck until 9.8: a patch may be cut from a branch off the
+  commit the last release was cut from, which carries no diffusion code. The guard is
+  enforced mechanically, not only in this text: 9.6 wires a release-time check (the WP0
+  runtime-classpath-check pattern, e.g. `verifyNoDiffusionInModels`) that fails any
+  `jmlx-models` release while diffusion classes are present, and 9.8 retires it after the
+  move. To make the check mechanical, **all 9.6/9.7 diffusion code lives under one package,
+  `se.alipsa.jmlx.models.diffusion` — except the conditioning encoders, which live in their
+  own `jmlx-models` packages (9.6's CLIP text encoder included)**, as the ownership table
+  above requires. The package moves whole into `jmlx-diffusion` at 9.8; the check asserts the
+  package and its subpackages are absent from the released `jmlx-models` jar, and the
+  encoders' exemption is what keeps it from false-positiving on the conditioning encoders and
+  seams that stay. A delegating-stub migration
+  is not an alternative: stubs in `jmlx-models` that delegate to the moved code would make
+  `jmlx-models` depend on `jmlx-diffusion`, which this §6 forbids, Gradle's cycle check
+  rejects, and WP0's runtime-classpath check would fail.
 - The requirements suggest this split (their §2 is explicitly "subject to JMLX's existing
   module conventions" and would also allow the pipelines in `jmlx-models` or an adapter
   module); this record adopts the `jmlx-diffusion` home rather than that alternative, for the
@@ -460,7 +478,7 @@ amended; nothing else in this record depends on the module boundary.
 
 | WP | Content |
 | --- | --- |
-| WP0 | Pin both artifacts; re-record the license acceptance; create `jmlx-diffusion` (release script, release order, smoke stub, the runtime-classpath direction check of §6) and move 9.6's and 9.7's diffusion code, recording the `jmlx-vision` scope (§6: `api` if 9.7's image result reuses `RgbImage`, otherwise no declaration); download Qwen3-4B (revision `1cfa9a7`, at least shard 3) and compare the two encoders' per-tensor digests; select the two LoRA adapters; fix the golden step and row sets; re-record the host's memory |
+| WP0 | Pin both artifacts; re-record the license acceptance; create `jmlx-diffusion` (release script, release order, smoke stub, the runtime-classpath direction check of §6) and move 9.6's and 9.7's diffusion code, recording the `jmlx-vision` scope (§6: `api` if 9.7's image result reuses `RgbImage`, otherwise no declaration) and retiring the release-time no-diffusion check (§6); download Qwen3-4B (revision `1cfa9a7`, at least shard 3) and compare the two encoders' per-tensor digests; select the two LoRA adapters; fix the golden step and row sets; re-record the host's memory |
 | WP1 | Reference scripts and probes: hidden-state indexing, FLUX.2 padding rows, both `enable_thinking` renderings against `HfTokenizer`, both sigma schedules, both guidance formulas, both RoPE layouts. The FLUX.2 padding-row probe is an explicit, independently reviewed checkpoint that must pass before WP4 starts: because FLUX.2 conditions on the padded positions' hidden-state values themselves (not just a mask), a wrong answer here would contaminate every later FLUX.2 numerical comparison |
 | WP2 | The public conditioning seam on the Qwen3 decoder: truncated encoder-only load, layer capture, right padding with the padding mask. The truncated loads are validated per §1: the 27-layer FLUX.2 load reproduces a full forward's `hidden_states[9/18/27]` (all 512 rows), the 35-layer Z-Image load reproduces `hidden_states[-2]` (real-token rows) |
 | WP3 | Scheduler extensions: static shift, empirical `mu`, per-model guidance |

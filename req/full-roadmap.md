@@ -314,13 +314,16 @@ published before `jmlx-models` itself.
    the reproducibility tuple from `req/phase6-4-benchmark.md`. Record per-token host overhead,
    including the native call count and FFM cost per decode step. This is a measurement only;
    optimization is Phase 9.1, so the first native release states decode speed honestly before any
-   optimization. It must also close out the Phase 7.5 open item, issue #73 (the
-   re-measurement's VLM wall-time delta, initially attributed to the 0.32.4 pin, was
-   retracted by a back-to-back alternating session — no measurable pin effect in a clean
-   host state; the remaining question is whether 0.32.4 degrades disproportionately under
-   a degraded host state): the baseline measures in a quiet host state, records the host
-   state with the numbers, and re-runs any surprising VLM prefill figure as a back-to-back
-   alternating session before attributing it to the runtime.
+   optimization. The Phase 7.5 open item, issue #73 (the re-measurement's VLM wall-time
+   delta, initially attributed to the 0.32.4 pin), is resolved: a back-to-back
+   alternating session showed no measurable pin effect in a clean host state, a
+   deliberately degraded-state alternating session showed both pins degrading by the
+   same factor under a controlled GPU load (pin×host interaction ruled out), and
+   Metal-cache forensics plus a cold-cache A/B ruled out a per-pin first-use cost —
+   the delta was a host-state artifact of the measurement window. 8.2 is the
+   methodology owner going forward: the baseline measures in a quiet host state,
+   records the host state with the numbers, and re-runs any surprising VLM prefill
+   figure as a back-to-back alternating session before attributing it to the runtime.
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
    the quarkus-langchain4j path). Callers may run on virtual threads: the

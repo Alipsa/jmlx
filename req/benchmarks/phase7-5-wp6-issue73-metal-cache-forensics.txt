@@ -50,8 +50,9 @@ windows):
   pre-A/B files were last modified after the window (functions.data,
   libraries.data, functions.list, libraries.list). Access times were not
   recorded. The two .list index files' birth times of 17:15:39/43 local
-  record their last recreation: cache writes recreate those files, so
-  these birth times cannot exclude earlier writes at the same paths.
+  are after the window. The birth-time pattern indicates that cache writes
+  recreate those files; recreation was not directly observed. These birth
+  times therefore cannot exclude earlier writes at the same paths.
   All four files can conceal an in-window write; nothing in the record
   decides it either way.
 - Only post-update first-use artifact: the <fe-hash-2> monolithic_metal.pcm

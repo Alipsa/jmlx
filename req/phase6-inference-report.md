@@ -370,8 +370,9 @@ file in the JDK-keyed Metal pipeline cache (`net.java.openjdk.java/com.apple.met
 in the per-user cache path) was last modified inside the 10:53–11:29 UTC window — mtime
 alone cannot exclude a write to a file also written later (four of the seventeen pre-A/B
 files were last modified after the window; all four can conceal an in-window write.
-The two .list files' birth times record their last recreation, not the first write
-at those paths, and access times were not recorded) — and the only post-update
+The birth-time pattern indicates that cache writes recreate the two .list files;
+recreation was not directly observed, and the birth times cannot exclude earlier
+writes at those paths. Access times were not recorded) — and the only post-update
 first-use artifact, an ~18 MB `metalfe` PCM in a fresh FE-hash directory, was created
 (birth 08:48:40 UTC) two hours before the window by some JDK-based process; the specific
 writer is not recoverable from the records, and it was not the resident omlx-server, which

@@ -237,7 +237,7 @@ peak 51,421,089,584 bytes (suite bound: 52,000,000,000 bytes, ~552 MB above the 
 ~1133 ms; one-request generation wall ~5423 ms — a dated 27.0.1 point, not a
 baseline: the same 0.31.2 pin measured 2,121–2,324 ms for this request on macOS
 27.2 in all five 2026-11-02 re-runs (three pin-isolated controls plus two
-alternating-session runs, `req/benchmarks/phase7-5-wp6-tierb-*-phi3v-*.xml`).
+alternating-session runs, `req/benchmarks/phase7-5-wp6-tierb-*46cb325-phi3v-*.xml`).
 
 **CI status: first self-hosted run pending.** A `phi3v` row was added to
 `.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner (the standard 7 GB runner cannot

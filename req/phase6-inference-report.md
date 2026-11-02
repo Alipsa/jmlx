@@ -305,7 +305,12 @@ median sustained throughput (median one-step decode 2.32 ms, max 2.51 ms over th
 samples) against 62.1 and 284.2 tok/s for two old-pin runs (median one-step decode 10.9
 and 3.16 ms; min/max 2.70/19.25 and 2.49/30.57 ms); the old-pin runs are too noisy (62.1
 vs 284.2 tok/s) to bound a regression, and the benchmark does not exercise the VLM
-prefill/vision path. All twenty Tier-B run XMLs are committed alongside the JSONs —
+prefill/vision path. Both decode benchmarks ran inside the 10:53–11:29 UTC window
+(new pin 11:24, old pin 11:26 / 11:29 UTC, by the local output-file mtimes — the
+JSONs carry no timestamps): the old pin stalled there too, on this light workload,
+while the new-pin small decode ran clean — see issue #73 for what this implies for
+the host-state and first-use explanations. All twenty Tier-B run XMLs are committed
+alongside the JSONs —
 the six old-pin controls, the six new-pin re-measurement runs and the eight
 alternating-session runs — so every figure above is backed by a raw record.
 The new-pin XMLs' file names state a commit provenance that is consistent with the

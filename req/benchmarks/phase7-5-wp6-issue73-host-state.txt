@@ -22,17 +22,27 @@ $ pmset -g therm
   Note: No thermal warning level has been recorded
   Note: No performance warning level has been recorded
   Note: No CPU power status has been recorded
-  (identical output at session start 15:49 UTC; the "therm-warnings=2" in the
-  per-run lines below counts the two "No ... recorded" note lines, i.e. zero
-  recorded warnings)
+  (identical output at 15:49 UTC, before the per-run session. The per-run
+  "therm-warnings=N" below is `pmset -g therm | grep -c 'warning level has
+  been recorded'`: 2 is the no-warnings state — the thermal and performance
+  "Note: No ... recorded" lines match, the CPU-power note does not. A
+  recorded warning replaces those notes ("... warning level set to N") and
+  drops the count below 2. The recording script is committed as
+  tools/gpu-burn/hostrec.sh; these full outputs are the primary record, the
+  per-run counts secondary.)
 
---- resident GPU-relevant processes at session start (15:49 UTC, from ps -r; user column omitted) ---
+--- resident GPU-relevant processes (recorded 15:49 UTC, before the per-run recording session; from ps -r, user column omitted) ---
 
   WindowServer                  PID 427   43.2% CPU   106,704 KB RSS     started 08:43 local
   omlx-server (local GPU model) PID 862   24.0% CPU   57,422,848 KB RSS (~55 GiB)  started 08:43 local (46 s after boot)
   Chrome GPU process            PID 2617  16.4% CPU   156,032 KB RSS     started 08:51 local
   ScreensharingAgent            PID 1258  30.0% CPU    90,832 KB RSS     started 08:49 local
   Terminal                      PID 1310  17.4% CPU   109,552 KB RSS     started 08:49 local
+
+  omlx-server's identity (re-verified 18:10 UTC): `ps -o comm=` gives
+  "omlx-server" and the text executable is a Homebrew Python 3.11 framework
+  binary — it is a Python process, NOT a JVM, and cannot write to the
+  JDK-keyed Metal cache (the forensics log's PCM attribution rests on this).
 
 --- per-run host state (one line recorded before each run; UTC time | label | load 1/5/15 min | therm-warnings | omlx-server %CPU | free memory %) ---
 
@@ -59,8 +69,9 @@ new-65e5306-qwen3vl-1.xml.)
 --- burner ---
 
 tools/gpu-burn/burn.swift, default settings (BURN_ON_MS=100, BURN_OFF_MS=25),
-one process: started 16:09:15 UTC before the calibration run, killed after the
-last loaded run (16:15:36 UTC), settings unchanged throughout — the
+one process: started 16:09:15 UTC before the calibration run, killed at
+16:16:12 UTC (the session-end line) after the last loaded run (started
+16:15:35 UTC, ended ~16:16:12 UTC), settings unchanged throughout — the
 calibration run is therefore part of the same loaded regime as the paired
 alternation. The GPU stays saturated (~100% duty) for these settings: each
 command buffer is a 262,144-thread dispatch of 200,000 dependent FMAs, and

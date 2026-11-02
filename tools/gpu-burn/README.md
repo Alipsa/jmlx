@@ -34,10 +34,13 @@ saturating contention source rather than a tunable duty cycle.
 
 The kernel is a constant-compute stream — not a calibrated bandwidth or power
 probe. For the measurement itself, record host state with the numbers (load,
-`pmset -g therm` warning level, free memory, resident GPU-using processes) and
-alternate the comparands back to back — the issue #73 session
+`pmset -g therm` warning level, free memory, resident GPU-using processes) —
+`hostrec.sh` next to this file is the per-run recorder committed from the
+issue #73 session, with its field semantics documented — and alternate the
+comparands back to back; the issue #73 session
 (`req/benchmarks/phase7-5-wp6-tierb-degraded-*.xml` plus the
-`phase7-5-wp6-issue73-*` host-state and forensics logs) is the worked example.
+`phase7-5-wp6-issue73-*` host-state and forensics records) is the worked
+example.
 
 ## Reference effect (M5 Max, macOS 27.2, default settings)
 

@@ -344,38 +344,48 @@ degrade by the same factor — Qwen3-VL 243/245 ms clean → 2,145/2,057 ms new 
 clean → 13,526/13,587 ms new vs. 14,555/14,273 ms old (3.8–4.0×, new/old
 0.93–0.95) — no pin×host interaction under that regime: within ±7 %, nowhere
 near the window's 2.3–14.9× per-model asymmetry. The burner was one process
-with unchanged settings from the 16:09:19 UTC calibration run through the
-16:15:36 UTC last loaded run, so the calibration run is part of the same loaded
-regime. No thermal or performance warning level was recorded in any run (load
-1.3–2.2, 41–71 % free memory; the resident omlx-server local GPU model serving
-and Chrome's GPU process ran throughout, as during the original window). Even
+with unchanged settings from the 16:09:19 UTC calibration run through the last
+loaded run (ended ~16:16:12 UTC, the session-end recording line), so the
+calibration run is part of the same loaded regime. No thermal or performance
+warning level was recorded in any run (load 1.3–2.2, 41–71 % free memory; the
+resident omlx-server local GPU model serving and Chrome's GPU process ran
+throughout, as during the original window; the per-run counting method and the
+committed recording script are documented in the host-state record and
+`tools/gpu-burn/hostrec.sh`). Even
 without the burner the clean phase's heavy Phi-3.5-Vision workload ran 1.5–1.7×
 its 14:10 baseline on both pins (3,538/3,658 ms vs. 2,118–2,324 ms, new/old
 ratio 0.97) while the light Qwen3-VL workload sat at baseline, so this live
 host's ordinary ambient state already degrades heavy workloads
 disproportionately, equally on both pins. All fourteen runs' logit errors and
 native peaks are at their normal values. The per-pin first-use alternative is
-ruled out two ways. First, forensics (raw record:
-`req/benchmarks/phase7-5-wp6-issue73-metal-cache-forensics.txt`): the JDK-keyed
-Metal pipeline cache (`net.java.openjdk.java/com.apple.metal{,fe}` in the
-per-user cache path) received zero writes during the 10:53–11:29 UTC window —
-the only post-update first-use artifact is an ~18 MB `metalfe` PCM (mtime
-08:48:41 UTC, two hours before the window, in a fresh FE-hash directory;
-attributed to the resident omlx-server, the only long-lived resident Java
-process, started 07:43:59 UTC, 46 s after the 07:43:13 UTC boot) — and the
-0.31.2 controls at 13:10–13:11 UTC wrote 4.8 MB of fresh pipeline data (mtime
-13:10:45/46 UTC) while both completed at baseline (2,165/2,161 ms). Second, a
-cold-cache A/B bounds what first-use can cost inside the measured walls: with
-the JDK's two Metal caches moved aside — the coldest state the pin can be in —
-the cold Qwen3-VL run took 5.081 s total test time against 3.802 s warm; of the
-~1.3 s cold cost, ≈1.1 s lands in the untimed logit-comparison loop, which runs
-the full prefill and every decode step in the same JVM before the timed
-generate, so decoder-path pipeline compilation structurally cannot reach
-generate_wall_ms at all, and only 86 ms (load_wall_ms 959 vs. 873) and 54 ms
+ruled out two ways. First, forensics (raw record with file mtimes and APFS
+birth times: `req/benchmarks/phase7-5-wp6-issue73-metal-cache-forensics.txt`):
+no file in the JDK-keyed Metal pipeline cache
+(`net.java.openjdk.java/com.apple.metal{,fe}` in the per-user cache path) was
+last modified inside the 10:53–11:29 UTC window — mtime alone cannot exclude a
+write to a file also written later (four of the seventeen pre-A/B files were
+last modified after the window; only the two Oct 2-era pipeline-data files
+keep an in-window write open, and access times were not recorded) — and the
+only post-update first-use artifact, an ~18 MB `metalfe` PCM in a fresh
+FE-hash directory, was created (birth 08:48:40 UTC) two hours before the
+window by some JDK-based process; the specific writer is not recoverable from
+the records, and it was not the resident omlx-server, which is a Python
+process, not a JVM. The 0.31.2 Qwen3-VL control at 13:10:43 UTC — which
+rewrote 4.8 MB of the two existing pipeline-data files (mtime
+13:10:45/46 UTC) during the run — completed at baseline (248 ms generate,
+839 ms load vs. 817 ms load for the 12:23 control). Second, a cold-cache A/B
+bounds what first-use can cost inside the measured walls: with the JDK's two
+Metal caches moved aside — the coldest state we can produce for the JDK-owned
+caches (system-level shader caches were not inspected) — the cold Qwen3-VL run
+took 5.081 s total test time against 3.802 s warm; of the ~1.3 s cold cost,
+≈1.1 s lands in the untimed logit-comparison loop, which runs the full prefill
+and every decode step in the same JVM before the timed generate, so
+decoder-path pipeline compilation structurally cannot reach generate_wall_ms
+at all, and only 86 ms (load_wall_ms 959 vs. 873) and 54 ms
 (generate_wall_ms 299 vs. 245) of the cold cost fall in the measured walls —
 at most 140 ms in total, below the smallest of Qwen3-VL's own window deltas
-(331 ms generate / 268 ms load) and orders of magnitude below the
-Phi-3.5-Vision delta (13.2–29.5 s). Question 1 — what degraded the host in the
+(331 ms generate; 260 ms load against the highest same-day baseline of
+851 ms) and orders of magnitude below the Phi-3.5-Vision delta (13.2–29.5 s). Question 1 — what degraded the host in the
 original window — is not recoverable retroactively (nothing was recorded). The
 leading candidate is GPU contention from the live host's own activity (the
 resident omlx-server serving, started at the 07:43 UTC reboot): the burner

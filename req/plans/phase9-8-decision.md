@@ -374,9 +374,12 @@ third and fourth families, and the condition now holds:
   runtime-classpath-check pattern, e.g. `verifyNoDiffusionInModels`) that fails any
   `jmlx-models` release while diffusion classes are present, and 9.8 retires it after the
   move. To make the check mechanical, **all 9.6/9.7 diffusion code lives under one package,
-  `se.alipsa.jmlx.models.diffusion`**, which 9.8 moves whole into `jmlx-diffusion`; the check
-  asserts that package is absent from the released `jmlx-models` jar, so it cannot
-  false-positive on the conditioning encoders and seams that stay. A delegating-stub migration
+  `se.alipsa.jmlx.models.diffusion` — except the conditioning encoders, which live in their
+  own `jmlx-models` packages (9.6's CLIP text encoder included)**, as the ownership table
+  above requires. The package moves whole into `jmlx-diffusion` at 9.8; the check asserts the
+  package and its subpackages are absent from the released `jmlx-models` jar, and the
+  encoders' exemption is what keeps it from false-positiving on the conditioning encoders and
+  seams that stay. A delegating-stub migration
   is not an alternative: stubs in `jmlx-models` that delegate to the moved code would make
   `jmlx-models` depend on `jmlx-diffusion`, which this §6 forbids, Gradle's cycle check
   rejects, and WP0's runtime-classpath check would fail.

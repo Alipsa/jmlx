@@ -493,8 +493,9 @@ diffusion code to `jmlx-diffusion` at 9.8's start, before the diffusion API is r
 until the move, no `jmlx-models` release, mid-phase or patch, is cut from a commit carrying
 9.6's diffusion code; urgent patches branch off the commit the last release was cut from,
 which carries none, and a release-time check wired in this milestone — all diffusion code
-under `se.alipsa.jmlx.models.diffusion`, asserted absent from the released jar — fails any
-release while it is present). All new surface
+under `se.alipsa.jmlx.models.diffusion` (conditioning encoders such as the CLIP text encoder
+excepted, in their own `jmlx-models` packages), the package and its subpackages asserted
+absent from the released jar — fails any release while it is present). All new surface
 is pure-Java — noise schedulers (**PNDM first** — the artifact's
 `model_index.json` default — then DDPM/DDIM/Euler), the sampler loop, the VAE
 decoder wrapper and the CLIP text encoder — so no new native bindings or
@@ -666,8 +667,10 @@ substituted silently for another.
    move breaks no published coordinate — provided no `jmlx-models` release, mid-phase or
    patch, is cut from a commit carrying that API before the move (urgent patches branch off
    the commit the last release was cut from, which carries none; a release-time check wired
-   in 9.6 — all diffusion code lives under `se.alipsa.jmlx.models.diffusion` and the check
-   asserts that package is absent from the released jar — fails any `jmlx-models` release
+   in 9.6 — all diffusion code lives under `se.alipsa.jmlx.models.diffusion` (conditioning
+   encoders such as 9.6's CLIP text encoder excepted, in their own `jmlx-models` packages) and
+   the check asserts that package and its subpackages are absent from the released jar —
+   fails any `jmlx-models` release
    while it is present; delegating stubs in `jmlx-models` are not an option, as they would
    invert the dependency rule below). `jmlx-diffusion` declares
    `api project(':jmlx-core')` — its public scheduler/sampler/VAE contracts take and return
@@ -994,7 +997,8 @@ Every release follows the existing manual procedure:
 - the next `-SNAPSHOT` bump only once Central resolves.
 
 Every release also updates the compatibility matrix and the benchmark report, states its native
-pins, and ships release notes.
+pins, and ships release notes recording the commit SHA the release was cut from (main only
+changes through PRs, so the version-change commit is on main and locatable with `git log -S`).
 
 ### Versioning and compatibility policy
 

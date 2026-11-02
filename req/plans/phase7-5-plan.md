@@ -1,6 +1,8 @@
 # Phase 7.5 — MLX paired-pin upgrade
 
-- **Status:** plan, not yet implemented.
+- **Status:** delivered 2026-11-01 (PR #71; follow-up PR #72). The issue #73 timing
+  investigation was recorded in PR #76, merged 2026-11-02 after Java/native CI passed;
+  its remaining measurement limits belong to Phase 8.2, not an incomplete pin upgrade.
 - **Parent:** `req/plans/phase7-plan.md` §7.5 (the reusable checklist) and `req/full-roadmap.md`
   § "Release and MLX upgrade plan".
 - **Prerequisites:** milestone 7.3c and milestone 7.4 are each closed, delivered or deferred with a

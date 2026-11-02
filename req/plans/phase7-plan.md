@@ -191,7 +191,7 @@ for every new op.
 | 7.3c LLaVA-style (Phi-3.5-Vision) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | Phi-3.5-Vision Tier-A logits and Tier-B image+text output | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`); reviewed via its PR: go — audio → Phase 11 milestone 11.5, diffusion → Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | delivered 2026-11-01 (PR #71; dims == 2 follow-up PR #72); issue #73 investigation recorded 2026-11-02: clean and induced-compute-load alternation found similar pin behavior (loaded new/old within ±7 %); the original host state was unrecorded, so host-state attribution remains an inference and pin×host interactions under other conditions remain untested. The new-pin Qwen3-VL cold-cache comparison timed warmed generation, not first inference; per-pin first-use effects remain untested across both models. Phase 8.2 owns those measurement limits; record in `req/phase6-inference-report.md` |
-| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | not started |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | planning 2026-11-02: `req/plans/phase7-6-plan.md` proposed for review; implementation not started |
 
 Step 0 merged first. 7.0 and 7.1 then proceeded in parallel, and 7.3a started once 7.1's conv,
 normalization and activation layers landed, while 7.2 was still open. From 7.3c on, the
@@ -799,8 +799,10 @@ Effect on this plan's verification:
 
 Added 2026-10-29 (numbered 7.5 until 2026-10-30). Prerequisites: 7.1 (the `conv1d` used by the
 short convolution), 7.3b (`MultiAxisRope`, the vision tower and the request lifecycle) and 7.5
-(the MLX upgrade). Its own sub-plan, `req/plans/phase7-6-plan.md`, is written and reviewed before
-code, and must decide every item under "Decisions for the sub-plan" below.
+(the MLX upgrade). The [detailed sub-plan](phase7-6-plan.md) is proposed 2026-11-02 and must be
+reviewed before code. Its [reference findings](phase7-6-reference-findings.md) distinguish the
+new version-pinned inspection from the dated mutable-main observations below. The sub-plan
+decides every item under "Decisions for the sub-plan" below.
 
 **Scope.** Qwen3.8-27B, like Qwen3.5 and the dense Qwen3.6, uses `model_type` `qwen3_5`. Its
 stack is hybrid: three of every four layers are Gated DeltaNet linear attention (a causal short
@@ -845,12 +847,15 @@ tower, request lifecycle and `MultiAxisRope`.
   - `mlx_lm`, which has no vision weights, so it loads as a text-only model whose metadata
     reports TEXT and rejects image requests.
 
-  The norm offset must be applied exactly once. mlx-vlm drops MTP tensors *before* it checks
-  whether to apply the offset. It then adds the offset to a norm weight when the checkpoint still
-  has an unconverted `conv1d`, or when that weight's original key does not start with
-  `language_model.`. So a key with the HF prefix always gets the offset. The key prefix
-  (`model.language_model.` versus `language_model.model.`) is therefore the signal for whether
-  the offset is already in the stored weights.
+  The norm offset must be applied exactly once. **2026-11-02 correction:** the pinned mlx-vlm
+  0.6.8 checks MTP presence and unconverted `conv1d` axes **before** dropping MTP tensors, then
+  also tests each norm's original prefix. This supersedes the 2026-10-29 mutable-main finding
+  that MTP was dropped first; prefix alone is not sufficient. The supported loader conventions
+  are HF prefix plus uniformly `[C,1,K]` convs (add 1), or converted prefix plus uniformly
+  `[C,K,1]` convs and no MTP subtrees (already shifted). Reject other/mixed combinations before
+  dropping unused tensors. The [detailed sub-plan](phase7-6-plan.md#5-checkpoint-classification-and-loading)
+  defines these checkpoint-readable rules; converter versions are reference evidence, not a
+  required model-card or external-manifest input to loading.
 
   The vision side reuses 7.3b's tower, but not its loader routing:
   - 7.3b's float path (`Qwen3VlVisionTower.visionWeights`) maps only the HF `model.visual.` and

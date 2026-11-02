@@ -15,6 +15,8 @@ import Foundation
 //
 // Build:  xcrun swiftc -O burn.swift -o burn -framework Metal
 // Run:    ./burn            (forever; stop with SIGTERM/SIGINT)
+//         BURN_SECONDS=1 ./burn  (bounded run with timing summary)
+// Signals terminate immediately without a summary.
 //
 // Env: BURN_ON_MS (default 100), BURN_OFF_MS (default 25),
 //      BURN_DRAIN_BEFORE_SLEEP (default 1; 0 for historical behavior),
@@ -23,7 +25,15 @@ import Foundation
 let onMs = ProcessInfo.processInfo.environment["BURN_ON_MS"].flatMap { Int($0) } ?? 100
 let offMs = ProcessInfo.processInfo.environment["BURN_OFF_MS"].flatMap { Int($0) } ?? 25
 let maxSeconds = ProcessInfo.processInfo.environment["BURN_SECONDS"].flatMap { Double($0) }
-let drainBeforeSleep = ProcessInfo.processInfo.environment["BURN_DRAIN_BEFORE_SLEEP"] != "0"
+let drainSetting = ProcessInfo.processInfo.environment["BURN_DRAIN_BEFORE_SLEEP"] ?? "1"
+guard drainSetting == "0" || drainSetting == "1" else {
+    FileHandle.standardError.write("BURN_DRAIN_BEFORE_SLEEP must be 0 or 1\n".data(using: .utf8)!)
+    exit(1)
+}
+let drainBeforeSleep = drainSetting == "1"
+// A single buffer bounds drain overshoot to one dispatch in the default mode.
+// Keep the original queue depth only when reproducing the historical load.
+let maxInFlight = drainBeforeSleep ? 1 : 64
 
 guard onMs > 0, offMs >= 0, maxSeconds.map({ $0.isFinite && $0 > 0 }) ?? true else {
     FileHandle.standardError.write("ON must be positive, OFF nonnegative, SECONDS finite and positive\n".data(using: .utf8)!)
@@ -83,7 +93,7 @@ while true {
         enc.endEncoding()
         cmd.commit()
         outstanding.append(cmd)
-        if outstanding.count >= 64 {
+        if outstanding.count >= maxInFlight {
             outstanding.removeFirst().waitUntilCompleted()
         }
     }
@@ -98,7 +108,13 @@ while true {
     cycles += 1
 }
 for cb in outstanding { cb.waitUntilCompleted() }
-let cycleSeconds = activeSeconds + idleSeconds
-let activeFraction = cycleSeconds > 0 ? activeSeconds / cycleSeconds : 0
-print("drain_before_sleep=\(drainBeforeSleep) cycles=\(cycles) active_s=\(activeSeconds) idle_s=\(idleSeconds) host_active_fraction=\(activeFraction)")
+if drainBeforeSleep {
+    let cycleSeconds = activeSeconds + idleSeconds
+    let activeFraction = cycleSeconds > 0 ? activeSeconds / cycleSeconds : 0
+    print("drain_before_sleep=true cycles=\(cycles) active_s=\(activeSeconds) queue_idle_s=\(idleSeconds) host_active_fraction=\(activeFraction)")
+} else {
+    // CPU sleep overlaps queued GPU execution. Do not present a duty fraction
+    // or call the sleep time idle; the final GPU drain is outside these totals.
+    print("drain_before_sleep=false cycles=\(cycles) cpu_submit_wait_s=\(activeSeconds) cpu_sleep_s=\(idleSeconds)")
+}
 print("burn done")

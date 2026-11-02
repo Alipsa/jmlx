@@ -36,7 +36,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.5) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
-| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record) | 9.0 | 0.x release | not started |
+| 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
 | 12 | Autodiff and function-transformation parity | 12.0 | 0.x release | not started |
@@ -347,7 +347,8 @@ prefixes between requests, a network protocol that existing clients speak, frame
 and a concise scripting API.
 
 **MLX upgrade:** 9.0. **Release:** a 0.x release at the end of the phase, including the first
-release of `jmlx-server`, the Spring Boot starter, the Quarkus extension and `jmlx-groovy`.
+release of `jmlx-server`, the Spring Boot starter, the Quarkus extension, `jmlx-groovy` and
+`jmlx-diffusion` (9.8).
 
 ### 9.0 — MLX upgrade
 
@@ -487,7 +488,8 @@ output.
 
 Scheduled by the 2026-10-31 Phase 7.4 decision (`req/plans/phase7-4-decision.md`):
 SD 1.5-class text-to-image on the delivered 7.1/7.2 surface, in `jmlx-models`
-(the inference-family module home; no new published module). All new surface
+(the inference-family module home; no new published module; the 9.8 decision moves the
+diffusion code to `jmlx-diffusion` at 9.8's start, before any release). All new surface
 is pure-Java — noise schedulers (**PNDM first** — the artifact's
 `model_index.json` default — then DDPM/DDIM/Euler), the sampler loop, the VAE
 decoder wrapper and the CLIP text encoder — so no new native bindings or
@@ -544,7 +546,8 @@ IMG-001 to IMG-016 are this milestone's requirements source.
    and VAE contracts. The two pipelines are the first two users of the model-independent
    interfaces. The decision is reopened if an external consumer needs diffusion without the
    model families, or if a third family would make `jmlx-models` carry diffusion code most of
-   its users don't need.
+   its users don't need. *Reopened 2026-11-02* by the 9.8 decision record: the diffusion code
+   moves to a new `jmlx-diffusion` module at 9.8's start (§ 9.8).
 3. **Reference toolchain: a new hash-locked `tools/image-gen-reference/`.** It pins
    `diffusers==0.42.1`, which is identical to the pinned main commit for the Qwen-Image-2.1
    pipeline, transformer and VAE files. The model card asks for git main, and 0.41.0's
@@ -629,6 +632,114 @@ masks, further model families, Turbo/LoRA/ControlNet) is deferred to later miles
   The quality thresholds the matrix defines gate the next release, not this milestone.
 - **IMG-012:** the release smoke generates an image from a synthetic Tier-A checkpoint (like its
   synthetic Mistral case) through the published-shape modules, on the hosted native CI job.
+
+### 9.8 — Z-Image Base and FLUX.2 Klein Base 4B image generation
+
+Proposed on 2026-11-02 in `req/jmlx-z-image-flux2-klein-base-requirements.md`, whose
+requirements (DIFF-001 to DIFF-011, ZIMG-001 to ZIMG-003, FKB-001 to FKB-003 and ART-001 to
+ART-004) are this milestone's requirements source. It covers two undistilled base checkpoints:
+`Tongyi-MAI/Z-Image` and `black-forest-labs/FLUX.2-klein-base-4B`. They are not `Z-Image-Turbo`
+or the distilled four-step `FLUX.2-klein-4B`, and no checkpoint or sampling schedule is ever
+substituted silently for another.
+
+**Decided by** `req/plans/phase9-8-decision.md` (2026-11-02, in the style of
+`req/plans/phase9-7-decision.md`; its PR review is the gate):
+
+1. **License: both accepted for pinned, read-only Tier-B test artifacts.** Both checkpoints are
+   Apache 2.0 at the pinned revisions, and neither repository has a `NOTICE` file. Unlike 9.7's
+   checkpoint, both may be used commercially. The documentation states that jmlx bundles no
+   weights and ships no safety filter, that FLUX.2 Klein 9B is under a different, non-commercial
+   license, and that each LoRA adapter (ART-001) has its own license. No artifact file enters the
+   repository. Committed Tier-B goldens are model outputs, capped at 12 MiB per model.
+2. **Module home: a new published `jmlx-diffusion` module, created at 9.8's start.** Z-Image and
+   FLUX.2 Klein are the third and fourth image families, the trigger 9.7's record §6 set for
+   reopening its "`jmlx-models`, no new published module" decision. 9.6's and 9.7's diffusion
+   code moves into the new module before any 9.8 code lands. Nothing is published before Phase
+   9's release, so the move breaks no published coordinate. `jmlx-diffusion` depends on
+   `jmlx-models` through `api`, where the conditioning encoders and their now-public seams stay.
+3. **Reference toolchain: 9.7's `tools/image-gen-reference/`, extended.** Its pinned
+   `diffusers==0.42.1` contains both pipelines. The reference is CPU float32, per component,
+   teacher-forced. MFLUX runs on MLX, so it is a debugging cross-check, never a reference.
+   Defaults (steps, guidance and its formula) come from the pinned pipeline code.
+4. **Quantization and LoRA scope.** One canonical representation: MLX affine Q4, group 64,
+   converted locally from the official BF16 checkpoints. Prequantized community checkpoints are
+   not loaded in 9.8. LoRA is inference only, one adapter at a time, applied unmerged next to the
+   base weight on every path, so scale 0 reproduces the base output exactly.
+
+If a later review reverses a decision, a dated amendment moves or removes 9.8, and Phase 9's
+done condition does not wait for it.
+
+**Scope.** Requirements P0 and P1: DIFF-001 to DIFF-011, ZIMG-001 to ZIMG-003, FKB-001, FKB-002,
+ART-001 and ART-002, which is text-to-image for `Tongyi-MAI/Z-Image` at revision
+`04cc4abb7c5069926f75c9bfde9ef43d49423021` and `black-forest-labs/FLUX.2-klein-base-4B` at
+revision `a3b4f4849157f664bdbc776fd7453c2783562f4d`. P2 (FKB-003 image-conditioned editing,
+ART-003 style presets and ART-004 model extensibility) is deferred to later milestones.
+
+**Builds on:**
+
+- 9.6's scheduler, sampler-loop and VAE-wrapper contracts, and 9.7's flow-match scheduler,
+  `RESIDENT`/`STAGED` staging policy, weight-residency paths and teacher-forced per-step parity
+  method, all extended rather than re-derived. 9.8 is the first test of IMG-015's acceptance in
+  `req/jmlx-image-generation-roadmap.md`: two more, architecturally distinct image families
+  integrate without changing the public request/result contract.
+- 7.0's Qwen3 text decoders for the conditioning (DIFF-003). Both encoders are Qwen3-4B-shaped
+  `qwen3` models, but conditioning is per model. Z-Image uses `hidden_states[-2]`, real tokens
+  only. FLUX.2 stacks layers 9, 18 and 27 over all 512 padded positions, so its padding rows
+  must match a right-padded reference. Next-token LLM inference is not reused as conditioning.
+- 9.6's VAE decoder: both VAEs use the same diffusers `Decoder` topology as SD 1.5's, with
+  latent widths 16 (Z-Image) and 32 (FLUX.2, plus BatchNorm-statistics de-normalization and a
+  2×2 unpatchify).
+- 7.1's conv, normalization, `Upsample` and `pad`, and 9.7's IMG-001 gap audit. DIFF-001 extends
+  that audit to both architectures.
+- 9.7's job, cancellation and benchmark designs (IMG-010, IMG-011) for DIFF-008 and DIFF-009.
+
+**Settled at milestone start:**
+
+- **Defaults are per checkpoint.** Steps, guidance and schedule come from each checkpoint's
+  pinned pipeline code (Z-Image 50 steps, guidance 5.0, static shift 6.0; FLUX.2 50 steps,
+  guidance 4.0, exponential dynamic shift). A capability descriptor exposes them, never as a
+  cross-model constant. Turbo's and distilled Klein's few-step schedules are never applied.
+- **Guidance values are not portable between the models.** Z-Image computes
+  `pos + g·(pos − neg)` and FLUX.2 `neg + g·(pos − neg)`, so the descriptor carries each model's
+  formula. Guidance is part of both base workflows, and the memory and benchmark bounds include
+  its passes.
+- **Build order:** FLUX.2 Klein Base 4B first, then Z-Image Base (requirements §5).
+- **Transformer parity is teacher-forced per step**, starting from the reference's injected
+  initial noise, as in 9.7. A torch-seeded trajectory cannot be reproduced with MLX random, so
+  DIFF-004's "fixed-seed intermediate latent trajectory" is met this way. Seeded
+  reproducibility is a separate, Java-only check.
+- **Generation runs on one platform worker thread**, per the threading rule.
+
+**Overlaps:** DIFF-011 packaging rides 8.4's native artifact. ART-001's LoRA loader is the first
+in jmlx, and Qwen-Image LoRA (IMG-016) reuses it later.
+
+**Exit gate:**
+
+- **DIFF-001, DIFF-002:** the gap matrix is checked in. Both checkpoints load without Python at
+  their pinned revisions, with deterministic diagnostics for incompatible checkpoints and an
+  inventory of component sizes.
+- **DIFF-003 to DIFF-005, ZIMG-001, ZIMG-002, FKB-001, FKB-002:** for each model:
+  - A strict Tier-A synthetic golden passes.
+  - On the pinned artifact, the token IDs and conditioning tensors, the teacher-forced per-step
+    denoiser outputs under the checkpoint's guided schedule, and the VAE decode of the
+    reference's final latent all match the CPU float32 reference within the recorded ε.
+  - A seeded PNG at the base workflow's nominal step count is generated in Java.
+- **DIFF-007:** for both models, a Q4 512×512 run completes on the 24 GB M4 Air without sustained
+  swapping. Its peak resident and allocator memory are recorded under a named bound. 768² is
+  recorded where it completes; 1024² does not block the milestone.
+- **DIFF-006, DIFF-008, DIFF-010, ART-002:**
+  - An external Java 25 example generates PNGs from both models and closes every native resource.
+  - Cancelling during denoising, then generating again in the same JVM, returns active memory
+    to its baseline.
+  - The recorded metadata reconstructs the request.
+  - Four seeds give four traceable images.
+- **ART-001:** one verified style LoRA per model changes the output comparably to the reference,
+  and at scale 0 it matches the unmodified base within the deterministic tolerance.
+- **DIFF-009, ZIMG-003:** the benchmark report is recorded under the `req/phase6-4-benchmark.md`
+  conventions. The ZIMG-003 gallery and review protocol are recorded too; they stay separate
+  from numerical parity and gate release validation, not this milestone.
+- **DIFF-011:** the release smoke generates an image from a synthetic Tier-A checkpoint of each
+  family through the published-shape modules.
 
 **Phase 9 done:** every milestone's exit gate passes and the phase release is published.
 
@@ -933,3 +1044,9 @@ tests, documentation and inventory changes are all delivered.
 - **2026-11-01:** Phase 9 milestone 9.7 (Qwen-Image-2.1 image generation, requirements P0/P1
   of `req/jmlx-image-generation-roadmap.md`) added after 9.6, decided by
   `req/plans/phase9-7-decision.md` (license, module home, reference toolchain).
+- **2026-11-02:** Phase 9 milestone 9.8 (Z-Image Base and FLUX.2 Klein Base 4B image generation,
+  requirements P0/P1 of `req/jmlx-z-image-flux2-klein-base-requirements.md`) added after 9.7,
+  decided by `req/plans/phase9-8-decision.md` (license, module home, reference toolchain, and
+  quantization and LoRA scope). Its module-home decision reopens 9.7's under the third-family
+  trigger of 9.7's record §6: a new published `jmlx-diffusion` module, created at 9.8's start,
+  takes 9.6's and 9.7's diffusion code.

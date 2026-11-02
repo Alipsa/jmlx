@@ -368,11 +368,15 @@ third and fourth families, and the condition now holds:
   diffusion API is new surface, and Phase 9 releases at the phase's end, so moving it at 9.8's
   start breaks no published coordinate. Until the move, **no `jmlx-models` release — mid-phase,
   per-milestone or bug-fix patch — is cut from a commit carrying 9.6's or 9.7's diffusion
-  code**. Urgent fixes are not stuck until 9.8: a patch may be cut from a branch off the last
-  release tag, which carries no diffusion code. The guard is enforced mechanically, not only
-  in this text: 9.6 wires a release-time check (the WP0 runtime-classpath-check pattern, e.g.
-  `verifyNoDiffusionInModels`) that fails any `jmlx-models` release while diffusion classes
-  are present, and 9.8 retires it after the move. A delegating-stub migration
+  code**. Urgent fixes are not stuck until 9.8: a patch may be cut from a branch off the
+  commit the last release was cut from, which carries no diffusion code. The guard is
+  enforced mechanically, not only in this text: 9.6 wires a release-time check (the WP0
+  runtime-classpath-check pattern, e.g. `verifyNoDiffusionInModels`) that fails any
+  `jmlx-models` release while diffusion classes are present, and 9.8 retires it after the
+  move. To make the check mechanical, **all 9.6/9.7 diffusion code lives under one package,
+  `se.alipsa.jmlx.models.diffusion`**, which 9.8 moves whole into `jmlx-diffusion`; the check
+  asserts that package is absent from the released `jmlx-models` jar, so it cannot
+  false-positive on the conditioning encoders and seams that stay. A delegating-stub migration
   is not an alternative: stubs in `jmlx-models` that delegate to the moved code would make
   `jmlx-models` depend on `jmlx-diffusion`, which this §6 forbids, Gradle's cycle check
   rejects, and WP0's runtime-classpath check would fail.

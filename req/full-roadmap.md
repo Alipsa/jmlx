@@ -660,10 +660,11 @@ substituted silently for another.
    `MLXArray` and IMG-007 puts `MLXScope` ownership on the API — and
    `implementation project(':jmlx-models')`, the conditioning encoders being consumed
    internally with no `jmlx-models` type on the surface (cancellation included:
-   `jmlx-diffusion` defines its own token rather than promote `jmlx-models` to `api`). The
-   conditioning encoders and their now-public seams stay in `jmlx-models`. WP0 adds a check
-   task asserting `jmlx-models`' runtime classpath contains no `:jmlx-diffusion`, so the
-   one-way dependency cannot silently invert.
+   `jmlx-diffusion` defines its own token rather than promote `jmlx-models` to `api`), and
+   `jmlx-vision` following the image result (`api` if it reuses `RgbImage`, `implementation`
+   otherwise). The conditioning encoders and their now-public seams stay in `jmlx-models`.
+   WP0 adds a check task asserting `jmlx-models`' runtime classpath contains no
+   `:jmlx-diffusion`, so the one-way dependency cannot silently invert.
 3. **Reference toolchain: 9.7's `tools/image-gen-reference/`, extended.** Its pinned
    `diffusers==0.42.1` contains both pipelines. The reference is CPU float32, per component,
    teacher-forced. MFLUX runs on MLX, so it is a debugging cross-check, never a reference.

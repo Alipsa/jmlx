@@ -330,17 +330,24 @@ output. The conditioning seams stay in `jmlx-models` and become public API there
 `implementation project(':jmlx-models')`.
 
 - **`jmlx-core` is `api`**: the public scheduler, sampler and VAE contracts that
-  `jmlx-diffusion` owns take and return tensors (`MLXArray`), and IMG-007's staging policy
-  puts `AutoCloseable`/`MLXScope` ownership on the public API, so `jmlx-core` types are on
-  the surface and must be visible to consumers.
+  `jmlx-diffusion` owns take and return tensors (`MLXArray`), and IMG-007's ownership
+  requirement (`AutoCloseable` and `MLXScope` ownership) puts `jmlx-core` types on the public
+  API, so they must be visible to consumers.
 - **`jmlx-models` is `implementation`**: the pipelines consume the conditioning encoders
   internally, and no `jmlx-models` type is part of `jmlx-diffusion`'s public API. The one
   candidate, cancellation, is settled below.
 - **Cancellation is its own type.** DIFF-008/IMG-010 need a cancellation token and the
   existing one is `se.alipsa.jmlx.models.CancellationToken`; `jmlx-diffusion` defines its own
-  rather than promote `jmlx-models` to `api` for a value type, and a job bridges the two
-  internally. (The 9.6/9.7 contracts this infers from are not written yet; if they land with
-  a genuine `jmlx-models` type on the surface, the milestone plan amends this paragraph.)
+  rather than promote `jmlx-models` to `api` for one interface, and a job bridges the two
+  internally.
+- **`jmlx-vision` follows the image result.** If 9.7's or 9.8's image result reuses
+  `jmlx-vision`'s `RgbImage`, `jmlx-vision` is `api` too (`implementation` on `jmlx-models`
+  would not put it on consumers' compile classpath); if the result carries its own pixel
+  type, `jmlx-vision` stays `implementation`. WP0 decides this with the first image-result
+  code.
+- (The 9.6/9.7 contracts these bullets infer from are not written yet; if they land with a
+  genuine `jmlx-models`, `jmlx-vision` or `jmlx-tokenizer` type on the surface, the
+  milestone plan amends this paragraph.)
 
 **`jmlx-models` must never depend on `jmlx-diffusion` — not at compile time, not at runtime.**
 Gradle already fails a compile-time project cycle; WP0 adds the missing runtime guard, a check

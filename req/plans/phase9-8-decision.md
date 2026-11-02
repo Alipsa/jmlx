@@ -95,17 +95,22 @@ same blob as Qwen3-4B's, and its embedded chat template is byte-identical to FLU
   elements are non-zero).
 - The pipeline conditions on `hidden_states[-2]` (§2). By the Transformers convention that entry
   is layer 34's output, so layer 35 never contributes. *Unverified* until the WP1 probe, whose
-  success criterion is a regression test, not just an observation:
+  success criterion is a regression test, not just an observation (run in the reference, one
+  process, CPU float32):
   1. load the official Z-Image encoder and run the reference prompt conditioning;
-  2. replace `model.layers.35`'s two tensors with Qwen3-4B's;
-  3. assert the selected conditioning output (`hidden_states[-2]`, real-token rows) is unchanged
-     within the recorded conditioning ε.
+  2. replace `model.layers.35`'s two tensors with Qwen3-4B's (revision `1cfa9a7`, downloaded in
+     WP0, at least shard 3);
+  3. assert the selected conditioning output (`hidden_states[-2]`, real-token rows) is
+     **bit-identical** — same process and dtype leave no tolerance to absorb a real
+     contribution from layer 35.
 - FLUX.2's encoder is sharded differently, so blobs cannot be compared. Whether its weights equal
   Qwen3-4B's (or Z-Image's) is *unverified*; WP0 compares per-tensor digests after the download.
-  If they match on layers 0–26, one resident encoder could serve both models. WP1 additionally
-  asserts that the truncated 27-layer encoder load reproduces the selected entries of a full
-  36-layer forward (`hidden_states[9/18/27]`, all 512 rows), so FLUX.2's conditioning never
-  depends on a layer it does not load.
+  If they match on layers 0–26, one resident encoder could serve both models. Whether the
+  truncated encoder loads reproduce the reference's selected entries is asserted in WP2, where
+  those loads are built: the 27-layer FLUX.2 load must reproduce a full 36-layer forward's
+  `hidden_states[9/18/27]` (all 512 rows) and the 35-layer Z-Image load must reproduce
+  `hidden_states[-2]` (real-token rows), each within the recorded conditioning ε, so neither
+  pipeline's conditioning ever depends on a layer it does not load.
 
 ## 2. Reference-pipeline facts (diffusers 0.42.1)
 
@@ -139,9 +144,10 @@ Further facts:
   in FLUX.2's formula. A guidance value is therefore not portable between the two models, and
   the capability descriptor (DIFF-006) must carry each model's own semantics.
 - **Z-Image's two extra guidance options are exposed, as floats.** The capability descriptor
-  (DIFF-010's metadata schema) carries `cfg_truncation` and `cfg_normalization` as optional
-  float parameters with the pipeline defaults (1.0 and off). They are floats, not booleans:
-  despite its boolean declaration, the pipeline uses `cfg_normalization` as a float factor
+  (DIFF-006) carries `cfg_truncation` and `cfg_normalization` as optional float parameters
+  with the pipeline defaults (1.0 and 0.0 — off when ≤ 0), and DIFF-010's persisted metadata
+  records their effective values. They are floats, not booleans: despite its boolean
+  declaration, the pipeline uses `cfg_normalization` as a float factor
   (`max_new_norm = ori_pos_norm * float(self._cfg_normalization)`,
   `pipeline_z_image.py:554-557`), and jmlx models both options as floats so the reference's
   full range is reproducible. FLUX.2 has neither option; its descriptor omits them.
@@ -287,7 +293,11 @@ commercially under Apache 2.0. The documentation still states:
     9.7, the Java transformer consumes its own conditioning; only the latent is injected.
 
   WP0 fixes the step sets (always including the first and last steps) and the padding-row
-  subset within the budget.
+  subset within the budget. ZIMG-001's internal-layer parity and FKB-001's per-block parity
+  never ride these goldens: one float32 internal activation at 1024² is 60 MiB (1,024 × 3,840
+  for Z-Image at 512² alone is 15 MiB; FLUX.2's joint stream at 512² is 18 MiB), over the
+  per-model cap on its own. They are Tier-A synthetic checks instead (§ 9.8 exit gate), where
+  small dimensions make them cheap and "at full precision" still holds.
 - **Tier-A fixtures use no artifact file.** Each synthetic checkpoint is generated, with a
   committed hand-written fixture tokenizer and a minimal chat template that renders the
   `enable_thinking` branches the way the real template does.
@@ -303,29 +313,31 @@ the diffusion layer: the scheduler, sampler and VAE contracts and 9.6's and 9.7'
 moved at 9.8's start, plus the two new pipelines, the LoRA loader, the job API and the image
 output. The conditioning seams stay in `jmlx-models` and become public API there.
 
-**Explicit ownership.** The dependency on `jmlx-models` is `api` only because the conditioning
-encoders appear on `jmlx-diffusion`'s public surface; `jmlx-diffusion` must not re-expose
-`jmlx-models`' general-purpose text-generation API any more than that:
+**Explicit ownership.**
 
 | Component | Module |
 | --- | --- |
 | MLX arrays and native operations | `jmlx-core` / `jmlx-ffi` |
-| Qwen3 text encoding (the conditioning encoders and their now-public seams) | `jmlx-models` |
+| Conditioning encoders — CLIP (9.6), Qwen3-VL (7.3b/WP5 tower), Qwen3 — and their now-public seams | `jmlx-models` |
 | Generic diffusion schedulers and samplers | `jmlx-diffusion` |
-| Z-Image and FLUX.2 pipelines | `jmlx-diffusion` |
+| Denoiser models: SD 1.5's UNet, Qwen-Image's, and the Z-Image and FLUX.2 DiTs | `jmlx-diffusion` |
+| VAE implementations: SD 1.5's, Qwen-Image's, Z-Image's and FLUX.2's | `jmlx-diffusion` |
+| Diffusion pipelines: 9.6's, 9.7's, `ZImagePipeline` and `Flux2KleinPipeline` | `jmlx-diffusion` |
 | Public image-generation API | `jmlx-diffusion` |
 | LoRA application for diffusion models | `jmlx-diffusion` |
 
+**Dependency direction.** `jmlx-diffusion` depends on `jmlx-models` with `implementation`,
+not `api`: the pipelines consume the conditioning encoders internally, and no `jmlx-models`
+type is part of `jmlx-diffusion`'s public API, so `implementation` keeps `jmlx-models` (and,
+through it, core, tokenizer and vision) off diffusion consumers' compile classpaths.
 **`jmlx-models` must never depend on `jmlx-diffusion` — not at compile time, not at runtime.**
-This is an explicit, permanent rule of both modules' build files, stated here so a later
-milestone cannot introduce it silently; it rules out the circular dependency the split could
-otherwise grow into as `jmlx-models` gains image-aware features.
+Gradle already fails a compile-time project cycle; WP0 adds the missing runtime guard, a check
+task asserting that `jmlx-models`' runtime classpath contains no `:jmlx-diffusion`, so the
+one-way direction cannot silently invert later.
 
-**Why reopen now.** 9.7's record §6 kept the diffusion code in `jmlx-models` behind a
-conditional trigger: splitting should wait "until a third image family arrived", on the
-grounds that by then `jmlx-models` would carry diffusion code most of its users don't need.
-9.8 brings the third and fourth families, so the trigger's condition is now argued, not just
-quoted:
+**Why reopen now.** 9.7's record §6 made the split conditional: "a third image family would
+make jmlx-models carry diffusion code that most of its users don't need." 9.8 brings the
+third and fourth families, and the condition now holds:
 
 - The interfaces have two in-module users, which is the validation 9.7 wanted.
 - Most diffusion code is still to come: two transformers, LoRA, jobs and metadata. Without a
@@ -427,9 +439,9 @@ amended; nothing else in this record depends on the module boundary.
 
 | WP | Content |
 | --- | --- |
-| WP0 | Pin both artifacts; re-record the license acceptance; create `jmlx-diffusion` (release script, release order, smoke stub) and move 9.6's and 9.7's diffusion code; compare the two encoders' per-tensor digests; select the two LoRA adapters; fix the golden step and row sets; re-record the host's memory |
+| WP0 | Pin both artifacts; re-record the license acceptance; create `jmlx-diffusion` (release script, release order, smoke stub, the runtime-classpath direction check of §6) and move 9.6's and 9.7's diffusion code; download Qwen3-4B (revision `1cfa9a7`, at least shard 3) and compare the two encoders' per-tensor digests; select the two LoRA adapters; fix the golden step and row sets; re-record the host's memory |
 | WP1 | Reference scripts and probes: hidden-state indexing, FLUX.2 padding rows, both `enable_thinking` renderings against `HfTokenizer`, both sigma schedules, both guidance formulas, both RoPE layouts. The FLUX.2 padding-row probe is an explicit, independently reviewed checkpoint that must pass before WP4 starts: because FLUX.2 conditions on the padded positions' hidden-state values themselves (not just a mask), a wrong answer here would contaminate every later FLUX.2 numerical comparison |
-| WP2 | The public conditioning seam on the Qwen3 decoder: truncated encoder-only load, layer capture, right padding with the padding mask |
+| WP2 | The public conditioning seam on the Qwen3 decoder: truncated encoder-only load, layer capture, right padding with the padding mask. The truncated loads are validated per §1: the 27-layer FLUX.2 load reproduces a full forward's `hidden_states[9/18/27]` (all 512 rows), the 35-layer Z-Image load reproduces `hidden_states[-2]` (real-token rows) |
 | WP3 | Scheduler extensions: static shift, empirical `mu`, per-model guidance |
 | WP4 | FLUX.2 transformer, VAE path and Tier-A golden (built first, per the requirements' order) |
 | WP5 | Z-Image transformer, VAE path and Tier-A golden |

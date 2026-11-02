@@ -656,7 +656,10 @@ substituted silently for another.
    reopening its "`jmlx-models`, no new published module" decision. 9.6's and 9.7's diffusion
    code moves into the new module before any 9.8 code lands. Nothing is published before Phase
    9's release, so the move breaks no published coordinate. `jmlx-diffusion` depends on
-   `jmlx-models` through `api`, where the conditioning encoders and their now-public seams stay.
+   `jmlx-models` through `implementation` (no `jmlx-models` type is on its public API), and the
+   conditioning encoders and their now-public seams stay in `jmlx-models`. WP0 adds a check task
+   asserting `jmlx-models`' runtime classpath contains no `:jmlx-diffusion`, so the one-way
+   dependency cannot silently invert.
 3. **Reference toolchain: 9.7's `tools/image-gen-reference/`, extended.** Its pinned
    `diffusers==0.42.1` contains both pipelines. The reference is CPU float32, per component,
    teacher-forced. MFLUX runs on MLX, so it is a debugging cross-check, never a reference.
@@ -730,10 +733,12 @@ in jmlx, and Qwen-Image LoRA (IMG-016) reuses it later.
     denoiser outputs under the checkpoint's guided schedule, and the VAE decode of the
     reference's final latent all match the CPU float32 reference within the recorded ε.
   - A seeded PNG at the base workflow's nominal step count is generated in Java.
-  - Z-Image additionally forwards at the latent lengths corresponding to 512, 768 and 1024 px,
-    with its selected internal layers compared against the reference (ZIMG-001's criteria in
-    full). FLUX.2 additionally compares per-block parity, not only the assembled forward
-    (FKB-001's criterion in full).
+  - Z-Image additionally forwards at the latent lengths corresponding to 512, 768 and 1024 px
+    with selected internal layers compared (ZIMG-001's criteria in full), and FLUX.2 compares
+    per-block parity, not only the assembled forward (FKB-001's criterion in full) — both as
+    **Tier-A synthetic checks**: one float32 internal activation at 1024² is 60 MiB, over the
+    decision record §5's 12 MiB per-model Tier-B budget, so these checks never ride the
+    pinned-artifact goldens.
 - **DIFF-007:** for both models, a Q4 512×512 run completes on the 24 GB M4 Air without sustained
   swapping. Its peak resident and allocator memory are recorded under a named bound, confirming
   or refuting the decision record's desk-estimated fit. 768² is recorded where it completes;
@@ -754,11 +759,12 @@ in jmlx, and Qwen-Image LoRA (IMG-016) reuses it later.
 - **DIFF-009, ZIMG-003:** the benchmark report is recorded under the `req/phase6-4-benchmark.md`
   conventions. ZIMG-003's full gallery and review protocol stay separate from numerical parity
   and gate release validation, not this milestone — but a small visual acceptance suite gates
-  the milestone itself: one archived, human-reviewed sample per prompt family (shanshui ink
-  painting; blue-green Chinese landscape; visionary landscape; fantasy landscape), generated on
-  the Q4 path, establishing that the implementation produces plausible, artistically useful
-  output with no visible quantization regression. This is an acceptance floor, not a subjective
-  quality competition between models; numerical parity alone cannot establish artistic fitness.
+  the milestone itself: one archived, human-reviewed sample per ZIMG-003 prompt family (ink
+  wash 水墨画; blue-green shanshui 青绿山水; literati painting; fantastical landscapes; visionary
+  imagery), generated on the Q4 path and paired with a full-precision sample of the same
+  prompt and seed, so the review can confirm plausible, artistically useful output with no
+  visible quantization regression. This is an acceptance floor, not a subjective quality
+  competition between models; numerical parity alone cannot establish artistic fitness.
 - **DIFF-011:** the release smoke generates an image from a synthetic Tier-A checkpoint of each
   family through the published-shape modules.
 

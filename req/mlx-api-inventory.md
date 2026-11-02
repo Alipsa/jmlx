@@ -273,7 +273,7 @@ row is reporting only: handwritten use requires an explicit mapping record.
 | `mlx_h.mlx_custom_function` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_custom_vjp` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_default_cpu_stream_new` | downcall | unplanned | — | — | — | — |
-| `mlx_h.mlx_default_gpu_stream_new` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |
+| `mlx_h.mlx_default_gpu_stream_new` | downcall | implemented | Loader validation only: jmlx-ffi's extraction-fallback test forces a GPU kernel through this stream to prove the extracted layout includes mlx.metallib; no production facade uses it | NativeLoaderExtractionFallbackTest | — | jmlx-ffi/src/test/java/se/alipsa/jmlx/ffi/NativeLoaderExtractionFallbackTest.java |
 | `mlx_h.mlx_degrees` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_depends` | downcall | unplanned | — | — | — | — |
 | `mlx_h.mlx_dequantize` | downcall | implemented | MLX and NativeOps implementation support | MLXNumericTest; MLXEvalTest | — | all handwritten source |

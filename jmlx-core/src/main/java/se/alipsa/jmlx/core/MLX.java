@@ -242,15 +242,10 @@ public final class MLX {
    * Creates a {@code dtype} array in {@code scope} counting from {@code start} to {@code stop}
    * (exclusive) by {@code step}.
    *
-   * <p>Rejects {@code step == 0} in Java: upstream {@code mlx::core::arange} (v0.31.2 {@code
-   * mlx/ops.cpp}) validates NaN in any of {@code start}/{@code stop}/{@code step} and infinite
-   * {@code start}/{@code stop} up front -- an infinite {@code step} is special-cased into an early
-   * return rather than rejected -- but only ever computes {@code real_size = ceil((stop - start) /
-   * step)} afterward -- so {@code step == 0} with {@code stop == start} reaches that division as
-   * {@code 0.0 / 0.0 == NaN}, which is not caught by the earlier checks or by the subsequent {@code
-   * real_size > INT_MAX} guard (a NaN comparison is always false), and flows into {@code
-   * static_cast<int>(real_size)} -- C++ undefined behaviour for a NaN operand, the same UB class
-   * {@link MLXShape#slice(MLXArray, int[], int[], int[])}'s zero-stride guard exists for.
+   * <p>Rejects {@code step == 0} in Java with {@link IllegalArgumentException}: the pinned MLX
+   * 0.32.4 rejects the same case ({@code "[arange] step must be nonzero."}), but only after its
+   * bool-dtype, NaN and infinite-{@code start}/{@code stop} checks, and through the native error
+   * path as {@link MLXException} rather than as a typed Java rejection.
    */
   public static MLXArray arange(
       MLXScope scope, double start, double stop, double step, DType dtype) {

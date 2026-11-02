@@ -88,7 +88,8 @@ skipped MLX releases, and the changes that matter to jmlx:
   non-contiguous bool input (#4590) — the cumsum path jmlx calls.
 
 mlx-c moved v0.6.0 → v0.7.0 → v0.8.0. The complete, authoritative symbol list is the regenerated
-`req/mlx-api-inventory.md` (733 → 801 entries; implemented stays 195) and
+`req/mlx-api-inventory.md` (733 → 801 entries; implemented 195 → 196, the recorded `MLX_CPU`
+constant) and
 `req/mlx-api-header-coverage.md` (721 → 788 declarations; declared-and-bound 710 → 777). The
 changes besides jmlx's two retargets (jmlx calls none of these today — the hazard is a later
 milestone calling an old name that still compiles but now means a different operation):
@@ -116,10 +117,10 @@ Also upstream and Python-side: 0.32.4's `mx.random.uniform` now takes
 only the re-locked Python environments (`tools/mlx-oracle`, `tools/qwen-vl-reference`) needed to
 account for it.
 
-### Hand-written Java changes (five)
+### Hand-written Java changes (six)
 
-The plan anticipated the two call-site retargets; the migration ended at five hand-written
-changes. All preserve the public API and the pre-upgrade observable behaviour:
+The plan anticipated the two call-site retargets; the migration ended at six hand-written changes.
+All preserve the public API; all but the last preserve the pre-upgrade observable behaviour:
 
 1. **`MLXOps.cumulativeSumAxis`** retargeted to `mlx_cumsum_axis` with the optional dtype
    parameter absent, reproducing the previous input-inferred dtype (the same-named
@@ -151,14 +152,23 @@ changes. All preserve the public API and the pre-upgrade observable behaviour:
    path, which is why the two agreed until now. Routing through the 1-D view reproduces the
    pre-upgrade call exactly — the same principle as change 2 — bit-identical for these shapes.
 
+6. **`SinusoidalPositionalEncoding`** rejects odd dims at construction. 0.32.4's
+   `nn.SinusoidalPositionalEncoding` requires the dims to be "positive and even"; 0.31.2 — and
+   jmlx until this change — returned `dims - 1` features for odd dims. The constructor guard gains
+   `dims % 2 != 0` (the message is now `SinusoidalPositionalEncoding: dims >= 4 and even, positive
+   frequencies required`), and `Phase71ContractsTest` asserts the odd-dims rejection next to the
+   existing dims-2 one. jmlx still rejects `dims == 2` on purpose (0.32.4 special-cases it; the
+   pre-upgrade reference returned NaNs and the Phase 7.1 probe rejected it deliberately), so the
+   remaining divergence from 0.32.4 is jmlx being stricter, never looser.
+
 ### Oracle fixture input changes
 
-Two `phase7-1-core.input.json` cases needed input-level edits (no Java change either way):
+Two `phase7-1-core.input.json` cases needed input-level edits:
 
 - **`sinusoidal-60`** (dims 5) removed: 0.32.4 rejects odd-dimension
-  `SinusoidalPositionalEncoding` inputs.
+  `SinusoidalPositionalEncoding` inputs; jmlx's constructor now matches (hand-written change 6).
 - **`repeat_axis-105`** shape moves `[0]` → `[0,3]`: 0.32.4 keeps the untouched axis's extent in
-  the repeat result.
+  the repeat result (no Java change).
 
 ### Re-recorded goldens — pin lines and host measurements only
 

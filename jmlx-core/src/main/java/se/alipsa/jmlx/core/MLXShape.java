@@ -189,8 +189,8 @@ public final class MLXShape {
    *
    * <p>Gradients: the pinned MLX 0.32.4 rejects a VJP with respect to the {@code indices} operand
    * ("Cannot calculate VJP with respect to indices"), so a differentiable caller whose indices are
-   * computed in the graph must pass {@code MLXOps.stopGradient(indices)} (the integer index channel
-   * carries no meaningful derivative; see {@code MoeMlp} and {@code SwitchGlu}).
+   * computed in the graph must pass {@code MLXOps.stopGradient(indices)} -- the integer index
+   * channel carries no meaningful derivative.
    */
   public static MLXArray takeAlongAxis(MLXArray a, MLXArray indices, int axis) {
     MLXScope scope = NativeOps.scopeOf("takeAlongAxis", a, indices);

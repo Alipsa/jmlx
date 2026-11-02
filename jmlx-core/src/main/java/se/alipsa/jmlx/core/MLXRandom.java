@@ -59,13 +59,14 @@ public final class MLXRandom {
   /**
    * Draws one categorical index along {@code axis} with an explicit key, returning INT32.
    *
-   * <p>Sampler pin: the pinned MLX 0.32.4 selects its new inverse-CDF sampler for any input whose
-   * total size equals the axis size (every non-axis extent is one) whenever the output shape is
-   * non-trivial; 0.31.2 ran its gumbel-max sampler for every shape, and 0.32.4 still runs it for
-   * 1-D inputs. The pinned sampling streams (the phase6-1-sampling oracle fixture and {@code
-   * LlamaModelTest}'s seeded goldens) are gumbel-max streams, so single-row inputs are routed
-   * through the 1-D view -- bit-identical to 0.31.2 for these shapes -- and the result is reshaped
-   * back to the axis-reduced shape.
+   * <p>Sampler pin: the pinned MLX 0.32.4 selects its inverse-CDF sampler for any input whose total
+   * size equals the axis size (every non-axis extent is one) whenever the axis size is positive and
+   * the output shape is non-trivial; 0.31.2 ran its gumbel-max sampler for every shape, and 0.32.4
+   * still runs gumbel-max for 1-D inputs. The inverse-CDF path may draw a different token than
+   * gumbel-max for identical values and key, so single-row inputs (ndim &gt; 1 with every non-axis
+   * extent one) are routed through a 1-D view instead -- bit-identical to 0.31.2 for these shapes,
+   * and a single-row draw keeps the gumbel-max stream that 1-D inputs use -- and the result is
+   * reshaped back to the axis-reduced shape.
    */
   public static MLXArray categorical(MLXArray logits, int axis, MLXArray key) {
     Objects.requireNonNull(logits, "logits");
@@ -80,18 +81,13 @@ public final class MLXRandom {
     MLXScope scope = NativeOps.scopeOf("categorical", logits, key);
     MLXArray input = logits;
     int inputAxis = normalizedAxis;
-    if (logits.ndim() > 1 && logits.size() == (long) logits.shape()[normalizedAxis]) {
+    int n = logits.shape()[normalizedAxis];
+    if (logits.ndim() > 1 && n > 0 && logits.size() == (long) n) {
       // The 1-D view is a per-call temporary: allocate it into the resolved scope (the innermost
       // of the operands' scopes), not logits.scope() -- the no-target MLXShape.reshape would
       // register one handle per draw in a long-lived logits scope when the key lives in a
-      // per-draw child scope (PR #71 review finding).
-      input =
-          NativeOps.shapeOp(
-              "reshape",
-              logits,
-              scope,
-              new int[] {logits.shape()[normalizedAxis]},
-              mlx_h::mlx_reshape);
+      // per-draw child scope.
+      input = NativeOps.shapeOp("reshape", logits, scope, new int[] {n}, mlx_h::mlx_reshape);
       inputAxis = 0;
     }
     MLXArray drawInput = input;

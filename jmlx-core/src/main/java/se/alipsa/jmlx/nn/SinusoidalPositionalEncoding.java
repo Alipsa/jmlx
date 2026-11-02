@@ -6,9 +6,7 @@ import se.alipsa.jmlx.core.MLXOps;
 import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 
-/**
- * Returns position features, without adding them to an input embedding. Odd dims returns dims-1.
- */
+/** Returns position features, without adding them to an input embedding. */
 public final class SinusoidalPositionalEncoding extends UnaryLayer {
   private final int dims;
   private final float minFrequency;
@@ -22,7 +20,11 @@ public final class SinusoidalPositionalEncoding extends UnaryLayer {
     this(scope, dims, 0.0001f, 1, (float) Math.sqrt(2.0 / dims), false, false);
   }
 
-  /** Dims below four are rejected: the pinned frequency denominator would be undefined. */
+  /**
+   * Dims below four or odd dims are rejected: the pinned MLX 0.32.4 requires the embedding
+   * dimension to be positive and even, and dims below four divide by the undefined {@code half - 1}
+   * frequency denominator.
+   */
   public SinusoidalPositionalEncoding(
       MLXScope scope,
       int dims,
@@ -32,9 +34,9 @@ public final class SinusoidalPositionalEncoding extends UnaryLayer {
       boolean cosFirst,
       boolean fullTurns) {
     super(scope);
-    if (dims < 4 || !(minFrequency > 0) || !(maxFrequency > 0)) {
+    if (dims < 4 || dims % 2 != 0 || !(minFrequency > 0) || !(maxFrequency > 0)) {
       throw new IllegalArgumentException(
-          "SinusoidalPositionalEncoding: dims >= 4 and positive frequencies required");
+          "SinusoidalPositionalEncoding: dims >= 4 and even, positive frequencies required");
     }
     this.dims = dims;
     this.minFrequency = minFrequency;

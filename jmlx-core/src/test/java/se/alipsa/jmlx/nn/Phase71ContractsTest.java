@@ -183,6 +183,7 @@ class Phase71ContractsTest {
               IllegalArgumentException.class, () -> new MaxPool1d(s, 4, 1, 0).forward(tiny));
       assertTrue(error.getMessage().contains("window 4"));
       assertThrows(IllegalArgumentException.class, () -> new SinusoidalPositionalEncoding(s, 2));
+      assertThrows(IllegalArgumentException.class, () -> new SinusoidalPositionalEncoding(s, 5));
       BatchNorm bn = new BatchNorm(s, 3, 1e-5f, false, null, null, null, null);
       assertThrows(
           IllegalArgumentException.class,

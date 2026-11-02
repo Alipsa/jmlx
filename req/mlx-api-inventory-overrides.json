@@ -5,7 +5,6 @@
         "mlx_h.mlx_add", "mlx_h.mlx_arange", "mlx_h.mlx_array_new", "mlx_h.mlx_array_new_bool",
         "mlx_h.mlx_array_new_data", "mlx_h.mlx_array_new_float32", "mlx_h.mlx_array_new_int",
         "mlx_h.mlx_contiguous",
-        "mlx_h.mlx_default_gpu_stream_new",
         "mlx_h.mlx_dequantize", "mlx_h.mlx_device_free", "mlx_h.mlx_device_get_type",
         "mlx_h.mlx_device_new", "mlx_h.mlx_device_new_type", "mlx_h.mlx_eval",
         "mlx_h.mlx_full", "mlx_h.mlx_get_active_memory",
@@ -25,6 +24,14 @@
       "status": "implemented",
       "facadeOrReason": "MLX and NativeOps implementation support",
       "tests": "MLXNumericTest; MLXEvalTest"
+    },
+    {
+      "binding": "mlx_h.mlx_default_gpu_stream_new",
+      "category": "downcall",
+      "status": "implemented",
+      "facadeOrReason": "Loader validation only: jmlx-ffi's extraction-fallback test forces a GPU kernel through this stream to prove the extracted layout includes mlx.metallib; no production facade uses it",
+      "tests": "NativeLoaderExtractionFallbackTest",
+      "sources": ["jmlx-ffi/src/test/java/se/alipsa/jmlx/ffi/NativeLoaderExtractionFallbackTest.java"]
     },
     {
       "bindings": [

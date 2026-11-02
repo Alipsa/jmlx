@@ -14,15 +14,21 @@
  *
  * <h2>Threading rule</h2>
  *
- * <p>Use MLX from <b>at most one thread at a time per process</b>. MLX's native state -- the
- * default stream and the Metal device -- is process-wide, and its streams are bound to the thread
- * that created them, so concurrent MLX use from several threads is unsupported, not merely
- * unsynchronized. An {@link se.alipsa.jmlx.memory.MLXScope} and every {@link
- * se.alipsa.jmlx.core.MLXArray} allocated from it are confined to the thread that created the
- * scope; each scope carries that thread's own stream, so a different thread can be the single MLX
- * thread later, but only with scopes it created itself. To serve many callers from one process,
+ * <p>Use MLX from <b>at most one thread at a time per process</b>. MLX's native state -- the Metal
+ * device and the allocator -- is process-wide, and its streams (including each device's default
+ * stream) are bound to the thread that created them, so concurrent MLX use from several threads is
+ * unsupported, not merely unsynchronized. An {@link se.alipsa.jmlx.memory.MLXScope} and every
+ * {@link se.alipsa.jmlx.core.MLXArray} allocated from it are confined to the thread that created
+ * the scope; each scope carries that thread's own stream, so a different thread can be the single
+ * MLX thread later, but only with scopes it created itself. To serve many callers from one process,
  * give them a single MLX-owning worker (the {@code BatchGenerationScheduler} in {@code jmlx-models}
  * is one) rather than sharing scopes.
+ *
+ * <p>The one shared stream is the I/O loaders' process-wide CPU stream ({@code
+ * NativeOps.DEFAULT_CPU_STREAM}), a thread-unsafe stream usable from any thread -- but MLX applies
+ * no synchronization to it, so the one-thread-at-a-time rule applies to it as well: two threads
+ * calling {@link MLXIO#loadSafetensors} or {@link MLXIO#loadGguf} at the same time race on that
+ * single stream.
  *
  * <p>The rule is per process. Library code can only enforce it within one jmlx classloader (the
  * scheduler rejects a second running scheduler), and the direct {@code generate} API cannot be
@@ -39,8 +45,9 @@
  * short-lived ones.
  *
  * <p><b>Virtual threads.</b> Virtual threads cannot be MLX threads. The stream binding is to the OS
- * thread -- in the pinned mlx-metal 0.31.2, each stream's Metal command state is a {@code static
- * thread_local} in {@code mlx/backend/metal/device.cpp} -- while a Java virtual thread migrates
+ * thread -- in the pinned MLX 0.32.4, each stream's Metal command encoder is registered in a
+ * per-thread table in {@code mlx/backend/metal/device.cpp} (a static map on the main thread, a
+ * {@code static thread_local} map on every other thread) -- while a Java virtual thread migrates
  * between carrier OS threads between calls. The Java-side confinement checks compare thread objects
  * and would keep passing after a migration, so the failure would surface, if at all, at a random
  * native call; creating a root {@code MLXScope} on a virtual thread is therefore rejected with

@@ -317,11 +317,15 @@ published before `jmlx-models` itself.
    optimization. The Phase 7.5 open item, issue #73 (the re-measurement's VLM wall-time
    delta, initially attributed to the 0.32.4 pin), is resolved: a back-to-back
    alternating session showed no measurable pin effect in a clean host state, a
-   deliberately degraded-state alternating session showed both pins degrading by the
-   same factor under a saturating GPU compute load (no pin×host interaction under
-   that regime, new/old within ±7 %), and Metal-cache forensics plus a cold-cache
-   A/B ruled out a per-pin first-use cost — the delta was a host-state artifact of
-   the measurement window. 8.2 is the methodology owner going forward: the
+   deliberately degraded-state alternating session showed similar slowdown on both
+   pins under the tested sustained compute load (new/old within ±7 %). This
+   does not exclude a pin×host interaction under the unrecorded original state;
+   host-state attribution remains an inference. The new-pin Qwen3-VL cold-cache
+   test timed generation after prefill/decode comparisons had warmed the model,
+   so it cannot bound first-inference cost or rule out a per-pin first-use effect.
+   Issue #73 closes as an investigation record with these limits. 8.2 owns the
+   follow-up methodology: measure actual first inference and warmed generation
+   separately on both pins and workloads, with per-run host observations. The
    baseline measures in a quiet host state, records the host state with the
    numbers, and re-runs any surprising VLM prefill figure as a back-to-back
    alternating session before attributing it to the runtime.

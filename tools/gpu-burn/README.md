@@ -20,17 +20,26 @@ Environment variables:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `BURN_ON_MS` | `100` | ms of compute dispatch per cycle (CPU submission pattern) |
-| `BURN_OFF_MS` | `25` | ms of CPU sleep per cycle |
+| `BURN_ON_MS` | `100` | ms of compute submission per cycle, before draining |
+| `BURN_OFF_MS` | `25` | ms of sleep after draining this queue |
+| `BURN_DRAIN_BEFORE_SLEEP` | `1` | `0` preserves the issue #73 loop, allowing GPU work during sleep |
 | `BURN_SECONDS` | (unset) | optional; exit after this many seconds |
 
-**The GPU stays saturated (~100 % duty) for the default settings.** Each
-command buffer is a 262,144-thread dispatch of 200,000 dependent FMAs, and the
-loop holds 64 buffers in flight: when each `BURN_OFF_MS` sleep starts, ~63
-buffers are still queued, and draining them inside 25 ms would need over
-1e14 FMA/s — beyond any M-series GPU. `BURN_ON_MS`/`BURN_OFF_MS` therefore
-shape the CPU submission pattern, not the GPU utilization; treat this as a
-saturating contention source rather than a tunable duty cycle.
+The default waits for every submitted command buffer before starting the
+sleep, guaranteeing that this burner's queue is idle during that interval.
+The active interval includes drain time, so 100/25 ms does **not** promise an
+80 % duty cycle. On normal exit the tool prints measured host active/idle
+seconds and their active fraction over completed cycles. These are host
+intervals, not a hardware GPU utilization measurement; other processes may
+still use the GPU during the burner's idle interval. The duration limit is
+checked between cycles and may overrun while work drains.
+
+The issue #73 measurements used the original loop, now selected with
+`BURN_DRAIN_BEFORE_SLEEP=0`. Up to 63 command buffers could remain queued
+during each CPU sleep, so no GPU idle interval was guaranteed. The load is
+treated as sustained compute contention; the previously stated ~100 % GPU
+utilization was inferred, not measured. The recorded timings below apply
+to that historical mode, not the current default.
 
 The kernel is a constant-compute stream — not a calibrated bandwidth or power
 probe. For the measurement itself, record host state with the numbers (load,
@@ -40,9 +49,10 @@ issue #73 session, with its field semantics documented — and alternate the
 comparands back to back; the issue #73 session
 (`req/benchmarks/phase7-5-wp6-tierb-degraded-*.xml` plus the
 `phase7-5-wp6-issue73-*` host-state and forensics records) is the worked
-example.
+example, with a gap: the four clean runs lack individual host samples because
+the recorder initially failed. The session-start sample provides context only.
 
-## Reference effect (M5 Max, macOS 27.2, default settings)
+## Reference effect (M5 Max, macOS 27.2, historical mode)
 
 Measured in the issue #73 session against the two Tier-B workloads, clean vs.
 under the burner (new 0.32.4 / old 0.31.2):
@@ -52,7 +62,8 @@ under the burner (new 0.32.4 / old 0.31.2):
 | Qwen3-VL 2B Tier-B generation (light) | 243 / 245 ms | 2,145/2,057 / 2,064/2,011 ms | 8.2–8.8× | 1.00–1.07 |
 | Phi-3.5-Vision 4B Tier-B generation (heavy) | 3,538 / 3,658 ms | 13,526/13,587 / 14,555/14,273 ms | 3.8–4.0× | 0.93–0.95 |
 
-No thermal or performance warning level was recorded in any run. A real
+The available pre-run samples show no thermal or performance warning; no
+continuous monitoring was recorded. A real
 degraded window with a different contention mix (e.g. memory-bandwidth-heavy
 serving rather than a constant compute stream) need not show the same
 per-model factors — the issue #73 window inverted them (Qwen3-VL 2.3–3.9× vs.

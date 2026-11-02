@@ -4,26 +4,31 @@ import Foundation
 // GPU load generator for controlled-degradation timing methodology (Phase 8.2).
 // Sustains a stream of compute work on the default GPU so that concurrently
 // running MLX workloads contend for GPU time, reproducing a degraded host
-// state on demand. First used to settle issue #73 (the 10:53-11:29 UTC
-// 2026-11-02 wall-time window was a host artifact: both MLX pins degraded by
-// the same factor under this burner).
+// state on demand. First used to investigate issue #73: both MLX pins
+// degraded similarly under this burner; the original host state is unknown.
 //
-// NOTE: the GPU stays saturated (~100% duty) for the default settings. Each
-// buffer is a 262,144-thread dispatch of 200,000 dependent FMAs; with 64
-// buffers held in flight, the ~63 still queued when each BURN_OFF_MS sleep
-// starts cannot drain inside 25 ms (that would need >1e14 FMA/s).
-// BURN_ON_MS / BURN_OFF_MS shape the CPU submission pattern, not the GPU
-// utilization.
+// The default drains this queue before sleeping. The active interval includes
+// drain time, so ON/(ON+OFF) is not the effective duty cycle. Printed timings
+// measure host active/idle intervals, not hardware GPU utilization.
+// BURN_DRAIN_BEFORE_SLEEP=0 preserves the original issue #73 submission loop:
+// queued work can execute throughout the CPU sleep; no GPU idle is guaranteed.
 //
 // Build:  xcrun swiftc -O burn.swift -o burn -framework Metal
 // Run:    ./burn            (forever; stop with SIGTERM/SIGINT)
 //
 // Env: BURN_ON_MS (default 100), BURN_OFF_MS (default 25),
+//      BURN_DRAIN_BEFORE_SLEEP (default 1; 0 for historical behavior),
 //      BURN_SECONDS (optional; run for this many seconds and exit).
 
 let onMs = ProcessInfo.processInfo.environment["BURN_ON_MS"].flatMap { Int($0) } ?? 100
 let offMs = ProcessInfo.processInfo.environment["BURN_OFF_MS"].flatMap { Int($0) } ?? 25
 let maxSeconds = ProcessInfo.processInfo.environment["BURN_SECONDS"].flatMap { Double($0) }
+let drainBeforeSleep = ProcessInfo.processInfo.environment["BURN_DRAIN_BEFORE_SLEEP"] != "0"
+
+guard onMs > 0, offMs >= 0, maxSeconds.map({ $0.isFinite && $0 > 0 }) ?? true else {
+    FileHandle.standardError.write("ON must be positive, OFF nonnegative, SECONDS finite and positive\n".data(using: .utf8)!)
+    exit(1)
+}
 
 guard let device = MTLCreateSystemDefaultDevice() else {
     FileHandle.standardError.write("no default GPU device\n".data(using: .utf8)!)
@@ -58,14 +63,17 @@ memcpy(nBuf.contents(), &n, MemoryLayout<UInt32>.size)
 let tg = MTLSize(width: 1024, height: 1, depth: 1)
 let grid = MTLSize(width: 1024 * 256, height: 1, depth: 1)
 
-let started = Date()
+let started = ProcessInfo.processInfo.systemUptime
+var activeSeconds = 0.0
+var idleSeconds = 0.0
+var cycles = 0
 var outstanding: [MTLCommandBuffer] = []
 while true {
-    if let maxSeconds, Date().timeIntervalSince(started) > maxSeconds {
+    if let maxSeconds, ProcessInfo.processInfo.systemUptime - started > maxSeconds {
         break
     }
-    let phaseStart = Date()
-    while Date().timeIntervalSince(phaseStart) < Double(onMs) / 1000.0 {
+    let phaseStart = ProcessInfo.processInfo.systemUptime
+    while ProcessInfo.processInfo.systemUptime - phaseStart < Double(onMs) / 1000.0 {
         guard let cmd = queue.makeCommandBuffer(),
               let enc = cmd.makeComputeCommandEncoder() else { break }
         enc.setComputePipelineState(pipe)
@@ -79,7 +87,18 @@ while true {
             outstanding.removeFirst().waitUntilCompleted()
         }
     }
+    if drainBeforeSleep {
+        for cb in outstanding { cb.waitUntilCompleted() }
+        outstanding.removeAll(keepingCapacity: true)
+    }
+    let idleStart = ProcessInfo.processInfo.systemUptime
+    activeSeconds += idleStart - phaseStart
     Thread.sleep(forTimeInterval: Double(offMs) / 1000.0)
+    idleSeconds += ProcessInfo.processInfo.systemUptime - idleStart
+    cycles += 1
 }
 for cb in outstanding { cb.waitUntilCompleted() }
+let cycleSeconds = activeSeconds + idleSeconds
+let activeFraction = cycleSeconds > 0 ? activeSeconds / cycleSeconds : 0
+print("drain_before_sleep=\(drainBeforeSleep) cycles=\(cycles) active_s=\(activeSeconds) idle_s=\(idleSeconds) host_active_fraction=\(activeFraction)")
 print("burn done")

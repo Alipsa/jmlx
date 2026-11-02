@@ -78,3 +78,24 @@ command buffer is a 262,144-thread dispatch of 200,000 dependent FMAs, and
 with 64 buffers held in flight the ~63 still queued when each 25 ms sleep
 starts cannot drain inside it (over 1e14 FMA/s would be needed); the ON/OFF
 variables shape the CPU submission pattern, not the GPU utilization.
+
+--- review clarification (added after the session; not a new observation) ---
+
+The ~100% duty statement above was inferred from the queue/work size, not
+measured GPU utilization. The CPU sleep did not guarantee a GPU idle phase.
+These runs used the original burner loop, now selected with
+BURN_DRAIN_BEFORE_SLEEP=0; the current default drains before sleeping and
+must not be used to reproduce these historical settings implicitly.
+
+The per-run lines are pre-run snapshots, not continuous monitoring. The
+15:49 process list is session context, not a per-run process inventory.
+The session-start snapshot cannot establish the state of each of the four
+clean-phase runs; those observations were not captured and cannot be
+reconstructed. There is also no original-window host-state record, so the
+induced compute load cannot establish which contention mix existed then.
+
+Additional label mapping (all files under req/benchmarks/):
+  cold-qwen3vl-new1 -> phase7-5-wp6-tierb-coldcache-new-65e5306-qwen3vl-cold.xml
+  cold-qwen3vl-new2 -> phase7-5-wp6-tierb-coldcache-new-65e5306-qwen3vl-warm.xml
+  session-start/session-end -> context only, no individual run XML
+  phase7-5-wp6-tierb-degraded-clean-*.xml -> no individual host-state line

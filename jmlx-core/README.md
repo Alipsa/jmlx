@@ -45,7 +45,8 @@ checks every reachable element address, with checked arithmetic and no unchecked
 ReLU, LeakyReLU, ELU, SELU, Tanh, Sigmoid, Softplus, Mish, HardSwish and QuickGELU are parameter-free.
 Softplus is stable at large magnitudes; QuickGELU is HF's `x * sigmoid(1.702*x)`.
 `logSoftmax` is composed from log-sum-exp and subtraction. SinusoidalPositionalEncoding returns
-features rather than adding to embeddings; dims<4 is deliberately rejected to avoid pinned NaNs.
+features rather than adding to embeddings; odd or non-positive dims are rejected, and dims == 2
+uses MLX 0.32.4's single maximum-frequency pair.
 ALiBi builds its bias with device operations, preserves the scores' dtype, and adds MLX's symmetric
 negative absolute-distance bias, with a query offset for cached scores.
 Position-sized temporaries are allocated in the input scope.

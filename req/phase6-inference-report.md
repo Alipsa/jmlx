@@ -164,7 +164,7 @@ All preserve the public API; all but the last preserve the pre-upgrade observabl
    `SinusoidalPositionalEncoding: even positive dims and positive frequencies required`), the
    dims-2 `assertThrows` became a value assertion (position 1 with the default max frequency 1 has
    angle exactly 1.0 rad), and the oracle gained case `sinusoidal-60` (dims 2, min 0.01 / max 2)
-   pinning the frequency choice — jmlx's validation is now exactly 0.32.4's.
+   pinning the frequency choice — jmlx's dims validation is now exactly 0.32.4's.
 
 ### Oracle fixture input changes
 

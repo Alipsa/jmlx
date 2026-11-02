@@ -64,11 +64,18 @@ reference math or replace converter output with hand-written Java-layout files.
 Use seed 20261102 and a four-layer hybrid model with three linear layers and one full-attention
 layer: hidden width 128, MLP width 256, two full-attention heads / one KV head, head width 64,
 partial rotary width 16, MRoPE sections `[3,3,2]`, two linear key heads / six value heads,
-linear key width 16 and value width 32, and an untied 128-token output vocabulary. Add an
+linear key width 32 and value width 64, and an untied 128-token output vocabulary. The key
+width must be at least 32 and divisible by 32 for the pinned mlx-vlm GPU delta kernel;
+the previous 16-wide proposal would leave its `Dk / 32` loops empty. Keep unequal key/value
+widths so the fixture still tests that distinction. Add an
 equal-head/tied-output variant and an eight-layer variant to test state indexing. A tiny
 vision config uses two layers, width 64, four heads, intermediate width 128, patch 16,
 temporal size 2, merge 2, no DeepStack and 64 learned positions, projecting to text width 128.
-Round source weights to BF16 before
+Remap special IDs into this vocabulary: pad 0, BOS 1, EOS 2, vision-start 118, vision-end 119,
+image 120 and video 121 (video input is still rejected). Pin these IDs, their token spellings
+and the paired tokenizer in the fixture config and goldens; do not inherit the real artifacts'
+248053–248057 vision IDs. Validate distinctness and vocabulary bounds before reference export
+and Java loading. Round source weights to BF16 before
 computing the HF-layout golden, then up-cast to float32 for both reference and Java execution.
 For float converted-layout equality, separately export a float32 fixture through each converter
 so norm-offset conversion does not introduce BF16 re-rounding into that comparison.
@@ -120,7 +127,7 @@ Normalize `y` per value head with the ordinary learned norm weight, then multipl
 and apply `out_proj`. This gate is distinct from the full-attention sigmoid gate. Never add
 the zero-centered norm offset to `linear_attn.norm.weight`.
 
-Prefill uses chunks of 64 with cumulative log decay, causal masks and batched matmuls. Implement
+Prototype 64-token chunked prefill with cumulative log decay, causal masks and batched matmuls. Implement
 the unit-lower-triangular solve by bounded forward substitution composed from existing ops;
 no linalg binding is required. Mask forbidden log-decay entries before exponentiating to avoid
 overflow. Tail padding must be recurrence-neutral and removed from outputs; retain convolution
@@ -129,10 +136,22 @@ scope, so a prompt does not retain every earlier chunk's graph.
 
 Compare chunked outputs/final state to both HF and a simple token recurrence, for lengths
 1, 3, 4, 5, 63, 64, 65, 127, 128 and 129, including nonzero initial state and split prefills.
-Benchmark ops-only prefill and decode with first-use and warmed timings separated. If state
-updates dominate measured execution, publish the breakdown before proposing acceleration.
-The already-bound `mlx_fast_gated_delta_update` is a candidate for a separately reviewed facade;
-custom Metal kernels are not pulled forward without measured evidence and a plan amendment.
+WP1 must compare three candidates before selecting the production prefill default: chunked
+ops, token recurrence, and the pinned native `mlx_fast_gated_delta_update` (initially measured
+through its Python MLX entry point in the isolated reference tool). Compare identical prepared
+Q/K/V, decay, beta and initial state, accounting explicitly for native gate convention and
+state orientation; all candidates must pass output/final-state checks first. Run tiny shapes
+and the real 0.8B/27B head dimensions at lengths 64, 256, 1024 and 1280, including the 27B's
+48-linear-layer execution cost. Record native-call/dispatch counts, evaluated wall time,
+temporary memory, and first-use versus warmed results under the host-state methodology.
+
+Per-chunk evaluation bounds graph retention, not dispatch overhead: the ops substitution can
+multiply small slice/update operations across rows, chunks and layers. HF normally uses
+`solve_triangular`; its export fallback has 63 row iterations, batched over chunks. Neither
+that source inspection nor an operation-count estimate is a measured slowdown. Record the
+comparison and proposed default for review at the WP1 gate. If native acceleration wins,
+add a separately reviewed core facade and inventory mapping before using it from Java;
+custom Metal kernels still require measured evidence and a plan amendment.
 
 ### Gated full attention and partial MRoPE
 
@@ -141,6 +160,15 @@ into two global halves would pair the wrong values. Apply zero-centered Q/K norm
 MRoPE, causal attention, then sigmoid(gate), then `o_proj`. Use the configured head dimension,
 not `hiddenSize / numHeads`. Layer selection follows validated `layer_types`; when an interval
 is also supplied, require agreement rather than silently overriding one with the other.
+
+Require `text_config.rope_parameters` with `rope_type: default`, `mrope_interleaved: true`
+and an explicit numeric `partial_rotary_factor`; other types/layouts and missing flags are
+rejected by name. The nested factor is canonical. An optional duplicate at the top of
+`text_config` must be numeric and equal to it; disagreement is rejected. If the nested factor
+is absent, reject even if the top-level alias exists. This deliberately supports the observed
+explicit configs rather than guessing between HF model/config defaults of 1.0 and 0.25.
+WP0 records nested-only, matching/conflicting duplicates and missing-factor cases against HF;
+Java tests pin the strict acceptance/rejection policy separately from HF's defaulting behavior.
 
 For this family require `rotaryDim = headDim * partial_rotary_factor` to be a positive even
 integer and `2 * sum(mrope_section) == rotaryDim`. Both real artifacts have 256-wide heads
@@ -156,9 +184,14 @@ do not replace sigmoid with SiLU just because the artifact carries the string `s
 
 ## 5. Checkpoint classification and loading
 
-Classify from the complete shard-header key/shape/dtype inventory, config and provenance before
+Classify from the complete shard-header key/shape/dtype inventory and config before
 allocating weights. Quantization and layout are independent decisions. Detect/reject mixed
-prefixes, colliding remaps, partial vision inventories and ambiguous norm-offset provenance.
+prefixes, colliding remaps, partial vision inventories and ambiguous norm-offset conventions.
+The loader does not require a model-card README, converter name/version or an external
+reference-tool provenance manifest. The inspected config/index do not identify the converter;
+shard `__metadata__` has not been inspected. WP0 records it if present, but it does not override
+the structural rules below. Converter/version records are reproducibility evidence for the
+reference fixtures and manual acceptance, not an assumed input available to every loader.
 
 | Layout | Text mapping | Conv axes | Vision handling | Zero-centered text norm |
 | --- | --- | --- | --- | --- |
@@ -166,20 +199,34 @@ prefixes, colliding remaps, partial vision inventories and ambiguous norm-offset
 | mlx-vlm | `language_model.model.*`, `language_model.lm_head.*` | already `[C,K,1]` | `vision_tower.*`; detect patch axes by shape | already shifted for a sanitized artifact |
 | mlx-lm | `language_model.model.*`, `language_model.lm_head.*` | already `[C,K,1]` | absent: TEXT capability only | already shifted for a sanitized artifact |
 
-The inspected mlx-lm wrapper uses the same text namespace as mlx-vlm. Their difference is the
-vision inventory/capability and recorded converter provenance, not a fabricated prefix split.
+The inspected mlx-lm wrapper uses the same text namespace as mlx-vlm. Loader capability comes
+from the vision inventory, not an inferred converter identity or a fabricated prefix split.
 WP0 verifies the actual saved namespace from each converter before loader implementation.
 
-Shape-detect patch axes for float and affine inputs alike. A convertible HF conv tensor alone
-does not prove that an entire checkpoint's norms need shifting. Converted prefixes, axes and
-converter provenance must agree; reject unsupported mixed/intermediate forms with a named error.
-The exact pinned converter sanitize behavior, including MTP detection order, is a fixture input,
-not a heuristic the loader runs repeatedly. Recognized unused `mtp.*` tensors are inventoried
-and skipped before native allocation; unknown extras are rejected.
+Apply these rules over the complete inventory, **before** dropping any MTP tensors:
+
+- HF text prefix `model.language_model.*` with every conv `[C,1,K]`: treat the selected text
+  norms as unshifted and add 1 exactly once. Recognized HF `mtp.*` tensors may be inventoried
+  and skipped before allocation; they never execute.
+- Converted text prefix `language_model.model.*` with every conv `[C,K,1]` and no MTP tensors
+  (including prefixed MTP subtrees): treat selected text norms as already shifted; add nothing.
+- Reject mixed prefixes, mixed conv axes, converted prefixes with any MTP subtree, or any
+  other unsupported combination. Never guess from a single tensor or sanitize twice.
+
+These define supported storage conventions, not proof that arbitrary tensor values were
+produced by a particular converter. Shape-detect patch axes independently for float and affine
+inputs alike. Unknown extras and colliding mappings are rejected by name. Record the exact
+pinned converter sanitize behavior in fixture provenance and check its saved outputs against
+these rules; do not require that provenance to be packaged with third-party checkpoints.
 
 Validate required/optional tensors, dimensions, ties and aliases through `TensorPlan`/preflight.
 Accept the observed legacy `vision_config.model_type: qwen3_5` only as this family's known vision
 alias. Validate typed generation metadata without treating it as a runtime policy override.
+Accept `language_model_only` only when absent or boolean `false`; reject `true` and non-booleans
+by name in this milestone. It is typed inert metadata, not the capability selector: `false`
+does not guarantee that vision tensors exist. A complete tower means TEXT+IMAGE, no vision
+tensors means TEXT, and a partial tower is rejected, regardless of quantization. Thus the
+supported text-only converter layout does not rely on setting this optional flag to `true`.
 Check context/layer schedules, gate flags, epsilon, head divisibility and grouped linear heads.
 All integer products/size accounting use overflow checks. Unsupported MoE and quantization
 forms fail before weight upload.
@@ -219,8 +266,18 @@ with the artifact's Fast declaration. Record a fast/slow comparison; Java, HF an
 MLX comparison consume the same digest-pinned processed patches and rendered prompt/IDs.
 If the new slow processor differs, document/port the difference before claiming reuse.
 
-Reuse the vision tower with no DeepStack, shape-selected patch axes and the smaller learned
-position grid. Reverify its interpolation and merger against HF; shared class names are not
+Reuse `Qwen3VlVisionTower` with no DeepStack and shape-selected patch axes. During WP5 remove
+the tower constructor's non-empty-index restriction and update its Javadoc to permit an empty
+array with no DeepStack merger subtrees and an empty feature-level list. Keep non-null,
+index-range/order and exact weight-inventory checks. Preserve the existing non-empty guard in
+`Qwen3VlDescriptor.parseDeepstackIndexes` and explicitly enforce it in every `Qwen3VlModel.load`
+path before constructing the shared tower. `Qwen35Descriptor` instead requires an empty array.
+Add tests for both family guards, shared-tower empty levels and zero-iteration feature handling;
+existing Qwen3-VL captures, logits and generation must remain unchanged.
+
+Both real artifacts have 2304 learned positions (48×48), the same grid size as Qwen3-VL-2B;
+only the tiny fixture has a smaller 64-position grid. Reverify interpolation and merger at
+both grid sizes against HF; shared class names are not
 proof. Prompt expansion retains original IDs in results, charges expanded positions, replaces
 image sentinel rows once and carries the per-request MRoPE delta into decode. Release per-image
 tower intermediates sequentially and image features after evaluated prefill state no longer
@@ -232,7 +289,7 @@ text path. Public video and remote-image fetching stay rejected.
 | WP | Deliverable and commit boundary | Gate before the next package |
 | --- | --- | --- |
 | 0 | Isolated locks, artifact/header inventories, reference/config/converter probes and findings | references execute; partial rotary, gate metadata, norm offsets, state orientation and preprocessing are recorded |
-| 1 | Core recurrent cache, token recurrence and chunked DeltaNet | outputs and state match independent references at convolution/chunk boundaries; request graphs are bounded |
+| 1 | Core recurrent cache, token recurrence and chunked DeltaNet prototypes; native comparison | outputs/state match independent references; graphs bounded; three-way prefill benchmark and proposed default reviewed before selection |
 | 2 | Gated full attention, partial-MRoPE tests and hybrid blocks | strict component goldens; existing decoder paths unchanged |
 | 3 | Pure descriptor, tensor-plan and layout classifier; actual converted tiny fixtures | all three float layouts agree; malformed/mixed layouts fail before allocation; packed fixture matches MLX |
 | 4 | Separate generation-loop extraction, hybrid text loader/generation | both-mode old-path exact-bit checks; text Tier-A prefill/cached/fresh-forward equality |

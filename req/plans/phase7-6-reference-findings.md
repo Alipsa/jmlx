@@ -85,3 +85,28 @@ the existing reference locks remain unchanged.
 
 These inspections support the proposed design; they are not parity, speed or memory results.
 The detailed plan owns the choices and the executable stop conditions.
+
+## 2026-11-02 plan-review amendments
+
+- The pinned [mlx-vlm delta kernel](https://github.com/Blaizzy/mlx-vlm/blob/v0.6.8/mlx_vlm/models/qwen3_5/gated_delta.py)
+  divides the key width by 32 in its per-thread loops. The tiny fixture now proposes key width
+  32 / value width 64; width 16 is unsuitable for its default GPU reference path. This is a
+  source-derived constraint, not a completed fixture run.
+- `Qwen3VlVisionTower` currently rejects empty DeepStack indices in its constructor. Planned
+  reuse therefore requires allowing empty indices in the shared tower while retaining the
+  Qwen3-VL descriptor guard and enforcing the same requirement at its model loader. The new
+  Qwen3.5 descriptor requires empty indices. Both real learned grids are 2304 positions; only
+  the synthetic fixture uses 64.
+- The inspected config/index JSON does not identify a converter. Shard `__metadata__` remains
+  uninspected. Loader classification is specified from the complete prefix/conv-axis/MTP
+  inventory; reference-tool converter provenance is not a required runtime input.
+- RoPE acceptance is explicit: nested factor required, matching top-level duplicate only,
+  `rope_type: default` and `mrope_interleaved: true`. Missing nested factors are rejected rather
+  than inferred from the model's 1.0 fallback or the config's 0.25 backward-compatibility default.
+  `language_model_only` is accepted only absent/false, with capability determined from weights.
+- The tiny vocabulary gets explicit in-range special IDs, config/tokenizer/golden pins, and
+  bounds checks. Neither artifact's real vision IDs can be copied into a 128-token fixture.
+- The inspected HF normal path uses `solve_triangular`; its export fallback iterates 63 rows
+  for chunk size 64, with the chunk dimension batched. A Java ops implementation that does this
+  per chunk can incur many dispatches. No cost was measured: WP1 now requires comparison of
+  chunked ops, token recurrence and the pinned native update before selecting a default.

@@ -253,7 +253,7 @@ code.
 
 Milestones, in order:
 
-| Milestone | Scope | Status |
+| Milestone | Scope | Status (2026-10-31 unless individually dated) |
 | --- | --- | --- |
 | 7.0 Qwen3 text decoders | `qwen3` mapping, per-head QK normalization, affine-quantized loading, Qwen3 chat template; Tier-B Qwen3-0.6B, manual Qwen3-8B 4-bit run | delivered |
 | 7.1 Core inference modules | containers, dropout (eval), activations, convolution and transpose convolution, pooling, padding, upsampling, normalization variants, positional encodings, evaluation losses | implemented; acceptance pending (oracle drift, cross-host CPU fixtures) |

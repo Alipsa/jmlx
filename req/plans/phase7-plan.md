@@ -847,12 +847,15 @@ tower, request lifecycle and `MultiAxisRope`.
   - `mlx_lm`, which has no vision weights, so it loads as a text-only model whose metadata
     reports TEXT and rejects image requests.
 
-  The norm offset must be applied exactly once. mlx-vlm drops MTP tensors *before* it checks
-  whether to apply the offset. It then adds the offset to a norm weight when the checkpoint still
-  has an unconverted `conv1d`, or when that weight's original key does not start with
-  `language_model.`. So a key with the HF prefix always gets the offset. The key prefix
-  (`model.language_model.` versus `language_model.model.`) is therefore the signal for whether
-  the offset is already in the stored weights.
+  The norm offset must be applied exactly once. **2026-11-02 correction:** the pinned mlx-vlm
+  0.6.8 checks MTP presence and unconverted `conv1d` axes **before** dropping MTP tensors, then
+  also tests each norm's original prefix. This supersedes the 2026-10-29 mutable-main finding
+  that MTP was dropped first; prefix alone is not sufficient. The supported loader conventions
+  are HF prefix plus uniformly `[C,1,K]` convs (add 1), or converted prefix plus uniformly
+  `[C,K,1]` convs and no MTP subtrees (already shifted). Reject other/mixed combinations before
+  dropping unused tensors. The [detailed sub-plan](phase7-6-plan.md#5-checkpoint-classification-and-loading)
+  defines these checkpoint-readable rules; converter versions are reference evidence, not a
+  required model-card or external-manifest input to loading.
 
   The vision side reuses 7.3b's tower, but not its loader routing:
   - 7.3b's float path (`Qwen3VlVisionTower.visionWeights`) maps only the HF `model.visual.` and

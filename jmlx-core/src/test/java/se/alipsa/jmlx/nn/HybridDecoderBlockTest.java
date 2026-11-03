@@ -179,6 +179,65 @@ class HybridDecoderBlockTest {
     }
   }
 
+  @Test
+  void postAttentionFailurePoisonsBothCachesBeforeReuse() {
+    try (MLXScope weights = new MLXScope()) {
+      Map<String, MLXArray> f = fixture(weights);
+      GatedDeltaNet delta = delta(weights, f, "base.linear_block.weights.linear_attn.");
+      HybridDecoderBlock linearBlock =
+          new HybridDecoderBlock(
+              weights,
+              norm(weights, f, "base.linear_block.weights.input_layernorm.weight"),
+              delta,
+              norm(weights, f, "base.linear_block.weights.post_attention_layernorm.weight"),
+              new FailingMlp(weights));
+      GatedDecoderAttention attention = attention(weights, f, "base.full_block.weights.self_attn.");
+      HybridDecoderBlock fullBlock =
+          new HybridDecoderBlock(
+              weights,
+              norm(weights, f, "base.full_block.weights.input_layernorm.weight"),
+              attention,
+              norm(weights, f, "base.full_block.weights.post_attention_layernorm.weight"),
+              new FailingMlp(weights));
+      try (MLXScope request = weights.newChild();
+          RecurrentCache recurrent = delta.newCache(request, 1)) {
+        KVCache kv = new KVCache(request);
+        try (MLXScope step = request.newChild()) {
+          MLXArray input = inScope(f.get("base.input"), step);
+          IllegalStateException linear =
+              assertThrows(
+                  IllegalStateException.class,
+                  () -> linearBlock.forward(input, recurrent, GatedDeltaNet.PrefillMethod.CHUNKED));
+          assertEquals("simulated MLP failure", linear.getMessage());
+          assertTrue(recurrent.isPoisoned());
+          IllegalStateException reuse =
+              assertThrows(
+                  IllegalStateException.class,
+                  () ->
+                      linearBlock.forward(
+                          inScope(f.get("base.input"), step),
+                          recurrent,
+                          GatedDeltaNet.PrefillMethod.CHUNKED));
+          assertEquals("DeltaNet cache is poisoned; discard the request", reuse.getMessage());
+        }
+        try (MLXScope step = request.newChild()) {
+          MLXArray input = inScope(f.get("base.input"), step);
+          MultiAxisRotation rotation = rotation(step, f, "base", false);
+          IllegalStateException full =
+              assertThrows(
+                  IllegalStateException.class, () -> fullBlock.forward(input, kv, null, rotation));
+          assertEquals("simulated MLP failure", full.getMessage());
+          assertTrue(kv.isPoisoned());
+          IllegalStateException reuse =
+              assertThrows(
+                  IllegalStateException.class,
+                  () -> fullBlock.forward(inScope(f.get("base.input"), step), kv, null, rotation));
+          assertEquals("attention cache is poisoned", reuse.getMessage());
+        }
+      }
+    }
+  }
+
   private static Map<String, MLXArray> fixture(MLXScope scope) {
     return MLXIO
         .loadSafetensors(
@@ -281,5 +340,17 @@ class HybridDecoderBlockTest {
   private static void assertNear(MLXArray expected, MLXArray actual) {
     assertArrayEquals(expected.shape(), actual.shape());
     assertArrayEquals(expected.toFloatArray(), actual.toFloatArray(), EPSILON);
+  }
+
+  /** An MLP whose forward always fails, to exercise the block's cache-poisoning paths. */
+  private static final class FailingMlp extends UnaryLayer {
+    FailingMlp(MLXScope scope) {
+      super(scope);
+    }
+
+    @Override
+    public MLXArray forward(MLXArray x) {
+      throw new IllegalStateException("simulated MLP failure");
+    }
   }
 }

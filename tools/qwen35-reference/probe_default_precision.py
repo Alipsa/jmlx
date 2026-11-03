@@ -36,8 +36,10 @@ def main():
     ordinary = json.loads(default_file.read_text())
     qualified = json.loads(qualified_file.read_text())
     assert not ordinary["floating_parameter_upcast"] and ordinary["tf32"] == "unset"
+    qualified_capture = args.captures/qualified["captures"]["file"]
+    assert digest(qualified_capture) == qualified["captures"]["sha256"]
     a = np.load(args.captures/ordinary["captures"]["file"], allow_pickle=False)
-    b = np.load(args.captures/qualified["captures"]["file"], allow_pickle=False)
+    b = np.load(qualified_capture, allow_pickle=False)
     phases = []
     for case in ordinary["cases"]:
         for phase in ["prefill"]+[f"decode{i}" for i in range(8)]:

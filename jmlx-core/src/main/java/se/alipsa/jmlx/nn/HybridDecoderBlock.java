@@ -64,7 +64,14 @@ public final class HybridDecoderBlock extends Module {
     if (linearAttention == null) {
       throw new IllegalStateException("full-attention block requires a K/V cache");
     }
-    return finish(x, linearAttention.forward(inputNorm.forward(x), cache, method, checkpoint));
+    try {
+      return finish(x, linearAttention.forward(inputNorm.forward(x), cache, method, checkpoint));
+    } catch (RuntimeException | Error error) {
+      // A DeltaNet failure poisons on its own; a post-attention failure must too, or the cache
+      // would retain this step's provisional state at an advanced position and look reusable.
+      cache.poison();
+      throw error;
+    }
   }
 
   /** Builds the full-attention block with the step's shared multi-axis rotation. */
@@ -72,7 +79,14 @@ public final class HybridDecoderBlock extends Module {
     if (fullAttention == null) {
       throw new IllegalStateException("linear-attention block requires a recurrent cache");
     }
-    return finish(x, fullAttention.forward(inputNorm.forward(x), cache, mask, rotation));
+    try {
+      return finish(x, fullAttention.forward(inputNorm.forward(x), cache, mask, rotation));
+    } catch (RuntimeException | Error error) {
+      // Without this, a post-attention failure leaves the K/V cache holding this step's
+      // lazy append, apparently usable for the next step with wrong history.
+      cache.poison();
+      throw error;
+    }
   }
 
   private MLXArray finish(MLXArray input, MLXArray attended) {

@@ -79,6 +79,8 @@ tasks.withType(Test).configureEach {
     mustRunAfter rootProject.tasks.named('generateMlxOracleFixtures')
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
     inputs.files(rootProject.fileTree('tools/mlx-oracle/fixtures') { include '*.json' })
+    // Qwen3.5 delta/gated-attention references; rerun when a pinned golden is regenerated.
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/goldens') { include '*.safetensors' })
     // Opt-in performance tests: ./gradlew :jmlx-core:test -Djmlx.benchmark=true --tests "*Benchmark*"
     systemProperty 'jmlx.benchmark', System.getProperty('jmlx.benchmark', 'false')
 }

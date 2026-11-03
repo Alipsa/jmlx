@@ -263,7 +263,7 @@ Milestones, in order:
 | 7.3c LLaVA-style connector | `microsoft/Phi-3.5-vision-instruct` (MIT), selected 2026-10-27 | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | a reviewed decision record, not code | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`), reviewed via its PR: go — audio scheduled as Phase 11 milestone 11.5, diffusion as Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | paired pin upgrade to the newest release (see § Release and MLX upgrade plan) | delivered 2026-11-01 (PR #71, follow-up #72); timing investigation recorded in merged PR #76 on 2026-11-02, with measurement limits owned by Phase 8.2 |
-| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | in progress 2026-11-03: reference probes and core DeltaNet prototypes verified locally; model integration and acceptance pending |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | delivered 2026-11-03 (PR #79): all WPs executed, Tier-A HF goldens and both real-artifact acceptances (0.8B Tier-B and 27B 4-bit run) recorded locally; macOS 26 hosted CI and the qwen35 arm's first self-hosted Tier-B run pending |
 
 7.4 decides only. A "go" for audio or diffusion schedules its implementation into a later phase
 by a dated roadmap amendment; it does not extend Phase 7.

@@ -22,8 +22,12 @@ def main():
     stock_record = json.loads(stock_file.read_text())
     diagnostic_record = json.loads(diagnostic_file.read_text())
     assert diagnostic_record["teacher_history_sha256"] == digest(stock_file)
-    stock = np.load(args.captures/stock_record["captures"]["file"], allow_pickle=False)
-    diagnostic = np.load(args.captures/diagnostic_record["captures"]["file"], allow_pickle=False)
+    stock_capture = args.captures/stock_record["captures"]["file"]
+    diagnostic_capture = args.captures/diagnostic_record["captures"]["file"]
+    assert digest(stock_capture) == stock_record["captures"]["sha256"]
+    assert digest(diagnostic_capture) == diagnostic_record["captures"]["sha256"]
+    stock = np.load(stock_capture, allow_pickle=False)
+    diagnostic = np.load(diagnostic_capture, allow_pickle=False)
     candidates = []
     for case in stock_record["cases"]:
         name = case["name"]

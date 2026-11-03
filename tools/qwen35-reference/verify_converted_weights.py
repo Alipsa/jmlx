@@ -59,7 +59,9 @@ def main():
             expected[target] = value
         assert set(expected) == set(actual), (set(expected)-set(actual), set(actual)-set(expected))
         for name, value in expected.items():
-            assert np.array_equal(value, actual[name]), name
+            stored = actual[name]
+            assert value.dtype == stored.dtype and value.shape == stored.shape, name
+            assert value.tobytes() == stored.tobytes(), name
         records.append(dict(family=family, tensor_count=len(actual), bit_exact=True,
                             shifted_norms=shifted, convolution_axes="C,K,1",
                             linear_attn_norm_shifted=False,

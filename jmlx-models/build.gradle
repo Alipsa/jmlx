@@ -181,6 +181,10 @@ tasks.withType(Test).configureEach {
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
     inputs.files(rootProject.fileTree('tools/mlx-oracle/fixtures') { include '*.json' })
     inputs.files(rootProject.fileTree('tools/hf-reference/goldens'))
+    // Qwen3.5 hybrid references; rerun when a pinned fixture, golden or evidence file changes.
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/fixtures'))
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/goldens'))
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/evidence'))
 }
 
 // Gate 0 thread probes (req/plans/phase6-5-plan.md). Each runs in its own forked JVM, like

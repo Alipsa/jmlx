@@ -144,8 +144,8 @@ public final class Qwen3VlVisionTower extends Module {
    *
    * @param numHeads the attention head count (not derivable from the weights)
    * @param deepstackIndexes the strictly-increasing layer indices (in {@code [0, depth)}) at which
-   *     a DeepStack feature is captured; must be non-empty and match the {@code deepstackMerger*}
-   *     subtrees present in {@code weights}
+   *     a DeepStack feature is captured; an empty array produces no feature levels and requires no
+   *     {@code deepstackMerger*} subtrees. Nonempty arrays must match those subtrees exactly.
    * @throws IllegalArgumentException if a dimension is invalid, a weight is missing or extra, a
    *     weight is not floating, or the weights are mutually inconsistent
    * @throws NullPointerException if {@code weights} or {@code deepstackIndexes} is {@code null}
@@ -157,9 +157,6 @@ public final class Qwen3VlVisionTower extends Module {
     Objects.requireNonNull(deepstackIndexes, "deepstackIndexes");
     if (numHeads <= 0) {
       throw new IllegalArgumentException("the vision tower needs at least one attention head");
-    }
-    if (deepstackIndexes.length == 0) {
-      throw new IllegalArgumentException("deepstackIndexes must not be empty");
     }
     int depth = 0;
     while (weights.containsKey("layer" + depth + ".norm1.weight")) {

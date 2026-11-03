@@ -185,3 +185,34 @@ proof. Maximum Java/HF error is 7.1525574e-7 for both layouts; maximum Java/stoc
 is 0.024449743, separately accounted for by its measured normalization convention. LM stock
 maximum error is 6.854534e-7. This completes WP3's text packed numerical gate; image composition,
 public generation, default-precision and Tier-B acceptance remain pending.
+
+## Public generation, vision and ownership qualified
+
+Added `Qwen35Model` implementing `TextGenerationModel` directly, dispatching only dense
+`qwen3_5`, with capability selected from the full vision inventory. All five storage layouts
+load; both LM layouts report TEXT and reject images. Scheduler startup rejects all five
+because the hybrid model is not a `DecoderModel`. Zero-token requests validate expanded
+geometry/capacity without inference. Public sampling, penalties, token/terminal events,
+EOS/stop precedence, abort cleanup and tokenizer output pass.
+
+The shared tower permits empty DeepStack levels; Qwen3-VL's descriptor guard remains and
+its loader explicitly checks before construction. The old tower rejection test is replaced
+with positive empty-feature-level and extra-subtree rejection checks, plus descriptor/loader
+family rejection. Independent HF vision cases pass for HF and actual VLM float layout,
+including resized/multiple images and both 8×8/48×48 learned grids. Pixels (1e-6), positions
+(exact), patch/interpolation/block/merger and full logits (1e-4), cached/fresh and public greedy
+IDs pass. Initial vision validation caught an incorrect fixture whitespace recipe: original
+IDs were assumed rather than tokenized. Preserved rejected recipe/artifact under ignored
+`.tier-b/phase7-6/rejected-vision-whitespace-recipe/`, then regenerated from tokenizer IDs.
+No Java math or numerical bound was changed to accommodate that recipe correction.
+
+Actual converted processor serialization needs a family-specific adapter documented in the
+living plan. Its saved files remain unchanged; source/pixel alias probe passes at 1.20e-7.
+Cancellation is cooperative between images, layers/chunks and decode steps; request reuse
+after cancellation passes. History uses indexed gathering to avoid retaining a larger
+contiguous-slice/donated buffer. Exact physical memory checks control allocator pool reuse:
+fixed recurrent state, K/V-only growth, borrowed handle retirement and exact cleanup pass.
+Default-mode HF error maximum is 0.0014960468 under its separately predeclared 0.005 bound.
+Strict FLOAT32 remains unchanged at 1e-4. Public-decode counter passes: no internal mlx_eval
+or mlx_array_eval before the boundary, one explicit all-roots mlx_eval, with readbacks recorded
+separately. Full regression refresh and real Tier-B acceptance are next; no PR is open.

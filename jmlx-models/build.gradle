@@ -60,6 +60,26 @@ dependencies {
     exactBitsImplementation testFixtures(project(':jmlx-ffi'))
 }
 
+tasks.named('test') {
+    useJUnitPlatform { excludeTags 'qwen35-counter' }
+}
+
+tasks.register('qwen35DecodeCounter', Test) {
+    group = 'verification'
+    description = 'Opt-in actual native downcalls for full hybrid public-generation decode; timings invalid.'
+    dependsOn tasks.named('testClasses'), ':jmlx-core:qwen35BindingAgent'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'qwen35-counter' }
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+    systemProperty 'jmlx.qwen35.counter.output', layout.buildDirectory.file('benchmarks/qwen35-decode-counts.json').get().asFile.absolutePath
+    doFirst {
+        jvmArgs "-javaagent:${project(':jmlx-core').tasks.named('qwen35BindingAgent').get().archiveFile.get().asFile.absolutePath}"
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register('tierBTest', Test) {
     group = 'verification'
     description = 'Runs opt-in real-checkpoint smoke tests when JMLX_TIER_B_MODEL_DIR is set.'

@@ -55,10 +55,16 @@ public final class HybridDecoderBlock extends Module {
 
   /** Builds the linear block; evaluation/commit occurs at the request's execution boundary. */
   public MLXArray forward(MLXArray x, RecurrentCache cache, GatedDeltaNet.PrefillMethod method) {
+    return forward(x, cache, method, () -> {});
+  }
+
+  /** Builds a linear block with cooperative prefill checks delegated to its DeltaNet scan. */
+  public MLXArray forward(
+      MLXArray x, RecurrentCache cache, GatedDeltaNet.PrefillMethod method, Runnable checkpoint) {
     if (linearAttention == null) {
       throw new IllegalStateException("full-attention block requires a K/V cache");
     }
-    return finish(x, linearAttention.forward(inputNorm.forward(x), cache, method));
+    return finish(x, linearAttention.forward(inputNorm.forward(x), cache, method, checkpoint));
   }
 
   /** Builds the full-attention block with the step's shared multi-axis rotation. */

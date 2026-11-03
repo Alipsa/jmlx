@@ -348,6 +348,16 @@ with the artifact's Fast declaration. Record a fast/slow comparison; Java, HF an
 MLX comparison consume the same digest-pinned processed patches and rendered prompt/IDs.
 If the new slow processor differs, document/port the difference before claiming reuse.
 
+2026-11-03 implementation finding: actual saved mlx-vlm 0.6.8 tiny artifacts use nested
+`processor_config.image_processor`, type `Qwen3VLImageProcessor`, explicit legacy min/max
+pixels and no size/resize/resample keys. Its inspected numpy/PIL image path always resizes with
+bicubic. After converted-layout classification, adapt only this known serialization to the
+selected slow-PIL contract (explicit min/max, resize enabled, bicubic); reject contradictory
+flags. Keep the shared Qwen3-VL parser unchanged. The saved artifacts remain untouched.
+The processor-alias probe checks all three resized/unresized fixture images: matching grids
+and at most 1.20e-7 pixel difference. HF 5's ordinary nested Qwen2 processor serialization is
+also read directly. Both forms retain the existing hard cap.
+
 Reuse `Qwen3VlVisionTower` with no DeepStack and shape-selected patch axes. During WP5 remove
 the tower constructor's non-empty-index restriction and update its Javadoc to permit an empty
 array with no DeepStack merger subtrees and an empty feature-level list. Keep non-null,

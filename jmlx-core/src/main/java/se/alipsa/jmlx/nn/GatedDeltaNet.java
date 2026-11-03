@@ -112,6 +112,13 @@ public final class GatedDeltaNet extends Module {
    * supplies the prefill algorithm explicitly.
    */
   public MLXArray forward(MLXArray x, RecurrentCache cache, PrefillMethod prefillMethod) {
+    return forward(x, cache, prefillMethod, () -> {});
+  }
+
+  /** Builds a step with cooperative checks before projections and between chunked prefill scans. */
+  public MLXArray forward(
+      MLXArray x, RecurrentCache cache, PrefillMethod prefillMethod, Runnable checkpoint) {
+    Objects.requireNonNull(checkpoint, "checkpoint");
     Objects.requireNonNull(prefillMethod, "prefillMethod");
     if (x.ndim() != 3 || x.shape()[0] < 1 || x.shape()[1] < 1 || x.dtype() != DType.FLOAT32) {
       throw new IllegalArgumentException("DeltaNet input must be nonempty FLOAT32 [B,T,hidden]");
@@ -127,6 +134,7 @@ public final class GatedDeltaNet extends Module {
       throw new IllegalStateException("DeltaNet cache is poisoned; discard the request");
     }
     try {
+      checkpoint.run();
       MLXArray projected = qkvProjection.forward(x);
       requireShape(projected, batch, length, channels);
       MLXArray convInput = MLXShape.concatenate(new MLXArray[] {cache.convolution(), projected}, 1);
@@ -161,7 +169,7 @@ public final class GatedDeltaNet extends Module {
               ? GatedDeltaRule.step(q, k, v, logDecay, beta, cache.state())
               : prefillMethod == PrefillMethod.RECURRENT
                   ? GatedDeltaRule.recurrent(q, k, v, logDecay, beta, cache.state())
-                  : GatedDeltaRule.chunked(q, k, v, logDecay, beta, cache.state());
+                  : GatedDeltaRule.chunked(q, k, v, logDecay, beta, cache.state(), checkpoint);
       MLXArray gate = gateProjection.forward(x);
       requireShape(gate, batch, length, valueWidth);
       gate = MLXShape.reshape(gate, new int[] {batch, length, valueHeads, valueDim});
@@ -169,7 +177,11 @@ public final class GatedDeltaNet extends Module {
       MLXArray output =
           outputProjection.forward(MLXShape.reshape(gated, new int[] {batch, length, valueWidth}));
       requireShape(output, batch, length, x.shape()[2]);
-      MLXArray history = window(convInput, 1, length, length + kernelSize - 1);
+      // Gather only K-1 real rows: a contiguous slice may retain the complete projected prefill.
+      // Gather cannot donate its arbitrarily indexed input, and preserves every FLOAT32 bit.
+      MLXArray history =
+          MLXShape.takeAxis(
+              convInput, MLX.arange(x.scope(), length, length + kernelSize - 1, 1, DType.INT32), 1);
       cache.replaceDeferred(history, result.state(), length);
       return output;
     } catch (RuntimeException | Error error) {

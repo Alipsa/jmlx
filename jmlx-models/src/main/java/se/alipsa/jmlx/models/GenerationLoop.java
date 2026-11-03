@@ -13,6 +13,9 @@ import se.alipsa.jmlx.tokenizer.TokenizerException;
 
 /** Shared synchronous sampling/event loop; architecture state and execution stay with adapters. */
 final class GenerationLoop {
+  /** Internal cooperative cancellation during preparation; no partial step may be committed. */
+  static final class Cancelled extends RuntimeException {}
+
   // Preserve the existing terminal-listener logging category across extraction.
   private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
 
@@ -80,6 +83,10 @@ final class GenerationLoop {
                       step,
                       state.retainedArrays());
               state.commitStep();
+            } catch (Cancelled cancelled) {
+              state.onStepFailure();
+              reason = FinishReason.CANCELLED;
+              break;
             } catch (RuntimeException | Error failure) {
               state.onStepFailure();
               throw failure;

@@ -3,6 +3,7 @@ package se.alipsa.jmlx.models;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
@@ -124,6 +125,7 @@ final class Qwen35Decoder extends Module {
     private int pending;
     private boolean poisoned;
     private boolean closed;
+    private Runnable checkpoint = () -> {};
 
     private Session(MLXScope request, KVCachePolicy policy) {
       this.policy = policy;
@@ -149,6 +151,10 @@ final class Qwen35Decoder extends Module {
       return poisoned;
     }
 
+    void checkpoint(Runnable checkpoint) {
+      this.checkpoint = java.util.Objects.requireNonNull(checkpoint);
+    }
+
     RecurrentCache recurrent(int layer) {
       return recurrent[layer];
     }
@@ -158,6 +164,14 @@ final class Qwen35Decoder extends Module {
     }
 
     MLXArray build(MLXArray ids, MultiAxisRotation rotation, boolean lastOnly) {
+      return build(ids, rotation, lastOnly, null);
+    }
+
+    MLXArray build(
+        MLXArray ids,
+        MultiAxisRotation rotation,
+        boolean lastOnly,
+        UnaryOperator<MLXArray> embeddingHook) {
       int[] shape = ids.shape();
       if (ids.dtype() != DType.INT32 || shape.length != 2 || shape[0] != 1 || shape[1] < 1) {
         throw new IllegalArgumentException("Qwen3.5 requires INT32 token IDs [1,T]");
@@ -167,7 +181,9 @@ final class Qwen35Decoder extends Module {
         rotation.validateAgainst(1, shape[1], text.headDim(), text.rotaryDim());
       }
       try {
-        return buildEmbeddings(embedding.forward(ids), rotation, lastOnly);
+        MLXArray embedded = embedding.forward(ids);
+        return buildEmbeddings(
+            embeddingHook == null ? embedded : embeddingHook.apply(embedded), rotation, lastOnly);
       } catch (RuntimeException | Error error) {
         poison();
         throw error;
@@ -197,6 +213,7 @@ final class Qwen35Decoder extends Module {
       try {
         MLXArray hidden = input;
         for (int i = 0; i < layers.size(); i++) {
+          checkpoint.run();
           try (MLXScope layer = input.scope().newChild()) {
             MLXArray local =
                 MLXShape.reshape(MLXShape.expandDims(hidden, layer, 0), hidden.shape());
@@ -204,7 +221,8 @@ final class Qwen35Decoder extends Module {
                 recurrent[i] != null
                     ? layers
                         .get(i)
-                        .forward(local, recurrent[i], GatedDeltaNet.PrefillMethod.CHUNKED)
+                        .forward(
+                            local, recurrent[i], GatedDeltaNet.PrefillMethod.CHUNKED, checkpoint)
                     : layers.get(i).forward(local, full[i], null, rotation);
             MLXArray next = MLX.hoist(output, input.scope());
             if (hidden != input) {

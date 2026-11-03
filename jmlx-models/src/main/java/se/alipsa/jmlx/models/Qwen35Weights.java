@@ -29,6 +29,10 @@ final class Qwen35Weights {
   static Loaded load(MLXScope target, Path directory, JsonNode config) throws IOException {
     // Deliberately precedes even the first native scope/array operation.
     Qwen35Checkpoint.Checked checked = Qwen35Checkpoint.inspect(directory, config);
+    return load(target, checked);
+  }
+
+  static Loaded load(MLXScope target, Qwen35Checkpoint.Checked checked) {
     Map<String, MLXArray> result = new LinkedHashMap<>();
     Map<String, String> canonical = new HashMap<>();
     checked.names().forEach((key, raw) -> canonical.put(raw, key));

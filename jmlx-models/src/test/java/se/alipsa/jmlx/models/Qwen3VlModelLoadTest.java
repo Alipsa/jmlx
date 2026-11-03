@@ -104,6 +104,20 @@ class Qwen3VlModelLoadTest {
   }
 
   @Test
+  void familyLoaderStillRejectsEmptyDeepstackAfterSharedTowerRelaxation(@TempDir Path dir)
+      throws Exception {
+    TinyCheckpoints.randomQwen3Vl(dir, 40L);
+    rewriteJson(
+        dir,
+        "config.json",
+        root -> ((ObjectNode) root.get("vision_config")).putArray("deepstack_visual_indexes"));
+    try (MLXScope scope = new MLXScope()) {
+      assertLoadRejected(scope, dir, "must be a non-empty array");
+      assertThrows(IllegalArgumentException.class, () -> TextGenerationModels.load(scope, dir));
+    }
+  }
+
+  @Test
   void loadReportsMetadataTowerAccessorsAndFloat32Weights(@TempDir Path dir) throws Exception {
     TinyCheckpoints.randomQwen3Vl(dir, 41L);
     try (MLXScope root = new MLXScope()) {

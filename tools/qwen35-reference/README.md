@@ -182,3 +182,30 @@ record the independently measured normalization contribution, without changing J
   --tests se.alipsa.jmlx.models.Qwen35TextGoldenTest \
   --tests se.alipsa.jmlx.models.Qwen35PackedGoldenTest
 ```
+
+## Vision, public generation and ownership
+
+`generate_vision.py --output goldens/model-vision.safetensors` creates an HF-saved tiny 48×48
+learned-grid variant and independent slow-PIL, interpolation, patch, block, merger, expanded
+position and full image/text logits. It includes resized and multiple images and cached/fresh
+decode. Original IDs come from the reference tokenizer, rather than assumed whitespace tokens.
+An earlier mistaken whitespace recipe is preserved under the ignored local evidence cache;
+correcting that recipe changes no Java arithmetic or tolerance. The accepted fixture remains
+at 1e-4, with exact position/ID checks and a 1e-6 processor pixel bound.
+
+`probe_processor_alias.py --output evidence/processor-alias.json` records actual mlx-vlm's
+saved nested `Qwen3VLImageProcessor` form and its PIL comparison. The family-specific loader
+adapts only the known converted serialization; the global Qwen3-VL parser remains strict.
+
+Public hybrid generation uses the separately extracted loop and keeps all recurrent/KV roots
+in one sampling evaluation. `:jmlx-models:qwen35DecodeCounter` uses the existing binding agent
+to count real public-decode graph construction, the one explicit all-roots evaluation, and
+already-evaluated scalar readbacks separately. Its timings are invalid and counts are not GPU
+dispatches. Generated bindings are untouched.
+
+Default TF32 is checked separately against an explicit 0.005 HF logit bound (measured maximum
+0.00149605 across the declared text cases); strict FLOAT32 stays at 1e-4. Memory checks use
+fresh allocations to distinguish live state from allocator pool reuse: recurrent storage is
+fixed, only K/V grows with positions, and normal/image/failure/abort requests return to the
+exact model baseline. History is retained by indexed gathering of K-1 real rows, avoiding a
+slice or donated arithmetic buffer retaining a whole projected prefill.

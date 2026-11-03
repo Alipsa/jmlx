@@ -127,6 +127,17 @@ final class GatedDeltaRule {
   /** Batched 64-position chunks, bounded preprocessing and eight-chunk state evaluation windows. */
   static Result chunked(
       MLXArray q, MLXArray k, MLXArray v, MLXArray g, MLXArray beta, MLXArray initial) {
+    return chunked(q, k, v, g, beta, initial, () -> {});
+  }
+
+  static Result chunked(
+      MLXArray q,
+      MLXArray k,
+      MLXArray v,
+      MLXArray g,
+      MLXArray beta,
+      MLXArray initial,
+      Runnable checkpoint) {
     Layout s = validate(q, k, v, g, beta, initial);
     if (s.length == 1) {
       return step(q, k, v, g, beta, initial, s);
@@ -137,6 +148,7 @@ final class GatedDeltaRule {
     List<MLXArray> parts = new ArrayList<>();
     try {
       for (int start = 0; start < s.length; start += BATCH_CHUNKS * CHUNK_SIZE) {
+        checkpoint.run();
         int length = Math.min(s.length - start, BATCH_CHUNKS * CHUNK_SIZE);
         int count = Math.min(CHUNK_SIZE, length);
         int chunks = (length + count - 1) / count;
@@ -153,6 +165,7 @@ final class GatedDeltaRule {
               MLXArray carried = inScope(state, scan);
               List<MLXArray> outputs = new ArrayList<>();
               for (int i = first; i < last; i++) {
+                checkpoint.run();
                 MLXArray query = part(inScope(prepared.query, scan), i);
                 MLXArray baseOutput = part(inScope(prepared.output, scan), i);
                 MLXArray keys = part(inScope(prepared.keys, scan), i);

@@ -177,6 +177,8 @@ jobs:
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
                               'Qwen35WeightsTest', 'Qwen35TextGoldenTest', 'Qwen35PackedGoldenTest',
+                              'Qwen35VisionGoldenTest', 'Qwen35GenerationTest', 'Qwen35MemoryTest',
+                              'Qwen35DefaultPrecisionTest',
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
                               'DecoderStackContractTest', 'DecoderForwardPoisoningTest',
                               'QuantizedKvFeasibilityProbeTest',
@@ -202,7 +204,7 @@ jobs:
                             'Qwen3VlVisionTowerGoldenTest',
                             'Qwen3VlTextOnlyEquivalenceTest', 'Qwen3VlModelFloatGoldenTest',
                             'Qwen3VlGoldenTest', 'Phi3VGoldenTest', 'Qwen35WeightsTest',
-                            'Qwen35TextGoldenTest', 'Qwen35PackedGoldenTest']
+                            'Qwen35TextGoldenTest', 'Qwen35PackedGoldenTest', 'Qwen35VisionGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['Qwen3VlCacheEquivalenceTest'] = ['test', 'float32GoldenTest']

@@ -176,7 +176,7 @@ jobs:
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',
                               'QuantizedCheckpointProbeTest', 'QuantizedDecoderTest', 'DecoderCacheLifecycleTest',
-                              'Qwen35WeightsTest',
+                              'Qwen35WeightsTest', 'Qwen35TextGoldenTest', 'Qwen35PackedGoldenTest',
                               'DecoderCacheCapacityTest', 'DecoderSlidingWindowTest',
                               'DecoderStackContractTest', 'DecoderForwardPoisoningTest',
                               'QuantizedKvFeasibilityProbeTest',
@@ -201,7 +201,8 @@ jobs:
                             'DecoderSlidingWindowTest', 'BertGoldenTest', 'T5GoldenTest', 'SmolVlmGoldenTest',
                             'Qwen3VlVisionTowerGoldenTest',
                             'Qwen3VlTextOnlyEquivalenceTest', 'Qwen3VlModelFloatGoldenTest',
-                            'Qwen3VlGoldenTest', 'Phi3VGoldenTest', 'Qwen35WeightsTest']
+                            'Qwen3VlGoldenTest', 'Phi3VGoldenTest', 'Qwen35WeightsTest',
+                            'Qwen35TextGoldenTest', 'Qwen35PackedGoldenTest']
           model_results = {name: ['float32GoldenTest'] for name in float32_suites}
           model_results['BatchStepEquivalenceTest'] = ['test', 'float32GoldenTest']
           model_results['Qwen3VlCacheEquivalenceTest'] = ['test', 'float32GoldenTest']

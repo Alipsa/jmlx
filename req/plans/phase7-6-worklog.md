@@ -164,3 +164,24 @@ loop adds a post-evaluation commit hook for hybrid sessions without changing exi
 Baseline metadata/capture digests and extracted source hashes are recorded in
 `tools/qwen35-reference/evidence/generation-loop-extraction.json`. This extraction is committed
 separately before hybrid stack integration.
+
+## Hybrid text stack and packed numerical gate
+
+Added internal `Qwen35Decoder` with full/recurrent per-layer state, lazy per-step construction,
+one all-roots execution boundary and a separate global-position commit. Split prefill covers
+convolution/chunk boundaries; late evaluation failure poisons every cache without advancing
+the committed session position. Independent CPU HF goldens cover all float layouts, tied/equal
+linear heads and an eight-layer schedule, lengths 4/65/129, two cached steps, fresh full
+forwards and complete retained state. Strict 1e-4 bounds pass unchanged.
+
+Before Java packed-output comparison, `generate_packed.py` declared 1e-4 arithmetic bounds
+against independently dequantized HF weights, plus separately measured normalization-only
+contributions for stock mlx-vlm envelopes. The diagnostic never supplies acceptance goldens:
+the exported file contains independent HF and unmodified stock MLX logits only. Case selection
+and gap eligibility precede Java; all 16 candidate prompts per family remain recorded.
+12/16 VLM and 16/16 LM cases satisfy gap > 2*epsilon + 1e-5 at every recorded step; exact
+IDs agree on every eligible case. The four ineligible VLM cases are not counted as passing ID
+proof. Maximum Java/HF error is 7.1525574e-7 for both layouts; maximum Java/stock VLM error
+is 0.024449743, separately accounted for by its measured normalization convention. LM stock
+maximum error is 6.854534e-7. This completes WP3's text packed numerical gate; image composition,
+public generation, default-precision and Tier-B acceptance remain pending.

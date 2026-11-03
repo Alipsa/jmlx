@@ -159,3 +159,26 @@ tools/qwen35-reference/hf/.venv/bin/python tools/qwen35-reference/generate_atten
 `HybridDecoderBlockTest` also checks explicit causal masks, split prefill/cache retention and
 preflight mask/rotation rejection. The acceptance bound remains `1e-4`; partial-tail equality
 uses exact float comparison. These component fixtures do not qualify a complete checkpoint.
+
+## Hybrid text and packed acceptance
+
+`generate_model.py --output goldens/model-text.safetensors` runs unmodified CPU HF against the
+original fixture and creates two additional HF-saved fixtures: tied/equal linear heads and an
+eight-layer hybrid schedule. Its logits/state cover prefill 4/65/129, cached steps and fresh
+full forwards at the fixed 1e-4 bound. Variant creation refuses existing directories; preserve
+prior evidence before an intentional regeneration.
+
+`generate_packed.py --output-dir evidence/packed-text` reloads the actual affine converter
+outputs in stock MLX, independently dequantizes their stored nibbles/scales/biases into HF
+in memory, and fixes arithmetic bounds and margin eligibility before Java comparison. Its
+separate labeled normalization diagnostic produces attribution evidence only; diagnostic
+arrays are excluded from `acceptance.safetensors`. All 16 candidates per family remain
+recorded, including four VLM cases ineligible for exact-ID evidence. Only eligible cases count
+as exact-ID proof. The fixed arithmetic allowance is 1e-4; stock VLM envelopes additionally
+record the independently measured normalization contribution, without changing Java math.
+
+```sh
+./gradlew :jmlx-models:float32GoldenTest \
+  --tests se.alipsa.jmlx.models.Qwen35TextGoldenTest \
+  --tests se.alipsa.jmlx.models.Qwen35PackedGoldenTest
+```

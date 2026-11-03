@@ -799,9 +799,10 @@ Effect on this plan's verification:
 
 Added 2026-10-29 (numbered 7.5 until 2026-10-30). Prerequisites: 7.1 (the `conv1d` used by the
 short convolution), 7.3b (`MultiAxisRope`, the vision tower and the request lifecycle) and 7.5
-(the MLX upgrade). The [detailed sub-plan](phase7-6-plan.md) is proposed 2026-11-02 and must be
-reviewed before code. Its [reference findings](phase7-6-reference-findings.md) distinguish the
-new version-pinned inspection from the dated mutable-main observations below. The sub-plan
+(the MLX upgrade). The [detailed sub-plan](phase7-6-plan.md) was reviewed in PR #78;
+implementation is in progress as of 2026-11-03. Its [reference findings](phase7-6-reference-findings.md)
+now separate executable reference/component evidence from the dated inspections below. Model
+integration and acceptance remain pending, as does the WP1 prefill-default review. The sub-plan
 decides every item under "Decisions for the sub-plan" below.
 
 **Scope.** Qwen3.8-27B, like Qwen3.5 and the dense Qwen3.6, uses `model_type` `qwen3_5`. Its

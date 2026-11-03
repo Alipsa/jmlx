@@ -107,18 +107,31 @@ class GatedDeltaBenchmarkTest {
             }
             oneCase.put("first_calls_per_shape_in_this_jvm", firstCalls);
           }
-          float[][] expected;
+          Path expectedPath =
+              inputPath.resolveSibling(shape + "-" + length + "-expected.safetensors");
+          Map<String, MLXArray> hfExpected =
+              MLXIO.loadSafetensors(prepared, expectedPath.toString()).tensors();
+          oneCase.put(
+              "expected_sha256",
+              java.util.HexFormat.of()
+                  .formatHex(
+                      java.security.MessageDigest.getInstance("SHA-256")
+                          .digest(Files.readAllBytes(expectedPath))));
+          final float[][] expected =
+              new float[][] {
+                hfExpected.get("output").toFloatArray(), hfExpected.get("state").toFloatArray()
+              };
+          Map<String, Object> qualification = new LinkedHashMap<>();
           try (MLXScope validation = prepared.newChild()) {
             GatedDeltaRule.Result reference = execute(validation, inputs, false);
-            expected =
-                new float[][] {reference.output().toFloatArray(), reference.state().toFloatArray()};
+            qualification.put("token_recurrence", qualify(expected, reference));
           }
           // Qualify the chunked implementation before collecting its performance evidence.
           try (MLXScope validation = prepared.newChild()) {
             GatedDeltaRule.Result chunked = execute(validation, inputs, true);
-            assertArrayEquals(expected[0], chunked.output().toFloatArray(), 1e-4f);
-            assertArrayEquals(expected[1], chunked.state().toFloatArray(), 1e-4f);
+            qualification.put("chunked_ops", qualify(expected, chunked));
           }
+          oneCase.put("hf_qualification", qualification);
           for (int sample = 0; sample < (counting ? 1 : samples); sample++) {
             for (int order = 0; order < 2; order++) {
               boolean chunked = (sample + order) % 2 == 0;
@@ -154,6 +167,26 @@ class GatedDeltaBenchmarkTest {
         }
       }
     }
+  }
+
+  private static Map<String, Float> qualify(float[][] expected, GatedDeltaRule.Result result) {
+    float[] output = result.output().toFloatArray();
+    float[] state = result.state().toFloatArray();
+    assertArrayEquals(expected[0], output, 1e-4f);
+    assertArrayEquals(expected[1], state, 1e-4f);
+    return Map.of(
+        "output_max_abs",
+        maxError(expected[0], output),
+        "state_max_abs",
+        maxError(expected[1], state));
+  }
+
+  private static float maxError(float[] expected, float[] actual) {
+    float maximum = 0;
+    for (int i = 0; i < expected.length; i++) {
+      maximum = Math.max(maximum, Math.abs(expected[i] - actual[i]));
+    }
+    return maximum;
   }
 
   private static GatedDeltaRule.Result execute(MLXScope scope, MLXArray[] input, boolean chunked) {

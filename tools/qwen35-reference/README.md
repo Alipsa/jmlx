@@ -90,7 +90,15 @@ measures aggregate layer cost. Inputs are saved and hashed for identical Java/re
 The first sample is the first candidate call after preparing inputs/reference qualification;
 it is not evidence of an untouched system's first inference.
 
+The HF venv's `export_benchmark_expected.py` exports independent chunked/recurrent reference
+outputs for these exact input hashes. Java qualifies both prototypes against those FLOAT32
+outputs and states before collecting warmed timing samples. Generate the external sidecars first:
+
 ```sh
+tools/qwen35-reference/hf/.venv/bin/python tools/qwen35-reference/export_benchmark_expected.py \
+  --inputs-dir "$PWD/.tier-b/phase7-6/benchmark-inputs" \
+  --input-manifest tools/qwen35-reference/evidence/delta-benchmark.json \
+  --output .tier-b/phase7-6/hf-benchmark-qualification.json
 JMLX_DELTA_BENCHMARK_INPUT_DIR="$PWD/.tier-b/phase7-6/benchmark-inputs" \
   ./gradlew :jmlx-core:deltaBenchmark
 ```

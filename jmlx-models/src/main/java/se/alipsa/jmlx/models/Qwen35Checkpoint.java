@@ -52,7 +52,38 @@ final class Qwen35Checkpoint {
     // Reuse index-to-shard ownership checks after complete type/shape/name validation.
     CheckpointLoader.preflight(
         directory, new TensorPlan(inventory.keySet(), Set.of(), Set.of(), Set.of()));
-    return checked;
+    return withoutVerifiedTiedHead(checked);
+  }
+
+  private static Checked withoutVerifiedTiedHead(Checked checked) throws IOException {
+    if (!checked.descriptor().text().tied() || !checked.names().containsKey("lm_head.weight")) {
+      return checked;
+    }
+    Map<String, String> names = new LinkedHashMap<>(checked.names());
+    for (String suffix : List.of("weight", "scales", "biases")) {
+      String embedding = names.get("text.embed_tokens." + suffix);
+      String head = names.get("lm_head." + suffix);
+      if (embedding == null && head == null) {
+        continue;
+      }
+      if (embedding == null
+          || head == null
+          || !SafetensorsHeaders.sameData(
+              checked.inventory().get(embedding), checked.inventory().get(head))) {
+        throw invalid("tied lm_head storage differs from embedding: " + suffix);
+      }
+      names.remove("lm_head." + suffix);
+    }
+    return new Checked(
+        checked.descriptor(),
+        checked.converted(),
+        checked.imageCapable(),
+        checked.shards(),
+        names,
+        checked.shiftedNorms(),
+        checked.transposedConvolutions(),
+        checked.transposePatch(),
+        checked.inventory());
   }
 
   /**

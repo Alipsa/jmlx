@@ -178,6 +178,41 @@ class Qwen35CheckpointTest {
   }
 
   @Test
+  void tiedValuesAreCheckedBeforeUploadAndIdenticalOptionalHeadIsNotRetained() throws Exception {
+    ObjectNode config = config("hf");
+    config.put("tie_word_embeddings", true);
+    text(config).put("tie_word_embeddings", true);
+    IllegalArgumentException mismatch =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Qwen35Checkpoint.inspect(FIXTURES.resolve("hf"), config));
+    assertTrue(mismatch.getMessage().contains("tied lm_head"));
+    // A temporary synthetic HF alias, not converter evidence or a replacement golden.
+    Path original = FIXTURES.resolve("hf/model.safetensors");
+    byte[] bytes = Files.readAllBytes(original);
+    int headerSize =
+        Math.toIntExact(ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getLong());
+    ObjectNode header =
+        (ObjectNode)
+            MAPPER.readTree(
+                new String(bytes, 8, headerSize, java.nio.charset.StandardCharsets.UTF_8));
+    var embedding = header.get("model.language_model.embed_tokens.weight").get("data_offsets");
+    var head = header.get("lm_head.weight").get("data_offsets");
+    int count = head.get(1).asInt() - head.get(0).asInt();
+    System.arraycopy(
+        bytes,
+        8 + headerSize + embedding.get(0).asInt(),
+        bytes,
+        8 + headerSize + head.get(0).asInt(),
+        count);
+    Path directory = Files.createTempDirectory(temporary, "tied-alias");
+    Files.write(directory.resolve("model.safetensors"), bytes);
+    Qwen35Checkpoint.Checked checked = Qwen35Checkpoint.inspect(directory, config);
+    assertFalse(checked.names().containsKey("lm_head.weight"));
+    assertTrue(checked.inventory().containsKey("lm_head.weight"));
+  }
+
+  @Test
   void metadataNeverOverridesVisionCapabilityAndAliasesStayTyped() throws IOException {
     ObjectNode lm = config("lm-float");
     lm.put("language_model_only", false);

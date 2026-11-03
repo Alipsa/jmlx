@@ -119,6 +119,48 @@ final class SafetensorsHeaders {
     return Map.copyOf(result);
   }
 
+  /** Compares already validated tied storage without allocating a native parameter. */
+  static boolean sameData(TensorInfo left, TensorInfo right) throws IOException {
+    if (!left.dtype().equals(right.dtype())
+        || !left.shape().equals(right.shape())
+        || left.end() - left.start() != right.end() - right.start()) {
+      return false;
+    }
+    try (FileChannel a = FileChannel.open(left.shard(), StandardOpenOption.READ);
+        FileChannel b = FileChannel.open(right.shard(), StandardOpenOption.READ)) {
+      a.position(payloadStart(a) + left.start());
+      b.position(payloadStart(b) + right.start());
+      ByteBuffer x = ByteBuffer.allocate(1024 * 1024);
+      ByteBuffer y = ByteBuffer.allocate(1024 * 1024);
+      long remaining = left.end() - left.start();
+      while (remaining > 0) {
+        int count = (int) Math.min(remaining, x.capacity());
+        x.clear().limit(count);
+        y.clear().limit(count);
+        readFully(a, x, "truncated tied tensor");
+        readFully(b, y, "truncated tied tensor");
+        x.flip();
+        y.flip();
+        if (!x.equals(y)) {
+          return false;
+        }
+        remaining -= count;
+      }
+      return true;
+    }
+  }
+
+  private static long payloadStart(FileChannel channel) throws IOException {
+    ByteBuffer bytes = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
+    readFully(channel, bytes, "truncated safetensors length");
+    bytes.flip();
+    long length = bytes.getLong();
+    if (length < 0 || length > MAX_HEADER_BYTES || length > channel.size() - 8) {
+      throw new IllegalArgumentException("invalid tied tensor shard header length");
+    }
+    return 8 + length;
+  }
+
   static Map<Path, Set<String>> tensorNames(List<Path> files) throws IOException {
     Map<Path, Set<String>> names = new LinkedHashMap<>();
     for (Path file : files) {

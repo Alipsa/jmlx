@@ -5,15 +5,17 @@ The task remains: implement the full reviewed plan, verify it, then open a PR. B
 
 ## Current boundary
 
-Reference work and core DeltaNet prototypes are committed and locally verified. The 2026-11-03 user review selects chunked prefill, rejects custom Metal for this milestone
-and requires an optimization pass before WP2; see [the benchmark report](phase7-6-wp1-benchmark.md). No production
-prefill default, new native facade or custom Metal kernel has been selected. The optimization target is about 600 ms at 1,280 tokens / 48 calls, with the unchanged
-1e-4 numerical bound. No further default-choice approval is needed after this gate is met.
+The user chose chunked prefill, deferred custom Metal and required structural optimization
+before WP2. That gate is now met: clean-source median 474.313 ms for 48 calls / 1,280 tokens,
+versus 2,550.557 ms before optimization and 304.105 ms for mlx-vlm ordinary chunked ops.
+The target was about 600 ms; all HF comparisons remain at 1e-4. No further default-choice
+approval is needed. See [the optimization report](phase7-6-wp1-optimization.md).
 
-At 1,280 tokens / 48 independent layer calls, the clean HF-qualified Java medians are about
-2.55 s chunked and 13.85 s recurrent. The reference custom Metal path is about 115 ms, while
-the built-in op fails the present numerical gate. Measured C API downcalls are 3,159,936 versus
-11,676,096; these are not GPU dispatch counts. All raw results and limits are in the report.
+The implementation batches preprocessing across at most 16 chunks, uses a stable 64×64 inverse,
+bounds state scan evaluation to eight-chunk windows, and has a dedicated lazy decode step.
+The complete DeltaNet decode counter measures zero internal evaluations and one caller boundary.
+The unchanged memory ceiling passes. The built-in native op remains excluded; no Metal facade
+or kernel is added. Proceed to WP2 and the remaining original implementation/PR objective.
 
 ## Completed local work
 
@@ -41,9 +43,9 @@ recorded as a failed 1e-4 measurement; strict tiny bounds were not changed. Stoc
 27B normalization contributions reach about 0.10, with recorded greedy choices agreeing.
 Diagnostics never replace stock acceptance/goldens. Java full-model remainder is still unmeasured.
 
-## Resume after the WP1 review
+## Remaining implementation packages
 
-1. Select the reviewed prefill default, or amend the plan before adding a custom Metal path.
+1. WP1 is complete; retain chunked prefill and the dedicated decode step as the chosen paths.
 2. WP2: gated full attention, partial MRoPE differential tests and hybrid blocks.
 3. WP3: strict pure descriptor/layout/header preflight; actual float and affine fixtures, with
    declared stock-reference bounds and separate normalization attribution before Java runs.
@@ -98,3 +100,12 @@ failures or errors). Provenance verification covers 110 local files plus the sha
   experiment fails the correlated FLOAT32 case and is not used.
 - Initial optimized aggregate median: about 512 ms versus 2,551 ms before restructuring.
   Clean-source benchmark/counter refresh and final guard verification remain before WP2.
+
+## Optimized WP1 gate completed
+
+Clean commit `2c3f9da4b30c1147cae11d6072320683bb9511f1`: 474.313 ms at 48 calls / 1,280
+tokens, 1.56× the ordinary mlx-vlm chunked path, within the 600 ms target. Full matrix, strict
+HF stress fixtures and unchanged memory checks pass. Calls drop to 430,032; decode measures
+zero internal evaluations and one caller boundary. Raw records are under `evidence/optimized/`
+and the optimization report. The user has selected chunked ops; proceed to WP2 without another
+default-choice permission request. Custom Metal and the built-in op remain excluded.

@@ -3,7 +3,7 @@
 - **Status:** implementation in progress, 2026-11-03. Reference probes and core DeltaNet
   prototypes have local evidence; model integration and acceptance remain pending.
   See the [worklog](phase7-6-worklog.md) for the current checkpoint and
-  [WP1 benchmark report](phase7-6-wp1-benchmark.md) for the pending default review.
+  [WP1 optimization report](phase7-6-wp1-optimization.md) for the completed structural gate.
 - **Parent:** [Phase 7 §7.6](phase7-plan.md#76--hybrid-linear-attention-qwen-decoders-qwen38).
 - **Prerequisites:** 7.1 core operations, 7.3b vision/MRoPE and the delivered 7.5 paired-pin
   upgrade. PR #76 is merged; its timing investigation leaves measurement limits with Phase 8.2.
@@ -191,7 +191,8 @@ The 2026-11-03 WP1 review selects chunked ops as the prefill algorithm and defer
 for this milestone; its 115 ms reference result motivates future work, not integration.
 The built-in delta op remains excluded under the unchanged numerical gate. Before WP2, the
 structural optimization pass must requalify at `1e-4` and target about twice mlx-vlm's own
-chunked-ops cost: approximately 600 ms for 48 calls at 1,280 tokens on the recording host.
+chunked-ops cost: approximately 600 ms for 48 calls at 1,280 tokens on the recording host. The clean-source
+qualification records 474 ms, meets that gate, and permits WP2 (see the optimization report).
 
 Invert the 64×64 unit-lower-triangular system by stable forward substitution, then apply it
 to the right-hand side with a batched matmul. Batch state-independent preprocessing across at

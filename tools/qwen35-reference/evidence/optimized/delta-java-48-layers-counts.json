@@ -1,0 +1,102 @@
+{
+  "kind" : "binding counts; timings invalid",
+  "java" : "25.0.4.1+1-LTS",
+  "tf32" : "0",
+  "git_sha" : "2c3f9da4b30c1147cae11d6072320683bb9511f1",
+  "git_status" : "",
+  "layers_per_sample" : 48,
+  "gpu_dispatch_count" : "not observed; binding counts are API downcalls, not Metal dispatches",
+  "cases" : [ {
+    "shape" : "27b",
+    "dimensions" : [ 16, 48, 128, 128 ],
+    "length" : 1280,
+    "inputs_sha256" : "819a528f20febaaee70dfa52ab7632b213aa526725893facee811fe8f626f60c",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  3859398.\nPages active:                                1393249.\nPages inactive:                              2546596.\nPages speculative:                            155818.\nPages throttled:                                   0.\nPages wired down:                             372815.\nPages purgeable:                               28368.\n\"Translation faults\":                       51014413.\nPages copy-on-write:                         1857712.\nPages zero filled:                          49621818.\nPages reactivated:                             64503.\nPages purged:                                 183726.\nFile-backed pages:                           2592931.\nAnonymous pages:                             1502732.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                     1206284.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 118496.\nPages tagged resident:                        118496.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3774.\nPages tag-storage free:                        24634.\nPages tag-storage non-tag pageable:           202614.\nPages tag-storage non-tag wired:                 113.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 2.9130859375,
+        "utc" : "2026-11-03T10:48:38.708087Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "25012 166.5 649728 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", "  428  16.8 189280 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2685  13.7 626736 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "11819   7.5  88272 /System/Library/CoreServices/RemoteManagement/ScreensharingAgent.bundle/Contents/MacOS/ScreensharingAgent", " 2633   4.2 162288 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", " 1058   3.7 126624 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "13039   2.3 705360 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", " 2942   1.8 576944 claude", "  677   1.8  24432 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", "24608   1.6 114944 /Users/per/.sdkman/candidates/java/current/bin/java", " 2109   1.2 299200 codex", "11818   0.9  11088 /System/Library/CoreServices/RemoteManagement/screensharingd.bundle/Contents/MacOS/screensharingd", "  751   0.9  28080 /usr/libexec/replayd", "11758   0.8  11424 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "  884   0.1 179536 omlx-server" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1920,
+        "mlx_array_dtype" : 9696,
+        "mlx_array_free" : 74448,
+        "mlx_array_ndim" : 110256,
+        "mlx_array_new" : 74256,
+        "mlx_array_new_data" : 96,
+        "mlx_array_new_float32" : 96,
+        "mlx_array_set" : 864,
+        "mlx_array_shape" : 60528,
+        "mlx_array_size" : 12672,
+        "mlx_astype" : 96,
+        "mlx_broadcast_to" : 96,
+        "mlx_concatenate_axis" : 6432,
+        "mlx_cumsum_axis" : 96,
+        "mlx_eval" : 288,
+        "mlx_exp" : 384,
+        "mlx_expand_dims" : 7104,
+        "mlx_full" : 96,
+        "mlx_matmul" : 9408,
+        "mlx_multiply" : 1632,
+        "mlx_ones" : 96,
+        "mlx_repeat_axis" : 192,
+        "mlx_reshape" : 12672,
+        "mlx_slice" : 24768,
+        "mlx_subtract" : 7296,
+        "mlx_transpose_axes" : 912,
+        "mlx_tril" : 96,
+        "mlx_vector_array_free" : 6720,
+        "mlx_vector_array_new_data" : 6720,
+        "mlx_where" : 96
+      },
+      "peak_above_active" : 484236292
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  3856515.\nPages active:                                1395391.\nPages inactive:                              2546596.\nPages speculative:                            155818.\nPages throttled:                                   0.\nPages wired down:                             373556.\nPages purgeable:                               29606.\n\"Translation faults\":                       51019223.\nPages copy-on-write:                         1857796.\nPages zero filled:                          49626121.\nPages reactivated:                             64503.\nPages purged:                                 183726.\nFile-backed pages:                           2592931.\nAnonymous pages:                             1504874.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                     1206286.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 118558.\nPages tagged resident:                        118558.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3774.\nPages tag-storage free:                        24635.\nPages tag-storage non-tag pageable:           202613.\nPages tag-storage non-tag wired:                 113.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 2.919921875,
+        "utc" : "2026-11-03T10:48:39.295401Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "25012 116.7 695712 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", "  428  16.6 189280 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2685  15.7 626736 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "11819   6.3  87680 /System/Library/CoreServices/RemoteManagement/ScreensharingAgent.bundle/Contents/MacOS/ScreensharingAgent", " 2633   5.0 162288 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", " 1058   4.4 126624 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   2.3  24432 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.5 299200 codex", "  751   0.9  28080 /usr/libexec/replayd", "11758   0.7  11424 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "11818   0.6  11088 /System/Library/CoreServices/RemoteManagement/screensharingd.bundle/Contents/MacOS/screensharingd", " 2620   0.3 675168 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 2942   0.3 576944 claude", "  694   0.1  64160 /System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter", "13039   0.1 705360 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 61440,
+        "mlx_array_dtype" : 184608,
+        "mlx_array_free" : 2211984,
+        "mlx_array_ndim" : 2273664,
+        "mlx_array_new" : 2211984,
+        "mlx_array_set" : 122880,
+        "mlx_array_shape" : 1536384,
+        "mlx_array_size" : 737328,
+        "mlx_concatenate_axis" : 48,
+        "mlx_eval" : 61488,
+        "mlx_exp" : 61440,
+        "mlx_expand_dims" : 368688,
+        "mlx_matmul" : 184320,
+        "mlx_multiply" : 122880,
+        "mlx_repeat_axis" : 122880,
+        "mlx_reshape" : 737328,
+        "mlx_slice" : 307200,
+        "mlx_subtract" : 61440,
+        "mlx_transpose_axes" : 61440,
+        "mlx_vector_array_free" : 61536,
+        "mlx_vector_array_new_data" : 61536
+      },
+      "peak_above_active" : 76546048
+    } ],
+    "expected_sha256" : "01c138d2a7ddd34953d67bb782c9fb33175e396798e17bc426a5b7746528a3cb",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.6987324E-6,
+        "output_max_abs" : 1.5646219E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 2.682209E-7,
+        "output_max_abs" : 5.5879354E-8
+      }
+    }
+  } ]
+}

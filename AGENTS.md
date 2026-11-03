@@ -1066,7 +1066,8 @@ those rounds that still apply:
 The isolated `tools/qwen35-reference/` environments and provenance guard cover executable
 Qwen3.5 reference probes and component fixtures; Python remains opt-in. Core adds
 `GatedDeltaNet`, package-private `GatedDeltaRule` prototypes and request-owned `RecurrentCache`.
-Prefill selection is explicit pending the plan's WP1 benchmark/default review. These components
+Chunked prefill passed the WP1 structural optimization gate; single-token decode is lazy,
+with the session responsible for evaluating output and all retained state roots together. These components
 do not yet add `qwen3_5` model loading or generation support. Strict component suites
 `GatedDeltaRuleTest` and `GatedDeltaNetTest` run in `float32GoldenTest`; `RecurrentCacheTest` and
 `GatedDeltaMemoryTest` cover ordinary-mode ownership and bounded temporary graphs. All four

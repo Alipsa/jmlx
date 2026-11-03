@@ -1,0 +1,8 @@
+{
+  "kind" : "evaluated decode sample",
+  "git_sha" : "2c3f9da4b30c1147cae11d6072320683bb9511f1",
+  "git_status" : "",
+  "tf32" : "0",
+  "evaluated_forward_ns" : 641042,
+  "cache_position" : 4
+}

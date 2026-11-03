@@ -166,6 +166,7 @@ jobs:
               'jmlx-core': ['DecoderAttentionTest', 'MoeMlpTest', 'SwitchGluTest', 'MoeRoutingProbeTest', 'RopeFreqsProbeTest',
                             'KVCacheTest', 'KVCacheMemoryPlateauTest', 'RecurrentCacheTest',
                             'GatedDeltaRuleTest', 'GatedDeltaNetTest', 'GatedDeltaMemoryTest',
+                            'HybridDecoderBlockTest',
                             'KVCacheQuantizationProbeTest', 'PackedAttentionProbeTest', 'AttentionMaskTest',
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest', 'StridedViewSafetyTest',
@@ -213,6 +214,7 @@ jobs:
           core_results['EncoderAttentionTest'] = ['float32GoldenTest']
           core_results['GatedDeltaRuleTest'] = ['float32GoldenTest']
           core_results['GatedDeltaNetTest'] = ['float32GoldenTest']
+          core_results['HybridDecoderBlockTest'] = ['float32GoldenTest']
           results_dirs = {'jmlx-models': model_results, 'jmlx-core': core_results}
           suites['jmlx-models'].append('WorkerStreamProbeTest')
           for module, names in suites.items():

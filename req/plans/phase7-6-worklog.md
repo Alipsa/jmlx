@@ -109,3 +109,15 @@ HF stress fixtures and unchanged memory checks pass. Calls drop to 430,032; deco
 zero internal evaluations and one caller boundary. Raw records are under `evidence/optimized/`
 and the optimization report. The user has selected chunked ops; proceed to WP2 without another
 default-choice permission request. Custom Metal and the built-in op remain excluded.
+
+## WP2 components qualified
+
+Added `GatedDecoderAttention` and `HybridDecoderBlock`, preserving the existing decoder classes.
+Attention splits query/gate within each head, uses shifted ordinary Q/K RMS norms, partial
+MRoPE and sigmoid gating; its output width comes from configured heads/head dimension.
+Independent pinned HF fixtures cover hidden widths 128 and 96 with attention width 128,
+unequal multimodal positions, both block variants, prefill and cached decode. All four strict
+tests execute and pass at the unchanged 1e-4 bound; rotary tails compare exactly. Split
+prefill and invalid mask/rotation preflight are covered. New native suite is required in CI.
+The partial-rotary Javadoc now distinguishes qualified Qwen3.5 behavior from the unchanged
+Qwen3-VL full-head requirement. Full model loading and generation remain pending.

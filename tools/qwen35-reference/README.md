@@ -139,3 +139,21 @@ state roots once at the token boundary. The optional counting run also writes a 
 record and asserts zero internal `mlx_eval` calls and exactly one caller-boundary call against
 the HF component fixture. The benchmark explicitly evaluates returned roots, including lazy
 decode/final concatenations, before timing completes.
+
+## WP2 gated attention and blocks
+
+`generate_attention.py` runs the pinned HF CPU FLOAT32 model with BF16-rounded weights and
+exports independent attention, full-block and linear-block outputs plus retained states before
+and after decode. A second hidden width (96) keeps attention width 128, preventing an implicit
+`hidden_size / heads` assumption. Unequal T/H/W positions qualify the 16-wide rotary prefix
+and exact untouched tail separately. No reference math is modified.
+
+```sh
+tools/qwen35-reference/hf/.venv/bin/python tools/qwen35-reference/generate_attention.py \
+  --output tools/qwen35-reference/goldens/gated-attention.safetensors
+./gradlew :jmlx-core:float32GoldenTest --tests se.alipsa.jmlx.nn.HybridDecoderBlockTest
+```
+
+`HybridDecoderBlockTest` also checks explicit causal masks, split prefill/cache retention and
+preflight mask/rotation rejection. The acceptance bound remains `1e-4`; partial-tail equality
+uses exact float comparison. These component fixtures do not qualify a complete checkpoint.

@@ -188,7 +188,7 @@ public final class Qwen35Model implements TextGenerationModel {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(listener, "listener");
     if (request.cachePolicy().mode() != GenerationCachePolicy.Mode.FULL) {
-      throw new IllegalArgumentException("Qwen3.5 supports FULL retention only");
+      throw new IllegalArgumentException("Qwen3.5 sliding retention is not supported");
     }
     if (!request.images().isEmpty() && tower == null) {
       throw new IllegalArgumentException("Qwen3.5 text-only checkpoint does not accept images");

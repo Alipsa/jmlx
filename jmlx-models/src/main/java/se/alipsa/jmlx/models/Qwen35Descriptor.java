@@ -160,7 +160,9 @@ record Qwen35Descriptor(Text text, Vision vision, Qwen3VlPromptTokens tokens, bo
         if (positive(q, "group_size") != 64 || positive(q, "bits") != 4) {
           throw invalid(name, "only affine 4-bit/group-64 is supported");
         }
-        equal(q, "mode", "affine");
+        // Older converter versions write only {group_size, bits} with the affine packing implied,
+        // so a missing mode is affine; only an explicit other mode is rejected.
+        optionalEqual(q, "mode", "affine");
       }
     }
     return new Qwen35Descriptor(text, vision, tokens, affine);

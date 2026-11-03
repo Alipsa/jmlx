@@ -224,6 +224,19 @@ class Qwen35CheckpointTest {
     assertThrows(IllegalArgumentException.class, () -> Qwen35Descriptor.parse(full));
   }
 
+  @Test
+  void quantizationModeIsOptionalWithAffineImplied() throws IOException {
+    ObjectNode implicit = config("vlm-affine");
+    ((ObjectNode) implicit.get("quantization")).remove("mode");
+    ((ObjectNode) implicit.get("quantization_config")).remove("mode");
+    assertTrue(Qwen35Descriptor.parse(implicit).affine());
+    ObjectNode explicit = config("vlm-affine");
+    ((ObjectNode) explicit.get("quantization")).put("mode", "linear");
+    IllegalArgumentException error =
+        assertThrows(IllegalArgumentException.class, () -> Qwen35Descriptor.parse(explicit));
+    assertTrue(error.getMessage().contains("mode"), error.getMessage());
+  }
+
   private void rejectHeader(String kind, Consumer<ObjectNode> mutation, String message)
       throws IOException {
     Path source;

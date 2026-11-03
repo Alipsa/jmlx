@@ -40,7 +40,10 @@ public final class MLXIO {
   /**
    * Retains only the named tensors from the native lazy file graph. Unselected entries never get
    * target-scope handles and are never evaluated; their file graph handles are released with the
-   * temporary native map. Every requested name must exist. Metadata is returned in full.
+   * temporary native map. Every requested name must exist; when one is missing, the handles already
+   * created for the matched entries are released from {@code target} before the throw, so a failed
+   * call does not hold a long-lived target scope onto lazy file-backed arrays until the scope
+   * closes. Metadata is returned in full.
    */
   public static SafetensorsResult loadSafetensors(
       MLXScope target, String file, Set<String> selected) {
@@ -68,6 +71,10 @@ public final class MLXIO {
                     tensorMap, metaMap, filePath, NativeOps.DEFAULT_CPU_STREAM));
         Map<String, MLXArray> tensors = readArrayMap(tensorMap, target, tmp, selected);
         if (selected != null && !tensors.keySet().equals(selected)) {
+          // Release the matched handles before throwing: they are registered in target, and a
+          // public caller with a long-lived target scope would otherwise keep these lazy
+          // file-backed arrays until that scope closes.
+          tensors.values().forEach(MLXArray::close);
           Set<String> missing = new java.util.TreeSet<>(selected);
           missing.removeAll(tensors.keySet());
           throw new IllegalArgumentException(

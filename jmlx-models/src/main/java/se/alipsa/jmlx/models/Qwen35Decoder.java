@@ -111,7 +111,7 @@ final class Qwen35Decoder extends Module {
 
   Session newSession(MLXScope request, KVCachePolicy policy) {
     if (policy.evicts()) {
-      throw new IllegalArgumentException("Qwen3.5 supports FULL retention only");
+      throw new IllegalArgumentException("Qwen3.5 sliding retention is not supported");
     }
     return new Session(request, policy);
   }

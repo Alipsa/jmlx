@@ -34,6 +34,13 @@ public final class GatedDeltaNet extends Module {
   private final UnaryLayer decayProjection;
   private final RMSNorm norm;
   private final UnaryLayer outputProjection;
+  // Native constants hoisted out of forward(): per-token decode must not pay for per-call
+  // scalar creation or a fresh view of the decay log. An operand in the (ancestor) module scope
+  // is legal, and these values are immutable once the weights are fixed.
+  private final MLXArray keyScale;
+  private final MLXArray zero;
+  private final MLXArray l2Epsilon;
+  private final MLXArray decayRate;
 
   /**
    * Constructs the component from unpacked or affine projection layers and FLOAT32 state weights.
@@ -98,6 +105,10 @@ public final class GatedDeltaNet extends Module {
     this.decayProjection = child("decayProjection", Objects.requireNonNull(decayProjection));
     norm = child("norm", new RMSNorm(scope, normWeight, epsilon));
     this.outputProjection = child("outputProjection", Objects.requireNonNull(outputProjection));
+    keyScale = scalar(scope, (float) (1 / Math.sqrt(keyDim)));
+    zero = scalar(scope, 0f);
+    l2Epsilon = scalar(scope, 1e-6f);
+    decayRate = MLXOps.negative(MLXOps.exp(decayLog));
   }
 
   /** Creates this layer's empty cache in the request scope. */
@@ -150,7 +161,7 @@ public final class GatedDeltaNet extends Module {
           MLXShape.reshape(
               window(conv, 2, 2 * keyWidth, channels),
               new int[] {batch, length, valueHeads, valueDim});
-      q = MLXOps.multiply(l2Normalize(q), scalar(x.scope(), (float) (1 / Math.sqrt(keyDim))));
+      q = MLXOps.multiply(l2Normalize(q), keyScale);
       k = l2Normalize(k);
       MLXArray decayInput = decayProjection.forward(x);
       MLXArray betaInput = betaProjection.forward(x);
@@ -159,10 +170,9 @@ public final class GatedDeltaNet extends Module {
       MLXArray shifted = MLXOps.add(decayInput, param("decayBias"));
       MLXArray softplus =
           MLXOps.add(
-              MLXOps.maximum(shifted, scalar(x.scope(), 0f)),
+              MLXOps.maximum(shifted, zero),
               MLXOps.log1p(MLXOps.exp(MLXOps.negative(MLXOps.abs(shifted)))));
-      MLXArray rate = MLXOps.negative(MLXOps.exp(inScope(param("decayLog"), x.scope())));
-      MLXArray logDecay = MLXOps.multiply(rate, softplus);
+      MLXArray logDecay = MLXOps.multiply(decayRate, softplus);
       MLXArray beta = MLXOps.sigmoid(betaInput);
       GatedDeltaRule.Result result =
           length == 1
@@ -190,9 +200,9 @@ public final class GatedDeltaNet extends Module {
     }
   }
 
-  private static MLXArray l2Normalize(MLXArray x) {
+  private MLXArray l2Normalize(MLXArray x) {
     MLXArray squared = MLXOps.sum(MLXOps.square(x), new int[] {3}, true);
-    return MLXOps.multiply(x, MLXOps.rsqrt(MLXOps.add(squared, scalar(x.scope(), 1e-6f))));
+    return MLXOps.multiply(x, MLXOps.rsqrt(MLXOps.add(squared, l2Epsilon)));
   }
 
   private static MLXArray scalar(MLXScope scope, float value) {
@@ -201,10 +211,6 @@ public final class GatedDeltaNet extends Module {
 
   private static MLXArray silu(MLXArray x) {
     return MLXOps.multiply(x, MLXOps.sigmoid(x));
-  }
-
-  private static MLXArray inScope(MLXArray a, MLXScope target) {
-    return MLXShape.reshape(MLXShape.expandDims(a, target, 0), a.shape());
   }
 
   private static MLXArray window(MLXArray a, int axis, int start, int end) {

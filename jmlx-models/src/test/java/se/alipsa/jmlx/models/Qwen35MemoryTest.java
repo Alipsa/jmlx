@@ -63,6 +63,11 @@ class Qwen35MemoryTest {
             // 32768 bytes over. That over-charge is the live K/V buffer itself; it dies
             // at the 129 tier crossing and with the session, which the exact baseline
             // assertion below re-checks.
+            // This set depends on this fixture's exact buffer sizes (49152-byte GDN
+            // states, 32768-byte K/V tiers, page 16384) and on MLX 0.32.4's reuse
+            // window: re-derive it on any MLX repin, since a repin can silently make
+            // it too loose or too strict. The exact checks at 64, 256 and session end
+            // still catch any real leak.
             long delta = observed - expected;
             assertTrue(delta == 0 || delta == 16384 || delta == 32768, "position 128: " + delta);
           } else {

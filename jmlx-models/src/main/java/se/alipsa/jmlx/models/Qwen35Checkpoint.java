@@ -115,7 +115,8 @@ final class Qwen35Checkpoint {
             "text."
                 + raw.substring((hf ? "model.language_model." : "language_model.model.").length());
       } else if (raw.startsWith(hf ? "model.visual." : "vision_tower.")) {
-        canonical = "vision." + raw.substring(13);
+        String prefix = hf ? "model.visual." : "vision_tower.";
+        canonical = "vision." + raw.substring(prefix.length());
       } else if (raw.startsWith(hf ? "lm_head." : "language_model.lm_head.")) {
         canonical =
             "lm_head." + raw.substring((hf ? "lm_head." : "language_model.lm_head.").length());

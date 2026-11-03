@@ -70,40 +70,12 @@ final class Qwen35Weights {
           transformed.forEach((key, value) -> result.put(key, MLX.hoist(value, loading)));
         }
       }
-      validateTie(checked.descriptor().text(), result, loading);
+      // Tied-head storage is verified at the byte level by Qwen35Checkpoint.inspect (which also
+      // drops the aliased lm_head names from the load inventory), so no loaded lm_head weights can
+      // reach this path when tied: there is nothing to re-check here.
       Map<String, MLXArray> retained = new LinkedHashMap<>();
       result.forEach((key, value) -> retained.put(key, MLX.hoist(value, target)));
       return new Loaded(checked, retained);
-    }
-  }
-
-  private static void validateTie(
-      Qwen35Descriptor.Text text, Map<String, MLXArray> weights, MLXScope scope) {
-    if (!text.tied() || !weights.containsKey("lm_head.weight")) {
-      return;
-    }
-    for (String suffix : new String[] {"weight", "scales", "biases"}) {
-      MLXArray embedding = weights.get("text.embed_tokens." + suffix);
-      MLXArray head = weights.get("lm_head." + suffix);
-      if (embedding == null && head == null) {
-        continue;
-      }
-      if (embedding == null
-          || head == null
-          || embedding.dtype() != head.dtype()
-          || !java.util.Arrays.equals(embedding.shape(), head.shape())) {
-        throw new IllegalArgumentException(
-            "Qwen3.5 tied lm_head has a different storage convention");
-      }
-      try (MLXScope comparison = scope.newChild()) {
-        MLXArray left =
-            MLXShape.reshape(MLXShape.expandDims(embedding, comparison, 0), embedding.shape());
-        MLXArray equal = MLX.astype(MLXOps.all(MLXOps.equal(left, head)), DType.INT32);
-        if (equal.toIntArray()[0] != 1) {
-          throw new IllegalArgumentException(
-              "Qwen3.5 tied lm_head differs from embedding: " + suffix);
-        }
-      }
     }
   }
 }

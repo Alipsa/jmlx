@@ -1104,13 +1104,15 @@ DeepStack levels — the Qwen3-VL descriptor/loader guard is preserved and check
 before construction), a partial tower is rejected. Float weights load as FLOAT32; uniform
 affine 4-bit group-64 projections stay packed.
 
-Required native suites: core `GatedDeltaRuleTest`, `GatedDeltaNetTest` and
-`HybridDecoderBlockTest` in `float32GoldenTest` (strict `1e-4`), `RecurrentCacheTest` and
-`GatedDeltaMemoryTest` in ordinary mode; models `Qwen35WeightsTest`, `Qwen35TextGoldenTest`,
-`Qwen35PackedGoldenTest` and `Qwen35VisionGoldenTest` in `float32GoldenTest`, plus
-`Qwen35GenerationTest`, `Qwen35MemoryTest`, `Qwen35DecodeCounterTest`,
-`Qwen35CheckpointTest` and `Qwen35DefaultPrecisionTest` (named default-TF32 bound `0.005`,
-measured `0.0014960468`) in ordinary mode — all in the macOS CI required-suite assertion.
+Required native suites (the macOS CI required-suite assertion): core `GatedDeltaRuleTest`,
+`GatedDeltaNetTest` and `HybridDecoderBlockTest` in `float32GoldenTest` (strict `1e-4`),
+`RecurrentCacheTest` and `GatedDeltaMemoryTest` in ordinary mode; models `Qwen35WeightsTest`,
+`Qwen35TextGoldenTest`, `Qwen35PackedGoldenTest` and `Qwen35VisionGoldenTest` in
+`float32GoldenTest`, plus `Qwen35GenerationTest`, `Qwen35MemoryTest` and
+`Qwen35DefaultPrecisionTest` (named default-TF32 bound `0.005`, measured `0.0014960468`)
+in ordinary mode. `Qwen35CheckpointTest` is pure Java (no native gate, not in the
+assertion); `Qwen35DecodeCounterTest` is `@Tag("qwen35-counter")`, excluded from `test` and
+run only by the opt-in `qwen35DecodeCounter` task.
 Real-artifact acceptance: the 0.8B Tier-B (`tools/tier-b/qwen35-08b.json`, task
 `qwen35-generation`, `TierBQwen35Test`, predeclared ε = 0.001 / margin 1e-4; measured
 maximum 4.0340423583984375e-4, native peak 5,118,123,572 B, footprint 6,648,795,264 B)

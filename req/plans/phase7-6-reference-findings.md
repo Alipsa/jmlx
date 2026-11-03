@@ -204,10 +204,19 @@ cleanup, a 4,128-position memory case and exact parameter-scope handle stability
 `:jmlx-core:check` and reference provenance guard pass. These tests are added to CI's required
 native execution assertion; hosted CI has not run this branch yet.
 
-The four-path reference benchmark and exploratory Java timings show material dispatch overhead:
+The four-path reference benchmark and exploratory Java timings show additional Java ops cost:
 the Java 27B/1,280-position chunked prototype was about 54 ms per layer versus 413 ms for the
 per-token prototype on the recorded exploratory run. This is not the Python reference's roughly
 7 ms chunked result. Prepared input files are shared and hashed across languages. Final
 committed-source/48-layer Java timings and separate measured native API downcall counts are
 still pending. API downcalls are not Metal dispatches. No production prefill default has been
 selected, and the WP1 review gate remains open.
+
+### Final WP1 benchmark checkpoint
+
+The [WP1 benchmark report](phase7-6-wp1-benchmark.md) supersedes the exploratory timings above.
+Its clean-source records include independent HF qualification at all 12 prepared-input cases,
+actual 48-call aggregate times, first per-shape calls, warmed samples and separately measured
+native API downcall counts. At 1,280 tokens, Java chunked/recurrent medians are about 2.55/13.85 s;
+the custom Metal reference is about 115 ms. Call counts are not GPU dispatch counts. The maximum
+Java/HF output/state error in the matrix is about 1.85e-6. The WP1 default review remains open.

@@ -119,3 +119,7 @@ are not substitutes for the planned committed-source benchmark and default revie
 `provenance.py --record` explicitly records local source/fixture/evidence hashes after review;
 without that flag it verifies them. The ordinary Gradle guard performs its own digest checks
 without Python. This provenance inventory is not a claim that Phase 7.6 is complete.
+
+The [final WP1 report](../../req/plans/phase7-6-wp1-benchmark.md) links the clean-source timing
+and count records. Prefill default selection remains a review gate, not an automatic outcome
+of generating those files. Full model acceptance remains pending.

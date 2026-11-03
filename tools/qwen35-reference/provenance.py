@@ -33,10 +33,11 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parent
     repo = root.parent.parent
-    shared = "tools/image-oracle/fast-comparison/fixtures/model-rgb-256x256.png"
+    shared = ["tools/image-oracle/fast-comparison/fixtures/model-rgb-256x256.png",
+              "tools/tier-b/qwen35-08b.json", "tools/tier-b/qwen38-27b-4bit.json"]
     record = dict(schema="jmlx-qwen35-reference-v1",
                   status="reference probes and component fixtures; full model acceptance pending",
-                  files=files(root), sharedFiles={shared: digest(repo/shared)})
+                  files=files(root), sharedFiles={path: digest(repo/path) for path in shared})
     path = root / "provenance.json"
     if args.record:
         path.write_text(json.dumps(record, indent=2)+"\n")
@@ -44,7 +45,7 @@ def main():
     else:
         expected = json.loads(path.read_text())
         assert record == expected, "Reference files differ from the reviewed provenance"
-        print(f'Verified {len(record["files"])} local files and the shared image')
+        print(f'Verified {len(record["files"])} local files and {len(record["sharedFiles"])} shared files')
 
 
 if __name__ == "__main__":

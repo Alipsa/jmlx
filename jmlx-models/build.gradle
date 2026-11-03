@@ -100,6 +100,7 @@ tasks.register('tierBTest', Test) {
                   classification: 'TierBClassificationTest', seq2seq: 'TierBSeq2SeqTest',
                   'image-text-generation': 'TierBVisionLanguageTest',
                   'qwen3-vl-generation': 'TierBQwen3VlTest',
+                  'qwen35-generation': 'TierBQwen35Test',
                   'phi3v-generation': 'TierBPhi3VTest']
     if (!suites.containsKey(taskName)) { throw new GradleException("Unsupported Tier-B task: ${taskName}") }
     def assertedTask = System.getenv('JMLX_TIER_B_TASK')
@@ -107,6 +108,9 @@ tasks.register('tierBTest', Test) {
         throw new GradleException("Expected Tier-B task ${assertedTask}, got ${taskName}")
     }
     include "**/${suites[taskName]}.class"
+    if (taskName == 'qwen35-generation') { maxHeapSize = '2g' }
+    def qwen35Output = System.getenv('JMLX_QWEN35_OUTPUT_DIR')
+    systemProperty 'jmlx.qwen35.acceptance.output', qwen35Output ? rootProject.file(qwen35Output).absolutePath : layout.buildDirectory.dir('tier-b/qwen35').get().asFile.absolutePath
     inputs.property('tierBTask', taskName)
     if (tierBManifest) { inputs.file(rootProject.file(tierBManifest)) }
     systemProperty 'jmlx.tier.b.expected.task', System.getenv('JMLX_TIER_B_TASK') ?: ''

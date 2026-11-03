@@ -389,4 +389,8 @@ public final class Qwen35Model implements TextGenerationModel {
   Qwen3VlImageProcessor processorForTest() {
     return processor;
   }
+
+  Qwen35Descriptor descriptorForTest() {
+    return descriptor;
+  }
 }

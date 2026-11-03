@@ -216,3 +216,32 @@ Default-mode HF error maximum is 0.0014960468 under its separately predeclared 0
 Strict FLOAT32 remains unchanged at 1e-4. Public-decode counter passes: no internal mlx_eval
 or mlx_array_eval before the boundary, one explicit all-roots mlx_eval, with readbacks recorded
 separately. Full regression refresh and real Tier-B acceptance are next; no PR is open.
+
+## Real-artifact acceptance declarations (before Java)
+
+Full regression refresh and both-mode exact-bit checks pass. Added a compile/lint-verified
+opt-in `TierBQwen35Test`, recording actual vectors, per-step errors/margins, exact IDs/text,
+first/warm request timings, native/process peaks and host observations. Bounds are declared
+before any Java real-model output: HF 0.8B uses 0.001 (independent HF cached/fresh reached
+0.000319, preserved failures at 1e-4); 27B keeps an independently fixed arithmetic allowance
+of 0.001 plus the measured stock normalization convention. Strict tiny remains 1e-4.
+
+Recorded full FLOAT32 stock and separately labeled diagnostic 27B probes before Java. The
+original prompt pair fails a global margin envelope because late text continuation has a
+0.29576 normalization shift, making that envelope too wide for other phases. It is preserved
+as ineligible. Added independently rendered candidates and stock/diagnostic probes with
+logits-only capture (same math/evaluations/path observations, omitting large captured states).
+`27b-reference-selection.json` preserves all failed candidates and selects the first eligible
+pair, `text_copy,image`, without Java measurements. Epsilon is 0.10062797164916992, comprising
+the unchanged 0.001 arithmetic allowance and a measured 0.09962797164916992 normalization
+contribution. Minimum gap is 0.3372325897216797, greater than 2*epsilon+0.0001. Diagnostic
+arrays never enter acceptance goldens. All nine source outputs (prefill plus eight decode
+outputs) remain included, including the post-budget ninth prediction. Public timing/ID scope
+is eight generated tokens with EOS stopping disabled, explicitly recorded.
+
+Both manifests pin original file digests, CPU-HF-derived positions, rendered prompts, expected
+decoded output, selected stock-only logits and predeclared resource bounds. They are covered
+by the pure reference guard as shared files. The old probe source before logits-only capture
+is archived under executed-sources to retain exact executed hashes. Persistent FLOAT32 and
+candidate captures are under `.tier-b/phase7-6/captures/`. Next execute the two Java suites
+sequentially on committed source; retain failed runs and diagnose without loosening bounds.

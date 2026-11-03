@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--family", choices=("vlm", "lm"), default="vlm")
     parser.add_argument("--normalization-diagnostic", action="store_true")
     parser.add_argument("--float32", action="store_true", help="Upcast floating parameters only")
+    parser.add_argument("--logits-only", action="store_true", help="Keep path observations but omit large Q/K/output/state capture arrays")
     parser.add_argument("--capture-dir", type=Path, help="External storage for large real-model captures")
     parser.add_argument("--decode-steps", type=int, default=1)
     parser.add_argument("--greedy-history", action="store_true")
@@ -112,8 +113,9 @@ def main():
         output, state = original_delta(q, k, v, *positional, **kwargs)
         mx.eval(q, k, output, state)
         stem = f"{phase}_delta{index}"
-        for name, value in (("q", q), ("k", k), ("output", output), ("state", state)):
-            arrays[f"{stem}_{name}"] = np.asarray(value.astype(mx.float32))
+        if not args.logits_only:
+            for name, value in (("q", q), ("k", k), ("output", output), ("state", state)):
+                arrays[f"{stem}_{name}"] = np.asarray(value.astype(mx.float32))
         events.append(dict(kind="delta", phase=phase, q_dtype=str(q.dtype),
                            v_dtype=str(v.dtype), state_dtype=str(state.dtype),
                            use_kernel=kwargs.get("use_kernel", True),
@@ -218,7 +220,7 @@ def main():
     capture_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(capture_path, **arrays)
     record["captures"] = dict(file=capture_path.name, sha256=digest(capture_path),
-                              external=bool(args.capture_dir))
+                              external=bool(args.capture_dir), logits_only=args.logits_only)
     args.output.write_text(json.dumps(record, indent=2) + "\n")
     print(args.output)
 

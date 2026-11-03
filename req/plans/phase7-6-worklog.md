@@ -1,7 +1,7 @@
 # Phase 7.6 implementation checkpoint — 2026-11-03
 
 Resumed on 2026-11-03 after the user's requested pause. The task remains to implement the
-entire phase, verify it, then open a PR. Work is uncommitted on `phase7-6-implementation`.
+entire phase, verify it, then open a PR. Reference tools and core prototypes are committed on `phase7-6-implementation`.
 No PR is open. This checkpoint is not a completion or acceptance report.
 
 ## Implemented so far
@@ -118,3 +118,9 @@ No PR is open. This checkpoint is not a completion or acceptance report.
 - Remaining immediate work: reviewed provenance/docs commits, final clean-source Java/reference
   benchmarks and native-call counts, then the required WP1 default review. No default is selected.
 - `resume.sh` is an unrelated untracked user file; leave it untouched and out of commits.
+
+- Reference commit: `93c43fe`; core prototype commit: `4cded59`.
+- Restored both large 27B stock/diagnostic captures in persistent ignored storage. Their raw
+  SHA-256s and full JSON records reproduce the original recordings exactly.
+- Java benchmark now separates first per-shape calls from warmed samples. Final benchmark runs
+  will use an isolated clean worktree so the unrelated user `resume.sh` remains untouched.

@@ -92,6 +92,21 @@ class GatedDeltaBenchmarkTest {
                       java.security.MessageDigest.getInstance("SHA-256")
                           .digest(Files.readAllBytes(inputPath))));
           oneCase.put("measurements", measurements);
+          if (!counting) {
+            List<Map<String, Object>> firstCalls = new ArrayList<>();
+            for (boolean chunked : new boolean[] {false, true}) {
+              Map<String, Object> first = new LinkedHashMap<>();
+              first.put("path", chunked ? "chunked_ops" : "token_recurrence");
+              first.put("host_state", hostState());
+              long start = System.nanoTime();
+              try (MLXScope invocation = prepared.newChild()) {
+                execute(invocation, inputs, chunked);
+              }
+              first.put("evaluated_and_cleanup_ns", System.nanoTime() - start);
+              firstCalls.add(first);
+            }
+            oneCase.put("first_calls_per_shape_in_this_jvm", firstCalls);
+          }
           float[][] expected;
           try (MLXScope validation = prepared.newChild()) {
             GatedDeltaRule.Result reference = execute(validation, inputs, false);

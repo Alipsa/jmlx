@@ -2,7 +2,7 @@
   "schema": "jmlx-qwen35-reference-v1",
   "status": "reference probes and component fixtures; full model acceptance pending",
   "files": {
-    "README.md": "490e63b3f083c272d22b502e96e2fdc668763d7c9ece9416d06c9d50361824dd",
+    "README.md": "3f99b01dee968a2f49d5bb38e92fc04adda6cd392366d548ec59105459493b1f",
     "benchmark_delta.py": "86e5e174f75171154fd07a689db94a6ff831cd669133b443fd4ee191ea08a832",
     "compare_normalization.py": "ffd8e6c7324dbee1497d2c160ea5b6e1006c7338a424cdbbe92d5911ecabb1fd",
     "environment.py": "d96b352233dbf1c09419e2ea0bc1e9acd7e9c0527cca62f86d1e1ebcf91fe469",

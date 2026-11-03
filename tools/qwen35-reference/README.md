@@ -30,9 +30,10 @@ The real-artifact inventories pin all files and tensor headers at these Hub revi
 
 Download them with `hf download --revision ... --local-dir .tier-b/phase7-6/artifacts/...`.
 Keep large artifacts, captures, wheels and benchmark inputs in ignored `.tier-b/phase7-6/`.
-The first session used temporary storage, which disappeared between sessions; original large
-27B capture binaries are absent. Their hashes and paired attribution summaries survive. Recreate
-captures before using them for any further comparison; the summaries do not replace raw data.
+The first session used temporary storage, which disappeared between sessions. Both large 27B
+captures were then recreated from the archived executed probe in persistent ignored storage;
+their raw hashes and complete JSON records reproduce the originals exactly. The binaries remain
+external; paired attribution summaries and hashes are committed.
 
 `probe_hf.py --output <json> --export-checkpoint <directory>` exports the seed-20261102 tiny HF
 fixture and records text/image prefill and cached/fresh checks. Optional repeated
@@ -93,6 +94,9 @@ it is not evidence of an untouched system's first inference.
 JMLX_DELTA_BENCHMARK_INPUT_DIR="$PWD/.tier-b/phase7-6/benchmark-inputs" \
   ./gradlew :jmlx-core:deltaBenchmark
 ```
+
+Java records first calls per shape within its JVM separately from qualified warmed samples.
+These are not untouched-system first-inference measurements.
 
 The Java task supports `JMLX_DELTA_BENCHMARK_{SHAPES,LENGTHS,SAMPLES,LAYERS,OUTPUT}`. Shapes and
 lengths are comma-separated. Its default output is `build/benchmarks/qwen35-delta-java.json`.

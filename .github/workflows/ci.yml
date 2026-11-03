@@ -171,7 +171,7 @@ jobs:
                             'GroupedQueryAttentionTest', 'MultiHeadAttentionTest',
                             'BatchAttentionMaskTest', 'BatchRopeProbeTest', 'StridedViewSafetyTest',
                             'Phase71OracleTest', 'Phase71DefaultModeTest', 'Phase71ContractsTest', 'EncoderAttentionTest',
-                            'MLXMemoryLeakTest', 'CategoricalTempScopeTest',
+                            'MLXMemoryLeakTest', 'MLXIOSelectionScopeTest', 'CategoricalTempScopeTest',
                             'MultiAxisRopeTest', 'DecoderRotationSeamTest', 'SingleRowDecodeEquivalenceTest'],
               'jmlx-models': ['DecoderRefactorGoldenTest', 'MistralModelTest', 'GemmaModelTest',
                               'Phi3ModelTest', 'MixtralModelTest', 'Llama31ModelTest', 'Qwen3ModelTest',

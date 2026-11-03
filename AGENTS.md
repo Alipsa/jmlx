@@ -1106,7 +1106,8 @@ affine 4-bit group-64 projections stay packed.
 
 Required native suites (the macOS CI required-suite assertion): core `GatedDeltaRuleTest`,
 `GatedDeltaNetTest` and `HybridDecoderBlockTest` in `float32GoldenTest` (strict `1e-4`),
-`RecurrentCacheTest` and `GatedDeltaMemoryTest` in ordinary mode; models `Qwen35WeightsTest`,
+`RecurrentCacheTest`, `GatedDeltaMemoryTest` and `MLXIOSelectionScopeTest` in ordinary
+mode; models `Qwen35WeightsTest`,
 `Qwen35TextGoldenTest`, `Qwen35PackedGoldenTest` and `Qwen35VisionGoldenTest` in
 `float32GoldenTest`, plus `Qwen35GenerationTest`, `Qwen35MemoryTest` and
 `Qwen35DefaultPrecisionTest` (named default-TF32 bound `0.005`, measured `0.0014960468`)

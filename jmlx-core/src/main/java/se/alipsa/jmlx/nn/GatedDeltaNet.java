@@ -109,6 +109,9 @@ public final class GatedDeltaNet extends Module {
     zero = scalar(scope, 0f);
     l2Epsilon = scalar(scope, 1e-6f);
     decayRate = MLXOps.negative(MLXOps.exp(decayLog));
+    // Every array the model keeps is evaluated during loading; these constants are no
+    // exception, so the first request pays no one-time evaluation of them.
+    MLX.eval(keyScale, zero, l2Epsilon, decayRate);
   }
 
   /** Creates this layer's empty cache in the request scope. */

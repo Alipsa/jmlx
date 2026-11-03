@@ -1,0 +1,260 @@
+{
+  "kind": "normalization attribution only; Java/reference remainder still unmeasured",
+  "stock_sha256": "770ff97369e0d90d22d3d3437ff825b6cda219e569e08448dd55b6915f51c4ae",
+  "diagnostic_sha256": "f939a68a677b080f507007be90f9c930f14591a5bfb28a19296317adca63c5b0",
+  "source_sha256": "ffd8e6c7324dbee1497d2c160ea5b6e1006c7338a424cdbbe92d5911ecabb1fd",
+  "phases": [
+    {
+      "phase": "image_decode0",
+      "normalization_contribution_max_abs": {
+        "q": 0.0008760932832956314,
+        "k": 0.007559061050415039,
+        "output": 0.003704223781824112,
+        "state": 0.29105234146118164,
+        "logits": 0.0385933518409729
+      },
+      "stock_greedy": 2099,
+      "diagnostic_greedy": 2099,
+      "stock_margin": 2.324939727783203,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode1",
+      "normalization_contribution_max_abs": {
+        "q": 0.0008877255022525787,
+        "k": 0.008098840713500977,
+        "output": 0.0017752423882484436,
+        "state": 0.29038238525390625,
+        "logits": 0.022338390350341797
+      },
+      "stock_greedy": 369,
+      "diagnostic_greedy": 369,
+      "stock_margin": 0.9238033294677734,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode2",
+      "normalization_contribution_max_abs": {
+        "q": 0.0008571892976760864,
+        "k": 0.00972294807434082,
+        "output": 0.0023903753608465195,
+        "state": 0.29019927978515625,
+        "logits": 0.023675382137298584
+      },
+      "stock_greedy": 264,
+      "diagnostic_greedy": 264,
+      "stock_margin": 2.0950546264648438,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode3",
+      "normalization_contribution_max_abs": {
+        "q": 0.000993378460407257,
+        "k": 0.012970149517059326,
+        "output": 0.002469247207045555,
+        "state": 0.29010748863220215,
+        "logits": 0.025159597396850586
+      },
+      "stock_greedy": 10558,
+      "diagnostic_greedy": 10558,
+      "stock_margin": 1.9926433563232422,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode4",
+      "normalization_contribution_max_abs": {
+        "q": 0.0005911104381084442,
+        "k": 0.007752597332000732,
+        "output": 0.002785591408610344,
+        "state": 0.28990697860717773,
+        "logits": 0.03413534164428711
+      },
+      "stock_greedy": 11,
+      "diagnostic_greedy": 11,
+      "stock_margin": 4.062740325927734,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode5",
+      "normalization_contribution_max_abs": {
+        "q": 0.0009176880121231079,
+        "k": 0.008934974670410156,
+        "output": 0.001776818186044693,
+        "state": 0.2898385524749756,
+        "logits": 0.023537635803222656
+      },
+      "stock_greedy": 7859,
+      "diagnostic_greedy": 7859,
+      "stock_margin": 3.7195587158203125,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode6",
+      "normalization_contribution_max_abs": {
+        "q": 0.0006615966558456421,
+        "k": 0.00813746452331543,
+        "output": 0.002407178282737732,
+        "state": 0.28963232040405273,
+        "logits": 0.02408742904663086
+      },
+      "stock_greedy": 19556,
+      "diagnostic_greedy": 19556,
+      "stock_margin": 0.9566669464111328,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_decode7",
+      "normalization_contribution_max_abs": {
+        "q": 0.0004839003086090088,
+        "k": 0.006875514984130859,
+        "output": 0.001772616058588028,
+        "state": 0.2893528938293457,
+        "logits": 0.027855873107910156
+      },
+      "stock_greedy": 53968,
+      "diagnostic_greedy": 53968,
+      "stock_margin": 0.3372325897216797,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "image_prefill",
+      "normalization_contribution_max_abs": {
+        "q": 0.0027369449380785227,
+        "k": 0.15394264459609985,
+        "output": 0.008598625659942627,
+        "state": 0.2918126583099365,
+        "logits": 0.09962797164916992
+      },
+      "stock_greedy": 1919,
+      "diagnostic_greedy": 1919,
+      "stock_margin": 0.9739227294921875,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode0",
+      "normalization_contribution_max_abs": {
+        "q": 0.0007709786295890808,
+        "k": 0.008835077285766602,
+        "output": 0.0021610427647829056,
+        "state": 0.3097982406616211,
+        "logits": 0.049968719482421875
+      },
+      "stock_greedy": 248046,
+      "diagnostic_greedy": 248046,
+      "stock_margin": 6.859586715698242,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode1",
+      "normalization_contribution_max_abs": {
+        "q": 0.0007051974534988403,
+        "k": 0.011209666728973389,
+        "output": 0.002405380830168724,
+        "state": 0.30544424057006836,
+        "logits": 0.09308719635009766
+      },
+      "stock_greedy": 198,
+      "diagnostic_greedy": 198,
+      "stock_margin": 18.961647033691406,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode2",
+      "normalization_contribution_max_abs": {
+        "q": 0.0008985958993434906,
+        "k": 0.01032644510269165,
+        "output": 0.0013748062774538994,
+        "state": 0.30502891540527344,
+        "logits": 0.097939133644104
+      },
+      "stock_greedy": 248044,
+      "diagnostic_greedy": 248044,
+      "stock_margin": 9.50326919555664,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode3",
+      "normalization_contribution_max_abs": {
+        "q": 0.0005891472101211548,
+        "k": 0.009940385818481445,
+        "output": 0.0040917061269283295,
+        "state": 0.2890932559967041,
+        "logits": 0.13983488082885742
+      },
+      "stock_greedy": 248045,
+      "diagnostic_greedy": 248045,
+      "stock_margin": 8.533236503601074,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode4",
+      "normalization_contribution_max_abs": {
+        "q": 0.0007291808724403381,
+        "k": 0.009765632450580597,
+        "output": 0.0015929043292999268,
+        "state": 0.2883427143096924,
+        "logits": 0.12644100189208984
+      },
+      "stock_greedy": 846,
+      "diagnostic_greedy": 846,
+      "stock_margin": 1.5624504089355469,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode5",
+      "normalization_contribution_max_abs": {
+        "q": 0.0010961834341287613,
+        "k": 0.013891041278839111,
+        "output": 0.0036059319972991943,
+        "state": 0.28774499893188477,
+        "logits": 0.1576375961303711
+      },
+      "stock_greedy": 248046,
+      "diagnostic_greedy": 248046,
+      "stock_margin": 4.837518692016602,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode6",
+      "normalization_contribution_max_abs": {
+        "q": 0.0006296597421169281,
+        "k": 0.00966179370880127,
+        "output": 0.0013819895684719086,
+        "state": 0.2874264717102051,
+        "logits": 0.17141008377075195
+      },
+      "stock_greedy": 198,
+      "diagnostic_greedy": 198,
+      "stock_margin": 15.961492538452148,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_decode7",
+      "normalization_contribution_max_abs": {
+        "q": 0.0008326247334480286,
+        "k": 0.010540366172790527,
+        "output": 0.002804214134812355,
+        "state": 0.28737783432006836,
+        "logits": 0.2957572937011719
+      },
+      "stock_greedy": 248045,
+      "diagnostic_greedy": 248045,
+      "stock_margin": 10.505691528320312,
+      "convention_only_margin_eligible": true
+    },
+    {
+      "phase": "text_prefill",
+      "normalization_contribution_max_abs": {
+        "q": 0.0027371414471417665,
+        "k": 0.1539420485496521,
+        "output": 0.008598655462265015,
+        "state": 0.31138038635253906,
+        "logits": 0.0632781982421875
+      },
+      "stock_greedy": 19,
+      "diagnostic_greedy": 19,
+      "stock_margin": 0.4146003723144531,
+      "convention_only_margin_eligible": true
+    }
+  ]
+}

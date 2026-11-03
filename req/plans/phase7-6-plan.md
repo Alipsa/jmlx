@@ -1,6 +1,8 @@
 # Phase 7.6 — Hybrid Qwen text and image inference
 
-- **Status:** proposed implementation plan, 2026-11-02; implementation has not started.
+- **Status:** implementation in progress, 2026-11-03. Reference probes and core DeltaNet
+  prototypes have local evidence; model integration and acceptance remain pending.
+  See the [worklog](phase7-6-worklog.md) for the current checkpoint.
 - **Parent:** [Phase 7 §7.6](phase7-plan.md#76--hybrid-linear-attention-qwen-decoders-qwen38).
 - **Prerequisites:** 7.1 core operations, 7.3b vision/MRoPE and the delivered 7.5 paired-pin
   upgrade. PR #76 is merged; its timing investigation leaves measurement limits with Phase 8.2.

@@ -146,3 +146,68 @@ product in float32 before casting back. WP0 records convolution, gated norm and 
 and dtypes for each phase, including when FLOAT32 weights disable the decode helper. Ragged
 left-padded attention and speculative target-verify paths are outside the batch-one greedy
 reference matrix, not additional required comparison modes.
+
+## 2026-11-03 executable reference and component checkpoint
+
+The isolated environments have now installed and executed. Full file/header inventories,
+selected wheel hashes/tags, installed source hashes, saved converter outputs and probe records
+are under `tools/qwen35-reference/`. Its provenance guard verifies committed files without
+executing Python. This is reference/component evidence; Java full-model acceptance is pending.
+
+- Both real legacy configs parse in Transformers 5.22.1. Tiny CPU FLOAT32 text/image prefill
+  and cached decode execute with eager attention and the Torch convolution/delta fallbacks.
+  Image forwards require explicit `mm_token_type_ids`. Missing/duplicate rotary-factor and
+  gate-metadata behavior is recorded in `evidence/config-probes.json`; Java's planned strict
+  acceptance policy remains distinct from HF's permissive/defaulting behavior.
+- Both actual converter entry points produced saved float and affine fixtures, then reloaded.
+  Saved float tensors match the source bit-for-bit after the specified text norm shifts and
+  convolution/vision patch transposes. mlx-lm removes vision and uses the same converted text
+  prefix as mlx-vlm. `linear_attn.norm.weight` remains unshifted. Tiny fixtures use an in-range
+  plain BPE tokenizer; the initial exploratory WordLevel tokenizer was replaced before this
+  checkpoint because jmlx does not support that tokenizer model.
+- Complete real inventories contain 488 tensors (0.8B) and 2180 tensors (27B). Each 27B shard's
+  metadata is only `{"format":"mlx"}`: it does not supply a converter identity/version.
+- Recorded dispatcher probes confirm mlx-vlm's GPU custom kernel and off-GPU/disabled-kernel
+  chunked/ops routes. Corrected mlx-lm observations identify its own delta helper/kernel and
+  `Qwen3NextRMSNormGated`/`precise_swiglu`, with `nn.Conv1d` in both recorded phases. The archived
+  earlier reload probe preserves the exact source hash of the 27B attribution runs.
+- The built-in native op accepts the tested key widths 1/16/31/32/33/64/128, value widths
+  32/64/128 and grouped heads on CPU/GPU in the recorded boundary matrix. It rejects the tested
+  nondivisible head grouping. These are accepted API cases, not a claim that all use an
+  accelerated internal kernel. The custom kernel's width constraint does not transfer to it.
+  Native and mlx-vlm state orientation is `[B,Hv,Dv,Dk]`, transposed against Java/HF. Masked
+  output rows differ, while active rows and final state agree within the probe's recorded
+  bound. The separate strict benchmark makes the built-in op ineligible on real-width cases
+  where its output/state error exceeds `1e-4`; no bound was relaxed to admit it.
+- Paired stock and explicitly labeled normalization-only runs quantify the discrepancy. Tiny
+  stock mlx-vlm prefill errors against HF are about 0.01; the diagnostic reduces them below
+  `6e-5`. Correct mlx-vlm decode calls the language-model entry point, preserving prefill MRoPE
+  delta rather than re-entering the multimodal wrapper. The 27B paired text/image records use
+  FLOAT32 floating parameters, identical packed weights/pixels and eight shared teacher-forced
+  stock histories. Greedy choices agree, while prefill logit contributions reach about 0.10.
+  Diagnostic outputs are attribution only, never acceptance goldens. Java/reference remainder
+  remains unmeasured. Token histories deliberately continue past EOS for state comparison;
+  this is not an end-to-end public-generation stopping-policy test.
+- Real input records pin slow-PIL patches and compare the declared fast backend on the selected
+  RGB input, with the explicit 4096-row cap. This particular no-resize sample differs by about
+  `5.9e-8` in normalized pixels. It does not establish all resize/geometry equivalences; vision
+  integration still owns the differential processor/tower cases.
+- The independent 0.8B HF record includes prefill, eight cached steps and fresh full forwards.
+  HF's own text cached/fresh discrepancy reaches `3.19e-4`; failed `1e-4` measurements remain
+  explicit. Strict tiny bounds are unchanged. Real Java acceptance bounds must be declared
+  separately before those runs, including stability/margins and normalization attribution.
+
+Locally, both Java delta-rule prototypes and the composed DeltaNet pass independent strict HF
+FLOAT32 goldens at the planned chunk/convolution boundary lengths, with unequal widths, grouped
+heads, nonzero state and split prefills. Cache ownership, failure poisoning, repeated-request
+cleanup, a 4,128-position memory case and exact parameter-scope handle stability pass. The full
+`:jmlx-core:check` and reference provenance guard pass. These tests are added to CI's required
+native execution assertion; hosted CI has not run this branch yet.
+
+The four-path reference benchmark and exploratory Java timings show material dispatch overhead:
+the Java 27B/1,280-position chunked prototype was about 54 ms per layer versus 413 ms for the
+per-token prototype on the recorded exploratory run. This is not the Python reference's roughly
+7 ms chunked result. Prepared input files are shared and hashed across languages. Final
+committed-source/48-layer Java timings and separate measured native API downcall counts are
+still pending. API downcalls are not Metal dispatches. No production prefill default has been
+selected, and the WP1 review gate remains open.

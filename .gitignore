@@ -60,3 +60,5 @@ __pycache__/
 /.tier-b/
 /tools/hf-reference/.venv/
 /tools/qwen-vl-reference/.venv/
+/tools/qwen35-reference/hf/.venv/
+/tools/qwen35-reference/mlx/.venv/

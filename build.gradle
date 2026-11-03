@@ -610,6 +610,45 @@ tasks.register('verifyMlxApiCallSites', JavaExec) {
     }
 }
 
+tasks.register('verifyQwen35ReferenceGoldens') {
+    group = 'verification'
+    description = 'Verifies Qwen3.5 reference sources, fixtures, locks and evidence without Python.'
+    def referenceDir = layout.projectDirectory.dir('tools/qwen35-reference')
+    def provenance = referenceDir.file('provenance.json')
+    inputs.file(provenance)
+    inputs.files(fileTree(referenceDir) {
+        exclude '**/.venv/**', '**/__pycache__/**', '**/*.pyc'
+    })
+    inputs.file('tools/image-oracle/fast-comparison/fixtures/model-rgb-256x256.png')
+    doLast {
+        def metadata = new JsonSlurper().parse(provenance.asFile)
+        if (metadata.schema != 'jmlx-qwen35-reference-v1' || !(metadata.files instanceof Map)
+                || metadata.files.isEmpty() || !(metadata.sharedFiles instanceof Map)) {
+            throw new GradleException('Invalid Qwen3.5 reference provenance')
+        }
+        def root = referenceDir.asFile.toPath().toAbsolutePath().normalize()
+        def actual = fileTree(referenceDir) {
+            exclude '**/.venv/**', '**/__pycache__/**', '**/*.pyc', 'provenance.json'
+        }.files.collect { root.relativize(it.toPath().toAbsolutePath()).toString().replace('\\', '/') }.toSet()
+        if (actual != metadata.files.keySet()) {
+            throw new GradleException('Qwen3.5 reference file inventory differs from provenance')
+        }
+        metadata.files.each { name, expected ->
+            def path = root.resolve(name).normalize()
+            if (!path.startsWith(root) || sha256File(path.toFile()) != expected) {
+                throw new GradleException("Qwen3.5 reference SHA-256 differs: ${name}")
+            }
+        }
+        metadata.sharedFiles.each { name, expected ->
+            def repoRoot = projectDir.toPath().toAbsolutePath().normalize()
+            def path = repoRoot.resolve(name).normalize()
+            if (!path.startsWith(repoRoot) || sha256File(path.toFile()) != expected) {
+                throw new GradleException("Qwen3.5 shared input SHA-256 differs: ${name}")
+            }
+        }
+    }
+}
+
 tasks.named('check') {
     // The root has no Java lifecycle plugin. Applying `base` creates this `check` lifecycle task
     // so repository-wide verifications can run once from CI without pretending that a module-local
@@ -618,7 +657,8 @@ tasks.named('check') {
             tasks.named('verifyHfReferenceGoldens'),
             tasks.named('verifyImageOracleDependencyPins'),
             tasks.named('verifyImageOracleFixtureDigests'),
-            tasks.named('verifyQwenVlReferenceProvenance')
+            tasks.named('verifyQwenVlReferenceProvenance'),
+            tasks.named('verifyQwen35ReferenceGoldens')
 }
 
 tasks.register('verifyHfReferenceGoldens') {

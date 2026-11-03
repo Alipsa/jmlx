@@ -1,0 +1,2291 @@
+{
+  "kind": "WP0 probes, not acceptance goldens",
+  "seed": 20261102,
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "mlx": "0.32.4",
+  "metal_available": true,
+  "gate_convention": "linear-space decay for native and mlx-vlm",
+  "state_orientation": "B,Hv,Dv,Dk (transpose last axes for Java/HF)",
+  "vlm_source_sha256": "0160d639dc74f93bd3eadc7457668c26cf97d5f59ce3eda86bce111f206de11d",
+  "probe_source_sha256": "3d68aa9b2604f7126cdbb827fd62f4a0c628b2025f7fbdd55ee8cd40b9c9eb17",
+  "native_doc": "gated_delta_update(q: mlx.core.array, k: mlx.core.array, v: mlx.core.array, gamma: mlx.core.array, beta: mlx.core.array, initial_state: mlx.core.array | None = None, mask: mlx.core.array | None = None, stream: mlx.core.Stream | mlx.core.ThreadLocalStream | mlx.core.Device | mlx.core.DeviceType | None = None) -> list[mlx.core.array]\n\nChunked gated delta network forward pass.\n\nArgs:\n    q: Queries [B, T, Hk, Dk]\n    k: Keys [B, T, Hk, Dk]\n    v: Values [B, T, Hv, Dv]\n    gamma: Decay rate in linear space [B, T, Hv]\n    beta: Delta update rates [B, T, Hv]\n    initial_state: Optional initial hidden state [B, T, Hk, Dv]\n    mask: Optional\nReturns:\n    Tuple of (output [B, T, Hv, Dv], final_state [B, T, Hk, Dv])",
+  "boundaries": [
+    {
+      "device": "DeviceType.gpu",
+      "dk": 1,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        1
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 1,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        1
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 1,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        1
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 16,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        16
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 16,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        16
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 16,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        16
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 31,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        31
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 31,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        31
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 31,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        31
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 2.9802322387695312e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 2.9802322387695312e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 2.9802322387695312e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 2.9802322387695312e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 2.9336661100387573e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 2.9336661100387573e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 33,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        33
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 33,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        33
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 33,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        33
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 64,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        64
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 4.470348358154297e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 4.470348358154297e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 64,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        64
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 4.470348358154297e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 4.470348358154297e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 64,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        64
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 5.960464477539063e-08,
+      "custom_state_max_abs": 4.470348358154297e-08,
+      "custom_active_output_max_abs": 5.960464477539063e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 128,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        128
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 5.960464477539063e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 5.960464477539063e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 128,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        128
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 3.3527612686157227e-08,
+      "custom_state_max_abs": 4.470348358154297e-08,
+      "custom_active_output_max_abs": 3.3527612686157227e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 128,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        128
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 5.960464477539063e-08,
+      "custom_state_max_abs": 3.725290298461914e-08,
+      "custom_active_output_max_abs": 5.960464477539063e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 2.9802322387695312e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 2.9802322387695312e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float32",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 6.51925802230835e-09,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 6.51925802230835e-09
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.0,
+      "custom_state_max_abs": 1.4901161193847656e-08,
+      "custom_active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 5.960464477539063e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 5.960464477539063e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.bfloat16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.0,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.bfloat16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.0,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 4.470348358154297e-08,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 4.470348358154297e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float32",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.18283222615718842,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.18283222615718842,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 3.725290298461914e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 6.103515625e-05,
+      "custom_state_max_abs": 4.470348358154297e-08,
+      "custom_active_output_max_abs": 6.103515625e-05
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.2127685546875,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.2127685546875,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 6.103515625e-05
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.bfloat16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 3.0517578125e-05,
+      "custom_state_max_abs": 4.470348358154297e-08,
+      "custom_active_output_max_abs": 3.0517578125e-05
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.bfloat16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.2275390625,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.2275390625,
+      "custom_state_max_abs": 3.3527612686157227e-08,
+      "custom_active_output_max_abs": 0.000244140625
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 4.470348358154297e-08,
+      "custom_state_max_abs": 3.725290298461914e-08,
+      "custom_active_output_max_abs": 4.470348358154297e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float32",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.19897210597991943,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.19897210597991943,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 4.470348358154297e-08
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 1.52587890625e-05,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 1.52587890625e-05
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.185791015625,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.185791015625,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 7.62939453125e-06
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.bfloat16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 1.52587890625e-05,
+      "custom_state_max_abs": 3.3527612686157227e-08,
+      "custom_active_output_max_abs": 1.52587890625e-05
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.bfloat16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.23046875,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0,
+      "custom_output_max_abs": 0.23046875,
+      "custom_state_max_abs": 2.9802322387695312e-08,
+      "custom_active_output_max_abs": 1.52587890625e-05
+    },
+    {
+      "device": "DeviceType.gpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 3,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": false,
+      "error": "[broadcast_shapes] Shapes (1,3,64,32) and (1,2,1,32) cannot be broadcast."
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 1,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        1
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 1,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        1
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 1,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        1
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 16,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        16
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 16,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        16
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 16,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        16
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 31,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        31
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 31,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        31
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 31,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        31
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 33,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        33
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 33,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        33
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 33,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        33
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 64,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        64
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 64,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        64
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 64,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        64
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 128,
+      "dv": 32,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        32
+      ],
+      "state_shape": [
+        1,
+        6,
+        32,
+        128
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 128,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        128
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 128,
+      "dv": 128,
+      "hk": 2,
+      "hv": 6,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        3,
+        6,
+        128
+      ],
+      "state_shape": [
+        1,
+        6,
+        128,
+        128
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float32",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.float16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.bfloat16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 1,
+      "dtype": "mlx.core.bfloat16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        1,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float32",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.24020466208457947,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.float16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.177490234375,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.bfloat16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 64,
+      "dtype": "mlx.core.bfloat16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        64,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.2158203125,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float32",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.18757128715515137,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.float16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.1817626953125,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.bfloat16",
+      "masked": false,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.0,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 6,
+      "length": 65,
+      "dtype": "mlx.core.bfloat16",
+      "masked": true,
+      "accepted": true,
+      "output_shape": [
+        1,
+        65,
+        6,
+        64
+      ],
+      "state_shape": [
+        1,
+        6,
+        64,
+        32
+      ],
+      "state_dtype": "mlx.core.float32",
+      "output_max_abs": 0.1845703125,
+      "state_max_abs": 0.0,
+      "active_output_max_abs": 0.0
+    },
+    {
+      "device": "DeviceType.cpu",
+      "dk": 32,
+      "dv": 64,
+      "hk": 2,
+      "hv": 3,
+      "length": 3,
+      "dtype": "mlx.core.float32",
+      "masked": false,
+      "accepted": false,
+      "error": "[broadcast_shapes] Shapes (1,3,64,32) and (1,2,1,32) cannot be broadcast."
+    }
+  ],
+  "dispatch": [
+    {
+      "device": "DeviceType.gpu",
+      "use_kernel": true,
+      "length": 1,
+      "selected": [
+        "gated_delta_kernel"
+      ]
+    },
+    {
+      "device": "DeviceType.gpu",
+      "use_kernel": true,
+      "length": 3,
+      "selected": [
+        "gated_delta_kernel"
+      ]
+    },
+    {
+      "device": "DeviceType.gpu",
+      "use_kernel": false,
+      "length": 1,
+      "selected": [
+        "gated_delta_ops"
+      ]
+    },
+    {
+      "device": "DeviceType.gpu",
+      "use_kernel": false,
+      "length": 3,
+      "selected": [
+        "gated_delta_chunked"
+      ]
+    },
+    {
+      "device": "DeviceType.cpu",
+      "use_kernel": true,
+      "length": 1,
+      "selected": [
+        "gated_delta_ops"
+      ]
+    },
+    {
+      "device": "DeviceType.cpu",
+      "use_kernel": true,
+      "length": 3,
+      "selected": [
+        "gated_delta_chunked"
+      ]
+    },
+    {
+      "device": "DeviceType.cpu",
+      "use_kernel": false,
+      "length": 1,
+      "selected": [
+        "gated_delta_ops"
+      ]
+    },
+    {
+      "device": "DeviceType.cpu",
+      "use_kernel": false,
+      "length": 3,
+      "selected": [
+        "gated_delta_chunked"
+      ]
+    }
+  ]
+}

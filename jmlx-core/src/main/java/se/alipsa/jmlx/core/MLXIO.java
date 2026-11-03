@@ -34,6 +34,21 @@ public final class MLXIO {
    * Loads every tensor and metadata entry from a safetensors file, allocated into {@code target}.
    */
   public static SafetensorsResult loadSafetensors(MLXScope target, String file) {
+    return loadSafetensorsImpl(target, file, null);
+  }
+
+  /**
+   * Retains only the named tensors from the native lazy file graph. Unselected entries never get
+   * target-scope handles and are never evaluated; their file graph handles are released with the
+   * temporary native map. Every requested name must exist. Metadata is returned in full.
+   */
+  public static SafetensorsResult loadSafetensors(
+      MLXScope target, String file, Set<String> selected) {
+    return loadSafetensorsImpl(target, file, Set.copyOf(selected));
+  }
+
+  private static SafetensorsResult loadSafetensorsImpl(
+      MLXScope target, String file, Set<String> selected) {
     Objects.requireNonNull(target, "loadSafetensors: target must not be null");
     Objects.requireNonNull(file, "loadSafetensors: file must not be null");
     try (Arena tmp = Arena.ofConfined()) {
@@ -51,7 +66,13 @@ public final class MLXIO {
             () ->
                 mlx_h.mlx_load_safetensors(
                     tensorMap, metaMap, filePath, NativeOps.DEFAULT_CPU_STREAM));
-        Map<String, MLXArray> tensors = readArrayMap(tensorMap, target, tmp);
+        Map<String, MLXArray> tensors = readArrayMap(tensorMap, target, tmp, selected);
+        if (selected != null && !tensors.keySet().equals(selected)) {
+          Set<String> missing = new java.util.TreeSet<>(selected);
+          missing.removeAll(tensors.keySet());
+          throw new IllegalArgumentException(
+              "safetensors selection contains missing names: " + missing);
+        }
         Map<String, String> metadata = readStringMap(metaMap, tmp);
         return new SafetensorsResult(tensors, metadata);
       } finally {
@@ -105,7 +126,8 @@ public final class MLXIO {
    * {@code valueScratch} itself is freed once the whole loop ends, since it is never {@code
    * MLXScope}-tracked and nothing else will release whatever it last held.
    */
-  private static Map<String, MLXArray> readArrayMap(MemorySegment map, MLXScope target, Arena tmp) {
+  private static Map<String, MLXArray> readArrayMap(
+      MemorySegment map, MLXScope target, Arena tmp, Set<String> selected) {
     Map<String, MLXArray> result = new LinkedHashMap<>();
     MemorySegment it = mlx_h.mlx_map_string_to_array_iterator_new(tmp, map);
     MemorySegment valueScratch = mlx_h.mlx_array_new(tmp);
@@ -115,6 +137,9 @@ public final class MLXIO {
           "loadSafetensors.next",
           () -> mlx_h.mlx_map_string_to_array_iterator_next(keySlot, valueScratch, it))) {
         String key = NativeOps.readNativeString(keySlot.get(ValueLayout.ADDRESS, 0));
+        if (selected != null && !selected.contains(key)) {
+          continue;
+        }
         MemorySegment arr = mlx_h.mlx_array_new(target);
         NativeOps.checked(
             "loadSafetensors.next.copy", () -> mlx_h.mlx_array_set(arr, valueScratch));

@@ -120,9 +120,11 @@ are not substitutes for the planned committed-source benchmark and default revie
 without that flag it verifies them. The ordinary Gradle guard performs its own digest checks
 without Python. This provenance inventory is not a claim that Phase 7.6 is complete.
 
-The [final WP1 report](../../req/plans/phase7-6-wp1-benchmark.md) links the clean-source timing
-and count records. Prefill default selection remains a review gate, not an automatic outcome
-of generating those files. Full model acceptance remains pending.
+The [baseline WP1 report](../../req/plans/phase7-6-wp1-benchmark.md) preserves the original
+timing and count records. The later
+[optimization report](../../req/plans/phase7-6-wp1-optimization.md) records the user-selected
+chunked default passing the required structural performance gate. Full model acceptance remains
+pending.
 
 ## WP1 structural optimization
 

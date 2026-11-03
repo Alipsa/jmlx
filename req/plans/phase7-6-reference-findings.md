@@ -219,4 +219,26 @@ Its clean-source records include independent HF qualification at all 12 prepared
 actual 48-call aggregate times, first per-shape calls, warmed samples and separately measured
 native API downcall counts. At 1,280 tokens, Java chunked/recurrent medians are about 2.55/13.85 s;
 the custom Metal reference is about 115 ms. Call counts are not GPU dispatch counts. The maximum
-Java/HF output/state error in the matrix is about 1.85e-6. The WP1 default review remains open.
+Java/HF output/state error in the matrix is about 1.85e-6. These are the preserved baseline
+measurements; the optimization and default decision below supersede that review checkpoint.
+
+### Optimized WP1 and subsequent component checks (2026-11-03)
+
+The user selected chunked ops prefill and requested structural optimization before WP2. The
+[optimized report](phase7-6-wp1-optimization.md) records 474 ms at 48 calls/1,280 tokens,
+1.56× mlx-vlm's ordinary chunked ops, meeting the approximately 600 ms target. Strict HF and
+unchanged memory gates pass. The dedicated decode path has zero internal `mlx_eval` calls and
+one caller boundary call. Custom Metal is deferred; the built-in op remains excluded. WP1 is
+complete and component implementation proceeds without another default-selection approval.
+
+Independent HF attention/block fixtures now qualify per-head query/gate splitting, configured
+head width, cached decode and unequal T/H/W partial rotary prefixes. The untouched rotary tail
+compares exactly. Existing Qwen3-VL full-head requirements are preserved.
+
+The actual saved mlx-lm 0.32.2 float/affine configs use `rope_parameters.type: default` rather
+than `rope_type`. This is an observed converter serialization detail, not a missing default.
+The checkpoint classifier accepts that explicit alias only in structurally converted layouts,
+requires any duplicate to agree and leaves the original artifacts unchanged. The HF rule still
+requires `rope_type`. Float parameter shifts/transposes match the actual converter outputs
+bit-for-bit; packed U32 weights retain their bits while floating sidecars become FLOAT32.
+These storage checks do not yet qualify full-model outputs.

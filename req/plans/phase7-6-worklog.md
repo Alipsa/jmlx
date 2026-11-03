@@ -121,3 +121,27 @@ tests execute and pass at the unchanged 1e-4 bound; rotary tails compare exactly
 prefill and invalid mask/rotation preflight are covered. New native suite is required in CI.
 The partial-rotary Javadoc now distinguishes qualified Qwen3.5 behavior from the unchanged
 Qwen3-VL full-head requirement. Full model loading and generation remain pending.
+
+## WP3 preflight and storage checks
+
+Added pure `Qwen35Descriptor`/`Qwen35Checkpoint` and complete header shape/type/byte-range
+validation. Actual five tiny converter artifacts and both recorded real-artifact inventories
+classify successfully. Malformed schedules, rotary metadata, capabilities, prefixes, axes,
+MTP combinations, partial vision, unknown keys and invalid byte ranges fail before loading.
+Typed metadata does not decide capability. Original real configs are copied under evidence;
+their hashes match the existing original Hub file inventory.
+
+`Qwen35Weights` selectively retains validated parameters, applies HF-only norm shifts and
+convolution transposes once, selects patch axes by shape and preserves packed U32 values.
+The new `MLXIO` overload releases unselected lazy native file entries without target-scope
+handles or evaluation. Thus recognized MTP data never becomes evaluated model parameters.
+Actual float converter parameters compare bit-for-bit with normalized HF parameters; packed
+weights retain every bit and floating sidecars become FLOAT32. Both new native tests execute
+and pass; required CI coverage is wired. `:check :jmlx-core:check :jmlx-models:check` passes.
+
+Actual mlx-lm config serialization requires the explicit `rope_parameters.type: default`
+alias after converted-layout classification; this dated finding is recorded in the living
+plan. Missing types and conflicting aliases remain rejected. Full-model float/packed output
+acceptance is still pending the WP4 stack; storage checks alone do not complete WP3's
+numerical gate. Next record pre-change exact bits in both modes, then extract the generation
+loop in its own commit before hybrid generation integration.

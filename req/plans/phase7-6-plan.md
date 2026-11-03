@@ -243,6 +243,12 @@ rejected by name. The nested factor is canonical. An optional duplicate at the t
 `text_config` must be numeric and equal to it; disagreement is rejected. If the nested factor
 is absent, reject even if the top-level alias exists. This deliberately supports the observed
 explicit configs rather than guessing between HF model/config defaults of 1.0 and 0.25.
+
+2026-11-03 implementation finding: actual mlx-lm 0.32.2 saved output spells the explicit
+default type as `rope_parameters.type`, not `rope_type`. After complete inventory classification
+has selected a converted layout, accept that known serialization alias with value `default`.
+Require any duplicate `rope_type` to agree. HF layout still requires `rope_type`; neither path
+defaults a missing type or layout flag. The original saved files remain unchanged.
 WP0 records nested-only, matching/conflicting duplicates and missing-factor cases against HF;
 Java tests pin the strict acceptance/rejection policy separately from HF's defaulting behavior.
 

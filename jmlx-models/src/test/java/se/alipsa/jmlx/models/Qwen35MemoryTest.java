@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -51,9 +52,23 @@ class Qwen35MemoryTest {
               session.evaluateAndCommit(logits, StepBoundaryEvaluator.NATIVE);
             }
           }
-          // K/V allocator tiers are exact at these lengths; no visual or layer graph may survive.
           long observed = MLXMemoryTestSupport.settledActiveBytes() - baseline;
-          assertEquals(fixed + 2L * end * 64 * Float.BYTES, observed, "position " + end);
+          long expected = fixed + 2L * end * 64 * Float.BYTES;
+          if (end == 128) {
+            // The 32768-byte K/V requests sit in the allocator's pool-reuse window
+            // [n, min(2n, n + 2 * page)), which contains the 49152-byte GDN state
+            // buffers, and the pinned MLX 0.32.4 Metal allocator charges the physical
+            // buffer length into activeBytes (buffer_cache.h, metal/allocator.cpp).
+            // K and/or V may therefore be charged 49152 instead of 32768: 0, 16384 or
+            // 32768 bytes over. That over-charge is the live K/V buffer itself; it dies
+            // at the 129 tier crossing and with the session, which the exact baseline
+            // assertion below re-checks.
+            long delta = observed - expected;
+            assertTrue(delta == 0 || delta == 16384 || delta == 32768, "position 128: " + delta);
+          } else {
+            // K/V allocator tiers are exact at these lengths; no visual or layer graph may survive.
+            assertEquals(expected, observed, "position " + end);
+          }
         }
         borrowed = session.recurrent(0).state();
       }

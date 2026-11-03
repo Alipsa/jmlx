@@ -86,7 +86,7 @@ tasks.withType(Test).configureEach {
 // Exact float32 reference comparisons run separately from default-precision inference tests.
 // Tag new strict references with full-float32 so the mode is enforced before MLX initializes.
 tasks.named('test', Test) {
-    useJUnitPlatform { excludeTags 'full-float32' }
+    useJUnitPlatform { excludeTags 'full-float32', 'qwen35-benchmark' }
     environment 'MLX_ENABLE_TF32', '1'
     inputs.property('mlxEnableTf32', '1')
 }
@@ -104,6 +104,30 @@ tasks.register('float32GoldenTest', Test) {
 }
 
 tasks.named('check') { dependsOn tasks.named('float32GoldenTest') }
+
+def qwen35BindingAgent = tasks.register('qwen35BindingAgent', Jar) {
+    dependsOn tasks.named('testClasses')
+    archiveClassifier = 'qwen35-benchmark-agent'
+    from(sourceSets.test.output) { include '**/BindingCounterAgent*.class' }
+    manifest.attributes('Premain-Class': 'se.alipsa.jmlx.nn.BindingCounterAgent')
+}
+
+tasks.register('deltaBenchmark', Test) {
+    group = 'verification'
+    description = 'Opt-in evaluated Qwen3.5 delta prototypes; optional separate native-call count run.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'qwen35-benchmark' }
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+    maxHeapSize = '2g'
+    outputs.upToDateWhen { false }
+    if (providers.gradleProperty('qwen35CountBindings').getOrElse('false').toBoolean()) {
+        dependsOn qwen35BindingAgent
+        jvmArgs "-javaagent:${qwen35BindingAgent.get().archiveFile.get().asFile.absolutePath}"
+    }
+}
 
 // Internal reader variants must never appear in published POM/module metadata.
 components.java.withVariantsFromConfiguration(configurations.testFixturesApiElements) { skip() }

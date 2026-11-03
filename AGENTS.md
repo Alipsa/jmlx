@@ -1060,3 +1060,17 @@ those rounds that still apply:
   models' shared helper.
 - Review-round labels do not belong in public API Javadoc, and upstream API
   docs don't name their downstream consumers.
+
+## Phase 7.6 in progress
+
+The isolated `tools/qwen35-reference/` environments and provenance guard cover executable
+Qwen3.5 reference probes and component fixtures; Python remains opt-in. Core adds
+`GatedDeltaNet`, package-private `GatedDeltaRule` prototypes and request-owned `RecurrentCache`.
+Prefill selection is explicit pending the plan's WP1 benchmark/default review. These components
+do not yet add `qwen3_5` model loading or generation support. Strict component suites
+`GatedDeltaRuleTest` and `GatedDeltaNetTest` run in `float32GoldenTest`; `RecurrentCacheTest` and
+`GatedDeltaMemoryTest` cover ordinary-mode ownership and bounded temporary graphs. All four
+are required by CI's native execution assertion. `:jmlx-core:deltaBenchmark` is opt-in; its
+binding-count agent is a separate observation run whose timings must not be compared. Native
+pins, generated bindings, publication and versions are unchanged. See the Phase 7.6 plan,
+reference findings and worklog for pending integration and real-artifact acceptance gates.

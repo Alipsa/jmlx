@@ -245,3 +245,71 @@ by the pure reference guard as shared files. The old probe source before logits-
 is archived under executed-sources to retain exact executed hashes. Persistent FLOAT32 and
 candidate captures are under `.tier-b/phase7-6/captures/`. Next execute the two Java suites
 sequentially on committed source; retain failed runs and diagnose without loosening bounds.
+
+## WP7 real-artifact acceptance executed (2026-11-03)
+
+Both Java suites ran sequentially on committed source `ee822c9` (M5 Max, macOS 27.2, MLX
+0.32.4 / mlx-c a26f2d5, TF32 off), the 0.8B Tier-B first and the 27B manual run second.
+Both passed every numerical, stability, exact-ID/decoded-output and resource gate on the
+first attempt; no bound was loosened and no golden was regenerated:
+
+- 0.8B (`TierBQwen35Test`, task `qwen35-generation`): maximum Java/HF absolute logit error
+  8.320808410644531e-5 (text) and 4.0340423583984375e-4 (image), under the predeclared
+  ε = 0.001 / margin = 1e-4; exact greedy IDs and decoded output on both cases in every
+  warmed repetition; native peak 5,118,123,572 B and sampled footprint 6,648,795,264 B,
+  both under the predeclared 8e9/12e9 `resource_limits`. Record:
+  `tools/qwen35-reference/evidence/08b-java-acceptance.json`.
+- 27B (manual run against `tools/tier-b/qwen38-27b-4bit.json`): maximum Java/stock error
+  0.044699668884277344 (text) and 0.09969949722290039 (image), under ε =
+  0.10062797164916992 (the unchanged 0.001 arithmetic allowance plus the measured
+  0.09962797164916992 stock normalization contribution) / margin 1e-4, minimum top-two gap
+  0.3372325897216797; exact greedy IDs and decoded output on both cases; native peak
+  19,261,831,808 B, sampled footprint 22,680,715,080 B, load 853 ms. Record:
+  `27b-java-acceptance.json` plus `27b-java-normalization-attribution.json`; the
+  independently labeled diagnostic arrays never enter the acceptance goldens.
+- Default-precision comparison only (27B, mlx-vlm's default BF16 parameters against the
+  qualified FLOAT32 teacher histories): maximum logit difference 1.1851611137390137 (image
+  prefill), all recorded greedy choices agree. Record:
+  `27b-default-precision-comparison.json`; qualified acceptance remains FLOAT32/TF32 off.
+
+The 0.8B manifest gained its `local_evidence` block (measured maxima, peaks, walls);
+provenance was re-recorded and verified (190 local + 3 shared files, both manifests among
+the shared set).
+
+## Qwen35MemoryTest allocator over-charge resolved (2026-11-03)
+
+The intermittent +16384/+32768 activeBytes failure at position 128 is the pinned MLX 0.32.4
+Metal allocator's pool reuse, not a jmlx leak and not caused by per-step `clearCache`:
+`BufferCache::reuse_from_cache(n)` accepts any pooled buffer in `[n, min(2n, n + 2 * page))`,
+and `MetalAllocator::malloc` charges `active_memory_ += buf->length()` (the physical length,
+not the requested size). The fixture's 49152-byte GDN state buffers sit inside only the
+32768-byte KV tier's window (positions 65–128; the 16384 and 65536 tiers' windows exclude
+it), so K and/or V can be physically charged 49152 instead of 32768: 0, 16384 or 32768
+bytes over. The over-charge is the live K/V buffer itself — it dies at the 129 tier crossing
+and at session end (the exact baseline assertion always passed), and a KV-only probe without
+the GDN buffers is byte-exact clean at every step. Whether a pooled 49152 old-state buffer
+(handed back by the previous step's late Metal completion-handler teardown) is in the pool at
+the KV malloc races the dispatch thread, which makes the failure intermittent; `clearCache`
+only modulates the frequency because the pool refills intra-eval. Pre-fix failure values were
+always 247808 (+16384) or 264192 (+32768) against expected 231424, and never anything else
+across ~20 runs. The test now asserts that exact set of physically possible deltas at 128
+(with a comment citing the mechanism) and keeps exact equality at 64, 256 and the session-end
+baseline — the real leak check. Verified stable: 10 consecutive full-suite runs pass. The
+PR #46 rule (memory 030d45fb) "clear the cache before the endpoint and assert exact equality"
+holds only while endpoint requests are below 16 KiB or their windows contain no other
+retained size; this fixture is the first counterexample geometry.
+
+## WP8 closeout (2026-11-03)
+
+- `.github/workflows/tier-b.yml`: new `qwen35` arm on `self-macos-xl` (task
+  `qwen35-generation`, suite `TierBQwen35Test`); the header and step comments now cover the
+  four self-hosted arms.
+- Docs updated: `req/phase6-compatibility.md`, `req/phase6-inference-report.md`,
+  `req/phase6-tier-b-artifacts.md`, `req/phase6-golden-precision.md`,
+  `tools/tier-b/README.md`, `jmlx-models/README.md`, the parent plan's delivery-order table
+  and §7.6 status, and AGENTS.md.
+- The three scratch memory-diagnostic tests were deleted; the throwaway benchmark worktree
+  was removed.
+- Full root `./gradlew check` re-run green on the final tree (post memory-test fix); PR
+  opened against `main`. No merge is authorized; human review and the hosted CI runs
+  (macOS 26 native job; the qwen35 arm's first self-hosted execution) remain pending.

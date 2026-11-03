@@ -1061,17 +1061,75 @@ those rounds that still apply:
 - Review-round labels do not belong in public API Javadoc, and upstream API
   docs don't name their downstream consumers.
 
-## Phase 7.6 in progress
+## Phase 7.6 additions
 
-The isolated `tools/qwen35-reference/` environments and provenance guard cover executable
-Qwen3.5 reference probes and component fixtures; Python remains opt-in. Core adds
-`GatedDeltaNet`, package-private `GatedDeltaRule` prototypes and request-owned `RecurrentCache`.
-Chunked prefill passed the WP1 structural optimization gate; single-token decode is lazy,
-with the session responsible for evaluating output and all retained state roots together. These components
-do not yet add `qwen3_5` model loading or generation support. Strict component suites
-`GatedDeltaRuleTest` and `GatedDeltaNetTest` run in `float32GoldenTest`; `RecurrentCacheTest` and
-`GatedDeltaMemoryTest` cover ordinary-mode ownership and bounded temporary graphs. All four
-are required by CI's native execution assertion. `:jmlx-core:deltaBenchmark` is opt-in; its
-binding-count agent is a separate observation run whose timings must not be compared. Native
-pins, generated bindings, publication and versions are unchanged. See the Phase 7.6 plan,
-reference findings and worklog for pending integration and real-artifact acceptance gates.
+Phase 7.6 is the hybrid Qwen3.5/Qwen3.8 text+image milestone; `req/plans/phase7-6-plan.md`
+(the reviewed sub-plan) and `req/plans/phase7-6-reference-findings.md` are the authoritative
+records, with the checkpoint-by-checkpoint evidence in `req/plans/phase7-6-worklog.md` and
+the WP1 performance gate in `req/plans/phase7-6-wp1-optimization.md`. `tools/qwen35-reference/`
+is the isolated opt-in reference/converter tool (hash-locked `hf/` and `mlx/` venvs,
+digest-pinned `provenance.json` verified by the pure-Java guard in root `check`; 190 local +
+3 shared files, the shared set including both `tools/tier-b` qwen35 manifests); Python
+remains an explicit, venv-dependent step.
+
+Core adds to `se.alipsa.jmlx.nn`: `GatedDeltaNet` (Gated DeltaNet linear attention: causal
+kernel-4 short convolution, L2/Q-scale convention `x / sqrt(sum(x*x) + 1e-6)`, float32
+recurrent state `[B,Hv,Dk,Dv]`, 64-token chunked prefill with a stable batched 64×64 inverse
+and bounded state-scan windows, plus a dedicated lazy single-token decode), package-private
+`GatedDeltaRule` prototypes, request-owned `RecurrentCache` (deferred state replacement; the
+session evaluates logits and every retained state root once at the token boundary and
+poisons the session on evaluation failure before committing its position),
+`GatedDecoderAttention` (gated full attention: per-head query/gate split, shifted ordinary
+Q/K RMSNorms, partial interleaved MRoPE, sigmoid gate) and `HybridDecoderBlock`. Chunked
+prefill passed the WP1 structural optimization gate at clean commit `2c3f9da` (474.313 ms
+for 48 calls / 1,280 tokens vs the ~600 ms target); custom Metal and MLX's built-in
+`mlx_fast_gated_delta_update` remain excluded. `:jmlx-core:deltaBenchmark` is opt-in; its
+binding-count agent is a separate observation run whose timings must not be compared.
+
+`jmlx-models` adds `Qwen35Model implements TextGenerationModel` (dense `qwen3_5` only,
+dispatched before the generic mappings; `Qwen35Model` is not a `DecoderModel`, so the batch
+scheduler's existing rejection applies), the strict `Qwen35Descriptor`/`Qwen35Checkpoint`
+(header shape/type/byte-range preflight before any allocation) and `Qwen35Weights`
+(selective parameter retention with the HF-only `+1` norm shift and conv transpose applied
+once, shape-detected patch axes, packed U32 retention; the new `MLXIO` overload releases
+unselected lazy file entries, so recognized MTP data never becomes evaluated parameters),
+the internal `Qwen35Decoder` session (one recurrent cache per linear layer, one KV cache per
+full-attention layer, atomic position/commit, FULL and capacity-bounded retention, sliding
+rejected), and the package-private `GenerationLoop` extracted from `DecoderModel.runStepLoop`
+(own commit; old-path exact bits verified for all 14 existing family/quantized variants in
+both TF32 modes before hybrid use). Storage layouts: HF float, mlx-vlm float/affine,
+mlx-lm float/affine (text-only, images rejected); a complete vision inventory is
+TEXT+IMAGE through the shared `Qwen3VlVisionTower` (whose constructor now permits empty
+DeepStack levels — the Qwen3-VL descriptor/loader guard is preserved and checked explicitly
+before construction), a partial tower is rejected. Float weights load as FLOAT32; uniform
+affine 4-bit group-64 projections stay packed.
+
+Required native suites: core `GatedDeltaRuleTest`, `GatedDeltaNetTest` and
+`HybridDecoderBlockTest` in `float32GoldenTest` (strict `1e-4`), `RecurrentCacheTest` and
+`GatedDeltaMemoryTest` in ordinary mode; models `Qwen35WeightsTest`, `Qwen35TextGoldenTest`,
+`Qwen35PackedGoldenTest` and `Qwen35VisionGoldenTest` in `float32GoldenTest`, plus
+`Qwen35GenerationTest`, `Qwen35MemoryTest`, `Qwen35DecodeCounterTest`,
+`Qwen35CheckpointTest` and `Qwen35DefaultPrecisionTest` (named default-TF32 bound `0.005`,
+measured `0.0014960468`) in ordinary mode — all in the macOS CI required-suite assertion.
+Real-artifact acceptance: the 0.8B Tier-B (`tools/tier-b/qwen35-08b.json`, task
+`qwen35-generation`, `TierBQwen35Test`, predeclared ε = 0.001 / margin 1e-4; measured
+maximum 4.0340423583984375e-4, native peak 5,118,123,572 B, footprint 6,648,795,264 B)
+gets a `tier-b.yml` arm on the self-hosted `self-macos-xl` runner (measured footprint within
+~400 MB of the hosted 7 GB RAM); the 27B (`tools/tier-b/qwen38-27b-4bit.json`, ε =
+0.10062797164916992 = 0.001 arithmetic + measured 0.09962797164916992 stock normalization
+contribution; measured maxima 0.0447 text / 0.0997 image, native peak 19,261,831,808 B,
+footprint 22,680,715,080 B) remains a resource-qualified manual acceptance, not a hosted
+runner claim. Measured maxima are recorded in `req/phase6-golden-precision.md`; the
+normalization-only diagnostic never enters acceptance goldens.
+
+Known measurement subtlety (root-caused 2026-11-03, see the worklog): `MLXMemory.activeBytes()`
+counts the Metal allocator's physical buffer length, and the pinned MLX 0.32.4
+`BufferCache::reuse_from_cache(n)` accepts any pooled buffer in `[n, min(2n, n + 2 * page))`.
+A KV request tier whose window contains another retained buffer size (here the 32768-byte KV
+tier containing the 49152-byte GDN state buffers) can therefore be charged the larger
+physical size — a live-buffer over-charge of up to one page per buffer, not a leak, dying at
+the tier crossing and at session end. Exact activeBytes endpoint assertions are only valid
+while endpoint requests are below 16 KiB or their reuse windows contain no other retained
+size (the PR #46 `VisionLanguageMemoryTest` rule); otherwise assert the derived set of
+physically possible values, as `Qwen35MemoryTest` does at position 128. No native pins,
+generated bindings, publication or versions changed in this milestone.

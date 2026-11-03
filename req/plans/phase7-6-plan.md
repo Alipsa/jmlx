@@ -1,8 +1,9 @@
 # Phase 7.6 — Hybrid Qwen text and image inference
 
-- **Status:** implementation in progress, 2026-11-03. Reference probes and core DeltaNet
-  prototypes have local evidence; model integration and acceptance remain pending.
-  See the [worklog](phase7-6-worklog.md) for the current checkpoint and
+- **Status:** implementation complete on `phase7-6-implementation`, 2026-11-03 (PR pending;
+  macOS 26 hosted CI and the qwen35 arm's first self-hosted Tier-B run remain pending). All
+  work packages executed with local evidence; see the [worklog](phase7-6-worklog.md) for the
+  checkpoint-by-checkpoint record and
   [WP1 optimization report](phase7-6-wp1-optimization.md) for the completed structural gate.
 - **Parent:** [Phase 7 §7.6](phase7-plan.md#76--hybrid-linear-attention-qwen-decoders-qwen38).
 - **Prerequisites:** 7.1 core operations, 7.3b vision/MRoPE and the delivered 7.5 paired-pin

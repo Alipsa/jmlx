@@ -254,3 +254,83 @@ the suite on a memory regression, but it is not a guarantee the runner's RAM sur
 M5 Max host (128 GB, macOS 27.0.1) that produced the local evidence, so runner fit is not the open
 question. While the self-hosted runner is offline the row's jobs wait and GitHub fails them after 24
 hours; the other rows run on the standard hosted runner (`tools/tier-b/README.md`).
+
+## Phase 7.6 Qwen3.5-0.8B Tier-B (2026-11-03)
+
+`tools/tier-b/qwen35-08b.json` pins `Qwen/Qwen3.5-0.8B` at revision
+`2fc06364715b967f1860aea9cf38778875588b17` (Apache-2.0, license evidence URL in the
+manifest): the 13-file WP0 inventory, 1,769,980,465 bytes in aggregate, each file
+SHA-256- and size-capped, downloaded through the Java `downloadTierBArtifact` manifest/SHA
+path.
+
+**Request.** Two greedy-8 cases with EOS stopping disabled: a text case ("What is two plus
+two? Answer briefly.", 21 positions) and an image case (the digest-pinned
+`tools/image-oracle/fast-comparison/fixtures/model-rgb-256x256.png`, MIT-licensed synthetic
+RGB, 83 expanded positions, delta −56). The chat template is the artifact's own with
+`enable_thinking: false`; the image path is the shared Qwen3-VL patch-16 processor (mean/std
+0.5, 4096 raw-row budget and effective pixel cap).
+
+**Reference.** The isolated locked HF environment under `tools/qwen35-reference/`
+(transformers 5.22.1, CPU float32, eager attention, seed 20261102) renders the prompts,
+expands the image, and records the full-vocabulary logit vector at every expected greedy
+history step (`tools/qwen35-reference/goldens/real-hf-08b-stock-logits.npz`). Bounds were
+predeclared before any Java run: ε = 0.001 / margin = 1e-4 (the reference's own
+cached-versus-fresh text spread reached 3.19e-4 and is preserved as a failed 1e-4
+measurement, never absorbed); eligibility is `gap > 2*epsilon + margin` at every recorded
+step.
+
+**Java suite.** `TierBQwen35Test` (task `qwen35-generation`, `model_type: qwen3_5`, part of
+the `tierBTest` suites map): re-verifies the image digest, re-processes it through
+`jmlx-vision`'s Qwen3-VL processor and asserts the reference's byte-exact processed pixels
+and grid, the rendered prompt, original/expanded IDs and the three MRoPE position arrays,
+compares every prefill/cached logit vector under the recorded ε, re-derives the reference's
+own gaps and applies the stability gate to both the reference vectors and the Java run's own
+measured margins, and asserts the exact greedy IDs, the exact decoded output (the case's
+`expected_text`), prompt positions, finish reason and the predeclared `resource_limits`
+(native peak ≤ 8e9, sampled footprint ≤ 12e9).
+
+**Measured local evidence** (manifest `local_evidence`; M5 Max / macOS 27.2, TF32 off, pinned
+mlx-metal 0.32.4 / mlx-c a26f2d5, commit `ee822c9`): maximum Java-vs-reference absolute logit
+error **8.320808410644531e-5** (text) and **4.0340423583984375e-4** (image), both far under
+ε; exact greedy IDs `[19, 248046, 198, 248044, 248045, 74455, 248068, 271]` (text) and
+`[1919, 369, 264, 10558, 11, 19556, 3870, 440]` (image) plus the pinned decoded outputs on
+every warmed repetition; native peak 5,118,123,572 bytes; sampled process footprint peak
+6,648,795,264 bytes; load wall 448.6 ms; warmed image-case generation wall ~144.9 ms (median
+of three). Full record: `tools/qwen35-reference/evidence/08b-java-acceptance.json`.
+
+**27B manual run.** `tools/tier-b/qwen38-27b-4bit.json` pins
+`mlx-community/Qwen3.8-27B-4bit` at revision `10c35caafbb80f7dc6a7a432cdd11af10a6d4818`
+(Apache-2.0, 15 files, 16,081,490,933 bytes; mlx-vlm 0.6.8 affine 4-bit group-64) for a
+recorded **manual** text/image run, not a hosted-runner claim: the measured 22.68 GB sampled
+footprint exceeds every hosted tier's RAM budget by an order of magnitude. ε =
+0.10062797164916992 composes the unchanged 0.001 arithmetic allowance with the measured
+0.09962797164916992 stock normalization contribution (mlx-vlm 0.6.8 passes `1e-6` directly
+to its Q/K RMSNorms instead of rescaling it — effective sum-space epsilon `Dk * 1e-6` =
+128e-6 at the 256-wide heads), margin 1e-4; the minimum top-two gap 0.3372325897216797
+exceeds 2ε + margin. The Java run's measured maxima (0.044699668884277344 text /
+0.09969949722290039 image) sit inside the normalization component alone; exact greedy IDs
+(`[588, 1330, 2250, 2943, 4097, 4590, 7840, 7810]` → "one two three four five six seven
+eight" text; `[1919, 2099, 369, 264, 10558, 11, 7859, 19556]` → "This image is a smooth,
+abstract gradient" image) and the exact decoded outputs match on both cases; native peak
+19,261,831,808 bytes, sampled footprint 22,680,715,080 bytes, load 853 ms. The independently
+labeled normalization-only diagnostic never enters the acceptance goldens, and the original
+prompt pair (whose late text continuation carries a 0.29576 normalization shift that would
+have widened the envelope beyond the other phases) is preserved as ineligible. A
+default-precision comparison (mlx-vlm's default BF16 parameters against the qualified
+FLOAT32 teacher histories; comparison only, not an acceptance) measured a maximum logit
+difference of 1.1851611137390137 with all recorded greedy choices agreeing — qualified
+acceptance remains FLOAT32/TF32 off. Full records:
+`tools/qwen35-reference/evidence/27b-java-acceptance.json`,
+`27b-java-normalization-attribution.json` and `27b-default-precision-comparison.json`.
+
+**CI status: first self-hosted run pending.** A `qwen35` row was added to
+`.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner: the measured
+6,648,795,264-byte (~6.2 GiB) footprint sits within ~400 MB of the standard runner's entire
+7 GB once the OS, test JVM and Gradle daemon share it, so the row does not target the hosted
+tier (GitHub's larger `macos-26-xlarge` tier is billed per minute even in public repos, and
+the row does not use it either). The row's first execution accepts the CI pipeline
+(checkout, artifact download, native bootstrap, pinned suite), not independent host, OS or
+memory-fit evidence, and the supported macOS 26 hosted execution remains pending. The
+suite's footprint bound fails the suite on a memory regression, but it is not a guarantee
+the runner's RAM survives a large regression (the OS and the Gradle daemon share that RAM,
+and macOS may swap or kill first).

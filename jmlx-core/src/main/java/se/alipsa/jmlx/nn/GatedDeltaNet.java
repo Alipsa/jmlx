@@ -108,10 +108,14 @@ public final class GatedDeltaNet extends Module {
     keyScale = scalar(scope, (float) (1 / Math.sqrt(keyDim)));
     zero = scalar(scope, 0f);
     l2Epsilon = scalar(scope, 1e-6f);
-    decayRate = MLXOps.negative(MLXOps.exp(decayLog));
+    MLXArray exp = MLXOps.exp(decayLog);
+    decayRate = MLXOps.negative(exp);
     // Every array the model keeps is evaluated during loading; these constants are no
     // exception, so the first request pays no one-time evaluation of them.
     MLX.eval(keyScale, zero, l2Epsilon, decayRate);
+    // exp is a construction input, not a model array: release it once decayRate is
+    // evaluated from it, so the model's retained set is exactly its parameters.
+    exp.close();
   }
 
   /** Creates this layer's empty cache in the request scope. */

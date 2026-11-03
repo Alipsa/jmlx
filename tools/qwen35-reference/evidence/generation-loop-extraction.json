@@ -1,0 +1,977 @@
+{
+  "purpose": "Before/after generation-loop extraction; exact bits and IDs, no tolerance",
+  "baseline_commit": "167eb382823f38b70de5b0b40ee822fd055d04c1",
+  "verification": "exactBitsVerifyTf32On and exactBitsVerifyTf32Off pass; models:check passes",
+  "modes": {
+    "tf32-0": {
+      "manifest": {
+        "formatVersion": 1,
+        "metadata": {
+          "gitCommit": "167eb382823f38b70de5b0b40ee822fd055d04c1",
+          "mlxMetalVersion": "0.32.4",
+          "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a",
+          "device": "gpu",
+          "osName": "Mac OS X",
+          "osVersion": "27.2",
+          "mlxEnableTf32": "0",
+          "specHash": "846396b1dbab5a770a4f2c36841fe5ed1570a586b908956ed6e224fe5248e687",
+          "inputHashes": {},
+          "derivedHashes": {},
+          "gitDirty": true,
+          "decoderModelSha256": "1a8d7493de47068a26d1697779b687746d14f0d4cfa850d1b44aca4ccac2715f"
+        },
+        "variants": [
+          {
+            "name": "llama",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "a1af239e0ebb8508206698a828409509c898e93e13e9164eb01af261de1bfcab",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
+              "model.safetensors": "fddd759c4e3e2ef9d91a860a60acb455779e765adebf17d9ac5dbb026058fddd"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "llama-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "60e90c0b177ea379125a3ade91ba05e5065479a92301cbb5ca5b9acbc2be2a56",
+              "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
+              "model.safetensors": "61aecf1af570b9ea7cc839c961bd32da646a1ef2d6bf5583d14dd719c1e06cad"
+            },
+            "derivedHashes": {
+              "config.json": "60e90c0b177ea379125a3ade91ba05e5065479a92301cbb5ca5b9acbc2be2a56",
+              "model.safetensors": "61aecf1af570b9ea7cc839c961bd32da646a1ef2d6bf5583d14dd719c1e06cad"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "llama31",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "cb3733b046b2cedca472506f8007cd1f7b8f27aa4300fb0ac9f06f9e1d53d4af",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "llama31.json": "51c231ec47bfa9461ca7b1b85cfc9899b21ab0691e218510d5f0f49cd706b5a4",
+              "model.safetensors": "86e2244f8bd9c2c11faebc5cbf018f712369366dde1e092e2d80596c5d9dac73"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "mistral",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "f264145b637eb7a817405303c62361668decaa101254416f657967c9ac479d1b",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "mistral.json": "c9c7b6fae983a8ec1f36fa0b9acb25c804bd8e46df7af1b0f73b2779bd144554",
+              "model.safetensors": "bec89ce16aa77ca108bbfe50df038413a389d768dd5dae0d6f73b11beaf65899"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "mistral-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "b91081d441339115e305d5468dacfa54fd3cbff22c90bd4f2089f245a6bdc8d6",
+              "mistral.json": "c9c7b6fae983a8ec1f36fa0b9acb25c804bd8e46df7af1b0f73b2779bd144554",
+              "model.safetensors": "a30fc78c00c9d395368733046f80cb63ed2169e7d084224673411a59ad089161"
+            },
+            "derivedHashes": {
+              "config.json": "b91081d441339115e305d5468dacfa54fd3cbff22c90bd4f2089f245a6bdc8d6",
+              "model.safetensors": "a30fc78c00c9d395368733046f80cb63ed2169e7d084224673411a59ad089161"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "mixtral",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "c984369fc0e51272226236c53a1d594362f21893d21c334adab28fd1cd9fae8b",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "mixtral.json": "a918494a8f61a882393772b6d1fbaa0deab33b32c84cccb5c0d995f685fee8aa",
+              "model.safetensors": "774a4341deebb0d2ceadc3bc1091e27ff3f73aec429d8897b8b6d10671e45977"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "phi3",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "6475c662e1775c4b5825d0770858d71de5ba80f7916deb0af9fae8a817161416",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "10fc24460fd1406e835395b1d0ffb71818907913702a897f6c27d5ee02d0f3e9",
+              "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "phi3-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "409ea82cc0528c02d5311c67c487925369e49f81c9f2e3ee785ee93a716c58ec",
+              "model.safetensors": "3d247c6f96f908f11491f366d216e0bdbea165ba645406392299927fa5f5ea45",
+              "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06"
+            },
+            "derivedHashes": {
+              "config.json": "409ea82cc0528c02d5311c67c487925369e49f81c9f2e3ee785ee93a716c58ec",
+              "model.safetensors": "3d247c6f96f908f11491f366d216e0bdbea165ba645406392299927fa5f5ea45"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen2",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "b9fce8ff7244a8001ad1ca40cdb66c32dbf2193e70f1f63b7244e8f7259a4a4c",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "a4032dcfb112f07e57c5b3c3ceb0974a3177491363e8170e40c4ffdc817b28ef",
+              "qwen2.json": "a98b86fcffbcc3528543f90f0d960e9302a0524ad672e00d466e2a7d2868b24e"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen2-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "23629970f5e2159eff29f81663c300e2ba86bd0480a268736e3f77adc1a92579",
+              "model.safetensors": "e490a294a6dc0d377960af33f4c6c9d5a5c1c82823ab27f5e242a4a81d47af43",
+              "qwen2.json": "a98b86fcffbcc3528543f90f0d960e9302a0524ad672e00d466e2a7d2868b24e"
+            },
+            "derivedHashes": {
+              "config.json": "23629970f5e2159eff29f81663c300e2ba86bd0480a268736e3f77adc1a92579",
+              "model.safetensors": "e490a294a6dc0d377960af33f4c6c9d5a5c1c82823ab27f5e242a4a81d47af43"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen3",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "87685f246c8fbcc0ea600681a726e9f99ee698cdbf0e550c9a2ea0983a81f57d",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "9b287aa3ed5343da031ad48e600ff8a9a2784c7efac5606fea957043e0a8d642",
+              "qwen3.json": "21c7aa6f2123ab61129e09d39eab2c99cc3c91bf50613c1fb96795d07149c012"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen3-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "d46dc15b2f045511e9582ddf41766dd12f90cad62eeecadc6eb36e2bdf4e8b37",
+              "model.safetensors": "d272e937f554ca2fe3615c9ffee8874c3d71e20603c5997b524668e3479f2971",
+              "qwen3.json": "21c7aa6f2123ab61129e09d39eab2c99cc3c91bf50613c1fb96795d07149c012"
+            },
+            "derivedHashes": {
+              "config.json": "d46dc15b2f045511e9582ddf41766dd12f90cad62eeecadc6eb36e2bdf4e8b37",
+              "model.safetensors": "d272e937f554ca2fe3615c9ffee8874c3d71e20603c5997b524668e3479f2971"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "gemma",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "699e044edc882eb6c13bc5f0409139fecc906c8ebd46ef8ea99c3f8b82cee830",
+              "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "9dd35c0ae0dcfa41863dd62507d2c01564794871b01db3edd4b620394bb689c5"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "gemma-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "20483b4d7fb87d7831e535b60990cc6a0a619b586e7df4923c4a800c258f04e7",
+              "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
+              "model.safetensors": "dfac518abab7289db1b04645edf5c5ba5dbf1ad4e423ee8bfe9cafecb2042e0c"
+            },
+            "derivedHashes": {
+              "config.json": "20483b4d7fb87d7831e535b60990cc6a0a619b586e7df4923c4a800c258f04e7",
+              "model.safetensors": "dfac518abab7289db1b04645edf5c5ba5dbf1ad4e423ee8bfe9cafecb2042e0c"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          }
+        ]
+      },
+      "capture_sha256": {
+        "gemma/batch-decode-0.json": "db1b8ad71007cd3930b196b3f81728ae6ae15f0c68894a4b6794beee00827bb4",
+        "gemma/batch-decode-1.json": "b6baa824883f6e35b799f7755fbcf41a70f73c9efe345ddcde1855c8e8f2de80",
+        "gemma/batch-prefill-hook.json": "0484f57714019172fcc35e189bc33f3c5c03f6708c93320090f8e21e3ef24d8d",
+        "gemma/batch-prefill.json": "7a6cc148ab1ab26f6c8e4f086c862d436c8f57dc5d1e726c24cfb82d319b6649",
+        "gemma/decode-step-0.json": "b39170f9dfaf961d668d45d9ae1e60e2fd36208503ccf014f44f80c0c290da67",
+        "gemma/decode-step-1.json": "8726e33d72642fa436a842b3f857ebf026342b344f4540551c280ee6abeedc6d",
+        "gemma/direct-prefill.json": "2e9c49b9d1e956646eff6fee37fd812d91d867c28d2f1f5be1c3ea0ac16336eb",
+        "gemma/greedy.json": "88e81f637e0ef27c8521af2ea1041fc2a70784cdcb1bc1d16cc7057e1e38ea66",
+        "gemma/scheduler.json": "80e631687a0beb895f52f6605c0212a357cc6b3b534c23124f42d880c7250a61",
+        "gemma-q4/batch-decode-0.json": "f54af173bc1d81f8f04631a5fefbe591e8596b4c05537b5cc1889179528ac00a",
+        "gemma-q4/batch-decode-1.json": "9d36205b488ef3e1a23fd678290a2bdd6febb3eeb03d1b88b0b12097142ca459",
+        "gemma-q4/batch-prefill-hook.json": "d3a57def5be37ad948b2cdce5f2516c572dc2ad75f090bac7335570c47a163fe",
+        "gemma-q4/batch-prefill.json": "cc6e8e9d60f0485a18566bec60b0983649c0bdb880beef7d14797b3842b93b05",
+        "gemma-q4/decode-step-0.json": "d8cb799c38170cbb5512f6499a3b891bc77d2c49ece4fe03f2008f1c3d0ee5ed",
+        "gemma-q4/decode-step-1.json": "dcf66a0d0771d4b1afecd01862d375bceb4451af749823d424d922cb05c09325",
+        "gemma-q4/direct-prefill.json": "57c2e02c03f5ee3fd772af21ccd1f45f895ca609b133fa8b650749b99fea2722",
+        "gemma-q4/greedy.json": "c79947cbefc7f6df0ef7c918a34e790b359d6dd59f9b0b5363480dc7b9fec545",
+        "gemma-q4/scheduler.json": "b0e7268b0f982a3eea7f108a5c4d38a689168d6c9cc32af39b0ccc296ad2e453",
+        "llama/batch-decode-0.json": "895c0023879d94ca75bc14e78b5289aee22a0e6363dcb5d73321800957496310",
+        "llama/batch-decode-1.json": "7fe15bf8473c9cbe3bb0ddcdbca6bd0f69c67adf0e0577e9edb26c4fe06526a5",
+        "llama/batch-prefill-hook.json": "0947af30b3fa6032608a90d9d575096a3d1dc0dcbbdc68cd66f41e9301a2211a",
+        "llama/batch-prefill.json": "83fb20f4590dc9e8baa57788c521e5991d2ba15f8251e8244b590cccb60a1b8d",
+        "llama/decode-step-0.json": "22414cf8f5e4d2009d2ffad25731097e9c478e2493a00bce0488da1c35e413f1",
+        "llama/decode-step-1.json": "6766dd3439c2c3287e8cc79d77cb5e5f63b429fb4fc37210efa3f11b31a31209",
+        "llama/direct-prefill.json": "b674fd19d70d5b07dc8146ffc465bcc0ae8090fc39e535b6ebbbe73912def7d5",
+        "llama/greedy.json": "05ebc14db4f8c9f165b03117bb5f9a42bfd971b3c7ce28e8f2b6110931009f5c",
+        "llama/scheduler.json": "ba80842204c05a44338bd902521f312db427e7b1d35400c6ac207dfbd251c7f4",
+        "llama-q4/batch-decode-0.json": "a313733f12af9543e43ddb9d3e3091110588ed9915699f69f12b06c034aec189",
+        "llama-q4/batch-decode-1.json": "512412da1bfc7f819fb1c893ddc45310c649acabe82887fea7c3999d654ec35e",
+        "llama-q4/batch-prefill-hook.json": "8a7d1f5fd12f99c612b813af9f01a89e175643bde8c292c11eb0e5423d988ae4",
+        "llama-q4/batch-prefill.json": "c055cb830110f8494b6db82a01b2ec630451a6fbe0a63e5df1724deb8d2a1976",
+        "llama-q4/decode-step-0.json": "72566937d57ce19009cd8e252f0a0d3c1fb2df3e16e3a44f0fddced6b6af4d31",
+        "llama-q4/decode-step-1.json": "305367912d7bb3a758a80a5647ca3ec183bb9b2f0a36d4d2da31f16877e22ff8",
+        "llama-q4/direct-prefill.json": "003a9de04d47e1e5173ffb519873124192ec05c01df03feb4bcc86f77b306be6",
+        "llama-q4/greedy.json": "61ebe482a0ac637fb382ff61fa7a2458f4268a6f3613cb4dbbe62a17de31d99a",
+        "llama-q4/scheduler.json": "14a4c33eafcdd382a4a3a44065b9b638500ae5ac3d4e4c3f716961c0bb927d78",
+        "llama31/batch-decode-0.json": "556e84066f8abb57a4e9cd5bec0b712271b4930e8518f4eb061f99f3e01b6dde",
+        "llama31/batch-decode-1.json": "b8c5c1015940bb80c40e53160f9be63a7d07a7c7cda1fe3e98e4c518964cdb5b",
+        "llama31/batch-prefill-hook.json": "0408c2b8728b5ab494b8debdaaee4f77592609520635c56001520f8a72295488",
+        "llama31/batch-prefill.json": "c6f14a54f847e494a80d719c13953616f958a7a8300668fdb315c6397fa94e72",
+        "llama31/decode-step-0.json": "8e8dbe95df5788f09cd31cc2dfb8c801b8c0e098d292d378a6497dc5800c2afb",
+        "llama31/decode-step-1.json": "0c0fa5d4e4f0c9ac406e3cb9cddad1ab88d3d2965c0c782b71025bc2ebbe5ce7",
+        "llama31/direct-prefill.json": "9db5bbc09dc16643ed483d69d04af57b7e4a58f513ae5d074d0c050a330afa5e",
+        "llama31/greedy.json": "d387076e192714194477c4dcd9bd6e5dd5e67b535074191aeae9a8a65234aa0c",
+        "llama31/scheduler.json": "86e980f06c8ac414ed324d2afa41a9bb17391afe0120ce5c812d183f2677cbc3",
+        "mistral/batch-decode-0.json": "1b01f1d4567cf1880f39a023fe385c1fdcde4aeaa9b6fe1a25e20196465bd30a",
+        "mistral/batch-decode-1.json": "36497a0f5b6e98d52769406f9c6862356c813980bebf66c8ece958ac8623437f",
+        "mistral/batch-prefill-hook.json": "3d5aae69bd657d2c2afa4a511d6cc8b6b3afea3255abdefc9febcb26021a8e6a",
+        "mistral/batch-prefill.json": "5d5e480c8b06a59127d888235f0165dedf8b5f54706f966b7d4da82377f689b8",
+        "mistral/decode-step-0.json": "b210da73964aaa689ce3930adeefa2bae0ae3d2c896b1f68d619dc9baf241a1b",
+        "mistral/decode-step-1.json": "7e123f6cca471253b37478e096854c12bad444429cc99dd33db4f9b56da099fd",
+        "mistral/direct-prefill.json": "9a881c32df87b2f7af54a85b9d8ae686abf772dcd27daee2ed5488a0a5f041dd",
+        "mistral/greedy.json": "3bc66f935529cb299f0272f93560485d26d5b8d2e1c7e907ece207a7c367d1ee",
+        "mistral/scheduler.json": "ac6580b3e75e9ecf9e795aa4f6fda462773ad2acb1996bea8825efcb9f4251c2",
+        "mistral-q4/batch-decode-0.json": "efa5dd6ea41c7f1e6ddae24dfc462ce832922462168c42ca9b529c749b955b4d",
+        "mistral-q4/batch-decode-1.json": "ce9ac7d1189c191206fed9d9d2268921efd464b78e241b1574fa08c1af4a40b0",
+        "mistral-q4/batch-prefill-hook.json": "08ad50374fc2b808cb277d3cea7bd6995a6da802ec9644cdfeefaa2077d8bd92",
+        "mistral-q4/batch-prefill.json": "d86415e37e192a69ea4e1ab0d842ae9defe43b44c5d36fcba78019d4220d4982",
+        "mistral-q4/decode-step-0.json": "b59840adf5b1a1d3e258f2171164b4680e7831ebaf686f6796da8da4c4cc070d",
+        "mistral-q4/decode-step-1.json": "5e3851b63ab3b8812ea22fe1eefee5e80e4a4c414273b3238cc79d0c1880c6ff",
+        "mistral-q4/direct-prefill.json": "2f463ccd9e234ce7877954391a69e59cf61fa4b1bcaad0797e427afc05aec7bf",
+        "mistral-q4/greedy.json": "d3dd71e1675d7cb212e89e5c071133d0aecc3ac72df39685c35ddc97277b7b8a",
+        "mistral-q4/scheduler.json": "2f3de9209740784f88ade18521bc47f95f3dfb777ab1b5d4407bb70afd7da0dd",
+        "mixtral/batch-decode-0.json": "3fbab2e149ade4d70e3b49e4de43826f8b248489359aacf098ac3af6e9183d15",
+        "mixtral/batch-decode-1.json": "5ae818c970dba701cfc3de3c5571a22872112bc11fda58d3bc6f41251ae17621",
+        "mixtral/batch-prefill-hook.json": "9600d7767337d7a715d8cb483d2cb31617df8795ee5214b886ad480850352316",
+        "mixtral/batch-prefill.json": "90def1393c0e7683db76ad522012ef479e30c011ab54522254a24448ac7bd5ef",
+        "mixtral/decode-step-0.json": "fa7a2c5e78f94c9ab401525b64ae5c511fb0225f83a67b3faff193015f24aa54",
+        "mixtral/decode-step-1.json": "fdfad0485f3c13a72fa326283890d05d8e9efcc36b478e995f91deb04abdccc9",
+        "mixtral/direct-prefill.json": "68d90be95be82f531b81c5688458a60b5877992aadf9855d6d206c381839d347",
+        "mixtral/greedy.json": "75b412cde30f294c374893f2619d9f5f1377544044ae74d0cff6bbee7adc16a7",
+        "mixtral/scheduler.json": "e7ea59c9b5863db0f23587805aef2a4ed01372cf5709c6658be4262d5cea87ad",
+        "phi3/batch-decode-0.json": "9793f1c83bd20cb90f3a06e22163859aa2c835e54bf27805818c8ccf44328bb5",
+        "phi3/batch-decode-1.json": "f5d3b23c5f8399b4c70edf03202fb25aff0a4c1b74ce39562bc9310d1975b32d",
+        "phi3/batch-prefill-hook.json": "3a2f474d9b76cf69d3154e222c5f7bf24ddc86ec10536bdf082a914018dd83ec",
+        "phi3/batch-prefill.json": "ab9adee5285d522b386a451deb16a7c977d551512767e09945b11155fd18fdfe",
+        "phi3/decode-step-0.json": "a6b8ed2bcb0bd6d07962081f5e17a4d81aa445a748edb8d8af25d1c9e9e3db6c",
+        "phi3/decode-step-1.json": "21a41eaf523e99298bb695605ff421d92cc766352ccee94802c431a67761af93",
+        "phi3/direct-prefill.json": "715bcc597a2953e3e5b507a1393b089f11e56fa86068255a0cd1990364e3f48b",
+        "phi3/greedy.json": "6dccbe938d7b1b4c275ea18cf3abcdc464057e3eee3409899131b248117202b0",
+        "phi3/scheduler.json": "7ddc19b5ac16b2f2e7c9fdb5343077a8d6fd772165f35b8b505fd4932becafdb",
+        "phi3-q4/batch-decode-0.json": "a28f02ed2b7136afaae18967aeb33c25b938075f053c2ba4cfe397df19205178",
+        "phi3-q4/batch-decode-1.json": "01f80052e02d52ae0fcb8f0760967839bd3c6947a671fdd657e0caa6c16e857b",
+        "phi3-q4/batch-prefill-hook.json": "e5ffbbda5e0c1cd102446484c4aaf22ed575421a270729d8f02bfe2865d0fbce",
+        "phi3-q4/batch-prefill.json": "0a6c31c06d29dc461698d46b46c89c3d9d5bd78f30d2e33bc1bca169ffafa208",
+        "phi3-q4/decode-step-0.json": "b61eae960934f08304a034e50d465c12c611c72b4d7259f3e926fa1f95a62ff8",
+        "phi3-q4/decode-step-1.json": "61d25260eb16bf213ac76652c5c381e3314fc3ced26337ca04a476df2a1556e4",
+        "phi3-q4/direct-prefill.json": "a9d0e4d8713cabdcacb1356eaa9c54e2ffb0597c253d2e9eba2955a786b0baf7",
+        "phi3-q4/greedy.json": "01ffb0ca308276c536a2791118e06ff1086eb0d75346850bf8a32a9e6eaa9a8a",
+        "phi3-q4/scheduler.json": "ab2c1e44387082fc1cf427a2af12fb831674cbd0e71338e6b731529c4639b81b",
+        "qwen2/batch-decode-0.json": "8a9cbbff73ea7324122a60f52593c63897eefa1a539e26a64441c483c90e6072",
+        "qwen2/batch-decode-1.json": "cad420447311235b34adcf4f232a510e2e3f6a0fa38f33e22bec539db6eaac3a",
+        "qwen2/batch-prefill-hook.json": "10f2f6f629a3182e8ea65fa6b68f027d41c3f064a5239fd44890ece7a2ca5488",
+        "qwen2/batch-prefill.json": "a186304949af36ef41caacfcff252057f41bf23be35920d6ef3db8ac948adecd",
+        "qwen2/decode-step-0.json": "e1b9cd1af62037753732b23f64797589932a5ce753022319cd63bf5ac018f449",
+        "qwen2/decode-step-1.json": "9ae4de93e541274c317934f170710734e90b0b491203f4e97eff77fd0e5fc984",
+        "qwen2/direct-prefill.json": "eeab83a8006f00941da3d8b15910b13a7eae064fbbe5e5fe1c7ea01c80eea6cc",
+        "qwen2/greedy.json": "f18706fe26556da402592487e9c326527780674559d9269edb650f72ea3c08b6",
+        "qwen2/scheduler.json": "9af0f2ee36368f810b851499a382e35e4b91c5ae51eb0e0a3316bddebc7a3102",
+        "qwen2-q4/batch-decode-0.json": "ece3a4fe8c6255fb5d154e787ec1935845262e2656cc835a4e8c361fd6bdf8b4",
+        "qwen2-q4/batch-decode-1.json": "5e6383a210566d7fb2b185f2894487c125d8411b77aee293a155ee39e60a980c",
+        "qwen2-q4/batch-prefill-hook.json": "ba039d8ae6e0e6e13230bf0e65ed115f1e4533917d227b777d3d4b57eb8253a9",
+        "qwen2-q4/batch-prefill.json": "9fd089479b7789d8c51a22f6abe83358e974520d57d3fbcf6b3817ae6e24224e",
+        "qwen2-q4/decode-step-0.json": "83f3ce66ef508be6e4e2ac2d7cdd942114fece51be891058e4d6f9e54c3614f6",
+        "qwen2-q4/decode-step-1.json": "c656b685e6be521ade8abf579d11d69973edf3f39bbb08160ac4408d7d6d437f",
+        "qwen2-q4/direct-prefill.json": "804322ef57cab0e59ceef2e009efe71eddd374f78d3fc15e968aa32443903b78",
+        "qwen2-q4/greedy.json": "8e3b4a472c8afc0a44a2eaef9ac251b8e553a0ceb7dd46c3458f6ae11d35699c",
+        "qwen2-q4/scheduler.json": "f8129feaa1576fb9356daa4f7cd6a445102937c45caefb5d596cb20128b463ce",
+        "qwen3/batch-decode-0.json": "48da02764a293c25111ee7a3243451220d4d575d67f3731b10703c862ecdc795",
+        "qwen3/batch-decode-1.json": "425b9c9e9aa8ded42906835ba95d2d1bd137c82514848d2173e48e894dd3b61c",
+        "qwen3/batch-prefill-hook.json": "e03a5693c51f2ac55a8bc75f5e162e74ce62be9be2f4d96c608574f290401ed8",
+        "qwen3/batch-prefill.json": "27523ea6ebf17b0e80b0d85f0486be52c6badd4654b5a84d818d27d91d4b8584",
+        "qwen3/decode-step-0.json": "87a5294a00f5666a325d9b34b3a94ba5d0744709eb6e9dc6ad336c39256f09ed",
+        "qwen3/decode-step-1.json": "593c84f11836aff495503c7a527d3a8565f24efa10328638b0d6e40ed903f233",
+        "qwen3/direct-prefill.json": "025178f2058ca7c35b543c9772dfacd509c7ba5c9353f53992c76eeae8149f07",
+        "qwen3/greedy.json": "68cdafda2f1e2b6bdc21a8dfe873a7c2b2894839993750d1293675f12b814d8d",
+        "qwen3/scheduler.json": "4584da033fcd719d7d10d09c4b6cfa782cafa3de39375c530ceece7f10fa97b1",
+        "qwen3-q4/batch-decode-0.json": "e7f5bc11ca5ed90f9427ff30796276ea6a6283de8ef41fb43d5f3145d316289c",
+        "qwen3-q4/batch-decode-1.json": "11505f29220047649b3e0f4015f70d3a0838a3d87675644046a2234b85fd68f8",
+        "qwen3-q4/batch-prefill-hook.json": "611354faad73f9b84d124af4d28941d658a479e6bf1878408f78627be83b6dca",
+        "qwen3-q4/batch-prefill.json": "690c6c39db9890697087e1e3017e455ecfbc2760376862aa49de811d19553620",
+        "qwen3-q4/decode-step-0.json": "a8a5774ee5096fe88356156bce363e772c39152fa481b0f6c29c33f6ffbccaa9",
+        "qwen3-q4/decode-step-1.json": "b5aab5fa58b8639d48dcf9876210553a00a702b9ec132592eaf592a23972259e",
+        "qwen3-q4/direct-prefill.json": "259ea8c99ae8d36954e0320dcb7330b0c727c1b03f2f76b7585c0e3db8c06348",
+        "qwen3-q4/greedy.json": "2eabce3b8ad039f62323b37cce85c8b5e6750225bc26d27ede867441811b9d3c",
+        "qwen3-q4/scheduler.json": "e0bef7cbf562f6232f3aa2d54596aaeec3f2258bf8489c63db112caae6dfc8a8"
+      }
+    },
+    "tf32-1": {
+      "manifest": {
+        "formatVersion": 1,
+        "metadata": {
+          "gitCommit": "167eb382823f38b70de5b0b40ee822fd055d04c1",
+          "mlxMetalVersion": "0.32.4",
+          "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a",
+          "device": "gpu",
+          "osName": "Mac OS X",
+          "osVersion": "27.2",
+          "mlxEnableTf32": "1",
+          "specHash": "846396b1dbab5a770a4f2c36841fe5ed1570a586b908956ed6e224fe5248e687",
+          "inputHashes": {},
+          "derivedHashes": {},
+          "gitDirty": true,
+          "decoderModelSha256": "1a8d7493de47068a26d1697779b687746d14f0d4cfa850d1b44aca4ccac2715f"
+        },
+        "variants": [
+          {
+            "name": "llama",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "a1af239e0ebb8508206698a828409509c898e93e13e9164eb01af261de1bfcab",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
+              "model.safetensors": "fddd759c4e3e2ef9d91a860a60acb455779e765adebf17d9ac5dbb026058fddd"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "llama-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "60e90c0b177ea379125a3ade91ba05e5065479a92301cbb5ca5b9acbc2be2a56",
+              "llama.json": "52b6e3edda3e48a13bed762a091897006a114f7dfd0fe170e0c1e5e36b4832fd",
+              "model.safetensors": "61aecf1af570b9ea7cc839c961bd32da646a1ef2d6bf5583d14dd719c1e06cad"
+            },
+            "derivedHashes": {
+              "config.json": "60e90c0b177ea379125a3ade91ba05e5065479a92301cbb5ca5b9acbc2be2a56",
+              "model.safetensors": "61aecf1af570b9ea7cc839c961bd32da646a1ef2d6bf5583d14dd719c1e06cad"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "llama31",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "cb3733b046b2cedca472506f8007cd1f7b8f27aa4300fb0ac9f06f9e1d53d4af",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "llama31.json": "51c231ec47bfa9461ca7b1b85cfc9899b21ab0691e218510d5f0f49cd706b5a4",
+              "model.safetensors": "86e2244f8bd9c2c11faebc5cbf018f712369366dde1e092e2d80596c5d9dac73"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "mistral",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "f264145b637eb7a817405303c62361668decaa101254416f657967c9ac479d1b",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "mistral.json": "c9c7b6fae983a8ec1f36fa0b9acb25c804bd8e46df7af1b0f73b2779bd144554",
+              "model.safetensors": "bec89ce16aa77ca108bbfe50df038413a389d768dd5dae0d6f73b11beaf65899"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "mistral-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "b91081d441339115e305d5468dacfa54fd3cbff22c90bd4f2089f245a6bdc8d6",
+              "mistral.json": "c9c7b6fae983a8ec1f36fa0b9acb25c804bd8e46df7af1b0f73b2779bd144554",
+              "model.safetensors": "a30fc78c00c9d395368733046f80cb63ed2169e7d084224673411a59ad089161"
+            },
+            "derivedHashes": {
+              "config.json": "b91081d441339115e305d5468dacfa54fd3cbff22c90bd4f2089f245a6bdc8d6",
+              "model.safetensors": "a30fc78c00c9d395368733046f80cb63ed2169e7d084224673411a59ad089161"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "mixtral",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "c984369fc0e51272226236c53a1d594362f21893d21c334adab28fd1cd9fae8b",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "mixtral.json": "a918494a8f61a882393772b6d1fbaa0deab33b32c84cccb5c0d995f685fee8aa",
+              "model.safetensors": "774a4341deebb0d2ceadc3bc1091e27ff3f73aec429d8897b8b6d10671e45977"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "phi3",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "6475c662e1775c4b5825d0770858d71de5ba80f7916deb0af9fae8a817161416",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "10fc24460fd1406e835395b1d0ffb71818907913702a897f6c27d5ee02d0f3e9",
+              "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "phi3-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "409ea82cc0528c02d5311c67c487925369e49f81c9f2e3ee785ee93a716c58ec",
+              "model.safetensors": "3d247c6f96f908f11491f366d216e0bdbea165ba645406392299927fa5f5ea45",
+              "phi3.json": "a4fb838091726ee71665d7847a795bfc5f76977d5182a1ce93d5dad6e6bfcb06"
+            },
+            "derivedHashes": {
+              "config.json": "409ea82cc0528c02d5311c67c487925369e49f81c9f2e3ee785ee93a716c58ec",
+              "model.safetensors": "3d247c6f96f908f11491f366d216e0bdbea165ba645406392299927fa5f5ea45"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen2",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "b9fce8ff7244a8001ad1ca40cdb66c32dbf2193e70f1f63b7244e8f7259a4a4c",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "a4032dcfb112f07e57c5b3c3ceb0974a3177491363e8170e40c4ffdc817b28ef",
+              "qwen2.json": "a98b86fcffbcc3528543f90f0d960e9302a0524ad672e00d466e2a7d2868b24e"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen2-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "23629970f5e2159eff29f81663c300e2ba86bd0480a268736e3f77adc1a92579",
+              "model.safetensors": "e490a294a6dc0d377960af33f4c6c9d5a5c1c82823ab27f5e242a4a81d47af43",
+              "qwen2.json": "a98b86fcffbcc3528543f90f0d960e9302a0524ad672e00d466e2a7d2868b24e"
+            },
+            "derivedHashes": {
+              "config.json": "23629970f5e2159eff29f81663c300e2ba86bd0480a268736e3f77adc1a92579",
+              "model.safetensors": "e490a294a6dc0d377960af33f4c6c9d5a5c1c82823ab27f5e242a4a81d47af43"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen3",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "87685f246c8fbcc0ea600681a726e9f99ee698cdbf0e550c9a2ea0983a81f57d",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "9b287aa3ed5343da031ad48e600ff8a9a2784c7efac5606fea957043e0a8d642",
+              "qwen3.json": "21c7aa6f2123ab61129e09d39eab2c99cc3c91bf50613c1fb96795d07149c012"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "qwen3-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "d46dc15b2f045511e9582ddf41766dd12f90cad62eeecadc6eb36e2bdf4e8b37",
+              "model.safetensors": "d272e937f554ca2fe3615c9ffee8874c3d71e20603c5997b524668e3479f2971",
+              "qwen3.json": "21c7aa6f2123ab61129e09d39eab2c99cc3c91bf50613c1fb96795d07149c012"
+            },
+            "derivedHashes": {
+              "config.json": "d46dc15b2f045511e9582ddf41766dd12f90cad62eeecadc6eb36e2bdf4e8b37",
+              "model.safetensors": "d272e937f554ca2fe3615c9ffee8874c3d71e20603c5997b524668e3479f2971"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "gemma",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "699e044edc882eb6c13bc5f0409139fecc906c8ebd46ef8ea99c3f8b82cee830",
+              "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
+              "generation_config.json": "90a693be3b4d0a8e517b718d4379cf46321fdf0d8ecdbcf8b12955e395952330",
+              "model.safetensors": "9dd35c0ae0dcfa41863dd62507d2c01564794871b01db3edd4b620394bb689c5"
+            },
+            "derivedHashes": {},
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          },
+          {
+            "name": "gemma-q4",
+            "applicable": true,
+            "reason": "",
+            "inputHashes": {
+              "config.json": "20483b4d7fb87d7831e535b60990cc6a0a619b586e7df4923c4a800c258f04e7",
+              "gemma.json": "51e40fd2b1901ff02325acbb94342a533d60473d958ad5212148f4c0dfc8c8b2",
+              "model.safetensors": "dfac518abab7289db1b04645edf5c5ba5dbf1ad4e423ee8bfe9cafecb2042e0c"
+            },
+            "derivedHashes": {
+              "config.json": "20483b4d7fb87d7831e535b60990cc6a0a619b586e7df4923c4a800c258f04e7",
+              "model.safetensors": "dfac518abab7289db1b04645edf5c5ba5dbf1ad4e423ee8bfe9cafecb2042e0c"
+            },
+            "captures": [
+              "direct-prefill",
+              "decode-step-0",
+              "decode-step-1",
+              "batch-prefill",
+              "batch-decode-0",
+              "batch-decode-1",
+              "batch-prefill-hook",
+              "greedy",
+              "scheduler"
+            ]
+          }
+        ]
+      },
+      "capture_sha256": {
+        "gemma/batch-decode-0.json": "c0dcac8a25a4395c7c1d36d43f76413de27775c242df1d3c8fb44ae2a0c47662",
+        "gemma/batch-decode-1.json": "ada54fea9373ab6c219f7d9e988759920ce71169ffa368e29655bfd5820226c5",
+        "gemma/batch-prefill-hook.json": "e4ff0b8e4b373b0507246fbc04fb076837e84e466bb276689014e7b2e77ca4c9",
+        "gemma/batch-prefill.json": "122ae82f8f78ac5de23539be918f593a92595a09c5c14ef9438bd79c867939d0",
+        "gemma/decode-step-0.json": "220d8eddd0402ccdf1aa10e31f137849823f444280ed698a88748b7bb00f3f7e",
+        "gemma/decode-step-1.json": "ac6ee389fb36f85638dbcff134c18f090a77cc37d11cd95c3d11e586db85d895",
+        "gemma/direct-prefill.json": "53a67543ecc564f609268ed5142f0f6e0123e3a973408b4f24eeb60ded31bbaf",
+        "gemma/greedy.json": "ee1f3bacd3e5f85f77c351e79750e2ca54de4680beec9ea366d91f3b8be53d1f",
+        "gemma/scheduler.json": "38d4974fea6443a106e2d20f468df0677e52552e5d120680e115120794eddf85",
+        "gemma-q4/batch-decode-0.json": "f785c202ae14a23bb581e3292a0ce16c12d61fd85b8c5e9224dc508218341bc3",
+        "gemma-q4/batch-decode-1.json": "3573d6018dad3b698dfc5fe9dada27aafc2ac4ed0380974496fd5faffa970008",
+        "gemma-q4/batch-prefill-hook.json": "c06310d7fa6992b1a3af5c961a93af3a98274bf19ab485a644b0da955b319d34",
+        "gemma-q4/batch-prefill.json": "ae2a0b8fcf9956655c12c9e7ff17b3054d65b1c2b17ab8093ff4535e5e303ed7",
+        "gemma-q4/decode-step-0.json": "88819696c892176ad020148cdaa07f3d43786d79747ca983877912541f794948",
+        "gemma-q4/decode-step-1.json": "8da08c58756f50dddb420c91d50390a7bb842da1623d4b4a0266adbd9fd55c7b",
+        "gemma-q4/direct-prefill.json": "0d95810cf2f1ab7cda57aec752f41bc56a6d0b07976042fabcff6b807a96396f",
+        "gemma-q4/greedy.json": "004af62dd976e5bd89184ba3e3313786b863610884881e0d5dfedb2c5059eff4",
+        "gemma-q4/scheduler.json": "e68c27958070ed5b76670ccae51cfb14c684e0c2c3adc27d1b61aaf72c6f6974",
+        "llama/batch-decode-0.json": "fc320fa7ed702ffb00bef72c2c5d22c42d129537da2dc76ea3d2b27fc6f3ef34",
+        "llama/batch-decode-1.json": "2eb2236ba576a9aaae6d42e2c4b3db1dcce4b096709e9b45b22b1b1a49f6a3ae",
+        "llama/batch-prefill-hook.json": "496db7b01f9cfb747151e9237d15fd9c8503c223394eb8e4882864b74cef6fcc",
+        "llama/batch-prefill.json": "b5258ab0e925ff41ef231e6dd6db3808cffb72c4301db2df5a6ba8032c4a713f",
+        "llama/decode-step-0.json": "42a0f9117331439f75cc5fe3f2a118506a5866be22d6b24247b067e004fe790b",
+        "llama/decode-step-1.json": "ee4039bed704ac1a8a197b09fc92624190c6965785fc632da54e7619676a9b6d",
+        "llama/direct-prefill.json": "9573f18673a3cfe77016efdb7fb90912192bb31d14a45fcbe28352a84d5b4dda",
+        "llama/greedy.json": "e25a6139484ae37f862054eb78a8ea1fe4ea9c6afd9fdddb4e6b49450ba37af5",
+        "llama/scheduler.json": "efce87d9be81fb041643216ce79f865c17129f9c4aa1e79f10e50dc9db96081e",
+        "llama-q4/batch-decode-0.json": "49ff9c7eb5f72f2396a1607bf19c01aabb565fafd86a8ba1a75300bc08aeefcb",
+        "llama-q4/batch-decode-1.json": "9aa8d7e176c376ef8734d420b286f90dc6ad9d4abb28b38b382e171e1ee7d1f8",
+        "llama-q4/batch-prefill-hook.json": "44c2a8d3801f0fd430747a5328829df9a638b686ba21a476f8049ecfdaa9c415",
+        "llama-q4/batch-prefill.json": "fcba044848c9701b40cbf508706b0b5da7f288c86d3beb92437e4d30ede49007",
+        "llama-q4/decode-step-0.json": "8e51772c5b1765c4c1c6c31a1ad8d957394597a615bd59f2155b6b3f71e8e0e3",
+        "llama-q4/decode-step-1.json": "e19be586c7238d7abae4cd6d0a496a9b478c594335c39be98e4bc4905080a60e",
+        "llama-q4/direct-prefill.json": "cf469daa9664986c18705eaf41cf66901b688d69bdd698133288e3c11faec46f",
+        "llama-q4/greedy.json": "6e5539cd531b3d2d3a70f034fb14e624a0aecc5b2f72ef62f10dc2f9dabc17da",
+        "llama-q4/scheduler.json": "a106c442f33a1474d7aa7de8fc884815d9ae22e11a776d382cb8c2e34ddff8ed",
+        "llama31/batch-decode-0.json": "ca8bb45b262ee9afb412dfc5e94d6652e7cab3ca4feea346839436a07182e630",
+        "llama31/batch-decode-1.json": "634e2316dc70771d629e3ff7dde0bf1e9cdab6a44eea11fd6b47f54d7e23acb8",
+        "llama31/batch-prefill-hook.json": "1509be7cfb6d212d7a121397b063796718c7a0c1f11039dfc0390fa909aa54b2",
+        "llama31/batch-prefill.json": "9a189bba033a1b9d2256b8101df3abad648f35e444bb5a63b53c783bcf79efa6",
+        "llama31/decode-step-0.json": "1fb2b3ebf9c17910ee19f3765a471a1136bbf0d1a3ce68684171666d76c2b4b7",
+        "llama31/decode-step-1.json": "a6d91d0f8603e446f8c2f79add9111b9761de0d437f21a45dff6cf1cec903be8",
+        "llama31/direct-prefill.json": "cb889a337fd6a9266c9395e2e09d75a833d78d37032a3d7714b893a56fc0e3b4",
+        "llama31/greedy.json": "788ffad7b3e9651e7d6d78b0857811bb9326c64e700b1423ccaa2558c9427db5",
+        "llama31/scheduler.json": "4a0879c7512e54bb8987b477958111e1a6ce201c6806c90423b832f9711eeef3",
+        "mistral/batch-decode-0.json": "b12dff23257018f501b88be97765b3106929a7b614eeff1faf2b735e27e121ca",
+        "mistral/batch-decode-1.json": "6d5b9a16df40bfc9935d6300818fe65583cabba004da28e9d3aeea4145536a4b",
+        "mistral/batch-prefill-hook.json": "ab7ac43a7072d9f2551f37c6ce00b77ef6d5f0599f8cb9a05f1709d4e112115e",
+        "mistral/batch-prefill.json": "d104dc6bd31b44b05e002e21848d219be61f435ba52375ea97288bfbab97d52e",
+        "mistral/decode-step-0.json": "64b30436177a88b7fa1bb085fe61317ff2cbb976a78f31ffa3f96cfb3feabc75",
+        "mistral/decode-step-1.json": "06f9d29004e65b2738cfd88216ed443df0b9e27f1d9d1847dd26b39b2c1c271a",
+        "mistral/direct-prefill.json": "6fef0135cfdb730d009bb848d3d915f0a522e95ddcc4e0fbc01676c0681b2c0f",
+        "mistral/greedy.json": "82b6f42b479961e107d3083681835d9777151daec247b17ab9effebaf8dda96a",
+        "mistral/scheduler.json": "e0ff4ebbc5bbab7af7211aafb0a960fdd3a6e303fa9a11fc36afc8f631a99b32",
+        "mistral-q4/batch-decode-0.json": "adfe542b1c857d2e4c898a7bff813f5ce7245e821a6e0bde230e9f5749328140",
+        "mistral-q4/batch-decode-1.json": "712fa941bb23b3d7a155a8d638c37e4eb47edfadce2e925a9c23a362e4b9ab04",
+        "mistral-q4/batch-prefill-hook.json": "dd1c63b5d34e3707fd7b2328e6e3e419b01d0072cdc3c3f3e92b7efc4c826712",
+        "mistral-q4/batch-prefill.json": "7ea8bf77114d0256e029eb84c0e92678727bb30128c388fc7f5c3ac71712829e",
+        "mistral-q4/decode-step-0.json": "330893b15bce8a4a39ccd87feadd9ffcb8da3f96c305615f8b5ca4348a12a239",
+        "mistral-q4/decode-step-1.json": "348416ddceca4fd7ed79c16c54f75eb4ee383e9c8feb81c52764b991bb81519f",
+        "mistral-q4/direct-prefill.json": "4815afde2efec62e1ef9db2d464f0e54555c101b61c7c0e632efc6f2706db249",
+        "mistral-q4/greedy.json": "d8fcff2e0d3e7643b494d6c583e0b5814625ef751d4ed3e2dfa9835817463ac8",
+        "mistral-q4/scheduler.json": "431339624eec3de6229c6fcbce7214b3b2720fdb2ed9f40b4b80cfcb775b83c1",
+        "mixtral/batch-decode-0.json": "2e1f5f48b6161a044133e0444b1c4b984254ddd3d87d9b578dac8dbc21a1a33f",
+        "mixtral/batch-decode-1.json": "d3fd0271cd2c42ceacd6515e5dfcfe86135fc251b6c88d3c35002b750c56556d",
+        "mixtral/batch-prefill-hook.json": "0f39504fd46cf95ef3fb9f2ba2a2ee9f06d80b2e7050057a6ce7268efca5fb62",
+        "mixtral/batch-prefill.json": "ceabc8dc933b95e3a6f582f87ce348cc92f4a1dec216967e134889e74894dafb",
+        "mixtral/decode-step-0.json": "906cb07c7f948c8bc4e2ae1e154910857b339233a1929ea86f893ecb7a43f374",
+        "mixtral/decode-step-1.json": "f263640f476437c5f089cb397de9ab637ca8167407a4045a8b236f2f4c08cf16",
+        "mixtral/direct-prefill.json": "d55f7670d61a3b32ffb986444b49dfbef0ccb1bc185a0b811d453ccc664637ee",
+        "mixtral/greedy.json": "213bd33c793520669cbcd987c308f563cc72ce7850865cd0c3f0e2d3f66e74db",
+        "mixtral/scheduler.json": "42c267261c23cd20c1dbc84d252d990ed45adb3ff5dd4c36749f12dd99c7b790",
+        "phi3/batch-decode-0.json": "b8cc1e7906f0daa5c7e3b21dd7a46debe2dd2d89daf2359fee92949d741087e6",
+        "phi3/batch-decode-1.json": "92dd2b31272ceac8a9a572017e71fba06d9808ee62b50e449e87e42ef7c3a7db",
+        "phi3/batch-prefill-hook.json": "ca82db594c135ad85a09bb9c416a2090955607950eb6d19252616a4e89feabe7",
+        "phi3/batch-prefill.json": "abadfed5d7d30054e3073348f5773922c8a486ea7cec2fa89b616fc7588cb8e3",
+        "phi3/decode-step-0.json": "6be2a05b80288f951becba6ca15dae3582494227411dfb791dd7752aeebebd17",
+        "phi3/decode-step-1.json": "000d10eaea94b38e48821ce89bace29d3dc50710630277798d5b54cfde3cd9a3",
+        "phi3/direct-prefill.json": "b13ee4e7637c4cfd040ce961cf1e5fd1315a601febec1e8b39874b018e2a958b",
+        "phi3/greedy.json": "43fa08a61252d156f4d6c405ab9f7a563d2726dd3a8b4f34354eb6aa32fe44e1",
+        "phi3/scheduler.json": "110250d29d1a20967a819ef69c93542a1b8cee7d5f84fa9fc490cf22dec9aacb",
+        "phi3-q4/batch-decode-0.json": "761ced8e15d4365e7a935c068bb2a57cbbf527db4509cf8737013f5aee782950",
+        "phi3-q4/batch-decode-1.json": "4a5211f7ed7c0df225a3baefac76870e69057aecf14cd0ed64ef2b3e09f54a24",
+        "phi3-q4/batch-prefill-hook.json": "6c31a6849524b3530e9df20102e21f40f993fcbd3906b26d21b32eb92deb6581",
+        "phi3-q4/batch-prefill.json": "f432ab5d0e4fa5cc911f48b1fc26cddf10786477b6fc9d9ff04edc1c8d70ae21",
+        "phi3-q4/decode-step-0.json": "9d21c924525bb980e0f7b361ec5db81f63c2904173dbe8ed1e2227a615992709",
+        "phi3-q4/decode-step-1.json": "66ba4370cdbe87557de6aa32eeb77a0bc03c9983f8d0eab5034f39bfa1c13aa2",
+        "phi3-q4/direct-prefill.json": "f73c22033b84cb483cd30d4154ed10204d98c9a49e066d37146666e5a52a2f19",
+        "phi3-q4/greedy.json": "d599ba4cac5df057bab7eb69142f6f1be8c15900fd4dd55af39a2bdebea1fe51",
+        "phi3-q4/scheduler.json": "c681d984d7dc2ef93d40f2fb148546f658ac5aa607cceb9ae44deb5a84bb83f5",
+        "qwen2/batch-decode-0.json": "8472e985b90fafae9e39b1d8598ad74dd02d27c7d8b5a4ae07e1a62d076dd106",
+        "qwen2/batch-decode-1.json": "b906596574de3dbd2f8219c8bd6a6979e6c0fb722eecb760c590fcf4d10bb303",
+        "qwen2/batch-prefill-hook.json": "1f00b8890ee87f52dd0951cb432570c75a516cd524735778c3f5cc5a909c164f",
+        "qwen2/batch-prefill.json": "fa5b06c59e7f72442dfa4efa67f5bddb68a2bb0d9b041eccb1de57202db89fd9",
+        "qwen2/decode-step-0.json": "9a529df434e3afb91be7c37ca73c3d74e01e0a04db64b2b11fff695598f28f86",
+        "qwen2/decode-step-1.json": "b7894a445f39207c187507108beee87c8221e45a2def002b4db2e2a8ac83e1f9",
+        "qwen2/direct-prefill.json": "180777c130b39d555b0e3ff7dfae196d0812cd42d2b758bb05c2542426d6e8df",
+        "qwen2/greedy.json": "4251c3805defa309e34cf77978d8f189d680ca595f95aecb3a2cc1a411bcd50c",
+        "qwen2/scheduler.json": "92b79b310a345e9f45cd94a7c025d4d22999d9b61b35890bba90259c84669c23",
+        "qwen2-q4/batch-decode-0.json": "23da3547400686a289901ff603b1ab66998628c521c2c66eed4eac47d98673a3",
+        "qwen2-q4/batch-decode-1.json": "f9daceabf688f34e1b5a307c7ea06fccc6d325d93b00818df7c0d871f52b6ce0",
+        "qwen2-q4/batch-prefill-hook.json": "8a79e93ad856b3c1533028f6b4d03dab4234d88297fbdf4f1df9dd55a5f08727",
+        "qwen2-q4/batch-prefill.json": "8e4506c5408f042978788e8719ed8542834122fd534f81c996ad662174459aa8",
+        "qwen2-q4/decode-step-0.json": "fd9255c0042dc58c6aefeff5f90999f2692c1ac71cb064d05e6b571ec912070a",
+        "qwen2-q4/decode-step-1.json": "558d7ecfc082295b6baaeb2c3e9a46a161b709f531b9781f3d55c33824ddfc81",
+        "qwen2-q4/direct-prefill.json": "0cdf5560922dd8d778a6a461f5e108083a9da3f92ea1a02391476d78bcbda5fd",
+        "qwen2-q4/greedy.json": "d1cf7e4b64617d2bac16a07236ef4c9dde7c369725f7cd4f7a1f390407099fdf",
+        "qwen2-q4/scheduler.json": "8421ee58a5178d00d906509f12e24003489d9f602d9b2bd1e49d059181b93615",
+        "qwen3/batch-decode-0.json": "3111ebae6a1b20ce81e55c28514d7162417f3a26b1e7d1660615422c3a3213b4",
+        "qwen3/batch-decode-1.json": "3539b3de7634a945d02172dfafb2659549852dcdd34d13802607775f41f24cfd",
+        "qwen3/batch-prefill-hook.json": "2fb28a14429a8781275a78e2e96cdf9cd32c2e264870e20e6803351a2a9a2ffe",
+        "qwen3/batch-prefill.json": "4771c7ff51a330fbc9fa7e18be0a5a52c79bd0944a2a76ca42f6fa2808022f5e",
+        "qwen3/decode-step-0.json": "f65186d9dade7ee7d50de434c563e8fcf56f43697e5cd79adb7faed4efc02224",
+        "qwen3/decode-step-1.json": "972a676bdd92410e86e31879aba62a4e8b28d8400ad3b5a27b83dea811c1391c",
+        "qwen3/direct-prefill.json": "af55c5dc7e9a25d6f3f6ab4a953ff239bfb1c174afa24e51da5d43333781d8fb",
+        "qwen3/greedy.json": "b07f3cb3f77aea7a512575173bbc872a97554d59916d297ebe0d9ce2b567a82a",
+        "qwen3/scheduler.json": "aa1c51ffebf060445daef1453a623e71afb084d6398b46a564c17e44ab378c8f",
+        "qwen3-q4/batch-decode-0.json": "37a514fdde4250caf5df943d39277ea51f30806bf17c0673d5c1f1351948da86",
+        "qwen3-q4/batch-decode-1.json": "b792736bd6167bbbd45a5a493e1ee0bf87102d8ab9ff79e3c1b20ff72dd1d078",
+        "qwen3-q4/batch-prefill-hook.json": "cb14f67f1ed7b705e240944251a2d807c223ae82d4c3970320318d3967d5ff71",
+        "qwen3-q4/batch-prefill.json": "3d8bc4ef772925a4ff56a7ceb2482871a1db0d02e28ebc3dc7b284d9f255f88c",
+        "qwen3-q4/decode-step-0.json": "15056abd15952bfbab8b7f064e6486e02187a8264fc80b340b245ca37c46b3a9",
+        "qwen3-q4/decode-step-1.json": "9a1bcc85b53310a84028c64eb0c46e71d313b531b05166932c568fb7ff57d44e",
+        "qwen3-q4/direct-prefill.json": "a34d691f7db4b08c3ac0a1eda5fc66cfcbb1f847392e99883d07464cfdbf68bf",
+        "qwen3-q4/greedy.json": "94d2461ea4c365e0a5e65311d3b49928466db47a00b1972ca39e8131ca4e9aea",
+        "qwen3-q4/scheduler.json": "4886eff9a04f434d4787686948121a58c9df2ba339950ec8e83ba57fff40c555"
+      }
+    }
+  },
+  "extracted_source_sha256": {
+    "jmlx-models/src/main/java/se/alipsa/jmlx/models/DecoderModel.java": "a997c0e691051338d2a27c99908b8119253cda81879fd2b7c364427c63d6e3ac",
+    "jmlx-models/src/main/java/se/alipsa/jmlx/models/GenerationLoop.java": "8016cf64115cb6fb5bd5ca6f867bc02e343a3bc9ba3be1bc20b18062851e1db3"
+  }
+}

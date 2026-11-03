@@ -26,6 +26,7 @@
     "evidence/delta-java.json": "1568dedbea9b9c798180e18688b38537106169d53a627a13ef98ccfefe42ddb2",
     "evidence/delta-probes.json": "639a244afee5e50ade602ab885d82f0a42283e9c863eb5681d6cfb43c5f0e8b9",
     "evidence/float-conversion-values.json": "9988aa00c5aa114ee24b181760ffb6ad1ee23e0f517f2d1ae9c151c94cc715d5",
+    "evidence/generation-loop-extraction.json": "97a7271ee8073a176e01cfbdea7bcdac874ee81bad3bbcc7f0d9399f8f418122",
     "evidence/hf-08b-config.json": "b90b86f35c8e6925ef74ee04d0e758f0a845c83a42089ad82bbaa948de9b4204",
     "evidence/hf-08b-inventory.json": "346f2c16940db6f1e90f73d452c6232ff4b10bdf4d7484426dbac6240cd0d8de",
     "evidence/hf-environment.json": "1bccc0ea681ca35107569dfd5c5e2714d31c0cab93aae1295f422947de37f6d5",

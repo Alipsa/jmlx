@@ -2,7 +2,6 @@ package se.alipsa.jmlx.models;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,15 +23,12 @@ import se.alipsa.jmlx.nn.MultiAxisRotation;
 import se.alipsa.jmlx.nn.RMSNorm;
 import se.alipsa.jmlx.nn.UnaryLayer;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
-import se.alipsa.jmlx.tokenizer.IncrementalTokenDecoder;
-import se.alipsa.jmlx.tokenizer.TokenizerException;
 
 /**
  * Inference-only pre-norm decoder shared by the Llama, Qwen2, Qwen3, Mistral, Gemma, Phi-3 and
  * Mixtral checkpoints.
  */
 public abstract class DecoderModel extends Module implements TextGenerationModel {
-  private static final System.Logger LOGGER = System.getLogger(DecoderModel.class.getName());
   private final DecoderConfig config;
   private final ArchitectureDescriptor descriptor;
   private final ModelMetadata metadata;
@@ -876,125 +872,59 @@ public abstract class DecoderModel extends Module implements TextGenerationModel
       Consumer<GenerationEvent> listener,
       FirstStep firstStep,
       DecodeStep decodeStep) {
-    HfTokenizer tokenizer = request.tokenizer();
-    List<Integer> generated = new ArrayList<>();
-    List<Double> logProbabilities = new ArrayList<>();
-    StringBuilder generatedText = tokenizer == null ? null : new StringBuilder();
-    IncrementalTokenDecoder decoder = null;
-    LinkedHashMap<Integer, Integer> frequencies = PenaltyInputs.frequencies(frequencySeed);
-    FinishReason reason = FinishReason.MAX_TOKENS;
-    if (!request.cancellationToken().isCancelled() && policy.maxNewTokens() > 0) {
-      decoder = tokenizer == null ? null : tokenizer.newIncrementalDecoder(true);
-      try (MLXScope generation = scope().newChild();
-          SamplingPipeline sampler =
-              new SamplingPipeline(generation, policy, config.vocabSize(), stepBoundaryEvaluator)) {
-        List<KVCache> caches = new ArrayList<>();
-        for (int i = 0; i < layers.size(); i++) {
-          caches.add(new KVCache(generation, cachePolicy));
-        }
-        int[] input = prompt;
-        for (int step = 0; step < policy.maxNewTokens(); step++) {
-          if (request.cancellationToken().isCancelled()) {
-            reason = FinishReason.CANCELLED;
-            break;
+    return GenerationLoop.run(
+        scope(),
+        config.vocabSize(),
+        stepBoundaryEvaluator,
+        request,
+        policy,
+        prompt,
+        frequencySeed,
+        promptPositions,
+        listener,
+        generation -> {
+          List<KVCache> caches = new ArrayList<>();
+          for (int i = 0; i < layers.size(); i++) {
+            caches.add(new KVCache(generation, cachePolicy));
           }
-          try (MLXScope activation = generation.newChild()) {
-            int[] before = null;
-            StepFailureGuard firstStepGuard = null;
-            SamplingPipeline.Selection selection;
-            try {
-              MLXArray lastLogits;
-              if (step == 0) {
-                FirstStepResult first = firstStep.apply(activation, caches);
-                lastLogits = first.logits();
-                firstStepGuard = first.guard();
-              } else {
-                MLXArray ids = MLX.array(activation, input, new int[] {1, input.length});
-                before = preflight(ids, caches);
-                lastLogits = decodeStep.apply(ids, caches, input[0]);
-              }
-              selection =
-                  sampler.select(
-                      lastLogits,
-                      PenaltyInputs.from(frequencies, config.vocabSize()),
-                      step,
-                      cacheArrays(caches));
-            } catch (RuntimeException | Error failure) {
-              if (step == 0 && firstStepGuard != null) {
-                firstStepGuard.onStepFailure(caches);
+          return new GenerationLoop.State() {
+            private int[] before;
+            private StepFailureGuard firstGuard;
+
+            @Override
+            public MLXArray firstStep(MLXScope activation) {
+              before = null;
+              firstGuard = null;
+              FirstStepResult first = firstStep.apply(activation, caches);
+              firstGuard = first.guard();
+              return first.logits();
+            }
+
+            @Override
+            public MLXArray decodeStep(MLXScope activation, int token) {
+              before = null;
+              firstGuard = null;
+              MLXArray ids = MLX.array(activation, new int[] {token}, new int[] {1, 1});
+              before = preflight(ids, caches);
+              return decodeStep.apply(ids, caches, token);
+            }
+
+            @Override
+            public MLXArray[] retainedArrays() {
+              return cacheArrays(caches);
+            }
+
+            @Override
+            public void onStepFailure() {
+              if (firstGuard != null) {
+                firstGuard.onStepFailure(caches);
               } else if (before != null) {
                 poisonIfMutated(caches, before);
               }
-              // A firstStep.apply failure is guarded by the first step's own preflight/catch.
-              throw failure;
+              // Failures inside firstStep.apply remain guarded by that step's own preflight/catch.
             }
-            int next = selection.tokenId();
-            boolean eos = policy.eosTokenIds().contains(next);
-            if (!eos && policy.stopTokenIds().contains(next)) {
-              reason = FinishReason.STOP_TOKEN;
-              break;
-            }
-            generated.add(next);
-            frequencies.merge(next, 1, Integer::sum);
-            if (selection.logProbability() != null) {
-              logProbabilities.add(selection.logProbability());
-            }
-            String textDelta = null;
-            if (decoder != null) {
-              try {
-                textDelta = decoder.append(next);
-                generatedText.append(textDelta);
-              } catch (TokenizerException e) {
-                throw new GenerationAbortedException(
-                    toList(prompt), generated, "output decoder", next, e);
-              }
-            }
-            try {
-              listener.accept(tokenEvent(next, textDelta, selection.logProbability()));
-            } catch (RuntimeException e) {
-              throw new GenerationAbortedException(toList(prompt), generated, e);
-            }
-            if (eos) {
-              reason = FinishReason.EOS;
-              break;
-            }
-            input = new int[] {next};
-          }
-        }
-      }
-    } else if (request.cancellationToken().isCancelled()) {
-      reason = FinishReason.CANCELLED;
-    }
-    String terminalDelta = null;
-    if (tokenizer != null) {
-      terminalDelta = "";
-      if (decoder != null) {
-        try {
-          terminalDelta = decoder.finish();
-        } catch (TokenizerException e) {
-          throw new GenerationAbortedException(
-              toList(prompt), generated, "output decoder finish", null, e);
-        }
-      }
-      generatedText.append(terminalDelta);
-    }
-    GenerationResult result =
-        new GenerationResult(
-            toList(prompt),
-            generated,
-            reason,
-            logProbabilities,
-            generatedText == null ? null : generatedText.toString(),
-            promptPositions);
-    try {
-      listener.accept(
-          terminalDelta == null
-              ? GenerationEvent.finished(reason)
-              : GenerationEvent.finished(reason, terminalDelta));
-    } catch (RuntimeException e) {
-      LOGGER.log(System.Logger.Level.WARNING, "generation terminal listener failed", e);
-    }
-    return result;
+          };
+        });
   }
 
   private MLXArray decode(MLXArray ids, List<KVCache> caches) {

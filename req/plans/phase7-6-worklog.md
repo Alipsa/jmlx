@@ -145,3 +145,22 @@ plan. Missing types and conflicting aliases remain rejected. Full-model float/pa
 acceptance is still pending the WP4 stack; storage checks alone do not complete WP3's
 numerical gate. Next record pre-change exact bits in both modes, then extract the generation
 loop in its own commit before hybrid generation integration.
+
+## Generation-loop extraction verified
+
+Recorded all 14 existing family/quantized variants in both TF32 modes before editing
+`DecoderModel`, at clean source commit `167eb382823f38b70de5b0b40ee822fd055d04c1` (the
+unrelated untracked user file still makes the recorder's global dirtiness flag true).
+Earlier recordings from `128cd1e` were preserved under ignored
+`.tier-b/phase7-6/prior-exact-bits-128cd1e/`; the fresh pre-change captures are also preserved
+under `.tier-b/phase7-6/pre-generation-extraction-bits/`. The recorder correctly refused to
+overwrite the earlier baseline before it was moved; no baseline was replaced silently.
+
+Extracted package-private `GenerationLoop` with an architecture state adapter. Existing
+decoders/composing models keep the same preflight, mutation guard, retained-array evaluation,
+sampler, cancellation, events, result IDs and terminal-listener logging category. The generic
+loop adds a post-evaluation commit hook for hybrid sessions without changing existing math.
+`exactBitsVerify` passes for all 14 variants in both modes, and `:jmlx-models:check` passes.
+Baseline metadata/capture digests and extracted source hashes are recorded in
+`tools/qwen35-reference/evidence/generation-loop-extraction.json`. This extraction is committed
+separately before hybrid stack integration.

@@ -25,6 +25,13 @@ public final class TextGenerationModels {
       return SmolVlmModel.load(scope, directory, root);
     }
     String modelType = root.path("model_type").asString();
+    if (modelType.startsWith("qwen3_5")) {
+      if (!modelType.equals("qwen3_5")) {
+        throw new IllegalArgumentException(
+            "unsupported model_type '" + modelType + "': only dense qwen3_5 loads");
+      }
+      return Qwen35Model.load(scope, directory, root);
+    }
     if (modelType.startsWith("qwen3_vl")) {
       // The composite loader owns its own strict config parse, so dispatch on the raw model_type
       // before the generic decoder mapping: only the exact dense type loads, and a sibling type

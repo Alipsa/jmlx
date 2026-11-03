@@ -250,3 +250,40 @@ dated to the runtime each names. The named default-mode bounds were re-measured 
 for the WP6 gate: every maximum is bit-identical to its 0.31.2 recording, each recorded next to
 the old value in the migration note's re-measured-bounds subsection in
 `req/phase6-inference-report.md`.
+
+## Phase 7.6 Qwen3.5 hybrid (2026-11-03)
+
+The milestone adds three strict `full-float32` model suites in
+`:jmlx-models:float32GoldenTest` — `Qwen35TextGoldenTest` (all float layouts, tied/equal
+linear heads, an eight-layer schedule, lengths 4/65/129, two cached steps, fresh full
+forwards and complete retained state), `Qwen35PackedGoldenTest` (actual converter-produced
+affine fixtures against their independent dequantized-HF reference) and
+`Qwen35VisionGoldenTest` (expansion, grids, processed pixels, positions, tower rows,
+prefill/cached steps) — all at the unchanged absolute `1e-4` bound against independent CPU
+float32 HF goldens; `Qwen35DefaultPrecisionTest` carries its own named default-TF32 bound
+`0.005` (measured maximum `0.0014960468` on the tiny fixture). Core adds
+`GatedDeltaRuleTest`, `GatedDeltaNetTest` and `HybridDecoderBlockTest` in
+`:jmlx-core:float32GoldenTest` at `1e-4`, plus ordinary-mode `RecurrentCacheTest` and
+`GatedDeltaMemoryTest`. No existing bound was loosened or re-derived, and no golden was
+regenerated to accommodate Java.
+
+Real-artifact bounds were predeclared in the manifests before any Java acceptance run:
+
+| Artifact | ε / margin | Measured maximum | Record |
+| --- | --- | --- | --- |
+| Qwen3.5-0.8B (HF CPU float32 reference) | 0.001 / 1e-4 | 4.0340423583984375e-4 (image prefill; text 8.320808410644531e-5) | `tools/qwen35-reference/evidence/08b-java-acceptance.json` |
+| Qwen3.8-27B-4bit (unmodified stock mlx-vlm reference) | 0.10062797164916992 / 1e-4 | 0.09969949722290039 (image prefill; text 0.044699668884277344) | `tools/qwen35-reference/evidence/27b-java-acceptance.json` |
+
+The 27B ε composes the unchanged 0.001 arithmetic allowance with the measured
+0.09962797164916992 stock normalization contribution (mlx-vlm 0.6.8's direct-`1e-6` Q/K
+RMSNorm convention, effective sum-space epsilon 128e-6 at the 256-wide heads); the
+normalization-only diagnostic is separately labeled, source-hashed, and never replaces the
+stock reference. The reference's own cached-versus-fresh 0.8B text spread (3.19e-4) is
+preserved as a failed 1e-4 measurement. Converted packed tiny fixtures measured
+7.1525574e-7 Java/HF (both layouts) against their independently dequantized 1e-4 bound;
+the Java/stock-VLM 0.024449743 maximum is separately attributed to the measured
+normalization convention, and the LM stock maximum is 6.854534e-7. The 27B
+default-precision comparison (mlx-vlm default BF16 parameters versus the qualified FLOAT32
+teacher histories; comparison only) measured a maximum logit difference of
+1.1851611137390137 (image prefill) with all recorded greedy choices agreeing — qualified
+acceptance remains FLOAT32/TF32 off.

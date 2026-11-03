@@ -1,0 +1,163 @@
+{
+  "kind": "HF CPU FLOAT32 reference; Java acceptance pending",
+  "cases": [
+    {
+      "name": "text",
+      "prefill_greedy": 19,
+      "decode": [
+        {
+          "input_id": 19,
+          "greedy": 248046,
+          "margin": 2.4446163177490234,
+          "cached_vs_fresh_max_abs": 2.288818359375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 248046,
+          "greedy": 198,
+          "margin": 10.818487167358398,
+          "cached_vs_fresh_max_abs": 5.4836273193359375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 198,
+          "greedy": 248044,
+          "margin": 11.46683120727539,
+          "cached_vs_fresh_max_abs": 0.0001468658447265625,
+          "cached_vs_fresh_1e4_pass": false
+        },
+        {
+          "input_id": 248044,
+          "greedy": 248045,
+          "margin": 9.176170349121094,
+          "cached_vs_fresh_max_abs": 0.0001392364501953125,
+          "cached_vs_fresh_1e4_pass": false
+        },
+        {
+          "input_id": 248045,
+          "greedy": 74455,
+          "margin": 1.3091316223144531,
+          "cached_vs_fresh_max_abs": 0.00028693675994873047,
+          "cached_vs_fresh_1e4_pass": false
+        },
+        {
+          "input_id": 74455,
+          "greedy": 248068,
+          "margin": 0.5396232604980469,
+          "cached_vs_fresh_max_abs": 0.0003185272216796875,
+          "cached_vs_fresh_1e4_pass": false
+        },
+        {
+          "input_id": 248068,
+          "greedy": 271,
+          "margin": 2.7466869354248047,
+          "cached_vs_fresh_max_abs": 0.00010466575622558594,
+          "cached_vs_fresh_1e4_pass": false
+        },
+        {
+          "input_id": 271,
+          "greedy": 248069,
+          "margin": 6.944877624511719,
+          "cached_vs_fresh_max_abs": 9.1552734375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        }
+      ],
+      "greedy_ids": [
+        19,
+        248046,
+        198,
+        248044,
+        248045,
+        74455,
+        248068,
+        271
+      ],
+      "decoded": "4<|im_end|>\n<|endoftext|><|im_start|>assistant<think>\n\n",
+      "eos_token_id": 248046
+    },
+    {
+      "name": "image",
+      "prefill_greedy": 1919,
+      "decode": [
+        {
+          "input_id": 1919,
+          "greedy": 369,
+          "margin": 0.42063331604003906,
+          "cached_vs_fresh_max_abs": 3.814697265625e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 369,
+          "greedy": 264,
+          "margin": 1.7648277282714844,
+          "cached_vs_fresh_max_abs": 3.0517578125e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 264,
+          "greedy": 10558,
+          "margin": 0.8816814422607422,
+          "cached_vs_fresh_max_abs": 2.956390380859375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 10558,
+          "greedy": 11,
+          "margin": 1.4681415557861328,
+          "cached_vs_fresh_max_abs": 3.62396240234375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 11,
+          "greedy": 19556,
+          "margin": 0.8551673889160156,
+          "cached_vs_fresh_max_abs": 4.482269287109375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 19556,
+          "greedy": 3870,
+          "margin": 1.2380847930908203,
+          "cached_vs_fresh_max_abs": 3.6597251892089844e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 3870,
+          "greedy": 440,
+          "margin": 0.7276554107666016,
+          "cached_vs_fresh_max_abs": 5.2928924560546875e-05,
+          "cached_vs_fresh_1e4_pass": true
+        },
+        {
+          "input_id": 440,
+          "greedy": 264,
+          "margin": 0.5075016021728516,
+          "cached_vs_fresh_max_abs": 5.7220458984375e-05,
+          "cached_vs_fresh_1e4_pass": true
+        }
+      ],
+      "greedy_ids": [
+        1919,
+        369,
+        264,
+        10558,
+        11,
+        19556,
+        3870,
+        440
+      ],
+      "decoded": "This is a smooth, gradient background with",
+      "eos_token_id": 248046
+    }
+  ],
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "python": "3.12.16",
+  "torch": "2.6.0",
+  "torch_threads": 1,
+  "inputs_sha256": "32f6eacae30a4909bfab1fae2e2ba42cf64c182e251f8b7447b423aa98de374f",
+  "source_sha256": "fe90af3bef5238b1b5f6fa188c170a6f766a08f0534c309cbeac6eae749339df",
+  "hf_source_sha256": "af05d0acfe79fff8aea1c75f93516a6a72bc80f6f901329a73e66a3866fe1e7c",
+  "logits_file": "08b-hf.npz",
+  "logits_sha256": "4add8b0ae7879718f3cfbf0ad80bdc5ec7ce86e71a436c831b0e9f08a2a6c38c",
+  "cached_vs_fresh_1e4_pass": false
+}

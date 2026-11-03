@@ -1,0 +1,151 @@
+{
+  "seed": 20261102,
+  "cases": [
+    {
+      "name": "t1h2",
+      "length": 1,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 7.450580596923828e-09,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.960464477539063e-08
+    },
+    {
+      "name": "t1h6",
+      "length": 1,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 7.450580596923828e-09,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.960464477539063e-08
+    },
+    {
+      "name": "t3h2",
+      "length": 3,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 1.4901161193847656e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 1.1920928955078125e-07
+    },
+    {
+      "name": "t3h6",
+      "length": 3,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 2.2351741790771484e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 1.7881393432617188e-07
+    },
+    {
+      "name": "t4h2",
+      "length": 4,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 3.725290298461914e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 1.7881393432617188e-07
+    },
+    {
+      "name": "t4h6",
+      "length": 4,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 2.9802322387695312e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 1.1920928955078125e-07
+    },
+    {
+      "name": "t5h2",
+      "length": 5,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 2.2351741790771484e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 1.7881393432617188e-07
+    },
+    {
+      "name": "t5h6",
+      "length": 5,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 3.725290298461914e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 2.086162567138672e-07
+    },
+    {
+      "name": "t63h2",
+      "length": 63,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 8.195638656616211e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 3.427267074584961e-07
+    },
+    {
+      "name": "t63h6",
+      "length": 63,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 7.450580596923828e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 7.748603820800781e-07
+    },
+    {
+      "name": "t64h2",
+      "length": 64,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 8.940696716308594e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 3.5762786865234375e-07
+    },
+    {
+      "name": "t64h6",
+      "length": 64,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 8.940696716308594e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.960464477539062e-07
+    },
+    {
+      "name": "t65h2",
+      "length": 65,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 8.940696716308594e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 2.980232238769531e-07
+    },
+    {
+      "name": "t65h6",
+      "length": 65,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 8.195638656616211e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.76837158203125e-07
+    },
+    {
+      "name": "t127h2",
+      "length": 127,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 7.450580596923828e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.6193599700927734e-07
+    },
+    {
+      "name": "t127h6",
+      "length": 127,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 9.685754776000977e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.76837158203125e-07
+    },
+    {
+      "name": "t128h2",
+      "length": 128,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 8.940696716308594e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.364418029785156e-07
+    },
+    {
+      "name": "t128h6",
+      "length": 128,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 1.1920928955078125e-07,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.960464477539062e-07
+    },
+    {
+      "name": "t129h2",
+      "length": 129,
+      "value_heads": 2,
+      "hf_chunk_vs_recurrence_max_abs": 1.1920928955078125e-07,
+      "hf_chunk_vs_recurrence_state_max_abs": 2.384185791015625e-07
+    },
+    {
+      "name": "t129h6",
+      "length": 129,
+      "value_heads": 6,
+      "hf_chunk_vs_recurrence_max_abs": 1.043081283569336e-07,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.960464477539062e-07
+    }
+  ],
+  "q_convention": "L2 normalized with sum-space epsilon 1e-6, scaled by 1/sqrt(Dk)",
+  "state_orientation": "B,Hv,Dk,Dv",
+  "gate_convention": "g is log-space decay",
+  "source_sha256": "4d8dcea71ddb1f6346c79d6fcec12ea27a6bb2aa419f0f1792ca9fbaa812357b",
+  "hf_source_sha256": "af05d0acfe79fff8aea1c75f93516a6a72bc80f6f901329a73e66a3866fe1e7c",
+  "safetensors_sha256": "6bcef17e94e94bff4716cfd00c4cb2560d729427938c571efa8f2ae7b520249a"
+}

@@ -435,6 +435,28 @@ SmolVLM, Qwen3-VL, Phi-3.5-Vision) pass unchanged locally; the `macos-26` dispat
 native CI run of `ci.yml` on the final tree (`-PmlxOracleRequireAllProfiles=true`,
 required-native-suites assertion, no skips); see the PR description for the run link.
 
+## Phase 7.6 hybrid Qwen3.5/Qwen3.8 (2026-11-03)
+
+`jmlx-models` loads dense `qwen3_5` hybrid decoders (three of every four layers Gated
+DeltaNet linear attention with fixed-size float32 recurrent state, the rest gated full
+attention with partial interleaved MRoPE) for text and image+text generation from HF float,
+mlx-vlm float/affine and mlx-lm float/affine layouts, reusing the Qwen3-VL vision tower
+(no DeepStack) and the shared patch-16 image processor. Support and verification:
+
+| Evidence | Content |
+| --- | --- |
+| Tier-A (synthetic) | strict `1e-4` HF float32 text/packed/vision goldens (`Qwen35TextGoldenTest`, `Qwen35PackedGoldenTest`, `Qwen35VisionGoldenTest`, full float32); separately named default-TF32 bound `0.005` in `Qwen35DefaultPrecisionTest` (measured `0.0014960468`); core component suites at `1e-4`; generation contracts, public-decode evaluation counter and exact memory-ownership suites in ordinary mode — all required by the macOS CI native-suite assertion |
+| Tier-B 0.8B (pinned, automated) | `tools/tier-b/qwen35-08b.json`, task `qwen35-generation`: exact greedy IDs and decoded output on text and image cases, every prefill/cached logit vector under predeclared ε = 0.001 / margin 1e-4 (measured maxima 8.320808410644531e-5 text / 4.0340423583984375e-4 image); native peak 5,118,123,572 B, sampled footprint 6,648,795,264 B under predeclared 8e9/12e9 limits — [Tier-B artifacts](phase6-tier-b-artifacts.md#phase-76-qwen35-08b-tier-b-2026-11-03) |
+| 27B 4-bit (pinned, manual) | `tools/tier-b/qwen38-27b-4bit.json`: exact greedy IDs and decoded output under ε = 0.10062797164916992 (the unchanged 0.001 arithmetic allowance plus the measured 0.09962797164916992 stock mlx-vlm Q/K-normalization contribution; margin 1e-4, minimum gap 0.3372325897216797), measured maxima 0.044699668884277344 text / 0.09969949722290039 image; native peak 19,261,831,808 B, sampled footprint 22,680,715,080 B — resource-qualified manual acceptance, not a hosted-runner claim |
+| WP1 performance gate | clean-source 474.313 ms for 48 chunked-prefill calls / 1,280 tokens (target ~600 ms; 1.56× the ordinary mlx-vlm chunked path), at clean commit `2c3f9da`; decode is one lazy step with a single all-roots evaluation at the token boundary — `req/plans/phase7-6-wp1-optimization.md` |
+| Generation-loop extraction | old-path exact bits preserved for all 14 existing family/quantized variants in both TF32 modes before the hybrid adapter was added — `tools/qwen35-reference/evidence/generation-loop-extraction.json` |
+
+Native pins, generated bindings, publication and module versions are unchanged (the 7.5 pin
+pair). Python reference tooling (`tools/qwen35-reference/`) remains opt-in and digest-pinned;
+its guard (`verifyQwen35ReferenceGoldens`) is part of root `check`. The `tier-b.yml` qwen35
+arm's first self-hosted execution and the macOS 26 hosted CI run of this branch remain
+pending.
+
 ## Notices and licenses
 
 jmlx and every published module are MIT. Every published jar now carries `META-INF/LICENSE` (the

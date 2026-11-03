@@ -1,0 +1,1491 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 81,
+      "sha256": "748c964f9b7e5f2c3770ce013bbc0153be7c54311d9692c343b6188eefe77ac6"
+    },
+    "chat_template.jinja": {
+      "bytes": 28,
+      "sha256": "e2ce372d1e093249ecf0ac01bf8ce1be16316356ee0be7176898b31d3b9db73c"
+    },
+    "config.json": {
+      "bytes": 1807,
+      "sha256": "a52a45d1c0ac73b9b41fecd2d1024de6498f12c246a1fcf36ab29df5a021dbbb"
+    },
+    "generation_config.json": {
+      "bytes": 216,
+      "sha256": "919ad803a6315b21c931fc40fe9bcedfa29babaa16165825b426350066592cb8"
+    },
+    "model.safetensors": {
+      "bytes": 662306,
+      "sha256": "f72145ef872306bd251ed80a7556af40441123e424e56e7ec362d2d14da4a1b1"
+    },
+    "model.safetensors.index.json": {
+      "bytes": 10584,
+      "sha256": "908b6a57396c38144b9ae7a4ae2544d17f2799fd61287840a7fea738ad05518e"
+    },
+    "tokenizer.json": {
+      "bytes": 4974,
+      "sha256": "d232d82adca3f9416140621cd21d447304f7b18cdb95fabd80be49ab33ccc741"
+    },
+    "tokenizer_config.json": {
+      "bytes": 483,
+      "sha256": "24b8bb032d74e8f8b6b409639de923d02f93dcbd8c130ece928b29ca8d812352"
+    }
+  },
+  "tensor_count": 122,
+  "tensors": {
+    "language_model.lm_head.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        494488,
+        495512
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        2
+      ]
+    },
+    "language_model.lm_head.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        0,
+        1024
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        2
+      ]
+    },
+    "language_model.lm_head.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        1024,
+        9216
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        16
+      ]
+    },
+    "language_model.model.embed_tokens.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        233536,
+        234560
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        2
+      ]
+    },
+    "language_model.model.embed_tokens.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        532376,
+        533400
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        2
+      ]
+    },
+    "language_model.model.embed_tokens.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        94256,
+        102448
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        16
+      ]
+    },
+    "language_model.model.layers.0.input_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        383192,
+        383704
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.A_log": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        547320,
+        547344
+      ],
+      "dtype": "F32",
+      "shape": [
+        6
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.conv1d.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        300096,
+        308288
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        4,
+        1
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.dt_bias": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        378816,
+        378840
+      ],
+      "dtype": "F32",
+      "shape": [
+        6
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_a.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        550440,
+        550488
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_a.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        569944,
+        569992
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_a.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        223888,
+        224272
+      ],
+      "dtype": "U32",
+      "shape": [
+        6,
+        16
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_b.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        533912,
+        533960
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_b.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        490344,
+        490392
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_b.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        609592,
+        609976
+      ],
+      "dtype": "U32",
+      "shape": [
+        6,
+        16
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_qkv.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        589112,
+        593208
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_qkv.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        609976,
+        614072
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_qkv.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        384136,
+        416904
+      ],
+      "dtype": "U32",
+      "shape": [
+        512,
+        16
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_z.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        550488,
+        553560
+      ],
+      "dtype": "F32",
+      "shape": [
+        384,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_z.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        534008,
+        537080
+      ],
+      "dtype": "F32",
+      "shape": [
+        384,
+        2
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.in_proj_z.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        449336,
+        473912
+      ],
+      "dtype": "U32",
+      "shape": [
+        384,
+        16
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.norm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        588856,
+        589112
+      ],
+      "dtype": "F32",
+      "shape": [
+        64
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.out_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        547344,
+        550416
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        6
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.out_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        539128,
+        542200
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        6
+      ]
+    },
+    "language_model.model.layers.0.linear_attn.out_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        147504,
+        172080
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        48
+      ]
+    },
+    "language_model.model.layers.0.mlp.down_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        545272,
+        547320
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.0.mlp.down_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        492440,
+        494488
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.0.mlp.down_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        515992,
+        532376
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        32
+      ]
+    },
+    "language_model.model.layers.0.mlp.gate_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        172080,
+        174128
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.0.mlp.gate_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        497560,
+        499608
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.0.mlp.gate_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        553560,
+        569944
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.0.mlp.up_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        486248,
+        488296
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.0.mlp.up_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        490392,
+        492440
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.0.mlp.up_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        593208,
+        609592
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.0.post_attention_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        533400,
+        533912
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.1.input_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        647376,
+        647888
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.A_log": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        192816,
+        192840
+      ],
+      "dtype": "F32",
+      "shape": [
+        6
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.conv1d.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        478056,
+        486248
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        4,
+        1
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.dt_bias": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        614072,
+        614096
+      ],
+      "dtype": "F32",
+      "shape": [
+        6
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_a.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        384088,
+        384136
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_a.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        473912,
+        473960
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_a.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        343616,
+        344000
+      ],
+      "dtype": "U32",
+      "shape": [
+        6,
+        16
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_b.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        416904,
+        416952
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_b.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        231440,
+        231488
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_b.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        448952,
+        449336
+      ],
+      "dtype": "U32",
+      "shape": [
+        6,
+        16
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_qkv.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        378840,
+        382936
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_qkv.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        473960,
+        478056
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_qkv.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        614608,
+        647376
+      ],
+      "dtype": "U32",
+      "shape": [
+        512,
+        16
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_z.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        416952,
+        420024
+      ],
+      "dtype": "F32",
+      "shape": [
+        384,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_z.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        542200,
+        545272
+      ],
+      "dtype": "F32",
+      "shape": [
+        384,
+        2
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.in_proj_z.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        422072,
+        446648
+      ],
+      "dtype": "U32",
+      "shape": [
+        384,
+        16
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.norm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        382936,
+        383192
+      ],
+      "dtype": "F32",
+      "shape": [
+        64
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.out_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        344512,
+        347584
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        6
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.out_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        348096,
+        351168
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        6
+      ]
+    },
+    "language_model.model.layers.1.linear_attn.out_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        354240,
+        378816
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        48
+      ]
+    },
+    "language_model.model.layers.1.mlp.down_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        537080,
+        539128
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.1.mlp.down_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        420024,
+        422072
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.1.mlp.down_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        308288,
+        324672
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        32
+      ]
+    },
+    "language_model.model.layers.1.mlp.gate_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        488296,
+        490344
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.1.mlp.gate_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        325184,
+        327232
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.1.mlp.gate_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        327232,
+        343616
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.1.mlp.up_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        495512,
+        497560
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.1.mlp.up_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        281664,
+        283712
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.1.mlp.up_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        283712,
+        300096
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.1.post_attention_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        344000,
+        344512
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.2.input_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        102448,
+        102960
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.A_log": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        550416,
+        550440
+      ],
+      "dtype": "F32",
+      "shape": [
+        6
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.conv1d.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        273472,
+        281664
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        4,
+        1
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.dt_bias": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        196216,
+        196240
+      ],
+      "dtype": "F32",
+      "shape": [
+        6
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_a.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        533960,
+        534008
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_a.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        92160,
+        92208
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_a.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        586376,
+        586760
+      ],
+      "dtype": "U32",
+      "shape": [
+        6,
+        16
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_b.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        196168,
+        196216
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_b.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        588808,
+        588856
+      ],
+      "dtype": "F32",
+      "shape": [
+        6,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_b.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        383704,
+        384088
+      ],
+      "dtype": "U32",
+      "shape": [
+        6,
+        16
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_qkv.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        224272,
+        228368
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_qkv.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        234560,
+        238656
+      ],
+      "dtype": "F32",
+      "shape": [
+        512,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_qkv.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        240704,
+        273472
+      ],
+      "dtype": "U32",
+      "shape": [
+        512,
+        16
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_z.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        351168,
+        354240
+      ],
+      "dtype": "F32",
+      "shape": [
+        384,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_z.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        196240,
+        199312
+      ],
+      "dtype": "F32",
+      "shape": [
+        384,
+        2
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.in_proj_z.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        199312,
+        223888
+      ],
+      "dtype": "U32",
+      "shape": [
+        384,
+        16
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.norm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        190512,
+        190768
+      ],
+      "dtype": "F32",
+      "shape": [
+        64
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.out_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        119856,
+        122928
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        6
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.out_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        192840,
+        195912
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        6
+      ]
+    },
+    "language_model.model.layers.2.linear_attn.out_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        122928,
+        147504
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        48
+      ]
+    },
+    "language_model.model.layers.2.mlp.down_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        586760,
+        588808
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.2.mlp.down_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        231488,
+        233536
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.2.mlp.down_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        499608,
+        515992
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        32
+      ]
+    },
+    "language_model.model.layers.2.mlp.gate_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        90112,
+        92160
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.2.mlp.gate_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        92208,
+        94256
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.2.mlp.gate_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        569992,
+        586376
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.2.mlp.up_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        88064,
+        90112
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.2.mlp.up_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        238656,
+        240704
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.2.mlp.up_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        174128,
+        190512
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.2.post_attention_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        102960,
+        103472
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.3.input_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        324672,
+        325184
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.3.mlp.down_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        13824,
+        15872
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.3.mlp.down_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        15872,
+        17920
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        4
+      ]
+    },
+    "language_model.model.layers.3.mlp.down_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        17920,
+        34304
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        32
+      ]
+    },
+    "language_model.model.layers.3.mlp.gate_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        34304,
+        36352
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.3.mlp.gate_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        446648,
+        448696
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.3.mlp.gate_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        36352,
+        52736
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.3.mlp.up_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        9728,
+        11776
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.3.mlp.up_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        11776,
+        13824
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.3.mlp.up_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        67584,
+        83968
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.3.post_attention_layernorm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        52736,
+        53248
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    },
+    "language_model.model.layers.3.self_attn.k_norm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        195912,
+        196168
+      ],
+      "dtype": "F32",
+      "shape": [
+        64
+      ]
+    },
+    "language_model.model.layers.3.self_attn.k_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        614096,
+        614608
+      ],
+      "dtype": "F32",
+      "shape": [
+        64,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.k_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        347584,
+        348096
+      ],
+      "dtype": "F32",
+      "shape": [
+        64,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.k_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        83968,
+        88064
+      ],
+      "dtype": "U32",
+      "shape": [
+        64,
+        16
+      ]
+    },
+    "language_model.model.layers.3.self_attn.o_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        53248,
+        54272
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.o_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        228368,
+        229392
+      ],
+      "dtype": "F32",
+      "shape": [
+        128,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.o_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        54272,
+        62464
+      ],
+      "dtype": "U32",
+      "shape": [
+        128,
+        16
+      ]
+    },
+    "language_model.model.layers.3.self_attn.q_norm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        448696,
+        448952
+      ],
+      "dtype": "F32",
+      "shape": [
+        64
+      ]
+    },
+    "language_model.model.layers.3.self_attn.q_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        190768,
+        192816
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.q_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        229392,
+        231440
+      ],
+      "dtype": "F32",
+      "shape": [
+        256,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.q_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        103472,
+        119856
+      ],
+      "dtype": "U32",
+      "shape": [
+        256,
+        16
+      ]
+    },
+    "language_model.model.layers.3.self_attn.v_proj.biases": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        62464,
+        62976
+      ],
+      "dtype": "F32",
+      "shape": [
+        64,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.v_proj.scales": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        62976,
+        63488
+      ],
+      "dtype": "F32",
+      "shape": [
+        64,
+        2
+      ]
+    },
+    "language_model.model.layers.3.self_attn.v_proj.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        63488,
+        67584
+      ],
+      "dtype": "U32",
+      "shape": [
+        64,
+        16
+      ]
+    },
+    "language_model.model.norm.weight": {
+      "shard": "model.safetensors",
+      "data_offsets": [
+        9216,
+        9728
+      ],
+      "dtype": "F32",
+      "shape": [
+        128
+      ]
+    }
+  },
+  "shard_metadata": {
+    "model.safetensors": {
+      "format": "mlx"
+    }
+  }
+}

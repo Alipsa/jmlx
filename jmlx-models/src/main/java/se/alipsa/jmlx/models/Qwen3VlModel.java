@@ -129,6 +129,10 @@ public final class Qwen3VlModel implements TextGenerationModel {
         affine
             ? Qwen3VlDescriptor.parseAffine(root, provenance.groupSize(), provenance.bits())
             : Qwen3VlDescriptor.parse(root);
+    // This family requires DeepStack even though the shared tower also serves Qwen3.5.
+    if (d.deepstackIndexes().length == 0) {
+      throw new IllegalArgumentException("Qwen3-VL deepstack_visual_indexes must not be empty");
+    }
     Qwen3VlProcessorConfig processorConfig =
         Qwen3VlProcessorConfig.fromJson(
             Files.readAllBytes(directory.resolve("preprocessor_config.json")));

@@ -1,0 +1,194 @@
+{
+  "kind": "Attribution only, not an acceptance reference or golden; stock acceptance is reported independently",
+  "source_sha256": "4c1b27cf51baf6576e5640fe94ad11148d2a7b71250b8ad08da78f1f5d3e6e0a",
+  "java_report_sha256": "b300e621dd98a7cded32b83ad708cdb775f4de40865467b9d6190b95acf62f77",
+  "java_source_commit": "a37621d46721fe77d3bd904893fea08fdb560b64",
+  "stock_capture_sha256": "7a2e8821e9192536620bbbdbee6853469118fffd0a1892a3856c7e7efc34a402",
+  "diagnostic_capture_sha256": "cf9319d0f60f8dd0b79bc3c3c320fe232a92025d0677f0dca01c8155ad106340",
+  "phases": [
+    {
+      "phase": "text_copy_prefill",
+      "java_stock_max_abs": 0.044699668884277344,
+      "normalization_contribution_max_abs": 0.04470252990722656,
+      "java_diagnostic_remainder_max_abs": 5.1975250244140625e-05,
+      "stock_greedy": 588,
+      "diagnostic_greedy": 588,
+      "java_greedy": 588,
+      "actual_sha256": "bb5b1f1719f64f2286ace13f0736490a7836e7bb8f65b8d4bdda441002964955"
+    },
+    {
+      "phase": "text_copy_decode0",
+      "java_stock_max_abs": 0.03724861145019531,
+      "normalization_contribution_max_abs": 0.037255287170410156,
+      "java_diagnostic_remainder_max_abs": 2.6702880859375e-05,
+      "stock_greedy": 1330,
+      "diagnostic_greedy": 1330,
+      "java_greedy": 1330,
+      "actual_sha256": "f9d758d56530db5a4a4e8bbec80b734965385f56d2c8329764560399bd90b5ae"
+    },
+    {
+      "phase": "text_copy_decode1",
+      "java_stock_max_abs": 0.029409408569335938,
+      "normalization_contribution_max_abs": 0.029413223266601562,
+      "java_diagnostic_remainder_max_abs": 2.193450927734375e-05,
+      "stock_greedy": 2250,
+      "diagnostic_greedy": 2250,
+      "java_greedy": 2250,
+      "actual_sha256": "fabc1e7bb54ae206db93ba6278a1b73291412e48efc2023c5e97f2ba56003133"
+    },
+    {
+      "phase": "text_copy_decode2",
+      "java_stock_max_abs": 0.028348922729492188,
+      "normalization_contribution_max_abs": 0.028348922729492188,
+      "java_diagnostic_remainder_max_abs": 2.4497509002685547e-05,
+      "stock_greedy": 2943,
+      "diagnostic_greedy": 2943,
+      "java_greedy": 2943,
+      "actual_sha256": "9f91977014ad948d3e9fffd96db6a2f9ca7737cf88bedab74678a1d1ded78452"
+    },
+    {
+      "phase": "text_copy_decode3",
+      "java_stock_max_abs": 0.04331827163696289,
+      "normalization_contribution_max_abs": 0.043311238288879395,
+      "java_diagnostic_remainder_max_abs": 2.288818359375e-05,
+      "stock_greedy": 4097,
+      "diagnostic_greedy": 4097,
+      "java_greedy": 4097,
+      "actual_sha256": "d47b5b6771c2d57a19f0eaacbeb595eeda0a3b0d41880565a67e12897492bc59"
+    },
+    {
+      "phase": "text_copy_decode4",
+      "java_stock_max_abs": 0.02517223358154297,
+      "normalization_contribution_max_abs": 0.025177955627441406,
+      "java_diagnostic_remainder_max_abs": 2.0444393157958984e-05,
+      "stock_greedy": 4590,
+      "diagnostic_greedy": 4590,
+      "java_greedy": 4590,
+      "actual_sha256": "45184abed7d99e308f6bb9fc39b5115d934ce9fad6ccec006a3730ca1bc97ef4"
+    },
+    {
+      "phase": "text_copy_decode5",
+      "java_stock_max_abs": 0.03310203552246094,
+      "normalization_contribution_max_abs": 0.03310108184814453,
+      "java_diagnostic_remainder_max_abs": 2.384185791015625e-05,
+      "stock_greedy": 7840,
+      "diagnostic_greedy": 7840,
+      "java_greedy": 7840,
+      "actual_sha256": "dc597e87b638034152731f53c92d3df84de28e1e192b64861af7daf6174f0409"
+    },
+    {
+      "phase": "text_copy_decode6",
+      "java_stock_max_abs": 0.023242950439453125,
+      "normalization_contribution_max_abs": 0.02324390411376953,
+      "java_diagnostic_remainder_max_abs": 2.47955322265625e-05,
+      "stock_greedy": 7810,
+      "diagnostic_greedy": 7810,
+      "java_greedy": 7810,
+      "actual_sha256": "fcc5998f92bd92e6fa977f123a1d85eefe0b1ef4dbf18265a32917b1782836e2"
+    },
+    {
+      "phase": "text_copy_decode7",
+      "java_stock_max_abs": 0.025409698486328125,
+      "normalization_contribution_max_abs": 0.025403976440429688,
+      "java_diagnostic_remainder_max_abs": 2.086162567138672e-05,
+      "stock_greedy": 11292,
+      "diagnostic_greedy": 11292,
+      "java_greedy": 11292,
+      "actual_sha256": "a6f128a7837ac6f6cfb8703e364940b1f8ce91853ad33f65f17190e14474d9fb"
+    },
+    {
+      "phase": "image_prefill",
+      "java_stock_max_abs": 0.09969949722290039,
+      "normalization_contribution_max_abs": 0.09962797164916992,
+      "java_diagnostic_remainder_max_abs": 0.0001666545867919922,
+      "stock_greedy": 1919,
+      "diagnostic_greedy": 1919,
+      "java_greedy": 1919,
+      "actual_sha256": "faf9614bafa33eb1ee397887f714f1046d2fafb50c777ed541b48e16c1e6ffd1"
+    },
+    {
+      "phase": "image_decode0",
+      "java_stock_max_abs": 0.03859066963195801,
+      "normalization_contribution_max_abs": 0.0385933518409729,
+      "java_diagnostic_remainder_max_abs": 0.0001080930233001709,
+      "stock_greedy": 2099,
+      "diagnostic_greedy": 2099,
+      "java_greedy": 2099,
+      "actual_sha256": "3835d663bfb83fdf0cbe3003b5aa68380f78c37147b23d7cbee1798a6fb826f8"
+    },
+    {
+      "phase": "image_decode1",
+      "java_stock_max_abs": 0.02234339714050293,
+      "normalization_contribution_max_abs": 0.022338390350341797,
+      "java_diagnostic_remainder_max_abs": 5.7220458984375e-05,
+      "stock_greedy": 369,
+      "diagnostic_greedy": 369,
+      "java_greedy": 369,
+      "actual_sha256": "b693b6944b9ed0b475912a1b646942daec893a685f162c10a90b27f6e28f127b"
+    },
+    {
+      "phase": "image_decode2",
+      "java_stock_max_abs": 0.023830950260162354,
+      "normalization_contribution_max_abs": 0.023675382137298584,
+      "java_diagnostic_remainder_max_abs": 0.00019168853759765625,
+      "stock_greedy": 264,
+      "diagnostic_greedy": 264,
+      "java_greedy": 264,
+      "actual_sha256": "6e4bfe32fea812ef0e286482c4edc6be862bfe4016725d27fba874cfa05200da"
+    },
+    {
+      "phase": "image_decode3",
+      "java_stock_max_abs": 0.02530050277709961,
+      "normalization_contribution_max_abs": 0.025159597396850586,
+      "java_diagnostic_remainder_max_abs": 0.0002741813659667969,
+      "stock_greedy": 10558,
+      "diagnostic_greedy": 10558,
+      "java_greedy": 10558,
+      "actual_sha256": "4ef088ca67f84579ce9a081b88e0c928a8ad7af57ecd1057d50d20e1fabc9ffa"
+    },
+    {
+      "phase": "image_decode4",
+      "java_stock_max_abs": 0.03436708450317383,
+      "normalization_contribution_max_abs": 0.03413534164428711,
+      "java_diagnostic_remainder_max_abs": 0.0002657175064086914,
+      "stock_greedy": 11,
+      "diagnostic_greedy": 11,
+      "java_greedy": 11,
+      "actual_sha256": "918069fc00c1bb4454c2aaae90f8ad2e8eedc122d27af43c0fa3dd8d0d6f92ea"
+    },
+    {
+      "phase": "image_decode5",
+      "java_stock_max_abs": 0.023789405822753906,
+      "normalization_contribution_max_abs": 0.023537635803222656,
+      "java_diagnostic_remainder_max_abs": 0.00028324127197265625,
+      "stock_greedy": 7859,
+      "diagnostic_greedy": 7859,
+      "java_greedy": 7859,
+      "actual_sha256": "f8811d126067d47f462b447292dcca972c5a207f3d29e8d53c7520453210fcab"
+    },
+    {
+      "phase": "image_decode6",
+      "java_stock_max_abs": 0.02429819107055664,
+      "normalization_contribution_max_abs": 0.02408742904663086,
+      "java_diagnostic_remainder_max_abs": 0.00023436546325683594,
+      "stock_greedy": 19556,
+      "diagnostic_greedy": 19556,
+      "java_greedy": 19556,
+      "actual_sha256": "57c960daf5f58d01bafcbb2fdf0df3fa8906fb8246f69b8d763e4a5e2a60ac90"
+    },
+    {
+      "phase": "image_decode7",
+      "java_stock_max_abs": 0.027884483337402344,
+      "normalization_contribution_max_abs": 0.027855873107910156,
+      "java_diagnostic_remainder_max_abs": 0.00018072128295898438,
+      "stock_greedy": 53968,
+      "diagnostic_greedy": 53968,
+      "java_greedy": 53968,
+      "actual_sha256": "ecf856c4856065768d4f58d5f10b0ad904a8ddc202147900f36f64c5eedcc503"
+    }
+  ],
+  "maximum_java_stock_error": 0.09969949722290039,
+  "maximum_normalization_contribution": 0.09962797164916992,
+  "maximum_java_diagnostic_remainder": 0.00028324127197265625,
+  "independently_stated_arithmetic_allowance": 0.001
+}

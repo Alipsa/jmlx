@@ -1,0 +1,49 @@
+{
+  "seed": 20261102,
+  "cases": [
+    {
+      "length": 1,
+      "hf_cached_vs_fresh_max_abs": 1.3387762010097504e-09
+    },
+    {
+      "length": 3,
+      "hf_cached_vs_fresh_max_abs": 6.05359673500061e-09
+    },
+    {
+      "length": 4,
+      "hf_cached_vs_fresh_max_abs": 8.381903171539307e-09
+    },
+    {
+      "length": 5,
+      "hf_cached_vs_fresh_max_abs": 4.6566128730773926e-09
+    },
+    {
+      "length": 63,
+      "hf_cached_vs_fresh_max_abs": 4.540197551250458e-09
+    },
+    {
+      "length": 64,
+      "hf_cached_vs_fresh_max_abs": 3.026798367500305e-09
+    },
+    {
+      "length": 65,
+      "hf_cached_vs_fresh_max_abs": 4.889443516731262e-09
+    },
+    {
+      "length": 127,
+      "hf_cached_vs_fresh_max_abs": 2.7939677238464355e-09
+    },
+    {
+      "length": 128,
+      "hf_cached_vs_fresh_max_abs": 3.725290298461914e-09
+    },
+    {
+      "length": 129,
+      "hf_cached_vs_fresh_max_abs": 2.2118911147117615e-09
+    }
+  ],
+  "convolution_history": "last K-1 projected real positions, initial zeros not charged",
+  "source_sha256": "07d9e3575cc66eb088757bac0d4e14918a2faa6b158ae147e75705820f3c3a78",
+  "hf_source_sha256": "af05d0acfe79fff8aea1c75f93516a6a72bc80f6f901329a73e66a3866fe1e7c",
+  "safetensors_sha256": "ea9ead1e94ca1b14ee3c37460f0da61fbc7fc06db1e1839ed97391454f065bc5"
+}

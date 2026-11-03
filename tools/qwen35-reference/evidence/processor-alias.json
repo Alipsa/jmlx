@@ -1,0 +1,26 @@
+{
+  "kind": "Observed mlx-vlm 0.6.8 saved processor alias; selected slow-PIL contract unchanged",
+  "source_sha256": "90498cd71c69ae06a67b9bdcfa64870379e1fe86025b31cd0a79bb944608ecd6",
+  "processor_source_sha256": "95396637225d61b0a5ab6b60f50fe8c65f8ee5f9f61815e2f39698cd5d34433c",
+  "config_sha256": "083789f3817567605a158d580b5fe4fba25bd5fcb038e3c015efdb7a4ee785a4",
+  "golden_sha256": "acb660b0cdb4a75f088472ccd9507f46eb824416ecbaad5bea6ae770f980cb07",
+  "raw_row_budget": 4096,
+  "effective_max_pixels": 1048576,
+  "cases": [
+    {
+      "image": "rgb-32x32.png",
+      "image_sha256": "c2b13bedf8a7d35f7adaf2c985c94dd7a52d154bb7b35f5287caeccceba7bf36",
+      "pixel_max_abs": 1.1920928955078125e-07
+    },
+    {
+      "image": "rgb-73x45.png",
+      "image_sha256": "11c983113f1f55de4684f9a75219f20391b13764cbbc792d0e81298b61fb96dc",
+      "pixel_max_abs": 1.1920928955078125e-07
+    },
+    {
+      "image": "rgb-250x130.png",
+      "image_sha256": "a043e8d110a26ef66f4f66f48d7d2e5299c8502572d3d30aa9eb4c9a595e20bb",
+      "pixel_max_abs": 1.1920928955078125e-07
+    }
+  ]
+}

@@ -1,0 +1,270 @@
+{
+  "kind": "stock reference probe; not yet a declared acceptance golden",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "python": "3.12.16",
+  "device": "Device(gpu, 0)",
+  "stream": "Stream(Device(gpu, 0), 0)",
+  "metal_available": true,
+  "tf32": "0",
+  "inputs_sha256": "44ffbc14091535c590e673ba06f894d588e9b3c653b4d4cff6ee9845b93dac97",
+  "teacher_history_sha256": null,
+  "packages": {
+    "mlx": "0.32.4",
+    "mlx-metal": "0.32.4",
+    "mlx-vlm": "0.6.8",
+    "mlx-lm": "0.32.2"
+  },
+  "sources": {
+    "mlx_lm.models.qwen3_5": "851449fd9989d6bf4b3c4fed92ddc3be5f1e781eb2246f89c54d7eff2518d9c6",
+    "mlx_lm.models.gated_delta": "f69e837ea68641dbb06fdb5dcc024a9a7e1d9353f08ae58c05275253a0c39428",
+    "mlx_lm.models.qwen3_next": "67ca08a4d08cb7be124965e95399735e556f1eaeb21a16bc23cb88d1ac035e11",
+    "probe_reload.py": "11fb4ec46f03861467b46fb35111f0a9308c487fca0fda0fe44d480f8a9f6905"
+  },
+  "cases": [
+    {
+      "name": "text",
+      "input_ids": [
+        [
+          1,
+          3,
+          4,
+          5
+        ]
+      ],
+      "prefill_greedy": 127,
+      "prefill_margin": 0.013669610023498535,
+      "prefill_hf_max_abs": 0.14750275015830994,
+      "decode_steps": [
+        {
+          "input_id": 6,
+          "greedy": 61,
+          "margin": 0.0886375904083252,
+          "hf_max_abs": 0.1191105842590332
+        }
+      ],
+      "paths": [
+        {
+          "kind": "conv1d",
+          "phase": "text_prefill",
+          "input_dtype": "mlx.core.float32",
+          "weight_dtype": "mlx.core.float32",
+          "output_dtype": "mlx.core.float32",
+          "callable_sha256": "28a87c4a877d4374fa1467648b29fa6d6d64840cface18c2f4b7784247143e62"
+        },
+        {
+          "kind": "delta",
+          "phase": "text_prefill",
+          "q_dtype": "mlx.core.float32",
+          "v_dtype": "mlx.core.float32",
+          "state_dtype": "mlx.core.float32",
+          "use_kernel": true,
+          "selected": [
+            {
+              "callable": "mlx_lm.models.gated_delta.gated_delta_kernel",
+              "source_sha256": "ffd8dae0eb94f667de2a034241dd4cffaa3c925909007401e0726c9fd7a071fd"
+            }
+          ],
+          "callable_sha256": "261212fc0a75471f173175182f22b36c1a5002024c38c9eaf080ee98fe0a2c1b"
+        },
+        {
+          "kind": "gated_norm_silu",
+          "phase": "text_prefill",
+          "input_dtypes": [
+            "mlx.core.float32",
+            "mlx.core.float32",
+            "mlx.core.float32"
+          ],
+          "output_dtype": "mlx.core.float32",
+          "accumulation": "float32 (source)",
+          "callable_sha256": "4364ad8d6121781c6e9ba244b119b09ab2495bd881f31c5981212bfe3fa5fa3d"
+        },
+        {
+          "kind": "conv1d",
+          "phase": "text_prefill",
+          "input_dtype": "mlx.core.float32",
+          "weight_dtype": "mlx.core.float32",
+          "output_dtype": "mlx.core.float32",
+          "callable_sha256": "28a87c4a877d4374fa1467648b29fa6d6d64840cface18c2f4b7784247143e62"
+        },
+        {
+          "kind": "delta",
+          "phase": "text_prefill",
+          "q_dtype": "mlx.core.float32",
+          "v_dtype": "mlx.core.float32",
+          "state_dtype": "mlx.core.float32",
+          "use_kernel": true,
+          "selected": [
+            {
+              "callable": "mlx_lm.models.gated_delta.gated_delta_kernel",
+              "source_sha256": "ffd8dae0eb94f667de2a034241dd4cffaa3c925909007401e0726c9fd7a071fd"
+            }
+          ],
+          "callable_sha256": "261212fc0a75471f173175182f22b36c1a5002024c38c9eaf080ee98fe0a2c1b"
+        },
+        {
+          "kind": "gated_norm_silu",
+          "phase": "text_prefill",
+          "input_dtypes": [
+            "mlx.core.float32",
+            "mlx.core.float32",
+            "mlx.core.float32"
+          ],
+          "output_dtype": "mlx.core.float32",
+          "accumulation": "float32 (source)",
+          "callable_sha256": "4364ad8d6121781c6e9ba244b119b09ab2495bd881f31c5981212bfe3fa5fa3d"
+        },
+        {
+          "kind": "conv1d",
+          "phase": "text_prefill",
+          "input_dtype": "mlx.core.float32",
+          "weight_dtype": "mlx.core.float32",
+          "output_dtype": "mlx.core.float32",
+          "callable_sha256": "28a87c4a877d4374fa1467648b29fa6d6d64840cface18c2f4b7784247143e62"
+        },
+        {
+          "kind": "delta",
+          "phase": "text_prefill",
+          "q_dtype": "mlx.core.float32",
+          "v_dtype": "mlx.core.float32",
+          "state_dtype": "mlx.core.float32",
+          "use_kernel": true,
+          "selected": [
+            {
+              "callable": "mlx_lm.models.gated_delta.gated_delta_kernel",
+              "source_sha256": "ffd8dae0eb94f667de2a034241dd4cffaa3c925909007401e0726c9fd7a071fd"
+            }
+          ],
+          "callable_sha256": "261212fc0a75471f173175182f22b36c1a5002024c38c9eaf080ee98fe0a2c1b"
+        },
+        {
+          "kind": "gated_norm_silu",
+          "phase": "text_prefill",
+          "input_dtypes": [
+            "mlx.core.float32",
+            "mlx.core.float32",
+            "mlx.core.float32"
+          ],
+          "output_dtype": "mlx.core.float32",
+          "accumulation": "float32 (source)",
+          "callable_sha256": "4364ad8d6121781c6e9ba244b119b09ab2495bd881f31c5981212bfe3fa5fa3d"
+        },
+        {
+          "kind": "conv1d",
+          "phase": "text_decode0",
+          "input_dtype": "mlx.core.float32",
+          "weight_dtype": "mlx.core.float32",
+          "output_dtype": "mlx.core.float32",
+          "callable_sha256": "28a87c4a877d4374fa1467648b29fa6d6d64840cface18c2f4b7784247143e62"
+        },
+        {
+          "kind": "delta",
+          "phase": "text_decode0",
+          "q_dtype": "mlx.core.float32",
+          "v_dtype": "mlx.core.float32",
+          "state_dtype": "mlx.core.float32",
+          "use_kernel": true,
+          "selected": [
+            {
+              "callable": "mlx_lm.models.gated_delta.gated_delta_kernel",
+              "source_sha256": "ffd8dae0eb94f667de2a034241dd4cffaa3c925909007401e0726c9fd7a071fd"
+            }
+          ],
+          "callable_sha256": "261212fc0a75471f173175182f22b36c1a5002024c38c9eaf080ee98fe0a2c1b"
+        },
+        {
+          "kind": "gated_norm_silu",
+          "phase": "text_decode0",
+          "input_dtypes": [
+            "mlx.core.float32",
+            "mlx.core.float32",
+            "mlx.core.float32"
+          ],
+          "output_dtype": "mlx.core.float32",
+          "accumulation": "float32 (source)",
+          "callable_sha256": "4364ad8d6121781c6e9ba244b119b09ab2495bd881f31c5981212bfe3fa5fa3d"
+        },
+        {
+          "kind": "conv1d",
+          "phase": "text_decode0",
+          "input_dtype": "mlx.core.float32",
+          "weight_dtype": "mlx.core.float32",
+          "output_dtype": "mlx.core.float32",
+          "callable_sha256": "28a87c4a877d4374fa1467648b29fa6d6d64840cface18c2f4b7784247143e62"
+        },
+        {
+          "kind": "delta",
+          "phase": "text_decode0",
+          "q_dtype": "mlx.core.float32",
+          "v_dtype": "mlx.core.float32",
+          "state_dtype": "mlx.core.float32",
+          "use_kernel": true,
+          "selected": [
+            {
+              "callable": "mlx_lm.models.gated_delta.gated_delta_kernel",
+              "source_sha256": "ffd8dae0eb94f667de2a034241dd4cffaa3c925909007401e0726c9fd7a071fd"
+            }
+          ],
+          "callable_sha256": "261212fc0a75471f173175182f22b36c1a5002024c38c9eaf080ee98fe0a2c1b"
+        },
+        {
+          "kind": "gated_norm_silu",
+          "phase": "text_decode0",
+          "input_dtypes": [
+            "mlx.core.float32",
+            "mlx.core.float32",
+            "mlx.core.float32"
+          ],
+          "output_dtype": "mlx.core.float32",
+          "accumulation": "float32 (source)",
+          "callable_sha256": "4364ad8d6121781c6e9ba244b119b09ab2495bd881f31c5981212bfe3fa5fa3d"
+        },
+        {
+          "kind": "conv1d",
+          "phase": "text_decode0",
+          "input_dtype": "mlx.core.float32",
+          "weight_dtype": "mlx.core.float32",
+          "output_dtype": "mlx.core.float32",
+          "callable_sha256": "28a87c4a877d4374fa1467648b29fa6d6d64840cface18c2f4b7784247143e62"
+        },
+        {
+          "kind": "delta",
+          "phase": "text_decode0",
+          "q_dtype": "mlx.core.float32",
+          "v_dtype": "mlx.core.float32",
+          "state_dtype": "mlx.core.float32",
+          "use_kernel": true,
+          "selected": [
+            {
+              "callable": "mlx_lm.models.gated_delta.gated_delta_kernel",
+              "source_sha256": "ffd8dae0eb94f667de2a034241dd4cffaa3c925909007401e0726c9fd7a071fd"
+            }
+          ],
+          "callable_sha256": "261212fc0a75471f173175182f22b36c1a5002024c38c9eaf080ee98fe0a2c1b"
+        },
+        {
+          "kind": "gated_norm_silu",
+          "phase": "text_decode0",
+          "input_dtypes": [
+            "mlx.core.float32",
+            "mlx.core.float32",
+            "mlx.core.float32"
+          ],
+          "output_dtype": "mlx.core.float32",
+          "accumulation": "float32 (source)",
+          "callable_sha256": "4364ad8d6121781c6e9ba244b119b09ab2495bd881f31c5981212bfe3fa5fa3d"
+        }
+      ]
+    }
+  ],
+  "floating_parameter_upcast": false,
+  "training": false,
+  "parameter_dtypes": [
+    "mlx.core.float32",
+    "mlx.core.uint32"
+  ],
+  "captures": {
+    "file": "lm-affine-stock.npz",
+    "sha256": "0c4166a5a8d4e2b9d9dd43dd0372040793ba20b5e7931ca9b5217ac574768d66",
+    "external": false
+  }
+}

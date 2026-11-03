@@ -1,0 +1,251 @@
+{
+  "source_sha256": "3bbea5aebd30fee70c86a6cad6f10606eb1834536713327d15b7b351dc92e809",
+  "hf_source_sha256": "af05d0acfe79fff8aea1c75f93516a6a72bc80f6f901329a73e66a3866fe1e7c",
+  "safetensors_sha256": "acb660b0cdb4a75f088472ccd9507f46eb824416ecbaad5bea6ae770f980cb07",
+  "seed": 20261106,
+  "epsilon": 0.0001,
+  "raw_row_budget": 4096,
+  "effective_max_pixels": 1048576,
+  "cases": [
+    {
+      "name": "hf.small",
+      "fixture": "hf",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-32x32.png",
+          "sha256": "c2b13bedf8a7d35f7adaf2c985c94dd7a52d154bb7b35f5287caeccceba7bf36"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        114,
+        7,
+        86
+      ],
+      "margins": [
+        0.03143209218978882,
+        0.010703414678573608,
+        0.11145883798599243
+      ]
+    },
+    {
+      "name": "hf.resize",
+      "fixture": "hf",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-73x45.png",
+          "sha256": "11c983113f1f55de4684f9a75219f20391b13764cbbc792d0e81298b61fb96dc"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        116,
+        125,
+        23
+      ],
+      "margins": [
+        0.1974899172782898,
+        0.02108675241470337,
+        0.012942373752593994
+      ]
+    },
+    {
+      "name": "hf.large",
+      "fixture": "hf",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-250x130.png",
+          "sha256": "a043e8d110a26ef66f4f66f48d7d2e5299c8502572d3d30aa9eb4c9a595e20bb"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        116,
+        28,
+        75
+      ],
+      "margins": [
+        0.23984450101852417,
+        0.03384476900100708,
+        0.04811066389083862
+      ]
+    },
+    {
+      "name": "hf.multi",
+      "fixture": "hf",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-32x32.png",
+          "sha256": "c2b13bedf8a7d35f7adaf2c985c94dd7a52d154bb7b35f5287caeccceba7bf36"
+        },
+        {
+          "file": "fixtures/images/rgb-73x45.png",
+          "sha256": "11c983113f1f55de4684f9a75219f20391b13764cbbc792d0e81298b61fb96dc"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        116,
+        28,
+        75
+      ],
+      "margins": [
+        0.13894224166870117,
+        0.05917865037918091,
+        0.0791669487953186
+      ]
+    },
+    {
+      "name": "hf-grid48.small",
+      "fixture": "hf-grid48",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-32x32.png",
+          "sha256": "c2b13bedf8a7d35f7adaf2c985c94dd7a52d154bb7b35f5287caeccceba7bf36"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        46,
+        105,
+        112
+      ],
+      "margins": [
+        0.15808925032615662,
+        0.07999345660209656,
+        0.15516269207000732
+      ]
+    },
+    {
+      "name": "hf-grid48.resize",
+      "fixture": "hf-grid48",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-73x45.png",
+          "sha256": "11c983113f1f55de4684f9a75219f20391b13764cbbc792d0e81298b61fb96dc"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        46,
+        105,
+        112
+      ],
+      "margins": [
+        0.16663947701454163,
+        0.03186160326004028,
+        0.1687343716621399
+      ]
+    },
+    {
+      "name": "hf-grid48.large",
+      "fixture": "hf-grid48",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-250x130.png",
+          "sha256": "a043e8d110a26ef66f4f66f48d7d2e5299c8502572d3d30aa9eb4c9a595e20bb"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        73,
+        23,
+        9
+      ],
+      "margins": [
+        0.005788266658782959,
+        0.00463026762008667,
+        0.07182323932647705
+      ]
+    },
+    {
+      "name": "hf-grid48.multi",
+      "fixture": "hf-grid48",
+      "images": [
+        {
+          "file": "fixtures/images/rgb-32x32.png",
+          "sha256": "c2b13bedf8a7d35f7adaf2c985c94dd7a52d154bb7b35f5287caeccceba7bf36"
+        },
+        {
+          "file": "fixtures/images/rgb-73x45.png",
+          "sha256": "11c983113f1f55de4684f9a75219f20391b13764cbbc792d0e81298b61fb96dc"
+        }
+      ],
+      "original_ids": [
+        1,
+        118,
+        120,
+        119,
+        37,
+        118,
+        120,
+        119,
+        37,
+        38
+      ],
+      "greedy_ids": [
+        46,
+        105,
+        112
+      ],
+      "margins": [
+        0.22103729844093323,
+        0.019966185092926025,
+        0.16994929313659668
+      ]
+    }
+  ]
+}

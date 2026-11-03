@@ -442,8 +442,6 @@ class Qwen3VlVisionTowerValidationTest {
     try (MLXScope scope = new MLXScope()) {
       Map<String, MLXArray> weights = baseWeights(scope);
       expectConstructorMessage(
-          scope, weights, NUM_HEADS, new int[] {}, "deepstackIndexes must not be empty");
-      expectConstructorMessage(
           scope, weights, NUM_HEADS, new int[] {5}, "deepstack index 0 = 5 is out of range [0, 2)");
       expectConstructorMessage(
           scope,
@@ -463,6 +461,23 @@ class Qwen3VlVisionTowerValidationTest {
           NUM_HEADS,
           new int[] {1, 0},
           "deepstack indexes must be strictly increasing; index 1 has 0 after 1");
+    }
+  }
+
+  @Test
+  void emptyDeepstackProducesNoLevelsAndRejectsExtraMergerSubtrees() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> weights = baseWeights(scope);
+      weights.keySet().removeIf(k -> k.startsWith("deepstackMerger"));
+      Qwen3VlVisionTower tower = new Qwen3VlVisionTower(scope, NUM_HEADS, weights, new int[0]);
+      assertArrayEquals(new int[0], tower.deepstackIndexes());
+      assertTrue(tower.forward(scope, List.of(processedImage())).deepstackLevels().isEmpty());
+      Map<String, MLXArray> extra = baseWeights(scope);
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> new Qwen3VlVisionTower(scope, NUM_HEADS, extra, new int[0]));
+      assertTrue(error.getMessage().contains("unexpected vision tower weights"));
     }
   }
 

@@ -1,6 +1,10 @@
 # Phase 7.6 — Hybrid Qwen text and image inference
 
-- **Status:** proposed implementation plan, 2026-11-02; implementation has not started.
+- **Status:** implementation complete on `phase7-6-implementation`, 2026-11-03 (PR pending;
+  macOS 26 hosted CI and the qwen35 arm's first self-hosted Tier-B run remain pending). All
+  work packages executed with local evidence; see the [worklog](phase7-6-worklog.md) for the
+  checkpoint-by-checkpoint record and
+  [WP1 optimization report](phase7-6-wp1-optimization.md) for the completed structural gate.
 - **Parent:** [Phase 7 §7.6](phase7-plan.md#76--hybrid-linear-attention-qwen-decoders-qwen38).
 - **Prerequisites:** 7.1 core operations, 7.3b vision/MRoPE and the delivered 7.5 paired-pin
   upgrade. PR #76 is merged; its timing investigation leaves measurement limits with Phase 8.2.
@@ -183,12 +187,26 @@ Normalize `y` per value head with the ordinary learned norm weight, then multipl
 and apply `out_proj`. This gate is distinct from the full-attention sigmoid gate. Never add
 the zero-centered norm offset to `linear_attn.norm.weight`.
 
-Prototype 64-token chunked prefill with cumulative log decay, causal masks and batched matmuls. Implement
-the unit-lower-triangular solve by bounded forward substitution composed from existing ops;
-no linalg binding is required. Mask forbidden log-decay entries before exponentiating to avoid
-overflow. Tail padding must be recurrence-neutral and removed from outputs; retain convolution
-history from real tokens only. Evaluate/hoist each chunk's next state before closing its child
-scope, so a prompt does not retain every earlier chunk's graph.
+Use 64-token chunked prefill with cumulative log decay, causal masks and batched matmuls.
+The 2026-11-03 WP1 review selects chunked ops as the prefill algorithm and defers custom Metal
+for this milestone; its 115 ms reference result motivates future work, not integration.
+The built-in delta op remains excluded under the unchanged numerical gate. Before WP2, the
+structural optimization pass must requalify at `1e-4` and target about twice mlx-vlm's own
+chunked-ops cost: approximately 600 ms for 48 calls at 1,280 tokens on the recording host. The clean-source
+qualification records 474 ms, meets that gate, and permits WP2 (see the optimization report).
+
+Invert the 64×64 unit-lower-triangular system by stable forward substitution, then apply it
+to the right-hand side with a batched matmul. Batch state-independent preprocessing across at
+most 16 chunks (1,024 positions), retaining the 64-position state scan. Repeated-squaring
+inversion is not selected: the correlated-key FLOAT32 stress experiment is numerically unstable.
+No linalg binding, kernel facade or API-inventory relaxation is required. Mask forbidden
+log-decay entries before exponentiating to avoid overflow. Tail padding must be recurrence-neutral and removed from outputs; retain convolution
+history from real tokens only. Evaluate/hoist preprocessing results and at most eight chunks
+of carried state/output before closing their temporary scopes, so a prompt does not retain every earlier chunk's graph.
+Decode has a dedicated single-token recurrence without per-layer evaluation, final concatenation
+or output transpose. Cache replacement retains provisional lazy state; the session evaluates
+logits and every retained state root once at the token boundary, and poisons the whole session
+on evaluation failure before committing its position.
 
 Compare chunked outputs/final state to both HF and a simple token recurrence, for lengths
 1, 3, 4, 5, 63, 64, 65, 127, 128 and 129, including nonzero initial state and split prefills.
@@ -226,6 +244,12 @@ rejected by name. The nested factor is canonical. An optional duplicate at the t
 `text_config` must be numeric and equal to it; disagreement is rejected. If the nested factor
 is absent, reject even if the top-level alias exists. This deliberately supports the observed
 explicit configs rather than guessing between HF model/config defaults of 1.0 and 0.25.
+
+2026-11-03 implementation finding: actual mlx-lm 0.32.2 saved output spells the explicit
+default type as `rope_parameters.type`, not `rope_type`. After complete inventory classification
+has selected a converted layout, accept that known serialization alias with value `default`.
+Require any duplicate `rope_type` to agree. HF layout still requires `rope_type`; neither path
+defaults a missing type or layout flag. The original saved files remain unchanged.
 WP0 records nested-only, matching/conflicting duplicates and missing-factor cases against HF;
 Java tests pin the strict acceptance/rejection policy separately from HF's defaulting behavior.
 
@@ -324,6 +348,16 @@ image target remains the explicitly selected slow PIL processor, not an assumed 
 with the artifact's Fast declaration. Record a fast/slow comparison; Java, HF and the manual
 MLX comparison consume the same digest-pinned processed patches and rendered prompt/IDs.
 If the new slow processor differs, document/port the difference before claiming reuse.
+
+2026-11-03 implementation finding: actual saved mlx-vlm 0.6.8 tiny artifacts use nested
+`processor_config.image_processor`, type `Qwen3VLImageProcessor`, explicit legacy min/max
+pixels and no size/resize/resample keys. Its inspected numpy/PIL image path always resizes with
+bicubic. After converted-layout classification, adapt only this known serialization to the
+selected slow-PIL contract (explicit min/max, resize enabled, bicubic); reject contradictory
+flags. Keep the shared Qwen3-VL parser unchanged. The saved artifacts remain untouched.
+The processor-alias probe checks all three resized/unresized fixture images: matching grids
+and at most 1.20e-7 pixel difference. HF 5's ordinary nested Qwen2 processor serialization is
+also read directly. Both forms retain the existing hard cap.
 
 Reuse `Qwen3VlVisionTower` with no DeepStack and shape-selected patch axes. During WP5 remove
 the tower constructor's non-empty-index restriction and update its Javadoc to permit an empty

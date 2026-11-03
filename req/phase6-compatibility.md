@@ -121,3 +121,21 @@ artifact's own vocab.json + merges.txt in `jmlx-tokenizer` — the artifact ship
 (`stable-diffusion-v1-5/stable-diffusion-v1-5`, CreativeML OpenRAIL-M) is accepted in the
 decision record for a pinned read-only test artifact. Until those milestones deliver, audio
 and diffusion remain unsupported and unverified.
+
+## Phase 7.6 hybrid Qwen3.5 image+text (2026-11-03)
+
+| Task/family | Tier-A | Tier-B | Limits |
+| --- | --- | --- | --- |
+| Image+text → text, Qwen3.5 / Qwen3.8 (hybrid Gated DeltaNet linear attention + gated full attention) | Four-layer hybrid checkpoint (three Gated DeltaNet layers + one gated full-attention layer, partial interleaved MRoPE, tiny no-DeepStack tower): text prefill/cached/fresh-forward logits and retained state, all five storage layouts (HF float, mlx-vlm float/affine, mlx-lm float/affine, plus tied/equal-head and eight-layer variants), and vision expansion/grids/pixels/positions/tower rows with prefill+cached steps — strict `1e-4` in `Qwen35TextGoldenTest`/`Qwen35PackedGoldenTest`/`Qwen35VisionGoldenTest` (full float32; packed text measured maximum Java/HF `7.1525574e-7`) and the separately named default-TF32 bound `0.005` in `Qwen35DefaultPrecisionTest` (measured `0.0014960468`); generation contracts, the public-decode evaluation counter and exact memory ownership in the ordinary-mode suites | `tools/tier-b/qwen35-08b.json` (Qwen/Qwen3.5-0.8B, Apache-2.0, revision `2fc0636…`): text and image cases, 8 greedy tokens each (EOS stopping disabled), exact greedy IDs and decoded output, every prefill/cached logit vector under predeclared ε = 0.001 / margin 1e-4 (measured maxima 8.321e-5 text / 4.034e-4 image), native peak 5.12 GB and sampled footprint 6.65 GB under predeclared 8 GB/12 GB limits — automated `tier-b.yml` arm on `self-macos-xl`. The 27B affine artifact (`tools/tier-b/qwen38-27b-4bit.json`, mlx-vlm 0.6.8 converter) is a resource-qualified manual run, not a hosted-runner claim: measured maxima 0.0447 text / 0.0997 image under ε = 0.1006 (0.001 arithmetic + the measured 0.0996 stock normalization contribution), exact IDs and decoded output, native peak 18.0 GiB / footprint 21.1 GiB | dense `qwen3_5` only (MTP execution, MoE, video, speculative decoding and sliding retention rejected); float weights up-cast to FLOAT32, uniform affine 4-bit group-64 packed projections (conv/norm/recurrent state never quantized); TEXT capability from a text-only inventory (mlx-lm) that rejects images, a partial tower rejected; FULL and capacity-bounded KV retention; the batch scheduler rejects the hybrid model at startup (it is a `TextGenerationModel`, not a `DecoderModel`); the shared Qwen3-VL processor caps (≤16 images, 4096 raw-row budget, effective pixel cap) |
+
+The row above is **local acceptance evidence**: the recorded runs used M5 Max / macOS 27.2
+(MLX 0.32.4, mlx-c a26f2d5) with TF32 disabled. All seven new model suites and the five new
+core suites are required by the macOS CI native-suite assertion; hosted CI has not run this
+branch. The `tier-b.yml` qwen35 arm targets the self-hosted `self-macos-xl` runner (the
+measured 6.65 GB footprint sits within ~400 MB of the standard runner's entire 7 GB once the
+OS, test JVM and Gradle daemon share it; GitHub's larger `macos-26-xlarge` tier is billed per
+minute even in public repos); its first execution accepts the CI pipeline, not independent
+host, OS or memory-fit evidence, and the supported macOS 26 hosted execution remains pending.
+See `req/plans/phase7-6-plan.md`, `req/plans/phase7-6-worklog.md` and
+`req/phase6-golden-precision.md` for the full evidence; the synthetic checks do not imply
+other hybrid families.

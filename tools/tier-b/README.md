@@ -85,6 +85,45 @@ JMLX_TIER_B_MODEL_DIR=.tier-b/phi3v \
   JMLX_TIER_B_MODEL_TYPE=phi3_v ./gradlew :jmlx-models:tierBTest
 ```
 
+Qwen3.5 uses `qwen35-08b.json` and task `qwen35-generation`, selecting
+`TierBQwen35Test` in the TF32-off JVM. The manifest pins `Qwen/Qwen3.5-0.8B` at revision
+`2fc06364715b967f1860aea9cf38778875588b17` (Apache-2.0): the 13-file WP0 inventory,
+1,769,980,465 bytes in aggregate. The request is two greedy-8 cases with EOS stopping
+disabled: a text case ("What is two plus two? Answer briefly.", 21 positions) and an image
+case (the digest-pinned `tools/image-oracle/fast-comparison/fixtures/model-rgb-256x256.png`,
+MIT-licensed synthetic RGB, 83 expanded positions, delta −56) through the shared Qwen3-VL
+patch-16 processor (mean/std 0.5, 4096 raw-row budget and 1,048,576 effective pixel cap).
+The reference is the isolated locked HF environment under `tools/qwen35-reference/`
+(transformers 5.22.1, CPU float32, eager attention), which records the full-vocabulary logit
+vector at every expected greedy history step as
+`tools/qwen35-reference/goldens/real-hf-08b-stock-logits.npz`; the golden, the manifest, the
+27B sibling manifest and the image are digest-pinned in
+`tools/qwen35-reference/provenance.json` and verified by `verifyQwen35ReferenceGoldens`.
+The bounds were predeclared before any Java run — ε = 0.001 / margin = 1e-4, never inferred
+from Java. The suite re-verifies the image digest, re-processes it through `jmlx-vision`'s
+Qwen3-VL processor and asserts the reference's byte-exact processed pixels and grid, the
+rendered prompt, original/expanded IDs and the three MRoPE position arrays, compares every
+prefill/cached logit vector under the recorded ε, re-derives the reference's own gaps and
+applies the stability gate to both the reference vectors and the Java run's measured margins,
+and asserts the exact greedy IDs, the exact decoded output (`expected_text`), prompt
+positions, finish reason and the predeclared `resource_limits` (native peak ≤ 8e9, sampled
+footprint ≤ 12e9). Measured local evidence (allocator peak 5,118,123,572 B, sampled footprint
+peak 6,648,795,264 B, load ~449 ms, warmed ~145 ms, 1.77 GB artifact disk) sizes the
+suite's bounds; full record in
+`tools/qwen35-reference/evidence/08b-java-acceptance.json`; macOS 26 acceptance is still
+pending. The 27B sibling `qwen38-27b-4bit.json` is a resource-qualified manual run only (its
+measured 22.68 GB footprint exceeds every hosted tier's RAM budget); see
+`req/phase6-tier-b-artifacts.md`.
+
+```sh
+./gradlew downloadTierBArtifact \
+  -PtierBManifest=tools/tier-b/qwen35-08b.json -PtierBTarget=.tier-b/qwen35
+JMLX_TIER_B_MODEL_DIR=.tier-b/qwen35 \
+  JMLX_TIER_B_MANIFEST=tools/tier-b/qwen35-08b.json \
+  JMLX_TIER_B_TASK=qwen35-generation \
+  JMLX_TIER_B_MODEL_TYPE=qwen3_5 ./gradlew :jmlx-models:tierBTest
+```
+
 The test samples the test process's physical footprint (libproc's `ri_phys_footprint`, the figure
 the runner's RAM must actually hold, unlike `ps -o rss` which misses MLX/Metal allocations) every
 20 ms and reports the highest sample alongside the native allocator peak, asserting both stay
@@ -92,20 +131,23 @@ below bounds sized from the manifest's recorded local evidence so a memory regre
 suite explicitly. The workflow uploads JUnit numerical/memory evidence even when
 the test fails.
 
-In CI, the SmolVLM, qwen3vl and phi3v rows of the `tier-b` workflow run on the self-hosted
-`self-macos-xl` runner (Apple Silicon, macOS 27, 128 GB RAM), because their measured
-footprints exceed the standard runner's 7 GB (the qwen3vl row needs more because the
+In CI, the SmolVLM, qwen3vl, phi3v and qwen35 rows of the `tier-b` workflow run on the
+self-hosted `self-macos-xl` runner (Apple Silicon, macOS 27, 128 GB RAM), because their
+measured footprints exceed the standard runner's 7 GB (the qwen3vl row needs more because the
 FLOAT32-up-cast 2B checkpoint's measured footprint peak is 11.16 GiB; its suite footprint
 bound — 12,500,000,000 bytes, ~520 MB above the measured peak — detects a regression but
 is not a guarantee the runner's RAM survives a large regression; the phi3v row's
 FLOAT32-up-cast 4B checkpoint's measured footprint peak is 51,421,089,584 bytes — its suite
 footprint bound, 52,000,000,000 bytes, ~552 MB above the measured peak — is the same
-regression-detector-not-guarantee). GitHub's larger `macos-26-xlarge` tier would fit, but
+regression-detector-not-guarantee; the qwen35 row's FLOAT32-up-cast 0.8B checkpoint's
+measured footprint peak is 6,648,795,264 bytes — ~6.2 GiB, within ~400 MB of the standard
+runner's entire 7 GB once the OS, test JVM and Gradle daemon share it, so the row does not
+target the hosted tier). GitHub's larger `macos-26-xlarge` tier would fit, but
 GitHub's Actions billing docs state that larger runners are always charged per minute, even
 in public repositories, and that larger-runner usage is blocked until a payment method is
 set up on the account
 (https://docs.github.com/en/billing/concepts/product-billing/github-actions), so the rows
-run free on the self-hosted runner. While that runner is offline the three jobs wait and
+run free on the self-hosted runner. While that runner is offline the four jobs wait and
 GitHub fails them after 24 hours; the other rows are unaffected (they run on the standard
 hosted runner). If the account later sets up a payment method, a row can be pointed back
 at `macos-26-xlarge` by changing its `runner` matrix value.
@@ -121,7 +163,7 @@ otherwise re-upload gigabytes of already-present files into the repository's cac
 each run); the workflow removes every unlisted file and every symlink (the downloader
 also refuses a symlink at any artifact path) and re-hashes every listed file against the
 pinned manifest, so a previous job cannot plant a file the loaders would read. The
-runner is the same M5 Max host (macOS 27.0.1) that produced the local evidence: its
+runner is the same M5 Max host (macOS 27) that produced the local evidence: its
 first execution of a row accepts the CI pipeline (checkout, artifact download, native
 bootstrap, pinned suite), not independent host, OS or memory-fit evidence, and the
 supported macOS 26 hosted execution those rows require remains pending.

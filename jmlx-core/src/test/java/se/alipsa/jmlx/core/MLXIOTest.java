@@ -150,6 +150,29 @@ class MLXIOTest {
   }
 
   @Test
+  void selectiveSafetensorsLoadRetainsOnlyRequestedNamesAndAllMetadata(@TempDir Path dir) {
+    String file = dir.resolve("selected.safetensors").toString();
+    try (MLXScope save = new MLXScope()) {
+      MLXIO.saveSafetensors(
+          file,
+          Map.of(
+              "keep", MLX.array(save, new float[] {2, 3}, new int[] {2}),
+              "skip", MLX.array(save, new float[] {4}, new int[] {1})),
+          Map.of("format", "test"));
+    }
+    try (MLXScope load = new MLXScope()) {
+      MLXIO.SafetensorsResult selected = MLXIO.loadSafetensors(load, file, Set.of("keep"));
+      assertEquals(Set.of("keep"), selected.tensors().keySet());
+      assertArrayEquals(new float[] {2, 3}, selected.tensors().get("keep").toFloatArray());
+      assertEquals(Map.of("format", "test"), selected.metadata());
+      assertEquals(Map.of(), MLXIO.loadSafetensors(load, file, Set.of()).tensors());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> MLXIO.loadSafetensors(load, file, Set.of("missing")));
+    }
+  }
+
+  @Test
   void loadSafetensorsAllocatesIntoTheGivenScope(@TempDir Path dir) {
     String file = dir.resolve("scoped.safetensors").toString();
     try (MLXScope saveScope = new MLXScope()) {

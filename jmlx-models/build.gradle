@@ -60,6 +60,26 @@ dependencies {
     exactBitsImplementation testFixtures(project(':jmlx-ffi'))
 }
 
+tasks.named('test') {
+    useJUnitPlatform { excludeTags 'qwen35-counter' }
+}
+
+tasks.register('qwen35DecodeCounter', Test) {
+    group = 'verification'
+    description = 'Opt-in actual native downcalls for full hybrid public-generation decode; timings invalid.'
+    dependsOn tasks.named('testClasses'), ':jmlx-core:qwen35BindingAgent'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'qwen35-counter' }
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+    systemProperty 'jmlx.qwen35.counter.output', layout.buildDirectory.file('benchmarks/qwen35-decode-counts.json').get().asFile.absolutePath
+    doFirst {
+        jvmArgs "-javaagent:${project(':jmlx-core').tasks.named('qwen35BindingAgent').get().archiveFile.get().asFile.absolutePath}"
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register('tierBTest', Test) {
     group = 'verification'
     description = 'Runs opt-in real-checkpoint smoke tests when JMLX_TIER_B_MODEL_DIR is set.'
@@ -80,6 +100,7 @@ tasks.register('tierBTest', Test) {
                   classification: 'TierBClassificationTest', seq2seq: 'TierBSeq2SeqTest',
                   'image-text-generation': 'TierBVisionLanguageTest',
                   'qwen3-vl-generation': 'TierBQwen3VlTest',
+                  'qwen35-generation': 'TierBQwen35Test',
                   'phi3v-generation': 'TierBPhi3VTest']
     if (!suites.containsKey(taskName)) { throw new GradleException("Unsupported Tier-B task: ${taskName}") }
     def assertedTask = System.getenv('JMLX_TIER_B_TASK')
@@ -87,6 +108,9 @@ tasks.register('tierBTest', Test) {
         throw new GradleException("Expected Tier-B task ${assertedTask}, got ${taskName}")
     }
     include "**/${suites[taskName]}.class"
+    if (taskName == 'qwen35-generation') { maxHeapSize = '2g' }
+    def qwen35Output = System.getenv('JMLX_QWEN35_OUTPUT_DIR')
+    systemProperty 'jmlx.qwen35.acceptance.output', qwen35Output ? rootProject.file(qwen35Output).absolutePath : layout.buildDirectory.dir('tier-b/qwen35').get().asFile.absolutePath
     inputs.property('tierBTask', taskName)
     if (tierBManifest) { inputs.file(rootProject.file(tierBManifest)) }
     systemProperty 'jmlx.tier.b.expected.task', System.getenv('JMLX_TIER_B_TASK') ?: ''
@@ -157,6 +181,10 @@ tasks.withType(Test).configureEach {
     systemProperty 'jmlx.repository.root', rootProject.projectDir.absolutePath
     inputs.files(rootProject.fileTree('tools/mlx-oracle/fixtures') { include '*.json' })
     inputs.files(rootProject.fileTree('tools/hf-reference/goldens'))
+    // Qwen3.5 hybrid references; rerun when a pinned fixture, golden or evidence file changes.
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/fixtures'))
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/goldens'))
+    inputs.files(rootProject.fileTree('tools/qwen35-reference/evidence'))
 }
 
 // Gate 0 thread probes (req/plans/phase6-5-plan.md). Each runs in its own forked JVM, like

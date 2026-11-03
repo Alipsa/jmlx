@@ -1,0 +1,110 @@
+{
+  "kind": "independent HF benchmark qualification; external tensor files",
+  "torch": "2.6.0",
+  "hf_source_sha256": "af05d0acfe79fff8aea1c75f93516a6a72bc80f6f901329a73e66a3866fe1e7c",
+  "source_sha256": "83b5fd1bd7673c46b40dec72837f9ae099b5e38aa33fabb4398f3d65301b5f81",
+  "input_manifest_sha256": "7f682e0754c3cf55a49013ee079d8c4bd767bf1027b5b0699f65f9889aba31e1",
+  "adapters": {
+    "query": "prepared_q * sqrt(Dk); HF rescales internally",
+    "state": "B,Hv,Dv,Dk transposed to B,Hv,Dk,Dv",
+    "decay": "saved log_decay; no Q/K renormalization"
+  },
+  "cases": [
+    {
+      "inputs_file": "tiny-64.safetensors",
+      "inputs_sha256": "65b587e897f96361e24a378ca5ae192f3edc4c0f467ca631ca2718876840fcfa",
+      "expected_file": "tiny-64-expected.safetensors",
+      "expected_sha256": "28c00b64336051f337458e34fb67285284489a313add25b4ef09f57931e44946",
+      "hf_chunk_vs_recurrence_output_max_abs": 6.705522537231445e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 5.364418029785156e-07
+    },
+    {
+      "inputs_file": "tiny-256.safetensors",
+      "inputs_sha256": "c9fdd37c56a9c7fb8b22a4cdbbcd41c1207370b18cba917c44532f70de033c94",
+      "expected_file": "tiny-256-expected.safetensors",
+      "expected_sha256": "5ad6b0ce9ee78e165e28b9c3d4fb2d4c2cfeeb10117d97fedb8350a8f540fe4f",
+      "hf_chunk_vs_recurrence_output_max_abs": 8.940696716308594e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.76837158203125e-07
+    },
+    {
+      "inputs_file": "tiny-1024.safetensors",
+      "inputs_sha256": "e231a732a26e389c3814af2e50c80e040aa965b375102a1ce805fe6dec426e77",
+      "expected_file": "tiny-1024-expected.safetensors",
+      "expected_sha256": "115951e84e1081226715939659aef1b2efe460d049d895cf93006d97e6d47196",
+      "hf_chunk_vs_recurrence_output_max_abs": 1.1175870895385742e-07,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.76837158203125e-07
+    },
+    {
+      "inputs_file": "tiny-1280.safetensors",
+      "inputs_sha256": "158d49d1f5242102322637b375d878c11cc596195b16c861015f8c6424ce0053",
+      "expected_file": "tiny-1280-expected.safetensors",
+      "expected_sha256": "6c06438331dc025179ddc21a549bd397778dd30e625f97d49167781adc826276",
+      "hf_chunk_vs_recurrence_output_max_abs": 8.940696716308594e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.172325134277344e-07
+    },
+    {
+      "inputs_file": "08b-64.safetensors",
+      "inputs_sha256": "f643dbe4e7e3c2ba2a1dc2151be4df2c0b16eb48af99c3b87ba9876609567cfa",
+      "expected_file": "08b-64-expected.safetensors",
+      "expected_sha256": "9b1689b4451ba8920973c928de150fe54101bf2f308f8371a61a949d56f91d66",
+      "hf_chunk_vs_recurrence_output_max_abs": 2.60770320892334e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.172325134277344e-07
+    },
+    {
+      "inputs_file": "08b-256.safetensors",
+      "inputs_sha256": "bae8317fde3635d178f4825524b8e99029db233f323f1d243a641ed8b3079353",
+      "expected_file": "08b-256-expected.safetensors",
+      "expected_sha256": "16b44d3d6872cb141fac9f58aaf561843cec94bc7340aed8633447e02b7102f9",
+      "hf_chunk_vs_recurrence_output_max_abs": 4.0978193283081055e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 3.5762786865234375e-07
+    },
+    {
+      "inputs_file": "08b-1024.safetensors",
+      "inputs_sha256": "b77f41b1dd97368f5c1415fec3df181f06766b7e419398257489c70642d5e5b9",
+      "expected_file": "08b-1024-expected.safetensors",
+      "expected_sha256": "e7fb2a8bd5c717bd8b94ef45153a58e7deb3fee446c50498bfc7ac26f2ffd80d",
+      "hf_chunk_vs_recurrence_output_max_abs": 3.91155481338501e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 3.8743019104003906e-07
+    },
+    {
+      "inputs_file": "08b-1280.safetensors",
+      "inputs_sha256": "d1c286c4edafc07caa0b3d9247dd030797386cc751c81ecd260a7349ac75d92b",
+      "expected_file": "08b-1280-expected.safetensors",
+      "expected_sha256": "d7d25b0ed063a4b36141bf300faae78807784e533421982a71caae5a61556ebc",
+      "hf_chunk_vs_recurrence_output_max_abs": 3.725290298461914e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 3.5762786865234375e-07
+    },
+    {
+      "inputs_file": "27b-64.safetensors",
+      "inputs_sha256": "33ecb0bc6fd77dfba5247a3b3081ed96818e1d0ee705a31bf3caf0de24002c51",
+      "expected_file": "27b-64-expected.safetensors",
+      "expected_sha256": "110963cc6fad84bd4f9de335fc3bcf7041ef233a2c2288ad1c13358d67692f00",
+      "hf_chunk_vs_recurrence_output_max_abs": 2.9802322387695312e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.172325134277344e-07
+    },
+    {
+      "inputs_file": "27b-256.safetensors",
+      "inputs_sha256": "aef54f97020c32ab31f3dc7bbd26538258d4c84bdbf820dd3175c6df81301c6c",
+      "expected_file": "27b-256-expected.safetensors",
+      "expected_sha256": "ba23425eed74652cf043cacb2744efadd888c475889b432cce78b33a128275a3",
+      "hf_chunk_vs_recurrence_output_max_abs": 5.21540641784668e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 3.8743019104003906e-07
+    },
+    {
+      "inputs_file": "27b-1024.safetensors",
+      "inputs_sha256": "cd29feedf91320ce41491c9a9bec9bc597254dc0b654b006110bbf446d3306a9",
+      "expected_file": "27b-1024-expected.safetensors",
+      "expected_sha256": "86a3e5899ea2bd092b1ec93808a3913bbc6c41a9ef06ccf18fd4e5eb701fb31f",
+      "hf_chunk_vs_recurrence_output_max_abs": 4.0978193283081055e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.172325134277344e-07
+    },
+    {
+      "inputs_file": "27b-1280.safetensors",
+      "inputs_sha256": "819a528f20febaaee70dfa52ab7632b213aa526725893facee811fe8f626f60c",
+      "expected_file": "27b-1280-expected.safetensors",
+      "expected_sha256": "01c138d2a7ddd34953d67bb782c9fb33175e396798e17bc426a5b7746528a3cb",
+      "hf_chunk_vs_recurrence_output_max_abs": 4.470348358154297e-08,
+      "hf_chunk_vs_recurrence_state_max_abs": 4.172325134277344e-07
+    }
+  ]
+}

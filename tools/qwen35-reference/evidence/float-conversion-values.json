@@ -1,0 +1,48 @@
+{
+  "kind": "saved actual-converter value checks, not neural acceptance",
+  "source_sha256": "81f4bda444fe654ba0cb1aec80d18a1297519429182e05ce8d0545e4510484d3",
+  "results": [
+    {
+      "family": "vlm",
+      "tensor_count": 89,
+      "bit_exact": true,
+      "shifted_norms": [
+        "language_model.model.layers.0.input_layernorm.weight",
+        "language_model.model.layers.0.post_attention_layernorm.weight",
+        "language_model.model.layers.1.input_layernorm.weight",
+        "language_model.model.layers.1.post_attention_layernorm.weight",
+        "language_model.model.layers.2.input_layernorm.weight",
+        "language_model.model.layers.2.post_attention_layernorm.weight",
+        "language_model.model.layers.3.input_layernorm.weight",
+        "language_model.model.layers.3.post_attention_layernorm.weight",
+        "language_model.model.layers.3.self_attn.k_norm.weight",
+        "language_model.model.layers.3.self_attn.q_norm.weight",
+        "language_model.model.norm.weight"
+      ],
+      "convolution_axes": "C,K,1",
+      "linear_attn_norm_shifted": false,
+      "vision_present": true
+    },
+    {
+      "family": "lm",
+      "tensor_count": 56,
+      "bit_exact": true,
+      "shifted_norms": [
+        "language_model.model.layers.0.input_layernorm.weight",
+        "language_model.model.layers.0.post_attention_layernorm.weight",
+        "language_model.model.layers.1.input_layernorm.weight",
+        "language_model.model.layers.1.post_attention_layernorm.weight",
+        "language_model.model.layers.2.input_layernorm.weight",
+        "language_model.model.layers.2.post_attention_layernorm.weight",
+        "language_model.model.layers.3.input_layernorm.weight",
+        "language_model.model.layers.3.post_attention_layernorm.weight",
+        "language_model.model.layers.3.self_attn.k_norm.weight",
+        "language_model.model.layers.3.self_attn.q_norm.weight",
+        "language_model.model.norm.weight"
+      ],
+      "convolution_axes": "C,K,1",
+      "linear_attn_norm_shifted": false,
+      "vision_present": false
+    }
+  ]
+}

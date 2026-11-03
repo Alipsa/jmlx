@@ -1,0 +1,127 @@
+{
+  "kind": "Precision-configuration comparison only; qualified acceptance remains FLOAT32/TF32 off",
+  "source_sha256": "d167228dd828381e8623a0cb4ffd129c7a1e2f5e99991c45e6071a238af2a37e",
+  "default_record_sha256": "37f4da5894f18b014bc1d9883a1b221e3f04587c227875bbd4d3298f6896452b",
+  "qualified_record_sha256": "9cdd73859f8a94c846889e43d16fad97062720a2a991e0d16f51890f7aa1177a",
+  "default_parameter_dtypes": [
+    "mlx.core.bfloat16",
+    "mlx.core.uint32"
+  ],
+  "qualified_parameter_dtypes": [
+    "mlx.core.float32",
+    "mlx.core.uint32"
+  ],
+  "maximum_logit_difference": 1.1851611137390137,
+  "all_recorded_choices_agree": true,
+  "scope": "Same FLOAT32-stock teacher histories; free-running equivalence follows only while all earlier choices agree",
+  "phases": [
+    {
+      "phase": "text_copy_prefill_logits",
+      "maximum_precision_difference": 0.27107763290405273,
+      "default_greedy": 588,
+      "qualified_float32_greedy": 588
+    },
+    {
+      "phase": "text_copy_decode0_logits",
+      "maximum_precision_difference": 0.29447460174560547,
+      "default_greedy": 1330,
+      "qualified_float32_greedy": 1330
+    },
+    {
+      "phase": "text_copy_decode1_logits",
+      "maximum_precision_difference": 0.17182517051696777,
+      "default_greedy": 2250,
+      "qualified_float32_greedy": 2250
+    },
+    {
+      "phase": "text_copy_decode2_logits",
+      "maximum_precision_difference": 0.18938446044921875,
+      "default_greedy": 2943,
+      "qualified_float32_greedy": 2943
+    },
+    {
+      "phase": "text_copy_decode3_logits",
+      "maximum_precision_difference": 0.20893478393554688,
+      "default_greedy": 4097,
+      "qualified_float32_greedy": 4097
+    },
+    {
+      "phase": "text_copy_decode4_logits",
+      "maximum_precision_difference": 0.20410966873168945,
+      "default_greedy": 4590,
+      "qualified_float32_greedy": 4590
+    },
+    {
+      "phase": "text_copy_decode5_logits",
+      "maximum_precision_difference": 0.14680957794189453,
+      "default_greedy": 7840,
+      "qualified_float32_greedy": 7840
+    },
+    {
+      "phase": "text_copy_decode6_logits",
+      "maximum_precision_difference": 0.16173028945922852,
+      "default_greedy": 7810,
+      "qualified_float32_greedy": 7810
+    },
+    {
+      "phase": "text_copy_decode7_logits",
+      "maximum_precision_difference": 0.18512344360351562,
+      "default_greedy": 11292,
+      "qualified_float32_greedy": 11292
+    },
+    {
+      "phase": "image_prefill_logits",
+      "maximum_precision_difference": 1.1851611137390137,
+      "default_greedy": 1919,
+      "qualified_float32_greedy": 1919
+    },
+    {
+      "phase": "image_decode0_logits",
+      "maximum_precision_difference": 0.5938153266906738,
+      "default_greedy": 2099,
+      "qualified_float32_greedy": 2099
+    },
+    {
+      "phase": "image_decode1_logits",
+      "maximum_precision_difference": 0.2621426582336426,
+      "default_greedy": 369,
+      "qualified_float32_greedy": 369
+    },
+    {
+      "phase": "image_decode2_logits",
+      "maximum_precision_difference": 0.5113850831985474,
+      "default_greedy": 264,
+      "qualified_float32_greedy": 264
+    },
+    {
+      "phase": "image_decode3_logits",
+      "maximum_precision_difference": 0.6212730407714844,
+      "default_greedy": 10558,
+      "qualified_float32_greedy": 10558
+    },
+    {
+      "phase": "image_decode4_logits",
+      "maximum_precision_difference": 0.7327785491943359,
+      "default_greedy": 11,
+      "qualified_float32_greedy": 11
+    },
+    {
+      "phase": "image_decode5_logits",
+      "maximum_precision_difference": 0.8899383544921875,
+      "default_greedy": 7859,
+      "qualified_float32_greedy": 7859
+    },
+    {
+      "phase": "image_decode6_logits",
+      "maximum_precision_difference": 1.0530953407287598,
+      "default_greedy": 19556,
+      "qualified_float32_greedy": 19556
+    },
+    {
+      "phase": "image_decode7_logits",
+      "maximum_precision_difference": 0.8663139343261719,
+      "default_greedy": 53968,
+      "qualified_float32_greedy": 53968
+    }
+  ]
+}

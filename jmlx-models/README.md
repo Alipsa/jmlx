@@ -339,3 +339,41 @@ injection counts; the measured maxima are recorded in `req/phase6-golden-precisi
 [WP8 evidence](../req/plans/phase7-3b-reference-findings.md#118-wp8-tier-a-acceptance-independent-hf-golden-and-default-mode-bound-2026-10-26).
 Tier-B acceptance for the pinned 2B artifact and the manual quantized 8B 4-bit run remain
 pending.
+
+## Qwen3.5 hybrid (Qwen3.8) image+text
+
+`Qwen35Model` loads the dense `qwen3_5` hybrid decoder — three of every four layers Gated
+DeltaNet linear attention (fixed-size float32 recurrent state) interleaved with gated full
+attention (partial interleaved MRoPE) — for text and image+text generation. It dispatches
+before the generic architecture mappings via `TextGenerationModels.load`, so a `qwen3_5`
+`config.json` always reaches it; `qwen3_vl` and every other family are untouched.
+
+- **Storage layouts.** HF float, mlx-vlm float/affine and mlx-lm float/affine. Float weights
+  load as FLOAT32; uniform affine 4-bit group-64 projections stay packed (conv weights,
+  norms and the recurrent state are never quantized in the supported artifacts). A header
+  shape/type/byte-range preflight runs before any allocation; a selective retention keeps
+  only the executed parameters, so recognized MTP data never becomes evaluated parameters.
+- **Vision.** A complete vision inventory is TEXT+IMAGE through the shared Qwen3-VL tower
+  (no DeepStack levels) and the shared patch-16 processor; a partial tower is rejected.
+  A text-only inventory (the mlx-lm layouts) reports TEXT and rejects image requests.
+- **Limits.** MTP execution, MoE, video, speculative decoding and sliding retention are
+  rejected. `Qwen35Model` is a `TextGenerationModel`, not a `DecoderModel`, so the batch
+  scheduler's existing rejection applies: one model instance, one thread at a time.
+- **Caches.** The decoder session owns one recurrent cache per linear-attention layer and
+  one KV cache per full-attention layer, with atomic position/commit; FULL and
+  capacity-bounded FULL retention are supported. At a token boundary the session evaluates
+  the logits and every retained state root once before committing its position, and an
+  evaluation failure poisons the session before any position advances.
+
+Verification: Tier-A strict `1e-4` CPU float32 goldens in `Qwen35TextGoldenTest`,
+`Qwen35PackedGoldenTest` and `Qwen35VisionGoldenTest` (full float32, against independent
+HF references; the packed suites run converter-produced affine fixtures against their
+independently dequantized references), the separately named default-TF32 bound `0.005`
+in `Qwen35DefaultPrecisionTest`, and the ordinary-mode generation, memory, decode-counter
+and checkpoint suites — all required by the macOS CI native-suite assertion. Real-artifact
+acceptance: the pinned 0.8B Tier-B (`tools/tier-b/qwen35-08b.json`, task
+`qwen35-generation`, `TierBQwen35Test`) and the resource-qualified manual 27B 4-bit run
+(`tools/tier-b/qwen38-27b-4bit.json`) — see
+[`req/phase6-tier-b-artifacts.md`](../req/phase6-tier-b-artifacts.md) and
+[`req/plans/phase7-6-plan.md`](../req/plans/phase7-6-plan.md) for the full evidence, and
+`req/phase6-golden-precision.md` for the measured maxima.

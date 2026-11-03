@@ -1,0 +1,647 @@
+{
+  "kind": "Independent reference-only eligibility; no Java measurements used",
+  "source_sha256": "186c08ecacbd186080e58e616b4a13edba5ebe6633f8d240fd2cf166e81608a3",
+  "stock_sha256": "9cdd73859f8a94c846889e43d16fad97062720a2a991e0d16f51890f7aa1177a",
+  "diagnostic_sha256": "28097401fde216bba519d2dfe1758b7403a6d6840e79eb7b501b6926cf61306f",
+  "arithmetic_epsilon": 0.001,
+  "margin": 0.0001,
+  "scope": "prefill and all eight recorded decode outputs, including the extra post-budget output",
+  "candidates": [
+    {
+      "name": "text",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 0.4146003723144531,
+          "normalization_contribution_max_abs": 0.0632781982421875,
+          "stock_greedy": 19,
+          "diagnostic_greedy": 19
+        },
+        {
+          "phase": "decode0",
+          "gap": 6.859586715698242,
+          "normalization_contribution_max_abs": 0.049968719482421875,
+          "stock_greedy": 248046,
+          "diagnostic_greedy": 248046
+        },
+        {
+          "phase": "decode1",
+          "gap": 18.961647033691406,
+          "normalization_contribution_max_abs": 0.09308719635009766,
+          "stock_greedy": 198,
+          "diagnostic_greedy": 198
+        },
+        {
+          "phase": "decode2",
+          "gap": 9.50326919555664,
+          "normalization_contribution_max_abs": 0.097939133644104,
+          "stock_greedy": 248044,
+          "diagnostic_greedy": 248044
+        },
+        {
+          "phase": "decode3",
+          "gap": 8.533236503601074,
+          "normalization_contribution_max_abs": 0.13983488082885742,
+          "stock_greedy": 248045,
+          "diagnostic_greedy": 248045
+        },
+        {
+          "phase": "decode4",
+          "gap": 1.5624504089355469,
+          "normalization_contribution_max_abs": 0.12644100189208984,
+          "stock_greedy": 846,
+          "diagnostic_greedy": 846
+        },
+        {
+          "phase": "decode5",
+          "gap": 4.837518692016602,
+          "normalization_contribution_max_abs": 0.1576375961303711,
+          "stock_greedy": 248046,
+          "diagnostic_greedy": 248046
+        },
+        {
+          "phase": "decode6",
+          "gap": 15.961492538452148,
+          "normalization_contribution_max_abs": 0.17141008377075195,
+          "stock_greedy": 198,
+          "diagnostic_greedy": 198
+        },
+        {
+          "phase": "decode7",
+          "gap": 10.505691528320312,
+          "normalization_contribution_max_abs": 0.2957572937011719,
+          "stock_greedy": 248045,
+          "diagnostic_greedy": 248045
+        }
+      ],
+      "maximum_normalization": 0.2957572937011719,
+      "minimum_gap": 0.4146003723144531
+    },
+    {
+      "name": "text_copy",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 7.180056571960449,
+          "normalization_contribution_max_abs": 0.04470252990722656,
+          "stock_greedy": 588,
+          "diagnostic_greedy": 588
+        },
+        {
+          "phase": "decode0",
+          "gap": 8.4412841796875,
+          "normalization_contribution_max_abs": 0.037255287170410156,
+          "stock_greedy": 1330,
+          "diagnostic_greedy": 1330
+        },
+        {
+          "phase": "decode1",
+          "gap": 9.438264846801758,
+          "normalization_contribution_max_abs": 0.029413223266601562,
+          "stock_greedy": 2250,
+          "diagnostic_greedy": 2250
+        },
+        {
+          "phase": "decode2",
+          "gap": 9.090967178344727,
+          "normalization_contribution_max_abs": 0.028348922729492188,
+          "stock_greedy": 2943,
+          "diagnostic_greedy": 2943
+        },
+        {
+          "phase": "decode3",
+          "gap": 7.136503219604492,
+          "normalization_contribution_max_abs": 0.043311238288879395,
+          "stock_greedy": 4097,
+          "diagnostic_greedy": 4097
+        },
+        {
+          "phase": "decode4",
+          "gap": 7.815267562866211,
+          "normalization_contribution_max_abs": 0.025177955627441406,
+          "stock_greedy": 4590,
+          "diagnostic_greedy": 4590
+        },
+        {
+          "phase": "decode5",
+          "gap": 7.453847885131836,
+          "normalization_contribution_max_abs": 0.03310108184814453,
+          "stock_greedy": 7840,
+          "diagnostic_greedy": 7840
+        },
+        {
+          "phase": "decode6",
+          "gap": 8.608297348022461,
+          "normalization_contribution_max_abs": 0.02324390411376953,
+          "stock_greedy": 7810,
+          "diagnostic_greedy": 7810
+        },
+        {
+          "phase": "decode7",
+          "gap": 7.978252410888672,
+          "normalization_contribution_max_abs": 0.025403976440429688,
+          "stock_greedy": 11292,
+          "diagnostic_greedy": 11292
+        }
+      ],
+      "maximum_normalization": 0.04470252990722656,
+      "minimum_gap": 7.136503219604492
+    },
+    {
+      "name": "text_count",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 2.4107112884521484,
+          "normalization_contribution_max_abs": 0.039310455322265625,
+          "stock_greedy": 588,
+          "diagnostic_greedy": 588
+        },
+        {
+          "phase": "decode0",
+          "gap": 8.494621276855469,
+          "normalization_contribution_max_abs": 0.019899368286132812,
+          "stock_greedy": 1330,
+          "diagnostic_greedy": 1330
+        },
+        {
+          "phase": "decode1",
+          "gap": 10.72421646118164,
+          "normalization_contribution_max_abs": 0.013612985610961914,
+          "stock_greedy": 2250,
+          "diagnostic_greedy": 2250
+        },
+        {
+          "phase": "decode2",
+          "gap": 11.250839233398438,
+          "normalization_contribution_max_abs": 0.015995025634765625,
+          "stock_greedy": 2943,
+          "diagnostic_greedy": 2943
+        },
+        {
+          "phase": "decode3",
+          "gap": 10.49908447265625,
+          "normalization_contribution_max_abs": 0.019486427307128906,
+          "stock_greedy": 4097,
+          "diagnostic_greedy": 4097
+        },
+        {
+          "phase": "decode4",
+          "gap": 9.542762756347656,
+          "normalization_contribution_max_abs": 0.021811485290527344,
+          "stock_greedy": 4590,
+          "diagnostic_greedy": 4590
+        },
+        {
+          "phase": "decode5",
+          "gap": 10.420585632324219,
+          "normalization_contribution_max_abs": 0.021890640258789062,
+          "stock_greedy": 7840,
+          "diagnostic_greedy": 7840
+        },
+        {
+          "phase": "decode6",
+          "gap": 10.036334991455078,
+          "normalization_contribution_max_abs": 0.03029632568359375,
+          "stock_greedy": 7810,
+          "diagnostic_greedy": 7810
+        },
+        {
+          "phase": "decode7",
+          "gap": 9.559642791748047,
+          "normalization_contribution_max_abs": 0.07830524444580078,
+          "stock_greedy": 11292,
+          "diagnostic_greedy": 11292
+        }
+      ],
+      "maximum_normalization": 0.07830524444580078,
+      "minimum_gap": 2.4107112884521484
+    },
+    {
+      "name": "text_sky",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 2.2356204986572266,
+          "normalization_contribution_max_abs": 0.04533195495605469,
+          "stock_greedy": 29108,
+          "diagnostic_greedy": 29108
+        },
+        {
+          "phase": "decode0",
+          "gap": 9.26446533203125,
+          "normalization_contribution_max_abs": 0.021579265594482422,
+          "stock_greedy": 4009,
+          "diagnostic_greedy": 4009
+        },
+        {
+          "phase": "decode1",
+          "gap": 0.14303207397460938,
+          "normalization_contribution_max_abs": 0.019748687744140625,
+          "stock_greedy": 369,
+          "diagnostic_greedy": 369
+        },
+        {
+          "phase": "decode2",
+          "gap": 1.4314651489257812,
+          "normalization_contribution_max_abs": 0.026666641235351562,
+          "stock_greedy": 22687,
+          "diagnostic_greedy": 22687
+        },
+        {
+          "phase": "decode3",
+          "gap": 12.628891944885254,
+          "normalization_contribution_max_abs": 0.016920089721679688,
+          "stock_greedy": 314,
+          "diagnostic_greedy": 314
+        },
+        {
+          "phase": "decode4",
+          "gap": 0.8702316284179688,
+          "normalization_contribution_max_abs": 0.01736307144165039,
+          "stock_greedy": 660,
+          "diagnostic_greedy": 660
+        },
+        {
+          "phase": "decode5",
+          "gap": 1.1018943786621094,
+          "normalization_contribution_max_abs": 0.013733267784118652,
+          "stock_greedy": 7736,
+          "diagnostic_greedy": 7736
+        },
+        {
+          "phase": "decode6",
+          "gap": 3.4446582794189453,
+          "normalization_contribution_max_abs": 0.026262283325195312,
+          "stock_greedy": 314,
+          "diagnostic_greedy": 314
+        },
+        {
+          "phase": "decode7",
+          "gap": 5.82744026184082,
+          "normalization_contribution_max_abs": 0.017192840576171875,
+          "stock_greedy": 279,
+          "diagnostic_greedy": 279
+        }
+      ],
+      "maximum_normalization": 0.04533195495605469,
+      "minimum_gap": 0.14303207397460938
+    },
+    {
+      "name": "text_planet",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 5.261602401733398,
+          "normalization_contribution_max_abs": 0.028670907020568848,
+          "stock_greedy": 42373,
+          "diagnostic_greedy": 42373
+        },
+        {
+          "phase": "decode0",
+          "gap": 6.241115570068359,
+          "normalization_contribution_max_abs": 0.027523040771484375,
+          "stock_greedy": 369,
+          "diagnostic_greedy": 369
+        },
+        {
+          "phase": "decode1",
+          "gap": 6.004032135009766,
+          "normalization_contribution_max_abs": 0.0192718505859375,
+          "stock_greedy": 279,
+          "diagnostic_greedy": 279
+        },
+        {
+          "phase": "decode2",
+          "gap": 0.828460693359375,
+          "normalization_contribution_max_abs": 0.016234874725341797,
+          "stock_greedy": 4688,
+          "diagnostic_greedy": 4688
+        },
+        {
+          "phase": "decode3",
+          "gap": 10.167552947998047,
+          "normalization_contribution_max_abs": 0.014863967895507812,
+          "stock_greedy": 11247,
+          "diagnostic_greedy": 11247
+        },
+        {
+          "phase": "decode4",
+          "gap": 11.636777877807617,
+          "normalization_contribution_max_abs": 0.015185356140136719,
+          "stock_greedy": 494,
+          "diagnostic_greedy": 494
+        },
+        {
+          "phase": "decode5",
+          "gap": 8.33480453491211,
+          "normalization_contribution_max_abs": 0.012337207794189453,
+          "stock_greedy": 279,
+          "diagnostic_greedy": 279
+        },
+        {
+          "phase": "decode6",
+          "gap": 6.269632339477539,
+          "normalization_contribution_max_abs": 0.021066665649414062,
+          "stock_greedy": 7806,
+          "diagnostic_greedy": 7806
+        },
+        {
+          "phase": "decode7",
+          "gap": 6.138896942138672,
+          "normalization_contribution_max_abs": 0.035468101501464844,
+          "stock_greedy": 321,
+          "diagnostic_greedy": 321
+        }
+      ],
+      "maximum_normalization": 0.035468101501464844,
+      "minimum_gap": 0.828460693359375
+    },
+    {
+      "name": "text_repeat",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 6.832509994506836,
+          "normalization_contribution_max_abs": 0.029047727584838867,
+          "stock_greedy": 14556,
+          "diagnostic_greedy": 14556
+        },
+        {
+          "phase": "decode0",
+          "gap": 10.714427947998047,
+          "normalization_contribution_max_abs": 0.0209043025970459,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode1",
+          "gap": 8.966365814208984,
+          "normalization_contribution_max_abs": 0.016667842864990234,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode2",
+          "gap": 7.539485931396484,
+          "normalization_contribution_max_abs": 0.020152568817138672,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode3",
+          "gap": 7.814702987670898,
+          "normalization_contribution_max_abs": 0.017131328582763672,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode4",
+          "gap": 7.8343658447265625,
+          "normalization_contribution_max_abs": 0.017965316772460938,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode5",
+          "gap": 6.08704948425293,
+          "normalization_contribution_max_abs": 0.02120065689086914,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode6",
+          "gap": 4.946996688842773,
+          "normalization_contribution_max_abs": 0.01968860626220703,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        },
+        {
+          "phase": "decode7",
+          "gap": 4.796445846557617,
+          "normalization_contribution_max_abs": 0.021997451782226562,
+          "stock_greedy": 23066,
+          "diagnostic_greedy": 23066
+        }
+      ],
+      "maximum_normalization": 0.029047727584838867,
+      "minimum_gap": 4.796445846557617
+    },
+    {
+      "name": "text_digits",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 8.172038078308105,
+          "normalization_contribution_max_abs": 0.05500173568725586,
+          "stock_greedy": 16,
+          "diagnostic_greedy": 16
+        },
+        {
+          "phase": "decode0",
+          "gap": 9.613178253173828,
+          "normalization_contribution_max_abs": 0.02741861343383789,
+          "stock_greedy": 220,
+          "diagnostic_greedy": 220
+        },
+        {
+          "phase": "decode1",
+          "gap": 11.985848426818848,
+          "normalization_contribution_max_abs": 0.019562184810638428,
+          "stock_greedy": 17,
+          "diagnostic_greedy": 17
+        },
+        {
+          "phase": "decode2",
+          "gap": 9.832683563232422,
+          "normalization_contribution_max_abs": 0.018315553665161133,
+          "stock_greedy": 220,
+          "diagnostic_greedy": 220
+        },
+        {
+          "phase": "decode3",
+          "gap": 11.152166366577148,
+          "normalization_contribution_max_abs": 0.0406494140625,
+          "stock_greedy": 18,
+          "diagnostic_greedy": 18
+        },
+        {
+          "phase": "decode4",
+          "gap": 9.332660675048828,
+          "normalization_contribution_max_abs": 0.01817631721496582,
+          "stock_greedy": 220,
+          "diagnostic_greedy": 220
+        },
+        {
+          "phase": "decode5",
+          "gap": 13.26070785522461,
+          "normalization_contribution_max_abs": 0.03669929504394531,
+          "stock_greedy": 19,
+          "diagnostic_greedy": 19
+        },
+        {
+          "phase": "decode6",
+          "gap": 9.708703994750977,
+          "normalization_contribution_max_abs": 0.01785898208618164,
+          "stock_greedy": 220,
+          "diagnostic_greedy": 220
+        },
+        {
+          "phase": "decode7",
+          "gap": 10.393463134765625,
+          "normalization_contribution_max_abs": 0.11249470710754395,
+          "stock_greedy": 20,
+          "diagnostic_greedy": 20
+        }
+      ],
+      "maximum_normalization": 0.11249470710754395,
+      "minimum_gap": 8.172038078308105
+    },
+    {
+      "name": "image",
+      "phases": [
+        {
+          "phase": "prefill",
+          "gap": 0.9739227294921875,
+          "normalization_contribution_max_abs": 0.09962797164916992,
+          "stock_greedy": 1919,
+          "diagnostic_greedy": 1919
+        },
+        {
+          "phase": "decode0",
+          "gap": 2.324939727783203,
+          "normalization_contribution_max_abs": 0.0385933518409729,
+          "stock_greedy": 2099,
+          "diagnostic_greedy": 2099
+        },
+        {
+          "phase": "decode1",
+          "gap": 0.9238033294677734,
+          "normalization_contribution_max_abs": 0.022338390350341797,
+          "stock_greedy": 369,
+          "diagnostic_greedy": 369
+        },
+        {
+          "phase": "decode2",
+          "gap": 2.0950546264648438,
+          "normalization_contribution_max_abs": 0.023675382137298584,
+          "stock_greedy": 264,
+          "diagnostic_greedy": 264
+        },
+        {
+          "phase": "decode3",
+          "gap": 1.9926433563232422,
+          "normalization_contribution_max_abs": 0.025159597396850586,
+          "stock_greedy": 10558,
+          "diagnostic_greedy": 10558
+        },
+        {
+          "phase": "decode4",
+          "gap": 4.062740325927734,
+          "normalization_contribution_max_abs": 0.03413534164428711,
+          "stock_greedy": 11,
+          "diagnostic_greedy": 11
+        },
+        {
+          "phase": "decode5",
+          "gap": 3.7195587158203125,
+          "normalization_contribution_max_abs": 0.023537635803222656,
+          "stock_greedy": 7859,
+          "diagnostic_greedy": 7859
+        },
+        {
+          "phase": "decode6",
+          "gap": 0.9566669464111328,
+          "normalization_contribution_max_abs": 0.02408742904663086,
+          "stock_greedy": 19556,
+          "diagnostic_greedy": 19556
+        },
+        {
+          "phase": "decode7",
+          "gap": 0.3372325897216797,
+          "normalization_contribution_max_abs": 0.027855873107910156,
+          "stock_greedy": 53968,
+          "diagnostic_greedy": 53968
+        }
+      ],
+      "maximum_normalization": 0.09962797164916992,
+      "minimum_gap": 0.3372325897216797
+    }
+  ],
+  "pairs": [
+    {
+      "cases": [
+        "text",
+        "image"
+      ],
+      "epsilon": 0.2967572937011719,
+      "margin": 0.0001,
+      "minimum_gap": 0.3372325897216797,
+      "eligible": false
+    },
+    {
+      "cases": [
+        "text_copy",
+        "image"
+      ],
+      "epsilon": 0.10062797164916992,
+      "margin": 0.0001,
+      "minimum_gap": 0.3372325897216797,
+      "eligible": true
+    },
+    {
+      "cases": [
+        "text_count",
+        "image"
+      ],
+      "epsilon": 0.10062797164916992,
+      "margin": 0.0001,
+      "minimum_gap": 0.3372325897216797,
+      "eligible": true
+    },
+    {
+      "cases": [
+        "text_sky",
+        "image"
+      ],
+      "epsilon": 0.10062797164916992,
+      "margin": 0.0001,
+      "minimum_gap": 0.14303207397460938,
+      "eligible": false
+    },
+    {
+      "cases": [
+        "text_planet",
+        "image"
+      ],
+      "epsilon": 0.10062797164916992,
+      "margin": 0.0001,
+      "minimum_gap": 0.3372325897216797,
+      "eligible": true
+    },
+    {
+      "cases": [
+        "text_repeat",
+        "image"
+      ],
+      "epsilon": 0.10062797164916992,
+      "margin": 0.0001,
+      "minimum_gap": 0.3372325897216797,
+      "eligible": true
+    },
+    {
+      "cases": [
+        "text_digits",
+        "image"
+      ],
+      "epsilon": 0.11349470710754395,
+      "margin": 0.0001,
+      "minimum_gap": 0.3372325897216797,
+      "eligible": true
+    }
+  ],
+  "selected": [
+    "text_copy",
+    "image"
+  ]
+}

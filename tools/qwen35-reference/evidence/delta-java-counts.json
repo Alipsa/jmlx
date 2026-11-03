@@ -1,0 +1,1082 @@
+{
+  "kind" : "binding counts; timings invalid",
+  "java" : "25.0.4.1+1-LTS",
+  "tf32" : "0",
+  "git_sha" : "7f315e02c2dc8e16dca67f2cb196c8923160ee54",
+  "git_status" : "",
+  "layers_per_sample" : 1,
+  "gpu_dispatch_count" : "not observed; binding counts are API downcalls, not Metal dispatches",
+  "cases" : [ {
+    "shape" : "tiny",
+    "dimensions" : [ 2, 6, 32, 64 ],
+    "length" : 64,
+    "inputs_sha256" : "65b587e897f96361e24a378ca5ae192f3edc4c0f467ca631ca2718876840fcfa",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4147948.\nPages active:                                1288845.\nPages inactive:                              2508773.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             237293.\nPages purgeable:                               33265.\n\"Translation faults\":                       22064043.\nPages copy-on-write:                          882570.\nPages zero filled:                          21241241.\nPages reactivated:                             13985.\nPages purged:                                  23025.\nFile-backed pages:                           2545644.\nAnonymous pages:                             1396991.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979763.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24567.\nPages tag-storage non-tag pageable:           202684.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:09.684734Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467 287.4 273088 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 2688  68.7 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 4537  10.4 696032 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", "10455   8.6 114192 /Users/per/.sdkman/candidates/java/current/bin/java", " 1058   6.8 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2706   5.8 180976 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  677   2.1  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.3 293296 codex", " 2634   1.1 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", "  428   1.0 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  778   0.8 195120 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", " 2620   0.5 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "  812   0.5  77024 /usr/libexec/spotlightknowledged.updater", "  826   0.4  26064 /System/Library/PrivateFrameworks/IntelligenceFlowRuntime.framework/Versions/A/intelligenceflowd", "  689   0.4  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 2,
+        "mlx_array_dtype" : 75,
+        "mlx_array_free" : 454,
+        "mlx_array_ndim" : 1180,
+        "mlx_array_new" : 453,
+        "mlx_array_new_float32" : 1,
+        "mlx_array_set" : 2,
+        "mlx_array_shape" : 580,
+        "mlx_array_size" : 7,
+        "mlx_astype" : 1,
+        "mlx_concatenate_axis" : 66,
+        "mlx_cumsum_axis" : 1,
+        "mlx_eval" : 2,
+        "mlx_exp" : 4,
+        "mlx_expand_dims" : 14,
+        "mlx_full" : 1,
+        "mlx_matmul" : 69,
+        "mlx_multiply" : 8,
+        "mlx_ones" : 1,
+        "mlx_repeat_axis" : 2,
+        "mlx_reshape" : 7,
+        "mlx_slice" : 198,
+        "mlx_subtract" : 66,
+        "mlx_transpose_axes" : 9,
+        "mlx_tril" : 1,
+        "mlx_vector_array_free" : 68,
+        "mlx_vector_array_new_data" : 68,
+        "mlx_where" : 1
+      },
+      "peak_above_active" : 7487516
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4147862.\nPages active:                                1288891.\nPages inactive:                              2508774.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             237332.\nPages purgeable:                               33265.\n\"Translation faults\":                       22065675.\nPages copy-on-write:                          882654.\nPages zero filled:                          21242439.\nPages reactivated:                             13985.\nPages purged:                                  23025.\nFile-backed pages:                           2545645.\nAnonymous pages:                             1397037.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979765.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24567.\nPages tag-storage non-tag pageable:           202684.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:09.723842Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467 287.4 274128 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 2688  68.7 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 4537  10.4 696032 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", "10455   8.6 114192 /Users/per/.sdkman/candidates/java/current/bin/java", " 1058   6.8 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2706   5.8 180976 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  677   2.1  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.3 293296 codex", " 2634   1.1 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", "  428   1.0 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  778   0.8 195120 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", " 2620   0.5 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "  812   0.5  77024 /usr/libexec/spotlightknowledged.updater", "  826   0.4  26064 /System/Library/PrivateFrameworks/IntelligenceFlowRuntime.framework/Versions/A/intelligenceflowd", "  689   0.4  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 64,
+        "mlx_array_dtype" : 198,
+        "mlx_array_free" : 2372,
+        "mlx_array_ndim" : 2704,
+        "mlx_array_new" : 2372,
+        "mlx_array_set" : 128,
+        "mlx_array_shape" : 1612,
+        "mlx_array_size" : 385,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 65,
+        "mlx_exp" : 64,
+        "mlx_expand_dims" : 513,
+        "mlx_matmul" : 192,
+        "mlx_multiply" : 128,
+        "mlx_repeat_axis" : 128,
+        "mlx_reshape" : 385,
+        "mlx_slice" : 320,
+        "mlx_subtract" : 64,
+        "mlx_transpose_axes" : 385,
+        "mlx_vector_array_free" : 66,
+        "mlx_vector_array_new_data" : 66
+      },
+      "peak_above_active" : 302616
+    } ],
+    "expected_sha256" : "28c00b64336051f337458e34fb67285284489a313add25b4ef09f57931e44946",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.4901161E-6,
+        "output_max_abs" : 2.5331974E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.5762787E-7,
+        "output_max_abs" : 5.9604645E-8
+      }
+    }
+  }, {
+    "shape" : "tiny",
+    "dimensions" : [ 2, 6, 32, 64 ],
+    "length" : 256,
+    "inputs_sha256" : "c9fdd37c56a9c7fb8b22a4cdbbcd41c1207370b18cba917c44532f70de033c94",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4147073.\nPages active:                                1289566.\nPages inactive:                              2508775.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             237445.\nPages purgeable:                               33265.\n\"Translation faults\":                       22068202.\nPages copy-on-write:                          882750.\nPages zero filled:                          21244500.\nPages reactivated:                             13985.\nPages purged:                                  23025.\nFile-backed pages:                           2545646.\nAnonymous pages:                             1397712.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979767.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24567.\nPages tag-storage non-tag pageable:           202684.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:09.884072Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467 235.7 286512 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 2688  69.6 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 1058   6.2 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 4537   5.3 696032 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", "10455   4.5 114144 /Users/per/.sdkman/candidates/java/current/bin/java", " 2706   3.5 180976 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  677   2.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.2 293296 codex", "  428   1.0 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2634   0.4 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", " 2942   0.2 525824 claude", "  778   0.2 195120 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  689   0.1  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 2620   0.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 8,
+        "mlx_array_dtype" : 282,
+        "mlx_array_free" : 1804,
+        "mlx_array_ndim" : 4672,
+        "mlx_array_new" : 1800,
+        "mlx_array_new_float32" : 4,
+        "mlx_array_set" : 8,
+        "mlx_array_shape" : 2284,
+        "mlx_array_size" : 25,
+        "mlx_astype" : 4,
+        "mlx_concatenate_axis" : 261,
+        "mlx_cumsum_axis" : 4,
+        "mlx_eval" : 5,
+        "mlx_exp" : 16,
+        "mlx_expand_dims" : 53,
+        "mlx_full" : 4,
+        "mlx_matmul" : 276,
+        "mlx_multiply" : 32,
+        "mlx_ones" : 4,
+        "mlx_repeat_axis" : 8,
+        "mlx_reshape" : 25,
+        "mlx_slice" : 792,
+        "mlx_subtract" : 264,
+        "mlx_transpose_axes" : 33,
+        "mlx_tril" : 4,
+        "mlx_vector_array_free" : 266,
+        "mlx_vector_array_new_data" : 266,
+        "mlx_where" : 4
+      },
+      "peak_above_active" : 7913756
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4146876.\nPages active:                                1289762.\nPages inactive:                              2508775.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             237446.\nPages purgeable:                               33265.\n\"Translation faults\":                       22070037.\nPages copy-on-write:                          882834.\nPages zero filled:                          21245883.\nPages reactivated:                             13985.\nPages purged:                                  23025.\nFile-backed pages:                           2545646.\nAnonymous pages:                             1397908.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979769.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24567.\nPages tag-storage non-tag pageable:           202684.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:09.924208Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467 207.9 289664 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 2688  42.3 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 1058   6.2 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 4537   3.1 696032 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", "10455   2.7 114144 /Users/per/.sdkman/candidates/java/current/bin/java", "  677   2.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2706   2.2 180976 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 2109   1.2 293296 codex", "  428   1.0 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2634   0.4 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", "  778   0.2 195120 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  689   0.1  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 2620   0.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 2942   0.1 525824 claude", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 256,
+        "mlx_array_dtype" : 774,
+        "mlx_array_free" : 9476,
+        "mlx_array_ndim" : 10768,
+        "mlx_array_new" : 9476,
+        "mlx_array_set" : 512,
+        "mlx_array_shape" : 6412,
+        "mlx_array_size" : 1537,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 257,
+        "mlx_exp" : 256,
+        "mlx_expand_dims" : 2049,
+        "mlx_matmul" : 768,
+        "mlx_multiply" : 512,
+        "mlx_repeat_axis" : 512,
+        "mlx_reshape" : 1537,
+        "mlx_slice" : 1280,
+        "mlx_subtract" : 256,
+        "mlx_transpose_axes" : 1537,
+        "mlx_vector_array_free" : 258,
+        "mlx_vector_array_new_data" : 258
+      },
+      "peak_above_active" : 931584
+    } ],
+    "expected_sha256" : "5ad6b0ce9ee78e165e28b9c3d4fb2d4c2cfeeb10117d97fedb8350a8f540fe4f",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.66893E-6,
+        "output_max_abs" : 3.5762787E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 4.172325E-7,
+        "output_max_abs" : 7.4505806E-8
+      }
+    }
+  }, {
+    "shape" : "tiny",
+    "dimensions" : [ 2, 6, 32, 64 ],
+    "length" : 1024,
+    "inputs_sha256" : "e231a732a26e389c3814af2e50c80e040aa965b375102a1ce805fe6dec426e77",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4145741.\nPages active:                                1290425.\nPages inactive:                              2508777.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             237916.\nPages purgeable:                               32753.\n\"Translation faults\":                       22073551.\nPages copy-on-write:                          882919.\nPages zero filled:                          21249057.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545648.\nAnonymous pages:                             1398571.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979771.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24569.\nPages tag-storage non-tag pageable:           202682.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:10.296590Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467 128.4 215440 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 2688   9.8 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 1058   4.5 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.6  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293296 codex", "  428   0.7 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "10455   0.4 114144 /Users/per/.sdkman/candidates/java/current/bin/java", "  778   0.4 195136 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  812   0.4  77072 /usr/libexec/spotlightknowledged.updater", " 4537   0.4 696032 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", " 2706   0.3 180976 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  689   0.2  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 2942   0.1 525824 claude", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", " 1060   0.1  10000 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 32,
+        "mlx_array_dtype" : 1110,
+        "mlx_array_free" : 7204,
+        "mlx_array_ndim" : 18640,
+        "mlx_array_new" : 7188,
+        "mlx_array_new_float32" : 16,
+        "mlx_array_set" : 32,
+        "mlx_array_shape" : 9100,
+        "mlx_array_size" : 97,
+        "mlx_astype" : 16,
+        "mlx_concatenate_axis" : 1041,
+        "mlx_cumsum_axis" : 16,
+        "mlx_eval" : 17,
+        "mlx_exp" : 64,
+        "mlx_expand_dims" : 209,
+        "mlx_full" : 16,
+        "mlx_matmul" : 1104,
+        "mlx_multiply" : 128,
+        "mlx_ones" : 16,
+        "mlx_repeat_axis" : 32,
+        "mlx_reshape" : 97,
+        "mlx_slice" : 3168,
+        "mlx_subtract" : 1056,
+        "mlx_transpose_axes" : 129,
+        "mlx_tril" : 16,
+        "mlx_vector_array_free" : 1058,
+        "mlx_vector_array_new_data" : 1058,
+        "mlx_where" : 16
+      },
+      "peak_above_active" : 9045532
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4145674.\nPages active:                                1290479.\nPages inactive:                              2508777.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             237929.\nPages purgeable:                               32753.\n\"Translation faults\":                       22075169.\nPages copy-on-write:                          883003.\nPages zero filled:                          21250245.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545648.\nAnonymous pages:                             1398625.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979773.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24569.\nPages tag-storage non-tag pageable:           202682.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:10.374282Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467 116.3 216336 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 2688   9.8 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 1058   4.5 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.6  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293296 codex", "  428   0.7 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "10455   0.4 114144 /Users/per/.sdkman/candidates/java/current/bin/java", "  778   0.4 195136 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  812   0.4  77072 /usr/libexec/spotlightknowledged.updater", " 4537   0.4 696032 /Users/per/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java", " 2706   0.3 180976 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  689   0.2  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 2942   0.1 525824 claude", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", " 1060   0.1  10000 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1024,
+        "mlx_array_dtype" : 3078,
+        "mlx_array_free" : 37892,
+        "mlx_array_ndim" : 43024,
+        "mlx_array_new" : 37892,
+        "mlx_array_set" : 2048,
+        "mlx_array_shape" : 25612,
+        "mlx_array_size" : 6145,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 1025,
+        "mlx_exp" : 1024,
+        "mlx_expand_dims" : 8193,
+        "mlx_matmul" : 3072,
+        "mlx_multiply" : 2048,
+        "mlx_repeat_axis" : 2048,
+        "mlx_reshape" : 6145,
+        "mlx_slice" : 5120,
+        "mlx_subtract" : 1024,
+        "mlx_transpose_axes" : 6145,
+        "mlx_vector_array_free" : 1026,
+        "mlx_vector_array_new_data" : 1026
+      },
+      "peak_above_active" : 3290880
+    } ],
+    "expected_sha256" : "115951e84e1081226715939659aef1b2efe460d049d895cf93006d97e6d47196",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.6093254E-6,
+        "output_max_abs" : 3.2782555E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.5762787E-7,
+        "output_max_abs" : 8.940697E-8
+      }
+    }
+  }, {
+    "shape" : "tiny",
+    "dimensions" : [ 2, 6, 32, 64 ],
+    "length" : 1280,
+    "inputs_sha256" : "158d49d1f5242102322637b375d878c11cc596195b16c861015f8c6424ce0053",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4144886.\nPages active:                                1290814.\nPages inactive:                              2508777.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             238382.\nPages purgeable:                               32685.\n\"Translation faults\":                       22077769.\nPages copy-on-write:                          883087.\nPages zero filled:                          21252429.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545648.\nAnonymous pages:                             1398960.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979775.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24569.\nPages tag-storage non-tag pageable:           202682.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:10.953910Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  71.9 229456 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.3 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293296 codex", "  428   0.7 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2688   0.6 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  812   0.4  77120 /usr/libexec/spotlightknowledged.updater", "  778   0.3 195136 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  689   0.2  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 1060   0.1  10000 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 40,
+        "mlx_array_dtype" : 1386,
+        "mlx_array_free" : 9004,
+        "mlx_array_ndim" : 23296,
+        "mlx_array_new" : 8984,
+        "mlx_array_new_float32" : 20,
+        "mlx_array_set" : 40,
+        "mlx_array_shape" : 11372,
+        "mlx_array_size" : 121,
+        "mlx_astype" : 20,
+        "mlx_concatenate_axis" : 1301,
+        "mlx_cumsum_axis" : 20,
+        "mlx_eval" : 21,
+        "mlx_exp" : 80,
+        "mlx_expand_dims" : 261,
+        "mlx_full" : 20,
+        "mlx_matmul" : 1380,
+        "mlx_multiply" : 160,
+        "mlx_ones" : 20,
+        "mlx_repeat_axis" : 40,
+        "mlx_reshape" : 121,
+        "mlx_slice" : 3960,
+        "mlx_subtract" : 1320,
+        "mlx_transpose_axes" : 161,
+        "mlx_tril" : 20,
+        "mlx_vector_array_free" : 1322,
+        "mlx_vector_array_new_data" : 1322,
+        "mlx_where" : 20
+      },
+      "peak_above_active" : 9438748
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4144837.\nPages active:                                1290887.\nPages inactive:                              2508777.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             238358.\nPages purgeable:                               32685.\n\"Translation faults\":                       22079395.\nPages copy-on-write:                          883171.\nPages zero filled:                          21253612.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545648.\nAnonymous pages:                             1399033.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979777.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24569.\nPages tag-storage non-tag pageable:           202682.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:11.044112Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  90.7 230224 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.6 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293296 codex", "  428   0.6 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2688   0.4 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  778   0.2 195136 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  812   0.2  77120 /usr/libexec/spotlightknowledged.updater", "  689   0.1  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1280,
+        "mlx_array_dtype" : 3846,
+        "mlx_array_free" : 47364,
+        "mlx_array_ndim" : 53776,
+        "mlx_array_new" : 47364,
+        "mlx_array_set" : 2560,
+        "mlx_array_shape" : 32012,
+        "mlx_array_size" : 7681,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 1281,
+        "mlx_exp" : 1280,
+        "mlx_expand_dims" : 10241,
+        "mlx_matmul" : 3840,
+        "mlx_multiply" : 2560,
+        "mlx_repeat_axis" : 2560,
+        "mlx_reshape" : 7681,
+        "mlx_slice" : 6400,
+        "mlx_subtract" : 1280,
+        "mlx_transpose_axes" : 7681,
+        "mlx_vector_array_free" : 1282,
+        "mlx_vector_array_new_data" : 1282
+      },
+      "peak_above_active" : 4077312
+    } ],
+    "expected_sha256" : "6c06438331dc025179ddc21a549bd397778dd30e625f97d49167781adc826276",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.847744E-6,
+        "output_max_abs" : 3.2782555E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.874302E-7,
+        "output_max_abs" : 9.685755E-8
+      }
+    }
+  }, {
+    "shape" : "08b",
+    "dimensions" : [ 16, 16, 128, 128 ],
+    "length" : 64,
+    "inputs_sha256" : "f643dbe4e7e3c2ba2a1dc2151be4df2c0b16eb48af99c3b87ba9876609567cfa",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4141828.\nPages active:                                1290959.\nPages inactive:                              2508778.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             241294.\nPages purgeable:                               32685.\n\"Translation faults\":                       22081539.\nPages copy-on-write:                          883255.\nPages zero filled:                          21257881.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545650.\nAnonymous pages:                             1399104.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979780.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24573.\nPages tag-storage non-tag pageable:           202678.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:11.373043Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  72.0 238080 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.1 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.6  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293296 codex", "  428   0.7 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "10455   0.1 114176 /Users/per/.sdkman/candidates/java/current/bin/java", " 2688   0.1 589200 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10429   0.0 212464 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9162   0.0 156128 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 2,
+        "mlx_array_dtype" : 75,
+        "mlx_array_free" : 452,
+        "mlx_array_ndim" : 1178,
+        "mlx_array_new" : 451,
+        "mlx_array_new_float32" : 1,
+        "mlx_array_set" : 2,
+        "mlx_array_shape" : 580,
+        "mlx_array_size" : 7,
+        "mlx_astype" : 1,
+        "mlx_concatenate_axis" : 66,
+        "mlx_cumsum_axis" : 1,
+        "mlx_eval" : 2,
+        "mlx_exp" : 4,
+        "mlx_expand_dims" : 14,
+        "mlx_full" : 1,
+        "mlx_matmul" : 69,
+        "mlx_multiply" : 8,
+        "mlx_ones" : 1,
+        "mlx_reshape" : 7,
+        "mlx_slice" : 198,
+        "mlx_subtract" : 66,
+        "mlx_transpose_axes" : 9,
+        "mlx_tril" : 1,
+        "mlx_vector_array_free" : 68,
+        "mlx_vector_array_new_data" : 68,
+        "mlx_where" : 1
+      },
+      "peak_above_active" : 47536268
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4141762.\nPages active:                                1290970.\nPages inactive:                              2508779.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             241348.\nPages purgeable:                               32685.\n\"Translation faults\":                       22083505.\nPages copy-on-write:                          883339.\nPages zero filled:                          21259187.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545651.\nAnonymous pages:                             1399115.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979782.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 115963.\nPages tagged resident:                        115963.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24573.\nPages tag-storage non-tag pageable:           202678.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:11.401186Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  73.4 238176 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.8 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2753   2.4 502416 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 2620   1.5 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293296 codex", "  428   0.7 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2634   0.2 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", "10455   0.1 114176 /Users/per/.sdkman/candidates/java/current/bin/java", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "10434   0.1 126032 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9162   0.0 156128 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService", " 9161   0.0  11024 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 64,
+        "mlx_array_dtype" : 198,
+        "mlx_array_free" : 2244,
+        "mlx_array_ndim" : 2576,
+        "mlx_array_new" : 2244,
+        "mlx_array_set" : 128,
+        "mlx_array_shape" : 1612,
+        "mlx_array_size" : 385,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 65,
+        "mlx_exp" : 64,
+        "mlx_expand_dims" : 513,
+        "mlx_matmul" : 192,
+        "mlx_multiply" : 128,
+        "mlx_reshape" : 385,
+        "mlx_slice" : 320,
+        "mlx_subtract" : 64,
+        "mlx_transpose_axes" : 385,
+        "mlx_vector_array_free" : 66,
+        "mlx_vector_array_new_data" : 66
+      },
+      "peak_above_active" : 4777544
+    } ],
+    "expected_sha256" : "9b1689b4451ba8920973c928de150fe54101bf2f308f8371a61a949d56f91d66",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.2516975E-6,
+        "output_max_abs" : 8.568168E-8
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 2.3841858E-7,
+        "output_max_abs" : 2.0489097E-8
+      }
+    }
+  }, {
+    "shape" : "08b",
+    "dimensions" : [ 16, 16, 128, 128 ],
+    "length" : 256,
+    "inputs_sha256" : "bae8317fde3635d178f4825524b8e99029db233f323f1d243a641ed8b3079353",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4140346.\nPages active:                                1291576.\nPages inactive:                              2508779.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             242158.\nPages purgeable:                               32685.\n\"Translation faults\":                       22086545.\nPages copy-on-write:                          883423.\nPages zero filled:                          21261750.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545651.\nAnonymous pages:                             1399721.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979784.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24573.\nPages tag-storage non-tag pageable:           202678.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:11.536451Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  78.4 260080 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.5 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2753   1.4 502416 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2620   1.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 2109   0.9 293296 codex", "  428   0.6 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2634   0.5 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", "10434   0.1 126032 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9162   0.0 156128 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 8,
+        "mlx_array_dtype" : 282,
+        "mlx_array_free" : 1796,
+        "mlx_array_ndim" : 4664,
+        "mlx_array_new" : 1792,
+        "mlx_array_new_float32" : 4,
+        "mlx_array_set" : 8,
+        "mlx_array_shape" : 2284,
+        "mlx_array_size" : 25,
+        "mlx_astype" : 4,
+        "mlx_concatenate_axis" : 261,
+        "mlx_cumsum_axis" : 4,
+        "mlx_eval" : 5,
+        "mlx_exp" : 16,
+        "mlx_expand_dims" : 53,
+        "mlx_full" : 4,
+        "mlx_matmul" : 276,
+        "mlx_multiply" : 32,
+        "mlx_ones" : 4,
+        "mlx_reshape" : 25,
+        "mlx_slice" : 792,
+        "mlx_subtract" : 264,
+        "mlx_transpose_axes" : 33,
+        "mlx_tril" : 4,
+        "mlx_vector_array_free" : 266,
+        "mlx_vector_array_new_data" : 266,
+        "mlx_where" : 4
+      },
+      "peak_above_active" : 50131020
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4140344.\nPages active:                                1291578.\nPages inactive:                              2508779.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             242158.\nPages purgeable:                               33939.\n\"Translation faults\":                       22088124.\nPages copy-on-write:                          883507.\nPages zero filled:                          21262891.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545651.\nAnonymous pages:                             1399723.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979786.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24573.\nPages tag-storage non-tag pageable:           202678.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:11.571990Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  78.4 260112 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.5 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2753   1.4 502416 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2620   1.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 2109   0.9 293296 codex", "  428   0.6 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2634   0.5 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", "10434   0.1 126032 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9162   0.0 156128 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 256,
+        "mlx_array_dtype" : 774,
+        "mlx_array_free" : 8964,
+        "mlx_array_ndim" : 10256,
+        "mlx_array_new" : 8964,
+        "mlx_array_set" : 512,
+        "mlx_array_shape" : 6412,
+        "mlx_array_size" : 1537,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 257,
+        "mlx_exp" : 256,
+        "mlx_expand_dims" : 2049,
+        "mlx_matmul" : 768,
+        "mlx_multiply" : 512,
+        "mlx_reshape" : 1537,
+        "mlx_slice" : 1280,
+        "mlx_subtract" : 256,
+        "mlx_transpose_axes" : 1537,
+        "mlx_vector_array_free" : 258,
+        "mlx_vector_array_new_data" : 258
+      },
+      "peak_above_active" : 6350408
+    } ],
+    "expected_sha256" : "16b44d3d6872cb141fac9f58aaf561843cec94bc7340aed8633447e02b7102f9",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.4901161E-6,
+        "output_max_abs" : 1.3411045E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 2.9802322E-7,
+        "output_max_abs" : 3.7252903E-8
+      }
+    }
+  }, {
+    "shape" : "08b",
+    "dimensions" : [ 16, 16, 128, 128 ],
+    "length" : 1024,
+    "inputs_sha256" : "b77f41b1dd97368f5c1415fec3df181f06766b7e419398257489c70642d5e5b9",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4133519.\nPages active:                                1295266.\nPages inactive:                              2508779.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             245295.\nPages purgeable:                               33942.\n\"Translation faults\":                       22095993.\nPages copy-on-write:                          883591.\nPages zero filled:                          21270962.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545651.\nAnonymous pages:                             1403411.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979788.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24573.\nPages tag-storage non-tag pageable:           202678.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:11.952122Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  69.7 358272 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.4 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.8  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293296 codex", "  428   0.7 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2753   0.3 502416 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", " 2942   0.1 525824 claude", "  812   0.1  77264 /usr/libexec/spotlightknowledged.updater", " 2634   0.1 133216 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif).app/Contents/MacOS/Google Chrome Helper (Aperitif)", " 2620   0.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 32,
+        "mlx_array_dtype" : 1110,
+        "mlx_array_free" : 7172,
+        "mlx_array_ndim" : 18608,
+        "mlx_array_new" : 7156,
+        "mlx_array_new_float32" : 16,
+        "mlx_array_set" : 32,
+        "mlx_array_shape" : 9100,
+        "mlx_array_size" : 97,
+        "mlx_astype" : 16,
+        "mlx_concatenate_axis" : 1041,
+        "mlx_cumsum_axis" : 16,
+        "mlx_eval" : 17,
+        "mlx_exp" : 64,
+        "mlx_expand_dims" : 209,
+        "mlx_full" : 16,
+        "mlx_matmul" : 1104,
+        "mlx_multiply" : 128,
+        "mlx_ones" : 16,
+        "mlx_reshape" : 97,
+        "mlx_slice" : 3168,
+        "mlx_subtract" : 1056,
+        "mlx_transpose_axes" : 129,
+        "mlx_tril" : 16,
+        "mlx_vector_array_free" : 1058,
+        "mlx_vector_array_new_data" : 1058,
+        "mlx_where" : 16
+      },
+      "peak_above_active" : 56434572
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4133650.\nPages active:                                1295132.\nPages inactive:                              2508779.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             245298.\nPages purgeable:                               33809.\n\"Translation faults\":                       22097549.\nPages copy-on-write:                          883675.\nPages zero filled:                          21272079.\nPages reactivated:                             13985.\nPages purged:                                  23217.\nFile-backed pages:                           2545651.\nAnonymous pages:                             1403277.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979790.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24573.\nPages tag-storage non-tag pageable:           202678.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.46630859375,
+        "utc" : "2026-11-03T07:05:12.032797Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  87.2 358272 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.8 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.5  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.2 293296 codex", "  428   0.6 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2753   0.1 502416 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10433   0.0 106624 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10432   0.0  14576 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared", "10429   0.0 212464 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1024,
+        "mlx_array_dtype" : 3078,
+        "mlx_array_free" : 35844,
+        "mlx_array_ndim" : 40976,
+        "mlx_array_new" : 35844,
+        "mlx_array_set" : 2048,
+        "mlx_array_shape" : 25612,
+        "mlx_array_size" : 6145,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 1025,
+        "mlx_exp" : 1024,
+        "mlx_expand_dims" : 8193,
+        "mlx_matmul" : 3072,
+        "mlx_multiply" : 2048,
+        "mlx_reshape" : 6145,
+        "mlx_slice" : 5120,
+        "mlx_subtract" : 1024,
+        "mlx_transpose_axes" : 6145,
+        "mlx_vector_array_free" : 1026,
+        "mlx_vector_array_new_data" : 1026
+      },
+      "peak_above_active" : 17835776
+    } ],
+    "expected_sha256" : "e7fb2a8bd5c717bd8b94ef45153a58e7deb3fee446c50498bfc7ac26f2ffd80d",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.7285347E-6,
+        "output_max_abs" : 1.6391277E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 2.8312206E-7,
+        "output_max_abs" : 2.9802322E-8
+      }
+    }
+  }, {
+    "shape" : "08b",
+    "dimensions" : [ 16, 16, 128, 128 ],
+    "length" : 1280,
+    "inputs_sha256" : "d1c286c4edafc07caa0b3d9247dd030797386cc751c81ecd260a7349ac75d92b",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4126295.\nPages active:                                1299369.\nPages inactive:                              2508785.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             248410.\nPages purgeable:                               30507.\n\"Translation faults\":                       22108833.\nPages copy-on-write:                          883759.\nPages zero filled:                          21282956.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545657.\nAnonymous pages:                             1407514.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979792.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24574.\nPages tag-storage non-tag pageable:           202677.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:12.650552Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  74.3 509488 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.5 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293312 codex", "  428   0.5 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2111   0.2 514560 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", "  812   0.1  77264 /usr/libexec/spotlightknowledged.updater", " 2620   0.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 2942   0.1 525824 claude", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 40,
+        "mlx_array_dtype" : 1386,
+        "mlx_array_free" : 8964,
+        "mlx_array_ndim" : 23256,
+        "mlx_array_new" : 8944,
+        "mlx_array_new_float32" : 20,
+        "mlx_array_set" : 40,
+        "mlx_array_shape" : 11372,
+        "mlx_array_size" : 121,
+        "mlx_astype" : 20,
+        "mlx_concatenate_axis" : 1301,
+        "mlx_cumsum_axis" : 20,
+        "mlx_eval" : 21,
+        "mlx_exp" : 80,
+        "mlx_expand_dims" : 261,
+        "mlx_full" : 20,
+        "mlx_matmul" : 1380,
+        "mlx_multiply" : 160,
+        "mlx_ones" : 20,
+        "mlx_reshape" : 121,
+        "mlx_slice" : 3960,
+        "mlx_subtract" : 1320,
+        "mlx_transpose_axes" : 161,
+        "mlx_tril" : 20,
+        "mlx_vector_array_free" : 1322,
+        "mlx_vector_array_new_data" : 1322,
+        "mlx_where" : 20
+      },
+      "peak_above_active" : 58527756
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4126245.\nPages active:                                1300059.\nPages inactive:                              2508785.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             247770.\nPages purgeable:                               30507.\n\"Translation faults\":                       22110459.\nPages copy-on-write:                          883843.\nPages zero filled:                          21284140.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545657.\nAnonymous pages:                             1408204.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979794.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24574.\nPages tag-storage non-tag pageable:           202677.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:12.742871Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  74.3 510256 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.5 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293312 codex", "  428   0.5 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2111   0.2 514560 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", "  812   0.1  77264 /usr/libexec/spotlightknowledged.updater", " 2620   0.1 626384 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " 2942   0.1 525824 claude", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1280,
+        "mlx_array_dtype" : 3846,
+        "mlx_array_free" : 44804,
+        "mlx_array_ndim" : 51216,
+        "mlx_array_new" : 44804,
+        "mlx_array_set" : 2560,
+        "mlx_array_shape" : 32012,
+        "mlx_array_size" : 7681,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 1281,
+        "mlx_exp" : 1280,
+        "mlx_expand_dims" : 10241,
+        "mlx_matmul" : 3840,
+        "mlx_multiply" : 2560,
+        "mlx_reshape" : 7681,
+        "mlx_slice" : 6400,
+        "mlx_subtract" : 1280,
+        "mlx_transpose_axes" : 7681,
+        "mlx_vector_array_free" : 1282,
+        "mlx_vector_array_new_data" : 1282
+      },
+      "peak_above_active" : 22030080
+    } ],
+    "expected_sha256" : "d7d25b0ed063a4b36141bf300faae78807784e533421982a71caae5a61556ebc",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.6093254E-6,
+        "output_max_abs" : 1.3783574E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.054738E-7,
+        "output_max_abs" : 3.3527613E-8
+      }
+    }
+  }, {
+    "shape" : "27b",
+    "dimensions" : [ 16, 48, 128, 128 ],
+    "length" : 64,
+    "inputs_sha256" : "33ecb0bc6fd77dfba5247a3b3081ed96818e1d0ee705a31bf3caf0de24002c51",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4117938.\nPages active:                                1299931.\nPages inactive:                              2508785.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             256205.\nPages purgeable:                               31761.\n\"Translation faults\":                       22113408.\nPages copy-on-write:                          883927.\nPages zero filled:                          21293697.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545657.\nAnonymous pages:                             1408076.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979796.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24576.\nPages tag-storage non-tag pageable:           202675.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:13.081951Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  62.6 526048 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.0 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293312 codex", "  428   0.6 179360 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  812   0.4  77312 /usr/libexec/spotlightknowledged.updater", "  778   0.4 195152 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", " 2688   0.3 589264 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  689   0.2  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 1060   0.1  10000 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 2,
+        "mlx_array_dtype" : 75,
+        "mlx_array_free" : 454,
+        "mlx_array_ndim" : 1180,
+        "mlx_array_new" : 453,
+        "mlx_array_new_float32" : 1,
+        "mlx_array_set" : 2,
+        "mlx_array_shape" : 580,
+        "mlx_array_size" : 7,
+        "mlx_astype" : 1,
+        "mlx_concatenate_axis" : 66,
+        "mlx_cumsum_axis" : 1,
+        "mlx_eval" : 2,
+        "mlx_exp" : 4,
+        "mlx_expand_dims" : 14,
+        "mlx_full" : 1,
+        "mlx_matmul" : 69,
+        "mlx_multiply" : 8,
+        "mlx_ones" : 1,
+        "mlx_repeat_axis" : 2,
+        "mlx_reshape" : 7,
+        "mlx_slice" : 198,
+        "mlx_subtract" : 66,
+        "mlx_transpose_axes" : 9,
+        "mlx_tril" : 1,
+        "mlx_vector_array_free" : 68,
+        "mlx_vector_array_new_data" : 68,
+        "mlx_where" : 1
+      },
+      "peak_above_active" : 145751492
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4117942.\nPages active:                                1299807.\nPages inactive:                              2508785.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             256325.\nPages purgeable:                               31761.\n\"Translation faults\":                       22114967.\nPages copy-on-write:                          884011.\nPages zero filled:                          21294816.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545657.\nAnonymous pages:                             1407952.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979798.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116027.\nPages tagged resident:                        116027.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24576.\nPages tag-storage non-tag pageable:           202675.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:13.109851Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  62.6 526064 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.0 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293312 codex", "  428   0.6 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  812   0.4  77312 /usr/libexec/spotlightknowledged.updater", "  778   0.4 195152 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", " 2688   0.3 589264 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  689   0.2  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 1060   0.1  10000 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 64,
+        "mlx_array_dtype" : 198,
+        "mlx_array_free" : 2372,
+        "mlx_array_ndim" : 2704,
+        "mlx_array_new" : 2372,
+        "mlx_array_set" : 128,
+        "mlx_array_shape" : 1612,
+        "mlx_array_size" : 385,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 65,
+        "mlx_exp" : 64,
+        "mlx_expand_dims" : 513,
+        "mlx_matmul" : 192,
+        "mlx_multiply" : 128,
+        "mlx_repeat_axis" : 128,
+        "mlx_reshape" : 385,
+        "mlx_slice" : 320,
+        "mlx_subtract" : 64,
+        "mlx_transpose_axes" : 385,
+        "mlx_vector_array_free" : 66,
+        "mlx_vector_array_new_data" : 66
+      },
+      "peak_above_active" : 15270080
+    } ],
+    "expected_sha256" : "110963cc6fad84bd4f9de335fc3bcf7041ef233a2c2288ad1c13358d67692f00",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.3113022E-6,
+        "output_max_abs" : 9.685755E-8
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.1292439E-7,
+        "output_max_abs" : 2.7939677E-8
+      }
+    }
+  }, {
+    "shape" : "27b",
+    "dimensions" : [ 16, 48, 128, 128 ],
+    "length" : 256,
+    "inputs_sha256" : "aef54f97020c32ab31f3dc7bbd26538258d4c84bdbf820dd3175c6df81301c6c",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4115894.\nPages active:                                1299940.\nPages inactive:                              2508786.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             258239.\nPages purgeable:                               30507.\n\"Translation faults\":                       22119139.\nPages copy-on-write:                          884095.\nPages zero filled:                          21298007.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545658.\nAnonymous pages:                             1408085.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979800.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116091.\nPages tagged resident:                        116091.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24576.\nPages tag-storage non-tag pageable:           202675.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:13.249938Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  55.3 560208 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   3.6 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293312 codex", "  428   0.5 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  812   0.2  77312 /usr/libexec/spotlightknowledged.updater", " 2688   0.2 589264 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "  778   0.2 195152 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", " 2942   0.1 525776 claude", "  689   0.1  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 8,
+        "mlx_array_dtype" : 282,
+        "mlx_array_free" : 1804,
+        "mlx_array_ndim" : 4672,
+        "mlx_array_new" : 1800,
+        "mlx_array_new_float32" : 4,
+        "mlx_array_set" : 8,
+        "mlx_array_shape" : 2284,
+        "mlx_array_size" : 25,
+        "mlx_astype" : 4,
+        "mlx_concatenate_axis" : 261,
+        "mlx_cumsum_axis" : 4,
+        "mlx_eval" : 5,
+        "mlx_exp" : 16,
+        "mlx_expand_dims" : 53,
+        "mlx_full" : 4,
+        "mlx_matmul" : 276,
+        "mlx_multiply" : 32,
+        "mlx_ones" : 4,
+        "mlx_repeat_axis" : 8,
+        "mlx_reshape" : 25,
+        "mlx_slice" : 792,
+        "mlx_subtract" : 264,
+        "mlx_transpose_axes" : 33,
+        "mlx_tril" : 4,
+        "mlx_vector_array_free" : 266,
+        "mlx_vector_array_new_data" : 266,
+        "mlx_where" : 4
+      },
+      "peak_above_active" : 153612996
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4115894.\nPages active:                                1299940.\nPages inactive:                              2508786.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             258239.\nPages purgeable:                               30507.\n\"Translation faults\":                       22120714.\nPages copy-on-write:                          884179.\nPages zero filled:                          21299143.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545658.\nAnonymous pages:                             1408085.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979802.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116091.\nPages tagged resident:                        116091.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24576.\nPages tag-storage non-tag pageable:           202675.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:13.288773Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  59.7 560208 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.7 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.8  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.0 293312 codex", "  428   0.7 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  812   0.1  77312 /usr/libexec/spotlightknowledged.updater", " 2111   0.1 514560 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", " 2942   0.1 525776 claude", " 2688   0.1 589264 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 256,
+        "mlx_array_dtype" : 774,
+        "mlx_array_free" : 9476,
+        "mlx_array_ndim" : 10768,
+        "mlx_array_new" : 9476,
+        "mlx_array_set" : 512,
+        "mlx_array_shape" : 6412,
+        "mlx_array_size" : 1537,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 257,
+        "mlx_exp" : 256,
+        "mlx_expand_dims" : 2049,
+        "mlx_matmul" : 768,
+        "mlx_multiply" : 512,
+        "mlx_repeat_axis" : 512,
+        "mlx_reshape" : 1537,
+        "mlx_slice" : 1280,
+        "mlx_subtract" : 256,
+        "mlx_transpose_axes" : 1537,
+        "mlx_vector_array_free" : 258,
+        "mlx_vector_array_new_data" : 258
+      },
+      "peak_above_active" : 23118016
+    } ],
+    "expected_sha256" : "ba23425eed74652cf043cacb2744efadd888c475889b432cce78b33a128275a3",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.847744E-6,
+        "output_max_abs" : 1.3783574E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.5762787E-7,
+        "output_max_abs" : 3.3527613E-8
+      }
+    }
+  }, {
+    "shape" : "27b",
+    "dimensions" : [ 16, 48, 128, 128 ],
+    "length" : 1024,
+    "inputs_sha256" : "cd29feedf91320ce41491c9a9bec9bc597254dc0b654b006110bbf446d3306a9",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4103994.\nPages active:                                1305536.\nPages inactive:                              2508799.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             264530.\nPages purgeable:                               30510.\n\"Translation faults\":                       22134527.\nPages copy-on-write:                          884448.\nPages zero filled:                          21313004.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545671.\nAnonymous pages:                             1413681.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979813.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116083.\nPages tagged resident:                        116083.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24579.\nPages tag-storage non-tag pageable:           202672.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:13.747128Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  56.0 706800 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.2 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2111   1.3 514656 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", "  677   1.3  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.2 293328 codex", "  428   0.6 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  812   0.5  77024 /usr/libexec/spotlightknowledged.updater", "  778   0.4 195152 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  396   0.4  23648 /usr/libexec/opendirectoryd", "    1   0.2  32496 /sbin/launchd", "  689   0.2  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", " 2942   0.1 525776 claude", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "  354   0.1  68288 /usr/libexec/logd", " 2504   0.1  28864 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex-code-mode-host" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 32,
+        "mlx_array_dtype" : 1110,
+        "mlx_array_free" : 7204,
+        "mlx_array_ndim" : 18640,
+        "mlx_array_new" : 7188,
+        "mlx_array_new_float32" : 16,
+        "mlx_array_set" : 32,
+        "mlx_array_shape" : 9100,
+        "mlx_array_size" : 97,
+        "mlx_astype" : 16,
+        "mlx_concatenate_axis" : 1041,
+        "mlx_cumsum_axis" : 16,
+        "mlx_eval" : 17,
+        "mlx_exp" : 64,
+        "mlx_expand_dims" : 209,
+        "mlx_full" : 16,
+        "mlx_matmul" : 1104,
+        "mlx_multiply" : 128,
+        "mlx_ones" : 16,
+        "mlx_repeat_axis" : 32,
+        "mlx_reshape" : 97,
+        "mlx_slice" : 3168,
+        "mlx_subtract" : 1056,
+        "mlx_transpose_axes" : 129,
+        "mlx_tril" : 16,
+        "mlx_vector_array_free" : 1058,
+        "mlx_vector_array_new_data" : 1058,
+        "mlx_where" : 16
+      },
+      "peak_above_active" : 172372676
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4103988.\nPages active:                                1305500.\nPages inactive:                              2508799.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             264572.\nPages purgeable:                               30510.\n\"Translation faults\":                       22136112.\nPages copy-on-write:                          884532.\nPages zero filled:                          21314149.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545671.\nAnonymous pages:                             1413645.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979815.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116083.\nPages tagged resident:                        116083.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24579.\nPages tag-storage non-tag pageable:           202672.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:13.824675Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  76.1 706800 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   5.7 120464 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", " 2111   4.5 514672 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", "  677   1.7  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   1.4 293328 codex", "  428   0.7 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", "  564   0.4  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "  778   0.2 195152 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd", "  812   0.2  77024 /usr/libexec/spotlightknowledged.updater", "  480   0.1  12448 /usr/sbin/mDNSResponder", "  396   0.1  23648 /usr/libexec/opendirectoryd", " 2942   0.1 525776 claude", "  689   0.1  15904 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent", "  354   0.1  68288 /usr/libexec/logd", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1024,
+        "mlx_array_dtype" : 3078,
+        "mlx_array_free" : 37892,
+        "mlx_array_ndim" : 43024,
+        "mlx_array_new" : 37892,
+        "mlx_array_set" : 2048,
+        "mlx_array_shape" : 25612,
+        "mlx_array_size" : 6145,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 1025,
+        "mlx_exp" : 1024,
+        "mlx_expand_dims" : 8193,
+        "mlx_matmul" : 3072,
+        "mlx_multiply" : 2048,
+        "mlx_repeat_axis" : 2048,
+        "mlx_reshape" : 6145,
+        "mlx_slice" : 5120,
+        "mlx_subtract" : 1024,
+        "mlx_transpose_axes" : 6145,
+        "mlx_vector_array_free" : 1026,
+        "mlx_vector_array_new_data" : 1026
+      },
+      "peak_above_active" : 63832064
+    } ],
+    "expected_sha256" : "86a3e5899ea2bd092b1ec93808a3913bbc6c41a9ef06ccf18fd4e5eb701fb31f",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.66893E-6,
+        "output_max_abs" : 1.4901161E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 3.5762787E-7,
+        "output_max_abs" : 3.7252903E-8
+      }
+    }
+  }, {
+    "shape" : "27b",
+    "dimensions" : [ 16, 48, 128, 128 ],
+    "length" : 1280,
+    "inputs_sha256" : "819a528f20febaaee70dfa52ab7632b213aa526725893facee811fe8f626f60c",
+    "measurements" : [ {
+      "path" : "chunked_ops",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4090482.\nPages active:                                1317893.\nPages inactive:                              2508799.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             265685.\nPages purgeable:                               30510.\n\"Translation faults\":                       22151958.\nPages copy-on-write:                          884616.\nPages zero filled:                          21328953.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545671.\nAnonymous pages:                             1426038.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979817.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116083.\nPages tagged resident:                        116083.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24582.\nPages tag-storage non-tag pageable:           202669.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:14.525360Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  78.1 911424 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.2 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293328 codex", "  428   0.7 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2111   0.2 514672 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", "  812   0.1  77024 /usr/libexec/spotlightknowledged.updater", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "10429   0.0 212464 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 40,
+        "mlx_array_dtype" : 1386,
+        "mlx_array_free" : 9004,
+        "mlx_array_ndim" : 23296,
+        "mlx_array_new" : 8984,
+        "mlx_array_new_float32" : 20,
+        "mlx_array_set" : 40,
+        "mlx_array_shape" : 11372,
+        "mlx_array_size" : 121,
+        "mlx_astype" : 20,
+        "mlx_concatenate_axis" : 1301,
+        "mlx_cumsum_axis" : 20,
+        "mlx_eval" : 21,
+        "mlx_exp" : 80,
+        "mlx_expand_dims" : 261,
+        "mlx_full" : 20,
+        "mlx_matmul" : 1380,
+        "mlx_multiply" : 160,
+        "mlx_ones" : 20,
+        "mlx_repeat_axis" : 40,
+        "mlx_reshape" : 121,
+        "mlx_slice" : 3960,
+        "mlx_subtract" : 1320,
+        "mlx_transpose_axes" : 161,
+        "mlx_tril" : 20,
+        "mlx_vector_array_free" : 1322,
+        "mlx_vector_array_new_data" : 1322,
+        "mlx_where" : 20
+      },
+      "peak_above_active" : 178636228
+    }, {
+      "path" : "token_recurrence",
+      "sample" : 0,
+      "host_state" : {
+        "vm_stat" : "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                  4089642.\nPages active:                                1318732.\nPages inactive:                              2508799.\nPages speculative:                            145017.\nPages throttled:                                   0.\nPages wired down:                             265686.\nPages purgeable:                               30510.\n\"Translation faults\":                       22154375.\nPages copy-on-write:                          884700.\nPages zero filled:                          21330929.\nPages reactivated:                             13985.\nPages purged:                                  23409.\nFile-backed pages:                           2545671.\nAnonymous pages:                             1426877.\nPages stored in compressor:                        0.\nPages occupied by compressor:                      0.\nDecompressions:                                    0.\nCompressions:                                      0.\nPageins:                                      979819.\nPageouts:                                          0.\nSwapins:                                           0.\nSwapouts:                                          0.\nPages tagged:                                 116083.\nPages tagged resident:                        116083.\nPages tagged compressed:                           0.\nPages tag-storage:                            262144.\nPages tag-storage holding tags:                 3675.\nPages tag-storage free:                        24582.\nPages tag-storage non-tag pageable:           202669.\nPages tag-storage non-tag wired:                 110.\nBytes of compressed tags:                          0.\nTagged compressions:                               0.\nTagged decompressions:                             0.\n",
+        "system_load_average" : 1.5087890625,
+        "utc" : "2026-11-03T07:05:14.607035Z",
+        "top_processes" : [ "  PID  %CPU    RSS COMM", "10467  78.1 924848 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 1058   4.2 120448 /System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal", "  677   1.4  24208 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager", " 2109   0.9 293328 codex", "  428   0.7 179344 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer", " 2111   0.2 514672 /Users/per/.codex/packages/app-server-daemon/releases/0.166.0-aarch64-apple-darwin/bin/codex", "  812   0.1  77024 /usr/libexec/spotlightknowledged.updater", "  564   0.1  12160 /System/Library/DriverExtensions/com.apple.DriverKit.AppleUserECM.dext/com.apple.DriverKit.AppleUserECM", "10429   0.0 212464 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.80/Helpers/Google Chrome Helper (Aperitif Renderer).app/Contents/MacOS/Google Chrome Helper (Aperitif Renderer)", "10358   0.0   2976 /bin/zsh", " 9989   0.0  18512 /System/Library/Frameworks/LocalAuthentication.framework/Support/coreautha.bundle/Contents/MacOS/coreautha", " 9751   0.0 212640 /Users/per/.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java", " 9701   0.0   8960 /usr/libexec/naturallanguaged", " 9697   0.0   8976 /System/Library/PrivateFrameworks/MediaAnalysisAccess.framework/Versions/A/XPCServices/mediaanalysisd-access.xpc/Contents/MacOS/mediaanalysisd-access", " 9379   0.0   9584 /System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService" ]
+      },
+      "native_binding_calls" : {
+        "mlx_add" : 1280,
+        "mlx_array_dtype" : 3846,
+        "mlx_array_free" : 47364,
+        "mlx_array_ndim" : 53776,
+        "mlx_array_new" : 47364,
+        "mlx_array_set" : 2560,
+        "mlx_array_shape" : 32012,
+        "mlx_array_size" : 7681,
+        "mlx_concatenate_axis" : 1,
+        "mlx_eval" : 1281,
+        "mlx_exp" : 1280,
+        "mlx_expand_dims" : 10241,
+        "mlx_matmul" : 3840,
+        "mlx_multiply" : 2560,
+        "mlx_repeat_axis" : 2560,
+        "mlx_reshape" : 7681,
+        "mlx_slice" : 6400,
+        "mlx_subtract" : 1280,
+        "mlx_transpose_axes" : 7681,
+        "mlx_vector_array_free" : 1282,
+        "mlx_vector_array_new_data" : 1282
+      },
+      "peak_above_active" : 78512128
+    } ],
+    "expected_sha256" : "01c138d2a7ddd34953d67bb782c9fb33175e396798e17bc426a5b7746528a3cb",
+    "hf_qualification" : {
+      "token_recurrence" : {
+        "state_max_abs" : 1.6987324E-6,
+        "output_max_abs" : 1.5646219E-7
+      },
+      "chunked_ops" : {
+        "state_max_abs" : 2.682209E-7,
+        "output_max_abs" : 3.7252903E-8
+      }
+    }
+  } ]
+}

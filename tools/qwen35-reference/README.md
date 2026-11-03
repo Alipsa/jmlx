@@ -123,3 +123,19 @@ without Python. This provenance inventory is not a claim that Phase 7.6 is compl
 The [final WP1 report](../../req/plans/phase7-6-wp1-benchmark.md) links the clean-source timing
 and count records. Prefill default selection remains a review gate, not an automatic outcome
 of generating those files. Full model acceptance remains pending.
+
+## WP1 structural optimization
+
+The 2026-11-03 review chooses chunked ops and requires a roughly 600 ms/48-call optimization
+gate before WP2. Custom Metal remains deferred and the built-in native op remains numerically
+ineligible. The implementation now batches state-independent work across at most 16 chunks,
+inverts the 64×64 system with stable forward substitution and bounds state evaluation to
+eight-chunk windows. The new `generate_delta_stress.py` exports independent HF correlated-key,
+strong-decay and multi-batch boundary fixtures; it separately records the failed FLOAT32
+doubling-inverse experiment. Existing goldens and the 1e-4 bound are unchanged.
+
+Single-token DeltaNet/cache execution is lazy. The caller evaluates output and all retained
+state roots once at the token boundary. The optional counting run also writes a `-decode.json`
+record and asserts zero internal `mlx_eval` calls and exactly one caller-boundary call against
+the HF component fixture. The benchmark explicitly evaluates returned roots, including lazy
+decode/final concatenations, before timing completes.

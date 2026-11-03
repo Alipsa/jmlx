@@ -1,4 +1,4 @@
-# Phase 7.6 WP1 — Delta rule benchmark and default review
+# Phase 7.6 WP1 — Initial delta-rule benchmark baseline
 
 Recorded 2026-11-03 from clean detached source commit
 `7f315e02c2dc8e16dca67f2cb196c8923160ee54`. All Java records report an empty Git status. The benchmark checkout uses
@@ -100,3 +100,13 @@ Raw records:
 - [Reference four-path timings/errors](../../tools/qwen35-reference/evidence/delta-benchmark-48-layers.json).
 - [Java per-case downcall counts](../../tools/qwen35-reference/evidence/delta-java-counts.json),
   [measured 48-layer counts](../../tools/qwen35-reference/evidence/delta-java-48-layers-counts.json).
+
+## 2026-11-03 review outcome
+
+The user selected chunked ops as the prefill algorithm but rejected deferring the structural
+optimization. The relevant comparison is Java 2,551 ms versus mlx-vlm's ordinary chunked ops
+304 ms, not only its custom kernel. WP1 must batch state-independent work, reduce the triangular
+solve and remove forced per-layer decode evaluations before WP2. The stated target is about
+600 ms for the same 1,280-token/48-call case, with unchanged 1e-4 numerical qualification.
+Custom Metal is deferred; the built-in op remains excluded. The baseline measurements above
+are preserved as the before record, not a proposal to ship this original structure.

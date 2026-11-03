@@ -1,0 +1,48 @@
+{
+  "seed": 20261103,
+  "source_sha256": "5c21a50ee630803038f8a9e1655b45db5e9eecad531a60f3347f20d10bb38897",
+  "hf_source_sha256": "af05d0acfe79fff8aea1c75f93516a6a72bc80f6f901329a73e66a3866fe1e7c",
+  "safetensors_sha256": "50498bccb43676d9eb3b65c93eb6691657de51e218fd96bd6f42c1c977cbb371",
+  "cases": [
+    {
+      "name": "correlated",
+      "batch": 1,
+      "length": 129,
+      "dk": 32,
+      "hf_chunk_vs_recurrence_max_abs": 4.76837158203125e-07
+    },
+    {
+      "name": "near_correlated",
+      "batch": 1,
+      "length": 129,
+      "dk": 128,
+      "hf_chunk_vs_recurrence_max_abs": 1.0076910257339478e-06
+    },
+    {
+      "name": "strong_decay",
+      "batch": 1,
+      "length": 129,
+      "dk": 32,
+      "hf_chunk_vs_recurrence_max_abs": 3.725290298461914e-08
+    },
+    {
+      "name": "batch_boundary",
+      "batch": 2,
+      "length": 1025,
+      "dk": 32,
+      "hf_chunk_vs_recurrence_max_abs": 6.854534149169922e-07
+    },
+    {
+      "name": "long_boundary",
+      "batch": 1,
+      "length": 2049,
+      "dk": 32,
+      "hf_chunk_vs_recurrence_max_abs": 6.556510925292969e-07
+    }
+  ],
+  "doubling_probe": {
+    "kind": "rejected numerical experiment, never a golden",
+    "inverse_max_abs_error": 4294967296.0,
+    "eligible_1e4": false
+  }
+}

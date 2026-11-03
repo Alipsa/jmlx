@@ -65,7 +65,8 @@ class GatedDeltaMemoryTest {
         RecurrentCache cache = net.newCache(request, 1)) {
       try (MLXScope step = request.newChild()) {
         MLXArray x = MLXShape.reshape(MLXShape.expandDims(input, step, 0), input.shape());
-        net.forward(x, cache, GatedDeltaNet.PrefillMethod.CHUNKED);
+        MLXArray output = net.forward(x, cache, GatedDeltaNet.PrefillMethod.CHUNKED);
+        MLX.eval(output, cache.convolution(), cache.state());
       }
       long logical = cache.logicalStorageBytes();
       assertEquals(4L * (6 * 32 * 64 + 3 * 512), logical);

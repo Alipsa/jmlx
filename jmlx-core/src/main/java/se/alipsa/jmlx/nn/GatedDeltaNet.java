@@ -106,8 +106,10 @@ public final class GatedDeltaNet extends Module {
   }
 
   /**
-   * Evaluates the output and complete new state before retiring the old state. The caller supplies
-   * the prefill algorithm explicitly; single-token decode always uses the token recurrence.
+   * Builds output and retains provisional request state. The caller must evaluate output and all
+   * retained cache arrays together before committing a request step; a later evaluation failure
+   * poisons the entire session. Single-token decode inserts no forced evaluation. The caller
+   * supplies the prefill algorithm explicitly.
    */
   public MLXArray forward(MLXArray x, RecurrentCache cache, PrefillMethod prefillMethod) {
     Objects.requireNonNull(prefillMethod, "prefillMethod");
@@ -155,9 +157,11 @@ public final class GatedDeltaNet extends Module {
       MLXArray logDecay = MLXOps.multiply(rate, softplus);
       MLXArray beta = MLXOps.sigmoid(betaInput);
       GatedDeltaRule.Result result =
-          length == 1 || prefillMethod == PrefillMethod.RECURRENT
-              ? GatedDeltaRule.recurrent(q, k, v, logDecay, beta, cache.state())
-              : GatedDeltaRule.chunked(q, k, v, logDecay, beta, cache.state());
+          length == 1
+              ? GatedDeltaRule.step(q, k, v, logDecay, beta, cache.state())
+              : prefillMethod == PrefillMethod.RECURRENT
+                  ? GatedDeltaRule.recurrent(q, k, v, logDecay, beta, cache.state())
+                  : GatedDeltaRule.chunked(q, k, v, logDecay, beta, cache.state());
       MLXArray gate = gateProjection.forward(x);
       requireShape(gate, batch, length, valueWidth);
       gate = MLXShape.reshape(gate, new int[] {batch, length, valueHeads, valueDim});
@@ -166,8 +170,7 @@ public final class GatedDeltaNet extends Module {
           outputProjection.forward(MLXShape.reshape(gated, new int[] {batch, length, valueWidth}));
       requireShape(output, batch, length, x.shape()[2]);
       MLXArray history = window(convInput, 1, length, length + kernelSize - 1);
-      MLX.eval(output, history, result.state());
-      cache.replace(history, result.state(), length);
+      cache.replaceDeferred(history, result.state(), length);
       return output;
     } catch (RuntimeException | Error error) {
       cache.poison();
@@ -193,8 +196,8 @@ public final class GatedDeltaNet extends Module {
   }
 
   private static MLXArray window(MLXArray a, int axis, int start, int end) {
-    int[] starts = new int[a.ndim()];
     int[] stops = a.shape();
+    int[] starts = new int[stops.length];
     starts[axis] = start;
     stops[axis] = end;
     return MLXShape.slice(a, starts, stops);

@@ -106,6 +106,37 @@ class GatedDeltaRuleTest {
     }
   }
 
+  @Test
+  void correlatedKeysDecayExtremesAndPreprocessingBoundariesMatchHf() {
+    try (MLXScope scope = new MLXScope()) {
+      Map<String, MLXArray> fixture =
+          MLXIO
+              .loadSafetensors(
+                  scope,
+                  Path.of("..", "tools", "qwen35-reference", "goldens", "delta-stress.safetensors")
+                      .toString())
+              .tensors();
+      for (String name :
+          new String[] {
+            "correlated", "near_correlated", "strong_decay", "batch_boundary", "long_boundary"
+          }) {
+        String stem = name + ".";
+        try (MLXScope request = scope.newChild()) {
+          MLXArray q = inScope(fixture.get(stem + "q"), request);
+          GatedDeltaRule.Result result =
+              GatedDeltaRule.chunked(
+                  q,
+                  fixture.get(stem + "k"),
+                  fixture.get(stem + "v"),
+                  fixture.get(stem + "g"),
+                  fixture.get(stem + "beta"),
+                  fixture.get(stem + "initial"));
+          assertResult(fixture, stem, result);
+        }
+      }
+    }
+  }
+
   private static Map<String, MLXArray> load(MLXScope scope) {
     return MLXIO
         .loadSafetensors(

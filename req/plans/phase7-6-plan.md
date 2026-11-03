@@ -186,12 +186,25 @@ Normalize `y` per value head with the ordinary learned norm weight, then multipl
 and apply `out_proj`. This gate is distinct from the full-attention sigmoid gate. Never add
 the zero-centered norm offset to `linear_attn.norm.weight`.
 
-Prototype 64-token chunked prefill with cumulative log decay, causal masks and batched matmuls. Implement
-the unit-lower-triangular solve by bounded forward substitution composed from existing ops;
-no linalg binding is required. Mask forbidden log-decay entries before exponentiating to avoid
-overflow. Tail padding must be recurrence-neutral and removed from outputs; retain convolution
-history from real tokens only. Evaluate/hoist each chunk's next state before closing its child
-scope, so a prompt does not retain every earlier chunk's graph.
+Use 64-token chunked prefill with cumulative log decay, causal masks and batched matmuls.
+The 2026-11-03 WP1 review selects chunked ops as the prefill algorithm and defers custom Metal
+for this milestone; its 115 ms reference result motivates future work, not integration.
+The built-in delta op remains excluded under the unchanged numerical gate. Before WP2, the
+structural optimization pass must requalify at `1e-4` and target about twice mlx-vlm's own
+chunked-ops cost: approximately 600 ms for 48 calls at 1,280 tokens on the recording host.
+
+Invert the 64×64 unit-lower-triangular system by stable forward substitution, then apply it
+to the right-hand side with a batched matmul. Batch state-independent preprocessing across at
+most 16 chunks (1,024 positions), retaining the 64-position state scan. Repeated-squaring
+inversion is not selected: the correlated-key FLOAT32 stress experiment is numerically unstable.
+No linalg binding, kernel facade or API-inventory relaxation is required. Mask forbidden
+log-decay entries before exponentiating to avoid overflow. Tail padding must be recurrence-neutral and removed from outputs; retain convolution
+history from real tokens only. Evaluate/hoist preprocessing results and at most eight chunks
+of carried state/output before closing their temporary scopes, so a prompt does not retain every earlier chunk's graph.
+Decode has a dedicated single-token recurrence without per-layer evaluation, final concatenation
+or output transpose. Cache replacement retains provisional lazy state; the session evaluates
+logits and every retained state root once at the token boundary, and poisons the whole session
+on evaluation failure before committing its position.
 
 Compare chunked outputs/final state to both HF and a simple token recurrence, for lengths
 1, 3, 4, 5, 63, 64, 65, 127, 128 and 129, including nonzero initial state and split prefills.

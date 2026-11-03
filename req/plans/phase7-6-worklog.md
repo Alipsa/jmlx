@@ -5,10 +5,10 @@ The task remains: implement the full reviewed plan, verify it, then open a PR. B
 
 ## Current boundary
 
-Reference work and core DeltaNet prototypes are committed and locally verified. The mandatory
-WP1 default review is next; see [the benchmark report](phase7-6-wp1-benchmark.md). No production
-prefill default, new native facade or custom Metal kernel has been selected. A general resume
-instruction does not decide this explicit review question.
+Reference work and core DeltaNet prototypes are committed and locally verified. The 2026-11-03 user review selects chunked prefill, rejects custom Metal for this milestone
+and requires an optimization pass before WP2; see [the benchmark report](phase7-6-wp1-benchmark.md). No production
+prefill default, new native facade or custom Metal kernel has been selected. The optimization target is about 600 ms at 1,280 tokens / 48 calls, with the unchanged
+1e-4 numerical bound. No further default-choice approval is needed after this gate is met.
 
 At 1,280 tokens / 48 independent layer calls, the clean HF-qualified Java medians are about
 2.55 s chunked and 13.85 s recurrent. The reference custom Metal path is about 115 ms, while
@@ -84,3 +84,17 @@ was removed after all measurements; no inventory exemption or binding mapping wa
 Final verification: `./gradlew :check :jmlx-core:check` passes after retiring the benchmark
 checkout. JUnit XML confirms all four new suites actually executed (11 tests total, zero skips,
 failures or errors). Provenance verification covers 110 local files plus the shared image.
+
+## WP1 optimization in progress
+
+- Replaced the repeated full-RHS solve with a stable 64×64 inverse batched across up to 16
+  chunks; all state-independent quantities are batched. State scan evaluation is bounded to
+  eight chunks per window. Temporary handles are retired promptly.
+- Added a dedicated lazy decode recurrence and deferred cache retention. The existing counter
+  measures zero internal `mlx_eval` calls in complete DeltaNet decode and one caller boundary
+  evaluation for output plus both state roots.
+- Added independent HF correlated/near-correlated, strong-decay, multi-batch and long-boundary
+  stress fixtures; existing strict and memory bounds remain unchanged. The doubling-inverse
+  experiment fails the correlated FLOAT32 case and is not used.
+- Initial optimized aggregate median: about 512 ms versus 2,551 ms before restructuring.
+  Clean-source benchmark/counter refresh and final guard verification remain before WP2.

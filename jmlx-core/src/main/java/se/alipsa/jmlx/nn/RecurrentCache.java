@@ -12,9 +12,9 @@ import se.alipsa.jmlx.memory.MLXScope;
  * Request-owned FLOAT32 convolution history and delta-rule state. State uses [B,Hv,Dk,Dv],
  * convolution history [B,K-1,C]. A recurrent prefix cannot be truncated to a tail.
  *
- * <p>Returned arrays are borrowed: callers must not close them. Replacements are evaluated and
- * retained in the request scope before the previous handles are retired. A failed native update
- * poisons this cache; discard the request rather than reusing partially advanced layer state.
+ * <p>Returned arrays are borrowed: callers must not close them. Replacements are retained in the
+ * request scope before the previous handles are retired. A failed native update poisons this cache;
+ * discard the request rather than reusing partially advanced layer state.
  */
 public final class RecurrentCache implements AutoCloseable {
   private final MLXScope scope;
@@ -99,6 +99,18 @@ public final class RecurrentCache implements AutoCloseable {
    * its position. The containing session must also discard every other layer's state on failure.
    */
   public void replace(MLXArray nextConvolution, MLXArray nextState, int realPositions) {
+    replaceState(nextConvolution, nextState, realPositions, true);
+  }
+
+  /**
+   * Retains provisional inference state without evaluation; the caller evaluates all step roots.
+   */
+  void replaceDeferred(MLXArray nextConvolution, MLXArray nextState, int realPositions) {
+    replaceState(nextConvolution, nextState, realPositions, false);
+  }
+
+  private void replaceState(
+      MLXArray nextConvolution, MLXArray nextState, int realPositions, boolean evaluate) {
     requireOpen();
     if (poisoned) {
       throw new IllegalStateException("RecurrentCache is poisoned; discard the request");
@@ -116,7 +128,9 @@ public final class RecurrentCache implements AutoCloseable {
       // A child view followed by hoist also gives a distinct owned handle for same-scope inputs.
       MLXArray convView = inScope(nextConvolution, retain);
       MLXArray stateView = inScope(nextState, retain);
-      MLX.eval(convView, stateView);
+      if (evaluate) {
+        MLX.eval(convView, stateView);
+      }
       retainedConvolution = MLX.hoist(convView, scope);
       retainedState = MLX.hoist(stateView, scope);
       convolution.close();

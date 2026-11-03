@@ -663,5 +663,18 @@
     "raw_row_budget": 4096,
     "effective_max_pixels": 1048576,
     "normalization_attribution": []
+  },
+  "local_evidence": {
+    "date": "2026-11-03",
+    "host": "macOS 27.2 / Apple Silicon (M5 Max, 128 GB)",
+    "tf32": false,
+    "max_abs_logit_error": 0.00040340423583984375,
+    "native_peak_bytes": 5118123572,
+    "sampled_peak_phys_footprint_bytes": 6648795264,
+    "footprint_sample_interval_ms": 20,
+    "load_wall_ms": 448.555292,
+    "generate_wall_ms": 144.914292,
+    "generate_scope": "two 8-token greedy generations (text 21 positions; image 83 expanded positions); median of three warmed image-case samples after one warm-up; case order and host caches retained",
+    "evidence_file": "tools/qwen35-reference/evidence/08b-java-acceptance.json"
   }
 }

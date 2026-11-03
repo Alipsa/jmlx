@@ -36,7 +36,8 @@ def main():
     shared = ["tools/image-oracle/fast-comparison/fixtures/model-rgb-256x256.png",
               "tools/tier-b/qwen35-08b.json", "tools/tier-b/qwen38-27b-4bit.json"]
     record = dict(schema="jmlx-qwen35-reference-v1",
-                  status="reference probes and component fixtures; full model acceptance pending",
+                  status="reference probes, component and converter fixtures, and real-artifact "
+                         "acceptance evidence (0.8B Tier-B and 27B manual run)",
                   files=files(root), sharedFiles={path: digest(repo/path) for path in shared})
     path = root / "provenance.json"
     if args.record:

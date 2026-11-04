@@ -454,8 +454,9 @@ mlx-vlm float/affine and mlx-lm float/affine layouts, reusing the Qwen3-VL visio
 Native pins, generated bindings, publication and module versions are unchanged (the 7.5 pin
 pair). Python reference tooling (`tools/qwen35-reference/`) remains opt-in and digest-pinned;
 its guard (`verifyQwen35ReferenceGoldens`) is part of root `check`. The `tier-b.yml` qwen35
-arm's first self-hosted execution and the macOS 26 hosted CI run of this branch remain
-pending.
+arm's first self-hosted execution passed on 2026-11-04 (run 41841745005, the first all-arms
+green run including the arm), and the macOS 26 hosted CI run of the merged head passed in
+run 41724687057 (2026-11-03).
 
 ## Notices and licenses
 

@@ -1,8 +1,11 @@
 # Phase 8.1 — First pure-Java releases
 
 - **Status:** proposed implementation plan, 2026-11-03; revised 2026-11-04; no release performed.
-  WP0 readiness recorded 2026-11-04 (gate table below); owner authorized WP1–WP3 tooling
-  on 2026-11-04 despite the open gates (see the WP0 gate note); publication remains blocked.
+  WP0 readiness recorded 2026-11-04 (gate table below); every gate in the table passed on
+  2026-11-04 (the last open row, the 7.6 self-hosted qwen35 Tier-B run, passed in run
+  41841745005). WP1–WP3 tooling merged as PR #80 (merge `dc3a61b`, 2026-11-04) under the
+  owner authorization recorded below; the WP4 candidate cut and the WP5 publication remain
+  outstanding.
 - **Parent:** [Full roadmap §Phase 8](../full-roadmap.md#phase-8--first-releases-and-framework-adapters),
   milestone 8.1, and its release/versioning policy.
 - **Prerequisite:** Phase 7 done under the [Phase 7 plan](phase7-plan.md): all milestones
@@ -253,7 +256,7 @@ owner-approved dated waiver with its scope and rationale. No waiver is granted b
 | 7.3c macOS 26 hosted execution | `phase7-plan.md` §7.3c; `AGENTS.md` Phase 7.3c additions | Required macOS 26 hosted execution; local/self-hosted evidence does not substitute | Pass (suite part): run 41724687057 executed the required Phi-3.5-Vision suites on hosted macOS 26. The phi3v Tier-B arm is self-hosted by design (51.4 GB measured footprint peak); its first self-hosted run is the separate row below |
 | 7.3c first self-hosted Tier-B run | `phase7-plan.md` §7.3c; `AGENTS.md` Phase 7.3c additions | First successful phi3v workflow run; pipeline acceptance only, not independent host/OS evidence | Pass. Run [41352378744](https://github.com/Alipsa/jmlx/actions/runs/41352378744) (workflow_dispatch, 2026-11-01, self-hosted `self-macos-xl` runner): the phi3v arm (revision `12b77fb`, task `phi3v-generation`, `TierBPhi3VTest`) succeeded. Pipeline acceptance only |
 | 7.6 macOS 26 hosted CI | `full-roadmap.md` Phase 7 milestone table, 7.6 row | Required hosted native suites executed on macOS 26 | Pass. Run 41724687057 `native` job executed the required Qwen35 hybrid suites on hosted macOS 26 ("Assert required native suites executed" green) |
-| 7.6 first self-hosted qwen35 Tier-B run | `full-roadmap.md` Phase 7 milestone table, 7.6 row | First successful qwen35 workflow arm | **Open.** The arm exists in `tier-b.yml` (task `qwen35-generation`, `TierBQwen35Test`, `self-macos-xl`) but has never executed — no qwen35 job appears in any Tier-B run's job list (checked 2026-11-04). No waiver |
+| 7.6 first self-hosted qwen35 Tier-B run | `full-roadmap.md` Phase 7 milestone table, 7.6 row | First successful qwen35 workflow arm | Pass. Run [41841745005](https://github.com/Alipsa/jmlx/actions/runs/41841745005) (workflow_dispatch, 2026-11-04, head `dc3a61b`, self-hosted `self-macos-xl` runner): the qwen35 arm (revision `2fc06364`, task `qwen35-generation`, `TierBQwen35Test`) succeeded in 7m23s — `max_abs_error=4.0340423583984375e-4` (ε = 0.001 / margin = 1e-4), native peak 5,118,123,572 B, exact greedy IDs and decoded output, `device=gpu` — bit-for-bit the manifest's local evidence. Pipeline acceptance only |
 
 - Check the full Phase 7 exit gate and record links to passed runs or dated waivers. Update the
   stale 7.6 delivery-table row and §7.6 narrative in `phase7-plan.md` to PR #79 / `e472c65`,

@@ -198,10 +198,12 @@ native allocator peak 30,202,748,009 bytes, the exact 24 greedy IDs and decoded 
 self-attesting `device=gpu, host=27.0.1/aarch64`; it was re-confirmed on merged main in
 run 41841745005 (2026-11-04, head `dc3a61b`) in 3m55s (native allocator peak
 30,202,745,961 bytes, `host=27.2/aarch64`). The 2026-11-01 scheduled run
-(41301596858) had the phi3v and qwen3vl jobs die with no Gradle error (runner-level,
-not a suite failure); both arms ran green in 41352378744 that evening and in
-41841745005. The qwen35 row first executed in that same run 41841745005, the first
-all-arms green run including the qwen35 row (all eleven arms green): `TierBQwen35Test`
+(41301596858) failed at the runner level — the self-hosted runner lost communication
+with the server (job annotation): the phi3v job's steps, including its Tier-B
+assertions, had all succeeded, while the qwen3vl job never started a step. Both arms
+ran green in 41352378744 that evening and in 41841745005. The qwen35 row first
+executed in 41841745005, the first all-arms green run (all eleven arms green):
+`TierBQwen35Test`
 (revision `2fc06364`) in 7m23s with `max_abs_error=4.0340423583984375e-4` (ε = 0.001 /
 margin = 1e-4), native allocator peak 5,118,123,572 bytes, the exact greedy IDs and
 decoded output, self-attesting `device=gpu, host=27.2/aarch64` — the maximum error and

@@ -34,7 +34,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | --- | --- | --- | --- | --- |
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
-| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | delivered (all milestones delivered; every acceptance gate in the Phase 7 done list below passed — the last, the 7.6 qwen35 self-hosted Tier-B run, in run 41841745005 on 2026-11-04) |
+| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | delivered (all milestones delivered; every gate in the Phase 7 done list below passed, hosted Tier-B arm execution being out of scope of that gate per the 2026-11-04 owner amendment in `phase8-1-plan.md` WP0 — the last passing gate, the 7.6 qwen35 self-hosted Tier-B run, in run 41841745005 on 2026-11-04) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
@@ -286,7 +286,10 @@ acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted run
 7.3a, 7.3b, 7.3c and 7.6, and the first self-hosted Tier-B runs for 7.3c and 7.6) has passed
 or carries a dated, recorded waiver; supported non-text
 modalities are stated explicitly in the compatibility matrix; and the `nn` API covers their
-required common layers without model packages bypassing core facades.
+required common layers without model packages bypassing core facades. The "macOS 26 hosted
+runs" item is the hosted macOS 26 suite execution (run 41724687057, 2026-11-03); hosted
+execution of the self-hosted Tier-B arms is out of scope for that item by the recorded
+owner amendment of 2026-11-04 (`phase8-1-plan.md` WP0 gate note).
 
 ## Phase 8 — First releases and framework adapters
 

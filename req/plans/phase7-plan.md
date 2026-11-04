@@ -18,7 +18,10 @@ every pending acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS
 for 7.2, 7.3a, 7.3b, 7.3c and 7.6, and the first self-hosted Tier-B runs for 7.3c and 7.6)
 has passed or carries a dated, recorded waiver; supported non-text modalities are stated
 explicitly in the compatibility matrix; and the `nn` API covers their required common layers
-without model packages bypassing core facades.
+without model packages bypassing core facades. The "macOS 26 hosted runs" item is the hosted
+macOS 26 suite execution (run 41724687057, 2026-11-03); hosted execution of the self-hosted
+Tier-B arms is out of scope for that item by the recorded owner amendment of 2026-11-04
+(`phase8-1-plan.md` WP0 gate note).
 
 Non-goals: training (dropout in training mode, optimizers, loss gradients: Phase 13), general
 array/indexing parity beyond the focused slices named below (Phase 10), FFT/linalg (Phase 11),

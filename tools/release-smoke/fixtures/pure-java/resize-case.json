@@ -1,0 +1,7 @@
+{
+  "name": "small-96x64-oddup-101x73-bilinear",
+  "image": "resize/small-96x64.png",
+  "width": 101,
+  "height": 73,
+  "resample": 2
+}

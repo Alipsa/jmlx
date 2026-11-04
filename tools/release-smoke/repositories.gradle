@@ -1,7 +1,8 @@
-// Shared by app and pom-check. The jmlx source is a parameter (-PjmlxRepoUrl): the disposable smoke
-// repository in CI / release-candidate mode, Maven Central for the final release-mode run.
-// exclusiveContent makes `se.alipsa` resolve ONLY from that source, and everything else (Jackson,
-// the only external runtime dependency) ONLY from Central. No mavenLocal(), no substitution rules.
+// Shared by app, pure-java and pom-check. The jmlx source is a parameter (-PjmlxRepoUrl): the
+// disposable smoke repository in CI / release-candidate mode, Maven Central for the final
+// release-mode run. exclusiveContent makes `se.alipsa` resolve ONLY from that source, and
+// everything else (Jackson, the only external runtime dependency) ONLY from Central. No
+// mavenLocal(), no substitution rules.
 def jmlxRepoUrl = providers.gradleProperty('jmlxRepoUrl').orElse('https://repo.maven.apache.org/maven2/').get()
 def pomOnly = project.hasProperty('pomOnlyResolution')
 
@@ -25,20 +26,86 @@ repositories {
     mavenCentral { content { excludeGroup 'se.alipsa' } }
 }
 
-ext.jmlxMode = providers.gradleProperty('jmlxMode').orElse('ci').get()
+def jmlxMode = providers.gradleProperty('jmlxMode').orElse('ci').get()
 if (!(jmlxMode in ['ci', 'release'])) {
     throw new GradleException("jmlxMode must be 'ci' or 'release', not '${jmlxMode}'")
 }
-def versionOf = { String property ->
-    def configured = providers.gradleProperty(property).get()
-    jmlxMode == 'release' ? configured.replace('-SNAPSHOT', '') : configured
+def profile = providers.gradleProperty('smokeProfile').getOrElse('all')
+if (!(profile in ['all', 'pure-java'])) {
+    throw new GradleException("smokeProfile must be 'all' or 'pure-java', not '${profile}'")
 }
-ext.jmlxVersions = [
-    'jmlx-models'            : versionOf('jmlxModelsVersion'),
-    'jmlx-native-macos-arm64': versionOf('jmlxNativeVersion'),
-    'jmlx-core'              : versionOf('jmlxCoreVersion'),
-    'jmlx-ffi'               : versionOf('jmlxFfiVersion'),
-    'jmlx-tokenizer'         : versionOf('jmlxTokenizerVersion'),
-    'jmlx-jinja'             : versionOf('jmlxJinjaVersion'),
-    'jmlx-vision'            : versionOf('jmlxVisionVersion'),
-]
+
+// The profile's selected modules are the ONLY coordinates this consumer resolves: the all profile
+// keeps the seven-module native graph, the pure profile resolves jinja/tokenizer/vision only, so
+// an unselected native version never needs to exist or be a release.
+def allModules = ['jmlx-models', 'jmlx-native-macos-arm64', 'jmlx-core', 'jmlx-ffi',
+                  'jmlx-tokenizer', 'jmlx-jinja', 'jmlx-vision']
+def pureModules = ['jmlx-jinja', 'jmlx-tokenizer', 'jmlx-vision']
+def selectedModules = profile == 'pure-java' ? pureModules : allModules
+
+// Property keys per module, matching the consumer gradle.properties defaults.
+def propertyKey = { String module ->
+    switch (module) {
+        case 'jmlx-models': return 'jmlxModelsVersion'
+        case 'jmlx-native-macos-arm64': return 'jmlxNativeVersion'
+        case 'jmlx-core': return 'jmlxCoreVersion'
+        case 'jmlx-ffi': return 'jmlxFfiVersion'
+        case 'jmlx-tokenizer': return 'jmlxTokenizerVersion'
+        case 'jmlx-jinja': return 'jmlxJinjaVersion'
+        case 'jmlx-vision': return 'jmlxVisionVersion'
+    }
+    throw new GradleException("No version property key for module ${module}")
+}
+
+// The released pure-Java tuple: the sole version source for the pure profile in release mode.
+def tupleFile = new File(project.rootDir, 'released-8.1.properties')
+def tupleVersions = null
+if (profile == 'pure-java' && jmlxMode == 'release') {
+    if (!tupleFile.isFile()) {
+        throw new GradleException("The pure-Java release run requires the committed tuple file ${tupleFile}")
+    }
+    def props = new Properties()
+    tupleFile.withInputStream { props.load(it) }
+    tupleVersions = [:]
+    for (String module in pureModules) {
+        def key = propertyKey(module)
+        def value = props.getProperty(key)
+        if (value == null || value.trim().isEmpty()) {
+            throw new GradleException("released-8.1.properties is missing required entry ${key}")
+        }
+        if (value.endsWith('-SNAPSHOT')) {
+            throw new GradleException("released-8.1.properties entry ${key} must not be a snapshot: ${value}")
+        }
+        tupleVersions[module] = value
+    }
+}
+
+def versionOf = { String module ->
+    def key = propertyKey(module)
+    def configured = providers.gradleProperty(key).get()
+    if (tupleVersions != null) {
+        // The committed tuple is the sole source: the gradle.properties defaults are ignored
+        // entirely (no snapshot-suffix fallback), and an explicit -P override may only repeat the
+        // file value exactly. This is checked here so a wrong override fails before any
+        // resolution, and the consumer can never disguise a different or snapshot version.
+        def fromTuple = tupleVersions[module]
+        def override = gradle.startParameter.projectProperties.get(key)
+        if (override != null && override != fromTuple) {
+            throw new GradleException(
+                "${key} override '${override}' disagrees with released-8.1.properties value '${fromTuple}'; " +
+                "overrides may only repeat a file value exactly")
+        }
+        def source = override != null ? 'released-8.1.properties (override repeats it)' : 'released-8.1.properties'
+        println "smoke version ${module}=${fromTuple} (${source})"
+        return fromTuple
+    }
+    def version = jmlxMode == 'release' ? configured.replace('-SNAPSHOT', '') : configured
+    println "smoke version ${module}=${version} (gradle.properties default${jmlxMode == 'release' ? ', -SNAPSHOT stripped' : ''})"
+    return version
+}
+
+ext.jmlxMode = jmlxMode
+ext.smokeProfile = profile
+ext.jmlxRepoUrl = jmlxRepoUrl
+ext.tupleFile = tupleFile
+ext.jmlxVersions = selectedModules.collectEntries { module -> [(module): versionOf(module)] }

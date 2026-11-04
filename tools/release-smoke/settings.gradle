@@ -1,8 +1,22 @@
 // Independent of the jmlx checkout: no project(...) dependencies, no includeBuild, no buildSrc.
-// Run via run.sh, which publishes the seven modules to a disposable repository first.
+// Run via run.sh, which publishes the selected modules to a disposable repository first.
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
+// The profile selects which consumer is configured at all: the native app (Java 25) for the full
+// seven-module graph, or the pure-Java consumer (Java 21, headless) for jinja/tokenizer/vision.
+// The pure profile therefore never configures or compiles the native app, so a machine or CI job
+// without the Java 25 toolchain can still run it.
+def profile = providers.gradleProperty('smokeProfile').getOrElse('all')
+if (!(profile in ['all', 'pure-java'])) {
+    throw new GradleException("smokeProfile must be 'all' or 'pure-java', not '${profile}'")
+}
 rootProject.name = 'release-smoke'
-include 'app', 'pom-check'
+// pom-check (POM-only resolution) is shared by both profiles; its project is selected by the
+// same profile so its toolchain and selected dependencies match the metadata consumer.
+if (profile == 'all') {
+    include 'app', 'pom-check'
+} else {
+    include 'pure-java', 'pom-check'
+}

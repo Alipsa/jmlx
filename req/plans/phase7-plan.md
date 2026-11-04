@@ -15,9 +15,10 @@ published during Phase 7; the first releases are Phase 8 and follow Phase 7 done
 
 **Phase 7 done (roadmap gate):** every milestone below is delivered, or deferred with a date;
 every pending acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
-for 7.2, 7.3a and 7.3b) has passed or carries a dated, recorded waiver; supported non-text
-modalities are stated explicitly in the compatibility matrix; and the `nn` API covers their
-required common layers without model packages bypassing core facades.
+for 7.2, 7.3a, 7.3b, 7.3c and 7.6, and the first self-hosted Tier-B runs for 7.3c and 7.6)
+has passed or carries a dated, recorded waiver; supported non-text modalities are stated
+explicitly in the compatibility matrix; and the `nn` API covers their required common layers
+without model packages bypassing core facades.
 
 Non-goals: training (dropout in training mode, optimizers, loss gradients: Phase 13), general
 array/indexing parity beyond the focused slices named below (Phase 10), FFT/linalg (Phase 11),
@@ -191,7 +192,7 @@ for every new op.
 | 7.3c LLaVA-style (Phi-3.5-Vision) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | Phi-3.5-Vision Tier-A logits and Tier-B image+text output | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`); reviewed via its PR: go — audio → Phase 11 milestone 11.5, diffusion → Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | delivered 2026-11-01 (PR #71; dims == 2 follow-up PR #72); issue #73 investigation recorded 2026-11-02: clean and induced-compute-load alternation found similar pin behavior (loaded new/old within ±7 %); the original host state was unrecorded, so host-state attribution remains an inference and pin×host interactions under other conditions remain untested. The new-pin Qwen3-VL cold-cache comparison timed warmed generation, not first inference; per-pin first-use effects remain untested across both models. Phase 8.2 owns those measurement limits; record in `req/phase6-inference-report.md` |
-| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | implemented on `phase7-6-implementation` (2026-11-03): all WPs executed, Tier-A goldens and both real-artifact acceptances recorded locally, docs updated; PR pending — macOS 26 hosted CI and the qwen35 arm's first self-hosted Tier-B run remain pending |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | delivered 2026-11-03 (PR #79, merge `e472c65`): all WPs executed, Tier-A HF goldens and both real-artifact acceptances (0.8B Tier-B and 27B 4-bit run) recorded locally; the macOS 26 hosted suites passed in run 41724687057 (2026-11-03); the qwen35 arm's first self-hosted Tier-B run remains pending (never executed, no waiver) |
 
 Step 0 merged first. 7.0 and 7.1 then proceeded in parallel, and 7.3a started once 7.1's conv,
 normalization and activation layers landed, while 7.2 was still open. From 7.3c on, the
@@ -799,9 +800,10 @@ Effect on this plan's verification:
 
 Added 2026-10-29 (numbered 7.5 until 2026-10-30). Prerequisites: 7.1 (the `conv1d` used by the
 short convolution), 7.3b (`MultiAxisRope`, the vision tower and the request lifecycle) and 7.5
-(the MLX upgrade). The [detailed sub-plan](phase7-6-plan.md) was reviewed in PR #78;
-implementation completed on branch `phase7-6-implementation` as of 2026-11-03 (all WPs
-executed, local acceptances recorded; PR pending, no merge). Its [reference findings](phase7-6-reference-findings.md)
+(the MLX upgrade). The [detailed sub-plan](phase7-6-plan.md) was reviewed in PR #78 and merged
+in PR #79 (merge `e472c65`, 2026-11-03; all WPs executed, local acceptances recorded). The
+macOS 26 hosted suites passed in run 41724687057 (2026-11-03); the qwen35 arm's first
+self-hosted Tier-B run remains pending (never executed, no waiver). Its [reference findings](phase7-6-reference-findings.md)
 now separate executable reference/component evidence from the dated inspections below. The
 WP1 structural optimization gate is complete (see the [optimization report](phase7-6-wp1-optimization.md));
 the [worklog](phase7-6-worklog.md) records the WP0–WP8 evidence, including the 0.8B Tier-B

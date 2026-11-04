@@ -1,0 +1,35 @@
+plugins { id 'java' }
+
+apply from: '../repositories.gradle'
+apply from: '../smoke-conventions.gradle'
+
+// Entry dependencies (tokenizer + vision; jinja transitively through tokenizer's published `api`
+// edge) and the Java 21 toolchain come from smoke-conventions.gradle.
+smokeDocsConfigurations()
+smokeRegisterVerificationTasks()
+
+// The pure-Java fixture set (see fixtures/pure-java/PROVENANCE.md): one image-oracle resize case
+// plus the hand-written tokenizer. The consumer re-verifies the extracted digests against the
+// pinned image-oracle sources in the checkout.
+def fixturesDir = layout.buildDirectory.dir('fixtures')
+tasks.register('stageFixtures', Sync) {
+    into fixturesDir
+    from('../fixtures/pure-java')
+}
+
+tasks.register('smoke', JavaExec) {
+    group = 'verification'
+    description = 'Runs the pure-Java release smoke against the resolved jinja/tokenizer/vision jars.'
+    dependsOn 'stageFixtures', 'verifyPomMatchesModuleMetadata', 'verifyPublishedArtifacts'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'pure.PureSmoke'
+    // Pure profile: headless, no native access flag, no native path override, no native cache or
+    // model assembly. The consumer JVM must be the profile's Java 21 toolchain.
+    environment.remove('JMLX_LIBRARY_PATH')
+    jvmArgs '-Djava.awt.headless=true'
+    systemProperty 'smoke.mode', jmlxMode
+    systemProperty 'smoke.checkout.root', rootProject.projectDir.parentFile.parentFile.absolutePath
+    systemProperty 'smoke.expected.versions', jmlxVersions.collect { k, v -> "${k}=${v}" }.join(',')
+    systemProperty 'smoke.fixtures', fixturesDir.get().asFile.absolutePath
+    systemProperty 'smoke.runtime.coordinates', layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.absolutePath
+}

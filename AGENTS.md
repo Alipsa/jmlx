@@ -281,19 +281,43 @@ dependency-update review) — that is not part of `check` and stays a separate, 
 ## Release smoke
 
 `tools/release-smoke/` is an independent Gradle consumer (no `project(...)` deps) that proves the
-published shape: `./tools/release-smoke/run.sh ci` publishes the seven modules to a disposable
-`build/smoke-repo` (each module's opt-in `smoke` Maven repository,
-`publishMavenPublicationToSmokeRepository`), then resolves `jmlx-models` plus the runtime-only native
-jar from it under a fresh `GRADLE_USER_HOME` with `exclusiveContent` for `se.alipsa`, a disposable
-`jmlx.native.cache.path`, and no native path override. It also checks the POM-only runtime classpath
-matches the Gradle-metadata one, every jar's license, the three vision jars' `META-INF/NOTICE`
-content (the pinned Pillow source references, SHA-256s and MIT-CMU license text), the native jar's
-payload, and a seeded two-request batch against `goldens/mistral-sampled.properties`. The smoke
-gates the scheduler so both requests share one cohort, then asserts `cohortSizes() == [2]`.
-`--record` rewrites the golden and is accepted in `ci` mode only. The native CI job runs `run.sh ci`.
-`run.sh candidate` is the same with SNAPSHOT suffixes stripped (release versions set first), and
-`run.sh central` resolves from Maven Central after all seven are published. The smoke tokenizer in
-`fixtures/` is hand-written to pair with the synthetic Mistral checkpoint (see its `PROVENANCE.md`).
+published shape. It has two named module-set profiles, selected with `--profile` (default `all`);
+`settings.gradle` includes only the profile's consumer projects, and `run.sh` invokes exactly
+`:app:smoke` or `:pure-java:smoke` by full project path:
+
+- **`all`** — publishes the seven modules to a disposable `build/smoke-repo` (each module's
+  opt-in `smoke` Maven repository, `publishMavenPublicationToSmokeRepository`), then the Java 25
+  `:app:smoke` resolves `jmlx-models` plus the runtime-only native jar from it under a fresh
+  `GRADLE_USER_HOME` with `exclusiveContent` for `se.alipsa`, a disposable
+  `jmlx.native.cache.path` and no native path override. It checks the POM-only runtime classpath
+  matches the Gradle-metadata one, every jar's license, the three vision jars' `META-INF/NOTICE`
+  content (the pinned Pillow and PyTorch source references, SHA-256s and license texts), the
+  published JPMS names, the native jar's payload, a seeded two-request batch against
+  `goldens/mistral-sampled.properties` (the smoke gates the scheduler so both requests share one
+  cohort, then asserts `cohortSizes() == [2]`). `--record` rewrites the golden and is accepted in
+  `ci --profile all` only. Runs on the macOS ARM64 native CI job (needs the staged native runtime;
+  that job's smoke step stays unchanged).
+- **`pure-java`** — publishes only jinja/tokenizer/vision and runs the Java 21 headless
+  `:pure-java:smoke` (cross-platform; no native runtime). jinja arrives transitively through
+  tokenizer's published `api` edge. The same graph/POM/license/NOTICE/JPMS checks apply to the
+  three modules, plus public-API assertions: a jinja loop render with non-ASCII output, the
+  hand-written `fixtures/pure-java/` tokenizer's exact encode/decode/chat/incremental facts
+  (fixed clock), one committed image-oracle resize case decoded and resized byte-exactly against
+  the Pillow-recorded bytes (fixture digests re-verified against the pinned oracle sources), and
+  an analytic normalize with exact float32 values. The Linux Java CI job runs
+  `run.sh ci --profile pure-java` and `selftest.sh` (the runner's parser/preflight regressions).
+
+In release mode (`candidate`/`central`) the full profile strips `-SNAPSHOT` from the consumer
+`gradle.properties` defaults, while the pure profile reads its versions solely from the committed
+`released-8.1.properties` tuple (no snapshot-suffix fallback; an override may only repeat a file
+value exactly). `run.sh` parses all arguments before any side effect, clears the consumer's
+project state before any Gradle invocation, runs a candidate preflight against the actual
+producer versions before deleting the smoke repo or publishing, and forwards
+`JMLX_<MODULE>_VERSION` environment overrides as `-P` properties. The full smoke's `fixtures/`
+tokenizer is hand-written to pair with the synthetic Mistral checkpoint (see its
+`PROVENANCE.md`); `fixtures/pure-java/` carries its own provenance and digests. `run.sh central`
+resolves from Maven Central after the modules are published. See `tools/release-smoke/README.md`
+for full usage, JDK requirements and failure diagnosis.
 
 ## Code style
 

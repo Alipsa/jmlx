@@ -6,11 +6,6 @@
  * This project uses @Incubating APIs which are subject to change.
  */
 
-plugins {
-    // Apply the foojay-resolver plugin to allow automatic download of JDKs
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
-}
-
 pluginManagement {
     // Local testing of nexus-release-plugin changes: point at a plugin checkout. Production
     // releases resolve the plugin exclusively from the Gradle Plugin Portal so a locally
@@ -30,6 +25,11 @@ pluginManagement {
         }
         gradlePluginPortal()
     }
+}
+
+plugins {
+    // Apply the foojay-resolver plugin to allow automatic download of JDKs
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
 rootProject.name = 'jmlx'

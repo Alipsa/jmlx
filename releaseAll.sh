@@ -52,11 +52,20 @@ fi
 # jmlx stages only Gradle-built components, so no GPG/Maven preflight is needed (unlike
 # consumers with static Maven components).
 scope=$(groovy -e 'new groovy.json.JsonSlurper().parse(new File(args[0])).verificationScope.each { println it }' "$manifest")
+selectedModules=$(groovy -e 'new groovy.json.JsonSlurper().parse(new File(args[0])).selected.findAll { it.projectPath }.each { println it.projectPath }' "$manifest")
 checks=()
+# verificationScope is the selected modules plus every candidate that (transitively) depends
+# on one: for jmlx that means :jmlx-models (SNAPSHOT) is check-verified against the released
+# tokenizer/vision versions. Only the selected modules get the SNAPSHOT self-version guard --
+# running it on a SNAPSHOT consumer would fail by design.
 while IFS= read -r module; do
   [[ -n "$module" ]] || continue
-  checks+=("$module:check" "$module:verifyNoSnapshotDependencies")
+  checks+=("$module:check")
 done <<< "$scope"
+while IFS= read -r module; do
+  [[ -n "$module" ]] || continue
+  checks+=("$module:verifyNoSnapshotDependencies")
+done <<< "$selectedModules"
 if (( ${#checks[@]} > 0 )); then
   "${gradle[@]}" "${checks[@]}"
 fi

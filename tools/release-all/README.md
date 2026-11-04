@@ -24,7 +24,11 @@ BOM/aggregate components were added in 2.4.1, which is why jmlx can use the flow
    modules that (transitively) depend on unreleased coordinates are excluded with reasons.
 2. `releaseAllSigningCheck` — verifies Gradle signing is configured for every selected module
    before the hours-long verification build runs.
-3. Per selected module: `check` + `verifyNoSnapshotDependencies` (run by `releaseAll.sh`).
+3. Verification build: for every module in the plan's `verificationScope` (the selected
+   modules plus every candidate that transitively depends on one — for jmlx, the SNAPSHOT
+   `:jmlx-models`, which is thereby check-verified against the released tokenizer/vision
+   versions) `releaseAll.sh` runs `check`; `verifyNoSnapshotDependencies` runs for the selected
+   modules only.
 4. `releaseAllStage` (with `-PreleaseAllPrepare`) — re-checks that HEAD and the working tree
    match the plan, then `publish…ToReleaseAllStagingRepository` writes each selected module's
    signed pom, `.module` and jars into `build/releaseAll/staging`.

@@ -44,9 +44,10 @@ the release SHA and branch (each module's own, not the PR's head), and the final
    - set `jmlx-jinja/build.gradle` to `0.6.0`, `jmlx-tokenizer/build.gradle` and
      `jmlx-vision/build.gradle` to `0.1.0`;
    - roll jinja's Unreleased changelog entries into a dated `0.6.0` section;
-   - update `tools/release-smoke/gradle.properties` defaults to the new development `-SNAPSHOT`
-     lines only if the smoke defaults must track them (the pure release mode ignores them — the
-     tuple is the sole source — but `ci` mode must stay aligned with what the producers publish);
+   - set the three pure-Java `tools/release-smoke/gradle.properties` defaults to the release
+     versions (the pure release mode ignores them — the tuple is the sole source — but `ci` mode
+     must match what the producers publish, and at WP4 that is the release versions, not
+     snapshots); the WP5 development bump resets them to the next `-SNAPSHOT` lines;
    - commit `tools/release-smoke/released-8.1.properties` with exactly `0.6.0` / `0.1.0` / `0.1.0`
      (it is already checked in with these values by the tooling PR; a release PR may keep it
      unchanged).

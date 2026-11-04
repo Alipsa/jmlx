@@ -109,7 +109,8 @@ public final class PureSmoke {
    * directory, and not from {@code mavenLocal}. In ci/candidate modes the disposable smoke
    * repository inside the checkout is the published location for the local run, and Gradle resolves
    * release artifacts from a local file repository in place (no dependency-cache copy), so a jar
-   * under it is the expected code source, not a working-tree leak.
+   * in that repository's own coordinate directory is the expected code source, not a working-tree
+   * leak.
    */
   private static void checkJarProvenance(Path checkout, Map<String, String> expected) throws Exception {
     Path smokeRepo = smokeRepoRoot();
@@ -120,17 +121,24 @@ public final class PureSmoke {
       Path jar = Path.of(URI.create(source.getLocation().toString())).toAbsolutePath();
       check(jar.toString().endsWith(".jar"), probe + " is not loaded from a jar: " + jar);
       Path normalized = jar.normalize();
-      // The smoke's own tree and its disposable repository live inside the checkout, so exclude
-      // them; any other path under the checkout (build/libs, build/classes) is a leak.
+      String artifact = jar.getFileName().toString();
+      String module = expected.keySet().stream().filter(artifact::startsWith).findFirst().orElse(null);
+      // The smoke's own tree lives inside the checkout, so exclude it. So does the exact
+      // published-coordinate directory of the disposable smoke repository: Gradle may resolve the
+      // artifact from that local file repository in place (no dependency-cache copy), so the
+      // repository's own jar is the expected code source. Any other path under the checkout
+      // (build/libs, build/classes, another coordinate) is a leak.
+      boolean inSmokeRepo =
+          smokeRepo != null
+              && module != null
+              && normalized.startsWith(
+                  smokeRepo.resolve("se/alipsa/" + module + "/" + expected.get(module) + "/"));
       check(
           !normalized.startsWith(checkout)
               || normalized.startsWith(checkout.resolve("tools/release-smoke"))
-              || (smokeRepo != null && normalized.startsWith(smokeRepo)),
+              || inSmokeRepo,
           probe + " came from the checkout: " + jar);
       check(!jar.toString().contains("/.m2/"), probe + " came from mavenLocal: " + jar);
-      String artifact = jar.getFileName().toString();
-      String module =
-          expected.keySet().stream().filter(artifact::startsWith).findFirst().orElse(null);
       check(module != null, "unexpected jar " + artifact);
       String version = SNAPSHOT_STAMP.matcher(artifact).replaceAll("-SNAPSHOT");
       check(

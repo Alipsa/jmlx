@@ -1,8 +1,11 @@
 # Phase 8.1 — First pure-Java releases
 
 - **Status:** proposed implementation plan, 2026-11-03; revised 2026-11-04; no release performed.
-  WP0 readiness recorded 2026-11-04 (gate table below); owner authorized WP1–WP3 tooling
-  on 2026-11-04 despite the open gates (see the WP0 gate note); publication remains blocked.
+  WP0 readiness recorded 2026-11-04 (gate table below); every gate in the table passed on
+  2026-11-04 (the last open row, the 7.6 self-hosted qwen35 Tier-B run, passed in run
+  41841745005). WP1–WP3 tooling merged as PR #80 (merge `dc3a61b`, 2026-11-04) under the
+  owner authorization recorded below; the WP4 candidate cut and the WP5 publication remain
+  outstanding.
 - **Parent:** [Full roadmap §Phase 8](../full-roadmap.md#phase-8--first-releases-and-framework-adapters),
   milestone 8.1, and its release/versioning policy.
 - **Prerequisite:** Phase 7 done under the [Phase 7 plan](phase7-plan.md): all milestones
@@ -248,12 +251,12 @@ owner-approved dated waiver with its scope and rationale. No waiver is granted b
 | 7.1 legacy oracle drift | `phase7-1-plan.md` §7; `phase7-plan.md` §7.1 | Pinned Phase 6 oracle verification with unchanged serialized output/hashes, or a separately reviewed drift resolution | Pass. CI run [41724687057](https://github.com/Alipsa/jmlx/actions/runs/41724687057) (main at the PR #79 merge `e472c65`, 2026-11-03, green; hosted macOS 26 `native` job) — "Run root verification" executed `verifyMlxOracle verifyMlxOracleFixtures -PmlxOracleRequireAllProfiles=true` with the pinned oracle's serialized outputs unchanged |
 | 7.1 cross-host CPU fixtures | `phase7-1-plan.md` §7; `full-roadmap.md` Phase 7 done | Canonical Phase 7.1 CPU fixture verification on development and CI hosts, including the accepted serialization policy | Pass. CI host: same run 41724687057 (hosted macOS 26). Development host: local `./gradlew verifyMlxOracle verifyMlxOracleFixtures` (phase7-1 profile, M5 Max, macOS 27) on 2026-11-04, green |
 | 7.2 macOS 26 CI | `phase7-2-implementation-report.md`; `phase7-plan.md` §7.2 | Required native suites executed on macOS 26 | Pass. Run 41724687057 `native` job (hosted macOS 26): "Run native module checks" and "Assert required native suites executed" both green for the required 7.2 suites |
-| 7.3a macOS 26 hosted acceptance | `phase7-3a-implementation-report.md`; `phase7-plan.md` §7.3a | Hosted WP6/WP7 suites and Tier-B acceptance row executed on macOS 26 | Pass (suite part): run 41724687057 executed the required SmolVLM suites on hosted macOS 26. Tier-B arm: not executed and not executable on the free hosted runners by design (the smolvlm arm targets the self-hosted `self-macos-xl`; the float32 test footprint exceeds the 7 GB hosted tier and the larger hosted tier bills per minute) — recorded design decision in `tier-b.yml`, not a waiver. First self-hosted arm run: run 41352378744 (2026-11-01, green) |
-| 7.3b macOS 26 hosted Tier-B | `phase7-plan.md` §7.3b; `AGENTS.md` Phase 7.3b additions | Required hosted macOS 26 Tier-B execution | Pass (suite part): run 41724687057 executed the required Qwen3-VL suites on hosted macOS 26. Arm execution: self-hosted by design (11.16 GiB measured footprint peak); first self-hosted runs 40403387275 (2026-10-26) and merged-head confirmation 40409087523; hosted arm execution remains not executed and not feasible on the free hosted runners (recorded, not waived) |
-| 7.3c macOS 26 hosted execution | `phase7-plan.md` §7.3c; `AGENTS.md` Phase 7.3c additions | Required macOS 26 hosted execution; local/self-hosted evidence does not substitute | Pass (suite part): run 41724687057 executed the required Phi-3.5-Vision suites on hosted macOS 26. The phi3v Tier-B arm is self-hosted by design (51.4 GB measured footprint peak); its first self-hosted run is the separate row below |
+| 7.3a macOS 26 hosted acceptance | `phase7-3a-implementation-report.md`; `phase7-plan.md` §7.3a | Hosted WP6/WP7 suites executed on macOS 26 (Tier-B arm execution out of scope per the 2026-11-04 owner amendment) | Pass: run 41724687057 executed the required SmolVLM suites on hosted macOS 26. Tier-B arm: not executed and not executable on the free hosted runners by design (the smolvlm arm targets the self-hosted `self-macos-xl`; the float32 test footprint exceeds the 7 GB hosted tier and the larger hosted tier bills per minute) — recorded design decision in `tier-b.yml`, not a waiver. First self-hosted arm runs: 40403387275 (2026-10-26, branch `phase7-3b-tierb-self-hosted-runner`, green) and merged-head confirmation 40409087523 (`tools/tier-b/README.md`); re-confirmed in run 41352378744 (2026-11-01) and run 41841745005 (2026-11-04) |
+| 7.3b macOS 26 hosted Tier-B | `phase7-plan.md` §7.3b; `AGENTS.md` Phase 7.3b additions | Required hosted macOS 26 suite execution (Tier-B arm execution out of scope per the 2026-11-04 owner amendment) | Pass: run 41724687057 executed the required Qwen3-VL suites on hosted macOS 26. Arm execution: self-hosted by design (11.16 GiB measured footprint peak); first self-hosted runs 40403387275 (2026-10-26) and merged-head confirmation 40409087523; hosted arm execution remains not executed and not feasible on the free hosted runners (recorded, not waived) |
+| 7.3c macOS 26 hosted execution | `phase7-plan.md` §7.3c; `AGENTS.md` Phase 7.3c additions | Required macOS 26 hosted suite execution; local/self-hosted evidence does not substitute (Tier-B arm execution out of scope per the 2026-11-04 owner amendment) | Pass: run 41724687057 executed the required Phi-3.5-Vision suites on hosted macOS 26. The phi3v Tier-B arm is self-hosted by design (51.4 GB measured footprint peak); its first self-hosted run is the separate row below |
 | 7.3c first self-hosted Tier-B run | `phase7-plan.md` §7.3c; `AGENTS.md` Phase 7.3c additions | First successful phi3v workflow run; pipeline acceptance only, not independent host/OS evidence | Pass. Run [41352378744](https://github.com/Alipsa/jmlx/actions/runs/41352378744) (workflow_dispatch, 2026-11-01, self-hosted `self-macos-xl` runner): the phi3v arm (revision `12b77fb`, task `phi3v-generation`, `TierBPhi3VTest`) succeeded. Pipeline acceptance only |
 | 7.6 macOS 26 hosted CI | `full-roadmap.md` Phase 7 milestone table, 7.6 row | Required hosted native suites executed on macOS 26 | Pass. Run 41724687057 `native` job executed the required Qwen35 hybrid suites on hosted macOS 26 ("Assert required native suites executed" green) |
-| 7.6 first self-hosted qwen35 Tier-B run | `full-roadmap.md` Phase 7 milestone table, 7.6 row | First successful qwen35 workflow arm | **Open.** The arm exists in `tier-b.yml` (task `qwen35-generation`, `TierBQwen35Test`, `self-macos-xl`) but has never executed — no qwen35 job appears in any Tier-B run's job list (checked 2026-11-04). No waiver |
+| 7.6 first self-hosted qwen35 Tier-B run | `full-roadmap.md` Phase 7 milestone table, 7.6 row | First successful qwen35 workflow arm | Pass. Run [41841745005](https://github.com/Alipsa/jmlx/actions/runs/41841745005) (workflow_dispatch, 2026-11-04, head `dc3a61b`, self-hosted `self-macos-xl` runner): the qwen35 arm (revision `2fc06364`, task `qwen35-generation`, `TierBQwen35Test`) succeeded in 7m23s — `max_abs_error=4.0340423583984375e-4` (ε = 0.001 / margin = 1e-4), native peak 5,118,123,572 B, exact greedy IDs and decoded output, `device=gpu` — bit-for-bit the manifest's local evidence. Pipeline acceptance only |
 
 - Check the full Phase 7 exit gate and record links to passed runs or dated waivers. Update the
   stale 7.6 delivery-table row and §7.6 narrative in `phase7-plan.md` to PR #79 / `e472c65`,
@@ -277,6 +280,16 @@ the still-open 7.6 self-hosted qwen35 Tier-B row and the recorded not-executed h
 arm limitations above. This authorizes neither the WP4 candidate cut nor the WP5 publication;
 the open rows remain release-cut blockers, and the hosted-arm limitations remain recorded
 design decisions rather than waivers.
+
+Recorded owner decision, 2026-11-04 (scope: Phase 7 done-gate interpretation): the done
+list's "macOS 26 hosted runs for 7.2, 7.3a, 7.3b, 7.3c and 7.6" is the hosted macOS 26
+suite execution — run 41724687057 (2026-11-03, hosted `native` job, green) executed the
+required suites of all five milestones — read together with the done list's separate
+first-self-hosted-run items where they exist. Hosted execution of the self-hosted Tier-B
+arms (7.3a smolvlm, 7.3b qwen3vl, 7.3c phi3v, 7.6 qwen35) is out of scope for the done
+gate: it is not executable on the free hosted runners by design (measured footprints vs
+the 7 GB hosted tier) and remains a recorded design decision in `tier-b.yml` and the WP0
+rows — not part of the gate's required evidence, neither a pass nor a waiver.
 
 ### WP1 — Implement profile selection and shared artifact verification
 

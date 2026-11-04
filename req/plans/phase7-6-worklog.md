@@ -312,5 +312,9 @@ retained size; this fixture is the first counterexample geometry.
   was removed.
 - Full root `./gradlew check` re-run green on the final tree (post memory-test fix); PR
   #79 merged after human review (merge `e472c65`, 2026-11-03). The macOS 26 hosted suites
-  passed in run 41724687057 (2026-11-03); the qwen35 arm's first self-hosted execution
-  remains pending (never executed, no waiver).
+  passed in run 41724687057 (2026-11-03). The qwen35 arm's first self-hosted execution
+  passed on 2026-11-04 (run 41841745005, workflow_dispatch, head `dc3a61b` — the first
+  all-arms green run including the arm, all eleven arms green): `TierBQwen35Test` in 7m23s
+  with `max_abs_error=4.0340423583984375e-4` (ε = 0.001 / margin = 1e-4), native peak
+  5,118,123,572 B, the exact greedy IDs and decoded output, `device=gpu, host=27.2/aarch64`
+  — bit-for-bit the manifest's local evidence; pipeline acceptance only.

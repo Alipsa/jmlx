@@ -55,7 +55,8 @@ named. Quantized KV cache remains unsupported.
 | Seq2seq text, T5/Flan-T5 | Tied ReLU/untied gated-GELU; encoder, full/cached logits, buckets, generation | flan-t5-small complete greedy IDs, EOS and every CPU logit history | FULL cache only; no scheduler, beam search, decoder prefixes or quantized weights |
 
 All three new real-artifact checks passed locally on M5 Max/macOS 27.0.1 with TF32 disabled.
-Their first supported macOS 26 CI executions remain pending. See `phase7-2-implementation-report.md`
+Their first supported macOS 26 CI executions passed in run 41724687057 (2026-11-03, hosted
+macOS 26 `native` job, green). See `phase7-2-implementation-report.md`
 for pins, margins and measured resource use; synthetic head checks do not imply other model families.
 
 ## Phase 7.3a image+text task (2026-10-13)
@@ -94,13 +95,15 @@ decision; the synthetic checks do not imply Tier-B support for the pinned 2B/8B 
 
 | Task/family | Tier-A | Tier-B | Limits |
 | --- | --- | --- | --- |
-| Image+text → text, Phi-3.5-Vision (LLaVA-style, dense) | WP6 tiny synthetic `Phi3VModel` checkpoint (`goldens/checkpoints/phi3v-wp6/`, 76 BF16 tensors, single shared embedding): byte-exact HD-transform + normalized bicubic preprocessing, per-image and expanded prompt IDs with the sentinel marker runs, the CLIP tower's patch/positioned embeddings, the reference-exact hd-transform rows, and prefill plus every cached step's fresh full uncached CPU float32 logits — strict `1e-4` in `Phi3VGoldenTest` (measured maximum `1.5497208e-6`) and default TF32 bound `0.0012` in `Phi3VDefaultPrecisionTest` (measured `9.266138e-4`); per-image evaluate-and-release peak, cancellation boundaries, capacity/sliding rejection and the 4096-boundary re-prefill verified on the tiny checkpoint (WP7) | Pinned locally (2026-10-30): `tools/tier-b/phi3v-4b-instruct.json` (MIT, 8,295,395,355 bytes, 15 files) — the required multi-image prompt (a 672x336 and a 336x336 image, 1241 expanded tokens, both under the 4096 original max so no NTK-Su re-prefill fires), byte-exact preprocessing, 24 exact greedy IDs under the recorded stability gate (minimum top-two gap 0.003166, ε 2e-4 / margin 1e-4 against a measured maximum error `1.0299683e-4`), measured allocator peak 31.1 GB, sampled footprint peak 51.4 GB, load ~1133 ms, generation ~5423 ms. CI: a `tier-b.yml` row exists on the self-hosted `self-macos-xl` runner (the standard 7 GB runner cannot hold the measured footprint, and GitHub's larger `macos-26-xlarge` tier is billed per minute even in public repos); its first self-hosted run accepts the CI pipeline, not independent host, OS or memory-fit evidence, and the macOS 26 hosted execution remains pending | float safetensors (storage BF16/FP16 up-cast; quantized keys rejected by name); per request ≤16 images / ≤80 sentinel slots and the context-length budget; NTK-Su RoPE (48-factor short/long tables) with the 4096-boundary recompute that selects the long table; FULL and capacity-bounded KV retention, sliding image-prefill retention rejected; no VLM batching or scheduler cohorts |
+| Image+text → text, Phi-3.5-Vision (LLaVA-style, dense) | WP6 tiny synthetic `Phi3VModel` checkpoint (`goldens/checkpoints/phi3v-wp6/`, 76 BF16 tensors, single shared embedding): byte-exact HD-transform + normalized bicubic preprocessing, per-image and expanded prompt IDs with the sentinel marker runs, the CLIP tower's patch/positioned embeddings, the reference-exact hd-transform rows, and prefill plus every cached step's fresh full uncached CPU float32 logits — strict `1e-4` in `Phi3VGoldenTest` (measured maximum `1.5497208e-6`) and default TF32 bound `0.0012` in `Phi3VDefaultPrecisionTest` (measured `9.266138e-4`); per-image evaluate-and-release peak, cancellation boundaries, capacity/sliding rejection and the 4096-boundary re-prefill verified on the tiny checkpoint (WP7) | Pinned locally (2026-10-30): `tools/tier-b/phi3v-4b-instruct.json` (MIT, 8,295,395,355 bytes, 15 files) — the required multi-image prompt (a 672x336 and a 336x336 image, 1241 expanded tokens, both under the 4096 original max so no NTK-Su re-prefill fires), byte-exact preprocessing, 24 exact greedy IDs under the recorded stability gate (minimum top-two gap 0.003166, ε 2e-4 / margin 1e-4 against a measured maximum error `1.0299683e-4`), measured allocator peak 31.1 GB, sampled footprint peak 51.4 GB, load ~1133 ms, generation ~5423 ms. CI: first self-hosted run passed 2026-11-01 (run 41352378744, workflow_dispatch, all arms green; re-confirmed on merged main in run 41841745005 on 2026-11-04 in 3m55s, both `device=gpu`; `tools/tier-b/README.md`): the `tier-b.yml` row runs on the self-hosted `self-macos-xl` runner (the standard 7 GB runner cannot hold the measured footprint, and GitHub's larger `macos-26-xlarge` tier is billed per minute even in public repos); the first run accepted the CI pipeline, not independent host, OS or memory-fit evidence, and the macOS 26 hosted execution of the row remains pending | float safetensors (storage BF16/FP16 up-cast; quantized keys rejected by name); per request ≤16 images / ≤80 sentinel slots and the context-length budget; NTK-Su RoPE (48-factor short/long tables) with the 4096-boundary recompute that selects the long table; FULL and capacity-bounded KV retention, sliding image-prefill retention rejected; no VLM batching or scheduler cohorts |
 
 The row above is **local acceptance evidence**: the recorded runs used M5 Max/macOS 27.0.1 (MLX
 0.31.2, mlx-c fba4470) with TF32 disabled for the allocator/footprint and the strict Tier-A bound.
 `Phi3VGoldenTest` and `Phi3VDefaultPrecisionTest` are required by the macOS CI native-suite
-assertion; the Tier-B row's first self-hosted execution remains pending, and the macOS 26 hosted
-execution of all four WP6/WP7/WP8 suites remains pending. See
+assertion. The macOS 26 hosted execution of all four WP6/WP7/WP8 suites passed in run
+41724687057 (2026-11-03, hosted macOS 26 `native` job, green), and the Tier-B row's first
+self-hosted execution passed on 2026-11-01 (run 41352378744, all arms green; re-confirmed on
+merged main in run 41841745005). See
 `phase7-3c-reference-findings.md` §16 for the WP8 acceptance evidence and
 `phase6-tier-b-artifacts.md` for the pin and the reference-generator contract.
 
@@ -130,12 +133,16 @@ and diffusion remain unsupported and unverified.
 
 The row above is **local acceptance evidence**: the recorded runs used M5 Max / macOS 27.2
 (MLX 0.32.4, mlx-c a26f2d5) with TF32 disabled. All seven new model suites and the five new
-core suites are required by the macOS CI native-suite assertion; hosted CI has not run this
-branch. The `tier-b.yml` qwen35 arm targets the self-hosted `self-macos-xl` runner (the
-measured 6.65 GB footprint sits within ~400 MB of the standard runner's entire 7 GB once the
-OS, test JVM and Gradle daemon share it; GitHub's larger `macos-26-xlarge` tier is billed per
-minute even in public repos); its first execution accepts the CI pipeline, not independent
-host, OS or memory-fit evidence, and the supported macOS 26 hosted execution remains pending.
+core suites are required by the macOS CI native-suite assertion, and hosted CI ran the merged
+head in run 41724687057 (2026-11-03, green). The `tier-b.yml` qwen35 arm targets the
+self-hosted `self-macos-xl` runner (the measured 6.65 GB footprint sits within ~400 MB of the
+standard runner's entire 7 GB once the OS, test JVM and Gradle daemon share it; GitHub's
+larger `macos-26-xlarge` tier is billed per minute even in public repos); its first execution
+passed on 2026-11-04 (run 41841745005, the first all-arms green run including the arm;
+`TierBQwen35Test` in 7m23s with `max_abs_error=4.0340423583984375e-4` and native peak
+5,118,123,572 B — bit-for-bit the manifest's local evidence), accepting the CI pipeline, not
+independent host, OS or memory-fit evidence, and the supported macOS 26 hosted execution of
+the arm remains pending.
 See `req/plans/phase7-6-plan.md`, `req/plans/phase7-6-worklog.md` and
 `req/phase6-golden-precision.md` for the full evidence; the synthetic checks do not imply
 other hybrid families.

@@ -243,10 +243,18 @@ three further issue-#73 runs now match the broader `*46cb325-phi3v*` glob, ran
 under induced GPU load, and their wall times are recorded in
 `req/phase6-inference-report.md`).
 
-**CI status: first self-hosted run pending.** A `phi3v` row was added to
+**CI status: first self-hosted run passed 2026-11-01** (run
+[41352378744](https://github.com/Alipsa/jmlx/actions/runs/41352378744),
+workflow_dispatch, `phase7-5-pin-upgrade` branch, head `4edeaf3`, all arms green;
+`TierBPhi3VTest` with `max_abs_error=8.0108642578125e-5` (ε = 2e-4 / margin = 1e-4),
+native allocator peak 30,202,748,009 bytes, the exact 24 greedy IDs and decoded output,
+`device=gpu, host=27.0.1/aarch64`; re-confirmed on merged main in run
+[41841745005](https://github.com/Alipsa/jmlx/actions/runs/41841745005) on 2026-11-04
+in 3m55s — native allocator peak 30,202,745,961 bytes, `device=gpu, host=27.2/aarch64`).
+A `phi3v` row was added to
 `.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner (the standard 7 GB runner cannot
 hold the 51.4 GB measured footprint, and GitHub's larger `macos-26-xlarge` tier is billed per minute even
-in public repos, so the row does not target it). The row's first execution accepts the CI pipeline
+in public repos, so the row does not target it). The row's first execution accepted the CI pipeline
 (checkout, artifact download, native bootstrap, pinned suite), not independent host, OS or memory-fit
 evidence, and the supported macOS 26 hosted execution remains pending. The suite's footprint bound fails
 the suite on a memory regression, but it is not a guarantee the runner's RAM survives a large regression
@@ -323,12 +331,19 @@ acceptance remains FLOAT32/TF32 off. Full records:
 `tools/qwen35-reference/evidence/27b-java-acceptance.json`,
 `27b-java-normalization-attribution.json` and `27b-default-precision-comparison.json`.
 
-**CI status: first self-hosted run pending.** A `qwen35` row was added to
+**CI status: first self-hosted run passed 2026-11-04** (run
+[41841745005](https://github.com/Alipsa/jmlx/actions/runs/41841745005),
+workflow_dispatch, head `dc3a61b` — the first all-arms green run including the `qwen35`
+row, all eleven arms green; `TierBQwen35Test` (revision `2fc06364`) in 7m23s with
+`max_abs_error=4.0340423583984375e-4` (ε = 0.001 / margin = 1e-4), native allocator peak
+5,118,123,572 bytes, the exact greedy IDs and decoded output, `device=gpu, host=27.2/aarch64`
+— the maximum error and the native peak bit-for-bit the manifest's local evidence). A
+`qwen35` row was added to
 `.github/workflows/tier-b.yml` on the self-hosted `self-macos-xl` runner: the measured
 6,648,795,264-byte (~6.2 GiB) footprint sits within ~400 MB of the standard runner's entire
 7 GB once the OS, test JVM and Gradle daemon share it, so the row does not target the hosted
 tier (GitHub's larger `macos-26-xlarge` tier is billed per minute even in public repos, and
-the row does not use it either). The row's first execution accepts the CI pipeline
+the row does not use it either). The row's first execution accepted the CI pipeline
 (checkout, artifact download, native bootstrap, pinned suite), not independent host, OS or
 memory-fit evidence, and the supported macOS 26 hosted execution remains pending. The
 suite's footprint bound fails the suite on a memory regression, but it is not a guarantee

@@ -18,7 +18,10 @@ every pending acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS
 for 7.2, 7.3a, 7.3b, 7.3c and 7.6, and the first self-hosted Tier-B runs for 7.3c and 7.6)
 has passed or carries a dated, recorded waiver; supported non-text modalities are stated
 explicitly in the compatibility matrix; and the `nn` API covers their required common layers
-without model packages bypassing core facades.
+without model packages bypassing core facades. The "macOS 26 hosted runs" item is the hosted
+macOS 26 suite execution (run 41724687057, 2026-11-03); hosted execution of the self-hosted
+Tier-B arms is out of scope for that item by the recorded owner amendment of 2026-11-04
+(`phase8-1-plan.md` WP0 gate note).
 
 Non-goals: training (dropout in training mode, optimizers, loss gradients: Phase 13), general
 array/indexing parity beyond the focused slices named below (Phase 10), FFT/linalg (Phase 11),
@@ -185,14 +188,14 @@ for every new op.
 | --- | --- | --- | --- | --- |
 | Step 0 Roadmap amendment | docs | — | amended roadmap merged | delivered |
 | 7.0 Qwen3 text decoders | `jmlx-core`, `jmlx-models`, `jmlx-jinja` | step 0 | Qwen3 Tier-A logits; Qwen3-0.6B Tier-B; Qwen3-8B 4-bit run recorded | delivered |
-| 7.1 Core inference modules | `jmlx-core`, `tools/mlx-oracle` | step 0 | every layer oracle-tested; inventory updated | implemented; acceptance pending |
-| 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models`, `jmlx-tokenizer`, reference/Tier-B tools | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens | implemented; macOS 26 CI acceptance pending |
-| 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B | delivered; macOS 26 hosted acceptance pending |
-| 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output | delivered; macOS 26 hosted Tier-B pending |
+| 7.1 Core inference modules | `jmlx-core`, `tools/mlx-oracle` | step 0 | every layer oracle-tested; inventory updated | delivered; the acceptance gates passed 2026-11-04 (`phase8-1-plan.md` WP0) |
+| 7.2 Encoders and encoder-decoder | `jmlx-core`, `jmlx-models`, `jmlx-tokenizer`, reference/Tier-B tools | 7.1 | BERT embeddings/classification; Flan-T5 generation goldens | delivered; macOS 26 CI acceptance passed in run 41724687057 (2026-11-03) |
+| 7.3a Vision foundation + SmolVLM | `jmlx-vision`, `jmlx-models`, `jmlx-tokenizer` | 7.1 (7.2 cross-attention not needed) | preprocessing goldens; SmolVLM-256M Tier-B | delivered; macOS 26 hosted suite acceptance passed in run 41724687057 (2026-11-03); the self-hosted Tier-B arm's first runs (2026-10-26) recorded in `tools/tier-b/README.md` |
+| 7.3b Qwen3-VL | `jmlx-models`, `jmlx-vision` | 7.0, 7.3a | Qwen3-VL Tier-A logits and Tier-B image+text output | delivered; macOS 26 hosted suite acceptance passed in run 41724687057 (2026-11-03); hosted Tier-B execution not executable on the free hosted runners by design (recorded, not waived) |
 | 7.3c LLaVA-style (Phi-3.5-Vision) | `jmlx-models`, `jmlx-vision`, `jmlx-core` | 7.3a | Phi-3.5-Vision Tier-A logits and Tier-B image+text output | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | docs | 7.2, 7.3a | reviewed decision record | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`); reviewed via its PR: go — audio → Phase 11 milestone 11.5, diffusion → Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | native pins, `jmlx-ffi`, inventory, oracle/golden evidence | 7.3c and 7.4 closed | paired pin upgrade merged; independent goldens and Tier-B pass unchanged on the new pins; MLX oracle fixtures regenerated and reviewed | delivered 2026-11-01 (PR #71; dims == 2 follow-up PR #72); issue #73 investigation recorded 2026-11-02: clean and induced-compute-load alternation found similar pin behavior (loaded new/old within ±7 %); the original host state was unrecorded, so host-state attribution remains an inference and pin×host interactions under other conditions remain untested. The new-pin Qwen3-VL cold-cache comparison timed warmed generation, not first inference; per-pin first-use effects remain untested across both models. Phase 8.2 owns those measurement limits; record in `req/phase6-inference-report.md` |
-| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | delivered 2026-11-03 (PR #79, merge `e472c65`): all WPs executed, Tier-A HF goldens and both real-artifact acceptances (0.8B Tier-B and 27B 4-bit run) recorded locally; the macOS 26 hosted suites passed in run 41724687057 (2026-11-03); the qwen35 arm's first self-hosted Tier-B run remains pending (never executed, no waiver) |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `jmlx-core`, `jmlx-models`, `jmlx-vision`, reference/converter tools | 7.1, 7.3b, 7.5 | Tier-A HF logits and converted-layout fixtures; Qwen3.5-0.8B Tier-B; Qwen3.8-27B 4-bit run recorded | delivered 2026-11-03 (PR #79, merge `e472c65`): all WPs executed, Tier-A HF goldens and both real-artifact acceptances (0.8B Tier-B and 27B 4-bit run) recorded locally; the macOS 26 hosted suites passed in run 41724687057 (2026-11-03); the qwen35 arm's first self-hosted Tier-B run passed on 2026-11-04 (run 41841745005, the first all-arms green run including the arm; pipeline acceptance only) |
 
 Step 0 merged first. 7.0 and 7.1 then proceeded in parallel, and 7.3a started once 7.1's conv,
 normalization and activation layers landed, while 7.2 was still open. From 7.3c on, the
@@ -281,9 +284,10 @@ constant/edge padding only; native 3-D grouped convolution unsupported; grouped 
 non-unit stride explicitly rejected for a CPU/GPU correctness defect; sinusoidal dims<4 rejected
 instead of returning NaNs (the dims == 2 case lifted post-7.5; see change 6 in the Phase 7.5 pin
 upgrade section of `req/phase6-inference-report.md`). KL takes log-probability targets, and empty
-max-pool outputs preserve the native reduction error. Acceptance remains pending legacy Phase 6
-byte-exact oracle drift and cross-host CPU fixture verification; implementation is not marked
-milestone-complete.
+max-pool outputs preserve the native reduction error. The legacy Phase 6 byte-exact oracle
+drift and cross-host CPU fixture verification acceptance passed on 2026-11-04 (run
+41724687057 plus a local cross-host verification — `phase8-1-plan.md` WP0); the milestone
+is complete.
 
 Focused Phase 10 slices land here under the permission step 0 adds, each recorded in the inventory.
 
@@ -379,7 +383,8 @@ inventory with tests; `verifyMlxApiCallSites` is green.
 ## 7.2 — Encoders and encoder-decoder generation
 
 **Implementation update, 2026-10-05:** local BERT/T5, tokenizer and Tier-B checks pass; see
-`req/phase7-2-implementation-report.md`. New macOS 26 CI acceptance remains pending. The inspected
+`req/phase7-2-implementation-report.md`. The new macOS 26 CI acceptance passed in run
+41724687057 (2026-11-03). The inspected
 Intel MRPC revision has no safetensors; the licensed single-sequence SST-2 fallback is selected.
 Pair encoding remains implemented and oracle-verified.
 
@@ -456,7 +461,10 @@ modality rows.
 
 Implementation sub-plan: [phase7-3a-plan.md](phase7-3a-plan.md), proposed 2026-10-06. WP1–WP7
 merged via PRs #41–#46; WP8 merged as PR #47 (2026-10-13). The macOS 26 hosted acceptance of
-the WP6/WP7 suites and the Tier-B row remains pending; see
+the WP6/WP7 suites passed in run 41724687057 (2026-11-03); the Tier-B row's first self-hosted
+runs were recorded on 2026-10-26 (runs 40403387275 and 40409087523), and the row's macOS 26
+hosted execution remains pending by design (not executable on the free hosted tier — recorded,
+not waived); see
 [phase7-3a-implementation-report.md](../phase7-3a-implementation-report.md).
 
 **Review amendments, 2026-10-06:**
@@ -651,7 +659,10 @@ Tier-A (`phi3v-wp6.json`, six cases including the boundary crossing) and Tier-B 
 greedy IDs and decoded output, allocator peak 31.1 GB, sampled footprint peak 51.4 GB) are
 recorded; the compatibility matrix gains a per-phase 7.3c section (VLMs get per-phase
 sections, not matrix rows). The Tier-B CI row runs on the self-hosted `self-macos-xl`
-runner; its first self-hosted run and the macOS 26 hosted execution remain pending.
+runner; its first self-hosted run passed on 2026-11-01 (run 41352378744, all arms green;
+re-confirmed on merged main in run 41841745005), and the row's macOS 26 hosted execution
+remains pending by design (not executable on the free hosted tier — recorded, not waived;
+the WP6/WP7/WP8 suites' hosted execution passed in run 41724687057).
 PaliGemma remains deferred.
 
 ## 7.4 — Audio and diffusion capability decision
@@ -803,7 +814,8 @@ short convolution), 7.3b (`MultiAxisRope`, the vision tower and the request life
 (the MLX upgrade). The [detailed sub-plan](phase7-6-plan.md) was reviewed in PR #78 and merged
 in PR #79 (merge `e472c65`, 2026-11-03; all WPs executed, local acceptances recorded). The
 macOS 26 hosted suites passed in run 41724687057 (2026-11-03); the qwen35 arm's first
-self-hosted Tier-B run remains pending (never executed, no waiver). Its [reference findings](phase7-6-reference-findings.md)
+self-hosted Tier-B run passed on 2026-11-04 (run 41841745005, the first all-arms green run
+including the arm; pipeline acceptance only). Its [reference findings](phase7-6-reference-findings.md)
 now separate executable reference/component evidence from the dated inspections below. The
 WP1 structural optimization gate is complete (see the [optimization report](phase7-6-wp1-optimization.md));
 the [worklog](phase7-6-worklog.md) records the WP0–WP8 evidence, including the 0.8B Tier-B

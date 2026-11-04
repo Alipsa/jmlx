@@ -189,3 +189,24 @@ the qwen3vl load wall is 1116/1114 ms in the two runs against ~843 ms locally
 run 40403387275 against 1298 ms on run 40409087523, about 5× the local ~247 ms.
 The acceptance semantics above are unchanged: these runs accept the CI pipeline
 only, and the supported macOS 26 hosted execution remains pending.
+
+First self-hosted runs of the phi3v and qwen35 rows (2026-11-01 and 2026-11-04). The
+phi3v row's first self-hosted run passed on 2026-11-01 (run 41352378744,
+workflow_dispatch, `phase7-5-pin-upgrade` branch, head `4edeaf3`, all arms green):
+`TierBPhi3VTest` with `max_abs_error=8.0108642578125e-5` (ε = 2e-4 / margin = 1e-4),
+native allocator peak 30,202,748,009 bytes, the exact 24 greedy IDs and decoded output,
+self-attesting `device=gpu, host=27.0.1/aarch64`; it was re-confirmed on merged main in
+run 41841745005 (2026-11-04, head `dc3a61b`) in 3m55s (native allocator peak
+30,202,745,961 bytes, `host=27.2/aarch64`). The 2026-11-01 scheduled run
+(41301596858) failed at the runner level — the self-hosted runner lost communication
+with the server (job annotation): the phi3v job's steps, including its Tier-B
+assertions, had all succeeded, while the qwen3vl job never started a step. Both arms
+ran green in 41352378744 that evening and in 41841745005. The qwen35 row first
+executed in 41841745005, the first all-arms green run (all eleven arms green):
+`TierBQwen35Test`
+(revision `2fc06364`) in 7m23s with `max_abs_error=4.0340423583984375e-4` (ε = 0.001 /
+margin = 1e-4), native allocator peak 5,118,123,572 bytes, the exact greedy IDs and
+decoded output, self-attesting `device=gpu, host=27.2/aarch64` — the maximum error and
+the native peak bit-for-bit the manifest's local evidence. The acceptance semantics
+above are unchanged: these runs accept the CI pipeline only, and the supported macOS 26
+hosted execution remains pending.

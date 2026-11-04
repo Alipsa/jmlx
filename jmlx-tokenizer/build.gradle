@@ -6,7 +6,7 @@ plugins {
 // Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: an
 // "independent release" that inherits the root version is not independent at all. Starts a
 // fresh 0.1.0 line because jmlx-tokenizer has never been published.
-version = '0.1.0-SNAPSHOT'
+version = '0.1.0'
 
 // Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain
 // (which exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and

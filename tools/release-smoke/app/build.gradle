@@ -40,6 +40,7 @@ tasks.register('smoke', JavaExec) {
     systemProperty 'smoke.model.dir', modelDir.get().asFile.absolutePath
     systemProperty 'smoke.golden', file('../goldens/mistral-sampled.properties').absolutePath
     systemProperty 'smoke.checkout.root', rootProject.projectDir.parentFile.parentFile.absolutePath
+    systemProperty 'smoke.repo.url', jmlxRepoUrl
     systemProperty 'smoke.mode', jmlxMode
     systemProperty 'smoke.record', providers.gradleProperty('smokeRecord').getOrElse('false')
     systemProperty 'smoke.expected.versions', jmlxVersions.collect { k, v -> "${k}=${v}" }.join(',')

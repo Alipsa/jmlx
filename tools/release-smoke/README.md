@@ -155,5 +155,12 @@ smoke repository untouched. It is a step of the Linux Java CI job.
 - `Module-metadata and POM-only runtime classpaths differ`: a published POM and its Gradle
   metadata disagree on the runtime graph; inspect the module's `api`/`implementation`/`runtimeOnly`
   declaration.
+- `class <X> came from the checkout: <path>`: the consumer loaded a class from a jar inside the
+  checkout instead of a published artifact. A jar in the run's disposable smoke repository's own
+  coordinate directory (`build/smoke-repo/se/alipsa/<module>/<version>/` by default) is expected:
+  Gradle resolves release artifacts from a local `file://` repository in place, without a
+  dependency-cache copy, so the repository's own jar is the code source in `ci`/`candidate` mode.
+  Any other path under the checkout (`build/libs`, `build/classes`, …) is a real leak — the
+  consumer build lost its isolation.
 - `consumer JVM must be Java 21` (pure profile): the Java 21 toolchain was not discovered — see
   the JDK requirements above.

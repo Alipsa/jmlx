@@ -29,6 +29,7 @@ tasks.register('smoke', JavaExec) {
     jvmArgs '-Djava.awt.headless=true'
     systemProperty 'smoke.mode', jmlxMode
     systemProperty 'smoke.checkout.root', rootProject.projectDir.parentFile.parentFile.absolutePath
+    systemProperty 'smoke.repo.url', jmlxRepoUrl
     systemProperty 'smoke.expected.versions', jmlxVersions.collect { k, v -> "${k}=${v}" }.join(',')
     systemProperty 'smoke.fixtures', fixturesDir.get().asFile.absolutePath
     systemProperty 'smoke.runtime.coordinates', layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.absolutePath

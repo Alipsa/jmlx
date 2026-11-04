@@ -211,10 +211,14 @@ public final class ReleaseSmoke {
 
   /**
    * Every jmlx class must come from a jar in the resolved dependency cache: not from a checkout
-   * build directory, and, in CI mode, not from {@code mavenLocal}.
+   * build directory, and, in CI mode, not from {@code mavenLocal}. In ci/candidate modes the
+   * disposable smoke repository inside the checkout is the published location for the local run,
+   * and Gradle resolves release artifacts from a local file repository in place (no
+   * dependency-cache copy), so a jar under it is the expected code source, not a working-tree leak.
    */
   private static void verifyJarProvenance() throws Exception {
     Path checkout = Path.of(requireProperty("smoke.checkout.root")).toAbsolutePath().normalize();
+    Path smokeRepo = smokeRepoRoot();
     Map<String, String> expected = expectedVersions();
     List<Class<?>> probes =
         List.of(
@@ -230,10 +234,12 @@ public final class ReleaseSmoke {
       Path jar = Path.of(java.net.URI.create(source.getLocation().toString())).toAbsolutePath();
       check(jar.toString().endsWith(".jar"), probe + " is not loaded from a jar: " + jar);
       Path normalized = jar.normalize();
-      // The smoke's own tree lives inside the checkout, so exclude it; any other path under the
-      // checkout (build/libs, build/classes) is a leak.
+      // The smoke's own tree and its disposable repository live inside the checkout, so exclude
+      // them; any other path under the checkout (build/libs, build/classes) is a leak.
       check(
-          !normalized.startsWith(checkout) || normalized.startsWith(checkout.resolve("tools/release-smoke")),
+          !normalized.startsWith(checkout)
+              || normalized.startsWith(checkout.resolve("tools/release-smoke"))
+              || (smokeRepo != null && normalized.startsWith(smokeRepo)),
           probe + " came from the checkout: " + jar);
       check(!jar.toString().contains("/.m2/"), probe + " came from mavenLocal: " + jar);
       String artifact = jar.getFileName().toString();
@@ -292,6 +298,15 @@ public final class ReleaseSmoke {
     Matcher matcher = Pattern.compile("\"" + field + "\"\\s*:\\s*(\\d+)").matcher(json);
     check(matcher.find(), "config.json lacks " + field);
     return Integer.parseInt(matcher.group(1));
+  }
+
+  /** The disposable local smoke repository this run resolved from, or null for a remote source. */
+  private static Path smokeRepoRoot() {
+    String url = System.getProperty("smoke.repo.url");
+    if (url == null || !url.startsWith("file://")) {
+      return null;
+    }
+    return Path.of(java.net.URI.create(url)).toAbsolutePath().normalize();
   }
 
   private static String requireProperty(String name) {

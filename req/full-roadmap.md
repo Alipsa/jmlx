@@ -34,7 +34,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | --- | --- | --- | --- | --- |
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
-| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (7.6 in progress; 7.5 delivered) |
+| 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | in progress (all milestones delivered; the 7.6 acceptance gates remain pending) |
 | 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
@@ -263,7 +263,7 @@ Milestones, in order:
 | 7.3c LLaVA-style connector | `microsoft/Phi-3.5-vision-instruct` (MIT), selected 2026-10-27 | delivered 2026-10-30 |
 | 7.4 Audio/diffusion decision | a reviewed decision record, not code | decision record delivered 2026-10-31 (`req/plans/phase7-4-decision.md`), reviewed via its PR: go — audio scheduled as Phase 11 milestone 11.5, diffusion as Phase 9 milestone 9.6 |
 | 7.5 MLX upgrade | paired pin upgrade to the newest release (see § Release and MLX upgrade plan) | delivered 2026-11-01 (PR #71, follow-up #72); timing investigation recorded in merged PR #76 on 2026-11-02, with measurement limits owned by Phase 8.2 |
-| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | delivered 2026-11-03 (PR #79): all WPs executed, Tier-A HF goldens and both real-artifact acceptances (0.8B Tier-B and 27B 4-bit run) recorded locally; macOS 26 hosted CI and the qwen35 arm's first self-hosted Tier-B run pending |
+| 7.6 Hybrid linear-attention Qwen (Qwen3.8) | `model_type` `qwen3_5`, text and image+text: Gated DeltaNet with a recurrent-state cache, gated full attention, partial rotary, HF/mlx-vlm/`mlx_lm` checkpoint layouts; Tier-B `Qwen/Qwen3.5-0.8B`, manual `mlx-community/Qwen3.8-27B-4bit` run | delivered 2026-11-03 (PR #79, merge `e472c65`): all WPs executed, Tier-A HF goldens and both real-artifact acceptances (0.8B Tier-B and 27B 4-bit run) recorded locally; the macOS 26 hosted suites passed in run 41724687057 (2026-11-03); the qwen35 arm's first self-hosted Tier-B run remains pending (never executed, no waiver) |
 
 7.4 decides only. A "go" for audio or diffusion schedules its implementation into a later phase
 by a dated roadmap amendment; it does not extend Phase 7.
@@ -282,8 +282,9 @@ and the release-script, release-order and release-smoke invariants grow with it)
 carry their own exit gates (9.6 and 11.5). Neither extends Phase 7; 7.5 follows 7.4 directly.
 
 **Phase 7 done:** every milestone above is delivered, or deferred with a date; every pending
-acceptance gate listed above (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs
-for 7.2, 7.3a and 7.3b) has passed or carries a dated, recorded waiver; supported non-text
+acceptance gate (the 7.1 oracle and cross-host fixtures, the macOS 26 hosted runs for 7.2,
+7.3a, 7.3b, 7.3c and 7.6, and the first self-hosted Tier-B runs for 7.3c and 7.6) has passed
+or carries a dated, recorded waiver; supported non-text
 modalities are stated explicitly in the compatibility matrix; and the `nn` API covers their
 required common layers without model packages bypassing core facades.
 
@@ -342,6 +343,16 @@ published before `jmlx-models` itself.
    0.5.0, `jmlx-models` 0.1.0 and the two adapters at 0.1.0, plus a new version of any pure-Java
    module that changed since 8.1. Run `tools/release-smoke/run.sh candidate` before publishing
    and `run.sh central` after.
+
+   **Amendment (2026-11-04, from [phase8-1-plan.md §1](plans/phase8-1-plan.md#1-goal-scope-and-exit-gate)):**
+   8.4 restores unchanged pure-Java modules to their published 8.1 versions before POM
+   generation and verifies them from Central without republishing. Candidate smoke must
+   resolve reused coordinates exclusively from Central and new ones exclusively from the
+   smoke repository, publishing only new coordinates locally. The 8.4 sub-plan must specify
+   shared source/version selection, repository filters and negative tests, including that
+   copies in `~/.m2`, caches or the smoke repository cannot shadow reused Central artifacts
+   or substitute for missing ones. Full candidate verification of this mixed graph is required
+   before any 8.4 publication.
 
 **Phase 8 done:** the 8.1 and 8.4 releases resolve from Maven Central, and the 8.4 release notes
 include the 8.2 benchmark, the compatibility matrix and the native pins.

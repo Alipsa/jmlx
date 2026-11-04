@@ -1,0 +1,264 @@
+// Profile-aware verification shared by the three release-smoke consumers (app, pure-java,
+// pom-check). Each consumer applies this after the java plugin and after repositories.gradle,
+// which defines the profile's ext properties (jmlxMode, smokeProfile, jmlxVersions, tupleFile,
+// jmlxRepoUrl). It adds the profile's entry dependencies and factors the graph and artifact
+// checks out of the consumers so the full and pure profiles cannot drift apart. It stays a
+// build-logic file of this independent consumer: no production module, no buildSrc dependency.
+
+// The consumer toolchain follows the profile: Java 21 for the pure profile (the release floor the
+// published artifacts must meet), Java 25 for the full profile (the checkout's own toolchain).
+java.toolchain.languageVersion = JavaLanguageVersion.of(smokeProfile == 'pure-java' ? 21 : 25)
+
+// The profile's entry dependencies. In the pure profile jinja arrives ONLY transitively through
+// tokenizer's published `api` edge, proving that edge; in the full profile core, tokenizer, vision
+// and jinja arrive transitively through models, and the native jar is runtime-only.
+if (smokeProfile == 'pure-java') {
+    dependencies {
+        implementation "se.alipsa:jmlx-tokenizer:${jmlxVersions['jmlx-tokenizer']}"
+        implementation "se.alipsa:jmlx-vision:${jmlxVersions['jmlx-vision']}"
+    }
+} else {
+    dependencies {
+        implementation "se.alipsa:jmlx-models:${jmlxVersions['jmlx-models']}"
+        runtimeOnly "se.alipsa:jmlx-native-macos-arm64:${jmlxVersions['jmlx-native-macos-arm64']}"
+    }
+}
+
+// Walk a resolved graph: fail on an unresolved dependency and on anything that is not a published
+// module component (a project dependency or a file dependency is a leak); return the full
+// coordinate set plus the se.alipsa subset.
+ext.smokeTraverse = { configuration ->
+    def root = configuration.incoming.resolutionResult.rootComponent
+    def rootResult = root.get()
+    def rootId = rootResult.id
+    def coordinates = new TreeSet<String>()
+    def seAlipsa = [:]
+    def queue = [rootResult]
+    def seen = new HashSet()
+    while (queue) {
+        def component = queue.remove(0)
+        if (!seen.add(component.id)) continue
+        component.dependencies.each { dep ->
+            if (dep instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult) {
+                throw new GradleException("Unresolved dependency in ${configuration.name}: ${dep.cause}")
+            }
+            if (dep instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult) {
+                queue << dep.selected
+            }
+        }
+        def id = component.id
+        if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+            if (id != rootId) {
+                throw new GradleException("A project dependency leaked into the consumer graph: ${id}")
+            }
+        } else if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+            coordinates << "${id.group}:${id.module}:${id.version}".toString()
+            if (id.group == 'se.alipsa') {
+                seAlipsa[id.module] = id.version
+            }
+        } else {
+            throw new GradleException("Unexpected component (not a published module): ${id}")
+        }
+    }
+    return [coordinates: coordinates, seAlipsa: seAlipsa]
+}
+
+// Declared inputs for every verification task: a mode, profile, version, released-tuple or
+// repository change reruns the task instead of reusing a stale report from an earlier mode.
+ext.smokeVerificationInputs = { task ->
+    task.inputs.property('mode', jmlxMode)
+    task.inputs.property('profile', smokeProfile)
+    task.inputs.property('versions', jmlxVersions.toString())
+    task.inputs.property('repo', jmlxRepoUrl)
+    if (tupleFile != null) {
+        task.inputs.file(tupleFile)
+    }
+}
+
+// Javadoc and sources jars for exactly the selected modules, resolved by variant attributes.
+ext.smokeDocsConfigurations = {
+    def docsAttributes = { String docsType ->
+        return { attrs ->
+            attrs.attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.DOCUMENTATION))
+            attrs.attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+            attrs.attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType, docsType))
+            attrs.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+        }
+    }
+    configurations {
+        javadocJars { canBeConsumed = false; canBeResolved = true; attributes(docsAttributes(DocsType.JAVADOC)) }
+        sourcesJars { canBeConsumed = false; canBeResolved = true; attributes(docsAttributes(DocsType.SOURCES)) }
+    }
+    jmlxVersions.each { name, version ->
+        dependencies.add('javadocJars', "se.alipsa:${name}:${version}")
+        dependencies.add('sourcesJars', "se.alipsa:${name}:${version}")
+    }
+}
+
+// The metadata consumer's verification tasks: exact selected versions under module metadata,
+// agreement with the POM-only resolution, and the published artifact checks (licenses, vision
+// NOTICE, JPMS names, and the native payload when the native module is selected).
+ext.smokeRegisterVerificationTasks = {
+    tasks.register('verifyResolution') {
+        def output = layout.buildDirectory.file('runtime-coordinates.txt')
+        outputs.file(output)
+        smokeVerificationInputs(it)
+        def configuration = configurations.runtimeClasspath
+        def expected = jmlxVersions
+        def mode = jmlxMode
+        doLast {
+            def result = smokeTraverse(configuration)
+            if (result.seAlipsa != expected) {
+                throw new GradleException("Resolved se.alipsa modules ${result.seAlipsa} != expected ${expected}")
+            }
+            if (mode == 'release') {
+                def snapshots = result.coordinates.findAll { it.endsWith('-SNAPSHOT') }
+                if (snapshots) {
+                    throw new GradleException("Release mode forbids SNAPSHOTs: ${snapshots}")
+                }
+            }
+            output.get().asFile.text = result.coordinates.join('\n') + '\n'
+            println "Resolved ${result.coordinates.size()} runtime components, se.alipsa: ${result.seAlipsa}"
+        }
+    }
+
+    // The Gradle-metadata resolution (above) and the POM-only resolution (:pom-check) must agree.
+    tasks.register('verifyPomMatchesModuleMetadata') {
+        dependsOn 'verifyResolution', ':pom-check:writeRuntimeCoordinates'
+        smokeVerificationInputs(it)
+        doLast {
+            def gradleMetadata = layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.readLines()
+            def pom = project(':pom-check').layout.buildDirectory.file('runtime-coordinates.txt').get().asFile.readLines()
+            if (gradleMetadata != pom) {
+                throw new GradleException("Module-metadata and POM-only runtime classpaths differ:\n" +
+                        "module metadata: ${gradleMetadata}\nPOM only:        ${pom}")
+            }
+            println "POM-only and module-metadata runtime classpaths agree (${pom.size()} components)"
+        }
+    }
+
+    // Every runtime jar carries a license; the three vision jars (main, sources, javadoc) each
+    // carry the module NOTICE with the required Pillow and PyTorch provenance references and
+    // license text; the main jars carry their JPMS names; the native jar carries its payload
+    // when the native module is selected.
+    tasks.register('verifyPublishedArtifacts') {
+        def runtime = configurations.runtimeClasspath
+        def javadocs = configurations.javadocJars
+        def sources = configurations.sourcesJars
+        def expectedCount = jmlxVersions.size()
+        def nativeSelected = jmlxVersions.containsKey('jmlx-native-macos-arm64')
+        smokeVerificationInputs(it)
+        doLast {
+            def jmlxJars = runtime.files.findAll { it.name.startsWith('jmlx-') }
+            if (jmlxJars.size() != expectedCount) {
+                throw new GradleException("Expected ${expectedCount} jmlx jars, got ${jmlxJars*.name}")
+            }
+            def entries = { File jar -> new java.util.zip.ZipFile(jar).withCloseable { z -> z.entries().collect { it.name } } }
+            def entryBytes = { File jar, String entryName ->
+                new java.util.zip.ZipFile(jar).withCloseable { z ->
+                    def entry = z.getEntry(entryName)
+                    entry == null ? null : z.getInputStream(entry).readAllBytes()
+                }
+            }
+            jmlxJars.each { jar ->
+                def names = entries(jar)
+                if (!names.contains('META-INF/LICENSE')) {
+                    throw new GradleException("${jar.name}: no META-INF/LICENSE")
+                }
+            }
+            // The vision jars port Pillow's C resampling and alpha-composite code and PyTorch's CPU
+            // upsampling kernels (the Phi-3-vision bicubic), so their NOTICE must pin every ported
+            // source file by SHA-256 and carry both license texts -- in the main jar and in the
+            // sources and javadoc jars a consumer downloads to read that provenance.
+            def requiredNotice = [
+                    'src/libImaging/Resample.c',
+                    '808c212d03289b9ab70fad67168da1b14ed8dd74f1607c7a7278c50cbc1ae0ab',
+                    'src/libImaging/AlphaComposite.c',
+                    '0063c136b8bb2be51e2fb76fac222a7ae96b438f3c09706834862d9c1ac62c93',
+                    'MIT-CMU License',
+                    'Secret Labs AB',
+                    'aten/src/ATen/native/cpu/UpSampleKernel.cpp',
+                    'e3b7bf13fecd1af33e1c6d7dfb441d97590b71075194d040c5ad325814fdac1f',
+                    'aten/src/ATen/native/UpSample.h',
+                    'd49801938b31a544d2f55d616eea5db4cbd611ba691dca128ccd6aa870d008ba',
+                    'BSD 3-Clause',
+                    'Facebook, Inc']
+            def visionJars = [
+                    jmlxJars.find { it.name.startsWith('jmlx-vision-') },
+                    javadocs.files.find { it.name.startsWith('jmlx-vision-') },
+                    sources.files.find { it.name.startsWith('jmlx-vision-')}]
+            visionJars.eachWithIndex { jar, index ->
+                def kind = ['main', 'javadoc', 'sources'][index]
+                if (jar == null) throw new GradleException("jmlx-vision ${kind} jar not resolved")
+                if (!entries(jar).contains('META-INF/NOTICE')) {
+                    throw new GradleException("${jar.name}: no META-INF/NOTICE")
+                }
+                def notice = new String(entryBytes(jar, 'META-INF/NOTICE'), java.nio.charset.StandardCharsets.UTF_8)
+                requiredNotice.each { required ->
+                    if (!notice.contains(required)) {
+                        throw new GradleException("${jar.name}: META-INF/NOTICE missing required content: ${required}")
+                    }
+                }
+            }
+            // JPMS: jinja is an explicit module; tokenizer and vision declare automatic module
+            // names. Check the published artifacts, not the project jars.
+            def jinjaJar = jmlxJars.find { it.name.startsWith('jmlx-jinja-') }
+            if (jinjaJar == null) throw new GradleException("jmlx-jinja jar not resolved")
+            def moduleInfo = entryBytes(jinjaJar, 'module-info.class')
+            if (moduleInfo == null) throw new GradleException("${jinjaJar.name}: no module-info.class")
+            def descriptor = java.lang.module.ModuleDescriptor.read(new java.io.ByteArrayInputStream(moduleInfo))
+            if (descriptor.name() != 'se.alipsa.jmlx.jinja') {
+                throw new GradleException("${jinjaJar.name}: module name '${descriptor.name()}' != se.alipsa.jmlx.jinja")
+            }
+            def automaticModule = { File jar, String expectedName ->
+                if (jar == null) throw new GradleException("module for ${expectedName} not resolved")
+                def manifest = entryBytes(jar, 'META-INF/MANIFEST.MF')
+                if (manifest == null) throw new GradleException("${jar.name}: no manifest")
+                def line = new String(manifest, java.nio.charset.StandardCharsets.UTF_8).readLines()
+                        .find { it.startsWith('Automatic-Module-Name:') }
+                def actual = line == null ? null : line.substring('Automatic-Module-Name:'.length()).trim()
+                if (actual != expectedName) {
+                    throw new GradleException("${jar.name}: Automatic-Module-Name '${actual}' != ${expectedName}")
+                }
+            }
+            automaticModule(jmlxJars.find { it.name.startsWith('jmlx-tokenizer-') }, 'se.alipsa.jmlx.tokenizer')
+            automaticModule(jmlxJars.find { it.name.startsWith('jmlx-vision-') }, 'se.alipsa.jmlx.vision')
+            if (nativeSelected) {
+                def nativeJar = jmlxJars.find { it.name.startsWith('jmlx-native-macos-arm64') }
+                if (nativeJar == null) throw new GradleException("jmlx-native-macos-arm64 jar not resolved")
+                def required = ['libmlxc.dylib', 'libmlx.dylib', 'libjaccl.dylib', 'mlx.metallib', 'native-pin.properties']
+                def names = entries(nativeJar)
+                required.each {
+                    if (!names.contains("se/alipsa/jmlx/native/macos-aarch64/${it}".toString())) {
+                        throw new GradleException("${nativeJar.name} lacks ${it}")
+                    }
+                }
+                if (!names.contains('META-INF/NOTICE')) throw new GradleException("${nativeJar.name}: no META-INF/NOTICE")
+            }
+            if (javadocs.files.size() != expectedCount) {
+                throw new GradleException("javadoc jars: ${javadocs.files*.name}")
+            }
+            if (sources.files.size() != expectedCount) {
+                throw new GradleException("sources jars: ${sources.files*.name}")
+            }
+            println "License, JPMS names, vision NOTICE${nativeSelected ? ' and native payload' : ''}, " +
+                    "${javadocs.files.size()} javadoc and ${sources.files.size()} sources jars verified"
+        }
+    }
+}
+
+// The POM-only consumer's task: the same traversal through POM-only resolution, writing the
+// coordinate report verifyPomMatchesModuleMetadata compares against the module-metadata one.
+ext.smokeRegisterPomTask = {
+    tasks.register('writeRuntimeCoordinates') {
+        def output = layout.buildDirectory.file('runtime-coordinates.txt')
+        outputs.file(output)
+        smokeVerificationInputs(it)
+        def configuration = configurations.runtimeClasspath
+        doLast {
+            def result = smokeTraverse(configuration)
+            output.get().asFile.text = result.coordinates.join('\n') + '\n'
+            println "POM-only resolution: ${result.coordinates.size()} components"
+        }
+    }
+}

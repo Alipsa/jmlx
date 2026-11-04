@@ -1,0 +1,10 @@
+# SHA-256 of every file in this fixture set (paths relative to this directory).
+71bcf8f79e3f08afa3c1ce67ec974866170211b6849673d26faf36c92f54989c  resize-small-96x64.png
+05a55c7b286304d83ec1479c4368fa9cc8d8d47b4c5e118f9c4d690fd3e4cad7  resize-expected.bin
+3eb0dcb2893cb93359070013c239051af15d98b05c3c41450b12745c71bc5274  resize-case.json
+f407962d9f7869760f01c753c7d382320bce5e711502e4f247fcc5a82dfd8e86  tokenizer/tokenizer.json
+7b0ca603fa108072d2d1c23aa8b1224fe9a71965d9e7ff8f069bbe97f08f2044  tokenizer/tokenizer_config.json
+
+# Source-of-truth files outside this directory (see PROVENANCE.md).
+1406c672319464b8314e4eab65517ffd37b15e6c0d403e7f3d4f717dba55a338  ../../../image-oracle/fixtures/resize.expected.json
+239db3b3c3a936b3494e21402c04b7edf944a06d2278e41a690125cdb8870ab6  ../../../image-oracle/fixtures/resize.input.json

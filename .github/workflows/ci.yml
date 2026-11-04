@@ -104,6 +104,19 @@ jobs:
             :jmlx-jinja:fuzzParserVerify \
             :jmlx-jinja:formatGoldenVerify
 
+      # Regression tests for the release smoke runner's argument parsing and candidate preflight,
+      # against disposable fixtures (no repository, producer or tuple side effects).
+      - name: Release smoke selftest
+        run: ./tools/release-smoke/selftest.sh
+
+      # The pure profile publishes the three pure-Java modules to a disposable repository and
+      # resolves them from a fresh Java 21 headless consumer (exclusive repository content, no
+      # native runtime). The consumer inherits this job's GRADLE_OPTS JDK discovery
+      # (fromEnv=JAVA_HOME_21_X64,JAVA_HOME_25_X64, auto-download disabled). The full profile's
+      # smoke stays on the macOS native job: it needs the staged native runtime.
+      - name: Release smoke (pure-Java, CI mode)
+        run: ./tools/release-smoke/run.sh ci --profile pure-java
+
   native:
     # macos-26 is GitHub's hosted ARM64 (M1) image. Each job starts on a
     # fresh VM, so the pinned MLX runtime must be bootstrapped in the checkout.

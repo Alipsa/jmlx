@@ -1,10 +1,11 @@
 # Phase 7.6 — Hybrid Qwen text and image inference
 
-- **Status:** implementation complete on `phase7-6-implementation`, 2026-11-03 (PR pending;
-  macOS 26 hosted CI and the qwen35 arm's first self-hosted Tier-B run remain pending). All
-  work packages executed with local evidence; see the [worklog](phase7-6-worklog.md) for the
-  checkpoint-by-checkpoint record and
-  [WP1 optimization report](phase7-6-wp1-optimization.md) for the completed structural gate.
+- **Status:** delivered; merged in PR #79 (merge `e472c65`, 2026-11-03). All work packages
+  executed with local evidence; the macOS 26 hosted suites passed in run 41724687057
+  (2026-11-03); the qwen35 arm's first self-hosted Tier-B run remains pending (never
+  executed, no waiver). See the [worklog](phase7-6-worklog.md) for the checkpoint-by-checkpoint
+  record and [WP1 optimization report](phase7-6-wp1-optimization.md) for the completed
+  structural gate.
 - **Parent:** [Phase 7 §7.6](phase7-plan.md#76--hybrid-linear-attention-qwen-decoders-qwen38).
 - **Prerequisites:** 7.1 core operations, 7.3b vision/MRoPE and the delivered 7.5 paired-pin
   upgrade. PR #76 is merged; its timing investigation leaves measurement limits with Phase 8.2.

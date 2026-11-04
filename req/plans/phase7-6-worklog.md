@@ -311,5 +311,6 @@ retained size; this fixture is the first counterexample geometry.
 - The three scratch memory-diagnostic tests were deleted; the throwaway benchmark worktree
   was removed.
 - Full root `./gradlew check` re-run green on the final tree (post memory-test fix); PR
-  opened against `main`. No merge is authorized; human review and the hosted CI runs
-  (macOS 26 native job; the qwen35 arm's first self-hosted execution) remain pending.
+  #79 merged after human review (merge `e472c65`, 2026-11-03). The macOS 26 hosted suites
+  passed in run 41724687057 (2026-11-03); the qwen35 arm's first self-hosted execution
+  remains pending (never executed, no waiver).

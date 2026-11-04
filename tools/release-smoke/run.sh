@@ -115,7 +115,8 @@ tuple_value() {
   local tuple="${JMLX_SMOKE_TUPLE_FILE:-$SMOKE_DIR/released-8.1.properties}" v
   v="$(grep -m1 "^$1=" "$tuple" 2>/dev/null | cut -d= -f2- || true)"
   case "$v" in
-    *[[:space:]]*) die "released-8.1.properties entry $1 contains whitespace: '$v' (the file is tightly formatted)" ;;
+    # %q: a CRLF-rewritten value carries a non-printing \r that would make the error unreadable.
+    *[[:space:]]*) die "released-8.1.properties entry $1 contains whitespace: $(printf '%q' "$v") (the file is tightly formatted)" ;;
   esac
   printf '%s\n' "$v"
 }

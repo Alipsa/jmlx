@@ -69,7 +69,15 @@ if (profile == 'pure-java' && jmlxMode == 'release') {
     if (!tupleFile.isFile()) {
         throw new GradleException("The pure-Java release run requires the committed tuple file ${tupleFile}")
     }
-    def lines = tupleFile.readLines()
+    def raw = tupleFile.getText('UTF-8')
+    // readLines() would strip carriage returns and silently accept a CRLF-rewritten file that
+    // the shell preflight rejects; check the raw text so the two readers agree on line endings.
+    if (raw.contains('\r')) {
+        throw new GradleException(
+            "released-8.1.properties must use LF line endings (no carriage returns); " +
+            "a CRLF-rewritten checkout cannot be published from")
+    }
+    def lines = raw.split('\n')
     tupleVersions = [:]
     for (String module in pureModules) {
         def key = propertyKey(module)

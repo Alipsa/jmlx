@@ -51,7 +51,8 @@ is `ci --profile all` only; it is rejected for every pure-Java run and for `cand
   Development snapshot bumps must not change this file; release and recovery PRs update it. The
   file is tightly formatted — `key=value` lines with no whitespace in the value — and the shell
   preflight and the Gradle reader both reject any whitespace in a value, so the two parsers cannot
-  disagree on what a valid entry is.
+  disagree on what a valid entry is. Its line endings are pinned to LF in `.gitattributes`, and
+  both readers reject a CRLF-rewritten file, so a `core.autocrlf=true` checkout cannot split them.
 
 Version overrides are the `JMLX_<MODULE>_VERSION` environment variables (e.g.
 `JMLX_TOKENIZER_VERSION=0.1.0`), forwarded to the consumer as `-P` properties. The version sources
@@ -144,7 +145,11 @@ smoke repository untouched. It is a step of the Linux Java CI job.
   disagree; fix the version pair in the same PR.
 - `released-8.1.properties entry <key> contains whitespace: '<value>'` (preflight; the Gradle
   reader reports the same error in release mode): the tuple file is tightly formatted — rewrite
-  the line as `key=value` with no whitespace.
+  the line as `key=value` with no whitespace. A value that prints as `$'…\r'` is a
+  CRLF-rewritten file (see below).
+- `released-8.1.properties must use LF line endings` (Gradle, release mode): a
+  `core.autocrlf=true` checkout rewrote the committed LF file to CRLF — restore it from the
+  repository (`.gitattributes` pins it to LF) and commit the restoration.
 - `A project dependency leaked into the consumer graph`: the consumer build lost its isolation —
   check that no `project(...)` dependency or composite build was introduced.
 - `Module-metadata and POM-only runtime classpaths differ`: a published POM and its Gradle

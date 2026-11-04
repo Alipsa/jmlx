@@ -23,7 +23,9 @@ expect() {
 }
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+# The state marker lives outside $tmp (in the real, gitignored consumer build directory); the
+# trap removes it too so an interrupted run leaves nothing behind.
+trap 'rm -rf "$tmp"; rm -f "$here/build/e2e-preflight-state"' EXIT
 
 # Source run.sh in a subshell and run a body against it. The body may export the test hooks first.
 body() {
@@ -79,6 +81,8 @@ expect "pure preflight rejects a non-repeating override" 2 body \
   "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release' JMLX_JINJA_VERSION=0.7.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a whitespace tuple value" 2 body \
   "printf 'jmlxJinjaVersion=0.6.0 \njmlxTokenizerVersion=0.1.0\njmlxVisionVersion=0.1.0\n' > '$tmp/whitespace-tuple.properties'; export JMLX_SMOKE_TUPLE_FILE='$tmp/whitespace-tuple.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+expect "pure preflight rejects a CRLF tuple file" 2 body \
+  "printf 'jmlxJinjaVersion=0.6.0\r\njmlxTokenizerVersion=0.1.0\r\njmlxVisionVersion=0.1.0\r\n' > '$tmp/crlf-tuple.properties'; export JMLX_SMOKE_TUPLE_FILE='$tmp/crlf-tuple.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 
 # --- preflight_candidate: all profile (consumer defaults are read from the real gradle.properties) ---
 all_producers="$tmp/all-producers"

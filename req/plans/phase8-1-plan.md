@@ -139,7 +139,9 @@ this proves the published dependency edge.
    including during recovery. Pure mode always requires the three committed entries.
    The tuple file is tightly formatted: `key=value` lines with no whitespace in the value;
    the shell preflight and the Gradle reader both reject any whitespace in a value, so the
-   two parsers agree on what a valid entry is.
+   two parsers agree on what a valid entry is. Its line endings are pinned to LF in
+   `.gitattributes`, and both readers reject a file containing carriage returns, so a
+   `core.autocrlf=true` checkout cannot rewrite the file to CRLF and split the two parsers.
    Central has no fallback to checkout version defaults or stripped snapshot versions.
    Report the file values,
    overrides, effective versions and their sources. Fail clearly for any selected module

@@ -4,6 +4,11 @@
 # Linux start script should use lf
 /gradlew        text eol=lf
 
+# The release-smoke tuple file is parsed line by line by the shell preflight and the Gradle
+# reader, which must agree byte for byte; pin LF so a core.autocrlf=true checkout cannot
+# rewrite it to CRLF and split the two parsers.
+tools/release-smoke/released-8.1.properties text eol=lf
+
 # These are Windows script files and should use crlf
 *.bat           text eol=crlf
 

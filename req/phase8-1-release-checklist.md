@@ -1,4 +1,4 @@
-# Phase 8.1 release runbook: jinja 0.6.0, tokenizer 0.1.0, vision 0.1.0
+# Phase 8.1 release runbook: jinja 0.6.1, tokenizer 0.1.1, vision 0.1.1
 
 This is the exact procedure for cutting, verifying, publishing and closing out the first
 pure-Java releases. It is the runbook the [Phase 8.1 plan](plans/phase8-1-plan.md) WP4/WP5
@@ -9,9 +9,16 @@ authorized manual action.
 
 | Module | Release | Next development | Notes |
 | --- | --- | --- | --- |
-| `se.alipsa:jmlx-jinja` | `0.6.0` | `0.6.1-SNAPSHOT` | hfjinja migration line; no `se.alipsa:hfjinja` relocation POM |
-| `se.alipsa:jmlx-tokenizer` | `0.1.0` | `0.1.1-SNAPSHOT` | published dependency `se.alipsa:jmlx-jinja:0.6.0` |
-| `se.alipsa:jmlx-vision` | `0.1.0` | `0.1.1-SNAPSHOT` | no project dependency |
+| `se.alipsa:jmlx-jinja` | `0.6.1` | `0.6.2-SNAPSHOT` | hfjinja migration line; no `se.alipsa:hfjinja` relocation POM |
+| `se.alipsa:jmlx-tokenizer` | `0.1.1` | `0.1.2-SNAPSHOT` | published dependency `se.alipsa:jmlx-jinja:0.6.1` |
+| `se.alipsa:jmlx-vision` | `0.1.1` | `0.1.2-SNAPSHOT` | no project dependency |
+
+The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`, published 2026-11-04) is
+superseded: its bundles omitted the Gradle module metadata file (`.module`) because the
+then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The 2026-11-04 recovery
+republished the three coordinates as `0.6.1` / `0.1.1` / `0.1.1` with the plugin pin at 2.4.0.
+The `0.6.0` / `0.1.0` / `0.1.0` coordinates remain on Central as dead artifacts; never publish to
+them again and never point a consumer at them.
 
 The four native-chain modules (`jmlx-ffi`, `jmlx-core`, `jmlx-models`,
 `jmlx-native-macos-arm64`) and the root keep their snapshot versions throughout; they are never
@@ -19,18 +26,20 @@ published in this milestone.
 
 ## Dependency order and publication order
 
-`jmlx-tokenizer` depends on `se.alipsa:jmlx-jinja:0.6.0` via its published POM, so jinja must be
+`jmlx-tokenizer` depends on `se.alipsa:jmlx-jinja:0.6.1` via its published POM, so jinja must be
 **resolved from Central** before tokenizer is released. `jmlx-vision` is independent. Publish in
 this order, waiting for Central availability between steps (a script's success is not proof of
-availability: the pinned nexus-release-plugin 2.2.0 submits `publishingType=AUTOMATIC` and its
-`ReleaseTask` accepts `PUBLISHING` and `PUBLISHED` alike — checked in the cached 2.2.0 sources jar,
-`CentralPortalClient.groovy:49`, `ReleaseTask.groovy:115–125`, source-jar SHA-256
-`6b2cbd42a469f024f1acca1e96e2b9e2c134224248e21db09f7490f4647314ed`; recheck if the plugin
-changes):
+availability: the pinned nexus-release-plugin 2.4.0 submits `publishingType=AUTOMATIC` and its
+`ReleaseTask` accepts `PUBLISHING` and `PUBLISHED` alike — checked in the 2.4.0 sources,
+`CentralPortalClient.groovy:64`, `ReleaseTask.groovy:133–143`, source-jar SHA-256
+`edd4e45ccb56ca667a6d05b8318d21b0434adb8b0501e9befb66d33f0d8b25f6`; recheck if the plugin
+changes. Since 2.3.0 the `release` task additionally validates the bundle before upload and
+rejects one whose POM advertises Gradle metadata without a signed `.module` entry
+(`BundleValidator.groovy:111`), so the 2.2.0 `.module`-omission shape cannot recur silently):
 
 1. `./jmlx-jinja/release.sh`
-2. Wait until `se.alipsa:jmlx-jinja:0.6.0` **resolves from Central** (bounded retries; its generated
-   POM names 0.6.0 regardless of propagation state).
+2. Wait until `se.alipsa:jmlx-jinja:0.6.1` **resolves from Central** (bounded retries; its generated
+   POM names 0.6.1 regardless of propagation state).
 3. `./jmlx-tokenizer/release.sh`
 4. `./jmlx-vision/release.sh`
 5. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
@@ -84,12 +93,12 @@ the release SHA and branch (each module's own, not the PR's head), and the final
    failed-resolution report if availability remains incomplete after bounded retries; a
    successful upload is not a successful Central resolution.
 4. Create annotated tags pointing at each module's verified release SHA:
-   `jmlx-jinja-v0.6.0`, `jmlx-tokenizer-v0.1.0`, `jmlx-vision-v0.1.0`; push them as part of the
+   `jmlx-jinja-v0.6.1`, `jmlx-tokenizer-v0.1.1`, `jmlx-vision-v0.1.1`; push them as part of the
    authorized release procedure and record the tag-to-SHA mapping. Never move an existing release
    tag; on partial publication tag only confirmed releases.
 5. Open the development-bump PR (the next merge after successful Central verification):
-   advance the three modules beyond any recovery releases to `0.6.1-SNAPSHOT` / `0.1.1-SNAPSHOT`
-   / `0.1.1-SNAPSHOT`, add a fresh jinja Unreleased section, reset the
+   advance the three modules beyond any recovery releases to `0.6.2-SNAPSHOT` / `0.1.2-SNAPSHOT`
+   / `0.1.2-SNAPSHOT`, add a fresh jinja Unreleased section, reset the
    `tools/release-smoke/gradle.properties` defaults to those new development versions, finalize
    `req/phase8-1-release-notes.md` with the per-module release SHAs/branches and tag mapping,
    update `req/full-roadmap.md`'s 8.1 status and `AGENTS.md`'s published-module statements, and add

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1] - 2026-11-04
+
+### Fixed
+
+- Re-release of `0.1.0` with no functional changes: the `0.1.0` upload omitted the Gradle module
+  metadata file (`.module`) because the release tooling then in use (nexus-release-plugin 2.2.0)
+  bundles only JAR and POM files, while the published POM advertises that metadata. `0.1.1`
+  publishes the complete artifact set and updates its dependency to `se.alipsa:jmlx-jinja:0.6.1`.
+  Use `0.1.1` (or later) instead of the superseded `0.1.0` coordinate.
+
 ## Unreleased
 
 - `renderChat` accepts structured message content: an ordered list of `{"type": "text",

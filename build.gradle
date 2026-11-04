@@ -20,6 +20,19 @@ plugins {
     alias(libs.plugins.nexusRelease) apply false
 }
 
+// Combined release workflow (Phase 8.1): active only with -PreleaseAllMode=...; see
+// tools/release-all/README.md. Applying the plugin at the root registers the six combined
+// tasks (releaseAllPlan, releaseAllSigningCheck, releaseAllGuard, releaseAllPrepareMaven,
+// bundleAll, releaseAll); the subprojects get the plugin through the maven-publish wiring
+// below exactly as before, and ordinary builds never reach this block.
+if (providers.gradleProperty('releaseAllMode').isPresent()) {
+    apply plugin: 'se.alipsa.nexus-release-plugin'
+    nexusReleasePlugin.combinedRelease { }
+    gradle.projectsEvaluated {
+        apply from: 'tools/release-all/release-all.gradle'
+    }
+}
+
 def projectJavaVersion = 25
 
 // The downloader verifies its own hashes; never fingerprint/cache multi-gigabyte model outputs.

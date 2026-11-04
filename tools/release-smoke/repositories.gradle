@@ -58,24 +58,34 @@ def propertyKey = { String module ->
 }
 
 // The released pure-Java tuple: the sole version source for the pure profile in release mode.
+// Parsed line by line (key=value, no whitespace), not with java.util.Properties: the shell
+// preflight reads the same file with grep/cut, and the two parsers must agree on what a valid
+// entry is. Properties silently strips the value's leading whitespace and keeps trailing
+// whitespace, so a malformed hand edit could pass here while failing the preflight (or vice
+// versa); any whitespace in the value is a clear error in both.
 def tupleFile = new File(project.rootDir, 'released-8.1.properties')
 def tupleVersions = null
 if (profile == 'pure-java' && jmlxMode == 'release') {
     if (!tupleFile.isFile()) {
         throw new GradleException("The pure-Java release run requires the committed tuple file ${tupleFile}")
     }
-    def props = new Properties()
-    tupleFile.withInputStream { props.load(it) }
+    def lines = tupleFile.readLines()
     tupleVersions = [:]
     for (String module in pureModules) {
         def key = propertyKey(module)
-        def value = props.getProperty(key)
-        if (value == null || value.trim().isEmpty()) {
+        def line = lines.find { it.startsWith(key + '=') }
+        if (line == null) {
             throw new GradleException("released-8.1.properties is missing required entry ${key}")
         }
-        // Properties skips the value's leading whitespace but keeps trailing whitespace; the shell
-        // preflight (grep/cut) and the committed file format do not, so trim to agree with it.
-        value = value.trim()
+        def value = line.substring(key.length() + 1)
+        if (value ==~ /.*\s.*/) {
+            throw new GradleException(
+                "released-8.1.properties entry ${key} contains whitespace: '${value}'; " +
+                "the file is tightly formatted (key=value lines, no whitespace)")
+        }
+        if (value.isEmpty()) {
+            throw new GradleException("released-8.1.properties is missing required entry ${key}")
+        }
         if (value.endsWith('-SNAPSHOT')) {
             throw new GradleException("released-8.1.properties entry ${key} must not be a snapshot: ${value}")
         }

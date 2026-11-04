@@ -48,7 +48,10 @@ is `ci --profile all` only; it is rejected for every pure-Java run and for `cand
   version source for both the local candidate run and the Central run. The `gradle.properties`
   defaults are ignored entirely (no snapshot-suffix fallback), an explicit override may only repeat
   a file value exactly, and a missing entry or a snapshot value fails before any resolution.
-  Development snapshot bumps must not change this file; release and recovery PRs update it.
+  Development snapshot bumps must not change this file; release and recovery PRs update it. The
+  file is tightly formatted — `key=value` lines with no whitespace in the value — and the shell
+  preflight and the Gradle reader both reject any whitespace in a value, so the two parsers cannot
+  disagree on what a valid entry is.
 
 Version overrides are the `JMLX_<MODULE>_VERSION` environment variables (e.g.
 `JMLX_TOKENIZER_VERSION=0.1.0`), forwarded to the consumer as `-P` properties. The version sources
@@ -139,6 +142,9 @@ smoke repository untouched. It is a step of the Linux Java CI job.
 - `producer <module> version X does not match tuple value Y` / `producer <module> is a snapshot:
   X` (preflight): the module's own `version =` line and the consumer's default/override/tuple
   disagree; fix the version pair in the same PR.
+- `released-8.1.properties entry <key> contains whitespace: '<value>'` (preflight; the Gradle
+  reader reports the same error in release mode): the tuple file is tightly formatted — rewrite
+  the line as `key=value` with no whitespace.
 - `A project dependency leaked into the consumer graph`: the consumer build lost its isolation —
   check that no `project(...)` dependency or composite build was introduced.
 - `Module-metadata and POM-only runtime classpaths differ`: a published POM and its Gradle

@@ -77,6 +77,8 @@ expect "pure preflight rejects a mismatched producer" 2 body \
   "printf 'jmlx-jinja=0.7.0\njmlx-tokenizer=0.1.0\njmlx-vision=0.1.0\n' > '$tmp/mismatched.properties'; export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/mismatched.properties'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a non-repeating override" 2 body \
   "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release' JMLX_JINJA_VERSION=0.7.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+expect "pure preflight rejects a whitespace tuple value" 2 body \
+  "printf 'jmlxJinjaVersion=0.6.0 \njmlxTokenizerVersion=0.1.0\njmlxVisionVersion=0.1.0\n' > '$tmp/whitespace-tuple.properties'; export JMLX_SMOKE_TUPLE_FILE='$tmp/whitespace-tuple.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 
 # --- preflight_candidate: all profile (consumer defaults are read from the real gradle.properties) ---
 all_producers="$tmp/all-producers"
@@ -92,20 +94,30 @@ expect "all preflight rejects an override that moves the expectation" 2 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_CORE_VERSION=0.4.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 
 # --- a failing preflight is side-effect-free: main runs the preflight immediately after argument
-# parsing, so a failing candidate run must exit 2 before the smoke repository is touched. Runs the
-# real run.sh, not the function: the property under test is main's ordering, not the function. ---
+# parsing, so a failing candidate run must exit 2 before the smoke repository or the consumer's
+# project state is touched. Runs the real run.sh, not the function: the property under test is
+# main's ordering, not the function. stderr is captured and must carry the preflight's own
+# message: other early paths (e.g. a missing wrapper distribution) also exit 2, so the status
+# alone would pass a preflight that never ran. The state marker lives in this checkout's real
+# consumer build directory (gitignored), created and removed by the test. ---
 repo="$tmp/repo"
+state_marker="$here/build/e2e-preflight-state"
 mkdir -p "$repo"
 touch "$repo/marker"
+mkdir -p "$here/build"
+touch "$state_marker"
+err="$tmp/e2e.err"
 status=0
 JMLX_SMOKE_REPO_DIR="$repo" JMLX_SMOKE_TUPLE_FILE="$tmp/absent.properties" JMLX_SMOKE_PRODUCER_VERSIONS="$producers_release" \
-  bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>&1 || status=$?
-if [ "$status" -eq 2 ] && [ -f "$repo/marker" ]; then
-  echo "ok: failing preflight exits 2 before touching the smoke repository"
+  bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>"$err" || status=$?
+if [ "$status" -eq 2 ] && [ -f "$repo/marker" ] && [ -f "$state_marker" ] \
+  && grep -q "released tuple file missing" "$err"; then
+  echo "ok: failing preflight exits 2 with its own message before touching the repository or consumer state"
 else
-  echo "FAIL: preflight ran with side effects (status $status; marker $([ -f "$repo/marker" ] && echo present || echo gone))"
+  echo "FAIL: preflight ran with side effects or the wrong exit (status $status; repo marker $([ -f "$repo/marker" ] && echo present || echo gone); state marker $([ -f "$state_marker" ] && echo present || echo gone); stderr: $(head -1 "$err"))"
   fail=1
 fi
+rm -f "$state_marker"
 
 # --- task input isolation: the verification tasks declare mode, profile, versions, tuple and repo ---
 for needle in "inputs.property('mode'" "inputs.property('profile'" "inputs.property('versions'" \

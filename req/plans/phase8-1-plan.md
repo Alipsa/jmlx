@@ -137,6 +137,9 @@ this proves the published dependency edge.
    (for example, native modules in the full profile) or repeat a file value exactly; a
    disagreement is an error. An intentional tuple change requires a reviewed file update,
    including during recovery. Pure mode always requires the three committed entries.
+   The tuple file is tightly formatted: `key=value` lines with no whitespace in the value;
+   the shell preflight and the Gradle reader both reject any whitespace in a value, so the
+   two parsers agree on what a valid entry is.
    Central has no fallback to checkout version defaults or stripped snapshot versions.
    Report the file values,
    overrides, effective versions and their sources. Fail clearly for any selected module

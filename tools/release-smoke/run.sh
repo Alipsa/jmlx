@@ -108,10 +108,16 @@ producer_version() {
 }
 
 # tuple_value <key> : the key's value in the released pure-Java tuple file (JMLX_SMOKE_TUPLE_FILE
-# test hook overrides the path).
+# test hook overrides the path). The file is tightly formatted -- exactly <key>=<value> with no
+# whitespace; a value containing whitespace is a clear error here, matching the Gradle reader
+# (which also rejects it) rather than silently trimming.
 tuple_value() {
-  local tuple="${JMLX_SMOKE_TUPLE_FILE:-$SMOKE_DIR/released-8.1.properties}"
-  grep -m1 "^$1=" "$tuple" 2>/dev/null | cut -d= -f2- || true
+  local tuple="${JMLX_SMOKE_TUPLE_FILE:-$SMOKE_DIR/released-8.1.properties}" v
+  v="$(grep -m1 "^$1=" "$tuple" 2>/dev/null | cut -d= -f2- || true)"
+  case "$v" in
+    *[[:space:]]*) die "released-8.1.properties entry $1 contains whitespace: '$v' (the file is tightly formatted)" ;;
+  esac
+  printf '%s\n' "$v"
 }
 
 # preflight_candidate : in candidate mode, check the actual selected producer versions against what

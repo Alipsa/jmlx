@@ -310,9 +310,10 @@ published shape. It has two named module-set profiles, selected with `--profile`
 In release mode (`candidate`/`central`) the full profile strips `-SNAPSHOT` from the consumer
 `gradle.properties` defaults, while the pure profile reads its versions solely from the committed
 `released-8.1.properties` tuple (no snapshot-suffix fallback; an override may only repeat a file
-value exactly). `run.sh` parses all arguments before any side effect, clears the consumer's
-project state before any Gradle invocation, runs a candidate preflight against the actual
-producer versions before deleting the smoke repo or publishing, and forwards
+value exactly). `run.sh` parses all arguments before any side effect, runs a candidate preflight
+against the actual producer versions immediately after argument parsing (a snapshot producer
+fails it in both profiles) and before any cleanup, smoke-repo deletion or publication, clears the
+consumer's project state before any Gradle invocation, and forwards
 `JMLX_<MODULE>_VERSION` environment overrides as `-P` properties. The full smoke's `fixtures/`
 tokenizer is hand-written to pair with the synthetic Mistral checkpoint (see its
 `PROVENANCE.md`); `fixtures/pure-java/` carries its own provenance and digests. `run.sh central`

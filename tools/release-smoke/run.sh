@@ -38,10 +38,11 @@ smoke_paths() {
   REPO_DIR="${JMLX_SMOKE_REPO_DIR:-$ROOT/build/smoke-repo}"
 }
 
-# parse_args <args...> : sets MODE, PROFILE, RECORD. Rejects unknown modes/profiles, duplicate or
-# conflicting arguments and any unused trailing argument, and --record outside ci --profile all.
+# parse_args <args...> : sets MODE, PROFILE, RECORD. Rejects unknown modes/profiles, duplicate,
+# empty or conflicting arguments and any unused trailing argument, and --record outside
+# ci --profile all.
 parse_args() {
-  local mode="" profile="" record="false"
+  local mode="" profile="" profile_set=false record="false"
   while [ $# -gt 0 ]; do
     case "$1" in
       ci|candidate|central)
@@ -50,13 +51,17 @@ parse_args() {
         ;;
       --profile)
         [ $# -ge 2 ] || die "--profile needs a value"
-        [ -z "$profile" ] || die "duplicate --profile"
+        [ "$profile_set" = false ] || die "duplicate --profile"
+        profile_set=true
         profile="$2"
+        [ -n "$profile" ] || die "--profile needs a value"
         shift
         ;;
       --profile=*)
-        [ -z "$profile" ] || die "duplicate --profile"
+        [ "$profile_set" = false ] || die "duplicate --profile"
+        profile_set=true
         profile="${1#--profile=}"
+        [ -n "$profile" ] || die "--profile needs a value"
         ;;
       --record)
         [ "$record" = false ] || die "duplicate --record"
@@ -110,12 +115,13 @@ tuple_value() {
 }
 
 # preflight_candidate : in candidate mode, check the actual selected producer versions against what
-# the consumer will resolve, BEFORE the smoke repository is deleted or anything is published.
+# the consumer will resolve. main runs it immediately after argument parsing, so a failure exits
+# before any side effect: no cleanup, no Gradle invocation, no repository deletion, no publish.
 #
-# pure-java: released-8.1.properties must hold all three entries (no snapshot values), each equal to
-# the producer's own version with any -SNAPSHOT suffix stripped; an environment override must repeat
-# the file value exactly. (A matching snapshot producer still fails the consumer stage: the producer
-# publishes -SNAPSHOT while the consumer expects the released version.)
+# pure-java: released-8.1.properties must hold all three entries (no snapshot values), and the
+# producer's own version must equal the file value and be a release version (candidate never
+# publishes snapshot output, so a snapshot producer fails here, not later at consumer resolution);
+# an environment override must repeat the file value exactly.
 # all: every producer must equal the consumer's effective expected version (the gradle.properties
 # default or the environment override, -SNAPSHOT stripped) and must not itself be a snapshot:
 # removing -SNAPSHOT from a consumer default must never disguise snapshot producer output.
@@ -123,7 +129,7 @@ preflight_candidate() {
   if [ "$PROFILE" = pure-java ]; then
     local tuple="${JMLX_SMOKE_TUPLE_FILE:-$SMOKE_DIR/released-8.1.properties}"
     [ -f "$tuple" ] || die "released tuple file missing: $tuple"
-    local entry module key file_value producer override stripped
+    local entry module key file_value producer override override_var
     for entry in jmlx-jinja:jmlxJinjaVersion:JMLX_JINJA_VERSION \
                  jmlx-tokenizer:jmlxTokenizerVersion:JMLX_TOKENIZER_VERSION \
                  jmlx-vision:jmlxVisionVersion:JMLX_VISION_VERSION; do
@@ -134,8 +140,8 @@ preflight_candidate() {
       [ -n "$file_value" ] || die "released-8.1.properties is missing entry $key"
       case "$file_value" in *-SNAPSHOT) die "released-8.1.properties entry $key is a snapshot: $file_value" ;; esac
       producer="$(producer_version "$module")"
-      stripped="${producer%-SNAPSHOT}"
-      [ "$stripped" = "$file_value" ] || die "producer $module version $producer does not match tuple value $file_value"
+      case "$producer" in *-SNAPSHOT) die "producer $module is a snapshot: $producer (candidate requires release producers)" ;; esac
+      [ "$producer" = "$file_value" ] || die "producer $module version $producer does not match tuple value $file_value"
       override="${!override_var:-}"
       if [ -n "$override" ]; then
         [ "$override" = "$file_value" ] || die "$override_var=$override must repeat the tuple value $file_value"
@@ -143,7 +149,7 @@ preflight_candidate() {
       echo "preflight: $module=$file_value (released-8.1.properties; producer $producer)"
     done
   else
-    local entry module key def override expected producer
+    local entry module key def override override_var expected producer
     for entry in jmlx-models:jmlxModelsVersion:JMLX_MODELS_VERSION \
                  jmlx-native-macos-arm64:jmlxNativeVersion:JMLX_NATIVE_VERSION \
                  jmlx-core:jmlxCoreVersion:JMLX_CORE_VERSION \
@@ -175,6 +181,13 @@ fi
 smoke_paths
 parse_args "$@"
 
+# Candidate mode checks the actual producer versions against what the consumer will resolve
+# immediately after argument parsing, before any side effect: a failing preflight exits with the
+# smoke repository and the consumer's state untouched.
+if [ "$MODE" = candidate ]; then
+  preflight_candidate
+fi
+
 # The profile's selected modules, in publish order (jinja before tokenizer: the tokenizer's POM
 # depends on jinja, so the consumer cannot resolve it while jinja is missing from the repo).
 if [ "$PROFILE" = pure-java ]; then
@@ -185,9 +198,9 @@ else
   consumer_task=":app:smoke"
 fi
 
-# Clean the consumer's project state after argument parsing and before any Gradle invocation
-# (including the preflight): a fresh home alone leaves this intact, and a stale build directory from
-# another mode could mask a failure.
+# Clean the consumer's project state after argument parsing and before any Gradle invocation:
+# a fresh home alone leaves this intact, and a stale build directory from another mode could mask
+# a failure.
 rm -rf "$SMOKE_DIR/.gradle" "$SMOKE_DIR/build" "$SMOKE_DIR"/*/build
 
 # Locate a Gradle distribution through the checkout's wrapper (default home), then run the consumer
@@ -209,9 +222,6 @@ fi
 args=()
 case "$MODE" in
   ci|candidate)
-    if [ "$MODE" = candidate ]; then
-      preflight_candidate
-    fi
     rm -rf "$REPO_DIR"
     tasks=()
     for m in $modules; do tasks+=(":$m:publishMavenPublicationToSmokeRepository"); done

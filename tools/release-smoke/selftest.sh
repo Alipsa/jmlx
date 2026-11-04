@@ -2,7 +2,8 @@
 # Regression tests for run.sh's argument parsing and candidate preflight. Everything runs in
 # subshells against disposable fixtures (JMLX_SMOKE_TUPLE_FILE, JMLX_SMOKE_PRODUCER_VERSIONS,
 # JMLX_SMOKE_REPO_DIR), so the real smoke repository, producer versions and tuple file are never
-# touched. Run it with ./tools/release-smoke/selftest.sh; CI's Java job runs it as a step.
+# touched; one test runs the real run.sh candidate path end-to-end with the hooks pointed at a
+# failing fixture. Run it with ./tools/release-smoke/selftest.sh; CI's Java job runs it as a step.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,6 +43,9 @@ expect "unknown mode" 2 body 'parse_args bogus'
 expect "duplicate mode" 2 body 'parse_args ci candidate'
 expect "unknown profile" 2 body 'parse_args ci --profile bogus'
 expect "profile without value" 2 body 'parse_args ci --profile'
+expect "empty --profile value" 2 body 'parse_args ci --profile ""'
+expect "empty --profile= value" 2 body 'parse_args ci --profile='
+expect "empty --profile= then --profile pure-java" 2 body 'parse_args ci --profile= --profile pure-java'
 expect "duplicate profile" 2 body 'parse_args ci --profile all --profile pure-java'
 expect "unexpected trailing argument" 2 body 'parse_args ci extra'
 expect "duplicate record" 2 body 'parse_args ci --record --record'
@@ -52,13 +56,17 @@ expect "record on pure profile" 2 body 'parse_args ci --profile pure-java --reco
 # --- preflight_candidate: pure profile ---
 tuple="$tmp/released.properties"
 producers="$tmp/producers"
+producers_release="$tmp/producers-release"
 printf 'jmlxJinjaVersion=0.6.0\njmlxTokenizerVersion=0.1.0\njmlxVisionVersion=0.1.0\n' > "$tuple"
 printf 'jmlx-jinja=0.6.0-SNAPSHOT\njmlx-tokenizer=0.1.0-SNAPSHOT\njmlx-vision=0.1.0-SNAPSHOT\n' > "$producers"
+printf 'jmlx-jinja=0.6.0\njmlx-tokenizer=0.1.0\njmlx-vision=0.1.0\n' > "$producers_release"
 
-expect "pure preflight passes (snapshot producers strip to the tuple)" 0 body \
-  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+expect "pure preflight passes (release producers match the tuple)" 0 body \
+  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight passes with a repeating override" 0 body \
-  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers' JMLX_JINJA_VERSION=0.6.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release' JMLX_JINJA_VERSION=0.6.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+expect "pure preflight rejects snapshot producers" 2 body \
+  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a missing tuple file" 2 body \
   "export JMLX_SMOKE_TUPLE_FILE='$tmp/absent.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a missing tuple entry" 2 body \
@@ -66,9 +74,9 @@ expect "pure preflight rejects a missing tuple entry" 2 body \
 expect "pure preflight rejects a snapshot tuple entry" 2 body \
   "printf 'jmlxJinjaVersion=0.6.0-SNAPSHOT\njmlxTokenizerVersion=0.1.0\njmlxVisionVersion=0.1.0\n' > '$tmp/snapshot-tuple.properties'; export JMLX_SMOKE_TUPLE_FILE='$tmp/snapshot-tuple.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a mismatched producer" 2 body \
-  "printf 'jmlx-jinja=0.7.0-SNAPSHOT\njmlx-tokenizer=0.1.0-SNAPSHOT\njmlx-vision=0.1.0-SNAPSHOT\n' > '$tmp/mismatched.properties'; export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/mismatched.properties'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+  "printf 'jmlx-jinja=0.7.0\njmlx-tokenizer=0.1.0\njmlx-vision=0.1.0\n' > '$tmp/mismatched.properties'; export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/mismatched.properties'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a non-repeating override" 2 body \
-  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers' JMLX_JINJA_VERSION=0.7.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release' JMLX_JINJA_VERSION=0.7.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 
 # --- preflight_candidate: all profile (consumer defaults are read from the real gradle.properties) ---
 all_producers="$tmp/all-producers"
@@ -83,15 +91,19 @@ expect "all preflight rejects a snapshot producer" 2 body \
 expect "all preflight rejects an override that moves the expectation" 2 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_CORE_VERSION=0.4.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 
-# --- a failing preflight is side-effect-free: the smoke repository is untouched ---
+# --- a failing preflight is side-effect-free: main runs the preflight immediately after argument
+# parsing, so a failing candidate run must exit 2 before the smoke repository is touched. Runs the
+# real run.sh, not the function: the property under test is main's ordering, not the function. ---
 repo="$tmp/repo"
 mkdir -p "$repo"
 touch "$repo/marker"
-body "export JMLX_SMOKE_REPO_DIR='$repo' JMLX_SMOKE_TUPLE_FILE='$tmp/absent.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate" >/dev/null 2>&1 || true
-if [ -f "$repo/marker" ]; then
-  echo "ok: failing preflight leaves the smoke repository untouched"
+status=0
+JMLX_SMOKE_REPO_DIR="$repo" JMLX_SMOKE_TUPLE_FILE="$tmp/absent.properties" JMLX_SMOKE_PRODUCER_VERSIONS="$producers_release" \
+  bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>&1 || status=$?
+if [ "$status" -eq 2 ] && [ -f "$repo/marker" ]; then
+  echo "ok: failing preflight exits 2 before touching the smoke repository"
 else
-  echo "FAIL: preflight touched the smoke repository"
+  echo "FAIL: preflight ran with side effects (status $status; marker $([ -f "$repo/marker" ] && echo present || echo gone))"
   fail=1
 fi
 

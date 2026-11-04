@@ -130,13 +130,15 @@ this proves the published dependency edge.
    Removing `-SNAPSHOT` from a consumer default must never disguise snapshot producer output.
    Commit the released pure-Java tuple in `tools/release-smoke/released-8.1.properties`
    with the release PR. Pure candidate preflight must require all three file entries to
-   equal the effective producer versions, as well as checking consumer overrides against
-   those producers. Central mode reads that tuple for `pure-java`, including after development
-   bumps. Overrides may only supply selected modules absent from the file (for example,
-   native modules in the full profile) or repeat a file value exactly; a disagreement is an
-   error. An intentional tuple change requires a reviewed file update, including during
-   recovery. Pure mode always requires the three committed entries. Central has no fallback
-   to checkout version defaults or stripped snapshot versions. Report the file values,
+   equal the producer's own version, which must itself be a release version (a snapshot
+   producer fails the preflight before any side effect), and must check consumer overrides
+   against those file values. Central mode reads that tuple for `pure-java`, including
+   after development bumps. Overrides may only supply selected modules absent from the file
+   (for example, native modules in the full profile) or repeat a file value exactly; a
+   disagreement is an error. An intentional tuple change requires a reviewed file update,
+   including during recovery. Pure mode always requires the three committed entries.
+   Central has no fallback to checkout version defaults or stripped snapshot versions.
+   Report the file values,
    overrides, effective versions and their sources. Fail clearly for any selected module
    without a released version. Reject snapshot overrides and any resolved snapshot in
    either release-mode graph.
@@ -144,8 +146,9 @@ this proves the published dependency edge.
    `central` never publishes locally and resolves only Central. Never add `mavenLocal`,
    composite builds, project dependencies or checkout classes to the consumer classpath.
 5. Keep the fresh consumer Gradle home, disabled build cache and exclusive repository filter.
-   After successful argument parsing, before any Gradle invocation (including preflight),
-   clear the consumer's project state with `rm -rf "$smoke/.gradle" "$smoke/build" "$smoke"/*/build`.
+   In candidate mode run the preflight immediately after successful argument parsing, before
+   any other side effect. Then, before any Gradle invocation, clear the consumer's project
+   state with `rm -rf "$smoke/.gradle" "$smoke/build" "$smoke"/*/build`.
    Keep cleanup confined to these consumer paths. A fresh home alone leaves that state intact.
    Share profile/version selection between metadata and POM-only consumers. Also declare
    profile, versions, released-tuple file and repository as verification task inputs; input

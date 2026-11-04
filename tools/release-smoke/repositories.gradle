@@ -73,6 +73,9 @@ if (profile == 'pure-java' && jmlxMode == 'release') {
         if (value == null || value.trim().isEmpty()) {
             throw new GradleException("released-8.1.properties is missing required entry ${key}")
         }
+        // Properties skips the value's leading whitespace but keeps trailing whitespace; the shell
+        // preflight (grep/cut) and the committed file format do not, so trim to agree with it.
+        value = value.trim()
         if (value.endsWith('-SNAPSHOT')) {
             throw new GradleException("released-8.1.properties entry ${key} must not be a snapshot: ${value}")
         }
@@ -96,11 +99,15 @@ def versionOf = { String module ->
                 "overrides may only repeat a file value exactly")
         }
         def source = override != null ? 'released-8.1.properties (override repeats it)' : 'released-8.1.properties'
-        println "smoke version ${module}=${fromTuple} (${source})"
+        if (!pomOnly) {
+            println "smoke version ${module}=${fromTuple} (${source})"
+        }
         return fromTuple
     }
     def version = jmlxMode == 'release' ? configured.replace('-SNAPSHOT', '') : configured
-    println "smoke version ${module}=${version} (gradle.properties default${jmlxMode == 'release' ? ', -SNAPSHOT stripped' : ''})"
+    if (!pomOnly) {
+        println "smoke version ${module}=${version} (gradle.properties default${jmlxMode == 'release' ? ', -SNAPSHOT stripped' : ''})"
+    }
     return version
 }
 

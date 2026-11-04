@@ -54,14 +54,14 @@ Version overrides are the `JMLX_<MODULE>_VERSION` environment variables (e.g.
 `JMLX_TOKENIZER_VERSION=0.1.0`), forwarded to the consumer as `-P` properties. The version sources
 are printed during configuration.
 
-In `candidate` mode the preflight runs **before** the smoke repository is deleted or anything is
-published: the pure profile requires all three tuple entries to equal the producers' own versions
-(stripped of `-SNAPSHOT`) and overrides to repeat the file value; the full profile requires every
-producer to equal the consumer's effective expected version (default or override, stripped) and to
-not be a snapshot, so removing `-SNAPSHOT` from a consumer default never disguises snapshot
-producer output. In this tooling PR `candidate --profile pure-java`'s preflight passes while the
-producer versions are still `-SNAPSHOT` (the stripped values match the tuple); the consumer stage
-then fails at resolution, until the release PR sets the producers to their release versions.
+In `candidate` mode the preflight runs immediately after argument parsing, **before any side
+effect** (consumer-state cleanup, Gradle invocation, smoke-repository deletion, publication):
+the pure profile requires all three tuple entries to equal the producers' own versions, and the
+producers themselves must be release versions — a `-SNAPSHOT` producer fails the preflight, not
+the consumer stage — and overrides must repeat the file value; the full profile requires every
+producer to equal the consumer's effective expected version (default or override, stripped) and
+to not be a snapshot, so removing `-SNAPSHOT` from a consumer default never disguises snapshot
+producer output.
 
 ## JDK requirements
 
@@ -131,13 +131,14 @@ smoke repository untouched. It is a step of the Linux Java CI job.
   the consumer must use.
 - `Could not find se.alipsa:<module>:<version>`: the selected source (disposable repo or Central)
   lacks that exact coordinate. In `ci`/`candidate` the publish step ran for the selected modules
-  only — unselected modules deliberately may be missing; in `candidate --profile pure-java` with
-  `-SNAPSHOT` producers this is expected until the release PR sets release versions; in `central`
-  the module has not been published (yet) or the tuple names a version that was never released.
+  only — unselected modules deliberately may be missing; in `central` the module has not been
+  published (yet) or the tuple names a version that was never released. A `-SNAPSHOT` producer
+  never reaches resolution in `candidate` mode: the preflight rejects it first.
 - `Release mode forbids SNAPSHOTs` / `... is a snapshot`: a selected producer (or a transitive
   dependency) is still a snapshot while the consumer is in release mode.
-- `producer <module> version X != consumer expected Y` (preflight): the module's own `version =`
-  line and the consumer's default/override/tuple disagree; fix the version pair in the same PR.
+- `producer <module> version X does not match tuple value Y` / `producer <module> is a snapshot:
+  X` (preflight): the module's own `version =` line and the consumer's default/override/tuple
+  disagree; fix the version pair in the same PR.
 - `A project dependency leaked into the consumer graph`: the consumer build lost its isolation —
   check that no `project(...)` dependency or composite build was introduced.
 - `Module-metadata and POM-only runtime classpaths differ`: a published POM and its Gradle

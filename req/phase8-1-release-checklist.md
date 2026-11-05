@@ -16,7 +16,7 @@ authorized manual action.
 The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`, published 2026-11-04) is
 superseded: its bundles omitted the Gradle module metadata file (`.module`) because the
 then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The recovery (versions
-cut 2026-11-04; combined tooling reworked 2026-11-05 for the 2.5.0 plugin pin) re-releases the
+cut 2026-11-04; combined tooling reworked 2026-11-05 for the 2.5.1 plugin pin) re-releases the
 three coordinates as `0.6.1` / `0.1.1` / `0.1.1` in **one combined `releaseAll` deployment**
 (publication pending; see Publication below). The `0.6.0` / `0.1.0` / `0.1.0` coordinates
 remain on Central as dead artifacts; never publish to them again and never point a consumer at
@@ -53,11 +53,11 @@ Publication is one run of `./releaseAll.sh` from the verified release SHA on a c
    logging "published and available"; that is **not** the binding gate.
 5. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
 
-A script's success is not proof of availability. The pinned nexus-release-plugin 2.5.0 submits
+A script's success is not proof of availability. The pinned nexus-release-plugin 2.5.1 submits
 `publishingType=AUTOMATIC`, and its `releaseAll` task only logs "published and available" after
 the Portal reports `PUBLISHED` **and** repo1 answers HEAD 200 for every selected component's
 POM and main JAR (`ReleaseAllTask.groovy`, `CombinedDeployment.groovy`; source-jar SHA-256
-`3becf9fc9a464728daaa824eb829e6bd32026c3949a6a53496378989dd727cca`; recheck if the plugin
+`843cf4952dfce429009939b158f7f2d5d0f5bb28d71d2b0b512997cd83b16078`; recheck if the plugin
 changes) — but that check covers only the POM and the main JAR, so sources/Javadoc/
 module-metadata resolution against the live artifacts is still proven only by the fresh-cache
 smoke. The bundle is additionally validated before upload (since 2.3.0), and the plan adds the
@@ -79,7 +79,7 @@ this milestone after the superseded cut — contains, in one commit:
 - `jmlx-jinja/build.gradle` at `0.6.1`, `jmlx-tokenizer/build.gradle` and
   `jmlx-vision/build.gradle` at `0.1.1`, with changelog sections recording the supersession
   (jinja, tokenizer; vision has no changelog);
-- the nexus-release-plugin pin at `2.5.0` (`gradle/libs.versions.toml`);
+- the nexus-release-plugin pin at `2.5.1` (`gradle/libs.versions.toml`);
 - the combined-release tooling: `releaseAll.sh`, `tools/release-all/`, the `settings.gradle`
   plugin-resolution gate, the root `build.gradle` `releaseAllMode` gate, and the committed
   sanitized `req/releaseAll-portal-fixture.json`;

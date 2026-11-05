@@ -43,13 +43,18 @@ Recovery decisions and facts:
   coordinates; comparison guard recorded in the release record). Use `0.6.1` / `0.1.1` / `0.1.1`
   (or later); the `0.6.0` / `0.1.0` / `0.1.0` coordinates remain on Central as dead artifacts and
   are never published to again.
-- nexus-release-plugin is pinned to 2.5.0, which provides the module-based combined release
-  this workflow uses (the root `combinedRelease.modules` list; the plugin derives the candidate
-  set, per-module staging, signing and output paths, and jmlx's earlier hand-rolled candidate
-  walk is gone) and, since 2.3.0, validates every bundle before upload — the plan adds the
-  `.module` to a candidate's file list whenever its POM advertises Gradle metadata, so a
-  staging directory missing the signed `.module` fails before any upload; the 2.2.0 shape
-  cannot recur silently.
+- nexus-release-plugin is pinned to 2.5.1 (the 2.5.0 line provides the module-based combined
+  release this workflow uses — the root `combinedRelease.modules` list, with the plugin
+  deriving the candidate set, per-module staging, signing and output paths, and jmlx's earlier
+  hand-rolled candidate walk gone — and, since 2.3.0, validates every bundle before upload:
+  the plan adds the `.module` to a candidate's file list whenever its POM advertises Gradle
+  metadata, so a staging directory missing the signed `.module` fails before any upload; the
+  2.2.0 shape cannot recur silently). 2.5.1 fixes the two defects jmlx hit with 2.5.0
+  (Alipsa/nexus-release-plugin#11/#12): the bundle's ZIP entries now carry a fixed,
+  deterministic entry time (1980-02-01, Gradle's reproducible-archive date) instead of the
+  write time, and requesting `releaseAllPlan` together with `releaseAll` in one invocation is
+  rejected up front (manifest consumers are `mustRunAfter` the plan, and `bundleAll` now
+  re-checks that the staged selection matches the saved plan).
 - The recovery is published as **one combined `releaseAll` deployment** (the plugin's
   mega-bundle flow: one Maven-layout ZIP, one automatic Portal deployment) instead of three
   single deployments: Maven Central allows 10 deployments per month, three were already spent by
@@ -146,10 +151,12 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
   recovery bundle carries them signed.
 - Deployment ID (single combined deployment): _pending_
 - Bundle SHA-256 (`bundle-receipt.json`): _pending — recorded from the production run that
-  actually uploads. The bundle is not byte-reproducible across runs (the plugin's bundle task
-  stamps each ZIP entry with the current time), so no local run's hash is binding evidence of
-  the uploaded bundle. The local `--bundle-only` run at branch tip `6b3557a` produced
-  `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d` (non-binding); the
-  binding value is the Central-published checksums plus the production run's receipt._
+  actually uploads. Since 2.5.1 the bundle's ZIP entries carry a fixed deterministic time, so
+  the container is byte-reproducible for identical staging bytes — but the per-run `.asc`
+  signatures (GPG creation time) still differ between runs, so no local run's hash is binding
+  evidence of the uploaded bundle. The local `--bundle-only` run at branch tip `6b3557a`
+  (plugin 2.5.0) produced `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d`
+  (non-binding); the binding value is the Central-published checksums plus the production
+  run's receipt._
 - Tag-to-SHA mapping: _pending_
 - Central smoke report: _pending_

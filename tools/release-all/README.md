@@ -16,7 +16,10 @@ one slot for the whole tuple.
 
 `releaseAll.sh` drives the combined tasks of `se.alipsa.nexus-release-plugin` (pinned in
 `gradle/libs.versions.toml`; 2.5.0 introduced the module-based combined release this workflow
-uses). The plugin derives the candidate set, the per-module staging publication, signing and
+uses, and the pin is at 2.5.1, which fixes the two 2.5.0 defects jmlx hit:
+Alipsa/nexus-release-plugin#11, deterministic bundle entry times, and #12, plan/manifest
+task wiring plus the up-front rejection of `releaseAllPlan` + `releaseAll` in one
+invocation). The plugin derives the candidate set, the per-module staging publication, signing and
 every output path from the root `build.gradle`'s `combinedRelease.modules` list; jmlx only sets
 the module list, the committed Portal fixture and the report/resume overrides:
 

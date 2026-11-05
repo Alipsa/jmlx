@@ -24,7 +24,7 @@ plugins {
 // tools/release-all/README.md. Applying the plugin at the root registers the combined tasks
 // (releaseAllPlan, releaseAllSigningCheck, releaseAllGuard, bundleAll, releaseAll;
 // releaseAllPrepareMaven is registered too but never runs: jmlx has no static Maven
-// candidates). nexus-release-plugin 2.5.0 derives the candidate set, the per-module staging
+// candidates). nexus-release-plugin 2.5.1 derives the candidate set, the per-module staging
 // publication (with signing and the module's check wired in), and every output path from
 // combinedRelease.modules; jmlx only sets the module list, the committed Portal fixture and
 // the report/resume overrides below. The subprojects get the plugin through the maven-publish

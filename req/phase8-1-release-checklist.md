@@ -135,7 +135,10 @@ Verification before publication (all from the clean recovery merge commit):
 5. Open the development-bump PR (the next merge after successful Central verification):
    advance the three modules beyond any recovery releases to `0.6.2-SNAPSHOT` / `0.1.2-SNAPSHOT`
    / `0.1.2-SNAPSHOT`, add a fresh jinja Unreleased section, reset the
-   `tools/release-smoke/gradle.properties` defaults to those new development versions, finalize
+   `tools/release-smoke/gradle.properties` defaults to those new development versions and the
+   matching fake producer tuple in `tools/release-smoke/selftest.sh` (the `all preflight`
+   cases read the real consumer defaults, so the two must move together — the recovery PR
+   hit this drift in CI), finalize
    `req/phase8-1-release-notes.md` with the per-module release SHAs/branches and tag mapping,
    update `req/full-roadmap.md`'s 8.1 status and `AGENTS.md`'s published-module statements — its
    "Releasing a module" section still does not mention the combined `releaseAll.sh` workflow,

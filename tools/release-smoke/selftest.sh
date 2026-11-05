@@ -86,7 +86,7 @@ expect "pure preflight rejects a CRLF tuple file" 2 body \
 
 # --- preflight_candidate: all profile (consumer defaults are read from the real gradle.properties) ---
 all_producers="$tmp/all-producers"
-printf 'jmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.0\njmlx-jinja=0.6.0\njmlx-vision=0.1.0\n' > "$all_producers"
+printf 'jmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.1\njmlx-jinja=0.6.1\njmlx-vision=0.1.1\n' > "$all_producers"
 
 expect "all preflight passes (release producers match stripped defaults)" 0 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"

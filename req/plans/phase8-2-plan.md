@@ -9,9 +9,12 @@
   Record passing evidence or dated owner waivers; do not infer readiness from implementation
   merges. The owner authorization recorded there for 8.1 tooling does not authorize 8.2
   implementation. Writing/reviewing this plan may proceed before readiness is established.
-  Coordinate with the 8.1 publication freeze: benchmark PRs cannot merge during that freeze.
-  The roadmap does not require Central publication of the pure-Java modules to measure a
-  local checkout; benchmark work does not publish or change module versions.
+  The 8.1 publication freeze ran from the 8.1 release merge until the WP5
+  development-bump PR merged (per `phase8-1-plan.md`); that PR (#84) merged at
+  `42e6ff0` on 2026-11-05, so the freeze is lifted. WP0 records that merge commit as the
+  freeze-lift evidence. The roadmap does not require Central publication of the pure-Java
+  modules to measure a local checkout; benchmark work does not publish or change
+  module versions.
 
 ## 1. Goal and scope
 
@@ -33,10 +36,10 @@ claims, not beating `mlx_lm` or meeting a speed threshold. The report is an inpu
 release notes and to 9.1's optimization choices.
 
 Non-goals: native upgrades, binding regeneration, new model-family support, new quantization,
-KV-cache redesign, graph compilation changes, batching/scheduler comparisons, framework adapter
-work,
-publication, or changing existing oracle goldens/tolerances. Ordinary users gain no Python
-prerequisite. Large artifacts and native benchmarking remain opt-in.
+KV-cache redesign, graph compilation changes, batching/scheduler comparisons,
+framework adapter work, publication, or changing existing oracle goldens/tolerances.
+Ordinary users gain no Python prerequisite. Large artifacts and native benchmarking
+remain opt-in.
 
 ## 2. Repository baseline and design constraints
 
@@ -148,9 +151,8 @@ record loader casts, effective parameter dtypes, tensor mappings and quantized c
 
 For each controlled text case use batch 1, full retention, no prefix reuse, greedy selection,
 no penalties, no stop/EOS termination, and exactly 128 emitted tokens. Start with exact pretokenized
-prompt
-ID arrays of lengths 32, 512 and 2048, within both models' supported context including decode.
-Freeze actual IDs, hashes and validation in the manifest; no runtime-specific chat rendering
+prompt ID arrays of lengths 32, 512 and 2048, within both models' supported context including
+decode. Freeze actual IDs, hashes and validation in the manifest; no runtime-specific chat rendering
 or prompt truncation. Record cache layout/capacity and prefill chunking on both sides. For the
 controlled comparison disable optional compilation, speculative decoding and chunked prefill
 in the custom adapter described below; this cannot be achieved merely by raising the stock
@@ -178,10 +180,11 @@ Before timing, WP0 records a per-case Java/Python dtype inventory: stored weight
 attention/MLP/expert matmul operands, quantized sidecars and unquantized leaves, plus any cast.
 Initial expectations to verify are BF16 dense Qwen3 weights/compute, the header-declared float
 dtype for the chosen MoE (not an assumed up-cast), and UINT32-packed 4-bit weights with the
-artifact's floating sidecar/activation dtypes. `DecoderAssembler` checks uniform dtype but
-does not by itself prove an end-to-end float32 conversion; inspect loaded arrays and operand
-paths on both sides. Do not reuse the VLM up-cast assumption for text decoders. A mismatch
-must be resolved or explicitly separated before a matched-work ratio is accepted.
+artifact's floating sidecar/activation dtypes. `DecoderAssembler` only checks that each MoE
+layer's expert tensors share one dtype; it neither enforces a model-wide dtype nor proves an
+end-to-end float32 conversion; inspect loaded arrays and operand paths on both sides. Do
+not reuse the VLM up-cast assumption for text decoders. A mismatch must be resolved or
+explicitly separated before a matched-work ratio is accepted.
 
 **Known Python loop differences and adapter decision.** The installed
 `tools/qwen35-reference/mlx/.venv/lib/python3.12/site-packages/mlx_lm/generate.py`
@@ -215,11 +218,28 @@ Implement two explicit Python adapters over the same pinned model weights:
 - **Stock:** execute installed `stream_generate` without changing its loop/model source;
   use exact prompt IDs and greedy settings, but retain its split prefill, pipelining,
   lookahead, wired-limit context, cache clears and detokenization/finalization. Record normal
-  EOS behavior and actual emitted count; the 128-token budget is a maximum here. Label these
-  results `stock-default-loop` with all explicit request options, not controlled equivalence.
-  Drain the iterator through context exit, including its final response/stream synchronization;
+  EOS behavior (the tokenizer's `eos_token_ids`) and actual emitted count; the 128-token
+  budget is a maximum here. Label these results `stock-default-loop` with all explicit
+  request options, not controlled equivalence. The `wired_limit` context's exit synchronizes
+  only when the device reports a recommended working-set size (`maybe_set_recommended_wired_limit`
+  returned a previous limit); on the no-limit branch it yields without `mx.synchronize`, and
+  `stream_generate` leaves the `generate_step` generator suspended rather than closed, so the
+  unused final forward can still be pending when the iterator ends. End the full-generation
+  timer with an explicit `mx.synchronize()` after the iterator finishes, whichever branch ran;
   last-token arrival and full completion are distinct timestamps. Count the token in the final
   `GenerationResponse` exactly once; its finish reason does not make it an extra token event.
+
+**Stock Java pair path.** The Java side of a stock cell is the public
+`DecoderModel.generate(GenerationRequest, Consumer)` with the checkpoint's own `HfTokenizer`
+attached to the request, so the loop's incremental detokenization runs and is timed, matching
+the stock loop's always-detokenizing behavior (`GenerationLoop` decodes text only when the
+request carries a tokenizer). The request carries the pretokenized prompt IDs, full retention,
+`greedyDefaults(128, eosTokenIds)` with `eosTokenIds` the checkpoint tokenizer's EOS set
+(matching the stock loop's stop) and no extra `stopTokenIds`, and a minimal event listener.
+Both stock loops keep their own internals, so the stock table is an end-to-end
+stock-versus-stock comparison: the paired ratio describes each runtime's default generation
+loop, not matched per-step cost. Record actual emitted counts and finish reasons on both sides
+and do not promote a stock ratio to a matched-work claim.
 
 Run controlled and stock comparisons in separate fresh workers/matrices; do not pool their
 statistics. The controlled default is that neither runtime calls a wired-limit setter:
@@ -272,7 +292,7 @@ Report controlled matched work and stock default-loop behavior in separate table
 | --- | --- |
 | Process startup | Parent launch to worker-ready handshake; separate from model work |
 | Load/setup | Worker model-load entry to loader return, with lazy/materialized state recorded; separate explicit weight materialization if performed |
-| First request TTFT | Generation entry with supplied IDs to the first emitted, host-visible token; includes lazy weight realization and first-use work left by the loader policy. Stock also includes building/submitting token 2 before yielding token 1; its boundary differs from controlled TTFT |
+| First request TTFT | Generation entry with supplied IDs to the first emitted, host-visible token; includes lazy weight realization and first-use work left by the loader policy. Stock also includes building/submitting token 2 before yielding token 1, and the `wired_limit` context entry's `tree_reduce` sum of every model array's byte size; its boundary differs from controlled TTFT |
 | Warm TTFT | Same request boundary after declared warmups, fresh request cache |
 | Prefill | Controlled generation-equivalent last-position projection through evaluated logits/cache, excluding sampling; prompt length divided by elapsed seconds |
 | Cached decode | Fixed continuation after prefill, one evaluated step per input token; step count divided by total step time; retain each step's time and context position |
@@ -305,14 +325,16 @@ Python's counters must be matched against the pinned native counter semantics. N
 and RSS overlap under unified memory: never add them or call native peak total process memory.
 RSS sampling is a lower bound unless a platform peak counter establishes the maximum.
 
-For each text workload cell and each Python adapter, run five fresh Java/Python process pairs,
-alternating which runtime leads each pair, serially on one host. Each worker records the first
-request,
-then five discarded warmups and 20 measured warm requests with fresh request caches.
+For each text workload cell and each Python adapter, run six fresh Java/Python process pairs,
+alternating which runtime leads each pair so each runtime leads equally, serially on one host.
+The Java member of a controlled pair is the `stepLogits`-equivalent adapter of §3.2; the Java
+member of a stock pair is the public `generate` path named in §3.2. Each worker records
+the first request then five discarded warmups and 20 measured warm requests with fresh
+request caches.
 Preserve raw per-process/per-request/per-step values and iteration order. Report medians,
 p10/p90 with a specified quantile convention, per-process summaries and paired ratios computed
 from each process pair's warm medians. Do not divide unrelated percentile summaries or treat
-100 requests from five workers as 100 independent process samples. First-request distributions
+120 requests from six workers as 120 independent process samples. First-request distributions
 come from the fresh processes and are separate from warm statistics.
 
 Record UTC start/end, device/chip, physical RAM, macOS version/build, Java vendor/version/flags,
@@ -342,11 +364,11 @@ for each real case/adapter, then extrapolate requests, process launches and data
 Initial WP0 estimates may use the existing harness and installed stock loop; refresh them
 with the implemented controlled adapter during WP2 before committing the WP3/WP4 budgets.
 Pilot results are planning/qualification evidence, not headline samples. For one adapter the
-base matrix is 3 artifacts × 3 lengths × 5 pairs × 2 runtimes × 26 requests = 2,340 requests,
-or 299,520 emitted-token slots. Both adapter comparisons budget 180 workers, 4,680 requests
-and up to 599,040 tokens; stock early stops may reduce that count, not the reserved budget.
-At a hypothetical aggregate 10/50/100 tokens/s this is 16.6/3.3/1.7 device-hours of decode alone,
-before 4,680 prefills, loads, validation, fixed-continuation, memory and diagnostic runs.
+base matrix is 3 artifacts × 3 lengths × 6 pairs × 2 runtimes × 26 requests = 2,808 requests,
+or 359,424 emitted-token slots. Both adapter comparisons budget 216 workers, 5,616 requests
+and up to 718,848 tokens; stock early stops may reduce that count, not the reserved budget.
+At a hypothetical aggregate 10/50/100 tokens/s this is 20.0/4.0/2.0 device-hours of decode alone,
+before 5,616 prefills, loads, validation, fixed-continuation, memory and diagnostic runs.
 These are arithmetic scenarios, not measured throughput or a promise of elapsed runtime.
 
 | WP | Initial planning allowance (wall clock, not measured) | Required refinement before execution |
@@ -355,7 +377,7 @@ These are arithmetic scenarios, not measured throughput or a promise of elapsed 
 | WP1 | 3–5 working days of implementation/verification | Include both adapters, model-output projection qualification and failure/report tests |
 | WP2 | 2–3 working days; up to 2 device-hours of calibration/pilots | Budget counting, tracing, memory passes and calibration separately; freeze run counts |
 | WP3 | Reserve 1–3 days of host time initially; actual request matrix may exceed this on MoE | Use pilot-based sums for both adapters, fixed-continuation, qualification and diagnostics; state a finite total time budget and per-cell limits |
-| WP4 | 1–2 days including compatible builds and at least 20 VLM workers (2 workloads × 5 old/new pairs) | Freeze per-worker request count, load/first/warm estimates and any extra cache-regime budget |
+| WP4 | 1–2 days including compatible builds and at least 24 VLM workers (2 workloads × 6 old/new pairs) | Freeze per-worker request count, load/first/warm estimates and any extra cache-regime budget |
 | WP5 | 1–2 working days | Include archive transfer, raw-to-summary verification and review preparation; human review latency excluded |
 
 Before WP3/WP4, the manifest/run policy must contain finite `worker_timeout`,
@@ -366,8 +388,8 @@ counts and complete pairs in each session; a rerun repeats the cell's fixed matr
 than selecting individual favorable observations. A timeout/resource failure stops that
 session; any restart consumes one of the remaining sessions and the same time budget.
 Stop the cell at budget exhaustion or the three-session limit. Preserve partial output and
-failure/timeout logs. No expensive run is started if its estimated cost exceeds the remaining
-budget.
+failure/timeout logs. No expensive run is started if its estimated cost exceeds the
+remaining budget.
 
 If a cell remains variable, finish it as `unstable`, retain every session and show ranges and
 host observations without a settled performance ratio or runtime attribution. A timeout,
@@ -395,9 +417,9 @@ native CPU work or GPU waits. Thread CPU time omits background/native worker thr
 minus GPU time is not a valid measurement of Java overhead when work overlaps. Include scope/
 array lifecycle overhead in the accounting and preserve the unassigned residual. Stock
 `mlx_lm`'s n+1 host-graph / n GPU pipeline is a known scheduling difference with a potential
-benefit over Java's synchronous loop, not an FFM saving. Analyze controlled synchronous diagnostics
-first;
-stock overlap, extra forwards and allocator policy belong in a separate attribution table.
+benefit over Java's synchronous loop, not an FFM saving. Analyze controlled synchronous
+diagnostics first; stock overlap, extra forwards and allocator policy belong in a separate
+attribution table.
 
 Measure FFM transition cost in a benchmark-only calibration using a small C library with
 non-elidable no-op/identity functions for representative downcall signatures, built with a
@@ -453,7 +475,7 @@ be established, record that limit and leave shader-cache attribution unresolved;
 invalidate a correctly labeled first-in-process measurement. OS page cache and system
 shader-cache state remain observed/uncontrolled unless separately demonstrated otherwise.
 
-Collect at least five alternating old/new process pairs per VLM for the observed-cache baseline
+Collect at least six alternating old/new process pairs per VLM for the observed-cache baseline
 and for each additional cache regime used to support an attribution claim.
 Apply §4's host records, correctness-after-capture and raw/paired statistics. Repeat surprising
 VLM prefill results back to back before attribution. Controlled contention with `gpu-burn`
@@ -466,7 +488,8 @@ state or prove which resident process caused the original slowdown.
 
 ### WP0 — Record readiness and freeze the comparison contract
 
-- Reconcile Phase 7 gates, any owner scope decisions and the 8.1 merge freeze; record evidence.
+- Reconcile Phase 7 gates and any owner scope decisions; record the 8.1 merge freeze as
+  lifted by the development-bump PR's merge at `42e6ff0` (2026-11-05).
 - Select and digest-pin the three real text artifacts, both VLM cases, exact input IDs/images,
   generation settings, precision/qualification tolerances, cache regimes and host capacity.
   Record TinyMistral acceptance/rejection and float-only MoE RAM/disk/page-cache/I/O budgets;

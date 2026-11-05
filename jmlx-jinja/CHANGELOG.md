@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-11-05
+
+### Fixed
+
+- Re-release of `0.6.0` with no functional changes: the `0.6.0` upload omitted the Gradle module
+  metadata file (`.module`) because the release tooling then in use (nexus-release-plugin 2.2.0)
+  bundles only JAR and POM files, while the published POM advertises that metadata. `0.6.1`
+  publishes the complete artifact set. Use `0.6.1` (or later) instead of the superseded `0.6.0`
+  coordinate.
+
 ## [0.6.0] - 2026-11-04
 
 ### Added

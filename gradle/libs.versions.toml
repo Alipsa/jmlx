@@ -13,4 +13,4 @@ jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version = "8.9.0" }
-nexusRelease = { id = "se.alipsa.nexus-release-plugin", version = "2.2.0" }
+nexusRelease = { id = "se.alipsa.nexus-release-plugin", version = "2.5.1" }

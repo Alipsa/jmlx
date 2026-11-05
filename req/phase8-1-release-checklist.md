@@ -1,4 +1,4 @@
-# Phase 8.1 release runbook: jinja 0.6.0, tokenizer 0.1.0, vision 0.1.0
+# Phase 8.1 release runbook: jinja 0.6.1, tokenizer 0.1.1, vision 0.1.1
 
 This is the exact procedure for cutting, verifying, publishing and closing out the first
 pure-Java releases. It is the runbook the [Phase 8.1 plan](plans/phase8-1-plan.md) WP4/WP5
@@ -9,91 +9,141 @@ authorized manual action.
 
 | Module | Release | Next development | Notes |
 | --- | --- | --- | --- |
-| `se.alipsa:jmlx-jinja` | `0.6.0` | `0.6.1-SNAPSHOT` | hfjinja migration line; no `se.alipsa:hfjinja` relocation POM |
-| `se.alipsa:jmlx-tokenizer` | `0.1.0` | `0.1.1-SNAPSHOT` | published dependency `se.alipsa:jmlx-jinja:0.6.0` |
-| `se.alipsa:jmlx-vision` | `0.1.0` | `0.1.1-SNAPSHOT` | no project dependency |
+| `se.alipsa:jmlx-jinja` | `0.6.1` | `0.6.2-SNAPSHOT` | hfjinja migration line; no `se.alipsa:hfjinja` relocation POM |
+| `se.alipsa:jmlx-tokenizer` | `0.1.1` | `0.1.2-SNAPSHOT` | published dependency `se.alipsa:jmlx-jinja:0.6.1` |
+| `se.alipsa:jmlx-vision` | `0.1.1` | `0.1.2-SNAPSHOT` | no project dependency |
+
+The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`, published 2026-11-04) is
+superseded: its bundles omitted the Gradle module metadata file (`.module`) because the
+then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The recovery (versions
+cut 2026-11-04; combined tooling reworked 2026-11-05 for the 2.5.1 plugin pin) re-releases the
+three coordinates as `0.6.1` / `0.1.1` / `0.1.1` in **one combined `releaseAll` deployment**
+(publication pending; see Publication below). The `0.6.0` / `0.1.0` / `0.1.0` coordinates
+remain on Central as dead artifacts; never publish to them again and never point a consumer at
+them.
 
 The four native-chain modules (`jmlx-ffi`, `jmlx-core`, `jmlx-models`,
 `jmlx-native-macos-arm64`) and the root keep their snapshot versions throughout; they are never
 published in this milestone.
 
-## Dependency order and publication order
+## Publication (one combined deployment)
 
-`jmlx-tokenizer` depends on `se.alipsa:jmlx-jinja:0.6.0` via its published POM, so jinja must be
-**resolved from Central** before tokenizer is released. `jmlx-vision` is independent. Publish in
-this order, waiting for Central availability between steps (a script's success is not proof of
-availability: the pinned nexus-release-plugin 2.2.0 submits `publishingType=AUTOMATIC` and its
-`ReleaseTask` accepts `PUBLISHING` and `PUBLISHED` alike — checked in the cached 2.2.0 sources jar,
-`CentralPortalClient.groovy:49`, `ReleaseTask.groovy:115–125`, source-jar SHA-256
-`6b2cbd42a469f024f1acca1e96e2b9e2c134224248e21db09f7490f4647314ed`; recheck if the plugin
-changes):
+`jmlx-tokenizer` depends on `se.alipsa:jmlx-jinja:0.6.1` via its published POM. In the combined
+flow that edge is satisfied inside one bundle: the planner's fixed point selects tokenizer only
+because jinja is selected in the same deployment, and Central resolves the edge once both
+coordinates are live. The four native-chain SNAPSHOT modules are candidates in every plan and are
+excluded — reported with their SNAPSHOT reasons — in every run.
 
-1. `./jmlx-jinja/release.sh`
-2. Wait until `se.alipsa:jmlx-jinja:0.6.0` **resolves from Central** (bounded retries; its generated
-   POM names 0.6.0 regardless of propagation state).
-3. `./jmlx-tokenizer/release.sh`
-4. `./jmlx-vision/release.sh`
+Publication is one run of `./releaseAll.sh` from the verified release SHA on a clean tree
+(`tools/release-all/README.md` documents the full task sequence):
+
+1. `./releaseAll.sh --dry-run` — plan and report (expect 3 selected / 4 excluded), signing
+   preflight in warning mode.
+2. jinja's complete checklist from the same clean SHA (this is a separate manual gate:
+   `releaseAll.sh`'s own per-module `check` does not include `:jmlx-jinja:releaseVerification`),
+   plus the pure candidate smoke.
+3. Publication-day changelog dates: the `[0.6.1]` / `[0.1.1]` sections are pre-filled with the
+   expected publication date in the recovery PR. If on publication day they differ from the
+   actual date, land the fix in its own small reviewed PR merged to main before the production
+   run — the production run happens from the merge SHA under the main freeze, so a post-merge
+   date fix is a recovery PR, not an edit to the release branch — and rerun the affected
+   modules' checks and the pure candidate smoke from the new SHA. The changelog is not part of
+   the published sources jars, so no artifact bytes change; the re-run is required because the
+   release SHA moved and the source guard requires a clean, recorded HEAD.
+4. `./releaseAll.sh` — the selected modules' checks (wired into `bundleAll`'s staging by the
+   plugin), staging, bundle validation and the single upload. The `releaseAll` task polls to
+   `PUBLISHED` plus repo1 HEAD 200 for every selected component's POM and main JAR before
+   logging "published and available"; that is **not** the binding gate.
 5. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
 
-Record per module: the deployment ID, terminal Central portal state, actual Central availability,
-the release SHA and branch (each module's own, not the PR's head), and the final tag mapping.
+A script's success is not proof of availability. The pinned nexus-release-plugin 2.5.1 submits
+`publishingType=AUTOMATIC`, and its `releaseAll` task only logs "published and available" after
+the Portal reports `PUBLISHED` **and** repo1 answers HEAD 200 for every selected component's
+POM and main JAR (`ReleaseAllTask.groovy`, `CombinedDeployment.groovy`; source-jar SHA-256
+`843cf4952dfce429009939b158f7f2d5d0f5bb28d71d2b0b512997cd83b16078`; recheck if the plugin
+changes) — but that check covers only the POM and the main JAR, so sources/Javadoc/
+module-metadata resolution against the live artifacts is still proven only by the fresh-cache
+smoke. The bundle is additionally validated before upload (since 2.3.0), and the plan adds the
+`.module` to a candidate's file list whenever its POM carries the
+`published-with-gradle-metadata` marker (`ReleaseAllPlanTask.groovy`), so a staging directory
+missing the signed `.module` fails `CombinedBundle.create` before any upload; the 2.2.0
+`.module`-omission shape cannot recur silently.
 
-## WP4 — cut and verify the release candidate
+Record: the single deployment ID, terminal Central portal state, actual Central availability, the
+release SHA and branch, the bundle SHA-256 from `build/releaseAll/bundle-receipt.json`, and the
+final tag mapping.
 
-1. After the tooling PR is merged, open the release PR from clean `main`:
-   - set `jmlx-jinja/build.gradle` to `0.6.0`, `jmlx-tokenizer/build.gradle` and
-     `jmlx-vision/build.gradle` to `0.1.0`;
-   - roll jinja's Unreleased changelog entries into a dated `0.6.0` section;
-   - set the three pure-Java `tools/release-smoke/gradle.properties` defaults to the release
-     versions (the pure release mode ignores them — the tuple is the sole source — but `ci` mode
-     must match what the producers publish, and at WP4 that is the release versions, not
-     snapshots); the WP5 development bump resets them to the next `-SNAPSHOT` lines;
-   - commit `tools/release-smoke/released-8.1.properties` with exactly `0.6.0` / `0.1.0` / `0.1.0`
-     (it is already checked in with these values by the tooling PR; a release PR may keep it
-     unchanged).
-2. Run the selected module checks, the root guards (`./gradlew check`) and, when build-logic
-   changed, `./gradlew -p buildSrc check`.
-3. From the clean release commit run jinja's complete checklist —
-   `jmlx-jinja/req/release-checklist.md`, including `:jmlx-jinja:releaseVerification`, the
-   dependency-update review and report inspection. Development
-   `-PreleaseVerificationAllowDirty` output is not release evidence.
-4. Run the pure candidate smoke from the clean release commit:
+## WP4 — cut and verify the release candidate (recovery amendment)
+
+The initial cut (`0.6.0` / `0.1.0` / `0.1.0`, release SHA `6097d8f`, published 2026-11-04) is
+recorded in `req/phase8-1-release-notes.md`. The recovery release PR — the only release PR of
+this milestone after the superseded cut — contains, in one commit:
+
+- `jmlx-jinja/build.gradle` at `0.6.1`, `jmlx-tokenizer/build.gradle` and
+  `jmlx-vision/build.gradle` at `0.1.1`, with changelog sections recording the supersession
+  (jinja, tokenizer; vision has no changelog);
+- the nexus-release-plugin pin at `2.5.1` (`gradle/libs.versions.toml`);
+- the combined-release tooling: `releaseAll.sh`, `tools/release-all/`, the `settings.gradle`
+  plugin-resolution gate, the root `build.gradle` `releaseAllMode` gate, and the committed
+  sanitized `req/releaseAll-portal-fixture.json`;
+- the three pure-Java `tools/release-smoke/gradle.properties` defaults and
+  `released-8.1.properties` at `0.6.1` / `0.1.1` / `0.1.1`.
+
+Verification before publication (all from the clean recovery merge commit):
+
+1. The selected module checks and the root guards (`./gradlew check`); the combined flow
+   re-runs the selected modules' `check` at publication time (the plugin wires it into
+   `bundleAll`'s staging), and its fail-closed plan excludes any module whose published graph
+   still contains a SNAPSHOT.
+2. jinja's complete checklist — `jmlx-jinja/req/release-checklist.md`, including
+   `:jmlx-jinja:releaseVerification`, the dependency-update review and report inspection. This
+   is a separate manual gate: `releaseAll.sh`'s per-module `check` does not include
+   `releaseVerification`. Development `-PreleaseVerificationAllowDirty` output is not release
+   evidence.
+3. The pure candidate smoke from the clean recovery merge commit:
    ```sh
    ./tools/release-smoke/run.sh candidate --profile pure-java
    ```
-   The preflight must report all three tuple values against matching release producers. Review the
-   generated POMs (tokenizer's POM must name `se.alipsa:jmlx-jinja:0.6.0`), the sources/Javadoc
-   jars, licenses/NOTICE and the candidate report.
-5. Merge the approved release PR with a required merge commit. **Freeze merges to `main` from that
-   merge** until the development-bump PR merges; only a reviewed recovery PR (below) may merge
-   during the freeze, including during partial-publication recovery. This prevents unrelated
-   changes from carrying versions already immutable on Central.
-6. On clean `main` at the initial release merge commit, unconditionally rerun jinja's complete
-   checklist (including `releaseVerification`) and the pure candidate smoke, and inspect their
-   reports. The merge commit is the initial release SHA: absent recovery, all three `release.sh`
-   runs execute from that same clean HEAD with no intervening commits, checkout changes or
-   version edits — verify `git rev-parse HEAD` before each run and stop if it changes.
+   The preflight must report all three tuple values against matching release producers. Review
+   the generated POMs (tokenizer's POM must name `se.alipsa:jmlx-jinja:0.6.1`), the
+   sources/Javadoc jars, licenses/NOTICE and the candidate report.
+4. Merge the approved recovery PR with a required merge commit. The WP4 freeze rules from the
+   original cut remain in force: only a reviewed recovery PR or the final development-bump PR
+   may merge to `main` until the freeze lifts.
+5. At the recovery merge commit (the release SHA for all three modules: the combined flow
+   publishes all three from one HEAD with no per-module version edits — verify
+   `git rev-parse HEAD` before the run and stop if it changes), unconditionally rerun jinja's
+   complete checklist (including `releaseVerification`) and the pure candidate smoke, and
+   inspect their reports.
 
 ## WP5 — publish, verify Central, resume development
 
-1. Execute the publication order above at the verified release SHA, retaining all three release
+1. Execute the Publication section above at the verified release SHA, retaining all three release
    versions through verification.
-2. If publication partly succeeds: retain the released versions, check each deployment's state,
-   and resume only missing modules. **Never overwrite an immutable released coordinate.**
+2. If the run fails **before** the upload is submitted: fix the cause and rerun `./releaseAll.sh`
+   from the same SHA (the source guard makes a stale manifest impossible). If it fails **after**
+   submission: `./releaseAll.sh --resume <deployment-id>` (the ID is journaled in
+   `build/releaseAll/deployment.json` and visible on the Portal). **Never overwrite an immutable
+   released coordinate** and never re-upload a bundle whose coordinates are already live.
 3. Rerun `./tools/release-smoke/run.sh central --profile pure-java` (fresh cache). Preserve the
    failed-resolution report if availability remains incomplete after bounded retries; a
    successful upload is not a successful Central resolution.
-4. Create annotated tags pointing at each module's verified release SHA:
-   `jmlx-jinja-v0.6.0`, `jmlx-tokenizer-v0.1.0`, `jmlx-vision-v0.1.0`; push them as part of the
+4. Create annotated tags pointing at the verified release SHA:
+   `jmlx-jinja-v0.6.1`, `jmlx-tokenizer-v0.1.1`, `jmlx-vision-v0.1.1`; push them as part of the
    authorized release procedure and record the tag-to-SHA mapping. Never move an existing release
    tag; on partial publication tag only confirmed releases.
 5. Open the development-bump PR (the next merge after successful Central verification):
-   advance the three modules beyond any recovery releases to `0.6.1-SNAPSHOT` / `0.1.1-SNAPSHOT`
-   / `0.1.1-SNAPSHOT`, add a fresh jinja Unreleased section, reset the
-   `tools/release-smoke/gradle.properties` defaults to those new development versions, finalize
+   advance the three modules beyond any recovery releases to `0.6.2-SNAPSHOT` / `0.1.2-SNAPSHOT`
+   / `0.1.2-SNAPSHOT`, add a fresh jinja Unreleased section, reset the
+   `tools/release-smoke/gradle.properties` defaults to those new development versions and the
+   matching fake producer tuple in `tools/release-smoke/selftest.sh` (the `all preflight`
+   cases read the real consumer defaults, so the two must move together — the recovery PR
+   hit this drift in CI), finalize
    `req/phase8-1-release-notes.md` with the per-module release SHAs/branches and tag mapping,
-   update `req/full-roadmap.md`'s 8.1 status and `AGENTS.md`'s published-module statements, and add
-   the runbook evidence links and final released tuple. **Keep
+   update `req/full-roadmap.md`'s 8.1 status and `AGENTS.md`'s published-module statements — its
+   "Releasing a module" section still does not mention the combined `releaseAll.sh` workflow,
+   and that addition is part of this step, not of the recovery PR — and add the runbook evidence
+   links and final released tuple. **Keep
    `released-8.1.properties` unchanged** so the Central smoke still selects the published tuple.
    Require both CI smokes (Linux pure, macOS full) to pass before merging and lifting the WP4
    freeze.
@@ -115,10 +165,12 @@ merge during the freeze:
   inspect reports before publishing.
 - The recovery candidate smoke locally rebuilds all three selected modules, including unchanged
   coordinates already on Central. Those copies are **not** evidence for the immutable Central
-  artifacts; candidate success cannot establish the final mixed graph before publication. Publish
-  only missing or replacement coordinates, in dependency order, never successful coordinates
-  again, then rerun the complete fresh-cache Central smoke against the updated tuple. Keep the
-  freeze until recovery succeeds and the development-bump PR merges.
+  artifacts; candidate success cannot establish the final mixed graph before publication. The
+  combined plan itself never re-selects a coordinate that is already published (fail-closed
+  availability), so a recovery `./releaseAll.sh` uploads exactly the new versions in one
+  deployment; never hand-publish a coordinate the plan excluded, and never publish a
+  superseded coordinate again. Then rerun the complete fresh-cache Central smoke against the
+  updated tuple. Keep the freeze until recovery succeeds and the development-bump PR merges.
 - Do not bypass guards or start native publication to make a partial release pass.
 
 ## Restoring unchanged modules at 8.4 (plan §1 policy)
@@ -144,8 +196,11 @@ carries the requirement and the reused/new version tuple to it.
 
 - Candidate: the run's log, `build/smoke-repo/` contents are disposable — preserve the report in
   the release record (do not commit caches or credentials).
-- Central: the fresh-cache `run.sh central --profile pure-java` log and, per module, deployment
-  ID, portal state and Central resolution evidence.
-- jinja verification: `jmlx-jinja`'s `releaseVerification` outputs on each jinja publication's
-  release commit.
+- Combined release: `build/releaseAll/` (`manifest.json`, `report.txt`, `bundle.zip`,
+  `bundle-receipt.json` with the bundle SHA-256, `deployment.json` with the deployment ID) and the
+  `releaseAll` task's "published and available" log line; the `report.txt` selected/excluded
+  listing is the per-run eligibility evidence.
+- Central: the fresh-cache `run.sh central --profile pure-java` log, the deployment ID, terminal
+  portal state and Central resolution evidence.
+- jinja verification: `jmlx-jinja`'s `releaseVerification` outputs on the release commit.
 - Tags: the tag-to-SHA mapping recorded in `req/phase8-1-release-notes.md`.

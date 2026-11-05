@@ -493,5 +493,10 @@ Archive candidate, Central and jinja verification evidence with the release reco
 committing credentials or local caches.
 
 Deferred: arbitrary module subsets, the native/adapters release (8.4), performance baseline
-(8.2), API expansion and any change to native pins. Cross-platform claims stay limited to
+(8.2), API expansion and any change to native pins. The smoke candidate preflight's dedicated
+snapshot message: in the `all`-profile branch of `preflight_candidate` the version comparison
+runs against the already-stripped expected value before the `*-SNAPSHOT` case, so a snapshot
+producer is always rejected by the version-mismatch message and the case line cannot fire
+(move the snapshot check above the comparison and have the selftest assert the message).
+Cross-platform claims stay limited to
 executed CI evidence; this milestone adds no general MLX-parity claim.

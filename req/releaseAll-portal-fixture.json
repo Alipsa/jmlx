@@ -1,0 +1,27 @@
+{
+    "source": "https://central.sonatype.com/api-doc#checkComponentPublished",
+    "captured": "2026-11-04T20:54:46.900557Z",
+    "namespacePolicy": "groupId",
+    "published": {
+        "parameters": {
+            "namespace": "se.alipsa",
+            "name": "jmlx-jinja",
+            "version": "0.6.0"
+        },
+        "status": 200,
+        "body": {
+            "published": true
+        }
+    },
+    "absent": {
+        "parameters": {
+            "namespace": "se.alipsa",
+            "name": "jmlx-jinja",
+            "version": "0.0.0-release-all-never-uploaded"
+        },
+        "status": 200,
+        "body": {
+            "published": false
+        }
+    }
+}

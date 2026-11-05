@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## [0.1.1] - 2026-11-05
+
+### Fixed
+
+- Re-release of `0.1.0` with no functional changes: the `0.1.0` upload omitted the Gradle module
+  metadata file (`.module`) because the release tooling then in use (nexus-release-plugin 2.2.0)
+  bundles only JAR and POM files, while the published POM advertises that metadata. `0.1.1`
+  publishes the complete artifact set and updates its dependency to `se.alipsa:jmlx-jinja:0.6.1`.
+  Use `0.1.1` (or later) instead of the superseded `0.1.0` coordinate.
+
+## [0.1.0] - 2026-11-04
+
+### Added
 
 - `renderChat` accepts structured message content: an ordered list of `{"type": "text",
   "text": ...}` and `{"type": "image"}` parts. Parts keep their order, image parts render the
@@ -17,8 +29,11 @@
   with its pinned chat golden and `tools/tokenizer-oracle` encoding fixtures.
 - Add SentencePiece Precompiled normalization with original UTF-8 offset alignment.
 - Add BERT pair encoding with `PairEncodingOptions` and all three `PairTruncationStrategy` values.
+
+### Changed
+
 - OnlySecond configurations now load. Short single inputs succeed; truncating a missing second
   sequence fails during encoding, matching the locked Rust oracle.
 - Pair offsets are input-local; type IDs and masks identify inputs only for supported BERT templates.
 
-The additive API belongs to this module's independent release. Versions are unchanged.
+Additive API; first published version.

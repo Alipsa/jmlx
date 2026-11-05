@@ -16,7 +16,7 @@ authorized manual action.
 The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`, published 2026-11-04) is
 superseded: its bundles omitted the Gradle module metadata file (`.module`) because the
 then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The 2026-11-04 recovery
-republished the three coordinates as `0.6.1` / `0.1.1` / `0.1.1` with the plugin pin at 2.4.1,
+republished the three coordinates as `0.6.1` / `0.1.1` / `0.1.1` with the plugin pin at 2.5.0,
 in **one combined `releaseAll` deployment** (see Publication below). The `0.6.0` / `0.1.0` /
 `0.1.0` coordinates remain on Central as dead artifacts; never publish to them again and never
 point a consumer at them.
@@ -41,21 +41,24 @@ Publication is one run of `./releaseAll.sh` from the verified release SHA on a c
 2. jinja's complete checklist from the same clean SHA (this is a separate manual gate:
    `releaseAll.sh`'s own per-module `check` does not include `:jmlx-jinja:releaseVerification`),
    plus the pure candidate smoke.
-3. `./releaseAll.sh` — verification build, staging, bundle validation and the single upload.
-   The `releaseAll` task polls to `PUBLISHED` plus repo1 HEAD 200 for every selected
-   component's POM and main JAR before logging "published and available"; that is **not** the
-   binding gate.
+3. `./releaseAll.sh` — the selected modules' checks (wired into `bundleAll`'s staging by the
+   plugin), staging, bundle validation and the single upload. The `releaseAll` task polls to
+   `PUBLISHED` plus repo1 HEAD 200 for every selected component's POM and main JAR before
+   logging "published and available"; that is **not** the binding gate.
 4. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
 
-A script's success is not proof of availability: the pinned nexus-release-plugin 2.4.1 submits
-`publishingType=AUTOMATIC` and accepts `PUBLISHING`/`PUBLISHED` alike at upload time — checked in
-the 2.4.0 sources, `CentralPortalClient.groovy:64`, `ReleaseTask.groovy:133–143` (source-jar
-SHA-256 `edd4e45ccb56ca667a6d05b8318d21b0434adb8b0501e9befb66d33f0d8b25f6`), and unchanged in
-2.4.1, which adds only the optional static BOM/aggregate POM inputs (plugin repo commit
-`63e46b9`, PR #10; recheck if the plugin changes). Since 2.3.0 the bundle is additionally
-validated before upload and a POM that advertises Gradle metadata without a signed `.module`
-entry is rejected (`BundleValidator.groovy:111`), so the 2.2.0 `.module`-omission shape cannot
-recur silently.
+A script's success is not proof of availability. The pinned nexus-release-plugin 2.5.0 submits
+`publishingType=AUTOMATIC`, and its `releaseAll` task only logs "published and available" after
+the Portal reports `PUBLISHED` **and** repo1 answers HEAD 200 for every selected component's
+POM and main JAR (`ReleaseAllTask.groovy`, `CombinedDeployment.groovy`; source-jar SHA-256
+`3becf9fc9a464728daaa824eb829e6bd32026c3949a6a53496378989dd727cca`; recheck if the plugin
+changes) — but that check covers only the POM and the main JAR, so sources/Javadoc/
+module-metadata resolution against the live artifacts is still proven only by the fresh-cache
+smoke. The bundle is additionally validated before upload (since 2.3.0), and the plan adds the
+`.module` to a candidate's file list whenever its POM carries the
+`published-with-gradle-metadata` marker (`ReleaseAllPlanTask.groovy`), so a staging directory
+missing the signed `.module` fails `CombinedBundle.create` before any upload; the 2.2.0
+`.module`-omission shape cannot recur silently.
 
 Record: the single deployment ID, terminal Central portal state, actual Central availability, the
 release SHA and branch, the bundle SHA-256 from `build/releaseAll/bundle-receipt.json`, and the
@@ -70,7 +73,7 @@ this milestone after the superseded cut — contains, in one commit:
 - `jmlx-jinja/build.gradle` at `0.6.1`, `jmlx-tokenizer/build.gradle` and
   `jmlx-vision/build.gradle` at `0.1.1`, with changelog sections recording the supersession
   (jinja, tokenizer; vision has no changelog);
-- the nexus-release-plugin pin at `2.4.1` (`gradle/libs.versions.toml`);
+- the nexus-release-plugin pin at `2.5.0` (`gradle/libs.versions.toml`);
 - the combined-release tooling: `releaseAll.sh`, `tools/release-all/`, the `settings.gradle`
   plugin-resolution gate, the root `build.gradle` `releaseAllMode` gate, and the committed
   sanitized `req/releaseAll-portal-fixture.json`;
@@ -79,8 +82,10 @@ this milestone after the superseded cut — contains, in one commit:
 
 Verification before publication (all from the clean recovery merge commit):
 
-1. The selected module checks and the root guards (`./gradlew check`); the combined flow's own
-   verification build (Publication step 3) re-runs the module checks at publication time.
+1. The selected module checks and the root guards (`./gradlew check`); the combined flow
+   re-runs the selected modules' `check` at publication time (the plugin wires it into
+   `bundleAll`'s staging), and its fail-closed plan excludes any module whose published graph
+   still contains a SNAPSHOT.
 2. jinja's complete checklist — `jmlx-jinja/req/release-checklist.md`, including
    `:jmlx-jinja:releaseVerification`, the dependency-update review and report inspection. This
    is a separate manual gate: `releaseAll.sh`'s per-module `check` does not include

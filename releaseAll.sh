@@ -23,14 +23,6 @@ case "${1:-}" in
 esac
 release_tools_preflight
 gradle=("$RELEASE_ROOT/gradlew" -p "$RELEASE_ROOT" -PreleaseAllMode=true)
-# Optional local testing of nexus-release-plugin changes. The release-mode settings gate
-# resolves the plugin exclusively from the Gradle Plugin Portal unless this override is set.
-if [[ -n "${RELEASE_ALL_PLUGIN_DIR:-}" ]]; then
-  [[ -f "$RELEASE_ALL_PLUGIN_DIR/src/main/groovy/se/alipsa/gradle/plugin/release/ReleaseAllPlanTask.groovy" ]] || {
-    echo 'Invalid nexus-release-plugin checkout: RELEASE_ALL_PLUGIN_DIR' >&2; exit 1
-  }
-  gradle+=("-PreleaseAllPluginDir=$RELEASE_ALL_PLUGIN_DIR")
-fi
 if [[ "$mode" == resume ]]; then
   "${gradle[@]}" releaseAll "-PreleaseAllResume=$resume"
   exit
@@ -41,35 +33,23 @@ fi
 "${gradle[@]}" releaseAllPlan
 manifest="$RELEASE_ROOT/build/releaseAll/manifest.json"
 selected=$(groovy -e 'println new groovy.json.JsonSlurper().parse(new File(args[0])).selected.size()' "$manifest")
-if [[ "$selected" == 0 ]]; then echo 'No eligible unreleased components'; exit; fi
+# Exact eligibility gate: the three pure-Java modules are the only selected candidates; the
+# four native-chain SNAPSHOT modules are reported excluded with their SNAPSHOT reasons in
+# report.txt (a SNAPSHOT dependency would exclude the depending module from the plan itself).
+[[ "$selected" == 3 ]] || {
+  echo "Expected 3 selected components, plan selected $selected; see build/releaseAll/report.txt" >&2
+  exit 1
+}
 if [[ "$mode" == plan ]]; then
   # Report mode: missing signing configuration is a warning, not a failure.
   "${gradle[@]}" -PreleaseAllSigningReport=true releaseAllSigningCheck
   echo 'Dry run completed; signing configuration will be checked during preparation.'
   exit
 fi
+# Strict signing preflight, before the selected modules' checks run: bundleAll's staging
+# wiring makes each selected module's publish/sign tasks depend on this check and its check
+# task depend on the source guard (the plugin wires both). The SNAPSHOT consumer
+# (:jmlx-models) is not part of this flow; the runbook's root ./gradlew check covers it.
 "${gradle[@]}" releaseAllSigningCheck
-# jmlx stages only Gradle-built components, so no GPG/Maven preflight is needed (unlike
-# consumers with static Maven components).
-scope=$(groovy -e 'new groovy.json.JsonSlurper().parse(new File(args[0])).verificationScope.each { println it }' "$manifest")
-selectedModules=$(groovy -e 'new groovy.json.JsonSlurper().parse(new File(args[0])).selected.findAll { it.projectPath }.each { println it.projectPath }' "$manifest")
-checks=()
-# verificationScope is the selected modules plus every candidate that (transitively) depends
-# on one: for jmlx that means :jmlx-models (SNAPSHOT) is check-verified against the released
-# tokenizer/vision versions. Only the selected modules get the SNAPSHOT self-version guard --
-# running it on a SNAPSHOT consumer would fail by design.
-while IFS= read -r module; do
-  [[ -n "$module" ]] || continue
-  checks+=("$module:check")
-done <<< "$scope"
-while IFS= read -r module; do
-  [[ -n "$module" ]] || continue
-  checks+=("$module:verifyNoSnapshotDependencies")
-done <<< "$selectedModules"
-if (( ${#checks[@]} > 0 )); then
-  "${gradle[@]}" "${checks[@]}"
-fi
-"${gradle[@]}" -PreleaseAllPrepare=true releaseAllStage
-"${gradle[@]}" releaseAllPrepareMaven
 "${gradle[@]}" bundleAll
 [[ "$mode" == bundle ]] || "${gradle[@]}" releaseAll

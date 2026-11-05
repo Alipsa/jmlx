@@ -21,15 +21,46 @@ plugins {
 }
 
 // Combined release workflow (Phase 8.1): active only with -PreleaseAllMode=...; see
-// tools/release-all/README.md. Applying the plugin at the root registers the six combined
-// tasks (releaseAllPlan, releaseAllSigningCheck, releaseAllGuard, releaseAllPrepareMaven,
-// bundleAll, releaseAll); the subprojects get the plugin through the maven-publish wiring
-// below exactly as before, and ordinary builds never reach this block.
+// tools/release-all/README.md. Applying the plugin at the root registers the combined tasks
+// (releaseAllPlan, releaseAllSigningCheck, releaseAllGuard, bundleAll, releaseAll;
+// releaseAllPrepareMaven is registered too but never runs: jmlx has no static Maven
+// candidates). nexus-release-plugin 2.5.0 derives the candidate set, the per-module staging
+// publication (with signing and the module's check wired in), and every output path from
+// combinedRelease.modules; jmlx only sets the module list, the committed Portal fixture and
+// the report/resume overrides below. The subprojects get the plugin through the maven-publish
+// wiring exactly as before, and ordinary builds never reach this block.
 if (providers.gradleProperty('releaseAllMode').isPresent()) {
     apply plugin: 'se.alipsa.nexus-release-plugin'
-    nexusReleasePlugin.combinedRelease { }
-    gradle.projectsEvaluated {
-        apply from: 'tools/release-all/release-all.gradle'
+    def credentialsUser = providers.gradleProperty('sonatypeUsername')
+            .orElse(providers.environmentVariable('SONATYPE_USERNAME'))
+    def credentialsPassword = providers.gradleProperty('sonatypePassword')
+            .orElse(providers.environmentVariable('SONATYPE_PASSWORD'))
+    def repoUrl = providers.gradleProperty('releaseAllRepositoryUrl')
+            .orElse('https://repo.maven.apache.org/maven2')
+    def portalUrlOverride = providers.gradleProperty('releaseAllPortalUrl').orNull
+    nexusReleasePlugin {
+        userName = credentialsUser.orNull
+        password = credentialsPassword.orNull
+        combinedRelease {
+            // All seven published modules are named: the four native-chain modules keep
+            // -SNAPSHOT versions until 8.4, so the plan excludes (and reports) them, and a
+            // future native cut only needs the version lines.
+            modules = [':jmlx-core', ':jmlx-ffi', ':jmlx-jinja', ':jmlx-models',
+                    ':jmlx-native-macos-arm64', ':jmlx-tokenizer', ':jmlx-vision']
+            portalFixture = rootProject.file('req/releaseAll-portal-fixture.json')
+            repositoryUrl = repoUrl
+            if (portalUrlOverride != null) portalUrl = portalUrlOverride
+        }
+    }
+    tasks.named('releaseAllPlan').configure {
+        reportFile = layout.buildDirectory.file('releaseAll/report.txt')
+    }
+    // The plugin's convention is strict; --dry-run keeps the warning-only preflight.
+    tasks.named('releaseAllSigningCheck').configure {
+        strict = !providers.gradleProperty('releaseAllSigningReport').isPresent()
+    }
+    tasks.named('releaseAll').configure {
+        resumeId = providers.gradleProperty('releaseAllResume').orElse('')
     }
 }
 

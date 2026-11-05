@@ -43,10 +43,13 @@ Recovery decisions and facts:
   coordinates; comparison guard recorded in the release record). Use `0.6.1` / `0.1.1` / `0.1.1`
   (or later); the `0.6.0` / `0.1.0` / `0.1.0` coordinates remain on Central as dead artifacts and
   are never published to again.
-- nexus-release-plugin is pinned to 2.4.1, which (a) since 2.3.0 validates every bundle before
-  upload and rejects a POM that advertises Gradle metadata without a signed `.module` entry, so
-  the 2.2.0 shape cannot recur silently, and (b) since 2.4.1 accepts consumers without static
-  BOM/aggregate POM components (jmlx publishes only Gradle-built modules).
+- nexus-release-plugin is pinned to 2.5.0, which provides the module-based combined release
+  this workflow uses (the root `combinedRelease.modules` list; the plugin derives the candidate
+  set, per-module staging, signing and output paths, and jmlx's earlier hand-rolled candidate
+  walk is gone) and, since 2.3.0, validates every bundle before upload — the plan adds the
+  `.module` to a candidate's file list whenever its POM advertises Gradle metadata, so a
+  staging directory missing the signed `.module` fails before any upload; the 2.2.0 shape
+  cannot recur silently.
 - The recovery is published as **one combined `releaseAll` deployment** (the plugin's
   mega-bundle flow: one Maven-layout ZIP, one automatic Portal deployment) instead of three
   single deployments: Maven Central allows 10 deployments per month, three were already spent by
@@ -137,7 +140,8 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
 - Release SHA / branch: _pending (recovery PR merge commit)_
 - Comparison guard: _recorded above in Verification summary_
 - Deployment ID (single combined deployment): _pending_
-- Bundle SHA-256 (`bundle-receipt.json`): _pending (the local pre-publication bundle is
-  `cf0eda90f3e3ba9bc6e800b3ff6a6bebe6c3a793bb46f4f9164778592c3997ea`)_
+- Bundle SHA-256 (`bundle-receipt.json`): _pending (re-recorded from the 2.5.0 tooling's local
+  `--bundle-only` run; the earlier `cf0eda90f3e3ba9bc6e800b3ff6a6bebe6c3a793bb46f4f9164778592c3997ea`
+  was produced by the pre-2.5.0 tooling and is not the published bundle)_
 - Tag-to-SHA mapping: _pending_
 - Central smoke report: _pending_

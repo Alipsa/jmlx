@@ -61,6 +61,9 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
             portalFixture = rootProject.file('req/releaseAll-portal-fixture.json')
             repositoryUrl = repoUrl
             if (portalUrlOverride != null) portalUrl = portalUrlOverride
+            // The plugin's default name is bundle.zip; the deployment carries this name on the
+            // Portal, so it identifies the bundle as jmlx's.
+            bundleFile.set(layout.buildDirectory.file('releaseAll/jmlx-mega-bundle.zip'))
         }
     }
     tasks.named('releaseAllPlan').configure {

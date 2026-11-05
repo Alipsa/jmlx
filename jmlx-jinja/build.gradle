@@ -6,7 +6,7 @@ plugins {
 // jmlx-jinja is a dependency-free Java 21 library; keep that promise even though
 // the rest of jmlx currently targets Java 25. It is versioned independently of the
 // other jmlx modules because it was migrated from the standalone hfjinja project.
-version = '0.6.1'
+version = '0.6.2-SNAPSHOT'
 
 java {
     toolchain {

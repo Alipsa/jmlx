@@ -138,10 +138,18 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
 ### Recovery (0.6.1 / 0.1.1 / 0.1.1)
 
 - Release SHA / branch: _pending (recovery PR merge commit)_
-- Comparison guard: _recorded above in Verification summary_
+- Comparison guard (re-verified 2026-11-05 against the Central-published `0.6.0` / `0.1.0`
+  artifacts downloaded from repo1): main and sources jars byte-identical (matching SHA-256),
+  javadoc jars identical after normalizing the HTML version strings, POMs identical after
+  normalizing the version coordinates (tokenizer's jinja edge `0.6.0` → `0.6.1` is the intended
+  dependency change), and the superseded coordinates' `.module` files 404 on Central while the
+  recovery bundle carries them signed.
 - Deployment ID (single combined deployment): _pending_
-- Bundle SHA-256 (`bundle-receipt.json`): _pending (re-recorded from the 2.5.0 tooling's local
-  `--bundle-only` run; the earlier `cf0eda90f3e3ba9bc6e800b3ff6a6bebe6c3a793bb46f4f9164778592c3997ea`
-  was produced by the pre-2.5.0 tooling and is not the published bundle)_
+- Bundle SHA-256 (`bundle-receipt.json`): the local `--bundle-only` run of the 2.5.0 tooling at
+  branch tip `6b3557a` is `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d`;
+  the production run from the merge SHA re-records the binding value (an identical tree is
+  expected to reproduce it byte-for-byte). The earlier
+  `cf0eda90f3e3ba9bc6e800b3ff6a6bebe6c3a793bb46f4f9164778592c3997ea` was produced by the
+  pre-2.5.0 tooling and is not the published bundle.
 - Tag-to-SHA mapping: _pending_
 - Central smoke report: _pending_

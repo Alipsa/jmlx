@@ -339,7 +339,8 @@ published before `jmlx-models` itself.
    separately on both pins and workloads, with per-run host observations. The
    baseline measures in a quiet host state, records the host state with the
    numbers, and re-runs any surprising VLM prefill figure as a back-to-back
-   alternating session before attributing it to the runtime.
+   alternating session before attributing it to the runtime. The detailed implementation and
+   evidence gates are in [phase8-2-plan.md](plans/phase8-2-plan.md).
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
    the quarkus-langchain4j path). Callers may run on virtual threads: the

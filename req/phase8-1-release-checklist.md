@@ -18,7 +18,8 @@ superseded: its bundles omitted the Gradle module metadata file (`.module`) beca
 then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The recovery (versions
 cut 2026-11-04; combined tooling reworked 2026-11-05 for the 2.5.1 plugin pin) re-releases the
 three coordinates as `0.6.1` / `0.1.1` / `0.1.1` in **one combined `releaseAll` deployment**
-(publication pending; see Publication below). The `0.6.0` / `0.1.0` / `0.1.0` coordinates
+(published 2026-11-05; the production record is in `req/phase8-1-release-notes.md`). The
+`0.6.0` / `0.1.0` / `0.1.0` coordinates
 remain on Central as dead artifacts; never publish to them again and never point a consumer at
 them.
 
@@ -196,7 +197,7 @@ carries the requirement and the reused/new version tuple to it.
 
 - Candidate: the run's log, `build/smoke-repo/` contents are disposable — preserve the report in
   the release record (do not commit caches or credentials).
-- Combined release: `build/releaseAll/` (`manifest.json`, `report.txt`, `bundle.zip`,
+- Combined release: `build/releaseAll/` (`manifest.json`, `report.txt`, `jmlx-mega-bundle.zip`,
   `bundle-receipt.json` with the bundle SHA-256, `deployment.json` with the deployment ID) and the
   `releaseAll` task's "published and available" log line; the `report.txt` selected/excluded
   listing is the per-run eligibility evidence.

@@ -260,6 +260,25 @@ so `jmlx-ffi:check` and any ffi release build the native jar. Release each chain
 ones it depends on are still checked out at their released version; only after every release in a
 chain should its modules be bumped back to their next `-SNAPSHOT` versions.
 
+**The pure-Java modules release through the combined flow, not these scripts.** Since Phase 8.1,
+`jmlx-jinja`, `jmlx-tokenizer` and `jmlx-vision` publish as one `releaseAll` deployment of
+nexus-release-plugin (`se.alipsa.nexus-release-plugin`, pinned in `gradle/libs.versions.toml`)
+driven by `./releaseAll.sh`: the root `combinedRelease.modules` list names all seven published
+modules, the plan derives the candidate set (SNAPSHOT modules are excluded and reported), the
+script gates the plan's selected set against the expected release tuple, and `releaseAll` runs
+the selected modules' checks, signs, stages and bundles — including the `.module` each POM
+advertises — and submits one Portal deployment (Central allows 10 deployments per month, and
+the combined flow spends one slot for the whole tuple). The auxiliary modes are
+`./releaseAll.sh --dry-run` (plan + report, warning-only signing), `--bundle-only` (through
+bundling, no upload) and `--resume <deployment-id>` (polls an already-submitted deployment,
+journaled in `build/releaseAll/deployment.json`, to `PUBLISHED` without re-uploading). A
+successful `releaseAll` is not proof of availability: the post-publication gate is the
+fresh-cache `./tools/release-smoke/run.sh central --profile pure-java` (in central mode the
+committed `tools/release-smoke/released-8.1.properties` is the sole version source).
+`tools/release-all/README.md` and `req/phase8-1-release-checklist.md` document the full
+procedure; the 8.4 first-native release also rides the combined flow (see the 8.4 amendment in
+`req/full-roadmap.md`).
+
 Signing and Central credentials come from Gradle properties (`signing.keyId`,
 `sonatypeUsername`, `sonatypePassword`), normally in `~/.gradle/gradle.properties`. Signing is
 inert when `signing.keyId` is absent, so `check` and CI stay keyless. Releasing is a local,
@@ -465,9 +484,11 @@ consumers. `jmlx-tokenizer`'s and `jmlx-vision`'s `verifyBytecodeLevel` tasks en
 
 **Seven modules are published**, each carrying its own version independent of the root's
 `0.5.0-SNAPSHOT` (`jmlx-examples` and `jmlx-benchmarks` are unpublished applications): `jmlx-jinja` is
-`0.6.0-SNAPSHOT` (continuing the archived hfjinja project's line), `jmlx-tokenizer`,
-`jmlx-native-macos-arm64` and `jmlx-vision` are all `0.1.0-SNAPSHOT` (none has ever been
-published), `jmlx-ffi` and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward
+`0.6.2-SNAPSHOT` (continuing the archived hfjinja project's line; `0.6.1` was published in
+Phase 8.1 after the `0.6.0` cut was superseded), `jmlx-tokenizer` and `jmlx-vision` are
+`0.1.2-SNAPSHOT` (each line started in Phase 8.1, where `0.1.1` was published after the `0.1.0`
+cut was superseded), `jmlx-native-macos-arm64` is `0.1.0-SNAPSHOT` (never published), `jmlx-ffi`
+and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward
 the number they already had via the root's default), and `jmlx-models` is `0.1.0-SNAPSHOT` (also
 never published). `jmlx-core`/`jmlx-models`/`jmlx-vision` disable Javadoc's `missing` doclint
 category (`-Xdoclint:all,-missing`) rather than retrofitting `@param`/`@return`/`@throws` tags onto

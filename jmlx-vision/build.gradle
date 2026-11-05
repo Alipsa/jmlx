@@ -3,10 +3,10 @@ plugins {
     id 'maven-publish'
 }
 
-// Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: jmlx-vision has
-// never been published, so it starts a fresh 0.1.0 line -- same reasoning jmlx-tokenizer used for
-// its own first version.
-version = '0.1.1'
+// Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: jmlx-vision's
+// line started at 0.1.0 in Phase 8.1 -- same reasoning jmlx-tokenizer used for its own first
+// version.
+version = '0.1.2-SNAPSHOT'
 
 // Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain (which
 // exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and

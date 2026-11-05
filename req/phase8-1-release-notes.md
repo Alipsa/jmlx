@@ -1,10 +1,10 @@
 # Phase 8.1 release notes: jmlx-jinja 0.6.1, jmlx-tokenizer 0.1.1, jmlx-vision 0.1.1
 
-**Status:** provisional. The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`,
+**Status:** final. The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`,
 published 2026-11-04) is **superseded** (see Recovery below); the recovery re-release
-`0.6.1` / `0.1.1` / `0.1.1` is cut and locally verified but not yet published. The
-development-bump PR finalizes this document with the recovery release SHA, deployment record and
-tag mapping after publication.
+`0.6.1` / `0.1.1` / `0.1.1` was published on 2026-11-05 as one combined Central deployment from
+release SHA `9bc85042df50ed3f979cb8d3e7c8767917c71483` (deployment `87af5c0f-39d7-4cdf-aeca-166a72639c99`;
+record below). This document was finalized by the development-bump PR.
 
 ## What is released
 
@@ -142,21 +142,34 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
 
 ### Recovery (0.6.1 / 0.1.1 / 0.1.1)
 
-- Release SHA / branch: _pending (recovery PR merge commit)_
+- Release SHA / branch: `9bc85042df50ed3f979cb8d3e7c8767917c71483`, the required merge commit of
+  PR #83 (branch `phase8-1-wp5-recovery`, head `96c27ff`), merged 2026-11-05 after java and native
+  CI passed on the final head.
 - Comparison guard (re-verified 2026-11-05 against the Central-published `0.6.0` / `0.1.0`
   artifacts downloaded from repo1): main and sources jars byte-identical (matching SHA-256),
   javadoc jars identical after normalizing the HTML version strings, POMs identical after
   normalizing the version coordinates (tokenizer's jinja edge `0.6.0` → `0.6.1` is the intended
   dependency change), and the superseded coordinates' `.module` files 404 on Central while the
   recovery bundle carries them signed.
-- Deployment ID (single combined deployment): _pending_
-- Bundle SHA-256 (`bundle-receipt.json`): _pending — recorded from the production run that
-  actually uploads. Since 2.5.1 the bundle's ZIP entries carry a fixed deterministic time, so
-  the container is byte-reproducible for identical staging bytes — but the per-run `.asc`
-  signatures (GPG creation time) still differ between runs, so no local run's hash is binding
-  evidence of the uploaded bundle. The local `--bundle-only` run at branch tip `6b3557a`
-  (plugin 2.5.0) produced `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d`
-  (non-binding); the binding value is the Central-published checksums plus the production
-  run's receipt._
-- Tag-to-SHA mapping: _pending_
-- Central smoke report: _pending_
+- Deployment ID (single combined deployment): `87af5c0f-39d7-4cdf-aeca-166a72639c99`, submitted
+  2026-11-05 from the release SHA; the Portal validated all three components and reached the
+  terminal `PUBLISHED` state, with repo1 answering HEAD 200 for every selected component's POM
+  and main JAR.
+- Bundle SHA-256 (`bundle-receipt.json`): `1e08934bc1ff07fa016d3a343bf00a715e9ed035a5f375c412971ab30fcba452`
+  (the production run's receipt; manifest SHA-256
+  `26d831a6a1e59c0e3e2bd4653d9609f3dfa45498565b1d1444e96bf318081ad4`). Since 2.5.1 the bundle's
+  ZIP entries carry a fixed deterministic time, so the container is byte-reproducible for
+  identical staging bytes — but the per-run `.asc` signatures (GPG creation time) still differ
+  between runs, so the local `--bundle-only` runs' hashes (branch tip `6b3557a`, plugin 2.5.0:
+  `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d`) were never binding evidence
+  of the uploaded bundle; the binding values are the Central-published checksums plus this
+  receipt.
+- Tag-to-SHA mapping: `jmlx-jinja-v0.6.1`, `jmlx-tokenizer-v0.1.1` and `jmlx-vision-v0.1.1` are
+  all annotated tags at `9bc85042df50ed3f979cb8d3e7c8767917c71483`.
+- Central smoke report: the fresh-cache
+  `./tools/release-smoke/run.sh central --profile pure-java` run from the release SHA passed —
+  the committed `released-8.1.properties` tuple (0.6.1/0.1.1/0.1.1) resolved from Maven Central
+  with the POM-only and module-metadata runtime classpaths agreeing (7 components), and the
+  license, JPMS, vision NOTICE, sources and javadoc artifact checks all passed; direct repo1
+  HEAD probes for the three POMs, the tokenizer `.module` and the jinja sources jar answered
+  200.

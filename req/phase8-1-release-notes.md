@@ -145,11 +145,11 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
   dependency change), and the superseded coordinates' `.module` files 404 on Central while the
   recovery bundle carries them signed.
 - Deployment ID (single combined deployment): _pending_
-- Bundle SHA-256 (`bundle-receipt.json`): the local `--bundle-only` run of the 2.5.0 tooling at
-  branch tip `6b3557a` is `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d`;
-  the production run from the merge SHA re-records the binding value (an identical tree is
-  expected to reproduce it byte-for-byte). The earlier
-  `cf0eda90f3e3ba9bc6e800b3ff6a6bebe6c3a793bb46f4f9164778592c3997ea` was produced by the
-  pre-2.5.0 tooling and is not the published bundle.
+- Bundle SHA-256 (`bundle-receipt.json`): _pending — recorded from the production run that
+  actually uploads. The bundle is not byte-reproducible across runs (the plugin's bundle task
+  stamps each ZIP entry with the current time), so no local run's hash is binding evidence of
+  the uploaded bundle. The local `--bundle-only` run at branch tip `6b3557a` produced
+  `c26996e500a1706a2fc2885b2563faa35267d383a447d641db5175ec38c2637d` (non-binding); the
+  binding value is the Central-published checksums plus the production run's receipt._
 - Tag-to-SHA mapping: _pending_
 - Central smoke report: _pending_

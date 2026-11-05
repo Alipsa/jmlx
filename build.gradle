@@ -38,6 +38,17 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
     def repoUrl = providers.gradleProperty('releaseAllRepositoryUrl')
             .orElse('https://repo.maven.apache.org/maven2')
     def portalUrlOverride = providers.gradleProperty('releaseAllPortalUrl').orNull
+    // The plan's availability probes and the upload client send the Portal credentials as
+    // Authorization headers to these hosts; a property override (including a committed
+    // gradle.properties) must never point them at a non-https endpoint. Without an override
+    // the plugin's hardcoded https Central portal is used.
+    def assertHttps = { String name, String url ->
+        if (!url.startsWith('https://')) {
+            throw new GradleException("releaseAll property ${name} must be an https URL: ${url}")
+        }
+    }
+    assertHttps('releaseAllRepositoryUrl', repoUrl.get())
+    if (portalUrlOverride != null) assertHttps('releaseAllPortalUrl', portalUrlOverride)
     nexusReleasePlugin {
         userName = credentialsUser.orNull
         password = credentialsPassword.orNull

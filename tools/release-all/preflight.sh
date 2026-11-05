@@ -5,7 +5,7 @@
 release_tools_preflight() {
   (( BASH_VERSINFO[0] >= 4 )) || { echo 'Use Bash 4+ (macOS: brew install bash)' >&2; return 1; }
   local tool
-  for tool in java groovy grep git; do
+  for tool in java groovy git; do
     command -v "$tool" >/dev/null || { echo "Required tool missing: $tool" >&2; return 1; }
   done
   # The Gradle daemon runs on the java on PATH. The releaseAll workflow only executes the

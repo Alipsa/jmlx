@@ -9,7 +9,10 @@
 pluginManagement {
     repositories {
         // Release mode resolves the pinned nexus-release-plugin exclusively from the Gradle
-        // Plugin Portal so a locally published build can never replace the released version.
+        // Plugin Portal. This build declares no mavenLocal(), so the guard only matters for
+        // repositories added out-of-band (for example by an init script) shadowing the
+        // released plugin version; the plain gradlePluginPortal() below still serves every
+        // other plugin the build resolves (the filter covers only the se.alipsa groups).
         // See tools/release-all/README.md.
         if (providers.gradleProperty('releaseAllMode').isPresent()) {
             exclusiveContent {

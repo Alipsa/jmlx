@@ -32,12 +32,16 @@ fi
 [[ -z "$(git status --porcelain)" ]] || { echo 'Commit or stash changes before release planning' >&2; exit 1; }
 "${gradle[@]}" releaseAllPlan
 manifest="$RELEASE_ROOT/build/releaseAll/manifest.json"
-selected=$(groovy -e 'println new groovy.json.JsonSlurper().parse(new File(args[0])).selected.size()' "$manifest")
-# Exact eligibility gate: the three pure-Java modules are the only selected candidates; the
-# four native-chain SNAPSHOT modules are reported excluded with their SNAPSHOT reasons in
-# report.txt (a SNAPSHOT dependency would exclude the depending module from the plan itself).
-[[ "$selected" == 3 ]] || {
-  echo "Expected 3 selected components, plan selected $selected; see build/releaseAll/report.txt" >&2
+# Exact eligibility gate: the plan must select exactly the three pure-Java modules of the 8.1
+# tuple; the four native-chain SNAPSHOT modules are reported excluded with their SNAPSHOT
+# reasons in report.txt (a SNAPSHOT dependency would exclude the depending module from the plan
+# itself). The expected set is hard-coded for the 8.1 release: when 8.4 publishes the native
+# chain, edit EXPECTED_SELECTION to the then-released coordinates (the header's "every
+# eligible publication" claim refers to the plan's selection logic, not to this gate).
+selected=$(groovy -e 'println new groovy.json.JsonSlurper().parse(new File(args[0])).selected.collect { "${it.artifactId}:${it.version}" }.sort().join(",")' "$manifest")
+EXPECTED_SELECTION='jmlx-jinja:0.6.1,jmlx-tokenizer:0.1.1,jmlx-vision:0.1.1'
+[[ "$selected" == "$EXPECTED_SELECTION" ]] || {
+  echo "Selected components '$selected' differ from expected '$EXPECTED_SELECTION'; see build/releaseAll/report.txt" >&2
   exit 1
 }
 if [[ "$mode" == plan ]]; then
@@ -51,5 +55,11 @@ fi
 # task depend on the source guard (the plugin wires both). The SNAPSHOT consumer
 # (:jmlx-models) is not part of this flow; the runbook's root ./gradlew check covers it.
 "${gradle[@]}" releaseAllSigningCheck
-"${gradle[@]}" bundleAll
-[[ "$mode" == bundle ]] || "${gradle[@]}" releaseAll
+if [[ "$mode" == bundle ]]; then
+  "${gradle[@]}" bundleAll
+else
+  # releaseAll depends on bundleAll (non-resume) and bundleAll never reports up-to-date, so a
+  # separate bundleAll call here would re-run the checks, re-sign and re-bundle everything;
+  # releaseAll re-checks the receipt against its own bundleAll run before uploading.
+  "${gradle[@]}" releaseAll
+fi

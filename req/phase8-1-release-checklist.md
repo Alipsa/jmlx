@@ -15,11 +15,12 @@ authorized manual action.
 
 The initial `0.6.0` / `0.1.0` / `0.1.0` cut (release SHA `6097d8f`, published 2026-11-04) is
 superseded: its bundles omitted the Gradle module metadata file (`.module`) because the
-then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The 2026-11-04 recovery
-republished the three coordinates as `0.6.1` / `0.1.1` / `0.1.1` with the plugin pin at 2.5.0,
-in **one combined `releaseAll` deployment** (see Publication below). The `0.6.0` / `0.1.0` /
-`0.1.0` coordinates remain on Central as dead artifacts; never publish to them again and never
-point a consumer at them.
+then-pinned nexus-release-plugin 2.2.0 bundles only JAR and POM files. The recovery (versions
+cut 2026-11-04; combined tooling reworked 2026-11-05 for the 2.5.0 plugin pin) re-releases the
+three coordinates as `0.6.1` / `0.1.1` / `0.1.1` in **one combined `releaseAll` deployment**
+(publication pending; see Publication below). The `0.6.0` / `0.1.0` / `0.1.0` coordinates
+remain on Central as dead artifacts; never publish to them again and never point a consumer at
+them.
 
 The four native-chain modules (`jmlx-ffi`, `jmlx-core`, `jmlx-models`,
 `jmlx-native-macos-arm64`) and the root keep their snapshot versions throughout; they are never
@@ -41,11 +42,16 @@ Publication is one run of `./releaseAll.sh` from the verified release SHA on a c
 2. jinja's complete checklist from the same clean SHA (this is a separate manual gate:
    `releaseAll.sh`'s own per-module `check` does not include `:jmlx-jinja:releaseVerification`),
    plus the pure candidate smoke.
-3. `./releaseAll.sh` — the selected modules' checks (wired into `bundleAll`'s staging by the
+3. Publication-day changelog dates: the `[0.6.1]` / `[0.1.1]` sections are pre-filled with the
+   expected publication date in the recovery PR; on publication day, if they differ from the
+   actual date, fix them on the release branch **before** the production run and rerun the
+   affected modules' checks and the pure candidate smoke from the new SHA (a changelog change
+   changes the sources jars).
+4. `./releaseAll.sh` — the selected modules' checks (wired into `bundleAll`'s staging by the
    plugin), staging, bundle validation and the single upload. The `releaseAll` task polls to
    `PUBLISHED` plus repo1 HEAD 200 for every selected component's POM and main JAR before
    logging "published and available"; that is **not** the binding gate.
-4. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
+5. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
 
 A script's success is not proof of availability. The pinned nexus-release-plugin 2.5.0 submits
 `publishingType=AUTOMATIC`, and its `releaseAll` task only logs "published and available" after
@@ -128,8 +134,10 @@ Verification before publication (all from the clean recovery merge commit):
    / `0.1.2-SNAPSHOT`, add a fresh jinja Unreleased section, reset the
    `tools/release-smoke/gradle.properties` defaults to those new development versions, finalize
    `req/phase8-1-release-notes.md` with the per-module release SHAs/branches and tag mapping,
-   update `req/full-roadmap.md`'s 8.1 status and `AGENTS.md`'s published-module statements, and add
-   the runbook evidence links and final released tuple. **Keep
+   update `req/full-roadmap.md`'s 8.1 status and `AGENTS.md`'s published-module statements — its
+   "Releasing a module" section still does not mention the combined `releaseAll.sh` workflow,
+   and that addition is part of this step, not of the recovery PR — and add the runbook evidence
+   links and final released tuple. **Keep
    `released-8.1.properties` unchanged** so the Central smoke still selects the published tuple.
    Require both CI smokes (Linux pure, macOS full) to pass before merging and lifting the WP4
    freeze.

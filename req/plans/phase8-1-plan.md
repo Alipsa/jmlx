@@ -498,5 +498,12 @@ snapshot message: in the `all`-profile branch of `preflight_candidate` the versi
 runs against the already-stripped expected value before the `*-SNAPSHOT` case, so a snapshot
 producer is always rejected by the version-mismatch message and the case line cannot fire
 (move the snapshot check above the comparison and have the selftest assert the message).
+
+Bundle naming (implemented in the development-bump PR): the 8.1 production bundle was
+submitted under the plugin's default name `bundle.zip`. The combined flow's bundle file is now
+explicitly `jmlx-mega-bundle.zip` (the root `combinedRelease` block sets the plugin's
+`bundleFile` property, a convention in nexus-release-plugin 2.5.1), because the Portal carries
+the bundle's file name as the deployment name. Future combined releases upload under the new
+name; the 8.1 record keeps the historical `bundle.zip` name.
 Cross-platform claims stay limited to
 executed CI evidence; this milestone adds no general MLX-parity claim.

@@ -35,7 +35,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | delivered (all milestones delivered; every gate in the Phase 7 done list below passed, hosted Tier-B arm execution being out of scope of that gate per the 2026-11-04 owner amendment in `phase8-1-plan.md` WP0 — the last passing gate, the 7.6 qwen35 self-hosted Tier-B run, in run 41841745005 on 2026-11-04) |
-| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | not started |
+| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.3 and 8.4 not started) |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
@@ -312,6 +312,13 @@ published before `jmlx-models` itself.
    `jmlx-vision` 0.1.0. These modules have no native dependency, target Java 21 and are useful on
    their own. This release also proves the release procedure on low-risk modules before the native
    release.
+
+   **Status (2026-11-05):** delivered. The cut was made as `0.6.0` / `0.1.0` / `0.1.0` and then
+   superseded by the recovery release `0.6.1` / `0.1.1` / `0.1.1` (the 2.2.0 bundles omitted the
+   Gradle `.module` file); the published coordinates are `se.alipsa:jmlx-jinja:0.6.1`,
+   `se.alipsa:jmlx-tokenizer:0.1.1` and `se.alipsa:jmlx-vision:0.1.1`, published as one combined
+   Central deployment from release SHA `9bc85042df50ed3f979cb8d3e7c8767917c71483`. The record,
+   evidence and tag mapping are in `req/phase8-1-release-notes.md`.
 2. **8.2 Decode baseline against `mlx_lm`.** Benchmark jmlx against `mlx_lm` on byte-identical
    weights (one dense family, one MoE family and one 4-bit checkpoint). Measure prefill tokens/s,
    decode tokens/s, time to first token and peak memory, using the existing benchmark harness and

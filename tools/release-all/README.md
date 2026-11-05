@@ -40,7 +40,7 @@ the module list, the committed Portal fixture and the report/resume overrides:
    modules' tests run at publication time. The SNAPSHOT consumer `:jmlx-models` is not part of
    this flow; the runbook's root `./gradlew check` covers it. Finally the task validates every
    staged file (allow-list, signatures, checksums, POM metadata) and writes
-   `build/releaseAll/bundle.zip` + `bundle-receipt.json` (the bundle SHA-256).
+   `build/releaseAll/jmlx-mega-bundle.zip` + `bundle-receipt.json` (the bundle SHA-256).
 4. `releaseAll` — re-checks source and availability (a coordinate published since planning is
    refused), verifies the bundle and manifest hashes against the receipt, uploads the bundle
    once (`publishingType=AUTOMATIC`), journals to `build/releaseAll/deployment.json`, and polls
@@ -62,7 +62,7 @@ behavior is ever in question; `releaseAll` itself does not refresh it.
 
 ```sh
 ./releaseAll.sh --dry-run      # plan + report + signing preflight (warning mode); no upload
-./releaseAll.sh --bundle-only  # … through bundleAll; writes bundle.zip; no upload
+./releaseAll.sh --bundle-only  # … through bundleAll; writes jmlx-mega-bundle.zip; no upload
 ./releaseAll.sh                # full release, including the single upload
 ./releaseAll.sh --resume <deployment-id>   # poll an already-submitted deployment to PUBLISHED
 ```

@@ -93,7 +93,7 @@ expect "all preflight passes (release producers match stripped defaults)" 0 body
 expect "all preflight passes with a matching override" 0 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_CORE_VERSION=0.5.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 expect "all preflight rejects a snapshot producer" 2 body \
-  "printf 'jmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.0\njmlx-jinja=0.6.0-SNAPSHOT\njmlx-vision=0.1.0\n' > '$tmp/all-snapshot.properties'; export JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/all-snapshot.properties'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
+  "printf 'jmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.1\njmlx-jinja=0.6.1-SNAPSHOT\njmlx-vision=0.1.1\n' > '$tmp/all-snapshot.properties'; export JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/all-snapshot.properties'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 expect "all preflight rejects an override that moves the expectation" 2 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_CORE_VERSION=0.4.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 

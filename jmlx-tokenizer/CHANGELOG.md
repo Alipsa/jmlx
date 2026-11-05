@@ -36,4 +36,4 @@
   sequence fails during encoding, matching the locked Rust oracle.
 - Pair offsets are input-local; type IDs and masks identify inputs only for supported BERT templates.
 
-The additive API belongs to this module's independent release. Versions are unchanged.
+Additive API; first published version.

@@ -43,10 +43,13 @@ Publication is one run of `./releaseAll.sh` from the verified release SHA on a c
    `releaseAll.sh`'s own per-module `check` does not include `:jmlx-jinja:releaseVerification`),
    plus the pure candidate smoke.
 3. Publication-day changelog dates: the `[0.6.1]` / `[0.1.1]` sections are pre-filled with the
-   expected publication date in the recovery PR; on publication day, if they differ from the
-   actual date, fix them on the release branch **before** the production run and rerun the
-   affected modules' checks and the pure candidate smoke from the new SHA (a changelog change
-   changes the sources jars).
+   expected publication date in the recovery PR. If on publication day they differ from the
+   actual date, land the fix in its own small reviewed PR merged to main before the production
+   run — the production run happens from the merge SHA under the main freeze, so a post-merge
+   date fix is a recovery PR, not an edit to the release branch — and rerun the affected
+   modules' checks and the pure candidate smoke from the new SHA. The changelog is not part of
+   the published sources jars, so no artifact bytes change; the re-run is required because the
+   release SHA moved and the source guard requires a clean, recorded HEAD.
 4. `./releaseAll.sh` — the selected modules' checks (wired into `bundleAll`'s staging by the
    plugin), staging, bundle validation and the single upload. The `releaseAll` task polls to
    `PUBLISHED` plus repo1 HEAD 200 for every selected component's POM and main JAR before

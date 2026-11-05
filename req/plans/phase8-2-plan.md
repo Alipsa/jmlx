@@ -218,25 +218,28 @@ Implement two explicit Python adapters over the same pinned model weights:
 - **Stock:** execute installed `stream_generate` without changing its loop/model source;
   use exact prompt IDs and greedy settings, but retain its split prefill, pipelining,
   lookahead, wired-limit context, cache clears and detokenization/finalization. Record normal
-  EOS behavior (the tokenizer's `eos_token_ids`) and actual emitted count; the 128-token
-  budget is a maximum here. Label these results `stock-default-loop` with all explicit
-  request options, not controlled equivalence. The `wired_limit` context's exit synchronizes
-  only when the device reports a recommended working-set size (`maybe_set_recommended_wired_limit`
-  returned a previous limit); on the no-limit branch it yields without `mx.synchronize`, and
-  `stream_generate` leaves the `generate_step` generator suspended rather than closed, so the
-  unused final forward can still be pending when the iterator ends. End the full-generation
-  timer with an explicit `mx.synchronize()` after the iterator finishes, whichever branch ran;
-  last-token arrival and full completion are distinct timestamps. Count the token in the final
-  `GenerationResponse` exactly once; its finish reason does not make it an extra token event.
+  EOS behavior (the resolved `TokenizerWrapper.eos_token_ids` stop set) and actual emitted
+  count; the 128-token budget is a maximum here. Label these results `stock-default-loop`
+  with all explicit request options, not controlled equivalence. The `wired_limit` context's
+  exit synchronizes only when the device reports a recommended working-set size
+  (`maybe_set_recommended_wired_limit` returned a previous limit); on the no-limit branch it
+  yields without `mx.synchronize`, and `stream_generate` leaves the `generate_step` generator
+  suspended rather than closed, so the unused final forward can still be pending when the
+  iterator ends. End the full-generation timer with an explicit `mx.synchronize()` after the
+  iterator finishes, whichever branch ran; last-token arrival and full completion are distinct
+  timestamps. Count the token in the final `GenerationResponse` exactly once; its finish
+  reason does not make it an extra token event.
 
 **Stock Java pair path.** The Java side of a stock cell is the public
 `DecoderModel.generate(GenerationRequest, Consumer)` with the checkpoint's own `HfTokenizer`
 attached to the request, so the loop's incremental detokenization runs and is timed, matching
 the stock loop's always-detokenizing behavior (`GenerationLoop` decodes text only when the
 request carries a tokenizer). The request carries the pretokenized prompt IDs, full retention,
-`greedyDefaults(128, eosTokenIds)` with `eosTokenIds` the checkpoint tokenizer's EOS set
-(matching the stock loop's stop) and no extra `stopTokenIds`, and a minimal event listener.
-Both stock loops keep their own internals, so the stock table is an end-to-end
+`greedyDefaults(128, eosTokenIds)` and a minimal event listener, with no extra `stopTokenIds`
+and `eosTokenIds` exactly the stock worker's resolved `TokenizerWrapper.eos_token_ids` — the
+union of `generation_config.json`/`config.json` `eos_token_id` and the tokenizer's
+`eos_token_id` — recorded per artifact in the manifest during WP0 so both sides stop on the
+same set. Both stock loops keep their own internals, so the stock table is an end-to-end
 stock-versus-stock comparison: the paired ratio describes each runtime's default generation
 loop, not matched per-step cost. Record actual emitted counts and finish reasons on both sides
 and do not promote a stock ratio to a matched-work claim.
@@ -329,7 +332,7 @@ For each text workload cell and each Python adapter, run six fresh Java/Python p
 alternating which runtime leads each pair so each runtime leads equally, serially on one host.
 The Java member of a controlled pair is the `stepLogits`-equivalent adapter of §3.2; the Java
 member of a stock pair is the public `generate` path named in §3.2. Each worker records
-the first request then five discarded warmups and 20 measured warm requests with fresh
+the first request, then five discarded warmups and 20 measured warm requests with fresh
 request caches.
 Preserve raw per-process/per-request/per-step values and iteration order. Report medians,
 p10/p90 with a specified quantile convention, per-process summaries and paired ratios computed

@@ -712,20 +712,25 @@ tasks.register('verifyDecodeBaselineManifest') {
     description = 'Verifies the Phase 8.2 decode-baseline workload manifest without Python: ' +
             'schema, frozen generation policy, stop-set/source agreement, identity claims, ' +
             'SplitMix64 prompt re-derivation, canonical prompt digests, tier-b manifest ' +
-            'cross-checks, the Python lock (direct pins, complete hash coverage, no mlx-vlm) ' +
-            'and the manifest self-digest of the frozen WP0 contract.'
+            'cross-checks, the Python lock (direct pins, complete hash coverage, no mlx-vlm), ' +
+            'the frozen run_policy limits (section 7.4) and the worker_sources digest freeze, ' +
+            'and the manifest self-digest of the frozen WP0/WP1 contract.'
     def workloadsFile = layout.projectDirectory.file('tools/decode-baseline/workloads.json').asFile
     def requirementsIn = layout.projectDirectory.file('tools/decode-baseline/requirements.in').asFile
     def requirementsLock = layout.projectDirectory.file('tools/decode-baseline/requirements.lock').asFile
     def denseTierBManifest = layout.projectDirectory.file('tools/tier-b/qwen3-0.6b.json').asFile
     def qwen3vlTierBManifest = layout.projectDirectory.file('tools/tier-b/qwen3vl-2b-instruct.json').asFile
     def phi3vTierBManifest = layout.projectDirectory.file('tools/tier-b/phi3v-4b-instruct.json').asFile
+    def workerPy = layout.projectDirectory.file('tools/decode-baseline/worker.py').asFile
+    def controlledPy = layout.projectDirectory.file('tools/decode-baseline/controlled.py').asFile
     inputs.file(workloadsFile)
     inputs.file(requirementsIn)
     inputs.file(requirementsLock)
     inputs.file(denseTierBManifest)
     inputs.file(qwen3vlTierBManifest)
     inputs.file(phi3vTierBManifest)
+    inputs.file(workerPy)
+    inputs.file(controlledPy)
     doLast {
         // SplitMix64 in JLS long arithmetic: the committed 2048 arrays are the oracle, so any
         // arithmetic promotion bug fails the re-derivation rather than passing silently.
@@ -927,12 +932,65 @@ tasks.register('verifyDecodeBaselineManifest') {
             }
         }
 
-        // The manifest is the frozen WP0 contract: the structural checks above give specific
+        // WP1 run policy: the finite worker/cell/session limits and frozen sample counts of
+        // reference findings section 7.4. The launcher and both workers reject
+        // missing/nonpositive values; this pins the committed numbers.
+        def policy = doc.run_policy
+        if (!(policy instanceof Map)) {
+            throw new GradleException('Decode baseline manifest is missing the run_policy block')
+        }
+        def policyLimits = ['worker_timeout_s': 1800, 'reference_pair_worker_timeout_s': 720,
+                            'cell_time_budget_s': 14400, 'session_time_budget_s': 43200,
+                            'pairs': 6, 'warmups': 5, 'measured_requests': 20,
+                            'emitted_tokens': 128]
+        policyLimits.each { key, expected ->
+            def value = policy[key]
+            if (!(value instanceof Integer) || value <= 0 || value != expected) {
+                throw new GradleException(
+                        "Decode baseline run_policy.${key} differs from the frozen value ${expected}: ${value}")
+            }
+        }
+        if (policy.cache_regime != 'primed-per-request') {
+            throw new GradleException(
+                    "Decode baseline run_policy.cache_regime differs: ${policy.cache_regime}")
+        }
+        if (new ArrayList(policy.io_affected_cells) != ['qwen3-8b-4bit/2048']) {
+            throw new GradleException(
+                    "Decode baseline run_policy.io_affected_cells differs: ${policy.io_affected_cells}")
+        }
+        if (policy.emitted_tokens != doc.controlled_generation.max_new_tokens) {
+            throw new GradleException(
+                    'Decode baseline run_policy.emitted_tokens disagrees with controlled_generation')
+        }
+
+        // Worker source freeze: the committed Python workers are digest-pinned in the manifest
+        // and re-hashed here, so editing a worker without regenerating the manifest fails.
+        def workerSources = doc.worker_sources
+        def expectedWorkerFiles = ['controlled.py', 'worker.py']
+        if (!(workerSources instanceof Map) || !workerSources.keySet().sort().equals(expectedWorkerFiles)) {
+            throw new GradleException(
+                    "Decode baseline worker_sources file set differs: ${workerSources?.keySet()}")
+        }
+        workerSources.each { name, pin ->
+            if (!(name instanceof String) || !name.endsWith('.py') || name.contains('/')
+                    || name.contains('\\') || name.contains('..')) {
+                throw new GradleException("Decode baseline worker source name differs: ${name}")
+            }
+            if (!(pin instanceof String) || !pin.matches('[0-9a-f]{64}')) {
+                throw new GradleException("Decode baseline worker source pin differs: ${name}=${pin}")
+            }
+            def workerFile = layout.projectDirectory.file("tools/decode-baseline/${name}").asFile
+            if (!workerFile.isFile() || sha256File(workerFile) != pin) {
+                throw new GradleException("Decode baseline worker source SHA-256 differs: ${name}")
+            }
+        }
+
+        // The manifest is the frozen WP0/WP1 contract: the structural checks above give specific
         // error messages, and this digest backstop catches drift in any field none of them
         // names (notes, evidence prose, file pins).
-        if (sha256File(workloadsFile) != '4e01b9a074a0c391deeb13ce3d58b2c7823f5aa129be32c6289e783d44e4763d') {
+        if (sha256File(workloadsFile) != '772753ac279ff9b4e1ce01db122d232e361a99f70a95c3299d9d8d39fbe7c6b8') {
             throw new GradleException(
-                    'Decode baseline workload manifest SHA-256 differs from the frozen WP0 contract')
+                    'Decode baseline workload manifest SHA-256 differs from the frozen WP0/WP1 contract')
         }
     }
 }

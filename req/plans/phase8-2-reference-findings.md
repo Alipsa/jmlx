@@ -1,8 +1,10 @@
-# Phase 8.2 — Reference findings (WP0)
+# Phase 8.2 — Reference findings (WP0+WP1)
 
 - **Status:** WP0 readiness and comparison-contract record, 2026-11-06. All evidence below was
   collected on the measurement host named in §8 from locally verified inputs; no headline
-  measurement was executed.
+  measurement was executed. WP1 adds §13 (frozen worker protocol and final report contract)
+  and the two Python workers; its evidence is same-host smoke runs on 2026-11-06 — contract
+  verification, not headline measurement.
 - **Parent:** [Phase 8.2 plan](phase8-2-plan.md) — "WP0 — Record readiness and freeze the
   comparison contract". This document is the plan's required
   `req/plans/phase8-2-reference-findings.md`.
@@ -31,7 +33,9 @@
 `tools/decode-baseline/workloads.json` (schema `jmlx-decode-baseline-workloads-1`) is the
 single frozen input for both runtimes. WP0 replaced every candidate with exact revisions,
 per-file SHA-256 and byte counts; the committed file's own digest is
-`4e01b9a074a0c391deeb13ce3d58b2c7823f5aa129be32c6289e783d44e4763d`, which the guard pins
+`772753ac279ff9b4e1ce01db122d232e361a99f70a95c3299d9d8d39fbe7c6b8` (WP1: carries the
+`run_policy` finite limits of §7.4 and the `worker_sources` digest pin for the two
+committed Python workers), which the guard pins
 as the frozen-contract backstop (§2.3).
 
 ### 2.1 Text cases
@@ -101,12 +105,19 @@ prompt SHA-256s, the 0.6b shared pins against `tools/tier-b/qwen3-0.6b.json`, bo
 manifest-file digests (with the VLM manifest path confined to the two declared repository
 inputs) and repository/revision agreement, the Python lock (the 8 direct pins with PEP 503
 name normalization, complete SHA-256 hash coverage including PEP 508 extras, malformed-pin
-rejection, and the absence of `mlx-vlm`), and finally the manifest's own SHA-256 as the
+rejection, and the absence of `mlx-vlm`), the WP1 `run_policy` block (each frozen §7.4 limit
+as an exact nonpositive-rejecting value, `cache_regime`, `io_affected_cells`, and
+`emitted_tokens` agreeing with `controlled_generation.max_new_tokens`) and the
+`worker_sources` freeze (exact file set `controlled.py` + `worker.py`, each path confined
+to `tools/decode-baseline/`, each re-hashed against the pinned SHA-256), and finally the
+manifest's own SHA-256 as the
 frozen-contract backstop for any field the structural checks do not name. Negative tests
 executed on 2026-11-06: file-sha, prompt-array, controlled-policy, stock-policy,
 stop-union, identity-claim, VLM-path, VLM-manifest, note-drift (digest backstop), malformed
-requirements pin, extra-without-hashes and schema tampers each fail with a distinct error;
-the restored manifest passes.
+requirements pin, extra-without-hashes, schema, run-policy-limit, run-policy-regime,
+io-affected-cells, worker-source-digest, worker-file-edit and worker-file-set tampers
+each fail (the worker-file-edit and worker-source-digest tampers share the "worker
+source SHA-256 differs" error by construction); the restored manifest passes.
 
 ### 2.4 Qualification results (untimed, separate processes)
 
@@ -491,3 +502,198 @@ Dedicated-process Java sweep (stock path), `~/wp0-scratch/budget/*.json`:
 | `qwen3-8b-4bit-2048.json` | `3c790fbf23a8c2bf2c89013a74524499bb244844132196c6dd3cc56baad8d805` |
 | dd-warm probe log (`4bit-2048-ddwarm-probe.log`) | `89976b4e12bc166bc06f42e13b6d02513113e28fc1008bcfb1e80ab62e798acd` |
 | rerun2048 / tf320 / ddprobe re-runs | `58a02faa349cd3bf9c60bb91037d54978e0568c66ed712f452b3abfa989fe004` / `44a91102ce7e76a9a8229967561728cf674fba9b4446e86b2487f7d4a28debdb` / `26c8897ad7ae5c521e2f85247d6b2bf1506a6dbcb92709da7cd2bcab81d3422c` |
+
+## 13. WP1 — Worker protocol and final report contract (frozen)
+
+This section freezes the launcher/worker handoff and the final
+`jmlx-decode-baseline-1` record shapes, superseding the §10 sketch where they
+differ (amendments listed in §13.4). The Python side of the contract is
+implemented in `tools/decode-baseline/worker.py` + `controlled.py` (both
+digest-pinned in the manifest's `worker_sources` and re-hashed by the §2.3
+guard) and was smoke-verified on this host on 2026-11-06 against the
+digest-pinned 0.6b artifact with the full policy request mix (1 first + 5
+warmups + 20 measured); the Java side implements the same contract in
+`jmlx-benchmarks` (launcher, statistics, validation) and `jmlx-models` test
+sources (benchmark-only adapters).
+
+### 13.1 Job file (`jmlx-decode-baseline-job-1`, launcher → worker)
+
+The launcher creates a unique per-worker output directory and writes one job
+file per worker. Fields (all required unless noted):
+
+| Field | Value / rule |
+| --- | --- |
+| `schema` | `jmlx-decode-baseline-job-1` |
+| `adapter` | `controlled` \| `stock` |
+| `case` | text-case name from the manifest (VLM cases rejected until WP4) |
+| `prompt_length` | member of `controlled_generation.prompt_lengths` |
+| `mode` | `headline` \| `fixed-continuation` \| `reference-pair` |
+| `requests` | `{first, warmups, measured}` nonnegative ints; headline/fixed-continuation must equal `run_policy.warmups`/`measured_requests`; reference-pair must be exactly `{0, 0, 1}` |
+| `timeout_s` | `run_policy.worker_timeout_s` (1800) or `run_policy.reference_pair_worker_timeout_s` (720) for reference-pair; must match exactly |
+| `precision_env` | `"1"` \| `"0"` — becomes `MLX_ENABLE_TF32`, set **before any mlx import** |
+| `artifact_dir` / `manifest_path` / `manifest_sha256` / `repo_dir` / `out_dir` | paths; `out_dir` is created by the launcher and must not already contain a `report.json` (overwrite rejected) |
+| `fixed_continuation` | `{offset: 32, count: 32}` only in fixed-continuation mode; the fed ids are `prefix512[32:64]` per the manifest `prompt_generator` rule |
+
+Worker validation, before any model work: manifest SHA-256 equals the job;
+every `files` pin re-verified; at least one safetensors present (priming
+precondition); venv pins re-checked (installed `mlx`/`mlx-metal`/`mlx-lm`
+versions and the installed `generate.py` digest against
+`installed-source-digests.json`); the frozen prompt's canonical SHA-256
+recomputed and compared to the manifest pin. Any failure → failed report
+(§13.3) and exit 1, never a partial success.
+
+### 13.2 Worker protocol and output layout
+
+- The worker writes `worker-ready` (`{utc, pid, adapter, case}`) after
+  validation, **before** the model load — it is the process-startup metric's
+  handshake endpoint (plan §4: parent launch to worker-ready).
+- The worker writes `report.json` atomically (tmp + rename), exactly once.
+- Exit codes: 0 ok, 1 failed (validation, contract or unexpected error),
+  3 timeout. A timeout or failure never presents a partial result as
+  success: the report carries `status` (`ok`/`failed`/`timeout`) and
+  `failure_reason`, plus whatever complete request records exist.
+- Wall-clock watchdog: a 1 s-poll daemon thread sets a fired event at the
+  deadline; the main loop breaks at the next request boundary and writes the
+  timeout report. A 30 s grace backstop then writes the report best-effort
+  and `os._exit(3)`, so a wedged GPU call cannot hold the cell open.
+- Priming (§7.3): one sequential full read of every checkpoint safetensors
+  file immediately before each request; `prime_s` is recorded per request and
+  excluded from every measured interval (`prime_excluded: true`).
+  Reference-pair workers prime nothing (`prime_s: 0.0`, `cache_regime:
+  "observed"`).
+- The model is loaded once per worker process after the worker-ready marker
+  (`load_s`, `load_state`); requests run sequentially over a fresh
+  per-request cache.
+
+### 13.3 Worker report record (per-worker file; schema `jmlx-decode-baseline-1`)
+
+```jsonc
+{
+  "schema": "jmlx-decode-baseline-1",
+  "worker": {
+    "runtime": "python",                  // or "java"
+    "adapter": "controlled | stock",
+    "case": "", "prompt_length": 0,
+    "mode": "headline | fixed-continuation | reference-pair",
+    "status": "ok | failed | timeout",
+    "failure_reason": null,
+    "utc_start": "", "utc_end": "",
+    "identity": {                          // per-worker (moved from the §10 session block)
+      "code": {"sha": "", "branch": "", "dirty": false},
+      "manifest_sha256": "",
+      "run_policy": { "worker_timeout_s": 1800, "reference_pair_worker_timeout_s": 720,
+                      "cell_time_budget_s": 14400, "session_time_budget_s": 43200,
+                      "warmups": 5, "measured_requests": 20, "emitted_tokens": 128,
+                      "cache_regime": "primed-per-request" },
+      "precision_env": "MLX_ENABLE_TF32=1",
+      "python": {"version": "", "venv": "", "mlx": "", "mlx_metal": "", "mlx_lm": ""},
+      "device": {"device_name": "", "memory_size_bytes": 0,
+                 "max_recommended_working_set_bytes": 0},
+      "wired_limit_policy": "",            // manifest controlled_generation/stock_generation.wired_limit verbatim
+      "cache_regime": "primed-per-request | observed",
+      "io_affected": false,
+      "instrumented": false
+    },
+    "stop_token_ids": [],
+    "load_s": 0.0, "load_state": "materialized",
+    "requests": [{
+      "index": 0, "kind": "first | warmup | measured",
+      "prime_s": 0.0, "prime_excluded": true,
+      "ttft_s": null, "prefill_s": null,
+      "steps": [ {"position": 0, "s": 0.0} ],   // controlled: one entry per cached step;
+                                                // fixed-continuation adds argmax_id, top2_margin
+      "event_s": [], "tokens": [],              // host-visible token times / emitted ids
+      "streaming_decode_tps": null,             // (N-1)/(event_s[N-1] - event_s[0]); token 1 excluded
+      "full_generation_s": 0.0, "emitted": 0,
+      "finish_reason": "controlled-max-tokens | stop | length | fixed-continuation",
+      "unused_lookahead_forwards": 0,           // stock: 1 for any non-empty run
+      "memory": null, "io_affected": false
+    }],
+    "notes": []
+  }
+}
+```
+
+Boundary semantics (frozen): controlled emits all `emitted_tokens`
+regardless of stop-set membership (`stop_termination: false`, finish
+`controlled-max-tokens`) with a single full-prompt forward, last-position
+projection, and exactly `emitted - 1` cached steps (step `position` =
+context length entering the step, so `prompt_length + 1` …
+`prompt_length + 127`); stock runs the shipped loop with the manifest stop
+set (early `stop` possible), reports host-visible event times only (its
+internal prompt/decode fields stay stock metrics), and drains the one queued
+lookahead forward with an explicit `mx.synchronize()` after the iterator —
+counted, not hidden. Stock records `prefill_s`/`steps` as null; the
+controlled-only measurements are the prefill/decode contract of plan §4.
+Fixed-continuation feeds `prefix512[32:64]` ids one per step (no sampling,
+no lookahead pipeline; stock uses the shipped model call with a
+last-position slice) and records per-step `argmax_id`/`top2_margin`; it has
+no `event_s`/`tokens`/`ttft_s` and `emitted: 0`. `memory` stays null in
+WP1 (WP2 diagnostic processes fill it; `instrumented` workers are
+ineligible for headline aggregation regardless).
+
+The **session report** is assembled by the launcher (Java side): the §10
+`session` block **minus** the identity fields that moved per-worker
+(`code`, `manifest_sha256`, `run_policy`, `precision_env`, `python`,
+`device`, `wired_limit_policy`, `cache_regime`, `io_affected`,
+`instrumented` — the session keeps `host`, `java`, `native_pins`,
+`workload`), plus `fork_order`, the embedded per-worker reports, and the
+`summary` with its exclusion list (failed/timeout/instrumented workers and
+requests are excluded by construction, with the exclusion recorded). The
+§10 quantile convention is unchanged.
+
+### 13.4 Amendments to §10 and verified WP1 facts (2026-11-06, this host)
+
+1. Identity block moves from the session to each worker report; the session
+   retains only host/fork-order/native-pin/workload fields (§13.3).
+2. Per-request fields gain `index`, `event_s`, `tokens`, `ttft_s`,
+   `prefill_s`, `full_generation_s`, `finish_reason`,
+   `unused_lookahead_forwards`, `io_affected`; `prefill_tps` is replaced by
+   `prefill_s` (tps is derived in the summary, never stored per request).
+3. `load_state` is recorded at the worker (Python: `materialized` — the
+   pinned `load()` evaluates all parameters; Java records its own state).
+4. Stop-set resolution (correcting an earlier probe that called
+   `load_tokenizer` directly): the pinned `mlx_lm.load()` merges
+   `generation_config.json`'s `eos_token_id` into the tokenizer config
+   (`utils.py:376`), so all three text cases already resolve to exactly the
+   manifest sets (0.6b → {151643, 151645}, tinymistral → {2, 32001}, 4bit →
+   {151645}); verified by direct load on 2026-11-06. The stock worker still
+   completes any missing ids via the shipped `add_eos_token` API (the
+   `--extra-eos-token` mechanism) and **asserts** the resolved set equals
+   the manifest set, so a future drift fails the worker instead of
+   changing behavior silently.
+5. Greedy-stream agreement is **not** an invariant between the two adapters:
+   on the frozen 0.6b L=32 prompt the controlled and stock streams match
+   for the first 102 tokens and diverge at token 103 (top-2 margin 0.125 at
+   the diverging step; 4 of 127 steps had margin < 1e-2, including exact
+   0-ties). The cause is the different forward structure (single full-prompt
+   forward vs shipped split-prefill + lookahead), not a load defect — the
+   §2.4 logit-level identity (max diff 0.0, greedy-region min gap 0.5) is
+   unaffected. Headline tables therefore compare per-adapter timings, never
+   pooled, per plan §4.
+6. Fixed-continuation cross-check on the same artifact: 26 × 32 steps per
+   adapter, positions 513–544, **zero argmax mismatches** between controlled
+   and stock including the exact-tie steps (first-maximum argmax tie-break
+   is deterministic in both paths).
+7. Metal first-use warm-up: the first process to exercise a shape pays a
+   one-time compile cost (observed: fixed-continuation L=512 request-0
+   prefill 0.332 s vs median 0.022 s; the later stock process's request-0
+   was 0.036 s). This is why the 5 discarded warmups exist; it is a note,
+   not a contract number.
+8. `mx.sort` in the pinned mlx 0.32.4 sorts ascending with no order keyword;
+   `mx.default_device() == mx.gpu` holds on this host (asserted by the
+   worker before load). The worker runs under `python -I` (isolated mode),
+   which keeps the script directory off `sys.path` — the worker inserts its
+   own directory for the sibling `controlled` import.
+
+### 13.5 Manifest re-pin flow (frozen)
+
+The manifest now carries `run_policy` (the frozen §7.4 limits, exact
+nonpositive-rejecting values) and `worker_sources` (SHA-256 of
+`worker.py` + `controlled.py`; path confined to `tools/decode-baseline/`).
+Any worker edit must be followed by: regenerate the manifest (the
+`worker_sources` pins move), update the guard's digest backstop and the §2
+digest citation, re-run `verifyDecodeBaselineManifest` and the negative
+tampers (a worker-file edit without manifest regeneration must fail with
+"worker source SHA-256 differs"). The current frozen manifest digest is the
+one cited in §2.

@@ -43,6 +43,25 @@
   "rule": "token = z % vocab_size; advance state and retry while the token is in the case excluded stop set; per_length arrays are nested prefixes 32 | 512 | 2048 of the 2048 stream; the fixed-continuation workload uses prefix512[32:64]",
   "canonical_sha256": "SHA-256 over the UTF-8 encoding of the JSON array of the token list with compact separators ',' and ':'"
  },
+ "run_policy": {
+  "worker_timeout_s": 1800,
+  "reference_pair_worker_timeout_s": 720,
+  "cell_time_budget_s": 14400,
+  "session_time_budget_s": 43200,
+  "pairs": 6,
+  "warmups": 5,
+  "measured_requests": 20,
+  "emitted_tokens": 128,
+  "cache_regime": "primed-per-request",
+  "io_affected_cells": [
+   "qwen3-8b-4bit/2048"
+  ],
+  "note": "Finite limits of reference findings section 7.4 (launcher and workers reject missing/nonpositive values); the observed-cache reference pair (section 7.3) primes nothing, runs one measured request per runtime and uses reference_pair_worker_timeout_s. Refreshed in WP2 with the implemented controlled adapters before the WP3/WP4 budgets are committed."
+ },
+ "worker_sources": {
+  "worker.py": "b626ae887ec0617279a0016244a0d6e3150a86b9ed1a0210715d4a022dfeb0e2",
+  "controlled.py": "f8496958c153530ed607b57a6bc2bc5fe042eb4e6b8697f6bdd946020d5e9f3a"
+ },
  "text_cases": [
   {
    "name": "qwen3-0.6b",

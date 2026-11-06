@@ -49,6 +49,7 @@
   "cell_time_budget_s": 14400,
   "session_time_budget_s": 43200,
   "pairs": 6,
+  "first_requests": 1,
   "warmups": 5,
   "measured_requests": 20,
   "emitted_tokens": 128,
@@ -59,8 +60,8 @@
   "note": "Finite limits of reference findings section 7.4 (launcher and workers reject missing/nonpositive values); the observed-cache reference pair (section 7.3) primes nothing, runs one measured request per runtime and uses reference_pair_worker_timeout_s. Refreshed in WP2 with the implemented controlled adapters before the WP3/WP4 budgets are committed."
  },
  "worker_sources": {
-  "worker.py": "b626ae887ec0617279a0016244a0d6e3150a86b9ed1a0210715d4a022dfeb0e2",
-  "controlled.py": "f8496958c153530ed607b57a6bc2bc5fe042eb4e6b8697f6bdd946020d5e9f3a"
+  "worker.py": "bf103ef0f34d31c37aba48503c9c02b39b81aa5e7e18b7896f2aebb4ba52d55e",
+  "controlled.py": "c3e682076fc757a8d08a5083033e312a6a3bfe570dff5360ec2cf1a528066500"
  },
  "text_cases": [
   {

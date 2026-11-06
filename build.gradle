@@ -941,7 +941,7 @@ tasks.register('verifyDecodeBaselineManifest') {
         }
         def policyLimits = ['worker_timeout_s': 1800, 'reference_pair_worker_timeout_s': 720,
                             'cell_time_budget_s': 14400, 'session_time_budget_s': 43200,
-                            'pairs': 6, 'warmups': 5, 'measured_requests': 20,
+                            'pairs': 6, 'first_requests': 1, 'warmups': 5, 'measured_requests': 20,
                             'emitted_tokens': 128]
         policyLimits.each { key, expected ->
             def value = policy[key]
@@ -988,7 +988,7 @@ tasks.register('verifyDecodeBaselineManifest') {
         // The manifest is the frozen WP0/WP1 contract: the structural checks above give specific
         // error messages, and this digest backstop catches drift in any field none of them
         // names (notes, evidence prose, file pins).
-        if (sha256File(workloadsFile) != '772753ac279ff9b4e1ce01db122d232e361a99f70a95c3299d9d8d39fbe7c6b8') {
+        if (sha256File(workloadsFile) != '23271da61e4424a27b712483413963d2c22f69a2dedac4ae34cd2578170268a5') {
             throw new GradleException(
                     'Decode baseline workload manifest SHA-256 differs from the frozen WP0/WP1 contract')
         }

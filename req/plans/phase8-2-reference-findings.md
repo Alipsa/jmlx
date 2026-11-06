@@ -33,9 +33,10 @@
 `tools/decode-baseline/workloads.json` (schema `jmlx-decode-baseline-workloads-1`) is the
 single frozen input for both runtimes. WP0 replaced every candidate with exact revisions,
 per-file SHA-256 and byte counts; the committed file's own digest is
-`772753ac279ff9b4e1ce01db122d232e361a99f70a95c3299d9d8d39fbe7c6b8` (WP1: carries the
+`23271da61e4424a27b712483413963d2c22f69a2dedac4ae34cd2578170268a5` (WP1: carries the
 `run_policy` finite limits of §7.4 and the `worker_sources` digest pin for the two
-committed Python workers), which the guard pins
+committed Python workers; the WP1 review round added `run_policy.first_requests` and
+re-pinned `worker_sources` after the worker fixes of §13.4), which the guard pins
 as the frozen-contract backstop (§2.3).
 
 ### 2.1 Text cases
@@ -105,7 +106,7 @@ prompt SHA-256s, the 0.6b shared pins against `tools/tier-b/qwen3-0.6b.json`, bo
 manifest-file digests (with the VLM manifest path confined to the two declared repository
 inputs) and repository/revision agreement, the Python lock (the 8 direct pins with PEP 503
 name normalization, complete SHA-256 hash coverage including PEP 508 extras, malformed-pin
-rejection, and the absence of `mlx-vlm`), the WP1 `run_policy` block (each frozen §7.4 limit
+rejection, and the absence of `mlx-vlm`), the WP1 `run_policy` block (each frozen §7.4 limit, including `first_requests`,
 as an exact nonpositive-rejecting value, `cache_regime`, `io_affected_cells`, and
 `emitted_tokens` agreeing with `controlled_generation.max_new_tokens`) and the
 `worker_sources` freeze (exact file set `controlled.py` + `worker.py`, each path confined
@@ -114,10 +115,17 @@ manifest's own SHA-256 as the
 frozen-contract backstop for any field the structural checks do not name. Negative tests
 executed on 2026-11-06: file-sha, prompt-array, controlled-policy, stock-policy,
 stop-union, identity-claim, VLM-path, VLM-manifest, note-drift (digest backstop), malformed
-requirements pin, extra-without-hashes, schema, run-policy-limit, run-policy-regime,
+requirements pin, extra-without-hashes, schema, run-policy-limit,
+run-policy-first-requests, run-policy-regime,
 io-affected-cells, worker-source-digest, worker-file-edit and worker-file-set tampers
 each fail (the worker-file-edit and worker-source-digest tampers share the "worker
-source SHA-256 differs" error by construction); the restored manifest passes.
+source SHA-256 differs" error by construction); the restored manifest passes. After the
+round-1 re-pin the guard tampers (run-policy-limit, run-policy-first-requests,
+run-policy-regime, note-drift, io-affected-cells, worker-source-digest, worker-file-set,
+worker-file-edit) were re-executed against the re-pinned manifest and fail with distinct
+errors; the remaining tampers cover structural checks whose manifest fields are
+byte-identical in the re-pin (only `run_policy.first_requests` and `worker_sources`
+changed), and the restored files are byte-identical after every round.
 
 ### 2.4 Qualification results (untimed, separate processes)
 
@@ -528,26 +536,37 @@ file per worker. Fields (all required unless noted):
 | `case` | text-case name from the manifest (VLM cases rejected until WP4) |
 | `prompt_length` | member of `controlled_generation.prompt_lengths` |
 | `mode` | `headline` \| `fixed-continuation` \| `reference-pair` |
-| `requests` | `{first, warmups, measured}` nonnegative ints; headline/fixed-continuation must equal `run_policy.warmups`/`measured_requests`; reference-pair must be exactly `{0, 0, 1}` |
+| `requests` | `{first, warmups, measured}` nonnegative ints; headline/fixed-continuation must equal `run_policy.first_requests`/`warmups`/`measured_requests`; reference-pair must be exactly `{0, 0, 1}` |
 | `timeout_s` | `run_policy.worker_timeout_s` (1800) or `run_policy.reference_pair_worker_timeout_s` (720) for reference-pair; must match exactly |
 | `precision_env` | `"1"` \| `"0"` — becomes `MLX_ENABLE_TF32`, set **before any mlx import** |
 | `artifact_dir` / `manifest_path` / `manifest_sha256` / `repo_dir` / `out_dir` | paths; `out_dir` is created by the launcher and must not already contain a `report.json` (overwrite rejected) |
 | `fixed_continuation` | `{offset: 32, count: 32}` only in fixed-continuation mode; the fed ids are `prefix512[32:64]` per the manifest `prompt_generator` rule |
 
-Worker validation, before any model work: manifest SHA-256 equals the job;
-every `files` pin re-verified; at least one safetensors present (priming
-precondition); venv pins re-checked (installed `mlx`/`mlx-metal`/`mlx-lm`
-versions and the installed `generate.py` digest against
-`installed-source-digests.json`); the frozen prompt's canonical SHA-256
-recomputed and compared to the manifest pin. Any failure → failed report
-(§13.3) and exit 1, never a partial success.
+Worker validation, before any model work: `manifest_path` resolves to the
+repository's canonical `tools/decode-baseline/workloads.json` (anchored on the
+worker file's own location, so a hand-written job cannot point at a matching
+copy); manifest SHA-256 equals the job; every `files` pin re-verified; the
+artifact's `*.safetensors` set equals the case's pinned set exactly (no
+unpinned weight file is primed or loaded); venv pins re-checked (installed
+`mlx`/`mlx-metal`/`mlx-lm` versions and the full installed `mlx_lm` source
+freeze — all 202 pinned files, not just `generate.py` — against
+`installed-source-digests.json`); outside reference-pair mode
+`requests.first`/`warmups`/`measured` equal `run_policy.first_requests`/
+`warmups`/`measured_requests`; the frozen prompt's canonical SHA-256 recomputed
+and compared to the manifest pin. Any failure → failed report (§13.3) and exit
+1, never a partial success — and never an overwrite of a report the directory
+already holds (§13.2).
 
 ### 13.2 Worker protocol and output layout
 
 - The worker writes `worker-ready` (`{utc, pid, adapter, case}`) after
   validation, **before** the model load — it is the process-startup metric's
   handshake endpoint (plan §4: parent launch to worker-ready).
-- The worker writes `report.json` atomically (tmp + rename), exactly once.
+- The worker writes `report.json` atomically (tmp + hard link, which fails
+  rather than replaces), exactly once, and never overwrites an existing
+  `report.json`: a write into an already-reported directory is refused and
+  reported on stderr only, leaving the existing report byte-identical. The
+  check-then-write is guarded by a lock shared with the watchdog backstop.
 - Exit codes: 0 ok, 1 failed (validation, contract or unexpected error),
   3 timeout. A timeout or failure never presents a partial result as
   success: the report carries `status` (`ok`/`failed`/`timeout`) and
@@ -555,7 +574,12 @@ recomputed and compared to the manifest pin. Any failure → failed report
 - Wall-clock watchdog: a 1 s-poll daemon thread sets a fired event at the
   deadline; the main loop breaks at the next request boundary and writes the
   timeout report. A 30 s grace backstop then writes the report best-effort
-  and `os._exit(3)`, so a wedged GPU call cannot hold the cell open.
+  and `os._exit(3)`, so a wedged GPU call cannot hold the cell open. The
+  backstop skips the status overwrite when the report is already written (the
+  main thread's report stays authoritative); the exit is unconditional.
+- The fired deadline is re-checked after the final request: if it fired while
+  the last request was running, the run reports `timeout` (exit 3) even though
+  that request finished within the grace, with all complete request records.
 - Priming (§7.3): one sequential full read of every checkpoint safetensors
   file immediately before each request; `prime_s` is recorded per request and
   excluded from every measured interval (`prime_excluded: true`).
@@ -583,8 +607,8 @@ recomputed and compared to the manifest pin. Any failure → failed report
       "manifest_sha256": "",
       "run_policy": { "worker_timeout_s": 1800, "reference_pair_worker_timeout_s": 720,
                       "cell_time_budget_s": 14400, "session_time_budget_s": 43200,
-                      "warmups": 5, "measured_requests": 20, "emitted_tokens": 128,
-                      "cache_regime": "primed-per-request" },
+                      "first_requests": 1, "warmups": 5, "measured_requests": 20,
+                      "emitted_tokens": 128, "cache_regime": "primed-per-request" },
       "precision_env": "MLX_ENABLE_TF32=1",
       "python": {"version": "", "venv": "", "mlx": "", "mlx_metal": "", "mlx_lm": ""},
       "device": {"device_name": "", "memory_size_bytes": 0,
@@ -617,9 +641,11 @@ recomputed and compared to the manifest pin. Any failure → failed report
 Boundary semantics (frozen): controlled emits all `emitted_tokens`
 regardless of stop-set membership (`stop_termination: false`, finish
 `controlled-max-tokens`) with a single full-prompt forward, last-position
-projection, and exactly `emitted - 1` cached steps (step `position` =
-context length entering the step, so `prompt_length + 1` …
-`prompt_length + 127`); stock runs the shipped loop with the manifest stop
+projection, and exactly `emitted - 1` cached steps (step `position` = the
+1-based position of the fed token — the cache length after the step — so
+`prompt_length + 1` … `prompt_length + 127`). Controlled `event_s` records
+every token's host-visible time after its argmax (token 1 included);
+`prefill_s` stops at the evaluated prefill logits. Stock runs the shipped loop with the manifest stop
 set (early `stop` possible), reports host-visible event times only (its
 internal prompt/decode fields stay stock metrics), and drains the one queued
 lookahead forward with an explicit `mx.synchronize()` after the iterator —
@@ -628,7 +654,11 @@ controlled-only measurements are the prefill/decode contract of plan §4.
 Fixed-continuation feeds `prefix512[32:64]` ids one per step (no sampling,
 no lookahead pipeline; stock uses the shipped model call with a
 last-position slice) and records per-step `argmax_id`/`top2_margin`; it has
-no `event_s`/`tokens`/`ttft_s` and `emitted: 0`. `memory` stays null in
+no `event_s`/`tokens`/`ttft_s` and `emitted: 0`. In both adapters the
+per-step `s` stops at the evaluated logits (the argmax and the
+full-vocabulary sort run outside the measured interval), and
+`full_generation_s` is the monotonic wall time from entry to the end of the
+final step's host work — one definition on both paths. `memory` stays null in
 WP1 (WP2 diagnostic processes fill it; `instrumented` workers are
 ineligible for headline aggregation regardless).
 
@@ -683,8 +713,53 @@ requests are excluded by construction, with the exclusion recorded). The
 8. `mx.sort` in the pinned mlx 0.32.4 sorts ascending with no order keyword;
    `mx.default_device() == mx.gpu` holds on this host (asserted by the
    worker before load). The worker runs under `python -I` (isolated mode),
-   which keeps the script directory off `sys.path` — the worker inserts its
-   own directory for the sibling `controlled` import.
+   which keeps the script directory off `sys.path` — the worker appends its
+   own directory (not prepends, so a stray sibling file cannot shadow stdlib
+   or installed packages) for the sibling `controlled` import.
+9. Review round 1 (2026-11-06, PR review of head `4ef0503`): (a) a refused
+   job can no longer destroy the existing report — `write_report` hard-links
+   the temp file (`FileExistsError` instead of replace) and the watchdog
+   skips the status overwrite once the report is written, the
+   check-then-write being lock-guarded; (b) the fired deadline is re-checked
+   after the final request (§13.2); (c) the artifact's safetensors set must
+   equal the pinned set exactly (§13.1); (d) `run_policy.first_requests: 1`
+   is frozen in the manifest, the guard and the worker (§13.1/§13.3);
+   (e) the full 202-file installed-source freeze is re-hashed per run;
+   (f) `manifest_path` is pinned to the canonical repository file; (g) the
+   fixed-continuation step timers and `full_generation_s` are defined
+   identically in both adapters, and controlled token 1's event time is
+   taken after its argmax (§13.3); (h) the worker appends its directory to
+   `sys.path` (item 8). The manifest was re-pinned (new digest in §2;
+   `worker_sources` moved with the worker edits) and the guard backstop
+   updated.
+10. The T2 timeout probe (item 12's method) found a real bug in the
+    round-1 watchdog rewrite: the fired-event set sat behind a loop whose
+    only exit condition was the event itself, so no timeout could ever fire
+    (every timed run would silently report `ok`). After the fix
+    (set-and-break inside the poll loop), the probe — a temporary
+    real-manifest tamper with the full 26-request mix on the 0.6b L=512
+    cell — placed the deadline inside request 25 (in-loop break, 25
+    complete records, exit 3) and inside the final request (post-loop
+    check, 26 complete records, `status: timeout`, exit 3); the manifest
+    was restored byte-identical (SHA-256 verified) and the guard re-passed.
+11. Worker-level negative tests (this host, 2026-11-06; 13 assertions,
+    validation failures only): a pre-seeded `report.json` survives a refused
+    job byte-identical (exit 1, the refusal reason on stderr, no temp file
+    left behind); a validation failure into an already-reported directory
+    leaves the report intact; a stray `model-extra.safetensors` in a cloned
+    artifact dir is rejected by name; `requests.first ≠ 1` is rejected; a
+    non-canonical manifest path with a matching digest is rejected.
+12. Smoke re-run after the fixes (0.6b, both adapters, full 26-request mix,
+    2026-11-06, warm on-disk Metal cache): fixed-continuation L=512 —
+    26 × 32 steps per adapter, positions 513–544, zero argmax mismatches,
+    max top-2 margin difference < 1e-6; step-s medians 4.46 ms (controlled)
+    / 3.95 ms (stock) with the sort outside the timer; `full_generation_s`
+    medians 0.2489 s (controlled) / 0.2401 s (stock). Headline L=32 —
+    controlled: 26/26 emitted 128, measured-request medians ttft 5.33 ms,
+    prefill 4.92 ms, 255.5 tok/s streaming, 0.5027 s full; stock: 26/26
+    emitted 128 (no early stop this run), 0.4253 s full median. Item 5's
+    stream-divergence fact and the §2.4 logit-level identity are unaffected
+    (same artifact, same adapters, same frozen prompts).
 
 ### 13.5 Manifest re-pin flow (frozen)
 

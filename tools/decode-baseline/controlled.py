@@ -77,10 +77,12 @@ def run(model, prompt_ids, emitted=EMITTED_TOKENS):
     - tokens: the emitted token ids (token 1 from the prefill projection, then
       one per cached step);
     - prefill_s: monotonic seconds from t_entry to evaluated prefill logits;
-    - steps: [{"position": context length entering the step, "s": seconds}]
-      for the (emitted - 1) cached steps;
+    - steps: [{"position": 1-based position of the fed token (the cache
+      length after the step), "s": seconds}] for the (emitted - 1) cached
+      steps;
     - token_rel_s: host-visible relative time (seconds from t_entry) of each
-      emitted token; token 1 at prefill completion.
+      emitted token; every entry, token 1 included, is taken after that
+      token's argmax.
     """
     if emitted < 1:
         raise ControlledContractError("emitted must be >= 1")
@@ -93,8 +95,10 @@ def run(model, prompt_ids, emitted=EMITTED_TOKENS):
     mx.eval(logits, *cache_states(cache))
     prefill_s = time.monotonic() - t0
 
+    # Token 1's event time is taken after its argmax, like every later
+    # token's; prefill_s above stops at the evaluated logits.
     tokens = [greedy_token(logits)]
-    token_rel_s = [prefill_s]
+    token_rel_s = [time.monotonic() - t0]
     steps = []
     for k in range(emitted - 1):
         step_start = time.monotonic()
@@ -113,9 +117,14 @@ def run_fixed_continuation(model, prompt_ids, continuation_ids):
 
     Each step feeds exactly one given id (identical context growth on both
     runtimes) and records the evaluated last-position projection:
-    position, seconds, greedy argmax id and top-2 margin. Used by the
-    untimed qualification workload (plan section 3.3); it is not a
-    generation run and emits no tokens.
+    position (1-based position of the fed token, i.e. the cache length after
+    the step), seconds, greedy argmax id and top-2 margin. Used by the
+    qualification workload (plan section 3.3); it is not a generation run and
+    emits no tokens.
+
+    Returns (prefill_s, steps, full_s): full_s is the monotonic wall time
+    from entry to the end of the final step's argmax/margin host work — the
+    same definition the stock path records as full_generation_s.
     """
     head = own_head(model)
     cache = make_prompt_cache(model)
@@ -141,4 +150,5 @@ def run_fixed_continuation(model, prompt_ids, continuation_ids):
                 "top2_margin": top2_margin(logits),
             }
         )
-    return prefill_s, steps
+    full_s = time.monotonic() - t0
+    return prefill_s, steps, full_s

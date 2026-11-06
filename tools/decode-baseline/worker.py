@@ -10,8 +10,13 @@ and 10 (schema), plan sections 3.2/3.3/4.
 Rules enforced here:
 
 - the frozen workload manifest is re-hashed and every consumed file digest is
-  re-verified before any model work; the venv pins (versions and the installed
-  mlx_lm generate.py digest) are re-checked the same way;
+  re-verified before any model work; the venv pins (versions and the full
+  installed mlx_lm source freeze, all 202 pinned files) are re-checked the
+  same way;
+- the job's manifest_path must be the repository's canonical
+  tools/decode-baseline/workloads.json, and artifact_dir's safetensors set
+  must equal the case's pinned set exactly -- no unpinned weight file is
+  primed or loaded;
 - MLX_ENABLE_TF32 is set from the job before any mlx import, so a
   shell-inherited precision mode can never select the run;
 - one sequential full read of every checkpoint safetensors file precedes each
@@ -21,7 +26,11 @@ Rules enforced here:
   wrapper stop set is completed to the manifest's frozen set with the shipped
   add_eos_token API and asserted equal; the full-generation timer ends with an
   explicit mx.synchronize() after the iterator finishes;
-- a worker wall-clock timeout produces a failed report and a nonzero exit; a
+- the report is written at most once, atomically, and never overwrites an
+  existing report.json (a failure into an already-reported directory is
+  refused and reported on stderr only);
+- a worker wall-clock timeout -- enforced at request boundaries and re-checked
+  after the final request -- produces a failed report and a nonzero exit; a
   worker never presents a partial result as success.
 """
 
@@ -37,8 +46,10 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 # -I (isolated mode) keeps this file's directory off sys.path; the controlled
-# loop module is a sibling and must be importable either way.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# loop module is a sibling and must be importable either way. Appended (not
+# prepended) so a stray module file next to the worker can never shadow
+# stdlib or installed packages.
+sys.path.append(str(Path(__file__).resolve().parent))
 
 JOB_SCHEMA = "jmlx-decode-baseline-job-1"
 REPORT_SCHEMA = "jmlx-decode-baseline-1"
@@ -72,6 +83,9 @@ state = {
 }
 PRIMING_ENABLED = True
 deadline = {"t": None, "fired": threading.Event()}
+# The watchdog backstop and the main thread both reach write_report; the lock
+# makes the check-then-set on report_written and the temp-file write atomic.
+report_lock = threading.Lock()
 
 
 class WorkerError(Exception):
@@ -97,50 +111,79 @@ def require(cond, reason):
 
 
 def write_report(out_dir):
-    if state["report_written"]:
-        return
-    state["report_written"] = True
-    state["utc_end"] = utcnow()
-    report = {
-        "schema": REPORT_SCHEMA,
-        "worker": {
-            "runtime": "python",
-            "adapter": state["adapter"],
-            "case": state["case"],
-            "prompt_length": state["prompt_length"],
-            "mode": state["mode"],
-            "status": state["status"],
-            "failure_reason": state["failure_reason"],
-            "utc_start": state["utc_start"],
-            "utc_end": state["utc_end"],
-            "identity": state["identity"],
-            "stop_token_ids": state["stop_token_ids"],
-            "load_s": state["load_s"],
-            "load_state": state["load_state"],
-            "requests": state["requests"],
-            "notes": state["notes"],
-        },
-    }
-    tmp = out_dir / "report.json.tmp"
-    with open(tmp, "w") as fid:
-        json.dump(report, fid, indent=1)
-        fid.write("\n")
-    os.replace(tmp, out_dir / "report.json")
+    """Write the report atomically, at most once, and never over an existing
+    report.json.
+
+    os.link fails with FileExistsError instead of replacing, so a
+    pre-existing report (e.g. from an earlier run that this worker refused to
+    join) is left byte-identical; the refusal is reported on stderr. The lock
+    keeps the watchdog backstop and the main thread from racing on the
+    check-then-set and the shared temp file."""
+    with report_lock:
+        if state["report_written"]:
+            return
+        state["report_written"] = True
+        state["utc_end"] = utcnow()
+        report = {
+            "schema": REPORT_SCHEMA,
+            "worker": {
+                "runtime": "python",
+                "adapter": state["adapter"],
+                "case": state["case"],
+                "prompt_length": state["prompt_length"],
+                "mode": state["mode"],
+                "status": state["status"],
+                "failure_reason": state["failure_reason"],
+                "utc_start": state["utc_start"],
+                "utc_end": state["utc_end"],
+                "identity": state["identity"],
+                "stop_token_ids": state["stop_token_ids"],
+                "load_s": state["load_s"],
+                "load_state": state["load_state"],
+                "requests": state["requests"],
+                "notes": state["notes"],
+            },
+        }
+        final = out_dir / "report.json"
+        tmp = out_dir / "report.json.tmp"
+        with open(tmp, "w") as fid:
+            json.dump(report, fid, indent=1)
+            fid.write("\n")
+        try:
+            os.link(tmp, final)
+        except FileExistsError:
+            print(
+                f"worker refused ({state['failure_reason']}); "
+                f"report already exists at {final}; leaving it untouched",
+                file=sys.stderr,
+            )
+        finally:
+            os.unlink(tmp)
 
 
 def watchdog():
     """Hard backstop: if the main loop has not exited shortly after the
-    deadline, write the timeout report and kill the process."""
+    deadline, write the timeout report and kill the process. When the report
+    is already written the status overwrite is skipped (the main thread's
+    report stays authoritative); the exit is unconditional."""
     while not deadline["fired"].is_set():
         time.sleep(1.0)
         if time.monotonic() < deadline["t"]:
             continue
         deadline["fired"].set()
-        time.sleep(WATCHDOG_GRACE_S)
-        state["status"] = "timeout"
-        state["failure_reason"] = "worker wall-clock timeout exceeded"
-        write_report(Path(state["out_dir"]))
-        os._exit(EXIT_TIMEOUT)
+        break
+    time.sleep(WATCHDOG_GRACE_S)
+    with report_lock:
+        already_written = state["report_written"]
+        if not already_written:
+            state["status"] = "timeout"
+            state["failure_reason"] = "worker wall-clock timeout exceeded"
+    if not already_written:
+        try:
+            write_report(Path(state["out_dir"]))
+        except Exception as exc:
+            print(f"failed to write timeout report: {exc}", file=sys.stderr)
+    os._exit(EXIT_TIMEOUT)
 
 
 def validate(job):
@@ -163,6 +206,16 @@ def validate(job):
         require(isinstance(job.get(key), str) and job[key], f"{key} is required")
 
     manifest_path = Path(job["manifest_path"])
+    # Anchored on this file's own location, not the job's repo_dir: a
+    # hand-written job cannot point at a copy of the manifest, however
+    # self-consistent its digest.
+    canonical_manifest = (
+        Path(__file__).resolve().parents[2] / "tools" / "decode-baseline" / "workloads.json"
+    )
+    require(
+        manifest_path.resolve() == canonical_manifest,
+        f"manifest_path must be the canonical frozen manifest {canonical_manifest}",
+    )
     require(manifest_path.is_file(), "manifest path does not exist")
     manifest_sha = sha256_file(manifest_path)
     require(manifest_sha == job["manifest_sha256"], "manifest SHA-256 mismatch (frozen contract)")
@@ -195,6 +248,10 @@ def validate(job):
             "reference-pair must be exactly one measured request with no priming",
         )
     else:
+        require(
+            requests["first"] == policy.get("first_requests"),
+            "requests.first differs from run_policy.first_requests",
+        )
         require(requests["warmups"] == policy.get("warmups"), "requests.warmups differs from run_policy")
         require(
             requests["measured"] == policy.get("measured_requests"),
@@ -222,18 +279,33 @@ def validate(job):
         require(path.is_file(), f"checkpoint file missing: {name}")
         actual = sha256_file(path)
         require(actual == pin["sha256"], f"checkpoint digest mismatch for {name}")
-    safetensors = sorted(artifact_dir.glob("*.safetensors"))
-    require(safetensors, "no safetensors files in artifact_dir (priming cannot run)")
+    # The safetensors set must equal the pinned set exactly: the pinned
+    # mlx_lm.load globs model*.safetensors, so an unpinned weight file would
+    # be primed and loaded without verification.
+    pinned_st = {name for name in case["files"] if name.endswith(".safetensors")}
+    present_st = {p.name for p in artifact_dir.glob("*.safetensors")}
+    require(
+        present_st == pinned_st,
+        "artifact_dir safetensors set differs from the pinned set (extra="
+        f"{sorted(present_st - pinned_st)}, missing={sorted(pinned_st - present_st)}); "
+        "unpinned weight files would be primed and loaded unverified",
+    )
 
-    # Venv pins: versions from the lock, installed source digest from the freeze.
+    # Venv pins: versions from the lock; the full installed mlx_lm source
+    # freeze (all pinned files, not just generate.py) re-hashed from the
+    # package location, so the controlled path's direct imports of
+    # mlx_lm.models.* are covered too.
     tool_dir = manifest_path.parent
     freeze = json.load(open(tool_dir / "installed-source-digests.json"))
-    generate_digest = freeze["files"]["generate.py"]
     import importlib.util
 
     spec = importlib.util.find_spec("mlx_lm")
-    generate_path = Path(spec.origin).parent / "generate.py"
-    require(sha256_file(generate_path) == generate_digest, "installed mlx_lm generate.py digest drifted")
+    install_root = Path(spec.origin).parent
+    for rel, digest in sorted(freeze["files"].items()):
+        require(
+            sha256_file(install_root / rel) == digest,
+            f"installed mlx_lm source drifted: {rel}",
+        )
     for dist, expected in EXPECTED_VERSIONS.items():
         require(pkg_version(dist) == expected, f"installed {dist} != {expected} (requirements.lock)")
 
@@ -322,7 +394,7 @@ def controlled_request(model, prompt, fed_ids, emitted, io_affected, index, kind
     prime_s = prime(artifact_dir)
     t_entry = time.monotonic()
     if fed_ids is not None:
-        prefill_s, steps = controlled.run_fixed_continuation(model, prompt, fed_ids)
+        prefill_s, steps, full_s = controlled.run_fixed_continuation(model, prompt, fed_ids)
         record = {
             "index": index,
             "kind": kind,
@@ -334,7 +406,7 @@ def controlled_request(model, prompt, fed_ids, emitted, io_affected, index, kind
             "event_s": [],
             "tokens": [],
             "streaming_decode_tps": None,
-            "full_generation_s": prefill_s + sum(s["s"] for s in steps),
+            "full_generation_s": full_s,
             "emitted": 0,
             "finish_reason": "fixed-continuation",
             "unused_lookahead_forwards": 0,
@@ -442,6 +514,7 @@ def main():
             "reference_pair_worker_timeout_s": v["policy"].get("reference_pair_worker_timeout_s"),
             "cell_time_budget_s": v["policy"].get("cell_time_budget_s"),
             "session_time_budget_s": v["policy"].get("session_time_budget_s"),
+            "first_requests": v["policy"].get("first_requests"),
             "warmups": v["policy"].get("warmups"),
             "measured_requests": v["policy"].get("measured_requests"),
             "emitted_tokens": v["policy"].get("emitted_tokens"),
@@ -538,8 +611,6 @@ def main():
 
             prime_s = prime(v["artifact_dir"])
             t_entry = time.monotonic()
-            from controlled import cache_states
-
             cache = make_prompt_cache(model)
             logits = model(mx.array(v["prompt"], dtype=mx.int32)[None], cache=cache)
             mx.eval(logits, *cache_states(cache))
@@ -550,12 +621,17 @@ def main():
                 logits = model(mx.array([int(fed)], dtype=mx.int32)[None], cache=cache)
                 logits = logits[:, -1:, :]
                 mx.eval(logits, *cache_states(cache))
+                # The step timer stops at the evaluated logits; the argmax and
+                # the full-vocabulary sort (the cross-adapter check) run
+                # outside the measured interval, as in the controlled path.
+                step_s = time.monotonic() - step_start
                 top = mx.sort(mx.reshape(logits[0], (-1,))).tolist()
+                argmax_id = int(mx.argmax(logits[0]).item())
                 steps.append(
                     {
                         "position": len(v["prompt"]) + k + 1,
-                        "s": time.monotonic() - step_start,
-                        "argmax_id": int(mx.argmax(logits[0]).item()),
+                        "s": step_s,
+                        "argmax_id": argmax_id,
                         "top2_margin": float(top[-1] - top[-2]),
                     }
                 )
@@ -582,6 +658,13 @@ def main():
                 mx, stream_generate, model, tokenizer, v["prompt"], emitted, v["io_affected"], index, kind, v["artifact_dir"]
             )
         state["requests"].append(record)
+
+    # Re-check the deadline after the final request: if it fired while the
+    # last request was running, the run is a timeout even though that request
+    # finished within the watchdog grace.
+    if deadline["fired"].is_set() and state["status"] != "timeout":
+        state["status"] = "timeout"
+        state["failure_reason"] = "worker wall-clock timeout exceeded"
 
     if state["status"] == "failed" and state["failure_reason"] is None:
         state["status"] = "ok"

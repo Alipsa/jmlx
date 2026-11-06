@@ -8152,7 +8152,7 @@
     "path": "tools/tier-b/qwen3vl-2b-instruct.json",
     "sha256": "5ebfaf7a2130e7a8e016c260a6be20831f986579b6f1bcc532240e188f898c8a"
    },
-   "note": "Prompt, image, cache and generation policy are owned by the referenced tier-b manifest; this manifest re-pins the manifest file digest so drift is caught by the pure-Java Gradle guard. The full artifact set is re-verified at WP4 execution; no re-download happens in WP0."
+   "note": "Prompt, image, cache and generation policy are owned by the referenced tier-b manifest; this manifest re-pins the manifest file digest so drift is caught by the pure-Java Gradle guard. The full artifact set is re-verified at WP4 execution; no re-download happens in WP0. In the qwen3vl config.json the eos 151645 sits under text_config.eos_token_id, not a top-level eos_token_id; WP4 re-verifies the key paths against the pinned artifact."
   },
   {
    "name": "phi3v-4b-instruct",
@@ -8179,7 +8179,7 @@
     "path": "tools/tier-b/phi3v-4b-instruct.json",
     "sha256": "faeae7ad6288656032a549ea93b53e7a12775d0550721740db15b26e864903f1"
    },
-   "note": "Prompt, image, cache and generation policy are owned by the referenced tier-b manifest; this manifest re-pins the manifest file digest. The tokenizer eos is 32000 (endoftext); 32001 is <|assistant|>. Per-artifact mismatch to resolve in WP4: the stock-resolved stop set here is {2, 32000}, while the Phase 7.3c Tier-B run pinned the jmlx-side stop set {32000}; the only difference is the extra token 2 (the config eos). Both runs must use one explicitly recorded set per run mode."
+   "note": "Prompt, image, cache and generation policy are owned by the referenced tier-b manifest; this manifest re-pins the manifest file digest. The tokenizer eos is 32000 (<|endoftext|>); 32001 is <|assistant|>. Per-artifact mismatch to resolve in WP4: the stock-resolved stop set here is {2, 32000}, while the Phase 7.3c Tier-B run pinned the jmlx-side stop set {32000}; the only difference is the extra token 2 (the config eos). Both runs must use one explicitly recorded set per run mode."
   }
  ]
 }

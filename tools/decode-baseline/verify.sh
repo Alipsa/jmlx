@@ -9,7 +9,7 @@ VENV="${SCRIPT_DIR}/.venv"
   exit 1
 }
 
-MLX_ENABLE_TF32=1 "$VENV/bin/python" - "$SCRIPT_DIR" <<'EOF'
+MLX_ENABLE_TF32=1 "$VENV/bin/python" -I - "$SCRIPT_DIR" <<'EOF'
 import hashlib
 import importlib.metadata as md
 import json

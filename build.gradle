@@ -930,7 +930,7 @@ tasks.register('verifyDecodeBaselineManifest') {
         // The manifest is the frozen WP0 contract: the structural checks above give specific
         // error messages, and this digest backstop catches drift in any field none of them
         // names (notes, evidence prose, file pins).
-        if (sha256File(workloadsFile) != 'e48041c7d1f671d5b99847410c99893f290605ee055062039cac9091be1073dc') {
+        if (sha256File(workloadsFile) != '4e01b9a074a0c391deeb13ce3d58b2c7823f5aa129be32c6289e783d44e4763d') {
             throw new GradleException(
                     'Decode baseline workload manifest SHA-256 differs from the frozen WP0 contract')
         }

@@ -31,7 +31,7 @@
 `tools/decode-baseline/workloads.json` (schema `jmlx-decode-baseline-workloads-1`) is the
 single frozen input for both runtimes. WP0 replaced every candidate with exact revisions,
 per-file SHA-256 and byte counts; the committed file's own digest is
-`e48041c7d1f671d5b99847410c99893f290605ee055062039cac9091be1073dc`, which the guard pins
+`4e01b9a074a0c391deeb13ce3d58b2c7823f5aa129be32c6289e783d44e4763d`, which the guard pins
 as the frozen-contract backstop (§2.3).
 
 ### 2.1 Text cases
@@ -46,14 +46,11 @@ Stop-set sources are recorded per case in the manifest (`stop_token_sources`): t
 `generation_config.json` / `config.json` `eos_token_id` and the tokenizer's `eos_token_id`
 as resolved by the pinned transformers 5.22.1 — the installed mlx-lm builds its stop set
 from exactly these two sources (`tokenizer_utils.py` / `utils.py`). The Qwen tokenizer eos
-is 151645 — the `
-</think>
-
-` special token — not 151643 (`</s>`), and the `phi3v`
-tokenizer eos is 32000 (`endoftext`), not 32001 (`<|assistant|>`); both were
-re-verified against the local digest-pinned artifact tokenizer files on 2026-11-06. `qwen3-8b-4bit` has no
-`generation_config.json`. Both stock loops stop on exactly these sets, so the stock
-comparison is stop-matched (plan §3.2 "Stock Java pair path").
+is 151645 (`<|im_end|>`), not 151643 (`<|endoftext|>`), and the `phi3v`
+tokenizer eos is 32000 (`<|endoftext|>`), not 32001 (`<|assistant|>`); both were
+re-verified against the local digest-pinned artifact tokenizer files on 2026-11-06.
+`qwen3-8b-4bit` has no `generation_config.json`. Both stock loops stop on exactly these
+sets, so the stock comparison is stop-matched (plan §3.2 "Stock Java pair path").
 
 The 4-bit case carries its existing pins forward: all 11 local file digests (including
 `model.safetensors` 4,607,835,174 B and `model.safetensors.index.json`) were re-verified
@@ -86,7 +83,7 @@ digest** of the existing Tier-B manifests (`tools/tier-b/qwen3vl-2b-instruct.jso
 `tools/tier-b/phi3v-4b-instruct.json`); prompt, images, cache and generation policy are owned
 by those manifests. The full artifact sets are re-verified at WP4 execution, not re-downloaded
 in WP0. Known per-artifact mismatch recorded for WP4: the stock-resolved `phi3v` stop set is
-`{2, 32000}` (the tokenizer eos is 32000 `endoftext`, 32001 is `<|assistant|>`), while the
+`{2, 32000}` (the tokenizer eos is 32000 `<|endoftext|>`, 32001 is `<|assistant|>`), while the
 Phase 7.3c Tier-B run pinned the jmlx-side set `{32000}`; the only difference is the extra
 token 2 (the config eos). Each WP4 run mode must use one explicitly recorded set.
 

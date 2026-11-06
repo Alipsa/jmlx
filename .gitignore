@@ -41,6 +41,7 @@ build
 /native/
 
 # Hash-locked Python MLX reference environment (created explicitly on Apple Silicon)
+/tools/decode-baseline/.venv/
 /tools/mlx-oracle/.venv/
 /tools/tokenizer-oracle/.venv/
 /tools/image-oracle/.venv/
@@ -58,6 +59,7 @@ __pycache__/
 
 # Opt-in real checkpoint downloads
 /.tier-b/
+/tools/decode-baseline/artifacts/
 /tools/hf-reference/.venv/
 /tools/qwen-vl-reference/.venv/
 /tools/qwen35-reference/hf/.venv/

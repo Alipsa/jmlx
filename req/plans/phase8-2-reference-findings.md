@@ -31,7 +31,8 @@
 `tools/decode-baseline/workloads.json` (schema `jmlx-decode-baseline-workloads-1`) is the
 single frozen input for both runtimes. WP0 replaced every candidate with exact revisions,
 per-file SHA-256 and byte counts; the committed file's own digest is
-`5a042000becff51c61df8dd4e917eaf0bc96eeb98a9eed5e0da6efab4b9bb7eb` (see the guard, §2.3).
+`e48041c7d1f671d5b99847410c99893f290605ee055062039cac9091be1073dc`, which the guard pins
+as the frozen-contract backstop (§2.3).
 
 ### 2.1 Text cases
 
@@ -42,10 +43,17 @@ per-file SHA-256 and byte counts; the committed file's own digest is
 | `qwen3-8b-4bit` | quantized-4bit | `mlx-community/Qwen3-8B-4bit` @ `545dc4251c05440727734bcd94334791f6ab0192` | MIT | `{151645}` | 254 × U32 + 653 × BF16 | fixed-continuation |
 
 Stop-set sources are recorded per case in the manifest (`stop_token_sources`): the union of
-`generation_config.json` / `config.json` `eos_token_id` and the tokenizer's `eos_token_id`,
-verified against the on-disk configs. `qwen3-8b-4bit` has no `generation_config.json`. Both
-stock loops stop on exactly these sets, so the stock comparison is stop-matched
-(plan §3.2 "Stock Java pair path").
+`generation_config.json` / `config.json` `eos_token_id` and the tokenizer's `eos_token_id`
+as resolved by the pinned transformers 5.22.1 — the installed mlx-lm builds its stop set
+from exactly these two sources (`tokenizer_utils.py` / `utils.py`). The Qwen tokenizer eos
+is 151645 — the `
+</think>
+
+` special token — not 151643 (`</s>`), and the `phi3v`
+tokenizer eos is 32000 (`endoftext`), not 32001 (`<|assistant|>`); both were
+re-verified against the local digest-pinned artifact tokenizer files on 2026-11-06. `qwen3-8b-4bit` has no
+`generation_config.json`. Both stock loops stop on exactly these sets, so the stock
+comparison is stop-matched (plan §3.2 "Stock Java pair path").
 
 The 4-bit case carries its existing pins forward: all 11 local file digests (including
 `model.safetensors` 4,607,835,174 B and `model.safetensors.index.json`) were re-verified
@@ -73,27 +81,35 @@ from each checkpoint header on 2026-11-06:
 `qwen3vl-2b-instruct` (`Qwen/Qwen3-VL-2B-Instruct` @
 `89644892e4d85e24eaac8bacfd4f463576704203`, Apache-2.0, stop `{151643, 151645}`) and
 `phi3v-4b-instruct` (`microsoft/Phi-3.5-vision-instruct` @
-`12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT, stop `{2, 32001}`) pin **the manifest-file
+`12b77fb40b63a2c73c68243d3f767aab688a1b2a`, MIT, stop `{2, 32000}`) pin **the manifest-file
 digest** of the existing Tier-B manifests (`tools/tier-b/qwen3vl-2b-instruct.json`,
 `tools/tier-b/phi3v-4b-instruct.json`); prompt, images, cache and generation policy are owned
 by those manifests. The full artifact sets are re-verified at WP4 execution, not re-downloaded
 in WP0. Known per-artifact mismatch recorded for WP4: the stock-resolved `phi3v` stop set is
-`{2, 32001}` while the Phase 7.3c Tier-B run pinned the jmlx-side set `{32000}`; each WP4 run
-mode must use one explicitly recorded set.
+`{2, 32000}` (the tokenizer eos is 32000 `endoftext`, 32001 is `<|assistant|>`), while the
+Phase 7.3c Tier-B run pinned the jmlx-side set `{32000}`; the only difference is the extra
+token 2 (the config eos). Each WP4 run mode must use one explicitly recorded set.
 
 ### 2.3 Pure-Java guard
 
 `./gradlew verifyDecodeBaselineManifest` (wired into root `check`) verifies the manifest
-without Python: schema, the frozen precision env values, the controlled/stock generation
-policy, per-file pin shape, stop-set/prompt-exclusion agreement, **full SplitMix64
-re-derivation of all 3 prompt streams** (the committed 2048 arrays are the oracle for the
-JLS-long arithmetic — `Long.remainderUnsigned` semantics, since the Python reference takes
-`z % vocab` over the unsigned 64-bit value), the canonical prompt SHA-256s, the 0.6b shared
-pins against `tools/tier-b/qwen3-0.6b.json`, both VLM manifest-file digests and
-repository/revision agreement, and the Python lock (the 8 direct pins, complete SHA-256 hash
-coverage, and the absence of `mlx-vlm`). Negative tests executed on 2026-11-06: file-sha
-tamper, prompt-array tamper, policy tamper, VLM-manifest tamper and schema tamper each fail
-with a distinct error; the restored manifest passes.
+without Python: schema, the frozen precision env values, the full controlled generation
+policy (including the `prefill`/`cache`/`wired_limit`/`penalties` strings verbatim) and the
+stock generation policy, per-file pin shape, the stop set equaling the **union of its
+recorded sources** for every case, stop-set/prompt-exclusion agreement, the per-case
+`identity_claim`, **full SplitMix64 re-derivation of all 3 prompt streams** (the committed
+2048 arrays are the oracle for the JLS-long arithmetic — `Long.remainderUnsigned` semantics,
+since the Python reference takes `z % vocab` over the unsigned 64-bit value), the canonical
+prompt SHA-256s, the 0.6b shared pins against `tools/tier-b/qwen3-0.6b.json`, both VLM
+manifest-file digests (with the VLM manifest path confined to the two declared repository
+inputs) and repository/revision agreement, the Python lock (the 8 direct pins with PEP 503
+name normalization, complete SHA-256 hash coverage including PEP 508 extras, malformed-pin
+rejection, and the absence of `mlx-vlm`), and finally the manifest's own SHA-256 as the
+frozen-contract backstop for any field the structural checks do not name. Negative tests
+executed on 2026-11-06: file-sha, prompt-array, controlled-policy, stock-policy,
+stop-union, identity-claim, VLM-path, VLM-manifest, note-drift (digest backstop), malformed
+requirements pin, extra-without-hashes and schema tampers each fail with a distinct error;
+the restored manifest passes.
 
 ### 2.4 Qualification results (untimed, separate processes)
 

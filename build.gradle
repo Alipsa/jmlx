@@ -710,8 +710,10 @@ tasks.register('verifyQwen35ReferenceGoldens') {
 tasks.register('verifyDecodeBaselineManifest') {
     group = 'verification'
     description = 'Verifies the Phase 8.2 decode-baseline workload manifest without Python: ' +
-            'schema, SplitMix64 prompt re-derivation, canonical prompt digests, tier-b manifest ' +
-            'cross-checks, and the Python lock (direct pins, complete hash coverage, no mlx-vlm).'
+            'schema, frozen generation policy, stop-set/source agreement, identity claims, ' +
+            'SplitMix64 prompt re-derivation, canonical prompt digests, tier-b manifest ' +
+            'cross-checks, the Python lock (direct pins, complete hash coverage, no mlx-vlm) ' +
+            'and the manifest self-digest of the frozen WP0 contract.'
     def workloadsFile = layout.projectDirectory.file('tools/decode-baseline/workloads.json').asFile
     def requirementsIn = layout.projectDirectory.file('tools/decode-baseline/requirements.in').asFile
     def requirementsLock = layout.projectDirectory.file('tools/decode-baseline/requirements.lock').asFile
@@ -756,9 +758,18 @@ tasks.register('verifyDecodeBaselineManifest') {
         def controlled = doc.controlled_generation
         if (!(controlled.batch == 1 && controlled.retention == 'full'
                 && controlled.prefix_reuse == false && controlled.selection == 'greedy'
-                && controlled.stop_termination == false && controlled.max_new_tokens == 128
-                && controlled.prompt_lengths == [32, 512, 2048])) {
+                && controlled.penalties == 'none' && controlled.stop_termination == false
+                && controlled.max_new_tokens == 128
+                && controlled.prompt_lengths == [32, 512, 2048]
+                && controlled.prefill == 'single full-prompt forward, last-position-only output projection, no chunking, no next-token lookahead, no periodic cache clearing (both adapters)'
+                && controlled.cache == 'full retention, per-request cache, no prefix reuse; KV dtype follows the case stored dtype (F32 for all three text cases)'
+                && controlled.wired_limit == 'not set (neither runtime calls a setter)')) {
             throw new GradleException('Decode baseline controlled generation policy differs')
+        }
+        def stock = doc.stock_generation
+        if (!(stock.selection == 'greedy' && stock.stop_termination == true
+                && stock.max_new_tokens == 128)) {
+            throw new GradleException('Decode baseline stock generation policy differs')
         }
 
         def textCases = doc.text_cases
@@ -835,7 +846,31 @@ tasks.register('verifyDecodeBaselineManifest') {
         if (!(vlmCases instanceof List) || vlmCases*.name != vlmNames) {
             throw new GradleException("Decode baseline VLM case set differs: ${vlmCases*.name}")
         }
+        def identityClaims = ['qwen3-0.6b': 'greedy', 'tinymistral-6x248m': 'greedy',
+                              'qwen3-8b-4bit': 'fixed-continuation']
+        textCases.each { tc ->
+            if (tc.identity_claim != identityClaims[tc.name]) {
+                throw new GradleException(
+                        "Decode baseline case ${tc.name} identity claim differs: ${tc.identity_claim}")
+            }
+        }
+        (textCases + vlmCases).each { c ->
+            def union = c.stop_token_sources.values().findAll { it != null }
+                    .flatten().unique().sort()
+            if (union != new ArrayList(c.stop_token_ids).sort()) {
+                throw new GradleException(
+                        "Decode baseline case ${c.name} stop set is not the union of its sources")
+            }
+        }
+        // The VLM manifest path must be exactly the declared, repository-confined task input;
+        // data-driven paths must never point elsewhere (../ escapes included).
+        def vlmManifestPaths = ['qwen3vl-2b-instruct': 'tools/tier-b/qwen3vl-2b-instruct.json',
+                                'phi3v-4b-instruct': 'tools/tier-b/phi3v-4b-instruct.json']
         vlmCases.each { entry ->
+            if (entry.manifest.path != vlmManifestPaths[entry.name]) {
+                throw new GradleException(
+                        "Decode baseline VLM manifest path differs: ${entry.name}")
+            }
             def manifestFile = layout.projectDirectory.file(entry.manifest.path).asFile
             if (sha256File(manifestFile) != entry.manifest.sha256) {
                 throw new GradleException(
@@ -848,12 +883,17 @@ tasks.register('verifyDecodeBaselineManifest') {
             }
         }
 
+        // PEP 503 name normalization: runs of '-', '_' and '.' fold into a single '-'.
+        def pinName = { String raw -> raw.toLowerCase().replaceAll(/[-_.]+/, '-') }
         def pins = [:]
         requirementsIn.readLines().each { line ->
             line = line.trim()
             if (line && !line.startsWith('#')) {
                 def parts = line.split('==', 2)
-                pins[parts[0].toLowerCase().replace('_', '-')] = parts[1]
+                if (parts.length != 2 || parts[0].trim().isEmpty() || parts[1].trim().isEmpty()) {
+                    throw new GradleException("Decode baseline requirements.in pin malformed: ${line}")
+                }
+                pins[pinName(parts[0].trim())] = parts[1].trim()
             }
         }
         if (pins.size() != 8) {
@@ -863,10 +903,12 @@ tasks.register('verifyDecodeBaselineManifest') {
         def locked = [:]
         def current = null
         requirementsLock.readLines().each { line ->
-            def header = (line =~ '^([A-Za-z0-9._-]+)==([^ ;\\\\]+)( ;.+?)?\\s*\\\\?\\s*$')
+            // The name may carry PEP 508 extras (pkg[extra]); the extra is not part of the
+            // normalized name, but the package and its hash lines must still be checked.
+            def header = (line =~ '^([A-Za-z0-9._-]+)(\\[[^]]*\\])?==([^ ;\\\\]+)( ;.+?)?\\s*\\\\?\\s*$')
             if (header.matches()) {
-                current = header.group(1).toLowerCase().replace('_', '-')
-                locked[current] = [version: header.group(2), hashed: false]
+                current = pinName(header.group(1))
+                locked[current] = [version: header.group(3), hashed: false]
             } else if (current != null && line.contains('--hash=sha256:')) {
                 locked[current].hashed = true
             }
@@ -883,6 +925,14 @@ tasks.register('verifyDecodeBaselineManifest') {
             if (locked[name] == null || locked[name].version != version) {
                 throw new GradleException("Decode baseline lock does not pin ${name}==${version}")
             }
+        }
+
+        // The manifest is the frozen WP0 contract: the structural checks above give specific
+        // error messages, and this digest backstop catches drift in any field none of them
+        // names (notes, evidence prose, file pins).
+        if (sha256File(workloadsFile) != 'e48041c7d1f671d5b99847410c99893f290605ee055062039cac9091be1073dc') {
+            throw new GradleException(
+                    'Decode baseline workload manifest SHA-256 differs from the frozen WP0 contract')
         }
     }
 }

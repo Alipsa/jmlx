@@ -134,14 +134,21 @@ tasks.register('deltaBenchmark', Test) {
 // Internal reader variants must never appear in published POM/module metadata.
 components.java.withVariantsFromConfiguration(configurations.testFixturesApiElements) { skip() }
 components.java.withVariantsFromConfiguration(configurations.testFixturesRuntimeElements) { skip() }
+// The ffi project is captured here, at configuration time, and its version read lazily: calling
+// project(...) inside doLast goes through Task.project at execution time (deprecated, an error in
+// Gradle 10), and reading the version eagerly would see it before jmlx-ffi's build script sets it
+// (jmlx-core is configured first).
+def ffiProject = project(':jmlx-ffi')
+def expectedCoreDependencies = providers.provider { ["se.alipsa:jmlx-ffi:${ffiProject.version}".toString()] }
 tasks.register('verifyPublishedDependencies') {
     group = 'verification'
     dependsOn 'generatePomFileForMavenPublication', 'generateMetadataFileForMavenPublication'
     def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml')
     def metadataFile = layout.buildDirectory.file('publications/maven/module.json')
     inputs.files(pomFile, metadataFile)
+    inputs.property('expected', expectedCoreDependencies)
     doLast {
-        def expected = ["se.alipsa:jmlx-ffi:${project(':jmlx-ffi').version}"]
+        def expected = expectedCoreDependencies.get()
         def actual = se.alipsa.jmlx.buildsrc.PublishedPomDependencies.read(pomFile.get().asFile)
                 .collect { it.coordinates() }
         if (actual != expected) { throw new GradleException("Core POM dependencies changed: ${actual}") }

@@ -18,6 +18,21 @@ plugins {
     id 'jvm-toolchains'
     alias(libs.plugins.spotless) apply false
     alias(libs.plugins.nexusRelease) apply false
+    alias(libs.plugins.benManesVersions)
+}
+
+// Ben Manes versions plugin: `./gradlew dependencyUpdates` reports newer versions of every
+// project's dependencies and plugins (applied at the root, it inspects all subprojects). A
+// pre-release candidate (alpha/beta/rc/milestone/...) is only reported when the current version
+// is itself a pre-release.
+def isNonStableVersion = { String version ->
+    def stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { version.toUpperCase().contains(it) }
+    return !stableKeyword && !(version ==~ /^[0-9,.v-]+(-r)?$/)
+}
+tasks.named('dependencyUpdates').configure {
+    rejectVersionIf {
+        isNonStableVersion(it.candidate.version) && !isNonStableVersion(it.currentVersion)
+    }
 }
 
 // Combined release workflow (Phase 8.1): active only with -PreleaseAllMode=...; see

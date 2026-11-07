@@ -146,6 +146,11 @@ wrapper, the pinned `mlx-metal` version, and — since mlx-c versions independen
 tag that pairs with a newer wheel). `scripts/updateMlx.zsh <mlx-c-commit-sha>` repins `MLX_C_COMMIT` in
 `bootstrap-native.sh` and re-runs bootstrap + regen for you; it takes a full 40-char SHA, not a short
 one.
+`./gradlew dependencyUpdates` (the Ben Manes versions plugin, applied at the root) reports newer
+Maven/plugin versions for every project's resolved configurations and the wrapper; pre-release
+candidates are only offered for dependencies already on a pre-release. It does not see the
+`google-java-format` version (Spotless resolves it on its own) or the duplicated pins in
+`buildSrc/build.gradle`, so bump those by hand alongside the catalog.
 
 ## Build, test, run
 

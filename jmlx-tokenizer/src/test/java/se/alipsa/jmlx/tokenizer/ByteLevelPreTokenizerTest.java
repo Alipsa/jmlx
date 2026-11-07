@@ -109,7 +109,7 @@ class ByteLevelPreTokenizerTest {
     // round 4, finding 1).
     ByteLevelPreTokenizer pretokenizer =
         new ByteLevelPreTokenizer(new PreTokenizerConfig(QWEN_REGEX, false));
-    String nbsp = " ";
+    String nbsp = "\u00A0";
     assertEquals(
         List.of("hi", ByteLevelCoding.encode(nbsp), ByteLevelCoding.encode(nbsp + "there")),
         pretokenizer.split("hi" + nbsp + nbsp + "there"));

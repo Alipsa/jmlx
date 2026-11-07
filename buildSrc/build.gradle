@@ -49,7 +49,7 @@ spotless {
     java {
         importOrder()
         removeUnusedImports()
-        googleJavaFormat('1.28.0').reflowLongStrings()
+        googleJavaFormat('1.36.1').reflowLongStrings()
         trimTrailingWhitespace()
         endWithNewline()
     }

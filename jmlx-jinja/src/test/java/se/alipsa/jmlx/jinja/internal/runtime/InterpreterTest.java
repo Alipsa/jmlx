@@ -2509,9 +2509,10 @@ class InterpreterTest {
         () ->
             assertEquals("-😀-", Template.parse("{{ '😀' | replace('', '-') }}").render(Map.of())),
         () ->
-            assertEquals("[\"a\", \"b\"]", Template.parse("{{ 'a b'.split() }}").render(Map.of())),
-        () -> assertEquals("a", Template.parse("{{ 'a  '.rstrip() }}").render(Map.of())),
-        () -> assertEquals("a", Template.parse("{{ '  a'.lstrip() }}").render(Map.of())),
+            assertEquals(
+                "[\"a\", \"b\"]", Template.parse("{{ 'a\u00A0b'.split() }}").render(Map.of())),
+        () -> assertEquals("a", Template.parse("{{ 'a\u00A0 '.rstrip() }}").render(Map.of())),
+        () -> assertEquals("a", Template.parse("{{ ' \u00A0a'.lstrip() }}").render(Map.of())),
         () ->
             assertEquals(
                 "[\"a\", \"b \"]", Template.parse("{{ ' a b '.split(none, 1) }}").render(Map.of())),

@@ -33,10 +33,10 @@
 `tools/decode-baseline/workloads.json` (schema `jmlx-decode-baseline-workloads-1`) is the
 single frozen input for both runtimes. WP0 replaced every candidate with exact revisions,
 per-file SHA-256 and byte counts; the committed file's own digest is
-`10eaaa0c3a002fc44ffd08111b4b258cc1534f8c115bd6296676302be035afe5` (WP1: carries the
+`e8c7730178a2e8f1bf1ace461db14119d2394fff4f60fa90deca34ef4857a270` (WP1: carries the
 `run_policy` finite limits of §7.4 and the `worker_sources` digest pin for the two
 committed Python workers; the WP1 review rounds added `run_policy.first_requests`
-and re-pinned `worker_sources` after the round-1 through round-3 worker fixes of
+and re-pinned `worker_sources` after the round-1 through round-4 worker fixes of
 §13.4), which the guard pins as the frozen-contract backstop (§2.3).
 
 ### 2.1 Text cases
@@ -911,6 +911,41 @@ requests are excluded by construction, with the exclusion recorded). The
     (sum 0.1248 s, ≈ 46%); headline L=32 controlled measured medians
     ttft 5.24 ms, prefill 4.89 ms, 255.6 tok/s; stock 26/26 emitted 128;
     fixed-continuation zero argmax mismatches with positions 513–544;
+    report `pid` == claim `pid` == ready `pid` on all four reports.
+    `verify.sh` VERIFIED and root `check` green on the final head.
+ 15. Review round 4 (2026-11-07, PR review of head `94fea72`):
+    (a) Reproduced: with the round-3 claim created before validation, a
+    missing output folder (or an out_dir that is a file) failed with a
+    raw `FileNotFoundError` from the claim create in the catch-all
+    handler, and the old `out_dir must be created by the launcher` check
+    in `validate` became dead code. Fix: `main` now checks
+    `Path(raw_out_dir).is_dir()` before claiming and raises the old
+    message as a `WorkerError` (stderr "worker validation failed: out_dir
+    must be created by the launcher", exit 1, nothing written — the
+    directory is absent or not a directory, so there is no report target);
+    the dead `validate` check was removed and the §13.2 claim bullet
+    records the rejection. Verified by new negative tests T8 (missing
+    dir: exit 1, the launcher message on stderr, no `FileNotFoundError`,
+    nothing written) and T9 (file in the way: exit 1, same message, the
+    file byte-identical, no report). (b) Nit: two comments still called
+    the step region "the comparable quantity" (controlled.py and the
+    stock fixed-continuation branch in worker.py), contradicting the
+    updated §13.3, and the controlled.py docstring still named the value
+    `full_s` while the report field is `step_region_s` — all reworded/
+    renamed in the same round (the `controlled.py` rewording rides this
+    round's re-pin rather than waiting for a later worker change).
+    Verification: the manifest was re-pinned (digest in §2;
+    `worker_sources` moved with both worker edits), the guard backstop
+    updated; the 8 tamper negatives re-passed with byte-identical
+    restore; the worker negative suites re-passed (20 + 14 assertions);
+    the round-3 suite re-passed (26 assertions); the T2 timeout probe
+    re-ran 11/11 (in-loop break at T=8 s — landed on the first attempt
+    under the corrected T-space aim — 25 complete records, exit 3;
+    post-loop check at T=1 s, 1 complete record, `status: timeout`, exit
+    3; both via the main thread, wall < T + 15 s); the manifest was
+    restored byte-identical and the guard re-passed. Round-4 smoke
+    (0.6b, both adapters, full mix, 30 cross-checks) re-ran green:
+    fixed-continuation zero argmax mismatches with positions 513–544,
     report `pid` == claim `pid` == ready `pid` on all four reports.
     `verify.sh` VERIFIED and root `check` green on the final head.
 

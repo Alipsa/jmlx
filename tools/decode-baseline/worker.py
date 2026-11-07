@@ -28,11 +28,13 @@ Rules enforced here:
   add_eos_token API and asserted equal; the full-generation timer ends with an
   explicit mx.synchronize() after the iterator finishes;
 - before any validation, the worker claims the launcher-created output
-  directory with an exclusive-create worker-claim file (utc + pid); if the
-  claim already exists, the worker writes nothing into the directory,
-  reports the refusal on stderr and exits 1; the claim is sticky -- a
-  killed worker leaves it, so a claimed directory without a report is
-  dead and the launcher must treat it as such;
+  directory with an exclusive-create worker-claim file (utc + pid); an
+  out_dir that is not an existing directory is rejected before the claim
+  ("out_dir must be created by the launcher"); if the claim already exists,
+  the worker writes nothing into the directory, reports the refusal on
+  stderr and exits 1; the claim is sticky -- a killed worker leaves it, so
+  a claimed directory without a report is dead and the launcher must treat
+  it as such;
 - the report is written at most once, atomically, via a per-process temp
   file, and never overwrites an existing report.json (a write into an
   already-reported directory is refused: an ok run is downgraded to
@@ -356,7 +358,6 @@ def validate(job):
         f"repo_dir must be the repository this worker runs from: {canonical_repo}",
     )
     out_dir = Path(job["out_dir"])
-    require(out_dir.is_dir(), "out_dir must be created by the launcher")
     require(not (out_dir / "report.json").exists(), "out_dir already contains a report (overwrite rejected)")
 
     prompt_entry = case["prompts"]["per_length"][str(prompt_length)]
@@ -439,7 +440,7 @@ def controlled_request(model, prompt, fed_ids, emitted, io_affected, index, kind
     prime_s = prime(artifact_dir)
     t_entry = time.monotonic()
     if fed_ids is not None:
-        prefill_s, steps, full_s = controlled.run_fixed_continuation(model, prompt, fed_ids)
+        prefill_s, steps, step_region_s = controlled.run_fixed_continuation(model, prompt, fed_ids)
         record = {
             "index": index,
             "kind": kind,
@@ -454,7 +455,7 @@ def controlled_request(model, prompt, fed_ids, emitted, io_affected, index, kind
             # Step region only (prefill excluded): it includes the per-step
             # argmax/sort host work, so it is not decode time (findings
             # section 13.3).
-            "step_region_s": full_s,
+            "step_region_s": step_region_s,
             "full_generation_s": None,
             "emitted": 0,
             "finish_reason": "fixed-continuation",
@@ -537,6 +538,12 @@ def main():
     raw_out_dir = job.get("out_dir")
     if isinstance(raw_out_dir, str) and raw_out_dir:
         state["out_dir"] = raw_out_dir
+        # The launcher creates the directory; the claim below can only
+        # distinguish "already claimed" from "cannot be written", so a
+        # missing (or file-in-the-way) out_dir is rejected explicitly, not
+        # as a FileNotFoundError from the claim create.
+        if not Path(raw_out_dir).is_dir():
+            raise WorkerError("out_dir must be created by the launcher")
         # Claim the launcher-created output directory before any validation:
         # a second worker (valid or not) pointed at a folder this worker owns
         # must refuse the folder, not write its report into it. The claim is
@@ -682,7 +689,9 @@ def main():
             # controlled path. Note the stock prefill is per-adapter: the
             # shipped model call projects the output head at every prompt
             # position, while the controlled prefill does so only at the
-            # last one; the comparable quantity is the step region below.
+            # last one; the step region below is the shared per-mode
+            # record (and it is not decode time itself, findings section
+            # 13.3).
             cache = make_prompt_cache(model)
             t_entry = time.monotonic()
             logits = model(mx.array(v["prompt"], dtype=mx.int32)[None], cache=cache)

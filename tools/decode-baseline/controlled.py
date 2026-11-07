@@ -122,13 +122,15 @@ def run_fixed_continuation(model, prompt_ids, continuation_ids):
     qualification workload (plan section 3.3); it is not a generation run and
     emits no tokens.
 
-    Returns (prefill_s, steps, full_s): full_s is the monotonic wall time
-    over the step region only (from the prefill evaluation to the end of the
-    final step's argmax/margin host work) — the comparable quantity in this
-    mode, defined the same way on the stock path. prefill_s is per-adapter
-    and not comparable across adapters: the stock shipped call projects the
-    output head at every prompt position, while the controlled prefill does
-    so only at the last position.
+    Returns (prefill_s, steps, step_region_s): step_region_s is the
+    monotonic wall time over the step region only (from the prefill
+    evaluation to the end of the final step's argmax/margin host work); it
+    includes that per-step host work, so it is not decode time (the
+    per-step s values are the decode comparison; findings section 13.3),
+    and it is defined the same way on the stock path. prefill_s is
+    per-adapter and not comparable across adapters: the stock shipped call
+    projects the output head at every prompt position, while the
+    controlled prefill does so only at the last position.
     """
     head = own_head(model)
     cache = make_prompt_cache(model)
@@ -155,5 +157,5 @@ def run_fixed_continuation(model, prompt_ids, continuation_ids):
                 "top2_margin": top2_margin(logits),
             }
         )
-    full_s = time.monotonic() - t_steps
-    return prefill_s, steps, full_s
+    step_region_s = time.monotonic() - t_steps
+    return prefill_s, steps, step_region_s

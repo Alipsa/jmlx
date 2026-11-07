@@ -14,9 +14,10 @@ Rules enforced here:
   installed mlx_lm source freeze, all 202 pinned files) are re-checked the
   same way;
 - the job's manifest_path must be the repository's canonical
-  tools/decode-baseline/workloads.json, and artifact_dir's safetensors set
-  must equal the case's pinned set exactly -- no unpinned weight file is
-  primed or loaded;
+  tools/decode-baseline/workloads.json, repo_dir must be the repository
+  this worker runs from (the report's code identity names that checkout),
+  and artifact_dir's safetensors set must equal the case's pinned set
+  exactly -- no unpinned weight file is primed or loaded;
 - MLX_ENABLE_TF32 is set from the job before any mlx import, so a
   shell-inherited precision mode can never select the run;
 - one sequential full read of every checkpoint safetensors file precedes each
@@ -26,9 +27,11 @@ Rules enforced here:
   wrapper stop set is completed to the manifest's frozen set with the shipped
   add_eos_token API and asserted equal; the full-generation timer ends with an
   explicit mx.synchronize() after the iterator finishes;
-- the report is written at most once, atomically, and never overwrites an
-  existing report.json (a failure into an already-reported directory is
-  refused and reported on stderr only);
+- the report is written at most once, atomically, via a per-process temp
+  file, and never overwrites an existing report.json (a failure into an
+  already-reported directory is refused and reported on stderr only; a
+  success into one becomes a failed run, since its results are not
+  recorded); a write failure leaves no temp file behind;
 - a worker wall-clock timeout -- enforced at request boundaries and re-checked
   after the final request -- produces a failed report and a nonzero exit; a
   worker never presents a partial result as success.
@@ -114,14 +117,18 @@ def write_report(out_dir):
     """Write the report atomically, at most once, and never over an existing
     report.json.
 
-    os.link fails with FileExistsError instead of replacing, so a
-    pre-existing report (e.g. from an earlier run that this worker refused to
-    join) is left byte-identical; the refusal is reported on stderr. The lock
-    keeps the watchdog backstop and the main thread from racing on the
-    check-then-set and the shared temp file."""
+    Returns True iff this call linked report.json; False when the report was
+    already written (by this process) or the link was refused. os.link fails
+    with FileExistsError instead of replacing, so a pre-existing report (e.g.
+    from an earlier run that this worker refused to join) is left
+    byte-identical; the refusal is reported on stderr. The temp file name is
+    per-process, so a concurrent worker in the same directory cannot
+    truncate it mid-write; a write failure removes it before propagating.
+    The lock keeps the watchdog backstop and the main thread from racing on
+    the check-then-set and the shared temp file."""
     with report_lock:
         if state["report_written"]:
-            return
+            return False
         state["report_written"] = True
         state["utc_end"] = utcnow()
         report = {
@@ -145,20 +152,31 @@ def write_report(out_dir):
             },
         }
         final = out_dir / "report.json"
-        tmp = out_dir / "report.json.tmp"
-        with open(tmp, "w") as fid:
-            json.dump(report, fid, indent=1)
-            fid.write("\n")
+        tmp = out_dir / f"report.json.tmp.{os.getpid()}"
         try:
-            os.link(tmp, final)
-        except FileExistsError:
-            print(
-                f"worker refused ({state['failure_reason']}); "
-                f"report already exists at {final}; leaving it untouched",
-                file=sys.stderr,
-            )
+            with open(tmp, "w") as fid:
+                json.dump(report, fid, indent=1)
+                fid.write("\n")
+            try:
+                os.link(tmp, final)
+            except FileExistsError:
+                detail = (
+                    "with no failure reason"
+                    if not state["failure_reason"]
+                    else f"with failure_reason {state['failure_reason']!r}"
+                )
+                print(
+                    f"run ended as {state['status']} {detail} but a report already "
+                    f"exists at {final}; leaving it untouched",
+                    file=sys.stderr,
+                )
+                return False
+            return True
         finally:
-            os.unlink(tmp)
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
 
 def watchdog():
@@ -310,6 +328,13 @@ def validate(job):
         require(pkg_version(dist) == expected, f"installed {dist} != {expected} (requirements.lock)")
 
     repo_dir = Path(job["repo_dir"])
+    # Anchored on this file's own location, not the job's word: the report's
+    # code identity must name the checkout this worker actually ran from.
+    canonical_repo = Path(__file__).resolve().parents[2]
+    require(
+        repo_dir.resolve() == canonical_repo,
+        f"repo_dir must be the repository this worker runs from: {canonical_repo}",
+    )
     out_dir = Path(job["out_dir"])
     require(out_dir.is_dir(), "out_dir must be created by the launcher")
     require(not (out_dir / "report.json").exists(), "out_dir already contains a report (overwrite rejected)")
@@ -610,11 +635,17 @@ def main():
             from controlled import cache_states
 
             prime_s = prime(v["artifact_dir"])
-            t_entry = time.monotonic()
+            # The cache is created before the timer starts, as in the
+            # controlled path. Note the stock prefill is per-adapter: the
+            # shipped model call projects the output head at every prompt
+            # position, while the controlled prefill does so only at the
+            # last one; the comparable quantity is the step region below.
             cache = make_prompt_cache(model)
+            t_entry = time.monotonic()
             logits = model(mx.array(v["prompt"], dtype=mx.int32)[None], cache=cache)
             mx.eval(logits, *cache_states(cache))
-            prefill_s = time.monotonic() - t_entry
+            t_prefill_done = time.monotonic()
+            prefill_s = t_prefill_done - t_entry
             steps = []
             for k, fed in enumerate(v["fed_ids"]):
                 step_start = time.monotonic()
@@ -646,7 +677,9 @@ def main():
                 "event_s": [],
                 "tokens": [],
                 "streaming_decode_tps": None,
-                "full_generation_s": time.monotonic() - t_entry,
+                # Wall time over the step region only (prefill excluded, as in
+                # the controlled path) — the comparable quantity in this mode.
+                "full_generation_s": time.monotonic() - t_prefill_done,
                 "emitted": 0,
                 "finish_reason": "fixed-continuation",
                 "unused_lookahead_forwards": 0,
@@ -668,7 +701,15 @@ def main():
 
     if state["status"] == "failed" and state["failure_reason"] is None:
         state["status"] = "ok"
-    write_report(v["out_dir"])
+    written = write_report(v["out_dir"])
+    if state["status"] == "ok" and not written:
+        # The link can only be refused here when a concurrent process already
+        # reported this directory; this worker's results are then not
+        # recorded, so it must not present the run as a success.
+        state["status"] = "failed"
+        state["failure_reason"] = (
+            "report write refused (directory already reported); results not recorded"
+        )
     if state["status"] == "ok":
         sys.exit(EXIT_OK)
     sys.exit(EXIT_TIMEOUT if state["status"] == "timeout" else EXIT_FAILED)

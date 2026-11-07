@@ -960,3 +960,135 @@ digest citation, re-run `verifyDecodeBaselineManifest` and the negative
 tampers (a worker-file edit without manifest regeneration must fail with
 "worker source SHA-256 differs"). The current frozen manifest digest is the
 one cited in §2.
+
+## 14. WP1 — Java workers, launcher and session report (2026-11-07)
+
+`phase8-2-wp1-java` implements the Java side of the frozen section 13 contract:
+benchmark-only adapters and the process worker in `jmlx-models` test sources
+(`BaselineAdapters`, `BaselineWorker`, `BaselineWorkerTestSupport`, driven through the
+`GenerationRequest.pretokenized` seam), and the launcher plus the job/report/statistics
+contract in `jmlx-benchmarks` (`BaselineBenchmark`, `BaselineJob`,
+`BaselineReportValidator`, `BaselineStatistics`), exposed through the opt-in
+`:jmlx-benchmarks:benchmarkBaseline` task (documented in `jmlx-benchmarks/README.md`).
+The Python workers of PR #87 are the reference implementation; the Java code mirrors the
+frozen contract, and the deviations below are the only intentional departures.
+
+### 14.1 Java-specific deviations from the Python worker
+
+- (a) JDK 25 removed `System.setenv` (deprecated for removal): the Java worker cannot
+  set its own `MLX_ENABLE_TF32` after JVM start. The launcher therefore owns the
+  environment on both worker processes (`builder.environment().put` before the fork),
+  and the Java worker *verifies* the process environment equals the job's
+  `precision_env` before any native initialization, failing the run on a mismatch
+  (the Python worker keeps setting it from the job file, where it is a no-op
+  equivalence).
+- (b) `Files.move(ATOMIC_MOVE)` is `rename(2)` and silently replaces an existing
+  destination: the no-replace report guarantee the Python worker gets from `os.link`
+  is instead an explicit `Files.exists(report.json)` refusal under the worker's
+  `REPORT_LOCK`, around the per-process temp-file-then-move (the report is written at
+  most once; a success whose report write is refused is downgraded to failed).
+- (c) Identity/label mapping: `identity.device` comes from sysctl (`hw.model`,
+  `hw.memsize`) with `max_recommended_working_set_bytes: 0` plus a note (the Java
+  worker has no MLX device-info facade); `identity.java` is
+  `{version, vendor, flags = java.vm.command}`; the frozen finish-reason labels map
+  EOS/STOP_TOKEN→`stop`, MAX_TOKENS→`length`, CANCELLED→`cancelled`; Java stock
+  reports `unused_lookahead_forwards: 0` (the Java loop has no queued lookahead) and
+  `load_state: "materialized"`; `instrumented: false` and `wired_limit_policy` are
+  carried from the job.
+
+### 14.2 Validator contract rules pinned by the launcher tests
+
+The pure-Java `BaselineReportValidator` mirrors frozen section 13.3 and, in addition,
+these adapter-aware shapes — each was caught by a fixture-driven test before the rule
+existed:
+
+- stock headline/reference-pair requests carry `steps: null` and `prefill_s: null`
+  (the shipped loop does not expose the controlled prefill/decode contract; the
+  Python worker writes the same nulls, worker.py:516-517); controlled requests
+  require a numeric `prefill_s` and a `steps` array of exactly `emitted - 1`
+  entries;
+- the python-stock "drain one queued lookahead iff the run is non-empty" rule
+  applies to zero-emission runs too — the emitted==0 early return must not skip it;
+- `streaming_decode_tps` is checked only when `event_s.size() == emitted` (Jackson
+  3's `get(int)` throws on an out-of-range index, so an unguarded check turns a
+  count mismatch into an NPE instead of a violation);
+- `step_region_s` must be null outside fixed-continuation — the schema's "one value
+  per mode, the other null (uniform key set)" (section 13.3, schema line 654).
+
+### 14.3 Session report shape (launcher decision)
+
+`session.json` (schema `jmlx-decode-baseline-1`): root
+`{schema, session, workers[], summary}`.
+
+- the session block is the section 10 block plus `fork_order` (the worker runtimes
+  in fork order) and minus `manifest_sha256` (it lives in each worker's identity;
+  the section 10 `workload` digest is retained as `workload`); `host.hostrec.pre/post`
+  and `python` are null until WP3; `native_pins.java` is read from
+  `native/install/lib/native-pin.properties` (`mlxMetalVersion` → `metal`,
+  `mlxcCommit` → `mlxc_commit`, empty strings when the file is absent),
+  `native_pins.python` is null until WP3;
+- `workers[]`: a valid report embeds the full worker block plus the worker's `dir`;
+  any other outcome embeds the stub
+  `{dir, runtime, adapter, case, prompt_length, mode, outcome}`, and an
+  `invalid-report` additionally embeds the raw `report` so its violations can be
+  reviewed;
+- `summary`: `quantile_convention "linear-interpolation-type-7"` (h = (n-1)q,
+  0-based, linear interpolation), `pairs: []` (WP3 fills),
+  `exclusions[] {worker, reason, violations?}`,
+  `per_runtime[runtime]["<mode>/<case>/<length>"][metric] = {p10, median, p90, n}`
+  and `first_request[runtime][mode][metric]`. The cells are **mode-scoped**:
+  headline and fixed-continuation measure different quantities and never pool, and
+  reference-pair samples run the observed (unprimed) cache regime, so they are
+  excluded from `per_runtime` entirely — they belong to the WP3 `pairs`
+  aggregation. Warmups are never aggregated. (An early unmodeled run pooled a
+  reference-pair sample into the headline cell — n=21 instead of 20 on the 0.6b
+  headline; the mode-scoped rule and its fixture tests are what caught it.)
+
+### 14.4 Outcomes and exit codes
+
+Worker outcomes in the session report: `ok` / `failed` / `timeout` (valid report,
+its `status`), `invalid-report` (report present, structural violations — with the
+raw report), `dead` (claim, no report), `crashed` (no claim, no report),
+`not-started` (the launcher never reached it). Launcher exit: 0 = all workers ok;
+1 = spec validation failed (nothing forked, no `session.json`); 2 = any worker
+non-ok (`session.json` is still written, the failed cells are recorded as
+exclusions, never a partial success presented as success). A starter exception
+stops the session: the remaining workers are recorded `not-started` and the exit
+is 2. Worker process exit: 0 ok, 1 failed, 3 timeout (the same codes as the
+Python worker).
+
+### 14.5 Jackson 3 (tools.jackson 3.1.2) API pitfalls (verified by javap + probe)
+
+- `ObjectNode.putArray(String)` returns `ArrayNode`, not `ObjectNode`;
+- `isTextual()` / `asText()` / `textValue()` are deprecated → `isString()` /
+  `asString()`;
+- `asStringOpt()` coerces *any* node type (a number yields `Optional[123]`) — it
+  is not a textual test;
+- `ObjectMapper` has no `createTextualNode` (use `put(String, String)` or
+  `createArrayNode()`);
+- a naive `find -name "*.jar"` over the Gradle cache puts `*-sources.jar` on the
+  classpath and breaks standalone javac runs (exclude `-sources` jars).
+
+### 14.6 Local evidence
+
+- `:jmlx-benchmarks:check` green with 59 launcher tests — 6 statistics
+  (hand-computed type-7 values), 28 validator (every valid adapter shape plus
+  every structural rejection), 25 end-to-end over a hermetic mini repository
+  (a temp-dir checkout with a tiny manifest and one artifact directory, and a
+  fake worker starter that simulates every protocol outcome — pure Java, no
+  native bootstrap, runs on any platform). `:jmlx-models:check` green with
+  `BaselineAdaptersTest` (5), `BaselineWorkerProtocolTest` (18) and
+  `BaselineWorkerProcessTest` (9), all three added to the macOS CI required-suite
+  list in `.github/workflows/ci.yml`.
+- Opt-in 0.6b session (real frozen manifest, M5 Max, precision 1): both workers
+  `ok` in ~20 s. Headline (`qwen3-0.6b`/32): 26 requests (1 first + 5 warmups +
+  20 measured), 128 emitted, finish `controlled-max-tokens`, load 0.042 s
+  `materialized`, primed-per-request;
+  `per_runtime.java["headline/qwen3-0.6b/32"].ttft_s = {p10 0.0058418836, median
+  0.006971979, p90 0.0136741962, n 20}`, `streaming_decode_tps` ≈ 226.6 / 228.4 /
+  230.3, first request ttft 0.121235167 s. Reference-pair: `ok`, `observed`, one
+  measured request, `prime_s 0.0`, excluded from `per_runtime`. Session
+  identity: workload sha `e8c7730178a2e8f1…` (the frozen manifest digest), native
+  pins metal 0.32.4 / mlx-c `a26f2d584a14ec619ae8db9a09be03becd47598a`, code sha
+  `36a9250` on branch `phase8-2-wp1-java` (dirty),
+  `fork_order ["java", "java"]`.

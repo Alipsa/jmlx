@@ -30,6 +30,23 @@ tasks.register('benchmarkTf32', JavaExec) {
             rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath)
 }
 
+tasks.register('benchmarkBaseline', JavaExec) {
+    group = 'benchmark'
+    description = 'Runs the phase 8.2 decode-baseline launcher (pass --args <spec.json>).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.benchmarks.BaselineBenchmark'
+    workingDir rootProject.projectDir
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    systemProperty('jmlx.library.path',
+            rootProject.layout.projectDirectory.dir('native/install/lib').asFile.absolutePath)
+    // The launcher forks the Java worker from the models module's test runtime classpath
+    // (BaselineWorker is a test-class, deliberately not a published API); the spec may name
+    // it with the "@models-test" alias, which the launcher resolves through this property.
+    systemProperty('jmlx.baseline.models.test.classpath',
+            project(':jmlx-models').sourceSets.test.runtimeClasspath.asPath)
+    dependsOn project(':jmlx-models').tasks.named('testClasses')
+}
+
 tasks.named('check') {
     dependsOn tasks.named('spotlessCheck')
 }

@@ -60,7 +60,7 @@
   "note": "Finite limits of reference findings section 7.4 (launcher and workers reject missing/nonpositive values); the observed-cache reference pair (section 7.3) primes nothing, runs one measured request per runtime and uses reference_pair_worker_timeout_s. Refreshed in WP2 with the implemented controlled adapters before the WP3/WP4 budgets are committed."
  },
  "worker_sources": {
-  "worker.py": "bea71002988fb3ad554ff0411d9a2aae66f651f341962f9e16985b451ba237f7",
+  "worker.py": "488f4fddea67894f04c59e6852fafc276dabf903ad01b6e51c8bb781908c8780",
   "controlled.py": "455fa7fb52e966aba97987cf4d99ff12a74c2fa60f367f5ed253b16410a85c78"
  },
  "text_cases": [

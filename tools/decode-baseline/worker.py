@@ -27,11 +27,18 @@ Rules enforced here:
   wrapper stop set is completed to the manifest's frozen set with the shipped
   add_eos_token API and asserted equal; the full-generation timer ends with an
   explicit mx.synchronize() after the iterator finishes;
+- before any validation, the worker claims the launcher-created output
+  directory with an exclusive-create worker-claim file (utc + pid); if the
+  claim already exists, the worker writes nothing into the directory,
+  reports the refusal on stderr and exits 1; the claim is sticky -- a
+  killed worker leaves it, so a claimed directory without a report is
+  dead and the launcher must treat it as such;
 - the report is written at most once, atomically, via a per-process temp
-  file, and never overwrites an existing report.json (a failure into an
-  already-reported directory is refused and reported on stderr only; a
-  success into one becomes a failed run, since its results are not
-  recorded); a write failure leaves no temp file behind;
+  file, and never overwrites an existing report.json (a write into an
+  already-reported directory is refused: an ok run is downgraded to
+  failed, since its results are not recorded, and the refusal message is
+  printed with the final status; a write failure leaves no temp file
+  behind); the report's worker block carries the worker's pid;
 - a worker wall-clock timeout -- enforced at request boundaries and re-checked
   after the final request -- produces a failed report and a nonzero exit; a
   worker never presents a partial result as success.
@@ -82,6 +89,7 @@ state = {
     "requests": [],
     "notes": [],
     "report_written": False,
+    "report_refused": False,
     "out_dir": None,
 }
 PRIMING_ENABLED = True
@@ -121,12 +129,15 @@ def write_report(out_dir):
     already written (by this process) or the link was refused. os.link fails
     with FileExistsError instead of replacing, so a pre-existing report (e.g.
     from an earlier run that this worker refused to join) is left
-    byte-identical; the refusal is reported on stderr. The temp file name is
+    byte-identical; the refusal is recorded in state["report_refused"] and
+    reported on stderr by the caller after the success downgrade, so the
+    message always carries the final status. The temp file name is
     per-process, so a concurrent worker in the same directory cannot
     truncate it mid-write; a write failure removes it before propagating.
     The lock keeps the watchdog backstop and the main thread from racing on
     the check-then-set and the shared temp file."""
     with report_lock:
+        state["report_refused"] = False
         if state["report_written"]:
             return False
         state["report_written"] = True
@@ -135,6 +146,7 @@ def write_report(out_dir):
             "schema": REPORT_SCHEMA,
             "worker": {
                 "runtime": "python",
+                "pid": os.getpid(),
                 "adapter": state["adapter"],
                 "case": state["case"],
                 "prompt_length": state["prompt_length"],
@@ -160,16 +172,7 @@ def write_report(out_dir):
             try:
                 os.link(tmp, final)
             except FileExistsError:
-                detail = (
-                    "with no failure reason"
-                    if not state["failure_reason"]
-                    else f"with failure_reason {state['failure_reason']!r}"
-                )
-                print(
-                    f"run ended as {state['status']} {detail} but a report already "
-                    f"exists at {final}; leaving it untouched",
-                    file=sys.stderr,
-                )
+                state["report_refused"] = True
                 return False
             return True
         finally:
@@ -177,6 +180,21 @@ def write_report(out_dir):
                 os.unlink(tmp)
             except OSError:
                 pass
+
+
+def refusal_message(out_dir):
+    """The stderr message for a refused report link, built from the final
+    state after the success downgrade, so it never reports an ok status the
+    run was downgraded away from."""
+    detail = (
+        "with no failure reason"
+        if not state["failure_reason"]
+        else f"with failure_reason {state['failure_reason']!r}"
+    )
+    return (
+        f"run ended as {state['status']} {detail} but a report already "
+        f"exists at {out_dir / 'report.json'}; leaving it untouched"
+    )
 
 
 def watchdog():
@@ -201,6 +219,8 @@ def watchdog():
             write_report(Path(state["out_dir"]))
         except Exception as exc:
             print(f"failed to write timeout report: {exc}", file=sys.stderr)
+        if state["report_refused"]:
+            print(refusal_message(Path(state["out_dir"])), file=sys.stderr)
     os._exit(EXIT_TIMEOUT)
 
 
@@ -431,7 +451,11 @@ def controlled_request(model, prompt, fed_ids, emitted, io_affected, index, kind
             "event_s": [],
             "tokens": [],
             "streaming_decode_tps": None,
-            "full_generation_s": full_s,
+            # Step region only (prefill excluded): it includes the per-step
+            # argmax/sort host work, so it is not decode time (findings
+            # section 13.3).
+            "step_region_s": full_s,
+            "full_generation_s": None,
             "emitted": 0,
             "finish_reason": "fixed-continuation",
             "unused_lookahead_forwards": 0,
@@ -453,6 +477,7 @@ def controlled_request(model, prompt, fed_ids, emitted, io_affected, index, kind
             "event_s": rel,
             "tokens": tokens,
             "streaming_decode_tps": streaming,
+            "step_region_s": None,
             "full_generation_s": rel[-1],
             "emitted": n,
             "finish_reason": controlled.CONTROLLED_FINISH_REASON,
@@ -492,6 +517,7 @@ def stock_request(mx, stream_generate, model, tokenizer, prompt, max_tokens, io_
         "event_s": events,
         "tokens": tokens,
         "streaming_decode_tps": streaming,
+        "step_region_s": None,
         "full_generation_s": full_s,
         "emitted": n,
         "finish_reason": finish_reason,
@@ -511,6 +537,23 @@ def main():
     raw_out_dir = job.get("out_dir")
     if isinstance(raw_out_dir, str) and raw_out_dir:
         state["out_dir"] = raw_out_dir
+        # Claim the launcher-created output directory before any validation:
+        # a second worker (valid or not) pointed at a folder this worker owns
+        # must refuse the folder, not write its report into it. The claim is
+        # sticky: a killed worker leaves it, so a claimed folder without a
+        # report is dead for the launcher.
+        claim = Path(raw_out_dir) / "worker-claim"
+        try:
+            with open(claim, "x") as fid:
+                json.dump({"utc": utcnow(), "pid": os.getpid()}, fid)
+                fid.write("\n")
+        except FileExistsError:
+            print(
+                "failure_reason: output folder already claimed by another "
+                f"worker ({claim} exists); refusing to write into {raw_out_dir}",
+                file=sys.stderr,
+            )
+            sys.exit(EXIT_FAILED)
     v = validate(job)
     state.update(
         adapter=v["adapter"], case=v["case"]["name"], prompt_length=v["prompt_length"], mode=v["mode"]
@@ -565,7 +608,7 @@ def main():
     }
 
     ready = v["out_dir"] / "worker-ready"
-    with open(ready, "w") as fid:
+    with open(ready, "x") as fid:
         json.dump({"utc": utcnow(), "pid": os.getpid(), "adapter": v["adapter"], "case": v["case"]["name"]}, fid)
         fid.write("\n")
 
@@ -677,9 +720,11 @@ def main():
                 "event_s": [],
                 "tokens": [],
                 "streaming_decode_tps": None,
-                # Wall time over the step region only (prefill excluded, as in
-                # the controlled path) — the comparable quantity in this mode.
-                "full_generation_s": time.monotonic() - t_prefill_done,
+                # Wall time over the step region only (prefill excluded, as
+                # in the controlled path); it includes the per-step
+                # argmax/sort host work (findings section 13.3).
+                "step_region_s": time.monotonic() - t_prefill_done,
+                "full_generation_s": None,
                 "emitted": 0,
                 "finish_reason": "fixed-continuation",
                 "unused_lookahead_forwards": 0,
@@ -710,6 +755,9 @@ def main():
         state["failure_reason"] = (
             "report write refused (directory already reported); results not recorded"
         )
+    if state["report_refused"]:
+        # Printed after the downgrade so the message carries the final status.
+        print(refusal_message(v["out_dir"]), file=sys.stderr)
     if state["status"] == "ok":
         sys.exit(EXIT_OK)
     sys.exit(EXIT_TIMEOUT if state["status"] == "timeout" else EXIT_FAILED)
@@ -726,6 +774,8 @@ if __name__ == "__main__":
         out_dir = state.get("out_dir")
         if out_dir and Path(out_dir).is_dir():
             write_report(Path(out_dir))
+            if state["report_refused"]:
+                print(refusal_message(Path(out_dir)), file=sys.stderr)
         else:
             print(f"worker validation failed: {exc}", file=sys.stderr)
         sys.exit(EXIT_FAILED)
@@ -735,6 +785,8 @@ if __name__ == "__main__":
         if state.get("out_dir"):
             try:
                 write_report(Path(state["out_dir"]))
+                if state["report_refused"]:
+                    print(refusal_message(Path(state["out_dir"])), file=sys.stderr)
             except Exception:
                 pass
         print(f"worker failed: {type(exc).__name__}: {exc}", file=sys.stderr)

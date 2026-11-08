@@ -1049,15 +1049,27 @@ requests are excluded by construction, with the exclusion recorded). The
      (a) Item 17(a) mischaracterized the round-2 race twice (corrected
      in place): on a slow runner A's resumed request woke before B
      wrote its report, and A's poisoned report was a failed report
-     from its error handler (its resumed request throws on the closed
-     scope, so the post-loop timeout path is never reached), not a
-     timeout report — the failed report landed in B's directory,
-     B's own write was refused, and B returned failed.
+     from its error handler (its resumed request throws on B's live
+     scope, which is confined to B's thread, so the post-loop timeout
+     path is never reached), not a timeout report — the failed report
+     landed in B's directory, B's own write was refused, and B
+     returned failed.
      (b) A failed check before the latch release left run A blocked on
      the latch for the rest of the test JVM: the cross-run test now
      releases the hold in a try/finally (and run A is a daemon
      thread), and `resetTestSeams` releases any outstanding latch, so
      a failed check can no longer strand a held thread between tests.
+  19. Review round 4 (2026-11-08, PR #89): one wording finding — no
+     code, contract, schema or measurement-path change, and no
+     session re-run is required:
+     (a) Item 18(a) and section 14.9 said A's resumed request in the
+     old race "throws on the closed scope"; that is true only in the
+     current test, where B has already finished. In the old race B
+     was still running, so the scope was B's live one and only B's
+     thread could use it (thread confinement, as the round-1 test
+     comment said). Corrected in place; the conclusion (A's request
+     throws, the post-loop timeout path is never reached) is
+     unchanged.
 
 ### 13.5 Manifest re-pin flow (frozen)
 
@@ -1303,10 +1315,20 @@ Two test-only findings, recorded in §13.4 item 18. Item 17(a)'s
 description of the round-2 race was corrected in place: A's resumed
 request woke before B wrote its report, and A's poisoned report was a
 failed report from the error handler (the resumed request throws on
-the closed scope, so the post-loop timeout path is never reached),
-not a timeout report. The cross-run test now releases the hold latch
-in a try/finally, run A is a daemon thread, and `resetTestSeams`
-releases any outstanding latch, so a failed check can no longer leave
-a held thread blocked for the rest of the test JVM. No contract,
-schema or measurement-path change; the §14.6 session 'd' numbers
-stay valid.
+B's live scope, which is confined to B's thread, so the post-loop
+timeout path is never reached), not a timeout report. The cross-run
+test now releases the hold latch in a try/finally, run A is a daemon
+thread, and `resetTestSeams` releases any outstanding latch, so a
+failed check can no longer leave a held thread blocked for the rest
+of the test JVM. No contract, schema or measurement-path change; the
+§14.6 session 'd' numbers stay valid.
+
+### 14.10 Review round 4 (2026-11-08, PR #89): scope-state wording in the old-race description
+
+One wording finding, recorded in §13.4 item 19: item 18(a) and §14.9
+attributed A's resumed-request failure in the old race to the closed
+scope — true only in the current test, where B has already finished.
+In the old race B was still running, so the scope was B's live one
+and only B's thread could use it (thread confinement, as the round-1
+test comment said). Corrected in place; no code, contract or
+measurement change and no session re-run.

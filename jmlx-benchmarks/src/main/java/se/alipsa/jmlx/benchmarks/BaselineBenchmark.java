@@ -44,9 +44,11 @@ import tools.jackson.databind.node.ObjectNode;
  * waits at most {@code min(timeout_s + 90 s, cell_time_budget_s)} for its worker (a longer-waiting
  * worker is killed and its cell classified from the artifacts it left), and the session stops
  * forking once {@code session_time_budget_s} has elapsed (the remaining workers are recorded
- * not-started). Exit codes: 0 all workers ok, 1 spec validation failure (nothing forked), 2 at
- * least one failed/timeout/dead/crashed/not-started/invalid-report worker (the session report is
- * still written).
+ * not-started). The budget gates new forks, not in-flight workers: a worker forked just before the
+ * limit runs to its own wait limit, so the session wall can exceed the budget by at most that wait
+ * limit. Exit codes: 0 all workers ok, 1 spec validation failure (nothing forked), 2 at least one
+ * failed/timeout/dead/crashed/not-started/invalid-report worker (the session report is still
+ * written).
  *
  * <p>Opt-in local tooling, not part of {@code check} or the publication surface.
  */

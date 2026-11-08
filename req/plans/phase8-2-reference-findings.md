@@ -953,17 +953,20 @@ requests are excluded by construction, with the exclusion recorded). The
      closed with a test; the implementation record is section 14.7). The
      round amended the frozen contract in four places:
      (a) **Medium, reproduced**: the session summary pooled adapters — the
-     mixed 0.6b run's headline median TTFT came out 0.535 s, between
+     reviewer's mixed fake-worker reproduction (the e2e mini case, not a
+     0.6b run) had a headline median TTFT of 0.535 s, between
      controlled's ~0.03 s and stock's ~1.03 s, because the cell key was
      `<mode>/<case>/<length>`. The key is now adapter- and mode-scoped on
      both `per_runtime` and `first_request`
      (`<adapter>/<mode>/<case>/<length>`), so no two adapters — and no two
      modes — ever pool.
      (b) The stock stop-set assertion (item 4) now unions the tokenizer's
-     own special-token eos id: the Java stock path feeds the resolved
-     `HfTokenizer` stop set into the generation loop, so the tokenizer's
-     eos is part of the artifact-resolved set; the tokenizer loads before
-     the assertion.
+     own special-token eos id: the tokenizer's eos is part of the
+     artifact-resolved set because the manifest derives its frozen set
+     from the artifact's stop sources, tokenizer included (the stock path
+     feeds the generation loop only the manifest frozen set — the loop
+     checks only that, not the tokenizer); the tokenizer loads before the
+     assertion.
      (c) The stock full-generation boundary is the `generate` return
      itself: the synchronous Java loop evaluates every step at its
      selection boundary and queues no lookahead, so nothing is pending at
@@ -1002,6 +1005,42 @@ requests are excluded by construction, with the exclusion recorded). The
      the job builder reads it default-free; the launcher pins the frozen
      manifest digest and refuses a checkout whose `workloads.json` digest
      differs. The Python side is untouched (frozen, PR #87).
+  17. Review round 2 (2026-11-08, PR #89): two test-only findings and
+     two wording nits — no contract, schema or measurement-path change,
+     so no opt-in session re-run is required (the section 14.6 session
+     'd' numbers, recorded on the pre-round-2 head, stay valid):
+     (a) The stale-watchdog two-run test relied on a sleep margin (run A
+     wedged in a 10 s request delay; on a slow runner A's resumed
+     request woke after B's report write, and A's timeout report —
+     targeted at the process-static out_dir, i.e. B's directory —
+     poisoned B's cell). A's wedge is now a one-shot `requestHold`
+     latch consumed by the held run's first request: the test orders
+     everything by bounded polls (worker-ready, latch consumption,
+     watchdog fire) and releases A only after B's report is on disk, so
+     no part of A's post-loop failure handling can race B's write.
+     Two read seams (`requestHoldConsumedForTest`, `hasFiredForTest`)
+     make the ordering observable without timing assumptions.
+     (b) `resetRunState()` ran before the run-token increment, outside
+     the lock: a stale watchdog whose grace action landed in that gap
+     saw the fresh reset state under the old token and could mark a
+     healthy new run timeout. The reset now runs inside the same
+     `REPORT_LOCK` critical section, after the increment. In-process
+     only — production is one run per process.
+     Plus wording nits:
+     (c) The stop-set record stated the tokenizer's eos is in the
+     resolved set because the stock path feeds the `HfTokenizer` stop
+     set to the generation loop; the stock path feeds the loop only the
+     manifest frozen set (item 16(b) and the assertion javadoc are
+     corrected in place).
+     (d) The section 14.7 Medium bullet attributed the pooling
+     reproduction to "the mixed 0.6b run"; it was the fake-worker e2e
+     reproduction over the tiny mini case (item 16(a) and the bullet
+     are corrected in place, numbers unchanged).
+     The session budget overrun (a worker forked just before
+     `session_time_budget_s` runs to its own wait limit, so the session
+     wall can exceed the budget by at most that limit) is the
+     documented behavior and stays as designed; the launcher javadoc
+     now says so explicitly.
 
 ### 13.5 Manifest re-pin flow (frozen)
 
@@ -1177,10 +1216,11 @@ suggestions), each closed with a test; the contract-level amendments are
 recorded in §13.4 item 16:
 
 - **Medium (reproduced)**: the summary pooled controlled and stock
-  headlines — the mixed 0.6b run's median TTFT was 0.535 s, between
-  controlled's ~0.03 s and stock's ~1.03 s. Fixed with the adapter- and
-  mode-scoped cell keys on `per_runtime` and `first_request` (§14.3),
-  asserted by the mixed-adapter e2e fixture.
+  headlines — the reviewer's reproduction (the mixed fake-worker e2e run
+  over the tiny mini case, not a 0.6b run) had a median TTFT of 0.535 s,
+  between controlled's ~0.03 s and stock's ~1.03 s. Fixed with the
+  adapter- and mode-scoped cell keys on `per_runtime` and `first_request`
+  (§14.3), asserted by the mixed-adapter e2e fixture.
 - **Low**: the launcher session block's and the worker identity's
   `java.flags` now share one source — space-joined
   `ManagementFactory.getRuntimeMXBean().getInputArguments()` (§14.1(c)).
@@ -1222,3 +1262,20 @@ recorded in §13.4 item 16:
   test and restore the production pin after each, and the backstop test
   walks up from the test class's code source to the repository root and
   asserts the pin equals this checkout's `workloads.json` digest.
+
+### 14.8 Review round 2 (2026-11-08, PR #89): deterministic cross-run test and lock ordering
+
+Two test-only findings — the stale-watchdog test's sleep margin and the
+`resetRunState`/run-token lock-ordering gap — plus two wording nits (the
+stop-set assertion javadoc's stated reason, the §14.7 Medium
+attribution); all recorded in §13.4 item 17. The cross-run test now
+holds run A on a one-shot `requestHold` latch and observes every
+ordering step (worker-ready, latch consumption, watchdog fire) with
+bounded polls instead of fixed sleeps; A is released only after run
+B's report is on disk, so A's post-loop failure handling can never
+race B's report write. `resetRunState()` moved inside the `REPORT_LOCK`
+critical section after the run-token increment, so a stale watchdog
+can no longer observe the fresh state under the old token. No
+contract, schema, golden or measurement-path change: the §14.6
+session 'd' numbers stay valid and no opt-in session re-run was
+needed.

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
@@ -76,7 +77,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Benchmark-only test source: this class and the adapters it drives are never published as API.
  * The package-visible seams ({@code setAnchorsForTest}, {@code setExitHookForTest}, {@code
- * setWatchdogGraceMsForTest}, {@code setRequestDelayMsForTest}) exist only so the protocol and the
+ * setWatchdogGraceMsForTest}, {@code setRequestDelayMsForTest}, {@code setRequestHoldForTest},
+ * {@code requestHoldConsumedForTest}, {@code hasFiredForTest}) exist only so the protocol and the
  * timeout path can be executed by tests; the launcher never sets them.
  */
 public final class BaselineWorker {
@@ -140,6 +142,7 @@ public final class BaselineWorker {
   private static IntConsumer exitHook = System::exit;
   private static long watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
   private static long requestDelayMs = 0L;
+  private static volatile CountDownLatch requestHold;
 
   private static final AtomicBoolean fired = new AtomicBoolean();
   private static final AtomicBoolean finished = new AtomicBoolean();
@@ -178,14 +181,16 @@ public final class BaselineWorker {
    * {@link #main} only.
    */
   static int run(JsonNode job) {
-    resetRunState();
     mainWorkerThread = Thread.currentThread();
     long token;
-    // The token increment and the fired/finished reset are one critical section: a watchdog from
-    // a previous run must see either the old token with the old flags, or the new token with the
-    // new flags — never the new flags under the old token.
+    // The token increment, the run-state reset and the fired/finished reset are one critical
+    // section: a watchdog from a previous run that wakes mid-reset sees either its own token
+    // with the old run's state (the backstop acts for that run, as designed) or the new token
+    // with the fresh state (stale — it drops); it must never see the fresh state under the old
+    // token, which would let it time out a healthy new run.
     synchronized (REPORT_LOCK) {
       token = runToken.incrementAndGet();
+      resetRunState();
       fired.set(false);
       finished.set(false);
     }
@@ -385,6 +390,14 @@ public final class BaselineWorker {
         // production worker never sets this).
         if (requestDelayMs > 0) {
           Thread.sleep(requestDelayMs);
+        }
+        // Test seam: a one-shot latch that wedges the first request that sees it, so the
+        // cross-run test can hold this run's request until the later run has finished (the
+        // production worker never sets this).
+        CountDownLatch hold = requestHold;
+        if (hold != null) {
+          requestHold = null;
+          hold.await();
         }
         double primeS = "reference-pair".equals(v.mode()) ? 0.0 : prime(v.artifactDir());
         requests.add(requestRecord(v, model, tokenizer, primeS, index, kinds.get(index), emitted));
@@ -604,8 +617,9 @@ public final class BaselineWorker {
    * tokenizer's special-token eos id (when it has one) plus the {@code generation_config.json} and
    * {@code config.json} {@code eos_token_id} values — must equal the manifest frozen set, so a
    * future drift fails the worker instead of changing behavior silently. The tokenizer's own eos is
-   * part of the resolved set because {@code HfTokenizer} is the stop set the stock path actually
-   * feeds the generation loop.
+   * part of the resolved set because the manifest derives its frozen set from the artifact's stop
+   * sources, tokenizer included — not because the generation loop consults the tokenizer: the stock
+   * path feeds the loop only the manifest frozen set, and the loop checks only that.
    */
   private static void assertStockStopSet(
       Path artifactDir, HfTokenizer tokenizer, String caseName, List<Integer> frozen) {
@@ -1225,10 +1239,29 @@ public final class BaselineWorker {
     requestDelayMs = delayMs;
   }
 
+  static void setRequestHoldForTest(CountDownLatch latch) {
+    requestHold = latch;
+  }
+
+  /**
+   * True once the current process has no unconsumed hold latch: before a test sets one, or after
+   * the held run's request loop consumed it (a consumed latch is what the cross-run test waits for,
+   * so the later run cannot consume it).
+   */
+  static boolean requestHoldConsumedForTest() {
+    return requestHold == null;
+  }
+
+  /** The watchdog's fired flag, for tests that must order a later run after a fire. */
+  static boolean hasFiredForTest() {
+    return fired.get();
+  }
+
   static void resetTestSeams() {
     anchors = null;
     exitHook = System::exit;
     watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
     requestDelayMs = 0L;
+    requestHold = null;
   }
 }

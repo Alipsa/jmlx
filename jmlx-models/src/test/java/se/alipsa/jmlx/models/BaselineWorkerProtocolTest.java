@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -106,6 +107,18 @@ class BaselineWorkerProtocolTest {
 
   private static void createOutDir(Path temp, String name) throws Exception {
     Files.createDirectories(temp.resolve(name));
+  }
+
+  /**
+   * Polls {@code condition} every 50 ms until it holds or 20 s elapse, asserting the message
+   * otherwise — the bounded-poll replacement for fixed sleeps in ordering-sensitive tests.
+   */
+  private static void awaitTrue(BooleanSupplier condition, String message) throws Exception {
+    long by = System.nanoTime() + 20_000_000_000L;
+    while (!condition.getAsBoolean() && System.nanoTime() < by) {
+      Thread.sleep(50);
+    }
+    assertTrue(condition.getAsBoolean(), message);
   }
 
   private static void assertControlledRequestRecord(JsonNode request) {
@@ -230,9 +243,10 @@ class BaselineWorkerProtocolTest {
   @Test
   void stockFailsWhenTokenizerEosExtendsTheFrozenStopSet(@TempDir Path temp) throws Exception {
     // The fixture gains a special-token eos the config files do not carry: the resolved stop
-    // set becomes {3, 4} and must fail the assertion instead of silently changing behavior.
-    // The eos content is a family control token, spelled with unicode escapes here: the
-    // literal control string must never appear in the test sources.
+    // set becomes {3, 4} and must fail the assertion, so a drift between the artifact's stop
+    // sources and the manifest frozen set never reaches the generation loop. The eos content
+    // is a family control token, spelled with unicode escapes here: the literal control string
+    // must never appear in the test sources.
     // CHECKSTYLE.SUPPRESS: AvoidEscapedUnicodeCharacters for +1 lines
     String eosContent = "\u003c|im_end|\u003e";
     String tokenizerJson =
@@ -391,21 +405,26 @@ class BaselineWorkerProtocolTest {
 
   @Test
   void staleWatchdogCannotActOnALaterRun(@TempDir Path temp) throws Exception {
-    // Run A (tiny workspace a) times out on a wedged request and its watchdog enters the grace
-    // period; run B (workspace b) starts in the same process while A's watchdog is still alive.
-    // Without the run-token disarm, A's watchdog wakes inside B's window, overwrites B's status,
-    // writes a timeout report into B's directory (so B's own report write is refused) and fires
-    // the exit hook; with it, B completes normally and the hook never fires.
+    // Run A (tiny workspace a) is held on a one-shot latch in its request loop and its watchdog
+    // fires; run B (workspace b) starts in the same process while A's fired watchdog is in its
+    // grace sleep. Without the run-token disarm, A's grace action wakes inside B's window,
+    // overwrites B's status, writes a timeout report into B's directory (so B's own report
+    // write is refused) and fires the exit hook; with it, the grace action sees B's token and
+    // drops, and B completes normally with its own report. A's hold is released only after B
+    // has finished, so none of A's post-loop failure handling can race B's report write — every
+    // A-vs-B ordering step is held by the latch or observed by a bounded poll, not encoded in
+    // a sleep margin.
     BaselineWorkerTestSupport.Workspace wsA =
         BaselineWorkerTestSupport.build(temp.resolve("a"), 2, 60, 8, 0);
     createOutDir(temp.resolve("a"), "outA");
     Path jobA = writeJob(temp.resolve("a"), wsA, "outA", ignored -> {});
 
     BaselineWorker.setWatchdogGraceMsForTest(4000);
-    BaselineWorker.setRequestDelayMsForTest(10_000);
+    CountDownLatch holdA = new CountDownLatch(1);
+    BaselineWorker.setRequestHoldForTest(holdA);
     AtomicInteger hookFires = new AtomicInteger();
     BaselineWorker.setExitHookForTest(hookFires::addAndGet);
-    // Anchors for run A; switched to B's workspace once A has finished validating.
+    // Anchors for run A; switched to B's workspace once A is held.
     BaselineWorker.setAnchorsForTest(wsA.manifestPath(), wsA.repoDir());
 
     AtomicReference<Integer> codeA = new AtomicReference<>();
@@ -422,24 +441,19 @@ class BaselineWorkerProtocolTest {
             "protocol-test-stale-watchdog-a");
     runA.start();
 
-    // Wait until A has claimed, validated and written worker-ready (its request is now wedged
-    // in the 10 s delay), then wait past A's 2 s deadline so its watchdog has fired and is in
-    // the 4 s grace sleep.
-    Path readyA = temp.resolve("a/outA/worker-ready");
-    long by = System.nanoTime() + 20_000_000_000L;
-    while (!Files.exists(readyA) && System.nanoTime() < by) {
-      Thread.sleep(50);
-    }
-    assertTrue(Files.exists(readyA), "run A reached worker-ready");
-    Thread.sleep(2500);
+    // Hold A deterministically, in order: worker-ready exists (the deadline is anchored there),
+    // the latch has been consumed (A is in its request loop, so run B cannot consume it) and
+    // the watchdog has fired (the deadline is ready + 2 s). The fire must precede B's start,
+    // or the test would pass without exercising the fired-watchdog disarm.
+    awaitTrue(
+        () -> Files.exists(temp.resolve("a/outA/worker-ready")), "run A reached worker-ready");
+    awaitTrue(BaselineWorker::requestHoldConsumedForTest, "run A consumed the hold latch");
+    awaitTrue(BaselineWorker::hasFiredForTest, "run A's watchdog fired");
 
-    // Start run B in the same process. Its requests must read the short delay, so the shared
-    // seam is switched now; run A has only one request and already read the long one. Building
-    // B's workspace here (rather than up front) is just file writes with no timing dependency.
+    // Start run B in the same process, while A's fired watchdog is in its 4 s grace sleep.
     BaselineWorkerTestSupport.Workspace wsB =
         BaselineWorkerTestSupport.build(temp.resolve("b"), 6, 60, 8, 1);
     createOutDir(temp.resolve("b"), "outB");
-    BaselineWorker.setRequestDelayMsForTest(2500);
     BaselineWorker.setAnchorsForTest(wsB.manifestPath(), wsB.repoDir());
     Path jobB = writeJob(temp.resolve("b"), wsB, "outB", ignored -> {});
     AtomicReference<Integer> codeB = new AtomicReference<>();
@@ -470,18 +484,21 @@ class BaselineWorkerProtocolTest {
         "B's report is B's own, not a stale timeout report written for run A");
     assertEquals(0, hookFires.get(), "no backstop exit may fire for a healthy later run");
 
-    // Run A finishes on its own after its wedged request elapses; it must not hang. Run A's own
-    // outcome is an in-process artifact, not a protocol result: when its wedged request resumes,
-    // run B has already replaced the process-static model scope, and the scope is confined to
-    // B's thread, so A's MLX access fails and A's report write goes to the (now static) B
-    // directory, where it is refused because B's report already exists. The worker's design is
-    // one run per process (production forks a fresh JVM per cell), so A is expected to leave no
-    // report of its own; the test's gate is that the later run B stays clean.
+    // Release A only now: its resumed request is guaranteed to run after B's report is on disk.
+    holdA.countDown();
+
+    // Run A finishes on its own once released; it must not hang. Run A's own outcome is an
+    // in-process artifact, not a protocol result: when its held request resumes, run B has
+    // already replaced and closed the process-static model scope (B's execute completed), so
+    // A's MLX access fails and A's report write goes to the (now static) B directory, where it
+    // is refused because B's report already exists. The worker's design is one run per process
+    // (production forks a fresh JVM per cell), so A is expected to leave no report of its own;
+    // the test's gate is that the later run B stays clean.
     runA.join(30_000);
     assertFalse(runA.isAlive(), "run A finished");
     assertFalse(
         Files.exists(temp.resolve("a/outA/report.json")),
-        "run A's resumed request fails on the thread-confined scope and leaves no report");
+        "run A's resumed request fails on the closed scope and leaves no report");
   }
 
   @Test

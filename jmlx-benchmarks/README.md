@@ -83,3 +83,52 @@ The matrix case shows a substantial precision cost on this hardware. The tiny
 decoder was dominated by other overhead; its small timing differences do not
 establish a meaningful inference slowdown. Results are workload-specific.
 The raw local report is `build/benchmarks/tf32-m5-max/comparison.json`.
+
+## Decode baseline (phase 8.2)
+
+```sh
+./gradlew :jmlx-benchmarks:benchmarkBaseline --args='path/to/spec.json'
+```
+
+The phase 8.2 decode-baseline launcher (frozen contract in
+`req/plans/phase8-2-reference-findings.md` section 13). It consumes one spec JSON,
+validates it and the frozen `tools/decode-baseline/workloads.json` manifest against
+the repository, forks one worker process per spec entry in the spec's fork order
+(sequentially), and writes the session report. The session directory must not
+pre-exist and must be outside the repository; the launcher creates it. Every worker
+gets its own launcher-created directory and job file, and failures or timeouts
+produce a failed report plus a nonzero launcher exit — never a partial summary
+presented as success.
+
+Spec fields:
+
+```text
+out_root             new directory, outside the repository
+repo_dir             the repository checkout
+precision_env        "0" or "1"; applied to each worker process environment
+java_worker_classpath  classpath of the Java worker; the alias "@models-test"
+                     resolves to this task's jmlx.baseline.models.test.classpath
+                     property, which points at :jmlx-models' test runtime
+                     classpath (BaselineWorker is benchmark-only test source,
+                     never a published API)
+artifact_dirs        case name → checkpoint directory
+workers[]            {runtime java|python, adapter controlled|stock, case,
+                     prompt_length (one of the manifest's frozen lengths),
+                     mode headline|fixed-continuation|reference-pair}
+```
+
+Layout under `out_root`: one directory per worker
+(`<runtime>-<adapter>-<case>-<length>-<mode>/` holding `worker-claim`,
+`worker-ready` and `report.json`), `jobs/<dir>.job.json` (the frozen job file
+handed to the worker), `stderr/<dir>.log`, the verbatim `spec.json`, and
+`session.json` (schema `jmlx-decode-baseline-1`: the session block, the embedded
+worker reports, and the summary with adapter/mode-scoped type-7 quantiles and
+the exclusion list).
+
+Exit codes: 0 all workers ok; 1 spec validation failed (nothing forked, no
+`session.json`); 2 any worker non-ok (`session.json` is still written, the failed
+cells are recorded as exclusions). The Java controlled worker needs the staged
+native runtime; the Python stock worker needs the pinned venv from
+`tools/decode-baseline/install.sh` (installed explicitly, never by a Gradle
+task). Use a new `out_root` for every experiment, and run without competing GPU
+workloads.

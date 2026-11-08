@@ -948,6 +948,128 @@ requests are excluded by construction, with the exclusion recorded). The
     fixed-continuation zero argmax mismatches with positions 513–544,
     report `pid` == claim `pid` == ready `pid` on all four reports.
     `verify.sh` VERIFIED and root `check` green on the final head.
+ 16. Review round 1 (2026-11-08, PR #89 review of the Java WP1 head
+     `c80cdfa`; one Medium, five Low, nits and two suggestions — each
+     closed with a test; the implementation record is section 14.7). The
+     round amended the frozen contract in four places:
+     (a) **Medium, reproduced**: the session summary pooled adapters — the
+     reviewer's mixed fake-worker reproduction (the e2e mini case, not a
+     0.6b run) had a headline median TTFT of 0.535 s, between
+     controlled's ~0.03 s and stock's ~1.03 s, because the cell key was
+     `<mode>/<case>/<length>`. The key is now adapter- and mode-scoped on
+     both `per_runtime` and `first_request`
+     (`<adapter>/<mode>/<case>/<length>`), so no two adapters — and no two
+     modes — ever pool.
+     (b) The stock stop-set assertion (item 4) now unions the tokenizer's
+     own special-token eos id: the tokenizer's eos is part of the
+     artifact-resolved set because the manifest derives its frozen set
+     from the artifact's stop sources, tokenizer included (the stock path
+     feeds the generation loop only the manifest frozen set — the loop
+     checks only that, not the tokenizer); the tokenizer loads before the
+     assertion.
+     (c) The stock full-generation boundary is the `generate` return
+     itself: the synchronous Java loop evaluates every step at its
+     selection boundary and queues no lookahead, so nothing is pending at
+     return — no drain evaluate exists or is needed (item 12's drain
+     wording applies to the Python stock path only).
+     (d) Fixed-continuation cells gain `step_s` — the contract's decode
+     comparison (§13.3) — quantiled per step over the measured
+     requests' 32 frozen positions each; first-request FC cells carry
+     only the request-level metrics.
+     Plus the worker/launcher hardening the review required:
+     (e) the worker's hard watchdog is per-run — each `run` increments a
+     process token under the report lock together with the fired/finished
+     reset, and the watchdog re-checks its token before every remaining
+     action (loop exit, fire, post-grace status, report write, exit
+     hook), dropping silently when a later run owns the shared state;
+     verified by a two-run in-process test (run A wedged past its
+     deadline with its watchdog in the grace period, run B started in the
+     same process: B exits 0 with its own ok report, the exit hook never
+     fires, and A — whose resumed request hits the thread-confined scope
+     the later run owns — leaves no report, the expected in-process
+     artifact of the one-run-per-process design).
+     (f) The launcher cross-checks every ok report against the job it
+     launched (runtime/adapter/case/prompt_length/mode, the report's own
+     `manifest_sha256`, `precision_env`, and the request-kind sequence —
+     an ok report must carry exactly the job's mix, a failed report at
+     most a complete prefix); a mismatch is `invalid-report` with the
+     violations, never silently aggregated.
+     (g) Launcher limits: the fork wait limit is
+     `min(timeout_s + 90 s backstop, cell_time_budget_s)` with a 10 s kill
+     settle (a killed worker is classified from its left artifacts with
+     the kill in the exclusion note); the session loop checks elapsed
+     against `session_time_budget_s` before each fork and records the
+     remainder `not-started` with the budget reason; `run_policy` is
+     validated without defaults (all eight fields integers, the four
+     timeouts/budgets > 0, first/measured/emitted ≥ 1, warmups ≥ 0) and
+     the job builder reads it default-free; the launcher pins the frozen
+     manifest digest and refuses a checkout whose `workloads.json` digest
+     differs. The Python side is untouched (frozen, PR #87).
+  17. Review round 2 (2026-11-08, PR #89): two test-only findings and
+     two wording nits — no contract, schema or measurement-path change,
+     so no opt-in session re-run is required (the section 14.6 session
+     'd' numbers, recorded on the pre-round-2 head, stay valid):
+     (a) The stale-watchdog two-run test relied on a sleep margin (run A
+     wedged in a 10 s request delay; on a slow runner A's resumed
+     request woke before B wrote its report, and A's failed report from
+     its error handler — targeted at the process-static out_dir, i.e.
+     B's directory — poisoned B's cell, so B's own report write was
+     refused and B returned failed). A's wedge is now a one-shot
+     `requestHold` latch consumed by the held run's first request: the
+     test orders everything by bounded polls (worker-ready, latch
+     consumption, watchdog fire) and releases A only after B's report
+     is on disk, so no part of A's post-release failure handling can
+     race B's write.
+     Two read seams (`requestHoldConsumedForTest`, `hasFiredForTest`)
+     make the ordering observable without timing assumptions.
+     (b) `resetRunState()` ran before the run-token increment, outside
+     the lock: a stale watchdog whose grace action landed in that gap
+     saw the fresh reset state under the old token and could mark a
+     healthy new run timeout. The reset now runs inside the same
+     `REPORT_LOCK` critical section, after the increment. In-process
+     only — production is one run per process.
+     Plus wording nits:
+     (c) The stop-set record stated the tokenizer's eos is in the
+     resolved set because the stock path feeds the `HfTokenizer` stop
+     set to the generation loop; the stock path feeds the loop only the
+     manifest frozen set (item 16(b) and the assertion javadoc are
+     corrected in place).
+     (d) The section 14.7 Medium bullet attributed the pooling
+     reproduction to "the mixed 0.6b run"; it was the fake-worker e2e
+     reproduction over the tiny mini case (item 16(a) and the bullet
+     are corrected in place, numbers unchanged).
+     The session budget overrun (a worker forked just before
+     `session_time_budget_s` runs to its own wait limit, so the session
+     wall can exceed the budget by at most that limit) is the
+     documented behavior and stays as designed; the launcher javadoc
+     now says so explicitly.
+  18. Review round 3 (2026-11-08, PR #89): two test-only findings — no
+     contract, schema or measurement-path change, and no session
+     re-run is required:
+     (a) Item 17(a) mischaracterized the round-2 race twice (corrected
+     in place): on a slow runner A's resumed request woke before B
+     wrote its report, and A's poisoned report was a failed report
+     from its error handler (its resumed request throws on B's live
+     scope, which is confined to B's thread, so the post-loop timeout
+     path is never reached), not a timeout report — the failed report
+     landed in B's directory, B's own write was refused, and B
+     returned failed.
+     (b) A failed check before the latch release left run A blocked on
+     the latch for the rest of the test JVM: the cross-run test now
+     releases the hold in a try/finally (and run A is a daemon
+     thread), and `resetTestSeams` releases any outstanding latch, so
+     a failed check can no longer strand a held thread between tests.
+  19. Review round 4 (2026-11-08, PR #89): one wording finding — no
+     code, contract, schema or measurement-path change, and no
+     session re-run is required:
+     (a) Item 18(a) and section 14.9 said A's resumed request in the
+     old race "throws on the closed scope"; that is true only in the
+     current test, where B has already finished. In the old race B
+     was still running, so the scope was B's live one and only B's
+     thread could use it (thread confinement, as the round-1 test
+     comment said). Corrected in place; the conclusion (A's request
+     throws, the post-loop timeout path is never reached) is
+     unchanged.
 
 ### 13.5 Manifest re-pin flow (frozen)
 
@@ -960,3 +1082,253 @@ digest citation, re-run `verifyDecodeBaselineManifest` and the negative
 tampers (a worker-file edit without manifest regeneration must fail with
 "worker source SHA-256 differs"). The current frozen manifest digest is the
 one cited in §2.
+
+## 14. WP1 — Java workers, launcher and session report (2026-11-07)
+
+`phase8-2-wp1-java` implements the Java side of the frozen section 13 contract:
+benchmark-only adapters and the process worker in `jmlx-models` test sources
+(`BaselineAdapters`, `BaselineWorker`, `BaselineWorkerTestSupport`, driven through the
+`GenerationRequest.pretokenized` seam), and the launcher plus the job/report/statistics
+contract in `jmlx-benchmarks` (`BaselineBenchmark`, `BaselineJob`,
+`BaselineReportValidator`, `BaselineStatistics`), exposed through the opt-in
+`:jmlx-benchmarks:benchmarkBaseline` task (documented in `jmlx-benchmarks/README.md`).
+The Python workers of PR #87 are the reference implementation; the Java code mirrors the
+frozen contract, and the deviations below are the only intentional departures.
+
+### 14.1 Java-specific deviations from the Python worker
+
+- (a) JDK 25 removed `System.setenv` (deprecated for removal): the Java worker cannot
+  set its own `MLX_ENABLE_TF32` after JVM start. The launcher therefore owns the
+  environment on both worker processes (`builder.environment().put` before the fork),
+  and the Java worker *verifies* the process environment equals the job's
+  `precision_env` before any native initialization, failing the run on a mismatch
+  (the Python worker keeps setting it from the job file, where it is a no-op
+  equivalence).
+- (b) `Files.move(ATOMIC_MOVE)` is `rename(2)` and silently replaces an existing
+  destination: the no-replace report guarantee the Python worker gets from `os.link`
+  is instead an explicit `Files.exists(report.json)` refusal under the worker's
+  `REPORT_LOCK`, around the per-process temp-file-then-move (the report is written at
+  most once; a success whose report write is refused is downgraded to failed).
+- (c) Identity/label mapping: `identity.device` comes from sysctl (`hw.model`,
+  `hw.memsize`) with `max_recommended_working_set_bytes: 0` plus a note (the Java
+  worker has no MLX device-info facade); `identity.java` is
+  `{version, vendor, flags}` with `flags` the space-joined
+  `ManagementFactory.getRuntimeMXBean().getInputArguments()` — the same source
+  the launcher's session block uses (review round 1, §13.4 item 16); the
+  frozen finish-reason labels map
+  EOS/STOP_TOKEN→`stop`, MAX_TOKENS→`length`, CANCELLED→`cancelled`; Java stock
+  reports `unused_lookahead_forwards: 0` (the Java loop has no queued lookahead) and
+  `load_state: "materialized"`; `instrumented: false` and `wired_limit_policy` are
+  carried from the job.
+
+### 14.2 Validator contract rules pinned by the launcher tests
+
+The pure-Java `BaselineReportValidator` mirrors frozen section 13.3 and, in addition,
+these adapter-aware shapes — each was caught by a fixture-driven test before the rule
+existed:
+
+- stock headline/reference-pair requests carry `steps: null` and `prefill_s: null`
+  (the shipped loop does not expose the controlled prefill/decode contract; the
+  Python worker writes the same nulls, worker.py:516-517); controlled requests
+  require a numeric `prefill_s` and a `steps` array of exactly `emitted - 1`
+  entries;
+- the python-stock "drain one queued lookahead iff the run is non-empty" rule
+  applies to zero-emission runs too — the emitted==0 early return must not skip it;
+- `streaming_decode_tps` is checked only when `event_s.size() == emitted` (Jackson
+  3's `get(int)` throws on an out-of-range index, so an unguarded check turns a
+  count mismatch into an NPE instead of a violation);
+- `step_region_s` must be null outside fixed-continuation — the schema's "one value
+  per mode, the other null (uniform key set)" (section 13.3, schema line 654).
+
+### 14.3 Session report shape (launcher decision)
+
+`session.json` (schema `jmlx-decode-baseline-1`): root
+`{schema, session, workers[], summary}`.
+
+- the session block is the section 10 block plus `fork_order` (the worker runtimes
+  in fork order) and minus `manifest_sha256` (it lives in each worker's identity;
+  the section 10 `workload` digest is retained as `workload`); `host.hostrec.pre/post`
+  and `python` are null until WP3; `native_pins.java` is read from
+  `native/install/lib/native-pin.properties` (`mlxMetalVersion` → `metal`,
+  `mlxcCommit` → `mlxc_commit`, empty strings when the file is absent),
+  `native_pins.python` is null until WP3;
+- `workers[]`: a valid report embeds the full worker block plus the worker's `dir`;
+  any other outcome embeds the stub
+  `{dir, runtime, adapter, case, prompt_length, mode, outcome}`, and an
+  `invalid-report` additionally embeds the raw `report` so its violations can be
+  reviewed;
+- `summary`: `quantile_convention "linear-interpolation-type-7"` (h = (n-1)q,
+  0-based, linear interpolation), `pairs: []` (WP3 fills),
+  `exclusions[] {worker, reason, violations?}`,
+  `per_runtime[runtime]["<adapter>/<mode>/<case>/<length>"][metric] = {p10, median, p90, n}`
+  and `first_request[runtime]["<adapter>/<mode>/<case>/<length>"][metric]`. The
+  cells are **adapter- and mode-scoped** (review round 1, §13.4 item 16(a)):
+  headline and fixed-continuation measure different quantities and never pool,
+  controlled and stock never pool (a mixed run's pooled median TTFT landed
+  between the two adapters' own medians — the finding that forced the key
+  change), and reference-pair samples run the observed (unprimed) cache
+  regime, so they are excluded from `per_runtime` entirely — they belong to
+  the WP3 `pairs` aggregation. Warmups are never aggregated. Fixed-continuation
+  cells additionally carry `step_s` — the contract's decode comparison
+  (§13.3) — quantiled per step over the measured requests' 32 frozen
+  positions each (32 × measured samples); the first request's FC steps are
+  not pooled into it, its first-request cell carrying only the request-level
+  metrics. (An early unmodeled run pooled a
+  reference-pair sample into the headline cell — n=21 instead of 20 on the 0.6b
+  headline; the mode-scoped rule and its fixture tests are what caught it.)
+
+### 14.4 Outcomes and exit codes
+
+Worker outcomes in the session report: `ok` / `failed` / `timeout` (valid report,
+its `status`), `invalid-report` (report present, structural violations — with the
+raw report), `dead` (claim, no report), `crashed` (no claim, no report),
+`not-started` (the launcher never reached it). Launcher exit: 0 = all workers ok;
+1 = spec validation failed (nothing forked, no `session.json`); 2 = any worker
+non-ok (`session.json` is still written, the failed cells are recorded as
+exclusions, never a partial success presented as success). A starter exception
+stops the session: the remaining workers are recorded `not-started` and the exit
+is 2. Worker process exit: 0 ok, 1 failed, 3 timeout (the same codes as the
+Python worker).
+
+### 14.5 Jackson 3 (tools.jackson 3.1.2) API pitfalls (verified by javap + probe)
+
+- `ObjectNode.putArray(String)` returns `ArrayNode`, not `ObjectNode`;
+- `isTextual()` / `asText()` / `textValue()` are deprecated → `isString()` /
+  `asString()`;
+- `asStringOpt()` coerces *any* node type (a number yields `Optional[123]`) — it
+  is not a textual test;
+- `ObjectMapper` has no `createTextualNode` (use `put(String, String)` or
+  `createArrayNode()`);
+- a naive `find -name "*.jar"` over the Gradle cache puts `*-sources.jar` on the
+  classpath and breaks standalone javac runs (exclude `-sources` jars).
+
+### 14.6 Local evidence
+
+- `:jmlx-benchmarks:check` green with 73 launcher tests — 6 statistics
+  (hand-computed type-7 values), 28 validator (every valid adapter shape plus
+  every structural rejection), 39 end-to-end over a hermetic mini repository
+  (a temp-dir checkout with a tiny manifest and one artifact directory, and a
+  fake worker starter that simulates every protocol outcome — pure Java, no
+  native bootstrap, runs on any platform). The review-round-1 e2e additions
+  cover the adapter-scoped key shape, the report-vs-job violations (mismatch,
+  no-requests, short prefix, extra requests), the kill and session-budget
+  paths, the run_policy rejections, and the digest-pin mismatch plus the
+  frozen-manifest backstop. `:jmlx-models:check` green with
+  `BaselineAdaptersTest` (5), `BaselineWorkerProtocolTest` (20 — the two
+  review-round-1 additions: the tokenizer-eos stop-set failure and the
+  stale-watchdog two-run test) and `BaselineWorkerProcessTest` (9); no new
+  suite classes were added in the round, so the macOS CI required-suite list
+  in `.github/workflows/ci.yml` is unchanged.
+- Opt-in 0.6b session on the final head (real frozen manifest, M5 Max,
+  precision 1): both workers `ok` in ~20 s wall. Headline (round-1 key
+  `controlled/headline/qwen3-0.6b/32`): 26 requests (1 first + 5 warmups +
+  20 measured), 128 emitted per request, finish `controlled-max-tokens`,
+  `load_state materialized`, primed-per-request;
+  `per_runtime.java["controlled/headline/qwen3-0.6b/32"].ttft_s = {p10
+  0.0057996631, median 0.006027583, p90 0.0068274292, n 20}`, `prefill_s`
+  median 0.0054023335, `full_generation_s` median 0.569823333,
+  `streaming_decode_tps` ≈ 223.3 / 225.4 / 228.1; first request ttft
+  0.119919417 s, prefill 0.115580583 s, full 0.842221583 s, 175.8 tok/s.
+  Reference-pair: `ok`, `observed`, one measured request, excluded from
+  `per_runtime`. Session identity: workload sha `e8c7730178a2e8f1…` (the
+  frozen manifest digest), native pins metal 0.32.4 / mlx-c
+  `a26f2d584a14ec619ae8db9a09be03becd47598a`, code sha `c80cdfa` on branch
+  `phase8-2-wp1-java` (dirty — with the review-round-1 fixes this section
+  records, committed with this record), `fork_order ["java", "java"]`.
+  The numbers agree with the pre-round session within run-to-run variation
+  (median TTFT 0.0070 s → 0.0060 s, streaming ≈ 228.4 → 225.4 tok/s).
+
+### 14.7 Review round 1 (2026-11-08, PR #89): launcher and worker hardening
+
+The round's findings (one Medium reproduced, five Low, nits, two
+suggestions), each closed with a test; the contract-level amendments are
+recorded in §13.4 item 16:
+
+- **Medium (reproduced)**: the summary pooled controlled and stock
+  headlines — the reviewer's reproduction (the mixed fake-worker e2e run
+  over the tiny mini case, not a 0.6b run) had a median TTFT of 0.535 s,
+  between controlled's ~0.03 s and stock's ~1.03 s. Fixed with the
+  adapter- and mode-scoped cell keys on `per_runtime` and `first_request`
+  (§14.3), asserted by the mixed-adapter e2e fixture.
+- **Low**: the launcher session block's and the worker identity's
+  `java.flags` now share one source — space-joined
+  `ManagementFactory.getRuntimeMXBean().getInputArguments()` (§14.1(c)).
+- **Low**: the stock "drain evaluate" note was wrong — the synchronous
+  Java loop evaluates every step at its selection boundary and queues no
+  lookahead, so nothing is pending at `generate` return. The explicit
+  `MLX.eval()` drain was removed from `BaselineAdapters.runStock` and the
+  worker's stock note reworded to say no drain exists or is needed
+  (§13.4 item 16(c)).
+- **Low**: the worker watchdog is per-run (the run token, §13.4 item
+  16(e)); the two-run in-process test executes the stale path end to end.
+- **Low**: the launcher cross-checks every ok report against the launched
+  job (`jobViolations`: runtime/adapter/case/prompt_length/mode, the
+  report's own `identity.manifest_sha256`, `identity.precision_env`, and
+  the request-kind sequence — ok carries exactly the job's mix, failed at
+  most a complete prefix); a mismatch is `invalid-report` with the
+  violations in the exclusion (§13.4 item 16(f)).
+- **Low**: the launcher limits (§13.4 item 16(g)) — the fork wait limit is
+  `min(timeout_s + 90 s, cell_time_budget_s)` (`WAIT_LIMIT_BACKSTOP_S`)
+  with a 10 s kill settle after `destroyForcibly`; a starter returning
+  `WORKER_KILLED = -1` (the starter-level sentinel, not an outcome)
+  classifies the cell from its left artifacts and records the kill with
+  the limit in the exclusion note; the session loop checks elapsed
+  against `session_time_budget_s` before each fork and records the
+  remainder `not-started` with `REASON_BUDGET`; `validateRunPolicy`
+  rejects a missing, non-integer or below-minimum `run_policy` field
+  before anything forks, and `buildJob` reads the policy default-free.
+- **Nits**: the stock stop-set assertion loads the `HfTokenizer` first and
+  unions its special-token eos into the resolved set (§13.4 item 16(b));
+  `benchmarkBaseline` depends on `:jmlx-models`' test *runtime classpath*
+  FileCollection (so the test-fixtures jars build, not just `testClasses`);
+  the `BaselineStatistics` javadoc now cites the right findings file and
+  says empty samples carry NaNs.
+- **Suggestions**: fixed-continuation `step_s` in the session summary
+  (§14.3); the frozen-manifest digest pin
+  (`PINNED_MANIFEST_SHA256 = e8c7730178a2e8f1…`, the same digest the root
+  `verifyDecodeBaselineManifest` guard backstops) with a test-only seam
+  (`setPinnedManifestSha256ForTest`) — the e2e mini repositories re-pin per
+  test and restore the production pin after each, and the backstop test
+  walks up from the test class's code source to the repository root and
+  asserts the pin equals this checkout's `workloads.json` digest.
+
+### 14.8 Review round 2 (2026-11-08, PR #89): deterministic cross-run test and lock ordering
+
+Two test-only findings — the stale-watchdog test's sleep margin and the
+`resetRunState`/run-token lock-ordering gap — plus two wording nits (the
+stop-set assertion javadoc's stated reason, the §14.7 Medium
+attribution); all recorded in §13.4 item 17. The cross-run test now
+holds run A on a one-shot `requestHold` latch and observes every
+ordering step (worker-ready, latch consumption, watchdog fire) with
+bounded polls instead of fixed sleeps; A is released only after run
+B's report is on disk, so A's post-release failure handling can never
+race B's report write. `resetRunState()` moved inside the `REPORT_LOCK`
+critical section after the run-token increment, so a stale watchdog
+can no longer observe the fresh state under the old token. No
+contract, schema, golden or measurement-path change: the §14.6
+session 'd' numbers stay valid and no opt-in session re-run was
+needed.
+
+### 14.9 Review round 3 (2026-11-08, PR #89): race-description correction and latch release on failure
+
+Two test-only findings, recorded in §13.4 item 18. Item 17(a)'s
+description of the round-2 race was corrected in place: A's resumed
+request woke before B wrote its report, and A's poisoned report was a
+failed report from the error handler (the resumed request throws on
+B's live scope, which is confined to B's thread, so the post-loop
+timeout path is never reached), not a timeout report. The cross-run
+test now releases the hold latch in a try/finally, run A is a daemon
+thread, and `resetTestSeams` releases any outstanding latch, so a
+failed check can no longer leave a held thread blocked for the rest
+of the test JVM. No contract, schema or measurement-path change; the
+§14.6 session 'd' numbers stay valid.
+
+### 14.10 Review round 4 (2026-11-08, PR #89): scope-state wording in the old-race description
+
+One wording finding, recorded in §13.4 item 19: item 18(a) and §14.9
+attributed A's resumed-request failure in the old race to the closed
+scope — true only in the current test, where B has already finished.
+In the old race B was still running, so the scope was B's live one
+and only B's thread could use it (thread confinement, as the round-1
+test comment said). Corrected in place; no code, contract or
+measurement change and no session re-run.

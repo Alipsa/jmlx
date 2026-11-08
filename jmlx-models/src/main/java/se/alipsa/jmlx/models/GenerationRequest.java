@@ -180,6 +180,34 @@ public final class GenerationRequest {
     return ChatContextCopies.copyMessages(messages);
   }
 
+  /**
+   * Creates a request from pretokenized prompt IDs carrying the checkpoint's own tokenizer, so the
+   * generation loop's incremental detokenization runs and is measured.
+   *
+   * <p>Package-private and benchmark-only: production callers tokenize through {@link #text} (or
+   * {@link #chat}); the Phase 8.2 decode-baseline stock worker (model test sources, this package)
+   * must feed the frozen pretokenized prompt IDs with the tokenizer attached, because the shipped
+   * public constructors either re-encode text or carry no tokenizer (req/plans/phase8-2-plan.md
+   * section 3.2). No public API is added for benchmarking.
+   */
+  static GenerationRequest pretokenized(
+      HfTokenizer tokenizer,
+      int[] promptTokenIds,
+      GenerationConfig config,
+      CancellationToken cancellationToken) {
+    return new GenerationRequest(
+        promptTokenIds,
+        config,
+        cancellationToken,
+        PromptSpecialTokens.PRETOKENIZED,
+        tokenizer,
+        GenerationCachePolicy.full(),
+        List.of(),
+        null,
+        null,
+        null);
+  }
+
   private static GenerationRequest tokenizerBacked(
       List<Integer> ids,
       GenerationConfig config,

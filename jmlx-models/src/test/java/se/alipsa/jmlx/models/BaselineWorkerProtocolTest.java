@@ -411,9 +411,9 @@ class BaselineWorkerProtocolTest {
     // overwrites B's status, writes a timeout report into B's directory (so B's own report
     // write is refused) and fires the exit hook; with it, the grace action sees B's token and
     // drops, and B completes normally with its own report. A's hold is released only after B
-    // has finished, so none of A's post-loop failure handling can race B's report write — every
-    // A-vs-B ordering step is held by the latch or observed by a bounded poll, not encoded in
-    // a sleep margin.
+    // has finished, so none of A's post-release failure handling can race B's report write —
+    // every A-vs-B ordering step is held by the latch or observed by a bounded poll, not
+    // encoded in a sleep margin.
     BaselineWorkerTestSupport.Workspace wsA =
         BaselineWorkerTestSupport.build(temp.resolve("a"), 2, 60, 8, 0);
     createOutDir(temp.resolve("a"), "outA");
@@ -439,53 +439,60 @@ class BaselineWorkerProtocolTest {
               }
             },
             "protocol-test-stale-watchdog-a");
+    // Daemon so a held (or wedged) run A can never keep the test JVM alive if a check fails.
+    runA.setDaemon(true);
     runA.start();
 
-    // Hold A deterministically, in order: worker-ready exists (the deadline is anchored there),
-    // the latch has been consumed (A is in its request loop, so run B cannot consume it) and
-    // the watchdog has fired (the deadline is ready + 2 s). The fire must precede B's start,
-    // or the test would pass without exercising the fired-watchdog disarm.
-    awaitTrue(
-        () -> Files.exists(temp.resolve("a/outA/worker-ready")), "run A reached worker-ready");
-    awaitTrue(BaselineWorker::requestHoldConsumedForTest, "run A consumed the hold latch");
-    awaitTrue(BaselineWorker::hasFiredForTest, "run A's watchdog fired");
+    try {
+      // Hold A deterministically, in order: worker-ready exists (the deadline is anchored
+      // there), the latch has been consumed (A is in its request loop, so run B cannot
+      // consume it) and the watchdog has fired (the deadline is ready + 2 s). The fire must
+      // precede B's start, or the test would pass without exercising the fired-watchdog
+      // disarm.
+      awaitTrue(
+          () -> Files.exists(temp.resolve("a/outA/worker-ready")), "run A reached worker-ready");
+      awaitTrue(BaselineWorker::requestHoldConsumedForTest, "run A consumed the hold latch");
+      awaitTrue(BaselineWorker::hasFiredForTest, "run A's watchdog fired");
 
-    // Start run B in the same process, while A's fired watchdog is in its 4 s grace sleep.
-    BaselineWorkerTestSupport.Workspace wsB =
-        BaselineWorkerTestSupport.build(temp.resolve("b"), 6, 60, 8, 1);
-    createOutDir(temp.resolve("b"), "outB");
-    BaselineWorker.setAnchorsForTest(wsB.manifestPath(), wsB.repoDir());
-    Path jobB = writeJob(temp.resolve("b"), wsB, "outB", ignored -> {});
-    AtomicReference<Integer> codeB = new AtomicReference<>();
-    Thread runB =
-        new Thread(
-            () -> {
-              try {
-                codeB.set(BaselineWorker.run(readJob(jobB)));
-              } catch (Exception e) {
-                codeB.set(-1);
-              }
-            },
-            "protocol-test-stale-watchdog-b");
-    runB.start();
+      // Start run B in the same process, while A's fired watchdog is in its 4 s grace sleep.
+      BaselineWorkerTestSupport.Workspace wsB =
+          BaselineWorkerTestSupport.build(temp.resolve("b"), 6, 60, 8, 1);
+      createOutDir(temp.resolve("b"), "outB");
+      BaselineWorker.setAnchorsForTest(wsB.manifestPath(), wsB.repoDir());
+      Path jobB = writeJob(temp.resolve("b"), wsB, "outB", ignored -> {});
+      AtomicReference<Integer> codeB = new AtomicReference<>();
+      Thread runB =
+          new Thread(
+              () -> {
+                try {
+                  codeB.set(BaselineWorker.run(readJob(jobB)));
+                } catch (Exception e) {
+                  codeB.set(-1);
+                }
+              },
+              "protocol-test-stale-watchdog-b");
+      runB.start();
 
-    runB.join(30_000);
-    assertFalse(runB.isAlive(), "run B finished");
-    assertEquals(
-        BaselineWorker.EXIT_OK,
-        codeB.get(),
-        "the later run must not be timed out, report-refused or exited by a stale watchdog");
-    JsonNode workerB = readReport(temp.resolve("b/outB")).path("worker");
-    assertEquals("ok", workerB.path("status").asString(null));
-    assertTrue(workerB.path("failure_reason").isNull());
-    assertEquals(
-        wsB.manifestSha256(),
-        workerB.path("identity").path("manifest_sha256").asString(null),
-        "B's report is B's own, not a stale timeout report written for run A");
-    assertEquals(0, hookFires.get(), "no backstop exit may fire for a healthy later run");
-
-    // Release A only now: its resumed request is guaranteed to run after B's report is on disk.
-    holdA.countDown();
+      runB.join(30_000);
+      assertFalse(runB.isAlive(), "run B finished");
+      assertEquals(
+          BaselineWorker.EXIT_OK,
+          codeB.get(),
+          "the later run must not be timed out, report-refused or exited by a stale watchdog");
+      JsonNode workerB = readReport(temp.resolve("b/outB")).path("worker");
+      assertEquals("ok", workerB.path("status").asString(null));
+      assertTrue(workerB.path("failure_reason").isNull());
+      assertEquals(
+          wsB.manifestSha256(),
+          workerB.path("identity").path("manifest_sha256").asString(null),
+          "B's report is B's own, not a stale timeout report written for run A");
+      assertEquals(0, hookFires.get(), "no backstop exit may fire for a healthy later run");
+    } finally {
+      // Release the hold on every path — including a failed check above — so the held run
+      // never stays blocked on the latch for the rest of the test JVM. On the success path
+      // this is what guarantees A's resumed request runs after B's report is on disk.
+      holdA.countDown();
+    }
 
     // Run A finishes on its own once released; it must not hang. Run A's own outcome is an
     // in-process artifact, not a protocol result: when its held request resumes, run B has

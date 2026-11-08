@@ -1262,6 +1262,12 @@ public final class BaselineWorker {
     exitHook = System::exit;
     watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
     requestDelayMs = 0L;
+    CountDownLatch hold = requestHold;
     requestHold = null;
+    // Release an outstanding hold (a test that failed while its run was still held) so the
+    // held thread is never left blocked on the latch for the rest of the test JVM.
+    if (hold != null) {
+      hold.countDown();
+    }
   }
 }

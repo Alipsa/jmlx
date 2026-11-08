@@ -1011,13 +1011,15 @@ requests are excluded by construction, with the exclusion recorded). The
      'd' numbers, recorded on the pre-round-2 head, stay valid):
      (a) The stale-watchdog two-run test relied on a sleep margin (run A
      wedged in a 10 s request delay; on a slow runner A's resumed
-     request woke after B's report write, and A's timeout report —
-     targeted at the process-static out_dir, i.e. B's directory —
-     poisoned B's cell). A's wedge is now a one-shot `requestHold`
-     latch consumed by the held run's first request: the test orders
-     everything by bounded polls (worker-ready, latch consumption,
-     watchdog fire) and releases A only after B's report is on disk, so
-     no part of A's post-loop failure handling can race B's write.
+     request woke before B wrote its report, and A's failed report from
+     its error handler — targeted at the process-static out_dir, i.e.
+     B's directory — poisoned B's cell, so B's own report write was
+     refused and B returned failed). A's wedge is now a one-shot
+     `requestHold` latch consumed by the held run's first request: the
+     test orders everything by bounded polls (worker-ready, latch
+     consumption, watchdog fire) and releases A only after B's report
+     is on disk, so no part of A's post-release failure handling can
+     race B's write.
      Two read seams (`requestHoldConsumedForTest`, `hasFiredForTest`)
      make the ordering observable without timing assumptions.
      (b) `resetRunState()` ran before the run-token increment, outside
@@ -1041,6 +1043,21 @@ requests are excluded by construction, with the exclusion recorded). The
      wall can exceed the budget by at most that limit) is the
      documented behavior and stays as designed; the launcher javadoc
      now says so explicitly.
+  18. Review round 3 (2026-11-08, PR #89): two test-only findings — no
+     contract, schema or measurement-path change, and no session
+     re-run is required:
+     (a) Item 17(a) mischaracterized the round-2 race twice (corrected
+     in place): on a slow runner A's resumed request woke before B
+     wrote its report, and A's poisoned report was a failed report
+     from its error handler (its resumed request throws on the closed
+     scope, so the post-loop timeout path is never reached), not a
+     timeout report — the failed report landed in B's directory,
+     B's own write was refused, and B returned failed.
+     (b) A failed check before the latch release left run A blocked on
+     the latch for the rest of the test JVM: the cross-run test now
+     releases the hold in a try/finally (and run A is a daemon
+     thread), and `resetTestSeams` releases any outstanding latch, so
+     a failed check can no longer strand a held thread between tests.
 
 ### 13.5 Manifest re-pin flow (frozen)
 
@@ -1272,10 +1289,24 @@ attribution); all recorded in §13.4 item 17. The cross-run test now
 holds run A on a one-shot `requestHold` latch and observes every
 ordering step (worker-ready, latch consumption, watchdog fire) with
 bounded polls instead of fixed sleeps; A is released only after run
-B's report is on disk, so A's post-loop failure handling can never
+B's report is on disk, so A's post-release failure handling can never
 race B's report write. `resetRunState()` moved inside the `REPORT_LOCK`
 critical section after the run-token increment, so a stale watchdog
 can no longer observe the fresh state under the old token. No
 contract, schema, golden or measurement-path change: the §14.6
 session 'd' numbers stay valid and no opt-in session re-run was
 needed.
+
+### 14.9 Review round 3 (2026-11-08, PR #89): race-description correction and latch release on failure
+
+Two test-only findings, recorded in §13.4 item 18. Item 17(a)'s
+description of the round-2 race was corrected in place: A's resumed
+request woke before B wrote its report, and A's poisoned report was a
+failed report from the error handler (the resumed request throws on
+the closed scope, so the post-loop timeout path is never reached),
+not a timeout report. The cross-run test now releases the hold latch
+in a try/finally, run A is a daemon thread, and `resetTestSeams`
+releases any outstanding latch, so a failed check can no longer leave
+a held thread blocked for the rest of the test JVM. No contract,
+schema or measurement-path change; the §14.6 session 'd' numbers
+stay valid.

@@ -55,6 +55,32 @@ final class BaselineAdapters {
       double fullGenerationS,
       FinishReason finishReason) {}
 
+  /**
+   * Observes the adapter's phase-local work windows (plan section 5.1; findings section 15). Each
+   * window names the phase and the 1-based position of the token the phase acts on (0 for the
+   * prefill phases and the stock whole-request window) and runs that phase's work between the
+   * observer's before/after hooks. The windows never change the work, the scope lifetimes or the
+   * frozen timer boundaries: an observing run produces the identical tokens and the same frozen
+   * timings as a {@link #NONE} run.
+   */
+  @FunctionalInterface
+  interface PhaseObserver {
+    /** Runs one phase's work; implementations measure only around {@code work.run()}. */
+    void window(String phase, int position, ModelWork work);
+
+    /**
+     * The work inside one phase window. Unchecked exceptions (for example {@code MLXException})
+     * propagate to the adapter.
+     */
+    @FunctionalInterface
+    interface ModelWork {
+      void run();
+    }
+
+    /** The no-op observer the adapters use when no diagnostics run. */
+    PhaseObserver NONE = (phase, position, work) -> work.run();
+  }
+
   /** One fresh FULL-retention cache per decoder layer, owned by {@code scope}. */
   static List<KVCache> freshCaches(DecoderModel model, MLXScope scope) {
     List<KVCache> caches = new ArrayList<>();
@@ -76,6 +102,11 @@ final class BaselineAdapters {
    */
   static ControlledResult runControlled(
       DecoderModel model, MLXScope owner, int[] prompt, int emitted) {
+    return runControlled(model, owner, prompt, emitted, PhaseObserver.NONE);
+  }
+
+  static ControlledResult runControlled(
+      DecoderModel model, MLXScope owner, int[] prompt, int emitted, PhaseObserver observer) {
     if (emitted < 1) {
       throw new IllegalArgumentException("emitted must be >= 1");
     }
@@ -85,16 +116,24 @@ final class BaselineAdapters {
       // t0 is also the event-time origin, as in the pinned Python loop.
       long t0 = System.nanoTime();
       int promptLength = prompt.length;
-      int token1;
       double prefillS;
+      int token1;
       try (MLXScope activation = request.newChild()) {
-        MLXArray ids = MLX.array(activation, prompt, new int[] {1, promptLength});
-        MLXArray logits = model.stepLogits(ids, caches, new int[] {promptLength}, null);
-        evalStep(logits, caches);
+        final MLXArray[] logitsRef = new MLXArray[1];
+        final int[] token1Ref = new int[1];
+        observer.window(
+            "prefill-construction",
+            0,
+            () -> {
+              MLXArray ids = MLX.array(activation, prompt, new int[] {1, promptLength});
+              logitsRef[0] = model.stepLogits(ids, caches, new int[] {promptLength}, null);
+            });
+        observer.window("prefill-sync", 0, () -> evalStep(logitsRef[0], caches));
         prefillS = (System.nanoTime() - t0) / NANOS_PER_SECOND;
         // Token 1's event time is taken after its argmax, like every later token's; the
         // prefill timer above already stopped at the evaluated logits.
-        token1 = argmax(logits);
+        observer.window("prefill-selection", 0, () -> token1Ref[0] = argmax(logitsRef[0]));
+        token1 = token1Ref[0];
       }
       double[] eventS = new double[emitted];
       eventS[0] = (System.nanoTime() - t0) / NANOS_PER_SECOND;
@@ -102,20 +141,29 @@ final class BaselineAdapters {
       tokens.add(token1);
       List<Step> steps = new ArrayList<>(emitted - 1);
       for (int k = 0; k < emitted - 1; k++) {
+        int position = promptLength + k + 1;
         long stepStart = System.nanoTime();
         double stepS;
         int next;
+        final int lastToken = tokens.get(tokens.size() - 1);
         try (MLXScope activation = request.newChild()) {
-          MLXArray ids =
-              MLX.array(activation, new int[] {tokens.get(tokens.size() - 1)}, new int[] {1, 1});
-          MLXArray logits = model.decode(ids, caches, null, null);
-          evalStep(logits, caches);
+          final MLXArray[] logitsRef = new MLXArray[1];
+          final int[] nextRef = new int[1];
+          observer.window(
+              "construction",
+              position,
+              () -> {
+                MLXArray ids = MLX.array(activation, new int[] {lastToken}, new int[] {1, 1});
+                logitsRef[0] = model.decode(ids, caches, null, null);
+              });
+          observer.window("sync", position, () -> evalStep(logitsRef[0], caches));
           // The per-step timer stops at the evaluated logits, before the argmax (frozen
           // section 13.3 boundary); the argmax host work runs outside the measured interval.
           stepS = (System.nanoTime() - stepStart) / NANOS_PER_SECOND;
-          next = argmax(logits);
+          observer.window("selection", position, () -> nextRef[0] = argmax(logitsRef[0]));
+          next = nextRef[0];
         }
-        steps.add(new Step(promptLength + k + 1, stepS, null, null));
+        steps.add(new Step(position, stepS, null, null));
         tokens.add(next);
         eventS[k + 1] = (System.nanoTime() - t0) / NANOS_PER_SECOND;
       }
@@ -135,6 +183,11 @@ final class BaselineAdapters {
    */
   static FixedContinuationResult runFixedContinuation(
       DecoderModel model, MLXScope owner, int[] prompt, int[] fedIds) {
+    return runFixedContinuation(model, owner, prompt, fedIds, PhaseObserver.NONE);
+  }
+
+  static FixedContinuationResult runFixedContinuation(
+      DecoderModel model, MLXScope owner, int[] prompt, int[] fedIds, PhaseObserver observer) {
     try (MLXScope request = owner.newChild()) {
       List<KVCache> caches = freshCaches(model, request);
       // The prompt caches are created before the timer starts (frozen section 13.3 boundary).
@@ -142,29 +195,52 @@ final class BaselineAdapters {
       int promptLength = prompt.length;
       double prefillS;
       try (MLXScope activation = request.newChild()) {
-        MLXArray ids = MLX.array(activation, prompt, new int[] {1, promptLength});
-        MLXArray logits = model.stepLogits(ids, caches, new int[] {promptLength}, null);
-        evalStep(logits, caches);
+        final MLXArray[] logitsRef = new MLXArray[1];
+        observer.window(
+            "prefill-construction",
+            0,
+            () -> {
+              MLXArray ids = MLX.array(activation, prompt, new int[] {1, promptLength});
+              logitsRef[0] = model.stepLogits(ids, caches, new int[] {promptLength}, null);
+            });
+        observer.window("prefill-sync", 0, () -> evalStep(logitsRef[0], caches));
       }
       prefillS = (System.nanoTime() - t0) / NANOS_PER_SECOND;
       List<Step> steps = new ArrayList<>(fedIds.length);
       for (int k = 0; k < fedIds.length; k++) {
+        int position = promptLength + k + 1;
         long stepStart = System.nanoTime();
         double stepS;
         int argmaxId;
         double top2Margin;
+        final int fedId = fedIds[k];
         try (MLXScope activation = request.newChild()) {
-          MLXArray ids = MLX.array(activation, new int[] {fedIds[k]}, new int[] {1, 1});
-          MLXArray logits = model.decode(ids, caches, null, null);
-          evalStep(logits, caches);
+          final MLXArray[] logitsRef = new MLXArray[1];
+          final int[] argmaxIdRef = new int[1];
+          final double[] marginRef = new double[1];
+          observer.window(
+              "construction",
+              position,
+              () -> {
+                MLXArray ids = MLX.array(activation, new int[] {fedId}, new int[] {1, 1});
+                logitsRef[0] = model.decode(ids, caches, null, null);
+              });
+          observer.window("sync", position, () -> evalStep(logitsRef[0], caches));
           // The step timer stops at the evaluated logits, before the argmax and the
           // full-vocabulary readback and sort (the cross-adapter check), exactly as in the
           // pinned Python loop.
           stepS = (System.nanoTime() - stepStart) / NANOS_PER_SECOND;
-          argmaxId = argmax(logits);
-          top2Margin = top2Margin(logits);
+          observer.window(
+              "selection",
+              position,
+              () -> {
+                argmaxIdRef[0] = argmax(logitsRef[0]);
+                marginRef[0] = top2Margin(logitsRef[0]);
+              });
+          argmaxId = argmaxIdRef[0];
+          top2Margin = marginRef[0];
         }
-        steps.add(new Step(promptLength + k + 1, stepS, argmaxId, top2Margin));
+        steps.add(new Step(position, stepS, argmaxId, top2Margin));
       }
       // Wall time over the step region only (prefill excluded, one definition on both paths).
       return new FixedContinuationResult(
@@ -186,6 +262,16 @@ final class BaselineAdapters {
       int[] prompt,
       int maxTokens,
       Set<Integer> eosTokenIds) {
+    return runStock(model, tokenizer, prompt, maxTokens, eosTokenIds, PhaseObserver.NONE);
+  }
+
+  static StockResult runStock(
+      DecoderModel model,
+      HfTokenizer tokenizer,
+      int[] prompt,
+      int maxTokens,
+      Set<Integer> eosTokenIds,
+      PhaseObserver observer) {
     GenerationRequest request =
         GenerationRequest.pretokenized(
             tokenizer,
@@ -195,15 +281,22 @@ final class BaselineAdapters {
     long t0 = System.nanoTime();
     List<Integer> tokens = new ArrayList<>();
     List<Double> eventRel = new ArrayList<>();
-    GenerationResult result =
-        model.generate(
-            request,
-            event -> {
-              if (event.tokenId() != null) {
-                eventRel.add((System.nanoTime() - t0) / NANOS_PER_SECOND);
-                tokens.add(event.tokenId());
-              }
-            });
+    final GenerationResult[] resultRef = new GenerationResult[1];
+    // The stock path has no phase split (a documented limitation: plan section 5.1 is
+    // controlled-first) — one whole-request window around the public generate call.
+    observer.window(
+        "request",
+        0,
+        () ->
+            resultRef[0] =
+                model.generate(
+                    request,
+                    event -> {
+                      if (event.tokenId() != null) {
+                        eventRel.add((System.nanoTime() - t0) / NANOS_PER_SECOND);
+                        tokens.add(event.tokenId());
+                      }
+                    }));
     // No drain: the Java loop evaluates every step at its selection boundary and queues no
     // lookahead forward, so all generated work is evaluated by the time generate returns.
     double[] eventS = new double[eventRel.size()];
@@ -215,7 +308,7 @@ final class BaselineAdapters {
         eventS,
         eventS.length > 0 ? eventS[0] : 0.0,
         (System.nanoTime() - t0) / NANOS_PER_SECOND,
-        result.finishReason());
+        resultRef[0].finishReason());
   }
 
   /**

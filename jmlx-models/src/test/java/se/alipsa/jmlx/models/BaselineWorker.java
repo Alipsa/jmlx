@@ -23,12 +23,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
+import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.nn.BindingCounterAgent;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -101,6 +104,7 @@ public final class BaselineWorker {
       String caseName,
       int promptLength,
       String mode,
+      String instrumentation,
       Map<String, Integer> requests,
       int timeoutS,
       String precisionEnv,
@@ -127,6 +131,7 @@ public final class BaselineWorker {
   private static String caseName;
   private static Integer promptLength;
   private static String mode;
+  private static String instrumentation;
   private static Map<String, Object> identity = Map.of();
   private static List<Integer> stopTokenIds = List.of();
   private static Double loadS;
@@ -137,6 +142,9 @@ public final class BaselineWorker {
   private static boolean reportRefused;
   private static Path outDir;
   private static MLXScope modelScope;
+
+  /** Peak RSS (bytes) sampled after every request of this run (findings section 15). */
+  private static long rssPeakBytes;
 
   private static Anchors anchors;
   private static IntConsumer exitHook = System::exit;
@@ -218,6 +226,7 @@ public final class BaselineWorker {
     caseName = null;
     promptLength = null;
     mode = null;
+    instrumentation = null;
     identity = Map.of();
     stopTokenIds = List.of();
     loadS = null;
@@ -228,6 +237,7 @@ public final class BaselineWorker {
     reportRefused = false;
     outDir = null;
     modelScope = null;
+    rssPeakBytes = 0L;
   }
 
   private static int execute(JsonNode job, long token) throws Exception {
@@ -279,39 +289,60 @@ public final class BaselineWorker {
             + v.precisionEnv()
             + "'; the launcher must set the worker process environment");
     stopTokenIds = List.copyOf(v.stopTokenIds());
-    identity =
+    instrumentation = v.instrumentation();
+    boolean instrumented = !"none".equals(instrumentation);
+    if (instrumented) {
+      // Diagnostics gate (plan section 5.1): an instrumented worker must fail loudly when its
+      // instrumentation is not actually in place, never count or time silently.
+      if ("binding-count".equals(instrumentation)) {
+        require(
+            BindingCounterAgent.isInstalled(),
+            "binding-count instrumentation requires the jmlx-core binding-agent "
+                + "-javaagent on the worker JVM");
+        String agentFailure = BindingCounterAgent.failureReason();
+        require(
+            agentFailure == null,
+            "binding-count agent transform failed during premain: " + agentFailure);
+      } else {
+        require(
+            ManagementFactory.getThreadMXBean().isThreadCpuTimeSupported(),
+            "tracing instrumentation needs the thread CPU time API");
+      }
+    }
+    Map<String, Object> identityMap = new LinkedHashMap<>();
+    identityMap.put("code", repoIdentity(v.repoDir()));
+    identityMap.put("manifest_sha256", v.manifestSha());
+    identityMap.put("run_policy", v.runPolicy());
+    identityMap.put("precision_env", "MLX_ENABLE_TF32=" + v.precisionEnv());
+    identityMap.put(
+        "java",
         Map.of(
-            "code",
-            repoIdentity(v.repoDir()),
-            "manifest_sha256",
-            v.manifestSha(),
-            "run_policy",
-            v.runPolicy(),
-            "precision_env",
-            "MLX_ENABLE_TF32=" + v.precisionEnv(),
-            "java",
-            Map.of(
-                "version",
-                System.getProperty("java.version", ""),
-                "vendor",
-                System.getProperty("java.vendor", ""),
-                "flags",
-                String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments())),
-            "device",
-            Map.of(
-                "device_name", hostString("hw.model", ""),
-                "memory_size_bytes", hostLong("hw.memsize", 0L),
-                "max_recommended_working_set_bytes", 0L),
-            "wired_limit_policy",
-            v.wiredLimitPolicy(),
-            "cache_regime",
-            "reference-pair".equals(v.mode())
-                ? "observed"
-                : String.valueOf(v.runPolicy().get("cache_regime")),
-            "io_affected",
-            v.ioAffected(),
-            "instrumented",
-            false);
+            "version",
+            System.getProperty("java.version", ""),
+            "vendor",
+            System.getProperty("java.vendor", ""),
+            "flags",
+            String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments())));
+    identityMap.put(
+        "device",
+        Map.of(
+            "device_name", hostString("hw.model", ""),
+            "memory_size_bytes", hostLong("hw.memsize", 0L),
+            "max_recommended_working_set_bytes", 0L));
+    identityMap.put("wired_limit_policy", v.wiredLimitPolicy());
+    identityMap.put(
+        "cache_regime",
+        "reference-pair".equals(v.mode())
+            ? "observed"
+            : String.valueOf(v.runPolicy().get("cache_regime")));
+    identityMap.put("io_affected", v.ioAffected());
+    identityMap.put("instrumented", instrumented);
+    if (instrumented) {
+      // Per-worker host record (findings section 15): the diagnostic processes capture their own
+      // host state; the frozen Python workers never carry this block.
+      identityMap.put("host", hostIdentity(v.outDir()));
+    }
+    identity = identityMap;
     notes.add(
         "java identity.device carries host facts (sysctl); the Java worker has no MLX"
             + " device-info facade, so max_recommended_working_set_bytes is 0");
@@ -508,10 +539,26 @@ public final class BaselineWorker {
     record.put("kind", kind);
     record.put("prime_s", primeS);
     record.put("prime_excluded", true);
+    boolean instrumented = !"none".equals(v.instrumentation());
+    boolean tracing = "tracing".equals(v.instrumentation());
+    List<Map<String, Object>> bindingPhases = new ArrayList<>();
+    List<Map<String, Object>> traceWindows = new ArrayList<>();
+    BaselineAdapters.PhaseObserver observer =
+        "none".equals(v.instrumentation())
+            ? BaselineAdapters.PhaseObserver.NONE
+            : (phase, position, work) ->
+                windowObserver(v, phase, position, work, bindingPhases, traceWindows);
+    double[] span;
     if ("fixed-continuation".equals(v.mode())) {
+      long wallStart = System.nanoTime();
+      long cpuStart = tracing ? threadCpuNanos() : 0L;
+      if (instrumented) {
+        MLXMemory.resetPeak();
+      }
       BaselineAdapters.FixedContinuationResult result =
           BaselineAdapters.runFixedContinuation(
-              model, modelScope(), promptArray(v.prompt()), fedArray(v.fedIds()));
+              model, modelScope(), promptArray(v.prompt()), fedArray(v.fedIds()), observer);
+      span = requestBookkeeping(tracing, instrumented, wallStart, cpuStart);
       List<Map<String, Object>> steps = new ArrayList<>();
       for (BaselineAdapters.Step step : result.steps()) {
         Map<String, Object> s = new LinkedHashMap<>();
@@ -534,13 +581,16 @@ public final class BaselineWorker {
       record.put("emitted", 0);
       record.put("finish_reason", "fixed-continuation");
       record.put("unused_lookahead_forwards", 0);
-      record.put("memory", null);
-      record.put("io_affected", v.ioAffected());
-      return record;
-    }
-    if ("controlled".equals(v.adapter())) {
+    } else if ("controlled".equals(v.adapter())) {
+      long wallStart = System.nanoTime();
+      long cpuStart = tracing ? threadCpuNanos() : 0L;
+      if (instrumented) {
+        MLXMemory.resetPeak();
+      }
       BaselineAdapters.ControlledResult result =
-          BaselineAdapters.runControlled(model, modelScope(), promptArray(v.prompt()), emitted);
+          BaselineAdapters.runControlled(
+              model, modelScope(), promptArray(v.prompt()), emitted, observer);
+      span = requestBookkeeping(tracing, instrumented, wallStart, cpuStart);
       List<Map<String, Object>> steps = new ArrayList<>();
       for (BaselineAdapters.Step step : result.steps()) {
         Map<String, Object> s = new LinkedHashMap<>();
@@ -561,31 +611,144 @@ public final class BaselineWorker {
       record.put("emitted", n);
       record.put("finish_reason", "controlled-max-tokens");
       record.put("unused_lookahead_forwards", 0);
-      record.put("memory", null);
-      record.put("io_affected", v.ioAffected());
-      return record;
+    } else {
+      long wallStart = System.nanoTime();
+      long cpuStart = tracing ? threadCpuNanos() : 0L;
+      if (instrumented) {
+        MLXMemory.resetPeak();
+      }
+      BaselineAdapters.StockResult result =
+          BaselineAdapters.runStock(
+              model,
+              tokenizer,
+              promptArray(v.prompt()),
+              emitted,
+              new TreeSet<>(v.stopTokenIds()),
+              observer);
+      span = requestBookkeeping(tracing, instrumented, wallStart, cpuStart);
+      int n = result.tokens().size();
+      Double streaming = n >= 2 ? (n - 1) / (result.eventS()[n - 1] - result.eventS()[0]) : null;
+      record.put("ttft_s", n > 0 ? result.ttftS() : null);
+      record.put("prefill_s", null);
+      record.put("steps", null);
+      record.put("event_s", result.eventS());
+      record.put("tokens", result.tokens());
+      record.put("streaming_decode_tps", streaming);
+      record.put("step_region_s", null);
+      record.put("full_generation_s", result.fullGenerationS());
+      record.put("emitted", n);
+      record.put("finish_reason", finishReasonName(result.finishReason()));
+      // The synchronous Java loop evaluates every step at its selection boundary; the one
+      // queued lookahead forward is a property of the pinned Python stock loop, not this one.
+      record.put("unused_lookahead_forwards", 0);
     }
-    BaselineAdapters.StockResult result =
-        BaselineAdapters.runStock(
-            model, tokenizer, promptArray(v.prompt()), emitted, new TreeSet<>(v.stopTokenIds()));
-    int n = result.tokens().size();
-    Double streaming = n >= 2 ? (n - 1) / (result.eventS()[n - 1] - result.eventS()[0]) : null;
-    record.put("ttft_s", n > 0 ? result.ttftS() : null);
-    record.put("prefill_s", null);
-    record.put("steps", null);
-    record.put("event_s", result.eventS());
-    record.put("tokens", result.tokens());
-    record.put("streaming_decode_tps", streaming);
-    record.put("step_region_s", null);
-    record.put("full_generation_s", result.fullGenerationS());
-    record.put("emitted", n);
-    record.put("finish_reason", finishReasonName(result.finishReason()));
-    // The synchronous Java loop evaluates every step at its selection boundary; the one
-    // queued lookahead forward is a property of the pinned Python stock loop, not this one.
-    record.put("unused_lookahead_forwards", 0);
-    record.put("memory", null);
+    appendDiagnostics(record, v, tracing, bindingPhases, traceWindows, span[0], span[1]);
+    record.put("memory", instrumented ? memoryBlock() : null);
     record.put("io_affected", v.ioAffected());
     return record;
+  }
+
+  /**
+   * Post-request bookkeeping for the WP2 diagnostics: the RSS sample (instrumented runs) and the
+   * request span — wall time always, caller-thread CPU in tracing mode only; uninstrumented workers
+   * pay for the two nanoTime reads and nothing else.
+   */
+  private static double[] requestBookkeeping(
+      boolean tracing, boolean instrumented, long wallStart, long cpuStart) {
+    if (instrumented) {
+      rssPeakBytes = Math.max(rssPeakBytes, currentRssBytes());
+    }
+    return new double[] {
+      (System.nanoTime() - wallStart) / 1_000_000_000d,
+      tracing ? (threadCpuNanos() - cpuStart) / 1_000_000_000d : 0.0
+    };
+  }
+
+  /**
+   * The per-request diagnostic window hook. binding-count mode counts the window's attempted
+   * downcalls through the agent (a mid-run agent failure fails the run, plan section 5.1); tracing
+   * mode measures wall and caller-thread CPU around the window.
+   */
+  private static void windowObserver(
+      Validated v,
+      String phase,
+      int position,
+      BaselineAdapters.PhaseObserver.ModelWork work,
+      List<Map<String, Object>> bindingPhases,
+      List<Map<String, Object>> traceWindows) {
+    if ("binding-count".equals(v.instrumentation())) {
+      try {
+        BindingCounterAgent.start();
+        work.run();
+        Map<String, Long> counts = BindingCounterAgent.stop();
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("phase", phase);
+        entry.put("position", position);
+        entry.put("counts", counts);
+        bindingPhases.add(entry);
+      } catch (IllegalStateException e) {
+        throw new WorkerError(
+            "binding-count agent failed in the '" + phase + "' window: " + e.getMessage());
+      }
+    } else {
+      long wallStart = System.nanoTime();
+      long cpuStart = threadCpuNanos();
+      work.run();
+      double wallS = (System.nanoTime() - wallStart) / 1_000_000_000d;
+      double cpuS = (threadCpuNanos() - cpuStart) / 1_000_000_000d;
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("phase", phase);
+      entry.put("position", position);
+      entry.put("wall_s", wallS);
+      entry.put("cpu_s", cpuS);
+      traceWindows.add(entry);
+    }
+  }
+
+  /**
+   * Appends the WP2 diagnostic fields to a request record (findings section 15): the binding_counts
+   * block in binding-count mode, or the tracing block with its unassigned residual in tracing mode;
+   * uninstrumented workers carry neither. The binding-count total over every phase window must be
+   * non-empty — an empty count means the agent silently stopped counting, which fails the run (plan
+   * section 5.1).
+   */
+  private static void appendDiagnostics(
+      Map<String, Object> record,
+      Validated v,
+      boolean tracing,
+      List<Map<String, Object>> bindingPhases,
+      List<Map<String, Object>> traceWindows,
+      double spanWallS,
+      double spanCpuS) {
+    if ("binding-count".equals(v.instrumentation())) {
+      Map<String, Long> total = new TreeMap<>();
+      for (Map<String, Object> phase : bindingPhases) {
+        for (Map.Entry<String, Long> entry : ((Map<String, Long>) phase.get("counts")).entrySet()) {
+          total.merge(entry.getKey(), entry.getValue(), Long::sum);
+        }
+      }
+      require(
+          !total.isEmpty(),
+          "binding counts are unexpectedly empty; the counting agent is not counting");
+      Map<String, Object> block = new LinkedHashMap<>();
+      block.put("phases", bindingPhases);
+      block.put("total", total);
+      record.put("binding_counts", block);
+    } else if (tracing) {
+      double wallSum = 0.0;
+      double cpuSum = 0.0;
+      for (Map<String, Object> window : traceWindows) {
+        wallSum += (double) window.get("wall_s");
+        cpuSum += (double) window.get("cpu_s");
+      }
+      Map<String, Object> block = new LinkedHashMap<>();
+      block.put("request_wall_s", spanWallS);
+      block.put("request_cpu_s", spanCpuS);
+      block.put("windows", traceWindows);
+      block.put("residual_wall_s", spanWallS - wallSum);
+      block.put("residual_cpu_s", spanCpuS - cpuSum);
+      record.put("tracing", block);
+    }
   }
 
   private static int[] promptArray(List<Integer> ids) {
@@ -683,6 +846,13 @@ public final class BaselineWorker {
             || "fixed-continuation".equals(mode)
             || "reference-pair".equals(mode),
         "mode must be headline, fixed-continuation or reference-pair");
+    // Absent means none: headline job files stay byte-identical to the WP1 shape.
+    String instrumentation = job.path("instrumentation").asString("none");
+    require(
+        "none".equals(instrumentation)
+            || "binding-count".equals(instrumentation)
+            || "tracing".equals(instrumentation),
+        "instrumentation must be none, binding-count or tracing");
     String caseName = job.path("case").asString(null);
     require(caseName != null && !caseName.isEmpty(), "case is required");
     Integer promptLength = intOrNull(job.path("prompt_length"));
@@ -899,6 +1069,7 @@ public final class BaselineWorker {
         caseName,
         promptLength,
         mode,
+        instrumentation,
         requests,
         timeoutS,
         precisionEnv,
@@ -1027,11 +1198,17 @@ public final class BaselineWorker {
       worker.put("case", caseName);
       worker.put("prompt_length", promptLength);
       worker.put("mode", mode);
+      worker.put("instrumentation", instrumentation == null ? "none" : instrumentation);
       worker.put("status", status);
       worker.put("failure_reason", failureReason);
       worker.put("utc_start", utcStart);
       worker.put("utc_end", utcEnd);
       worker.put("identity", identity);
+      if ("binding-count".equals(instrumentation)) {
+        // The instrumented downcalls' JVM descriptors (agent-recorded at class-load time); the
+        // FFM transition estimate groups counts by these signature classes (findings section 15).
+        worker.put("binding_signatures", BindingCounterAgent.signatures());
+      }
       worker.put("stop_token_ids", stopTokenIds);
       worker.put("load_s", loadS);
       worker.put("load_state", loadState);
@@ -1172,6 +1349,98 @@ public final class BaselineWorker {
     } catch (NumberFormatException e) {
       return fallback;
     }
+  }
+
+  /**
+   * The per-worker host record for diagnostic (instrumented) runs (findings section 15), mirroring
+   * the launcher's session host block: hardware model, OS, disk free, load average, vm_stat and the
+   * top processes by CPU.
+   */
+  private static Map<String, Object> hostIdentity(Path probe) {
+    Map<String, Object> host = new LinkedHashMap<>();
+    host.put("hw_model", hostString("hw.model", ""));
+    host.put("os", commandOutput("uname", "-s"));
+    host.put("os_build", commandOutput("uname", "-r"));
+    host.put("disk_free_bytes", diskFreeBytes(probe));
+    host.put(
+        "system_load_average", ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage());
+    host.put("vm_stat", commandOutput("vm_stat"));
+    host.put("top_processes", topProcesses());
+    return host;
+  }
+
+  private static List<String> topProcesses() {
+    String out = commandOutput("ps", "-Ao", "pid,pcpu,rss,comm", "-r");
+    return out.isEmpty() ? List.of() : out.lines().limit(16).toList();
+  }
+
+  private static long diskFreeBytes(Path probe) {
+    String out = commandOutput("df", "-Pk", probe.toString());
+    String[] lines = out.strip().split("\n");
+    if (lines.length < 2) {
+      return 0L;
+    }
+    // POSIX df -Pk: Filesystem 1024-blocks Used Available Capacity Mounted-on
+    String[] fields = lines[1].trim().split("\\s+");
+    if (fields.length < 5) {
+      return 0L;
+    }
+    try {
+      return Long.parseLong(fields[fields.length - 2]) * 1024L;
+    } catch (NumberFormatException e) {
+      return 0L;
+    }
+  }
+
+  /** The current process RSS in bytes (macOS ps reports kilobytes); 0 when unreadable. */
+  private static long currentRssBytes() {
+    String out =
+        commandOutput("ps", "-o", "rss=", "-p", Long.toString(ProcessHandle.current().pid()));
+    try {
+      return out.isEmpty() ? 0L : Long.parseLong(out.strip()) * 1024L;
+    } catch (NumberFormatException e) {
+      return 0L;
+    }
+  }
+
+  /**
+   * One-shot host-observation command runner: returns the stripped output, or "" when the command
+   * fails or is missing, so a host sample degrades to a missing value instead of failing the run.
+   */
+  private static String commandOutput(String... arguments) {
+    try {
+      Process process = new ProcessBuilder(arguments).redirectErrorStream(true).start();
+      String out =
+          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+      return process.waitFor() == 0 ? out : "";
+    } catch (Exception e) {
+      return "";
+    }
+  }
+
+  /** The caller thread's CPU time in nanoseconds; an unsupported (negative) value fails the run. */
+  private static long threadCpuNanos() {
+    long value =
+        ManagementFactory.getThreadMXBean().getThreadCpuTime(Thread.currentThread().threadId());
+    if (value < 0) {
+      throw new WorkerError("thread CPU time is unavailable; tracing instrumentation cannot run");
+    }
+    return value;
+  }
+
+  /**
+   * The per-request memory block (findings section 10 shape), sampled after the request.
+   * peak_active_bytes covers the request itself: the process-wide peak counter is reset before each
+   * request, so the model load's allocations are not in it. rss_peak_bytes is the peak RSS sampled
+   * after every request of this run — a lower bound on the true peak.
+   */
+  private static Map<String, Object> memoryBlock() {
+    Map<String, Object> memory = new LinkedHashMap<>();
+    memory.put("active_bytes", MLXMemory.activeBytes());
+    memory.put("peak_active_bytes", MLXMemory.peakBytes());
+    memory.put("cached_bytes", MLXMemory.cachedBytes());
+    memory.put("rss_peak_bytes", rssPeakBytes);
+    return memory;
   }
 
   static String sha256File(Path path) {

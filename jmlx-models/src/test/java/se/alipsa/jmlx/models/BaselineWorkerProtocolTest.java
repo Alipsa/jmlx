@@ -170,6 +170,7 @@ class BaselineWorkerProtocolTest {
     assertEquals(BaselineWorkerTestSupport.CASE_NAME, worker.path("case").asString(null));
     assertEquals(32, worker.path("prompt_length").asInt());
     assertEquals("headline", worker.path("mode").asString(null));
+    assertEquals("none", worker.path("instrumentation").asString(null));
     assertEquals("ok", worker.path("status").asString(null));
     assertTrue(worker.path("failure_reason").isNull());
     assertFalse(worker.path("utc_start").asString("").isEmpty());
@@ -305,6 +306,81 @@ class BaselineWorkerProtocolTest {
       assertEquals(0.0, steps.get(k).path("top2_margin").asDouble(), 0.0);
       assertTrue(steps.get(k).path("s").asDouble() > 0.0);
     }
+  }
+
+  @Test
+  void bindingCountFailsWhenAgentNotInstalled(@TempDir Path temp) throws Exception {
+    // The in-process run has no -javaagent, so the binding-count gate must fail the run with a
+    // failed report, never silently stop counting (plan section 5.1).
+    BaselineWorkerTestSupport.Workspace ws = setup(temp, 300, 60, 8, 1);
+    createOutDir(temp, "count");
+    Path job = writeJob(temp, ws, "count", j -> j.put("instrumentation", "binding-count"));
+
+    RunOutcome outcome = runCapturing(readJob(job));
+
+    assertFailedReportWithReason(temp.resolve("count"), outcome.exitCode(), "binding-agent");
+  }
+
+  @Test
+  void tracingWindowsCoverEveryPhaseAndCarryResidual(@TempDir Path temp) throws Exception {
+    BaselineWorkerTestSupport.Workspace ws = setup(temp, 300, 60, 8, 1);
+    createOutDir(temp, "trace");
+    Path job = writeJob(temp, ws, "trace", j -> j.put("instrumentation", "tracing"));
+
+    assertEquals(BaselineWorker.EXIT_OK, runCapturing(readJob(job)).exitCode());
+
+    JsonNode worker = readReport(temp.resolve("trace")).path("worker");
+    assertEquals("tracing", worker.path("instrumentation").asString(null));
+    assertTrue(worker.path("identity").path("instrumented").asBoolean());
+    assertTrue(worker.path("identity").path("host").isObject());
+    assertTrue(worker.path("binding_signatures").isMissingNode());
+    JsonNode request = worker.path("requests").get(0);
+    JsonNode tracing = request.path("tracing");
+    assertTrue(tracing.isObject());
+    assertTrue(tracing.path("request_wall_s").asDouble() > 0.0);
+    assertTrue(tracing.path("request_cpu_s").asDouble() > 0.0);
+    JsonNode windows = tracing.path("windows");
+    // 3 prefill phases plus 3 phases for each of the 7 cached steps.
+    assertEquals(24, windows.size());
+    assertEquals("prefill-construction", windows.get(0).path("phase").asString(null));
+    assertEquals(0, windows.get(0).path("position").asInt());
+    assertEquals("prefill-sync", windows.get(1).path("phase").asString(null));
+    assertEquals("prefill-selection", windows.get(2).path("phase").asString(null));
+    for (int k = 0; k < 7; k++) {
+      JsonNode construction = windows.get(3 + 3 * k);
+      JsonNode sync = windows.get(3 + 3 * k + 1);
+      JsonNode selection = windows.get(3 + 3 * k + 2);
+      assertEquals("construction", construction.path("phase").asString(null));
+      assertEquals("sync", sync.path("phase").asString(null));
+      assertEquals("selection", selection.path("phase").asString(null));
+      assertEquals(33 + k, construction.path("position").asInt());
+      assertEquals(33 + k, sync.path("position").asInt());
+      assertEquals(33 + k, selection.path("position").asInt());
+    }
+    double wallSum = 0.0;
+    double cpuSum = 0.0;
+    for (JsonNode window : windows) {
+      assertTrue(window.path("wall_s").asDouble() >= 0.0);
+      assertTrue(window.path("cpu_s").asDouble() >= 0.0);
+      wallSum += window.path("wall_s").asDouble();
+      cpuSum += window.path("cpu_s").asDouble();
+    }
+    assertEquals(
+        tracing.path("request_wall_s").asDouble() - wallSum,
+        tracing.path("residual_wall_s").asDouble(),
+        1e-9);
+    assertEquals(
+        tracing.path("request_cpu_s").asDouble() - cpuSum,
+        tracing.path("residual_cpu_s").asDouble(),
+        1e-9);
+    assertTrue(tracing.path("residual_wall_s").asDouble() >= 0.0);
+    // The instrumented worker fills the memory block (findings section 10 shape).
+    JsonNode memory = request.path("memory");
+    assertTrue(memory.isObject());
+    assertTrue(memory.path("active_bytes").isIntegralNumber());
+    assertTrue(memory.path("peak_active_bytes").asLong() > 0);
+    assertTrue(memory.path("cached_bytes").isIntegralNumber());
+    assertTrue(memory.path("rss_peak_bytes").asLong() > 0);
   }
 
   @Test

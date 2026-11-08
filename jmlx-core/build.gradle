@@ -88,7 +88,7 @@ tasks.withType(Test).configureEach {
 // Exact float32 reference comparisons run separately from default-precision inference tests.
 // Tag new strict references with full-float32 so the mode is enforced before MLX initializes.
 tasks.named('test', Test) {
-    useJUnitPlatform { excludeTags 'full-float32', 'qwen35-benchmark' }
+    useJUnitPlatform { excludeTags 'full-float32', 'qwen35-benchmark', 'binding-coverage' }
     environment 'MLX_ENABLE_TF32', '1'
     inputs.property('mlxEnableTf32', '1')
 }
@@ -107,11 +107,31 @@ tasks.register('float32GoldenTest', Test) {
 
 tasks.named('check') { dependsOn tasks.named('float32GoldenTest') }
 
-def qwen35BindingAgent = tasks.register('qwen35BindingAgent', Jar) {
-    dependsOn tasks.named('testClasses')
-    archiveClassifier = 'qwen35-benchmark-agent'
-    from(sourceSets.test.output) { include '**/BindingCounterAgent*.class' }
+// Generalized binding-count agent jar (WP2): the class now lives in testFixtures so both
+// jmlx-core's own tests and jmlx-models' baseline worker (testImplementation testFixtures)
+// resolve the instrumented entry point's BindingCounterAgent.hit.
+def bindingAgent = tasks.register('bindingAgent', Jar) {
+    dependsOn tasks.named('testFixturesClasses')
+    archiveClassifier = 'binding-agent'
+    from(sourceSets.testFixtures.output) { include '**/BindingCounterAgent*.class' }
     manifest.attributes('Premain-Class': 'se.alipsa.jmlx.nn.BindingCounterAgent')
+}
+
+// Opt-in gate (WP2): the counters must cover the direct allocation/free paths as well as the op
+// facades, in a run where the agent is actually installed.
+tasks.register('bindingCoverage', Test) {
+    group = 'verification'
+    description = 'Opt-in gate: the binding-count agent covers allocation/free paths and op facades.'
+    dependsOn tasks.named('testClasses'), tasks.named('bindingAgent')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'binding-coverage' }
+    environment 'MLX_ENABLE_TF32', '0'
+    inputs.property('mlxEnableTf32', '0')
+    outputs.upToDateWhen { false }
+    doFirst {
+        jvmArgs "-javaagent:${bindingAgent.get().archiveFile.get().asFile.absolutePath}"
+    }
 }
 
 tasks.register('deltaBenchmark', Test) {
@@ -126,8 +146,8 @@ tasks.register('deltaBenchmark', Test) {
     maxHeapSize = '2g'
     outputs.upToDateWhen { false }
     if (providers.gradleProperty('qwen35CountBindings').getOrElse('false').toBoolean()) {
-        dependsOn qwen35BindingAgent
-        jvmArgs "-javaagent:${qwen35BindingAgent.get().archiveFile.get().asFile.absolutePath}"
+        dependsOn bindingAgent
+        jvmArgs "-javaagent:${bindingAgent.get().archiveFile.get().asFile.absolutePath}"
     }
 }
 

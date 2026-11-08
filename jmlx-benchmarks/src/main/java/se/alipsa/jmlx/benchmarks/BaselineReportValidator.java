@@ -22,6 +22,7 @@ final class BaselineReportValidator {
   private static final Set<String> KINDS = Set.of("first", "warmup", "measured");
   private static final Set<String> FINISH_REASONS =
       Set.of("controlled-max-tokens", "stop", "length", "fixed-continuation", "cancelled");
+  private static final Set<String> INSTRUMENTATIONS = Set.of("none", "binding-count", "tracing");
   private static final double TOLERANCE = 1e-9;
 
   private BaselineReportValidator() {}
@@ -83,6 +84,39 @@ final class BaselineReportValidator {
     if (!identity.path("code").isObject()) {
       violations.add("identity.code is required");
     }
+    String instrumentation = worker.path("instrumentation").asString("none");
+    if (!INSTRUMENTATIONS.contains(instrumentation)) {
+      violations.add("instrumentation must be none, binding-count or tracing");
+    }
+    boolean instrumented = !"none".equals(instrumentation);
+    if (!identity.path("instrumented").isBoolean()
+        || identity.path("instrumented").asBoolean(false) != instrumented) {
+      violations.add("identity.instrumented must be a boolean equal to instrumentation != none");
+    }
+    if (instrumented) {
+      if (!identity.path("host").isObject()) {
+        violations.add("instrumented workers carry an identity.host record");
+      }
+    } else if (identity.has("host")) {
+      violations.add("uninstrumented workers carry no identity.host record");
+    }
+    if ("binding-count".equals(instrumentation)) {
+      // The instrumented downcalls' JVM descriptors, by exact binding name (the FFM
+      // transition estimate groups counts by these signature classes).
+      JsonNode signatures = worker.path("binding_signatures");
+      if (!signatures.isObject() || signatures.size() == 0) {
+        violations.add("binding-count reports carry a nonempty binding_signatures object");
+      } else {
+        for (JsonNode descriptor : signatures) {
+          if (!descriptor.isTextual() || descriptor.asString("").isEmpty()) {
+            violations.add("binding_signatures values are nonempty descriptor strings");
+            break;
+          }
+        }
+      }
+    } else if (worker.has("binding_signatures")) {
+      violations.add("binding_signatures is present only in binding-count mode");
+    }
     if (!worker.path("stop_token_ids").isArray()) {
       violations.add("stop_token_ids must be an array");
     }
@@ -110,6 +144,7 @@ final class BaselineReportValidator {
           mode,
           worker.path("adapter").asString(null),
           worker.path("runtime").asString(null),
+          instrumentation,
           violations);
     }
     return violations;
@@ -121,6 +156,7 @@ final class BaselineReportValidator {
       String mode,
       String adapter,
       String runtime,
+      String instrumentation,
       List<String> violations) {
     String prefix = "requests[" + index + "].";
     if (!request.isObject()) {
@@ -139,9 +175,27 @@ final class BaselineReportValidator {
     if (!request.path("prime_excluded").asBoolean(false)) {
       violations.add(prefix + "prime_excluded must be true");
     }
-    if (!request.path("memory").isNull()) {
-      violations.add(prefix + "memory is null in WP1");
+    // The section 10 memory block: filled with the four allocator/RSS counters for instrumented
+    // workers, null otherwise (the frozen Python and uninstrumented Java workers never fill it).
+    JsonNode memory = request.path("memory");
+    if (!"none".equals(instrumentation)) {
+      if (!memory.isObject()) {
+        violations.add(prefix + "instrumented requests carry the memory object");
+      } else {
+        String[] keys = {"active_bytes", "peak_active_bytes", "cached_bytes", "rss_peak_bytes"};
+        for (String key : keys) {
+          if (!memory.path(key).isIntegralNumber() || memory.path(key).asLong(-1) < 0) {
+            violations.add(prefix + "memory." + key + " must be a nonnegative integer");
+          }
+        }
+        if (memory.size() != keys.length) {
+          violations.add(prefix + "memory carries exactly the four section 10 counters");
+        }
+      }
+    } else if (!memory.isNull()) {
+      violations.add(prefix + "memory is null when the worker is not instrumented");
     }
+    validateDiagnostics(request, prefix, instrumentation, violations);
     if (!request.path("io_affected").isBoolean()) {
       violations.add(prefix + "io_affected must be a boolean");
     }
@@ -257,6 +311,99 @@ final class BaselineReportValidator {
       if (Math.abs(request.path("streaming_decode_tps").asDouble() - expected) > 1e-9) {
         violations.add(
             prefix + "streaming_decode_tps must be (emitted - 1) / (last - first) event time");
+      }
+    }
+  }
+
+  /**
+   * The WP2 per-request diagnostics blocks (findings section 15): binding-count requests carry
+   * their phase/count records, tracing requests their per-window wall/CPU and the unassigned
+   * residual, and uninstrumented requests carry neither.
+   */
+  private static void validateDiagnostics(
+      JsonNode request, String prefix, String instrumentation, List<String> violations) {
+    if ("none".equals(instrumentation)) {
+      if (request.has("binding_counts") || request.has("tracing")) {
+        violations.add(prefix + "uninstrumented requests carry no diagnostics blocks");
+      }
+      return;
+    }
+    if ("binding-count".equals(instrumentation)) {
+      if (request.has("tracing")) {
+        violations.add(prefix + "binding-count requests carry no tracing block");
+      }
+      JsonNode counts = request.path("binding_counts");
+      if (!counts.isObject()) {
+        violations.add(prefix + "binding-count requests carry a binding_counts block");
+        return;
+      }
+      JsonNode phases = counts.path("phases");
+      if (!phases.isArray() || phases.size() == 0) {
+        violations.add(prefix + "binding_counts.phases must be a nonempty array");
+      } else {
+        for (JsonNode phase : phases) {
+          if (!phase.isObject()
+              || !phase.path("phase").isTextual()
+              || phase.path("phase").asString("").isEmpty()
+              || !phase.path("position").isIntegralNumber()
+              || phase.path("position").asLong(-1) < 0
+              || !phase.path("counts").isObject()) {
+            violations.add(prefix + "binding_counts.phases entries need phase/position/counts");
+            break;
+          }
+          for (JsonNode value : phase.path("counts")) {
+            if (!value.isIntegralNumber() || value.asLong(-1) < 0) {
+              violations.add(prefix + "binding_counts phase counts are nonnegative integers");
+              break;
+            }
+          }
+        }
+      }
+      // The agent's stop() returns only the names it hit, so every total is a positive sum.
+      JsonNode total = counts.path("total");
+      if (!total.isObject() || total.size() == 0) {
+        violations.add(prefix + "binding_counts.total must be a nonempty object");
+      } else {
+        for (JsonNode value : total) {
+          if (!value.isIntegralNumber() || value.asLong(0) <= 0) {
+            violations.add(prefix + "binding_counts.total values are positive integers");
+            break;
+          }
+        }
+      }
+    } else {
+      if (request.has("binding_counts")) {
+        violations.add(prefix + "tracing requests carry no binding_counts block");
+      }
+      JsonNode tracing = request.path("tracing");
+      if (!tracing.isObject()) {
+        violations.add(prefix + "tracing requests carry a tracing block");
+        return;
+      }
+      for (String key :
+          new String[] {"request_wall_s", "request_cpu_s", "residual_wall_s", "residual_cpu_s"}) {
+        if (!tracing.path(key).isDouble() || tracing.path(key).asDouble() < -TOLERANCE) {
+          violations.add(prefix + "tracing." + key + " must be a nonnegative number");
+        }
+      }
+      JsonNode windows = tracing.path("windows");
+      if (!windows.isArray()) {
+        violations.add(prefix + "tracing.windows must be an array");
+      } else {
+        for (JsonNode window : windows) {
+          if (!window.isObject()
+              || !window.path("phase").isTextual()
+              || window.path("phase").asString("").isEmpty()
+              || !window.path("position").isIntegralNumber()
+              || window.path("position").asLong(-1) < 0
+              || !window.path("wall_s").isDouble()
+              || window.path("wall_s").asDouble() < -TOLERANCE
+              || !window.path("cpu_s").isDouble()
+              || window.path("cpu_s").asDouble() < -TOLERANCE) {
+            violations.add(prefix + "tracing.windows entries need phase/position/wall_s/cpu_s");
+            break;
+          }
+        }
       }
     }
   }

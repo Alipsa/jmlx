@@ -13,13 +13,14 @@ import tools.jackson.databind.node.ObjectNode;
  * One launcher-written worker job file (schema {@code jmlx-decode-baseline-job-1}; frozen contract
  * in req/plans/phase8-2-reference-findings.md section 13.1). The launcher is the only writer; the
  * worker treats every field as data to be re-verified, never as a source of truth over the manifest
- * anchors. The last two components are launcher-side metadata (the fork command needs them); the
- * job file itself carries no classpath.
+ * anchors. The last four components are launcher-side metadata (the fork command needs them); the
+ * job file itself carries no classpath and no agent jar.
  *
  * @param adapter controlled or stock
  * @param caseName manifest text-case name
  * @param promptLength frozen manifest prompt length
  * @param mode headline, fixed-continuation or reference-pair
+ * @param instrumentation none, binding-count or tracing (written only when not none)
  * @param first run_policy first_requests (0 for reference-pair)
  * @param warmups run_policy warmups (0 for reference-pair)
  * @param measured run_policy measured_requests (1 for reference-pair)
@@ -34,12 +35,16 @@ import tools.jackson.databind.node.ObjectNode;
  * @param fcCount fixed-continuation count (32; written only in that mode)
  * @param runtime java or python (launcher-side: selects the fork command)
  * @param modelsTestClasspath the Java worker's classpath (launcher-side only)
+ * @param bindingAgentJar the jmlx-core binding-agent jar path for binding-count Java workers
+ *     (launcher-side only; empty when the system property is absent)
+ * @param nativeCacheDir the session's isolated native-cache directory (launcher-side only)
  */
 record BaselineJob(
     String adapter,
     String caseName,
     int promptLength,
     String mode,
+    String instrumentation,
     int first,
     int warmups,
     int measured,
@@ -53,7 +58,9 @@ record BaselineJob(
     int fcOffset,
     int fcCount,
     String runtime,
-    String modelsTestClasspath) {
+    String modelsTestClasspath,
+    String bindingAgentJar,
+    String nativeCacheDir) {
 
   static final String SCHEMA = "jmlx-decode-baseline-job-1";
 
@@ -67,6 +74,10 @@ record BaselineJob(
     job.put("case", caseName);
     job.put("prompt_length", promptLength);
     job.put("mode", mode);
+    // Absent means none: headline job files stay byte-identical to the WP1 shape.
+    if (!"none".equals(instrumentation)) {
+      job.put("instrumentation", instrumentation);
+    }
     ObjectNode requests = job.putObject("requests");
     requests.put("first", first);
     requests.put("warmups", warmups);
@@ -86,10 +97,21 @@ record BaselineJob(
     Files.writeString(file, MAPPER.writeValueAsString(job), StandardCharsets.UTF_8);
   }
 
-  /** The worker directory name: unique per (runtime, adapter, case, length, mode) cell. */
+  /**
+   * The worker directory name: unique per (runtime, adapter, case, length, mode, instrumentation)
+   * cell; the instrumentation suffix keeps a diagnostic run from colliding with the headline cell
+   * it measures.
+   */
   static String dirName(
-      String runtime, String adapter, String caseName, int promptLength, String mode) {
-    return String.join("-", runtime, adapter, caseName, Integer.toString(promptLength), mode);
+      String runtime,
+      String adapter,
+      String caseName,
+      int promptLength,
+      String mode,
+      String instrumentation) {
+    String base =
+        String.join("-", runtime, adapter, caseName, Integer.toString(promptLength), mode);
+    return "none".equals(instrumentation) ? base : base + "-" + instrumentation;
   }
 
   /**
@@ -97,7 +119,10 @@ record BaselineJob(
    * test-class {@code BaselineWorker} on the models test runtime classpath; the Python worker is
    * the pinned venv interpreter in isolated mode on the frozen worker source. The precision mode is
    * a worker-process environment variable the caller sets, not a command-line argument (JDK 25 has
-   * no {@code System.setenv}; the Java worker verifies the environment).
+   * no {@code System.setenv}; the Java worker verifies the environment). The Java worker's
+   * classpath-extraction cache is pinned to the session's isolated {@code nativeCacheDir} (the
+   * user's default cache is never touched), and a binding-count worker additionally runs the
+   * jmlx-core binding-agent as a javaagent.
    */
   List<String> command(Path jobFile) {
     List<String> command = new ArrayList<>();
@@ -105,6 +130,10 @@ record BaselineJob(
       command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
       command.add("--enable-native-access=ALL-UNNAMED");
       command.add("-Djmlx.library.path=" + repoDir + "/native/install/lib");
+      command.add("-Djmlx.native.cache.path=" + nativeCacheDir);
+      if ("binding-count".equals(instrumentation)) {
+        command.add("-javaagent:" + bindingAgentJar);
+      }
       command.add("-cp");
       command.add(modelsTestClasspath);
       command.add("se.alipsa.jmlx.models.BaselineWorker");
@@ -119,5 +148,10 @@ record BaselineJob(
 
   /** A parsed launcher spec's worker entry (spec section: {@code workers}). */
   record WorkerEntry(
-      String runtime, String adapter, String caseName, int promptLength, String mode) {}
+      String runtime,
+      String adapter,
+      String caseName,
+      int promptLength,
+      String mode,
+      String instrumentation) {}
 }

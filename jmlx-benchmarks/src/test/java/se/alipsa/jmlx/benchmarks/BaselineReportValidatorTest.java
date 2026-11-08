@@ -266,7 +266,7 @@ class BaselineReportValidatorTest {
   void memoryMustBeNull() {
     ObjectNode report = baseControlledJava();
     request(report, 0).put("memory", 1.5);
-    assertViolation(report, "memory is null in WP1");
+    assertViolation(report, "memory is null when the worker is not instrumented");
   }
 
   @Test

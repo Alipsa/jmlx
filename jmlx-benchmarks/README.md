@@ -112,18 +112,36 @@ java_worker_classpath  classpath of the Java worker; the alias "@models-test"
                      classpath (BaselineWorker is benchmark-only test source,
                      never a published API)
 artifact_dirs        case name → checkpoint directory
+orchestration        optional: spec-order (the default) or alternating
+                     (consecutive workers must use different runtimes)
 workers[]            {runtime java|python, adapter controlled|stock, case,
                      prompt_length (one of the manifest's frozen lengths),
-                     mode headline|fixed-continuation|reference-pair}
+                     mode headline|fixed-continuation|reference-pair,
+                     instrumentation optional none|binding-count|tracing
+                     (Java workers only; the launcher wires the jmlx-core
+                     binding agent as a -javaagent for binding-count)}
 ```
 
 Layout under `out_root`: one directory per worker
-(`<runtime>-<adapter>-<case>-<length>-<mode>/` holding `worker-claim`,
-`worker-ready` and `report.json`), `jobs/<dir>.job.json` (the frozen job file
-handed to the worker), `stderr/<dir>.log`, the verbatim `spec.json`, and
-`session.json` (schema `jmlx-decode-baseline-1`: the session block, the embedded
-worker reports, and the summary with adapter/mode-scoped type-7 quantiles and
-the exclusion list).
+(`<runtime>-<adapter>-<case>-<length>-<mode>/`, with a
+`-<instrumentation>` suffix when the worker is instrumented — the
+instrumentation mode is part of the cell identity — holding
+`worker-claim`, `worker-ready` and `report.json`), `jobs/<dir>.job.json` (the
+frozen job file handed to the worker), `stderr/<dir>.log`, `native-cache/`
+(the isolated classpath-extraction cache for the forked Java workers;
+retained on a successful session, deleted on session failure), the verbatim
+`spec.json`, and `session.json` (schema `jmlx-decode-baseline-1`: the session
+block, the embedded worker reports, and the summary with adapter/mode-scoped
+type-7 quantiles and the exclusion list).
+
+Instrumented workers (the spec's per-worker `instrumentation`) additionally
+write, in their `report.json`: per-request `binding_counts` (binding-count
+mode) or `tracing` (tracing mode), a `memory` block, and the `identity.host`
+record; the worker block carries `binding_signatures` in binding-count mode.
+Instrumented workers are excluded from the headline aggregation by
+construction (exclusion reason `instrumented`). The frozen contract and the
+WP2 record are in `req/plans/phase8-2-reference-findings.md` sections 13 and
+15.
 
 Exit codes: 0 all workers ok; 1 spec validation failed (nothing forked, no
 `session.json`); 2 any worker non-ok (`session.json` is still written, the failed
@@ -132,3 +150,43 @@ native runtime; the Python stock worker needs the pinned venv from
 `tools/decode-baseline/install.sh` (installed explicitly, never by a Gradle
 task). Use a new `out_root` for every experiment, and run without competing GPU
 workloads.
+
+## FFM calibration (phase 8.2 WP2)
+
+```sh
+./gradlew :jmlx-benchmarks:benchmarkFfmCalibration --args='build/ffm-cal'
+```
+
+Builds a no-op FFM calibration dylib under the output directory
+(`cc -shared -O2`; a machine without `cc` fails with a clear error) and
+measures the Project Panama downcall transition cost of representative
+generated mlx-c binding shapes in fresh JVMs. Arguments:
+
+```text
+output-directory [iterations calls forks warmup]
+```
+
+Defaults are 200 iterations, 2000 calls per sample, 5 forks and 2000 warmup
+calls. Each shape is a non-elidable no-op C function with the same
+parameter/return register shape as a class of the generated downcalls
+(see `src/main/resources/ffm_cal.c` for the shapes and the carrier-fidelity
+argument), invoked through the generated wrappers' own `invokeExact` form.
+The dylib and the extracted C source are the only build artifacts; both stay
+under the output directory. Outputs: `build-info.json` (compiler, flags,
+source/binary SHA-256s), `raw-fork-<n>.json` (the per-fork raw samples) and
+`ffm-calibration.json` (per-shape p10/median/p90, min/max and every raw
+sample, plus an empty-loop timing-floor entry).
+
+To estimate the per-decode-step FFM transition budget from a
+binding-count worker report (the decode baseline) and a calibration summary,
+run this module's `FfmTransitionEstimate` main class with its main runtime
+classpath:
+
+```text
+FfmTransitionEstimate worker-report.json ffm-calibration.json output-json
+```
+
+It is a calibrated estimate, not a causal partition of the step's time:
+the output carries the explicit assumptions, the coverage of classified
+calls and the uncovered signatures. The contract and the local measurement
+baseline are in `req/plans/phase8-2-reference-findings.md` section 15.4.

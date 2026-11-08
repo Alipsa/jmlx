@@ -24,10 +24,11 @@ import se.alipsa.jmlx.tokenizer.HfTokenizer;
  * java.util.function.Consumer)} path with the checkpoint's own tokenizer attached through {@link
  * GenerationRequest#pretokenized}; no production public API is added for timing.
  *
- * <p>Every timer is monotonic and stops at the frozen boundaries: the prefill timer stops at the
+ * <p>Every timer is monotonic and starts and stops at the frozen boundaries (section 13.3): the
+ * timers start after the per-request prompt caches are created; the prefill timer stops at the
  * evaluated prefill logits; each cached-step timer stops at the evaluated step logits, and the
  * argmax (and, for fixed continuation, the full-vocabulary readback and sort) run outside the
- * measured interval. The controlled loop has no next-token lookahead, no async pipeline, no
+ * measured intervals. The controlled loop has no next-token lookahead, no async pipeline, no
  * periodic cache clearing and no stop termination: all {@code emitted} tokens are produced,
  * stop-set members included.
  */
@@ -70,17 +71,19 @@ final class BaselineAdapters {
    * (finish {@code controlled-max-tokens}); token 1 comes from the prefill projection.
    *
    * <p>Every step's required logits and cache state are evaluated before its timer stops; each
-   * token's {@code eventS} entry (seconds from entry, token 1 included) is taken after that token's
-   * argmax, matching the pinned Python controlled loop.
+   * token's {@code eventS} entry (seconds from the timer origin, token 1 included) is taken after
+   * that token's argmax, matching the pinned Python controlled loop.
    */
   static ControlledResult runControlled(
       DecoderModel model, MLXScope owner, int[] prompt, int emitted) {
     if (emitted < 1) {
       throw new IllegalArgumentException("emitted must be >= 1");
     }
-    long t0 = System.nanoTime();
     try (MLXScope request = owner.newChild()) {
       List<KVCache> caches = freshCaches(model, request);
+      // The prompt caches are created before the timer starts (frozen section 13.3 boundary);
+      // t0 is also the event-time origin, as in the pinned Python loop.
+      long t0 = System.nanoTime();
       int promptLength = prompt.length;
       int token1;
       double prefillS;
@@ -100,22 +103,19 @@ final class BaselineAdapters {
       List<Step> steps = new ArrayList<>(emitted - 1);
       for (int k = 0; k < emitted - 1; k++) {
         long stepStart = System.nanoTime();
+        double stepS;
         int next;
         try (MLXScope activation = request.newChild()) {
           MLXArray ids =
               MLX.array(activation, new int[] {tokens.get(tokens.size() - 1)}, new int[] {1, 1});
           MLXArray logits = model.decode(ids, caches, null, null);
           evalStep(logits, caches);
+          // The per-step timer stops at the evaluated logits, before the argmax (frozen
+          // section 13.3 boundary); the argmax host work runs outside the measured interval.
+          stepS = (System.nanoTime() - stepStart) / NANOS_PER_SECOND;
           next = argmax(logits);
         }
-        // The step timer stops at the evaluated logits; the argmax host work above ran after
-        // the stop, exactly as in the pinned Python loop.
-        steps.add(
-            new Step(
-                promptLength + k + 1,
-                (System.nanoTime() - stepStart) / NANOS_PER_SECOND,
-                null,
-                null));
+        steps.add(new Step(promptLength + k + 1, stepS, null, null));
         tokens.add(next);
         eventS[k + 1] = (System.nanoTime() - t0) / NANOS_PER_SECOND;
       }
@@ -135,9 +135,10 @@ final class BaselineAdapters {
    */
   static FixedContinuationResult runFixedContinuation(
       DecoderModel model, MLXScope owner, int[] prompt, int[] fedIds) {
-    long t0 = System.nanoTime();
     try (MLXScope request = owner.newChild()) {
       List<KVCache> caches = freshCaches(model, request);
+      // The prompt caches are created before the timer starts (frozen section 13.3 boundary).
+      long t0 = System.nanoTime();
       int promptLength = prompt.length;
       double prefillS;
       try (MLXScope activation = request.newChild()) {
@@ -149,24 +150,21 @@ final class BaselineAdapters {
       List<Step> steps = new ArrayList<>(fedIds.length);
       for (int k = 0; k < fedIds.length; k++) {
         long stepStart = System.nanoTime();
+        double stepS;
         int argmaxId;
         double top2Margin;
         try (MLXScope activation = request.newChild()) {
           MLXArray ids = MLX.array(activation, new int[] {fedIds[k]}, new int[] {1, 1});
           MLXArray logits = model.decode(ids, caches, null, null);
           evalStep(logits, caches);
-          // The step timer stops at the evaluated logits; the argmax and the full-vocabulary
-          // readback and sort (the cross-adapter check) run outside the measured interval,
-          // as in the pinned Python loop.
+          // The step timer stops at the evaluated logits, before the argmax and the
+          // full-vocabulary readback and sort (the cross-adapter check), exactly as in the
+          // pinned Python loop.
+          stepS = (System.nanoTime() - stepStart) / NANOS_PER_SECOND;
           argmaxId = argmax(logits);
           top2Margin = top2Margin(logits);
         }
-        steps.add(
-            new Step(
-                promptLength + k + 1,
-                (System.nanoTime() - stepStart) / NANOS_PER_SECOND,
-                argmaxId,
-                top2Margin));
+        steps.add(new Step(promptLength + k + 1, stepS, argmaxId, top2Margin));
       }
       // Wall time over the step region only (prefill excluded, one definition on both paths).
       return new FixedContinuationResult(

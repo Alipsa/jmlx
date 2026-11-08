@@ -55,6 +55,18 @@ tasks.register('benchmarkBaseline', JavaExec) {
     dependsOn project(':jmlx-core').tasks.named('bindingAgent')
 }
 
+tasks.register('benchmarkFfmCalibration', JavaExec) {
+    group = 'benchmark'
+    description = 'Builds the no-op FFM calibration dylib under the output directory (cc -shared ' +
+            '-O2; a machine without cc fails with a clear error) and measures the downcall ' +
+            'transition cost of representative generated-binding shapes in fresh JVMs (pass --args ' +
+            'output-directory [iterations calls forks warmup], defaults 200 2000 5 2000).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.benchmarks.FfmCalibration'
+    workingDir rootProject.projectDir
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+}
+
 tasks.named('check') {
     dependsOn tasks.named('spotlessCheck')
 }

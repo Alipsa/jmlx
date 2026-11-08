@@ -178,8 +178,9 @@ final class BaselineAdapters {
    * The stock Java path: the public {@code generate} with pretokenized prompt IDs, the checkpoint's
    * own tokenizer (so the loop's incremental detokenization runs and is timed), full retention and
    * the frozen greedy policy. Host-visible token events are observed without inserting per-token
-   * synchronizations; after the call returns, all pending work is drained with an explicit evaluate
-   * before the full-generation timer stops.
+   * synchronizations; the synchronous loop evaluates every step at its selection boundary and
+   * queues no lookahead, so nothing is pending when the call returns — there is no drain to run,
+   * and the full-generation timer stops at the return.
    */
   static StockResult runStock(
       DecoderModel model,
@@ -205,9 +206,8 @@ final class BaselineAdapters {
                 tokens.add(event.tokenId());
               }
             });
-    // The Java loop evaluates every step at its selection boundary and queues no lookahead
-    // forward; the explicit drain makes the full-completion boundary unambiguous either way.
-    MLX.eval();
+    // No drain: the Java loop evaluates every step at its selection boundary and queues no
+    // lookahead forward, so all generated work is evaluated by the time generate returns.
     double[] eventS = new double[eventRel.size()];
     for (int i = 0; i < eventS.length; i++) {
       eventS[i] = eventRel.get(i);

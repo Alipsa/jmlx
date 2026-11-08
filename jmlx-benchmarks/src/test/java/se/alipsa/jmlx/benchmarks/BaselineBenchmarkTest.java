@@ -2,15 +2,19 @@ package se.alipsa.jmlx.benchmarks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,9 +41,12 @@ class BaselineBenchmarkTest {
           "cache_regime": "primed-per-request",
           "worker_timeout_s": 300,
           "reference_pair_worker_timeout_s": 60,
+          "cell_time_budget_s": 3600,
+          "session_time_budget_s": 7200,
           "first_requests": 1,
           "warmups": 0,
-          "measured_requests": 2
+          "measured_requests": 2,
+          "emitted_tokens": 8
         },
         "text_cases": [{"name": "tiny"}],
         "controlled_generation": {"prompt_lengths": [32, 512]},
@@ -52,6 +59,9 @@ class BaselineBenchmarkTest {
   @AfterEach
   void clearClasspathProperty() {
     System.clearProperty(CLASSPATH_PROPERTY);
+    // The launcher's digest pin is process-wide state; every test that builds a mini repository
+    // re-pins it in setup(), and each test must leave the production pin in place.
+    BaselineBenchmark.setPinnedManifestSha256ForTest(BaselineBenchmark.PINNED_MANIFEST_SHA256);
   }
 
   /** Simulated worker outcome for one worker directory. */
@@ -69,20 +79,43 @@ class BaselineBenchmarkTest {
   private static final class FakeStarter implements BaselineBenchmark.WorkerStarter {
     final List<BaselineJob> jobs = new ArrayList<>();
     final Map<String, Behavior> behaviors = new LinkedHashMap<>();
+    final Map<String, Long> waitLimits = new LinkedHashMap<>();
+
+    /** Delays each simulated fork; the session-budget test uses it to burn the budget. */
+    long startDelayMs = 0L;
+
+    /** Tamper hook: run on the worker block before the report is written (null normally). */
+    Consumer<ObjectNode> reportMutator = null;
+
+    /** When set, the starter returns WORKER_KILLED and leaves no report for that cell. */
+    String killedCell = null;
 
     @Override
-    public int start(BaselineJob job, Path jobFile, Path stderrLog) throws Exception {
+    public int start(BaselineJob job, Path jobFile, Path stderrLog, long waitLimitSeconds)
+        throws Exception {
       String dir =
           BaselineJob.dirName(
               job.runtime(), job.adapter(), job.caseName(), job.promptLength(), job.mode());
       Behavior behavior = behaviors.getOrDefault(dir, Behavior.OK);
       jobs.add(job);
+      waitLimits.put(dir, waitLimitSeconds);
       if (behavior == Behavior.THROW) {
         throw new IllegalStateException("simulated fork failure");
+      }
+      if (startDelayMs > 0) {
+        Thread.sleep(startDelayMs);
       }
       Files.createDirectories(stderrLog.getParent());
       Files.writeString(stderrLog, "fake stderr");
       Path outDir = Path.of(job.outDir());
+      if (dir.equals(killedCell)) {
+        // A wedged worker the launcher killed after the wait limit: whatever artifacts it had
+        // (none here, or a claim if the behavior says so) are all the launcher classifies from.
+        if (behavior == Behavior.DEAD) {
+          Files.writeString(outDir.resolve("worker-claim"), dir);
+        }
+        return BaselineBenchmark.WORKER_KILLED;
+      }
       switch (behavior) {
         case OK -> writeReport(job, "ok", null, true);
         case FAILED -> writeReport(job, "failed", "simulated failure", true);
@@ -121,14 +154,18 @@ class BaselineBenchmarkTest {
               failure,
               job.manifestSha256(),
               requests.toArray(new ObjectNode[0]));
-      ObjectNode report = BaselineReportFixtures.report(worker);
       if (!valid) {
         ObjectNode first = (ObjectNode) ((ArrayNode) worker.get("requests")).get(0);
         first.putNull("streaming_decode_tps");
         ((ArrayNode) first.get("event_s")).remove(7);
       }
+      if (reportMutator != null) {
+        reportMutator.accept(worker);
+      }
       Path outDir = Path.of(job.outDir());
       Files.writeString(outDir.resolve("worker-claim"), job.caseName());
+      // The report wraps the (already tampered) worker node by reference.
+      ObjectNode report = BaselineReportFixtures.report(worker);
       Files.writeString(outDir.resolve("report.json"), MAPPER.writeValueAsString(report));
     }
 
@@ -149,14 +186,22 @@ class BaselineBenchmarkTest {
   }
 
   private Setup setup() throws IOException {
+    return setup(MANIFEST);
+  }
+
+  /** The mini checkout with a manifest variant (the run_policy and digest-pin tests). */
+  private Setup setup(String manifest) throws IOException {
     Setup setup = new Setup();
     setup.repo = base.resolve("repo");
     Path tools = setup.repo.resolve("tools/decode-baseline");
     Files.createDirectories(tools);
     Files.writeString(setup.repo.resolve("settings.gradle"), "// mini repo");
     setup.manifest = tools.resolve("workloads.json");
-    Files.writeString(setup.manifest, MANIFEST);
+    Files.writeString(setup.manifest, manifest);
     setup.manifestSha = BaselineBenchmark.sha256File(setup.manifest);
+    // The launcher's digest pin is process-wide; every mini repository re-pins it to its own
+    // manifest, and the @AfterEach restores the production pin.
+    BaselineBenchmark.setPinnedManifestSha256ForTest(setup.manifestSha);
     setup.artifact = base.resolve("artifact-tiny");
     Files.createDirectories(setup.artifact);
     Files.writeString(setup.artifact.resolve("model.safetensors"), "tiny");
@@ -291,21 +336,31 @@ class BaselineBenchmarkTest {
     assertEquals(0, summary.path("pairs").size());
     assertEquals(0, summary.path("exclusions").size());
     // Two measured ttft samples 0.03 and 0.04; all four headline metrics present
-    // (step_region_s is null outside fixed-continuation). The cell key is mode-scoped:
-    // headline and fixed-continuation never pool, and reference-pair samples (observed
-    // regime) are excluded from the headline quantiles entirely.
+    // (step_region_s is null outside fixed-continuation). The cell key is adapter- and
+    // mode-scoped: controlled and stock never pool, headline and fixed-continuation never
+    // pool, and reference-pair samples (observed regime) are excluded from the headline
+    // quantiles entirely.
     JsonNode ttft =
-        summary.path("per_runtime").path("java").path("headline/tiny/32").path("ttft_s");
+        summary.path("per_runtime").path("java").path("controlled/headline/tiny/32").path("ttft_s");
     assertEquals(2, ttft.path("n").asInt(0));
     assertEquals(0.031, ttft.path("p10").asDouble(0), 1e-12);
     assertEquals(0.035, ttft.path("median").asDouble(0), 1e-12);
     assertEquals(0.039, ttft.path("p90").asDouble(0), 1e-12);
-    assertEquals(4, summary.path("per_runtime").path("java").path("headline/tiny/32").size());
-    // The single first request is a separate distribution, mode-scoped.
-    JsonNode first = summary.path("first_request").path("java").path("headline").path("ttft_s");
+    assertEquals(
+        4, summary.path("per_runtime").path("java").path("controlled/headline/tiny/32").size());
+    // The single first request is a separate distribution, adapter- and mode-scoped per cell.
+    JsonNode first =
+        summary
+            .path("first_request")
+            .path("java")
+            .path("controlled/headline/tiny/32")
+            .path("ttft_s");
     assertEquals(1, first.path("n").asInt(0));
     assertEquals(0.02, first.path("median").asDouble(0), 1e-12);
-    assertEquals(4, summary.path("first_request").path("java").path("headline").size());
+    assertEquals(
+        4, summary.path("first_request").path("java").path("controlled/headline/tiny/32").size());
+    // The launcher gave the fork min(timeout_s + 90 s backstop, cell_time_budget_s).
+    assertEquals(390L, starter.waitLimits.get(dir));
   }
 
   private record ModeRun(JsonNode jobFile, JsonNode session) {}
@@ -336,19 +391,35 @@ class BaselineBenchmarkTest {
     assertEquals(2, jobFile.path("requests").path("measured").asInt(0));
     assertEquals(32, jobFile.path("fixed_continuation").path("offset").asInt(0));
     assertEquals(32, jobFile.path("fixed_continuation").path("count").asInt(0));
-    // The FC samples live in their own mode cell: only its two measured metrics, no ttft.
+    // The FC samples live in their own adapter-/mode-scoped cell: prefill and step-region over the
+    // measured requests, plus step_s — the contract's decode comparison — pooled per step over
+    // every measured request's 32 frozen positions (32 x 2 = 64 samples here), no ttft.
     JsonNode cell =
         run.session()
             .path("summary")
             .path("per_runtime")
             .path("java")
-            .path("fixed-continuation/tiny/32");
+            .path("controlled/fixed-continuation/tiny/32");
     assertEquals(2, cell.path("prefill_s").path("n").asInt(0));
     assertEquals(0.02, cell.path("prefill_s").path("median").asDouble(0), 1e-12);
     assertEquals(2, cell.path("step_region_s").path("n").asInt(0));
     assertEquals(0.32, cell.path("step_region_s").path("median").asDouble(0), 1e-12);
+    assertEquals(64, cell.path("step_s").path("n").asInt(0));
+    assertEquals(0.01, cell.path("step_s").path("median").asDouble(0), 1e-12);
     assertFalse(cell.has("ttft_s"));
-    assertEquals(2, cell.size());
+    assertEquals(3, cell.size());
+    // The FC first request contributes only its request-level metrics to first_request
+    // (prefill and step region); step_s is a measured-only metric — the decode comparison
+    // pools the measured requests' steps, never the first request's.
+    JsonNode firstCell =
+        run.session()
+            .path("summary")
+            .path("first_request")
+            .path("java")
+            .path("controlled/fixed-continuation/tiny/32");
+    assertEquals(1, firstCell.path("prefill_s").path("n").asInt(0));
+    assertEquals(1, firstCell.path("step_region_s").path("n").asInt(0));
+    assertFalse(firstCell.has("step_s"));
   }
 
   @Test
@@ -364,6 +435,266 @@ class BaselineBenchmarkTest {
     assertEquals(0, run.session().path("summary").path("per_runtime").size());
     assertEquals(0, run.session().path("summary").path("first_request").size());
     assertEquals(0, run.session().path("summary").path("exclusions").size());
+  }
+
+  /**
+   * Runs one headline cell with a tampered ok report and asserts the launcher classified it
+   * invalid-report with the job-mismatch violation, not silently counted it.
+   */
+  private JsonNode invalidReportSession(Setup setup, String outName, Consumer<ObjectNode> mutator)
+      throws IOException {
+    FakeStarter starter = new FakeStarter();
+    starter.reportMutator = mutator;
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            base.resolve(outName),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_WORKERS_FAILED, exit);
+    return session(spec);
+  }
+
+  @Test
+  void reportNotMatchingJobIsInvalid() throws IOException {
+    // The report describes a different case than the job the launcher launched for it.
+    JsonNode root =
+        invalidReportSession(
+            setup(), "session-mismatch", workerBlock -> workerBlock.put("case", "other"));
+    assertEquals("invalid-report", root.path("workers").get(0).path("outcome").asString(""));
+    assertTrue(
+        root.path("summary")
+            .path("exclusions")
+            .get(0)
+            .path("violations")
+            .toString()
+            .contains("differs from the launched job's"));
+  }
+
+  @Test
+  void okReportWithoutRequestsIsInvalid() throws IOException {
+    // An ok report with no requests is rejected: it cannot have done the work the job ordered.
+    JsonNode root =
+        invalidReportSession(
+            setup(), "session-no-requests", workerBlock -> workerBlock.putArray("requests"));
+    assertEquals("invalid-report", root.path("workers").get(0).path("outcome").asString(""));
+    assertTrue(
+        root.path("summary")
+            .path("exclusions")
+            .get(0)
+            .path("violations")
+            .toString()
+            .contains("must carry exactly the job's 3 requests"));
+  }
+
+  @Test
+  void failedReportShortPrefixIsAccepted() throws IOException {
+    // A failed report may carry a shorter complete prefix of the job's request mix (the run
+    // died mid-way); it is still classified failed, not invalid-report.
+    FakeStarter starter = new FakeStarter();
+    starter.behaviors.put("java-controlled-tiny-32-headline", Behavior.FAILED);
+    starter.reportMutator =
+        workerBlock -> {
+          ArrayNode requests = (ArrayNode) workerBlock.get("requests");
+          requests.remove(requests.size() - 1);
+        };
+    ObjectNode spec =
+        buildSpec(
+            setup(),
+            base.resolve("session-short-prefix"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_WORKERS_FAILED, exit);
+    JsonNode root = session(spec);
+    assertEquals("failed", root.path("workers").get(0).path("status").asString(""));
+    assertEquals(
+        "failed", root.path("summary").path("exclusions").get(0).path("reason").asString(""));
+    assertFalse(
+        root.path("summary").path("exclusions").get(0).has("violations"),
+        "a short prefix is not a report violation");
+  }
+
+  @Test
+  void failedReportWithExtraRequestsIsInvalid() throws IOException {
+    FakeStarter starter = new FakeStarter();
+    starter.behaviors.put("java-controlled-tiny-32-headline", Behavior.FAILED);
+    starter.reportMutator =
+        workerBlock -> {
+          ArrayNode requests = (ArrayNode) workerBlock.get("requests");
+          requests.add(BaselineReportFixtures.request(requests.size(), "measured", 0.06));
+        };
+    ObjectNode spec =
+        buildSpec(
+            setup(),
+            base.resolve("session-extra-requests"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_WORKERS_FAILED, exit);
+    JsonNode root = session(spec);
+    assertEquals("invalid-report", root.path("workers").get(0).path("outcome").asString(""));
+    assertTrue(
+        root.path("summary")
+            .path("exclusions")
+            .get(0)
+            .path("violations")
+            .toString()
+            .contains("more than the job's 3"));
+  }
+
+  @Test
+  void killedWorkerIsCrashedWithKillNote() throws IOException {
+    // The worker wedged: the launcher killed it after the wait limit and classified the cell
+    // from the artifacts it left (none here: crashed), recording the kill in the exclusion.
+    FakeStarter starter = new FakeStarter();
+    starter.killedCell = "java-controlled-tiny-32-headline";
+    ObjectNode spec =
+        buildSpec(
+            setup(),
+            base.resolve("session-killed"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_WORKERS_FAILED, exit);
+    JsonNode root = session(spec);
+    assertEquals("crashed", root.path("workers").get(0).path("outcome").asString(""));
+    // The recorded wait limit is min(timeout_s + 90 s backstop, cell_time_budget_s) = 390.
+    assertTrue(
+        root.path("summary")
+            .path("exclusions")
+            .get(0)
+            .path("violations")
+            .toString()
+            .contains("launcher killed the worker after the wait limit (390 s)"));
+  }
+
+  @Test
+  void killedWorkerWithClaimIsDead() throws IOException {
+    FakeStarter starter = new FakeStarter();
+    starter.behaviors.put("java-controlled-tiny-32-headline", Behavior.DEAD);
+    starter.killedCell = "java-controlled-tiny-32-headline";
+    ObjectNode spec =
+        buildSpec(
+            setup(),
+            base.resolve("session-killed-dead"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_WORKERS_FAILED, exit);
+    JsonNode root = session(spec);
+    assertEquals("dead", root.path("workers").get(0).path("outcome").asString(""));
+    assertTrue(
+        root.path("summary")
+            .path("exclusions")
+            .get(0)
+            .path("violations")
+            .toString()
+            .contains("launcher killed the worker after the wait limit"),
+        "the kill note is recorded even when the claim already marks the cell dead");
+  }
+
+  @Test
+  void sessionBudgetStopsForking() throws IOException {
+    // A one-second session budget with a fork that takes longer: the second worker is never
+    // set up and is recorded not-started with the budget reason, the first ran to completion.
+    Setup setup =
+        setup(MANIFEST.replace("\"session_time_budget_s\": 7200", "\"session_time_budget_s\": 1"));
+    FakeStarter starter = new FakeStarter();
+    starter.startDelayMs = 1200L;
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            base.resolve("session-budget"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"),
+            worker("java", "controlled", "tiny", 512, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_WORKERS_FAILED, exit);
+    JsonNode root = session(spec);
+    assertEquals("ok", root.path("workers").get(0).path("status").asString(""));
+    assertEquals("not-started", root.path("workers").get(1).path("outcome").asString(""));
+    assertEquals(1, root.path("session").path("fork_order").size());
+    assertTrue(
+        root.path("summary")
+            .path("exclusions")
+            .get(0)
+            .path("violations")
+            .toString()
+            .contains("session time budget exceeded"));
+  }
+
+  @Test
+  void runPolicyMissingFieldIsRefused() throws IOException {
+    Setup setup = setup(MANIFEST.replace("\"emitted_tokens\"", "\"emitted_tokens_absent\""));
+    assertRefused(
+        buildSpec(
+            setup,
+            base.resolve("session-policy-missing"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline")),
+        new FakeStarter());
+  }
+
+  @Test
+  void runPolicyNonpositiveTimeoutIsRefused() throws IOException {
+    Setup setup = setup(MANIFEST.replace("\"worker_timeout_s\": 300", "\"worker_timeout_s\": 0"));
+    assertRefused(
+        buildSpec(
+            setup,
+            base.resolve("session-policy-zero"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline")),
+        new FakeStarter());
+  }
+
+  @Test
+  void runPolicyNonIntegerIsRefused() throws IOException {
+    Setup setup = setup(MANIFEST.replace("\"warmups\": 0", "\"warmups\": \"0\""));
+    assertRefused(
+        buildSpec(
+            setup,
+            base.resolve("session-policy-string"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline")),
+        new FakeStarter());
+  }
+
+  @Test
+  void digestPinMismatchIsRefused() throws IOException {
+    Setup setup = setup();
+    // A hand-edited manifest (the seam now names a different digest) is a spec failure, even
+    // though its self-consistent digest would satisfy the workers' re-hash.
+    BaselineBenchmark.setPinnedManifestSha256ForTest("0".repeat(64));
+    assertRefused(
+        buildSpec(
+            setup,
+            base.resolve("session-digest-pin"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline")),
+        new FakeStarter());
+  }
+
+  @Test
+  void pinnedDigestMatchesFrozenManifest() throws IOException, URISyntaxException {
+    // Backstop (parity with the root build's verifyDecodeBaselineManifest): the launcher's
+    // pinned digest must be this checkout's frozen manifest digest, so a manifest re-pin that
+    // forgets the launcher fails the build instead of silently accepting edited manifests.
+    Path here =
+        Path.of(
+            Objects.requireNonNull(
+                    BaselineBenchmarkTest.class.getProtectionDomain().getCodeSource().getLocation())
+                .toURI());
+    Path root = here;
+    while (root != null
+        && !Files.isRegularFile(root.resolve("tools/decode-baseline/workloads.json"))) {
+      root = root.getParent();
+    }
+    assertNotNull(root, "could not find the repository root from the test class location");
+    assertEquals(
+        BaselineBenchmark.PINNED_MANIFEST_SHA256,
+        BaselineBenchmark.sha256File(root.resolve("tools/decode-baseline/workloads.json")));
   }
 
   private void assertRefused(ObjectNode specNode, FakeStarter starter) {

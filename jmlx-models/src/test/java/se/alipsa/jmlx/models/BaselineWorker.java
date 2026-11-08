@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
@@ -20,9 +21,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
@@ -140,6 +143,14 @@ public final class BaselineWorker {
 
   private static final AtomicBoolean fired = new AtomicBoolean();
   private static final AtomicBoolean finished = new AtomicBoolean();
+
+  /**
+   * Monotonic per-run token: each {@link #run} increments it, and that run's watchdog captures it.
+   * A watchdog whose token no longer matches the current one is stale (a later run owns the shared
+   * run state now) and must drop every remaining action silently.
+   */
+  private static final AtomicLong runToken = new AtomicLong();
+
   private static Thread mainWorkerThread;
 
   private BaselineWorker() {}
@@ -169,17 +180,28 @@ public final class BaselineWorker {
   static int run(JsonNode job) {
     resetRunState();
     mainWorkerThread = Thread.currentThread();
-    fired.set(false);
-    finished.set(false);
+    long token;
+    // The token increment and the fired/finished reset are one critical section: a watchdog from
+    // a previous run must see either the old token with the old flags, or the new token with the
+    // new flags — never the new flags under the old token.
+    synchronized (REPORT_LOCK) {
+      token = runToken.incrementAndGet();
+      fired.set(false);
+      finished.set(false);
+    }
     utcStart = utcNow();
     try {
-      return execute(job);
+      return execute(job, token);
     } catch (WorkerError e) {
       return handleValidationFailure(e);
     } catch (Exception e) {
       return handleUnexpected(e);
     } finally {
-      finished.set(true);
+      synchronized (REPORT_LOCK) {
+        if (runToken.get() == token) {
+          finished.set(true);
+        }
+      }
     }
   }
 
@@ -203,7 +225,7 @@ public final class BaselineWorker {
     modelScope = null;
   }
 
-  private static int execute(JsonNode job) throws Exception {
+  private static int execute(JsonNode job, long token) throws Exception {
     // The launcher creates the directory; the claim below can only distinguish "already
     // claimed" from "cannot be written", so a missing (or file-in-the-way) out_dir is
     // rejected explicitly, not as an IO error from the claim create.
@@ -269,7 +291,7 @@ public final class BaselineWorker {
                 "vendor",
                 System.getProperty("java.vendor", ""),
                 "flags",
-                System.getProperty("java.vm.command", "")),
+                String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments())),
             "device",
             Map.of(
                 "device_name", hostString("hw.model", ""),
@@ -304,7 +326,7 @@ public final class BaselineWorker {
     // The deadline sits at worker-ready, before model load — the same anchor the pinned
     // Python worker uses (findings section 13.4 item 13/14 placement).
     long deadlineNanos = System.nanoTime() + v.timeoutS() * 1_000_000_000L;
-    Thread watchdog = new Thread(() -> watchdog(deadlineNanos), "baseline-worker-watchdog");
+    Thread watchdog = new Thread(() -> watchdog(deadlineNanos, token), "baseline-worker-watchdog");
     watchdog.setDaemon(true);
     watchdog.start();
 
@@ -320,19 +342,20 @@ public final class BaselineWorker {
       }
       HfTokenizer tokenizer = null;
       if ("stock".equals(v.adapter())) {
-        assertStockStopSet(v.artifactDir(), v.caseName(), v.stopTokenIds());
+        // The tokenizer loads first: its special-token eos participates in the resolved stop set.
         tokenizer = HfTokenizer.fromDirectory(v.artifactDir());
+        assertStockStopSet(v.artifactDir(), tokenizer, v.caseName(), v.stopTokenIds());
         notes.add(
-            "stock stop set resolved from the artifact (tokenizer eos plus generation_config.json"
-                + " and config.json eos_token_id) equals the manifest frozen set for "
+            "stock stop set resolved from the artifact (tokenizer special-token eos plus"
+                + " generation_config.json and config.json eos_token_id) equals the manifest"
+                + " frozen set for "
                 + v.caseName());
         notes.add(
             "stock (public generate with the checkpoint's own HfTokenizer) retains the"
                 + " generation loop's incremental detokenization and finalization inside the"
                 + " stream; event times include it. unused_lookahead_forwards is 0: the"
                 + " synchronous Java loop evaluates every step at its selection boundary and"
-                + " queues no lookahead forward; the full-generation boundary is an explicit"
-                + " drain evaluate after the call returns");
+                + " queues no lookahead forward, so nothing is pending when generate returns");
       }
       if ("fixed-continuation".equals(v.mode())) {
         notes.add(
@@ -399,22 +422,33 @@ public final class BaselineWorker {
 
   /**
    * Hard backstop: if the main loop has not exited shortly after the deadline, write the timeout
-   * report and exit 3. When the report is already written the status overwrite is skipped (the main
-   * thread's report stays authoritative); the exit is unconditional. When the run finished before
-   * the deadline, or finished normally after a fire, no backstop exit is performed.
+   * report and exit 3. The watchdog carries its run's token: if a later run has started in the same
+   * process, the shared run state (flags, status, out_dir) belongs to that run, so every remaining
+   * action is dropped silently — a stale watchdog must never fire into, report for, or exit on
+   * behalf of a healthy later run. When the report is already written the status overwrite is
+   * skipped (the main thread's report stays authoritative); the exit is unconditional. When the run
+   * finished before the deadline, or finished normally after a fire, no backstop exit is performed.
    */
-  private static void watchdog(long deadlineNanos) {
+  private static void watchdog(long deadlineNanos, long token) {
     try {
       while (!fired.get() && !finished.get()) {
         Thread.sleep(1000L);
-        if (finished.get()) {
+        if (runToken.get() != token || finished.get()) {
           return;
         }
         if (System.nanoTime() < deadlineNanos) {
           continue;
         }
-        fired.set(true);
-        break;
+        boolean fire;
+        synchronized (REPORT_LOCK) {
+          fire = runToken.get() == token && !fired.get() && !finished.get();
+          if (fire) {
+            fired.set(true);
+          }
+        }
+        if (!fire) {
+          return;
+        }
       }
       if (!fired.get()) {
         return;
@@ -422,13 +456,16 @@ public final class BaselineWorker {
       Thread.sleep(watchdogGraceMs);
       boolean alreadyWritten;
       synchronized (REPORT_LOCK) {
+        if (runToken.get() != token) {
+          return;
+        }
         alreadyWritten = reportWritten;
         if (!alreadyWritten) {
           status = "timeout";
           failureReason = "worker wall-clock timeout exceeded";
         }
       }
-      if (alreadyWritten || finished.get()) {
+      if (alreadyWritten || finished.get() || runToken.get() != token) {
         return;
       }
       try {
@@ -564,16 +601,23 @@ public final class BaselineWorker {
 
   /**
    * The stock stop-set assertion (findings section 13.4 item 4): the artifact-resolved set — the
-   * tokenizer's eos ID plus the {@code generation_config.json} and {@code config.json} {@code
-   * eos_token_id} values — must equal the manifest frozen set, so a future drift fails the worker
-   * instead of changing behavior silently.
+   * tokenizer's special-token eos id (when it has one) plus the {@code generation_config.json} and
+   * {@code config.json} {@code eos_token_id} values — must equal the manifest frozen set, so a
+   * future drift fails the worker instead of changing behavior silently. The tokenizer's own eos is
+   * part of the resolved set because {@code HfTokenizer} is the stop set the stock path actually
+   * feeds the generation loop.
    */
-  private static void assertStockStopSet(Path artifactDir, String caseName, List<Integer> frozen) {
+  private static void assertStockStopSet(
+      Path artifactDir, HfTokenizer tokenizer, String caseName, List<Integer> frozen) {
     Set<Integer> resolved = new TreeSet<>();
     JsonNode generationConfig = readJsonOrNull(artifactDir.resolve("generation_config.json"));
     JsonNode config = readJsonOrNull(artifactDir.resolve("config.json"));
     collectEos(generationConfig, resolved);
     collectEos(config, resolved);
+    OptionalInt tokenizerEos = tokenizer.eosTokenId();
+    if (tokenizerEos.isPresent()) {
+      resolved.add(tokenizerEos.getAsInt());
+    }
     if (!resolved.equals(new TreeSet<>(frozen))) {
       throw new WorkerError(
           "resolved stop set "

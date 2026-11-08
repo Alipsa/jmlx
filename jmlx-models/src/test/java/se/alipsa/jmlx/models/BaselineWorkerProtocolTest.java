@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -227,6 +228,32 @@ class BaselineWorkerProtocolTest {
   }
 
   @Test
+  void stockFailsWhenTokenizerEosExtendsTheFrozenStopSet(@TempDir Path temp) throws Exception {
+    // The fixture gains a special-token eos the config files do not carry: the resolved stop
+    // set becomes {3, 4} and must fail the assertion instead of silently changing behavior.
+    // The eos content is a family control token, spelled with unicode escapes here: the
+    // literal control string must never appear in the test sources.
+    // CHECKSTYLE.SUPPRESS: AvoidEscapedUnicodeCharacters for +1 lines
+    String eosContent = "\u003c|im_end|\u003e";
+    String tokenizerJson =
+        BaselineWorkerTestSupport.DEFAULT_TOKENIZER_JSON.replace(
+            "\"added_tokens\":[]",
+            "\"added_tokens\":[{\"id\":4,\"content\":\""
+                + eosContent
+                + "\",\"special\":true,\"lstrip\":false,\"rstrip\":false,"
+                + "\"normalized\":false}]");
+    BaselineWorkerTestSupport.Workspace ws =
+        BaselineWorkerTestSupport.buildWithTokenizer(temp, 300, 60, 8, 1, tokenizerJson);
+    BaselineWorker.setAnchorsForTest(ws.manifestPath(), ws.repoDir());
+    createOutDir(temp, "stock");
+    Path job = writeJob(temp, ws, "stock", j -> j.put("adapter", "stock"));
+
+    RunOutcome outcome = runCapturing(readJob(job));
+
+    assertFailedReportWithReason(temp.resolve("stock"), outcome.exitCode(), "resolved stop set");
+  }
+
+  @Test
   void fixedContinuationReportsPerStepChecks(@TempDir Path temp) throws Exception {
     BaselineWorkerTestSupport.Workspace ws = setup(temp, 300, 60, 8, 1);
     createOutDir(temp, "fc");
@@ -360,6 +387,101 @@ class BaselineWorkerProtocolTest {
     worker.interrupt();
     worker.join(10_000);
     assertFalse(worker.isAlive());
+  }
+
+  @Test
+  void staleWatchdogCannotActOnALaterRun(@TempDir Path temp) throws Exception {
+    // Run A (tiny workspace a) times out on a wedged request and its watchdog enters the grace
+    // period; run B (workspace b) starts in the same process while A's watchdog is still alive.
+    // Without the run-token disarm, A's watchdog wakes inside B's window, overwrites B's status,
+    // writes a timeout report into B's directory (so B's own report write is refused) and fires
+    // the exit hook; with it, B completes normally and the hook never fires.
+    BaselineWorkerTestSupport.Workspace wsA =
+        BaselineWorkerTestSupport.build(temp.resolve("a"), 2, 60, 8, 0);
+    createOutDir(temp.resolve("a"), "outA");
+    Path jobA = writeJob(temp.resolve("a"), wsA, "outA", ignored -> {});
+
+    BaselineWorker.setWatchdogGraceMsForTest(4000);
+    BaselineWorker.setRequestDelayMsForTest(10_000);
+    AtomicInteger hookFires = new AtomicInteger();
+    BaselineWorker.setExitHookForTest(hookFires::addAndGet);
+    // Anchors for run A; switched to B's workspace once A has finished validating.
+    BaselineWorker.setAnchorsForTest(wsA.manifestPath(), wsA.repoDir());
+
+    AtomicReference<Integer> codeA = new AtomicReference<>();
+    Thread runA =
+        new Thread(
+            () -> {
+              try {
+                codeA.set(BaselineWorker.run(readJob(jobA)));
+              } catch (Exception e) {
+                // The run completes on its own; any exception here is a test error.
+                codeA.set(-1);
+              }
+            },
+            "protocol-test-stale-watchdog-a");
+    runA.start();
+
+    // Wait until A has claimed, validated and written worker-ready (its request is now wedged
+    // in the 10 s delay), then wait past A's 2 s deadline so its watchdog has fired and is in
+    // the 4 s grace sleep.
+    Path readyA = temp.resolve("a/outA/worker-ready");
+    long by = System.nanoTime() + 20_000_000_000L;
+    while (!Files.exists(readyA) && System.nanoTime() < by) {
+      Thread.sleep(50);
+    }
+    assertTrue(Files.exists(readyA), "run A reached worker-ready");
+    Thread.sleep(2500);
+
+    // Start run B in the same process. Its requests must read the short delay, so the shared
+    // seam is switched now; run A has only one request and already read the long one. Building
+    // B's workspace here (rather than up front) is just file writes with no timing dependency.
+    BaselineWorkerTestSupport.Workspace wsB =
+        BaselineWorkerTestSupport.build(temp.resolve("b"), 6, 60, 8, 1);
+    createOutDir(temp.resolve("b"), "outB");
+    BaselineWorker.setRequestDelayMsForTest(2500);
+    BaselineWorker.setAnchorsForTest(wsB.manifestPath(), wsB.repoDir());
+    Path jobB = writeJob(temp.resolve("b"), wsB, "outB", ignored -> {});
+    AtomicReference<Integer> codeB = new AtomicReference<>();
+    Thread runB =
+        new Thread(
+            () -> {
+              try {
+                codeB.set(BaselineWorker.run(readJob(jobB)));
+              } catch (Exception e) {
+                codeB.set(-1);
+              }
+            },
+            "protocol-test-stale-watchdog-b");
+    runB.start();
+
+    runB.join(30_000);
+    assertFalse(runB.isAlive(), "run B finished");
+    assertEquals(
+        BaselineWorker.EXIT_OK,
+        codeB.get(),
+        "the later run must not be timed out, report-refused or exited by a stale watchdog");
+    JsonNode workerB = readReport(temp.resolve("b/outB")).path("worker");
+    assertEquals("ok", workerB.path("status").asString(null));
+    assertTrue(workerB.path("failure_reason").isNull());
+    assertEquals(
+        wsB.manifestSha256(),
+        workerB.path("identity").path("manifest_sha256").asString(null),
+        "B's report is B's own, not a stale timeout report written for run A");
+    assertEquals(0, hookFires.get(), "no backstop exit may fire for a healthy later run");
+
+    // Run A finishes on its own after its wedged request elapses; it must not hang. Run A's own
+    // outcome is an in-process artifact, not a protocol result: when its wedged request resumes,
+    // run B has already replaced the process-static model scope, and the scope is confined to
+    // B's thread, so A's MLX access fails and A's report write goes to the (now static) B
+    // directory, where it is refused because B's report already exists. The worker's design is
+    // one run per process (production forks a fresh JVM per cell), so A is expected to leave no
+    // report of its own; the test's gate is that the later run B stays clean.
+    runA.join(30_000);
+    assertFalse(runA.isAlive(), "run A finished");
+    assertFalse(
+        Files.exists(temp.resolve("a/outA/report.json")),
+        "run A's resumed request fails on the thread-confined scope and leaves no report");
   }
 
   @Test

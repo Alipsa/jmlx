@@ -44,7 +44,9 @@ tasks.register('benchmarkBaseline', JavaExec) {
     // it with the "@models-test" alias, which the launcher resolves through this property.
     systemProperty('jmlx.baseline.models.test.classpath',
             project(':jmlx-models').sourceSets.test.runtimeClasspath.asPath)
-    dependsOn project(':jmlx-models').tasks.named('testClasses')
+    // The runtime classpath includes the test-fixtures jars (jmlx-ffi's are published into the
+    // classpath via testFixtures), so depend on the FileCollection itself, not just testClasses.
+    dependsOn project(':jmlx-models').sourceSets.test.runtimeClasspath
 }
 
 tasks.named('check') {

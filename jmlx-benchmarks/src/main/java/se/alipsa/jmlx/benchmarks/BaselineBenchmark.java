@@ -1,6 +1,7 @@
 package se.alipsa.jmlx.benchmarks;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,13 +33,20 @@ import tools.jackson.databind.node.ObjectNode;
  * exclusion list and type-7 quantiles over the measured samples.
  *
  * <p>Rules: the session directory ({@code out_root}) must not pre-exist and must be outside the
- * repository — the launcher creates it and refuses to reuse or overwrite; every worker gets its own
- * launcher-created directory and job file; the precision mode is set in each child process
- * environment (the Java worker verifies it, the Python worker sets it from the job); a claimed
- * directory without a report is dead, a worker that left neither claim nor report crashed — both
- * are excluded and never presented as success. Exit codes: 0 all workers ok, 1 spec validation
- * failure (nothing forked), 2 at least one failed/timeout/dead/crashed/not-started/invalid-report
- * worker (the session report is still written).
+ * repository — the launcher creates it and refuses to reuse or overwrite; the frozen manifest's
+ * file digest must equal the pinned digest (an edited manifest is a spec failure, and the workers'
+ * re-hash is a real check, not a tautology); the manifest {@code run_policy} must carry finite
+ * limits — missing or nonpositive timeouts, budgets or request counts are a spec failure, never
+ * silently defaulted; every worker gets its own launcher-created directory and job file; the
+ * precision mode is set in each child process environment (the Java worker verifies it, the Python
+ * worker sets it from the job); a claimed directory without a report is dead, a worker that left
+ * neither claim nor report crashed — both are excluded and never presented as success. Every fork
+ * waits at most {@code min(timeout_s + 90 s, cell_time_budget_s)} for its worker (a longer-waiting
+ * worker is killed and its cell classified from the artifacts it left), and the session stops
+ * forking once {@code session_time_budget_s} has elapsed (the remaining workers are recorded
+ * not-started). Exit codes: 0 all workers ok, 1 spec validation failure (nothing forked), 2 at
+ * least one failed/timeout/dead/crashed/not-started/invalid-report worker (the session report is
+ * still written).
  *
  * <p>Opt-in local tooling, not part of {@code check} or the publication surface.
  */
@@ -46,6 +55,33 @@ public final class BaselineBenchmark {
   public static final int EXIT_SPEC_FAILED = 1;
   public static final int EXIT_WORKERS_FAILED = 2;
 
+  /**
+   * The exit code a {@link WorkerStarter} returns when it had to kill a worker that did not exit
+   * within the launcher's per-worker wait limit. Not a process exit code; the worker left whatever
+   * protocol artifacts it had (its cell is then classified dead/crashed from them).
+   */
+  public static final int WORKER_KILLED = -1;
+
+  /**
+   * Headroom the launcher gives a worker past its own wall-clock timeout before the wait limit is
+   * reached: the worker's 30 s backstop grace plus 60 s of process-level margin.
+   */
+  private static final long WAIT_LIMIT_BACKSTOP_S = 90L;
+
+  /** The deadline the launcher gives a killed worker to die before it gives up waiting for it. */
+  private static final long KILL_SETTLE_S = 10L;
+
+  /**
+   * The digest of the frozen workload manifest (findings section 2; backstop mirrored by {@code
+   * verifyDecodeBaselineManifest} in the root build). The launcher rejects a manifest whose file
+   * digest differs, so an edited manifest cannot stay self-consistent and pass the workers'
+   * re-hash; a re-pin follows findings section 13.5. Mutable only through the test seam below.
+   */
+  static final String PINNED_MANIFEST_SHA256 =
+      "e8c7730178a2e8f1bf1ace461db14119d2394fff4f60fa90deca34ef4857a270";
+
+  static String pinnedManifestSha256 = PINNED_MANIFEST_SHA256;
+
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /** The per-request metrics aggregated from ok worker reports into the summary. */
@@ -53,21 +89,49 @@ public final class BaselineBenchmark {
     "ttft_s", "prefill_s", "full_generation_s", "streaming_decode_tps", "step_region_s"
   };
 
+  /**
+   * The per-step time of a fixed-continuation request, aggregated over the measured requests' steps
+   * (the contract's decode comparison; the step region is not decode time). Sampled per step, so a
+   * cell with {@code n} measured requests contributes {@code 32 * n} samples pooled over the frozen
+   * positions 33..64.
+   */
+  private static final String STEP_TIME_METRIC = "step_s";
+
+  /**
+   * The exclusion reason for a worker the launcher never reached (starter failure / setup error).
+   */
+  private static final String REASON_LAUNCHER = "launcher failed to start the worker";
+
+  /** The exclusion reason for a worker skipped because the session's time budget had elapsed. */
+  private static final String REASON_BUDGET = "session time budget exceeded; worker not started";
+
   /** One worker process launch; injectable for the pure-Java launcher tests. */
   public interface WorkerStarter {
-    /** Forks the worker for {@code job} and returns its exit code. */
-    int start(BaselineJob job, Path jobFile, Path stderrLog) throws Exception;
+    /**
+     * Forks the worker for {@code job}, waits at most {@code waitLimitSeconds} for it to exit and
+     * returns its exit code; a worker that has not exited by the limit is killed and {@link
+     * #WORKER_KILLED} is returned instead.
+     */
+    int start(BaselineJob job, Path jobFile, Path stderrLog, long waitLimitSeconds)
+        throws Exception;
   }
 
   private static final WorkerStarter FORK =
-      (job, jobFile, stderrLog) -> {
+      (job, jobFile, stderrLog, waitLimitSeconds) -> {
         ProcessBuilder builder = new ProcessBuilder(job.command(jobFile));
         builder.environment().put("MLX_ENABLE_TF32", job.precisionEnv());
         // redirectError(File) creates (or truncates) the log; the worker prints nothing on stdout.
         builder.redirectError(stderrLog.toFile());
         builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
         Process process = builder.start();
-        return process.waitFor();
+        // The wait limit sits past the worker's own timeout plus its backstop grace: a healthy
+        // worker always reports (or fails) on its own, so the kill only fires for a wedged process.
+        if (!process.waitFor(waitLimitSeconds, TimeUnit.SECONDS)) {
+          process.destroyForcibly();
+          process.waitFor(KILL_SETTLE_S, TimeUnit.SECONDS);
+          return WORKER_KILLED;
+        }
+        return process.exitValue();
       };
 
   private final WorkerStarter starter;
@@ -170,6 +234,20 @@ public final class BaselineBenchmark {
         violations.add("the frozen manifest is not readable JSON: " + e.getMessage());
       }
     }
+    // The digest pin: a manifest that does not byte-match the frozen one is a spec failure, so
+    // the workers' re-hash of the manifest against the job is a real check, not a self-hash.
+    if (manifestSha != null && !pinnedManifestSha256.equals(manifestSha)) {
+      violations.add(
+          "the frozen manifest's digest "
+              + manifestSha
+              + " differs from the pinned digest "
+              + pinnedManifestSha256
+              + " (an edited manifest is refused; a re-pin follows findings section 13.5)");
+    }
+    // Finite limits (findings section 7.4): the run_policy's timeouts, budgets and request counts
+    // must be present and finite; missing or nonpositive values are a spec failure, never a
+    // silent default.
+    validateRunPolicy(manifestNode, violations);
     Set<String> seenCells = new LinkedHashSet<>();
     for (int i = 0; i < workers.size(); i++) {
       validateEntry(
@@ -218,9 +296,19 @@ public final class BaselineBenchmark {
 
     // Fork sequentially in the spec's fork order. A worker that exits nonzero is a normal
     // outcome (its report carries the failure); a starter exception is launcher-side and stops
-    // the session — the remaining workers are recorded not-started, never silently dropped.
+    // the session — the remaining workers are recorded not-started, never silently dropped. The
+    // session stops forking once its time budget has elapsed (the remaining workers are recorded
+    // not-started with the budget reason), and each fork waits at most
+    // min(timeout_s + 90 s, cell_time_budget_s) for its worker before killing it.
+    JsonNode policy = manifestNode.path("run_policy");
+    int cellBudgetS = policy.path("cell_time_budget_s").asInt();
+    int sessionBudgetS = policy.path("session_time_budget_s").asInt();
+    long sessionStartNanos = System.nanoTime();
+    long sessionBudgetNanos = sessionBudgetS * 1_000_000_000L;
+    boolean budgetExhausted = false;
     List<BaselineJob> builtJobs = new ArrayList<>();
-    List<Boolean> started = new ArrayList<>();
+    List<String> notStartedReason = new ArrayList<>();
+    Map<String, Long> killed = new LinkedHashMap<>();
     for (int i = 0; i < workers.size(); i++) {
       BaselineJob.WorkerEntry entry = workers.get(i);
       String dirName =
@@ -230,6 +318,14 @@ public final class BaselineBenchmark {
               entry.caseName(),
               entry.promptLength(),
               entry.mode());
+      if (!budgetExhausted && System.nanoTime() - sessionStartNanos >= sessionBudgetNanos) {
+        budgetExhausted = true;
+      }
+      if (budgetExhausted) {
+        builtJobs.add(null);
+        notStartedReason.add(REASON_BUDGET);
+        continue;
+      }
       Path outDir = session.resolve(dirName);
       Path jobFile = jobsDir.resolve(dirName + ".job.json");
       BaselineJob job = null;
@@ -252,22 +348,26 @@ public final class BaselineBenchmark {
       }
       boolean forked = job != null;
       if (forked) {
+        long waitLimitS = Math.min(job.timeoutS() + WAIT_LIMIT_BACKSTOP_S, cellBudgetS);
         try {
-          starter.start(job, jobFile, stderrs.resolve(dirName + ".log"));
+          int code = starter.start(job, jobFile, stderrs.resolve(dirName + ".log"), waitLimitS);
+          if (code == WORKER_KILLED) {
+            killed.put(dirName, waitLimitS);
+          }
         } catch (Exception e) {
           System.err.println("worker " + dirName + " could not be started: " + e);
           forked = false;
         }
       }
       builtJobs.add(job);
-      started.add(forked);
+      notStartedReason.add(forked ? null : REASON_LAUNCHER);
       if (!forked) {
         break;
       }
     }
     for (int i = builtJobs.size(); i < workers.size(); i++) {
       builtJobs.add(null);
-      started.add(false);
+      notStartedReason.add(REASON_LAUNCHER);
     }
 
     Assembled assembled =
@@ -280,7 +380,8 @@ public final class BaselineBenchmark {
             utcStart,
             workers,
             builtJobs,
-            started);
+            notStartedReason,
+            killed);
     boolean allOk = assembled.outcomes().stream().allMatch("ok"::equals);
     try {
       Files.writeString(
@@ -306,7 +407,8 @@ public final class BaselineBenchmark {
       String utcStart,
       List<BaselineJob.WorkerEntry> workers,
       List<BaselineJob> builtJobs,
-      List<Boolean> started) {
+      List<String> notStartedReason,
+      Map<String, Long> killed) {
     ObjectNode root = MAPPER.createObjectNode();
     root.put("schema", BaselineReportValidator.SCHEMA);
     ObjectNode sessionBlock = root.putObject("session");
@@ -322,7 +424,8 @@ public final class BaselineBenchmark {
     ObjectNode java = sessionBlock.putObject("java");
     java.put("vendor", System.getProperty("java.vendor", ""));
     java.put("version", System.getProperty("java.version", ""));
-    java.put("flags", System.getProperty("java.vm.command", ""));
+    // The launcher JVM's own input arguments (java.vm.command does not exist on JDK 25).
+    java.put("flags", String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments()));
     // Replaced below when a Python worker's identity names its venv (WP1 runs are Java-only).
     sessionBlock.putNull("python");
     sessionBlock.set("native_pins", nativePins(repo));
@@ -350,10 +453,9 @@ public final class BaselineBenchmark {
               entry.caseName(),
               entry.promptLength(),
               entry.mode());
-      if (job == null || !started.get(i)) {
+      if (job == null || notStartedReason.get(i) != null) {
         outcomes.add("not-started");
-        addExclusion(
-            exclusions, dirName, "not-started", List.of("launcher failed to start the worker"));
+        addExclusion(exclusions, dirName, "not-started", List.of(notStartedReason.get(i)));
         workerRecords.add(stubRecord(entry, dirName, "not-started", null));
         continue;
       }
@@ -364,6 +466,11 @@ public final class BaselineBenchmark {
       List<String> reportViolations = List.of();
       if (report != null) {
         reportViolations = BaselineReportValidator.validate(report);
+        if (reportViolations.isEmpty()) {
+          // The report must also describe the job the launcher launched: a report from a
+          // different cell (or a stale/differing identity) is invalid, not silently counted.
+          reportViolations = jobViolations(job, report);
+        }
         outcome =
             reportViolations.isEmpty()
                 ? report.path("worker").path("status").asString("failed")
@@ -371,6 +478,13 @@ public final class BaselineBenchmark {
       } else {
         outcome =
             Files.exists(session.resolve(dirName).resolve("worker-claim")) ? "dead" : "crashed";
+        if (killed.containsKey(dirName)) {
+          reportViolations =
+              List.of(
+                  "launcher killed the worker after the wait limit ("
+                      + killed.get(dirName)
+                      + " s)");
+        }
       }
       outcomes.add(outcome);
       if (!"ok".equals(outcome)) {
@@ -411,6 +525,105 @@ public final class BaselineBenchmark {
     }
   }
 
+  /**
+   * Cross-checks a schema-valid report against the job the launcher launched for it (the frozen
+   * contract says a report describes the cell it ran). The worker fields and the identity's
+   * manifest digest and precision mode must match the job exactly, so a report from a different
+   * cell — or a stale identity — is invalid, never counted under this job's cell. An {@code ok}
+   * report must also carry exactly the job's request mix (an ok report with no requests is
+   * rejected); a failed/timeout report may carry a shorter complete-prefix of it.
+   */
+  static List<String> jobViolations(BaselineJob job, JsonNode report) {
+    List<String> violations = new ArrayList<>();
+    JsonNode worker = report.path("worker");
+    checkJobField(violations, "runtime", worker.path("runtime").asString(null), job.runtime());
+    checkJobField(violations, "adapter", worker.path("adapter").asString(null), job.adapter());
+    checkJobField(violations, "case", worker.path("case").asString(null), job.caseName());
+    checkJobField(
+        violations,
+        "prompt_length",
+        worker.path("prompt_length").isInt()
+            ? Integer.toString(worker.path("prompt_length").asInt())
+            : null,
+        Integer.toString(job.promptLength()));
+    checkJobField(violations, "mode", worker.path("mode").asString(null), job.mode());
+    checkJobField(
+        violations,
+        "identity.manifest_sha256",
+        worker.path("identity").path("manifest_sha256").asString(null),
+        job.manifestSha256());
+    checkJobField(
+        violations,
+        "identity.precision_env",
+        worker.path("identity").path("precision_env").asString(null),
+        "MLX_ENABLE_TF32=" + job.precisionEnv());
+    List<String> expectedKinds = expectedKinds(job);
+    JsonNode requests = worker.path("requests");
+    int size = requests.isArray() ? requests.size() : -1;
+    if ("ok".equals(worker.path("status").asString(null))) {
+      if (size != expectedKinds.size()) {
+        violations.add(
+            "an ok report must carry exactly the job's "
+                + expectedKinds.size()
+                + " requests (first="
+                + job.first()
+                + ", warmups="
+                + job.warmups()
+                + ", measured="
+                + job.measured()
+                + "); found "
+                + size);
+      }
+    } else if (size > expectedKinds.size()) {
+      violations.add(
+          "a non-ok report carries "
+              + size
+              + " requests, more than the job's "
+              + expectedKinds.size());
+    }
+    if (requests.isArray() && size >= 0) {
+      // The kind sequence must match the job's mix as a prefix; extra requests were already
+      // rejected above, so this only walks as far as the job's own mix runs.
+      int checked = Math.min(size, expectedKinds.size());
+      for (int k = 0; k < checked; k++) {
+        if (!expectedKinds.get(k).equals(requests.get(k).path("kind").asString(null))) {
+          violations.add("requests[" + k + "].kind differs from the job's request mix");
+          break;
+        }
+      }
+    }
+    return violations;
+  }
+
+  private static void checkJobField(
+      List<String> violations, String field, String actual, String expected) {
+    if (!expected.equals(actual)) {
+      violations.add(
+          "report "
+              + field
+              + " '"
+              + actual
+              + "' differs from the launched job's '"
+              + expected
+              + "'");
+    }
+  }
+
+  /** The job's request kinds in order: firsts, then warmups, then measureds. */
+  private static List<String> expectedKinds(BaselineJob job) {
+    List<String> kinds = new ArrayList<>(job.first() + job.warmups() + job.measured());
+    for (int i = 0; i < job.first(); i++) {
+      kinds.add("first");
+    }
+    for (int i = 0; i < job.warmups(); i++) {
+      kinds.add("warmup");
+    }
+    for (int i = 0; i < job.measured(); i++) {
+      kinds.add("measured");
+    }
+    return kinds;
+  }
+
   private static void addExclusion(
       ArrayNode exclusions, String dirName, String reason, List<String> reportViolations) {
     ObjectNode exclusion = exclusions.addObject();
@@ -442,11 +655,13 @@ public final class BaselineBenchmark {
   }
 
   /**
-   * Collects the summary samples: measured requests per (runtime, mode, case, length) cell and
-   * first requests per (runtime, mode); warmups are excluded from both. Modes are never pooled —
-   * headline and fixed-continuation measure different quantities, and reference-pair requests run
-   * the observed (unprimed) cache regime, whose samples belong to the WP3 {@code pairs}
-   * aggregation, never to the primed headline quantiles.
+   * Collects the summary samples: measured requests per (runtime, adapter, mode, case, length) cell
+   * and first requests per (runtime, adapter, mode, case, length); warmups are excluded from both.
+   * Modes are never pooled — headline and fixed-continuation measure different quantities, and
+   * reference-pair requests run the observed (unprimed) cache regime, whose samples belong to the
+   * WP3 {@code pairs} aggregation, never to the primed headline quantiles. Fixed-continuation cells
+   * additionally pool the per-step {@code step_s} samples (the contract's decode comparison) over
+   * every measured request's 32 frozen positions.
    */
   private static void accumulate(
       BaselineJob job,
@@ -457,10 +672,21 @@ public final class BaselineBenchmark {
       return;
     }
     String cell =
-        job.runtime() + "|" + job.mode() + "/" + job.caseName() + "/" + job.promptLength();
-    String firstKey = job.runtime() + "|" + job.mode();
+        job.runtime()
+            + "|"
+            + job.adapter()
+            + "/"
+            + job.mode()
+            + "/"
+            + job.caseName()
+            + "/"
+            + job.promptLength();
+    boolean fixedContinuation = "fixed-continuation".equals(job.mode());
     for (JsonNode request : report.path("worker").path("requests")) {
       String kind = request.path("kind").asString(null);
+      if (!"measured".equals(kind) && !"first".equals(kind)) {
+        continue;
+      }
       for (String metric : SUMMARY_METRICS) {
         JsonNode value = request.path(metric);
         if (!value.isDouble()) {
@@ -471,11 +697,23 @@ public final class BaselineBenchmark {
               .computeIfAbsent(cell, k -> new LinkedHashMap<>())
               .computeIfAbsent(metric, k -> new ArrayList<>())
               .add(value.asDouble());
-        } else if ("first".equals(kind)) {
+        } else {
           firsts
-              .computeIfAbsent(firstKey, k -> new LinkedHashMap<>())
+              .computeIfAbsent(cell, k -> new LinkedHashMap<>())
               .computeIfAbsent(metric, k -> new ArrayList<>())
               .add(value.asDouble());
+        }
+      }
+      if (fixedContinuation && "measured".equals(kind)) {
+        JsonNode steps = request.path("steps");
+        for (int i = 0; steps.isArray() && i < steps.size(); i++) {
+          JsonNode step = steps.get(i);
+          if (step.path("s").isDouble()) {
+            measured
+                .computeIfAbsent(cell, k -> new LinkedHashMap<>())
+                .computeIfAbsent(STEP_TIME_METRIC, k -> new ArrayList<>())
+                .add(step.path("s").asDouble());
+          }
         }
       }
     }
@@ -504,7 +742,10 @@ public final class BaselineBenchmark {
     }
   }
 
-  /** The first-request samples are a separate distribution, quantiled per (runtime, mode). */
+  /**
+   * The first-request samples are a separate distribution, quantiled per (runtime, adapter, mode,
+   * case, length).
+   */
   private static void finishFirstRequest(
       ObjectNode firstRequest, Map<String, Map<String, List<Double>>> firsts) {
     for (Map.Entry<String, Map<String, List<Double>>> entry : firsts.entrySet()) {
@@ -603,6 +844,41 @@ public final class BaselineBenchmark {
     }
   }
 
+  /**
+   * The finite-limits check (findings section 7.4): every run_policy field must be present as an
+   * int, and the timeouts/budgets positive and the request counts finite. Missing or nonpositive
+   * values are a spec failure — the launcher never silently defaults a limit, because a worker's
+   * wall clock is the only backstop a missing timeout would leave behind.
+   */
+  static void validateRunPolicy(JsonNode manifestNode, List<String> violations) {
+    if (manifestNode == null) {
+      return;
+    }
+    JsonNode policy = manifestNode.path("run_policy");
+    String[] positive = {
+      "worker_timeout_s",
+      "reference_pair_worker_timeout_s",
+      "cell_time_budget_s",
+      "session_time_budget_s"
+    };
+    for (String field : positive) {
+      checkRunPolicyInt(policy, field, 1, violations);
+    }
+    checkRunPolicyInt(policy, "first_requests", 1, violations);
+    checkRunPolicyInt(policy, "warmups", 0, violations);
+    checkRunPolicyInt(policy, "measured_requests", 1, violations);
+    checkRunPolicyInt(policy, "emitted_tokens", 1, violations);
+  }
+
+  private static void checkRunPolicyInt(
+      JsonNode policy, String field, int minimum, List<String> violations) {
+    JsonNode value = policy.path(field);
+    if (!value.isInt() || value.asInt() < minimum) {
+      violations.add(
+          "run_policy." + field + " must be an integer >= " + minimum + " (got " + value + ")");
+    }
+  }
+
   private static BaselineJob buildJob(
       BaselineJob.WorkerEntry entry,
       Path outDir,
@@ -615,13 +891,15 @@ public final class BaselineBenchmark {
       String modelsClasspath) {
     JsonNode policy = manifestNode.path("run_policy");
     boolean referencePair = "reference-pair".equals(entry.mode());
+    // runSession has validated the run_policy (presence and finiteness), so the reads here are
+    // plain and never default.
     int timeoutS =
         referencePair
-            ? policy.path("reference_pair_worker_timeout_s").asInt(720)
-            : policy.path("worker_timeout_s").asInt(1800);
-    int first = referencePair ? 0 : policy.path("first_requests").asInt(1);
-    int warmups = referencePair ? 0 : policy.path("warmups").asInt(0);
-    int measured = referencePair ? 1 : policy.path("measured_requests").asInt(0);
+            ? policy.path("reference_pair_worker_timeout_s").asInt()
+            : policy.path("worker_timeout_s").asInt();
+    int first = referencePair ? 0 : policy.path("first_requests").asInt();
+    int warmups = referencePair ? 0 : policy.path("warmups").asInt();
+    int measured = referencePair ? 1 : policy.path("measured_requests").asInt();
     String artifactDir = artifactDirs.path(entry.caseName()).asString("");
     return new BaselineJob(
         entry.adapter(),
@@ -747,7 +1025,7 @@ public final class BaselineBenchmark {
       return 0L;
     }
     String[] parts = lines[1].split("\\s+");
-    if (parts.length < 3) {
+    if (parts.length < 4) {
       return 0L;
     }
     try {
@@ -799,5 +1077,12 @@ public final class BaselineBenchmark {
     } catch (IOException | NoSuchAlgorithmException e) {
       throw new IllegalStateException("sha256 failed for " + path, e);
     }
+  }
+
+  // --- Test-only seam. The launcher tests run against a hermetic mini repository whose manifest
+  // is not the frozen one, so they pin the seam to their own manifest's digest. ---
+
+  static void setPinnedManifestSha256ForTest(String sha) {
+    pinnedManifestSha256 = sha;
   }
 }

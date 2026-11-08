@@ -28,6 +28,23 @@ final class BaselineWorkerTestSupport {
 
   static final String CASE_NAME = "tiny-llama";
 
+  /** The fixture tokenizer: four one-byte BPE pieces, no added tokens, no special eos. */
+  static final String DEFAULT_TOKENIZER_JSON =
+      """
+      {
+        "version":"1.0","truncation":null,"padding":null,"added_tokens":[],
+        "normalizer":null,
+        "pre_tokenizer":{"type":"ByteLevel","add_prefix_space":false,
+                          "trim_offsets":true,"use_regex":false},
+        "post_processor":null,
+        "decoder":{"type":"ByteLevel"},
+        "model":{"type":"BPE","dropout":null,"unk_token":null,
+                 "continuing_subword_prefix":"","end_of_word_suffix":"",
+                 "fuse_unk":false,"byte_fallback":false,"ignore_merges":false,
+                 "vocab":{"a":0,"p":1,"x":2,"y":3},"merges":[]}
+      }
+      """;
+
   /** A self-consistent mini repository: manifest under the canonical path, artifact beside it. */
   record Workspace(
       Path repoDir,
@@ -47,8 +64,29 @@ final class BaselineWorkerTestSupport {
       int emittedTokens,
       int measuredRequests)
       throws Exception {
+    return buildWithTokenizer(
+        tempDir,
+        workerTimeoutS,
+        referencePairTimeoutS,
+        emittedTokens,
+        measuredRequests,
+        DEFAULT_TOKENIZER_JSON);
+  }
+
+  /**
+   * The mini repository with a custom {@code tokenizer.json}: the stock stop-set tests build a
+   * variant whose special-token eos participates in the resolved stop set.
+   */
+  static Workspace buildWithTokenizer(
+      Path tempDir,
+      int workerTimeoutS,
+      int referencePairTimeoutS,
+      int emittedTokens,
+      int measuredRequests,
+      String tokenizerJson)
+      throws Exception {
     Path artifact = tempDir.resolve("artifact");
-    writeTinyArtifact(artifact);
+    writeTinyArtifact(artifact, tokenizerJson);
     Map<String, String> digests = new LinkedHashMap<>();
     for (String name :
         new String[] {
@@ -137,6 +175,11 @@ final class BaselineWorkerTestSupport {
 
   /** The tiny llama checkpoint (all-zero weights; every greedy selection is token 0). */
   static void writeTinyArtifact(Path artifactDir) throws Exception {
+    writeTinyArtifact(artifactDir, DEFAULT_TOKENIZER_JSON);
+  }
+
+  /** The tiny llama checkpoint with a custom {@code tokenizer.json}. */
+  static void writeTinyArtifact(Path artifactDir, String tokenizerJson) throws Exception {
     Files.createDirectories(artifactDir);
     Files.writeString(
         artifactDir.resolve("config.json"),
@@ -153,23 +196,7 @@ final class BaselineWorkerTestSupport {
         {"eos_token_id":[3]}
         """,
         StandardCharsets.UTF_8);
-    Files.writeString(
-        artifactDir.resolve("tokenizer.json"),
-        """
-        {
-          "version":"1.0","truncation":null,"padding":null,"added_tokens":[],
-          "normalizer":null,
-          "pre_tokenizer":{"type":"ByteLevel","add_prefix_space":false,
-                            "trim_offsets":true,"use_regex":false},
-          "post_processor":null,
-          "decoder":{"type":"ByteLevel"},
-          "model":{"type":"BPE","dropout":null,"unk_token":null,
-                   "continuing_subword_prefix":"","end_of_word_suffix":"",
-                   "fuse_unk":false,"byte_fallback":false,"ignore_merges":false,
-                   "vocab":{"a":0,"p":1,"x":2,"y":3},"merges":[]}
-        }
-        """,
-        StandardCharsets.UTF_8);
+    Files.writeString(artifactDir.resolve("tokenizer.json"), tokenizerJson, StandardCharsets.UTF_8);
     try (MLXScope saveScope = new MLXScope()) {
       Map<String, MLXArray> tensors = new LinkedHashMap<>();
       tensors.put("model.embed_tokens.weight", zeros(saveScope, 4, 4));

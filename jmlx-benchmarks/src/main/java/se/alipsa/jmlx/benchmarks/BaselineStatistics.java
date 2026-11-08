@@ -4,13 +4,13 @@ import java.util.List;
 
 /**
  * Type-7 (linear interpolation, numpy "R" convention) quantiles over the frozen phase 8.2 baseline
- * samples (req/plans/phase8-2-reference-find.md section 10: "linear interpolation (numpy R/type-7)
- * over the per-process warm medians"). Pure Java, headline reports only.
+ * samples (req/plans/phase8-2-reference-findings.md section 10: "linear interpolation (numpy
+ * R/type-7) over the per-process warm medians"). Pure Java, headline reports only.
  */
 final class BaselineStatistics {
   private BaselineStatistics() {}
 
-  /** One sample's quantile summary; empty samples carry nulls. */
+  /** One sample's quantile summary; empty samples carry NaNs. */
   record Quantiles(double p10, double median, double p90, int n) {}
 
   /** Type-7 quantiles of the values (mutates a copy; the input is left untouched). */

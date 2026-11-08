@@ -122,8 +122,8 @@ Layout under `out_root`: one directory per worker
 `worker-ready` and `report.json`), `jobs/<dir>.job.json` (the frozen job file
 handed to the worker), `stderr/<dir>.log`, the verbatim `spec.json`, and
 `session.json` (schema `jmlx-decode-baseline-1`: the session block, the embedded
-worker reports, and the summary with mode-scoped type-7 quantiles and the
-exclusion list).
+worker reports, and the summary with adapter/mode-scoped type-7 quantiles and
+the exclusion list).
 
 Exit codes: 0 all workers ok; 1 spec validation failed (nothing forked, no
 `session.json`); 2 any worker non-ok (`session.json` is still written, the failed

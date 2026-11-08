@@ -948,6 +948,60 @@ requests are excluded by construction, with the exclusion recorded). The
     fixed-continuation zero argmax mismatches with positions 513–544,
     report `pid` == claim `pid` == ready `pid` on all four reports.
     `verify.sh` VERIFIED and root `check` green on the final head.
+ 16. Review round 1 (2026-11-08, PR #89 review of the Java WP1 head
+     `c80cdfa`; one Medium, five Low, nits and two suggestions — each
+     closed with a test; the implementation record is section 14.7). The
+     round amended the frozen contract in four places:
+     (a) **Medium, reproduced**: the session summary pooled adapters — the
+     mixed 0.6b run's headline median TTFT came out 0.535 s, between
+     controlled's ~0.03 s and stock's ~1.03 s, because the cell key was
+     `<mode>/<case>/<length>`. The key is now adapter- and mode-scoped on
+     both `per_runtime` and `first_request`
+     (`<adapter>/<mode>/<case>/<length>`), so no two adapters — and no two
+     modes — ever pool.
+     (b) The stock stop-set assertion (item 4) now unions the tokenizer's
+     own special-token eos id: the Java stock path feeds the resolved
+     `HfTokenizer` stop set into the generation loop, so the tokenizer's
+     eos is part of the artifact-resolved set; the tokenizer loads before
+     the assertion.
+     (c) The stock full-generation boundary is the `generate` return
+     itself: the synchronous Java loop evaluates every step at its
+     selection boundary and queues no lookahead, so nothing is pending at
+     return — no drain evaluate exists or is needed (item 12's drain
+     wording applies to the Python stock path only).
+     (d) Fixed-continuation cells gain `step_s` — the contract's decode
+     comparison (§13.3) — quantiled per step over the measured
+     requests' 32 frozen positions each; first-request FC cells carry
+     only the request-level metrics.
+     Plus the worker/launcher hardening the review required:
+     (e) the worker's hard watchdog is per-run — each `run` increments a
+     process token under the report lock together with the fired/finished
+     reset, and the watchdog re-checks its token before every remaining
+     action (loop exit, fire, post-grace status, report write, exit
+     hook), dropping silently when a later run owns the shared state;
+     verified by a two-run in-process test (run A wedged past its
+     deadline with its watchdog in the grace period, run B started in the
+     same process: B exits 0 with its own ok report, the exit hook never
+     fires, and A — whose resumed request hits the thread-confined scope
+     the later run owns — leaves no report, the expected in-process
+     artifact of the one-run-per-process design).
+     (f) The launcher cross-checks every ok report against the job it
+     launched (runtime/adapter/case/prompt_length/mode, the report's own
+     `manifest_sha256`, `precision_env`, and the request-kind sequence —
+     an ok report must carry exactly the job's mix, a failed report at
+     most a complete prefix); a mismatch is `invalid-report` with the
+     violations, never silently aggregated.
+     (g) Launcher limits: the fork wait limit is
+     `min(timeout_s + 90 s backstop, cell_time_budget_s)` with a 10 s kill
+     settle (a killed worker is classified from its left artifacts with
+     the kill in the exclusion note); the session loop checks elapsed
+     against `session_time_budget_s` before each fork and records the
+     remainder `not-started` with the budget reason; `run_policy` is
+     validated without defaults (all eight fields integers, the four
+     timeouts/budgets > 0, first/measured/emitted ≥ 1, warmups ≥ 0) and
+     the job builder reads it default-free; the launcher pins the frozen
+     manifest digest and refuses a checkout whose `workloads.json` digest
+     differs. The Python side is untouched (frozen, PR #87).
 
 ### 13.5 Manifest re-pin flow (frozen)
 
@@ -990,7 +1044,10 @@ frozen contract, and the deviations below are the only intentional departures.
 - (c) Identity/label mapping: `identity.device` comes from sysctl (`hw.model`,
   `hw.memsize`) with `max_recommended_working_set_bytes: 0` plus a note (the Java
   worker has no MLX device-info facade); `identity.java` is
-  `{version, vendor, flags = java.vm.command}`; the frozen finish-reason labels map
+  `{version, vendor, flags}` with `flags` the space-joined
+  `ManagementFactory.getRuntimeMXBean().getInputArguments()` — the same source
+  the launcher's session block uses (review round 1, §13.4 item 16); the
+  frozen finish-reason labels map
   EOS/STOP_TOKEN→`stop`, MAX_TOKENS→`length`, CANCELLED→`cancelled`; Java stock
   reports `unused_lookahead_forwards: 0` (the Java loop has no queued lookahead) and
   `load_state: "materialized"`; `instrumented: false` and `wired_limit_policy` are
@@ -1035,12 +1092,20 @@ existed:
 - `summary`: `quantile_convention "linear-interpolation-type-7"` (h = (n-1)q,
   0-based, linear interpolation), `pairs: []` (WP3 fills),
   `exclusions[] {worker, reason, violations?}`,
-  `per_runtime[runtime]["<mode>/<case>/<length>"][metric] = {p10, median, p90, n}`
-  and `first_request[runtime][mode][metric]`. The cells are **mode-scoped**:
-  headline and fixed-continuation measure different quantities and never pool, and
-  reference-pair samples run the observed (unprimed) cache regime, so they are
-  excluded from `per_runtime` entirely — they belong to the WP3 `pairs`
-  aggregation. Warmups are never aggregated. (An early unmodeled run pooled a
+  `per_runtime[runtime]["<adapter>/<mode>/<case>/<length>"][metric] = {p10, median, p90, n}`
+  and `first_request[runtime]["<adapter>/<mode>/<case>/<length>"][metric]`. The
+  cells are **adapter- and mode-scoped** (review round 1, §13.4 item 16(a)):
+  headline and fixed-continuation measure different quantities and never pool,
+  controlled and stock never pool (a mixed run's pooled median TTFT landed
+  between the two adapters' own medians — the finding that forced the key
+  change), and reference-pair samples run the observed (unprimed) cache
+  regime, so they are excluded from `per_runtime` entirely — they belong to
+  the WP3 `pairs` aggregation. Warmups are never aggregated. Fixed-continuation
+  cells additionally carry `step_s` — the contract's decode comparison
+  (§13.3) — quantiled per step over the measured requests' 32 frozen
+  positions each (32 × measured samples); the first request's FC steps are
+  not pooled into it, its first-request cell carrying only the request-level
+  metrics. (An early unmodeled run pooled a
   reference-pair sample into the headline cell — n=21 instead of 20 on the 0.6b
   headline; the mode-scoped rule and its fixture tests are what caught it.)
 
@@ -1071,24 +1136,89 @@ Python worker).
 
 ### 14.6 Local evidence
 
-- `:jmlx-benchmarks:check` green with 59 launcher tests — 6 statistics
+- `:jmlx-benchmarks:check` green with 73 launcher tests — 6 statistics
   (hand-computed type-7 values), 28 validator (every valid adapter shape plus
-  every structural rejection), 25 end-to-end over a hermetic mini repository
+  every structural rejection), 39 end-to-end over a hermetic mini repository
   (a temp-dir checkout with a tiny manifest and one artifact directory, and a
   fake worker starter that simulates every protocol outcome — pure Java, no
-  native bootstrap, runs on any platform). `:jmlx-models:check` green with
-  `BaselineAdaptersTest` (5), `BaselineWorkerProtocolTest` (18) and
-  `BaselineWorkerProcessTest` (9), all three added to the macOS CI required-suite
-  list in `.github/workflows/ci.yml`.
-- Opt-in 0.6b session (real frozen manifest, M5 Max, precision 1): both workers
-  `ok` in ~20 s. Headline (`qwen3-0.6b`/32): 26 requests (1 first + 5 warmups +
-  20 measured), 128 emitted, finish `controlled-max-tokens`, load 0.042 s
-  `materialized`, primed-per-request;
-  `per_runtime.java["headline/qwen3-0.6b/32"].ttft_s = {p10 0.0058418836, median
-  0.006971979, p90 0.0136741962, n 20}`, `streaming_decode_tps` ≈ 226.6 / 228.4 /
-  230.3, first request ttft 0.121235167 s. Reference-pair: `ok`, `observed`, one
-  measured request, `prime_s 0.0`, excluded from `per_runtime`. Session
-  identity: workload sha `e8c7730178a2e8f1…` (the frozen manifest digest), native
-  pins metal 0.32.4 / mlx-c `a26f2d584a14ec619ae8db9a09be03becd47598a`, code sha
-  `36a9250` on branch `phase8-2-wp1-java` (dirty),
-  `fork_order ["java", "java"]`.
+  native bootstrap, runs on any platform). The review-round-1 e2e additions
+  cover the adapter-scoped key shape, the report-vs-job violations (mismatch,
+  no-requests, short prefix, extra requests), the kill and session-budget
+  paths, the run_policy rejections, and the digest-pin mismatch plus the
+  frozen-manifest backstop. `:jmlx-models:check` green with
+  `BaselineAdaptersTest` (5), `BaselineWorkerProtocolTest` (20 — the two
+  review-round-1 additions: the tokenizer-eos stop-set failure and the
+  stale-watchdog two-run test) and `BaselineWorkerProcessTest` (9); no new
+  suite classes were added in the round, so the macOS CI required-suite list
+  in `.github/workflows/ci.yml` is unchanged.
+- Opt-in 0.6b session on the final head (real frozen manifest, M5 Max,
+  precision 1): both workers `ok` in ~20 s wall. Headline (round-1 key
+  `controlled/headline/qwen3-0.6b/32`): 26 requests (1 first + 5 warmups +
+  20 measured), 128 emitted per request, finish `controlled-max-tokens`,
+  `load_state materialized`, primed-per-request;
+  `per_runtime.java["controlled/headline/qwen3-0.6b/32"].ttft_s = {p10
+  0.0057996631, median 0.006027583, p90 0.0068274292, n 20}`, `prefill_s`
+  median 0.0054023335, `full_generation_s` median 0.569823333,
+  `streaming_decode_tps` ≈ 223.3 / 225.4 / 228.1; first request ttft
+  0.119919417 s, prefill 0.115580583 s, full 0.842221583 s, 175.8 tok/s.
+  Reference-pair: `ok`, `observed`, one measured request, excluded from
+  `per_runtime`. Session identity: workload sha `e8c7730178a2e8f1…` (the
+  frozen manifest digest), native pins metal 0.32.4 / mlx-c
+  `a26f2d584a14ec619ae8db9a09be03becd47598a`, code sha `c80cdfa` on branch
+  `phase8-2-wp1-java` (dirty — with the review-round-1 fixes this section
+  records, committed with this record), `fork_order ["java", "java"]`.
+  The numbers agree with the pre-round session within run-to-run variation
+  (median TTFT 0.0070 s → 0.0060 s, streaming ≈ 228.4 → 225.4 tok/s).
+
+### 14.7 Review round 1 (2026-11-08, PR #89): launcher and worker hardening
+
+The round's findings (one Medium reproduced, five Low, nits, two
+suggestions), each closed with a test; the contract-level amendments are
+recorded in §13.4 item 16:
+
+- **Medium (reproduced)**: the summary pooled controlled and stock
+  headlines — the mixed 0.6b run's median TTFT was 0.535 s, between
+  controlled's ~0.03 s and stock's ~1.03 s. Fixed with the adapter- and
+  mode-scoped cell keys on `per_runtime` and `first_request` (§14.3),
+  asserted by the mixed-adapter e2e fixture.
+- **Low**: the launcher session block's and the worker identity's
+  `java.flags` now share one source — space-joined
+  `ManagementFactory.getRuntimeMXBean().getInputArguments()` (§14.1(c)).
+- **Low**: the stock "drain evaluate" note was wrong — the synchronous
+  Java loop evaluates every step at its selection boundary and queues no
+  lookahead, so nothing is pending at `generate` return. The explicit
+  `MLX.eval()` drain was removed from `BaselineAdapters.runStock` and the
+  worker's stock note reworded to say no drain exists or is needed
+  (§13.4 item 16(c)).
+- **Low**: the worker watchdog is per-run (the run token, §13.4 item
+  16(e)); the two-run in-process test executes the stale path end to end.
+- **Low**: the launcher cross-checks every ok report against the launched
+  job (`jobViolations`: runtime/adapter/case/prompt_length/mode, the
+  report's own `identity.manifest_sha256`, `identity.precision_env`, and
+  the request-kind sequence — ok carries exactly the job's mix, failed at
+  most a complete prefix); a mismatch is `invalid-report` with the
+  violations in the exclusion (§13.4 item 16(f)).
+- **Low**: the launcher limits (§13.4 item 16(g)) — the fork wait limit is
+  `min(timeout_s + 90 s, cell_time_budget_s)` (`WAIT_LIMIT_BACKSTOP_S`)
+  with a 10 s kill settle after `destroyForcibly`; a starter returning
+  `WORKER_KILLED = -1` (the starter-level sentinel, not an outcome)
+  classifies the cell from its left artifacts and records the kill with
+  the limit in the exclusion note; the session loop checks elapsed
+  against `session_time_budget_s` before each fork and records the
+  remainder `not-started` with `REASON_BUDGET`; `validateRunPolicy`
+  rejects a missing, non-integer or below-minimum `run_policy` field
+  before anything forks, and `buildJob` reads the policy default-free.
+- **Nits**: the stock stop-set assertion loads the `HfTokenizer` first and
+  unions its special-token eos into the resolved set (§13.4 item 16(b));
+  `benchmarkBaseline` depends on `:jmlx-models`' test *runtime classpath*
+  FileCollection (so the test-fixtures jars build, not just `testClasses`);
+  the `BaselineStatistics` javadoc now cites the right findings file and
+  says empty samples carry NaNs.
+- **Suggestions**: fixed-continuation `step_s` in the session summary
+  (§14.3); the frozen-manifest digest pin
+  (`PINNED_MANIFEST_SHA256 = e8c7730178a2e8f1…`, the same digest the root
+  `verifyDecodeBaselineManifest` guard backstops) with a test-only seam
+  (`setPinnedManifestSha256ForTest`) — the e2e mini repositories re-pin per
+  test and restore the production pin after each, and the backstop test
+  walks up from the test class's code source to the repository root and
+  asserts the pin equals this checkout's `workloads.json` digest.

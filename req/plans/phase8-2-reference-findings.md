@@ -1533,8 +1533,14 @@ work, scope lifetimes or timer boundaries:
   lifetimes or the frozen timer boundaries: each `close` runs at the
   same wall-clock position try-with-resources gave it (an observing run
   produces the identical tokens and the same frozen timings as a
-  `NONE` run; `MLXScope.close()` is idempotent, so the finally-close
-  path is safe even after an observer hook of its own fails).
+  `NONE` run). The release windows run through
+  `BaselineAdapters.releaseWindow` (§15.7 item D): a release-window
+  failure does not replace an in-flight exception — it is attached to
+  it with `addSuppressed` (and propagates as-is when no exception is
+  in flight). Fixed-continuation's `prefill_s` is measured inside the
+  prefill try, after `prefill-sync` (the evaluated prefill logits) and
+  before the `prefill-release` window, so the release window's own
+  overhead never enters `prefill_s` on either adapter (§15.7 item C).
 
 **Worker.** The job field `instrumentation` (absent -> `none`) gates
 before model load: binding-count requires the agent installed on the
@@ -1561,11 +1567,17 @@ agent's lifecycle apart from the window's work: `start()`, `work.run()`
 and `stop()` each run in their own error boundary — an agent failure
 fails the run with a named phase ("failed to start the binding-count
 agent for the '<phase>' window" / "failed to stop the binding-count
-agent in the '<phase>' window"), while a `RuntimeException` from inside
-`work.run()` (a model error, an `MLXException`) propagates as itself
-after a best-effort agent `stop()`, never re-labelled as an agent
-failure (§15.6 item 6). Uninstrumented workers carry none of the
-diagnostic fields and pay for two `nanoTime` reads only. The
+agent in the '<phase>' window"), while a `RuntimeException` *or an
+`Error`* (an `OutOfMemoryError`, an `ExceptionInInitializerError` when
+a lazy holder class loads) from inside `work.run()` (a model error, an
+`MLXException`) propagates as itself after a best-effort agent
+`stop()`, never re-labelled as an agent failure (§15.6 item 6; the
+`Error` boundary is §15.7 item E). Both boundaries catch
+`Throwable`, and a `stop()` failure is attached to the work failure
+with `addSuppressed` instead of swallowed — the agent is already
+broken; the window's own failure is what the report must carry.
+Uninstrumented workers carry none of the diagnostic fields and pay for
+two `nanoTime` reads only. The
 host-observation command runner degrades to a missing sample when its
 10 s bounded wait times out (§15.6 item 12).
 
@@ -1601,10 +1613,12 @@ on `:jmlx-core:bindingAgent`.
 ### 15.4 FFM calibration (`135c9b3`)
 
 **C source** (`jmlx-benchmarks/src/main/resources/ffm_cal.c`, a
-classpath resource): one non-elidable no-op per dominant
-generated-wrapper shape — the keys `(M)I (M)J (M)Z (M)V (M)M (AM)M
-(MM)I (MMM)I (MMMM)I (MMMMM)I (MI)I (MMIM)I (MMIIM)I (MZM)I (MMMJM)I
-(MMIMM)I`, symbols `cal_M_I` … `cal_MMIMM_I`. Each body folds its
+classpath resource): one non-elidable no-op per shape the controlled
+binding-count workloads actually call — the 27 keys of §15.7 item A
+(round-1's 16 representative classes are gone), symbols
+`cal_<param-keys>_<return-key>` (`cal_M_I` … `cal_P_P_I_I_M`; P =
+void* parameter, M = 8-byte struct carrier by value, I/J/F/D/Z/V the
+scalars, the no-parameter shape `cal__M`). Each body folds its
 arguments into a `volatile uint64_t` sink (an observable side
 effect, so `-O2` cannot eliminate the call) and never dereferences an
 input; `struct cal_eight { void *ctx; }` mirrors the 8-byte opaque
@@ -1628,28 +1642,39 @@ modeled by `C_LONG` (key `J`), `int` by `C_INT` (`I`), `bool` by
 **Worker** (`FfmCalWorker`, fresh JVM): `SymbolLookup.libraryLookup`
 + `Linker.nativeLinker().downcallHandle` exactly like the generated
 holders — one private holder class per shape
-(`Handle0` … `Handle15`, `static final MethodHandle HANDLE =
+(`Handle0` … `Handle26`, `static final MethodHandle HANDLE =
 downcall(N)`, bound in `<clinit>` through a shared lookup installed by
-`run()` before `initializeHandles()` pre-touches all 16), so each
+`run()` before `initializeHandles()` pre-touches all 27), so each
 measured call site references a JIT-trusted constant field — the
 jextract wrappers' own form (678 `invokeExact` sites in
 `mlx_h.java`), not the address-indexed dispatch a `MethodHandle[]`
 array load would force (review round 1, §15.6 item 7); one dedicated
-typed static call site per shape (`call0` … `call15`) invoking
+typed static call site per shape (`call0` … `call26`) invoking
 `invokeExact` on its holder's handle. Every M parameter slot is
 declared the 8-byte struct layout (by value, as in the generated
-wrappers); the struct-return shape `(AM)M` takes a `SegmentAllocator`
-as its first Java argument, `DESC` = `of(struct8, struct8)` (JEP 451:
-the allocator is the handle's first parameter, consumed JVM-side; the
-8-byte struct is returned in a register, no hidden C out-parameter),
-and the `(M)M` pointer return keeps its `ADDRESS` return layout. The
-shape order rotates per iteration; one sample is the wall time of
-`calls` consecutive downcalls; the timing floor is a private
-`floor(calls)` no-op loop — one xor-fold per iteration (two ALU ops,
-so C2 must execute every iteration instead of folding an empty loop
-body away) — warmed up like the batches and folded into the same
-volatile sink; fixed argument constants `INT_ARG = 7`, `LONG_ARG =
-4096`, `BOOL_ARG = true`; raw JSON schema `jmlx-ffm-cal-raw-1`.
+wrappers); the pointer-return shape `(M)P` keeps its `ADDRESS` return
+layout, and each of the four struct-return shapes (`()M`, `(F)M`,
+`(PJ)M`, `(PPII)M`) takes a `SegmentAllocator` as its first Java
+argument (JEP 451: the allocator is the handle's first parameter,
+consumed JVM-side; the 8-byte struct is returned in a register, no
+hidden C out-parameter). The carriers are production's kind, not a
+bare confined arena (§15.7 item A, calibration side): the ten P/M
+argument carriers (the maximally-arity shapes need ten 8-byte
+arguments) are process-lifetime `Arena.ofShared()` segments — the
+same arena kind production `MLXScope.Holder` uses for every native
+handle — and the struct-return shapes allocate their results through
+a `CalScope` that mirrors `MLXScope.Holder.allocate` (synchronized
+shared-arena allocation plus per-scope handle tracking); the dylib's
+`libraryLookup` keeps its own confined arena open for the run (the
+dylib must stay loaded). The shape order rotates per iteration; one
+sample is the wall time of `calls` consecutive downcalls; the timing
+floor is a private `floor(calls)` no-op loop — a linear congruential
+recurrence `sink = sink * C + (k + 1)` with a loop-carried
+dependency, so a vectorizer cannot reassociate the iterations away
+(review round 1's xor-fold was reassociatable, §15.7 item F) —
+warmed up like the batches and folded into the same volatile sink;
+fixed argument constants `INT_ARG = 7`, `LONG_ARG = 4096`,
+`BOOL_ARG = true`; raw JSON schema `jmlx-ffm-cal-raw-1`.
 
 **Calibration** (`FfmCalibration`, task `benchmarkFfmCalibration`
 with `--args 'output-directory [iterations calls forks warmup]'`,
@@ -1673,16 +1698,27 @@ per-shape `n/p10/median/p90/min/max/raw` (type-7 quantiles from
 `jmlx-ffm-transition-estimate-1`. Refuses up front any
 non-controlled worker report (the stock adapter's single
 whole-request window cannot be split into prefill and per-step
-phases) and any report with no measured request (§15.6 items 2 and
-3). `normalize` maps the generated
-wrapper's JVM descriptor to a shape key (`MemorySegment` -> M,
-`SegmentAllocator` -> A, the I/J/F/D/Z scalars, the return char or M;
-null when unparsable -> uncovered). Only `kind == "measured"`
-requests enter every aggregate (totals, per_shape, uncovered,
-prefill, per-step, request_total — warmups and firsts are excluded,
-§15.6 item 2); the output carries `measured_requests`. Windows whose
-phase starts with `prefill-` -> the request's prefill budget; phases
-in {construction, sync, selection, release} with position > 0 -> that
+phases), any report with no measured request (§15.6 items 2 and
+3), any report without a nonempty `binding_descriptors` object
+(predating the native-descriptor recording — a clear re-run error,
+§15.7 item A) and any calibration summary without a positive
+`workload.calls` (the per-call division below would be undefined,
+§15.7 item B). `shapeKey` (round 1's `normalize` is gone) parses the
+*native* descriptor grammar of the worker-recorded
+`binding_descriptors` into a shape key — `(params)return`; `a8`
+(optionally named, optionally carrying the `:[*:b1]` element
+annotation) -> P; `[body](name)` -> M iff the body's byte size is 8
+(padding counts as `xN`; brackets are matched, so nested structs and
+named members parse), unmodeled otherwise; `i4`/`j8`/`f4`/`d8`/`z1`/
+`v` -> I/J/F/D/Z/V — with null (unparsable or unmodeled, e.g. a
+by-value struct that is not 8 bytes) -> uncovered with the recorded
+descriptor; the JVM-form `binding_signatures` are provenance only and
+never classify (§15.7 item A). Only `kind == "measured"` requests
+enter every aggregate (totals, per_shape, uncovered, prefill,
+per-step, request_total — warmups and firsts are excluded, §15.6
+item 2); the output carries `measured_requests`. Windows whose phase
+starts with `prefill-` -> the request's prefill budget; phases in
+{construction, sync, selection, release} with position > 0 -> that
 request's step-phase budget at the position; the per-position output
 is the type-7 quantiles over the requests' own per-position samples
 (one sample per (measured request, position) — never a sum across
@@ -1690,62 +1726,105 @@ requests, the N-times-too-large pooling bug of §15.6 item 2), and the
 top-level `per_decode_step` is the pooled quantiles over all
 (request, position) samples; plus the request total (one sample per
 measured request; the `request-release` window enters it but neither
-prefill nor any step), the per-shape calls / `median_ns_per_call` /
-budget table, the classified-call coverage, the uncovered signatures
-(name -> descriptor + calls) and four
-explicit assumptions — the first names the holder-form constant
-handles, the per-call result-segment allocation through the
-caller's `SegmentAllocator` for the struct-return shapes and that the
-calibration's struct-return allocator is a confined arena, not
-production `MLXScope`'s synchronized shared-arena allocator; the
-second names the by-value carrier fidelity through the struct-by-value
-declarations, with the caveat that a hypothetical pointer-kind M
-parameter (no 8-byte read) is indistinguishable in the recorded JVM
-descriptor (both `MemorySegment`); the last is "A calibrated
-estimate, not a causal partition".
+prefill nor any step). Every per-call cost divides the per-sample
+calibration quantile by `workload.calls` (type-7 quantiles commute
+with a positive scale factor, so the divided quantiles are exactly
+the quantiles of the per-call samples) — round 1's
+`median_ns_per_call` emitted the per-*sample* median as if it were
+per-call, overstating every budget by the factor `calls` (§15.7 item
+B) — so `per_shape` carries `median_ns_per_call` with
+`p10_ns_per_call`/`p90_ns_per_call` alongside, and the budgets
+(`budget_ns` plus `budget_p10_ns`/`budget_p90_ns` — the p10/p90
+accumulators round 1 computed but never emitted) are per-call. Every
+summary node (each per-position entry, `per_decode_step`, `prefill`,
+`request_total`) reports two ranges: `p10_ns`/`median_ns`/`p90_ns`
+keep the round-1 meaning (the request-to-request spread of the
+per-request budgets computed from each shape's calibration median),
+and the new `calibration_p10_ns`/`calibration_p90_ns` are the
+calibration's own sampling range — the same per-request and
+per-position budgets computed from each shape's calibration p10 and
+p90 samples (§15.7 item B). The output also carries the
+classified-call coverage, the uncovered signatures (name ->
+descriptor + calls) and four explicit assumptions: the holder-form
+constant handles plus the production arena fidelity (the P/M carriers
+on a process-lifetime shared arena, the struct-return results
+through the `CalScope` mirror of `MLXScope.Holder.allocate` —
+round 1's confined-arena caveat is gone), the by-value carrier
+fidelity with the shape keys now the native descriptor classes of
+the called bindings (round 1's pointer-kind-M-indistinguishable
+caveat is resolved by the native descriptor), the count semantics
+(attempted downcalls through the generated wrappers, no Metal/GPU
+work), and "A calibrated estimate, not a causal partition" with the
+two-range reporting named.
 
 **Local measurement baseline** (M5 Max, Apple clang 21.0.0,
-review-round-1 source SHA-256
-`fe9826346d3386c25fa2ec60c0ce5a77e82b83ecd6707cb7d6a5acbf28537c7b`,
-2 forks × 20 iterations × 500 calls, warmup 200, re-measured after
-§15.6 item 7 changed the worker's handle form and parameter carriers,
-so these numbers supersede and are not comparable to the
-pre-round-1 values recorded in §15.6; the artifact is gitignored
-under `build/ffm-cal/`): no-op floor median 584 ns per 500 calls
-(~1.2 ns/iteration); `(M)I` median 28104 ns per 500 (~56.2 ns/call);
-the 4-5 carrier shapes ~83-233 ns/call (medians: `(MM)I` 82.9,
-`(MMM)I` 107.7, `(MMMM)I` 207.9, `(MMMMM)I` 158.4, `(MMIM)I` 98.0,
-`(MMIIM)I` 106.5, `(MZM)I` 99.1, `(MMMJM)I` 232.8, `(MMIMM)I` 138.1);
-`(M)M` ~69.4 ns/call; **`(AM)M` ~183.3 ns/call** — the per-call
-result-segment allocation through the caller's allocator (a confined
-arena here, not `MLXScope`'s synchronized shared allocator — assumption
-1), real generated-wrapper behavior for struct returns, kept (not
-"fixed") and named in assumption 1. The struct-by-value parameter form
-measures the 8-byte argument-segment read the generated wrappers pay,
-which is why the per-call figures are higher than the pre-round-1
-`void *` form's; the large max/p90 spikes are OS noise
-(which is why p10/median/p90 are reported).
+review-round-2 source SHA-256
+`9ad1d216c544aa6e3b116106947f69c96a979c54adef230a79b099eb20764e84`,
+binary SHA-256
+`f1e2e7d76b4ff25d610c4284f38b856044eee604e3b844c45f539f0d30901ad9`,
+default workload 5 forks × 200 iterations × 2000 calls, warmup 2000,
+n = 1000 pooled samples per shape, re-measured after §15.7 items A
+and F changed the shape set, the carriers, the result allocator and
+the floor — these numbers supersede and are not comparable to the
+review-round-1 values recorded above; the artifact is gitignored
+under `build/ffm-cal/`): no-op floor median 2375 ns per 2000 calls
+(1.19 ns/iteration); the 23 int-return shapes 4.31–12.62 ns/call
+(median ns/call: `(M)I` 4.31, `(M)J` 4.38, `(PMMMM)I` 8.50, `(PMM)I`
+8.62, `(PM)I` 8.65, `(PMIIM)I` 8.65, `(PMMIM)I` 8.67, `(PMMFM)I`
+8.67, `(PMIZM)I` 8.69, `(PMMM)I` 8.71, `(PMIM)I` 8.71,
+`(PMIZMFIMM)I` 8.71, `(PDDDIM)I` 8.74, `(PMZM)I` 8.75, `(PMMMMZM)I`
+8.75, `(PMMMFPMMZM)I` 9.88, `(PPJMIM)I` 10.00, `(PMPJZM)I` 10.02,
+`(PMMMMZMMPM)I` 10.08, `(M)P` 10.67, `(PMMMMMPMMM)I` 10.71,
+`(PMPJM)I` 10.94, `(PMPJPJPJM)I` 12.62); **the four struct-return
+shapes 509.0–517.9 ns/call** (`()M` 509.0, `(F)M` 511.7, `(PPII)M`
+515.5, `(PJ)M` 517.9) — the per-call result-segment allocation
+through the production-mirroring `CalScope` dominates, exactly as in
+production (round 1's `(AM)M` confined-arena figure of ~183 ns/call
+is superseded, not just by the number but by the allocator it
+measured). The estimate re-run end-to-end against two real
+binding-count session reports (TinyMistral-6x248M and Qwen3-0.6B;
+§15.7 describes the `binding_descriptors` provenance) gives coverage
+1.0000 with zero uncovered bindings in both, a per-decode-step FFM
+budget of 506.8 µs / 696.8 µs against measured decode-step wall times
+of 14,437.2 µs / 20,162.5 µs (≈ 3.5%), prefill budgets 573.0 µs /
+647.1 µs and request totals 64.94 ms / 89.14 ms (calibration ranges
+257.7–677.7 / 354.6–931.6 µs per step); the top per-shape
+contributors are the struct-return shapes `()M` (1152.1 / 1614.0 ms
+per request) and `(PJ)M` (66.0 / 76.3 ms). The large max/p90 spikes
+are OS noise (which is why p10/median/p90 are reported).
 
 ### 15.5 Test evidence
 
-`:jmlx-benchmarks:check` green with 94 tests (89 before review
+`:jmlx-benchmarks:check` green with 96 tests (94 after review
 round 1, §15.6) — `BaselineBenchmarkTest`
 51, `BaselineReportValidatorTest` 28, `BaselineStatisticsTest` 6,
 `FfmCalibrationTest` 1 (executed when `cc` is present: the full
 pipeline, ordered per-shape quantiles above the loop floor; skipped
 when `cc` is absent, so ordinary `check` gains no compiler
-prerequisite), `FfmTransitionEstimateTest` 6 (pure Java: descriptor
-normalization including the unparsable and missing-descriptor cases;
-the hand-computed budget/coverage over the controlled adapter's full
-window set including the release windows — step 33 = 210 ns,
-step 34 = 270, pooled per-step p10/median/p90 216/240/264 over the
-two (request, position) samples, prefill 480, request total 1080,
-coverage 1.0, per-shape `(MMMM)I` 8 calls/720 ns and `(J)V` 9/360;
-the two-measured-requests pooling test (position-33 samples [40, 90]
-→ median 65, warmup request with 200 matmul calls excluded from every
-aggregate); the non-controlled and no-measured-request refusals; the
-uncovered case at coverage 3/7 lists both `mlx_matmul` (missing
-descriptor) and the unparsable signature) and `Tf32BenchmarkTest` 2.
+prerequisite), `FfmTransitionEstimateTest` 8 (pure Java: the
+native-descriptor `shapeKey` mapping including the unparsable
+(`(L)I`, `(i4`, `int(int)`, null), the unmodeled non-8-byte struct
+and the scalar-only `(II)I` parse; the hand-computed budget/coverage
+over the controlled adapter's full window set including the release
+windows — step 33 = 210 ns, step 34 = 270, pooled per-step
+p10/median/p90 216/240/264 over the two (request, position) samples
+with the calibration range 177/323, prefill 480 (range 410/590),
+request total 1080 (range 910/1330), coverage 1.0, per-shape
+`(PMMM)I` 8 calls / 720 ns budget with per-call 90/80/110 and
+`(M)I` 9 / 360 with per-call 40 — the synthetic calibration carries
+`calls = 10` with per-sample quantiles 10× the per-call values, so
+the division by `workload.calls` is pinned, §15.7 item B); the
+two-measured-requests pooling test (position-33 samples [90, 90] →
+the request-to-request spread collapses to 90 while the
+calibration range does not, 80/110; prefill p10/median/p90
+45/65/85 over [40, 90] with calibration range 35/104, request total
+median 155 with range 115/214; warmup request with 200 matmul calls
+excluded from every aggregate, including the calibration-range
+fields); the non-controlled, no-measured-request and
+no-native-descriptor refusals; the calibration-without-a-positive-
+`workload.calls` refusal; the uncovered case at coverage 3/7 lists
+both the unparsable `(L)I` signature and the missing-descriptor
+binding) and `Tf32BenchmarkTest` 2.
 The `:jmlx-models` baseline suites green: `BaselineAdaptersTest` 5,
 `BaselineWorkerProcessTest` 9, `BaselineWorkerProtocolTest` 22 (its
 tracing window-count assertion now expects the 33-window layout with
@@ -1878,3 +1957,221 @@ it).
     compilerVersion` (30 s, degrade to "cc") and
     `FfmCalibration.runWorker` (300 s + 1 s per million downcalls the
     fork makes, fail).
+
+### 15.7 Review round 2 (2026-11-09, PR #90): calibration classification, ranges and adapter exception paths
+
+Six findings (A–F). The contract amendments are the in-place edits to
+§15.3 and §15.4 above, plus the worker-report amendment below. No job
+schema changed; the worker report schema gains one additive field; the
+estimate output schema stays `jmlx-ffm-transition-estimate-1` and gains
+additive fields only (`calibration_p10_ns`/`calibration_p90_ns` on
+every summary node and per-position entry, `budget_p10_ns`/
+`budget_p90_ns`, `p10_ns_per_call`/`p90_ns_per_call` on `per_shape`).
+
+**Amendment — worker report: `binding_descriptors` (finding A).** The
+frozen §13.3 text is untouched; this is recorded here as the amendment.
+In binding-count mode the worker block now also carries
+`binding_descriptors`: a name -> string object mapping each recorded
+binding name to the `toString` of the generated downcall's own
+`FunctionDescriptor` (the *native* descriptor form, e.g. `mlx_eval` ->
+`([a8(ctx):[*:b1]](mlx_vector_array_))i4`). Source:
+`se.alipsa.jmlx.ffi.mlx_h.<name>$descriptor` via reflection — jmlx-ffi
+is an `implementation`-scoped dependency of `jmlx-core`, on the
+worker's runtime classpath but not its compile classpath, so the worker
+cannot name the type. A binding whose descriptor cannot be read is
+omitted rather than failing the run (the estimate records it as
+uncovered). `binding_signatures` (the agent-recorded JVM-form
+descriptors) is still written, now provenance only. The validator
+requires a nonempty object of nonempty strings for both fields in
+binding-count mode and their absence otherwise (Python workers are
+never instrumented, so the requirement cannot fire for them).
+
+**A. The estimate classified the counts by the JVM descriptor, not the
+native one — and the calibration measured classes the workloads never
+call.** Round 1's `normalize` keyed the JVM-form
+`binding_signatures` (e.g. `mlx_matmul` ->
+`(Ljava/lang/foreign/MemorySegment;...)I`) to the shape keys, treating
+every `MemorySegment` as an 8-byte by-value struct `M`. That
+classification conflates two register classes: a by-value 8-byte struct
+and a raw pointer are both `MemorySegment` in JVM form, so the recorded
+`M` carried a pointer-shaped binding's counts (or vice versa) into the
+struct-shaped calibration number. Closed on three fronts:
+
+1. *Worker recording* (the amendment above): `binding_descriptors`
+   carries each called binding's native descriptor.
+2. *Estimator classification* (native-descriptor-only): `normalize` is
+   gone; `shapeKey` parses the native descriptor grammar —
+   `(params)return`; `a8` (optionally named, optionally carrying the
+   `:[*:b1]` element annotation) -> P; `[body](name)` -> M when the
+   body's byte size is 8 (padding counts as `xN`; brackets are matched,
+   so nested structs and named members parse), unmodeled otherwise;
+   `i4`/`j8`/`f4`/`d8`/`z1`/`v` -> I/J/F/D/Z/V. Unparsable or
+   unmodeled descriptors (a by-value struct that is not 8 bytes, an
+   unknown token) classify as uncovered with the recorded descriptor,
+   and a report with no nonempty `binding_descriptors` object (i.e.
+   predating the recording) is refused with a clear re-run error. The
+   JVM-form `binding_signatures` never drives the estimate again.
+3. *Calibration shape set*: the 16 round-1 representative classes are
+   replaced by the union of the native descriptor classes of the
+   bindings the controlled binding-count workloads actually call — 51
+   distinct called bindings across the three runs (TinyMistral-6x248M,
+   Qwen3-0.6B, Qwen3-8B-4bit; the per-binding native descriptors are
+   the worker-recorded `binding_descriptors` / agent class-load
+   recording) collapse to exactly **27 keys**:
+
+   | key | called bindings |
+   | --- | --- |
+   | `()M` | `mlx_array_new` |
+   | `(F)M` | `mlx_array_new_float32` |
+   | `(M)I` | `mlx_array_dtype`, `mlx_array_eval`, `mlx_array_free`, `mlx_eval`, `mlx_vector_array_free` |
+   | `(M)J` | `mlx_array_ndim`, `mlx_array_size` |
+   | `(M)P` | `mlx_array_data_int32`, `mlx_array_shape` |
+   | `(PDDDIM)I` | `mlx_arange` |
+   | `(PJ)M` | `mlx_vector_array_new_data` |
+   | `(PM)I` | `mlx_array_set` |
+   | `(PMIIM)I` | `mlx_flatten`, `mlx_swapaxes` |
+   | `(PMIM)I` | `mlx_argsort_axis`, `mlx_astype`, `mlx_concatenate_axis`, `mlx_expand_dims` |
+   | `(PMIZM)I` | `mlx_argmax_axis`, `mlx_softmax_axis` |
+   | `(PMIZMFIMM)I` | `mlx_fast_rope` |
+   | `(PMM)I` | `mlx_sigmoid`, `mlx_stop_gradient`, `mlx_transpose` |
+   | `(PMMFM)I` | `mlx_fast_rms_norm` |
+   | `(PMMIM)I` | `mlx_take_along_axis`, `mlx_take_axis` |
+   | `(PMMM)I` | `mlx_add`, `mlx_divide`, `mlx_equal`, `mlx_greater_equal`, `mlx_less`, `mlx_less_equal`, `mlx_logical_and`, `mlx_matmul`, `mlx_multiply` |
+   | `(PMMMFPMMZM)I` | `mlx_fast_scaled_dot_product_attention` |
+   | `(PMMMM)I` | `mlx_where` |
+   | `(PMMMMMPMMM)I` | `mlx_dequantize` |
+   | `(PMMMMZM)I` | `mlx_gather_mm` |
+   | `(PMMMMZMMPM)I` | `mlx_quantized_matmul` |
+   | `(PMPJM)I` | `mlx_broadcast_to`, `mlx_reshape`, `mlx_transpose_axes` |
+   | `(PMPJPJPJM)I` | `mlx_slice` |
+   | `(PMPJZM)I` | `mlx_sum_axes` |
+   | `(PMZM)I` | `mlx_contiguous` |
+   | `(PPII)M` | `mlx_array_new_data` |
+   | `(PPJMIM)I` | `mlx_full` |
+
+   The pinned-header fact backing the M class: in mlx-c v0.8.0 every
+   by-value struct — the opaque handles and the `mlx_optional_*`
+   scalar wrappers alike — is a single 8-byte pointer member
+   (`mlx_vector_array` at
+   `native/install/include/mlx/c/vector.h:26`, so `mlx_eval` is
+   `(M)I` and `mlx_vector_array_new_data` is `(PJ)M`); any by-value
+   struct that is not 8 bytes is unmodeled and uncovered by
+   construction (the pinned header has none). Consequence in the
+   re-run: coverage is 1.0000 with zero uncovered bindings on both
+   e2e reports (§15.4).
+
+**B. One range where two were owed, and per-sample costs charged as
+per-call.** Round 1's output carried a single p10/median/p90 triple
+(the request-to-request spread over the per-request budgets) — the
+calibration's own sampling range was dead weight: the per-shape p10/p90
+budget accumulators were computed but never emitted, and
+`median_ns_per_call` emitted the per-*sample* median (one sample is
+`workload.calls` consecutive downcalls) as if it were per-call, so
+every budget overstated the per-shape cost by the factor `calls`
+(2000× at the default workload). Closed:
+
+1. *Per-call costs*: every per-call cost divides the per-sample
+   quantile by `workload.calls` (type-7 quantiles commute with a
+   positive scale factor, so the divided quantiles are exactly the
+   quantiles of the per-call samples); a calibration without a
+   positive `workload.calls` is refused up front instead of dividing
+   by zero. `median_ns_per_call` is now per-call, with
+   `p10_ns_per_call`/`p90_ns_per_call` alongside.
+2. *Two ranges*: every summary node (each per-position entry,
+   `per_decode_step`, `prefill`, `request_total`) now reports both —
+   `p10_ns`/`median_ns`/`p90_ns` keep the round-1 meaning (the
+   request-to-request spread of the per-request budgets computed from
+   each shape's calibration median; one sample per measured request,
+   per (measured request, position) for the step nodes), and the new
+   `calibration_p10_ns`/`calibration_p90_ns` are the calibration's own
+   sampling range — the same per-request/per-position budgets computed
+   from each shape's calibration p10 and p90 samples. `per_shape`
+   emits the formerly dead p10/p90 accumulators as
+   `budget_p10_ns`/`budget_p90_ns`.
+3. *Assumption labels*: the assumption texts were rewritten for the
+   native-descriptor classification, the shared-arena carriers and
+   `CalScope` — both round-1 caveats are gone (the "confined arena"
+   one, resolved by the `CalScope` mirror in item A, calibration
+   side; the "pointer-kind M indistinguishable" one, resolved by the
+   native descriptor in item A) — and for the two-range reporting.
+
+**A (calibration side). The carriers and result allocator were not
+production's.** (a) The P/M argument carriers lived on the same
+*confined* arena as the dylib lookup; production
+`MLXScope.Holder` allocates every native handle on a process-lifetime
+`Arena.ofShared()`. (b) The struct-return shapes took their results
+from that same bare confined arena, while production pays a
+*synchronized* shared-arena allocation plus per-scope
+`LinkedHashSet` tracking (`MLXScope.Holder.allocate`) for every
+struct-return downcall result. Closed: the ten P/M carriers (the
+maximally-arity shapes need ten 8-byte arguments) are
+process-lifetime shared-arena segments; the four struct-return shapes
+allocate their results through a `CalScope` that mirrors
+`MLXScope.Holder.allocate` (synchronized shared-arena allocation plus
+the per-scope handle set); the dylib's `libraryLookup` keeps its own
+confined arena open for the run (the dylib must stay loaded). The
+measured effect is visible in §15.4: the struct-return shapes land at
+~509–518 ns/call against 4.3–12.6 ns/call for the int-return shapes —
+the per-call result allocation dominates, exactly as in production.
+
+**C. The fixed-continuation `prefill_s` included its release window.**
+In `runFixedContinuation`, `prefillS` was computed after the prefill
+try/finally, so it absorbed the `prefill-release` window (the
+activation scope's `close` and, in binding-count mode, its per-array
+`mlx_array_free` downcalls) — while the controlled loop's prefill
+timer already stopped at the evaluated prefill logits (frozen §13.3
+boundary; the controlled path needed no change). Closed: `prefillS` is
+now measured inside the prefill try, after `prefill-sync` (the
+evaluated prefill logits) and before the release window runs, so the
+release window's own overhead never enters `prefill_s` on either
+adapter; the frozen timer boundaries are otherwise untouched.
+
+**D. A release-window failure replaced the original exception.**
+Round 1's explicit try/finally (round 1, item 1) ran
+`observer.window(..., scope::close)` in a `finally`: when the
+protected block threw *and* the release window threw, the
+release-window failure propagated out of the `finally` and *replaced*
+the original exception — try/finally does not attach, only
+try-with-resources does, and the adapter no longer uses it. Closed:
+the six release sites (pre / step / request, both adapters) now run
+through `releaseWindow(observer, phase, position, scope, original)`:
+the close still runs at the same wall-clock position try-with-resources
+gave it; a release-window failure is attached to the in-flight
+exception with `addSuppressed` (and propagates as-is when no
+exception is in flight, as before).
+
+**E. An `Error` from the window's work left the agent recording.**
+The binding-count window hook caught `RuntimeException` from
+`work.run()`; an `Error` (an `OutOfMemoryError`, an
+`ExceptionInInitializerError` when a lazy holder class loads) bypassed
+the catch and propagated with the agent still recording, and a
+`stop()` failure was swallowed outright. Closed: both boundaries catch
+`Throwable` — an `Error` from the work stops the recording like a
+`RuntimeException` — and a `stop()` failure is attached to the work
+failure with `addSuppressed` instead of swallowed (the agent is
+already broken; the window's own failure is what the report must
+carry).
+
+**F. The floor loop was vectorizable.** Round 1's floor was
+`sink ^= (k + 1) * C` — an XOR reduction whose per-iteration terms are
+independent of each other, so a vectorizer can reassociate it into
+independent even/odd chains (or across SIMD lanes) and fold the loop.
+Closed: the floor is now a linear congruential recurrence
+`sink = sink * C + (k + 1)` — every iteration depends on the previous
+result (the multiply-add cannot be reassociated), so the loop cannot
+be vectorized, while the per-iteration ALU work stays in the same
+order as the C no-op bodies; the result lands in the volatile sink
+like the batch results.
+
+**Local evidence.** `:jmlx-benchmarks:test` green with 96 tests
+(§15.5, round-2 counts); the `:jmlx-models` baseline suites green
+(`BaselineAdaptersTest` 5, `BaselineWorkerProcessTest` 9,
+`BaselineWorkerProtocolTest` 22). The calibration was re-measured at
+the default workload and the estimate re-run end-to-end against two
+real binding-count session reports with the worker-recorded
+`binding_descriptors` injected — coverage 1.0000, zero uncovered,
+per-decode-step FFM budget ≈ 3.5% of the measured step wall time
+(full numbers and the source/binary SHA-256 in §15.4). The
+`FfmTransitionEstimateTest` per-call test pins the division
+(workload `calls = 10`, per-sample quantiles 10× the per-call values),
+so the round-1 conflation cannot return silently.

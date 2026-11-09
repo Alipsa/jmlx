@@ -219,7 +219,8 @@ final class BaselineReportFixtures {
   /**
    * Stamps the WP2 worker-level instrumentation metadata: the instrumentation field, the
    * instrumented identity flag, the per-worker host record and (binding-count only) the
-   * binding_signatures object.
+   * binding_signatures (JVM descriptors, provenance) and binding_descriptors (native function
+   * descriptors, the estimate's classification source) objects.
    */
   static void instrumentWorker(ObjectNode worker, String instrumentation) {
     worker.put("instrumentation", instrumentation);
@@ -228,6 +229,9 @@ final class BaselineReportFixtures {
     identity.putObject("host").put("hw_model", "arm64");
     if ("binding-count".equals(instrumentation)) {
       worker.putObject("binding_signatures").put("mlx_eval", "(J)V");
+      worker
+          .putObject("binding_descriptors")
+          .put("mlx_eval", "([a8(ctx):[*:b1]](mlx_vector_array_))i4");
     }
   }
 

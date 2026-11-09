@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.foreign.FunctionDescriptor;
 import java.lang.management.ManagementFactory;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -698,11 +699,15 @@ public final class BaselineWorker {
       }
       try {
         work.run();
-      } catch (RuntimeException workFailure) {
+      } catch (Throwable workFailure) {
         try {
           BindingCounterAgent.stop();
-        } catch (RuntimeException stopFailure) {
+        } catch (Throwable stopFailure) {
           // The agent is already broken; the window's own failure is what the report must carry.
+          // An Error from the work (an OutOfMemoryError, an ExceptionInInitializerError when a
+          // lazy holder class loads) stops the recording too, not only a RuntimeException
+          // (review round 2, E).
+          workFailure.addSuppressed(stopFailure);
         }
         throw workFailure;
       }
@@ -1236,9 +1241,14 @@ public final class BaselineWorker {
       worker.put("utc_end", utcEnd);
       worker.put("identity", identity);
       if ("binding-count".equals(instrumentation)) {
-        // The instrumented downcalls' JVM descriptors (agent-recorded at class-load time); the
-        // FFM transition estimate groups counts by these signature classes (findings section 15).
-        worker.put("binding_signatures", BindingCounterAgent.signatures());
+        // The instrumented downcalls' JVM descriptors (agent-recorded at class-load time), kept
+        // as provenance (findings section 15.7, review round 2, A).
+        Map<String, String> signatures = BindingCounterAgent.signatures();
+        worker.put("binding_signatures", signatures);
+        // The native function descriptors the generated bindings actually use, by exact binding
+        // name: the FFM transition estimate classifies the counts by these descriptor shapes
+        // (findings section 15.7, review round 2, A).
+        worker.put("binding_descriptors", nativeBindingDescriptors(signatures));
       }
       worker.put("stop_token_ids", stopTokenIds);
       worker.put("load_s", loadS);
@@ -1269,6 +1279,33 @@ public final class BaselineWorker {
         }
       }
     }
+  }
+
+  /**
+   * The native function descriptors of the recorded bindings, by exact binding name (review round
+   * 2, A): the toString of each generated wrapper's own downcall {@code FunctionDescriptor},
+   * reached by reflection because jmlx-ffi is an {@code implementation}-scoped dependency — on the
+   * worker's runtime classpath, not its compile classpath. A binding whose descriptor cannot be
+   * read is omitted rather than failing the run (the estimate records it as uncovered).
+   */
+  private static Map<String, String> nativeBindingDescriptors(Map<String, String> signatures) {
+    Map<String, String> descriptors = new TreeMap<>();
+    Class<?> mlxh;
+    try {
+      mlxh = Class.forName("se.alipsa.jmlx.ffi.mlx_h");
+    } catch (ClassNotFoundException e) {
+      return descriptors;
+    }
+    for (String name : signatures.keySet()) {
+      try {
+        FunctionDescriptor descriptor =
+            (FunctionDescriptor) mlxh.getMethod(name + "$descriptor").invoke(null);
+        descriptors.put(name, descriptor.toString());
+      } catch (ReflectiveOperationException e) {
+        // Unreadable descriptor: omit it; the estimate records the binding as uncovered.
+      }
+    }
+    return descriptors;
   }
 
   /**

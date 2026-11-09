@@ -115,6 +115,7 @@ final class BaselineAdapters {
       throw new IllegalArgumentException("emitted must be >= 1");
     }
     MLXScope request = owner.newChild();
+    ControlledResult result;
     try {
       List<KVCache> caches = freshCaches(model, request);
       // The prompt caches are created before the timer starts (frozen section 13.3 boundary);
@@ -140,12 +141,14 @@ final class BaselineAdapters {
         // prefill timer above already stopped at the evaluated logits.
         observer.window("prefill-selection", 0, () -> token1Ref[0] = argmax(logitsRef[0]));
         token1 = token1Ref[0];
-      } finally {
-        // The release of the prefill's activation scope is observed work too (its per-array
-        // mlx_array_free downcalls); the close itself runs at the same wall-clock position it
-        // always did, outside every frozen timer.
-        observer.window("prefill-release", 0, activation::close);
+      } catch (Throwable t) {
+        releaseWindow(observer, "prefill-release", 0, activation, t);
+        throw t;
       }
+      // The release of the prefill's activation scope is observed work too (its per-array
+      // mlx_array_free downcalls); the close itself runs at the same wall-clock position it
+      // always did, outside every frozen timer.
+      releaseWindow(observer, "prefill-release", 0, activation, null);
       double[] eventS = new double[emitted];
       eventS[0] = (System.nanoTime() - t0) / NANOS_PER_SECOND;
       List<Integer> tokens = new ArrayList<>(emitted);
@@ -174,20 +177,26 @@ final class BaselineAdapters {
           stepS = (System.nanoTime() - stepStart) / NANOS_PER_SECOND;
           observer.window("selection", position, () -> nextRef[0] = argmax(logitsRef[0]));
           next = nextRef[0];
-        } finally {
-          observer.window("release", position, stepActivation::close);
+        } catch (Throwable t) {
+          releaseWindow(observer, "release", position, stepActivation, t);
+          throw t;
         }
+        releaseWindow(observer, "release", position, stepActivation, null);
         steps.add(new Step(position, stepS, null, null));
         tokens.add(next);
         eventS[k + 1] = (System.nanoTime() - t0) / NANOS_PER_SECOND;
       }
-      return new ControlledResult(
-          List.copyOf(tokens), eventS[0], prefillS, List.copyOf(steps), eventS);
-    } finally {
-      // The request scope owns the per-request caches; its close (and their per-array frees)
-      // is the request-release window, after every frozen timer has stopped.
-      observer.window("request-release", 0, request::close);
+      result =
+          new ControlledResult(
+              List.copyOf(tokens), eventS[0], prefillS, List.copyOf(steps), eventS);
+    } catch (Throwable t) {
+      releaseWindow(observer, "request-release", 0, request, t);
+      throw t;
     }
+    // The request scope owns the per-request caches; its close (and their per-array frees)
+    // is the request-release window, after every frozen timer has stopped.
+    releaseWindow(observer, "request-release", 0, request, null);
+    return result;
   }
 
   /**
@@ -207,12 +216,14 @@ final class BaselineAdapters {
   static FixedContinuationResult runFixedContinuation(
       DecoderModel model, MLXScope owner, int[] prompt, int[] fedIds, PhaseObserver observer) {
     MLXScope request = owner.newChild();
+    List<Step> steps;
+    double stepRegionS;
+    double prefillS;
     try {
       List<KVCache> caches = freshCaches(model, request);
       // The prompt caches are created before the timer starts (frozen section 13.3 boundary).
       long t0 = System.nanoTime();
       int promptLength = prompt.length;
-      double prefillS;
       MLXScope activation = request.newChild();
       try {
         final MLXArray[] logitsRef = new MLXArray[1];
@@ -224,12 +235,18 @@ final class BaselineAdapters {
               logitsRef[0] = model.stepLogits(ids, caches, new int[] {promptLength}, null);
             });
         observer.window("prefill-sync", 0, () -> evalStep(logitsRef[0], caches));
-      } finally {
-        // Same release-window accounting as the controlled loop (findings section 15.6).
-        observer.window("prefill-release", 0, activation::close);
+        // The prefill timer stops at the evaluated prefill logits, before the activation
+        // scope's release (the frozen section 13.3 boundary; the controlled loop does the
+        // same). The release window's own overhead (and its downcalls in binding-count
+        // mode) never enter prefill_s.
+        prefillS = (System.nanoTime() - t0) / NANOS_PER_SECOND;
+      } catch (Throwable t) {
+        releaseWindow(observer, "prefill-release", 0, activation, t);
+        throw t;
       }
-      prefillS = (System.nanoTime() - t0) / NANOS_PER_SECOND;
-      List<Step> steps = new ArrayList<>(fedIds.length);
+      // Same release-window accounting as the controlled loop (findings section 15.6).
+      releaseWindow(observer, "prefill-release", 0, activation, null);
+      steps = new ArrayList<>(fedIds.length);
       for (int k = 0; k < fedIds.length; k++) {
         int position = promptLength + k + 1;
         long stepStart = System.nanoTime();
@@ -263,17 +280,21 @@ final class BaselineAdapters {
               });
           argmaxId = argmaxIdRef[0];
           top2Margin = marginRef[0];
-        } finally {
-          observer.window("release", position, stepActivation::close);
+        } catch (Throwable t) {
+          releaseWindow(observer, "release", position, stepActivation, t);
+          throw t;
         }
+        releaseWindow(observer, "release", position, stepActivation, null);
         steps.add(new Step(position, stepS, argmaxId, top2Margin));
       }
       // Wall time over the step region only (prefill excluded, one definition on both paths).
-      return new FixedContinuationResult(
-          prefillS, List.copyOf(steps), (System.nanoTime() - t0) / NANOS_PER_SECOND - prefillS);
-    } finally {
-      observer.window("request-release", 0, request::close);
+      stepRegionS = (System.nanoTime() - t0) / NANOS_PER_SECOND - prefillS;
+    } catch (Throwable t) {
+      releaseWindow(observer, "request-release", 0, request, t);
+      throw t;
     }
+    releaseWindow(observer, "request-release", 0, request, null);
+    return new FixedContinuationResult(prefillS, List.copyOf(steps), stepRegionS);
   }
 
   /**
@@ -349,6 +370,25 @@ final class BaselineAdapters {
     all[0] = logits;
     System.arraycopy(cacheArrays, 0, all, 1, cacheArrays.length);
     MLX.eval(all);
+  }
+
+  /**
+   * Runs one scope's release window while preserving the exception in flight (if any): the close
+   * still runs at the same wall-clock position the try-with-resources it replaced gave it, but a
+   * release-window failure is attached to {@code original} as a suppressed exception instead of
+   * replacing it — try-with-resources used to do the attaching (review round 2, D). With no
+   * original exception, a release-window failure propagates, as before.
+   */
+  private static void releaseWindow(
+      PhaseObserver observer, String phase, int position, MLXScope scope, Throwable original) {
+    try {
+      observer.window(phase, position, scope::close);
+    } catch (RuntimeException releaseFailure) {
+      if (original == null) {
+        throw releaseFailure;
+      }
+      original.addSuppressed(releaseFailure);
+    }
   }
 
   /** Native greedy argmax of the {@code [1,1,V]} row, read back to the host. */

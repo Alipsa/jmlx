@@ -101,8 +101,9 @@ final class BaselineReportValidator {
       violations.add("uninstrumented workers carry no identity.host record");
     }
     if ("binding-count".equals(instrumentation)) {
-      // The instrumented downcalls' JVM descriptors, by exact binding name (the FFM
-      // transition estimate groups counts by these signature classes).
+      // The instrumented downcalls' JVM descriptors, by exact binding name, kept as provenance
+      // (the FFM transition estimate classifies the counts by the native descriptors below;
+      // review round 2, A).
       JsonNode signatures = worker.path("binding_signatures");
       if (!signatures.isObject() || signatures.size() == 0) {
         violations.add("binding-count reports carry a nonempty binding_signatures object");
@@ -114,8 +115,22 @@ final class BaselineReportValidator {
           }
         }
       }
-    } else if (worker.has("binding_signatures")) {
-      violations.add("binding_signatures is present only in binding-count mode");
+      // The native function descriptors the generated bindings actually use, by exact binding
+      // name: the FFM transition estimate groups the counts by these descriptor shapes.
+      JsonNode descriptors = worker.path("binding_descriptors");
+      if (!descriptors.isObject() || descriptors.size() == 0) {
+        violations.add("binding-count reports carry a nonempty binding_descriptors object");
+      } else {
+        for (JsonNode descriptor : descriptors) {
+          if (!descriptor.isTextual() || descriptor.asString("").isEmpty()) {
+            violations.add("binding_descriptors values are nonempty descriptor strings");
+            break;
+          }
+        }
+      }
+    } else if (worker.has("binding_signatures") || worker.has("binding_descriptors")) {
+      violations.add(
+          "binding_signatures and binding_descriptors are present only in binding-count mode");
     }
     if (!worker.path("stop_token_ids").isArray()) {
       violations.add("stop_token_ids must be an array");

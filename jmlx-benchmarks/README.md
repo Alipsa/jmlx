@@ -141,7 +141,10 @@ type-7 quantiles and the exclusion list).
 Instrumented workers (the spec's per-worker `instrumentation`) additionally
 write, in their `report.json`: per-request `binding_counts` (binding-count
 mode) or `tracing` (tracing mode), a `memory` block, and the `identity.host`
-record; the worker block carries `binding_signatures` in binding-count mode.
+record; the worker block carries `binding_signatures` (the JVM-form
+descriptors, provenance only) and `binding_descriptors` (each recorded
+binding's native `FunctionDescriptor` — what the FFM estimator
+classifies) in binding-count mode.
 Instrumented workers are excluded from the headline aggregation by
 construction (exclusion reason `instrumented`). The frozen contract and the
 WP2 record are in `req/plans/phase8-2-reference-findings.md` sections 13 and
@@ -163,24 +166,32 @@ workloads.
 
 Builds a no-op FFM calibration dylib under the output directory
 (`cc -shared -O2`; a machine without `cc` fails with a clear error) and
-measures the Project Panama downcall transition cost of representative
-generated mlx-c binding shapes in fresh JVMs. Arguments:
+measures the Project Panama downcall transition cost of the 27 binding
+shapes the controlled binding-count workloads actually call (the union
+of the native descriptor classes of the called bindings, findings
+section 15.7 item A) in fresh JVMs. Arguments:
 
 ```text
 output-directory [iterations calls forks warmup]
 ```
 
 Defaults are 200 iterations, 2000 calls per sample, 5 forks and 2000 warmup
-calls. Each shape is a non-elidable no-op C function with the same
-parameter/return register shape as a class of the generated downcalls
+calls. The reported quantiles are per sample (one sample is `calls`
+consecutive downcalls); the transition estimator divides by `calls` for
+per-call costs. Each shape is a non-elidable no-op C function with the
+same parameter/return register shape as a class of the generated
+downcalls
 (see `src/main/resources/ffm_cal.c` for the shapes and the carrier-fidelity
 argument — the M parameters are the 8-byte structs the pinned header passes
 by value, declared on the Java side with the struct's 8-byte layout exactly
 as the generated wrappers do), invoked through the generated wrappers' own
 `invokeExact` form: one private holder class per shape binds its handle in a
 `static final` field, so each call site references a JIT-trusted constant.
-The dylib and the extracted C source are the only build artifacts; both stay
-under the output directory. Every external-process wait is bounded
+The argument carriers and the struct-return results use the same
+process-lifetime shared-arena allocation kind production `MLXScope` uses,
+so the measured per-call cost is production's. The dylib and the extracted
+C source are the only build artifacts; both stay under the output
+directory. Every external-process wait is bounded
 (`cc` compile 300 s, version probe 30 s, worker fork 300 s + 1 s per
 million downcalls). Outputs: `build-info.json` (compiler, flags,
 source/binary SHA-256s), `raw-fork-<n>.json` (the per-fork raw samples) and
@@ -196,12 +207,20 @@ classpath:
 FfmTransitionEstimate worker-report.json ffm-calibration.json output-json
 ```
 
-The estimate accepts only controlled worker reports (the stock adapter's
-single whole-request window cannot be split into prefill and per-step
-phases) and aggregates only the `measured` requests — one step-budget
-sample per (measured request, position), so the per-step figures never
-scale with the request count. It is a calibrated estimate, not a causal
-partition of the step's time: the output carries the explicit assumptions,
-the coverage of classified calls and the uncovered signatures. The contract
+The estimate accepts only controlled worker reports that carry
+`binding_descriptors` (the stock adapter's single whole-request window
+cannot be split into prefill and per-step phases, and a report
+predating the native-descriptor recording is a re-run, not a
+misclassification) and aggregates only the `measured` requests — one
+step-budget sample per (measured request, position), so the per-step
+figures never scale with the request count. It refuses a calibration
+summary without a positive `workload.calls`: the calibration quantiles
+are per sample, and every per-call cost divides them by `calls`. Every
+summary node reports two ranges: `p10_ns`/`median_ns`/`p90_ns` are the
+request-to-request spread of the per-request budgets, and
+`calibration_p10_ns`/`calibration_p90_ns` are the calibration's own
+sampling range. It is a calibrated estimate, not a causal partition of
+the step's time: the output carries the explicit assumptions, the
+coverage of classified calls and the uncovered signatures. The contract
 and the local measurement baseline are in
 `req/plans/phase8-2-reference-findings.md` section 15.4.

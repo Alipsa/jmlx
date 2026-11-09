@@ -805,16 +805,22 @@ class BaselineWorkerProtocolTest {
         assertTrue(descriptor.asString("").startsWith("("), descriptor.asString());
       }
     } finally {
+      // Clear every agent property the faked run may have left behind, including the recording
+      // flag the agent's stop sets back to false (review round 4, c).
       System.clearProperty("jmlx.binding.installed");
       System.clearProperty("jmlx.binding.signatures");
+      System.clearProperty("jmlx.binding.recording");
     }
   }
 
   @Test
   void bindingDescriptorsAreRestrictedToTheCountedNames() {
-    // Review round 3, 4: the lookup set is exactly the names with a nonzero count in some
-    // measured window, never the full instrumented set — a binding that was never counted must
-    // not be looked up (each lookup initialises the binding's holder and links its downcall).
+    // Review round 3, 4; strengthened in review round 4, b: the lookup set is exactly the names
+    // with a nonzero count in some measured window, never the full instrumented set — a binding
+    // that was never counted must not be looked up (each lookup initialises the binding's holder
+    // and links its downcall). The counting lookup seam proves the restriction directly: checking
+    // only the output keys would pass even if an uncounted binding's holder had been initialised
+    // and its result then dropped.
     Map<String, String> signatures =
         new TreeMap<>(
             Map.of(
@@ -826,6 +832,10 @@ class BaselineWorkerProtocolTest {
     Map<String, String> descriptors = BaselineWorker.nativeBindingDescriptors(signatures, counted);
 
     assertEquals(Set.of("mlx_add", "mlx_eval"), descriptors.keySet());
+    assertEquals(
+        2,
+        BaselineWorker.descriptorLookupCountForTest(),
+        "only the counted names' $descriptor holders are looked up");
     for (String descriptor : descriptors.values()) {
       assertTrue(descriptor.startsWith("("), descriptor);
       assertFalse(descriptor.isEmpty());
@@ -842,27 +852,9 @@ class BaselineWorkerProtocolTest {
     try {
       List<Map<String, Object>> bindingPhases = new ArrayList<>();
       List<Map<String, Object>> traceWindows = new ArrayList<>();
-      BaselineWorker.Validated v =
-          new BaselineWorker.Validated(
-              null,
-              null,
-              0,
-              null,
-              "binding-count",
-              Map.of(),
-              0,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              List.of(),
-              false,
-              Map.of(),
-              null,
-              List.of());
+      // The record factory (review round 4, d) replaces a positional constructor call that
+      // would rot silently-but-noisily whenever the record's shape changes.
+      BaselineWorker.Validated v = BaselineWorker.Validated.forInstrumentation("binding-count");
       OutOfMemoryError failure = new OutOfMemoryError("test error");
 
       OutOfMemoryError thrown =
@@ -886,7 +878,10 @@ class BaselineWorkerProtocolTest {
           System.getProperty("jmlx.binding.recording"),
           "the best-effort agent stop ran despite the Error");
     } finally {
+      // Clear every agent property the faked run may have left behind, including the recording
+      // flag the agent's stop sets back to false (review round 4, c).
       System.clearProperty("jmlx.binding.installed");
+      System.clearProperty("jmlx.binding.recording");
     }
   }
 

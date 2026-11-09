@@ -2331,3 +2331,70 @@ walls 14,437.2 µs / 20,162.5 µs (≈ 0.53%, vs round 2's ≈ 3.5%),
 prefill 85.54 µs / 100.23 µs, request totals 9.82 ms / 13.65 ms
 (calibration ranges 63.26–98.74 / 88.11–137.33 µs per step),
 coverage 1.0 with zero uncovered — full numbers in §15.4.
+
+### 15.9 Review round 4 (2026-11-09, PR #90): counted-name filtering, lookup seam and test hygiene
+
+Four findings (all low), all in the `jmlx-models` test sources.
+No job, report or estimate schema changed (the estimate output
+schema stays `jmlx-ffm-transition-estimate-1`), and no calibration
+artifact moved (binary SHA-256
+`f1e2e7d76b4ff25d610c4284f38b856044eee604e3b844c45f539f0d30901ad9`,
+source SHA-256
+`cb30e80b9824eb51113efca5a608f704d9503421e9e7ee331a0eb3d5bc60e2d4`).
+
+a. **`countedBindingNames` measured filter (low).** The Javadoc
+   said "some measured request" while the loop iterated every
+   request record — `requests` holds one `requestRecord` per
+   index, whatever its kind (first + warmups + measured). The
+   superset lookup set was harmless (the estimator classifies
+   measured windows only) but the wording was false. Closed by
+   filtering on `"measured".equals(record.get("kind"))` in
+   `countedBindingNames()` — the stricter of the two offered
+   fixes, so the Javadoc now holds. No estimate output changes:
+   a name that appears only in a first/warmup window is neither
+   classified nor uncovered, so the round-3 result (counted-only
+   descriptors reproduce the full-descriptor estimates exactly)
+   stands without a re-run.
+
+b. **Descriptor-restriction test checked less than its comment
+   (low).** `bindingDescriptorsAreRestrictedToTheCountedNames`
+   asserted only the output keys; it would have passed even if
+   the uncounted `mlx_array_new_data` holder had been
+   initialised and its result then dropped. Closed by checking
+   the restriction directly through a counting lookup seam:
+   `nativeBindingDescriptors` carries a `descriptorLookups`
+   counter incremented once per attempted reflective
+   `$descriptor` invoke, with a package-private
+   `descriptorLookupCountForTest()` accessor and a reset in
+   `resetTestSeams()` (the file's existing `*ForTest` seam
+   pattern). The test now asserts exactly 2 lookups for counted
+   = {`mlx_add`, `mlx_eval`} while the signature map also
+   carries `mlx_array_new_data`, so the "must not be looked up"
+   comment is true.
+
+c. **Agent properties left behind (hygiene).** Both fake-agent
+   protocol tests cleared `jmlx.binding.installed` (and
+   `jmlx.binding.signatures`) but left `jmlx.binding.recording`
+   set to `false` — the agent's `start()` sets it `true` and its
+   `stop()` sets it back to `false` and leaves it. Nothing reads
+   it today; the finally blocks now clear it alongside the other
+   properties. `jmlx.binding.count.*` is never created in a fake
+   run (no transformer installed), so nothing else needs
+   clearing.
+
+d. **Positional 19-argument `Validated` constructor in a test
+   (low).** `bindingCountWindowWorkErrorPropagatesUnwrapped`
+   built the `Validated` record from 19 positional arguments,
+   mostly null — a record-shape change would have broken it
+   silently-but-noisily. Closed with a record factory
+   `Validated.forInstrumentation(String instrumentation)` that
+   fills the rest with the same null / `Map.of()` / `List.of()`
+   values; the test calls it.
+
+**Local evidence.** The `:jmlx-models` baseline suites are green
+unchanged at `BaselineAdaptersTest` 9, `BaselineWorkerProcessTest`
+9 and `BaselineWorkerProtocolTest` 25 (§15.5's counts — the tests
+were strengthened, none added). `:jmlx-models:spotlessCheck` and
+`:jmlx-models:checkstyleTest` are clean; `git diff --check` is
+clean. No `jmlx-benchmarks` change, and no golden, schema, pin or
+version change; the round-3 estimate numbers stand.

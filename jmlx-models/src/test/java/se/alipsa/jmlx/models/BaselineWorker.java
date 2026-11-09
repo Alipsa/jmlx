@@ -120,7 +120,35 @@ public final class BaselineWorker {
       boolean ioAffected,
       Map<String, Object> runPolicy,
       String wiredLimitPolicy,
-      List<Integer> stopTokenIds) {}
+      List<Integer> stopTokenIds) {
+    /**
+     * A {@link Validated} with only the instrumentation mode filled in, for the window-observer
+     * unit tests (review round 4, d): a positional constructor call in the test would rot
+     * silently-but-noisily whenever the record's shape changes.
+     */
+    static Validated forInstrumentation(String instrumentation) {
+      return new Validated(
+          null,
+          null,
+          0,
+          null,
+          instrumentation,
+          Map.of(),
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          List.of(),
+          false,
+          Map.of(),
+          null,
+          List.of());
+    }
+  }
 
   private static final Object REPORT_LOCK = new Object();
 
@@ -158,6 +186,13 @@ public final class BaselineWorker {
   private static long watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
   private static long requestDelayMs = 0L;
   private static volatile CountDownLatch requestHold;
+
+  /**
+   * The {@code $descriptor} lookups attempted by {@link #nativeBindingDescriptors} since the last
+   * seam reset (review round 4, b): each lookup initialises the binding's holder, so the count is
+   * the direct evidence that an uncounted binding's holder stayed uninitialised.
+   */
+  private static int descriptorLookups;
 
   private static final AtomicBoolean fired = new AtomicBoolean();
   private static final AtomicBoolean finished = new AtomicBoolean();
@@ -1292,14 +1327,18 @@ public final class BaselineWorker {
 
   /**
    * The binding names with a nonzero count in some measured request's binding-count windows (review
-   * round 3, 4): the union of every request's per-name {@code total} over the {@code
-   * binding_counts} blocks — exactly the set the descriptor lookups are restricted to, and all the
-   * FFM transition estimate needs. A run that failed before any window completed has none (its
-   * report falls back to every instrumented name).
+   * round 3, 4; filtered to measured records in review round 4, a): the union of every measured
+   * record's per-name {@code total} over the {@code binding_counts} blocks — exactly the set the
+   * descriptor lookups are restricted to, and all the FFM transition estimate needs. A run that
+   * failed before any measured window completed has none (its report falls back to every
+   * instrumented name).
    */
   private static Set<String> countedBindingNames() {
     Set<String> counted = new TreeSet<>();
     for (Map<String, Object> record : requests) {
+      if (!"measured".equals(record.get("kind"))) {
+        continue;
+      }
       Object block = record.get("binding_counts");
       if (!(block instanceof Map<?, ?> counts)) {
         continue;
@@ -1324,7 +1363,9 @@ public final class BaselineWorker {
    * {@code implementation}-scoped dependency — on the worker's runtime classpath, not its compile
    * classpath. Looking up a name initialises the binding's holder ({@code findOrThrow} plus {@code
    * downcallHandle}), so the lookup set is exactly the names with a nonzero count in some measured
-   * window — never the full instrumented set. A binding whose descriptor cannot be read is omitted
+   * window — never the full instrumented set. Each attempted lookup increments {@link
+   * #descriptorLookups} (review round 4, b), so a test can prove directly that an uncounted
+   * binding's holder was never initialised. A binding whose descriptor cannot be read is omitted
    * rather than failing the run (the estimate records it as uncovered). Package-visible for the
    * direct unit tests (review round 3, 6).
    */
@@ -1341,6 +1382,7 @@ public final class BaselineWorker {
       if (!signatures.containsKey(name)) {
         continue;
       }
+      descriptorLookups++;
       try {
         FunctionDescriptor descriptor =
             (FunctionDescriptor) mlxh.getMethod(name + "$descriptor").invoke(null);
@@ -1644,11 +1686,17 @@ public final class BaselineWorker {
     return fired.get();
   }
 
+  /** The {@code $descriptor} lookups attempted since the last seam reset (review round 4, b). */
+  static int descriptorLookupCountForTest() {
+    return descriptorLookups;
+  }
+
   static void resetTestSeams() {
     anchors = null;
     exitHook = System::exit;
     watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
     requestDelayMs = 0L;
+    descriptorLookups = 0;
     CountDownLatch hold = requestHold;
     requestHold = null;
     // Release an outstanding hold (a test that failed while its run was still held) so the

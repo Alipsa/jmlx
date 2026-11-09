@@ -37,7 +37,10 @@ import tools.jackson.databind.node.ObjectNode;
  * @param modelsTestClasspath the Java worker's classpath (launcher-side only)
  * @param bindingAgentJar the jmlx-core binding-agent jar path for binding-count Java workers
  *     (launcher-side only; empty when the system property is absent)
- * @param nativeCacheDir the session's isolated native-cache directory (launcher-side only)
+ * @param nativeCacheDir the session's isolated native-cache directory (launcher-side only); it is a
+ *     guard, not a live path — the worker command always sets {@code jmlx.library.path} first, and
+ *     {@code NativeLoader} resolves that before falling back to classpath extraction, so in a
+ *     bootstrapped checkout the directory stays empty
  */
 record BaselineJob(
     String adapter,
@@ -119,10 +122,12 @@ record BaselineJob(
    * test-class {@code BaselineWorker} on the models test runtime classpath; the Python worker is
    * the pinned venv interpreter in isolated mode on the frozen worker source. The precision mode is
    * a worker-process environment variable the caller sets, not a command-line argument (JDK 25 has
-   * no {@code System.setenv}; the Java worker verifies the environment). The Java worker's
-   * classpath-extraction cache is pinned to the session's isolated {@code nativeCacheDir} (the
-   * user's default cache is never touched), and a binding-count worker additionally runs the
-   * jmlx-core binding-agent as a javaagent.
+   * no {@code System.setenv}; the Java worker verifies the environment). The {@code
+   * jmlx.native.cache.path} pin to the session's isolated {@code nativeCacheDir} is a guard only:
+   * {@code jmlx.library.path} is always set first, and {@code NativeLoader} resolves it before any
+   * classpath-extraction fallback, so in a bootstrapped checkout no extraction ever runs and the
+   * directory stays empty. A binding-count worker additionally runs the jmlx-core binding-agent as
+   * a javaagent.
    */
   List<String> command(Path jobFile) {
     List<String> command = new ArrayList<>();

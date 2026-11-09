@@ -18,14 +18,18 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Opt-in FFM calibration worker (phase 8.2 WP2, plan section 5.1): in a fresh JVM, measures one
  * no-op downcall per representative shape of the generated mlx-c bindings, through the same
- * invocation form the generated wrappers use ({@code invokeExact} on a {@code MethodHandle} created
- * by {@link Linker#nativeLinker()}).
+ * invocation form the generated wrappers use ({@code invokeExact} on a {@code MethodHandle} bound
+ * in a private holder class's {@code static final} field — the jextract wrappers' own form, so the
+ * measured call sites reference a JIT-trusted constant, not an array load).
  *
  * <p>The shapes, their C symbols and their register carrier classes are defined by {@code
- * src/main/resources/ffm_cal.c}; every opaque mlx-c struct is a single 8-byte pointer, so on
- * AArch64 the no-op carriers are register-identical to the real ones. One sample is the total wall
- * time of {@code calls} consecutive downcalls; an empty Java loop over the same call count is
- * measured as the timing floor.
+ * src/main/resources/ffm_cal.c}. Every mlx-c opaque struct parameter is an 8-byte struct passed
+ * <em>by value</em> in the pinned header (jextract maps it to the struct's 8-byte layout, not to a
+ * pointer), so the M parameter slots are declared as an 8-byte struct layout — the AArch64 C ABI
+ * carrier (one 64-bit register) is identical to a pointer's, and the Java-side marshalling (the
+ * 8-byte struct read from the segment) matches the generated wrappers' exactly. One sample is the
+ * total wall time of {@code calls} consecutive downcalls; an empty Java loop over the same call
+ * count is measured as the timing floor (warmed up like the batches).
  *
  * <p>This is a calibrated estimate of the FFM transition only (dispatch, marshalling, return
  * handling), not a causal partition of model work, and it does not measure Metal dispatches,
@@ -81,64 +85,90 @@ public final class FfmCalWorker {
     "cal_MMIMM_I"
   };
 
-  /** The downcall descriptors, one per batch id; return layout first, then parameters. */
+  /**
+   * The downcall descriptors, one per batch id; return layout first, then parameters. Every M
+   * parameter slot is the 8-byte struct layout (by value, as the pinned header passes {@code
+   * mlx_array} and friends — the generated wrappers declare the same layout); the M return slots
+   * keep their own form (the pointer return of (M)M, the struct return of (AM)M).
+   */
   private static final FunctionDescriptor[] DESCS = {
-    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(ValueLayout.JAVA_BOOLEAN, ValueLayout.ADDRESS),
-    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
-    FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(STRUCT8, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(
-        ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_LONG, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_BOOLEAN, STRUCT8),
+    FunctionDescriptor.ofVoid(STRUCT8),
+    FunctionDescriptor.of(ValueLayout.ADDRESS, STRUCT8),
+    FunctionDescriptor.of(STRUCT8, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, STRUCT8, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, STRUCT8, STRUCT8, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, STRUCT8, STRUCT8, STRUCT8, STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, ValueLayout.JAVA_INT),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, STRUCT8, ValueLayout.JAVA_INT, STRUCT8),
     FunctionDescriptor.of(
         ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS),
-    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+        STRUCT8,
+        STRUCT8,
+        ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_INT,
+        STRUCT8),
+    FunctionDescriptor.of(ValueLayout.JAVA_INT, STRUCT8, ValueLayout.JAVA_BOOLEAN, STRUCT8),
     FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS),
+        ValueLayout.JAVA_INT, STRUCT8, STRUCT8, STRUCT8, ValueLayout.JAVA_LONG, STRUCT8),
     FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS),
-    FunctionDescriptor.of(
-        ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN, ValueLayout.ADDRESS),
-    FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS),
-    FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS)
+        ValueLayout.JAVA_INT, STRUCT8, STRUCT8, ValueLayout.JAVA_INT, STRUCT8, STRUCT8)
   };
 
-  /** One bound downcall handle per batch id, installed by {@link #run}. */
-  private static final MethodHandle[] H = new MethodHandle[KEYS.length];
+  /** The shared symbol lookup; {@link #run} installs it before any {@code Handle} class loads. */
+  private static final class Init {
+    static SymbolLookup lookup;
+  }
+
+  /** Binds one shape's downcall (called from a holder class's static initializer). */
+  private static MethodHandle downcall(int id) {
+    try {
+      return Linker.nativeLinker().downcallHandle(Init.lookup.findOrThrow(SYMBOLS[id]), DESCS[id]);
+    } catch (RuntimeException e) {
+      throw new IllegalStateException("failed to bind the " + KEYS[id] + " downcall", e);
+    }
+  }
+
+  /**
+   * Pre-touches every holder class so each downcall binds here — before warmup — and a binding
+   * failure surfaces as a clean {@link IllegalStateException} instead of an {@code
+   * ExceptionInInitializerError} on the first measured call.
+   */
+  private static void initializeHandles() {
+    try {
+      MethodHandle[] bound =
+          new MethodHandle[] {
+            Handle0.HANDLE,
+            Handle1.HANDLE,
+            Handle2.HANDLE,
+            Handle3.HANDLE,
+            Handle4.HANDLE,
+            Handle5.HANDLE,
+            Handle6.HANDLE,
+            Handle7.HANDLE,
+            Handle8.HANDLE,
+            Handle9.HANDLE,
+            Handle10.HANDLE,
+            Handle11.HANDLE,
+            Handle12.HANDLE,
+            Handle13.HANDLE,
+            Handle14.HANDLE,
+            Handle15.HANDLE
+          };
+      if (bound.length != KEYS.length) {
+        throw new IllegalStateException("holder classes and shape keys mismatch");
+      }
+    } catch (ExceptionInInitializerError e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException re) {
+        throw re;
+      }
+      throw new IllegalStateException("failed to bind the calibration downcalls", cause);
+    }
+  }
 
   private FfmCalWorker() {}
 
@@ -163,9 +193,9 @@ public final class FfmCalWorker {
   }
 
   /**
-   * Loads the dylib, warms every shape, measures one sample per shape per iteration (rotating the
-   * shape order per iteration to avoid systematic order effects) plus the empty-loop timing floor,
-   * and writes the raw samples as JSON.
+   * Loads the dylib, binds and warms every shape, measures one sample per shape per iteration
+   * (rotating the shape order per iteration to avoid systematic order effects) plus the no-op
+   * timing floor, and writes the raw samples as JSON.
    *
    * @param dylib the compiled calibration dylib
    * @param output the raw-sample JSON path
@@ -180,10 +210,8 @@ public final class FfmCalWorker {
           "iterations and calls must be positive; warmup may be zero");
     }
     try (Arena arena = Arena.ofConfined()) {
-      SymbolLookup lookup = SymbolLookup.libraryLookup(dylib, arena);
-      for (int i = 0; i < KEYS.length; i++) {
-        H[i] = Linker.nativeLinker().downcallHandle(lookup.findOrThrow(SYMBOLS[i]), DESCS[i]);
-      }
+      Init.lookup = SymbolLookup.libraryLookup(dylib, arena);
+      initializeHandles();
       MemorySegment[] carriers = new MemorySegment[5];
       for (int i = 0; i < carriers.length; i++) {
         carriers[i] = arena.allocate(8);
@@ -193,7 +221,7 @@ public final class FfmCalWorker {
       long sink = 0;
       for (int w = 0; w < warmup; w++) {
         for (int i = 0; i < KEYS.length; i++) {
-          sink ^= batch(i, carriers, resultAllocator, 1);
+          sink ^= batch(i, carriers, resultAllocator, 1) ^ floor(1);
         }
       }
       SINK ^= sink;
@@ -209,9 +237,7 @@ public final class FfmCalWorker {
           raw[id][i] = System.nanoTime() - t0;
         }
         long t0 = System.nanoTime();
-        for (int k = 0; k < calls; k++) {
-          // empty loop: the timing floor (timer overhead plus a no-op iteration)
-        }
+        SINK ^= floor(calls);
         loop[i] = System.nanoTime() - t0;
       }
 
@@ -248,9 +274,23 @@ public final class FfmCalWorker {
   private static volatile long SINK;
 
   /**
+   * The timing floor: {@code calls} no-op iterations. Each iteration runs a per-iteration xor-fold
+   * (two ALU ops — the same order of work the C no-op body does), so C2 has to execute every
+   * iteration instead of folding an empty loop body away; the result lands in the volatile sink
+   * like the batch results.
+   */
+  private static long floor(int calls) {
+    long sink = 0;
+    for (int k = 0; k < calls; k++) {
+      sink ^= (k + 1L) * 0x9E3779B97F4A7C15L;
+    }
+    return sink;
+  }
+
+  /**
    * One measured batch: {@code calls} consecutive downcalls of the shape with the given batch id.
    * Each call site below has exactly the generated wrapper's invocation form ({@code invokeExact}
-   * on the bound downcall handle with a matching signature).
+   * on the holder's {@code static final} downcall handle with a matching signature).
    */
   static long batch(int id, MemorySegment[] carriers, SegmentAllocator allocator, int calls) {
     long sink = 0;
@@ -314,73 +354,142 @@ public final class FfmCalWorker {
   }
 
   private static int call0(MemorySegment a) throws Throwable {
-    return (int) H[0].invokeExact(a);
+    return (int) Handle0.HANDLE.invokeExact(a);
   }
 
   private static long call1(MemorySegment a) throws Throwable {
-    return (long) H[1].invokeExact(a);
+    return (long) Handle1.HANDLE.invokeExact(a);
   }
 
   private static boolean call2(MemorySegment a) throws Throwable {
-    return (boolean) H[2].invokeExact(a);
+    return (boolean) Handle2.HANDLE.invokeExact(a);
   }
 
   private static void call3(MemorySegment a) throws Throwable {
-    H[3].invokeExact(a);
+    Handle3.HANDLE.invokeExact(a);
   }
 
   private static MemorySegment call4(MemorySegment a) throws Throwable {
-    return (MemorySegment) H[4].invokeExact(a);
+    return (MemorySegment) Handle4.HANDLE.invokeExact(a);
   }
 
   private static MemorySegment call5(SegmentAllocator allocator, MemorySegment a) throws Throwable {
-    return (MemorySegment) H[5].invokeExact(allocator, a);
+    return (MemorySegment) Handle5.HANDLE.invokeExact(allocator, a);
   }
 
   private static int call6(MemorySegment a, MemorySegment b) throws Throwable {
-    return (int) H[6].invokeExact(a, b);
+    return (int) Handle6.HANDLE.invokeExact(a, b);
   }
 
   private static int call7(MemorySegment a, MemorySegment b, MemorySegment c) throws Throwable {
-    return (int) H[7].invokeExact(a, b, c);
+    return (int) Handle7.HANDLE.invokeExact(a, b, c);
   }
 
   private static int call8(MemorySegment a, MemorySegment b, MemorySegment c, MemorySegment d)
       throws Throwable {
-    return (int) H[8].invokeExact(a, b, c, d);
+    return (int) Handle8.HANDLE.invokeExact(a, b, c, d);
   }
 
   private static int call9(
       MemorySegment a, MemorySegment b, MemorySegment c, MemorySegment d, MemorySegment e)
       throws Throwable {
-    return (int) H[9].invokeExact(a, b, c, d, e);
+    return (int) Handle9.HANDLE.invokeExact(a, b, c, d, e);
   }
 
   private static int call10(MemorySegment a, int i) throws Throwable {
-    return (int) H[10].invokeExact(a, i);
+    return (int) Handle10.HANDLE.invokeExact(a, i);
   }
 
   private static int call11(MemorySegment a, MemorySegment b, int i, MemorySegment c)
       throws Throwable {
-    return (int) H[11].invokeExact(a, b, i, c);
+    return (int) Handle11.HANDLE.invokeExact(a, b, i, c);
   }
 
   private static int call12(MemorySegment a, MemorySegment b, int i, int j, MemorySegment c)
       throws Throwable {
-    return (int) H[12].invokeExact(a, b, i, j, c);
+    return (int) Handle12.HANDLE.invokeExact(a, b, i, j, c);
   }
 
   private static int call13(MemorySegment a, boolean z, MemorySegment b) throws Throwable {
-    return (int) H[13].invokeExact(a, z, b);
+    return (int) Handle13.HANDLE.invokeExact(a, z, b);
   }
 
   private static int call14(
       MemorySegment a, MemorySegment b, MemorySegment c, long j, MemorySegment d) throws Throwable {
-    return (int) H[14].invokeExact(a, b, c, j, d);
+    return (int) Handle14.HANDLE.invokeExact(a, b, c, j, d);
   }
 
   private static int call15(
       MemorySegment a, MemorySegment b, int i, MemorySegment c, MemorySegment d) throws Throwable {
-    return (int) H[15].invokeExact(a, b, i, c, d);
+    return (int) Handle15.HANDLE.invokeExact(a, b, i, c, d);
+  }
+
+  // The 16 per-shape downcall holders: the jextract-generated wrappers' own form — a private
+  // holder class binding its MethodHandle in <clinit> as a static final field. A call site
+  // referencing HandleN.HANDLE can be constant-folded by C2 (a trusted final of a private
+  // class); the previous MethodHandle[] array load could not, so the measurement would have
+  // included address-indexed dispatch the generated wrappers do not pay.
+  private static final class Handle0 {
+    static final MethodHandle HANDLE = downcall(0);
+  }
+
+  private static final class Handle1 {
+    static final MethodHandle HANDLE = downcall(1);
+  }
+
+  private static final class Handle2 {
+    static final MethodHandle HANDLE = downcall(2);
+  }
+
+  private static final class Handle3 {
+    static final MethodHandle HANDLE = downcall(3);
+  }
+
+  private static final class Handle4 {
+    static final MethodHandle HANDLE = downcall(4);
+  }
+
+  private static final class Handle5 {
+    static final MethodHandle HANDLE = downcall(5);
+  }
+
+  private static final class Handle6 {
+    static final MethodHandle HANDLE = downcall(6);
+  }
+
+  private static final class Handle7 {
+    static final MethodHandle HANDLE = downcall(7);
+  }
+
+  private static final class Handle8 {
+    static final MethodHandle HANDLE = downcall(8);
+  }
+
+  private static final class Handle9 {
+    static final MethodHandle HANDLE = downcall(9);
+  }
+
+  private static final class Handle10 {
+    static final MethodHandle HANDLE = downcall(10);
+  }
+
+  private static final class Handle11 {
+    static final MethodHandle HANDLE = downcall(11);
+  }
+
+  private static final class Handle12 {
+    static final MethodHandle HANDLE = downcall(12);
+  }
+
+  private static final class Handle13 {
+    static final MethodHandle HANDLE = downcall(13);
+  }
+
+  private static final class Handle14 {
+    static final MethodHandle HANDLE = downcall(14);
+  }
+
+  private static final class Handle15 {
+    static final MethodHandle HANDLE = downcall(15);
   }
 }

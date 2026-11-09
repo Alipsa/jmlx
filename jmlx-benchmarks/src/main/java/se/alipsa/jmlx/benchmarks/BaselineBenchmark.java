@@ -267,16 +267,25 @@ public final class BaselineBenchmark {
     // The binding-count Java workers run the jmlx-core binding agent as a -javaagent of the
     // forked JVM; the agent jar comes from the system property (set by the benchmarkBaseline
     // task), and its absence is a spec failure — an instrumented worker that cannot count must
-    // fail loudly, never silently (plan section 5.1).
+    // fail loudly, never silently (plan section 5.1). A property that names a file which is not
+    // there is the same failure: the forked JVM would die at -javaagent load time, long after
+    // the session started (findings section 15.6, review round 1).
     String bindingAgentJar = System.getProperty("jmlx.baseline.binding.agent.jar", "");
     boolean needsAgent =
         workers.stream()
             .anyMatch(
                 w -> "java".equals(w.runtime()) && "binding-count".equals(w.instrumentation()));
-    if (needsAgent && bindingAgentJar.isEmpty()) {
-      violations.add(
-          "a binding-count java worker needs the jmlx.baseline.binding.agent.jar system"
-              + " property (set by the benchmarkBaseline task)");
+    if (needsAgent) {
+      if (bindingAgentJar.isEmpty()) {
+        violations.add(
+            "a binding-count java worker needs the jmlx.baseline.binding.agent.jar system"
+                + " property (set by the benchmarkBaseline task)");
+      } else if (!Files.isRegularFile(Path.of(bindingAgentJar))) {
+        violations.add(
+            "the jmlx.baseline.binding.agent.jar property names a file that is not a regular file ("
+                + bindingAgentJar
+                + "); the forked worker JVM would die at -javaagent load time");
+      }
     }
     Path manifest = repo == null ? null : repo.resolve("tools/decode-baseline/workloads.json");
     JsonNode manifestNode = null;
@@ -350,8 +359,11 @@ public final class BaselineBenchmark {
     }
 
     // The session's isolated native-cache directory: the forked Java workers point their
-    // classpath-extraction cache at it (the user's default cache is never touched). It is
-    // retained for a successful session (session evidence) and deleted on failure.
+    // classpath-extraction cache at it (the user's default cache is never touched). It is a guard,
+    // not a live path — every worker command sets jmlx.library.path first, and NativeLoader
+    // resolves that before the classpath-extraction fallback, so in a bootstrapped checkout no
+    // extraction ever runs and the directory stays empty. It is retained for a successful session
+    // (session evidence) and deleted on failure.
     Path nativeCacheDir = session.resolve("native-cache");
     // Fork sequentially in the spec's fork order. A worker that exits nonzero is a normal
     // outcome (its report carries the failure); a starter exception is launcher-side and stops
@@ -926,7 +938,8 @@ public final class BaselineBenchmark {
             entry.adapter(),
             entry.caseName(),
             Integer.toString(entry.promptLength()),
-            entry.mode());
+            entry.mode(),
+            entry.instrumentation());
     if (!seenCells.add(cell)) {
       violations.add(prefix + "duplicate cell " + cell);
     }
@@ -1134,11 +1147,19 @@ public final class BaselineBenchmark {
     return commandOutput(command);
   }
 
+  // The launcher's host probes (git, df) are short; a bounded wait keeps a stuck child from
+  // hanging the session (findings section 15.6, review round 1).
+  private static final long COMMAND_TIMEOUT_SECONDS = 30;
+
   private static String commandOutput(List<String> command) {
     try {
       Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+      if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return null;
+      }
       String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      return process.waitFor() == 0 ? out.strip() : null;
+      return process.exitValue() == 0 ? out.strip() : null;
     } catch (Exception e) {
       return null;
     }

@@ -340,23 +340,31 @@ class BaselineWorkerProtocolTest {
     assertTrue(tracing.path("request_wall_s").asDouble() > 0.0);
     assertTrue(tracing.path("request_cpu_s").asDouble() > 0.0);
     JsonNode windows = tracing.path("windows");
-    // 3 prefill phases plus 3 phases for each of the 7 cached steps.
-    assertEquals(24, windows.size());
+    // 4 prefill phases (construction, sync, selection and the activation's release) plus 4
+    // phases for each of the 7 cached steps (construction, sync, selection, release), plus the
+    // request scope's release (findings section 15.6, review round 1).
+    assertEquals(33, windows.size());
     assertEquals("prefill-construction", windows.get(0).path("phase").asString(null));
     assertEquals(0, windows.get(0).path("position").asInt());
     assertEquals("prefill-sync", windows.get(1).path("phase").asString(null));
     assertEquals("prefill-selection", windows.get(2).path("phase").asString(null));
+    assertEquals("prefill-release", windows.get(3).path("phase").asString(null));
+    assertEquals(0, windows.get(3).path("position").asInt());
     for (int k = 0; k < 7; k++) {
-      JsonNode construction = windows.get(3 + 3 * k);
-      JsonNode sync = windows.get(3 + 3 * k + 1);
-      JsonNode selection = windows.get(3 + 3 * k + 2);
+      JsonNode construction = windows.get(4 + 4 * k);
+      JsonNode sync = windows.get(4 + 4 * k + 1);
+      JsonNode selection = windows.get(4 + 4 * k + 2);
       assertEquals("construction", construction.path("phase").asString(null));
       assertEquals("sync", sync.path("phase").asString(null));
       assertEquals("selection", selection.path("phase").asString(null));
+      assertEquals("release", windows.get(4 + 4 * k + 3).path("phase").asString(null));
       assertEquals(33 + k, construction.path("position").asInt());
       assertEquals(33 + k, sync.path("position").asInt());
       assertEquals(33 + k, selection.path("position").asInt());
+      assertEquals(33 + k, windows.get(4 + 4 * k + 3).path("position").asInt());
     }
+    assertEquals("request-release", windows.get(32).path("phase").asString(null));
+    assertEquals(0, windows.get(32).path("position").asInt());
     double wallSum = 0.0;
     double cpuSum = 0.0;
     for (JsonNode window : windows) {

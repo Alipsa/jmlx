@@ -20,7 +20,12 @@ import tools.jackson.databind.node.ObjectNode;
  * estimate.
  *
  * <p>It is a calibrated estimate, not a causal partition of the step's time (plan section 5.1): the
- * assumptions are repeated in every output.
+ * assumptions are repeated in every output. It accepts only controlled worker reports (the stock
+ * adapter's single whole-request window cannot be split into prefill and per-step phases), and it
+ * aggregates only {@code kind == "measured"} requests: one step-budget sample per (measured
+ * request, position) — the request's own step-phase window budgets at that position — so per-step
+ * and per-position values never scale with the number of requests, and warmups/firsts are excluded
+ * from every aggregate (totals, per_shape, uncovered, prefill, per-step, request_total).
  *
  * <p>Opt-in local tooling, not part of {@code check} or the publication surface.
  */
@@ -29,17 +34,27 @@ public final class FfmTransitionEstimate {
   private static final List<String> ASSUMPTIONS =
       List.of(
           "The calibration measures no-op C functions with the same parameter/return register"
-              + " shapes as the generated mlx-c downcalls, through Project Panama downcall handles"
-              + " in the generated wrappers' own invokeExact form: it is the FFM transition cost"
-              + " (method-handle dispatch, argument marshalling, return handling, plus the"
-              + " per-call result-segment allocation through the caller's SegmentAllocator for"
+              + " shapes as the generated mlx-c downcalls, through the generated wrappers' own"
+              + " invocation form (invokeExact on a static final MethodHandle bound in a private"
+              + " holder class's static initializer): it is the FFM transition cost (method-handle"
+              + " dispatch, argument marshalling, return handling, plus the per-call"
+              + " result-segment allocation through the caller's SegmentAllocator for"
               + " struct-return shapes) plus a small fixed Java prologue/epilogue per call, and it"
               + " does not include the real mlx-c's C-side work (Metal dispatch, kernel launches,"
-              + " synchronization, allocator work).",
-          "Carrier fidelity: every opaque mlx-c struct is a single 8-byte pointer, passed in a"
-              + " 64-bit register exactly like a void* on AArch64, and 8-byte struct returns by"
-              + " value use the same register convention, so the no-op carriers are"
-              + " register-equivalent to the real ones.",
+              + " synchronization, allocator work). For the struct-return shapes the calibration's"
+              + " result allocator is a plain confined arena, not production MLXScope's"
+              + " synchronized shared-arena allocator, so the (AM)M figure excludes that"
+              + " allocator's extra cost.",
+          "Carrier fidelity: the pinned mlx-c header passes every opaque struct (a single 8-byte"
+              + " pointer member) by value, and on AArch64 an 8-byte struct parameter is carried"
+              + " in one 64-bit register — the same C ABI as a void* — while 8-byte struct returns"
+              + " by value use the same register convention, so the no-op carriers are"
+              + " register-equivalent to the real ones; the Java side matches through the same"
+              + " struct-by-value declarations the generated wrappers use (every M parameter slot"
+              + " is the struct's 8-byte layout). Caveat: a hypothetical pointer-kind M parameter"
+              + " (no 8-byte struct read) is indistinguishable in the recorded JVM descriptor"
+              + " (both are MemorySegment) and would be slightly over-measured by the"
+              + " struct-by-value calibration.",
           "Counts are attempted mlx-c downcalls through the generated wrappers (the"
               + " BindingCounterAgent), one measurement per downcall; the estimate does not cover"
               + " Metal dispatches, kernels or GPU synchronization (plan section 5.1).",
@@ -67,9 +82,20 @@ public final class FfmTransitionEstimate {
     MAPPER.writerWithDefaultPrettyPrinter().writeValue(Path.of(args[2]).toFile(), estimate);
   }
 
-  /** Computes the estimate (pure; the report and calibration JSON are data). */
+  /**
+   * Computes the estimate (pure; the report and calibration JSON are data). Refuses non-controlled
+   * worker reports and reports with no measured request.
+   */
   static ObjectNode estimate(JsonNode report, JsonNode calibration) {
     JsonNode worker = report.path("worker");
+    String adapter = worker.path("adapter").asString("");
+    if (!"controlled".equals(adapter)) {
+      throw new IllegalArgumentException(
+          "the FFM transition estimate requires a controlled worker report (got adapter '"
+              + adapter
+              + "'): the stock adapter's single whole-request window cannot be split into"
+              + " prefill and per-step phases");
+    }
     JsonNode signatures = worker.path("binding_signatures");
     JsonNode shapes = calibration.path("shapes");
 
@@ -80,14 +106,25 @@ public final class FfmTransitionEstimate {
     // binding name -> [calls]
     Map<String, long[]> uncovered = new LinkedHashMap<>();
     Map<String, String> uncoveredDescriptors = new LinkedHashMap<>();
-    // position -> [median ns, p10 ns, p90 ns] over the step's phase windows
-    Map<Long, long[]> steps = new LinkedHashMap<>();
-    List<Double> prefillBudgets = new ArrayList<>();
-    List<Double> requestTotals = new ArrayList<>();
+    // position -> one sample per measured request: that request's step-phase budget at the
+    // position (pooling the requests' own sums, never summing across requests)
+    Map<Long, List<Long>> stepSamples = new LinkedHashMap<>();
+    List<Long> allStepSamples = new ArrayList<>();
+    List<Long> prefillBudgets = new ArrayList<>();
+    List<Long> requestTotals = new ArrayList<>();
+    int measuredRequests = 0;
 
     for (JsonNode request : worker.path("requests")) {
+      // Measured requests only: warmups and firsts measured the same code, but pooling them into
+      // every aggregate would mix cold-start behavior into the budget (findings section 15.6).
+      if (!"measured".equals(request.path("kind").asString(""))) {
+        continue;
+      }
+      measuredRequests++;
       long requestTotal = 0;
       long requestPrefill = 0;
+      // this request's step-phase budget per position (the per-position sample)
+      Map<Long, Long> requestStepBudgets = new LinkedHashMap<>();
       for (JsonNode window : request.path("binding_counts").path("phases")) {
         String phase = window.path("phase").asString("");
         long position = window.path("position").asLong(0);
@@ -95,7 +132,7 @@ public final class FfmTransitionEstimate {
         long windowP10 = 0;
         long windowP90 = 0;
         for (String name : window.path("counts").propertyNames()) {
-          int count = window.path("counts").path(name).asInt(0);
+          long count = window.path("counts").path(name).asLong(0);
           if (count <= 0) {
             continue;
           }
@@ -121,21 +158,28 @@ public final class FfmTransitionEstimate {
           windowP90 += Math.round(count * p90);
         }
         requestTotal += windowMedian;
-        if (position == 0) {
+        if (phase.startsWith("prefill-")) {
           requestPrefill += windowMedian;
         } else if ("construction".equals(phase)
             || "sync".equals(phase)
-            || "selection".equals(phase)) {
-          long[] step = steps.computeIfAbsent(position, p -> new long[3]);
-          step[0] += windowMedian;
-          step[1] += windowP10;
-          step[2] += windowP90;
+            || "selection".equals(phase)
+            || "release".equals(phase)) {
+          requestStepBudgets.merge(position, windowMedian, Long::sum);
         }
       }
       if (requestPrefill > 0) {
-        prefillBudgets.add((double) requestPrefill);
+        prefillBudgets.add(requestPrefill);
       }
-      requestTotals.add((double) requestTotal);
+      requestTotals.add(requestTotal);
+      for (Map.Entry<Long, Long> entry : requestStepBudgets.entrySet()) {
+        stepSamples.computeIfAbsent(entry.getKey(), p -> new ArrayList<>()).add(entry.getValue());
+        allStepSamples.add(entry.getValue());
+      }
+    }
+    if (measuredRequests == 0) {
+      throw new IllegalArgumentException(
+          "the worker report carries no measured requests; the FFM transition estimate"
+              + " aggregates measured requests only");
     }
 
     ObjectNode estimate = MAPPER.createObjectNode();
@@ -143,6 +187,7 @@ public final class FfmTransitionEstimate {
     estimate.put("created_at", Instant.now().toString());
     estimate.put("calibration_schema", calibration.path("schema").asString(""));
     estimate.set("calibration_workload", calibration.path("workload"));
+    estimate.put("measured_requests", measuredRequests);
 
     ObjectNode totals = estimate.putObject("totals");
     totals.put("binding_calls", bindingCalls);
@@ -152,17 +197,17 @@ public final class FfmTransitionEstimate {
 
     ObjectNode perStep = estimate.putObject("per_decode_step");
     ArrayNode positions = perStep.putArray("positions");
-    List<Double> stepMedians = new ArrayList<>();
-    for (Map.Entry<Long, long[]> entry : steps.entrySet()) {
-      stepMedians.add((double) entry.getValue()[0]);
+    for (Map.Entry<Long, List<Long>> entry : stepSamples.entrySet()) {
+      BaselineStatistics.Quantiles quantiles =
+          BaselineStatistics.quantiles(doubleList(entry.getValue()));
       positions
           .addObject()
           .put("position", entry.getKey())
-          .put("median_ns", (double) entry.getValue()[0])
-          .put("p10_ns", (double) entry.getValue()[1])
-          .put("p90_ns", (double) entry.getValue()[2]);
+          .put("median_ns", quantiles.median())
+          .put("p10_ns", quantiles.p10())
+          .put("p90_ns", quantiles.p90());
     }
-    stepSummary(perStep, stepMedians);
+    stepSummary(perStep, allStepSamples);
 
     stepSummary(estimate.putObject("prefill"), prefillBudgets);
     stepSummary(estimate.putObject("request_total"), requestTotals);
@@ -191,8 +236,21 @@ public final class FfmTransitionEstimate {
     return estimate;
   }
 
-  private static void stepSummary(ObjectNode node, List<Double> budgets) {
-    BaselineStatistics.Quantiles quantiles = BaselineStatistics.quantiles(budgets);
+  private static List<Double> doubleList(List<Long> values) {
+    List<Double> out = new ArrayList<>(values.size());
+    for (long v : values) {
+      out.add((double) v);
+    }
+    return out;
+  }
+
+  /**
+   * Type-7 quantiles (p10/median/p90) of a budget pool with its sample count; the pool is one
+   * sample per measured request (or per (measured request, position) for the per-step summary),
+   * never a sum across requests.
+   */
+  private static void stepSummary(ObjectNode node, List<Long> budgets) {
+    BaselineStatistics.Quantiles quantiles = BaselineStatistics.quantiles(doubleList(budgets));
     node.put("n", budgets.size());
     node.put("p10_ns", quantiles.p10());
     node.put("median_ns", quantiles.median());

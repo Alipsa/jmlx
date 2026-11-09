@@ -9,6 +9,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -28,6 +29,18 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public final class FfmCalibration {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /** The cc compile is a local, short job; a bound keeps a stuck compiler from hanging the run. */
+  private static final int BUILD_TIMEOUT_SECONDS = 300;
+
+  /** The version probe is cosmetic; a bound keeps a stuck cc from hanging the run. */
+  private static final int VERSION_TIMEOUT_SECONDS = 30;
+
+  /**
+   * Base bound on one calibration worker fork, before the per-million-downcalls allowance (a fresh
+   * JVM start plus the whole measured workload; findings section 15.6, review round 1).
+   */
+  private static final int WORKER_BASE_TIMEOUT_SECONDS = 300;
 
   private FfmCalibration() {}
 
@@ -97,7 +110,10 @@ public final class FfmCalibration {
     }
   }
 
-  /** Compiles the dylib with {@code cc -shared -O2}. */
+  /**
+   * Compiles the dylib with {@code cc -shared -O2}; the wait is bounded, so a stuck compiler fails
+   * the run instead of hanging it (findings section 15.6, review round 1).
+   */
   static void build(Path dylib, Path source) throws Exception {
     List<String> command =
         List.of("cc", "-shared", "-O2", "-o", dylib.toString(), source.toString());
@@ -108,7 +124,11 @@ public final class FfmCalibration {
       throw new IllegalStateException(
           "cc is not available; the FFM calibration needs a C compiler", e);
     }
-    int status = process.waitFor();
+    if (!process.waitFor(BUILD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+      process.destroyForcibly();
+      throw new IllegalStateException("cc timed out after " + BUILD_TIMEOUT_SECONDS + " s");
+    }
+    int status = process.exitValue();
     if (status != 0) {
       throw new IllegalStateException("cc exited with " + status);
     }
@@ -135,7 +155,12 @@ public final class FfmCalibration {
     return info;
   }
 
-  /** Forks one fresh JVM running the worker (the Tf32Benchmark fresh-JVM pattern). */
+  /**
+   * Forks one fresh JVM running the worker (the Tf32Benchmark fresh-JVM pattern). The wait is
+   * bounded: 300 s of JVM-start and I/O slack plus one second per million downcalls the fork will
+   * make — a worker past its bound is stuck, and the run fails the fork instead of hanging
+   * (findings section 15.6, review round 1).
+   */
   static void runWorker(Path dylib, Path output, int iterations, int calls, int warmup)
       throws Exception {
     List<String> command =
@@ -151,9 +176,15 @@ public final class FfmCalibration {
                 Integer.toString(iterations),
                 Integer.toString(calls),
                 Integer.toString(warmup)));
+    long timeoutS =
+        WORKER_BASE_TIMEOUT_SECONDS + workerDowncalls(iterations, calls, warmup) / 1_000_000;
     Process worker = new ProcessBuilder(command).inheritIO().start();
     try {
-      int status = worker.waitFor();
+      if (!worker.waitFor(timeoutS, TimeUnit.SECONDS)) {
+        worker.destroyForcibly();
+        throw new IllegalStateException("calibration worker timed out after " + timeoutS + " s");
+      }
+      int status = worker.exitValue();
       if (status != 0) {
         throw new IllegalStateException("calibration worker exited with " + status);
       }
@@ -162,6 +193,11 @@ public final class FfmCalibration {
         worker.destroyForcibly();
       }
     }
+  }
+
+  /** The fork's total downcalls: every shape, once per warmup plus once per iteration. */
+  private static long workerDowncalls(int iterations, int calls, int warmup) {
+    return (long) FfmCalWorker.KEYS.length * (warmup + iterations) * calls;
   }
 
   /**
@@ -224,15 +260,20 @@ public final class FfmCalibration {
     }
   }
 
+  /** The compiler's first version line; the wait is bounded and any failure degrades to "cc". */
   private static String compilerVersion() {
     try {
       Process process = new ProcessBuilder("cc", "--version").start();
+      if (!process.waitFor(VERSION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return "cc";
+      }
       String firstLine =
           new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
               .lines()
               .findFirst()
               .orElse("cc");
-      return process.waitFor() == 0 ? firstLine : "cc";
+      return process.exitValue() == 0 ? firstLine : "cc";
     } catch (Exception e) {
       return "cc";
     }

@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
@@ -121,6 +122,11 @@ public final class BaselineWorker {
       List<Integer> stopTokenIds) {}
 
   private static final Object REPORT_LOCK = new Object();
+
+  /**
+   * The bound on a host-observation probe ({@code ps}, {@code df}) inside {@link #commandOutput}.
+   */
+  private static final long HOST_PROBE_TIMEOUT_SECONDS = 10;
 
   // Mutable run state; the watchdog backstop and the main thread both reach it.
   private static String utcStart;
@@ -651,23 +657,27 @@ public final class BaselineWorker {
   /**
    * Post-request bookkeeping for the WP2 diagnostics: the RSS sample (instrumented runs) and the
    * request span — wall time always, caller-thread CPU in tracing mode only; uninstrumented workers
-   * pay for the two nanoTime reads and nothing else.
+   * pay for the two nanoTime reads and nothing else. The clocks are taken before the RSS sample on
+   * purpose: {@code currentRssBytes} forks {@code ps}, and the fork must not land inside the
+   * request's measured span (findings section 15.6, review round 1).
    */
   private static double[] requestBookkeeping(
       boolean tracing, boolean instrumented, long wallStart, long cpuStart) {
+    double wallS = (System.nanoTime() - wallStart) / 1_000_000_000d;
+    double cpuS = tracing ? (threadCpuNanos() - cpuStart) / 1_000_000_000d : 0.0;
     if (instrumented) {
       rssPeakBytes = Math.max(rssPeakBytes, currentRssBytes());
     }
-    return new double[] {
-      (System.nanoTime() - wallStart) / 1_000_000_000d,
-      tracing ? (threadCpuNanos() - cpuStart) / 1_000_000_000d : 0.0
-    };
+    return new double[] {wallS, cpuS};
   }
 
   /**
    * The per-request diagnostic window hook. binding-count mode counts the window's attempted
    * downcalls through the agent (a mid-run agent failure fails the run, plan section 5.1); tracing
-   * mode measures wall and caller-thread CPU around the window.
+   * mode measures wall and caller-thread CPU around the window. Agent lifecycle errors and the
+   * window's own work failures are kept apart: a failure inside {@code work.run()} (a model error,
+   * an MLXException) propagates as itself after a best-effort agent stop, never re-labelled as an
+   * agent failure (findings section 15.6, review round 1).
    */
   private static void windowObserver(
       Validated v,
@@ -679,17 +689,38 @@ public final class BaselineWorker {
     if ("binding-count".equals(v.instrumentation())) {
       try {
         BindingCounterAgent.start();
-        work.run();
-        Map<String, Long> counts = BindingCounterAgent.stop();
-        Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("phase", phase);
-        entry.put("position", position);
-        entry.put("counts", counts);
-        bindingPhases.add(entry);
       } catch (IllegalStateException e) {
         throw new WorkerError(
-            "binding-count agent failed in the '" + phase + "' window: " + e.getMessage());
+            "failed to start the binding-count agent for the '"
+                + phase
+                + "' window: "
+                + e.getMessage());
       }
+      try {
+        work.run();
+      } catch (RuntimeException workFailure) {
+        try {
+          BindingCounterAgent.stop();
+        } catch (RuntimeException stopFailure) {
+          // The agent is already broken; the window's own failure is what the report must carry.
+        }
+        throw workFailure;
+      }
+      Map<String, Long> counts;
+      try {
+        counts = BindingCounterAgent.stop();
+      } catch (IllegalStateException e) {
+        throw new WorkerError(
+            "failed to stop the binding-count agent in the '"
+                + phase
+                + "' window: "
+                + e.getMessage());
+      }
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("phase", phase);
+      entry.put("position", position);
+      entry.put("counts", counts);
+      bindingPhases.add(entry);
     } else {
       long wallStart = System.nanoTime();
       long cpuStart = threadCpuNanos();
@@ -1406,13 +1437,19 @@ public final class BaselineWorker {
   /**
    * One-shot host-observation command runner: returns the stripped output, or "" when the command
    * fails or is missing, so a host sample degrades to a missing value instead of failing the run.
+   * The wait is bounded — a stuck child (a wedged {@code ps}) must degrade to a missing sample,
+   * never hang the request (findings section 15.6, review round 1).
    */
   private static String commandOutput(String... arguments) {
     try {
       Process process = new ProcessBuilder(arguments).redirectErrorStream(true).start();
+      if (!process.waitFor(HOST_PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return "";
+      }
       String out =
           new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
-      return process.waitFor() == 0 ? out : "";
+      return process.exitValue() == 0 ? out : "";
     } catch (Exception e) {
       return "";
     }

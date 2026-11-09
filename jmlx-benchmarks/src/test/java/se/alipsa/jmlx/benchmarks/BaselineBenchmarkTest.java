@@ -830,6 +830,38 @@ class BaselineBenchmarkTest {
   }
 
   @Test
+  void sameCellDifferentInstrumentationIsAccepted() throws IOException {
+    // The duplicate-cell key includes the instrumentation (findings 15.6): the headline cell and
+    // the instrumented cell it measures are different cells and must both run.
+    ObjectNode instrumented = worker("java", "controlled", "tiny", 32, "headline");
+    instrumented.put("instrumentation", "binding-count");
+    Path agentJar = base.resolve("binding-agent-pair.jar");
+    Files.writeString(agentJar, "fake agent jar");
+    System.setProperty(AGENT_JAR_PROPERTY, agentJar.toString());
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    Path outRoot = base.resolve("session-cell-instr");
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            outRoot,
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"),
+            instrumented);
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_OK, exit);
+    assertEquals(2, starter.jobs.size());
+    assertTrue(
+        Files.isRegularFile(
+            outRoot.resolve("jobs").resolve("java-controlled-tiny-32-headline.job.json")));
+    assertTrue(
+        Files.isRegularFile(
+            outRoot
+                .resolve("jobs")
+                .resolve("java-controlled-tiny-32-headline-binding-count.job.json")));
+  }
+
+  @Test
   void refusedMissingArtifactDir() throws IOException {
     FakeStarter starter = new FakeStarter();
     Setup setup = setup();
@@ -1201,12 +1233,29 @@ class BaselineBenchmarkTest {
   }
 
   @Test
-  void bindingCountJobRunsInstrumentedCell() throws IOException {
+  void bindingCountWithMissingAgentJarFileIsRefused() throws IOException {
     Setup setup = setup();
     FakeStarter starter = new FakeStarter();
     ObjectNode entry = worker("java", "controlled", "tiny", 32, "headline");
     entry.put("instrumentation", "binding-count");
-    System.setProperty(AGENT_JAR_PROPERTY, "/agent/binding-agent.jar");
+    // A property that names a file which is not a regular file must be refused up front: the
+    // forked worker JVM would otherwise die at -javaagent load time, mid-session.
+    System.setProperty(AGENT_JAR_PROPERTY, base.resolve("no-such-agent.jar").toString());
+    assertRefused(
+        buildSpec(setup, base.resolve("session-missing-agent"), CLASSPATH, entry), starter);
+  }
+
+  @Test
+  void bindingCountJobRunsInstrumentedCell() throws IOException {
+    ObjectNode entry = worker("java", "controlled", "tiny", 32, "headline");
+    entry.put("instrumentation", "binding-count");
+    // The launcher validates the agent jar's existence before forking (findings 15.6): a
+    // property that names a file that is not a regular file is a spec failure.
+    Path agentJar = base.resolve("binding-agent.jar");
+    Files.writeString(agentJar, "fake agent jar");
+    System.setProperty(AGENT_JAR_PROPERTY, agentJar.toString());
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
     Path outRoot = base.resolve("session-agent");
     ObjectNode spec = buildSpec(setup, outRoot, CLASSPATH, entry);
     int exit = new BaselineBenchmark(starter).runSession(spec);
@@ -1214,7 +1263,7 @@ class BaselineBenchmarkTest {
 
     BaselineJob job = starter.jobs.get(0);
     assertEquals("binding-count", job.instrumentation());
-    assertEquals("/agent/binding-agent.jar", job.bindingAgentJar());
+    assertEquals(agentJar.toString(), job.bindingAgentJar());
     assertEquals(outRoot.resolve("native-cache").toString(), job.nativeCacheDir());
     String dir = "java-controlled-tiny-32-headline-binding-count";
     assertEquals(
@@ -1223,7 +1272,7 @@ class BaselineBenchmarkTest {
     JsonNode jobFile = MAPPER.readTree(outRoot.resolve("jobs").resolve(dir + ".job.json"));
     assertEquals("binding-count", jobFile.path("instrumentation").asString(""));
     List<String> command = job.command(outRoot.resolve("jobs").resolve(dir + ".job.json"));
-    assertTrue(command.contains("-javaagent:/agent/binding-agent.jar"));
+    assertTrue(command.contains("-javaagent:" + agentJar));
     // A valid instrumented ok report is excluded from the headline aggregation by
     // construction (frozen section 13.3), with the exclusion recorded.
     JsonNode root = session(spec);

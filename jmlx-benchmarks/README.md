@@ -128,8 +128,12 @@ Layout under `out_root`: one directory per worker
 instrumentation mode is part of the cell identity — holding
 `worker-claim`, `worker-ready` and `report.json`), `jobs/<dir>.job.json` (the
 frozen job file handed to the worker), `stderr/<dir>.log`, `native-cache/`
-(the isolated classpath-extraction cache for the forked Java workers;
-retained on a successful session, deleted on session failure), the verbatim
+(the isolated classpath-extraction cache for the forked Java workers, pinned
+by `-Djmlx.native.cache.path`; a guard, not a live path — every worker
+command sets `jmlx.library.path` first and `NativeLoader` resolves it before
+the classpath-extraction fallback, so in a bootstrapped checkout no
+extraction runs and the directory stays empty; retained on a successful
+session, deleted on session failure), the verbatim
 `spec.json`, and `session.json` (schema `jmlx-decode-baseline-1`: the session
 block, the embedded worker reports, and the summary with adapter/mode-scoped
 type-7 quantiles and the exclusion list).
@@ -170,12 +174,18 @@ Defaults are 200 iterations, 2000 calls per sample, 5 forks and 2000 warmup
 calls. Each shape is a non-elidable no-op C function with the same
 parameter/return register shape as a class of the generated downcalls
 (see `src/main/resources/ffm_cal.c` for the shapes and the carrier-fidelity
-argument), invoked through the generated wrappers' own `invokeExact` form.
+argument — the M parameters are the 8-byte structs the pinned header passes
+by value, declared on the Java side with the struct's 8-byte layout exactly
+as the generated wrappers do), invoked through the generated wrappers' own
+`invokeExact` form: one private holder class per shape binds its handle in a
+`static final` field, so each call site references a JIT-trusted constant.
 The dylib and the extracted C source are the only build artifacts; both stay
-under the output directory. Outputs: `build-info.json` (compiler, flags,
+under the output directory. Every external-process wait is bounded
+(`cc` compile 300 s, version probe 30 s, worker fork 300 s + 1 s per
+million downcalls). Outputs: `build-info.json` (compiler, flags,
 source/binary SHA-256s), `raw-fork-<n>.json` (the per-fork raw samples) and
 `ffm-calibration.json` (per-shape p10/median/p90, min/max and every raw
-sample, plus an empty-loop timing-floor entry).
+sample, plus a warmed-up no-op timing-floor entry).
 
 To estimate the per-decode-step FFM transition budget from a
 binding-count worker report (the decode baseline) and a calibration summary,
@@ -186,7 +196,12 @@ classpath:
 FfmTransitionEstimate worker-report.json ffm-calibration.json output-json
 ```
 
-It is a calibrated estimate, not a causal partition of the step's time:
-the output carries the explicit assumptions, the coverage of classified
-calls and the uncovered signatures. The contract and the local measurement
-baseline are in `req/plans/phase8-2-reference-findings.md` section 15.4.
+The estimate accepts only controlled worker reports (the stock adapter's
+single whole-request window cannot be split into prefill and per-step
+phases) and aggregates only the `measured` requests — one step-budget
+sample per (measured request, position), so the per-step figures never
+scale with the request count. It is a calibrated estimate, not a causal
+partition of the step's time: the output carries the explicit assumptions,
+the coverage of classified calls and the uncovered signatures. The contract
+and the local measurement baseline are in
+`req/plans/phase8-2-reference-findings.md` section 15.4.

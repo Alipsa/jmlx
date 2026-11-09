@@ -3,6 +3,8 @@ package se.alipsa.jmlx.models;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -12,6 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -170,6 +176,7 @@ class BaselineWorkerProtocolTest {
     assertEquals(BaselineWorkerTestSupport.CASE_NAME, worker.path("case").asString(null));
     assertEquals(32, worker.path("prompt_length").asInt());
     assertEquals("headline", worker.path("mode").asString(null));
+    assertEquals("none", worker.path("instrumentation").asString(null));
     assertEquals("ok", worker.path("status").asString(null));
     assertTrue(worker.path("failure_reason").isNull());
     assertFalse(worker.path("utc_start").asString("").isEmpty());
@@ -305,6 +312,89 @@ class BaselineWorkerProtocolTest {
       assertEquals(0.0, steps.get(k).path("top2_margin").asDouble(), 0.0);
       assertTrue(steps.get(k).path("s").asDouble() > 0.0);
     }
+  }
+
+  @Test
+  void bindingCountFailsWhenAgentNotInstalled(@TempDir Path temp) throws Exception {
+    // The in-process run has no -javaagent, so the binding-count gate must fail the run with a
+    // failed report, never silently stop counting (plan section 5.1).
+    BaselineWorkerTestSupport.Workspace ws = setup(temp, 300, 60, 8, 1);
+    createOutDir(temp, "count");
+    Path job = writeJob(temp, ws, "count", j -> j.put("instrumentation", "binding-count"));
+
+    RunOutcome outcome = runCapturing(readJob(job));
+
+    assertFailedReportWithReason(temp.resolve("count"), outcome.exitCode(), "binding-agent");
+  }
+
+  @Test
+  void tracingWindowsCoverEveryPhaseAndCarryResidual(@TempDir Path temp) throws Exception {
+    BaselineWorkerTestSupport.Workspace ws = setup(temp, 300, 60, 8, 1);
+    createOutDir(temp, "trace");
+    Path job = writeJob(temp, ws, "trace", j -> j.put("instrumentation", "tracing"));
+
+    assertEquals(BaselineWorker.EXIT_OK, runCapturing(readJob(job)).exitCode());
+
+    JsonNode worker = readReport(temp.resolve("trace")).path("worker");
+    assertEquals("tracing", worker.path("instrumentation").asString(null));
+    assertTrue(worker.path("identity").path("instrumented").asBoolean());
+    assertTrue(worker.path("identity").path("host").isObject());
+    assertTrue(worker.path("binding_signatures").isMissingNode());
+    JsonNode request = worker.path("requests").get(0);
+    JsonNode tracing = request.path("tracing");
+    assertTrue(tracing.isObject());
+    assertTrue(tracing.path("request_wall_s").asDouble() > 0.0);
+    assertTrue(tracing.path("request_cpu_s").asDouble() > 0.0);
+    JsonNode windows = tracing.path("windows");
+    // 4 prefill phases (construction, sync, selection and the activation's release) plus 4
+    // phases for each of the 7 cached steps (construction, sync, selection, release), plus the
+    // request scope's release (findings section 15.6, review round 1).
+    assertEquals(33, windows.size());
+    assertEquals("prefill-construction", windows.get(0).path("phase").asString(null));
+    assertEquals(0, windows.get(0).path("position").asInt());
+    assertEquals("prefill-sync", windows.get(1).path("phase").asString(null));
+    assertEquals("prefill-selection", windows.get(2).path("phase").asString(null));
+    assertEquals("prefill-release", windows.get(3).path("phase").asString(null));
+    assertEquals(0, windows.get(3).path("position").asInt());
+    for (int k = 0; k < 7; k++) {
+      JsonNode construction = windows.get(4 + 4 * k);
+      JsonNode sync = windows.get(4 + 4 * k + 1);
+      JsonNode selection = windows.get(4 + 4 * k + 2);
+      assertEquals("construction", construction.path("phase").asString(null));
+      assertEquals("sync", sync.path("phase").asString(null));
+      assertEquals("selection", selection.path("phase").asString(null));
+      assertEquals("release", windows.get(4 + 4 * k + 3).path("phase").asString(null));
+      assertEquals(33 + k, construction.path("position").asInt());
+      assertEquals(33 + k, sync.path("position").asInt());
+      assertEquals(33 + k, selection.path("position").asInt());
+      assertEquals(33 + k, windows.get(4 + 4 * k + 3).path("position").asInt());
+    }
+    assertEquals("request-release", windows.get(32).path("phase").asString(null));
+    assertEquals(0, windows.get(32).path("position").asInt());
+    double wallSum = 0.0;
+    double cpuSum = 0.0;
+    for (JsonNode window : windows) {
+      assertTrue(window.path("wall_s").asDouble() >= 0.0);
+      assertTrue(window.path("cpu_s").asDouble() >= 0.0);
+      wallSum += window.path("wall_s").asDouble();
+      cpuSum += window.path("cpu_s").asDouble();
+    }
+    assertEquals(
+        tracing.path("request_wall_s").asDouble() - wallSum,
+        tracing.path("residual_wall_s").asDouble(),
+        1e-9);
+    assertEquals(
+        tracing.path("request_cpu_s").asDouble() - cpuSum,
+        tracing.path("residual_cpu_s").asDouble(),
+        1e-9);
+    assertTrue(tracing.path("residual_wall_s").asDouble() >= 0.0);
+    // The instrumented worker fills the memory block (findings section 10 shape).
+    JsonNode memory = request.path("memory");
+    assertTrue(memory.isObject());
+    assertTrue(memory.path("active_bytes").isIntegralNumber());
+    assertTrue(memory.path("peak_active_bytes").asLong() > 0);
+    assertTrue(memory.path("cached_bytes").isIntegralNumber());
+    assertTrue(memory.path("rss_peak_bytes").asLong() > 0);
   }
 
   @Test
@@ -678,5 +768,129 @@ class BaselineWorkerProtocolTest {
     Path job = writeJob(temp, ws, "precision", j -> j.put("precision_env", "0"));
     RunOutcome outcome = runCapturing(readJob(job));
     assertFailedReportWithReason(temp.resolve("precision"), outcome.exitCode(), "MLX_ENABLE_TF32");
+  }
+
+  @Test
+  void bindingCountReportCarriesBindingDescriptorsForTheInstrumentedNames(@TempDir Path temp)
+      throws Exception {
+    // Review round 3, 4 and 6. The in-process run has no -javaagent, so the agent's state is
+    // faked through its system properties (the installed flag and the JVM descriptor table):
+    // the run's model work then executes real, uncounted downcalls, every window's counts come
+    // out empty, and the run fails at the non-empty-counts require — after every window ran,
+    // before any request record was added. The report write must still record
+    // binding_descriptors: with no counted names it falls back to every instrumented name,
+    // keeping the nonempty-object invariant the report validator enforces, and the reflective
+    // $descriptor lookup must have resolved the faked names' real downcall descriptors.
+    System.setProperty("jmlx.binding.installed", "true");
+    System.setProperty("jmlx.binding.signatures", "mlx_add\t(JJ)V\nmlx_eval\t(J)V");
+    try {
+      BaselineWorkerTestSupport.Workspace ws = setup(temp, 300, 60, 8, 1);
+      createOutDir(temp, "desc");
+      Path job = writeJob(temp, ws, "desc", j -> j.put("instrumentation", "binding-count"));
+
+      RunOutcome outcome = runCapturing(readJob(job));
+
+      assertFailedReportWithReason(
+          temp.resolve("desc"), outcome.exitCode(), "binding counts are unexpectedly empty");
+      JsonNode worker = readReport(temp.resolve("desc")).path("worker");
+      assertEquals("binding-count", worker.path("instrumentation").asString(null));
+      JsonNode signatures = worker.path("binding_signatures");
+      assertEquals(Set.of("mlx_add", "mlx_eval"), keySet(signatures));
+      JsonNode descriptors = worker.path("binding_descriptors");
+      assertEquals(
+          Set.of("mlx_add", "mlx_eval"),
+          keySet(descriptors),
+          "the fallback records every instrumented name");
+      for (JsonNode descriptor : descriptors) {
+        assertTrue(descriptor.asString("").startsWith("("), descriptor.asString());
+      }
+    } finally {
+      // Clear every agent property the faked run may have left behind, including the recording
+      // flag the agent's stop sets back to false (review round 4, c).
+      System.clearProperty("jmlx.binding.installed");
+      System.clearProperty("jmlx.binding.signatures");
+      System.clearProperty("jmlx.binding.recording");
+    }
+  }
+
+  @Test
+  void bindingDescriptorsAreRestrictedToTheCountedNames() {
+    // Review round 3, 4; strengthened in review round 4, b: the lookup set is exactly the names
+    // with a nonzero count in some measured window, never the full instrumented set — a binding
+    // that was never counted must not be looked up (each lookup initialises the binding's holder
+    // and links its downcall). The counting lookup seam proves the restriction directly: checking
+    // only the output keys would pass even if an uncounted binding's holder had been initialised
+    // and its result then dropped.
+    Map<String, String> signatures =
+        new TreeMap<>(
+            Map.of(
+                "mlx_add", "(JJ)V",
+                "mlx_array_new_data", "(JJ)V",
+                "mlx_eval", "(J)V"));
+    Set<String> counted = Set.of("mlx_add", "mlx_eval");
+
+    Map<String, String> descriptors = BaselineWorker.nativeBindingDescriptors(signatures, counted);
+
+    assertEquals(Set.of("mlx_add", "mlx_eval"), descriptors.keySet());
+    assertEquals(
+        2,
+        BaselineWorker.descriptorLookupCountForTest(),
+        "only the counted names' $descriptor holders are looked up");
+    for (String descriptor : descriptors.values()) {
+      assertTrue(descriptor.startsWith("("), descriptor);
+      assertFalse(descriptor.isEmpty());
+    }
+  }
+
+  @Test
+  void bindingCountWindowWorkErrorPropagatesUnwrapped() {
+    // Review round 2, E, untested until review round 3, 6: an Error from the window's own work —
+    // not a RuntimeException — stops the recording and propagates as itself, never re-labelled
+    // as an agent failure. The installed flag is faked (no -javaagent in-process) so the window
+    // starts and the work failure is the one under test.
+    System.setProperty("jmlx.binding.installed", "true");
+    try {
+      List<Map<String, Object>> bindingPhases = new ArrayList<>();
+      List<Map<String, Object>> traceWindows = new ArrayList<>();
+      // The record factory (review round 4, d) replaces a positional constructor call that
+      // would rot silently-but-noisily whenever the record's shape changes.
+      BaselineWorker.Validated v = BaselineWorker.Validated.forInstrumentation("binding-count");
+      OutOfMemoryError failure = new OutOfMemoryError("test error");
+
+      OutOfMemoryError thrown =
+          assertThrows(
+              OutOfMemoryError.class,
+              () ->
+                  BaselineWorker.windowObserver(
+                      v,
+                      "construction",
+                      33,
+                      () -> {
+                        throw failure;
+                      },
+                      bindingPhases,
+                      traceWindows));
+
+      assertSame(failure, thrown, "the work's own Error must propagate as itself");
+      assertTrue(bindingPhases.isEmpty(), "a failed window records no counts");
+      assertEquals(
+          "false",
+          System.getProperty("jmlx.binding.recording"),
+          "the best-effort agent stop ran despite the Error");
+    } finally {
+      // Clear every agent property the faked run may have left behind, including the recording
+      // flag the agent's stop sets back to false (review round 4, c).
+      System.clearProperty("jmlx.binding.installed");
+      System.clearProperty("jmlx.binding.recording");
+    }
+  }
+
+  /** The field names of a JSON object, as a set (for two-name object comparisons). */
+  private static Set<String> keySet(JsonNode object) {
+    Set<String> keys = new TreeSet<>();
+    for (String name : object.propertyNames()) {
+      keys.add(name);
+    }
+    return keys;
   }
 }

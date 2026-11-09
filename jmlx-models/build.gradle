@@ -67,7 +67,7 @@ tasks.named('test') {
 tasks.register('qwen35DecodeCounter', Test) {
     group = 'verification'
     description = 'Opt-in actual native downcalls for full hybrid public-generation decode; timings invalid.'
-    dependsOn tasks.named('testClasses'), ':jmlx-core:qwen35BindingAgent'
+    dependsOn tasks.named('testClasses'), ':jmlx-core:bindingAgent'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform { includeTags 'qwen35-counter' }
@@ -75,7 +75,7 @@ tasks.register('qwen35DecodeCounter', Test) {
     inputs.property('mlxEnableTf32', '0')
     systemProperty 'jmlx.qwen35.counter.output', layout.buildDirectory.file('benchmarks/qwen35-decode-counts.json').get().asFile.absolutePath
     doFirst {
-        jvmArgs "-javaagent:${project(':jmlx-core').tasks.named('qwen35BindingAgent').get().archiveFile.get().asFile.absolutePath}"
+        jvmArgs "-javaagent:${project(':jmlx-core').tasks.named('bindingAgent').get().archiveFile.get().asFile.absolutePath}"
     }
     outputs.upToDateWhen { false }
 }

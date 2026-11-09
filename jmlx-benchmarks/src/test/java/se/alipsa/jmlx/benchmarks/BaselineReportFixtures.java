@@ -180,6 +180,61 @@ final class BaselineReportFixtures {
     return worker;
   }
 
+  /**
+   * Stamps one completed request record with the WP2 diagnostics for the given instrumentation
+   * (findings section 15): the section 10 memory block plus the binding_counts or tracing block.
+   */
+  static void instrument(ObjectNode request, String instrumentation) {
+    ObjectNode memory = request.putObject("memory");
+    memory.put("active_bytes", 1024L);
+    memory.put("peak_active_bytes", 2048L);
+    memory.put("cached_bytes", 0L);
+    memory.put("rss_peak_bytes", 1_000_000L);
+    if ("binding-count".equals(instrumentation)) {
+      ObjectNode counts = request.putObject("binding_counts");
+      counts
+          .putArray("phases")
+          .addObject()
+          .put("phase", "prefill-sync")
+          .put("position", 0)
+          .putObject("counts")
+          .put("mlx_eval", 1L);
+      counts.putObject("total").put("mlx_eval", 1L);
+    } else {
+      ObjectNode tracing = request.putObject("tracing");
+      tracing.put("request_wall_s", 0.1);
+      tracing.put("request_cpu_s", 0.05);
+      tracing
+          .putArray("windows")
+          .addObject()
+          .put("phase", "sync")
+          .put("position", 33)
+          .put("wall_s", 0.05)
+          .put("cpu_s", 0.025);
+      tracing.put("residual_wall_s", 0.05);
+      tracing.put("residual_cpu_s", 0.025);
+    }
+  }
+
+  /**
+   * Stamps the WP2 worker-level instrumentation metadata: the instrumentation field, the
+   * instrumented identity flag, the per-worker host record and (binding-count only) the
+   * binding_signatures (JVM descriptors, provenance) and binding_descriptors (native function
+   * descriptors, the estimate's classification source) objects.
+   */
+  static void instrumentWorker(ObjectNode worker, String instrumentation) {
+    worker.put("instrumentation", instrumentation);
+    ObjectNode identity = (ObjectNode) worker.get("identity");
+    identity.put("instrumented", true);
+    identity.putObject("host").put("hw_model", "arm64");
+    if ("binding-count".equals(instrumentation)) {
+      worker.putObject("binding_signatures").put("mlx_eval", "(J)V");
+      worker
+          .putObject("binding_descriptors")
+          .put("mlx_eval", "([a8(ctx):[*:b1]](mlx_vector_array_))i4");
+    }
+  }
+
   /** The full report object ({@code schema} + {@code worker}). */
   static ObjectNode report(ObjectNode worker) {
     ObjectNode report = MAPPER.createObjectNode();

@@ -1,8 +1,11 @@
 package se.alipsa.jmlx.models;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -146,6 +149,104 @@ class BaselineAdaptersTest {
       assertEquals(1, eos.eventS().length);
       assertEquals(eos.eventS()[0], eos.ttftS(), 0.0);
       assertTrue(eos.fullGenerationS() >= eos.eventS()[0]);
+    }
+  }
+
+  // Review round 3, 6: the release-window failure paths (review round 2, D/E) are unit-tested
+  // directly — a throwing PhaseObserver around a real scope close — rather than only by the
+  // end-to-end adapter runs, which never fail their windows.
+
+  @Test
+  void releaseWindowClosesScopeWhenTheObserverDiesBeforeTheClose() {
+    try (MLXScope scope = new MLXScope()) {
+      RuntimeException original = new RuntimeException("original failure");
+      RuntimeException observerFailure = new RuntimeException("observer failure");
+
+      // With an exception in flight, the window's failure is attached to it, never thrown from
+      // releaseWindow itself (the caller rethrows the original).
+      BaselineAdapters.releaseWindow(
+          (phase, position, work) -> {
+            throw observerFailure;
+          },
+          "release",
+          1,
+          scope,
+          original);
+
+      assertArrayEquals(new Throwable[] {observerFailure}, original.getSuppressed());
+      assertThrows(
+          IllegalStateException.class,
+          scope::newChild,
+          "the window died before the close ran; the fallback close must have run");
+    }
+  }
+
+  @Test
+  void releaseWindowSuppressesObserverFailureAroundACleanClose() {
+    try (MLXScope scope = new MLXScope()) {
+      RuntimeException original = new RuntimeException("original failure");
+      RuntimeException observerFailure = new RuntimeException("observer failure");
+
+      BaselineAdapters.releaseWindow(
+          (phase, position, work) -> {
+            work.run();
+            throw observerFailure;
+          },
+          "release",
+          1,
+          scope,
+          original);
+
+      // The window ran the close and then died: the observer's failure is attached to the
+      // in-flight one, and the fallback close() on the already-closed scope is the idempotent
+      // no-op it must be.
+      assertArrayEquals(new Throwable[] {observerFailure}, original.getSuppressed());
+      assertThrows(IllegalStateException.class, scope::newChild);
+    }
+  }
+
+  @Test
+  void releaseWindowKeepsTheOriginalWhenTheObserverDiesWithAnError() {
+    try (MLXScope scope = new MLXScope()) {
+      RuntimeException original = new RuntimeException("original failure");
+      OutOfMemoryError observerFailure = new OutOfMemoryError("observer error");
+
+      // An Error from the window is caught like a RuntimeException: attached to the in-flight
+      // exception, never propagated out of releaseWindow in its place (review round 3, 2).
+      BaselineAdapters.releaseWindow(
+          (phase, position, work) -> {
+            throw observerFailure;
+          },
+          "release",
+          1,
+          scope,
+          original);
+
+      assertArrayEquals(new Throwable[] {observerFailure}, original.getSuppressed());
+      assertThrows(IllegalStateException.class, scope::newChild);
+    }
+  }
+
+  @Test
+  void releaseWindowPropagatesTheObserverFailureWithNoOriginal() {
+    try (MLXScope scope = new MLXScope()) {
+      RuntimeException observerFailure = new RuntimeException("observer failure");
+
+      RuntimeException thrown =
+          assertThrows(
+              RuntimeException.class,
+              () ->
+                  BaselineAdapters.releaseWindow(
+                      (phase, position, work) -> {
+                        throw observerFailure;
+                      },
+                      "release",
+                      1,
+                      scope,
+                      null));
+
+      assertSame(observerFailure, thrown);
+      assertThrows(IllegalStateException.class, scope::newChild);
     }
   }
 }

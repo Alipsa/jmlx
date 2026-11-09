@@ -34,6 +34,7 @@ class BaselineBenchmarkTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final String CLASSPATH = "fake-models-test-classpath";
   private static final String CLASSPATH_PROPERTY = "jmlx.baseline.models.test.classpath";
+  private static final String AGENT_JAR_PROPERTY = "jmlx.baseline.binding.agent.jar";
   private static final String MANIFEST =
       """
       {
@@ -59,6 +60,7 @@ class BaselineBenchmarkTest {
   @AfterEach
   void clearClasspathProperty() {
     System.clearProperty(CLASSPATH_PROPERTY);
+    System.clearProperty(AGENT_JAR_PROPERTY);
     // The launcher's digest pin is process-wide state; every test that builds a mini repository
     // re-pins it in setup(), and each test must leave the production pin in place.
     BaselineBenchmark.setPinnedManifestSha256ForTest(BaselineBenchmark.PINNED_MANIFEST_SHA256);
@@ -90,12 +92,20 @@ class BaselineBenchmarkTest {
     /** When set, the starter returns WORKER_KILLED and leaves no report for that cell. */
     String killedCell = null;
 
+    /** When set, each simulated fork populates the session's isolated native-cache directory. */
+    boolean createNativeCache = false;
+
     @Override
     public int start(BaselineJob job, Path jobFile, Path stderrLog, long waitLimitSeconds)
         throws Exception {
       String dir =
           BaselineJob.dirName(
-              job.runtime(), job.adapter(), job.caseName(), job.promptLength(), job.mode());
+              job.runtime(),
+              job.adapter(),
+              job.caseName(),
+              job.promptLength(),
+              job.mode(),
+              job.instrumentation());
       Behavior behavior = behaviors.getOrDefault(dir, Behavior.OK);
       jobs.add(job);
       waitLimits.put(dir, waitLimitSeconds);
@@ -108,6 +118,12 @@ class BaselineBenchmarkTest {
       Files.createDirectories(stderrLog.getParent());
       Files.writeString(stderrLog, "fake stderr");
       Path outDir = Path.of(job.outDir());
+      if (createNativeCache) {
+        // Simulate the extraction fallback having populated the session's isolated cache.
+        Path cache = outDir.toAbsolutePath().normalize().getParent().resolve("native-cache");
+        Files.createDirectories(cache);
+        Files.writeString(cache.resolve("staged.txt"), "cached native files");
+      }
       if (dir.equals(killedCell)) {
         // A wedged worker the launcher killed after the wait limit: whatever artifacts it had
         // (none here, or a claim if the behavior says so) are all the launcher classifies from.
@@ -154,6 +170,12 @@ class BaselineBenchmarkTest {
               failure,
               job.manifestSha256(),
               requests.toArray(new ObjectNode[0]));
+      if (!"none".equals(job.instrumentation())) {
+        BaselineReportFixtures.instrumentWorker(worker, job.instrumentation());
+        for (ObjectNode request : requests) {
+          BaselineReportFixtures.instrument(request, job.instrumentation());
+        }
+      }
       if (!valid) {
         ObjectNode first = (ObjectNode) ((ArrayNode) worker.get("requests")).get(0);
         first.putNull("streaming_decode_tps");
@@ -172,6 +194,10 @@ class BaselineBenchmarkTest {
     private static ObjectNode requestFor(BaselineJob job, int index, String kind, double ttft) {
       if ("fixed-continuation".equals(job.mode())) {
         return BaselineReportFixtures.fixedContinuationRequest(index, kind);
+      }
+      if ("python".equals(job.runtime()) && "stock".equals(job.adapter())) {
+        // Python stock drains the one queued lookahead forward (the frozen worker).
+        return BaselineReportFixtures.stockRequest(index, kind, ttft, 1);
       }
       return BaselineReportFixtures.request(index, kind, ttft);
     }
@@ -294,9 +320,11 @@ class BaselineBenchmarkTest {
     assertEquals(setup.repo.toString(), jobFile.path("repo_dir").asString(""));
     assertEquals(job.outDir(), jobFile.path("out_dir").asString(""));
     assertFalse(jobFile.has("fixed_continuation"));
-    // The launcher-only fields never leak into the frozen job-file schema.
+    // The launcher-only fields never leak into the frozen job-file schema; the headline
+    // (uninstrumented) job file stays byte-identical to the WP1 shape.
     assertFalse(jobFile.has("runtime"));
     assertFalse(jobFile.has("models_test_classpath"));
+    assertFalse(jobFile.has("instrumentation"));
 
     JsonNode root = session(spec);
     assertEquals("jmlx-decode-baseline-1", root.path("schema").asString(""));
@@ -318,7 +346,12 @@ class BaselineBenchmarkTest {
         "", sessionBlock.path("native_pins").path("java").path("mlxc_commit").asString("x"));
     assertTrue(sessionBlock.path("native_pins").path("python").path("mlx").isNull());
     assertEquals(1, sessionBlock.path("fork_order").size());
-    assertEquals("java", sessionBlock.path("fork_order").get(0).asString(""));
+    // fork_order carries the full cell identifiers in fork order.
+    assertEquals(
+        "java-controlled-tiny-32-headline", sessionBlock.path("fork_order").get(0).asString(""));
+    assertEquals("spec-order", sessionBlock.path("orchestration").asString(""));
+    assertEquals(
+        outRoot.resolve("native-cache").toString(), sessionBlock.path("native_cache").asString(""));
 
     JsonNode worker0 = root.path("workers").get(0);
     assertEquals(dir, worker0.path("dir").asString(""));
@@ -375,7 +408,7 @@ class BaselineBenchmarkTest {
             worker("java", "controlled", "tiny", 32, mode));
     int exit = new BaselineBenchmark(starter).runSession(spec);
     assertEquals(BaselineBenchmark.EXIT_OK, exit);
-    String dir = BaselineJob.dirName("java", "controlled", "tiny", 32, mode);
+    String dir = BaselineJob.dirName("java", "controlled", "tiny", 32, mode, "none");
     JsonNode jobFile =
         MAPPER.readTree(base.resolve("session-" + mode).resolve("jobs").resolve(dir + ".job.json"));
     return new ModeRun(jobFile, session(spec));
@@ -797,6 +830,38 @@ class BaselineBenchmarkTest {
   }
 
   @Test
+  void sameCellDifferentInstrumentationIsAccepted() throws IOException {
+    // The duplicate-cell key includes the instrumentation (findings 15.6): the headline cell and
+    // the instrumented cell it measures are different cells and must both run.
+    ObjectNode instrumented = worker("java", "controlled", "tiny", 32, "headline");
+    instrumented.put("instrumentation", "binding-count");
+    Path agentJar = base.resolve("binding-agent-pair.jar");
+    Files.writeString(agentJar, "fake agent jar");
+    System.setProperty(AGENT_JAR_PROPERTY, agentJar.toString());
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    Path outRoot = base.resolve("session-cell-instr");
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            outRoot,
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"),
+            instrumented);
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_OK, exit);
+    assertEquals(2, starter.jobs.size());
+    assertTrue(
+        Files.isRegularFile(
+            outRoot.resolve("jobs").resolve("java-controlled-tiny-32-headline.job.json")));
+    assertTrue(
+        Files.isRegularFile(
+            outRoot
+                .resolve("jobs")
+                .resolve("java-controlled-tiny-32-headline-binding-count.job.json")));
+  }
+
+  @Test
   void refusedMissingArtifactDir() throws IOException {
     FakeStarter starter = new FakeStarter();
     Setup setup = setup();
@@ -1003,6 +1068,7 @@ class BaselineBenchmarkTest {
             "tiny",
             32,
             "headline",
+            "binding-count",
             1,
             0,
             2,
@@ -1016,16 +1082,49 @@ class BaselineBenchmarkTest {
             32,
             32,
             "java",
-            "cp1:cp2");
+            "cp1:cp2",
+            "/agent/binding-agent.jar",
+            "/session/native-cache");
     Path jobFile = Path.of("/session/jobs/job.job.json");
     List<String> command = javaJob.command(jobFile);
     assertEquals(
         Path.of(System.getProperty("java.home"), "bin", "java").toString(), command.get(0));
     assertTrue(command.contains("--enable-native-access=ALL-UNNAMED"));
     assertTrue(command.contains("-Djmlx.library.path=/repo/native/install/lib"));
+    // The session's isolated extraction cache and the binding-count agent are both on the
+    // forked JVM's command line.
+    assertTrue(command.contains("-Djmlx.native.cache.path=/session/native-cache"));
+    assertTrue(command.contains("-javaagent:/agent/binding-agent.jar"));
     assertEquals("cp1:cp2", command.get(command.indexOf("-cp") + 1));
     assertEquals("se.alipsa.jmlx.models.BaselineWorker", command.get(command.size() - 2));
     assertEquals(jobFile.toString(), command.get(command.size() - 1));
+
+    BaselineJob uninstrumentedJob =
+        new BaselineJob(
+            "controlled",
+            "tiny",
+            32,
+            "headline",
+            "none",
+            1,
+            0,
+            2,
+            300,
+            "1",
+            "/artifact",
+            "/repo/tools/decode-baseline/workloads.json",
+            "sha",
+            "/repo",
+            "/out",
+            32,
+            32,
+            "java",
+            "cp1:cp2",
+            "",
+            "/session/native-cache");
+    List<String> plain = uninstrumentedJob.command(jobFile);
+    assertTrue(plain.contains("-Djmlx.native.cache.path=/session/native-cache"));
+    assertTrue(plain.stream().noneMatch(argument -> argument.startsWith("-javaagent:")));
 
     BaselineJob pythonJob =
         new BaselineJob(
@@ -1033,6 +1132,7 @@ class BaselineBenchmarkTest {
             "tiny",
             32,
             "headline",
+            "none",
             1,
             0,
             2,
@@ -1046,11 +1146,243 @@ class BaselineBenchmarkTest {
             32,
             32,
             "python",
-            "");
+            "",
+            "",
+            "/session/native-cache");
     List<String> python = pythonJob.command(jobFile);
     assertEquals("/repo/tools/decode-baseline/.venv/bin/python", python.get(0));
     assertEquals("-I", python.get(1));
     assertEquals("/repo/tools/decode-baseline/worker.py", python.get(2));
     assertEquals(jobFile.toString(), python.get(3));
+  }
+
+  @Test
+  void alternatingOrchestrationRefusesConsecutiveSameRuntime() throws IOException {
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            base.resolve("session-alt-bad"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"),
+            worker("java", "controlled", "tiny", 512, "headline"));
+    spec.put("orchestration", "alternating");
+    assertRefused(spec, starter);
+  }
+
+  @Test
+  void alternatingOrchestrationRefusesUnknownValue() throws IOException {
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            base.resolve("session-alt-unknown"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    spec.put("orchestration", "round-robin");
+    assertRefused(spec, starter);
+  }
+
+  @Test
+  void alternatingOrchestrationSession() throws IOException {
+    // A valid alternating session (one java, one python worker): the session block records the
+    // orchestration and the full-cell fork order, and the python worker's identity fills the
+    // session's python block.
+    Setup setup = setup();
+    Path venvPython = setup.repo.resolve("tools/decode-baseline/.venv/bin/python");
+    Files.createDirectories(venvPython.getParent());
+    Files.writeString(venvPython, "# fake pinned venv python");
+    FakeStarter starter = new FakeStarter();
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            base.resolve("session-alt"),
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"),
+            worker("python", "stock", "tiny", 32, "headline"));
+    spec.put("orchestration", "alternating");
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_OK, exit);
+    JsonNode sessionBlock = session(spec).path("session");
+    assertEquals("alternating", sessionBlock.path("orchestration").asString(""));
+    JsonNode forkOrder = sessionBlock.path("fork_order");
+    assertEquals(2, forkOrder.size());
+    assertEquals("java-controlled-tiny-32-headline", forkOrder.get(0).asString(""));
+    assertEquals("python-stock-tiny-32-headline", forkOrder.get(1).asString(""));
+    assertTrue(sessionBlock.path("python").isObject());
+  }
+
+  @Test
+  void pythonInstrumentationIsRefused() throws IOException {
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    ObjectNode entry = worker("python", "stock", "tiny", 32, "headline");
+    entry.put("instrumentation", "tracing");
+    assertRefused(buildSpec(setup, base.resolve("session-py-instr"), CLASSPATH, entry), starter);
+  }
+
+  @Test
+  void bindingCountWithoutAgentJarIsRefused() throws IOException {
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    ObjectNode entry = worker("java", "controlled", "tiny", 32, "headline");
+    entry.put("instrumentation", "binding-count");
+    assertRefused(buildSpec(setup, base.resolve("session-no-agent"), CLASSPATH, entry), starter);
+  }
+
+  @Test
+  void bindingCountWithMissingAgentJarFileIsRefused() throws IOException {
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    ObjectNode entry = worker("java", "controlled", "tiny", 32, "headline");
+    entry.put("instrumentation", "binding-count");
+    // A property that names a file which is not a regular file must be refused up front: the
+    // forked worker JVM would otherwise die at -javaagent load time, mid-session.
+    System.setProperty(AGENT_JAR_PROPERTY, base.resolve("no-such-agent.jar").toString());
+    assertRefused(
+        buildSpec(setup, base.resolve("session-missing-agent"), CLASSPATH, entry), starter);
+  }
+
+  @Test
+  void bindingCountJobRunsInstrumentedCell() throws IOException {
+    ObjectNode entry = worker("java", "controlled", "tiny", 32, "headline");
+    entry.put("instrumentation", "binding-count");
+    // The launcher validates the agent jar's existence before forking (findings 15.6): a
+    // property that names a file that is not a regular file is a spec failure.
+    Path agentJar = base.resolve("binding-agent.jar");
+    Files.writeString(agentJar, "fake agent jar");
+    System.setProperty(AGENT_JAR_PROPERTY, agentJar.toString());
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    Path outRoot = base.resolve("session-agent");
+    ObjectNode spec = buildSpec(setup, outRoot, CLASSPATH, entry);
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_OK, exit);
+
+    BaselineJob job = starter.jobs.get(0);
+    assertEquals("binding-count", job.instrumentation());
+    assertEquals(agentJar.toString(), job.bindingAgentJar());
+    assertEquals(outRoot.resolve("native-cache").toString(), job.nativeCacheDir());
+    String dir = "java-controlled-tiny-32-headline-binding-count";
+    assertEquals(
+        dir, BaselineJob.dirName("java", "controlled", "tiny", 32, "headline", "binding-count"));
+    // The job file carries the instrumentation; the fork command carries the agent.
+    JsonNode jobFile = MAPPER.readTree(outRoot.resolve("jobs").resolve(dir + ".job.json"));
+    assertEquals("binding-count", jobFile.path("instrumentation").asString(""));
+    List<String> command = job.command(outRoot.resolve("jobs").resolve(dir + ".job.json"));
+    assertTrue(command.contains("-javaagent:" + agentJar));
+    // A valid instrumented ok report is excluded from the headline aggregation by
+    // construction (frozen section 13.3), with the exclusion recorded.
+    JsonNode root = session(spec);
+    assertEquals("ok", root.path("workers").get(0).path("status").asString(""));
+    assertEquals(0, root.path("summary").path("per_runtime").size());
+    assertEquals(0, root.path("summary").path("first_request").size());
+    JsonNode exclusion = root.path("summary").path("exclusions").get(0);
+    assertEquals("instrumented", exclusion.path("reason").asString(""));
+    assertEquals(dir, exclusion.path("worker").asString(""));
+  }
+
+  @Test
+  void nativeCacheRetainedOnSuccessDeletedOnFailure() throws IOException {
+    Setup setup = setup();
+    FakeStarter okStarter = new FakeStarter();
+    okStarter.createNativeCache = true;
+    Path okRoot = base.resolve("session-cache-ok");
+    ObjectNode okSpec =
+        buildSpec(setup, okRoot, CLASSPATH, worker("java", "controlled", "tiny", 32, "headline"));
+    assertEquals(BaselineBenchmark.EXIT_OK, new BaselineBenchmark(okStarter).runSession(okSpec));
+    assertTrue(
+        Files.isRegularFile(okRoot.resolve("native-cache").resolve("staged.txt")),
+        "a successful session retains its isolated native-cache directory");
+
+    Setup failedSetup = setup();
+    FakeStarter failedStarter = new FakeStarter();
+    failedStarter.createNativeCache = true;
+    failedStarter.behaviors.put("java-controlled-tiny-32-headline", Behavior.FAILED);
+    Path failedRoot = base.resolve("session-cache-failed");
+    ObjectNode failedSpec =
+        buildSpec(
+            failedSetup,
+            failedRoot,
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"));
+    assertEquals(
+        BaselineBenchmark.EXIT_WORKERS_FAILED,
+        new BaselineBenchmark(failedStarter).runSession(failedSpec));
+    assertFalse(
+        Files.exists(failedRoot.resolve("native-cache")),
+        "a failed session deletes its task-owned isolated native-cache directory");
+  }
+
+  @Test
+  void validatorAcceptsInstrumentedBindingCountReport() {
+    ObjectNode request = BaselineReportFixtures.request(0, "first", 0.02);
+    BaselineReportFixtures.instrument(request, "binding-count");
+    ObjectNode worker =
+        BaselineReportFixtures.workerBlock(
+            "java", "controlled", "tiny", 32, "headline", "ok", null, "sha", request);
+    BaselineReportFixtures.instrumentWorker(worker, "binding-count");
+    assertTrue(BaselineReportValidator.validate(BaselineReportFixtures.report(worker)).isEmpty());
+  }
+
+  @Test
+  void validatorAcceptsInstrumentedTracingReport() {
+    ObjectNode request = BaselineReportFixtures.request(0, "first", 0.02);
+    BaselineReportFixtures.instrument(request, "tracing");
+    ObjectNode worker =
+        BaselineReportFixtures.workerBlock(
+            "java", "controlled", "tiny", 32, "headline", "ok", null, "sha", request);
+    BaselineReportFixtures.instrumentWorker(worker, "tracing");
+    List<String> violations =
+        BaselineReportValidator.validate(BaselineReportFixtures.report(worker));
+    assertTrue(violations.isEmpty(), violations.toString());
+  }
+
+  @Test
+  void validatorRejectsMemoryBlockOnUninstrumentedWorker() {
+    ObjectNode request = BaselineReportFixtures.request(0, "first", 0.02);
+    request.putObject("memory").put("active_bytes", 1L);
+    ObjectNode worker =
+        BaselineReportFixtures.workerBlock(
+            "java", "controlled", "tiny", 32, "headline", "ok", null, "sha", request);
+    List<String> violations =
+        BaselineReportValidator.validate(BaselineReportFixtures.report(worker));
+    assertTrue(
+        violations.stream()
+            .anyMatch(v -> v.contains("memory is null when the worker is not instrumented")),
+        violations.toString());
+  }
+
+  @Test
+  void validatorRejectsInstrumentedReportMissingCountBlock() {
+    // A binding-count worker whose request record carries the tracing block instead of
+    // binding_counts: the block mismatch is a structural violation, not a silent correction.
+    ObjectNode request = BaselineReportFixtures.request(0, "first", 0.02);
+    BaselineReportFixtures.instrument(request, "tracing");
+    ObjectNode worker =
+        BaselineReportFixtures.workerBlock(
+            "java", "controlled", "tiny", 32, "headline", "ok", null, "sha", request);
+    BaselineReportFixtures.instrumentWorker(worker, "binding-count");
+    List<String> violations =
+        BaselineReportValidator.validate(BaselineReportFixtures.report(worker));
+    assertTrue(
+        violations.stream().anyMatch(v -> v.contains("binding_counts block")),
+        violations.toString());
+  }
+
+  @Test
+  void validatorRejectsHostRecordOnUninstrumentedWorker() {
+    ObjectNode request = BaselineReportFixtures.request(0, "first", 0.02);
+    ObjectNode worker =
+        BaselineReportFixtures.workerBlock(
+            "java", "controlled", "tiny", 32, "headline", "ok", null, "sha", request);
+    ((ObjectNode) worker.get("identity")).putObject("host");
+    List<String> violations =
+        BaselineReportValidator.validate(BaselineReportFixtures.report(worker));
+    assertTrue(
+        violations.stream().anyMatch(v -> v.contains("no identity.host record")),
+        violations.toString());
   }
 }

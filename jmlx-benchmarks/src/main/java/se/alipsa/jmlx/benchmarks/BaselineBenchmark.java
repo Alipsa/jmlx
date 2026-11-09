@@ -9,6 +9,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -48,7 +50,12 @@ import tools.jackson.databind.node.ObjectNode;
  * limit runs to its own wait limit, so the session wall can exceed the budget by at most that wait
  * limit. Exit codes: 0 all workers ok, 1 spec validation failure (nothing forked), 2 at least one
  * failed/timeout/dead/crashed/not-started/invalid-report worker (the session report is still
- * written).
+ * written). Workers may additionally declare an instrumentation (binding-count or tracing): an
+ * instrumented worker runs in its own suffixed cell directory and, even when ok, is excluded from
+ * headline aggregation by construction (frozen section 13.3) with the exclusion recorded. The
+ * spec's orchestration (spec-order, the default, or alternating — which requires consecutive
+ * workers to use different runtimes) is recorded in the session block alongside the session's
+ * isolated native-cache directory (retained on success, deleted on failure).
  *
  * <p>Opt-in local tooling, not part of {@code check} or the publication surface.
  */
@@ -195,6 +202,10 @@ public final class BaselineBenchmark {
           "java_worker_classpath must be set (or the \"@models-test\" alias resolved via the"
               + " jmlx.baseline.models.test.classpath system property)");
     }
+    String orchestration = spec.path("orchestration").asString("spec-order");
+    if (!"spec-order".equals(orchestration) && !"alternating".equals(orchestration)) {
+      violations.add("orchestration must be spec-order or alternating");
+    }
     List<BaselineJob.WorkerEntry> workers = new ArrayList<>();
     for (JsonNode entry : spec.path("workers")) {
       int index = workers.size();
@@ -212,6 +223,20 @@ public final class BaselineBenchmark {
           && !"reference-pair".equals(mode)) {
         violations.add("workers[" + index + "].mode is not a frozen mode");
       }
+      String instrumentation = entry.path("instrumentation").asString("none");
+      if (!"none".equals(instrumentation)
+          && !"binding-count".equals(instrumentation)
+          && !"tracing".equals(instrumentation)) {
+        violations.add(
+            "workers[" + index + "].instrumentation must be none, binding-count or tracing");
+      }
+      if ("python".equals(runtime) && !"none".equals(instrumentation)) {
+        violations.add(
+            "workers["
+                + index
+                + "] python workers are never instrumented (the frozen Python workers carry no"
+                + " diagnostics)");
+      }
       String caseName = entry.path("case").asString(null);
       if (caseName == null || caseName.isEmpty()) {
         violations.add("workers[" + index + "].case is required");
@@ -220,10 +245,47 @@ public final class BaselineBenchmark {
       if (promptLength <= 0) {
         violations.add("workers[" + index + "].prompt_length must be positive");
       }
-      workers.add(new BaselineJob.WorkerEntry(runtime, adapter, caseName, promptLength, mode));
+      workers.add(
+          new BaselineJob.WorkerEntry(
+              runtime, adapter, caseName, promptLength, mode, instrumentation));
     }
     if (workers.isEmpty()) {
       violations.add("workers must be nonempty");
+    }
+    if ("alternating".equals(orchestration)) {
+      for (int i = 1; i < workers.size(); i++) {
+        if (workers.get(i).runtime().equals(workers.get(i - 1).runtime())) {
+          violations.add(
+              "orchestration alternating requires consecutive workers to use different runtimes"
+                  + " (workers["
+                  + i
+                  + "])");
+          break;
+        }
+      }
+    }
+    // The binding-count Java workers run the jmlx-core binding agent as a -javaagent of the
+    // forked JVM; the agent jar comes from the system property (set by the benchmarkBaseline
+    // task), and its absence is a spec failure — an instrumented worker that cannot count must
+    // fail loudly, never silently (plan section 5.1). A property that names a file which is not
+    // there is the same failure: the forked JVM would die at -javaagent load time, long after
+    // the session started (findings section 15.6, review round 1).
+    String bindingAgentJar = System.getProperty("jmlx.baseline.binding.agent.jar", "");
+    boolean needsAgent =
+        workers.stream()
+            .anyMatch(
+                w -> "java".equals(w.runtime()) && "binding-count".equals(w.instrumentation()));
+    if (needsAgent) {
+      if (bindingAgentJar.isEmpty()) {
+        violations.add(
+            "a binding-count java worker needs the jmlx.baseline.binding.agent.jar system"
+                + " property (set by the benchmarkBaseline task)");
+      } else if (!Files.isRegularFile(Path.of(bindingAgentJar))) {
+        violations.add(
+            "the jmlx.baseline.binding.agent.jar property names a file that is not a regular file ("
+                + bindingAgentJar
+                + "); the forked worker JVM would die at -javaagent load time");
+      }
     }
     Path manifest = repo == null ? null : repo.resolve("tools/decode-baseline/workloads.json");
     JsonNode manifestNode = null;
@@ -296,6 +358,13 @@ public final class BaselineBenchmark {
       return EXIT_WORKERS_FAILED;
     }
 
+    // The session's isolated native-cache directory: the forked Java workers point their
+    // classpath-extraction cache at it (the user's default cache is never touched). It is a guard,
+    // not a live path — every worker command sets jmlx.library.path first, and NativeLoader
+    // resolves that before the classpath-extraction fallback, so in a bootstrapped checkout no
+    // extraction ever runs and the directory stays empty. It is retained for a successful session
+    // (session evidence) and deleted on failure.
+    Path nativeCacheDir = session.resolve("native-cache");
     // Fork sequentially in the spec's fork order. A worker that exits nonzero is a normal
     // outcome (its report carries the failure); a starter exception is launcher-side and stops
     // the session — the remaining workers are recorded not-started, never silently dropped. The
@@ -319,7 +388,8 @@ public final class BaselineBenchmark {
               entry.adapter(),
               entry.caseName(),
               entry.promptLength(),
-              entry.mode());
+              entry.mode(),
+              entry.instrumentation());
       if (!budgetExhausted && System.nanoTime() - sessionStartNanos >= sessionBudgetNanos) {
         budgetExhausted = true;
       }
@@ -343,7 +413,9 @@ public final class BaselineBenchmark {
                 manifestSha,
                 precisionEnv,
                 spec.path("artifact_dirs"),
-                modelsClasspath);
+                modelsClasspath,
+                bindingAgentJar,
+                nativeCacheDir.toString());
         job.write(jobFile);
       } catch (IOException e) {
         System.err.println("cannot set up the job for " + dirName + ": " + e.getMessage());
@@ -379,12 +451,14 @@ public final class BaselineBenchmark {
             manifestSha,
             manifestNode,
             precisionEnv,
+            orchestration,
             utcStart,
             workers,
             builtJobs,
             notStartedReason,
             killed);
     boolean allOk = assembled.outcomes().stream().allMatch("ok"::equals);
+    int exit = allOk ? EXIT_OK : EXIT_WORKERS_FAILED;
     try {
       Files.writeString(
           session.resolve("session.json"),
@@ -392,9 +466,14 @@ public final class BaselineBenchmark {
           StandardCharsets.UTF_8);
     } catch (IOException | JacksonException e) {
       System.err.println("session report write failed: " + e.getMessage());
-      return EXIT_WORKERS_FAILED;
+      exit = EXIT_WORKERS_FAILED;
     }
-    return allOk ? EXIT_OK : EXIT_WORKERS_FAILED;
+    // The isolated native-cache directory is task-owned: retained on a successful session,
+    // deleted on any failure so a failed session leaves no task-owned residue behind.
+    if (exit != EXIT_OK) {
+      deleteTree(nativeCacheDir);
+    }
+    return exit;
   }
 
   /** The assembled session report plus the per-worker outcomes that decide the exit code. */
@@ -406,6 +485,7 @@ public final class BaselineBenchmark {
       String manifestSha,
       JsonNode manifestNode,
       String precisionEnv,
+      String orchestration,
       String utcStart,
       List<BaselineJob.WorkerEntry> workers,
       List<BaselineJob> builtJobs,
@@ -431,6 +511,12 @@ public final class BaselineBenchmark {
     // Replaced below when a Python worker's identity names its venv (WP1 runs are Java-only).
     sessionBlock.putNull("python");
     sessionBlock.set("native_pins", nativePins(repo));
+    sessionBlock.put("orchestration", orchestration);
+    // The forked Java workers' isolated classpath-extraction cache (retained on success,
+    // deleted on session failure).
+    sessionBlock.put("native_cache", session.resolve("native-cache").toString());
+    // fork_order carries the full cell identifiers in fork order (the worker directory
+    // names; the instrumentation suffix is part of the cell identity).
     ArrayNode forkOrder = sessionBlock.putArray("fork_order");
 
     ObjectNode summary = root.putObject("summary");
@@ -454,14 +540,15 @@ public final class BaselineBenchmark {
               entry.adapter(),
               entry.caseName(),
               entry.promptLength(),
-              entry.mode());
+              entry.mode(),
+              entry.instrumentation());
       if (job == null || notStartedReason.get(i) != null) {
         outcomes.add("not-started");
         addExclusion(exclusions, dirName, "not-started", List.of(notStartedReason.get(i)));
         workerRecords.add(stubRecord(entry, dirName, "not-started", null));
         continue;
       }
-      forkOrder.add(job.runtime());
+      forkOrder.add(dirName);
       Path reportPath = session.resolve(dirName).resolve("report.json");
       JsonNode report = readReport(reportPath);
       String outcome;
@@ -497,7 +584,13 @@ public final class BaselineBenchmark {
         workerBlock.put("dir", dirName);
         workerRecords.add(workerBlock);
         if ("ok".equals(outcome)) {
-          accumulate(job, report, measured, firsts);
+          if (workerBlock.path("identity").path("instrumented").asBoolean(false)) {
+            // Frozen section 13.3: instrumented workers are excluded from headline
+            // aggregation by construction, with the exclusion recorded.
+            addExclusion(exclusions, dirName, "instrumented", List.of());
+          } else {
+            accumulate(job, report, measured, firsts);
+          }
         }
       } else {
         workerRecords.add(stubRecord(entry, dirName, outcome, report));
@@ -549,6 +642,11 @@ public final class BaselineBenchmark {
             : null,
         Integer.toString(job.promptLength()));
     checkJobField(violations, "mode", worker.path("mode").asString(null), job.mode());
+    checkJobField(
+        violations,
+        "instrumentation",
+        worker.path("instrumentation").asString("none"),
+        job.instrumentation());
     checkJobField(
         violations,
         "identity.manifest_sha256",
@@ -840,7 +938,8 @@ public final class BaselineBenchmark {
             entry.adapter(),
             entry.caseName(),
             Integer.toString(entry.promptLength()),
-            entry.mode());
+            entry.mode(),
+            entry.instrumentation());
     if (!seenCells.add(cell)) {
       violations.add(prefix + "duplicate cell " + cell);
     }
@@ -890,7 +989,9 @@ public final class BaselineBenchmark {
       String manifestSha,
       String precisionEnv,
       JsonNode artifactDirs,
-      String modelsClasspath) {
+      String modelsClasspath,
+      String bindingAgentJar,
+      String nativeCacheDir) {
     JsonNode policy = manifestNode.path("run_policy");
     boolean referencePair = "reference-pair".equals(entry.mode());
     // runSession has validated the run_policy (presence and finiteness), so the reads here are
@@ -908,6 +1009,7 @@ public final class BaselineBenchmark {
         entry.caseName(),
         entry.promptLength(),
         entry.mode(),
+        entry.instrumentation(),
         first,
         warmups,
         measured,
@@ -921,7 +1023,9 @@ public final class BaselineBenchmark {
         32,
         32,
         entry.runtime(),
-        modelsClasspath);
+        modelsClasspath,
+        bindingAgentJar,
+        nativeCacheDir);
   }
 
   private static ObjectNode hostBlock(Path session) {
@@ -1043,11 +1147,19 @@ public final class BaselineBenchmark {
     return commandOutput(command);
   }
 
+  // The launcher's host probes (git, df) are short; a bounded wait keeps a stuck child from
+  // hanging the session (findings section 15.6, review round 1).
+  private static final long COMMAND_TIMEOUT_SECONDS = 30;
+
   private static String commandOutput(List<String> command) {
     try {
       Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+      if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return null;
+      }
       String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      return process.waitFor() == 0 ? out.strip() : null;
+      return process.exitValue() == 0 ? out.strip() : null;
     } catch (Exception e) {
       return null;
     }
@@ -1078,6 +1190,29 @@ public final class BaselineBenchmark {
       return HexFormat.of().formatHex(digest.digest());
     } catch (IOException | NoSuchAlgorithmException e) {
       throw new IllegalStateException("sha256 failed for " + path, e);
+    }
+  }
+
+  /**
+   * Recursively deletes a tree, best-effort: the session-failure cleanup of the isolated
+   * native-cache directory must never itself fail the session or mask its exit code.
+   */
+  private static void deleteTree(Path root) {
+    if (!Files.exists(root)) {
+      return;
+    }
+    try (Stream<Path> walk = Files.walk(root)) {
+      walk.sorted(Comparator.reverseOrder()).forEach(p -> deleteQuietly(p));
+    } catch (IOException ignored) {
+      // best effort
+    }
+  }
+
+  private static void deleteQuietly(Path path) {
+    try {
+      Files.delete(path);
+    } catch (IOException ignored) {
+      // best effort
     }
   }
 

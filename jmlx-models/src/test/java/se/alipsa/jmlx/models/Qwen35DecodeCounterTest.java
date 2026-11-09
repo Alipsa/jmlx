@@ -70,7 +70,7 @@ class Qwen35DecodeCounterTest {
             }
           });
     } finally {
-      System.setProperty("jmlx.qwen35.binding.recording", "false");
+      System.setProperty("jmlx.binding.recording", "false");
     }
     assertEquals(2, samples.size());
     Map<String, Object> record =

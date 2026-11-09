@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.foreign.FunctionDescriptor;
 import java.lang.management.ManagementFactory;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -23,12 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
+import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.memory.MLXScope;
+import se.alipsa.jmlx.nn.BindingCounterAgent;
 import se.alipsa.jmlx.tokenizer.HfTokenizer;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -95,12 +100,13 @@ public final class BaselineWorker {
   /** Anchors the manifest/repo identity checks on the worker's own location. */
   record Anchors(Path canonicalManifest, Path canonicalRepo) {}
 
-  /** Parsed and validated job (section 13.1). */
-  private record Validated(
+  /** Parsed and validated job (section 13.1). Package-visible for the direct unit tests. */
+  record Validated(
       String adapter,
       String caseName,
       int promptLength,
       String mode,
+      String instrumentation,
       Map<String, Integer> requests,
       int timeoutS,
       String precisionEnv,
@@ -114,9 +120,42 @@ public final class BaselineWorker {
       boolean ioAffected,
       Map<String, Object> runPolicy,
       String wiredLimitPolicy,
-      List<Integer> stopTokenIds) {}
+      List<Integer> stopTokenIds) {
+    /**
+     * A {@link Validated} with only the instrumentation mode filled in, for the window-observer
+     * unit tests (review round 4, d): a positional constructor call in the test would rot
+     * silently-but-noisily whenever the record's shape changes.
+     */
+    static Validated forInstrumentation(String instrumentation) {
+      return new Validated(
+          null,
+          null,
+          0,
+          null,
+          instrumentation,
+          Map.of(),
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          List.of(),
+          false,
+          Map.of(),
+          null,
+          List.of());
+    }
+  }
 
   private static final Object REPORT_LOCK = new Object();
+
+  /**
+   * The bound on a host-observation probe ({@code ps}, {@code df}) inside {@link #commandOutput}.
+   */
+  private static final long HOST_PROBE_TIMEOUT_SECONDS = 10;
 
   // Mutable run state; the watchdog backstop and the main thread both reach it.
   private static String utcStart;
@@ -127,6 +166,7 @@ public final class BaselineWorker {
   private static String caseName;
   private static Integer promptLength;
   private static String mode;
+  private static String instrumentation;
   private static Map<String, Object> identity = Map.of();
   private static List<Integer> stopTokenIds = List.of();
   private static Double loadS;
@@ -138,11 +178,21 @@ public final class BaselineWorker {
   private static Path outDir;
   private static MLXScope modelScope;
 
+  /** Peak RSS (bytes) sampled after every request of this run (findings section 15). */
+  private static long rssPeakBytes;
+
   private static Anchors anchors;
   private static IntConsumer exitHook = System::exit;
   private static long watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
   private static long requestDelayMs = 0L;
   private static volatile CountDownLatch requestHold;
+
+  /**
+   * The {@code $descriptor} lookups attempted by {@link #nativeBindingDescriptors} since the last
+   * seam reset (review round 4, b): each lookup initialises the binding's holder, so the count is
+   * the direct evidence that an uncounted binding's holder stayed uninitialised.
+   */
+  private static int descriptorLookups;
 
   private static final AtomicBoolean fired = new AtomicBoolean();
   private static final AtomicBoolean finished = new AtomicBoolean();
@@ -218,6 +268,7 @@ public final class BaselineWorker {
     caseName = null;
     promptLength = null;
     mode = null;
+    instrumentation = null;
     identity = Map.of();
     stopTokenIds = List.of();
     loadS = null;
@@ -228,6 +279,7 @@ public final class BaselineWorker {
     reportRefused = false;
     outDir = null;
     modelScope = null;
+    rssPeakBytes = 0L;
   }
 
   private static int execute(JsonNode job, long token) throws Exception {
@@ -279,39 +331,60 @@ public final class BaselineWorker {
             + v.precisionEnv()
             + "'; the launcher must set the worker process environment");
     stopTokenIds = List.copyOf(v.stopTokenIds());
-    identity =
+    instrumentation = v.instrumentation();
+    boolean instrumented = !"none".equals(instrumentation);
+    if (instrumented) {
+      // Diagnostics gate (plan section 5.1): an instrumented worker must fail loudly when its
+      // instrumentation is not actually in place, never count or time silently.
+      if ("binding-count".equals(instrumentation)) {
+        require(
+            BindingCounterAgent.isInstalled(),
+            "binding-count instrumentation requires the jmlx-core binding-agent "
+                + "-javaagent on the worker JVM");
+        String agentFailure = BindingCounterAgent.failureReason();
+        require(
+            agentFailure == null,
+            "binding-count agent transform failed during premain: " + agentFailure);
+      } else {
+        require(
+            ManagementFactory.getThreadMXBean().isThreadCpuTimeSupported(),
+            "tracing instrumentation needs the thread CPU time API");
+      }
+    }
+    Map<String, Object> identityMap = new LinkedHashMap<>();
+    identityMap.put("code", repoIdentity(v.repoDir()));
+    identityMap.put("manifest_sha256", v.manifestSha());
+    identityMap.put("run_policy", v.runPolicy());
+    identityMap.put("precision_env", "MLX_ENABLE_TF32=" + v.precisionEnv());
+    identityMap.put(
+        "java",
         Map.of(
-            "code",
-            repoIdentity(v.repoDir()),
-            "manifest_sha256",
-            v.manifestSha(),
-            "run_policy",
-            v.runPolicy(),
-            "precision_env",
-            "MLX_ENABLE_TF32=" + v.precisionEnv(),
-            "java",
-            Map.of(
-                "version",
-                System.getProperty("java.version", ""),
-                "vendor",
-                System.getProperty("java.vendor", ""),
-                "flags",
-                String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments())),
-            "device",
-            Map.of(
-                "device_name", hostString("hw.model", ""),
-                "memory_size_bytes", hostLong("hw.memsize", 0L),
-                "max_recommended_working_set_bytes", 0L),
-            "wired_limit_policy",
-            v.wiredLimitPolicy(),
-            "cache_regime",
-            "reference-pair".equals(v.mode())
-                ? "observed"
-                : String.valueOf(v.runPolicy().get("cache_regime")),
-            "io_affected",
-            v.ioAffected(),
-            "instrumented",
-            false);
+            "version",
+            System.getProperty("java.version", ""),
+            "vendor",
+            System.getProperty("java.vendor", ""),
+            "flags",
+            String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments())));
+    identityMap.put(
+        "device",
+        Map.of(
+            "device_name", hostString("hw.model", ""),
+            "memory_size_bytes", hostLong("hw.memsize", 0L),
+            "max_recommended_working_set_bytes", 0L));
+    identityMap.put("wired_limit_policy", v.wiredLimitPolicy());
+    identityMap.put(
+        "cache_regime",
+        "reference-pair".equals(v.mode())
+            ? "observed"
+            : String.valueOf(v.runPolicy().get("cache_regime")));
+    identityMap.put("io_affected", v.ioAffected());
+    identityMap.put("instrumented", instrumented);
+    if (instrumented) {
+      // Per-worker host record (findings section 15): the diagnostic processes capture their own
+      // host state; the frozen Python workers never carry this block.
+      identityMap.put("host", hostIdentity(v.outDir()));
+    }
+    identity = identityMap;
     notes.add(
         "java identity.device carries host facts (sysctl); the Java worker has no MLX"
             + " device-info facade, so max_recommended_working_set_bytes is 0");
@@ -508,10 +581,26 @@ public final class BaselineWorker {
     record.put("kind", kind);
     record.put("prime_s", primeS);
     record.put("prime_excluded", true);
+    boolean instrumented = !"none".equals(v.instrumentation());
+    boolean tracing = "tracing".equals(v.instrumentation());
+    List<Map<String, Object>> bindingPhases = new ArrayList<>();
+    List<Map<String, Object>> traceWindows = new ArrayList<>();
+    BaselineAdapters.PhaseObserver observer =
+        "none".equals(v.instrumentation())
+            ? BaselineAdapters.PhaseObserver.NONE
+            : (phase, position, work) ->
+                windowObserver(v, phase, position, work, bindingPhases, traceWindows);
+    double[] span;
     if ("fixed-continuation".equals(v.mode())) {
+      long wallStart = System.nanoTime();
+      long cpuStart = tracing ? threadCpuNanos() : 0L;
+      if (instrumented) {
+        MLXMemory.resetPeak();
+      }
       BaselineAdapters.FixedContinuationResult result =
           BaselineAdapters.runFixedContinuation(
-              model, modelScope(), promptArray(v.prompt()), fedArray(v.fedIds()));
+              model, modelScope(), promptArray(v.prompt()), fedArray(v.fedIds()), observer);
+      span = requestBookkeeping(tracing, instrumented, wallStart, cpuStart);
       List<Map<String, Object>> steps = new ArrayList<>();
       for (BaselineAdapters.Step step : result.steps()) {
         Map<String, Object> s = new LinkedHashMap<>();
@@ -534,13 +623,16 @@ public final class BaselineWorker {
       record.put("emitted", 0);
       record.put("finish_reason", "fixed-continuation");
       record.put("unused_lookahead_forwards", 0);
-      record.put("memory", null);
-      record.put("io_affected", v.ioAffected());
-      return record;
-    }
-    if ("controlled".equals(v.adapter())) {
+    } else if ("controlled".equals(v.adapter())) {
+      long wallStart = System.nanoTime();
+      long cpuStart = tracing ? threadCpuNanos() : 0L;
+      if (instrumented) {
+        MLXMemory.resetPeak();
+      }
       BaselineAdapters.ControlledResult result =
-          BaselineAdapters.runControlled(model, modelScope(), promptArray(v.prompt()), emitted);
+          BaselineAdapters.runControlled(
+              model, modelScope(), promptArray(v.prompt()), emitted, observer);
+      span = requestBookkeeping(tracing, instrumented, wallStart, cpuStart);
       List<Map<String, Object>> steps = new ArrayList<>();
       for (BaselineAdapters.Step step : result.steps()) {
         Map<String, Object> s = new LinkedHashMap<>();
@@ -561,31 +653,174 @@ public final class BaselineWorker {
       record.put("emitted", n);
       record.put("finish_reason", "controlled-max-tokens");
       record.put("unused_lookahead_forwards", 0);
-      record.put("memory", null);
-      record.put("io_affected", v.ioAffected());
-      return record;
+    } else {
+      long wallStart = System.nanoTime();
+      long cpuStart = tracing ? threadCpuNanos() : 0L;
+      if (instrumented) {
+        MLXMemory.resetPeak();
+      }
+      BaselineAdapters.StockResult result =
+          BaselineAdapters.runStock(
+              model,
+              tokenizer,
+              promptArray(v.prompt()),
+              emitted,
+              new TreeSet<>(v.stopTokenIds()),
+              observer);
+      span = requestBookkeeping(tracing, instrumented, wallStart, cpuStart);
+      int n = result.tokens().size();
+      Double streaming = n >= 2 ? (n - 1) / (result.eventS()[n - 1] - result.eventS()[0]) : null;
+      record.put("ttft_s", n > 0 ? result.ttftS() : null);
+      record.put("prefill_s", null);
+      record.put("steps", null);
+      record.put("event_s", result.eventS());
+      record.put("tokens", result.tokens());
+      record.put("streaming_decode_tps", streaming);
+      record.put("step_region_s", null);
+      record.put("full_generation_s", result.fullGenerationS());
+      record.put("emitted", n);
+      record.put("finish_reason", finishReasonName(result.finishReason()));
+      // The synchronous Java loop evaluates every step at its selection boundary; the one
+      // queued lookahead forward is a property of the pinned Python stock loop, not this one.
+      record.put("unused_lookahead_forwards", 0);
     }
-    BaselineAdapters.StockResult result =
-        BaselineAdapters.runStock(
-            model, tokenizer, promptArray(v.prompt()), emitted, new TreeSet<>(v.stopTokenIds()));
-    int n = result.tokens().size();
-    Double streaming = n >= 2 ? (n - 1) / (result.eventS()[n - 1] - result.eventS()[0]) : null;
-    record.put("ttft_s", n > 0 ? result.ttftS() : null);
-    record.put("prefill_s", null);
-    record.put("steps", null);
-    record.put("event_s", result.eventS());
-    record.put("tokens", result.tokens());
-    record.put("streaming_decode_tps", streaming);
-    record.put("step_region_s", null);
-    record.put("full_generation_s", result.fullGenerationS());
-    record.put("emitted", n);
-    record.put("finish_reason", finishReasonName(result.finishReason()));
-    // The synchronous Java loop evaluates every step at its selection boundary; the one
-    // queued lookahead forward is a property of the pinned Python stock loop, not this one.
-    record.put("unused_lookahead_forwards", 0);
-    record.put("memory", null);
+    appendDiagnostics(record, v, tracing, bindingPhases, traceWindows, span[0], span[1]);
+    record.put("memory", instrumented ? memoryBlock() : null);
     record.put("io_affected", v.ioAffected());
     return record;
+  }
+
+  /**
+   * Post-request bookkeeping for the WP2 diagnostics: the RSS sample (instrumented runs) and the
+   * request span — wall time always, caller-thread CPU in tracing mode only; uninstrumented workers
+   * pay for the two nanoTime reads and nothing else. The clocks are taken before the RSS sample on
+   * purpose: {@code currentRssBytes} forks {@code ps}, and the fork must not land inside the
+   * request's measured span (findings section 15.6, review round 1).
+   */
+  private static double[] requestBookkeeping(
+      boolean tracing, boolean instrumented, long wallStart, long cpuStart) {
+    double wallS = (System.nanoTime() - wallStart) / 1_000_000_000d;
+    double cpuS = tracing ? (threadCpuNanos() - cpuStart) / 1_000_000_000d : 0.0;
+    if (instrumented) {
+      rssPeakBytes = Math.max(rssPeakBytes, currentRssBytes());
+    }
+    return new double[] {wallS, cpuS};
+  }
+
+  /**
+   * The per-request diagnostic window hook. binding-count mode counts the window's attempted
+   * downcalls through the agent (a mid-run agent failure fails the run, plan section 5.1); tracing
+   * mode measures wall and caller-thread CPU around the window. Agent lifecycle errors and the
+   * window's own work failures are kept apart: a failure inside {@code work.run()} (a model error,
+   * an MLXException) propagates as itself after a best-effort agent stop, never re-labelled as an
+   * agent failure (findings section 15.6, review round 1). Package-visible for the direct unit
+   * tests (review round 3, 6).
+   */
+  static void windowObserver(
+      Validated v,
+      String phase,
+      int position,
+      BaselineAdapters.PhaseObserver.ModelWork work,
+      List<Map<String, Object>> bindingPhases,
+      List<Map<String, Object>> traceWindows) {
+    if ("binding-count".equals(v.instrumentation())) {
+      try {
+        BindingCounterAgent.start();
+      } catch (IllegalStateException e) {
+        throw new WorkerError(
+            "failed to start the binding-count agent for the '"
+                + phase
+                + "' window: "
+                + e.getMessage());
+      }
+      try {
+        work.run();
+      } catch (Throwable workFailure) {
+        try {
+          BindingCounterAgent.stop();
+        } catch (Throwable stopFailure) {
+          // The agent is already broken; the window's own failure is what the report must carry.
+          // An Error from the work (an OutOfMemoryError, an ExceptionInInitializerError when a
+          // lazy holder class loads) stops the recording too, not only a RuntimeException
+          // (review round 2, E).
+          workFailure.addSuppressed(stopFailure);
+        }
+        throw workFailure;
+      }
+      Map<String, Long> counts;
+      try {
+        counts = BindingCounterAgent.stop();
+      } catch (IllegalStateException e) {
+        throw new WorkerError(
+            "failed to stop the binding-count agent in the '"
+                + phase
+                + "' window: "
+                + e.getMessage());
+      }
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("phase", phase);
+      entry.put("position", position);
+      entry.put("counts", counts);
+      bindingPhases.add(entry);
+    } else {
+      long wallStart = System.nanoTime();
+      long cpuStart = threadCpuNanos();
+      work.run();
+      double wallS = (System.nanoTime() - wallStart) / 1_000_000_000d;
+      double cpuS = (threadCpuNanos() - cpuStart) / 1_000_000_000d;
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("phase", phase);
+      entry.put("position", position);
+      entry.put("wall_s", wallS);
+      entry.put("cpu_s", cpuS);
+      traceWindows.add(entry);
+    }
+  }
+
+  /**
+   * Appends the WP2 diagnostic fields to a request record (findings section 15): the binding_counts
+   * block in binding-count mode, or the tracing block with its unassigned residual in tracing mode;
+   * uninstrumented workers carry neither. The binding-count total over every phase window must be
+   * non-empty — an empty count means the agent silently stopped counting, which fails the run (plan
+   * section 5.1).
+   */
+  private static void appendDiagnostics(
+      Map<String, Object> record,
+      Validated v,
+      boolean tracing,
+      List<Map<String, Object>> bindingPhases,
+      List<Map<String, Object>> traceWindows,
+      double spanWallS,
+      double spanCpuS) {
+    if ("binding-count".equals(v.instrumentation())) {
+      Map<String, Long> total = new TreeMap<>();
+      for (Map<String, Object> phase : bindingPhases) {
+        for (Map.Entry<String, Long> entry : ((Map<String, Long>) phase.get("counts")).entrySet()) {
+          total.merge(entry.getKey(), entry.getValue(), Long::sum);
+        }
+      }
+      require(
+          !total.isEmpty(),
+          "binding counts are unexpectedly empty; the counting agent is not counting");
+      Map<String, Object> block = new LinkedHashMap<>();
+      block.put("phases", bindingPhases);
+      block.put("total", total);
+      record.put("binding_counts", block);
+    } else if (tracing) {
+      double wallSum = 0.0;
+      double cpuSum = 0.0;
+      for (Map<String, Object> window : traceWindows) {
+        wallSum += (double) window.get("wall_s");
+        cpuSum += (double) window.get("cpu_s");
+      }
+      Map<String, Object> block = new LinkedHashMap<>();
+      block.put("request_wall_s", spanWallS);
+      block.put("request_cpu_s", spanCpuS);
+      block.put("windows", traceWindows);
+      block.put("residual_wall_s", spanWallS - wallSum);
+      block.put("residual_cpu_s", spanCpuS - cpuSum);
+      record.put("tracing", block);
+    }
   }
 
   private static int[] promptArray(List<Integer> ids) {
@@ -683,6 +918,13 @@ public final class BaselineWorker {
             || "fixed-continuation".equals(mode)
             || "reference-pair".equals(mode),
         "mode must be headline, fixed-continuation or reference-pair");
+    // Absent means none: headline job files stay byte-identical to the WP1 shape.
+    String instrumentation = job.path("instrumentation").asString("none");
+    require(
+        "none".equals(instrumentation)
+            || "binding-count".equals(instrumentation)
+            || "tracing".equals(instrumentation),
+        "instrumentation must be none, binding-count or tracing");
     String caseName = job.path("case").asString(null);
     require(caseName != null && !caseName.isEmpty(), "case is required");
     Integer promptLength = intOrNull(job.path("prompt_length"));
@@ -899,6 +1141,7 @@ public final class BaselineWorker {
         caseName,
         promptLength,
         mode,
+        instrumentation,
         requests,
         timeoutS,
         precisionEnv,
@@ -1027,11 +1270,30 @@ public final class BaselineWorker {
       worker.put("case", caseName);
       worker.put("prompt_length", promptLength);
       worker.put("mode", mode);
+      worker.put("instrumentation", instrumentation == null ? "none" : instrumentation);
       worker.put("status", status);
       worker.put("failure_reason", failureReason);
       worker.put("utc_start", utcStart);
       worker.put("utc_end", utcEnd);
       worker.put("identity", identity);
+      if ("binding-count".equals(instrumentation)) {
+        // The instrumented downcalls' JVM descriptors (agent-recorded at class-load time), kept
+        // as provenance (findings section 15.7, review round 2, A).
+        Map<String, String> signatures = BindingCounterAgent.signatures();
+        worker.put("binding_signatures", signatures);
+        // The native function descriptors the generated bindings actually use, by exact binding
+        // name: the FFM transition estimate classifies the counts by these descriptor shapes
+        // (findings section 15.7, review round 2, A). The lookups are restricted to the names
+        // with a nonzero count in some measured window (review round 3, 4) — looking up a name
+        // initialises the binding's holder and links its downcall, so linking every instrumented
+        // downcall (675) while the report is assembled is needless work; a run that failed
+        // before any window completed has no counted names and falls back to every instrumented
+        // name, keeping the nonempty-object invariant the report validator enforces.
+        Set<String> counted = countedBindingNames();
+        Map<String, String> descriptors =
+            nativeBindingDescriptors(signatures, counted.isEmpty() ? signatures.keySet() : counted);
+        worker.put("binding_descriptors", descriptors);
+      }
       worker.put("stop_token_ids", stopTokenIds);
       worker.put("load_s", loadS);
       worker.put("load_state", loadState);
@@ -1061,6 +1323,75 @@ public final class BaselineWorker {
         }
       }
     }
+  }
+
+  /**
+   * The binding names with a nonzero count in some measured request's binding-count windows (review
+   * round 3, 4; filtered to measured records in review round 4, a): the union of every measured
+   * record's per-name {@code total} over the {@code binding_counts} blocks — exactly the set the
+   * descriptor lookups are restricted to, and all the FFM transition estimate needs. A run that
+   * failed before any measured window completed has none (its report falls back to every
+   * instrumented name).
+   */
+  private static Set<String> countedBindingNames() {
+    Set<String> counted = new TreeSet<>();
+    for (Map<String, Object> record : requests) {
+      if (!"measured".equals(record.get("kind"))) {
+        continue;
+      }
+      Object block = record.get("binding_counts");
+      if (!(block instanceof Map<?, ?> counts)) {
+        continue;
+      }
+      Object total = counts.get("total");
+      if (!(total instanceof Map<?, ?> totalMap)) {
+        continue;
+      }
+      for (Map.Entry<?, ?> entry : totalMap.entrySet()) {
+        if (entry.getValue() instanceof Long count && count > 0) {
+          counted.add((String) entry.getKey());
+        }
+      }
+    }
+    return counted;
+  }
+
+  /**
+   * The native function descriptors of the counted bindings, by exact binding name (review round 2,
+   * A; restricted to the counted names in review round 3, 4): the toString of each generated
+   * wrapper's own downcall {@code FunctionDescriptor}, reached by reflection because jmlx-ffi is an
+   * {@code implementation}-scoped dependency — on the worker's runtime classpath, not its compile
+   * classpath. Looking up a name initialises the binding's holder ({@code findOrThrow} plus {@code
+   * downcallHandle}), so the lookup set is exactly the names with a nonzero count in some measured
+   * window — never the full instrumented set. Each attempted lookup increments {@link
+   * #descriptorLookups} (review round 4, b), so a test can prove directly that an uncounted
+   * binding's holder was never initialised. A binding whose descriptor cannot be read is omitted
+   * rather than failing the run (the estimate records it as uncovered). Package-visible for the
+   * direct unit tests (review round 3, 6).
+   */
+  static Map<String, String> nativeBindingDescriptors(
+      Map<String, String> signatures, Set<String> counted) {
+    Map<String, String> descriptors = new TreeMap<>();
+    Class<?> mlxh;
+    try {
+      mlxh = Class.forName("se.alipsa.jmlx.ffi.mlx_h");
+    } catch (ClassNotFoundException e) {
+      return descriptors;
+    }
+    for (String name : counted) {
+      if (!signatures.containsKey(name)) {
+        continue;
+      }
+      descriptorLookups++;
+      try {
+        FunctionDescriptor descriptor =
+            (FunctionDescriptor) mlxh.getMethod(name + "$descriptor").invoke(null);
+        descriptors.put(name, descriptor.toString());
+      } catch (ReflectiveOperationException e) {
+        // Unreadable descriptor: omit it; the estimate records the binding as uncovered.
+      }
+    }
+    return descriptors;
   }
 
   /**
@@ -1174,6 +1505,104 @@ public final class BaselineWorker {
     }
   }
 
+  /**
+   * The per-worker host record for diagnostic (instrumented) runs (findings section 15), mirroring
+   * the launcher's session host block: hardware model, OS, disk free, load average, vm_stat and the
+   * top processes by CPU.
+   */
+  private static Map<String, Object> hostIdentity(Path probe) {
+    Map<String, Object> host = new LinkedHashMap<>();
+    host.put("hw_model", hostString("hw.model", ""));
+    host.put("os", commandOutput("uname", "-s"));
+    host.put("os_build", commandOutput("uname", "-r"));
+    host.put("disk_free_bytes", diskFreeBytes(probe));
+    host.put(
+        "system_load_average", ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage());
+    host.put("vm_stat", commandOutput("vm_stat"));
+    host.put("top_processes", topProcesses());
+    return host;
+  }
+
+  private static List<String> topProcesses() {
+    String out = commandOutput("ps", "-Ao", "pid,pcpu,rss,comm", "-r");
+    return out.isEmpty() ? List.of() : out.lines().limit(16).toList();
+  }
+
+  private static long diskFreeBytes(Path probe) {
+    String out = commandOutput("df", "-Pk", probe.toString());
+    String[] lines = out.strip().split("\n");
+    if (lines.length < 2) {
+      return 0L;
+    }
+    // POSIX df -Pk: Filesystem 1024-blocks Used Available Capacity Mounted-on
+    String[] fields = lines[1].trim().split("\\s+");
+    if (fields.length < 5) {
+      return 0L;
+    }
+    try {
+      return Long.parseLong(fields[fields.length - 2]) * 1024L;
+    } catch (NumberFormatException e) {
+      return 0L;
+    }
+  }
+
+  /** The current process RSS in bytes (macOS ps reports kilobytes); 0 when unreadable. */
+  private static long currentRssBytes() {
+    String out =
+        commandOutput("ps", "-o", "rss=", "-p", Long.toString(ProcessHandle.current().pid()));
+    try {
+      return out.isEmpty() ? 0L : Long.parseLong(out.strip()) * 1024L;
+    } catch (NumberFormatException e) {
+      return 0L;
+    }
+  }
+
+  /**
+   * One-shot host-observation command runner: returns the stripped output, or "" when the command
+   * fails or is missing, so a host sample degrades to a missing value instead of failing the run.
+   * The wait is bounded — a stuck child (a wedged {@code ps}) must degrade to a missing sample,
+   * never hang the request (findings section 15.6, review round 1).
+   */
+  private static String commandOutput(String... arguments) {
+    try {
+      Process process = new ProcessBuilder(arguments).redirectErrorStream(true).start();
+      if (!process.waitFor(HOST_PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return "";
+      }
+      String out =
+          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+      return process.exitValue() == 0 ? out : "";
+    } catch (Exception e) {
+      return "";
+    }
+  }
+
+  /** The caller thread's CPU time in nanoseconds; an unsupported (negative) value fails the run. */
+  private static long threadCpuNanos() {
+    long value =
+        ManagementFactory.getThreadMXBean().getThreadCpuTime(Thread.currentThread().threadId());
+    if (value < 0) {
+      throw new WorkerError("thread CPU time is unavailable; tracing instrumentation cannot run");
+    }
+    return value;
+  }
+
+  /**
+   * The per-request memory block (findings section 10 shape), sampled after the request.
+   * peak_active_bytes covers the request itself: the process-wide peak counter is reset before each
+   * request, so the model load's allocations are not in it. rss_peak_bytes is the peak RSS sampled
+   * after every request of this run — a lower bound on the true peak.
+   */
+  private static Map<String, Object> memoryBlock() {
+    Map<String, Object> memory = new LinkedHashMap<>();
+    memory.put("active_bytes", MLXMemory.activeBytes());
+    memory.put("peak_active_bytes", MLXMemory.peakBytes());
+    memory.put("cached_bytes", MLXMemory.cachedBytes());
+    memory.put("rss_peak_bytes", rssPeakBytes);
+    return memory;
+  }
+
   static String sha256File(Path path) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -1257,11 +1686,17 @@ public final class BaselineWorker {
     return fired.get();
   }
 
+  /** The {@code $descriptor} lookups attempted since the last seam reset (review round 4, b). */
+  static int descriptorLookupCountForTest() {
+    return descriptorLookups;
+  }
+
   static void resetTestSeams() {
     anchors = null;
     exitHook = System::exit;
     watchdogGraceMs = DEFAULT_WATCHDOG_GRACE_MS;
     requestDelayMs = 0L;
+    descriptorLookups = 0;
     CountDownLatch hold = requestHold;
     requestHold = null;
     // Release an outstanding hold (a test that failed while its run was still held) so the

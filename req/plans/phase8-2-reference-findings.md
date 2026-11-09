@@ -1537,7 +1537,13 @@ work, scope lifetimes or timer boundaries:
   `BaselineAdapters.releaseWindow` (§15.7 item D): a release-window
   failure does not replace an in-flight exception — it is attached to
   it with `addSuppressed` (and propagates as-is when no exception is
-  in flight). Fixed-continuation's `prefill_s` is measured inside the
+  in flight); the catch is `Throwable`, and if the window dies before
+  the close runs (the binding-count agent's `start()` failing, for
+  example), the close is called directly rather than skipped —
+  `MLXScope.close()` is idempotent, so a window that already ran it
+  pays nothing — and a fallback-close failure is attached to the
+  release failure, never masking it (review round 3, 2).
+  Fixed-continuation's `prefill_s` is measured inside the
   prefill try, after `prefill-sync` (the evaluated prefill logits) and
   before the `prefill-release` window, so the release window's own
   overhead never enters `prefill_s` on either adapter (§15.7 item C).
@@ -1663,10 +1669,15 @@ argument carriers (the maximally-arity shapes need ten 8-byte
 arguments) are process-lifetime `Arena.ofShared()` segments — the
 same arena kind production `MLXScope.Holder` uses for every native
 handle — and the struct-return shapes allocate their results through
-a `CalScope` that mirrors `MLXScope.Holder.allocate` (synchronized
-shared-arena allocation plus per-scope handle tracking); the dylib's
-`libraryLookup` keeps its own confined arena open for the run (the
-dylib must stay loaded). The shape order rotates per iteration; one
+a `CalScope` that mirrors a production step scope's lifecycle
+(synchronized shared-arena allocation plus per-scope handle tracking,
+created before every sample's timed batch and closed after it,
+outside the timed region, exactly as production closes a step scope
+after every step — review round 3, 1; a fork-lifetime scope would
+have run its tracking set's doubling rehashes and the growing live
+heap's GC pauses inside the later samples' timed batches); the
+dylib's `libraryLookup` keeps its own confined arena open for the run
+(the dylib must stay loaded). The shape order rotates per iteration; one
 sample is the wall time of `calls` consecutive downcalls; the timing
 floor is a private `floor(calls)` no-op loop — a linear congruential
 recurrence `sink = sink * C + (k + 1)` with a loop-carried
@@ -1729,10 +1740,14 @@ measured request; the `request-release` window enters it but neither
 prefill nor any step). Every per-call cost divides the per-sample
 calibration quantile by `workload.calls` (type-7 quantiles commute
 with a positive scale factor, so the divided quantiles are exactly
-the quantiles of the per-call samples) — round 1's
-`median_ns_per_call` emitted the per-*sample* median as if it were
-per-call, overstating every budget by the factor `calls` (§15.7 item
-B) — so `per_shape` carries `median_ns_per_call` with
+the quantiles of the per-call samples). Every budget accumulates its
+`count × per-call cost` terms in double and rounds once at its
+output value — rounding each (binding, window) term to whole
+nanoseconds would bias a ~50-binding step by up to ±25 ns at
+per-call costs of tens of nanoseconds (review round 3, 3). Round
+1's `median_ns_per_call` emitted the per-*sample* median as if it
+were per-call, overstating every budget by the factor `calls`
+(§15.7 item B) — so `per_shape` carries `median_ns_per_call` with
 `p10_ns_per_call`/`p90_ns_per_call` alongside, and the budgets
 (`budget_ns` plus `budget_p10_ns`/`budget_p90_ns` — the p10/p90
 accumulators round 1 computed but never emitted) are per-call. Every
@@ -1748,8 +1763,9 @@ classified-call coverage, the uncovered signatures (name ->
 descriptor + calls) and four explicit assumptions: the holder-form
 constant handles plus the production arena fidelity (the P/M carriers
 on a process-lifetime shared arena, the struct-return results
-through the `CalScope` mirror of `MLXScope.Holder.allocate` —
-round 1's confined-arena caveat is gone), the by-value carrier
+through the per-sample `CalScope` that mirrors a production step
+scope's lifecycle — round 1's confined-arena caveat is gone), the
+by-value carrier
 fidelity with the shape keys now the native descriptor classes of
 the called bindings (round 1's pointer-kind-M-indistinguishable
 caveat is resolved by the native descriptor), the count semantics
@@ -1758,40 +1774,50 @@ work), and "A calibrated estimate, not a causal partition" with the
 two-range reporting named.
 
 **Local measurement baseline** (M5 Max, Apple clang 21.0.0,
-review-round-2 source SHA-256
-`9ad1d216c544aa6e3b116106947f69c96a979c54adef230a79b099eb20764e84`,
+review-round-3 source SHA-256
+`cb30e80b9824eb51113efca5a608f704d9503421e9e7ee331a0eb3d5bc60e2d4`,
 binary SHA-256
-`f1e2e7d76b4ff25d610c4284f38b856044eee604e3b844c45f539f0d30901ad9`,
-default workload 5 forks × 200 iterations × 2000 calls, warmup 2000,
-n = 1000 pooled samples per shape, re-measured after §15.7 items A
-and F changed the shape set, the carriers, the result allocator and
-the floor — these numbers supersede and are not comparable to the
-review-round-1 values recorded above; the artifact is gitignored
-under `build/ffm-cal/`): no-op floor median 2375 ns per 2000 calls
-(1.19 ns/iteration); the 23 int-return shapes 4.31–12.62 ns/call
-(median ns/call: `(M)I` 4.31, `(M)J` 4.38, `(PMMMM)I` 8.50, `(PMM)I`
-8.62, `(PM)I` 8.65, `(PMIIM)I` 8.65, `(PMMIM)I` 8.67, `(PMMFM)I`
-8.67, `(PMIZM)I` 8.69, `(PMMM)I` 8.71, `(PMIM)I` 8.71,
-`(PMIZMFIMM)I` 8.71, `(PDDDIM)I` 8.74, `(PMZM)I` 8.75, `(PMMMMZM)I`
-8.75, `(PMMMFPMMZM)I` 9.88, `(PPJMIM)I` 10.00, `(PMPJZM)I` 10.02,
-`(PMMMMZMMPM)I` 10.08, `(M)P` 10.67, `(PMMMMMPMMM)I` 10.71,
-`(PMPJM)I` 10.94, `(PMPJPJPJM)I` 12.62); **the four struct-return
-shapes 509.0–517.9 ns/call** (`()M` 509.0, `(F)M` 511.7, `(PPII)M`
-515.5, `(PJ)M` 517.9) — the per-call result-segment allocation
-through the production-mirroring `CalScope` dominates, exactly as in
+`f1e2e7d76b4ff25d610c4284f38b856044eee604e3b844c45f539f0d30901ad9`
+— bit-identical to the round-2 binary, the round-3 C change being
+comment-only — default workload 5 forks × 200 iterations × 2000
+calls, warmup 2000, n = 1000 pooled samples per shape, re-measured
+after review round 3, 1 re-scoped the result allocator per sample —
+these numbers supersede and are not comparable to the review-round-2
+values recorded above; the struct-return shapes drop ~10× and that
+drop is the expected correction: the round-2 medians carried exactly
+the artifact of review round 3, 1 (the fork-lifetime tracking set's
+doubling rehashes and the growing live heap's GC pauses landing in
+the later samples' timed batches), while the allocation-free int
+shapes show only the environmental variance of the +10% floor shift
+(1.19 → 1.31 ns/iteration); the artifact is gitignored under
+`build/ffm-cal/`): no-op floor median 2625 ns per 2000 calls
+(1.31 ns/iteration; p10 2416, p90 3125); the 23 int-return shapes
+4.56–13.17 ns/call (median ns/call: `(M)I` 4.56, `(M)J` 4.77,
+`(PDDDIM)I` 8.98, `(PMM)I` 9.04, `(PMIIM)I` 9.08, `(PM)I` 9.15,
+`(PMMMM)I` 9.17, `(PMMM)I` 9.31, `(PMIM)I` 9.31, `(PMMIM)I` 9.31,
+`(PMMFM)I` 9.38, `(PMIZMFIMM)I` 9.48, `(PMMMMZM)I` 9.48, `(PMZM)I`
+9.56, `(PMIZM)I` 9.56, `(PPJMIM)I` 10.40, `(PMMMFPMMZM)I` 10.71,
+`(PMPJM)I` 10.75, `(PMPJZM)I` 10.90, `(PMMMMZMMPM)I` 10.98,
+`(PMMMMMPMMM)I` 11.54, `(M)P` 12.28, `(PMPJPJPJM)I` 13.17); **the
+four struct-return shapes 52.2–55.1 ns/call** (`()M` 52.2, `(F)M`
+54.1, `(PJ)M` 54.1, `(PPII)M` 55.1) — the per-call result-segment
+allocation through the per-sample `CalScope` dominates, exactly as in
 production (round 1's `(AM)M` confined-arena figure of ~183 ns/call
-is superseded, not just by the number but by the allocator it
-measured). The estimate re-run end-to-end against two real
-binding-count session reports (TinyMistral-6x248M and Qwen3-0.6B;
-§15.7 describes the `binding_descriptors` provenance) gives coverage
-1.0000 with zero uncovered bindings in both, a per-decode-step FFM
-budget of 506.8 µs / 696.8 µs against measured decode-step wall times
-of 14,437.2 µs / 20,162.5 µs (≈ 3.5%), prefill budgets 573.0 µs /
-647.1 µs and request totals 64.94 ms / 89.14 ms (calibration ranges
-257.7–677.7 / 354.6–931.6 µs per step); the top per-shape
-contributors are the struct-return shapes `()M` (1152.1 / 1614.0 ms
-per request) and `(PJ)M` (66.0 / 76.3 ms). The large max/p90 spikes
-are OS noise (which is why p10/median/p90 are reported).
+and the round-2 fork-lifetime figure of 509.0–517.9 ns/call are
+superseded; the round-2 figure measured the same allocation plus the
+artifact the re-scoping removed). The estimate re-run end-to-end
+against the same two binding-count session reports (TinyMistral-6x248M
+and Qwen3-0.6B) gives coverage 1.0 with zero uncovered bindings in
+both, a per-decode-step FFM budget of 76.65 µs / 106.68 µs against
+measured decode-step wall times of 14,437.2 µs / 20,162.5 µs
+(≈ 0.53%), prefill budgets 85.54 µs / 100.23 µs and request totals
+9.82 ms / 13.65 ms (calibration ranges 63.26–98.74 / 88.11–137.33
+µs per step); the top per-shape contributors are now `()M` (118.2 /
+165.7 ms per request), `(M)P` (24.0 / 34.6 ms) and `(M)I` (13.2 /
+18.8 ms), and the counted-only descriptor restriction (review round
+3, 4) reproduces the full-descriptor estimates exactly (minus
+`created_at`) on both workloads. The large max/p90 spikes are OS
+noise (which is why p10/median/p90 are reported).
 
 ### 15.5 Test evidence
 
@@ -1825,10 +1851,20 @@ no-native-descriptor refusals; the calibration-without-a-positive-
 `workload.calls` refusal; the uncovered case at coverage 3/7 lists
 both the unparsable `(L)I` signature and the missing-descriptor
 binding) and `Tf32BenchmarkTest` 2.
-The `:jmlx-models` baseline suites green: `BaselineAdaptersTest` 5,
-`BaselineWorkerProcessTest` 9, `BaselineWorkerProtocolTest` 22 (its
+The `:jmlx-models` baseline suites green: `BaselineAdaptersTest` 9
+(four more: the release-window failure paths — the observer dying
+before the close, the observer dying after a clean close, an `Error`
+instead of a `RuntimeException`, and no original in flight — direct
+unit tests over a throwing `PhaseObserver` and a real scope close,
+review round 3, 6), `BaselineWorkerProcessTest` 9,
+`BaselineWorkerProtocolTest` 25 (its
 tracing window-count assertion now expects the 33-window layout with
-the release windows, §15.6 item 1). The opt-in
+the release windows, §15.6 item 1; three more: a fake-agent
+binding-count run whose report falls back to recording
+`binding_descriptors` for every instrumented name, the counted-only
+descriptor restriction, and a window work `Error` propagating
+unwrapped with the recording stopped — review round 3, 4 and 6).
+The opt-in
 `:jmlx-core:bindingCoverage` (`BindingCoverageTest` 1) executed
 against the staged native runtime. Every WP2 suite is pure Java or a
 cc-gated optional, so the macOS CI required-suite list in
@@ -2175,3 +2211,123 @@ per-decode-step FFM budget ≈ 3.5% of the measured step wall time
 `FfmTransitionEstimateTest` per-call test pins the division
 (workload `calls = 10`, per-sample quantiles 10× the per-call values),
 so the round-1 conflation cannot return silently.
+
+### 15.8 Review round 3 (2026-11-09, PR #90): measurement fidelity, rounding and failure paths
+
+Six findings (one medium, four low, one nit), each closed with a
+test where the behavior is observable; the contract amendments are
+the in-place edits to §15.3, §15.4 and §15.5 above. No report or job
+schema changed; the estimate output schema stays
+`jmlx-ffm-transition-estimate-1` (the first assumption's text was
+amended to the per-sample allocator lifecycle — same schema, same
+four-assumption array); the calibration summary schema and the
+27-key shape set are unchanged.
+
+1. **CalScope per sample (medium).** The struct-return shapes
+   allocated their results through one fork-lifetime `CalScope`: the
+   measured batches alone would have kept 4 × iterations × calls =
+   1.6M segments (plus one more per struct shape per warmup round) in
+   one tracking set and one arena for the whole fork. The set's
+   doubling rehashes run on later insertions, and the growing live
+   heap could put GC pauses into any shape's samples — both inside
+   timed batches, biasing the p90 tails the calibration reads.
+   Closed: every sample — warmup and measured — gets a fresh
+   `CalScope` (the per-scope shared arena plus per-scope
+   `LinkedHashSet`), created before its `t0` and closed after the
+   sample, outside the timed region. This mirrors the production
+   step-scope lifecycle exactly: production closes its step scope
+   (arena release included) after every step, so the
+   first-allocation reservation cost inside the timed region is
+   faithful. The non-allocating shapes create and close a scope per
+   sample too (the allocator goes unused; the create/close are
+   off-timed), so no shape's timed batch differs in structure from
+   production's.
+2. **`releaseWindow` (low).** The release-window catch was
+   `RuntimeException`, and a window that died before `scope::close`
+   ran (the binding-count agent's `start()` failing) left the
+   activation and request scopes to the Cleaner instead of closing
+   them. Closed: the catch is `Throwable`; on any release failure the
+   close is called directly (a nested try) — `MLXScope.close()` is
+   idempotent, so a window that already ran the close pays nothing —
+   and a fallback-close failure is attached to the release failure
+   with `addSuppressed`, never masking the in-flight original.
+   Package-private for the direct unit tests (6).
+3. **Rounding bias (low).** The estimate rounded every
+   (binding, window) `count × per-call cost` term to whole
+   nanoseconds before summing — at per-call costs of tens of ns a
+   ~50-binding step biases by up to ±25 ns. Closed: the per-shape
+   split is now `perShapeCalls` (long) + `perShapeBudgets`
+   (double[3]), and every window/request/pool accumulator is double;
+   `Math.round` applies once, at each per-shape output value.
+   `stepSummary`/`calibrationP10`/`calibrationP90` take
+   `List<Double>`; the `doubleList` helper is gone. The
+   `FfmTransitionEstimateTest` hand-computed values are exact on
+   integer costs and stay green unchanged.
+4. **Descriptor lookups (low perf).** The worker looked up the
+   native descriptors of every instrumented binding (670 names in the
+   Tier-A workloads) when assembling the report — each lookup
+   initialises the binding's holder (`findOrThrow` plus
+   `downcallHandle`) and links its downcall, so the report path
+   linked every instrumented downcall for a classification set of at
+   most 49 names. Closed: `countedBindingNames()` is the union
+   of every measured request's per-name `total` with count > 0, and
+   `nativeBindingDescriptors(signatures, counted)` (package-private)
+   looks up only the counted ∩ signatures. A run that failed before
+   any window completed carries no counted names (failed runs add no
+   request records) and falls back to every instrumented name,
+   keeping the nonempty-`binding_descriptors` invariant the report
+   validator enforces for failed runs too. End-to-end the counted-only
+   descriptors (49 of 670 for TinyMistral-6x248M, 39 of 670 for
+   Qwen3-0.6B) reproduce the full-descriptor estimates exactly (minus
+   `created_at`) on both workloads.
+5. **`ffm_cal.c` comment (nit).** The carrier-fidelity comment
+   described every by-value struct as "a single 8-byte pointer
+   member": the opaque handles are, but the `mlx_optional_*` scalar
+   wrappers are a value/has-value pair padded to 8 bytes. Comment
+   fixed; the rebuilt dylib is bit-identical to the round-2 binary
+   (comment-only change; the binary SHA-256 in §15.4 is unchanged,
+   the source SHA-256 is the new one).
+6. **Tests (low).** The D/E release-window and window-work error
+   paths of §15.6/§15.7 had no direct tests (the end-to-end adapter
+   runs never fail their windows). Closed: `BaselineAdaptersTest`
+   +4 — a throwing `PhaseObserver` around a real scope close:
+   observer dies before the close (the fallback close must have run),
+   observer dies after a clean close (the fallback is the idempotent
+   no-op), an `OutOfMemoryError` instead of a `RuntimeException`
+   (caught, attached to the original, never propagated in its place),
+   and no original in flight (the failure propagates); closed
+   asserted via `newChild`'s `IllegalStateException`.
+   `BaselineWorkerProtocolTest` +3 — a fake-agent binding-count run
+   (the agent's state faked through its system properties, no
+   `-javaagent` in-process: the model work executes real, uncounted
+   downcalls, every window's counts come out empty, and the run fails
+   at the non-empty-counts require) whose report must still carry a
+   nonempty `binding_descriptors` — exactly {`mlx_add`, `mlx_eval`}
+   with `(`-prefixed descriptor values through the real reflective
+   `$descriptor` lookup; a direct counted-only-restriction test of
+   `nativeBindingDescriptors` (a never-counted name is not looked
+   up); and a window work `OutOfMemoryError` propagating unwrapped
+   with the recording stopped (`jmlx.binding.recording` false).
+
+**Local evidence.** `:jmlx-benchmarks:test` green with 96 tests (the
+`FfmTransitionEstimateTest` hand-computed values unchanged under
+double accumulation); the `:jmlx-models` baseline suites green
+(`BaselineAdaptersTest` 9, `BaselineWorkerProcessTest` 9,
+`BaselineWorkerProtocolTest` 25 — §15.5). The calibration was
+re-measured at the default workload (source SHA-256
+`cb30e80b9824eb51113efca5a608f704d9503421e9e7ee331a0eb3d5bc60e2d4`,
+binary SHA-256
+`f1e2e7d76b4ff25d610c4284f38b856044eee604e3b844c45f539f0d30901ad9`
+— bit-identical to the round-2 pin, confirming the comment-only C
+change, Apple clang 21.0.0): floor 2625 ns per 2000 calls (1.31
+ns/iteration), int shapes 4.56–13.17 ns/call, struct shapes
+52.2–55.1 ns/call. The ~10× struct drop against the round-2
+509.0–517.9 ns/call is the expected correction (item 1's artifact
+removed); the int shapes move only +5–8%, consistent with the
+floor's +10% environmental shift. The estimate re-run end-to-end
+against the same two binding-count session reports gives
+per-decode-step budgets 76.65 µs / 106.68 µs against measured step
+walls 14,437.2 µs / 20,162.5 µs (≈ 0.53%, vs round 2's ≈ 3.5%),
+prefill 85.54 µs / 100.23 µs, request totals 9.82 ms / 13.65 ms
+(calibration ranges 63.26–98.74 / 88.11–137.33 µs per step),
+coverage 1.0 with zero uncovered — full numbers in §15.4.

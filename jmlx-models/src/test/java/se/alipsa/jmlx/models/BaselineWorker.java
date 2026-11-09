@@ -100,8 +100,8 @@ public final class BaselineWorker {
   /** Anchors the manifest/repo identity checks on the worker's own location. */
   record Anchors(Path canonicalManifest, Path canonicalRepo) {}
 
-  /** Parsed and validated job (section 13.1). */
-  private record Validated(
+  /** Parsed and validated job (section 13.1). Package-visible for the direct unit tests. */
+  record Validated(
       String adapter,
       String caseName,
       int promptLength,
@@ -678,9 +678,10 @@ public final class BaselineWorker {
    * mode measures wall and caller-thread CPU around the window. Agent lifecycle errors and the
    * window's own work failures are kept apart: a failure inside {@code work.run()} (a model error,
    * an MLXException) propagates as itself after a best-effort agent stop, never re-labelled as an
-   * agent failure (findings section 15.6, review round 1).
+   * agent failure (findings section 15.6, review round 1). Package-visible for the direct unit
+   * tests (review round 3, 6).
    */
-  private static void windowObserver(
+  static void windowObserver(
       Validated v,
       String phase,
       int position,
@@ -1247,8 +1248,16 @@ public final class BaselineWorker {
         worker.put("binding_signatures", signatures);
         // The native function descriptors the generated bindings actually use, by exact binding
         // name: the FFM transition estimate classifies the counts by these descriptor shapes
-        // (findings section 15.7, review round 2, A).
-        worker.put("binding_descriptors", nativeBindingDescriptors(signatures));
+        // (findings section 15.7, review round 2, A). The lookups are restricted to the names
+        // with a nonzero count in some measured window (review round 3, 4) — looking up a name
+        // initialises the binding's holder and links its downcall, so linking every instrumented
+        // downcall (675) while the report is assembled is needless work; a run that failed
+        // before any window completed has no counted names and falls back to every instrumented
+        // name, keeping the nonempty-object invariant the report validator enforces.
+        Set<String> counted = countedBindingNames();
+        Map<String, String> descriptors =
+            nativeBindingDescriptors(signatures, counted.isEmpty() ? signatures.keySet() : counted);
+        worker.put("binding_descriptors", descriptors);
       }
       worker.put("stop_token_ids", stopTokenIds);
       worker.put("load_s", loadS);
@@ -1282,13 +1291,45 @@ public final class BaselineWorker {
   }
 
   /**
-   * The native function descriptors of the recorded bindings, by exact binding name (review round
-   * 2, A): the toString of each generated wrapper's own downcall {@code FunctionDescriptor},
-   * reached by reflection because jmlx-ffi is an {@code implementation}-scoped dependency — on the
-   * worker's runtime classpath, not its compile classpath. A binding whose descriptor cannot be
-   * read is omitted rather than failing the run (the estimate records it as uncovered).
+   * The binding names with a nonzero count in some measured request's binding-count windows (review
+   * round 3, 4): the union of every request's per-name {@code total} over the {@code
+   * binding_counts} blocks — exactly the set the descriptor lookups are restricted to, and all the
+   * FFM transition estimate needs. A run that failed before any window completed has none (its
+   * report falls back to every instrumented name).
    */
-  private static Map<String, String> nativeBindingDescriptors(Map<String, String> signatures) {
+  private static Set<String> countedBindingNames() {
+    Set<String> counted = new TreeSet<>();
+    for (Map<String, Object> record : requests) {
+      Object block = record.get("binding_counts");
+      if (!(block instanceof Map<?, ?> counts)) {
+        continue;
+      }
+      Object total = counts.get("total");
+      if (!(total instanceof Map<?, ?> totalMap)) {
+        continue;
+      }
+      for (Map.Entry<?, ?> entry : totalMap.entrySet()) {
+        if (entry.getValue() instanceof Long count && count > 0) {
+          counted.add((String) entry.getKey());
+        }
+      }
+    }
+    return counted;
+  }
+
+  /**
+   * The native function descriptors of the counted bindings, by exact binding name (review round 2,
+   * A; restricted to the counted names in review round 3, 4): the toString of each generated
+   * wrapper's own downcall {@code FunctionDescriptor}, reached by reflection because jmlx-ffi is an
+   * {@code implementation}-scoped dependency — on the worker's runtime classpath, not its compile
+   * classpath. Looking up a name initialises the binding's holder ({@code findOrThrow} plus {@code
+   * downcallHandle}), so the lookup set is exactly the names with a nonzero count in some measured
+   * window — never the full instrumented set. A binding whose descriptor cannot be read is omitted
+   * rather than failing the run (the estimate records it as uncovered). Package-visible for the
+   * direct unit tests (review round 3, 6).
+   */
+  static Map<String, String> nativeBindingDescriptors(
+      Map<String, String> signatures, Set<String> counted) {
     Map<String, String> descriptors = new TreeMap<>();
     Class<?> mlxh;
     try {
@@ -1296,7 +1337,10 @@ public final class BaselineWorker {
     } catch (ClassNotFoundException e) {
       return descriptors;
     }
-    for (String name : signatures.keySet()) {
+    for (String name : counted) {
+      if (!signatures.containsKey(name)) {
+        continue;
+      }
       try {
         FunctionDescriptor descriptor =
             (FunctionDescriptor) mlxh.getMethod(name + "$descriptor").invoke(null);

@@ -376,14 +376,27 @@ final class BaselineAdapters {
    * Runs one scope's release window while preserving the exception in flight (if any): the close
    * still runs at the same wall-clock position the try-with-resources it replaced gave it, but a
    * release-window failure is attached to {@code original} as a suppressed exception instead of
-   * replacing it — try-with-resources used to do the attaching (review round 2, D). With no
-   * original exception, a release-window failure propagates, as before.
+   * replacing it — try-with-resources used to do the attaching (review round 2, D). The catch is
+   * {@code Throwable}: an Error from the release window (an OutOfMemoryError during the per-array
+   * frees, an ExceptionInInitializerError from a lazy downcall holder) must not replace the
+   * original either (review round 3, 2). If the window dies before the close runs (the
+   * binding-count agent's {@code start()} failing, for example), the close is called directly here
+   * rather than skipped — {@code MLXScope.close()} is idempotent, so a window that already ran the
+   * close pays nothing for the extra call — instead of leaving the activation and request scopes to
+   * the Cleaner (review round 3, 2); a fallback-close failure is attached to the release failure,
+   * so the in-flight exception still wins. With no original exception, a release-window failure
+   * propagates, as before. Package-visible for the direct unit tests (review round 3, 6).
    */
-  private static void releaseWindow(
+  static void releaseWindow(
       PhaseObserver observer, String phase, int position, MLXScope scope, Throwable original) {
     try {
       observer.window(phase, position, scope::close);
-    } catch (RuntimeException releaseFailure) {
+    } catch (Throwable releaseFailure) {
+      try {
+        scope.close();
+      } catch (Throwable closeFailure) {
+        releaseFailure.addSuppressed(closeFailure);
+      }
       if (original == null) {
         throw releaseFailure;
       }

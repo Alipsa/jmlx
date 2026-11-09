@@ -187,9 +187,12 @@ by value, declared on the Java side with the struct's 8-byte layout exactly
 as the generated wrappers do), invoked through the generated wrappers' own
 `invokeExact` form: one private holder class per shape binds its handle in a
 `static final` field, so each call site references a JIT-trusted constant.
-The argument carriers and the struct-return results use the same
-process-lifetime shared-arena allocation kind production `MLXScope` uses,
-so the measured per-call cost is production's. The dylib and the extracted
+The argument carriers use the same process-lifetime shared-arena
+allocation kind production `MLXScope` uses, and the struct-return
+results are allocated through a per-sample allocator that mirrors a
+production step scope's lifecycle (created before every sample's timed
+batch and closed after it, outside the timed region), so the measured
+per-call cost is production's. The dylib and the extracted
 C source are the only build artifacts; both stay under the output
 directory. Every external-process wait is bounded
 (`cc` compile 300 s, version probe 30 s, worker fork 300 s + 1 s per

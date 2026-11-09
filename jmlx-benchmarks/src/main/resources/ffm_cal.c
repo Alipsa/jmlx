@@ -18,14 +18,15 @@
  * representative-class set with the classes the estimate actually consumes.
  *
  * Carrier fidelity: in the pinned mlx-c header (a26f2d5, v0.8.0) every
- * by-value struct — the opaque handles (mlx_array, mlx_stream, mlx_vector_*)
- * and the mlx_optional_* scalar wrappers alike — is a single 8-byte pointer
- * member, passed by value. jextract maps such a parameter to the struct's
- * 8-byte layout, not to a pointer. On AArch64 an 8-byte struct parameter is
- * carried in one 64-bit register, exactly like a void*, so the C ABI of the
- * M slots (declared struct cal_eight below) is identical to the real one; the
- * Java side is what the by-value form mirrors (the 8-byte struct read from
- * the segment, matching the generated wrappers' marshalling). The struct-return
+ * by-value struct is 8 bytes and passed by value: the opaque handles
+ * (mlx_array, mlx_stream, mlx_vector_*) are a single 8-byte pointer member,
+ * and the mlx_optional_* scalar wrappers are a value/has-value pair padded
+ * to 8 bytes. jextract maps such a parameter to the struct's 8-byte layout,
+ * not to a pointer. On AArch64 an 8-byte struct parameter is carried in one
+ * 64-bit register, exactly like a void*, so the C ABI of the M slots
+ * (declared struct cal_eight below) is identical to the real one; the Java
+ * side is what the by-value form mirrors (the 8-byte struct read from the
+ * segment, matching the generated wrappers' marshalling). The struct-return
  * shapes use the same register convention (an 8-byte struct return by value).
  *
  * Naming: cal_<param-keys>_<return-key>, where P = void* parameter (the C

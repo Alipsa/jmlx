@@ -25,7 +25,11 @@ import tools.jackson.databind.node.ObjectNode;
  * consecutive downcalls, {@code workload.calls}), so every per-call cost divides the per-sample
  * quantile by that count (the per-sample {@code p10_ns}/{@code median_ns}/{@code p90_ns} never
  * enters a budget as-is). Type-7 quantiles commute with a positive scale factor, so the divided
- * quantiles are exactly the quantiles of the per-call samples.
+ * quantiles are exactly the quantiles of the per-call samples. Every budget accumulates its {@code
+ * count x per-call cost} terms in double, with no intermediate whole-nanosecond rounding (review
+ * round 3, 3) — rounding each (binding, window) term would bias a ~50-binding step by up to ±25 ns
+ * at per-call costs of tens of nanoseconds — and the per-shape budgets round once, at their output
+ * values.
  *
  * <p>It is a calibrated estimate, not a causal partition of the step's time (plan section 5.1): the
  * assumptions are repeated in every output. It accepts only controlled worker reports (the stock
@@ -59,9 +63,11 @@ public final class FfmTransitionEstimate {
               + " launches, synchronization, allocator work). The P/M argument carriers live on"
               + " a process-lifetime shared arena — the same arena kind production MLXScope.Holder"
               + " uses for every native handle — and the struct-return shapes allocate their"
-              + " results through an allocator that mirrors MLXScope.Holder.allocate (synchronized"
-              + " shared-arena allocation plus per-scope tracking), so the measured per-call"
-              + " allocation cost is production's, not a bare confined arena's.",
+              + " results through a per-sample allocator that mirrors a production step scope's"
+              + " lifecycle (fresh synchronized shared-arena allocation plus per-scope tracking,"
+              + " closed after every sample outside the timed region), so the measured per-call"
+              + " allocation cost is production's, not a bare confined arena's, and no result"
+              + " segment, set entry or arena reservation outlives its sample's batch.",
           "Carrier fidelity: the pinned mlx-c header passes every opaque struct (a single 8-byte"
               + " pointer member) and every mlx_optional_* scalar wrapper (an 8-byte"
               + " value/has-value struct) by value, and on AArch64 an 8-byte struct parameter is"
@@ -143,26 +149,30 @@ public final class FfmTransitionEstimate {
 
     long bindingCalls = 0;
     long classifiedCalls = 0;
-    // key -> [calls, budget median ns, budget p10 ns, budget p90 ns]
-    Map<String, long[]> perShape = new LinkedHashMap<>();
+    // key -> the shape's counted calls
+    Map<String, Long> perShapeCalls = new LinkedHashMap<>();
+    // key -> [budget median ns, budget p10 ns, budget p90 ns], accumulated in double and rounded
+    // once per output value (review round 3, 3): rounding each (binding, window) term to whole
+    // nanoseconds biases a ~50-binding step by up to ±25 ns at per-call costs of tens of ns.
+    Map<String, double[]> perShapeBudgets = new LinkedHashMap<>();
     // binding name -> [calls]
     Map<String, long[]> uncovered = new LinkedHashMap<>();
     Map<String, String> uncoveredDescriptors = new LinkedHashMap<>();
     // position -> one sample per measured request: that request's step-phase budget at the
     // position (pooling the requests' own sums, never summing across requests), computed from
     // the calibration's median/p10/p90 samples respectively
-    Map<Long, List<Long>> stepSamples = new LinkedHashMap<>();
-    Map<Long, List<Long>> stepSamplesP10 = new LinkedHashMap<>();
-    Map<Long, List<Long>> stepSamplesP90 = new LinkedHashMap<>();
-    List<Long> allStepSamples = new ArrayList<>();
-    List<Long> allStepP10 = new ArrayList<>();
-    List<Long> allStepP90 = new ArrayList<>();
-    List<Long> prefillBudgets = new ArrayList<>();
-    List<Long> prefillP10Budgets = new ArrayList<>();
-    List<Long> prefillP90Budgets = new ArrayList<>();
-    List<Long> requestTotals = new ArrayList<>();
-    List<Long> requestTotalsP10 = new ArrayList<>();
-    List<Long> requestTotalsP90 = new ArrayList<>();
+    Map<Long, List<Double>> stepSamples = new LinkedHashMap<>();
+    Map<Long, List<Double>> stepSamplesP10 = new LinkedHashMap<>();
+    Map<Long, List<Double>> stepSamplesP90 = new LinkedHashMap<>();
+    List<Double> allStepSamples = new ArrayList<>();
+    List<Double> allStepP10 = new ArrayList<>();
+    List<Double> allStepP90 = new ArrayList<>();
+    List<Double> prefillBudgets = new ArrayList<>();
+    List<Double> prefillP10Budgets = new ArrayList<>();
+    List<Double> prefillP90Budgets = new ArrayList<>();
+    List<Double> requestTotals = new ArrayList<>();
+    List<Double> requestTotalsP10 = new ArrayList<>();
+    List<Double> requestTotalsP90 = new ArrayList<>();
     int measuredRequests = 0;
 
     for (JsonNode request : worker.path("requests")) {
@@ -172,20 +182,20 @@ public final class FfmTransitionEstimate {
         continue;
       }
       measuredRequests++;
-      long requestTotal = 0;
-      long requestTotalP10 = 0;
-      long requestTotalP90 = 0;
-      long requestPrefill = 0;
-      long requestPrefillP10 = 0;
-      long requestPrefillP90 = 0;
+      double requestTotal = 0.0;
+      double requestTotalP10 = 0.0;
+      double requestTotalP90 = 0.0;
+      double requestPrefill = 0.0;
+      double requestPrefillP10 = 0.0;
+      double requestPrefillP90 = 0.0;
       // this request's step-phase budget per position (the per-position samples)
-      Map<Long, Long> requestStepBudgets = new LinkedHashMap<>();
-      Map<Long, Long> requestStepP10 = new LinkedHashMap<>();
-      Map<Long, Long> requestStepP90 = new LinkedHashMap<>();
+      Map<Long, Double> requestStepBudgets = new LinkedHashMap<>();
+      Map<Long, Double> requestStepP10 = new LinkedHashMap<>();
+      Map<Long, Double> requestStepP90 = new LinkedHashMap<>();
       for (JsonNode window : request.path("binding_counts").path("phases")) {
-        long windowMedian = 0;
-        long windowP10 = 0;
-        long windowP90 = 0;
+        double windowMedian = 0.0;
+        double windowP10 = 0.0;
+        double windowP90 = 0.0;
         for (String name : window.path("counts").propertyNames()) {
           long count = window.path("counts").path(name).asLong(0);
           if (count <= 0) {
@@ -202,18 +212,19 @@ public final class FfmTransitionEstimate {
             continue;
           }
           classifiedCalls += count;
-          long[] shape = perShape.computeIfAbsent(key, k -> new long[4]);
-          shape[0] += count;
-          // Per-call costs (the per-sample quantiles divided by the workload's call count).
+          perShapeCalls.merge(key, count, Long::sum);
+          double[] shape = perShapeBudgets.computeIfAbsent(key, k -> new double[3]);
+          // Per-call costs (the per-sample quantiles divided by the workload's call count);
+          // the terms accumulate unrounded (review round 3, 3).
           double median = shapes.path(key).path("median_ns").asDouble(0) * perCall;
-          shape[1] += Math.round(count * median);
+          shape[0] += count * median;
           double p10 = shapes.path(key).path("p10_ns").asDouble(0) * perCall;
-          shape[2] += Math.round(count * p10);
+          shape[1] += count * p10;
           double p90 = shapes.path(key).path("p90_ns").asDouble(0) * perCall;
-          shape[3] += Math.round(count * p90);
-          windowMedian += Math.round(count * median);
-          windowP10 += Math.round(count * p10);
-          windowP90 += Math.round(count * p90);
+          shape[2] += count * p90;
+          windowMedian += count * median;
+          windowP10 += count * p10;
+          windowP90 += count * p90;
         }
         // The window's classification, read after its counts: prefill-* windows charge the
         // request's prefill budget, the step phases at position > 0 the per-position step
@@ -229,15 +240,15 @@ public final class FfmTransitionEstimate {
                 || "sync".equals(phase)
                 || "selection".equals(phase)
                 || "release".equals(phase))) {
-          requestStepBudgets.merge(position, windowMedian, Long::sum);
-          requestStepP10.merge(position, windowP10, Long::sum);
-          requestStepP90.merge(position, windowP90, Long::sum);
+          requestStepBudgets.merge(position, windowMedian, Double::sum);
+          requestStepP10.merge(position, windowP10, Double::sum);
+          requestStepP90.merge(position, windowP90, Double::sum);
         }
         requestTotal += windowMedian;
         requestTotalP10 += windowP10;
         requestTotalP90 += windowP90;
       }
-      if (requestPrefill > 0) {
+      if (requestPrefill > 0.0) {
         prefillBudgets.add(requestPrefill);
         prefillP10Budgets.add(requestPrefillP10);
         prefillP90Budgets.add(requestPrefillP90);
@@ -245,7 +256,7 @@ public final class FfmTransitionEstimate {
       requestTotals.add(requestTotal);
       requestTotalsP10.add(requestTotalP10);
       requestTotalsP90.add(requestTotalP90);
-      for (Map.Entry<Long, Long> entry : requestStepBudgets.entrySet()) {
+      for (Map.Entry<Long, Double> entry : requestStepBudgets.entrySet()) {
         stepSamples.computeIfAbsent(entry.getKey(), p -> new ArrayList<>()).add(entry.getValue());
         allStepSamples.add(entry.getValue());
         stepSamplesP10
@@ -279,9 +290,8 @@ public final class FfmTransitionEstimate {
 
     ObjectNode perStep = estimate.putObject("per_decode_step");
     ArrayNode positions = perStep.putArray("positions");
-    for (Map.Entry<Long, List<Long>> entry : stepSamples.entrySet()) {
-      BaselineStatistics.Quantiles quantiles =
-          BaselineStatistics.quantiles(doubleList(entry.getValue()));
+    for (Map.Entry<Long, List<Double>> entry : stepSamples.entrySet()) {
+      BaselineStatistics.Quantiles quantiles = BaselineStatistics.quantiles(entry.getValue());
       positions
           .addObject()
           .put("position", entry.getKey())
@@ -299,18 +309,17 @@ public final class FfmTransitionEstimate {
         estimate.putObject("request_total"), requestTotals, requestTotalsP10, requestTotalsP90);
 
     ObjectNode perShapeOut = estimate.putObject("per_shape");
-    for (Map.Entry<String, long[]> entry : perShape.entrySet()) {
+    for (Map.Entry<String, double[]> entry : perShapeBudgets.entrySet()) {
+      String key = entry.getKey();
       perShapeOut
-          .putObject(entry.getKey())
-          .put("calls", entry.getValue()[0])
-          .put(
-              "median_ns_per_call",
-              shapes.path(entry.getKey()).path("median_ns").asDouble(0) * perCall)
-          .put("p10_ns_per_call", shapes.path(entry.getKey()).path("p10_ns").asDouble(0) * perCall)
-          .put("p90_ns_per_call", shapes.path(entry.getKey()).path("p90_ns").asDouble(0) * perCall)
-          .put("budget_ns", entry.getValue()[1])
-          .put("budget_p10_ns", entry.getValue()[2])
-          .put("budget_p90_ns", entry.getValue()[3]);
+          .putObject(key)
+          .put("calls", perShapeCalls.get(key))
+          .put("median_ns_per_call", shapes.path(key).path("median_ns").asDouble(0) * perCall)
+          .put("p10_ns_per_call", shapes.path(key).path("p10_ns").asDouble(0) * perCall)
+          .put("p90_ns_per_call", shapes.path(key).path("p90_ns").asDouble(0) * perCall)
+          .put("budget_ns", Math.round(entry.getValue()[0]))
+          .put("budget_p10_ns", Math.round(entry.getValue()[1]))
+          .put("budget_p90_ns", Math.round(entry.getValue()[2]));
     }
 
     ObjectNode uncoveredOut = estimate.putObject("uncovered");
@@ -329,21 +338,13 @@ public final class FfmTransitionEstimate {
   }
 
   /** The type-7 p10 of a calibration-p10 budget pool (its lower range endpoint). */
-  private static double calibrationP10(List<Long> budgets) {
-    return BaselineStatistics.quantiles(doubleList(budgets)).p10();
+  private static double calibrationP10(List<Double> budgets) {
+    return BaselineStatistics.quantiles(budgets).p10();
   }
 
   /** The type-7 p90 of a calibration-p90 budget pool (its upper range endpoint). */
-  private static double calibrationP90(List<Long> budgets) {
-    return BaselineStatistics.quantiles(doubleList(budgets)).p90();
-  }
-
-  private static List<Double> doubleList(List<Long> values) {
-    List<Double> out = new ArrayList<>(values.size());
-    for (long v : values) {
-      out.add((double) v);
-    }
-    return out;
+  private static double calibrationP90(List<Double> budgets) {
+    return BaselineStatistics.quantiles(budgets).p90();
   }
 
   /**
@@ -354,8 +355,8 @@ public final class FfmTransitionEstimate {
    * request, position) for the per-step summary), never a sum across requests.
    */
   private static void stepSummary(
-      ObjectNode node, List<Long> budgets, List<Long> p10Budgets, List<Long> p90Budgets) {
-    BaselineStatistics.Quantiles quantiles = BaselineStatistics.quantiles(doubleList(budgets));
+      ObjectNode node, List<Double> budgets, List<Double> p10Budgets, List<Double> p90Budgets) {
+    BaselineStatistics.Quantiles quantiles = BaselineStatistics.quantiles(budgets);
     node.put("n", budgets.size());
     node.put("p10_ns", quantiles.p10());
     node.put("median_ns", quantiles.median());

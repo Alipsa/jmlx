@@ -395,17 +395,19 @@ public final class FfmCalWorker {
       throw new IllegalArgumentException(
           "iterations and calls must be positive; warmup may be zero");
     }
-    // The lookup's confined arena keeps the dylib loaded for the measurement; the carriers and
-    // the CalScope use process-lifetime shared arenas (review round 2, A).
+    // The lookup's confined arena keeps the dylib loaded for the measurement; the carriers use a
+    // process-lifetime shared arena (review round 2, A). Every sample gets a fresh CalScope,
+    // closed after its batch, outside the timed region (review round 3, 1).
     try (Arena lookupArena = Arena.ofConfined()) {
       Init.lookup = SymbolLookup.libraryLookup(dylib, lookupArena);
       initializeHandles();
-      CalScope resultScope = new CalScope();
 
       long sink = 0;
       for (int w = 0; w < warmup; w++) {
         for (int i = 0; i < KEYS.length; i++) {
-          sink ^= batch(i, resultScope, 1) ^ floor(1);
+          CalScope sample = new CalScope();
+          sink ^= batch(i, sample, 1) ^ floor(1);
+          sample.close();
         }
       }
       SINK ^= sink;
@@ -416,9 +418,11 @@ public final class FfmCalWorker {
         int offset = i % KEYS.length;
         for (int s = 0; s < KEYS.length; s++) {
           int id = (offset + s) % KEYS.length;
+          CalScope sample = new CalScope();
           long t0 = System.nanoTime();
-          SINK ^= batch(id, resultScope, calls);
+          SINK ^= batch(id, sample, calls);
           raw[id][i] = System.nanoTime() - t0;
+          sample.close();
         }
         long t0 = System.nanoTime();
         SINK ^= floor(calls);
@@ -473,10 +477,16 @@ public final class FfmCalWorker {
   }
 
   /**
-   * The struct-return result allocator (review round 2, A): mirrors production {@code
-   * MLXScope.Holder.allocate} — a synchronized allocation from a per-scope shared arena plus the
-   * per-scope {@code LinkedHashSet} tracking — so the four struct-return shapes pay the production
-   * per-call allocation cost, not a bare confined arena's.
+   * The struct-return result allocator for one sample (review round 2, A, re-scoped in review round
+   * 3, 1). It mirrors a production step scope's lifecycle: a per-scope shared arena plus a
+   * per-scope {@code LinkedHashSet} tracking set (the production per-call cost of {@code
+   * MLXScope.Holder.allocate}, not a bare confined arena's), created before the sample's timed
+   * batch and closed after it, exactly as production closes a step scope after every step. With a
+   * fork-lifetime scope the defaults would have kept the measured 4 x iterations x calls = 1.6M
+   * segments in one set and one arena for the whole fork — the warmup rounds add one more per
+   * struct shape apiece — so the set's doubling rehashes would have run inside the later samples'
+   * timed batches and the growing live heap could have put GC pauses into any shape's samples,
+   * biasing the p90 tails the calibration reads.
    */
   private static final class CalScope implements SegmentAllocator {
     private final Arena arena = Arena.ofShared();
@@ -488,6 +498,16 @@ public final class FfmCalWorker {
         MemorySegment seg = arena.allocate(byteSize, byteAlignment);
         handles.add(seg);
         return seg;
+      }
+    }
+
+    /**
+     * Releases the sample's arena after its batch; the carriers are no-op structs, so there is no
+     * native array to free (unlike a production scope close's per-array frees).
+     */
+    void close() {
+      synchronized (this) {
+        arena.close();
       }
     }
   }

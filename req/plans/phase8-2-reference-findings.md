@@ -2401,6 +2401,9 @@ version change; the round-3 estimate numbers stand.
 
 ## 16. WP3 — Qualification and the headline text baseline (2026-11-09/10)
 
+Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
+"section N" is this findings file.
+
 ### 16.1 Code and host state
 
 - Measured code: clean tree at cc0c603 (branch phase8-2-wp3, no untracked files —
@@ -2413,53 +2416,74 @@ version change; the round-3 estimate numbers stand.
   mlx-metal 0.32.4, matching the staged Java runtime, section 9).
 - Timestamps: all hostrec and session.json times are UTC (the recorder uses
   date -u); the machine's local time is UTC+1.
-- Host boots and quieting: the pilot and qualification sessions ran on the
-  pre-reboot host (a sustained ~1-core load from RemoteManagement
+- Host boots and quieting: the pilot session (19:27:50-19:48:19 UTC) ran on
+  the pre-reboot host (a sustained ~1-core load from RemoteManagement
   screensharingd, 87-138% CPU with no visible remote session, was resolved by
-  the owner with a reboot at ~20:13 UTC). Headline session A ran on the
-  post-reboot host (boot ~20:13 UTC; the post-boot mediaanalysisd reindex had
+  the owner with a reboot at 20:13 UTC; `last reboot` records 21:13 local).
+  The qualification sessions (20:29:12-20:32:37 UTC) and headline session A
+  ran on the post-reboot host (the post-boot mediaanalysisd reindex had
   finished before the first fork). The extra controlled session (A2) ran after
-  the owner's next morning reboot (~05:10 UTC). The pre-reboot host evidence
-  covers planning/qualification sessions only; every headline and diagnostic
-  sample comes from the quiet post-reboot hosts.
-- hostrec convention (section 4): pre/post records plus a 60 s poll per
+  the owner's next morning reboot (05:10 UTC; 06:10 local). The pre-reboot
+  host evidence covers the planning pilot only; every qualification, headline
+  and diagnostic sample comes from the post-reboot hosts.
+- hostrec convention (plan section 4): pre/post records plus a 60 s poll per
   launcher session; the launcher's session.json carries the hostrec.pre/post
   nulls by design (WP1 shape), the operator records are hostrec.log in each
-  session directory.
+  session directory. hostrec records memfree, not a memory-pressure level.
+- Launcher summary defect (fixed in section 16.8, after the measurement): at
+  cc0c603 every session.json `summary.first_request` block holds only the last
+  cell of each runtime (the per-runtime object was re-created for every cell).
+  `summary.per_runtime` is unaffected. Every first-request figure in this
+  section is recomputed from the raw worker records, never from that block.
 
 ### 16.2 Budget refresh (controlled-adapter pilot, planning evidence)
 
 One dedicated process per (case, length, runtime), controlled adapter, headline
 mode, 1 load + 26 requests each (18 workers, one pair per cell, pair leaders
 alternating): planning/qualification evidence only, never headline samples
-(section 4.1). Session wall 20m30s, exit 0, 18/18 ok, 0 exclusions.
+(plan section 4.1). Session wall 20m30s, exit 0, 18/18 ok, 0 exclusions.
 
-| Case | L | java req-s (median) | python req-s (median) | java step-ms | python step-ms | cell wall (12 proc, both runtimes) |
+| Case | L | java req-s (median) | python req-s (median) | java step-ms | python step-ms | cell wall (6 java + 6 python worker walls) |
 | --- | --- | --- | --- | --- | --- | --- |
-| qwen3-0.6b | 32 | 0.565 | 0.500 | 3.989 | 3.641 | 0.09 h |
-| qwen3-0.6b | 512 | 0.661 | 0.530 | 4.660 | 3.817 | 0.11 h |
-| qwen3-0.6b | 2048 | 0.977 | 2.229 | 6.773 | 16.596 | 0.28 h |
-| qwen3-8b-4bit | 32 | 1.399 | 4.350 | 10.267 | 32.884 | 0.50 h |
-| qwen3-8b-4bit | 512 | 1.843 | 1.516 | 12.490 | 10.424 | 0.29 h |
-| qwen3-8b-4bit | 2048 | 9.797 | 2.149 | 26.977 | 10.525 | 1.04 h |
-| tinymistral-6x248m | 32 | 0.583 | 0.517 | 4.127 | 3.733 | 0.10 h |
-| tinymistral-6x248m | 512 | 0.637 | 0.540 | 4.439 | 3.817 | 0.10 h |
-| tinymistral-6x248m | 2048 | 0.880 | 0.666 | 5.542 | 4.078 | 0.13 h |
+| qwen3-0.6b | 32 | 0.565 | 0.500 | 3.989 | 3.641 | 0.08 h |
+| qwen3-0.6b | 512 | 0.661 | 0.530 | 4.660 | 3.817 | 0.06 h |
+| qwen3-0.6b | 2048 | 0.977 | 2.229* | 6.773 | 16.596* | 0.16 h |
+| qwen3-8b-4bit | 32 | 1.399 | 4.350* | 10.267 | 32.884* | 0.27 h |
+| qwen3-8b-4bit | 512 | 1.843 | 1.516 | 12.490 | 10.424 | 0.17 h |
+| qwen3-8b-4bit | 2048 | 9.797* | 2.149 | 26.977* | 10.525 | 1.08 h |
+| tinymistral-6x248m | 32 | 0.583 | 0.517 | 4.127 | 3.733 | 0.07 h |
+| tinymistral-6x248m | 512 | 0.637 | 0.540 | 4.439 | 3.817 | 0.07 h |
+| tinymistral-6x248m | 2048 | 0.880 | 0.666 | 5.542 | 4.078 | 0.09 h |
 
+\* Degraded pilot workers on the pre-reboot host, not representative of the
+clean regime: java 4bit/2048 9.80 s/request and 27.0 ms/step (worker wall
+587 s) against the headline clean ~3.1 s and 17.5 ms; python 4bit/32 4.35 s
+against ~1.27 s; python 0.6b/2048 2.23 s against ~0.61 s.
+
+- The cell wall is 6 x (java worker wall + python worker wall) from the pilot's
+  own worker records, so it includes load, the first request and the warmups.
+  (An earlier draft used 12 x 26 x the median request per runtime, which
+  counted 12 processes per runtime instead of 6 and left out load and the
+  slower first/warmup requests; it happened to give a similar 4bit/2048 total.)
 - Frozen manifest limits (worker 1800 s / reference-pair 720 s / cell 4.0 h /
-  session 12 h) remain valid unchanged: the binding cell is 4bit-2048 at a
-  12-process wall of ~1.04 h (java 0.85 h + python 0.19 h), under the 4.0 h
-  cell budget with ~4x margin. The primed regime held in the pilot
-  (4bit-2048 java 27 ms/step vs the section 7.3 degraded ~285 ms).
-- Actual walls measured: pilot 20m30s; qualification ~3m18s total (both TF32
-  modes); session A 1h29m; all far inside the section 7.4 reservation.
+  session 12 h) remain valid unchanged: the binding cell is 4bit-2048 at
+  ~1.08 h (java 6 x 587 s = 0.98 h + python 6 x 61 s = 0.10 h), under the 4.0 h
+  cell budget with ~3.7x margin even with the degraded pilot worker. The pilot
+  java 4bit/2048 worker was degraded but stayed far from the section 7.3
+  unprimed regime (27 ms/step against ~285 ms).
+- Actual walls measured: pilot 20m30s; qualification 3m14s of worker sessions
+  (1m46s TF32=1 + 1m28s TF32=0); session A 1h29m; all far inside the
+  section 7.4 reservation.
 
 ### 16.3 Qualification re-run (separate processes, untimed)
 
 Fixed-continuation mode (prefix512[32:64], 32 steps, per-step argmax_id/
 top2_margin — the plan section 3.3 qualification workload), both runtimes, all
-three cases, both TF32 modes (12 workers; each worker 1 first + 20 measured
-requests = 21 x 32 = 672 steps per runtime).
+three cases, both TF32 modes (12 workers). Each worker ran 1 first + 5 warmup +
+20 measured requests; the table compares the first and measured requests
+(21 x 32 = 672 steps per runtime). The 5 warmups (160 further steps per
+runtime) also match exactly, and their tie-eligible counts scale in the same
+proportion (832/832 steps over all 26 requests).
 
 | Case | TF32 | argmax match (java vs python) | tie-eligible (<0.05) | max margin diff | vs section 2.4 |
 | --- | --- | --- | --- | --- | --- |
@@ -2475,7 +2499,9 @@ fixed-continuation (the matched-greedy claim was rejected there because of the
 greedy-region top-2 ties); the fixed continuation re-verified with zero
 tie-eligible steps at the 0.05 bound in both modes. 0.6b and tinymistral keep
 their greedy claims (tie-eligible steps lie in the fixed-continuation region
-only, as in 2.4). No golden regenerated, no tolerance widened.
+only, as in 2.4). No golden regenerated, no tolerance widened. This
+qualification covers the controlled adapters; the stock greedy comparison is
+recorded with the stock sessions (section 16.5).
 
 ### 16.4 Headline session A — controlled adapter, TF32=1, primed-per-request
 
@@ -2496,9 +2522,9 @@ fixed-continuation, section 2.4).
 
 Pairs aggregation (the launcher leaves summary.pairs empty for WP3; frozen
 convention: per-pair warm median over the 20 measured requests, type-7
-quantiles over the six pair medians, ratio = per-pair java/python median).
-full_generation_s and streaming_decode_tps, java p10/median/p90 then python,
-then ratio(java/python):
+quantiles over the six pair medians, ratio = median over the pairs of the
+per-pair java/python median ratio). full_generation_s and
+streaming_decode_tps, java p10/median/p90 then python, then ratio(java/python):
 
 | Cell | full_gen java (p10/med/p90) | full_gen python | ratio | tps java | tps python | ratio |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -2519,109 +2545,141 @@ then ratio(java/python):
 
 First-request (first-use, a separate distribution, never pooled with warm):
 java vs python full_generation medians over the 6 workers per cell — 0.6b:
-0.76/0.51, 0.85/0.54, 1.27/0.63 s; 4bit: 1.65/1.28, 2.03/1.42, 3.61/1.92 s;
+0.76/0.51, 0.85/0.54, 1.27/0.63 s; 4bit: 1.65/1.28, 2.03/1.42, 3.61/1.91 s;
 tinymistral: 0.74/0.53, 0.80/0.55, 1.08/0.68 s (at 32/512/2048). Median load
-0.17-0.23 s.
+per cell: java 0.03-0.20 s, python 0.18-0.43 s.
 
-Host anomalies — three degraded windows tripped the section 4 >10%
+Host anomalies — three degraded windows tripped the plan section 4 >10%
 adjacent-fork-median rule (an investigation trigger, not a discard):
 
-- W1 20:46:43-20:54:03 (pair0), both runtimes, 4 workers: 0.6b/2048-py
-  2.07 vs ~0.61 s, 4bit/32-ja 5.35 vs 1.38 s, 4bit/32-py 4.58 vs 1.27 s,
-  4bit/512-ja 2.72 vs 1.79 s; decode steps 3.3-4.0x. Concurrent omlx-server
-  CPU spike to 88.7% at 20:46:52 (agent activity on the resident model, the
-  leading candidate); load stayed 1.4-2.2; memfree 68->59% during the window,
-  dropping further to 28-39% in the 20:55-21:03 post-window minutes, recovered
-  21:04.
+- W1 20:46:43-21:04:32 (pair0), both runtimes, 5 workers: 0.6b/2048-py
+  2.07 vs ~0.61 s, 4bit/32-ja 5.35 vs 1.38 s, 4bit/32-py 4.58 vs 1.27 s
+  (decode-step medians 3.3-3.9x), 4bit/512-ja 2.72 vs 1.79 s (median step
+  only 13.7 vs 12.2 ms), and 4bit/2048-ja (20:54:50-21:04:32): first request
+  19.6 s, warmups 287.6 / 175.0 / 10.0 s — the section 7.3 degraded regime —
+  then measured median 3.42 vs pair1's 3.08 s (+11.1%). Concurrent omlx-server
+  CPU spike to 88.7% at 20:46:52; load stayed <=3.5. memfree 68->58% through
+  20:54, then 28-39% from 20:55:53 to 21:02:53 with omlx-server idle
+  (0.2-0.3%), recovering to 62% at 21:03:53 and 86% at 21:04:53 — the deepest
+  trough coincides with the 4bit/2048-ja worker's own window.
 - W2 21:21:18-21:38:21 (pair2), java only: 4bit/512-ja 6.14 vs 1.79 s
   (steps 42.0 vs 12.2 ms; prefill 0.433 vs 0.162 s) and 4bit/2048-ja 10.60 vs
   3.08 s (steps 28.3 vs 17.5 ms; prefill 1.019 vs 0.637 s); the adjacent
   python workers were normal. memfree 28-40% sustained; load <=2.4.
-- W3 22:08:06-22:11:21 (pair5), java only, mild: 4bit/2048-ja 9.51 vs 3.06 s
-  (steps 18.3 vs 17.5 ms; prefill 0.840 vs 0.624 s); memfree 75-78%.
+- W3 22:08:06-22:11:21 (pair5), java only: 4bit/2048-ja 9.51 vs 3.06 s per
+  request (3.1x). The median step (18.3 vs 17.5 ms) hides a heavy tail: the
+  per-request step sums are 8.3-8.8 s against 2.4 s clean; prefill 0.840 vs
+  0.624 s. memfree stayed at 75-78%, so W3 carries no memory signature.
+
+The 10% rule also fires in session A without a degraded-window signature, on
+the controlled python 4bit cells' per-pair regime (the same bimodal pattern
+as the stock python cells of section 16.5): python 4bit/512 1.572->1.405
+(-10.7%), 1.405->1.561 (+11.2%), 1.400->1.541 (+10.1%); python 4bit/2048
+1.939->2.192 (+13.0%). These cells are already blocked by W1/W2/W3, so the
+set of cells that needs a further session is unchanged.
 
 No thermal warnings in any of the six host logs (therm-warnings=2 throughout),
-no jetsam/memorystatus events in the unified log for the windows, and the
-memfree levels do not correlate one-to-one with the degraded workers (pair0's
-4bit/2048-ja ran clean at 31% free while pair2's degraded at 28-40%): no
-definitive root cause is available at the 60 s hostrec resolution. The
-W2/W3 pattern (java-only, prefill and decode steps both inflated) is
-consistent with checkpoint page-cache churn of the section 7.3 io_affected
-mechanism, but that attribution remains unconfirmed.
+and no jetsam/memorystatus events in the unified log for the windows. W1's
+later part and W2 coincide with memfree troughs, and W1's deepest trough
+coincides with a java 4bit/2048 worker's window; W3 has no memory signature. The W2/W3 pattern
+(java-only, prefill and decode steps both inflated) is consistent with
+checkpoint page-cache churn of the section 7.3 io_affected mechanism, but
+that attribution remains unconfirmed (see section 16.4b for the candidate
+causes).
 
 10%-rule outcome: the affected cells (qwen3-8b-4bit/32 both runtimes, /512
-java, /2048 java; qwen3-0.6b/2048 python) cannot receive a runtime
-attribution from session A alone — section 4 requires one further alternating
-session before attribution. No sample was discarded; the contaminated pair
-medians stay in the quantiles with these host observations attached. The clean
-cells (tinymistral x3, 0.6b/32, 0.6b/512; spreads <1%) are settled.
+both runtimes, /2048 both runtimes; qwen3-0.6b/2048 python) cannot receive a
+runtime attribution from session A alone — plan section 4 requires one further
+alternating session before attribution. No sample was discarded; the
+contaminated pair medians stay in the quantiles with these host observations
+attached. The clean cells (tinymistral x3, 0.6b/32, 0.6b/512; spreads <1%)
+are settled.
 
 ### 16.4a Extra controlled session (A2) for the four blocked cells
 
-Three further alternating pairs (pairs 6-8; leaders java/python/java, 3/3
-parity), the four affected cells x 2 runtimes = 8 workers per session, 24
-workers total, on the post-morning-reboot host (boot ~05:10 UTC). Block wall
-05:23:56-05:59:58 UTC (36 min), 24/24 ok, 0 exclusions, clean cc0c603.
+Three further alternating pairs (pairs 6-8; leaders java/python/java), the
+four affected cells x 2 runtimes = 8 workers per session, 24 workers total, on
+the post-morning-reboot host (boot 05:10 UTC). Block wall 05:23:56-05:59:58
+UTC (36 min), 24/24 ok, 0 exclusions, clean cc0c603.
+
+Deviation from plan section 4.1 (recorded here, not covered by a plan
+revision): plan section 4.1 requires "the same sample counts and complete pairs
+in each session" and plan section 4 requires each runtime to lead equally. A2
+ran 3 pairs, not the cell's fixed 6, with 2 java-led and 1 python-led pair;
+the cumulative leaders over sessions A + A2 are java 5 / python 4. Section
+16.7 lists the outcomes that rest on this session as pending the owner's
+ratification.
 
 Per-pair full_generation_s medians (with decode step medians):
 - qwen3-8b-4bit/32: pair6 1.380/1.334 (10.2/10.0 ms), pair7 1.377/1.268,
-  pair8 1.370/1.270 — all clean, internal shifts <3%.
+  pair8 1.370/1.270 — no degraded window; java shifts <1%, python pair6->7
+  1.334->1.268 (-4.9%), below the 10% trigger.
 - qwen3-8b-4bit/512: pair7 1.797/1.448 (12.2/9.7 ms), pair8 1.785/1.405 —
   clean; pair6 degraded, both runtimes (java 6.046, steps 43.5 ms; python
   4.597, steps 33.2 ms; 05:25:26-05:30:01).
 - qwen3-8b-4bit/2048: pair7 3.126/2.235 (17.5/11.1 ms), pair8 3.082/2.168 —
-  clean; pair6 java measured median 3.580 (+14% vs pair7), its warmup requests
-  showing the full section 7.3 degraded regime decaying toward clean:
-  first 25.1 s, warmups 310.2 / 237.3 / 110.0 / 10.6 / 3.6 s (a 310 s
-  request matches the section 7.1 degraded 328 s cell wall); all 20 measured
-  requests 3.48-5.40 s.
+  java clean; python pair6->7 1.970->2.235 (+13.5%); pair6 java measured
+  median 3.580 (+14% vs pair7), its warmup requests showing the full section
+  7.3 degraded regime decaying toward clean: first 25.1 s, warmups 310.2 /
+  237.3 / 110.0 / 10.6 / 3.6 s (a 310 s request matches the section 7.1
+  degraded 328 s cell wall); all 20 measured requests 3.48-5.40 s.
 - qwen3-0.6b/2048: all three pairs clean (java ~0.97, python ~0.61).
 
 Host evidence for the pair6 window: memfree 67% (05:27:56) -> 21%
 (05:30:57), holding 31-40% until 05:41:57, recovered 05:43 (the same
-~40-60 GiB consumer as W1/W2, ~15 min after this morning's boot); load
-normal (<=2.9); no thermal warnings. The 4bit/2048-ja load landed at the
+~40-60 GiB consumer signature as W1/W2, ~15 min after this morning's boot);
+load normal (<=2.9); no thermal warnings. The 4bit/2048-ja load landed at the
 bottom of the trough (hence the 310 s warmup requests), while the 4bit/512
 workers ran across its leading edge (both runtimes).
 
-Outcome per the section 4 rule:
-- qwen3-8b-4bit/32 and qwen3-0.6b/2048: the further alternating session is
-  clean -> the attribution block lifts; both cells aggregate 9 pair medians
-  (the two contaminated session-A pairs remain in the quantiles with the W1
-  host observations attached).
+Outcome per the plan section 4 rule:
+- qwen3-8b-4bit/32 and qwen3-0.6b/2048: the further alternating session has
+  no >10% shift -> the attribution block lifts; both cells aggregate 9 pair
+  medians (each cell's contaminated session-A pair0 remains in the quantiles
+  with the W1 host observations attached), subject to the A2 deviation above.
 - qwen3-8b-4bit/512 and qwen3-8b-4bit/2048: A2 itself contains >10%
-  adjacent-fork shifts (the pair6 window), so they remain variable after this
-  further session.
+  adjacent-fork shifts (the pair6 window; for 2048 also the python
+  pair6->7 shift), so they remain variable after this further session.
 
 ### 16.4b Second further session (A3) — recorded owner-approved extension
 
-Per section 4.1, a session beyond the one the 10% rule required needs a
+Per plan section 4.1, a session beyond the one the 10% rule required needs a
 recorded run-policy/plan revision, not an automatic retry. This extension was
-approved by the owner on 2026-11-10 before the fork: two further alternating
-pairs (pairs 9-10; leaders python/java) over the two still-blocked cells
+approved by the owner on 2026-11-10 before the fork, but it is recorded only
+here, after the run, not in a plan revision: two further alternating pairs
+(pairs 9-10; leaders python/java) over the two still-blocked cells
 (qwen3-8b-4bit/512, /2048) x 2 runtimes = 8 workers, inside the frozen
 per-cell budgets (no manifest or run_policy change; the manifest stays
-digest-pinned and untouched). A scratch-only host consumer watcher
-(top-10 RSS processes + memfree every 60 s, outside the verified checkout)
-runs during the block to identify the recurring memory consumer if it strikes
-again. Rule: if A3 is clean (no >10% adjacent-fork shift within it), both
-cells settle over 11 pair medians; if it strikes again, both cells close as
-`unstable` (section 4.1) with the ranges and host observations, and no
-further rerun happens.
+digest-pinned and untouched). A3, like A2, ran fewer than the cell's fixed 6
+pairs (plan section 4.1 deviation; cumulative leaders over A + A2 + A3:
+java 6 / python 5). The stock B3 session of section 16.5b is the same kind
+of third session and was run on the owner's handoff without a separately
+recorded extension; both are listed for ratification in section 16.7. A
+scratch-only host consumer watcher (top-10 RSS processes + memfree every
+60 s, outside the verified checkout) runs during the block to identify the
+recurring memory consumer if it strikes again. Rule: if A3 is clean (no >10%
+adjacent-fork shift within it), both cells settle over 11 pair medians; if it
+strikes again, both cells close as `unstable` (plan section 4.1) with the
+ranges and host observations, and no further rerun happens.
 
 A3 results. pair9 (python-led, 06:29:01-07:02:39 UTC) ran across a fresh
 strike of the memory consumer: python/512 measured median 3.551 s (first
 4.84 s) vs the clean ~1.42 s, java/512 1.813 s (clean), python/2048 1.915 s
-(clean), and **java/2048 hit the 1800 s worker wall-clock timeout** (its
-warmup requests ran in the full section 7.3 degraded regime, as in A2 pair6:
-a 310 s-class first requests decaying toward clean, then degraded measured
-requests on top). pair10 (java-led, 07:03:03-07:07:25) was fully clean:
+(clean), and **java/2048 hit the 1800 s worker wall-clock timeout**: first
+request 14.8 s, warmups 264.8 / 155.9 / 10.9 / 3.4 / 3.5 s (the section 7.3
+degraded regime decaying toward clean), measured requests 1-6 clean at
+3.5-3.7 s, then a second degradation from measured request 7 (11.1, 12.0,
+14.7, 238.2, 319.3, 283.0, 282.7, 124.5, 11.7 s) until the timeout after 15
+measured requests. pair10 (java-led, 07:03:03-07:07:25) was fully clean:
 java/512 1.799, python/512 1.417, java/2048 3.205, python/2048 2.253 s.
 A3 therefore contains >10% adjacent-fork shifts (python/512 pair9 vs pair10:
-150%; the java/2048 timeout), so per the recorded rule above **both cells
-close as `unstable` (section 4.1) and no further rerun happens**. The
-timed-out worker is retained as an incomplete pair with its reason
-(worker wall-clock timeout exceeded), never silently rerun.
+150%; python/2048 1.915->2.253, +17.6%; the java/2048 timeout), so per the
+recorded rule above **both cells close as `unstable` (plan section 4.1) and
+no further rerun happens**. The timed-out worker is retained as an incomplete
+pair with its reason (worker wall-clock timeout exceeded), never silently
+rerun. Plan section 4.1 says a timeout "stops that session"; pair10 was a
+separate launcher session and still ran after the timeout (07:02:38 ->
+07:03:03), a further recorded deviation.
 
 Watcher findings on the memory consumer: during the pair9 strike, memfree
 held 28-41% while the top-10-RSS snapshot showed **no user process above
@@ -2629,24 +2687,50 @@ held 28-41% while the top-10-RSS snapshot showed **no user process above
 wired (16 KB pages) and swap had grown from ~13 GB (2026-11-09 evening) to
 ~48 GB total / ~46 GB used. Wired growth of that size on this host is
 IOAccelerator/GPU buffer memory. Every degradation window to date
-(W1 20:46-20:54 and W2 21:21-21:38 on 2026-11-09, W3 22:08-22:11, A2-pair6
+(W1 20:46-21:04 and W2 21:21-21:38 on 2026-11-09, W3 22:08-22:11, A2-pair6
 05:25-05:30, A3-pair9 06:29-07:02, B-pair0 07:23-07:30, B2-pair6
 17:08-17:16 on 2026-11-10 UTC) bracketed the big 4-bit checkpoint
-worker(s)' execution windows; five of the seven also overlapped periods of
-heavy omlx-server generation, while B-pair0's and B2-pair6's struck while
-the serving agent was idle (both hit the java stock 4bit/2048 worker's own
-window). An 8.5 h idle window between the two afternoon blocks showed zero
-strike activity (0/515 watcher samples below 50% memfree). The elevated
-wired pool churns the page cache and evicts the 4-bit checkpoint's
-(~4.6 GB) cached pages, degrading workers that run inside the window into
-the section 7.3 SSD regime. Per-process wired attribution is not available
-without root, so this is recorded as the leading candidate, not a proven
-cause; the idle-window strikes shift the weight toward the workers' own
-Metal loads of the large checkpoint (with concurrent omlx generation as a
-contributor where present). Consequence: 4bit/512 and 4bit/2048 close as unstable
-(clean clusters tight - 4bit/512 java within 0.7%, 4bit/2048 java within
-3% - with five and two degraded pairs respectively, all with host
-observations), and the 4bit/2048 io_affected label applies throughout.
+worker(s)' execution windows. Five of the seven overlapped periods of heavy
+omlx-server generation at some point, but W1's deepest trough (20:55-21:03),
+B-pair0 and B2-pair6 occurred while the serving agent was idle (all three
+inside a java 4bit/2048 worker's window). An 8.5 h idle window between the
+two afternoon blocks showed zero strike activity (0/515 watcher samples below
+50% memfree). The elevated wired pool churns the page cache and evicts the
+4-bit checkpoint's (~4.6 GB) cached pages, degrading workers that run inside
+the window into the section 7.3 SSD regime.
+
+Two candidate causes remain, and the evidence does not settle between them:
+- A host-level consumer, with concurrent omlx-server generation as a
+  contributor where present.
+- The benchmark workers' own Metal buffer pools (unverified hypothesis). The
+  section 16.6 memory blocks show the java controlled worker's pooled free
+  device buffers (allocator-cached, mlx_get_cache_memory) at ~103 GB
+  (96 GiB) at 4bit/2048 and ~28 GB at 4bit/512, on a 128 GiB host, on top
+  of a ~21.6 GB peak. Clean java 4bit/2048 workers alone pull memfree down
+  (A pair1 64% at 21:14:54, B pair1 55% at 07:40:24, B2 pair7 67% at
+  17:23:32). The RSS watcher cannot see pooled Metal buffers (the same
+  worker's rss_peak is ~5.9 GB), so "no process above X GB" does not
+  exclude the workers. If this cause holds, the 4bit instability is a
+  property of the java adapter's no-periodic-clearing allocator policy, not
+  host noise, and the java/python difference at 4bit/512 and 4bit/2048
+  would be partly runtime-attributable.
+- Evidence against a purely self-inflicted cause: A3-pair9's python/512 was
+  degraded from its first request (before any 2048 worker of that session
+  ran), and W3 degraded at 75-78% memfree.
+
+Per-process wired attribution is not available without root, so neither
+cause is proven. Python memory counters were not collected (section 16.6),
+so the two runtimes' pools cannot be compared from this data.
+
+Consequence: 4bit/512 and 4bit/2048 close as unstable, with four and five
+degraded pairs respectively, all with host observations:
+- 4bit/512: A pair0 java, A pair2 java, A2 pair6 both runtimes, A3 pair9
+  python.
+- 4bit/2048: A pairs 0/2/5 java, A2 pair6 java, the A3 pair9 java timeout.
+
+The clean clusters stay tight: 4bit/512 java 1.786-1.813 s (within 1.2% of
+their median), 4bit/2048 java 3.059-3.205 s (within 3.3%). The 4bit/2048
+io_affected label applies throughout.
 
 ### 16.5 Headline session B — stock adapter, TF32=1, primed-per-request
 
@@ -2661,10 +2745,10 @@ exclusion reason, never rerun in place (its re-run, if any, comes as a
 complete pair, see 16.5a).
 
 Strike: memfree 70% (07:23) -> 25% (07:24) holding 32-40% to 07:30,
-recovered 07:32 (the sixth strike; the watcher again showed no process
-above ~1.4 GB — the wired-pool signature). No other pair0 worker ran inside
-the window; python 4bit/2048 ran 07:31:11-07:32:10, after recovery, fully
-clean. No thermal warnings in any of the six host logs.
+recovered 07:32 (the sixth degradation window; the watcher again showed no
+process above ~1.4 GB, which is the size of the worker JVM itself). No other
+pair0 worker ran inside the window; python 4bit/2048 ran 07:31:11-07:32:10,
+after recovery, fully clean. No thermal warnings in any of the six host logs.
 
 Pairs aggregation (type-7 over pair medians; full_generation_s and
 streaming_decode_tps, java p10/med/p90 | python | ratio):
@@ -2682,8 +2766,32 @@ streaming_decode_tps, java p10/med/p90 | python | ratio):
 | tinymistral/2048 (6) | 0.855/0.856/0.857 | 0.600/0.601/0.602 | 1.4245 | 0.6387 |
 
 Every stock request emitted exactly 128 tokens with finish_reason length
-(no early-EOS occurrences; the per-case stop set never fired on the fixed
-headline prompts).
+(4,056 stock requests over sessions B, B2 and B3; no early-EOS occurrences;
+the per-case stop set never fired on the fixed headline prompts).
+
+**Stock greedy outputs diverge in five of the nine cells.** Pairing the
+measured requests by pair and request index (as for the controlled check of
+section 16.4):
+
+| Stock cell | java vs python identical sequences | first divergent token (B pair1) |
+| --- | --- | --- |
+| qwen3-0.6b/32 | 0/120 | 102 |
+| qwen3-0.6b/512 | 0/120 | 6 |
+| qwen3-0.6b/2048 | 0/120 | 5 |
+| qwen3-8b-4bit/32 | 0/120 (B), 0/120 (B2), 0/120 (B3) | 6 |
+| qwen3-8b-4bit/512 | 0/120 (B), 0/120 (B2) | 16 |
+| qwen3-8b-4bit/2048 | 120/120 (B), 120/120 (B2) | — |
+| tinymistral x3 | 120/120 each | — |
+
+Within each runtime every request emits the same sequence. The stock java
+sequences are identical to the controlled sequences, while the stock python
+sequences differ from both, so the divergence lies in the stock mlx-lm loop.
+The cause has not been investigated; it is not a token-count difference
+(both runtimes emit 128 tokens). Plan section 3.3: "If greedy outputs
+diverge, reject the matched-generation ratio for that cell pending review;
+retain the mismatch". The five divergent cells' ratios are therefore
+rejected as matched-generation ratios, pending review (section 16.7). Their
+timing stays recorded as stock-default-loop observations.
 
 10%-rule findings (per-pair medians, adjacent shifts; pairs 1-5 ran on a
 quiet host, memfree 54-88% with single-poll dips only):
@@ -2693,16 +2801,24 @@ quiet host, memfree 54-88% with single-poll dips only):
   systematic per-pair effect, not a degradation window (no strike in
   pairs 1-5). Four adjacent shifts of 14-16%.
 - qwen3-8b-4bit/512 python: one +10.9% adjacent shift (pair1 low at 1.343 s,
-  the other pairs 1.43-1.53 s), same per-pair-regime phenomenon, weaker.
+  the other pairs 1.43-1.52 s), same per-pair-regime phenomenon, weaker.
 - qwen3-8b-4bit/2048: no >10% shift among the five complete pairs (max
   +3.4% java, +9.0% python), but pair0's pair is incomplete (the excluded
   java member).
 - All other cells: adjacent shifts <=2.6%.
 
-Outcome: per section 4, the two triggered cells and the incomplete 2048 pair
-require one further alternating session (2nd of the 3-session cap) before
-runtime attribution, and the affected 2048 pair's re-run includes both
-members. The clean stock cells (0.6b x3, tinymistral x3) are settled.
+Memory-warning trigger: plan section 4 also lists "a thermal/memory warning"
+as a trigger, alongside the >10% shift. hostrec records memfree, not a
+pressure level. If the strikes count as memory warnings, stock 4bit/2048
+(the strike fell inside its pair0 java window) also needs a further session
+before attribution. Section 16.5a applies the same reading to B2.
+
+Outcome: per plan section 4, the two triggered cells and the incomplete 2048
+pair require one further alternating session (2nd of the 3-session cap)
+before runtime attribution, and the affected 2048 pair's re-run includes both
+members. The clean stock cells (0.6b x3, tinymistral x3) have no timing
+trigger; the 0.6b cells' ratios are nonetheless rejected under the greedy
+divergence above.
 
 ### 16.5a Stock re-session (B2) for the three 4bit stock cells
 
@@ -2712,79 +2828,96 @@ java/python), 3 cells x 2 runtimes = 6 workers per session, 36 workers total
 2026-11-10). Block wall 17:04:31-17:48:33 UTC (44 min). 35/36 ok, clean
 cc0c603.
 
-Strike (the seventh): memfree 74% (17:08) -> 28% (17:09-17:15), recovered
-17:16-17:17, bracketing the java stock 4bit/2048 pair6 worker's window
-(17:08:27-17:16:57). Its first request again violated the 50 ms event
-consistency tolerance -> invalid-report exclusion, the second occurrence on
-exactly this worker (B pair0 was the first). The watcher again showed no
-process above the ~1.4 GB worker JVM. Notably, this strike (and B pair0's)
-occurred while the serving agent session was idle — the owner parked the
-remaining blocks on a different (remote-inference) agent so omlx-server
-stays quiet.
+Strike (the seventh degradation window): memfree 74% (17:08) -> 28%
+(17:09-17:15), recovered 17:16-17:17, bracketing the java stock 4bit/2048
+pair6 worker's window (17:08:27-17:16:57). Its first request again violated
+the 50 ms event consistency tolerance (+188 ms) -> invalid-report exclusion,
+the second occurrence on exactly this worker (B pair0 was the first). The
+watcher again showed no process above the ~1.4 GB worker JVM. Notably, this
+strike (and B pair0's) occurred while the serving agent session was idle —
+the owner parked the remaining blocks on a different (remote-inference) agent
+so omlx-server stays quiet.
 
 Results (per-pair measured medians, full_generation_s):
 - qwen3-8b-4bit/32: java pair6 1.850, pairs 7-11 1.355-1.361; python
   1.187-1.195 in ALL six pairs (both leaders). The session-B python bimodal
   regime (1.187 in python-led vs 1.380 in java-led pairs) did NOT
   reproduce. pair6's java worker is the block's first worker after the
-  8.5 h idle gap: first request 4.90 s, warmups 4.6-4.7 s, measured
-  requests 4.54-4.74 s decaying through request 10 to the clean 1.356-1.362
-  s by request 11 (the block-start cold-cache regime, a mild version of the
-  section 7.3 decay; the python worker starting after it was clean from its
-  first request at 1.22 s). Its measured median 1.850 is a contaminated
-  mixture, retained with this host observation.
+  8.5 h idle gap (memfree 57-71%, no strike): first request 4.90 s, warmups
+  4.6-4.7 s, measured requests 1-7 at 4.54-4.74 s, then 2.34 / 3.77 /
+  3.70 s, and the clean 1.36 s from measured request 11 (the block-start
+  cold-cache regime, a mild version of the section 7.3 decay; the python
+  worker starting after it was clean from its first request at 1.22 s). Its
+  measured median 1.850 is a contaminated mixture, retained with this host
+  observation.
 - qwen3-8b-4bit/512: java 1.776-1.786 (all six, uniform), python 1.325-1.342
-  (all six, uniform) — the session-B high cluster (1.46-1.53 in pairs 2-5)
+  (all six, uniform) — the session-B high cluster (1.48-1.52 in pairs 2-5)
   did not reproduce; no >10% adjacent shift inside B2 (max +0.8%).
 - qwen3-8b-4bit/2048: java pairs 7-11 3.040-3.069 (tight; pair6 java
   excluded by the strike), python 1.902-2.035, max adjacent shift +7.0% —
-  no >10% shift anywhere in the cell's history.
+  no >10% shift within any session of the cell.
 
 Outcomes per the recorded rules:
-- qwen3-8b-4bit/512 (stock): the further session is clean -> the attribution
-  block lifts; settled over 12 pair medians (the non-reproduced session-B
-  high cluster stays in the quantile ranges, both runtimes).
+- qwen3-8b-4bit/512 (stock): the further session is clean -> the timing
+  attribution block lifts; settled over 12 pair medians (the non-reproduced
+  session-B high cluster stays in the quantile ranges, both runtimes). The
+  cell's matched-generation ratio is nonetheless rejected under the greedy
+  divergence of section 16.5.
 - qwen3-8b-4bit/2048 (stock, io_affected): no >10% trigger and 10 complete
   pairs (>= the 6-pair minimum); the two strike-excluded java pair members
   (B pair0, B2 pair6, same worker, same signature) are retained incomplete
-  with their host observations; the cell is complete and settles over the
-  10 complete pair medians.
+  with their host observations. Two open points keep the cell pending owner
+  review (section 16.7):
+  - Memory warnings: if the strikes count as memory warnings, B and B2 both
+    carry one for this cell, so a third session was required before
+    attribution and was not run.
+  - Exclusion bias: both excluded members were the slow ones (measured
+    medians 3.504 / 3.475 s against 3.04-3.16 s, pair ratios 1.743 / 1.813).
+    They were excluded by the first-request event check only; their 20
+    measured requests passed validation. Over the 10 complete pairs the
+    ratio is 1.5021 (tps 0.5313); including both pairs it is 1.5226
+    (tps 0.5272).
 - qwen3-8b-4bit/32 (stock): B2's block-start contaminated java pair median
   (1.850 vs 1.358, a -27% adjacent shift) means the further session is not
   fully clean, so the cell stays blocked after its second session. One
   further (third, final, cap-bound) session B3 (pairs 12-17, 12 workers)
   then ran under the remote-inference agent per the owner's handoff so the
   local serving agent stays quiet (section 16.5b): B3 is clean, and the
-  cell settles over the 18 pair medians.
+  cell's timing settles over the 18 pair medians. Its matched-generation
+  ratio is rejected under the greedy divergence of section 16.5.
 
 ### 16.5b Final stock session (B3) for qwen3-8b-4bit/32
 
-Three fresh complete pairs (pairs 12-17, leaders continuing the
-alternation — java-led 12/14/16, python-led 13/15/17, 3/3 parity), 1
-cell x 2 runtimes, 12 workers, run by the remote-inference agent per the
-owner's handoff so the local serving agent stays quiet (block wall
-18:21:24-18:32:50 UTC, 11 min). 12/12 ok, 0 exclusions, every record
-clean cc0c603 / dirty: false, the preflight meeting the quiet-host
-thresholds without a wait. One benign runner deviation, no measurement
-impact: the initial detached nohup shell died before executing the loop
-(no partial data, no runner/launcher/worker process, no session
-directory); the loop restarted under a persistent session, no
-measurement was retried, no worker interrupted, no repository edit.
+Six fresh complete pairs (pairs 12-17, leaders continuing the alternation —
+java-led 12/14/16, python-led 13/15/17, 3/3 parity), 1 cell x 2 runtimes,
+12 workers, run by the remote-inference agent per the owner's handoff so the
+local serving agent stays quiet (block wall 18:21:24-18:32:50 UTC, 11 min).
+12/12 ok, 0 exclusions, every record clean cc0c603 / dirty: false, the
+preflight meeting the quiet-host thresholds without a wait. One benign runner
+deviation, no measurement impact: the initial detached nohup shell died
+before executing the loop (no partial data, no runner/launcher/worker
+process, no session directory); the loop restarted under a persistent
+session, no measurement was retried, no worker interrupted, no repository
+edit.
 
 - java pair medians 1.373 / 1.377 / 1.437 / 1.377 / 1.389 / 1.375 s
-  (adjacent shifts +0.3 to +4.4%); python 1.199 / 1.195 / 1.264 / 1.252 /
-  1.199 / 1.213 s (-0.3 to +5.8%). No shift over 10%; no decay signature
+  (adjacent shifts -4.2 to +4.4%); python 1.199 / 1.195 / 1.264 / 1.252 /
+  1.199 / 1.213 s (-4.2 to +5.8%). No shift over 10%; no decay signature
   (largest first-five/last-five measured-request ratio in the block:
-  medians 1.030, means 1.028). pair14 is the one mildly elevated pair, in
-  both runtimes.
+  medians 1.030, means 1.028). pair14 is the most elevated pair in both
+  runtimes; python pair15 (1.252 s) is also elevated.
 - Host: memfree 89-96% in all 12 watcher samples of the window, no
   strike, therm-warnings 2 in every hostrec poll.
+- Greedy output: 0/120 identical java/python sequences, as in B and B2
+  (section 16.5).
 
-B3 is clean, so the attribution block lifts and qwen3-8b-4bit/32 (stock)
-settles over the 18 pair medians (B pairs 0-5, B2 pairs 6-11, B3 pairs
-12-17; B2-pair6's contaminated java member, 1.850 s, stays in the
-quantile with its block-start cold-cache observation of section 16.5a).
-Final aggregation (type-7 over the 18 pair medians):
+B3 is clean, so the timing attribution block lifts and qwen3-8b-4bit/32
+(stock) settles over the 18 pair medians (B pairs 0-5, B2 pairs 6-11, B3
+pairs 12-17; B2-pair6's contaminated java member, 1.850 s, stays in the
+quantile with its block-start cold-cache observation of section 16.5a). The
+ratio below is a stock-loop timing observation, not an accepted
+matched-generation ratio (section 16.5). Final aggregation (type-7 over the
+18 pair medians):
 
 | Metric | java (p10/med/p90) | python | ratio |
 | --- | --- | --- | --- |
@@ -2792,7 +2925,7 @@ Final aggregation (type-7 over the 18 pair medians):
 | full_generation_s | 1.3564 / 1.3740 / 1.4525 | 1.1869 / 1.1953 / 1.2992 | 1.1375 |
 | streaming_decode_tps | 90.33 / 95.54 / 96.79 | 103.58 / 112.17 / 112.95 | 0.8604 |
 
-### 16.6 Memory and section 5.1 diagnostics (ineligible for headline)
+### 16.6 Memory and plan section 5.1 diagnostics (ineligible for headline)
 
 The diag-5-1 spec: 18 java workers — every cell x {binding-count,
 tracing}, controlled adapter, headline mode, 1 first + 5 warmup + 20
@@ -2800,7 +2933,7 @@ measured requests per worker, TF32=1. Block wall 18:33:47-18:50:58 UTC
 (17m11s), run by the same remote-inference agent immediately after B3,
 on the same quiet host. 18/18 ok; exclusions=18 reason=instrumented, by
 design — instrumented workers are ineligible for the headline
-(section 5.1), and no headline sample comes from this block. Loads
+(plan section 5.1), and no headline sample comes from this block. Loads
 0.034-0.198 s (warm page cache). The payload (91,353,713 bytes, the 18
 worker objects) verifies exactly against the original worker objects
 after removing only the request fields tokens/event_s/steps.
@@ -2819,7 +2952,7 @@ cell's tracing worker (18:46:49-18:48:23, after the window, clean). The
 count-based FFM budget of that worker is unaffected — the downcall
 counts are deterministic graph properties, identical across all three
 prompt lengths within a model — but its wall times and its memory block
-(rss_peak 1,290 MiB, far below the tracing worker's 5,864 MiB and the
+(rss_peak 1,290 MB, far below the tracing worker's 5,864 MB and the
 other 4bit cells) are suspect and excluded from the evidence; the
 4bit/2048 memory block is taken from the tracing worker.
 
@@ -2843,7 +2976,7 @@ calls/request) and mlx_quantized_matmul (PMMMMZMMPM)I (32,384
 calls/request) and tinymistral's mlx_array_new_float32 (F)M (1,536
 calls/request). The estimate reproduces the section 15.4 end-to-end
 baseline exactly on the two non-quantized models — per-step 76.65 /
-106.68 us, prefill 85.54 / 100.23 us, request total 9.820 / 13.649 ms —
+106.68 µs, prefill 85.54 / 100.23 µs, request total 9.820 / 13.649 ms —
 so the trimmed payload and the estimate path are identical to WP2's.
 
 The per-request FFM budget is length-independent (identical at
@@ -2853,9 +2986,9 @@ max-tokens, not the prompt length):
 
 | Case | per-decode-step (cal p10-p90) | prefill (cal p10-p90) | request total (cal p10-p90) |
 | --- | --- | --- | --- |
-| qwen3-0.6b | 106.68 us (88.11-137.33) | 100.23 us (82.68-129.00) | 13.649 ms (11.273-17.571) |
-| qwen3-8b-4bit | 111.12 us (91.72-143.74) | 102.37 us (84.37-132.45) | 14.214 ms (11.733-18.388) |
-| tinymistral-6x248m | 76.65 us (63.26-98.74) | 85.54 us (70.53-110.21) | 9.820 ms (8.105-12.650) |
+| qwen3-0.6b | 106.68 µs (88.11-137.33) | 100.23 µs (82.68-129.00) | 13.649 ms (11.273-17.571) |
+| qwen3-8b-4bit | 111.12 µs (91.72-143.74) | 102.37 µs (84.37-132.45) | 14.214 ms (11.733-18.388) |
+| tinymistral-6x248m | 76.65 µs (63.26-98.74) | 85.54 µs (70.53-110.21) | 9.820 ms (8.105-12.650) |
 
 Downcall counts per measured request (identical across the 20):
 prefill-construction 4,948 / 4,567 / 3,980; prefill-sync 3;
@@ -2875,7 +3008,7 @@ the same graph shapes.
 20 measured requests); the unassigned residual is the request wall/cpu
 minus the sum of the phase windows:
 
-| Cell | wall/cpu ms | residual wall/cpu ms | prefill-sync us | step constr/sync/sel/rel us | req-release us |
+| Cell | wall/cpu ms | residual wall/cpu ms | prefill-sync µs | step constr/sync/sel/rel µs | req-release µs |
 | --- | --- | --- | --- | --- | --- |
 | 0.6b/32 | 559.5 / 236.9 | +1.97 / +1.61 | 4,818.6 | 366.0 / 3,557.2 / 252.7 / 116.6 | 811.2 |
 | 0.6b/512 | 662.9 / 243.3 | +1.88 / +1.55 | 14,393.7 | 386.5 / 4,264.4 / 254.4 / 124.9 | 829.0 |
@@ -2888,7 +3021,7 @@ minus the sum of the phase windows:
 | tinymistral/2048 | 883.9 / 224.5 | +1.88 / +1.57 | 128,775.8 | 328.2 / 5,220.4 / 230.0 / 100.3 | 354.3 |
 
 The per-step sync (the per-token eval/sync) dominates the step wall
-(3,557 us at 0.6b/32 to 16,980 us at 4bit/2048); the per-step
+(3,557 µs at 0.6b/32 to 16,980 µs at 4bit/2048); the per-step
 construction (graph building) is a fixed 0.32-0.55 ms and the
 selection/release phases 0.10-0.23 and 0.10-0.22 ms. prefill-sync grows
 with the prompt (0.6b: 4.8 / 14.4 / 72.3 ms at 32/512/2048; 4bit:
@@ -2897,12 +3030,15 @@ phase windows: inter-phase bookkeeping and token emission) is a small
 positive +1.6 to +4.1 ms wall per request, growing with length.
 
 **Memory blocks** (medians over the 20 measured requests, the section
-10 shape). active/peak/allocator-cached are identical in the two
-workers of every cell; rss_peak differs only by the counting agent's
-JVM overhead (~0.3 GiB for 0.6b/4bit, ~0.4 GiB for tinymistral). The
-4bit/2048 binding-count rss is starred (suspect, above).
+10 shape; MB = 10^6 bytes). active is identical in the two workers of
+every cell. peak differs by at most 1,024 bytes (tinymistral/32 and
+/512) and allocator-cached by at most 0.25% (0.6b/32, 0.6b/512,
+tinymistral/32 and /512; 0.6b/512 7,338.6 vs 7,320.2 MB); the table
+shows the binding-count worker's values. rss_peak differs by the counting
+agent's JVM overhead (~0.3 GB for 0.6b/4bit, ~0.4 GB for tinymistral).
+The 4bit/2048 binding-count rss is starred (suspect, above).
 
-| Cell | active MiB | peak MiB | allocator-cached MiB | rss_peak MiB (binding-count / tracing) |
+| Cell | active MB | peak MB | allocator-cached MB | rss_peak MB (binding-count / tracing) |
 | --- | --- | --- | --- | --- |
 | 0.6b/32 | 1,503 | 1,574 | 794 | 3,032 / 2,740 |
 | 0.6b/512 | 1,503 | 2,660 | 7,339 | 3,047 / 2,731 |
@@ -2915,24 +3051,40 @@ JVM overhead (~0.3 GiB for 0.6b/4bit, ~0.4 GiB for tinymistral). The
 | tinymistral/2048 | 4,012 | 11,035 | 14,563 | 2,073 / 1,660 |
 
 active is the resident GPU working set (the 4bit checkpoint at 4,608
-MiB in all three lengths, plus the small 128-token KV remainder) and is
+MB in all three lengths, plus the small 128-token KV remainder) and is
 flat in length within a model; peak carries the prefill/decode
-transients (21,570 MiB at 4bit/2048); allocator-cached
+transients (21,570 MB at 4bit/2048); allocator-cached
 (mlx_get_cache_memory, the pooled free device buffers) grows with the
-prefill transient size (0.6b: 794 -> 26,190 MiB; 4bit: 4,174 -> 103,258
-MiB; tinymistral: 716 -> 14,563 MiB).
+prefill transient size (0.6b: 794 -> 26,190 MB; 4bit: 4,174 -> 103,258
+MB, i.e. ~96 GiB of the host's 128 GiB; tinymistral: 716 -> 14,563 MB).
+
+Memory-run gap: these Java blocks come from the instrumented diagnostic
+workers. No Python worker recorded a memory block in any session, and no
+headline worker records one (memory is null by design, plan section 4).
+WP3 calls for separate memory runs, with Python's counters matched against
+the native counter semantics (plan section 4). Those runs are not done; the
+gap is listed in section 16.7.
 
 ### 16.7 Session outcomes
 
-Final status per section 4.1: seven of the nine controlled cells and all
-nine stock cells are `stable` (settled with a java/python ratio);
-controlled 4bit/512 and 4bit/2048 are `unstable` (closed with the ranges
-and host observations of section 16.4b, no further rerun). No cell
-remains blocked: the single timed-out worker (controlled 4bit/2048, A3
-pair9 java) is retained as the incomplete member of a pair inside an
-already-closed cell, and the two strike-excluded stock java members
-(B pair0, B2 pair6) are retained inside the complete, settled 4bit/2048
-stock cell (section 16.5a).
+Final status per plan section 4.1, with the review-round-1 corrections of
+section 16.8. Items marked "pending" need an owner decision (a dated scope
+amendment or plan revision) before WP3's gate can pass on them.
+
+| Adapter | Cell | Status |
+| --- | --- | --- |
+| controlled | 0.6b/32, 0.6b/512, tinymistral x3 | `stable` (session A, 6 pairs) |
+| controlled | 0.6b/2048, 4bit/32 | `stable`, pending ratification of the A2 reduced-session deviation (section 16.4a) |
+| controlled | 4bit/512 | `unstable` (A + A2 + A3) |
+| controlled | 4bit/2048 io_affected | `unstable` with one timed-out worker; pending owner confirmation that a timeout inside a cell with 10 complete pairs closes it as `unstable`, not `incomplete` (plan section 4.1) |
+| stock | tinymistral x3 | `stable` (greedy-identical) |
+| stock | 4bit/2048 io_affected | timing settles over 10 complete pairs; pending owner review of the memory-warning trigger and the exclusion bias (section 16.5a) |
+| stock | 0.6b x3, 4bit/32, 4bit/512 | greedy-divergent: matched-generation ratio rejected pending review (plan section 3.3, section 16.5); timing recorded as stock-loop observations |
+
+No cell remains blocked by an unrun session. The single timed-out worker
+(controlled 4bit/2048, A3 pair9 java) is retained as the incomplete member of
+a pair in the cell that A3 closed. The two strike-excluded stock java members
+(B pair0, B2 pair6) are retained in the 4bit/2048 stock cell (section 16.5a).
 
 **Controlled adapter (TF32=1, primed per request).**
 full_generation_s, java p10/median/p90 then python, then
@@ -2944,34 +3096,38 @@ section 16.4 for those two cells).
 | --- | --- | --- | --- | --- | --- |
 | qwen3-0.6b/32 | 6 | 0.557/0.558/0.559 | 0.491/0.494/0.503 | 1.1318 | 0.8912 |
 | qwen3-0.6b/512 | 6 | 0.654/0.657/0.658 | 0.516/0.518/0.526 | 1.2655 | 0.7963 |
-| qwen3-0.6b/2048 | 9 | 0.969/0.969/0.976 | 0.606/0.612/0.906 | 1.5863 | 0.6241 |
-| qwen3-8b-4bit/32 | 9 | 1.372/1.377/2.184 | 1.267/1.270/1.983 | 1.0841 | 0.9220 |
+| qwen3-0.6b/2048 (pending A2) | 9 | 0.969/0.969/0.976 | 0.606/0.612/0.906 | 1.5863 | 0.6241 |
+| qwen3-8b-4bit/32 (pending A2) | 9 | 1.372/1.377/2.184 | 1.267/1.270/1.983 | 1.0841 | 0.9220 |
 | tinymistral/32 | 6 | 0.580/0.582/0.585 | 0.516/0.517/0.517 | 1.1278 | 0.8851 |
 | tinymistral/512 | 6 | 0.631/0.632/0.634 | 0.538/0.538/0.541 | 1.1734 | 0.8487 |
 | tinymistral/2048 | 6 | 0.874/0.876/0.876 | 0.664/0.664/0.664 | 1.3185 | 0.7301 |
 
-Unstable cells: no ratio is attributed. Pair-median ranges over the full
-history (11 complete pairs for 4bit/512; 10 complete pairs plus the 1
-incomplete A3-pair9 for 4bit/2048), type-7 p10-p90:
-full_generation_s java 1.790-6.046 s / python 1.405-3.551 s for 4bit/512,
-java 3.077-9.623 s / python 1.967-2.237 s for 4bit/2048 (io_affected
-throughout); streaming_decode_tps java 22.4-78.0 / python 38.3-101.4 and
-java 14.5-52.2 / python 87.6-95.2 respectively. The clean clusters stay
-tight (4bit/512 java within 0.7%, 4bit/2048 java within 3% of their
-medians); every degraded member carries its host observation
-(section 16.4b).
+Unstable cells: no ratio is attributed. Pair-median ranges, type-7
+p10-p90, over the 11 complete pairs for 4bit/512 and the 10 complete pairs
+for 4bit/2048 (the incomplete A3-pair9 is excluded from the 4bit/2048
+range): full_generation_s java 1.790-6.046 s / python 1.405-3.551 s for
+4bit/512, java 3.077-9.623 s / python 1.967-2.237 s for 4bit/2048
+(io_affected throughout); streaming_decode_tps java 22.4-78.0 / python
+38.3-101.4 and java 14.5-52.2 / python 87.6-95.2 respectively. Including
+A3-pair9 (its partial java median over 15 measured requests, 11.682 s, and
+python 1.915 s), the 4bit/2048 full_generation_s range is java
+3.079-10.600 s / python 1.939-2.235 s. The clean clusters stay tight
+(4bit/512 java within 1.2%, 4bit/2048 java within 3.3% of their medians);
+every degraded member carries its host observation (section 16.4b).
 
 **Stock adapter (TF32=1, primed per request).** Final pair counts
-(6 / 18 / 12 / 10 complete pairs):
+(6 / 18 / 12 / 10 complete pairs). The ratios of the five greedy-divergent
+cells are stock-loop timing observations, not accepted matched-generation
+ratios:
 
 | Cell | pairs | full_gen java | full_gen python | ratio | tps ratio |
 | --- | --- | --- | --- | --- | --- |
-| qwen3-0.6b/32 | 6 | 0.532/0.533/0.535 | 0.395/0.395/0.397 | 1.3485 | 0.7372 |
-| qwen3-0.6b/512 | 6 | 0.632/0.633/0.635 | 0.423/0.424/0.426 | 1.4935 | 0.6592 |
-| qwen3-0.6b/2048 | 6 | 0.946/0.947/0.949 | 0.509/0.512/0.519 | 1.8516 | 0.5150 |
-| qwen3-8b-4bit/32 | 18 | 1.356/1.374/1.453 | 1.187/1.195/1.299 | 1.1375 | 0.8604 |
-| qwen3-8b-4bit/512 | 12 | 1.780/1.785/1.915 | 1.329/1.342/1.489 | 1.3269 | 0.7207 |
-| qwen3-8b-4bit/2048 io_affected | 10 | 3.046/3.063/3.156 | 1.923/2.032/2.141 | 1.5021 | 0.5313 |
+| qwen3-0.6b/32 (greedy-divergent) | 6 | 0.532/0.533/0.535 | 0.395/0.395/0.397 | 1.3485 | 0.7372 |
+| qwen3-0.6b/512 (greedy-divergent) | 6 | 0.632/0.633/0.635 | 0.423/0.424/0.426 | 1.4935 | 0.6592 |
+| qwen3-0.6b/2048 (greedy-divergent) | 6 | 0.946/0.947/0.949 | 0.509/0.512/0.519 | 1.8516 | 0.5150 |
+| qwen3-8b-4bit/32 (greedy-divergent) | 18 | 1.356/1.374/1.453 | 1.187/1.195/1.299 | 1.1375 | 0.8604 |
+| qwen3-8b-4bit/512 (greedy-divergent) | 12 | 1.780/1.785/1.915 | 1.329/1.342/1.489 | 1.3269 | 0.7207 |
+| qwen3-8b-4bit/2048 io_affected (pending) | 10 | 3.046/3.063/3.156 | 1.923/2.032/2.141 | 1.5021 | 0.5313 |
 | tinymistral/32 | 6 | 0.561/0.561/0.563 | 0.457/0.458/0.458 | 1.2272 | 0.7754 |
 | tinymistral/512 | 6 | 0.611/0.612/0.612 | 0.467/0.468/0.468 | 1.3078 | 0.7402 |
 | tinymistral/2048 | 6 | 0.855/0.856/0.857 | 0.600/0.601/0.602 | 1.4245 | 0.6387 |
@@ -2979,11 +3135,12 @@ medians); every degraded member carries its host observation
 The 4bit/32 row is the 18-pair aggregation of section 16.5b
 (superseding the 6-pair 1.1238/0.8709 of section 16.5); the 4bit/512 and
 4bit/2048 rows supersede the session-B values 1.2728/0.7462 and
-1.4780/0.5451 of section 16.5.
+1.4780/0.5451 of section 16.5. With the two excluded 4bit/2048 pairs
+included, that cell's ratio is 1.5226 (tps 0.5272).
 
 Session-count cap (at most 3 alternating sessions per cell): fully
 consumed only by controlled 4bit/512 and 4bit/2048 (A + A2 + A3; A3 is
-the recorded owner-approved extension, section 16.4b) and by stock
+the owner-approved extension recorded in section 16.4b) and by stock
 4bit/32 (B + B2 + B3, settled in B3). Every other cell used 1 session;
 controlled 0.6b/2048 and 4bit/32 and stock 4bit/512 and 4bit/2048 used
 2.
@@ -2997,13 +3154,84 @@ primed-regime headline question (the settled ratios above) does not
 depend on it.
 
 Correctness and no-discard: the controlled greedy-ID identity
-(120/120 per cell, 1080 comparisons, session A, section 16.4) holds in
-all 9 cells; the 4bit identity claim is the frozen-manifest
-fixed-continuation one (the greedy match is observation-only, section
-2.4); every stock request emitted 128 tokens with finish_reason length
-(section 16.5). No headline sample was discarded: the W1/W2/W3-
-contaminated pair medians, B2-pair6's block-start java member (1.850 s),
-the strike-excluded B-pair0 and B2-pair6 java workers and the
+(120/120 per cell, 1080 comparisons, session A, section 16.4; A2 and A3
+also identical) holds in all 9 cells; the 4bit identity claim is the
+frozen-manifest fixed-continuation one (the greedy match is
+observation-only, section 2.4). Every stock request emitted 128 tokens with
+finish_reason length, but stock greedy outputs diverge between the runtimes
+in five cells (section 16.5). No headline sample was discarded: the
+W1/W2/W3-contaminated pair medians, B2-pair6's block-start java member
+(1.850 s), the strike-excluded B-pair0 and B2-pair6 java workers and the
 A3-pair9 java timeout are all retained with their reasons and host
 observations, and the 10% adjacent-fork rule acted as an investigation
 trigger, never as a discard.
+
+Open items for the owner before WP3's gate (plan section 6, WP3):
+1. Stock greedy divergence (five cells): review the stock mlx-lm loop
+   divergence and either accept the stock ratios with a dated scope
+   amendment or keep them rejected (plan section 3.3).
+2. Reduced-size further sessions: ratify or reject A2 (3 pairs, 2/1
+   leaders) and A3 (2 pairs), and the cumulative leader imbalance, against
+   plan section 4.1's same-sample-count rule. A2 decides controlled
+   0.6b/2048 and 4bit/32.
+3. Third sessions: record the A3 extension and the B3 third session as
+   plan/run-policy revisions, and record that A3 pair10 ran after the pair9
+   timeout.
+4. Controlled 4bit/2048: confirm `unstable` (10 complete pairs) rather than
+   `incomplete` for a cell with one timed-out worker (plan section 4.1).
+5. Stock 4bit/2048: decide whether the memfree strikes count as plan
+   section 4 memory warnings (which would require a further session), and
+   whether the two first-request event-check exclusions stand, given their
+   bias (1.5021 vs 1.5226).
+6. Memory runs: the separate memory runs and Python memory counters WP3
+   requires are not done (section 16.6).
+7. 4bit memory consumer: the worker-allocator-pool hypothesis of section
+   16.4b is open and bears on whether the 4bit/512 and 4bit/2048 instability
+   is host noise or runtime-attributable.
+
+### 16.8 Review round 1 (2026-11-10, PR #91)
+
+The review recomputed every table from the raw session records under
+`~/wp3-scratch/sessions` (per-pair medians, type-7 quantiles, per-pair ratio
+medians, the qualification table, the B3 table and the diagnostics windows).
+Those reproduce exactly. This round amends section 16 in place:
+
+- Stock greedy identity, which the first version did not check: five stock
+  cells diverge (section 16.5). Their ratios are relabeled per plan section
+  3.3, and section 16.7 now gives per-cell statuses and open owner items.
+- W1 now includes the session-A pair0 java 4bit/2048 worker, which the first
+  version called clean. It was degraded (warmups 287.6 / 175.0 s, measured
+  +11.1%) and coincides with the deepest memfree trough. The memfree
+  correlation statement is corrected accordingly.
+- Section 16.4b records the worker-allocator-pool hypothesis for the memory
+  consumer, with the evidence for and against it.
+- Recorded deviations: A2/A3 sample counts and leader parity (A2 is 2/1, not
+  3/3), the post-timeout A3 pair10, the timeout-versus-`incomplete` question,
+  and the memory-warning trigger with the stock 4bit/2048 exclusion bias.
+- Previously unreported >10% shifts in controlled python (session A 4bit/512
+  and 4bit/2048, A2 and A3 4bit/2048). The set of cells that needed further
+  sessions is unchanged.
+- The unstable 4bit/2048 range is now stated as over the 10 complete pairs,
+  with the pair9-inclusive range added. The degraded-pair counts are
+  corrected from "five and two" to four and five.
+- Memory blocks: the unit is MB (10^6 bytes), not MiB, and the
+  binding-count/tracing difference is stated exactly instead of "identical".
+  The Python memory-run gap is recorded.
+- Pilot: the cell-wall column is recomputed from worker walls (the first
+  version counted 12 processes per runtime), and degraded pilot cells are
+  marked.
+- Qualification ran on the post-reboot host, not the pre-reboot one.
+- Smaller corrections: B3 has six pairs, not three; the A2 4bit/32 python
+  shift is -4.9%; the B3 shift ranges; first-request 4bit/2048 python median
+  1.91 s; per-cell load ranges; the qualification request mix; W3 is no
+  longer called mild; W1's step ratios; the A3-pair9 request sequence;
+  clean-cluster spreads; the plan-versus-findings cross-reference convention;
+  µs units.
+- Launcher defect (code change after the measurement; the measured code
+  remains cc0c603): `BaselineBenchmark.finishFirstRequest` re-created each
+  runtime's `summary.first_request` block for every cell (Jackson's
+  `putObject` replaces an existing property), so only the last cell
+  survived. It now reuses the runtime block. The new
+  `BaselineBenchmarkTest.firstRequestSummaryKeepsEveryCellOfARuntime` runs two
+  cells of one runtime and fails without the fix. The archived session.json
+  files keep the defective block; section 16 never used it.

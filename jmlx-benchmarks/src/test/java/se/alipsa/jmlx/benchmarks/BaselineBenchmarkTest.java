@@ -415,6 +415,32 @@ class BaselineBenchmarkTest {
   }
 
   @Test
+  void firstRequestSummaryKeepsEveryCellOfARuntime() throws IOException {
+    // Regression (findings 16.8): the first-request block once kept only the last cell of each
+    // runtime, because the per-runtime object was re-created for every cell.
+    Setup setup = setup();
+    FakeStarter starter = new FakeStarter();
+    Path outRoot = base.resolve("session-first-multi");
+    ObjectNode spec =
+        buildSpec(
+            setup,
+            outRoot,
+            CLASSPATH,
+            worker("java", "controlled", "tiny", 32, "headline"),
+            worker("java", "controlled", "tiny", 512, "headline"));
+    int exit = new BaselineBenchmark(starter).runSession(spec);
+    assertEquals(BaselineBenchmark.EXIT_OK, exit);
+    JsonNode first = session(spec).path("summary").path("first_request").path("java");
+    assertEquals(2, first.size());
+    for (String cell : List.of("controlled/headline/tiny/32", "controlled/headline/tiny/512")) {
+      assertEquals(1, first.path(cell).path("ttft_s").path("n").asInt(0), cell);
+      assertEquals(4, first.path(cell).size(), cell);
+    }
+    // The measured-request quantiles were always grouped correctly; pin the same cell set.
+    assertEquals(2, session(spec).path("summary").path("per_runtime").path("java").size());
+  }
+
+  @Test
   void fixedContinuationJob() throws IOException {
     ModeRun run = runSingleMode(setup(), "fixed-continuation");
     JsonNode jobFile = run.jobFile();

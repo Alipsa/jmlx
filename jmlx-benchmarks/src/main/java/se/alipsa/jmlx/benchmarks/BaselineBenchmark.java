@@ -850,10 +850,13 @@ public final class BaselineBenchmark {
       ObjectNode firstRequest, Map<String, Map<String, List<Double>>> firsts) {
     for (Map.Entry<String, Map<String, List<Double>>> entry : firsts.entrySet()) {
       int separator = entry.getKey().indexOf('|');
-      ObjectNode metrics =
-          firstRequest
-              .putObject(entry.getKey().substring(0, separator))
-              .putObject(entry.getKey().substring(separator + 1));
+      String runtime = entry.getKey().substring(0, separator);
+      // putObject replaces an existing property, so the runtime block is created once and
+      // reused: every cell of that runtime must survive, not just the last one.
+      JsonNode existing = firstRequest.get(runtime);
+      ObjectNode runtimeBlock =
+          existing instanceof ObjectNode block ? block : firstRequest.putObject(runtime);
+      ObjectNode metrics = runtimeBlock.putObject(entry.getKey().substring(separator + 1));
       for (Map.Entry<String, List<Double>> metric : entry.getValue().entrySet()) {
         metrics.set(metric.getKey(), quantileNode(BaselineStatistics.quantiles(metric.getValue())));
       }

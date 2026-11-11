@@ -2448,15 +2448,17 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
   `summary.per_runtime` is unaffected. Every first-request figure in this
   section is recomputed from the raw worker records, never from that block.
 - Raw-data digests: `req/plans/phase8-2-wp3-raw-digests.json` (schema v2,
-  452 files, paths relative to `~/wp3-scratch`) records the SHA-256 of
+  458 files, paths relative to `~/wp3-scratch`) records the SHA-256 of
   every session.json (33), report.json (344) and spec.json (33) under
   `sessions/`, the 33 per-session `hostrec.log` operator records (each
   byte-identical to the hostrec tool's own `hostrec/<session>/host.log`
   copy, verified 2026-11-11), `hostrec/a3-block/rsswatch.log`, the four
-  `codex-{b3,diag}-thermal-{before,after}.txt` records and the
-  pilot/qualification/diagnostic `hostrec/<block>/host.log` files — tying
-  this section, including its host-side claims, to the exact raw tree;
-  every session.json code block is cc0c603 / dirty: false.
+  `codex-{b3,diag}-thermal-{before,after}.txt` records, the
+  pilot/qualification/diagnostic `hostrec/<block>/host.log` and
+  `launcher.log` files, and the rejected first launch of session A
+  (`hostrec/session-a-controlled/host.log` and `launcher.log`, section
+  16.4) — tying this section, including its host-side claims, to the exact
+  raw tree; every session.json code block is cc0c603 / dirty: false.
 
 ### 16.2 Budget refresh (controlled-adapter pilot, planning evidence)
 
@@ -2533,7 +2535,12 @@ so the execution unit was one launcher session per pair: six spec-order
 sessions of 18 workers, pair leaders alternating by pair index (java-led
 pairs 0/2/4, python-led 1/3/5 — 3/3 parity per cell). Block wall
 20:44:52-22:13:39 UTC (1h29m), all 108 workers ok, 0 exclusions, every record
-clean cc0c603 / dirty: false.
+clean cc0c603 / dirty: false. Before pair0, a first launch of session A was
+rejected (20:36:50-20:36:51, hostrec/session-a-controlled): a single
+108-worker spec — one session for all six pairs — failed with "duplicate
+cell" spec errors, the consequence of the pair-index-free cell identity
+above; BUILD FAILED in 526 ms, no worker ran. It has no measurement impact
+and does not count against plan section 4.1's restart rule.
 
 Per-cell greedy-ID agreement (headline greedy, 128 tokens, 20 measured requests
 x 6 workers per runtime, paired by pair and request index): 120/120 identical
@@ -2592,7 +2599,7 @@ adjacent-fork-median rule (an investigation trigger, not a discard):
   began. The 4bit/2048 worker's (21:24:23-21:38:21) first request and
   warmups ran inside the trough: memfree 28-50% sustained 21:24:54-21:33:55
   (the 21:28:54 sample read 50%), recovering from 21:34:55; load <=2.4. But
-  its 20 measured requests (placement window 21:34:29-21:34:50 to
+  its 20 measured requests (placement window 21:34:40-21:34:42 to
   21:38:21, section 16.4b) ran at 81-82% memfree — every hostrec sample
   covering the measured phase read 81-82% — uniformly 9.923-10.768 s
   (median 10.60, 3.4x the adjacent pair's 3.08 s), so that measured
@@ -2668,8 +2675,8 @@ recovered from 05:41:57 (63%) — the same ~40-60 GiB consumer signature as
 W1/W2, ~15 min after this morning's boot; load normal (<=2.9); no thermal
 warnings. The 4bit/2048-ja worker's (05:30:01-05:43:08) first request and
 warmups ran inside the trough (hence the 310 s warmup requests); its
-measured requests began at the 05:41:57 recovery (estimated from
-05:41:38-05:41:55, section 16.4b), at 63-68% memfree. The 4bit/512 workers
+measured requests began 7-9 s before the 05:41:57 recovery (estimated from
+05:41:48-05:41:50, section 16.4b), at 63-68% memfree. The 4bit/512 workers
 (both runtimes, 43-67% memfree) ran before the trough began.
 
 Outcome per the plan section 4 rule:
@@ -2756,29 +2763,29 @@ In all five recovered cases the recovery begins 0.7-3.4 min before the
 worker's own end (39 s for A pair0, 47 s for B pair0, 71 s for A2 pair6,
 86 s for B2 pair6, 3.4 min for A pair2; A3 pair9's trough never recovered
 in-window — the worker timed out). Placing each worker's requests on the
-clock from its report (summing request durations forward from utc_start and
-backward from utc_end; model load is ~0.05 s, so the unattributed
-inter-request gaps — 14.7-21.2 s per worker — bound the placement
-uncertainty) shows each trough (crash sample to recovery sample) lasts
-within about 40 s of that worker's first-request plus warmup phase, and
-the recovery sample falls within 45 s of the
-estimated end of that slow phase: the measured phases of A pair0, A2
-pair6, B pair0 and B2 pair6 began 2-44 s before, or 2-16 s after, the
-recovery sample, and the hostrec samples covering them (60 s cadence) read
-56-82%; the 60 s cadence and the placement window leave at most the first
-39-44 s of A pair0's and B pair0's measured phases possibly still in the
-trough's final transition. The same placement shows A pair2's 20 measured
-requests (10.6 s each, 3.4x clean) began at its recovery (placement window
-21:34:29-21:34:50, recovery sample 21:34:55), and every hostrec sample
+clock from its report (summing full_generation_s plus the recorded prime_s
+— the primed-per-request mode excludes prime time from full_generation_s —
+forward from utc_start and backward from utc_end) leaves only 2.0-2.4 s
+unaccounted per worker (model load ~0.05 s), so the forward and backward
+placements agree to within ~2 s. The recovery sample falls 9-36 s after the
+estimated end of that worker's first-request plus warmup phase (B2 pair6's
+trough ended 9 s before its estimated end), and the measured phases of A
+pair0, A2 pair6 and B pair0 began 7-36 s before their recovery sample (B2
+pair6's began 9-12 s after it), with the hostrec samples (60 s cadence)
+covering the measured phases reading 56-82%; the 60 s cadence leaves at
+most the first 28-37 s of A pair0's and B pair0's measured phases possibly
+still in the trough's final transition. The same placement shows A pair2's
+20 measured requests (10.6 s each, 3.4x clean) began 12-15 s before its
+recovery sample (21:34:40-21:34:42 vs 21:34:55), and every hostrec sample
 covering their run read 81-82% (section 16.4). A python
 4bit/2048 worker cannot overlap a trough in the first place (the workers
 run one at a time and every trough sits inside a java 4bit/2048 window),
 and its ~60 s window admits at most one hostrec sample, so the useful
 evidence is the python-led pairs, where the python 4bit/2048 worker ran
-first at normal memfree: A3 pair9's python/2048 ran 06:31:35-06:32:33 at
-59-70% memfree, 28 s before the 06:33:01 strike, clean at 1.915 s (A2
-pair7's ran 05:49:04-05:50:09, its in-window sample 88%, clean at 2.235
-s). The 4bit/512 slowdowns form a different pattern: W2's java worker ran
+first at normal memfree: A3 pair9's python/2048 ran 06:31:35-06:32:33 (its
+in-window sample 70%), 28 s before the 06:33:01 strike, clean at 1.915 s
+(A2 pair7's ran 05:49:04-05:50:09, its in-window sample 88%, clean at
+2.235 s). The 4bit/512 slowdowns form a different pattern: W2's java worker ran
 at 54-55% memfree (77% at 21:20:54, before it started), A2 pair6's workers
 (both runtimes) at 43-67%, and A3 pair9's python worker at 55-60% — all
 before their troughs began. The data thus suggests two mechanisms rather
@@ -2980,14 +2987,19 @@ Outcomes per the recorded rules:
   session-B high cluster stays in the quantile ranges, both runtimes). The
   cell's matched-generation ratio is nonetheless rejected under the greedy
   divergence of section 16.5.
-- qwen3-8b-4bit/2048 (stock, io_affected): no >10% trigger and 10 complete
-  pairs (>= the 6-pair minimum); the two strike-excluded java pair members
-  (B pair0, B2 pair6, same worker, same signature) are retained incomplete
-  with their host observations. Two open points keep the cell pending owner
-  review (section 16.7):
+- qwen3-8b-4bit/2048 (stock, io_affected): the >10% trigger fires on
+  pair6 -> 7 counting the excluded member's validated measured median
+  (-12.5%, above), so a third alternating session is required before
+  attribution whatever the owner decides about the memory warnings — the
+  section 4.1 cap allows one and it was not run, so the cell is blocked
+  (section 16.7). Timing is reported over the 10 complete pairs (>= the
+  6-pair minimum); the two strike-excluded java pair members (B pair0, B2
+  pair6, same worker, same signature) are retained incomplete with their
+  host observations. Two open points remain for owner review (section
+  16.7):
   - Memory warnings: if the strikes count as memory warnings, B and B2 both
-    carry one for this cell, so a third session was required before
-    attribution and was not run.
+    carry one for this cell — an independent further-session trigger that
+    changes nothing about the blocked status.
   - Exclusion bias: both excluded members were the slow ones (measured
     medians 3.504 / 3.475 s against 3.04-3.16 s, pair ratios 1.743 / 1.813).
     They were excluded by the first-request event check only; their 20
@@ -3199,7 +3211,7 @@ amendment or plan revision) before WP3's gate can pass on them.
 | controlled | 4bit/512 | `unstable` (A + A2 + A3) |
 | controlled | 4bit/2048 io_affected | `incomplete` by default (one timed-out worker; plan section 4.1: a timeout "is incomplete, not unstable success"); the recorded run rule of section 16.4b closes it as `unstable` — pending the owner's dated scope amendment (item 4 below) |
 | stock | tinymistral x3 | `stable` (greedy-identical) |
-| stock | 4bit/2048 io_affected | the >10% trigger fires counting the excluded members' validated medians (sections 16.5/16.5a) whatever the memory-warning decision; timing reported over the 10 complete pairs; pending owner review (item 5 below) |
+| stock | 4bit/2048 io_affected | the >10% trigger fires counting the excluded members' validated medians (sections 16.5/16.5a) whatever the memory-warning decision; timing reported over the 10 complete pairs; blocked (unrun third session — pending owner decision, item 5 below) |
 | stock | 0.6b x3, 4bit/32, 4bit/512 | greedy-divergent: matched-generation ratio rejected pending review (plan section 3.3, section 16.5); timing recorded as stock-loop observations |
 
 One cell remains blocked by an unrun session: stock 4bit/2048. The >10%
@@ -3483,25 +3495,29 @@ round amends section 16 in place:
   measured-request block and the first-request block. No behavior change.
 - Trough alignment (section 16.4b): in all five recovered cases the
   recovery begins 39-206 s (0.7-3.4 min) before the worker's own end, not
-  "within about 4 min of the worker ending"; it falls within 45 s of the
-  estimated end of that worker's first-request plus warmup phase, and each
-  trough (crash sample to recovery sample) lasts within about 40 s of that
-  slow phase. The placement is an estimate:
-  model load is ~0.05 s, so the unattributed inter-request gaps (14.7-21.2
-  s per worker) bound the placement uncertainty.
+  "within about 4 min of the worker ending"; it falls 9-36 s after the
+  estimated end of that worker's first-request plus warmup phase (B2
+  pair6's trough ended 9 s before its estimated end). Review round 4
+  (section 16.11) tightens the placement: the 14.7-21.2 s apparent
+  inter-request gaps are mostly the recorded prime time, which the
+  primed-per-request mode excludes from full_generation_s; including
+  prime_s leaves only 2.0-2.4 s unaccounted per worker.
 - W2 (sections 16.4/16.4b): the W2 bullet had said the worker "ran
   inside" the trough; only its first request and warmups did. Its 20
-  measured requests (9.923-10.768 s each, 3.4x the clean 3.08 s) all ran
-  after the 21:34:55 recovery at 81-82% free, so that slowdown is not
+  measured requests (9.923-10.768 s each, 3.4x the clean 3.08 s) ran at
+  81-82% free — every hostrec sample covering the measured phase read
+  81-82% (the measured phase began 12-15 s before the 21:34:55 recovery
+  sample; placement tightened in section 16.11), so that slowdown is not
   explained by the trough or by page-cache churn — whatever slowed them
   outlasted the memory pressure (an unverified guess).
 - The python-overlap statement carried little weight: the workers run one
   at a time and every trough sits inside a java 4bit/2048 window, so a
   python worker could not overlap a trough, and a ~60 s python window
   admits at most one hostrec sample. It is replaced by the python-led-pair
-  evidence: A3 pair9's python/2048 ran 06:31:35-06:32:33 at 59-70% memfree,
-  28 s before the strike, clean at 1.915 s (A2 pair7's at 88%, clean at
-  2.235 s).
+  evidence: A3 pair9's python/2048 ran 06:31:35-06:32:33 (its in-window
+  sample 70% — the 59% sample at 06:31:01 predates the worker; corrected
+  in section 16.11), 28 s before the strike, clean at 1.915 s (A2 pair7's
+  in-window sample 88%, clean at 2.235 s).
 - Section 16.7: "No cell remains blocked by an unrun session" was false
   since round 2 — the stock 4bit/2048 trigger fires in B2, the cell's
   second session, plan section 4 requires one further alternating session,
@@ -3520,4 +3536,41 @@ round amends section 16 in place:
   (each byte-identical to hostrec/<session>/host.log),
   hostrec/a3-block/rsswatch.log, the four codex-*-thermal-*.txt records
   and the pilot/qualification/diagnostic hostrec/<block>/host.log files —
-  so the host-side claims tie to fixed data too.
+  so the host-side claims tie to fixed data too. (Review round 4, section
+  16.11, adds the block launcher.log files and the rejected
+  session-a-controlled directory, bringing the total to 458.)
+
+### 16.11 Review round 4 (2026-11-11, PR #91)
+
+This round amends section 16 in place:
+
+- Section 16.5a outcome: the stock 4bit/2048 bullet no longer says "no
+  >10% trigger" — the trigger fires on pair6 -> 7 counting the excluded
+  member's validated measured median (-12.5%), so a third alternating
+  session is required before attribution whatever the memory-warning
+  decision, it was not run, and the cell is blocked; the section 16.7
+  status row is labeled "blocked (unrun third session)".
+- Placement precision (sections 16.4/16.4a/16.4b/16.10): the "unattributed
+  inter-request gaps" (14.7-21.2 s per worker) are mostly the recorded
+  prime_s — the primed-per-request mode excludes prime time from
+  full_generation_s, so placing requests on full_generation_s + prime_s
+  leaves only 2.0-2.4 s unaccounted per worker, and the forward and
+  backward placements agree to within ~2 s. Quoted windows tightened: W2
+  21:34:40-21:34:42 (was 21:34:29-21:34:50), A2 pair6 05:41:48-05:41:50
+  (was 05:41:38-05:41:55), the trough-tail hedge is now "at most the first
+  28-37 s of A pair0's and B pair0's measured phases". The conclusions are
+  unchanged: with prime time included, A pair0's measured phase starts
+  34-36 s before its recovery sample and B2 pair6's 9-12 s after it.
+- A3 pair9's python 4bit/2048 worker (06:31:35-06:32:33): the only hostrec
+  sample inside its window is 06:32:01 (70%); the 59% sample (06:31:01)
+  predates the worker, so "at 59-70% memfree" is restated as "its
+  in-window sample 70%" (sections 16.4b/16.10).
+- Rejected first launch of session A recorded (section 16.4): at
+  20:36:50-20:36:51 a single 108-worker spec — one session for all six
+  pairs — was rejected with "duplicate cell" spec errors (the cell
+  identity carries no pair index), BUILD FAILED in 526 ms, no worker ran
+  (hostrec/session-a-controlled). No measurement impact; it does not
+  count against plan section 4.1's restart rule.
+- Raw-data digests (section 16.1): the manifest gains the
+  hostrec/session-a-controlled host.log and launcher.log and the
+  pilot/qualification/diagnostic launcher.log files — 458 files.

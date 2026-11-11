@@ -55,6 +55,17 @@ tasks.register('benchmarkBaseline', JavaExec) {
     dependsOn project(':jmlx-core').tasks.named('bindingAgent')
 }
 
+tasks.register('benchmarkVlmFirstUse', JavaExec) {
+    group = 'benchmark'
+    description = 'Runs the phase 8.2 WP4 both-pin, both-VLM first-inference launcher ' +
+            '(pass --args <spec.json>; each worker forks from its own tree installDist and staged native lib).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'se.alipsa.jmlx.benchmarks.VlmFirstUseBenchmark'
+    workingDir rootProject.projectDir
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    dependsOn tasks.named('installDist')
+}
+
 tasks.register('benchmarkFfmCalibration', JavaExec) {
     group = 'benchmark'
     description = 'Builds the no-op FFM calibration dylib under the output directory (cc -shared ' +

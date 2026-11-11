@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import se.alipsa.jmlx.core.MLXMemory;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.models.CancellationToken;
@@ -39,13 +40,15 @@ import tools.jackson.databind.node.ObjectNode;
  * VlmFirstUseBenchmark} from exactly one tree (the current checkout or the isolated old-pin
  * compatibility worktree), one workload case per process.
  *
- * <p>Sequence: handshake claim, staged-native-pin and environment verification, request
- * construction from the digest-verified Tier-B manifest (same image/prompt/config bytes and
- * generation policy on both pins), model load, the first image+text generation (the first-use
- * measurement, captured before any warmup or probe), correctness verification of the first
- * request's greedy output against the manifest's recorded reference, then the declared discarded
- * warmups and measured warm repetitions of the same request. All intervals use the monotonic clock;
- * UTC stamps bracket the run for host-record correlation.
+ * <p>Sequence: environment, staged-pin, image and manifest verification (all before any
+ * measurement), handshake claim and the internal backstop, request construction from the
+ * digest-verified Tier-B manifest (same image/prompt/config bytes and generation policy on both
+ * pins), model load, the first image+text generation (the first-use measurement, captured before
+ * any warmup or probe), the declared discarded warmups and measured warm repetitions of the same
+ * request, then the post-capture verdict (first request against the manifest's recorded reference,
+ * plus warm/measured ID determinism). A warm or measured divergence records the divergent IDs and
+ * stops the remaining iterations; the first-request capture is always retained in the report. All
+ * intervals use the monotonic clock; UTC stamps bracket the run for host-record correlation.
  *
  * <p>The source file is byte-identical between the two trees (it references only the stable public
  * API shared by both); the measured-code record is the tree SHA plus this file's digest, not the
@@ -55,8 +58,15 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Opt-in local tooling, not part of {@code check} or the publication surface.
  */
 public final class VlmFirstUseWorker {
-  /** Report/claim protocol schema. */
-  public static final String REPORT_SCHEMA = "jmlx-vlm-first-use-1";
+  /**
+   * Report/claim protocol schema. Version 2 (vs the v1 recorded in findings section 17.3): the
+   * workload inputs object is named {@code workload_inputs} (v1's second {@code put} with the same
+   * name overwrote the workload name), {@code token_event_times_s} carries every first-request
+   * token event (v1 stopped at the first), {@code measured_ids_match} records real per-iteration
+   * results, {@code divergences} retains divergent warm/measured outputs, and the memory peaks are
+   * phase-local ({@code MLXMemory.resetPeak()} after the after_load and after_first samples).
+   */
+  public static final String REPORT_SCHEMA = "jmlx-vlm-first-use-2";
 
   public static final String JOB_SCHEMA = "jmlx-vlm-first-use-job-1";
 
@@ -70,6 +80,45 @@ public final class VlmFirstUseWorker {
   private static final long BACKSTOP_GRACE_S = 30L;
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /** The post-capture verdict (status, exit code, and the failure reason when not ok). */
+  public record Verdict(String status, int exitCode, String failureReason) {}
+
+  /** One warm or measured repetition whose IDs diverged from the first request (retained). */
+  public record WarmDivergence(String label, List<Integer> generatedIds) {}
+
+  /**
+   * The post-capture correctness decision, kept static and side-effect free so the worker-failure
+   * paths are testable without a native runtime: the first request must match the manifest's
+   * recorded reference on all three fields, and no warm/measured repetition may have diverged
+   * (greedy selection must be deterministic). Any violation is a correctness failure (exit 3),
+   * never a runtime failure, and the first-request capture is retained by the caller.
+   */
+  public static Verdict postCaptureVerdict(
+      boolean idsMatch,
+      boolean finishMatch,
+      boolean positionsMatch,
+      List<WarmDivergence> divergences) {
+    List<String> problems = new ArrayList<>();
+    if (!idsMatch) {
+      problems.add("first-request IDs differ from the manifest's target_ids");
+    }
+    if (!finishMatch) {
+      problems.add("first-request finish reason differs from the manifest's finish_reason");
+    }
+    if (!positionsMatch) {
+      problems.add("first-request prompt positions differ from the manifest's expanded_ids size");
+    }
+    for (WarmDivergence divergence : divergences) {
+      problems.add(
+          divergence.label()
+              + " generated IDs diverged from the first request (greedy must be deterministic)");
+    }
+    if (problems.isEmpty()) {
+      return new Verdict("ok", EXIT_OK, null);
+    }
+    return new Verdict("correctness_failed", EXIT_CORRECTNESS_FAILED, String.join("; ", problems));
+  }
 
   private VlmFirstUseWorker() {}
 
@@ -127,6 +176,10 @@ public final class VlmFirstUseWorker {
       Path outDir) {
 
     static Job parse(JsonNode root) {
+      if (!JOB_SCHEMA.equals(root.path("schema").asString())) {
+        throw new IllegalArgumentException(
+            "job schema must be " + JOB_SCHEMA + ", got " + root.path("schema").asString());
+      }
       int pairIndex = root.required("pair_index").asInt();
       int maxNewTokens = root.required("max_new_tokens").asInt();
       if (pairIndex < 0 || maxNewTokens <= 0) {
@@ -191,7 +244,10 @@ public final class VlmFirstUseWorker {
     private final ScheduledExecutorService backstop = Executors.newSingleThreadScheduledExecutor();
     private final List<Double> tokenEventTimesS = new ArrayList<>();
     private long firstTokenTimeNanos;
-    private volatile boolean backstopFired;
+    // Write-once report guard: the backstop timer and the main thread both reach finish(), and
+    // only the first writer may write report.json (the backstop would otherwise race a late
+    // main-thread report and either overwrite it or be overwritten).
+    private final AtomicBoolean reportWritten = new AtomicBoolean();
     private Map<String, String> stagedPin;
     private ManifestCase reference;
 
@@ -247,13 +303,17 @@ public final class VlmFirstUseWorker {
       Files.write(claim, claimNode.toString().getBytes(StandardCharsets.UTF_8));
       backstop.schedule(
           () -> {
-            backstopFired = true;
             System.err.println("vlm-first-use worker backstop fired");
-            finish(
-                "timeout",
-                "internal backstop elapsed " + (job.workerTimeoutS + BACKSTOP_GRACE_S) + " s",
-                EXIT_TIMEOUT);
-            System.exit(EXIT_TIMEOUT);
+            // Only exit here if the backstop itself wrote the report: if the main thread
+            // finished first, its report stands and this timer simply lapses.
+            boolean wrote =
+                finish(
+                    "timeout",
+                    "internal backstop elapsed " + (job.workerTimeoutS + BACKSTOP_GRACE_S) + " s",
+                    EXIT_TIMEOUT);
+            if (wrote) {
+              System.exit(EXIT_TIMEOUT);
+            }
           },
           job.workerTimeoutS + BACKSTOP_GRACE_S,
           TimeUnit.SECONDS);
@@ -270,13 +330,16 @@ public final class VlmFirstUseWorker {
       List<Double> measuredTtft = new ArrayList<>();
       List<Double> measuredFull = new ArrayList<>();
       List<Boolean> measuredIdsMatch = new ArrayList<>();
+      List<WarmDivergence> divergences = new ArrayList<>();
       long loadNanos;
       Map<String, Map<String, Long>> memory = new LinkedHashMap<>();
       try (MLXScope root = new MLXScope()) {
         long loadStart = System.nanoTime();
         TextGenerationModel model = TextGenerationModels.load(root, job.modelDir);
         loadNanos = System.nanoTime() - loadStart;
-        memory.put("after_load", memorySample());
+        // Phase-local peaks (plan section 7 "peaks reset at stated phases"): the after_first
+        // peak covers the first request only, the after_final peak the warm/measured phases.
+        memory.put("after_load", memorySampleAndResetPeak());
 
         generate(
             model,
@@ -293,26 +356,37 @@ public final class VlmFirstUseWorker {
         if (!first.captured) {
           throw new IllegalStateException("first generation emitted no completion");
         }
-        memory.put("after_first", memorySample());
+        memory.put("after_first", memorySampleAndResetPeak());
 
+        // Warm and measured repetitions must reproduce the first request's IDs exactly (greedy
+        // determinism). A divergence is a correctness event, not a runtime failure: it records
+        // the divergent IDs (retained, plan section 7 "divergence retained") and stops the
+        // remaining iterations, so no later measured values of a nondeterministic process enter
+        // any statistic.
         List<Integer> expected = first.ids;
-        for (int i = 0; i < job.warmups; i++) {
+        for (int i = 0; i < job.warmups && divergences.isEmpty(); i++) {
           final int warmupIndex = i;
           generate(
               model,
               request,
               false,
-              (ids, finish, ttft, full, positions) ->
-                  verifyWarmIds(ids, expected, "warmup " + warmupIndex));
+              (ids, finish, ttft, full, positions) -> {
+                if (!ids.equals(expected)) {
+                  divergences.add(new WarmDivergence("warmup " + warmupIndex, ids));
+                }
+              });
         }
-        for (int i = 0; i < job.measured; i++) {
+        for (int i = 0; i < job.measured && divergences.isEmpty(); i++) {
           final int measuredIndex = i;
           generate(
               model,
               request,
               false,
               (ids, finish, ttft, full, positions) -> {
-                verifyWarmIds(ids, expected, "measured " + measuredIndex);
+                if (!ids.equals(expected)) {
+                  divergences.add(new WarmDivergence("measured " + measuredIndex, ids));
+                  return;
+                }
                 measuredTtft.add(seconds(ttft));
                 measuredFull.add(seconds(full));
                 measuredIdsMatch.add(true);
@@ -322,48 +396,42 @@ public final class VlmFirstUseWorker {
       }
 
       // Correctness after capture: the first request's greedy output must equal the
-      // manifest's recorded reference.
+      // manifest's recorded reference, and no warm/measured repetition may have diverged.
+      // The verdict carries the exit code, so a correctness failure can never fall through
+      // to an "ok" report (write-once guard: if the backstop already wrote the timeout
+      // report, this finish is a no-op and the timeout code wins).
       boolean idsMatch = first.ids.equals(reference.targetIds);
       boolean finishMatch = reference.finishReason.equals(first.finish);
       boolean positionsMatch = reference.expandedIdsSize == first.positions;
-      if (backstopFired) {
-        return EXIT_TIMEOUT;
-      }
-      if (!(idsMatch && finishMatch && positionsMatch)) {
-        finish(
-            "correctness_failed",
-            "first-request correctness mismatch: ids_match="
-                + idsMatch
-                + " finish_match="
-                + finishMatch
-                + " positions_match="
-                + positionsMatch,
-            EXIT_CORRECTNESS_FAILED);
-      }
-      finish(
-          "ok",
-          null,
-          EXIT_OK,
-          new ReportData(
-              stagedPin,
-              loadNanos,
-              first.ttftNanos,
-              first.fullNanos,
-              first.ids,
-              first.finish,
-              first.positions,
-              idsMatch,
-              finishMatch,
-              positionsMatch,
-              measuredTtft,
-              measuredFull,
-              measuredIdsMatch,
-              memory));
-      return EXIT_OK;
+      Verdict verdict = postCaptureVerdict(idsMatch, finishMatch, positionsMatch, divergences);
+      boolean wrote =
+          finish(
+              verdict.status(),
+              verdict.failureReason(),
+              verdict.exitCode(),
+              new ReportData(
+                  stagedPin,
+                  loadNanos,
+                  first.ttftNanos,
+                  first.fullNanos,
+                  first.ids,
+                  first.finish,
+                  first.positions,
+                  idsMatch,
+                  finishMatch,
+                  positionsMatch,
+                  divergences,
+                  measuredTtft,
+                  measuredFull,
+                  measuredIdsMatch,
+                  memory));
+      return wrote ? verdict.exitCode() : EXIT_TIMEOUT;
     }
 
-    /** Runs one generation and returns the TTFT/full-generation intervals in nanos. */
-    private long[] generate(
+    /**
+     * Runs one generation and hands the TTFT/full-generation intervals (nanos) to {@code onDone}.
+     */
+    private void generate(
         TextGenerationModel model, GenerationRequest request, boolean recordEvents, OnDone onDone) {
       firstTokenTimeNanos = -1;
       long entry = System.nanoTime();
@@ -371,13 +439,15 @@ public final class VlmFirstUseWorker {
           model.generate(
               request,
               event -> {
-                if (event.tokenId() == null || firstTokenTimeNanos >= 0) {
+                if (event.tokenId() == null) {
                   return;
                 }
                 long now = System.nanoTime();
-                firstTokenTimeNanos = now;
-                // Only the first request records the full token event list; every generation
-                // (warmups included) still stamps the first-token time, which is the TTFT.
+                // Every generation (warmups included) stamps the first-token time, which is the
+                // TTFT; only the first request records the full token-event list (every event).
+                if (firstTokenTimeNanos < 0) {
+                  firstTokenTimeNanos = now;
+                }
                 if (recordEvents) {
                   tokenEventTimesS.add(seconds(now - entry));
                 }
@@ -390,15 +460,6 @@ public final class VlmFirstUseWorker {
           ttft,
           terminal - entry,
           result.promptPositions());
-      return new long[] {ttft, terminal - entry};
-    }
-
-    private void verifyWarmIds(List<Integer> ids, List<Integer> expected, String label) {
-      if (!ids.equals(expected)) {
-        throw new IllegalStateException(
-            label
-                + " generated IDs diverged from the first request (greedy must be deterministic)");
-      }
     }
 
     private GenerationRequest buildRequest(HfTokenizer tokenizer, List<RgbImage> images) {
@@ -448,11 +509,19 @@ public final class VlmFirstUseWorker {
             Map<String, Object> partMap = new HashMap<>();
             for (Map.Entry<String, JsonNode> field : part.properties()) {
               JsonNode value = field.getValue();
-              partMap.put(
-                  field.getKey(),
-                  value.isIntegralNumber()
-                      ? value.asLong()
-                      : value.isTextual() ? value.asString() : value);
+              // The chat template accepts only String and numeric parts; anything else (an
+              // object, array, float or boolean) is a manifest error, not a pass-through.
+              if (value.isTextual()) {
+                partMap.put(field.getKey(), value.asString());
+              } else if (value.isIntegralNumber()) {
+                partMap.put(field.getKey(), value.asLong());
+              } else {
+                throw new IllegalStateException(
+                    "manifest content part field '"
+                        + field.getKey()
+                        + "' must be a string or integer, got: "
+                        + value);
+              }
             }
             parts.add(partMap);
           }
@@ -486,7 +555,12 @@ public final class VlmFirstUseWorker {
         int expandedIdsSize,
         String finishReason) {}
 
-    /** The staged runtime's pin identity read from the worker's own library path. */
+    /**
+     * The staged runtime's pin identity, re-read from the native-pin.properties at the worker's own
+     * {@code jmlx.library.path}. This verifies the staged pin at the path the loader resolves
+     * first; it does not verify which dylib the process actually loaded (no runtime load check is
+     * made).
+     */
     private Map<String, String> readStagedPinProperties() throws IOException {
       String libraryPath = System.getProperty("jmlx.library.path");
       if (libraryPath == null) {
@@ -515,6 +589,16 @@ public final class VlmFirstUseWorker {
       sample.put("active_bytes", MLXMemory.activeBytes());
       sample.put("peak_bytes", MLXMemory.peakBytes());
       sample.put("cached_bytes", MLXMemory.cachedBytes());
+      return sample;
+    }
+
+    /**
+     * Samples the memory counters and then resets the peak, so the next phase's peak covers that
+     * phase only (plan section 7 "peaks reset at stated phases").
+     */
+    private Map<String, Long> memorySampleAndResetPeak() {
+      Map<String, Long> sample = memorySample();
+      MLXMemory.resetPeak();
       return sample;
     }
 
@@ -566,13 +650,21 @@ public final class VlmFirstUseWorker {
         boolean idsMatch,
         boolean finishMatch,
         boolean positionsMatch,
+        List<WarmDivergence> divergences,
         List<Double> measuredTtft,
         List<Double> measuredFull,
         List<Boolean> measuredIdsMatch,
         Map<String, Map<String, Long>> memory) {}
 
-    private void finish(
+    /**
+     * Writes the report (once: the first caller wins, later callers are no-ops) and returns whether
+     * this call wrote it.
+     */
+    private boolean finish(
         String status, String failureReason, int code, ReportData data, long wallNanos) {
+      if (!reportWritten.compareAndSet(false, true)) {
+        return false;
+      }
       ObjectNode report = MAPPER.createObjectNode();
       report.put("schema", REPORT_SCHEMA);
       report.put("status", status);
@@ -596,7 +688,11 @@ public final class VlmFirstUseWorker {
         for (Map.Entry<String, String> entry : data.pin().entrySet()) {
           pin.put(entry.getKey(), entry.getValue());
         }
-        ObjectNode workload = report.putObject("workload");
+        pin.put(
+            "note",
+            "staged pin file re-read from the worker's own jmlx.library.path (the property the "
+                + "loader resolves first); not verified as the dylib the process actually loaded");
+        ObjectNode workload = report.putObject("workload_inputs");
         workload.put("model_dir", job.modelDir.toString());
         workload.put("manifest_path", job.manifestPath.toString());
         workload.put("manifest_sha256", job.manifestSha256);
@@ -643,7 +739,9 @@ public final class VlmFirstUseWorker {
         }
         memory.put(
             "note",
-            "process-wide MLX counters sampled after each phase's eval; Metal "
+            "process-wide MLX counters sampled after each phase's eval; peak_bytes is "
+                + "phase-local (MLXMemory.resetPeak() after the after_load and after_first "
+                + "samples), so after_first and after_final peaks exclude earlier phases; Metal "
                 + "completion-handler frees can lag the eval return, so post-eval values may be "
                 + "momentarily high");
         // The warm (post-warmup) measurements of the same request, one entry per measured
@@ -656,9 +754,20 @@ public final class VlmFirstUseWorker {
         for (double t : data.measuredFull()) {
           full.add(t);
         }
+        // One entry per completed measured repetition; a shorter array than the declared
+        // measured count means the loop stopped early (see divergences).
         ArrayNode matches = report.putArray("measured_ids_match");
         for (boolean m : data.measuredIdsMatch()) {
           matches.add(m);
+        }
+        ArrayNode diverged = report.putArray("divergences");
+        for (WarmDivergence divergence : data.divergences()) {
+          ObjectNode node = diverged.addObject();
+          node.put("label", divergence.label());
+          ArrayNode divergedIds = node.putArray("generated_ids");
+          for (int id : divergence.generatedIds()) {
+            divergedIds.add(id);
+          }
         }
       }
       try {
@@ -668,14 +777,15 @@ public final class VlmFirstUseWorker {
       } catch (IOException e) {
         System.err.println("vlm-first-use worker could not write the report: " + e);
       }
+      return true;
     }
 
-    private void finish(String status, String failureReason, int code) {
-      finish(status, failureReason, code, null, System.nanoTime() - baseNanos);
+    private boolean finish(String status, String failureReason, int code) {
+      return finish(status, failureReason, code, null, System.nanoTime() - baseNanos);
     }
 
-    private void finish(String status, String failureReason, int code, ReportData data) {
-      finish(status, failureReason, code, data, System.nanoTime() - baseNanos);
+    private boolean finish(String status, String failureReason, int code, ReportData data) {
+      return finish(status, failureReason, code, data, System.nanoTime() - baseNanos);
     }
   }
 }

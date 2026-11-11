@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +33,13 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Before any fork, the launcher verifies each tree's HEAD against the spec's expected SHA, its
  * tracked-clean state (untracked files are recorded, not rejected), the staged {@code mlx.metallib}
- * and pin properties (read from disk, never trusted from the spec), and the byte-identical worker
- * source in both trees (its digest is the measured-code identity together with the tree SHA). Each
- * workload's Tier-B manifest is digest-verified and its frozen case 0 parsed (max new tokens and
- * the resolved image paths/digests); the session directory must not pre-exist and must sit outside
- * the repository. Every fork is bracketed by {@code hostrec.sh} pre/post records, and full-output
- * thermal records bracket the session.
+ * and pin properties (read from disk, never trusted from the spec), the byte-identical worker
+ * source in both trees (its digest is the measured-code identity together with the tree SHA), and
+ * digests every jar in each tree's class dir (the executed jars, recorded in the session report).
+ * Each workload's Tier-B manifest is digest-verified and its frozen case 0 parsed (max new tokens
+ * and the resolved image paths/digests); the session directory must not pre-exist and must sit
+ * outside the repository. Every fork is bracketed by {@code hostrec.sh} pre/post records, and
+ * full-output thermal records bracket the session.
  *
  * <p>The session stops forking once {@code session_time_budget_s} has elapsed (the remaining
  * workers are recorded not-started, never silently dropped); the budget gates new forks, not
@@ -70,6 +72,11 @@ public final class VlmFirstUseBenchmark {
 
   /** The deadline the launcher gives a killed worker to die before it gives up waiting for it. */
   private static final long KILL_SETTLE_S = 10L;
+
+  /**
+   * The deadline for one hostrec.sh append; a hung script is killed and recorded, not waited on.
+   */
+  private static final long HOSTREC_TIMEOUT_S = 30L;
 
   /** The exclusion reason for a worker the launcher never reached (starter failure). */
   private static final String REASON_LAUNCHER = "launcher failed to start the worker";
@@ -197,11 +204,11 @@ public final class VlmFirstUseBenchmark {
       if (session.isBlank()) {
         throw new IllegalArgumentException("session is required");
       }
-      Path outRoot = Path.of(root.required("out_root").asString()).toAbsolutePath();
-      Path repoRoot = Path.of(root.required("repo_root").asString()).toAbsolutePath();
-      if (outRoot.startsWith(repoRoot) || outRoot.equals(repoRoot)) {
-        throw new IllegalArgumentException("out_root must be outside the repository: " + outRoot);
-      }
+      // Normalized: a lexical containment check on an un-normalized path would let "./" and
+      // ".." segments slip through. (Symlink resolution is not possible: out_root must not
+      // pre-exist, so there is nothing to resolve yet.)
+      Path outRoot = Path.of(root.required("out_root").asString()).toAbsolutePath().normalize();
+      Path repoRoot = Path.of(root.required("repo_root").asString()).toAbsolutePath().normalize();
       Map<String, Tree> trees = new LinkedHashMap<>();
       for (String name : List.of("old", "new")) {
         JsonNode tree = root.required("trees").required(name);
@@ -209,10 +216,18 @@ public final class VlmFirstUseBenchmark {
             name,
             new Tree(
                 name,
-                Path.of(tree.required("path").asString()).toAbsolutePath(),
+                Path.of(tree.required("path").asString()).toAbsolutePath().normalize(),
                 tree.required("expected_tree_sha").asString(),
-                Path.of(tree.required("class_dir").asString()).toAbsolutePath(),
-                Path.of(tree.required("native_dir").asString()).toAbsolutePath()));
+                Path.of(tree.required("class_dir").asString()).toAbsolutePath().normalize(),
+                Path.of(tree.required("native_dir").asString()).toAbsolutePath().normalize()));
+      }
+      // The session directory must sit outside the repository and outside both measured trees:
+      // session artifacts inside a measured tree would make it tracked-dirty for the next run.
+      if (outRoot.startsWith(repoRoot)
+          || outRoot.startsWith(trees.get("old").path())
+          || outRoot.startsWith(trees.get("new").path())) {
+        throw new IllegalArgumentException(
+            "out_root must be outside the repository and both trees: " + outRoot);
       }
       List<Workload> workloads = new ArrayList<>();
       for (JsonNode workload : root.required("workloads")) {
@@ -313,15 +328,21 @@ public final class VlmFirstUseBenchmark {
       JsonNode report,
       String detail) {}
 
-  /** One tree's verified identity (HEAD, tracked state, worker source digest). */
+  /** One tree's verified identity (HEAD, tracked state, worker source digest, installed jars). */
   record TreeInfo(
-      Tree tree, String treeSha, boolean trackedDirty, List<String> untracked, String workerSha) {}
+      Tree tree,
+      String treeSha,
+      boolean trackedDirty,
+      List<String> untracked,
+      String workerSha,
+      Map<String, String> jarSha256) {}
 
   /** The per-fork job record (launcher -> worker; schema {@code jmlx-vlm-first-use-job-1}). */
   record JobData(
       Workload workload,
       Tree tree,
       int pairIndex,
+      Path manifestPath,
       WorkloadPrep prep,
       int warmups,
       int measured,
@@ -339,7 +360,10 @@ public final class VlmFirstUseBenchmark {
       job.put("tree_path", tree.path().toString());
       job.put("pair_index", pairIndex);
       job.put("model_dir", workload.modelDir().toString());
-      job.put("manifest_path", workload.manifest().toString());
+      // The manifest path the launcher verified from disk (resolved against the repo root when
+      // the spec gave a relative path), not the spec's raw string: the worker must never
+      // re-resolve it against its own working directory.
+      job.put("manifest_path", manifestPath.toString());
       job.put("manifest_sha256", workload.manifestSha256());
       ArrayNode paths = job.putArray("image_paths");
       ArrayNode digests = job.putArray("image_sha256s");
@@ -387,6 +411,7 @@ public final class VlmFirstUseBenchmark {
     private final Map<String, TreeInfo> treeInfos = new LinkedHashMap<>();
     private final Map<String, WorkloadPrep> preps = new LinkedHashMap<>();
     private final List<String> thermalNotes = new ArrayList<>();
+    private final List<String> hostrecFailures = new ArrayList<>();
     private boolean budgetExhausted;
 
     private Session(Spec spec, WorkerStarter starter) {
@@ -457,11 +482,6 @@ public final class VlmFirstUseBenchmark {
                   + "tree SHA): "
                   + String.join(" ", dirty));
         }
-        List<String> untracked =
-            status.stream()
-                .filter(line -> line.startsWith("??"))
-                .map(line -> line.substring(3))
-                .toList();
         Path workerSource =
             tree.path.resolve(
                 "jmlx-benchmarks/src/main/java/se/alipsa/jmlx/benchmarks/VlmFirstUseWorker.java");
@@ -478,8 +498,29 @@ public final class VlmFirstUseBenchmark {
                   + " vs "
                   + workerSha);
         }
+        // The executed jars, digested per tree: the git state and worker source verify the
+        // source, these verify what the workers actually ran against.
+        Map<String, String> jarSha = new LinkedHashMap<>();
+        try (var listing = Files.list(tree.classDir)) {
+          List<Path> jars =
+              listing
+                  .filter(path -> path.getFileName().toString().endsWith(".jar"))
+                  .sorted(
+                      Comparator.comparing(
+                          path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
+                  .toList();
+          for (Path jar : jars) {
+            jarSha.put(jar.getFileName().toString(), sha256Hex(jar));
+          }
+        }
+        // Untracked files are recorded, not rejected (a staged native dir is untracked on purpose).
+        List<String> untracked =
+            status.stream()
+                .filter(line -> line.startsWith("??"))
+                .map(line -> line.substring(3))
+                .toList();
         // Tracked-dirty trees are refused above, so every recorded tree is tracked-clean.
-        treeInfos.put(tree.name, new TreeInfo(tree, head, false, untracked, workerSha));
+        treeInfos.put(tree.name, new TreeInfo(tree, head, false, untracked, workerSha, jarSha));
       }
       for (Workload workload : spec.workloads) {
         Path manifest = workload.manifestAt(spec.repoRoot);
@@ -571,6 +612,7 @@ public final class VlmFirstUseBenchmark {
                   workload,
                   tree,
                   pair,
+                  workload.manifestAt(spec.repoRoot),
                   prep,
                   spec.warmups,
                   spec.measured,
@@ -632,6 +674,25 @@ public final class VlmFirstUseBenchmark {
                 "report schema differs from " + VlmFirstUseWorker.REPORT_SCHEMA);
           }
           String status = parsed.path("status").asString();
+          if ("ok".equals(status)) {
+            // Defense in depth: a worker that reports ok must also have exited 0 and have every
+            // first_request.correct.* field true. A mismatch means the worker's report is
+            // internally inconsistent with its own protocol; it is not an ok cell and its warm
+            // values must not enter the pooled or paired statistics (plan section 7:
+            // "missing/failed/instrumented samples cannot enter successful headline summaries").
+            if (starterResult == VlmFirstUseWorker.EXIT_OK && firstRequestCorrect(parsed)) {
+              return new WorkerOutcome(workload, tree, pair, "ok", parsed, null);
+            }
+            return new WorkerOutcome(
+                workload,
+                tree,
+                pair,
+                "invalid-report",
+                parsed,
+                "report status is ok but the exit code ("
+                    + starterResult
+                    + ") or first_request.correct.* fields disagree with it");
+          }
           return new WorkerOutcome(workload, tree, pair, status, parsed, null);
         } catch (Exception e) {
           return new WorkerOutcome(
@@ -663,19 +724,46 @@ public final class VlmFirstUseBenchmark {
           "worker exited " + starterResult + " before the handshake");
     }
 
+    /** True when the report's first_request.correct object is present and every field is true. */
+    private static boolean firstRequestCorrect(JsonNode report) {
+      JsonNode correct = report.path("first_request").path("correct");
+      if (!correct.isObject() || correct.isEmpty()) {
+        return false;
+      }
+      for (Map.Entry<String, JsonNode> field : correct.properties()) {
+        if (!field.getValue().isBoolean() || !field.getValue().asBoolean()) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     /**
      * One hostrec.sh append (the 60 s polling loop is the session wrapper's job, not this one's).
+     * Failures never abort the session but are recorded in the session report: a missing host
+     * record is a plan section 4 trigger for a further session.
      */
     void hostrec(String label) {
+      Path dir = spec.outRoot.resolve("hostrec");
       try {
-        Path dir = spec.outRoot.resolve("hostrec");
         Files.createDirectories(dir);
         ProcessBuilder builder = new ProcessBuilder(spec.hostrecScript.toString(), label);
         builder.environment().put("HOSTREC_DIR", dir.toString());
         builder.redirectErrorStream(true);
         Process process = builder.start();
+        // Bounded wait: a hung script must not wedge the session. hostrec emits at most a few
+        // lines, so reading after the wait cannot lose output to a full pipe buffer.
+        if (!process.waitFor(HOSTREC_TIMEOUT_S, TimeUnit.SECONDS)) {
+          process.destroyForcibly();
+          hostrecFailures.add(
+              label + ": hostrec.sh did not exit within " + HOSTREC_TIMEOUT_S + " s");
+          return;
+        }
+        int exit = process.exitValue();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        process.waitFor();
+        if (exit != 0) {
+          hostrecFailures.add(label + ": hostrec.sh exited " + exit);
+        }
         Files.writeString(
             dir.resolve("host.log.cmds"),
             label + "\n",
@@ -686,7 +774,7 @@ public final class VlmFirstUseBenchmark {
           System.err.println("hostrec " + label + ": " + output.trim());
         }
       } catch (Exception e) {
-        System.err.println("hostrec " + label + " failed: " + e.getMessage());
+        hostrecFailures.add(label + ": " + e.getMessage());
       }
     }
 
@@ -704,7 +792,9 @@ public final class VlmFirstUseBenchmark {
     /** The assembled session report (raw worker records + per-pair and pooled warm statistics). */
     ObjectNode sessionReport() {
       ObjectNode report = MAPPER.createObjectNode();
-      report.put("schema", "jmlx-vlm-first-use-session-1");
+      // Version 2 (vs the v1 recorded in findings section 17.3): per-tree jar_sha256 of the
+      // executed jars, hostrec_failures, and the corrected hostrec file description.
+      report.put("schema", "jmlx-vlm-first-use-session-2");
       report.put("session", spec.session);
       report.put("utc_start", utcStart.toString());
       report.put("utc_end", Instant.now().toString());
@@ -731,6 +821,10 @@ public final class VlmFirstUseBenchmark {
           untracked.add(file);
         }
         tree.put("worker_source_sha256", info.workerSha());
+        ObjectNode jars = tree.putObject("jar_sha256");
+        for (Map.Entry<String, String> entry : info.jarSha256().entrySet()) {
+          jars.put(entry.getKey(), entry.getValue());
+        }
         ObjectNode pin = tree.putObject("native_pin");
         for (Map.Entry<String, String> entry :
             readPinProperties(info.tree().nativeDir()).entrySet()) {
@@ -760,9 +854,15 @@ public final class VlmFirstUseBenchmark {
       }
       report.put(
           "hostrec",
-          "hostrec.sh pre/post appends per fork, plus the session wrapper's 60 s polling loop, "
-              + "in "
-              + spec.outRoot.resolve("hostrec").resolve("host.log"));
+          "hostrec.sh pre/post appends per fork in "
+              + spec.outRoot.resolve("hostrec").resolve("host.log")
+              + " (one line per record); the 60 s polling loop is the session wrapper's job, and "
+              + "the wrapper copies its host log into the session directory as hostrec.log; "
+              + "failed or timed-out hostrec calls are listed in hostrec_failures");
+      ArrayNode hostrecFailuresNode = report.putArray("hostrec_failures");
+      for (String failure : hostrecFailures) {
+        hostrecFailuresNode.add(failure);
+      }
       ArrayNode workers = report.putArray("workers");
       for (WorkerOutcome outcome : outcomes) {
         ObjectNode node = workers.addObject();

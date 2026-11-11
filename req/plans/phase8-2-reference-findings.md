@@ -3643,11 +3643,13 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
   `native/install/lib` (each tree's `class_dir` and `native_dir` are
   recorded in the session report's tree blocks, and the worker report
   records the pin loaded from its own `-Djmlx.library.path`).
-- Pin identities, staged (read from disk by the launcher) and actually
-  loaded (read from the worker's own `-Djmlx.library.path`): old
-  0.31.2 / mlx-c fba4470b89073180056c9ea46c443051375f7399; new 0.32.4 /
+- Pin identities, staged (read from disk by the launcher) and re-verified
+  at the worker's own `-Djmlx.library.path` (the property the loader
+  resolves first; this is the staged pin file at that path, not a runtime
+  verification of which dylib the process actually loaded): old 0.31.2 /
+  mlx-c fba4470b89073180056c9ea46c443051375f7399; new 0.32.4 /
   mlx-c a26f2d584a14ec619ae8db9a09be03becd47598a. Launcher-side and
-  worker-side identities agree for all 24 workers.
+  worker-side staged identities agree for all 24 workers.
 - Dist dependency sets (recorded, not a controlled variable): the old
   tree's installDist resolves jackson 3.1.2, jmlx-jinja 0.6.0,
   jmlx-tokenizer/jmlx-vision 0.1.0; the new tree's resolves jackson 3.2.4,
@@ -3721,13 +3723,34 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
   MAX_TOKENS, prompt positions equal the expanded-ID size, rendered prompt
   equal to the manifest's, and all 5 measured repetitions of each worker
   reproduced the first request's IDs (greedy determinism under TF32=0).
-- Host records: 9 hostrec records (pre, 7 polls, post), therm-warnings
-  count 2 in every record (no new warnings), load averages 1.40-3.32
-  (1-min), omlx at most 76.6% in the pre record (the agent's own model
-  server; below ~15% during the session), memfree 35-59%. Thermal start
-  and end: no warning or performance level recorded. The session ran on
-  the quiet post-reboot host; no gpu-burn contention was applied (plan
-  section 5.2: controlled contention is optional follow-up only).
+- Host records, restated from both record sets (the wrapper-only
+  statement that originally stood here is withdrawn by section 17.5,
+  P2): the launcher's 48 per-fork records (one per pre/post fork,
+  `hostrec/host.log`, digest-pinned) show therm-warnings count 2 in
+  every record (no new warnings), 1-min load 1.24-4.20, memfree 38-64%,
+  and omlx (hostrec.sh's "leading contention candidate" — the resident
+  serving-model server) at or below 0.6% only from 15:43:29 on (the
+  phi3v phase): 16 of the 48 records read above 15%, and four bursts
+  above 50% (97.9 / 95.2 / 83.2 / 75.6%) all fall in
+  15:38:49-15:40:14, bracketing the qwen3vl pairs 2-5 and the anomalous
+  qwen3vl-2b new-pair-2 dip. The wrapper's coarser 9 records (pre, 7
+  polls, post; `hostrec.log`) agree in trend but sample only every 60 s
+  (omlx at most 76.6%, in the pre record; 0.4-14.5% at every poll and
+  the post; load 1.40-3.32; memfree 35-59%) and miss the bursts between
+  samples. Two caveats: `ps` %CPU on macOS is a decaying average, so a
+  high reading covers earlier activity and no causal link between the
+  omlx bursts and the p2 dip is claimed; and the session did not run on
+  a quiet host — the serving agent (this session's own model,
+  omlx-server) was actively working during the qwen3vl phase, against
+  the section 16.4b convention of parking the agent's work on a
+  different agent so omlx-server stays quiet. The session therefore does
+  not qualify as the plan section 4 quiet-host baseline, and the section
+  4 trigger rule (a >10% adjacent-fork-median shift, or a surprising
+  host state) calls for another alternating session before runtime
+  attribution: session 2, section 17.6. No gpu-burn contention was
+  applied (plan section 5.2: controlled contention is optional follow-up
+  only). Thermal start and end: no warning or performance level
+  recorded.
 - First-in-process (first request; raw per-worker values in the session
   report, MB below are 10^6):
   - qwen3vl-2b: load wall old 0.793-1.306 s, new 1.070-1.409 s (medians
@@ -3763,9 +3786,10 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
     forks) are slow in **both trees at the same session position**
     (warm full ~3.6-4.0 s) and step down to ~2.3-2.4 s from pair 2
     (forks 17-18) in both trees. A synchronized
-    two-tree step at one session position is a host cache-regime
-    transition (OS page cache / system shader cache warming across the
-    fresh processes), not a pin effect; the controlled shader-cache
+    two-tree step at one session position is consistent with a host
+    cache-regime transition (OS page cache / system shader cache
+    warming across the fresh processes) rather than a pin effect; the
+    controlled shader-cache
     experiment that would attribute it was not run (plan section 5.2
     marks it additional work), so shader-cache attribution is left
     unresolved, as the plan allows. It does not invalidate the paired
@@ -3778,7 +3802,11 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
     session was triggered (one session per cell, under the plan section 4
     cap of three).
 - Memory (process-wide MLX counters sampled after each phase's eval; the
-  report's note on lagging Metal frees applies):
+  report's note on lagging Metal frees applies; the v1 worker never
+  reset the peak counter, so every peak below is lifetime-cumulative —
+  the after_first peak includes the load and after_load phases — and is
+  not directly comparable to the phase-local peaks of session 2,
+  section 17.6):
   - qwen3vl-2b: after load, peak 8,514.86 MB and active 8,510.14 MB in
     both trees (span across the 12 workers: peak 8,514,863,104-
     8,514,865,152 B, active 8,510,144,512-8,510,146,560 B). After the
@@ -3836,3 +3864,101 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
   (`/Users/per/jmlx-wp4-oldpin`) and its staged runtime stay in place for
   any repeat session the owner orders; nothing in this section repins or
   modifies the main checkout.
+
+### 17.5 Review round 1 (2026-11-11, PR #92)
+
+Sixteen findings (1 high, 5 medium, 10 low), all addressed in the review
+commit; the worker report schema is bumped `jmlx-vlm-first-use-1` -> `-2`
+and the session report schema `jmlx-vlm-first-use-session-1` -> `-2`
+(the job schema is unchanged — its `manifest_path` now always carries
+the launcher-verified resolved path). The review commit's worker source
+digest is `fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac`
+(byte-identical in both trees, as before). Session 1's results stand as
+recorded (all 24 workers ok, all IDs matched; the high-severity finding
+did not affect it — every `first_request.correct.*` field in the raw
+reports is true), but the harness it ran on changed, and the section 4
+triggers fired, so session 2 (section 17.6) runs the fixed harness from
+the review commit's SHA on a quiet host before any runtime attribution.
+
+- P1 (high): a first-request correctness failure wrote
+  `correctness_failed` and then fell through to an `ok` report with
+  exit 0 (missing `return`), and the launcher's classify trusted
+  `status` alone. Fixed: the post-capture decision is now the static,
+  side-effect-free `postCaptureVerdict(idsMatch, finishMatch,
+  positionsMatch, divergences)` returning `Verdict(status, exitCode,
+  failureReason)`, and the verdict's exit code is the process exit code;
+  classify accepts `ok` only when the exit code is 0 and every
+  `first_request.correct.*` field is boolean true
+  (`firstRequestCorrect`), else `invalid-report` with a detail.
+- P2: the section 17.3 host bullet restated from both record sets (the
+  48 per-fork records, not only the wrapper's 9); "quiet" withdrawn;
+  the serving agent's own omlx activity during the qwen3vl phase
+  recorded. See the restated bullet.
+- P3: the worker's second `put("workload")` (the inputs object)
+  overwrote the workload name (Jackson 3 `putObject` replaces an
+  existing property). The object is now `workload_inputs`.
+- P4: a warm/measured ID divergence threw, was misclassified as a
+  runtime exit-2 failure with the captured first request lost, and
+  `measuredIdsMatch.add(true)` was tautological. Fixed: a divergence
+  records `WarmDivergence(label, generatedIds)` in the report's
+  `divergences` array, stops the remaining iterations, and the post-
+  capture verdict finishes the worker as `correctness_failed` (exit 3)
+  with the first-request data retained; `measured_ids_match` records
+  real per-iteration results.
+- P5: `token_event_times_s` held only the first token (the early return
+  skipped every later event). Every first-request token event is now
+  recorded; the TTFT stamping (first event only) is unchanged.
+- P6: the worker had no tests. `VlmFirstUseWorkerTest` (pure Java, no
+  native) covers the verdict matrix (all-ok, each single first-request
+  mismatch, labeled warm/measured divergences, combined problems) and
+  the job schema gate; the launcher test gained the two inconsistent-
+  ok classify cells (ok report with exit 3; ok report with a false
+  `correct` field) and the new out_root refusal scenarios.
+- P7: "actually loaded" pin identity reworded to "staged pin file re-
+  read from the worker's own `-Djmlx.library.path`" (the property the
+  loader resolves first; no runtime dylib-load verification); the
+  report now carries the same note in `native_pin.note` (section 17.1
+  bullet restated).
+- P8: the phi3v step-down wording softened to "consistent with a host
+  cache-regime transition rather than a pin effect" (section 17.3).
+- P9: the executed jars are now digested per tree (`jar_sha256` in each
+  session-report tree block).
+- P10: hostrec failures and timeouts are no longer invisible: 30 s
+  timeout per call (killed and recorded), all failures listed in the
+  session report's `hostrec_failures` array (a missing host record is a
+  plan section 4 trigger).
+- P11: the session report's hostrec string corrected (per-fork records
+  in `hostrec/host.log`; the wrapper's 60 s poll log is `hostrec.log`).
+- P12: the backstop race fixed with a write-once `reportWritten`
+  guard: only the first caller of `finish` writes the report, and the
+  backstop exits 4 only if it itself wrote.
+- P13: the job now carries the launcher-verified resolved manifest path
+  (`workload.manifestAt(spec.repoRoot)`), not the spec's raw string.
+- P14: `out_root` (and every spec path) is normalized before the
+  containment check, which now also covers both trees.
+- P15: the worker now calls `MLXMemory.resetPeak()` after the
+  after_load and after_first samples (phase-local peaks, plan section 7
+  "peaks reset at stated phases"); session 1's peaks were
+  lifetime-cumulative and are labeled as such (section 17.3 memory
+  bullet).
+- P16 (minors): `Job.parse` rejects a missing or wrong schema;
+  `generate` is void (the unused `long[]` return is gone); the worker
+  class Javadoc order matches the code (verification before the
+  handshake claim); non-string, non-integer manifest content-part
+  fields are rejected instead of passed into the chat template as raw
+  JsonNode.
+
+Session 2 (the section 4 trigger): the plan's trigger rule is "a >10%
+shift between adjacent fork medians, a thermal/memory warning, a
+missing host record, or a surprising VLM prefill triggers another
+alternating session before runtime attribution" (cap three sessions per
+cell; one used). Two triggers fire in session 1: the qwen3vl-2b
+new-pair-2 dip (0.285 s vs ~0.5-0.6 s neighbors) and the phi3v-4b
+early-pair step-down; and session 1 does not qualify as a quiet-host
+baseline (the serving agent worked on omlx during the run, section
+17.3). Session 2 reuses the frozen case, config and fork-order
+convention (spec `wp4-observed-cache-2`: same pairs 6, warmups 3,
+measured 5, timeout 900 s, budget 5400 s, TF32=0, stop sets qwen3vl
+{151643, 151645} / phi3v {32000}) from the review commit's SHA, with
+the serving agent fully idle during the run (the section 16.4b
+convention restored).

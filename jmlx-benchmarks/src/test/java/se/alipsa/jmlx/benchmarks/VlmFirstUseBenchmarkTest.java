@@ -53,7 +53,11 @@ class VlmFirstUseBenchmarkTest {
     JOB_VERIFICATION,
     INVALID_REPORT,
     KILLED,
-    THROW
+    THROW,
+    /** An ok report (correct.* all true) but a nonzero exit code: classify must not accept ok. */
+    OK_REPORT_EXIT_3,
+    /** An ok report with a false correct field: classify must not accept ok. */
+    OK_REPORT_INCONSISTENT
   }
 
   /** Records the jobs it started and leaves whatever protocol artifacts the behavior demands. */
@@ -102,8 +106,20 @@ class VlmFirstUseBenchmarkTest {
         case INVALID_REPORT ->
             Files.writeString(
                 cellDir.resolve("report.json"), "{\"schema\":\"wrong-schema\",\"status\":\"ok\"}");
+        case OK_REPORT_EXIT_3 ->
+            writeReport(
+                cellDir,
+                job,
+                "ok",
+                null,
+                List.of(0.5, 1.0, 1.5, 2.0),
+                List.of(10.0, 20.0, 30.0, 40.0));
+        case OK_REPORT_INCONSISTENT -> writeInconsistentOkReport(cellDir, job);
         case KILLED -> {}
         default -> {}
+      }
+      if (behavior == Behavior.OK_REPORT_EXIT_3) {
+        return VlmFirstUseWorker.EXIT_CORRECTNESS_FAILED;
       }
       if (behavior == Behavior.JOB_VERIFICATION) {
         return VlmFirstUseWorker.EXIT_JOB_VERIFICATION_FAILED;
@@ -138,6 +154,14 @@ class VlmFirstUseBenchmarkTest {
       ObjectNode first = report.putObject("first_request");
       first.put("ttft_s", 1.0);
       first.put("full_generation_s", 2.0);
+      if ("ok".equals(status)) {
+        // The launcher's classify gate accepts ok only when this object is present and every
+        // field is true (defense in depth for the worker's own verdict).
+        ObjectNode correct = first.putObject("correct");
+        correct.put("ids_match", true);
+        correct.put("finish_match", true);
+        correct.put("prompt_positions_match", true);
+      }
       ObjectNode load = report.putObject("load");
       load.put("wall_s", 0.5);
       if (ttft != null) {
@@ -148,6 +172,31 @@ class VlmFirstUseBenchmarkTest {
         var array = report.putArray("measured_full_generation_s");
         full.forEach(array::add);
       }
+      Files.writeString(cellDir.resolve("report.json"), report.toString());
+    }
+
+    /**
+     * An ok report whose own correct object disagrees with the ok status (ids_match false): the
+     * launcher must classify it as invalid-report even though the worker exits 0.
+     */
+    private void writeInconsistentOkReport(Path cellDir, VlmFirstUseBenchmark.JobData job)
+        throws IOException {
+      ObjectNode report = MAPPER.createObjectNode();
+      report.put("schema", VlmFirstUseWorker.REPORT_SCHEMA);
+      report.put("status", "ok");
+      report.put("workload", job.workload().name());
+      report.put("tree", job.tree().name());
+      report.put("pair_index", job.pairIndex());
+      report.put("wall_s", 1.0);
+      ObjectNode first = report.putObject("first_request");
+      first.put("ttft_s", 1.0);
+      first.put("full_generation_s", 2.0);
+      ObjectNode correct = first.putObject("correct");
+      correct.put("ids_match", false);
+      correct.put("finish_match", true);
+      correct.put("prompt_positions_match", true);
+      ObjectNode load = report.putObject("load");
+      load.put("wall_s", 0.5);
       Files.writeString(cellDir.resolve("report.json"), report.toString());
     }
   }
@@ -295,7 +344,7 @@ class VlmFirstUseBenchmarkTest {
 
     Path outRoot = setup.root().resolve("out-all-ok");
     JsonNode report = MAPPER.readTree(outRoot.resolve("session-report.json").toFile());
-    assertEquals("jmlx-vlm-first-use-session-1", report.path("schema").asString());
+    assertEquals("jmlx-vlm-first-use-session-2", report.path("schema").asString());
     assertEquals("test-all-ok", report.path("session").asString());
     assertEquals(2, report.path("pairs").asInt());
     assertEquals(1, report.path("warmups").asInt());
@@ -319,6 +368,9 @@ class VlmFirstUseBenchmarkTest {
     assertEquals(WORKER_SOURCE_SHA, newTree.path("worker_source_sha256").asString());
     assertEquals("0.31.2", oldTree.path("native_pin").path("mlxMetalVersion").asString());
     assertEquals("fba4470", oldTree.path("native_pin").path("mlxcCommit").asString());
+    // The executed jars are recorded per tree (empty here: the fake trees have no jars).
+    assertTrue(oldTree.path("jar_sha256").isObject());
+    assertTrue(newTree.path("jar_sha256").isObject());
 
     // Every worker ok, with its report embedded.
     assertEquals(4, report.path("workers").size());
@@ -363,6 +415,11 @@ class VlmFirstUseBenchmarkTest {
     // The job file carries the session's declared settings, not placeholders.
     JsonNode job = MAPPER.readTree(outRoot.resolve("mini/old-p0/job.json").toFile());
     assertEquals(VlmFirstUseWorker.JOB_SCHEMA, job.path("schema").asString());
+    // The job carries the launcher-verified manifest path (resolved against the repo root when
+    // the spec gives a relative one), never the spec's raw string.
+    assertEquals(
+        setup.repoRoot().resolve("tools/tier-b/mini.json").toAbsolutePath().normalize().toString(),
+        job.path("manifest_path").asString());
     assertEquals(1, job.path("warmups").asInt());
     assertEquals(4, job.path("measured").asInt());
     assertEquals(60, job.path("worker_timeout_s").asLong());
@@ -380,6 +437,9 @@ class VlmFirstUseBenchmarkTest {
     assertTrue(hostCmds.contains("pre:mini:old:p0"));
     assertTrue(hostCmds.contains("post:mini:old:p0"));
     assertEquals(2, report.path("thermal").size());
+    // The fake hostrec always exits 0, so no failures were recorded.
+    assertTrue(report.path("hostrec_failures").isArray());
+    assertEquals(0, report.path("hostrec_failures").size());
   }
 
   @Test
@@ -394,7 +454,9 @@ class VlmFirstUseBenchmarkTest {
     starter.behaviors.put("mini/new/p2", Behavior.JOB_VERIFICATION);
     starter.behaviors.put("mini/old/p3", Behavior.INVALID_REPORT);
     starter.behaviors.put("mini/new/p3", Behavior.KILLED);
-    int exit = new VlmFirstUseBenchmark(starter).runSession(spec(setup, "failures", 4));
+    starter.behaviors.put("mini/old/p4", Behavior.OK_REPORT_EXIT_3);
+    starter.behaviors.put("mini/new/p4", Behavior.OK_REPORT_INCONSISTENT);
+    int exit = new VlmFirstUseBenchmark(starter).runSession(spec(setup, "failures", 5));
     assertEquals(VlmFirstUseBenchmark.EXIT_WORKERS_FAILED, exit);
 
     JsonNode report =
@@ -417,6 +479,10 @@ class VlmFirstUseBenchmarkTest {
     assertEquals("job-verification-failed", classification.get("mini/new/p2"));
     assertEquals("invalid-report", classification.get("mini/old/p3"));
     assertEquals("timeout", classification.get("mini/new/p3"));
+    // The defense-in-depth gate: an ok report is not ok when the exit code or the report's own
+    // correct object disagrees with it.
+    assertEquals("invalid-report", classification.get("mini/old/p4"));
+    assertEquals("invalid-report", classification.get("mini/new/p4"));
   }
 
   @Test
@@ -487,6 +553,21 @@ class VlmFirstUseBenchmarkTest {
         "out-root-inside-repo",
         (s, out) ->
             s.put("out_root", Path.of(s.path("repo_root").asString()).resolve("out").toString()));
+    refused(
+        "out-root-inside-old-tree",
+        (s, out) ->
+            s.put("out_root", pathObj(s, "trees", "old").path("path").asString() + "/session-out"));
+    refused(
+        "out-root-traversal-into-repo",
+        (s, out) -> {
+          // Lexically outside (a sibling "else/..."), but normalizes to <repo>/out: the
+          // launcher must normalize before the containment check.
+          s.put(
+              "out_root",
+              Path.of(s.path("repo_root").asString())
+                  .resolveSibling("else/../repo/out")
+                  .toString());
+        });
     refused(
         "missing-tree",
         (s, out) ->

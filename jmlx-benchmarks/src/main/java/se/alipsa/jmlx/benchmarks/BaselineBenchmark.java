@@ -603,7 +603,7 @@ public final class BaselineBenchmark {
       }
     }
     finishQuantiles(perRuntime, measured);
-    finishFirstRequest(firstRequest, firsts);
+    finishQuantiles(firstRequest, firsts);
     return new Assembled(root, outcomes);
   }
 
@@ -819,11 +819,16 @@ public final class BaselineBenchmark {
     }
   }
 
-  /** Replaces the measured sample lists with their type-7 quantile summaries. */
+  /**
+   * Replaces per-cell sample lists with their type-7 quantile summaries, grouped by runtime. Each
+   * runtime block is created exactly once (the intermediate map is keyed by runtime), so every cell
+   * of a runtime survives, not just the last. Used for both the measured-request block and the
+   * separate first-request distribution.
+   */
   private static void finishQuantiles(
-      ObjectNode perRuntime, Map<String, Map<String, List<Double>>> measured) {
+      ObjectNode target, Map<String, Map<String, List<Double>>> samplesByCell) {
     Map<String, Map<String, Map<String, List<Double>>>> byRuntime = new LinkedHashMap<>();
-    for (Map.Entry<String, Map<String, List<Double>>> cell : measured.entrySet()) {
+    for (Map.Entry<String, Map<String, List<Double>>> cell : samplesByCell.entrySet()) {
       int separator = cell.getKey().indexOf('|');
       String runtime = cell.getKey().substring(0, separator);
       byRuntime
@@ -831,31 +836,13 @@ public final class BaselineBenchmark {
           .put(cell.getKey().substring(separator + 1), cell.getValue());
     }
     for (Map.Entry<String, Map<String, Map<String, List<Double>>>> runtime : byRuntime.entrySet()) {
-      ObjectNode cells = perRuntime.putObject(runtime.getKey());
+      ObjectNode cells = target.putObject(runtime.getKey());
       for (Map.Entry<String, Map<String, List<Double>>> cell : runtime.getValue().entrySet()) {
         ObjectNode metrics = cells.putObject(cell.getKey());
         for (Map.Entry<String, List<Double>> metric : cell.getValue().entrySet()) {
           metrics.set(
               metric.getKey(), quantileNode(BaselineStatistics.quantiles(metric.getValue())));
         }
-      }
-    }
-  }
-
-  /**
-   * The first-request samples are a separate distribution, quantiled per (runtime, adapter, mode,
-   * case, length).
-   */
-  private static void finishFirstRequest(
-      ObjectNode firstRequest, Map<String, Map<String, List<Double>>> firsts) {
-    for (Map.Entry<String, Map<String, List<Double>>> entry : firsts.entrySet()) {
-      int separator = entry.getKey().indexOf('|');
-      ObjectNode metrics =
-          firstRequest
-              .putObject(entry.getKey().substring(0, separator))
-              .putObject(entry.getKey().substring(separator + 1));
-      for (Map.Entry<String, List<Double>> metric : entry.getValue().entrySet()) {
-        metrics.set(metric.getKey(), quantileNode(BaselineStatistics.quantiles(metric.getValue())));
       }
     }
   }

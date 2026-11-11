@@ -3840,27 +3840,37 @@ Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
 
 ### 17.4 Raw-data digests and open items
 
-- Raw-data digests: `req/plans/phase8-2-wp4-raw-digests.json` (schema v1,
-  100 files, paths relative to `~/wp4-scratch`) records the SHA-256 of the
-  full session (session report, all 24 job/report/stderr files, per-fork
-  hostrec records, `hostrec.log`, thermal records), the post-fix smoke
-  session (same layout, 4 cells), the wrapper's
-  `hostrec/wp4-observed-cache-1/{host.log,launcher.log}` and both session
-  specs — tying this section, including its host-side claims, to the
-  exact raw tree. Both session reports carry tree new e4cb1f0 / tree old
-  46cb325 and the byte-identical worker digest quoted in section 17.1.
-  The rejected first-smoke session was removed before the post-fix smoke
-  ran and is not in the raw tree (its only evidentiary role was exposing
-  the TTFT stamping bug, section 17.2).
+- Raw-data digests: `req/plans/phase8-2-wp4-raw-digests.json` (schema v2,
+  181 files, paths relative to `~/wp4-scratch`) records the SHA-256 of
+  both full sessions (`wp4-observed-cache-1`: 24 worker cells with
+  job/report/stderr each, session report, per-fork hostrec records,
+  `hostrec.log`, thermal records; `wp4-observed-cache-2`: same layout),
+  the post-fix smoke session (same layout, 4 cells), the wrapper's
+  `hostrec/<session>/{host.log,launcher.log}` for both sessions and all
+  three session specs — tying this section, including its host-side
+  claims, to the exact raw tree. All 100 v1 files are byte-identical in
+  v2 (session 1's raw tree is unchanged). Session 1's report carries
+  tree new e4cb1f0 / tree old 46cb325 and the v1 worker digest quoted in
+  section 17.1; session 2's carries tree new ecc69a5 / tree old 46cb325
+  and the review commit's worker digest quoted in section 17.5, plus the
+  executed-jar digests per tree. The rejected first-smoke session was
+  removed before the post-fix smoke ran and is not in the raw tree (its
+  only evidentiary role was exposing the TTFT stamping bug, section
+  17.2).
 - Open items: the phi3v-4b early-pair transition (section 17.3) remains
   unattributed — attributing it needs either back-to-back repeats or the
   controlled shader-cache experiment, both follow-up work per plan section
-  5.2; the qwen3vl-2b new-pair-2 dip is recorded, single-pair, no
-  follow-up triggered. The phi3v-4b after-first-forward allocator peak
+  5.2; session 2 (section 17.6) is the back-to-back repeat: the
+  early-pair slowness did not recur on the quiet host, so the state is
+  consistent with a first-use-after-reboot host effect, still not
+  attributed. The qwen3vl-2b new-pair-2 dip (section 17.3) was the other
+  section 4 trigger that ordered session 2; it did not recur (section
+  17.6) and its bracketing by session 1's omlx burst is recorded without
+  causal attribution. The phi3v-4b after-first-forward allocator peak
   difference (~897.6 MB, new tree lower) is a code-and-pin observation
-  under the section 17.1 label; attributing it to specific framework
-  changes would need a commit-range memory bisect, which is not part of
-  this work package. The old-pin worktree
+  under the section 17.1 label, unchanged in session 2; attributing it to
+  specific framework changes would need a commit-range memory bisect,
+  which is not part of this work package. The old-pin worktree
   (`/Users/per/jmlx-wp4-oldpin`) and its staged runtime stay in place for
   any repeat session the owner orders; nothing in this section repins or
   modifies the main checkout.
@@ -3962,3 +3972,129 @@ measured 5, timeout 900 s, budget 5400 s, TF32=0, stop sets qwen3vl
 {151643, 151645} / phi3v {32000}) from the review commit's SHA, with
 the serving agent fully idle during the run (the section 16.4b
 convention restored).
+
+### 17.6 Session 2 `wp4-observed-cache-2` (quiet host, fixed harness)
+
+- Session 21:00:17-21:07:00 UTC (6 m 43 s wall, 24 workers) from the
+  review commit ecc69a5 (worker digest
+  `fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac`
+  byte-identical in both trees, re-verified by the launcher; executed-jar
+  digests in each session-report tree block; `hostrec_failures` empty).
+  All 24 workers `ok` under the `-2` schemas; every first request
+  matches the manifest reference (all `correct.*` true), no warm or
+  measured divergence (all `divergences` arrays empty; all 5 measured
+  repetitions of every worker reproduce the first request's IDs), and
+  every report carries `workload_inputs` and the full
+  `token_event_times_s` array.
+- Host: the 48 per-fork records show omlx at 89.4% in the pre record,
+  decaying monotonically (34.6 / 20.3 / 29.9 / 17.9 / 15.1 / 13.1 /
+  12.5 / 12.6 / 7.4%) across the first four qwen3vl forks and at or
+  below 0.7% from qwen3vl old:p4 (21:01:24) to the end of the session —
+  the entire phi3v phase ran on the quiet host of the section 16.4b
+  convention, with no bursts between the readings (unlike session 1).
+  The decaying readings of the first ~70 s carry the owner's pre-launch
+  activity (the agent was idle from the moment the background run was
+  launched); per the decaying-average caveat they are recorded without
+  causal attribution. therm-warnings 2 in all 48 records; thermal start
+  and end: no warning or performance level; 1-min load 3.37-7.08 (the
+  phi3v forks themselves push the load); memfree 28-69%.
+- First-in-process (first request; separate from the warm statistics,
+  plan section 4; ranges over the 6 workers per tree):
+  - qwen3vl-2b: load wall old 0.786-1.459 s, new 0.819-2.845 s (new p2's
+    load is an outlier); first TTFT old 0.204-0.765 s, new 0.233-0.922
+    s; first full old 0.335-1.327 s, new 0.366-1.350 s.
+  - phi3v-4b: load wall old 0.896-1.351 s, new 0.937-1.315 s; first
+    TTFT old 1.355-1.655 s, new 1.316-1.817 s; first full old
+    2.472-6.568 s (p0 4.959, p1 6.568, p3 5.384), new 2.447-9.755 s
+    (p0 9.755, p4 8.685). Slow first requests occur in both trees (the
+    lazy loader work inside the first request; recorded without
+    attribution) and the first-request distribution stays separate from
+    the warm statistics.
+- Warm measurements (5 measured per worker, pooled n=30 per tree per
+  workload; type-7 quantiles as in section 16):
+  - qwen3vl-2b TTFT: old p10/median/p90 0.110/0.239/0.378 s, new
+    0.111/0.338/0.389 s; full generation old 0.224/0.392/0.654 s, new
+    0.226/0.616/0.674 s.
+  - phi3v-4b TTFT: old 1.416/1.617/1.869 s, new 1.348/1.733/1.855 s;
+    full generation old 2.332/2.491/2.794 s, new 2.234/2.672/2.864 s.
+- Paired per-pair warm-median ratios (new/old, the paired statistic):
+  - qwen3vl-2b full generation
+    1.190/1.063/0.994/2.379/1.079/1.005 (TTFT 1.303/1.068/0.986/2.328/
+    1.036/1.001): pairs 1, 2, 4 and 5 sit in 0.994-1.079. The p3 ratio
+    is an intra-pair ordering artifact: the host's fast-regime boundary
+    fell between new:p3 and old:p3, so the pair's new member measured in
+    the slow regime and its old member in the fast one.
+  - phi3v-4b full generation 0.902/1.026/0.992/1.120/1.058/1.018 (TTFT
+    0.830/1.013/0.964/1.167/1.027/1.034), median 1.022, on the fully
+    quiet host.
+- Regime structure and session-to-session comparison:
+  - qwen3vl-2b runs two warm-full regimes in session 2, ~0.563-0.669 s
+    (pairs 0-2 and new p3) vs ~0.224-0.272 s (old p3, pairs 4-5); the
+    boundary coincides with the omlx readings crossing below 1%
+    (21:01:24-21:01:28). Session 1's qwen3vl phase ran entirely inside
+    the omlx-burst window and its warm full was 0.549-0.618 s (old) and
+    0.484-0.612 s (new, apart from the new-p2 dip of 0.285 s) — the same
+    slow regime; session 1's new-p2 dip did not recur (session 2 new p2
+    is 0.629 s), consistent with its bracketing by session 1's 95.2%
+    omlx burst (recorded without causal attribution, decaying-average
+    caveat).
+  - The phi3v-4b early-pair slowness (session 1: ~3.6-4.0 s for pairs
+    0-1 in both trees, stepping down from pair 2) did not recur:
+    session 2's warm full is flat at 2.136-2.815 s across all pairs on
+    the quiet host, and the pooled medians (old 2.491 / new 2.672 s)
+    match session 1's quiet-phase values (2.448 / 2.397 s). This
+    supports the section 17.3 interpretation of session 1's slowness as
+    a host-side state tied to the first use of the checkpoint after the
+    09:03 reboot, not a within-session transition and not a pin effect;
+    the controlled experiment that would attribute it was not run (plan
+    section 5.2 marks it additional work), so attribution stays
+    "consistent with".
+  - No code-and-pin effect on warm throughput is detectable at this
+    precision: on the quiet host the paired ratios cluster at 1.0 in
+    both workloads (phi3v-4b medians 0.975 session 1 / 1.022 session
+    2; qwen3vl-2b regime-stable pairs 1.001-1.079), and the small
+    new/old difference flips direction between sessions — consistent
+    with host/measurement noise rather than a systematic effect of the
+    156 commits and pin change.
+- Memory (phase-local peaks, schema -2; session 1's cumulative peaks,
+  section 17.3, agree within the quoted spans, confirming the peak is
+  reached in the first forward, not during load):
+  - qwen3vl-2b: after load, peak 8,514,863,104-8,514,865,152 B in both
+    trees (session 1's span). After the first forward, peak
+    9,828,890,684-9,828,892,836 B — byte-identical to session 1's
+    after-first span and to the 7.3b WP8 measurement
+    (9,828,890,788 B). After the warm/measured phases, peak
+    9,828,890,685-9,828,892,733 B: the warm phase never exceeds the
+    first forward's peak, it re-touches the same maximum buffer.
+  - phi3v-4b: after load, peak 16,643,123,200-16,643,125,248 B in both
+    trees. After the first forward: old 31,100,376,165-31,100,378,213
+    B, new 30,202,744,781-30,202,748,009 B (session 1 spans: old
+    31,100,376,165-31,100,380,261, new 30,202,745,961-30,202,748,009 —
+    the ~897.6 MB tree-to-tree gap is unchanged, a code-and-pin
+    observation under the section 17.1 label, not attributable to the
+    pin alone); after the warm/measured phases, the peaks equal the
+    after-first peaks (same maximum buffer re-touched).
+- Session-3 decision: not triggered. The section 4 triggers present in
+  session 2 are the >10% adjacent-fork deltas from the qwen3vl regime
+  boundary, which the per-fork records investigate (they coincide with
+  the omlx decay crossing 1%, are synchronized across both trees, and
+  the one intra-pair ratio is an ordering artifact); there is no
+  thermal or memory warning (therm count is the host-constant 2 with no
+  level), no missing host record (48/48 records present,
+  `hostrec_failures` empty), and no surprising prefill (the slow first
+  requests occur in both trees and stay in the separate first-request
+  distribution). The investigation session 2 was ordered for is
+  complete: quiet-host baselines now exist for both workloads (the
+  whole phi3v phase; the qwen3vl tail), the quiet-host paired comparison
+  is 1.0, and both session-1 anomalies are resolved (the p2 dip did not
+  recur; the early-pair slowness is consistent with a first-use-after-
+  reboot host state). The qwen3vl fast-regime mechanism and the omlx
+  decaying-reading correlation remain host-side open questions,
+  explicitly out of scope per plan section 5.2 (controlled
+  contention/shader-cache experiments are optional follow-up).
+- Artifacts: `session-report.json` (schema `jmlx-vlm-first-use-session-2`),
+  24 cells each with `job.json`, `report.json` (schema
+  `jmlx-vlm-first-use-2`) and `worker-stderr.log` (empty for every
+  worker), the per-fork hostrec directory (48 records), `hostrec.log`
+  (wrapper host log) and the two thermal records; digested in the v2
+  raw-digest manifest (section 17.4).

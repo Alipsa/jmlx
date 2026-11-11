@@ -603,7 +603,7 @@ public final class BaselineBenchmark {
       }
     }
     finishQuantiles(perRuntime, measured);
-    finishFirstRequest(firstRequest, firsts);
+    finishQuantiles(firstRequest, firsts);
     return new Assembled(root, outcomes);
   }
 
@@ -819,7 +819,12 @@ public final class BaselineBenchmark {
     }
   }
 
-  /** Replaces the measured sample lists with their type-7 quantile summaries. */
+  /**
+   * Replaces per-cell sample lists with their type-7 quantile summaries, grouped by runtime. Each
+   * runtime block is created exactly once (the intermediate map is keyed by runtime), so every cell
+   * of a runtime survives, not just the last. Used for both the measured-request block and the
+   * separate first-request distribution.
+   */
   private static void finishQuantiles(
       ObjectNode perRuntime, Map<String, Map<String, List<Double>>> measured) {
     Map<String, Map<String, Map<String, List<Double>>>> byRuntime = new LinkedHashMap<>();
@@ -838,27 +843,6 @@ public final class BaselineBenchmark {
           metrics.set(
               metric.getKey(), quantileNode(BaselineStatistics.quantiles(metric.getValue())));
         }
-      }
-    }
-  }
-
-  /**
-   * The first-request samples are a separate distribution, quantiled per (runtime, adapter, mode,
-   * case, length).
-   */
-  private static void finishFirstRequest(
-      ObjectNode firstRequest, Map<String, Map<String, List<Double>>> firsts) {
-    for (Map.Entry<String, Map<String, List<Double>>> entry : firsts.entrySet()) {
-      int separator = entry.getKey().indexOf('|');
-      String runtime = entry.getKey().substring(0, separator);
-      // putObject replaces an existing property, so the runtime block is created once and
-      // reused: every cell of that runtime must survive, not just the last one.
-      JsonNode existing = firstRequest.get(runtime);
-      ObjectNode runtimeBlock =
-          existing instanceof ObjectNode block ? block : firstRequest.putObject(runtime);
-      ObjectNode metrics = runtimeBlock.putObject(entry.getKey().substring(separator + 1));
-      for (Map.Entry<String, List<Double>> metric : entry.getValue().entrySet()) {
-        metrics.set(metric.getKey(), quantileNode(BaselineStatistics.quantiles(metric.getValue())));
       }
     }
   }

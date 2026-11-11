@@ -826,9 +826,9 @@ public final class BaselineBenchmark {
    * separate first-request distribution.
    */
   private static void finishQuantiles(
-      ObjectNode perRuntime, Map<String, Map<String, List<Double>>> measured) {
+      ObjectNode target, Map<String, Map<String, List<Double>>> samplesByCell) {
     Map<String, Map<String, Map<String, List<Double>>>> byRuntime = new LinkedHashMap<>();
-    for (Map.Entry<String, Map<String, List<Double>>> cell : measured.entrySet()) {
+    for (Map.Entry<String, Map<String, List<Double>>> cell : samplesByCell.entrySet()) {
       int separator = cell.getKey().indexOf('|');
       String runtime = cell.getKey().substring(0, separator);
       byRuntime
@@ -836,7 +836,7 @@ public final class BaselineBenchmark {
           .put(cell.getKey().substring(separator + 1), cell.getValue());
     }
     for (Map.Entry<String, Map<String, Map<String, List<Double>>>> runtime : byRuntime.entrySet()) {
-      ObjectNode cells = perRuntime.putObject(runtime.getKey());
+      ObjectNode cells = target.putObject(runtime.getKey());
       for (Map.Entry<String, Map<String, List<Double>>> cell : runtime.getValue().entrySet()) {
         ObjectNode metrics = cells.putObject(cell.getKey());
         for (Map.Entry<String, List<Double>> metric : cell.getValue().entrySet()) {

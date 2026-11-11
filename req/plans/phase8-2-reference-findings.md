@@ -2767,12 +2767,13 @@ clock from its report (summing full_generation_s plus the recorded prime_s
 — the primed-per-request mode excludes prime time from full_generation_s —
 forward from utc_start and backward from utc_end) leaves only 2.0-2.4 s
 unaccounted per worker (model load ~0.05 s), so the forward and backward
-placements agree to within ~2 s. The recovery sample falls 9-36 s after the
-estimated end of that worker's first-request plus warmup phase (B2 pair6's
-trough ended 9 s before its estimated end), and the measured phases of A
-pair0, A2 pair6 and B pair0 began 7-36 s before their recovery sample (B2
-pair6's began 9-12 s after it), with the hostrec samples (60 s cadence)
-covering the measured phases reading 56-82%; the 60 s cadence leaves at
+placements agree to within ~2 s. The recovery sample falls 7-36 s after
+the estimated end of that worker's first-request plus warmup phase — the
+start of the measured phase (B2 pair6's trough ended 9 s before it) — so
+the measured phases of A pair0, A2 pair6 and B pair0 began 7-36 s before
+their recovery sample (B2 pair6's began 9-12 s after it), with the hostrec
+samples (60 s cadence) covering those phases reading 56-69%; the 60 s
+cadence leaves at
 most the first 28-37 s of A pair0's and B pair0's measured phases possibly
 still in the trough's final transition. The same placement shows A pair2's
 20 measured requests (10.6 s each, 3.4x clean) began 12-15 s before its
@@ -3495,13 +3496,14 @@ round amends section 16 in place:
   measured-request block and the first-request block. No behavior change.
 - Trough alignment (section 16.4b): in all five recovered cases the
   recovery begins 39-206 s (0.7-3.4 min) before the worker's own end, not
-  "within about 4 min of the worker ending"; it falls 9-36 s after the
+  "within about 4 min of the worker ending"; it falls 7-36 s after the
   estimated end of that worker's first-request plus warmup phase (B2
   pair6's trough ended 9 s before its estimated end). Review round 4
   (section 16.11) tightens the placement: the 14.7-21.2 s apparent
   inter-request gaps are mostly the recorded prime time, which the
   primed-per-request mode excludes from full_generation_s; including
-  prime_s leaves only 2.0-2.4 s unaccounted per worker.
+  prime_s leaves only 2.0-2.4 s unaccounted per worker. Review round 5
+  (section 16.12) corrected the range.
 - W2 (sections 16.4/16.4b): the W2 bullet had said the worker "ran
   inside" the trough; only its first request and warmups did. Its 20
   measured requests (9.923-10.768 s each, 3.4x the clean 3.08 s) ran at
@@ -3574,3 +3576,27 @@ This round amends section 16 in place:
 - Raw-data digests (section 16.1): the manifest gains the
   hostrec/session-a-controlled host.log and launcher.log and the
   pilot/qualification/diagnostic launcher.log files — 458 files.
+
+### 16.12 Review round 5 (2026-11-11, PR #91)
+
+This round amends section 16 in place; both findings are consistency
+fixes in the section 16.4b placement paragraph, verified against the
+raw report.json placements and the 60 s hostrec samples:
+
+- Range unification (sections 16.4b/16.10): "the recovery sample
+  falls 9-36 s after the estimated end of that worker's
+  first-request plus warmup phase" and "the measured phases of A
+  pair0, A2 pair6 and B pair0 began 7-36 s before their recovery
+  sample" describe the same moment — the end of the warmup phase is
+  the start of the measured phase. The verified per-worker offsets
+  (backward placement / forward placement) are A pair0 34/36 s, B
+  pair0 28/30 s and A2 pair6 7/9 s before the recovery sample, so
+  both clauses now read 7-36 s.
+- In-phase sample range (section 16.4b): "the hostrec samples (60 s
+  cadence) covering the measured phases reading 56-82%" — the named
+  workers' in-phase samples are 62 (A pair0), 63 and 68 (A2 pair6),
+  56 (B pair0) and 69 (B2 pair6), so the range is 56-69%. The
+  81-82% readings are A pair2's measured phase, which the next
+  sentence covers separately.
+- No code, measurement or raw-data change; the digest manifest
+  remains at 458 entries.

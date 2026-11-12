@@ -149,3 +149,11 @@ jobs:
           path: ${{ runner.temp }}/wp4-vlm-smoke-${{ github.run_id }}-${{ github.run_attempt }}/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Remove old-pin worktree
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${WP4_OLD_TREE:-}" ]]; then
+            git worktree remove --force "$WP4_OLD_TREE" || git worktree prune --expire now
+          fi

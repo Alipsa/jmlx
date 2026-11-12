@@ -201,21 +201,7 @@ jobs:
           : "${HOME:?the job environment must set HOME}"
           MODEL_DIR="$HOME/tier-b-models/${{ matrix.name }}"
           echo "Model dir: $MODEL_DIR"
-          mkdir -p "$MODEL_DIR"
-          python3 - "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST" <<'PY'
-          import json, os, sys
-          from pathlib import Path
-
-          root = Path(sys.argv[1])
-          listed = {os.path.normpath(k) for k in json.load(open(sys.argv[2]))["files"]}
-          # Deepest first, so a directory is visited after its contents.
-          for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-              rel = os.path.normpath(str(path.relative_to(root)))
-              if path.is_symlink() or (path.is_file() and rel not in listed):
-                  path.unlink()
-              elif path.is_dir() and not any(path.iterdir()):
-                  path.rmdir()
-          PY
+          python3 tools/vlm-first-use/model_cache.py "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST"
           echo "JMLX_TIER_B_MODEL_DIR=$MODEL_DIR" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v6
         with:

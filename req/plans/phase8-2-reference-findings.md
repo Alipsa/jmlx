@@ -4112,12 +4112,11 @@ Worker input-verification failures exit 1. Report and session schemas are
 now `jmlx-vlm-first-use-3` and `jmlx-vlm-first-use-session-3`;
 `job_verification_failed` has one spelling with or without a report.
 
-This committed harness has **not had a native smoke or full session**.
-The macOS CI native job runs module checks and release smoke, not this
-two-tree VLM launcher. A one-pair native smoke with the refreshed old
-worker and both real `installDist` trees is needed before another full
-session to check real `exit_code`, `native_pin.library_path` and jar
-freshness acceptance.
+At the end of review round 3, this committed harness had **not had a
+native smoke or full session**. The macOS CI native job runs module checks
+and release smoke, not this two-tree VLM launcher. Section 17.8 records
+the subsequent one-pair native smoke of this harness, including real
+`exit_code`, `native_pin.library_path` and jar freshness acceptance.
 Its worker-source SHA-256 is
 `76c053b8f1a52dbfaa8b27983e81d223c794f1585e380a0286f25b5411efa439`,
 different from both measured worker versions. The session 1 and 2
@@ -4131,3 +4130,37 @@ commit. The section 4 trigger applies to both workloads: session 2's
 phi3v pair 0 and pair 3 gaps exceed 10% as well as the qwen3vl shifts,
 so both cells close as `unstable`, without a settled ratio or runtime
 attribution from session 2.
+
+### 17.8 CI one-pair native VLM smoke (2026-11-12, PR #92)
+
+The labeled [GitHub Actions run](https://github.com/Alipsa/jmlx/actions/runs/43307319179)
+`43307319179` (attempt 1) executed head
+`76dac46c323c54d99e8bcd6596218c0207703a32` against old tree
+`46cb325bec9b4878534cc5c6bda1a569dfe4aa4c`. Both trees used the
+byte-identical worker source SHA-256
+`76c053b8f1a52dbfaa8b27983e81d223c794f1585e380a0286f25b5411efa439`
+and rebuilt `installDist` from their source. The worker reports record
+Java 25.0.5; the two full sessions used 25.0.4.1.
+
+| Tree | `mlxMetalVersion` | `mlxcCommit` | `mlx.metallib` SHA-256 | `libmlxc.dylib` SHA-256 | `libmlx.dylib` SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| old | 0.31.2 | `fba4470b89073180056c9ea46c443051375f7399` | `8c8bfcece8c0610745b68879771e5aa1b92b29fa5e17172e5508e4f5153d8d15` | `f63fe68131e23876859497369069ef2ad3c869569563fd70bab8ab65ec0b8847` | `2ee6fbd32ff22e22e1301ebe3c3bece95584104ff9cbc900513d41a095211bbd` |
+| new | 0.32.4 | `a26f2d584a14ec619ae8db9a09be03becd47598a` | `c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893` | `3b17e14ba9fffc430983c9f216935542e72abc6872a6d0ec103b4a838bbf63ce` | `d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6` |
+
+The protocol gate passed **4/4 real `ok` workers**: one old/new pair for
+each workload, with matching exit codes, tree/cell identities, pin values,
+and two measured iterations per worker. The after-first-forward MLX peaks
+reproduce the prior shape: qwen3vl-2b old/new both 9,828,890,788 B;
+phi3v-4b old 31,100,376,165 B and new 30,202,745,961 B. These are
+phase-local peaks. The first pre-fork host record has `omlx=40.0%`, so
+the host was **not quiet**. The smoke's per-pair warm ratios, based on
+only two measured iterations per worker, are protocol observations, **not
+performance evidence**; they do not change either cell's `unstable`
+closure in section 17.6 or support runtime attribution.
+
+The downloaded 18-file Actions artifact is archived as
+`req/plans/evidence/wp4-native-smoke-43307319179-1.zip` (SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`).
+`req/plans/phase8-2-wp4-raw-digests.json` schema v3 records the archive
+and every contained file's digest, independently of the Actions artifact's
+14-day retention. Its 181 historical scratch-tree digests remain unchanged.

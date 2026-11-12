@@ -4095,11 +4095,12 @@ convention restored).
   (wrapper host log) and the two thermal records; digested in the v2
   raw-digest manifest (section 17.4).
 
-### 17.7 Review round 2 (2026-11-12, PR #92)
+### 17.7 Review rounds 2–3 (2026-11-12, PR #92)
 
 The round-2 harness checks each installed JMLX jar against the newest
 tracked main-source or build-file modification in its own module and
-the root Gradle inputs; it also checks the benchmarks jar against the
+the root Gradle inputs (including `gradle.properties` and the Gradle
+wrapper version); it also checks the benchmarks jar against the
 worker source, which can be untracked in the old worktree. A Git checkout
 can refresh input mtimes while Gradle keeps content-identical jars; a
 freshness refusal now directs the operator to rerun `installDist` with
@@ -4112,6 +4113,11 @@ now `jmlx-vlm-first-use-3` and `jmlx-vlm-first-use-session-3`;
 `job_verification_failed` has one spelling with or without a report.
 
 This committed harness has **not had a native smoke or full session**.
+The macOS CI native job runs module checks and release smoke, not this
+two-tree VLM launcher. A one-pair native smoke with the refreshed old
+worker and both real `installDist` trees is needed before another full
+session to check real `exit_code`, `native_pin.library_path` and jar
+freshness acceptance.
 Its worker-source SHA-256 is
 `76c053b8f1a52dbfaa8b27983e81d223c794f1585e380a0286f25b5411efa439`,
 different from both measured worker versions. The session 1 and 2

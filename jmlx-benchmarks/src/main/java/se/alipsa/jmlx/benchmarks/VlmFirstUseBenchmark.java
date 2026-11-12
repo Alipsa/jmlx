@@ -625,7 +625,9 @@ public final class VlmFirstUseBenchmark {
               module + "/build.gradle",
               "build.gradle",
               "settings.gradle",
+              "gradle.properties",
               "gradle/libs.versions.toml",
+              "gradle/wrapper/gradle-wrapper.properties",
               "buildSrc")) {
         if (!relative.isBlank()) {
           FileTime time = Files.getLastModifiedTime(tree.resolve(relative));

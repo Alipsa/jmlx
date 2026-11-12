@@ -3887,8 +3887,9 @@ digest is `fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac`
 recorded (all 24 workers ok, all IDs matched; the high-severity finding
 did not affect it — every `first_request.correct.*` field in the raw
 reports is true), but the harness it ran on changed, and the section 4
-triggers fired, so session 2 (section 17.6) runs the fixed harness from
-the review commit's SHA on a quiet host before any runtime attribution.
+triggers fired, so session 2 (section 17.6) ran the fixed harness from
+the review commit's SHA. Its first qwen3vl forks showed residual omlx
+activity, so only its later qwen3vl pairs and phi3v phase were quiet.
 
 - P1 (high): a first-request correctness failure wrote
   `correctness_failed` and then fell through to an `ok` report with
@@ -3973,7 +3974,7 @@ measured 5, timeout 900 s, budget 5400 s, TF32=0, stop sets qwen3vl
 the serving agent fully idle during the run (the section 16.4b
 convention restored).
 
-### 17.6 Session 2 `wp4-observed-cache-2` (quiet host, fixed harness)
+### 17.6 Session 2 `wp4-observed-cache-2` (host activity during qwen3vl, fixed harness)
 
 - Session 21:00:17-21:07:00 UTC (6 m 43 s wall, 24 workers) from the
   review commit ecc69a5 (worker digest
@@ -4049,13 +4050,12 @@ convention restored).
     the controlled experiment that would attribute it was not run (plan
     section 5.2 marks it additional work), so attribution stays
     "consistent with".
-  - No code-and-pin effect on warm throughput is detectable at this
-    precision: on the quiet host the paired ratios cluster at 1.0 in
-    both workloads (phi3v-4b medians 0.975 session 1 / 1.022 session
-    2; qwen3vl-2b regime-stable pairs 1.001-1.079), and the small
-    new/old difference flips direction between sessions — consistent
-    with host/measurement noise rather than a systematic effect of the
-    156 commits and pin change.
+  - The fully quiet phi3v phase has paired ratios near 1.0 (median
+    1.022 in session 2). For qwen3vl, only pairs 4-5 ran after the
+    observed omlx activity decayed; their full-generation ratios are
+    1.079 and 1.005. These two quiet pairs do not support a workload-wide
+    code-and-pin attribution. The earlier qwen3vl forks and the p3
+    ratio of 2.379 remain part of the reported data.
 - Memory (phase-local peaks, schema -2; session 1's cumulative peaks,
   section 17.3, agree within the quoted spans, confirming the peak is
   reached in the first forward, not during load):
@@ -4074,24 +4074,15 @@ convention restored).
     observation under the section 17.1 label, not attributable to the
     pin alone); after the warm/measured phases, the peaks equal the
     after-first peaks (same maximum buffer re-touched).
-- Session-3 decision: not triggered. The section 4 triggers present in
-  session 2 are the >10% adjacent-fork deltas from the qwen3vl regime
-  boundary, which the per-fork records investigate (they coincide with
-  the omlx decay crossing 1%, are synchronized across both trees, and
-  the one intra-pair ratio is an ordering artifact); there is no
-  thermal or memory warning (therm count is the host-constant 2 with no
-  level), no missing host record (48/48 records present,
-  `hostrec_failures` empty), and no surprising prefill (the slow first
-  requests occur in both trees and stay in the separate first-request
-  distribution). The investigation session 2 was ordered for is
-  complete: quiet-host baselines now exist for both workloads (the
-  whole phi3v phase; the qwen3vl tail), the quiet-host paired comparison
-  is 1.0, and both session-1 anomalies are resolved (the p2 dip did not
-  recur; the early-pair slowness is consistent with a first-use-after-
-  reboot host state). The qwen3vl fast-regime mechanism and the omlx
-  decaying-reading correlation remain host-side open questions,
-  explicitly out of scope per plan section 5.2 (controlled
-  contention/shader-cache experiments are optional follow-up).
+- Session-3 decision: **deviation from plan section 4**. The >10%
+  adjacent-fork shifts in session 2 meet the written trigger for another
+  alternating session before runtime attribution, and the three-session
+  cap would permit it. Session 3 was not run. The per-fork host records
+  show a regime boundary alongside decaying omlx activity, but that
+  observation does not waive the trigger. Consequently, session 2
+  establishes no qwen3vl workload-wide runtime attribution. It supplies
+  two quiet qwen3vl pairs (4-5) and a fully quiet phi3v phase; a further
+  alternating session is needed before a qwen3vl runtime attribution.
 - Artifacts: `session-report.json` (schema `jmlx-vlm-first-use-session-2`),
   24 cells each with `job.json`, `report.json` (schema
   `jmlx-vlm-first-use-2`) and `worker-stderr.log` (empty for every

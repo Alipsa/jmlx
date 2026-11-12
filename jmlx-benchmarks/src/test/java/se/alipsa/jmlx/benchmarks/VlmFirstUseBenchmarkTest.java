@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -130,7 +131,12 @@ class VlmFirstUseBenchmarkTest {
       if (behavior == Behavior.KILLED) {
         return VlmFirstUseBenchmark.WORKER_KILLED;
       }
-      return 0;
+      return switch (behavior) {
+        case FAILED -> VlmFirstUseWorker.EXIT_RUNTIME_FAILED;
+        case CORRECTNESS_FAILED -> VlmFirstUseWorker.EXIT_CORRECTNESS_FAILED;
+        case BACKSTOP_TIMEOUT -> VlmFirstUseWorker.EXIT_TIMEOUT;
+        default -> 0;
+      };
     }
 
     private void writeReport(
@@ -150,6 +156,10 @@ class VlmFirstUseBenchmarkTest {
       report.put("workload", job.workload().name());
       report.put("tree", job.tree().name());
       report.put("pair_index", job.pairIndex());
+      ObjectNode pin = report.putObject("native_pin");
+      pin.put("mlxMetalVersion", "0.31.2");
+      pin.put("mlxcCommit", "fba4470");
+      pin.put("library_path", job.tree().nativeDir().toString());
       report.put("wall_s", 1.0);
       ObjectNode first = report.putObject("first_request");
       first.put("ttft_s", 1.0);
@@ -291,8 +301,11 @@ class VlmFirstUseBenchmarkTest {
     run(tree, "git", "add", ".");
     run(tree, "git", "commit", "-m", "init");
     Files.createDirectories(tree.resolve("install/lib"));
+    Files.writeString(tree.resolve("install/lib/jmlx-benchmarks-test.jar"), "fake jar");
     Files.createDirectories(tree.resolve("native/lib"));
     Files.writeString(tree.resolve("native/lib/mlx.metallib"), "fake metallib");
+    Files.writeString(tree.resolve("native/lib/libmlxc.dylib"), "fake mlxc");
+    Files.writeString(tree.resolve("native/lib/libmlx.dylib"), "fake mlx");
     Files.writeString(
         tree.resolve("native/lib/native-pin.properties"),
         "mlxMetalVersion=0.31.2\nmlxcCommit=fba4470\n");
@@ -483,6 +496,84 @@ class VlmFirstUseBenchmarkTest {
     // correct object disagrees with it.
     assertEquals("invalid-report", classification.get("mini/old/p4"));
     assertEquals("invalid-report", classification.get("mini/new/p4"));
+  }
+
+  @Test
+  void mismatchedReportIdentityAndSamplesAreExcluded() throws Exception {
+    Setup setup = setup("report-identity");
+    FakeStarter fake = new FakeStarter();
+    VlmFirstUseBenchmark.WorkerStarter starter =
+        (job, file, stderr, limit) -> {
+          int exit = fake.start(job, file, stderr, limit);
+          ObjectNode report =
+              (ObjectNode) MAPPER.readTree(job.cell().resolve("report.json").toFile());
+          if (job.tree().name().equals("old")) {
+            ((ObjectNode) report.path("native_pin")).put("mlxcCommit", "wrong");
+          } else {
+            report.putArray("measured_ttft_s").add(1.0);
+          }
+          Files.writeString(job.cell().resolve("report.json"), report.toString());
+          return exit;
+        };
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_WORKERS_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(setup, "report-identity", 1)));
+    JsonNode session =
+        MAPPER.readTree(setup.root().resolve("out-report-identity/session-report.json").toFile());
+    assertEquals(
+        "invalid-report", session.path("workers").get(0).path("classification").asString());
+    assertEquals(
+        "invalid-report", session.path("workers").get(1).path("classification").asString());
+    assertEquals(
+        0, session.path("summary").path("pooled_warm").path("mini").path("old").path("n").asInt());
+  }
+
+  @Test
+  void unknownStatusAndWrongCellAreInvalidReports() throws Exception {
+    Setup setup = setup("wrong-cell");
+    FakeStarter fake = new FakeStarter();
+    VlmFirstUseBenchmark.WorkerStarter starter =
+        (job, file, stderr, limit) -> {
+          int exit = fake.start(job, file, stderr, limit);
+          ObjectNode report =
+              (ObjectNode) MAPPER.readTree(job.cell().resolve("report.json").toFile());
+          if (job.tree().name().equals("old")) {
+            report.put("status", "unexpected");
+          } else {
+            report.put("pair_index", job.pairIndex() + 1);
+          }
+          Files.writeString(job.cell().resolve("report.json"), report.toString());
+          return exit;
+        };
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_WORKERS_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(setup, "wrong-cell", 1)));
+    JsonNode session =
+        MAPPER.readTree(setup.root().resolve("out-wrong-cell/session-report.json").toFile());
+    for (JsonNode worker : session.path("workers")) {
+      assertEquals("invalid-report", worker.path("classification").asString());
+    }
+  }
+
+  @Test
+  void staleBenchmarksJarAndUntrackedSourceAreRefused() throws Exception {
+    Setup stale = setup("stale-jar");
+    Path jar = stale.oldTree().resolve("install/lib/jmlx-benchmarks-test.jar");
+    Files.setLastModifiedTime(jar, FileTime.fromMillis(1));
+    FakeStarter starter = new FakeStarter();
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_SPEC_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(stale, "stale-jar", 1)));
+    assertTrue(starter.jobs.isEmpty());
+
+    Setup extra = setup("extra-source");
+    Path source = extra.oldTree().resolve("jmlx-core/src/main/java/Extra.java");
+    Files.createDirectories(source.getParent());
+    Files.writeString(source, "class Extra {}\n");
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_SPEC_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(extra, "extra-source", 1)));
+    assertTrue(starter.jobs.isEmpty());
   }
 
   @Test

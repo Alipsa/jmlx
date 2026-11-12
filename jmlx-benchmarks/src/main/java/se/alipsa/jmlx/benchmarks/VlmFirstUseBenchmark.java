@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -32,21 +33,23 @@ import tools.jackson.databind.node.ObjectNode;
  * consecutive forks always run on different trees.
  *
  * <p>Before any fork, the launcher verifies each tree's HEAD against the spec's expected SHA, its
- * tracked-clean state (untracked files are recorded, not rejected), the staged {@code mlx.metallib}
- * and pin properties (read from disk, never trusted from the spec), the byte-identical worker
- * source in both trees (its digest is the measured-code identity together with the tree SHA), and
- * digests every jar in each tree's class dir (the executed jars, recorded in the session report).
- * Each workload's Tier-B manifest is digest-verified and its frozen case 0 parsed (max new tokens
- * and the resolved image paths/digests); the session directory must not pre-exist and must sit
- * outside the repository. Every fork is bracketed by {@code hostrec.sh} pre/post records, and
- * full-output thermal records bracket the session.
+ * tracked-clean state (untracked source files other than the shared worker are rejected), the
+ * staged native binaries and pin properties (read from disk, never trusted from the spec), the
+ * byte-identical worker source in both trees, and every installed jar's digest. The benchmarks jar
+ * must be at least as recent as the worker source; this guards against an installDist left behind
+ * before a source edit. The launcher records the verified pin and native binary digests. Each
+ * workload's Tier-B manifest is digest-verified and its frozen case 0 parsed (max new tokens and
+ * the resolved image paths/digests); the session directory must not pre-exist and must sit outside
+ * the repository. Every fork is bracketed by {@code hostrec.sh} pre/post records, and full-output
+ * thermal records bracket the session.
  *
  * <p>The session stops forking once {@code session_time_budget_s} has elapsed (the remaining
  * workers are recorded not-started, never silently dropped); the budget gates new forks, not
  * in-flight workers, so the session wall can exceed the budget by at most one worker wait limit.
  * Every forked worker leaves a classification in the session report: a valid report's status (ok /
- * failed / correctness_failed / timeout), or, with no report, timeout (launcher wait limit killed
- * it), dead (claim without report), job-verification-failed (exit 1) or crashed (anything else).
+ * failed / correctness_failed / timeout / job_verification_failed), or, with no report, timeout
+ * (launcher wait limit killed it), dead (claim without report), job-verification-failed (exit 1) or
+ * crashed (anything else).
  *
  * <p>Exit codes: 0 all workers ok, 1 spec validation failure (nothing forked), 2 at least one
  * non-ok worker (the session report is still written). Opt-in local tooling, not part of {@code
@@ -335,7 +338,9 @@ public final class VlmFirstUseBenchmark {
       boolean trackedDirty,
       List<String> untracked,
       String workerSha,
-      Map<String, String> jarSha256) {}
+      Map<String, String> jarSha256,
+      Map<String, String> nativePin,
+      Map<String, String> nativeSha256) {}
 
   /** The per-fork job record (launcher -> worker; schema {@code jmlx-vlm-first-use-job-1}). */
   record JobData(
@@ -469,7 +474,8 @@ public final class VlmFirstUseBenchmark {
           throw new SpecFailure(
               "tree " + tree.name + " HEAD " + head + " != expected " + tree.expectedTreeSha);
         }
-        List<String> status = runCommandLines(tree.path, "git", "status", "--porcelain");
+        List<String> status =
+            runCommandLines(tree.path, "git", "status", "--porcelain", "--untracked-files=all");
         List<String> dirty =
             status.stream().filter(line -> !line.isBlank() && !line.startsWith("??")).toList();
         if (!dirty.isEmpty()) {
@@ -501,6 +507,7 @@ public final class VlmFirstUseBenchmark {
         // The executed jars, digested per tree: the git state and worker source verify the
         // source, these verify what the workers actually ran against.
         Map<String, String> jarSha = new LinkedHashMap<>();
+        boolean benchmarksJarFound = false;
         try (var listing = Files.list(tree.classDir)) {
           List<Path> jars =
               listing
@@ -510,8 +517,18 @@ public final class VlmFirstUseBenchmark {
                           path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
                   .toList();
           for (Path jar : jars) {
+            if (jar.getFileName().toString().startsWith("jmlx-benchmarks-")) {
+              benchmarksJarFound = true;
+              FileTime sourceTime = Files.getLastModifiedTime(workerSource);
+              if (Files.getLastModifiedTime(jar).compareTo(sourceTime) < 0) {
+                throw new SpecFailure("benchmarks jar predates worker source: " + jar);
+              }
+            }
             jarSha.put(jar.getFileName().toString(), sha256Hex(jar));
           }
+        }
+        if (!benchmarksJarFound) {
+          throw new SpecFailure("tree has no jmlx-benchmarks jar in class dir: " + tree.classDir);
         }
         // Untracked files are recorded, not rejected (a staged native dir is untracked on purpose).
         List<String> untracked =
@@ -519,8 +536,24 @@ public final class VlmFirstUseBenchmark {
                 .filter(line -> line.startsWith("??"))
                 .map(line -> line.substring(3))
                 .toList();
+        for (String path : untracked) {
+          if ((path.startsWith("src/") || path.contains("/src/"))
+              && !path.equals(tree.path.relativize(workerSource).toString())) {
+            throw new SpecFailure("untracked source path in tree " + tree.name + ": " + path);
+          }
+        }
+        Map<String, String> nativeSha = new LinkedHashMap<>();
+        for (String name : List.of("mlx.metallib", "libmlxc.dylib", "libmlx.dylib")) {
+          Path binary = tree.nativeDir.resolve(name);
+          if (!Files.isRegularFile(binary)) {
+            throw new SpecFailure("tree native binary missing: " + binary);
+          }
+          nativeSha.put(name, sha256Hex(binary));
+        }
         // Tracked-dirty trees are refused above, so every recorded tree is tracked-clean.
-        treeInfos.put(tree.name, new TreeInfo(tree, head, false, untracked, workerSha, jarSha));
+        treeInfos.put(
+            tree.name,
+            new TreeInfo(tree, head, false, untracked, workerSha, jarSha, pin, nativeSha));
       }
       for (Workload workload : spec.workloads) {
         Path manifest = workload.manifestAt(spec.repoRoot);
@@ -674,6 +707,37 @@ public final class VlmFirstUseBenchmark {
                 "report schema differs from " + VlmFirstUseWorker.REPORT_SCHEMA);
           }
           String status = parsed.path("status").asString();
+          if (!List.of("ok", "failed", "correctness_failed", "timeout", "job_verification_failed")
+              .contains(status)) {
+            return new WorkerOutcome(
+                workload, tree, pair, "invalid-report", parsed, "unknown report status: " + status);
+          }
+          if (!workload.equals(parsed.path("workload").asString())
+              || !tree.equals(parsed.path("tree").asString())
+              || pair != parsed.path("pair_index").asInt(-1)) {
+            return new WorkerOutcome(
+                workload, tree, pair, "invalid-report", parsed, "report cell identity differs");
+          }
+          if (!parsed.path("exit_code").isMissingNode()
+              && parsed.path("exit_code").asInt(-1) != starterResult) {
+            return new WorkerOutcome(
+                workload, tree, pair, "invalid-report", parsed, "report exit_code differs");
+          }
+          JsonNode pin = parsed.path("native_pin");
+          Map<String, String> expectedPin = treeInfos.get(tree).nativePin();
+          if ("ok".equals(status) || pin.isObject()) {
+            for (String key : List.of("mlxMetalVersion", "mlxcCommit", "library_path")) {
+              if (!expectedPin.get(key).equals(pin.path(key).asString())) {
+                return new WorkerOutcome(
+                    workload,
+                    tree,
+                    pair,
+                    "invalid-report",
+                    parsed,
+                    "report native pin differs: " + key);
+              }
+            }
+          }
           if ("ok".equals(status)) {
             // Defense in depth: a worker that reports ok must also have exited 0 and have every
             // first_request.correct.* field true. A mismatch means the worker's report is
@@ -681,6 +745,17 @@ public final class VlmFirstUseBenchmark {
             // values must not enter the pooled or paired statistics (plan section 7:
             // "missing/failed/instrumented samples cannot enter successful headline summaries").
             if (starterResult == VlmFirstUseWorker.EXIT_OK && firstRequestCorrect(parsed)) {
+              if (!measuredValuesValid(parsed.path("measured_ttft_s"), spec.measured)
+                  || !measuredValuesValid(
+                      parsed.path("measured_full_generation_s"), spec.measured)) {
+                return new WorkerOutcome(
+                    workload,
+                    tree,
+                    pair,
+                    "invalid-report",
+                    parsed,
+                    "measured sample count or value differs");
+              }
               return new WorkerOutcome(workload, tree, pair, "ok", parsed, null);
             }
             return new WorkerOutcome(
@@ -692,6 +767,22 @@ public final class VlmFirstUseBenchmark {
                 "report status is ok but the exit code ("
                     + starterResult
                     + ") or first_request.correct.* fields disagree with it");
+          }
+          int expectedExit =
+              switch (status) {
+                case "failed" -> VlmFirstUseWorker.EXIT_RUNTIME_FAILED;
+                case "correctness_failed" -> VlmFirstUseWorker.EXIT_CORRECTNESS_FAILED;
+                case "job_verification_failed" -> VlmFirstUseWorker.EXIT_JOB_VERIFICATION_FAILED;
+                default -> VlmFirstUseWorker.EXIT_TIMEOUT;
+              };
+          if (starterResult != expectedExit) {
+            return new WorkerOutcome(
+                workload,
+                tree,
+                pair,
+                "invalid-report",
+                parsed,
+                "report status and exit code differ");
           }
           return new WorkerOutcome(workload, tree, pair, status, parsed, null);
         } catch (Exception e) {
@@ -732,6 +823,18 @@ public final class VlmFirstUseBenchmark {
       }
       for (Map.Entry<String, JsonNode> field : correct.properties()) {
         if (!field.getValue().isBoolean() || !field.getValue().asBoolean()) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    private static boolean measuredValuesValid(JsonNode values, int count) {
+      if (!values.isArray() || values.size() != count) {
+        return false;
+      }
+      for (JsonNode value : values) {
+        if (!value.isNumber() || !Double.isFinite(value.asDouble()) || value.asDouble() <= 0) {
           return false;
         }
       }
@@ -826,9 +929,12 @@ public final class VlmFirstUseBenchmark {
           jars.put(entry.getKey(), entry.getValue());
         }
         ObjectNode pin = tree.putObject("native_pin");
-        for (Map.Entry<String, String> entry :
-            readPinProperties(info.tree().nativeDir()).entrySet()) {
+        for (Map.Entry<String, String> entry : info.nativePin().entrySet()) {
           pin.put(entry.getKey(), entry.getValue());
+        }
+        ObjectNode nativeDigests = tree.putObject("native_sha256");
+        for (Map.Entry<String, String> entry : info.nativeSha256().entrySet()) {
+          nativeDigests.put(entry.getKey(), entry.getValue());
         }
         tree.put("class_dir", info.tree().classDir().toString());
       }
@@ -964,6 +1070,11 @@ public final class VlmFirstUseBenchmark {
             }
           }
           ObjectNode treeNode = workloadNode.putObject(treeName);
+          if (ttft.isEmpty() || full.isEmpty()) {
+            treeNode.put("n", 0);
+            treeNode.put("note", "no ok workers; warm quantiles unavailable");
+            continue;
+          }
           BaselineStatistics.Quantiles ttftQ = BaselineStatistics.quantiles(ttft);
           BaselineStatistics.Quantiles fullQ = BaselineStatistics.quantiles(full);
           treeNode.put("ttft_p10", ttftQ.p10());

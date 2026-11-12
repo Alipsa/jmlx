@@ -51,9 +51,10 @@ import tools.jackson.databind.node.ObjectNode;
  * intervals use the monotonic clock; UTC stamps bracket the run for host-record correlation.
  *
  * <p>The source file is byte-identical between the two trees (it references only the stable public
- * API shared by both); the measured-code record is the tree SHA plus this file's digest, not the
- * file's location. Exit codes: 0 ok, 1 job verification failure, 2 runtime failure, 3 correctness
- * failure, 4 internal backstop timeout.
+ * API shared by both); the launcher records the tree SHA and source digest, checks that the
+ * installed benchmarks jar is no older than the source, and digests the executed jars. Exit codes:
+ * 0 ok, 1 job verification failure, 2 runtime failure, 3 correctness failure, 4 internal backstop
+ * timeout.
  *
  * <p>Opt-in local tooling, not part of {@code check} or the publication surface.
  */
@@ -86,6 +87,13 @@ public final class VlmFirstUseWorker {
 
   /** One warm or measured repetition whose IDs diverged from the first request (retained). */
   public record WarmDivergence(String label, List<Integer> generatedIds) {}
+
+  /** A rejected job or staged input, before model execution begins. */
+  private static final class JobVerificationException extends Exception {
+    JobVerificationException(Throwable cause) {
+      super(cause);
+    }
+  }
 
   /**
    * The post-capture correctness decision, kept static and side-effect free so the worker-failure
@@ -258,6 +266,10 @@ public final class VlmFirstUseWorker {
     int execute() {
       try {
         return executeInner();
+      } catch (JobVerificationException e) {
+        finish(
+            "job_verification_failed", String.valueOf(e.getCause()), EXIT_JOB_VERIFICATION_FAILED);
+        return EXIT_JOB_VERIFICATION_FAILED;
       } catch (Exception e) {
         // A failure after the claim still leaves a report (the launcher classifies dead/crashed
         // only for workers that left neither artifact).
@@ -267,31 +279,7 @@ public final class VlmFirstUseWorker {
     }
 
     private int executeInner() throws Exception {
-      // Environment and staged-pin verification before any measurement.
-      String actualEnv = System.getenv(job.precisionEnv);
-      if (!job.precisionValue.equals(actualEnv)) {
-        throw new IllegalStateException(
-            job.precisionEnv
-                + " must be "
-                + job.precisionValue
-                + " (declared precision), got '"
-                + actualEnv
-                + "'");
-      }
-      stagedPin = readStagedPinProperties();
-      for (int i = 0; i < job.imagePaths.size(); i++) {
-        String sha = sha256Hex(job.imagePaths.get(i));
-        if (!sha.equals(job.imageSha256s.get(i))) {
-          throw new IllegalStateException(
-              "image digest mismatch ("
-                  + job.imagePaths.get(i)
-                  + "): "
-                  + sha
-                  + " != "
-                  + job.imageSha256s.get(i));
-        }
-      }
-      reference = loadManifest();
+      verifyInputs();
 
       // Handshake claim, then the internal backstop.
       ObjectNode claimNode = MAPPER.createObjectNode();
@@ -426,6 +414,26 @@ public final class VlmFirstUseWorker {
                   measuredIdsMatch,
                   memory));
       return wrote ? verdict.exitCode() : EXIT_TIMEOUT;
+    }
+
+    private void verifyInputs() throws JobVerificationException {
+      try {
+        String actualEnv = System.getenv(job.precisionEnv);
+        if (!job.precisionValue.equals(actualEnv)) {
+          throw new IllegalStateException(
+              job.precisionEnv + " must be " + job.precisionValue + ", got '" + actualEnv + "'");
+        }
+        stagedPin = readStagedPinProperties();
+        for (int i = 0; i < job.imagePaths.size(); i++) {
+          String sha = sha256Hex(job.imagePaths.get(i));
+          if (!sha.equals(job.imageSha256s.get(i))) {
+            throw new IllegalStateException("image digest mismatch: " + job.imagePaths.get(i));
+          }
+        }
+        reference = loadManifest();
+      } catch (Exception e) {
+        throw new JobVerificationException(e);
+      }
     }
 
     /**
@@ -668,6 +676,7 @@ public final class VlmFirstUseWorker {
       ObjectNode report = MAPPER.createObjectNode();
       report.put("schema", REPORT_SCHEMA);
       report.put("status", status);
+      report.put("exit_code", code);
       if (failureReason != null) {
         report.put("failure_reason", failureReason);
       }
@@ -704,6 +713,7 @@ public final class VlmFirstUseWorker {
         }
         workload.put("max_new_tokens", job.maxNewTokens);
         ArrayNode stops = workload.putArray("stop_token_ids");
+        workload.put("stop_token_ids_semantics", "eosTokenIds in GenerationConfig.greedyDefaults");
         for (int id : job.stopTokenIds) {
           stops.add(id);
         }

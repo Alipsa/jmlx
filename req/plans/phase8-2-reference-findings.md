@@ -4074,18 +4074,20 @@ convention restored).
     observation under the section 17.1 label, not attributable to the
     pin alone); after the warm/measured phases, the peaks equal the
     after-first peaks (same maximum buffer re-touched).
-- Session-3 decision: **deviation from plan section 4**. The >10%
-  adjacent-fork shifts in session 2 meet the written trigger for another
-  alternating session before runtime attribution, and the three-session
-  cap would permit it. Session 3 was not run. The per-fork host records
-  show a regime boundary alongside decaying omlx activity, but that
-  observation does not waive the trigger. Phi3v also has >10% adjacent
-  fork gaps (pair 0 TTFT ratio 0.830; pair 3 full/TTFT ratios
-  1.120/1.167), despite the quiet host. Consequently, session 2
-  establishes no workload-wide runtime attribution for either VLM. It
-  supplies two quiet qwen3vl pairs (4-5) and a quiet phi3v phase as
-  observations; a further alternating session is needed before runtime
-  attribution for either workload.
+- Cell closure: **qwen3vl-2b = `unstable`; phi3v-4b = `unstable`** under
+  plan section 4.1. Both sessions have all required worker samples and
+  are retained with their ranges and host records, but neither cell has
+  a settled performance ratio or runtime attribution. Session 2 has
+  >10% adjacent-fork shifts in qwen3vl, and phi3v pair 0 (TTFT ratio
+  0.830) and pair 3 (full/TTFT ratios 1.120/1.167) also meet that
+  trigger. The qwen3vl regime boundary coincides with decaying omlx
+  activity; the phi3v host phase is quiet but still variable. Session 3
+  was not run. Section 4 requires another alternating session **before
+  runtime attribution**; no such attribution is made here. Ending
+  collection after two sessions, before budget exhaustion or the
+  three-session limit, is a recorded deviation from section 4.1's
+  stopping rule. Any later runtime attribution needs another complete
+  alternating session or a recorded plan revision.
 - Artifacts: `session-report.json` (schema `jmlx-vlm-first-use-session-2`),
   24 cells each with `job.json`, `report.json` (schema
   `jmlx-vlm-first-use-2`) and `worker-stderr.log` (empty for every
@@ -4096,9 +4098,12 @@ convention restored).
 ### 17.7 Review round 2 (2026-11-12, PR #92)
 
 The round-2 harness checks each installed JMLX jar against the newest
-tracked main-source or build-file modification in its own module; it also
-checks the benchmarks jar against the worker source, which can be untracked
-in the old worktree. The launcher compares worker reports with the expected
+tracked main-source or build-file modification in its own module and
+the root Gradle inputs; it also checks the benchmarks jar against the
+worker source, which can be untracked in the old worktree. A Git checkout
+can refresh input mtimes while Gradle keeps content-identical jars; a
+freshness refusal now directs the operator to rerun `installDist` with
+`--rerun-tasks`. The launcher compares worker reports with the expected
 cell and verified pin, accepts only known statuses and matching exit codes,
 retains a timeout classification when the launcher kills a worker after its
 backstop wrote a timeout report, and records three native-binary digests.
@@ -4118,4 +4123,5 @@ launcher rejects the byte-different worker source (or a stale benchmarks
 jar). The new checkout also needs its `installDist` rebuilt from this
 commit. The section 4 trigger applies to both workloads: session 2's
 phi3v pair 0 and pair 3 gaps exceed 10% as well as the qwen3vl shifts,
-so neither workload receives a runtime attribution from session 2.
+so both cells close as `unstable`, without a settled ratio or runtime
+attribution from session 2.

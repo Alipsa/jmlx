@@ -312,6 +312,14 @@ class VlmFirstUseBenchmarkTest {
     Path modelsSource = tree.resolve("jmlx-models/src/main/java/Model.java");
     Files.createDirectories(modelsSource.getParent());
     Files.writeString(modelsSource, "class Model {}\n");
+    Files.writeString(tree.resolve("build.gradle"), "// fake root build\n");
+    Files.writeString(tree.resolve("settings.gradle"), "// fake settings\n");
+    Path catalog = tree.resolve("gradle/libs.versions.toml");
+    Files.createDirectories(catalog.getParent());
+    Files.writeString(catalog, "# fake catalog\n");
+    Path buildSrc = tree.resolve("buildSrc/src/main/java/BuildInput.java");
+    Files.createDirectories(buildSrc.getParent());
+    Files.writeString(buildSrc, "class BuildInput {}\n");
     Files.writeString(tree.resolve("README"), label + "\n");
     run(tree, "git", "add", ".");
     run(tree, "git", "commit", "-m", "init");
@@ -582,6 +590,14 @@ class VlmFirstUseBenchmarkTest {
         new VlmFirstUseBenchmark(starter).runSession(spec(stale, "stale-jar", 1)));
     assertTrue(starter.jobs.isEmpty());
 
+    Setup staleRoot = setup("stale-root-input");
+    Path rootInput = staleRoot.oldTree().resolve("gradle/libs.versions.toml");
+    Files.setLastModifiedTime(rootInput, FileTime.fromMillis(System.currentTimeMillis() + 60_000));
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_SPEC_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(staleRoot, "stale-root-input", 1)));
+    assertTrue(starter.jobs.isEmpty());
+
     Setup staleModels = setup("stale-models-jar");
     Path modelsJar = staleModels.oldTree().resolve("install/lib/jmlx-models-test.jar");
     Files.setLastModifiedTime(modelsJar, FileTime.fromMillis(1));
@@ -611,6 +627,23 @@ class VlmFirstUseBenchmarkTest {
     JsonNode session =
         MAPPER.readTree(setup.root().resolve("out-timeout-killed/session-report.json").toFile());
     assertEquals("timeout", session.path("workers").get(0).path("classification").asString());
+  }
+
+  @Test
+  void checkedPreForkFailureUsesSpecExitCode() throws Exception {
+    Setup setup = setup("quoted-tracked-path");
+    Path odd = setup.oldTree().resolve("jmlx-models/src/main/java/Quoted\nInput.java");
+    Files.writeString(odd, "class QuotedInput {}\n");
+    run(setup.oldTree(), "git", "add", ".");
+    run(setup.oldTree(), "git", "commit", "-m", "add quoted path");
+    ObjectNode input = spec(setup, "quoted-tracked-path", 1);
+    pathObj(input, "trees", "old")
+        .put("expected_tree_sha", run(setup.oldTree(), "git", "rev-parse", "HEAD").trim());
+    FakeStarter starter = new FakeStarter();
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_SPEC_FAILED, new VlmFirstUseBenchmark(starter).runSession(input));
+    assertTrue(starter.jobs.isEmpty());
+    assertFalse(Files.exists(setup.root().resolve("out-quoted-tracked-path")));
   }
 
   @Test

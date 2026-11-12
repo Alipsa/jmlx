@@ -37,12 +37,12 @@ import tools.jackson.databind.node.ObjectNode;
  * staged native binaries and pin properties (read from disk, never trusted from the spec), the
  * byte-identical worker source in both trees, and every installed jar's digest. Each JMLX jar must
  * be at least as recent as its own tracked main sources and build file; the benchmarks jar must
- * also be as recent as the worker source, which may be untracked in the old tree. The launcher
- * records the verified pin and native binary digests. Each workload's Tier-B manifest is
- * digest-verified and its frozen case 0 parsed (max new tokens and the resolved image
- * paths/digests); the session directory must not pre-exist and must sit outside the repository.
- * Every fork is bracketed by {@code hostrec.sh} pre/post records, and full-output thermal records
- * bracket the session.
+ * also be as recent as the worker source, which may be untracked in the old tree. Root Gradle
+ * inputs are checked for every JMLX jar. The launcher records the verified pin and native binary
+ * digests. Each workload's Tier-B manifest is digest-verified and its frozen case 0 parsed (max new
+ * tokens and the resolved image paths/digests); the session directory must not pre-exist and must
+ * sit outside the repository. Every fork is bracketed by {@code hostrec.sh} pre/post records, and
+ * full-output thermal records bracket the session.
  *
  * <p>The session stops forking once {@code session_time_budget_s} has elapsed (the remaining
  * workers are recorded not-started, never silently dropped); the budget gates new forks, not
@@ -437,8 +437,14 @@ public final class VlmFirstUseBenchmark {
     }
 
     int execute() throws Exception {
-      verifyEnvironment();
-      Files.createDirectories(spec.outRoot);
+      try {
+        verifyEnvironment();
+        Files.createDirectories(spec.outRoot);
+      } catch (SpecFailure e) {
+        throw e;
+      } catch (Exception e) {
+        throw new SpecFailure("pre-fork verification failed: " + e);
+      }
       runThermal("start", spec.outRoot.resolve("thermal-start.txt"));
       for (Workload workload : spec.workloads) {
         runWorkload(workload, preps.get(workload.name()));
@@ -543,7 +549,12 @@ public final class VlmFirstUseBenchmark {
                   }
                 }
                 if (Files.getLastModifiedTime(jar).compareTo(newestInput) < 0) {
-                  throw new SpecFailure(module + " jar predates its source or build file: " + jar);
+                  throw new SpecFailure(
+                      module
+                          + " jar predates a tracked build input: "
+                          + jar
+                          + "; rerun installDist with --rerun-tasks in "
+                          + tree.path);
                 }
                 break;
               }
@@ -606,7 +617,16 @@ public final class VlmFirstUseBenchmark {
       FileTime newest = FileTime.fromMillis(0);
       for (String relative :
           runCommandLines(
-              tree, "git", "ls-files", "--", module + "/src/main", module + "/build.gradle")) {
+              tree,
+              "git",
+              "ls-files",
+              "--",
+              module + "/src/main",
+              module + "/build.gradle",
+              "build.gradle",
+              "settings.gradle",
+              "gradle/libs.versions.toml",
+              "buildSrc")) {
         if (!relative.isBlank()) {
           FileTime time = Files.getLastModifiedTime(tree.resolve(relative));
           if (time.compareTo(newest) > 0) {

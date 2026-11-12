@@ -66,8 +66,9 @@ public final class VlmFirstUseWorker {
    * token event (v1 stopped at the first), {@code measured_ids_match} records real per-iteration
    * results, {@code divergences} retains divergent warm/measured outputs, and the memory peaks are
    * phase-local ({@code MLXMemory.resetPeak()} after the after_load and after_first samples).
+   * Version 3 adds {@code exit_code}, the stop-ID semantics field, and the job-verification status.
    */
-  public static final String REPORT_SCHEMA = "jmlx-vlm-first-use-2";
+  public static final String REPORT_SCHEMA = "jmlx-vlm-first-use-3";
 
   public static final String JOB_SCHEMA = "jmlx-vlm-first-use-job-1";
 
@@ -267,14 +268,18 @@ public final class VlmFirstUseWorker {
       try {
         return executeInner();
       } catch (JobVerificationException e) {
-        finish(
-            "job_verification_failed", String.valueOf(e.getCause()), EXIT_JOB_VERIFICATION_FAILED);
-        return EXIT_JOB_VERIFICATION_FAILED;
+        return finish(
+                "job_verification_failed",
+                String.valueOf(e.getCause()),
+                EXIT_JOB_VERIFICATION_FAILED)
+            ? EXIT_JOB_VERIFICATION_FAILED
+            : EXIT_TIMEOUT;
       } catch (Exception e) {
         // A failure after the claim still leaves a report (the launcher classifies dead/crashed
         // only for workers that left neither artifact).
-        finish("failed", String.valueOf(e), EXIT_RUNTIME_FAILED);
-        return EXIT_RUNTIME_FAILED;
+        return finish("failed", String.valueOf(e), EXIT_RUNTIME_FAILED)
+            ? EXIT_RUNTIME_FAILED
+            : EXIT_TIMEOUT;
       }
     }
 

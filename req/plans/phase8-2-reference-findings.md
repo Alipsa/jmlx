@@ -4044,9 +4044,9 @@ convention restored).
     session 2's warm full is flat at 2.136-2.815 s across all pairs on
     the quiet host, and the pooled medians (old 2.491 / new 2.672 s)
     match session 1's quiet-phase values (2.448 / 2.397 s). This
-    supports the section 17.3 interpretation of session 1's slowness as
-    a host-side state tied to the first use of the checkpoint after the
-    09:03 reboot, not a within-session transition and not a pin effect;
+    is consistent with a host-side state tied to the first use of the
+    checkpoint after the 09:03 reboot; this does not establish a
+    code-and-pin runtime attribution;
     the controlled experiment that would attribute it was not run (plan
     section 5.2 marks it additional work), so attribution stays
     "consistent with".
@@ -4079,13 +4079,43 @@ convention restored).
   alternating session before runtime attribution, and the three-session
   cap would permit it. Session 3 was not run. The per-fork host records
   show a regime boundary alongside decaying omlx activity, but that
-  observation does not waive the trigger. Consequently, session 2
-  establishes no qwen3vl workload-wide runtime attribution. It supplies
-  two quiet qwen3vl pairs (4-5) and a fully quiet phi3v phase; a further
-  alternating session is needed before a qwen3vl runtime attribution.
+  observation does not waive the trigger. Phi3v also has >10% adjacent
+  fork gaps (pair 0 TTFT ratio 0.830; pair 3 full/TTFT ratios
+  1.120/1.167), despite the quiet host. Consequently, session 2
+  establishes no workload-wide runtime attribution for either VLM. It
+  supplies two quiet qwen3vl pairs (4-5) and a quiet phi3v phase as
+  observations; a further alternating session is needed before runtime
+  attribution for either workload.
 - Artifacts: `session-report.json` (schema `jmlx-vlm-first-use-session-2`),
   24 cells each with `job.json`, `report.json` (schema
   `jmlx-vlm-first-use-2`) and `worker-stderr.log` (empty for every
   worker), the per-fork hostrec directory (48 records), `hostrec.log`
   (wrapper host log) and the two thermal records; digested in the v2
   raw-digest manifest (section 17.4).
+
+### 17.7 Review round 2 (2026-11-12, PR #92)
+
+The round-2 harness checks each installed JMLX jar against the newest
+tracked main-source or build-file modification in its own module; it also
+checks the benchmarks jar against the worker source, which can be untracked
+in the old worktree. The launcher compares worker reports with the expected
+cell and verified pin, accepts only known statuses and matching exit codes,
+retains a timeout classification when the launcher kills a worker after its
+backstop wrote a timeout report, and records three native-binary digests.
+Worker input-verification failures exit 1. Report and session schemas are
+now `jmlx-vlm-first-use-3` and `jmlx-vlm-first-use-session-3`;
+`job_verification_failed` has one spelling with or without a report.
+
+This committed harness has **not had a native smoke or full session**.
+Its worker-source SHA-256 is
+`76c053b8f1a52dbfaa8b27983e81d223c794f1585e380a0286f25b5411efa439`,
+different from both measured worker versions. The session 1 and 2
+reports retain their historical worker digests and
+schemas; their raw artifacts have not been rewritten. Before any next
+session, copy the current `VlmFirstUseWorker.java` into the old worktree's
+untracked worker path and rebuild that tree's `installDist`. Otherwise the
+launcher rejects the byte-different worker source (or a stale benchmarks
+jar). The new checkout also needs its `installDist` rebuilt from this
+commit. The section 4 trigger applies to both workloads: session 2's
+phi3v pair 0 and pair 3 gaps exceed 10% as well as the qwen3vl shifts,
+so neither workload receives a runtime attribution from session 2.

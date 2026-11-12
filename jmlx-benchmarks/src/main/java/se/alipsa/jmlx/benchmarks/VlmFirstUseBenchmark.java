@@ -35,20 +35,21 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Before any fork, the launcher verifies each tree's HEAD against the spec's expected SHA, its
  * tracked-clean state (untracked source files other than the shared worker are rejected), the
  * staged native binaries and pin properties (read from disk, never trusted from the spec), the
- * byte-identical worker source in both trees, and every installed jar's digest. The benchmarks jar
- * must be at least as recent as the worker source; this guards against an installDist left behind
- * before a source edit. The launcher records the verified pin and native binary digests. Each
- * workload's Tier-B manifest is digest-verified and its frozen case 0 parsed (max new tokens and
- * the resolved image paths/digests); the session directory must not pre-exist and must sit outside
- * the repository. Every fork is bracketed by {@code hostrec.sh} pre/post records, and full-output
- * thermal records bracket the session.
+ * byte-identical worker source in both trees, and every installed jar's digest. Each JMLX jar must
+ * be at least as recent as its own tracked main sources and build file; the benchmarks jar must
+ * also be as recent as the worker source, which may be untracked in the old tree. The launcher
+ * records the verified pin and native binary digests. Each workload's Tier-B manifest is
+ * digest-verified and its frozen case 0 parsed (max new tokens and the resolved image
+ * paths/digests); the session directory must not pre-exist and must sit outside the repository.
+ * Every fork is bracketed by {@code hostrec.sh} pre/post records, and full-output thermal records
+ * bracket the session.
  *
  * <p>The session stops forking once {@code session_time_budget_s} has elapsed (the remaining
  * workers are recorded not-started, never silently dropped); the budget gates new forks, not
  * in-flight workers, so the session wall can exceed the budget by at most one worker wait limit.
  * Every forked worker leaves a classification in the session report: a valid report's status (ok /
  * failed / correctness_failed / timeout / job_verification_failed), or, with no report, timeout
- * (launcher wait limit killed it), dead (claim without report), job-verification-failed (exit 1) or
+ * (launcher wait limit killed it), dead (claim without report), job_verification_failed (exit 1) or
  * crashed (anything else).
  *
  * <p>Exit codes: 0 all workers ok, 1 spec validation failure (nothing forked), 2 at least one
@@ -92,6 +93,17 @@ public final class VlmFirstUseBenchmark {
       "workload-major, pair-major, tree-minor; the leading tree alternates per pair "
           + "(even pairs lead old, odd pairs lead new), so consecutive forks always run on "
           + "different trees and each native pin leads equally";
+
+  private static final List<String> JMLX_MODULES =
+      List.of(
+          "jmlx-native-macos-arm64",
+          "jmlx-benchmarks",
+          "jmlx-tokenizer",
+          "jmlx-vision",
+          "jmlx-models",
+          "jmlx-jinja",
+          "jmlx-core",
+          "jmlx-ffi");
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -504,8 +516,8 @@ public final class VlmFirstUseBenchmark {
                   + " vs "
                   + workerSha);
         }
-        // The executed jars, digested per tree: the git state and worker source verify the
-        // source, these verify what the workers actually ran against.
+        // The executed jars are digested and checked against the source/build inputs of their
+        // own module. This detects an installDist left behind after switching commits.
         Map<String, String> jarSha = new LinkedHashMap<>();
         boolean benchmarksJarFound = false;
         try (var listing = Files.list(tree.classDir)) {
@@ -517,11 +529,23 @@ public final class VlmFirstUseBenchmark {
                           path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
                   .toList();
           for (Path jar : jars) {
-            if (jar.getFileName().toString().startsWith("jmlx-benchmarks-")) {
-              benchmarksJarFound = true;
-              FileTime sourceTime = Files.getLastModifiedTime(workerSource);
-              if (Files.getLastModifiedTime(jar).compareTo(sourceTime) < 0) {
-                throw new SpecFailure("benchmarks jar predates worker source: " + jar);
+            String jarName = jar.getFileName().toString();
+            for (String module : JMLX_MODULES) {
+              if (jarName.startsWith(module + "-") || jarName.equals(module + ".jar")) {
+                if (module.equals("jmlx-benchmarks")) {
+                  benchmarksJarFound = true;
+                }
+                FileTime newestInput = newestModuleInput(tree.path, module);
+                if (module.equals("jmlx-benchmarks")) {
+                  FileTime workerTime = Files.getLastModifiedTime(workerSource);
+                  if (workerTime.compareTo(newestInput) > 0) {
+                    newestInput = workerTime;
+                  }
+                }
+                if (Files.getLastModifiedTime(jar).compareTo(newestInput) < 0) {
+                  throw new SpecFailure(module + " jar predates its source or build file: " + jar);
+                }
+                break;
               }
             }
             jarSha.put(jar.getFileName().toString(), sha256Hex(jar));
@@ -576,6 +600,21 @@ public final class VlmFirstUseBenchmark {
         }
         preps.put(workload.name, verifyWorkloadCase(workload, manifest));
       }
+    }
+
+    private static FileTime newestModuleInput(Path tree, String module) throws Exception {
+      FileTime newest = FileTime.fromMillis(0);
+      for (String relative :
+          runCommandLines(
+              tree, "git", "ls-files", "--", module + "/src/main", module + "/build.gradle")) {
+        if (!relative.isBlank()) {
+          FileTime time = Files.getLastModifiedTime(tree.resolve(relative));
+          if (time.compareTo(newest) > 0) {
+            newest = time;
+          }
+        }
+      }
+      return newest;
     }
 
     /** Parses the manifest's frozen case 0 and verifies its images against the recorded digests. */
@@ -718,8 +757,11 @@ public final class VlmFirstUseBenchmark {
             return new WorkerOutcome(
                 workload, tree, pair, "invalid-report", parsed, "report cell identity differs");
           }
-          if (!parsed.path("exit_code").isMissingNode()
-              && parsed.path("exit_code").asInt(-1) != starterResult) {
+          if (!parsed.path("exit_code").isInt()
+              || (parsed.path("exit_code").asInt(-1) != starterResult
+                  && !("timeout".equals(status)
+                      && starterResult == WORKER_KILLED
+                      && parsed.path("exit_code").asInt(-1) == VlmFirstUseWorker.EXIT_TIMEOUT))) {
             return new WorkerOutcome(
                 workload, tree, pair, "invalid-report", parsed, "report exit_code differs");
           }
@@ -775,7 +817,8 @@ public final class VlmFirstUseBenchmark {
                 case "job_verification_failed" -> VlmFirstUseWorker.EXIT_JOB_VERIFICATION_FAILED;
                 default -> VlmFirstUseWorker.EXIT_TIMEOUT;
               };
-          if (starterResult != expectedExit) {
+          if (starterResult != expectedExit
+              && !("timeout".equals(status) && starterResult == WORKER_KILLED)) {
             return new WorkerOutcome(
                 workload,
                 tree,
@@ -802,7 +845,7 @@ public final class VlmFirstUseBenchmark {
             workload,
             tree,
             pair,
-            "job-verification-failed",
+            "job_verification_failed",
             null,
             "worker rejected the job (exit 1)");
       }
@@ -895,9 +938,8 @@ public final class VlmFirstUseBenchmark {
     /** The assembled session report (raw worker records + per-pair and pooled warm statistics). */
     ObjectNode sessionReport() {
       ObjectNode report = MAPPER.createObjectNode();
-      // Version 2 (vs the v1 recorded in findings section 17.3): per-tree jar_sha256 of the
-      // executed jars, hostrec_failures, and the corrected hostrec file description.
-      report.put("schema", "jmlx-vlm-first-use-session-2");
+      // Version 3 adds verified native_sha256 and a consistent job_verification_failed category.
+      report.put("schema", "jmlx-vlm-first-use-session-3");
       report.put("session", spec.session);
       report.put("utc_start", utcStart.toString());
       report.put("utc_end", Instant.now().toString());

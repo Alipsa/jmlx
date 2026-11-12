@@ -49,6 +49,7 @@ class VlmFirstUseBenchmarkTest {
     FAILED,
     CORRECTNESS_FAILED,
     BACKSTOP_TIMEOUT,
+    BACKSTOP_TIMEOUT_KILLED,
     DEAD,
     CRASHED,
     JOB_VERIFICATION,
@@ -101,6 +102,8 @@ class VlmFirstUseBenchmarkTest {
             writeReport(cellDir, job, "correctness_failed", "simulated mismatch", null, null);
         case BACKSTOP_TIMEOUT ->
             writeReport(cellDir, job, "timeout", "internal backstop elapsed 930 s", null, null);
+        case BACKSTOP_TIMEOUT_KILLED ->
+            writeReport(cellDir, job, "timeout", "internal backstop elapsed 930 s", null, null);
         case DEAD -> Files.writeString(cellDir.resolve("claim.json"), "{\"status\":\"started\"}");
         case CRASHED -> {}
         case JOB_VERIFICATION -> {}
@@ -128,7 +131,7 @@ class VlmFirstUseBenchmarkTest {
       if (behavior == Behavior.CRASHED) {
         return 134;
       }
-      if (behavior == Behavior.KILLED) {
+      if (behavior == Behavior.KILLED || behavior == Behavior.BACKSTOP_TIMEOUT_KILLED) {
         return VlmFirstUseBenchmark.WORKER_KILLED;
       }
       return switch (behavior) {
@@ -150,6 +153,14 @@ class VlmFirstUseBenchmarkTest {
       ObjectNode report = MAPPER.createObjectNode();
       report.put("schema", VlmFirstUseWorker.REPORT_SCHEMA);
       report.put("status", status);
+      report.put(
+          "exit_code",
+          switch (status) {
+            case "failed" -> VlmFirstUseWorker.EXIT_RUNTIME_FAILED;
+            case "correctness_failed" -> VlmFirstUseWorker.EXIT_CORRECTNESS_FAILED;
+            case "timeout" -> VlmFirstUseWorker.EXIT_TIMEOUT;
+            default -> VlmFirstUseWorker.EXIT_OK;
+          });
       if (failure != null) {
         report.put("failure_reason", failure);
       }
@@ -194,6 +205,7 @@ class VlmFirstUseBenchmarkTest {
       ObjectNode report = MAPPER.createObjectNode();
       report.put("schema", VlmFirstUseWorker.REPORT_SCHEMA);
       report.put("status", "ok");
+      report.put("exit_code", VlmFirstUseWorker.EXIT_OK);
       report.put("workload", job.workload().name());
       report.put("tree", job.tree().name());
       report.put("pair_index", job.pairIndex());
@@ -297,11 +309,15 @@ class VlmFirstUseBenchmarkTest {
     Files.createDirectories(
         tree.resolve("jmlx-benchmarks/src/main/java/se/alipsa/jmlx/benchmarks"));
     Files.writeString(tree.resolve(WORKER_SOURCE_PATH), WORKER_SOURCE);
+    Path modelsSource = tree.resolve("jmlx-models/src/main/java/Model.java");
+    Files.createDirectories(modelsSource.getParent());
+    Files.writeString(modelsSource, "class Model {}\n");
     Files.writeString(tree.resolve("README"), label + "\n");
     run(tree, "git", "add", ".");
     run(tree, "git", "commit", "-m", "init");
     Files.createDirectories(tree.resolve("install/lib"));
     Files.writeString(tree.resolve("install/lib/jmlx-benchmarks-test.jar"), "fake jar");
+    Files.writeString(tree.resolve("install/lib/jmlx-models-test.jar"), "fake models jar");
     Files.createDirectories(tree.resolve("native/lib"));
     Files.writeString(tree.resolve("native/lib/mlx.metallib"), "fake metallib");
     Files.writeString(tree.resolve("native/lib/libmlxc.dylib"), "fake mlxc");
@@ -357,7 +373,7 @@ class VlmFirstUseBenchmarkTest {
 
     Path outRoot = setup.root().resolve("out-all-ok");
     JsonNode report = MAPPER.readTree(outRoot.resolve("session-report.json").toFile());
-    assertEquals("jmlx-vlm-first-use-session-2", report.path("schema").asString());
+    assertEquals("jmlx-vlm-first-use-session-3", report.path("schema").asString());
     assertEquals("test-all-ok", report.path("session").asString());
     assertEquals(2, report.path("pairs").asInt());
     assertEquals(1, report.path("warmups").asInt());
@@ -489,7 +505,7 @@ class VlmFirstUseBenchmarkTest {
     assertEquals("timeout", classification.get("mini/old/p1"));
     assertEquals("dead", classification.get("mini/new/p1"));
     assertEquals("crashed", classification.get("mini/old/p2"));
-    assertEquals("job-verification-failed", classification.get("mini/new/p2"));
+    assertEquals("job_verification_failed", classification.get("mini/new/p2"));
     assertEquals("invalid-report", classification.get("mini/old/p3"));
     assertEquals("timeout", classification.get("mini/new/p3"));
     // The defense-in-depth gate: an ok report is not ok when the exit code or the report's own
@@ -566,6 +582,14 @@ class VlmFirstUseBenchmarkTest {
         new VlmFirstUseBenchmark(starter).runSession(spec(stale, "stale-jar", 1)));
     assertTrue(starter.jobs.isEmpty());
 
+    Setup staleModels = setup("stale-models-jar");
+    Path modelsJar = staleModels.oldTree().resolve("install/lib/jmlx-models-test.jar");
+    Files.setLastModifiedTime(modelsJar, FileTime.fromMillis(1));
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_SPEC_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(staleModels, "stale-models-jar", 1)));
+    assertTrue(starter.jobs.isEmpty());
+
     Setup extra = setup("extra-source");
     Path source = extra.oldTree().resolve("jmlx-core/src/main/java/Extra.java");
     Files.createDirectories(source.getParent());
@@ -574,6 +598,19 @@ class VlmFirstUseBenchmarkTest {
         VlmFirstUseBenchmark.EXIT_SPEC_FAILED,
         new VlmFirstUseBenchmark(starter).runSession(spec(extra, "extra-source", 1)));
     assertTrue(starter.jobs.isEmpty());
+  }
+
+  @Test
+  void timeoutReportSurvivesLauncherKill() throws Exception {
+    Setup setup = setup("timeout-killed");
+    FakeStarter starter = new FakeStarter();
+    starter.behaviors.put("mini/old/p0", Behavior.BACKSTOP_TIMEOUT_KILLED);
+    assertEquals(
+        VlmFirstUseBenchmark.EXIT_WORKERS_FAILED,
+        new VlmFirstUseBenchmark(starter).runSession(spec(setup, "timeout-killed", 1)));
+    JsonNode session =
+        MAPPER.readTree(setup.root().resolve("out-timeout-killed/session-report.json").toFile());
+    assertEquals("timeout", session.path("workers").get(0).path("classification").asString());
   }
 
   @Test
